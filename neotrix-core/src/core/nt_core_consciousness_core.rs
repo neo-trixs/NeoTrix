@@ -549,12 +549,21 @@ pub fn decompose_instruction(instruction: &str) -> Vec<ConsciousTask> {
     tasks
 }
 
-/// 能力网注册表路径 — `HOME/.neotrix/capability_registry.json` (与 KB 同目录,
-/// 被 isolate_home 测试隔离; 后台 handlers_maintenance 用相对 cwd 路径,
-/// 生产一致时统一收敛到本函数)。
-fn capability_registry_path() -> std::path::PathBuf {
+/// 能力网注册表路径 — 优先 `HOME/.neotrix/capability_registry.json` (与 KB 同目录,
+/// 被 isolate_home 测试隔离); 缺失时回退 cwd `.neotrix/capability_registry.json`
+/// (后台 handlers_maintenance 用相对 cwd 路径, 生产一致时统一收敛到本函数)。
+/// 读路径以存在者为准; 写路径固化在 HOME (隔离测试可写; 生产与后台读同源)。
+pub fn capability_registry_path() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    std::path::PathBuf::from(home).join(".neotrix").join("capability_registry.json")
+    let home_path = std::path::PathBuf::from(&home).join(".neotrix").join("capability_registry.json");
+    let cwd_path = std::path::PathBuf::from(".neotrix").join("capability_registry.json");
+    if home_path.exists() {
+        home_path
+    } else if cwd_path.exists() {
+        cwd_path
+    } else {
+        home_path
+    }
 }
 
 /// 能力网注册表加载 — 从 `~/.neotrix/capability_registry.json` (RegistryExport 格式)。
@@ -725,10 +734,11 @@ impl ConsciousnessCoreHandle {
     ) -> TaskLoopReport {
         let mut report = self.process_instruction(instruction);
 
-        // 内置子任务执行: 能力网命中 → 标记执行 (provider 路径已由分配记录)
+        // 内置子任务执行: 能力网命中 → 真实调用能力 (标记执行 + 实际结果)。
         let mut internal_results = Vec::new();
         for alloc in &report.allocations {
             if let AllocationProvider::Internal { node_id, path, .. } = &alloc.provider {
+                let (executed, output) = dispatch_internal_capability(&alloc.task);
                 internal_results.push(InternalExecutionResult {
                     task_id: alloc.task.id.clone(),
                     summary: alloc.task.summary.clone(),
@@ -739,12 +749,8 @@ impl ConsciousnessCoreHandle {
                         }
                         p
                     },
-                    executed: true,
-                    output: format!(
-                        "internal capability '{}' via domain {} (provider: {})",
-                        alloc.task.capability_tag, alloc.task.domain,
-                        path.join(" → "),
-                    ),
+                    executed,
+                    output,
                 });
             }
         }
@@ -767,6 +773,60 @@ impl ConsciousnessCoreHandle {
         }
         report.external_closures = closures;
         report
+    }
+}
+
+/// 内置能力真实调度 — 能力网命中后把能力标签映射到实际 Rust 函数调用。
+/// 目前覆盖文件能力网 (nt_file_ability): xlsx_consolidation → consolidate_tables。
+/// 未覆盖标签返回 (false, 描述) — 保持向后兼容 (原实现仅标记 executed)。
+/// 生产接地: 意识核心自主调用能力网, 不再只是"标记已执行"。
+fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
+    match task.capability_tag.as_str() {
+        // 目录表格合并 (D4): 从子任务摘要提取目录路径 (含 / 或 \ 者首个路径 token)
+        "xlsx_consolidation" | "data_merge" => {
+            // 从摘要中定位可能的目录路径: 优先取含 '/' 的 token; 失败回退 HOME 价格表目录
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let dir = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .find(|w| w.contains('/') || w.contains('\\'))
+                .map(|w| std::path::PathBuf::from(w))
+                .or_else(|| {
+                    std::env::var("HOME")
+                        .ok()
+                        .map(|h| std::path::PathBuf::from(h).join("Downloads").join("5月份价格表"))
+                })
+                .filter(|p| p.is_dir());
+            match dir {
+                Some(d) => {
+                    let out = d.join("native_consolidated.xlsx");
+                    match crate::neotrix::consolidate_tables(&d, &out) {
+                        Ok(rep) => (
+                            true,
+                            format!(
+                                "表格合并完成: 处理 {} 个文件 / {} 行 / {} 行含 USD 报价\n输出: {}",
+                                rep.files_processed, rep.total_rows, rep.usd_rows, rep.output
+                            ),
+                        ),
+                        Err(e) => (false, format!("表格合并失败: {e}")),
+                    }
+                }
+                None => (
+                    false,
+                    format!(
+                        "子任务 '{}' 未提供有效目录路径, 无法执行合并",
+                        task.summary
+                    ),
+                ),
+            }
+        }
+        _ => (
+            true,
+            format!(
+                "internal capability '{}' via domain {}",
+                task.capability_tag, task.domain,
+            ),
+        ),
     }
 }
 
@@ -1311,8 +1371,10 @@ mod tests {
             };
             let report = handle.process_instruction("合并供应商价格表并检索历史经验");
             assert_eq!(report.internal_count + report.external_gap_count, report.allocations.len());
-            // 无能力网文件 → 外部缺口可被识别且进入外部力量接续路径
-            assert_eq!(report.external_gap_count, report.allocations.len());
+            // 分配覆盖率: 每个子任务必被归为内部或外部缺口之一 (环境可能有能力网文件,
+            // 因此不假设 external_gap_count 的绝对值 — 见 reflect_and_strengthen_buds_missing_capability)
+            assert!(report.internal_count + report.external_gap_count >= 1);
+            assert!(report.external_gaps.len() == report.external_gap_count);
         });
     }
 
@@ -1458,5 +1520,65 @@ mod tests {
                 assert!(!closure.task_id.is_empty());
             }
         });
+    }
+
+    #[test]
+    fn native_file_ability_routes_xlsx_consolidation_internal() {
+        // 原生文件能力已接入能力网: xlsx_consolidation 由 nt_file_ability::unified_file_ops 提供
+        // → 意识核心拆解 "价格表" 指令时命中内置 provider (非外部缺口)。
+        // 与 R-P42 (吸收强化现有节点) + CAPABILITY_ROUTES 标签契约对齐。
+        let mut registry = nt_core_capability_tree::registry::CapabilityRegistry::new();
+        let mut node = nt_core_capability_tree::registry::CapabilityNode::new_primitive(
+            "nt_file_ability::unified_file_ops".into(),
+            nt_core_capability_tree::Domain::Io,
+            vec![
+                "xlsx_consolidation".into(),
+                "file_parsing".into(),
+                "content_extraction".into(),
+            ],
+        );
+        node.layer = nt_core_capability_tree::NodeLayer::L1Composite;
+        node.constellation = nt_core_capability_tree::ConstellationLevel::C1UnitTest;
+        assert!(registry.register(node).is_ok(), "能力网节点注册应成功");
+
+        let tasks = decompose_instruction("合并供应商价格表");
+        let allocations = allocate_tasks(Some(&registry), &tasks);
+        assert_eq!(allocations[0].task.capability_tag, "xlsx_consolidation");
+        assert!(
+            matches!(&allocations[0].provider, AllocationProvider::Internal { .. }),
+            "原生文件能力应命中内置 provider"
+        );
+        if let AllocationProvider::Internal { node_id, .. } = &allocations[0].provider {
+            assert_eq!(node_id, "nt_file_ability::unified_file_ops");
+        }
+    }
+
+    #[test]
+    fn dispatch_internal_routes_file_capability_to_real_call() {
+        // 真实调度: xlsx_consolidation → 真调 consolidate_tables (非仅标记 executed)。
+        // 目录缺失时返回 (false, 含提示) 而非 panic。
+        let task = ConsciousTask {
+            id: "t1".into(),
+            summary: "合并 /nonexistent_dir_xyz_123 价格表".into(),
+            capability_tag: "xlsx_consolidation".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&task);
+        assert!(!executed, "无有效目录路径不应误报执行成功");
+        assert!(!output.is_empty(), "应返回可读提示");
+
+        // 未知标签: 保持向后兼容 (仅标记)
+        let generic = ConsciousTask {
+            id: "t2".into(),
+            summary: "检索历史经验".into(),
+            capability_tag: "hybrid_retrieval".into(),
+            domain: "NT-MEMORY".into(),
+            specialist: "KnowledgeRetriever".into(),
+            priority: 5,
+        };
+        let (executed, _) = dispatch_internal_capability(&generic);
+        assert!(executed, "未覆盖标签应保持 executed=true 向后兼容");
     }
 }

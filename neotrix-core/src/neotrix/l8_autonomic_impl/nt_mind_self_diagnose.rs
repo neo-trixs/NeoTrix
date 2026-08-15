@@ -527,8 +527,19 @@ mod tests {
 
     #[test]
     fn test_action_executor_run_cargo_fix() {
-        let result = ActionExecutor::execute(&ActionPlan::RunCargoFix);
-        assert!(result.is_ok() || result.is_err());
+        // 仅验证 CompileWarning → RunCargoFix 分发正确, 不实际执行 cargo fix 子进程
+        // (真实修复执行由 breaker 保护路径承担, 单测避免派生子进程拖慢/不稳定)。
+        let issue = Issue {
+            issue_type: IssueType::CompileWarning,
+            severity: 5,
+            file: Some("dummy.rs".into()),
+            description: "warnings".into(),
+            suggestion: "cargo fix".into(),
+            auto_fixable: true,
+            cycle_discovered: 0,
+        };
+        let plan = SelfDiagnose::plan_action(&issue);
+        assert!(matches!(plan, ActionPlan::RunCargoFix), "CompileWarning 应映射到 RunCargoFix, got {:?}", plan);
     }
 
     #[test]

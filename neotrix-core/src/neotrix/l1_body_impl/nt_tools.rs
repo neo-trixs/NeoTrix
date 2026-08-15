@@ -315,6 +315,8 @@ mod tests {
         if std::process::Command::new("which").arg("bash").output().is_err() {
             return;
         }
+        let _lock = crate::cli::shield_enforcer::TEST_SHIELD_LOCK
+            .lock().unwrap_or_else(|e| e.into_inner());
         let prev_mode = crate::cli::shield_enforcer::global_shield()
             .lock().map(|s| s.approval.mode()).ok();
         crate::cli::shield_enforcer::init_shield(crate::cli::approval::ApprovalMode::FullAuto);
@@ -430,6 +432,8 @@ mod tests {
         if std::process::Command::new("which").arg("bash").output().is_err() {
             return;
         }
+        let _lock = crate::cli::shield_enforcer::TEST_SHIELD_LOCK
+            .lock().unwrap_or_else(|e| e.into_inner());
         let prev_mode = crate::cli::shield_enforcer::global_shield()
             .lock().map(|s| s.approval.mode()).ok();
         crate::cli::shield_enforcer::init_shield(crate::cli::approval::ApprovalMode::FullAuto);

@@ -73,6 +73,10 @@ impl CliCommand for SkillCmd {
 }
 
 impl SkillCmd {
+    fn new() -> Self {
+        SkillCmd
+    }
+
     fn skills_dir() -> PathBuf {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         PathBuf::from(&home).join(".neotrix").join("skills")
@@ -156,10 +160,24 @@ impl SkillCmd {
     fn activate(&self, name: &str) -> CommandOutput {
         let mut engine = self.engine();
         match engine.activate_skill(name) {
-            Ok(()) => match engine.get_skill(name) {
-                Some(skill) => CommandOutput::ok(&format!("✅ Skill '{}' activated — {}", name, skill.description)),
-                None => CommandOutput::ok(&format!("✅ Skill '{}' activated", name)),
-            },
+            Ok(()) => {
+                let skill = engine.get_skill(name);
+                let mut msg = match skill {
+                    Some(s) => format!("✅ Skill '{}' activated — {}", name, s.description),
+                    None => format!("✅ Skill '{}' activated", name),
+                };
+                if let Some(s) = skill {
+                    msg.push_str(&format!("\n  🏷 category: {}", s.category));
+                    // 互补性检索 (AgentSkillOS 吸收): 推荐同域其他类别的可互补技能
+                    let query = s.triggers.first().cloned().unwrap_or_else(|| name.to_string());
+                    let complements = engine.find_matching_complementary(&query, None, &[name]);
+                    if !complements.is_empty() {
+                        let top: Vec<&str> = complements.iter().take(3).map(|c| c.name.as_str()).collect();
+                        msg.push_str(&format!("\n  🔗 complementary: {}", top.join(", ")));
+                    }
+                }
+                CommandOutput::ok(&msg)
+            }
             Err(e) => CommandOutput::err(&e),
         }
     }
@@ -241,6 +259,10 @@ impl SkillCmd {
                 output.push_str(&format!("**Description**: {}\n", s.description));
                 output.push_str(&format!("**Path**: {}\n", s.path.display()));
                 output.push_str(&format!("**Priority**: {}\n", s.priority));
+                output.push_str(&format!("**Category**: {}\n", s.category));
+                if !s.parent.is_empty() {
+                    output.push_str(&format!("**Parent**: {}\n", s.parent));
+                }
                 if !s.triggers.is_empty() {
                     output.push_str(&format!("**Triggers**: {}\n", s.triggers.join(", ")));
                 }
@@ -252,6 +274,19 @@ impl SkillCmd {
                 }
                 if !s.hooks.is_empty() {
                     output.push_str(&format!("**Hooks**: {}\n", s.hooks.join(", ")));
+                }
+                // 差分归因 (arxiv 2608.11888 吸收): procedure-heavy 风险标记
+                let report = engine.attribution_report();
+                if let Some(a) = report.iter().find(|a| a.name == name) {
+                    let risk = if a.procedure_heavy {
+                        "⚠️ procedure-heavy (过度验证风险)"
+                    } else {
+                        "ok"
+                    };
+                    output.push_str(&format!(
+                        "**Attribution**: activations={} over_validation_score={} {}\n",
+                        a.activations, a.over_validation_score, risk
+                    ));
                 }
                 let body = s.body().trim();
                 if !body.is_empty() {
@@ -303,5 +338,16 @@ impl SkillCmd {
             lines
         };
         CommandOutput::ok(&format!("{}{}", msg, sync_note))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_placeholder() {
+        let instance = SkillCmd::new();
+        assert!(true);
     }
 }

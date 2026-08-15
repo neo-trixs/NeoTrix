@@ -6,7 +6,9 @@ use super::docker::LocalDockerProvider;
 use super::provider::NoopProvider;
 
 fn create_sandbox(timeout: u64) -> CloudSandbox {
-    CloudSandbox::new(
+    // #[allow(unused_mut)]: sandbox feature 关闭时 attach_default_vault 不编译, mut 未用
+    #[allow(unused_mut)]
+    let mut sandbox = CloudSandbox::new(
         "http://localhost".to_string(),
         None,
         Duration::from_secs(timeout),
@@ -15,7 +17,11 @@ fn create_sandbox(timeout: u64) -> CloudSandbox {
         } else {
             Arc::new(NoopProvider)
         },
-    )
+    );
+    // R-P79 生产接线: 挂接凭据 Vault, 沙盒 workload 以 env 获得注入的 secrets。
+    #[cfg(feature = "sandbox")]
+    sandbox.attach_default_vault();
+    sandbox
 }
 
 fn print_result(result: &super::CloudResult) {

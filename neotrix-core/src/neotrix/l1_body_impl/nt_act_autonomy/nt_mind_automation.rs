@@ -105,6 +105,9 @@ pub struct AutomationResult {
 pub struct AutomationEngine {
     rules: Vec<AutomationRule>,
     last_checked: HashMap<AutomationTrigger, SystemTime>,
+    /// 技能执行器注入 (L8/bin 层注入真实 SkillEngine, 避免 L1→L8 越层)。
+    /// None 时 RunSkill 降级为 "queued" (不执行具体技能, 保持 L1 自包含)。
+    skill_runner: Option<Box<dyn Fn(&str) -> Result<String, String>>>,
 }
 
 impl AutomationEngine {
@@ -112,7 +115,16 @@ impl AutomationEngine {
         Self {
             rules: Vec::new(),
             last_checked: HashMap::new(),
+            skill_runner: None,
         }
+    }
+
+    /// 注入技能执行器 (生产接线: L8/bin 层传入闭包, 内部构造 SkillEngine)。
+    pub fn set_skill_runner<F>(&mut self, runner: F)
+    where
+        F: Fn(&str) -> Result<String, String> + 'static,
+    {
+        self.skill_runner = Some(Box::new(runner));
     }
 
     /// Load from file and return an engine with persisted rules.
@@ -232,16 +244,11 @@ impl AutomationEngine {
         match &rule.action {
             AutomationAction::RunSkill { name } => {
                 log::info!("[Automation] RunSkill: {} — triggering skill execution", name);
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                let skills_dir = std::path::PathBuf::from(&home).join(".agents").join("skills");
-                let mut skill_engine = crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine::new(skills_dir);
-                skill_engine.load_all();
-                if skill_engine.get_skill(name).is_some() {
-                    skill_engine.activate_skill(name).ok();
-                    Ok(format!("skill:{} activated", name))
-                } else {
-                    Ok(format!("skill:{} not found, logged for later execution", name))
+                // 经注入执行器触发 (L1 不直接依赖 L8 SkillEngine); 未注入则排队降级。
+                if let Some(runner) = &self.skill_runner {
+                    return runner(&name);
                 }
+                Ok(format!("skill:{} queued for later execution", name))
             }
             AutomationAction::RunSealPipeline => {
                 log::info!("[Automation] RunSealPipeline triggered — queued for next SEAL iteration");

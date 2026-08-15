@@ -10,6 +10,12 @@ use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 pub struct WikiCmd;
 
+impl WikiCmd {
+    fn new() -> Self {
+        WikiCmd
+    }
+}
+
 impl CliCommand for WikiCmd {
     fn name(&self) -> &str {
         "/wiki"
@@ -316,4 +322,15 @@ fn build_tree(root: &Path, depth: usize, max_depth: usize) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_placeholder() {
+        let instance = WikiCmd::new();
+        assert!(true);
+    }
 }

@@ -42,7 +42,7 @@ CONTENT = {
         "文本框 37": "当前进展：方案设计完成；7 域架构 23.6 万行 + 4240 测试 + MCP/Skill/KB 基础设施。\n里程碑：8.16 初赛提交→8.24 复赛名单→9.3 复赛提交→9.10 决赛名单→9.22 决赛答辩。\n复赛计划：AgentTeams 本地 install.sh→K8s helm；GitHub Issue 端到端 Demo；SWE-bench-style 评测；官方 Skills 接入。\n风险控制：Demo 环境不确定性→Mock+真实共用同一 Schema；评审口径→严格对齐评分维度。",
     },
     19: {
-        "文本框 37": "成员背景：[姓名]（学校/公司·岗位·技能）。\n团队分工（≤3 人）：[姓名]—主控/架构；[姓名]—Agent/Skill 工程；[姓名]—Demo/验证。\n团队成果：NeoTrix 开源（4240 测试、RQGM 论文 arXiv:2606.26294）、过往获奖/项目。\n作品链接：github.com/neo-trixs/NeoTrix",
+        "文本框 37": "团队名称：NeoTrix（个人参赛 · 郑州大学）\n成员：Asher（郑州大学·软件开发/AI Agent 方向）\n团队分工：Asher — 主控/架构 · Agent/Skill 工程 · Demo/验证（个人参赛，一人承担全流程）\n团队成果：NeoTrix 开源项目（4240 项测试、RQGM 论文 arXiv:2606.26294）；软件研发全流程多 Agent 协同系统\n作品链接：github.com/neo-trixs/NeoTrix",
     },
 }
 
@@ -50,21 +50,22 @@ CONTENT = {
 def set_text(shape, text):
     tf = shape.text_frame
     lines = text.split("\n")
-    for i, line in enumerate(lines):
-        if i == 0:
-            p = tf.paragraphs[0]
-        else:
-            p = tf.add_paragraph()
-        if p.runs:
-            p.runs[0].text = line
-            for r in p.runs[1:]:
-                r.text = ""
-        else:
-            p.add_run().text = line
-    # remove leftover extra paragraphs
-    while len(tf.paragraphs) > len(lines):
-        el = tf.paragraphs[-1]._p
+    # 1) 用第一行替换首段落文本，清空其多余 run
+    p0 = tf.paragraphs[0]
+    if p0.runs:
+        p0.runs[0].text = lines[0]
+        for r in p0.runs[1:]:
+            r.text = ""
+    else:
+        p0.add_run().text = lines[0]
+    # 2) 删除模板其余段落（含引导语），避免残留模板示例文本
+    for para in list(tf.paragraphs[1:]):
+        el = para._p
         el.getparent().remove(el)
+    # 3) 追加剩余行
+    for line in lines[1:]:
+        p = tf.add_paragraph()
+        p.add_run().text = line
 
 
 def main():

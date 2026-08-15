@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
@@ -32,6 +33,9 @@ pub struct SkillEntry {
     /// 渐进披露 (progressive disclosure, 吸收自 cathrynlavery/diagram-design):
     /// SKILL.md 只保留选择指南, 深层细节以 `references/*.md` 按需加载。
     pub references: Vec<String>,
+    /// 技能树层级 (AgentSkillOS 吸收): 粗到细分类 + 父技能指针, 支撑互补性检索。
+    pub category: String,
+    pub parent: String,
 }
 
 impl SkillEntry {
@@ -56,6 +60,8 @@ impl SkillEntry {
         let mut hooks = Vec::new();
         let mut priority: u8 = 50;
         let mut references = Vec::new();
+        let mut category = "general".to_string();
+        let mut parent = String::new();
 
         for line in frontmatter.lines() {
             let line = line.trim();
@@ -73,6 +79,13 @@ impl SkillEntry {
                 hooks = parse_array_field(val);
             } else if let Some(val) = line.strip_prefix("references:") {
                 references = parse_array_field(val);
+            } else if let Some(val) = line.strip_prefix("category:") {
+                let c = val.trim().trim_matches('"').trim_matches('\'').to_string();
+                if !c.is_empty() {
+                    category = c;
+                }
+            } else if let Some(val) = line.strip_prefix("parent:") {
+                parent = val.trim().trim_matches('"').trim_matches('\'').to_string();
             } else if let Some(val) = line.strip_prefix("priority:") {
                 priority = val.trim().parse::<u8>().unwrap_or(50).min(100);
             }
@@ -94,6 +107,8 @@ impl SkillEntry {
             content: content.to_string(),
             active: false,
             references,
+            category,
+            parent,
         })
     }
 
@@ -108,6 +123,18 @@ impl SkillEntry {
             stripped
         }
     }
+}
+
+/// 差分归因记录 (arxiv 2608.11888 SkillTriage 吸收): 单个技能的激活统计与
+/// procedure-heavy 风险标记。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillAttribution {
+    pub name: String,
+    pub category: String,
+    pub activations: u32,
+    pub over_validation_score: u32,
+    pub procedure_heavy: bool,
+    pub flagged: bool,
 }
 
 fn parse_array_field(val: &str) -> Vec<String> {
@@ -138,9 +165,12 @@ pub struct SkillEngine {
     hooks: Option<MindHookRegistry>,
     /// Optional GWT for broadcasting activation events
     gwt: Option<Arc<RwLock<GlobalWorkspace>>>,
-    /// Optional KB handle: when attached, load_all() auto-syncs the skill
-    /// index into the KB `skills_index` table (UCN Phase 1 写通).
+/// Optional KB handle: when attached, load_all() auto-syncs the skill
+    /// index into the KB `skills_index` table (UCN Phase 1 写通)。
     kb: Option<Arc<KnowledgeBase>>,
+    /// 差分归因 (arxiv 2608.11888 SkillTriage 吸收): 每 skill 的激活次数 /
+    /// 过程过重标记, 识别 procedure-heavy 技能 (过度验证 = 强制劳动毒源)。
+    attribution: HashMap<String, SkillAttribution>,
 }
 
 impl SkillEngine {
@@ -153,6 +183,7 @@ impl SkillEngine {
             hooks: None,
             gwt: None,
             kb: None,
+            attribution: HashMap::new(),
         }
     }
 
@@ -326,6 +357,120 @@ impl SkillEngine {
             .collect()
     }
 
+    /// 技能树 (AgentSkillOS 吸收): category → skills, 每类内按 priority 降序。
+    pub fn skill_tree(&self) -> HashMap<String, Vec<&SkillEntry>> {
+        let mut tree: HashMap<String, Vec<&SkillEntry>> = HashMap::new();
+        for s in self.skills.iter() {
+            tree.entry(s.category.clone()).or_default().push(s);
+        }
+        for v in tree.values_mut() {
+            v.sort_by(|a, b| b.priority.cmp(&a.priority));
+        }
+        tree
+    }
+
+    pub fn children_of(&self, name: &str) -> Vec<&SkillEntry> {
+        self.skills.iter().filter(|s| s.parent == name).collect()
+    }
+
+    /// 互补性感知检索 (AgentSkillOS 吸收): 在 find_matching 候选基础上, 对
+    /// 与已激活技能同 category 的候选施加降级, 优先返回未覆盖类别 (多样化)。
+    pub fn find_matching_complementary(
+        &self,
+        query: &str,
+        e8_mode: Option<u8>,
+        active_names: &[&str],
+    ) -> Vec<&SkillEntry> {
+        let covered: Vec<String> = self
+            .skills
+            .iter()
+            .filter(|s| active_names.contains(&s.name.as_str()))
+            .map(|s| s.category.clone())
+            .collect();
+
+        let mut candidates = self.find_matching(query, e8_mode);
+        candidates.sort_by(|a, b| {
+            let a_covered = covered.contains(&a.category);
+            let b_covered = covered.contains(&b.category);
+            match (a_covered, b_covered) {
+                (true, false) => std::cmp::Ordering::Greater,
+                (false, true) => std::cmp::Ordering::Less,
+                _ => b.priority.cmp(&a.priority),
+            }
+        });
+        candidates
+    }
+
+    pub fn record_activation(&mut self, name: &str) {
+        let Some(entry) = self.get_skill(name) else {
+            return;
+        };
+        let entry = entry.clone();
+        let score = self.over_validation_score(name);
+        let procedure_heavy = score >= 12;
+        let attr = self.attribution.entry(name.to_string()).or_insert(SkillAttribution {
+            name: name.to_string(),
+            category: entry.category.clone(),
+            activations: 0,
+            over_validation_score: score,
+            procedure_heavy,
+            flagged: false,
+        });
+        attr.activations += 1;
+        attr.over_validation_score = score;
+        attr.procedure_heavy = procedure_heavy;
+        attr.flagged = procedure_heavy && attr.activations > 1;
+    }
+
+    pub fn over_validation_score(&self, name: &str) -> u32 {
+        let Some(skill) = self.get_skill(name) else {
+            return 0;
+        };
+        let body = skill.body();
+        let lower = body.to_lowercase();
+        let markers = [
+            "rebuild", "cargo clean", "verify", "re-read", "re read", "audit", "validate",
+            "recheck", "must ensure", "compile twice", "check twice",
+        ];
+        let mut score = 0u32;
+        for m in markers {
+            score += lower.matches(m).count() as u32;
+        }
+        score += lower
+            .lines()
+            .filter(|l| {
+                let t = l.trim();
+                t.len() > 4
+                    && (t.chars().next().is_some_and(|c| c.is_ascii_digit())
+                        || t.starts_with('-'))
+                    && t.matches(' ').count() >= 8
+            })
+            .count() as u32;
+        score
+    }
+
+    pub fn attribution_report(&self) -> Vec<SkillAttribution> {
+        let mut report: Vec<SkillAttribution> = self
+            .skills
+            .iter()
+            .map(|s| {
+                self.attribution
+                    .get(&s.name)
+                    .cloned()
+                    .unwrap_or(SkillAttribution {
+                        name: s.name.clone(),
+                        category: s.category.clone(),
+                        activations: 0,
+                        over_validation_score: self.over_validation_score(&s.name),
+                        procedure_heavy: false,
+                        flagged: false,
+                    })
+            })
+            .collect();
+        report.sort_by(|a, b| b.activations.cmp(&a.activations));
+        report
+    }
+
     pub fn get_skill(&self, name: &str) -> Option<&SkillEntry> {
         self.skills.iter().find(|s| s.name == name)
     }
@@ -368,6 +513,7 @@ impl SkillEngine {
             return Err(format!("Skill '{}' is already active", name));
         }
         self.skills[idx].active = true;
+        self.record_activation(name);
         let desc = self.skills[idx].description.clone();
         let triggers = self.skills[idx].triggers.clone();
         let e8_modes = self.skills[idx].e8_modes.clone();
@@ -522,6 +668,8 @@ impl SkillEngine {
             content: yaml,
             active: false,
             references: vec![],
+            category: "procedural".to_string(),
+            parent: String::new(),
         }
     }
 
@@ -1297,5 +1445,185 @@ low"#;
         let recs = skill_list_all(&conn, 10).unwrap();
         assert_eq!(recs.len(), 1, "load_all 后应自动写通到 skills_index");
         assert_eq!(recs[0].name, "rust-analyzer");
+    }
+
+    #[test]
+    fn test_parse_category_parent_frontmatter() {
+        let content = r#"---
+name: nested
+description: A categorized skill
+triggers: ["nested"]
+category: "test-domain"
+parent: root-skill
+---
+body"#;
+        let entry = SkillEntry::from_content(Path::new("nested.md"), content).unwrap();
+        assert_eq!(entry.category, "test-domain");
+        assert_eq!(entry.parent, "root-skill");
+    }
+
+    #[test]
+    fn test_default_category_is_general() {
+        let entry = SkillEntry::from_content(Path::new("x.md"), sample_skill_content()).unwrap();
+        assert_eq!(entry.category, "general");
+        assert!(entry.parent.is_empty());
+    }
+
+    #[test]
+    fn test_skill_tree_groups_by_category() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let cat_a = r#"---
+name: a-skill
+description: cat a
+triggers: ["alpha"]
+category: analysis
+---
+body"#;
+        let cat_b = r#"---
+name: b-skill
+description: cat b
+triggers: ["beta"]
+category: coding
+---
+body"#;
+        std::fs::write(skills_dir.join("a.md"), cat_a).unwrap();
+        std::fs::write(skills_dir.join("b.md"), cat_b).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        let tree = engine.skill_tree();
+        assert_eq!(tree.len(), 2);
+        assert!(tree.contains_key("analysis"));
+        assert!(tree.contains_key("coding"));
+    }
+
+    #[test]
+    fn test_children_of_returns_subskills() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let parent = r#"---
+name: root-skill
+description: root
+triggers: ["root"]
+category: coding
+---
+body"#;
+        let child = r#"---
+name: child-skill
+description: child
+triggers: ["child"]
+category: coding
+parent: root-skill
+---
+body"#;
+        std::fs::write(skills_dir.join("root.md"), parent).unwrap();
+        std::fs::write(skills_dir.join("child.md"), child).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        let children = engine.children_of("root-skill");
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].name, "child-skill");
+    }
+
+    #[test]
+    fn test_find_matching_complementary_prefers_uncovered_category() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let covered = r#"---
+name: rust-analyzer
+description: rust analysis
+triggers: ["rust"]
+category: coding
+priority: 90
+---
+body"#;
+        let uncovered = r#"---
+name: security-review
+description: security review
+triggers: ["rust"]
+category: security
+priority: 40
+---
+body"#;
+        std::fs::write(skills_dir.join("a.md"), covered).unwrap();
+        std::fs::write(skills_dir.join("b.md"), uncovered).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+
+        // 无已激活技能 → 按优先级: coding(90) 优先
+        let base = engine.find_matching("rust", None);
+        assert_eq!(base[0].name, "rust-analyzer");
+
+        // 已激活 coding 类技能 → security 类应前置 (互补)
+        let comp = engine.find_matching_complementary("rust", None, &["rust-analyzer"]);
+        assert!(!comp.is_empty());
+        assert_eq!(comp[0].name, "security-review");
+    }
+
+    #[test]
+    fn test_over_validation_score_flags_procedure_heavy() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let heavy = r#"---
+name: heavy-skill
+description: procedure heavy
+triggers: ["heavy"]
+category: general
+---
+1. rebuild the entire project and verify
+2. cargo clean then re-read every file
+3. verify compile twice and re-read all docs
+4. audit every line and validate again
+5. recheck rebuild and verify the compile
+"#;
+        std::fs::write(skills_dir.join("heavy.md"), heavy).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        let score = engine.over_validation_score("heavy-skill");
+        assert!(score >= 12, "procedure-heavy skill must score >= 12, got {}", score);
+    }
+
+    #[test]
+    fn test_attribution_tracks_activations_and_flags() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let heavy = r#"---
+name: heavy-skill
+description: procedure heavy
+triggers: ["heavy"]
+category: general
+---
+1. rebuild the entire project and verify the compile
+2. cargo clean then re-read every single file and recheck
+3. verify compile twice and audit the result line by line
+4. validate the rebuild and recheck the verify output
+5. cargo clean again and re-read the recheck report
+"#;
+        std::fs::write(skills_dir.join("heavy.md"), heavy).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+
+        engine.activate_skill("heavy-skill").unwrap();
+        engine.activate_skill("heavy-skill").unwrap_err();
+
+        let report = engine.attribution_report();
+        let attr = report.iter().find(|a| a.name == "heavy-skill").unwrap();
+        assert_eq!(attr.activations, 1);
+        assert!(attr.procedure_heavy, "heavy skill must be flagged procedure-heavy");
     }
 }

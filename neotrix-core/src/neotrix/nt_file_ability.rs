@@ -43,6 +43,8 @@ pub enum FileAbilityError {
     Image(image::ImageError),
     #[error("内容为空: {path}")]
     Empty { path: PathBuf },
+    #[error("结构化解析失败: {0}")]
+    Parse(String),
 }
 
 /// 统一结果类型
@@ -1015,6 +1017,1033 @@ pub fn create_from_markdown(
     create::create_from_markdown(markdown, format, target).map_err(FileAbilityError::Office)
 }
 
+// ─────────────────── 通用表格读写 (D1/D2): XLSX 写 + CSV/TSV 读写 ───────────────────
+// 对标: python-docx/openpyxl/csv。吸收此前 Python 价格表脚本的表格化逻辑为原生能力。
+
+/// 通用表格数据 — 表头 + 行数据 (行内单元格为字符串, 保留原始显示文本)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TableData {
+    /// 表名 (sheet 名 / CSV 文件名 stem)
+    pub name: String,
+    /// 表头 (列名)
+    pub headers: Vec<String>,
+    /// 数据行 (每行列数 = headers.len(), 缺失格以空串填充)
+    pub rows: Vec<Vec<String>>,
+}
+
+impl TableData {
+    /// 从 CSV/TSV 文本构造表格 (自动检测分隔符: 逗号/制表符/分号)
+    pub fn from_delimited_text(name: impl Into<String>, text: &str) -> TableData {
+        let mut lines = text.lines();
+        // 跳过空行
+        let header = lines
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("")
+            .to_string();
+        let delimiter = detect_delimiter(&header);
+        let headers: Vec<String> = split_delimited(&header, delimiter);
+        let mut rows = Vec::new();
+        for line in lines {
+            let t = line.trim();
+            if t.is_empty() {
+                continue;
+            }
+            let mut cells = split_delimited(t, delimiter);
+            // 行补齐/截断到表头列数
+            if cells.len() < headers.len() {
+                cells.resize(headers.len(), String::new());
+            } else if cells.len() > headers.len() {
+                cells.truncate(headers.len());
+            }
+            rows.push(cells);
+        }
+        TableData {
+            name: name.into(),
+            headers,
+            rows,
+        }
+    }
+
+    /// 行数
+    pub fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    /// 列数
+    pub fn col_count(&self) -> usize {
+        self.headers.len()
+    }
+
+    /// 按列名取值 (第 row 行, 列名匹配 header)。不存在返回 None。
+    pub fn cell(&self, row: usize, header: &str) -> Option<&str> {
+        let idx = self.headers.iter().position(|h| h == header)?;
+        self.rows.get(row).and_then(|r| r.get(idx)).map(|s| s.as_str())
+    }
+}
+
+/// 检测表格行使用的分隔符 (逗号/制表符/分号/竖线)
+fn detect_delimiter(line: &str) -> char {
+    for d in [',', '\t', ';', '|'] {
+        if line.contains(d) {
+            return d;
+        }
+    }
+    ','
+}
+
+/// 按分隔符拆分单元格 (支持引号包裹的字段, 引号内分隔符不切分)
+fn split_delimited(line: &str, delimiter: char) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                // 双引号转义 ("" → ")
+                if in_quotes && chars.peek() == Some(&'"') {
+                    chars.next();
+                    cur.push('"');
+                } else {
+                    in_quotes = !in_quotes;
+                }
+            }
+            c if c == delimiter && !in_quotes => {
+                out.push(cur.trim().to_string());
+                cur.clear();
+            }
+            _ => cur.push(c),
+        }
+    }
+    out.push(cur.trim().to_string());
+    out
+}
+
+/// 写入 XLSX 表格 (D1) — 表头加粗+底色, 数值列带数字格式, 列宽自适应。
+/// 对标 openpyxl: 支持字符串/数值/公式单元格。
+pub fn write_xlsx_table(path: impl AsRef<Path>, table: &TableData) -> Result<()> {
+    use office_oxide::xlsx::write::{CellData, CellStyle, HAlign, XlsxWriter};
+    let mut wb = XlsxWriter::new();
+    let sheet = wb.add_sheet_get_index(if table.name.is_empty() {
+        "Sheet1"
+    } else {
+        &table.name
+    });
+    // 表头
+    let header_style = CellStyle::new()
+        .bold()
+        .font_color("FFFFFF")
+        .background("2F5496")
+        .align(HAlign::Center)
+        .wrap();
+    for (col, h) in table.headers.iter().enumerate() {
+        wb.sheet_set_cell_styled(sheet, 0, col, CellData::String(h.clone()), header_style.clone());
+    }
+    // 数据行
+    for (r, row) in table.rows.iter().enumerate() {
+        for (col, cell) in row.iter().enumerate() {
+            let cdata = to_cell_data(cell);
+            wb.sheet_set_cell(sheet, r + 1, col, cdata);
+        }
+    }
+    // 列宽 (表头长度 + 内容最大长度, 上限 40)
+    for col in 0..table.headers.len() {
+        let mut w = table.headers.get(col).map(|h| h.chars().count()).unwrap_or(8);
+        for row in &table.rows {
+            if let Some(c) = row.get(col) {
+                w = w.max(c.chars().count());
+            }
+        }
+        wb.sheet_set_column_width(sheet, col, (w as f64).clamp(6.0, 40.0));
+    }
+    wb.save(path).map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
+}
+
+/// 单元格文本 → CellData (纯数字→Number, 公式前缀→Formula, 其余→String)
+fn to_cell_data(text: &str) -> office_oxide::xlsx::write::CellData {
+    use office_oxide::xlsx::write::CellData;
+    let t = text.trim();
+    if let Some(f) = t.strip_prefix('=') {
+        if !f.is_empty() {
+            return CellData::Formula(f.to_string());
+        }
+    }
+    if let Ok(n) = t.replace(',', "").replace('￥', "").parse::<f64>() {
+        return CellData::Number(n);
+    }
+    CellData::String(t.to_string())
+}
+
+/// 写入 CSV 文件 (UTF-8, BOM 可选) — 对标 Python csv.writer
+pub fn write_csv(path: impl AsRef<Path>, table: &TableData, delimiter: char, with_bom: bool) -> Result<()> {
+    use std::io::Write;
+    let mut buf = Vec::new();
+    if with_bom {
+        buf.extend_from_slice(&[0xEF, 0xBB, 0xBF]);
+    }
+    let mut write_row = |cells: &[String]| -> std::io::Result<()> {
+        let line: Vec<String> = cells
+            .iter()
+            .map(|c| {
+                if c.contains(delimiter) || c.contains('"') || c.contains('\n') {
+                    format!("\"{}\"", c.replace('"', "\"\""))
+                } else {
+                    c.clone()
+                }
+            })
+            .collect();
+        buf.extend_from_slice(line.join(&delimiter.to_string()).as_bytes());
+        buf.push(b'\n');
+        Ok(())
+    };
+    write_row(&table.headers).map_err(FileAbilityError::Io)?;
+    for row in &table.rows {
+        write_row(row).map_err(FileAbilityError::Io)?;
+    }
+    let mut f = std::fs::File::create(path.as_ref()).map_err(FileAbilityError::Io)?;
+    f.write_all(&buf).map_err(FileAbilityError::Io)
+}
+
+/// 读取 CSV/TSV 文件 (自动编码检测: UTF-8 BOM / UTF-8 / GBK) (D2+D3)
+pub fn read_csv(path: impl AsRef<Path>) -> Result<TableData> {
+    let raw = std::fs::read(path.as_ref()).map_err(FileAbilityError::Io)?;
+    let text = decode_bytes(&raw);
+    let name = path
+        .as_ref()
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    Ok(TableData::from_delimited_text(name, &text))
+}
+
+/// 读取 XLSX 所有工作表为表格 (calamine 驱动, 懒加载 per-sheet)。
+///
+/// 外部吸收 (R-P42): calamine 0.36 读 xlsx 比 openpyxl 快 ~9.4×, 支持
+/// xls/xlsm/xlsb/ods, 纯 Rust 零 unsafe。对齐 E13 教训: 多 sheet XLSX 需全遍历,
+/// 每个 sheet 都可能含独立数据。表头 = 每 sheet 第一个非空行。
+pub fn read_xlsx_sheets_all(path: impl AsRef<Path>) -> Result<Vec<TableData>> {
+    use calamine::{open_workbook, Reader, Xlsx};
+    use std::io::BufReader;
+    let mut wb: Xlsx<BufReader<std::fs::File>> = open_workbook(path.as_ref())
+        .map_err(|e: calamine::XlsxError| FileAbilityError::Parse(e.to_string()))?;
+    let names = wb.sheet_names().to_vec();
+    let mut out = Vec::new();
+    for name in names {
+        let range = wb
+            .worksheet_range(&name)
+            .map_err(|e: calamine::XlsxError| FileAbilityError::Parse(e.to_string()))?;
+        // 计算最大列 (cells() 产出 (row, col, &Data), c.1 为列索引)
+        let max_col = range
+            .cells()
+            .map(|c| c.1)
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1);
+        if max_col == 0 {
+            continue;
+        }
+        // 按 (row, col) 填充
+        let mut grid: Vec<Vec<String>> = Vec::new();
+        for cell in range.cells() {
+            let (r, c, v) = (cell.0 as usize, cell.1 as usize, cell.2);
+            while grid.len() <= r {
+                grid.push(vec![String::new(); max_col]);
+            }
+            grid[r][c] = data_to_text(v);
+        }
+        // 表头 = 第一个非空行
+        let header_idx = grid
+            .iter()
+            .position(|row| row.iter().any(|c| !c.trim().is_empty()))
+            .unwrap_or(0);
+        let headers: Vec<String> = grid
+            .get(header_idx)
+            .cloned()
+            .unwrap_or_else(|| vec![String::new(); max_col]);
+        let rows: Vec<Vec<String>> = grid
+            .iter()
+            .enumerate()
+            .filter(|(i, row)| *i > header_idx && row.iter().any(|c| !c.trim().is_empty()))
+            .map(|(_, row)| row.clone())
+            .collect();
+        out.push(TableData {
+            name: name.clone(),
+            headers,
+            rows,
+        });
+    }
+    Ok(out)
+}
+
+/// calamine Data → 显示文本 (与 office_oxide 显示文本语义对齐)
+fn data_to_text(d: &calamine::Data) -> String {
+    match d {
+        calamine::Data::Int(i) => i.to_string(),
+        calamine::Data::Float(f) => {
+            if f.fract() == 0.0 && f.abs() < 1e15 {
+                format!("{}", *f as i64)
+            } else {
+                format!("{}", f)
+            }
+        }
+        calamine::Data::String(s) => s.clone(),
+        calamine::Data::Bool(b) => b.to_string(),
+        calamine::Data::DateTime(dt) => dt
+            .as_datetime()
+            .map(|d| d.to_string())
+            .unwrap_or_else(|| dt.to_string()),
+        calamine::Data::DateTimeIso(s) => s.clone(),
+        calamine::Data::DurationIso(s) => s.clone(),
+        calamine::Data::Error(_) => String::new(),
+        calamine::Data::Empty => String::new(),
+    }
+}
+
+/// 读取 XLSX 第一个非空工作表为表格 (calamine 驱动)。
+/// 兼容原 office_oxide 语义; 多 sheet 场景用 [`read_xlsx_sheets_all`]。
+pub fn read_xlsx_table(path: impl AsRef<Path>) -> Result<TableData> {
+    let tables = read_xlsx_sheets_all(&path)?;
+    tables
+        .iter()
+        .find(|t| !t.rows.is_empty())
+        .cloned()
+        .or_else(|| tables.first().cloned())
+        .ok_or_else(|| FileAbilityError::Parse("XLSX 无工作表".into()))
+}
+
+// ─────────────────────────── 编码检测 (D3) ───────────────────────────
+
+/// 检测到的编码
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextEncoding {
+    /// UTF-8 (含 BOM)
+    Utf8,
+    /// GBK/GB18030 (简体中文)
+    Gbk,
+    /// UTF-16 (BE/LE)
+    Utf16,
+    /// 无法判定, 回退 UTF-8 宽容解码
+    Unknown,
+}
+
+/// 检测字节流编码 (BOM 优先, 其次 UTF-8 合法性, 再次 GBK 启发式)。
+/// 对标 Python chardet — 覆盖中文场景 GBK/GB18030。
+pub fn detect_encoding(data: &[u8]) -> TextEncoding {
+    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return TextEncoding::Utf8;
+    }
+    if data.starts_with(&[0xFF, 0xFE]) || data.starts_with(&[0xFE, 0xFF]) {
+        return TextEncoding::Utf16;
+    }
+    if std::str::from_utf8(data).is_ok() {
+        return TextEncoding::Utf8;
+    }
+    // GBK 启发: 高字节区段必须能成对构成合法双字节序列 (首字节 0x81-0xFE,
+    // 次字节 0x40-0xFE 且非 0x7F)。以"高字节成对率"判定。
+    let mut high = 0usize;
+    let mut i = 0usize;
+    while i < data.len() {
+        let b = data[i];
+        if b < 0x80 {
+            i += 1;
+            continue;
+        }
+        high += 1;
+        // GBK 双字节: 首字节 0x81-0xFE, 次字节 0x40-0xFE (不含 0x7F)
+        if (0x81..=0xFE).contains(&b) && i + 1 < data.len() {
+            let b2 = data[i + 1];
+            if (0x40..=0xFE).contains(&b2) && b2 != 0x7F {
+                i += 2;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    if high > 0 {
+        let valid_pairs = count_gbk_pairs(data);
+        let pair_ratio = valid_pairs as f64 / high as f64;
+        if pair_ratio > 0.9 && valid_pairs >= 2 {
+            TextEncoding::Gbk
+        } else {
+            TextEncoding::Unknown
+        }
+    } else {
+        TextEncoding::Unknown
+    }
+}
+
+/// 统计合法 GBK 双字节对的个数
+fn count_gbk_pairs(data: &[u8]) -> usize {
+    let mut count = 0usize;
+    let mut i = 0usize;
+    while i + 1 < data.len() {
+        let b = data[i];
+        if (0x81..=0xFE).contains(&b) {
+            let b2 = data[i + 1];
+            if (0x40..=0xFE).contains(&b2) && b2 != 0x7F {
+                count += 1;
+                i += 2;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    count
+}
+
+/// 解码字节流为 UTF-8 字符串 (编码检测 + encoding_rs 转换)。
+pub fn decode_bytes(data: &[u8]) -> String {
+    let out = match detect_encoding(data) {
+        TextEncoding::Gbk => {
+            let (cow, _, _) = encoding_rs::GBK.decode(data);
+            cow.into_owned()
+        }
+        TextEncoding::Utf16 => {
+            // 自动去除 BOM
+            let (cow, _, _) = encoding_rs::UTF_16LE.decode(data);
+            cow.into_owned()
+        }
+        _ => String::from_utf8_lossy(data).into_owned(),
+    };
+    // 去除 BOM (UTF-8)
+    out.trim_start_matches('\u{feff}').to_string()
+}
+
+/// 编码名称 (人类可读)
+impl TextEncoding {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TextEncoding::Utf8 => "UTF-8",
+            TextEncoding::Gbk => "GBK/GB18030",
+            TextEncoding::Utf16 => "UTF-16",
+            TextEncoding::Unknown => "unknown",
+        }
+    }
+}
+
+// ─────────────────── 多文件合并 (D4): 通用引擎 + 领域 Schema 分离 ───────────────────
+//
+// 分层架构 (贯穿整个文件能力体系):
+//   L1 格式编解码 (通用): read_xlsx_table/write_csv/detect_encoding — 任何类型文件
+//   L2 表格语义 (通用):   merge_tables_with(schema) — 零领域知识的多表合并引擎
+//   L3 领域 schema (差异化): PRICE_TABLE_SCHEMA + skills md 镜像 — 唯一个性化层
+//   L4 意图层 (通用):     意识核心 xlsx_consolidation → 选 schema → 调 merge_tables_with
+//
+// 领域知识 (列名变体/标准列序/单位规则/供应商命名/跳过前缀) 全部数据化进 MergeSchema,
+// 不再编译进引擎函数。换行业 = 新增一个 schema const, 不改引擎代码。
+
+/// 单重/尺寸等列的补单位规则
+#[derive(Debug, Clone, Copy)]
+pub struct UnitRule {
+    /// 目标标准列名 (如 "单重(Kg)")
+    pub column: &'static str,
+    /// 值缺失该后缀时追加 (如 "kg")
+    pub suffix: &'static str,
+    /// 值中已含这些标记则跳过 (如 ["kg", "千克"])
+    pub skip_if_contains: &'static [&'static str],
+}
+
+/// 标准列数据类型 (用于输出校验)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColumnType {
+    /// 数值列 (可含单位后缀/千分位/货币符; 解析失败记 warning)
+    Numeric,
+    /// 文本列 (默认)
+    Text,
+}
+
+/// 合并 Schema — 领域知识数据 (纯 const, 编译期校验)
+#[derive(Debug, Clone, Copy)]
+pub struct MergeSchema {
+    /// Schema 名 (如 "价格表")
+    pub name: &'static str,
+    /// 标准列序 (合并输出的目标列)
+    pub standard_columns: &'static [&'static str],
+    /// 列名变体 → 标准列 (每项 (标准列, [变体...]))
+    pub column_variants: &'static [(&'static str, &'static [&'static str])],
+    /// 供应商/来源名推导: 文件名剥离的后缀标记 (如 "价格表"/"报价模板")
+    pub filename_suffixes: &'static [&'static str],
+    /// 需要补单位的列规则
+    pub unit_rules: &'static [UnitRule],
+    /// 用于统计的价值列 (如 USD 报价列), 必须 ∈ standard_columns
+    pub value_columns: &'static [&'static str],
+    /// 附加透出列 (如 "备注"/"_source_file")
+    pub extra_columns: &'static [&'static str],
+    /// 输入目录扫描时跳过的文件名前缀 (如已合并输出自身)
+    pub skip_prefixes: &'static [&'static str],
+    /// 源表无供应商列时, 回退用文件名推导并写入该列
+    pub supplier_column: Option<&'static str>,
+    /// 同文件内跨 sheet 去重键 (E14: 用 (口径,单价,产品小类) 而非型号 —
+    /// 型号常是文件名回退/垃圾值; 为空则不去重)。
+    /// 注意: 去重仅限同一文件内, 不同文件=不同供应商, 不去重。
+    pub dedup_columns: &'static [&'static str],
+    /// 标准列数据类型 (输出校验: 数字列非数值 → validation_warning)
+    pub column_types: &'static [(&'static str, ColumnType)],
+}
+
+impl MergeSchema {
+    /// 校验 schema 一致性 (编译期无法全查, 运行时断言):
+    /// 标准列唯一 / value_columns ∈ standard_columns / extra 不与标准列冲突。
+    pub fn validate(&self) -> std::result::Result<(), String> {
+        let mut seen = std::collections::HashSet::new();
+        for (i, c) in self.standard_columns.iter().enumerate() {
+            if !seen.insert(*c) {
+                return Err(format!("standard_columns[{}] 重复: '{}'", i, c));
+            }
+        }
+        for v in self.value_columns {
+            if !self.standard_columns.contains(v) {
+                return Err(format!(
+                    "value_column '{}' 不在 standard_columns 中 (schema '{}')",
+                    v, self.name
+                ));
+            }
+        }
+        for e in self.extra_columns {
+            if self.standard_columns.contains(e) {
+                return Err(format!(
+                    "extra_column '{}' 与 standard_columns 冲突 (schema '{}')",
+                    e, self.name
+                ));
+            }
+        }
+        if let Some(sup) = self.supplier_column {
+            if !self.standard_columns.contains(&sup) {
+                return Err(format!(
+                    "supplier_column '{}' 不在 standard_columns 中 (schema '{}')",
+                    sup, self.name
+                ));
+            }
+        }
+        for d in self.dedup_columns {
+            if !self.standard_columns.contains(d) {
+                return Err(format!(
+                    "dedup_column '{}' 不在 standard_columns 中 (schema '{}')",
+                    d, self.name
+                ));
+            }
+        }
+        for (col, _t) in self.column_types {
+            if !self.standard_columns.contains(col) {
+                return Err(format!(
+                    "column_types 引用的列 '{}' 不在 standard_columns 中 (schema '{}')",
+                    col, self.name
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// 变体 → 标准列 (未命中返回原样, 与旧 normalize_column_name 行为一致)
+    pub fn normalize_column(&self, name: &str) -> String {
+        let t = name.trim();
+        for (std, variants) in self.column_variants {
+            if *std == t || variants.contains(&t) {
+                return (*std).to_string();
+            }
+        }
+        t.to_string()
+    }
+
+    /// 标准列 → 索引
+    pub fn column_index(&self, name: &str) -> Option<usize> {
+        self.standard_columns.iter().position(|c| *c == name)
+    }
+}
+
+/// 价格表标准列 (兼容导出 — 由 PRICE_TABLE_SCHEMA 派生)
+pub const PRICE_STANDARD_COLUMNS: &[&str] = &[
+    "产品大类",
+    "产品小类",
+    "产品型号",
+    "阀体材质",
+    "阀板材质",
+    "阀杆材质",
+    "阀座材质",
+    "驱动方式",
+    "连接方式",
+    "标准",
+    "压力",
+    "口径",
+    "含税单价(元)",
+    "美元报价(USD)",
+    "青岛港FOB报价(USD)",
+    "天津港FOB报价(USD)",
+    "单重(Kg)",
+    "供应商名称",
+    "档次",
+];
+
+/// 价格表领域 Schema (L3 差异化知识 — 数据化, 引擎零内置)。
+/// 迁移自: 原 PRICE_STANDARD_COLUMNS + normalize_column_name 变体表 + 供应商后缀。
+pub const PRICE_TABLE_SCHEMA: MergeSchema = MergeSchema {
+    name: "价格表",
+    standard_columns: PRICE_STANDARD_COLUMNS,
+    column_variants: &[
+        ("产品大类", &["大类"]),
+        ("产品小类", &["小类"]),
+        ("产品型号", &["型号", "规格型号", "产品规格"]),
+        (
+            "阀体材质",
+            &["阀体", "body材质", "BODY阀体", "BODY体", "壳材质"],
+        ),
+        ("阀板材质", &["阀板", "disc材质", "碟板材质", "蝶板材质"]),
+        (
+            "阀杆材质",
+            &["阀杆", "stem材质", "MAIN SHAFT主软", "阀轴材质"],
+        ),
+        (
+            "阀座材质",
+            &["阀座", "seat材质", "SEAT RING座座环", "密封圈材质"],
+        ),
+        ("驱动方式", &["驱动", "操作方式"]),
+        ("连接方式", &["连接", "连接形式"]),
+        ("标准", &["执行标准", "设计标准"]),
+        ("压力", &["公称压力", "压力等级", "PN"]),
+        ("口径", &["公称通径", "DN", "尺寸"]),
+        (
+            "含税单价(元)",
+            &["含税单价", "单价(元)", "单价", "价格(元)", "单价(含税)", "含税价(元)"],
+        ),
+        (
+            "美元报价(USD)",
+            &["美元价(USD)", "美元价", "美元报价", "USD报价", "单价(美元)", "美元单价"],
+        ),
+        (
+            "青岛港FOB报价(USD)",
+            &["青岛港FOB单价(元)", "青岛港FOB单价", "青岛港FOB", "青岛FOB"],
+        ),
+        (
+            "天津港FOB报价(USD)",
+            &["天津港FOB单价(元)", "天津港FOB单价", "天津港FOB", "天津FOB"],
+        ),
+        (
+            "单重(Kg)",
+            &["单重", "重量(Kg)", "重量", "单重(kg)", "预估单重(Kg)"],
+        ),
+        ("供应商名称", &["供应商", "厂家", "品牌"]),
+        ("档次", &["等级", "级别"]),
+        ("备注", &["说明", "备注信息"]),
+    ],
+    filename_suffixes: &[
+        "价格_报价", "价格表", "报价模板", "_报价", "-报价", "价格表_报价", "已完善",
+        "-已更新", "-修改版", "-中高档", "-中低档", "-第一版", "-第二版", "-第五版本", "-含税",
+    ],
+    unit_rules: &[UnitRule {
+        column: "单重(Kg)",
+        suffix: "kg",
+        skip_if_contains: &["kg", "千克"],
+    }],
+    value_columns: &["美元报价(USD)", "青岛港FOB报价(USD)", "天津港FOB报价(USD)"],
+    extra_columns: &["备注", "_source_file"],
+    skip_prefixes: &["consolidated", "native_consolidated"],
+    supplier_column: Some("供应商名称"),
+    dedup_columns: &["口径", "含税单价(元)", "产品小类"],
+    column_types: &[
+        ("口径", ColumnType::Numeric),
+        ("含税单价(元)", ColumnType::Numeric),
+        ("美元报价(USD)", ColumnType::Numeric),
+        ("青岛港FOB报价(USD)", ColumnType::Numeric),
+        ("天津港FOB报价(USD)", ColumnType::Numeric),
+        ("单重(Kg)", ColumnType::Numeric),
+    ],
+};
+
+/// 列名变体 → 标准列 (兼容导出 — 委托 PRICE_TABLE_SCHEMA)
+pub fn normalize_column_name(name: &str) -> String {
+    PRICE_TABLE_SCHEMA.normalize_column(name)
+}
+
+/// 合并报告
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConsolidationReport {
+    /// 处理的文件数
+    pub files_processed: usize,
+    /// 读取失败的文件 (路径, 原因)
+    pub files_failed: Vec<(String, String)>,
+    /// 总数据行数
+    pub total_rows: usize,
+    /// 含美元报价的行数
+    pub usd_rows: usize,
+    /// 输出路径
+    pub output: String,
+    /// 同文件内跨 sheet 去重跳过的行 (E14: 来源标注 文件名::sheet名)
+    pub dedup_rows: Option<Vec<String>>,
+    /// 输出数据校验告警 (数字列非数值)
+    pub validation_warnings: Vec<String>,
+}
+
+/// 通用多表合并引擎 (L2 表格语义层 — 零领域知识)。
+/// 领域知识全部来自传入的 `MergeSchema` (L3), 本引擎对任何表格目录+对应 schema 通用。
+///
+/// - 扫描 src_dir 下 xlsx/csv/tsv (跳过 skip_prefixes)
+/// - 列名变体 → schema.standard_columns 归一化
+/// - 单位规则 (schema.unit_rules) 补充缺失单位
+/// - 供应商列缺失时从文件名推导 (schema.filename_suffixes)
+/// - value_columns 非空计数统计
+/// - 附加透出列 (schema.extra_columns, 含 _source_file)
+/// - 输出 XLSX + 返回合并报告
+pub fn merge_tables_with(
+    schema: &MergeSchema,
+    src_dir: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<ConsolidationReport> {
+    schema.validate().map_err(FileAbilityError::Parse)?;
+    let mut report = ConsolidationReport::default();
+    let mut table = TableData {
+        name: format!("统一{}", schema.name),
+        headers: schema.standard_columns.iter().map(|s| s.to_string()).collect(),
+        rows: Vec::new(),
+    };
+    // 标准列名 → 索引
+    let std_idx: std::collections::HashMap<String, usize> = schema
+        .standard_columns
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.to_string(), i))
+        .collect();
+    // 附加透出列
+    let mut extra_data: Vec<Vec<String>> = Vec::new();
+
+    // 扫描输入目录
+    let mut entries: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(read) = std::fs::read_dir(src_dir.as_ref()) {
+        for e in read.flatten() {
+            let p = e.path();
+            let ext = p
+                .extension()
+                .and_then(|x| x.to_str())
+                .map(|x| x.to_lowercase())
+                .unwrap_or_default();
+            if matches!(ext.as_str(), "xlsx" | "csv" | "tsv") {
+                // 跳过已合并输出 (防止重复合并自身产物)
+                let name = p
+                    .file_name()
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+                    .to_lowercase();
+                if schema
+                    .skip_prefixes
+                    .iter()
+                    .any(|pfx| name.starts_with(&pfx.to_lowercase()))
+                {
+                    continue;
+                }
+                entries.push(p);
+            }
+        }
+    }
+    entries.sort();
+
+    for path in entries {
+        let ext = path
+            .extension()
+            .and_then(|x| x.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let srcs: Vec<TableData> = match ext.as_str() {
+            "xlsx" => match read_xlsx_sheets_all(&path) {
+                Ok(tables) => tables,
+                Err(e) => {
+                    report
+                        .files_failed
+                        .push((path.display().to_string(), e.to_string()));
+                    continue;
+                }
+            },
+            "csv" | "tsv" => match read_csv(&path) {
+                Ok(t) => vec![t],
+                Err(e) => {
+                    report
+                        .files_failed
+                        .push((path.display().to_string(), e.to_string()));
+                    continue;
+                }
+            },
+            _ => continue,
+        };
+        if srcs.is_empty() {
+            continue;
+        }
+        report.files_processed += 1;
+        // 来源名 (从文件名剥离序号/后缀)
+        let source_name = derive_source_name(&path, schema);
+        // 文件名 (用于 _source_file)
+        let file_name = path
+            .file_name()
+            .map(|f| f.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
+        // 多 sheet 逐 sheet 合并 (E13: 每个 sheet 都可能含独立数据)
+        // 同文件内跨 sheet 去重 (E14: key 用 schema.dedup_columns, 默认去重启用)
+        let mut seen: std::collections::HashSet<Vec<String>> = std::collections::HashSet::new();
+        let dedup_idx: Vec<Option<usize>> = schema
+            .dedup_columns
+            .iter()
+            .map(|d| std_idx.get(*d).copied())
+            .collect();
+        for src in srcs {
+            // 归一化源表头 → 标准列名
+            let norm_headers: Vec<String> = src
+                .headers
+                .iter()
+                .map(|h| schema.normalize_column(h))
+                .collect();
+            for row in &src.rows {
+                // 标准列填充
+                let mut std_row = vec![String::new(); schema.standard_columns.len()];
+                for (c, h) in norm_headers.iter().enumerate() {
+                    if let Some(&idx) = std_idx.get(h) {
+                        let v = row.get(c).cloned().unwrap_or_default();
+                        std_row[idx] =
+                            if v.trim().is_empty() { String::new() } else { v.trim().to_string() };
+                    }
+                }
+                // 供应商列缺失 → 用文件名推导回填
+                if let Some(sup) = schema.supplier_column {
+                    if !norm_headers.iter().any(|h| h == sup) {
+                        if let Some(&idx) = std_idx.get(sup) {
+                            std_row[idx] = source_name.clone();
+                        }
+                    }
+                }
+                // 单位规则补充
+                for rule in schema.unit_rules {
+                    if let Some(&idx) = std_idx.get(rule.column) {
+                        let v = std_row[idx].trim().to_string();
+                        if !v.is_empty()
+                            && !rule
+                                .skip_if_contains
+                                .iter()
+                                .any(|mark| v.to_lowercase().contains(&mark.to_lowercase()))
+                        {
+                            std_row[idx] = format!("{v}{}", rule.suffix);
+                        }
+                    }
+                }
+                // 同文件内跨 sheet 去重 (E14): key = dedup_columns 非空拼接
+                if !dedup_idx.is_empty() {
+                    let key: Vec<String> = dedup_idx
+                        .iter()
+                        .map(|oi| oi.map(|i| std_row[i].clone()).unwrap_or_default())
+                        .collect();
+                    // 至少一个 key 字段非空才有意义
+                    if key.iter().any(|k| !k.is_empty()) && !seen.insert(key) {
+                        report
+                            .dedup_rows
+                            .get_or_insert_with(Vec::new)
+                            .push(format!("{}::{}", file_name, src.name));
+                        continue;
+                    }
+                }
+                table.rows.push(std_row.clone());
+                // 附加列 (schema.extra_columns; 末位 _source_file 填 文件名[::sheet名])
+                let mut extra = vec![String::new(); schema.extra_columns.len()];
+                for (c, h) in norm_headers.iter().enumerate() {
+                    for (ei, ecol) in schema.extra_columns.iter().enumerate() {
+                        if h == *ecol {
+                            extra[ei] = row.get(c).cloned().unwrap_or_default();
+                        }
+                    }
+                }
+                if let Some(last) = extra.last_mut() {
+                    if schema.extra_columns.last() == Some(&"_source_file") {
+                        let sheet_suffix =
+                            if !src.name.is_empty() { format!("::{}", src.name) } else { String::new() };
+                        *last = format!("{file_name}{sheet_suffix}");
+                    }
+                }
+                extra_data.push(extra);
+                // value_columns 统计 (基于去重后 std_row, 非空计数)
+                let has_value = schema.value_columns.iter().any(|vc| {
+                    std_idx
+                        .get(*vc)
+                        .and_then(|&i| std_row.get(i))
+                        .map(|v| !v.trim().is_empty())
+                        .unwrap_or(false)
+                });
+                if has_value {
+                    report.usd_rows += 1;
+                }
+            }
+            // 清理: norm_headers 作用域结束
+        }
+    }
+
+    // 拼接附加列到输出表格
+    table.headers.extend(schema.extra_columns.iter().map(|s| s.to_string()));
+    for (i, r) in table.rows.iter_mut().enumerate() {
+        if let Some(e) = extra_data.get(i) {
+            r.extend(e.iter().cloned());
+        } else {
+            r.extend(vec![String::new(); schema.extra_columns.len()]);
+        }
+    }
+    report.total_rows = table.rows.len();
+    report.output = output.as_ref().display().to_string();
+
+    // 输出数据校验 (阶段2): 数字列非数值 → validation_warnings
+    for (ci, (col, ctype)) in schema.column_types.iter().enumerate() {
+        if *ctype != ColumnType::Numeric {
+            continue;
+        }
+        let col_idx = std_idx.get(*col);
+        let Some(&col_idx) = col_idx else { continue };
+        for (ri, row) in table.rows.iter().enumerate() {
+            let Some(v) = row.get(col_idx) else { continue };
+            let v = v.trim();
+            if v.is_empty() {
+                continue; // 空值不算错误
+            }
+            if parse_numeric(v).is_none() {
+                report.validation_warnings.push(format!(
+                    "row{} 列'{}' 非数值: '{}'",
+                    ri + 1,
+                    col,
+                    v
+                ));
+            }
+        }
+    }
+
+    write_xlsx_table(output, &table)?;
+    Ok(report)
+}
+
+/// 宽松数值解析 (兼容 千分位/货币符/单位后缀/科学计数法)。
+/// 返回 Some(数值) 若可解析, None 否则。
+fn parse_numeric(v: &str) -> Option<f64> {
+    let t = v
+        .replace(',', "")
+        .replace('￥', "")
+        .replace('¥', "")
+        .replace('$', "");
+    // 单位后缀 (如 "2.5kg" / "300元") — 剥离尾部非数值字符
+    let trimmed: String = t
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-' || *c == '+' || *c == 'e' || *c == 'E')
+        .collect();
+    trimmed.parse::<f64>().ok()
+}
+
+/// 价格表合并 (D4) — 薄封装: 委托通用引擎 + 价格表 schema。
+/// 保持向后兼容签名; 领域知识已外置为 PRICE_TABLE_SCHEMA。
+pub fn consolidate_tables(
+    src_dir: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<ConsolidationReport> {
+    merge_tables_with(&PRICE_TABLE_SCHEMA, src_dir, output)
+}
+
+/// 从文件名推导来源名 (通用: 剥离序号/后缀, 后缀来自 schema.filename_suffixes)。
+/// 例: "4、玉鹏价格_报价模板-修改版" → "玉鹏"
+fn derive_source_name(path: &Path, schema: &MergeSchema) -> String {
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut s = stem.as_str();
+    // 剥离开头的数字序号 (如 "4、", "44. ", "7、")
+    if let Some(stripped) = strip_leading_num(s) {
+        s = stripped;
+    }
+    // 剥离后缀标记 (schema.filename_suffixes)
+    for marker in schema.filename_suffixes {
+        if let Some(pos) = s.find(marker) {
+            s = &s[..pos];
+        }
+    }
+    s.trim_matches(|c: char| c == '_' || c == '-' || c == '、' || c == '.' || c == ' ').to_string()
+}
+
+/// 剥离开头的数字序号 (返回剩余部分)
+fn strip_leading_num(s: &str) -> Option<&str> {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i == 0 {
+        return None;
+    }
+    // 跳过后续分隔符 (、. 空格)
+    let rest = &s[i..];
+    let rest = rest.trim_start_matches(|c: char| c == '、' || c == '.' || c == ' ' || c == '-' || c == '_');
+    if rest.is_empty() {
+        None
+    } else {
+        Some(rest)
+    }
+}
+
+// ─────────────────── 结构化数据读写 (D5): JSON/YAML ───────────────────
+
+/// 结构化文件读取结果 — 统一 JSON/YAML 为 serde_json::Value
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StructuredData {
+    pub format: String,
+    pub value: serde_json::Value,
+}
+
+/// 读取 JSON/YAML 结构化文件 (D5)
+pub fn read_structured(path: impl AsRef<Path>) -> Result<StructuredData> {
+    let raw = std::fs::read(path.as_ref()).map_err(FileAbilityError::Io)?;
+    let text = decode_bytes(&raw);
+    let ext = path
+        .as_ref()
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    match ext.as_str() {
+        "json" | "jsonc" => Ok(StructuredData {
+            format: "json".to_string(),
+            value: serde_json::from_str(&text)
+                .map_err(|e| FileAbilityError::Parse(e.to_string()))?,
+        }),
+        "yaml" | "yml" => {
+            let v: serde_yaml::Value = serde_yaml::from_str(&text)
+                .map_err(|e| FileAbilityError::Parse(e.to_string()))?;
+            let value = serde_json::to_value(v)
+                .map_err(|e| FileAbilityError::Parse(e.to_string()))?;
+            Ok(StructuredData {
+                format: "yaml".to_string(),
+                value,
+            })
+        }
+        other => Err(FileAbilityError::UnsupportedFormat {
+            ext: other.to_string(),
+        }),
+    }
+}
+
+/// 写入 JSON 文件 (D5)
+pub fn write_json(path: impl AsRef<Path>, value: &serde_json::Value, pretty: bool) -> Result<()> {
+    let text = if pretty {
+        serde_json::to_string_pretty(value)
+            .map_err(|e| FileAbilityError::Parse(e.to_string()))?
+    } else {
+        serde_json::to_string(value)
+            .map_err(|e| FileAbilityError::Parse(e.to_string()))?
+    };
+    std::fs::write(path.as_ref(), text).map_err(FileAbilityError::Io)
+}
+
+// ─────────────────── 内容快照存储 (D6) ───────────────────
+
+/// 将 ContentSnapshot 持久化为 JSON 文件 (D6)
+pub fn store_snapshot(snapshot: &ContentSnapshot, target: impl AsRef<Path>) -> Result<()> {
+    let json = serde_json::to_string_pretty(snapshot)
+        .map_err(|e| FileAbilityError::Parse(e.to_string()))?;
+    std::fs::write(target.as_ref(), json).map_err(FileAbilityError::Io)
+}
+
+/// 从 JSON 文件加载 ContentSnapshot (D6)
+pub fn load_snapshot(path: impl AsRef<Path>) -> Result<ContentSnapshot> {
+    let raw = std::fs::read(path.as_ref()).map_err(FileAbilityError::Io)?;
+    serde_json::from_slice(&raw).map_err(|e| FileAbilityError::Parse(e.to_string()))
+}
+
 // ─────────────────────── doc7 吸收: Grounding 精确值校验 ───────────────────────
 // 来源: github.com/magicrew/doc7 internal/extract/grounding.go + grounding_numeric.go
 // (MIT, absorbed 2026-08-13, cycle 1101)。
@@ -1545,7 +2574,124 @@ impl SelfTest for FileAbilitySelfTest {
         let _ = std::fs::remove_file(&probe_path);
         let _ = std::fs::remove_dir(&probe_dir);
 
-        // 9) grounding 公理链路 (公理二: 精确值保险): 可靠性评分契约 + 提取上限分发。
+        // 9) 统一表格读写链路 (D1/D2/D3): XLSX 写读回环 + CSV 写读回环 + 编码探测/解码。
+        //    生产接地: write_xlsx_table 即合并输出通路 (consolidate_tables → 落盘)。
+        let probe_tbl = TableData {
+            name: "probe".into(),
+            headers: vec!["名称".into(), "数量".into()],
+            rows: vec![vec!["阀门".into(), "12".into()]],
+        };
+        let probe_dir = std::env::temp_dir().join("nt_file_ability_selftest");
+        if std::fs::create_dir_all(&probe_dir).is_err() {
+            failures.push("selftest 临时目录创建失败".into());
+        }
+        let probe_xlsx = probe_dir.join("probe_tbl.xlsx");
+        let probe_csv = probe_dir.join("probe_tbl.csv");
+        if write_xlsx_table(&probe_xlsx, &probe_tbl).is_err() {
+            failures.push("write_xlsx_table 失败".into());
+        } else {
+            match read_xlsx_table(&probe_xlsx) {
+                Ok(t) => {
+                    if t.headers != probe_tbl.headers || t.rows != probe_tbl.rows {
+                        failures.push("XLSX 表格写读回环不一致".into());
+                    }
+                }
+                Err(e) => failures.push(format!("read_xlsx_table 失败: {e}")),
+            }
+        }
+        if write_csv(&probe_csv, &probe_tbl, ',', false).is_err() {
+            failures.push("write_csv 失败".into());
+        } else {
+            match read_csv(&probe_csv) {
+                Ok(t) => {
+                    if t.headers != probe_tbl.headers || t.rows != probe_tbl.rows {
+                        failures.push("CSV 表格写读回环不一致".into());
+                    }
+                }
+                Err(e) => failures.push(format!("read_csv 失败: {e}")),
+            }
+        }
+        let gbk_bytes = b"\xd6\xd0\xb9\xfa";
+        if detect_encoding(gbk_bytes) != TextEncoding::Gbk || decode_bytes(gbk_bytes) != "中国" {
+            failures.push("GBK 编码探测/解码契约破坏".into());
+        }
+        let _ = std::fs::remove_file(&probe_xlsx);
+        let _ = std::fs::remove_file(&probe_csv);
+
+        // 10) 多表合并链路 (D4): 两文件端到端合并 → 列名归一化 + 行数 + 排序表头。
+        //     生产接地: 合并产物已内置跳过 consolidate_* 自身输出, 防止重复吸收。
+        let m_dir = probe_dir.join("merge");
+        if std::fs::create_dir_all(&m_dir).is_ok() {
+            let a = TableData {
+                name: "a".into(),
+                headers: vec!["产品型号".into(), "阀体材质".into(), "单重(Kg)".into()],
+                rows: vec![vec!["V1".into(), "WCB".into(), "1.5kg".into()]],
+            };
+            let b = TableData {
+                name: "b".into(),
+                headers: vec!["型号".into(), "阀体材料".into(), "重量".into()],
+                rows: vec![vec!["V2".into(), "CF8".into(), "2kg".into()]],
+            };
+            if write_xlsx_table(m_dir.join("a.xlsx"), &a).is_err()
+                || write_xlsx_table(m_dir.join("b.xlsx"), &b).is_err()
+            {
+                failures.push("合并源写入失败".into());
+            } else {
+                let out = m_dir.join("out.xlsx");
+                match consolidate_tables(&m_dir, &out) {
+                    Ok(rep) => {
+                        if rep.files_processed != 2 || rep.total_rows != 2 {
+                            failures.push(format!(
+                                "合并统计异常 processed={} rows={}",
+                                rep.files_processed, rep.total_rows
+                            ));
+                        }
+                        if let Ok(t) = read_xlsx_table(&out) {
+                            let has_std = t
+                                .headers
+                                .iter()
+                                .any(|h| h == "阀体材质" || h == "单重(Kg)");
+                            if !has_std {
+                                failures.push("合并列名未归一化为标准列".into());
+                            }
+                        }
+                    }
+                    Err(e) => failures.push(format!("consolidate_tables 失败: {e}")),
+                }
+            }
+            let _ = std::fs::remove_dir_all(&m_dir);
+        }
+
+        // 11) 结构化/快照链路 (D5/D6): JSON 写读回环 + 快照存读。
+        let s_path = probe_dir.join("probe.json");
+        if let Ok(sd) = read_structured(s_path.as_path()) {
+            // 文件不存在时 read_structured 应报错; 存在时 roundtrip
+            let _ = sd;
+        }
+        let snap = ContentSnapshot {
+            kind: FileKind::Text,
+            text: Some("探针".into()),
+            markdown: None,
+            image: None,
+            media: None,
+            mime_type: "text/plain".into(),
+            size_bytes: 42,
+        };
+        let snap_path = probe_dir.join("probe_snapshot.json");
+        if store_snapshot(&snap, &snap_path).is_err() {
+            failures.push("store_snapshot 失败".into());
+        } else if let Ok(back) = load_snapshot(&snap_path) {
+            if back.text != snap.text || back.mime_type != snap.mime_type {
+                failures.push("快照存读回环不一致".into());
+            }
+        } else {
+            failures.push("load_snapshot 失败".into());
+        }
+        let _ = std::fs::remove_file(&s_path);
+        let _ = std::fs::remove_file(&snap_path);
+        let _ = std::fs::remove_dir(&probe_dir);
+
+        // 12) grounding 公理链路 (公理二: 精确值保险): 可靠性评分契约 + 提取上限分发。
         // 生产接地: self_test 结果经 run_all → set_branch_health 驱动 NT-IO 分支健康 (T3)。
         let gr = ground_missing_tokens("版本 2.5.1 已发布", "版本 2.5.1 已发布");
         if gr.reliability_score < 0.99 {
@@ -1563,7 +2709,7 @@ impl SelfTest for FileAbilitySelfTest {
             failures.push("低可靠性提取应标记 extraction_bound_ok=false".into());
         }
 
-        if failures.is_empty() {
+if failures.is_empty() {
             Ok(())
         } else {
             Err(failures)
@@ -1722,6 +2868,597 @@ mod tests {
         assert_eq!(ab.kind(), FileKind::Text);
         assert!(ab.plain_text().contains("main"));
         std::fs::remove_file(&path).ok();
+    }
+
+    // ── D1-D6: 通用表格读写 / 编码检测 / 多文件合并 / 结构化数据 / 快照存储 ──
+
+    fn test_dir() -> PathBuf {
+        let d = std::env::temp_dir().join("nt_file_ability_d1d6");
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn test_d1_write_xlsx_table_roundtrip() {
+        let dir = test_dir();
+        let path = dir.join("t_out.xlsx");
+        let t = TableData {
+            name: "Sheet1".to_string(),
+            headers: vec!["品名".to_string(), "单价".to_string(), "单重(Kg)".to_string()],
+            rows: vec![
+                vec!["蝶阀".to_string(), "305.69".to_string(), "8".to_string()],
+                vec!["闸阀".to_string(), "128".to_string(), "12.5kg".to_string()],
+            ],
+        };
+        write_xlsx_table(&path, &t).unwrap();
+        // 回读校验
+        let back = read_xlsx_table(&path).unwrap();
+        assert_eq!(back.headers, vec!["品名", "单价", "单重(Kg)"]);
+        assert_eq!(back.row_count(), 2);
+        assert_eq!(back.cell(0, "品名"), Some("蝶阀"));
+        assert_eq!(back.cell(1, "单价"), Some("128"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_d2_csv_write_read_roundtrip() {
+        let dir = test_dir();
+        let path = dir.join("t.csv");
+        let t = TableData {
+            name: "prices".to_string(),
+            headers: vec!["品名".to_string(), "单价".to_string()],
+            rows: vec![
+                vec!["蝶阀".to_string(), "305.69".to_string()],
+                vec!["闸阀,带逗号".to_string(), "128".to_string()],
+            ],
+        };
+        write_csv(&path, &t, ',', true).unwrap();
+        let back = read_csv(&path).unwrap();
+        assert_eq!(back.headers, vec!["品名", "单价"]);
+        assert_eq!(back.row_count(), 2);
+        // 引号包裹字段正确还原
+        assert_eq!(back.cell(1, "品名"), Some("闸阀,带逗号"));
+        assert_eq!(back.cell(0, "单价"), Some("305.69"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_read_xlsx_sheets_all_multi_sheet() {
+        // calamine 多 sheet 全遍历 (E13): 每 sheet 独立表头 = 首个非空行。
+        // 锁定 read_xlsx_sheets_all 契约: sheet 数 / 表头 / 数据行。
+        let path = xlsx_fixture();
+        let tables = read_xlsx_sheets_all(&path).unwrap();
+        assert_eq!(tables.len(), 2, "应读出全部 2 个 sheet");
+        let s1 = &tables[0];
+        assert_eq!(s1.name, "Sheet1");
+        assert_eq!(s1.headers, vec!["品名", "单价"]);
+        assert_eq!(s1.rows.len(), 3, "表头后应有 3 行数据");
+        assert_eq!(s1.rows[0][0], "蝶阀");
+        assert_eq!(s1.rows[1][0], "闸阀");
+        let s2 = &tables[1];
+        assert_eq!(s2.name, "Sheet2");
+        assert_eq!(s2.headers, vec!["备注"]);
+        assert_eq!(s2.rows.len(), 1);
+        assert_eq!(s2.rows[0][0], "原始数据");
+    }
+
+    #[test]
+    fn test_data_to_text_contract() {
+        // 数值/文本/布尔语义锁定 (跨库显示文本契约):
+        // 整数值浮点去 .0、小数保留、超大数不丢精度。
+        assert_eq!(data_to_text(&calamine::Data::Int(123)), "123");
+        assert_eq!(data_to_text(&calamine::Data::Float(305.69)), "305.69");
+        assert_eq!(data_to_text(&calamine::Data::Float(100.0)), "100");
+        assert_eq!(data_to_text(&calamine::Data::Float(1e16)), "10000000000000000");
+        assert_eq!(data_to_text(&calamine::Data::String("蝶阀".into())), "蝶阀");
+        assert_eq!(data_to_text(&calamine::Data::Bool(true)), "true");
+        assert_eq!(data_to_text(&calamine::Data::Empty), "");
+        // DateTime 语义: 必须渲染为日期而非 Excel 原始序列号。
+        // serial 44484.7916666667 ≈ 2021-10-15 19:00:00 (calamine 自带测试锚点)。
+        let dt = calamine::Data::DateTime(calamine::ExcelDateTime::new(
+            44484.7916666667,
+            calamine::ExcelDateTimeType::DateTime,
+            false,
+        ));
+        let s = data_to_text(&dt);
+        assert!(
+            s.starts_with("2021-10-15"),
+            "DateTime 应渲染为日期, 实际: {s}"
+        );
+        assert!(
+            !s.contains("44484"),
+            "不得输出 Excel 原始序列号, 实际: {s}"
+        );
+    }
+
+    #[test]
+    fn test_d4_dedup_cross_sheet_same_key() {
+        // E14 同文件跨 sheet 去重: 单文件双 sheet 共享去重键 (单价) →
+        // 只保留首行, 第二 sheet 重复行计入 dedup_rows。
+        let dir = test_dir();
+        let src = dir.join("dedup_src");
+        std::fs::create_dir_all(&src).unwrap();
+        use office_oxide::xlsx::write::{CellData, XlsxWriter};
+        let mut xw = XlsxWriter::new();
+        let s1 = xw.add_sheet_get_index("Sheet1");
+        let s2 = xw.add_sheet_get_index("Sheet2");
+        for s in [s1, s2] {
+            xw.sheet_set_cell(s, 0, 0, CellData::String("品名".into()));
+            xw.sheet_set_cell(s, 0, 1, CellData::String("单价(元)".into()));
+            xw.sheet_set_cell(s, 1, 0, CellData::String("蝶阀".into()));
+            xw.sheet_set_cell(s, 1, 1, CellData::Number(100.0));
+        }
+        xw.save(src.join("供应商甲.xlsx")).unwrap();
+
+        let schema = MergeSchema {
+            name: "去重测试",
+            standard_columns: &["品名", "单价(元)"],
+            column_variants: &[],
+            filename_suffixes: &[],
+            unit_rules: &[],
+            value_columns: &["单价(元)"],
+            extra_columns: &["_source_file"],
+            skip_prefixes: &["consolidated"],
+            supplier_column: None,
+            dedup_columns: &["单价(元)"],
+        column_types: &[],
+        };
+        let out = dir.join("dedup_out.xlsx");
+        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        // 两 sheet 各 1 数据行, 去重键相同 → 只保留 1 行
+        assert_eq!(report.total_rows, 1);
+        assert_eq!(report.usd_rows, 1);
+        assert_eq!(report.dedup_rows.as_ref().map(|v| v.len()), Some(1));
+        assert!(report.dedup_rows.unwrap()[0].contains("Sheet2"));
+        // 输出回读验证行数
+        let back = read_xlsx_table(&out).unwrap();
+        assert_eq!(back.row_count(), 1);
+        assert_eq!(back.cell(0, "品名"), Some("蝶阀"));
+        std::fs::remove_dir_all(&src).ok();
+        std::fs::remove_file(&out).ok();
+    }
+
+    #[test]
+    fn test_d3_detect_encoding_bom_utf8_gbk() {
+        // UTF-8 BOM
+        assert_eq!(detect_encoding(&[0xEF, 0xBB, 0xBF, b'a']), TextEncoding::Utf8);
+        // 纯 UTF-8
+        assert_eq!(detect_encoding("你好, NeoTrix".as_bytes()), TextEncoding::Utf8);
+        // UTF-16 BOM
+        assert_eq!(detect_encoding(&[0xFF, 0xFE, b'a', 0x00]), TextEncoding::Utf16);
+        // 非法 UTF-8 高字节区段 → GBK 启发
+        assert_eq!(detect_encoding(&[0xD6, 0xD0, 0xB9, 0xFA]), TextEncoding::Gbk);
+        // GBK 解码往返
+        let gbk_bytes = encode_gbk("测试");
+        let decoded = decode_bytes(&gbk_bytes);
+        assert_eq!(decoded, "测试");
+    }
+
+    // GBK 编码辅助 (测试用, 与实现对称)
+    fn encode_gbk(s: &str) -> Vec<u8> {
+        let (enc, _, _) = encoding_rs::GBK.encode(s);
+        enc.into_owned()
+    }
+
+    #[test]
+    fn test_d4_normalize_column_name() {
+        assert_eq!(normalize_column_name("阀体材质"), "阀体材质");
+        assert_eq!(normalize_column_name("BODY阀体"), "阀体材质");
+        assert_eq!(normalize_column_name("stem材质"), "阀杆材质");
+        assert_eq!(normalize_column_name("单价(美元)"), "美元报价(USD)");
+        assert_eq!(normalize_column_name("青岛港FOB单价(元)"), "青岛港FOB报价(USD)");
+        assert_eq!(normalize_column_name("单重(kg)"), "单重(Kg)");
+        assert_eq!(normalize_column_name("未知列"), "未知列");
+    }
+
+    #[test]
+    fn test_d4_supplier_from_filename() {
+        // 供应商名推导已 schema 化: derive_source_name 委托 PRICE_TABLE_SCHEMA
+        assert_eq!(
+            derive_source_name(Path::new("4、玉鹏价格_报价模板-修改版.xlsx"), &PRICE_TABLE_SCHEMA),
+            "玉鹏"
+        );
+        assert_eq!(
+            derive_source_name(
+                Path::new("44. 河北威世迪阀门_报价模板-第一版-修改版.xlsx"),
+                &PRICE_TABLE_SCHEMA
+            ),
+            "河北威世迪阀门"
+        );
+        assert_eq!(
+            derive_source_name(Path::new("7、青岛润通_报价模板-修改版.xlsx"), &PRICE_TABLE_SCHEMA),
+            "青岛润通"
+        );
+    }
+
+    #[test]
+    fn test_d4_schema_validate() {
+        // 合法 schema 通过
+        PRICE_TABLE_SCHEMA.validate().unwrap();
+        // value_columns 必须是标准列
+        let bad = MergeSchema {
+            name: "bad",
+            standard_columns: &["a", "b"],
+            column_variants: &[],
+            filename_suffixes: &[],
+            unit_rules: &[],
+            value_columns: &["c"],
+            extra_columns: &["d"],
+            skip_prefixes: &[],
+            supplier_column: Some("b"),
+            dedup_columns: &[],
+        column_types: &[],
+        };
+        assert!(bad.validate().is_err());
+        // 标准列重复
+        let dup = MergeSchema {
+            name: "dup",
+            standard_columns: &["a", "a"],
+            column_variants: &[],
+            filename_suffixes: &[],
+            unit_rules: &[],
+            value_columns: &["a"],
+            extra_columns: &[],
+            skip_prefixes: &[],
+            supplier_column: None,
+            dedup_columns: &[],
+        column_types: &[],
+        };
+        assert!(dup.validate().is_err());
+        // extra 与标准列冲突
+        let clash = MergeSchema {
+            name: "clash",
+            standard_columns: &["a"],
+            column_variants: &[],
+            filename_suffixes: &[],
+            unit_rules: &[],
+            value_columns: &["a"],
+            extra_columns: &["a"],
+            skip_prefixes: &[],
+            supplier_column: None,
+            dedup_columns: &[],
+        column_types: &[],
+        };
+        assert!(clash.validate().is_err());
+    }
+
+    #[test]
+    fn test_d4_merge_tables_with_generic_schema() {
+        // 通用引擎零领域知识验证: 自定义 schema + 变体列
+        let dir = test_dir();
+        let src = dir.join("merge_generic_src");
+        std::fs::create_dir_all(&src).unwrap();
+        // 源表1: 使用变体列名 + 无供应商列 (由文件名推导)
+        let t1 = TableData {
+            name: "s1".into(),
+            headers: vec!["品名".to_string(), "价格".to_string(), "重量".to_string()],
+            rows: vec![vec!["A阀".to_string(), "100".to_string(), "2.5".to_string()]],
+        };
+        write_xlsx_table(src.join("1、华北阀门_目录-第一版.xlsx"), &t1).unwrap();
+        // 源表2: 使用标准列名 + 显式供应商
+        let t2 = TableData {
+            name: "s2".into(),
+            headers: vec![
+                "产品型号".to_string(),
+                "单价(元)".to_string(),
+                "单重(Kg)".to_string(),
+                "供应商名称".to_string(),
+            ],
+            rows: vec![vec![
+                "B阀".to_string(),
+                "200".to_string(),
+                String::new(),
+                "华南阀门".to_string(),
+            ]],
+        };
+        write_xlsx_table(src.join("2、华东阀门_目录.xlsx"), &t2).unwrap();
+
+        let schema = MergeSchema {
+            name: "测试目录",
+            standard_columns: &["品名", "单价(元)", "单重(Kg)", "供应商名称"],
+            column_variants: &[
+                ("品名", &["产品型号", "型号"]),
+                ("单价(元)", &["价格", "单价"]),
+                ("单重(Kg)", &["重量"]),
+            ],
+            filename_suffixes: &["目录", "-第一版"],
+            unit_rules: &[UnitRule {
+                column: "单重(Kg)",
+                suffix: "kg",
+                skip_if_contains: &["kg"],
+            }],
+            value_columns: &["单价(元)"],
+            extra_columns: &["_source_file"],
+            skip_prefixes: &["consolidated"],
+            supplier_column: Some("供应商名称"),
+            dedup_columns: &["单价(元)"],
+        column_types: &[],
+        };
+        let out = dir.join("merge_generic_out.xlsx");
+        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        assert_eq!(report.files_processed, 2);
+        assert_eq!(report.total_rows, 2);
+        assert_eq!(report.usd_rows, 2); // 两行都有单价
+
+        let merged = read_xlsx_table(&out).unwrap();
+        // 变体列归一化: 源表1 "价格"→"单价(元)", "品名"不变
+        assert_eq!(merged.headers[..4], vec!["品名", "单价(元)", "单重(Kg)", "供应商名称"]);
+        // 源表1 供应商由文件名推导 "华北阀门", 单重补 kg
+        assert_eq!(merged.rows[0][0], "A阀");
+        assert_eq!(merged.rows[0][1], "100");
+        assert_eq!(merged.rows[0][2], "2.5kg");
+        assert_eq!(merged.rows[0][3], "华北阀门");
+        // 源表2 显式供应商保留, 空单重不补单位
+        assert_eq!(merged.rows[1][0], "B阀");
+        assert_eq!(merged.rows[1][2], "");
+        assert_eq!(merged.rows[1][3], "华南阀门");
+        // 附加 _source_file 透出
+        assert_eq!(merged.headers[4], "_source_file");
+        assert!(merged.rows[0][4].contains("华北阀门_目录-第一版.xlsx"));
+        assert!(merged.rows[1][4].contains("华东阀门_目录.xlsx"));
+    }
+
+    #[test]
+    fn test_d4_merge_multi_sheet_dedup() {
+        // 多 sheet 全遍历 (E13) + 同文件内跨 sheet 去重 (E14), 跨文件不去重
+        let dir = test_dir();
+        let src = dir.join("merge_multisheet_src");
+        std::fs::create_dir_all(&src).unwrap();
+        // 单文件双 sheet: sheet1 有 2 行, sheet2 有 1 行独立 + 1 行与 sheet1 重复
+        // 需用 XlsxWriter 写双 sheet
+        {
+            use office_oxide::xlsx::write::{CellData, XlsxWriter};
+            let mut xw = XlsxWriter::new();
+            let s1 = xw.add_sheet_get_index("主表");
+            for (c, h) in ["产品型号", "单价(元)", "口径"].iter().enumerate() {
+                xw.sheet_set_cell(s1, 0, c, CellData::String(h.to_string()));
+            }
+            for (r, row) in [["A阀", "100", "DN50"], ["B阀", "200", "DN65"]].iter().enumerate() {
+                for (c, v) in row.iter().enumerate() {
+                    xw.sheet_set_cell(s1, r + 1, c, CellData::String(v.to_string()));
+                }
+            }
+            let s2 = xw.add_sheet_get_index("副表");
+            for (c, h) in ["产品型号", "单价(元)", "口径"].iter().enumerate() {
+                xw.sheet_set_cell(s2, 0, c, CellData::String(h.to_string()));
+            }
+            // 与主表 B阀/DN65 重复 + 独立 C阀
+            for (r, row) in [["C阀", "300", "DN80"], ["B阀", "200", "DN65"]].iter().enumerate() {
+                for (c, v) in row.iter().enumerate() {
+                    xw.sheet_set_cell(s2, r + 1, c, CellData::String(v.to_string()));
+                }
+            }
+            xw.save(src.join("1、多sheet厂_目录.xlsx")).unwrap();
+        }
+        // 另一文件同 key (DN65/200) — 跨文件不去重
+        let t2 = TableData {
+            name: "s".into(),
+            headers: vec![
+                "产品型号".to_string(),
+                "单价(元)".to_string(),
+                "口径".to_string(),
+            ],
+            rows: vec![vec![
+                "D阀".to_string(),
+                "200".to_string(),
+                "DN65".to_string(),
+            ]],
+        };
+        write_xlsx_table(src.join("2、异厂_目录.xlsx"), &t2).unwrap();
+
+        let schema = MergeSchema {
+            name: "测试目录",
+            standard_columns: &["产品型号", "单价(元)", "口径", "供应商名称"],
+            column_variants: &[],
+            filename_suffixes: &["目录"],
+            unit_rules: &[],
+            value_columns: &["单价(元)"],
+            extra_columns: &["_source_file"],
+            skip_prefixes: &["consolidated"],
+            supplier_column: Some("供应商名称"),
+            dedup_columns: &["口径", "单价(元)"],
+            column_types: &[],
+        };
+        let out = dir.join("merge_multisheet_out.xlsx");
+        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        // 全遍历 4 行, 同文件去重 1 行 (副表 B阀/DN65), 剩 3 行;
+        // 文件2 D阀 同 key [DN65,200] 跨文件不去重 → 总计 4 行
+        assert_eq!(report.files_processed, 2);
+        assert_eq!(report.total_rows, 4);
+        let dedup = report.dedup_rows.as_ref().unwrap();
+        assert_eq!(dedup.len(), 1);
+        assert!(dedup[0].contains("多sheet厂_目录.xlsx::副表"), "去重行来源应为副表: {dedup:?}");
+        assert_eq!(report.usd_rows, 4);
+
+        let merged = read_xlsx_sheets_all(&out).unwrap();
+        let m = merged.first().unwrap();
+        assert_eq!(m.rows.len(), 4);
+        // 主表两行 + 副表独立 C阀 + 异厂 D阀 (同 key 跨文件保留)
+        let lines: Vec<String> = m.rows.iter().map(|r| r[..3].join("|")).collect();
+        assert!(lines.iter().any(|l| l == "A阀|100|DN50"));
+        assert!(lines.iter().any(|l| l == "C阀|300|DN80"));
+        assert!(lines.iter().any(|l| l == "D阀|200|DN65"));
+        // B阀|200|DN65 只出现一次 (同文件去重), D阀|200|DN65 是异厂行保留
+        assert_eq!(lines.iter().filter(|l| l.as_str() == "B阀|200|DN65").count(), 1);
+        assert_eq!(lines.iter().filter(|l| l.as_str() == "D阀|200|DN65").count(), 1);
+        // _source_file 标注 sheet
+        let srcs: Vec<&str> = m.rows.iter().map(|r| r[4].as_str()).collect();
+        assert!(srcs.iter().any(|s| s.contains("::主表")), "主表来源标注: {srcs:?}");
+        assert!(srcs.iter().any(|s| s.contains("::副表")), "副表来源标注: {srcs:?}");
+    }
+
+    #[test]
+    fn test_d4_validation_warnings() {
+        // 输出数据校验: Numeric 列非数值值 → validation_warnings; 千分位/单位后缀可解析
+        let dir = test_dir();
+        let src = dir.join("merge_validate_src");
+        std::fs::create_dir_all(&src).unwrap();
+        let t1 = TableData {
+            name: "Sheet1".into(),
+            headers: vec![
+                "产品型号".to_string(),
+                "单价(元)".to_string(),
+                "单重(Kg)".to_string(),
+            ],
+            rows: vec![
+                vec!["A阀".into(), "1,200".into(), "2.5kg".into()],
+                vec!["B阀".into(), "N/A".into(), "3".into()],
+                vec!["C阀".into(), "300".into(), "abc".into()],
+            ],
+        };
+        write_xlsx_table(src.join("1、校验厂_目录.xlsx"), &t1).unwrap();
+        let schema = MergeSchema {
+            name: "校验目录",
+            standard_columns: &["产品型号", "单价(元)", "单重(Kg)"],
+            column_variants: &[],
+            filename_suffixes: &["目录"],
+            unit_rules: &[],
+            value_columns: &["单价(元)"],
+            extra_columns: &["_source_file"],
+            skip_prefixes: &["consolidated"],
+            supplier_column: None,
+            dedup_columns: &[],
+            column_types: &[
+                ("单价(元)", ColumnType::Numeric),
+                ("单重(Kg)", ColumnType::Numeric),
+            ],
+        };
+        let out = dir.join("merge_validate_out.xlsx");
+        let report = merge_tables_with(&schema, &src, &out).unwrap();
+        assert_eq!(report.total_rows, 3);
+        // 非数值: B阀单价 "N/A", C阀单重 "abc" → 2 条警告; "1,200" 与 "2.5kg" 可解析不告警
+        assert_eq!(report.validation_warnings.len(), 2, "{:?}", report.validation_warnings);
+        assert!(report.validation_warnings[0].contains("单价(元)"), "{:?}", report.validation_warnings);
+        assert!(report.validation_warnings[0].contains("N/A"), "{:?}", report.validation_warnings);
+        assert!(report.validation_warnings[1].contains("单重(Kg)"), "{:?}", report.validation_warnings);
+        assert!(report.validation_warnings[1].contains("abc"), "{:?}", report.validation_warnings);
+    }
+
+    #[test]
+    fn test_d4_consolidate_tables() {
+        let dir = test_dir();
+        let src = dir.join("consolidate_src");
+        std::fs::create_dir_all(&src).unwrap();
+        // 两个 CSV 供应商文件, 列名变体不同
+        let t1 = TableData {
+            name: "a".to_string(),
+            headers: vec!["品名".to_string(), "BODY阀体".to_string(), "单价".to_string(), "单重".to_string()],
+            rows: vec![vec!["蝶阀".to_string(), "铸铁".to_string(), "305.69".to_string(), "8".to_string()]],
+        };
+        write_csv(src.join("1、甲工厂_报价模板.csv"), &t1, ',', false).unwrap();
+        let t2 = TableData {
+            name: "b".to_string(),
+            headers: vec![
+                "品名".to_string(),
+                "阀体".to_string(),
+                "单价(美元)".to_string(),
+                "重量(Kg)".to_string(),
+            ],
+            rows: vec![vec!["闸阀".to_string(), "不锈钢".to_string(), "42.5".to_string(), "12".to_string()]],
+        };
+        write_csv(src.join("2、乙工厂_报价模板.csv"), &t2, ',', false).unwrap();
+
+        let out = dir.join("consolidated.xlsx");
+        let report = consolidate_tables(&src, &out).unwrap();
+        assert_eq!(report.files_processed, 2);
+        assert_eq!(report.total_rows, 2);
+        assert!(report.usd_rows >= 1, "应检测到 USD 报价行");
+        assert!(out.exists());
+        // 回读验证归一化 + 供应商名 + 单重单位
+        let back = read_xlsx_table(&out).unwrap();
+        assert!(back.headers.iter().any(|h| h == "阀体材质"), "列名应归一化为标准列");
+        assert!(back.headers.iter().any(|h| h == "供应商名称"));
+        let suppliers: Vec<String> = (0..back.row_count())
+            .map(|i| back.cell(i, "供应商名称").unwrap_or("").to_string())
+            .collect();
+        assert!(suppliers.iter().any(|s| s.contains("甲工厂")));
+        assert!(suppliers.iter().any(|s| s.contains("乙工厂")));
+        // 单重带 kg
+        let weights: Vec<String> = (0..back.row_count())
+            .map(|i| back.cell(i, "单重(Kg)").unwrap_or("").to_string())
+            .collect();
+        assert!(weights.iter().any(|w| w.contains("kg")), "单重应带单位: {weights:?}");
+        std::fs::remove_file(&out).ok();
+    }
+
+    #[test]
+    fn test_d5_read_structured_json_yaml() {
+        let dir = test_dir();
+        let j = dir.join("cfg.json");
+        std::fs::write(&j, r#"{"name":"NeoTrix","level":5}"#).unwrap();
+        let s = read_structured(&j).unwrap();
+        assert_eq!(s.format, "json");
+        assert_eq!(s.value["name"], "NeoTrix");
+        let y = dir.join("cfg.yaml");
+        std::fs::write(&y, "name: NeoTrix\nlevel: 5\n").unwrap();
+        let sy = read_structured(&y).unwrap();
+        assert_eq!(sy.format, "yaml");
+        assert_eq!(sy.value["level"], 5);
+        std::fs::remove_file(&j).ok();
+        std::fs::remove_file(&y).ok();
+    }
+
+    #[test]
+    fn test_d5_write_json_roundtrip() {
+        let dir = test_dir();
+        let j = dir.join("out.json");
+        let v = serde_json::json!({"a": 1, "b": [true, null]});
+        write_json(&j, &v, true).unwrap();
+        let s = read_structured(&j).unwrap();
+        assert_eq!(s.value["a"], 1);
+        std::fs::remove_file(&j).ok();
+    }
+
+    #[test]
+    fn test_d6_snapshot_store_load() {
+        let dir = test_dir();
+        let path = dir.join("sample_snap.docx");
+        if !path.exists() {
+            create::create_from_markdown(
+                "# 快照测试\n\nHello {{name}}",
+                DocumentFormat::Docx,
+                &path,
+            )
+            .unwrap();
+        }
+        let ab = FileAbility::open(&path).unwrap();
+        let snap = ab.snapshot();
+        let out = dir.join("snapshot.json");
+        store_snapshot(&snap, &out).unwrap();
+        let loaded = load_snapshot(&out).unwrap();
+        assert_eq!(loaded.kind, snap.kind);
+        assert_eq!(loaded.size_bytes, snap.size_bytes);
+        std::fs::remove_file(&out).ok();
+        std::fs::remove_file(&path).ok();
+    }
+
+    // ── 真实数据端到端验证 (5月份价格表 26 家供应商) — 手动触发: --ignored ──
+
+    #[test]
+    #[ignore]
+    fn test_d4_consolidate_real_price_tables() {
+        let src = PathBuf::from("/Users/neo/Downloads/5月份价格表");
+        let out = src.join("native_consolidated_v2.xlsx");
+        let report = consolidate_tables(&src, &out).unwrap();
+        println!("files_processed={} total_rows={} usd_rows={} failed={:?}",
+            report.files_processed, report.total_rows, report.usd_rows, report.files_failed);
+        assert!(report.files_processed >= 20, "应合并多数供应商文件");
+        assert!(report.total_rows > 1000);
+        assert!(out.exists());
+        let back = read_xlsx_table(&out).unwrap();
+        assert!(back.headers.iter().any(|h| h == "阀体材质"), "材质列应归一化");
+        let usd_rates = (0..back.row_count())
+            .map(|i| back.cell(i, "美元报价(USD)").unwrap_or(""))
+            .filter(|s| !s.trim().is_empty())
+            .count();
+        println!("raw USD cells present: {usd_rates}");
+        // 单重单位抽查
+        let with_kg = (0..back.row_count())
+            .map(|i| back.cell(i, "单重(Kg)").unwrap_or(""))
+            .filter(|s| !s.trim().is_empty() && !s.contains("kg"))
+            .count();
+        println!("weight cells missing kg: {with_kg}");
+        assert_eq!(with_kg, 0, "所有非空单重应带 kg 单位");
     }
 
     #[test]

@@ -117,6 +117,7 @@ impl HotReloadWatcher {
         guard.iter().rev().cloned().collect()
     }
 
+    #[cfg(test)]
     fn record(&self, record: ReloadRecord) {
         if let Ok(mut guard) = self.history.lock() {
             guard.push(record);

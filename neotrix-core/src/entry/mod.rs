@@ -335,7 +335,14 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
                 .build()
                 .expect("HTTP server runtime");
             rt.block_on(async {
-                neotrix::neotrix::nt_io_web::server::start_server(http_port).await;
+                // L1 层禁止直接依赖 L8 (层边界守卫 arch_fitness_layer_boundary):
+                // 在 entry (bin 层) 构造 ReasoningBrain 后经 start_server_with 注入。
+                neotrix::neotrix::nt_io_web::server::start_server_with(
+                    http_port,
+                    Box::new(neotrix::neotrix::l8_autonomic_impl::nt_mind::ReasoningBrain::new()),
+                    neotrix::core::ReasoningBank::new(10000),
+                )
+                .await;
             });
         });
         // G3: SIGHUP → 配置热重载（kill -HUP <pid> 不重启即刷新 stealth-net 配置）
@@ -366,7 +373,7 @@ pub(crate) fn spawn_sighup_reload() -> tokio::task::JoinHandle<()> {
                     sig.recv().await;
                     #[cfg(feature = "stealth-net")]
                     {
-                        match crate::neotrix::nt_shield_stealth_net::config::reload() {
+                        match neotrix::neotrix::nt_shield_stealth_net::config::reload() {
                             Ok(_) => log::info!("[hotreload] SIGHUP: stealth-net config reloaded"),
                             Err(e) => log::warn!("[hotreload] SIGHUP reload failed: {}", e),
                         }
@@ -1013,7 +1020,7 @@ pub fn run_mcp_server() {
     server.register_all_tools();
     // 单调授权守卫: 阻断破坏性 shell 命令 (NT-SHIELD GuardChain 生产接线)
     {
-        use neotrix::l1_body_impl::nt_shield::guard_chain::GuardVerdict;
+        use neotrix::neotrix::l1_body_impl::nt_shield::guard_chain::GuardVerdict;
         server.add_guard("destructive_shell", |tool, args| {
             if tool != "execute_command" {
                 return GuardVerdict::Allow;

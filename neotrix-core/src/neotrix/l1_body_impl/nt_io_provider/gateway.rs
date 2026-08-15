@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, LazyLock, Mutex, RwLock, Weak};
 use std::time::{Duration, Instant};
 
 use super::agent_routing::AgentRoutingTable;
@@ -242,6 +242,425 @@ impl SubGrid {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Provider Reliability Suite (G: Response Caching / Healing / MarketRouter)
+// R-P42 强化既有 GatewayV2 — 不新建平行模块
+// ═══════════════════════════════════════════════════════════════════
+
+/// G: Response Caching — LRU 响应缓存, key 为 (model_id, messages) 的哈希。
+/// 容量默认 256 条, 超出按最久未使用 (LRU) 驱逐; 命中/未命中计数器暴露给遥测。
+#[derive(Debug)]
+pub struct ResponseCache {
+    entries: HashMap<u64, (String, u64)>,
+    capacity: usize,
+    tick: u64,
+    hit_count: u64,
+    miss_count: u64,
+}
+
+impl ResponseCache {
+    /// 默认容量 (条目数)
+    pub const DEFAULT_CAPACITY: usize = 256;
+
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: HashMap::with_capacity(capacity),
+            capacity: capacity.max(1),
+            tick: 0,
+            hit_count: 0,
+            miss_count: 0,
+        }
+    }
+
+    /// 构造 (model_id, messages) → 规范化 key 字符串 (供内部哈希使用)
+    pub fn key_for(model_id: &str, messages: &[Message]) -> String {
+        let body = messages
+            .iter()
+            .map(|m| format!("{:?}:{}", m.role, m.content))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("{}|{}", model_id, body)
+    }
+
+    /// 确定性哈希 (std DefaultHasher, 无外部依赖)
+    fn hash_key(key: &str) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    /// 查询缓存 — 命中刷新 LRU 时间戳并返回克隆的响应文本
+    pub fn cache(&mut self, key: &str) -> Option<String> {
+        let hash = Self::hash_key(key);
+        if let Some((resp, last_used)) = self.entries.get_mut(&hash) {
+            self.tick += 1;
+            *last_used = self.tick;
+            self.hit_count += 1;
+            return Some(resp.clone());
+        }
+        self.miss_count += 1;
+        None
+    }
+
+    /// 写入缓存 — 已存在则刷新, 满容量驱逐最久未使用条目
+    pub fn insert(&mut self, key: &str, response: String) {
+        let hash = Self::hash_key(key);
+        self.tick += 1;
+        if let Some(entry) = self.entries.get_mut(&hash) {
+            *entry = (response, self.tick);
+            return;
+        }
+        if self.entries.len() >= self.capacity {
+            let lru_key = self
+                .entries
+                .iter()
+                .min_by_key(|(_, (_, t))| *t)
+                .map(|(k, _)| *k);
+            if let Some(k) = lru_key {
+                self.entries.remove(&k);
+            }
+        }
+        self.entries.insert(hash, (response, self.tick));
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn hit_count(&self) -> u64 {
+        self.hit_count
+    }
+
+    pub fn miss_count(&self) -> u64 {
+        self.miss_count
+    }
+}
+
+/// G: Response Healing — 修复 LLM 输出的畸形 JSON 响应。
+/// 修复链: 提取 (```json 围栏 / 散文包裹) → 去尾部逗号 → 闭合未闭合括号。
+/// 无法修复时返回原始文本; heal / unrepairable 计数器暴露给遥测。
+#[derive(Debug, Default)]
+pub struct ResponseHealer {
+    heal_count: u64,
+    unrepairable_count: u64,
+}
+
+impl ResponseHealer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn heal(&mut self, raw: &str) -> String {
+        // 已是合法 JSON → 原样返回 (不计数为修复)
+        if serde_json::from_str::<serde_json::Value>(raw).is_ok() {
+            return raw.to_string();
+        }
+        let extracted = self.extract_json(raw);
+        let trimmed = self.trim_trailing_commas(&extracted);
+        let closed = self.close_unclosed(&trimmed);
+        if serde_json::from_str::<serde_json::Value>(&closed).is_ok() {
+            self.heal_count += 1;
+            return closed;
+        }
+        self.unrepairable_count += 1;
+        raw.to_string()
+    }
+
+    /// 提取 JSON: 优先 ```json 围栏, 否则取首个 `{`/`[` 到深度归零的闭合区间
+    fn extract_json(&self, raw: &str) -> String {
+        let trimmed = raw.trim();
+        // 1. ```json ... ``` 围栏提取
+        if let Some(fence) = trimmed.find("```json") {
+            let after = &trimmed[fence + "```json".len()..];
+            let content = match after.find("```") {
+                Some(end) => &after[..end],
+                None => after,
+            };
+            let c = content.trim();
+            return if c.is_empty() {
+                raw.to_string()
+            } else {
+                c.to_string()
+            };
+        }
+        // 2. 首个 `{` / `[` → 深度归零的 JSON 区间
+        let chars: Vec<char> = trimmed.chars().collect();
+        let mut start = None;
+        for (i, c) in chars.iter().enumerate() {
+            if *c == '{' || *c == '[' {
+                start = Some(i);
+                break;
+            }
+        }
+        let start = match start {
+            Some(s) => s,
+            None => return raw.to_string(),
+        };
+        let mut depth = 0i32;
+        let mut in_string = false;
+        let mut escaped = false;
+        let mut end = chars.len();
+        for (i, c) in chars.iter().enumerate().skip(start) {
+            if in_string {
+                if escaped {
+                    escaped = false;
+                } else if *c == '\\' {
+                    escaped = true;
+                } else if *c == '"' {
+                    in_string = false;
+                }
+                continue;
+            }
+            match *c {
+                '"' => in_string = true,
+                '{' | '[' => depth += 1,
+                '}' | ']' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        chars[start..end].iter().collect::<String>().trim().to_string()
+    }
+
+    /// 去除对象/数组内的尾部逗号 (字符串感知, 保持 UTF-8 内容不变)
+    fn trim_trailing_commas(&self, s: &str) -> String {
+        let chars: Vec<char> = s.chars().collect();
+        let n = chars.len();
+        let mut out = String::with_capacity(s.len());
+        let mut i = 0;
+        let mut in_string = false;
+        let mut escaped = false;
+        while i < n {
+            let c = chars[i];
+            if in_string {
+                out.push(c);
+                if escaped {
+                    escaped = false;
+                } else if c == '\\' {
+                    escaped = true;
+                } else if c == '"' {
+                    in_string = false;
+                }
+                i += 1;
+                continue;
+            }
+            if c == '"' {
+                in_string = true;
+                out.push('"');
+                i += 1;
+                continue;
+            }
+            if c == ',' {
+                let mut j = i + 1;
+                while j < n && chars[j].is_whitespace() {
+                    j += 1;
+                }
+                if j < n && (chars[j] == '}' || chars[j] == ']') {
+                    i += 1;
+                    continue;
+                }
+            }
+            out.push(c);
+            i += 1;
+        }
+        out
+    }
+
+    /// 按栈式配对闭合未闭合的 `{` / `[` (字符串感知)
+    fn close_unclosed(&self, s: &str) -> String {
+        let mut out = String::with_capacity(s.len() + 4);
+        let mut stack: Vec<char> = Vec::new();
+        let mut in_string = false;
+        let mut escaped = false;
+        for c in s.chars() {
+            if in_string {
+                out.push(c);
+                if escaped {
+                    escaped = false;
+                } else if c == '\\' {
+                    escaped = true;
+                } else if c == '"' {
+                    in_string = false;
+                }
+                continue;
+            }
+            match c {
+                '"' => {
+                    in_string = true;
+                    out.push('"');
+                }
+                '{' => {
+                    stack.push('{');
+                    out.push('{');
+                }
+                '[' => {
+                    stack.push('[');
+                    out.push('[');
+                }
+                '}' => {
+                    if stack.last() == Some(&'{') {
+                        stack.pop();
+                        out.push('}');
+                    } else if stack.last() == Some(&'[') {
+                        // 栈顶为 `[`: 先补其正确闭合符, 再处理当前 `}`
+                        stack.pop();
+                        out.push(']');
+                        stack.pop();
+                        out.push('}');
+                    }
+                    // 栈空时多余的 `}` 跳过, 避免输出畸形
+                }
+                ']' => {
+                    if stack.last() == Some(&'[') {
+                        stack.pop();
+                        out.push(']');
+                    } else if stack.last() == Some(&'{') {
+                        stack.pop();
+                        out.push('}');
+                        stack.pop();
+                        out.push(']');
+                    }
+                }
+                _ => out.push(c),
+            }
+        }
+        while let Some(open) = stack.pop() {
+            out.push(match open {
+                '{' => '}',
+                _ => ']',
+            });
+        }
+        out
+    }
+
+    pub fn heal_count(&self) -> u64 {
+        self.heal_count
+    }
+
+    pub fn unrepairable_count(&self) -> u64 {
+        self.unrepairable_count
+    }
+}
+
+/// G: market-wisdom 路由 + Auto Exacto 周期重估。
+/// 维护每 provider 的市场权重 (success_rate / composite_score / avg_latency 加权混合),
+/// `re_evaluate()` 每隔 N 分钟 (默认 5min, 可经构造器注入短间隔) 重算一次权重;
+/// `route()` 按权重返回最佳 provider index。
+#[derive(Debug)]
+pub struct MarketRouter {
+    interval: Duration,
+    last_eval: Instant,
+    weights: Vec<f64>,
+    eval_count: u64,
+}
+
+impl MarketRouter {
+    /// 默认重估间隔: 5 分钟
+    pub const DEFAULT_INTERVAL: Duration = Duration::from_secs(300);
+
+    pub fn new() -> Self {
+        Self::with_interval(Self::DEFAULT_INTERVAL)
+    }
+
+    /// 可配置重估间隔 (测试注入短间隔)
+    pub fn with_interval(interval: Duration) -> Self {
+        Self {
+            interval,
+            last_eval: Instant::now(),
+            weights: Vec::new(),
+            eval_count: 0,
+        }
+    }
+
+    /// 周期重估: 距上次重估超过 `interval` (或首次) 时重算全部权重。
+    /// 返回是否真的重估了。
+    pub fn re_evaluate(&mut self, providers: &[&ProviderState]) -> bool {
+        let due = self.weights.is_empty() || self.last_eval.elapsed() >= self.interval;
+        if !due {
+            return false;
+        }
+        self.weights = providers.iter().map(|s| market_weight(s)).collect();
+        self.last_eval = Instant::now();
+        self.eval_count += 1;
+        true
+    }
+
+    /// 返回最佳 provider index (不可用 / 权重 <= 0 者跳过); 无可用返回 None
+    pub fn route(&mut self, providers: &[&mut ProviderState]) -> Option<usize> {
+        if providers.is_empty() {
+            return None;
+        }
+        let refs: Vec<&ProviderState> = providers.iter().map(|p| &**p).collect();
+        let _ = self.re_evaluate(&refs);
+        drop(refs);
+        let mut best: Option<(usize, f64)> = None;
+        for (i, p) in providers.iter().enumerate() {
+            let w = self
+                .weights
+                .get(i)
+                .copied()
+                .unwrap_or_else(|| market_weight(p));
+            if w <= 0.0 {
+                continue;
+            }
+            if best.map(|(_, bw)| w > bw).unwrap_or(true) {
+                best = Some((i, w));
+            }
+        }
+        best.map(|(i, _)| i)
+    }
+
+    pub fn weights(&self) -> &[f64] {
+        &self.weights
+    }
+
+    pub fn eval_count(&self) -> u64 {
+        self.eval_count
+    }
+}
+
+impl Default for MarketRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 单 provider 的市场权重: success_rate + composite_score + avg_latency 加权混合
+fn market_weight(s: &ProviderState) -> f64 {
+    if !s.is_available() {
+        return 0.0;
+    }
+    let success = s.success_ema.clamp(0.0, 1.0);
+    // avg latency factor: 越低越优 (无样本时视为最优 1.0)
+    let avg_latency = if s.latency_window.is_empty() {
+        0.0
+    } else {
+        s.latency_window.iter().sum::<f64>() / s.latency_window.len() as f64
+    };
+    let latency_factor = if avg_latency > 0.0 {
+        (1.0 / (avg_latency / 1000.0).max(0.1)).min(1.0)
+    } else {
+        1.0
+    };
+    // composite_score 归一化到 ~[0,1]
+    let composite_factor = (s.composite_score() / 1.5).clamp(0.0, 1.0);
+    success * 0.4 + composite_factor * 0.4 + latency_factor * 0.2
+}
+
 pub struct GatewayV2 {
     providers: HashMap<String, Box<dyn LlmProvider>>,
     states: RwLock<HashMap<String, ProviderState>>,
@@ -256,6 +675,14 @@ pub struct GatewayV2 {
     /// 组合的子网格映射: 子网格名称 -> SubGrid
     /// 支持动态组合已有节点能力构建安全隐匿的通信小循环
     sub_grids: RwLock<HashMap<String, SubGrid>>,
+    /// G: Response Caching — LRU 响应缓存实例 (默认关闭)
+    pub response_cache: Mutex<ResponseCache>,
+    response_cache_enabled: bool,
+    /// G: Response Healing — 畸形 JSON 修复器实例 (默认关闭)
+    pub response_healer: Mutex<ResponseHealer>,
+    response_healer_enabled: bool,
+    /// G: MarketRouter — market-wisdom 路由 + Auto Exacto 周期重估
+    pub market_router: Mutex<MarketRouter>,
 }
 
 impl GatewayV2 {
@@ -272,6 +699,11 @@ impl GatewayV2 {
             cache: Mutex::new(SemanticCache::new(CacheConfig::default())),
             cost_budget_per_query: 0.02,
             sub_grids: RwLock::new(HashMap::new()),
+            response_cache: Mutex::new(ResponseCache::new(ResponseCache::DEFAULT_CAPACITY)),
+            response_cache_enabled: false,
+            response_healer: Mutex::new(ResponseHealer::new()),
+            response_healer_enabled: false,
+            market_router: Mutex::new(MarketRouter::new()),
         }
     }
 
@@ -289,6 +721,83 @@ impl GatewayV2 {
 
     pub fn set_cost_budget(&mut self, budget: f64) {
         self.cost_budget_per_query = budget;
+    }
+
+    // ── G: Provider Reliability Suite 接线 ──────────────────────────
+
+    /// 开关 LRU 响应缓存 (G: Response Caching)
+    pub fn enable_response_cache(&mut self, enabled: bool) {
+        self.response_cache_enabled = enabled;
+    }
+
+    pub fn response_cache_enabled(&self) -> bool {
+        self.response_cache_enabled
+    }
+
+    /// LRU 响应缓存命中计数 (遥测可见)
+    pub fn response_cache_hits(&self) -> u64 {
+        self.response_cache.lock().map(|c| c.hit_count()).unwrap_or(0)
+    }
+
+    pub fn response_cache_len(&self) -> usize {
+        self.response_cache.lock().map(|c| c.len()).unwrap_or(0)
+    }
+
+    /// 开关畸形 JSON 修复 (G: Response Healing)
+    pub fn set_response_healer(&mut self, enabled: bool) {
+        self.response_healer_enabled = enabled;
+    }
+
+    pub fn response_healer_enabled(&self) -> bool {
+        self.response_healer_enabled
+    }
+
+    /// 修复器计数 (heal, unrepairable)
+    pub fn response_healer_counters(&self) -> (u64, u64) {
+        match self.response_healer.lock() {
+            Ok(h) => (h.heal_count(), h.unrepairable_count()),
+            Err(_) => (0, 0),
+        }
+    }
+
+    /// G: MarketRouter 周期重估 tick hook — 从当前 states 重算市场权重。
+    /// 由外部循环 (Auto Exacto) 周期性调用; 内部受 5min 间隔约束。
+    /// `&self` (纯内部锁) — 使 Arc<GatewayV2> 可直接被后台循环 tick。
+    pub fn maybe_re_evaluate(&self) -> bool {
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
+        let refs: Vec<&ProviderState> = states.values().collect();
+        match self.market_router.lock() {
+            Ok(mut router) => router.re_evaluate(&refs),
+            Err(e) => {
+                log::warn!("[gateway] market_router Mutex poisoned: {}", e);
+                false
+            }
+        }
+    }
+
+    /// G: Response Healing + Caching — 成功响应后处理 (修复畸形 JSON, 回写 LRU 缓存)
+    fn heal_and_cache_response(&self, request: &LlmRequest, response: LlmResponse) -> LlmResponse {
+        let mut response = response;
+        if self.response_healer_enabled {
+            if let Ok(mut healer) = self.response_healer.lock() {
+                if response.content.contains('{') || response.content.contains('[') {
+                    response.content = healer.heal(&response.content);
+                }
+            }
+        }
+        if self.response_cache_enabled {
+            let rc_key = ResponseCache::key_for(&request.model, &request.messages);
+            if let Ok(mut rc) = self.response_cache.lock() {
+                match serde_json::to_string(&response) {
+                    Ok(serialized) => rc.insert(&rc_key, serialized),
+                    Err(_) => rc.insert(&rc_key, response.content.clone()),
+                }
+            }
+        }
+        response
     }
 
     /// 缓存 key 硬化: 除消息内容外, 纳入会影响响应语义的请求指纹
@@ -949,6 +1458,18 @@ impl GatewayV2 {
             }
         }
 
+        // Layer 1.5: LRU response cache (G: Response Caching) — 命中直接返回
+        if self.response_cache_enabled {
+            let rc_key = ResponseCache::key_for(&request.model, &request.messages);
+            if let Ok(mut rc) = self.response_cache.lock() {
+                if let Some(cached) = rc.cache(&rc_key) {
+                    if let Ok(response) = serde_json::from_str::<LlmResponse>(&cached) {
+                        return Ok(response);
+                    }
+                }
+            }
+        }
+
         // Create telemetry span for this multi-provider attempt
         let mut telemetry_span = match self.tracer.read() {
             Ok(guard) => guard.as_ref().map(|t| {
@@ -1063,6 +1584,8 @@ impl GatewayV2 {
                             );
                         }
                     }
+                    // G: Response Healing + Caching — 修复畸形 JSON, 回写 LRU 缓存
+                    let response = self.heal_and_cache_response(request, response);
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
@@ -1297,6 +1820,8 @@ impl GatewayV2 {
                             }
                         }
                     }
+                    // G: Response Healing + Caching — 修复畸形 JSON, 回写 LRU 缓存
+                    let response = self.heal_and_cache_response(request, response);
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
@@ -1780,6 +2305,51 @@ impl ChallengeTask {
             .to_lowercase()
             .contains(&self.expected.to_lowercase())
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Auto Exacto 周期重估注册表 (R-P79 生产接线)
+// GatewayV2 在各子系统各自持有 (SEAL 推理引擎 / subagent 共享缓存 / 会话网关),
+// 后台循环无法直接引用某个实例。这里提供进程级注册表 (Weak 防泄漏) —
+// NT-MIND 后台循环每 5min 经 run_periodic_re_evaluation() 统一 tick,
+// 使市场权重重估由生产调度驱动, 而非仅依赖 route() 惰性触发。
+// ═══════════════════════════════════════════════════════════════════
+
+/// 进程级活跃 GatewayV2 注册表 — Weak 持有, 网关释放后自动剔除。
+pub static RE_EVALUATION_GATEWAYS: LazyLock<Mutex<Vec<Weak<GatewayV2>>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// 注册一个进程级共享 GatewayV2 参与 Auto Exacto 周期重估。
+/// 生产共享网关创建点 (SEAL 推理引擎 / subagent 静态缓存) 调用;
+/// Weak 持有 — 网关被释放后由下一次 tick 剔除, 不泄漏。
+pub fn register_gateway_for_re_evaluation(gateway: &Arc<GatewayV2>) {
+    if let Ok(mut registry) = RE_EVALUATION_GATEWAYS.lock() {
+        registry.retain(|w| w.strong_count() > 0);
+        registry.push(Arc::downgrade(gateway));
+    }
+}
+
+/// 周期驱动 Auto Exacto 重估 — 遍历注册的活跃 GatewayV2 调用
+/// [`GatewayV2::maybe_re_evaluate`]。返回本次实际触发重估的网关数
+/// (每个网关内部受各自 5min 间隔约束, 未到期返回 false 不计数)。
+pub fn run_periodic_re_evaluation() -> usize {
+    let mut registry = match RE_EVALUATION_GATEWAYS.lock() {
+        Ok(reg) => reg,
+        Err(e) => {
+            log::warn!("[gateway] re-evaluation registry poisoned: {}", e);
+            e.into_inner()
+        }
+    };
+    registry.retain(|w| w.strong_count() > 0);
+    let mut evaluated = 0usize;
+    for weak in registry.iter() {
+        if let Some(gw) = weak.upgrade() {
+            if gw.maybe_re_evaluate() {
+                evaluated += 1;
+            }
+        }
+    }
+    evaluated
 }
 
 impl Default for GatewayV2 {
@@ -2974,5 +3544,263 @@ mod tests {
             buf
         );
         println!("E2E-OK streamed: {:?}", buf);
+    }
+}
+
+/// Provider Reliability Suite (G: Response Caching / Healing / MarketRouter) 单元测试
+#[cfg(test)]
+mod provider_reliability_tests {
+    use super::*;
+
+    // ── ResponseCache (G: Response Caching) ─────────────────────────
+
+    #[test]
+    fn test_response_cache_hit_after_insert() {
+        let mut cache = ResponseCache::new(8);
+        let key = ResponseCache::key_for(
+            "llm7/codestral-latest",
+            &[Message::new(Role::User, "hello")],
+        );
+        assert_eq!(cache.cache(&key), None, "未插入前不应命中");
+        cache.insert(&key, "{\"content\":\"hi\"}".to_string());
+        assert_eq!(cache.cache(&key), Some("{\"content\":\"hi\"}".to_string()));
+        assert_eq!(cache.hit_count(), 1);
+        assert_eq!(cache.miss_count(), 1, "初始未命中查询应计为 1 次 miss");
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_response_cache_evicts_lru_at_capacity() {
+        let mut cache = ResponseCache::new(3);
+        cache.insert("k1", "v1".to_string());
+        cache.insert("k2", "v2".to_string());
+        cache.insert("k3", "v3".to_string());
+        // 触碰 k1 → k2 成为最久未使用
+        assert_eq!(cache.cache("k1"), Some("v1".to_string()));
+        cache.insert("k4", "v4".to_string());
+        assert_eq!(cache.len(), 3, "容量 3, 插入第 4 条应驱逐一条");
+        assert_eq!(cache.cache("k2"), None, "k2 应被驱逐 (LRU)");
+        assert_eq!(cache.cache("k1"), Some("v1".to_string()), "k1 最近使用, 应保留");
+        assert_eq!(cache.cache("k3"), Some("v3".to_string()));
+        assert_eq!(cache.cache("k4"), Some("v4".to_string()));
+    }
+
+    #[test]
+    fn test_response_cache_capacity_bound() {
+        let cache = ResponseCache::new(256);
+        assert_eq!(cache.capacity(), 256);
+        assert!(cache.is_empty());
+        let min_cap = ResponseCache::new(0);
+        assert_eq!(min_cap.capacity(), 1, "容量下限为 1");
+    }
+
+    #[test]
+    fn test_gateway_response_cache_toggle_and_counters() {
+        let mut gw = GatewayV2::new();
+        assert!(!gw.response_cache_enabled(), "缓存默认关闭");
+        gw.enable_response_cache(true);
+        assert!(gw.response_cache_enabled());
+        {
+            let mut rc = gw.response_cache.lock().unwrap();
+            rc.insert("k", "v".into());
+            assert_eq!(rc.cache("k"), Some("v".into()));
+        }
+        assert_eq!(gw.response_cache_hits(), 1, "命中计数器应接线到 gateway");
+        assert_eq!(gw.response_cache_len(), 1);
+    }
+
+    // ── ResponseHealer (G: Response Healing) ────────────────────────
+
+    #[test]
+    fn test_healer_fixes_trailing_comma() {
+        let mut healer = ResponseHealer::new();
+        let healed = healer.heal("{\"a\": 1, \"b\": [2, 3,],}");
+        assert_eq!(healed, "{\"a\": 1, \"b\": [2, 3]}");
+        assert_eq!(healer.heal_count(), 1);
+        assert_eq!(healer.unrepairable_count(), 0);
+    }
+
+    #[test]
+    fn test_healer_closes_unclosed_brace() {
+        let mut healer = ResponseHealer::new();
+        let healed = healer.heal("{\"a\": {\"b\": [1, 2}");
+        assert_eq!(healed, "{\"a\": {\"b\": [1, 2]}}");
+        assert_eq!(healer.heal_count(), 1);
+    }
+
+    #[test]
+    fn test_healer_leaves_valid_json_untouched() {
+        let mut healer = ResponseHealer::new();
+        let raw = "{\"ok\": true, \"list\": [1, 2, 3]}";
+        assert_eq!(healer.heal(raw), raw);
+        assert_eq!(healer.heal_count(), 0, "合法 JSON 不应计为修复");
+    }
+
+    #[test]
+    fn test_healer_extracts_fenced_json() {
+        let mut healer = ResponseHealer::new();
+        let raw = "Here is the JSON:\n```json\n{\"a\": 1,}\n```\nHope this helps.";
+        assert_eq!(healer.heal(raw), "{\"a\": 1}");
+        assert_eq!(healer.heal_count(), 1);
+    }
+
+    #[test]
+    fn test_healer_extracts_prose_wrapped_json() {
+        let mut healer = ResponseHealer::new();
+        let raw = "Sure! Here is the answer: {\"a\": [1, 2,], \"b\": 2} and that's it.";
+        assert_eq!(healer.heal(raw), "{\"a\": [1, 2], \"b\": 2}");
+        assert_eq!(healer.heal_count(), 1);
+    }
+
+    #[test]
+    fn test_healer_unrepairable_returns_original() {
+        let mut healer = ResponseHealer::new();
+        let raw = "definitely not json at all";
+        assert_eq!(healer.heal(raw), raw);
+        assert_eq!(healer.unrepairable_count(), 1);
+        assert_eq!(healer.heal_count(), 0);
+    }
+
+    #[test]
+    fn test_gateway_response_healer_toggle_and_counters() {
+        let mut gw = GatewayV2::new();
+        assert!(!gw.response_healer_enabled(), "修复器默认关闭");
+        gw.set_response_healer(true);
+        assert!(gw.response_healer_enabled());
+        {
+            let mut h = gw.response_healer.lock().unwrap();
+            h.heal("{\"a\": 1,}");
+        }
+        let (heal, unrep) = gw.response_healer_counters();
+        assert_eq!(heal, 1, "heal 计数器应接线到 gateway");
+        assert_eq!(unrep, 0);
+    }
+
+    // ── MarketRouter (G: market-wisdom routing) ─────────────────────
+
+    #[test]
+    fn test_router_picks_highest_composite_score() {
+        let mut router = MarketRouter::new();
+        let mut a = ProviderState::new(false, ProviderCategory::Cloud);
+        let mut b = ProviderState::new(false, ProviderCategory::Cloud);
+        for _ in 0..5 {
+            a.record_success(100.0, 10);
+            b.record_failure(1000.0);
+        }
+        assert!(
+            a.composite_score() > b.composite_score(),
+            "a composite={} b composite={}",
+            a.composite_score(),
+            b.composite_score()
+        );
+        let providers = [&mut a, &mut b];
+        assert_eq!(router.route(&providers), Some(0), "应选 composite_score 更高者");
+    }
+
+    #[test]
+    fn test_router_returns_none_for_empty_or_unavailable() {
+        let mut router = MarketRouter::new();
+        assert_eq!(router.route(&[]), None, "空列表应返回 None");
+        let mut dead = ProviderState::new(false, ProviderCategory::Cloud);
+        for _ in 0..6 {
+            dead.record_failure(500.0);
+        }
+        let providers = [&mut dead];
+        assert_eq!(router.route(&providers), None, "不可用 provider 不应被选中");
+    }
+
+    #[test]
+    fn test_router_re_evaluate_updates_weights_with_short_interval() {
+        // 短间隔构造 (1ms) → 首次重估立即执行并更新权重
+        let mut router = MarketRouter::with_interval(Duration::from_millis(1));
+        let mut a = ProviderState::new(true, ProviderCategory::Cloud);
+        a.record_success(50.0, 10);
+        let providers = [&a];
+        assert!(router.re_evaluate(&providers), "首次重估应立即执行");
+        assert_eq!(router.weights().len(), 1);
+        assert!(router.weights()[0] > 0.0, "健康 provider 权重应 > 0");
+        assert_eq!(router.eval_count(), 1);
+    }
+
+    #[test]
+    fn test_router_re_evaluate_respects_default_interval() {
+        // 默认 5 分钟: 首次重估后, 间隔未到不得再次重估
+        let mut router = MarketRouter::new();
+        let mut a = ProviderState::new(true, ProviderCategory::Cloud);
+        a.record_success(50.0, 10);
+        let providers = [&a];
+        assert!(router.re_evaluate(&providers), "首次重估应立即执行");
+        assert_eq!(router.weights().len(), 1);
+        assert!(
+            !router.re_evaluate(&providers),
+            "默认 5 分钟间隔未到, 不应重估"
+        );
+        assert_eq!(router.eval_count(), 1);
+        assert_eq!(MarketRouter::DEFAULT_INTERVAL, Duration::from_secs(300));
+    }
+
+    #[test]
+    fn test_gateway_market_router_tick_hook() {
+        let mut gw = GatewayV2::new();
+        {
+            let mut states = gw.states.write().unwrap();
+            states.insert("p1".into(), ProviderState::new(true, ProviderCategory::Cloud));
+            states.insert(
+                "p2".into(),
+                ProviderState::new(false, ProviderCategory::Cloud),
+            );
+        }
+        assert!(gw.maybe_re_evaluate(), "首次 tick 应触发重估");
+        assert!(!gw.maybe_re_evaluate(), "5 分钟间隔内不应重估");
+        let router = gw.market_router.lock().unwrap();
+        assert_eq!(router.eval_count(), 1);
+        assert_eq!(router.weights().len(), 2, "权重应按注册 provider 数重算");
+    }
+
+    // ── Auto Exacto 周期重估注册表 (R-P79 生产接线) ──────────────
+    // 注册表是进程级全局 — 两个共享该全局的测试用互斥锁串行, 避免并行竞态。
+    static REGISTRY_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn test_periodic_re_evaluation_via_registry() {
+        let _guard = REGISTRY_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // 注册的 GatewayV2 经 run_periodic_re_evaluation() 周期触发重估
+        let mut gw = GatewayV2::new();
+        {
+            let mut states = gw.states.write().unwrap();
+            states.insert("p1".into(), ProviderState::new(true, ProviderCategory::Cloud));
+        }
+        let gw = Arc::new(gw);
+        register_gateway_for_re_evaluation(&gw);
+        assert_eq!(
+            run_periodic_re_evaluation(),
+            1,
+            "首次周期 tick 应触发重估"
+        );
+        assert_eq!(
+            run_periodic_re_evaluation(),
+            0,
+            "5 分钟间隔内周期 tick 不应重复重估"
+        );
+        assert_eq!(
+            gw.market_router.lock().unwrap().eval_count(),
+            1,
+            "market_router 只应被重估一次"
+        );
+    }
+
+    #[test]
+    fn test_periodic_re_evaluation_prunes_dropped_gateway() {
+        let _guard = REGISTRY_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // Weak 注册表: 网关释放后周期 tick 自动剔除, 不 panic 不计数
+        {
+            let gw = Arc::new(GatewayV2::new());
+            register_gateway_for_re_evaluation(&gw);
+        }
+        assert_eq!(
+            run_periodic_re_evaluation(),
+            0,
+            "已释放网关不应被周期 tick 计入"
+        );
     }
 }

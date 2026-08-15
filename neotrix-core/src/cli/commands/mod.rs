@@ -49,6 +49,7 @@ pub mod self_audit_cmds;
 pub mod comm_cmds;
 pub mod acp_cmds;
 pub mod chain_cmds;
+pub mod quantum_cmds;
 
 pub use types::*;
 pub use sandbox_cmds::*;
@@ -92,3 +93,4 @@ pub use osint_cmds::*;
 pub use self_audit_cmds::*;
 pub use acp_cmds::*;
 pub use chain_cmds::*;
+pub use quantum_cmds::*;

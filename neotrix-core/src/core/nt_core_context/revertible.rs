@@ -223,4 +223,57 @@ mod tests {
         ctx.undo_last();
         assert_eq!(*ctx.state(), "");
     }
+
+    // ── C2 集成测试: 生产消费形态 (借用状态 + 事务回滚) ──
+    // 复刻 nt_io_plugin/registry.rs::load_batch 的真实消费形态: RevertibleContext
+    // 以 `&mut *self` 借用状态, 批内失败 → recover() 整体回滚 (all-or-nothing)。
+    // R-P79 验证: revertible_effects 被 registry 生产路径消费 (registry.rs:83/131)。
+
+    /// 模拟注册表: 与 InnerRegistry 同构的最小借用状态。
+    #[derive(Default)]
+    struct FakeRegistry {
+        plugins: std::collections::HashMap<String, String>,
+    }
+
+    #[test]
+    fn test_borrowed_state_transaction_rollback() {
+        // 消费形态 = RevertibleContext::new(&mut *self) — 借用状态 (registry.rs:83)
+        let mut reg = FakeRegistry::default();
+        {
+            let mut ctx = RevertibleContext::new(&mut reg);
+            ctx.track(add_effect(
+                "load:alpha",
+                |r: &mut &mut FakeRegistry| { r.plugins.insert("alpha".into(), "v1".into()); },
+                |r: &mut &mut FakeRegistry| { r.plugins.remove("alpha"); },
+            ));
+            assert!(ctx.state().plugins.contains_key("alpha"));
+            // 模拟第二个插件 on_load 失败 → 整批回滚
+            ctx.recover();
+        }
+        assert!(!reg.plugins.contains_key("alpha"), "transaction rolled back");
+    }
+
+    #[test]
+    fn test_borrowed_state_partial_then_undo() {
+        let mut reg = FakeRegistry::default();
+        {
+            let mut ctx = RevertibleContext::new(&mut reg);
+            ctx.track(add_effect(
+                "load:a",
+                |r: &mut &mut FakeRegistry| { r.plugins.insert("a".into(), "1".into()); },
+                |r: &mut &mut FakeRegistry| { r.plugins.remove("a"); },
+            ));
+            ctx.track(add_effect(
+                "load:b",
+                |r: &mut &mut FakeRegistry| { r.plugins.insert("b".into(), "2".into()); },
+                |r: &mut &mut FakeRegistry| { r.plugins.remove("b"); },
+            ));
+            // 撤销 a (栈中间) — 模拟 revert_key 在借用状态下的消费
+            assert!(ctx.revert_key("load:a"));
+            assert!(!ctx.state().plugins.contains_key("a"));
+            assert!(ctx.state().plugins.contains_key("b"));
+            ctx.recover();
+        }
+        assert!(reg.plugins.is_empty(), "full rollback on borrow");
+    }
 }

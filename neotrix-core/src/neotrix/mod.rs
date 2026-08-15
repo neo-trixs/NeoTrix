@@ -219,11 +219,15 @@ pub mod proxy_daemon_wrapper;
 // + image crate (图像元数据)。复用 ConstellationLevel 成熟度 + SelfTest T1-T3 接线。
 // Dark Forest 合规: 模块需有消费者方可存活，每次编辑后需 register_consumer
 pub use nt_file_ability::{
-    check_health, content_similarity, create_from_markdown, embed_text, extract_text,
-    replace_placeholder, route_attention, save_edited, specialist_index, to_markdown,
-    ContentSnapshot, FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation,
-    ImageMetadata, OcrEngine, OcrResult, RuleBasedOcr, SheetCellData, SheetCellValueType,
-    SheetData, SheetRowData,
+    check_health, consolidate_tables, content_similarity, create_from_markdown, decode_bytes,
+    detect_encoding, embed_text, extract_text, load_snapshot, merge_tables_with,
+    normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
+    replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
+    to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport, ContentSnapshot,
+    FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation, ImageMetadata,
+    MergeSchema, OcrEngine, OcrResult, PRICE_STANDARD_COLUMNS, PRICE_TABLE_SCHEMA, RuleBasedOcr,
+    SheetCellData, SheetCellValueType, SheetData, SheetRowData, StructuredData, TableData,
+    TextEncoding, UnitRule,
 };
 
 // ─── L7 Capability Tree 採入 (经验 → 能力节点迭代目标) ─────────────────────

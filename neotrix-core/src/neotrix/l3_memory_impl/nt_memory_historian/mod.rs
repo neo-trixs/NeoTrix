@@ -5,6 +5,7 @@ pub mod nt_evidence_factory_gate;
 pub mod nt_evidence_hypothesis;
 pub mod nt_evidence_credibility;
 pub mod nt_evidence_temporal;
+pub mod nt_temporal_facts;
 pub mod dmn_consolidation;
 
 pub use nt_evidence_types::{
@@ -27,6 +28,7 @@ pub use nt_evidence_temporal::{
     AnachronismDetector, TemporalEvidenceTracker, TemporalRelation, TemporalTrend,
     TimelineReconstructor, TrendDirection, allen_relation,
 };
+pub use nt_temporal_facts::{TemporalFact, TemporalFactLedger};
 pub use dmn_consolidation::{
     ConsolidationReport, DMNConsolidation, DmnConfig, DmnStats, FamiliarityWeightedRetrieval,
     LearnedGraphExecutor, MemoryItem, MemoryTier, ThreeTierStore,

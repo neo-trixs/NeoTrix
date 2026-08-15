@@ -1166,6 +1166,15 @@ mod tests {
             vsa_expander: std::sync::RwLock::new(
                 crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_vsa_expand::VsaAssociativeExpander::default(),
             ),
+            retrieval_evolver: std::sync::RwLock::new(
+                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_search::RetrievalEvolver::new(),
+            ),
+            temporal_ledger: std::sync::Mutex::new(
+                crate::neotrix::l3_memory_impl::nt_memory_historian::TemporalFactLedger::open(
+                    Some(std::path::Path::new(":memory:")),
+                )
+                .expect("in-memory temporal ledger"),
+            ),
         };
 
         let high_conf_id = Uuid::new_v4();

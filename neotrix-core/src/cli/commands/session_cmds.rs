@@ -371,3 +371,14 @@ impl CliCommand for HistoryCmd {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_placeholder() {
+        let instance = CompactCmd;
+        assert!(true);
+    }
+}

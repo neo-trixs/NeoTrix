@@ -20,37 +20,10 @@ use crate::neotrix::nt_world_code_search::CodeSearchEngine;
 use std::path::PathBuf;
 
 // ============================================================
-// 本地类型：IITPhiCalculator（真实计算）、PhiReport、IssueType/Lifecycle 等
+// 统一 Φ 计算：从 L5 真实 IITPhiCalculator 导入 (单一事实源, 消除本地平行实现)
 // ============================================================
 
-#[derive(Debug, Clone, Default)]
-pub struct IITPhiCalculator;
-
-impl IITPhiCalculator {
-    pub fn new() -> Self { Self }
-}
-
-impl IITPhiCalculator {
-    pub fn compute_phi(&self, state: &[f64]) -> PhiReport {
-        let n = state.len();
-        let energy: f64 = state.iter().map(|v| v * v).sum();
-        if n < 2 || energy < 1e-12 { return PhiReport { phi: 0.0 }; }
-        let sigma_sq = 0.0225;
-        let mut weighted_sum = 0.0;
-        for i in 0..n {
-            for j in 0..n {
-                let diff = state[i] - state[j];
-                let resonance = (-diff * diff / sigma_sq).exp();
-                weighted_sum += resonance * state[i] * state[j];
-            }
-        }
-        let phi = (weighted_sum / energy - 1.0 / n as f64).max(0.0).min(1.0);
-        PhiReport { phi }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PhiReport { pub phi: f64 }
+pub use crate::neotrix::l5_consciousness_impl::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
 
 // EvolutionLoop::ProjectSnapshot -> nt_l1_shared_types::ProjectSnapshot 转换
 fn to_l1_snapshot(snap: &ProjectSnapshot) -> crate::neotrix::l1_body_impl::nt_l1_shared_types::ProjectSnapshot {
@@ -429,12 +402,14 @@ impl EvolutionDaemon {
                     continue;
                 }
 
-                // 修复前确认目标文件存在 (代码搜索定位)
+                // 修复前确认目标文件存在 + 符号验证 (代码智能: 符号索引定位)
+                let target_path = std::path::Path::new(&file);
                 let file_exists = !CodeSearchEngine::search(
                     "fn ",
-                    std::path::Path::new(&file),
+                    target_path,
                 ).is_empty()
-                    || std::path::Path::new(&file).exists();
+                    || CodeSearchEngine::file_symbol_count(target_path) > 0
+                    || target_path.exists();
                 if !file_exists {
                     continue;
                 }

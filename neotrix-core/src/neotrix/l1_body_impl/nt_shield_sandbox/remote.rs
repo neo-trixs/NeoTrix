@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -44,11 +45,13 @@ impl CloudSandboxProvider for RemoteApiProvider {
         session_id: &str,
         code: &str,
         runtime: CloudRuntime,
+        env: &HashMap<String, String>,
     ) -> Result<CloudResult, String> {
         let url = format!("{}/api/v1/sandbox/{}/execute", self.endpoint, session_id);
         let mut req = self.client.post(&url).json(&serde_json::json!({
             "code": code,
             "runtime": format!("{:?}", runtime),
+            "env": env,
         }));
 
         if let Some((k, v)) = self.auth_header() {

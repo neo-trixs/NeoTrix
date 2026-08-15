@@ -985,7 +985,12 @@ impl SubagentDispatch {
                 log::warn!("[subagent] gateway build task failed: {e}; using empty gateway");
                 crate::neotrix::nt_io_provider::gateway::GatewayV2::new()
             });
-        SUBAGENT_GATEWAY.get_or_init(|| Arc::new(gateway)).clone()
+        let gateway = Arc::new(gateway);
+        // R-P79: 注册参与 Auto Exacto 周期重估 — 后台循环 5min cadence 统一 tick。
+        // 即使并发下本 Arc 输给 get_or_init 竞争而被丢弃, Weak 注册也会在
+        // 下一次 tick 自动剔除, 无泄漏。
+        crate::neotrix::l1_body_impl::nt_io_provider::gateway::register_gateway_for_re_evaluation(&gateway);
+        SUBAGENT_GATEWAY.get_or_init(|| gateway.clone()).clone()
     }
 
     /// 核心派发逻辑 — 对注入的 provider 执行，测试可注入 fake。

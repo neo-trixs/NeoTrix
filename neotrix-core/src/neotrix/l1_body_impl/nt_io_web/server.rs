@@ -211,13 +211,6 @@ async fn ws_echo_loop(socket: axum::extract::ws::WebSocket) {
     }
 }
 
-pub async fn start_server(port: u16) {
-    start_server_with(port,
-        Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::ReasoningBrain::new()),
-        crate::core::ReasoningBank::new(10000),
-    ).await;
-}
-
 /// Inner server start — accepts pre-constructed brain and bank
 /// to avoid L1→L8 direct dependency. Callers from L8/binaries
 /// construct the brain and pass it in.

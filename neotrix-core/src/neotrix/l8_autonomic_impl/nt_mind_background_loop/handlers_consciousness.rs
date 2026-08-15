@@ -243,7 +243,8 @@ impl BackgroundLoopHandle {
         // ── Collect real context from brain + KB ──
         let (iteration, caps_mean) = match self.brain.try_read() {
             Ok(b) => {
-                let mean = b.brain.capability.arr.iter().sum::<f64>() / 23.0_f64.max(1.0);
+                let n = neotrix_types::core::nt_core_cap::NUM_FIELDS.max(1) as f64;
+                let mean = b.brain.capability.arr.iter().sum::<f64>() / n;
                 (b.iteration, mean)
             }
             Err(_) => (0, 0.0),
@@ -332,7 +333,7 @@ impl BackgroundLoopHandle {
                 .as_ref()
                 .map(|p| p.gwt.last_resonance.is_some() && !p.gwt.resonant_specialists().is_empty())
                 .unwrap_or(false);
-            tree.trunk.workspace_size = 23;
+            tree.trunk.workspace_size = crate::core::nt_core_gwt::resonance::MODULE_COUNT;
             // Branch health is now set from SelfTest results in handle_architecture_audit
             // No simulated fallback here — real data or neutral 0.5 from set_branch_health_from_self_tests
             let growth_report = tree.run_growth_cycle();

@@ -30,6 +30,7 @@ use super::nt_io_provider::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
 };
 use super::nt_shield_propagation_guard::PropagationGuard;
+use super::nt_shield::redaction::Redactor;
 use crate::cli::approval::{ActionType, PendingAction};
 use crate::core::nt_core_traits::{NativeTool, ToolOutput};
 
@@ -612,21 +613,14 @@ impl AgentLoop {
         // 经工具参数泄漏给外部服务或写入日志。对应 sonarqube-cli
         // "detect secrets before they leak" 的 pre-tool-use hook 语义。
         let args_text = args.to_string();
-        let scanner = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::secret_scanner::SecretScanner::new();
-        let findings = scanner.scan(&args_text);
-        let blocked: Vec<String> = findings
-            .iter()
-            .filter(|f| {
-                f.severity
-                    >= crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::secret_scanner::Severity::High
-            })
-            .map(|f| format!("{}@{}", f.pattern, f.line))
-            .collect();
-        if !blocked.is_empty() {
+        // 使用 L1 NT-SHIELD Redactor (强化现有节点, R-P42): 检测并阻断凭据泄漏
+        let redactor = Redactor::new();
+        let (risk, hits) = redactor.analyze(&args_text);
+        if risk == super::nt_shield::redaction::RiskLevel::Dangerous {
             return Err(format!(
                 "[secret-guard] tool '{}' blocked: potential credential leak in args ({})",
                 name,
-                blocked.join(", ")
+                hits.join(", ")
             ));
         }
         self.tools

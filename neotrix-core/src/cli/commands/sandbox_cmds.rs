@@ -119,6 +119,9 @@ impl SandboxCmd {
 
     fn run_code(&self, runtime: CloudRuntime, code: &str, want_json: bool) -> CommandOutput {
         let mut cloud = CloudSandbox::default_local();
+        // R-P79 生产接线: 挂接凭据 Vault, 沙盒 workload 以 env 获得注入的 secrets。
+        #[cfg(feature = "sandbox")]
+        cloud.attach_default_vault();
         let rt = match tokio::runtime::Runtime::new() {
             Ok(r) => r,
             Err(e) => return CommandOutput::err(&format!("Failed to create tokio runtime: {}", e)),

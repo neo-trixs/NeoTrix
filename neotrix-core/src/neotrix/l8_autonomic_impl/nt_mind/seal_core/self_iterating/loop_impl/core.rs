@@ -51,9 +51,10 @@ pub struct SelfIteratingBrain {
     pub select_operator: Option<SelectableOperator>,
     pub selective_state: Option<SelectiveState>,
     pub group_manager: Option<MultiBrainManager>,
-pub reasoning_engine: Option<ReasoningEngine>,
+    pub reasoning_engine: Option<ReasoningEngine>,
     pub attention_router: Option<AttentionRouter>,
     pub cortex: CortexMemory,
+    pub skip_kb_io: bool,
     pub pipeline: BrainPipeline,
     pub archive: ChangeArchive,
     pub champion: Option<BrainSnapshot>,
@@ -147,6 +148,16 @@ impl SelfIteratingBrain {
                 .unwrap_or_default();
             (kb, adapter)
         };
+        Self::build_full(init_kb, init_adapter, false)
+    }
+
+    /// 轻量构造 (单元测试用): 跳过真实用户 KB 打开与 HarnessAdapter 加载,
+    /// 避免测试污染 ~/.neotrix 生产数据并大幅缩短 init 时间。
+    pub fn new_lightweight() -> Self {
+        Self::build_full(None, HarnessAdapter::default(), true)
+    }
+
+    fn build_full(init_kb: Option<KnowledgeBase>, init_adapter: HarnessAdapter, skip_kb_io: bool) -> Self {
         Self {
             brain: ReasoningBrain::new(),
             iteration: 0,
@@ -164,6 +175,7 @@ impl SelfIteratingBrain {
             reasoning_engine: None,
             attention_router: None,
             cortex: CortexMemory::new(50, 500),
+            skip_kb_io,
             pipeline: seal_pipeline(),
             archive: ChangeArchive::new(),
             champion: None,

@@ -1,4 +1,6 @@
+use crate::core::nt_core_arch_fitness::arch_fitness_tests;
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, ConstitutionComplianceTest};
+use crate::core::nt_core_qtest::QTestEngineSelfTest;
 
 pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
@@ -7,7 +9,11 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(DigitalHumanSelfTest));
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(VideoPipelineSelfTest));
+    registry.register(Box::new(QTestEngineSelfTest));
     registry.register(Box::new(ConstitutionComplianceTest));
+    for t in arch_fitness_tests() {
+        registry.register(t);
+    }
 }
 
 struct AnswerEngineSelfTest;
@@ -134,7 +140,7 @@ mod tests {
     fn test_register_all() {
         let mut registry = SelfTestRegistry::new();
         register_absorbed_modules(&mut registry);
-        assert_eq!(registry.count(), 7);
+        assert_eq!(registry.count(), 13);
     }
 
     #[test]
@@ -144,10 +150,14 @@ mod tests {
 
     #[test]
     fn test_all_have_names() {
-        let tests: [&dyn SelfTest; 6] = [
+        let tests: [&dyn SelfTest; 12] = [
             &AnswerEngineSelfTest, &AgentTeamSelfTest,
             &AgenticScanSelfTest, &DigitalHumanSelfTest, &LeannStoreSelfTest,
-            &VideoPipelineSelfTest,
+            &VideoPipelineSelfTest, &QTestEngineSelfTest, &ConstitutionComplianceTest,
+            &crate::core::nt_core_arch_fitness::LayerBoundaryFitness,
+            &crate::core::nt_core_arch_fitness::NoCycleFitness,
+            &crate::core::nt_core_arch_fitness::CapabilityConsistencyFitness,
+            &crate::core::nt_core_arch_fitness::TreeSingletonFitness,
         ];
         for t in &tests { assert!(!t.name().is_empty()); }
     }

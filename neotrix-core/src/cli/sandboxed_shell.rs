@@ -96,6 +96,7 @@ pub fn is_shell_allowed(silent: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::shield_enforcer::TEST_SHIELD_LOCK;
 
     #[test]
     fn test_is_shell_allowed_default() {
@@ -104,11 +105,17 @@ mod tests {
         if std::process::Command::new("which").arg("bash").output().is_err() {
             return;
         }
+        // Serialize against any test mutating GLOBAL_SHIELD (e.g.
+        // shield_enforcer::tests::test_init_shield setting FullAuto). is_shell_allowed
+        // uses try_lock and returns true when the global is briefly held by another
+        // test, so this assertion must not overlap any global accessor.
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         assert!(!is_shell_allowed(true), "Suggest mode should not allow shell");
     }
 
     #[test]
     fn test_is_shell_allowed_full_auto() {
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         {
             let _s = global_shield().lock().unwrap();
             // We can't easily modify the global singleton in parallel tests,
@@ -120,6 +127,7 @@ mod tests {
 
     #[test]
     fn test_check_file_operation_read() {
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let result = check_file_operation("file_read", "/tmp/test.txt", None);
         // Should either succeed or fail gracefully
         assert!(result.is_ok() || result.is_err());
@@ -127,6 +135,7 @@ mod tests {
 
     #[test]
     fn test_execute_guarded_empty_command() {
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let result = execute_guarded("echo hello");
         // May be blocked by ShieldEnforcer, but should not panic
         assert!(result.is_ok() || result.is_err());

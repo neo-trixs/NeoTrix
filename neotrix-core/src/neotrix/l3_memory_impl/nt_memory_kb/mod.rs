@@ -110,6 +110,8 @@ use nt_memory_adaptive_rag::AdaptiveRetrieval;
 use bm25::Bm25Index;
 use nt_memory_crawl::CrawlCycleReport;
 
+use crate::neotrix::l3_memory_impl::nt_memory_historian::{TemporalFact, TemporalFactLedger};
+
 pub struct KnowledgeBase {
     pub(crate) conn: Mutex<Connection>,
     pub db_path: PathBuf,
@@ -134,6 +136,12 @@ pub struct KnowledgeBase {
     pub feedback_store: RwLock<FeedbackStore>,
     pub gwt_router: RwLock<GwtRouter>,
     pub vsa_expander: RwLock<VsaAssociativeExpander>,
+    /// 检索自进化 (SimpleMem EvolveMem absorb, G4): 每次检索记录质量,
+    /// 周期性 Diagnose→Propose→Guard 提交召回调参, 影响后续扩召深度。
+    pub retrieval_evolver: RwLock<nt_memory_search::RetrievalEvolver>,
+    /// 时序事实账本 (TemporalFactLedger 接线, R-P79): 节点写入/更正自动记
+    /// temporal_facts, 知识变更获得 append-only + supersede + point-in-time 语义。
+    pub temporal_ledger: Mutex<TemporalFactLedger>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -161,6 +169,14 @@ impl KnowledgeBase {
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
         let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
         let db_path_str = db_path.display().to_string();
+        let temporal_ledger = TemporalFactLedger::open(Some(&db_path)).unwrap_or_else(|e| {
+            log::warn!(
+                "[KB] temporal ledger open failed ({}), using isolated in-memory ledger",
+                e
+            );
+            TemporalFactLedger::open(Some(std::path::Path::new(":memory:")))
+                .expect("in-memory temporal ledger")
+        });
         let kb = Self {
             conn: Mutex::new(conn),
             db_path,
@@ -184,8 +200,10 @@ impl KnowledgeBase {
             graph_cache: RwLock::new(nt_memory_graph_cache::GraphCache::empty()),
             feedback_store: RwLock::new(FeedbackStore::new(0.05)),
             gwt_router: RwLock::new(GwtRouter::new(GwtRouterConfig::default())),
-            vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
-        };
+             vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
+             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
+             temporal_ledger: Mutex::new(temporal_ledger),
+         };
         {
             let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
             let mut cache = kb.graph_cache.write().map_err(|e| format!("Lock: {}", e))?;
@@ -219,6 +237,14 @@ impl KnowledgeBase {
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
         let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
         let cache = nt_memory_graph_cache::GraphCache::new(&conn).unwrap_or_else(|_| nt_memory_graph_cache::GraphCache::empty());
+        let temporal_ledger = TemporalFactLedger::open(Some(&db_path)).unwrap_or_else(|e| {
+            log::warn!(
+                "[KB] temporal ledger open failed ({}), using isolated in-memory ledger",
+                e
+            );
+            TemporalFactLedger::open(Some(std::path::Path::new(":memory:")))
+                .expect("in-memory temporal ledger")
+        });
         Self {
             conn: Mutex::new(conn),
             db_path,
@@ -241,8 +267,10 @@ impl KnowledgeBase {
             skills_library: RwLock::new(nt_memory_knowledge_assets::SkillsLibrary::new()),
             feedback_store: RwLock::new(FeedbackStore::new(0.05)),
             gwt_router: RwLock::new(GwtRouter::new(GwtRouterConfig::default())),
-            vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
-            graph_cache: RwLock::new(cache),
+vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
+             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
+             graph_cache: RwLock::new(cache),
+             temporal_ledger: Mutex::new(temporal_ledger),
         }
     }
 
@@ -699,7 +727,56 @@ impl KnowledgeBase {
             self.mark_bm25_dirty();
             let _ = nt_memory_crawl::on_node_inserted(&conn, node);
         }
+        drop(conn);
+        if r.is_ok() {
+            self.record_node_fact(node);
+        }
         r
+    }
+
+    /// 时序事实记账 (TemporalFactLedger 接线, R-P79): 事实型节点 (有正文) 写入
+    /// append-only temporal_facts。记账是 side-channel, 失败仅告警不阻断主库写入。
+    fn record_node_fact(&self, node: &KnowledgeNode) {
+        let Some(object) = node.content.as_ref().filter(|c| !c.trim().is_empty()) else {
+            return;
+        };
+        let object: String = object.chars().take(2048).collect();
+        let predicate = node.node_type.as_str();
+        let source = node
+            .url
+            .as_deref()
+            .or(node.domain.as_deref())
+            .unwrap_or("kb_ingest");
+        let (valid_from, valid_until) = match node.temporal.as_ref() {
+            Some(t) => (Some(t.valid_from), t.valid_until),
+            None => (Some(node.updated_at), None),
+        };
+        let res = self
+            .temporal_ledger
+            .lock()
+            .map_err(|e| format!("Lock: {}", e))
+            .and_then(|lg| {
+                lg.add_node_fact(
+                    &node.id,
+                    &node.title,
+                    predicate,
+                    &object,
+                    valid_from,
+                    valid_until,
+                    source,
+                )
+                .map_err(|e| format!("{e}"))
+            });
+        if let Err(e) = res {
+            log::debug!("[temporal] skip node fact {}: {}", node.id, e);
+        }
+    }
+
+    /// 时序事实点时刻查询 (生产接线): 返回 subject (节点标题) 在 ts 时刻有效的事实
+    /// 版本。旧版事实在 supersede 时 valid_until 已截断, 不再出现在结果中。
+    pub fn query_temporal(&self, key: &str, ts: i64) -> Result<Vec<TemporalFact>, String> {
+        let lg = self.temporal_ledger.lock().map_err(|e| format!("Lock: {}", e))?;
+        lg.query_valid_at_subject(key, ts)
     }
 
     pub fn get_node(&self, id: &str) -> Result<Option<KnowledgeNode>, String> {
@@ -830,6 +907,12 @@ impl KnowledgeBase {
         // 1. 主库写入 (插入或复用)
         let node_id = self.insert_or_get_node(title, node_type, content, url, domain)?;
 
+        // 1b. 时序事实记账 (TemporalFactLedger 接线, R-P79): 事实型节点 (有正文)
+        //     写入 append-only temporal_facts, 知识变更获得 point-in-time 语义。
+        if let Ok(Some(node)) = self.get_node(&node_id) {
+            self.record_node_fact(&node);
+        }
+
         // 2. 代际版本化 (generation stamp) — 同源重写 (同 URL/同标题) 每次
         //    经统一弧落库都在 metadata 递增 generation, 形成可审计的版本链。
         //    来源: skales 经验代际模式 + Claude-OSINT 溯源要求 (P1-2 接线)。
@@ -927,30 +1010,63 @@ impl KnowledgeBase {
                     .unwrap_or_default();
                 drop(conn);
                 if !conflicts.is_empty() {
-                    let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
                     // fidelity ledger (diagram-design 吸收): 冲突解决留差异清单
                     // + provenance 溯源, 供审计回查, 而非仅静默覆盖。
-                    match nt_memory_curation::apply_supersede_with_ledger(&conn, &conflicts) {
-                        Ok((applied, ledger)) => {
-                            if !ledger.is_empty() {
-                                log::info!(
-                                    "[curation] superseded {} nodes w/ provenance ledger: {}",
-                                    applied, ledger.len()
-                                );
-                                // PROV-O 决策溯源 (semantica 吸收): 每次覆盖解决
-                                // 记录谁/做什么/基于什么证据。
-                                for e in &ledger.entries {
-                                    let _ = self.record_decision_provenance(
-                                        "nt_memory_curation",
-                                        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_provenance::ProvActivity::Supersede,
-                                        &e.older_id,
-                                        &format!("superseded by {}", e.newer_id),
-                                        vec![e.newer_id.clone(), format!("sim={:.3}", e.sim)],
-                                    );
+                    let (applied, ledger) = {
+                        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+                        match nt_memory_curation::apply_supersede_with_ledger(&conn, &conflicts) {
+                            Ok(ok) => ok,
+                            Err(e) => {
+                                log::warn!("[curation] supersede ledger failed: {}", e);
+                                (0, nt_memory_curation::FidelityLedger::new())
+                            }
+                        }
+                    };
+                    if !ledger.is_empty() {
+                        log::info!(
+                            "[curation] superseded {} nodes w/ provenance ledger: {}",
+                            applied, ledger.len()
+                        );
+                        // PROV-O 决策溯源 (semantica 吸收): 每次覆盖解决
+                        // 记录谁/做什么/基于什么证据。锁已释放, 避免非重入 Mutex 死锁。
+                        for e in &ledger.entries {
+                            let _ = self.record_decision_provenance(
+                                "nt_memory_curation",
+                                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_provenance::ProvActivity::Supersede,
+                                &e.older_id,
+                                &format!("superseded by {}", e.newer_id),
+                                vec![e.newer_id.clone(), format!("sim={:.3}", e.sim)],
+                            );
+                            // 时序事实账本 (R-P79): 旧节点事实沿版本链 supersede
+                            // (append-only 更正), 新对象 = 胜出新节点正文。
+                            if let Ok(Some(newer)) = self.get_node(&e.newer_id) {
+                                if let Some(obj) = newer
+                                    .content
+                                    .as_ref()
+                                    .filter(|c| !c.trim().is_empty())
+                                {
+                                    let obj: String = obj.chars().take(2048).collect();
+                                    if let Err(terr) = self
+                                        .temporal_ledger
+                                        .lock()
+                                        .map_err(|x| format!("{x}"))
+                                        .and_then(|lg| {
+                                            lg.supersede_node_fact(
+                                                &e.older_id, &obj, None, "nt_memory_curation",
+                                            )
+                                            .map_err(|x| format!("{x}"))
+                                        })
+                                    {
+                                        log::debug!(
+                                            "[temporal] supersede skip {} -> {}: {}",
+                                            e.older_id,
+                                            e.newer_id,
+                                            terr
+                                        );
+                                    }
                                 }
                             }
                         }
-                        Err(e) => log::warn!("[curation] supersede ledger failed: {}", e),
                     }
                 }
             }
@@ -1133,10 +1249,18 @@ impl KnowledgeBase {
 
         // [T3] GWT 意图路由: 决策通道 → 影响 VSA 扩召强度 (AgentLoop/Graph 扩更多)
         let intent = self.gwt_router.read().map(|r| r.route(query));
-        let vsa_top_k = match intent.as_ref().map(|i| i.channel) {
+        let mut vsa_top_k = match intent.as_ref().map(|i| i.channel) {
             Ok(RetrievalChannel::AgentLoop) | Ok(RetrievalChannel::Graph) => 5,
             _ => 3,
         };
+        // [T3] 检索自进化 (SimpleMem EvolveMem absorb, G4): 自进化调参的召回
+        // 加成直接影响扩召深度 — 检索质量退化时自我提升召回, 形成行为闭环。
+        let recall_boost = self
+            .retrieval_evolver
+            .read()
+            .map(|e| e.recall_boost())
+            .unwrap_or(0.0);
+        vsa_top_k = (vsa_top_k as f64 + recall_boost).round().clamp(1.0, 12.0) as usize;
         // [T3] VSA 联想扩召: 有词典时扩展查询词增强召回 (空词典零开销回退原查询)
         let effective_query = self
             .vsa_expander
@@ -1188,6 +1312,19 @@ impl KnowledgeBase {
     ) -> Result<Vec<SearchResult>, String> {
         let results = self.recency_rerank(results);
         let results = self.graph_signal_augment(query, results, limit);
+        // 检索自进化 (G4): 每次检索记录质量 (结果数 + 均值分), 窗口满时
+        // Diagnose→Propose→Guard 自调参。
+        let (rlen, mean) = if results.is_empty() {
+            (0usize, 0.0f64)
+        } else {
+            let rlen = results.len();
+            let mean = results.iter().map(|r| r.score).sum::<f64>() / rlen as f64;
+            (rlen, mean)
+        };
+        if let Ok(mut ev) = self.retrieval_evolver.write() {
+            ev.evaluate(query, rlen, mean);
+            let _ = ev.evolve_if_due();
+        }
         if let Ok(mut cache) = self.fused_cache.lock() {
             cache.put(cache_key.to_string(), results.clone());
         }
@@ -3013,6 +3150,73 @@ mod tests {
             .expect("tier");
         drop(conn);
         assert_eq!(tier_col, "cold", "旧节点应降级 cold");
+    }
+
+    #[test]
+    fn test_temporal_ledger_wired_into_ingest_bus() {
+        // R-P79 生产接线验证: write_memory_entry (统一写入弧) 写节点 →
+        // TemporalFactLedger 自动记账; 冲突更正 → 旧节点事实 supersede
+        // (query_valid_at 返回新版, history_chain 2 条)。
+        let kb = test_kb();
+        let url = "https://temporal.example/policy";
+        kb.write_memory_entry(
+            "Temporal fact policy",
+            super::nt_memory_types::NodeType::Concept,
+            Some("retry is enabled for provider"),
+            Some(url),
+            Some("test"),
+            None,
+        ).expect("first write (positive)");
+        let old = kb.find_node_by_url(url).expect("find").expect("old node");
+
+        // 记账断言: 主库写入后 ledger 已记录 (事实 id 由节点 id 确定性派生)
+        let old_fact_id = format!("tf_n_{}", old.id);
+        {
+            let lg = kb.temporal_ledger.lock().expect("lock ledger");
+            let recorded = lg.get_fact(&old_fact_id).expect("get fact").expect("fact recorded");
+            assert_eq!(recorded.subject, "Temporal fact policy");
+            assert_eq!(recorded.object, "retry is enabled for provider");
+        }
+
+        // 同标题相反断言 → 冲突检测 → 旧节点 supersede (生产更正路径)
+        kb.write_memory_entry(
+            "Temporal fact policy",
+            super::nt_memory_types::NodeType::Concept,
+            Some("retry is not enabled for provider"),
+            Some("https://temporal.example/policy-v2"),
+            Some("test"),
+            None,
+        ).expect("second write (negative)");
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("epoch")
+            .as_secs() as i64;
+
+        // 点时刻查询: 返回更正后版本, 旧对象已截断失效 (append-only)
+        let at = kb.query_temporal("Temporal fact policy", now + 1000).expect("query temporal");
+        assert!(!at.is_empty(), "应返回有效时序事实");
+        assert!(
+            at.iter().any(|f| f.object == "retry is not enabled for provider"),
+            "当前有效事实应为更正后版本"
+        );
+        assert!(
+            at.iter().all(|f| f.object != "retry is enabled for provider"),
+            "旧版事实应在更正后失效 (append-only 截断)"
+        );
+
+        // 版本链: 旧节点事实 → supersede 新版本 = 2 条
+        {
+            let lg = kb.temporal_ledger.lock().expect("lock ledger");
+            let leaf = at
+                .iter()
+                .find(|f| f.supersedes.as_deref() == Some(old_fact_id.as_str()))
+                .expect("superseding leaf version");
+            let chain = lg.history_chain(&leaf.id).expect("chain");
+            assert_eq!(chain.len(), 2, "supersession 链应有 2 条版本");
+            assert_eq!(chain[0].object, "retry is not enabled for provider");
+            assert_eq!(chain[1].object, "retry is enabled for provider");
+        }
     }
 
     #[test]

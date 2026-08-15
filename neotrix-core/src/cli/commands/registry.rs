@@ -44,6 +44,7 @@ use crate::cli::commands::self_audit_cmds::SelfAuditCmd;
 use crate::cli::commands::osint_cmds::OsintCmd;
 use crate::cli::commands::comm_cmds::CommCmd;
 use crate::cli::commands::chain_cmds::ChainCmd;
+use crate::cli::commands::quantum_cmds::QTestCmd;
 use crate::cli::commands::sources_cmds::SourcesCmd;
 use crate::cli::commands::explore_cmds::ExploreCmd;
 use crate::cli::commands::consolidated_cmds::{
@@ -172,6 +173,9 @@ pub fn default_registry() -> CommandRegistry {
 
     // 链路命令 (Chain) — 端到端工作流编排
     reg.register(Box::new(ChainCmd));
+
+    // 量子态测试选择 (Quantum Test) — 变更驱动坍缩, 避免全量测试
+    reg.register(Box::new(QTestCmd));
 
     // 外部知识源 (Sources) — GitHub/书籍/arXiv/Wiki 定向爬取
     reg.register(Box::new(SourcesCmd));

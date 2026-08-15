@@ -9,7 +9,7 @@ use crate::neotrix::nt_act_orchestrator::Orchestrator;
 use crate::agent::AgentTeam;
 use crate::core::nt_core_self::MotivationState;
 use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::neotrix::nt_mind_distiller::SessionDistiller;
+use crate::neotrix::nt_mind_distiller::{CommandDistiller, DistilledOutput, SessionDistiller};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 
 fn state_icon(state: &GoalState) -> &str {
@@ -44,6 +44,11 @@ pub struct GoalLoop {
     pub active_plan: Option<PlanTemplate>,
     pub plan_stack: Vec<PlanTemplate>,
     pub oscillator_network: Option<OscillatorNetwork>,
+    /// 最近一次可逆蒸馏输出 — CommandDistiller 生产接线 (R-P79):
+    /// run_distillation 蒸馏原始会话日志源后保留, 供 expand_last_distillation 还原。
+    pub last_distilled_output: Option<DistilledOutput>,
+    /// 最近一次可逆蒸馏落盘目录 — expand 时按同一 artifact_dir 还原。
+    last_distill_dir: Option<PathBuf>,
 }
 
 impl Default for GoalLoop {
@@ -72,6 +77,8 @@ impl GoalLoop {
             active_plan: None,
             plan_stack: Vec::new(),
             oscillator_network: None,
+            last_distilled_output: None,
+            last_distill_dir: None,
         }
     }
 
@@ -90,6 +97,8 @@ impl GoalLoop {
             active_plan: None,
             plan_stack: Vec::new(),
             oscillator_network: None,
+            last_distilled_output: None,
+            last_distill_dir: None,
         }
     }
 
@@ -321,7 +330,25 @@ impl GoalLoop {
     }
 
     pub fn run_distillation(&mut self) -> Vec<String> {
-        let mut distiller = SessionDistiller::new();
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        self.run_distillation_with_paths(
+            home.join(".neotrix").join("session-logs"),
+            PathBuf::from("AGENTS.md"),
+            home.join(".neotrix").join("distill-artifacts"),
+        )
+    }
+
+    /// 带显式路径的可逆蒸馏 — 生产路径 (run_distillation, pursue.rs) 与
+    /// 集成测试共用同一实现。CommandDistiller 直接蒸馏原始会话日志源
+    /// (而非序列化报告, 报告不含错误行), 错误行优先保留并落盘 artifact;
+    /// 记录 error_lines 最多的输出, 供 expand_last_distillation 还原。
+    pub(crate) fn run_distillation_with_paths(
+        &mut self,
+        session_logs_dir: PathBuf,
+        agents_path: PathBuf,
+        artifact_dir: PathBuf,
+    ) -> Vec<String> {
+        let mut distiller = SessionDistiller::with_paths(session_logs_dir, agents_path);
         let report = distiller.generate_distillation_report();
         if !report.suggestions.is_empty() {
             println!("[goal] 🧠 distilled {} patterns from {} sessions", report.patterns.len(), report.session_count);
@@ -329,7 +356,41 @@ impl GoalLoop {
                 println!("[goal]   → {}", s);
             }
         }
+        // 可逆蒸馏 (repowise absorb): 原始会话日志 → 错误先行压缩落盘 artifact, 可 expand 还原。
+        let distilled = CommandDistiller::with_dir(artifact_dir);
+        let distill_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let mut stored: Option<DistilledOutput> = None;
+        for (name, content) in distiller.load_session_logs() {
+            let id = format!("goal-distill-{}-{}", distill_id, name);
+            match distilled.distill(&id, &content, 2048) {
+                Ok(out) => {
+                    println!(
+                        "[goal] 📦 reversible distill '{}': {} chars → {} ({:.0}%), {} error lines, expand: {}",
+                        name, out.total_chars, out.kept_chars, out.ratio * 100.0, out.error_lines, out.artifact_path
+                    );
+                    // 保留 error_lines 最多的输出 — 生产路径后续 expand 优先还原问题最多的会话。
+                    if stored.as_ref().map(|s| out.error_lines > s.error_lines).unwrap_or(true) {
+                        stored = Some(out);
+                    }
+                }
+                Err(e) => log::warn!("[goal] reversible distill '{}' failed: {}", name, e),
+            }
+        }
+        if let Some(out) = stored {
+            self.last_distilled_output = Some(out);
+            self.last_distill_dir = Some(distilled.artifact_dir);
+        }
         report.suggestions
+    }
+
+    /// 生产路径 expand — 还原最近一次可逆蒸馏的原始会话日志内容。
+    pub fn expand_last_distillation(&self) -> Result<String, String> {
+        let out = self.last_distilled_output.as_ref().ok_or_else(|| "no distillation stored yet".to_string())?;
+        let dir = self.last_distill_dir.clone().unwrap_or_else(|| CommandDistiller::new().artifact_dir);
+        CommandDistiller::with_dir(dir).expand(&out.id)
     }
 
     pub fn save(&self) -> NeoTrixResult<()> {
@@ -484,5 +545,47 @@ mod tests {
         assert!(gl.active_goal.is_none());
         assert_eq!(gl.completed_goals.len(), 0);
         let _ = std::fs::remove_file(&path);
+    }
+
+    // 集成测试: CommandDistiller 在生产蒸馏路径中真实运行 —
+    // 会话日志源流过 run_distillation_with_paths, error_lines 被保留,
+    // DistilledOutput 落盘存储, expand_last_distillation 还原原始内容。
+    #[test]
+    fn test_run_distillation_wires_command_distiller_production_path() {
+        use std::path::PathBuf;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let logs_dir = tmp.path().join("session-logs");
+        std::fs::create_dir_all(&logs_dir).unwrap();
+        std::fs::write(
+            logs_dir.join("2026-08-14.md"),
+            "cargo check\n   Compiling x\nerror[E0277]: type mismatch\nwarning: unused\n   Finished\n",
+        ).unwrap();
+        let artifact_dir = tmp.path().join("distill-artifacts");
+
+        let mut gl = GoalLoop::new();
+        let suggestions = gl.run_distillation_with_paths(
+            logs_dir.clone(),
+            PathBuf::from("AGENTS.md"),
+            artifact_dir.clone(),
+        );
+        assert!(suggestions.is_empty(), "no session patterns expected, got {:?}", suggestions);
+
+        let out = gl.last_distilled_output
+            .as_ref()
+            .expect("run_distillation must store DistilledOutput for later expand");
+        assert!(out.error_lines >= 1, "error lines from session log must be retained, got {}", out.error_lines);
+        assert!(out.artifact_path.contains("distill-artifacts"), "artifact must land in configured dir: {}", out.artifact_path);
+
+        let expanded = gl.expand_last_distillation()
+            .expect("expand_last_distillation must restore original");
+        assert!(expanded.contains("E0277"), "expand must restore error lines: {}", expanded);
+        assert!(expanded.contains("cargo check"));
+    }
+
+    #[test]
+    fn test_expand_last_distillation_without_distill_errors() {
+        let gl = GoalLoop::new();
+        assert!(gl.expand_last_distillation().is_err(), "no distillation stored yet → Err");
     }
 }

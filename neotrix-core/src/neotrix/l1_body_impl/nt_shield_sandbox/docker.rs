@@ -61,6 +61,12 @@ impl LocalDockerProvider {
     }
 }
 
+/// Render docker args for logging with secret values masked (Redactor).
+/// Env values are never logged raw — only after secret redaction.
+fn redact_docker_args(args: &[String]) -> String {
+    crate::neotrix::l1_body_impl::nt_shield::redaction::redact_secrets(&args.join(" "))
+}
+
 #[async_trait]
 impl CloudSandboxProvider for LocalDockerProvider {
     fn name(&self) -> &'static str {
@@ -72,6 +78,7 @@ impl CloudSandboxProvider for LocalDockerProvider {
         session_id: &str,
         code: &str,
         runtime: CloudRuntime,
+        env: &HashMap<String, String>,
     ) -> Result<CloudResult, String> {
         let image = Self::image_for(runtime);
         let (entrypoint, args) = Self::wrap_command(runtime, code);
@@ -101,9 +108,26 @@ impl CloudSandboxProvider for LocalDockerProvider {
             docker_args.push(format!("{}:/workspace:ro", tmpdir));
         }
 
+        // 注入 vault 凭据为容器环境变量。仅记录 key 名 — value 永不进日志/遥测。
+        if !env.is_empty() {
+            let mut keys: Vec<&str> = env.keys().map(|k| k.as_str()).collect();
+            keys.sort();
+            log::info!(
+                "[sandbox] injecting {} vault secret(s) into container env (keys: {})",
+                env.len(),
+                keys.join(", ")
+            );
+            for (k, v) in env {
+                docker_args.push("--env".into());
+                docker_args.push(format!("{}={}", k, v));
+            }
+        }
+
         docker_args.push(image.into());
         docker_args.push(entrypoint);
         docker_args.extend(args);
+
+        log::debug!("[sandbox] docker run: {}", redact_docker_args(&docker_args));
 
         let start = std::time::Instant::now();
         let output = tokio::process::Command::new("docker")
@@ -217,5 +241,30 @@ impl CloudSandboxProvider for LocalDockerProvider {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(all(test, feature = "sandbox"))]
+mod tests {
+    use super::*;
+
+    /// 负例: 注入的 secret 出现在日志命令串中时必须被 Redactor 遮蔽,
+    /// 禁止明文泄露到日志/遥测/LLM 上下文。
+    #[test]
+    fn test_redactor_masks_secret_in_logged_command() {
+        let secret = "sk-supersecret";
+        let args = vec![
+            "run".to_string(),
+            "--rm".to_string(),
+            "--env".to_string(),
+            format!("NEOTRIX_VAULT_API_KEY={}", secret),
+            "python:3.11-slim".to_string(),
+            "python3".to_string(),
+            "-c".to_string(),
+            "print(1)".to_string(),
+        ];
+        let rendered = redact_docker_args(&args);
+        assert!(!rendered.contains("sk-supersecret"), "secret must be masked in command log");
+        assert!(rendered.contains("[REDACTED]"));
     }
 }

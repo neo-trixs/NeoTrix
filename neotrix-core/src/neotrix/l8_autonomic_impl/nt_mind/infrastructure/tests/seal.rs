@@ -7,7 +7,7 @@ mod tests {
 
     #[test]
     fn test_self_iteration() {
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let result = system.iterate(TaskType::UIDesign);
         assert!(result.iteration == 1);
@@ -19,7 +19,7 @@ mod tests {
     fn test_seal_loop_basic() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let reward = system.run_seal_loop("design a UI component", None, None);
         assert!(reward.is_ok());
@@ -34,7 +34,7 @@ mod tests {
     fn test_seal_loop_with_embedding() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let embedding = vec![0.5, 0.3, 0.8, 0.2, 0.6];
         let embedding_clone = embedding.clone();
@@ -51,7 +51,7 @@ mod tests {
     fn test_seal_loop_multiple_iterations() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let tasks = ["design UI", "analyze code", "review nt_shield"];
         for task in &tasks {
@@ -70,7 +70,7 @@ mod tests {
     fn test_seal_loop_reward_threshold() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
         system.quality_threshold = 0.5;
 
         let reward = system.run_seal_loop("test task for reward", None, None);
@@ -89,7 +89,7 @@ mod tests {
         // (curiosity/goal/depth/tool) 可能把 reward 推出上界, 返回点必须 clamp。
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         // 多轮迭代让 state_trajectory 增长, 提高 depth/total_steps ratio
         let tasks = [
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn test_self_iterating_brain_creation() {
-        let system = SelfIteratingBrain::new();
+        let system = SelfIteratingBrain::new_lightweight();
         assert_eq!(system.iteration, 0);
         assert!(system.auto_absorb);
         assert_eq!(system.quality_threshold, 0.85);
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_self_iterating_brain_report() {
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let _ = system.iterate(TaskType::UIDesign);
 
@@ -134,7 +134,7 @@ mod tests {
     fn test_seal_with_memory() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let _ = system.run_seal_loop("design a UI component with accessibility", None, None);
 
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_kernel_iterate_basic() {
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
         let result = system.kernel_iterate("implement user authentication");
 
         assert_eq!(result.iteration, 1);
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_kernel_iterate_multiple_times() {
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
 
         let r1 = system.kernel_iterate("fix memory leak in data pipeline");
         assert_eq!(r1.iteration, 1);
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_kernel_iterate_with_memory_storage() {
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
         system.kernel_iterate("refactor database access layer");
 
         let stats = system.reasoning_bank.stats();
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_kernel_iterate_adaptive_lr() {
-        let mut system = SelfIteratingBrain::new();
+        let mut system = SelfIteratingBrain::new_lightweight();
         let _initial_lr = system.brain.learning_rate;
 
         let mem = ReasoningMemory::new("high reward task", TaskType::CodeGeneration, &[], 0.9);

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use super::nt_shield::http_proxy::HttpInterceptor;
+use super::nt_shield::poc_engine::{PoCHttpRequest, PoCExpectedResult, PoCStep, PocEngine};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HunterKind {
     Xss,
@@ -230,6 +233,9 @@ impl AgenticScanner {
         new_findings
     }
 
+    /// Backward-compatible static fallback: no live HTTP target is available, so
+    /// confirmation uses the cvss threshold only. Production callers should prefer
+    /// [`Self::validate_with_target`], which confirms findings with real PoC evidence.
     pub fn validate(&mut self) -> Vec<usize> {
         let mut confirmed = Vec::new();
         for finding in self.findings.iter_mut() {
@@ -239,6 +245,42 @@ impl AgenticScanner {
                 if confident {
                     confirmed.push(finding.id);
                 }
+            }
+        }
+        self.advance_stage();
+        confirmed
+    }
+
+    /// Production PoC-verified validation path.
+    ///
+    /// Each Candidate finding is turned into a `PoCStep` (mapped from its hunter
+    /// kind) and run through `PocEngine::verify()` against a live `HttpInterceptor`.
+    /// Design decision: the static `cvss.base_score > 6.0` threshold is kept ONLY
+    /// as a pre-filter — a candidate must be severe enough AND its PoC must
+    /// reproduce (`Evidence.reproducible == true`) to become `Confirmed`. Findings
+    /// that fail the pre-filter, have no verifiable request mapping, or whose PoC
+    /// does not reproduce are `Rejected`.
+    pub fn validate_with_target(&mut self, interceptor: &HttpInterceptor) -> Vec<usize> {
+        let mut confirmed = Vec::new();
+        for finding in self.findings.iter_mut() {
+            if finding.status != FindingStatus::Candidate {
+                continue;
+            }
+            if finding.cvss.base_score <= 6.0 {
+                finding.status = FindingStatus::Rejected;
+                continue;
+            }
+            let reproduced = match poc_step_for_finding(finding) {
+                Some(step) => {
+                    let mut engine = PocEngine::new();
+                    engine.add_step(step);
+                    engine.verify(interceptor).unwrap_or(false)
+                }
+                None => false,
+            };
+            finding.status = if reproduced { FindingStatus::Confirmed } else { FindingStatus::Rejected };
+            if reproduced {
+                confirmed.push(finding.id);
             }
         }
         self.advance_stage();
@@ -284,6 +326,63 @@ impl AgenticScanner {
     }
 }
 
+/// Map a hunter kind to a verifiable HTTP PoC request + expected result.
+/// Returns `None` for hunts with no HTTP probe surface (kept as Rejected).
+fn poc_step_for_finding(finding: &VulnerabilityFinding) -> Option<PoCStep> {
+    let (url, expected_result) = match finding.hunter {
+        HunterKind::Xss => (
+            "/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E".to_string(),
+            PoCExpectedResult::BodyContains("<script>alert(1)</script>".to_string()),
+        ),
+        HunterKind::SqlInjection => (
+            "/login?user=admin'%20OR%201=1--".to_string(),
+            PoCExpectedResult::StatusCode(500),
+        ),
+        HunterKind::Ssrf => (
+            "/proxy?url=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data%2F".to_string(),
+            PoCExpectedResult::BodyContains("ami-id".to_string()),
+        ),
+        HunterKind::PathTraversal => (
+            "/download?file=../../etc/passwd".to_string(),
+            PoCExpectedResult::BodyContains("root:".to_string()),
+        ),
+        HunterKind::CommandInjection => (
+            "/exec?cmd=%3Bid".to_string(),
+            PoCExpectedResult::BodyContains("uid=".to_string()),
+        ),
+        HunterKind::Csrf => (
+            "/transfer".to_string(),
+            PoCExpectedResult::StatusCode(200),
+        ),
+        HunterKind::BrokenAuth => (
+            "/admin".to_string(),
+            PoCExpectedResult::StatusCode(200),
+        ),
+        HunterKind::InsecureDeserialization => (
+            "/api/deserialize".to_string(),
+            PoCExpectedResult::StatusCode(500),
+        ),
+        HunterKind::SensitiveDataExposure => (
+            "/api/users".to_string(),
+            PoCExpectedResult::BodyContains("password".to_string()),
+        ),
+        HunterKind::SecurityMisconfiguration => (
+            "/health".to_string(),
+            PoCExpectedResult::HeaderPresent("X-Powered-By".to_string()),
+        ),
+    };
+    Some(PoCStep {
+        description: format!("PoC probe for {} ({})", finding.hunter.label(), finding.title),
+        request: PoCHttpRequest {
+            method: "GET".to_string(),
+            url,
+            headers: vec![("Host".to_string(), "target.local".to_string())],
+            body: None,
+        },
+        expected_result,
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct ReconReport {
     pub target: String,
@@ -309,6 +408,8 @@ pub struct ScanReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpListener};
 
     fn scanner() -> AgenticScanner {
         AgenticScanner::new(ScanConfig {
@@ -394,5 +495,98 @@ mod tests {
         let recon = s.recon_scan("https://example.com");
         assert_eq!(recon.target, "https://example.com");
         assert!(recon.estimated_files > 0);
+    }
+
+    fn finding(id: usize, hunter: HunterKind, base: f64) -> VulnerabilityFinding {
+        VulnerabilityFinding {
+            id,
+            hunter,
+            title: format!("PoC test {}", hunter.label()),
+            description: "test finding".into(),
+            file_path: "src/test.rs".into(),
+            line_number: 1,
+            code_snippet: "// test".into(),
+            cvss: CvssScore::from_base(base),
+            status: FindingStatus::Candidate,
+            fix_suggestion: "fix".into(),
+            discovered_at: Instant::now(),
+        }
+    }
+
+    /// Minimal raw HTTP upstream: answers each accepted connection with a fixed response.
+    fn spawn_upstream(body: &str, status_code: u16, connections: usize) -> SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind upstream");
+        let addr = listener.local_addr().expect("upstream local addr");
+        let body = body.to_string();
+        std::thread::spawn(move || {
+            for _ in 0..connections {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        let mut buf = [0u8; 4096];
+                        let _ = stream.read(&mut buf);
+                        let response = format!(
+                            "HTTP/1.1 {} \r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            status_code,
+                            body.len(),
+                            body
+                        );
+                        let _ = stream.write_all(response.as_bytes());
+                        let _ = stream.flush();
+                    }
+                    Err(_) => return,
+                }
+            }
+        });
+        addr
+    }
+
+    /// Forward-proxy interceptor bound to a concrete free port, pointing upstream at the test server.
+    fn interceptor(upstream: SocketAddr) -> HttpInterceptor {
+        let probe = TcpListener::bind("127.0.0.1:0").expect("bind probe");
+        let port = probe.local_addr().expect("probe local addr").port();
+        drop(probe);
+        HttpInterceptor::new(
+            format!("127.0.0.1:{}", port).parse().expect("parse listen addr"),
+            &format!("127.0.0.1:{}", upstream.port()),
+        )
+    }
+
+    #[test]
+    fn test_validate_with_target_confirms_on_poc_reproduction() {
+        let mut s = scanner();
+        s.findings.push(finding(1, HunterKind::Xss, 9.0));
+        let upstream = spawn_upstream("<script>alert(1)</script>", 200, 2);
+        let mut ic = interceptor(upstream);
+        ic.start().expect("start interceptor");
+        let confirmed = s.validate_with_target(&ic);
+        ic.stop();
+        assert_eq!(confirmed, vec![1]);
+        assert_eq!(s.findings[0].status, FindingStatus::Confirmed);
+    }
+
+    #[test]
+    fn test_validate_with_target_rejects_on_poc_mismatch() {
+        let mut s = scanner();
+        s.findings.push(finding(2, HunterKind::Xss, 9.0));
+        let upstream = spawn_upstream("nothing malicious here", 200, 2);
+        let mut ic = interceptor(upstream);
+        ic.start().expect("start interceptor");
+        let confirmed = s.validate_with_target(&ic);
+        ic.stop();
+        assert!(confirmed.is_empty());
+        assert_eq!(s.findings[0].status, FindingStatus::Rejected);
+    }
+
+    #[test]
+    fn test_validate_with_target_cvss_prefilter_rejects_low_severity() {
+        let mut s = scanner();
+        s.findings.push(finding(3, HunterKind::Xss, 3.0));
+        let upstream = spawn_upstream("<script>alert(1)</script>", 200, 1);
+        let mut ic = interceptor(upstream);
+        ic.start().expect("start interceptor");
+        let confirmed = s.validate_with_target(&ic);
+        ic.stop();
+        assert!(confirmed.is_empty());
+        assert_eq!(s.findings[0].status, FindingStatus::Rejected);
     }
 }

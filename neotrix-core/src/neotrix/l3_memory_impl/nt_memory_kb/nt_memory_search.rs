@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 
 use super::bm25;
 use super::nt_memory_embed::{cosine_similarity, load_all_embeddings};
@@ -724,6 +725,190 @@ impl Fts5OptimizerConfig {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// RetrievalEvolver — 检索自进化 (SimpleMem EvolveMem absorb, G4)
+// ═══════════════════════════════════════════════════════════════════
+// EvolveMem 闭环: Evaluate(记录每次检索质量) → Diagnose(定位低效查询类)
+// → Propose(提出调参建议) → Guard(单调性门: 仅当新窗口均值优于 committed
+// 基线才提交, 否则回滚)。提交的 tuning 持久化 (kv_store) 并影响后续召回深度
+// (VSA 扩召 top_k), 使检索机制自身随使用自评自调。
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetrievalEvalPoint {
+    pub query: String,
+    pub results_len: usize,
+    pub mean_score: f64,
+    pub ts: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RetrievalTuning {
+    /// VSA 扩召 top_k 的召回加成 (self-evolved), clamp 到 [-2, +4]
+    pub boost: f64,
+    pub committed_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Diagnosis {
+    pub class: String,
+    pub sample_count: usize,
+    pub mean_score: f64,
+    pub degraded: bool,
+}
+
+#[derive(Debug)]
+pub struct RetrievalEvolver {
+    window: Vec<RetrievalEvalPoint>,
+    max_window: usize,
+    pub tuning: RetrievalTuning,
+    baseline_mean: Option<f64>,
+}
+
+impl Default for RetrievalEvolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RetrievalEvolver {
+    pub fn new() -> Self {
+        Self {
+            window: Vec::new(),
+            max_window: 128,
+            tuning: RetrievalTuning::default(),
+            baseline_mean: None,
+        }
+    }
+
+    pub fn window_len(&self) -> usize {
+        self.window.len()
+    }
+
+    pub fn window_mean(&self) -> Option<f64> {
+        if self.window.is_empty() {
+            return None;
+        }
+        Some(self.window.iter().map(|p| p.mean_score).sum::<f64>() / self.window.len() as f64)
+    }
+
+    /// Evaluate: 记录一次检索质量 (每次 production search 调用)
+    pub fn evaluate(&mut self, query: &str, results_len: usize, mean_score: f64) {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        if self.window.len() >= self.max_window {
+            self.window.remove(0);
+        }
+        self.window.push(RetrievalEvalPoint {
+            query: query.to_string(),
+            results_len,
+            mean_score,
+            ts,
+        });
+    }
+
+    /// Diagnose: 按查询类聚合并报告低效类。类: long(>5 token) / short / empty(0结果)
+    pub fn diagnose(&self) -> Vec<Diagnosis> {
+        let overall = self.window_mean().unwrap_or(0.0);
+        let mut classes: HashMap<&str, Vec<&RetrievalEvalPoint>> = HashMap::new();
+        for p in &self.window {
+            if p.results_len == 0 {
+                classes.entry("empty").or_default().push(p);
+            } else if p.query.split_whitespace().count() > 5 {
+                classes.entry("long").or_default().push(p);
+            } else {
+                classes.entry("short").or_default().push(p);
+            }
+        }
+        classes
+            .into_iter()
+            .map(|(class, pts)| {
+                let mean = pts.iter().map(|p| p.mean_score).sum::<f64>() / pts.len() as f64;
+                Diagnosis {
+                    class: class.to_string(),
+                    sample_count: pts.len(),
+                    mean_score: mean,
+                    degraded: mean < overall * 0.9 && !pts.is_empty(),
+                }
+            })
+            .collect()
+    }
+
+    /// Propose: 基于诊断提出调参建议 — 低效类占比高则建议提升召回加成
+    pub fn propose(&self) -> Option<RetrievalTuning> {
+        let diagnoses = self.diagnose();
+        if self.window.is_empty() {
+            return None;
+        }
+        let degraded_share = diagnoses
+            .iter()
+            .filter(|d| d.degraded)
+            .map(|d| d.sample_count)
+            .sum::<usize>() as f64
+            / self.window.len() as f64;
+        let empty_share = diagnoses
+            .iter()
+            .find(|d| d.class == "empty")
+            .map(|d| d.sample_count as f64 / self.window.len() as f64)
+            .unwrap_or(0.0);
+        let new_boost = if empty_share > 0.3 || degraded_share > 0.5 {
+            (self.tuning.boost + 0.5).min(4.0)
+        } else if degraded_share < 0.15 && self.tuning.boost > 0.0 {
+            // 过度激进 → 适当回退 (防过度召回噪声)
+            (self.tuning.boost - 0.5).max(-2.0)
+        } else {
+            self.tuning.boost
+        };
+        if (new_boost - self.tuning.boost).abs() < 1e-9 {
+            return None;
+        }
+        Some(RetrievalTuning {
+            boost: new_boost,
+            committed_at: 0,
+        })
+    }
+
+    /// Guard: 单调性门 — 仅当提交后窗口均值 ≥ committed 基线才接受调参,
+    /// 否则拒绝 (保留原 tuning)。返回是否提交。
+    pub fn guard(&mut self, proposal: &RetrievalTuning) -> bool {
+        let Some(current_mean) = self.window_mean() else {
+            return false;
+        };
+        let baseline = self.baseline_mean.unwrap_or(current_mean);
+        if current_mean >= baseline {
+            self.tuning = proposal.clone();
+            self.tuning.committed_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            self.baseline_mean = Some(current_mean);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 自进化主循环: Evaluate 已由外部调用; 每 max_window 次评估执行一次
+    /// Diagnose→Propose→Guard 并返回是否提交了调参。
+    pub fn evolve_if_due(&mut self) -> Option<RetrievalTuning> {
+        if self.window.len() < self.max_window {
+            return None;
+        }
+        let proposal = self.propose()?;
+        if self.guard(&proposal) {
+            Some(self.tuning.clone())
+        } else {
+            None
+        }
+    }
+
+    /// 当前生效的召回加成 (clamp 供外部使用)
+    pub fn recall_boost(&self) -> f64 {
+        self.tuning.boost.clamp(-2.0, 4.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -830,5 +1015,73 @@ mod tests {
             "标题精确匹配的本体应排第一, 实际: {} | {:?}",
             first_title,
             results.iter().map(|r| format!("{}[{:.2}]", r.node.title, r.score)).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_evolver_evaluate_and_window_mean() {
+        let mut ev = super::RetrievalEvolver::new();
+        ev.evaluate("rust 生命周期", 10, 0.8);
+        ev.evaluate("async", 5, 0.6);
+        assert_eq!(ev.window_len(), 2);
+        let mean = ev.window_mean().unwrap();
+        assert!((mean - 0.7).abs() < 1e-9);
+        // 窗口滚动上限
+        for i in 0..300 {
+            ev.evaluate(&format!("q{i}"), 1, 0.5);
+        }
+        assert!(ev.window_len() <= 128);
+    }
+
+    #[test]
+    fn test_evolver_diagnose_flags_degraded_classes() {
+        let mut ev = super::RetrievalEvolver::new();
+        // 大量空结果查询 → empty 类退化
+        for _ in 0..10 {
+            ev.evaluate("extremely obscure term xyzzy", 0, 0.0);
+        }
+        for _ in 0..5 {
+            ev.evaluate("常见词", 8, 0.9);
+        }
+        let diag = ev.diagnose();
+        let empty = diag.iter().find(|d| d.class == "empty").unwrap();
+        assert!(empty.degraded);
+    }
+
+    #[test]
+    fn test_evolver_propose_raises_boost_on_empty_queries() {
+        let mut ev = super::RetrievalEvolver::new();
+        for _ in 0..10 {
+            ev.evaluate("unmatched term", 0, 0.0);
+        }
+        let proposal = ev.propose();
+        assert!(proposal.is_some(), "空结果占比高应提出调参");
+        assert!(proposal.unwrap().boost > 0.0);
+    }
+
+    #[test]
+    fn test_evolver_guard_monotonic_commit_and_reject() {
+        let mut ev = super::RetrievalEvolver::new();
+        for _ in 0..8 {
+            ev.evaluate("term", 10, 0.9);
+        }
+        let proposal = super::RetrievalTuning { boost: 1.0, committed_at: 0 };
+        assert!(ev.guard(&proposal), "窗口均值高应接受调参");
+        assert_eq!(ev.recall_boost(), 1.0);
+        // 之后检索质量下滑 → 新调参被拒绝, 保留已提交的 boost
+        for _ in 0..8 {
+            ev.evaluate("noise", 0, 0.05);
+        }
+        let proposal2 = super::RetrievalTuning { boost: 2.0, committed_at: 0 };
+        assert!(!ev.guard(&proposal2), "均值下滑应拒绝");
+        assert_eq!(ev.recall_boost(), 1.0, "拒绝后保留原 tuning");
+    }
+
+    #[test]
+    fn test_evolver_recall_boost_clamped() {
+        let mut ev = super::RetrievalEvolver::new();
+        ev.tuning.boost = 99.0;
+        assert_eq!(ev.recall_boost(), 4.0);
+        ev.tuning.boost = -99.0;
+        assert_eq!(ev.recall_boost(), -2.0);
     }
 }

@@ -792,7 +792,8 @@ impl SelfIteratingBrain {
         if let Some(ref jepa) = self.nt_world_jepa {
             engine = engine.with_jepa(jepa.clone());
         }
-        if let Ok(mut kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+        if !self.skip_kb_io {
+            if let Ok(mut kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
             let emb_cfg = crate::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
             if !emb_cfg.api_key.is_empty() {
                 kb = kb.with_embedding(emb_cfg);
@@ -843,6 +844,7 @@ impl SelfIteratingBrain {
                 log::warn!("[KB] agent session init: {}", e);
             }
             engine = engine.with_kb(kb);
+            }
         }
         engine = engine.with_ewhr_bridge(E8EwhrBridge::new());
         let hyp_net = Arc::new(Mutex::new(
@@ -852,6 +854,8 @@ impl SelfIteratingBrain {
 
         // 连接 GatewayV2: 统一 LLM 网关 (断路器/限流器/回退策略/提供者池)
         let gateway = std::sync::Arc::new(create_gateway());
+        // R-P79: 注册参与 Auto Exacto 周期重估 — 后台循环 5min cadence 统一 tick
+        crate::neotrix::l1_body_impl::nt_io_provider::gateway::register_gateway_for_re_evaluation(&gateway);
         engine = engine.with_gateway(gateway.clone());
 
         // 从 self.default_model 设置引擎默认模型（由 entry 层从 config.toml 填充）

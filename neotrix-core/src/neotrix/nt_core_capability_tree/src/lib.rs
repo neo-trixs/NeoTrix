@@ -11,11 +11,13 @@ pub mod registry;
 pub mod evolution;
 pub mod cli;
 pub mod serialize;
+pub mod fusion;
 
 pub use node::{CapabilityNode, NodeLayer, ConstellationLevel, Domain, RuneSocket, EvolutionOp, EvolutionLogEntry};
 pub use registry::{CapabilityRegistry, RegistryError};
 pub use evolution::{EvolutionEngine, EvolutionPlan, EvolutionAction};
 pub use cli::CapabilityCli;
+pub use fusion::{FusionReport, TraitNodeDescriptor};
 
 #[cfg(test)]
 mod tests {

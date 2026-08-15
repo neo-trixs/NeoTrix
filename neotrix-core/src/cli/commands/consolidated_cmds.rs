@@ -26,11 +26,11 @@ pub struct FileCmd;
 impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff <args>" }
+    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate <args>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异");
+            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -41,7 +41,27 @@ impl CliCommand for FileCmd {
             "edit" => delegate!("/edit", &rest, brain),
             "patch" => delegate!("/patch", &rest, brain),
             "diff" => delegate!("/diff", &rest, brain),
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff", sub)),
+            "consolidate" => {
+                if rest.is_empty() {
+                    return CommandOutput::err("用法: /file consolidate <目录> [输出路径]");
+                }
+                let src = std::path::PathBuf::from(&rest[0]);
+                let out = rest
+                    .get(1)
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|| src.join("native_consolidated.xlsx"));
+                match crate::neotrix::consolidate_tables(&src, &out) {
+                    Ok(rep) => CommandOutput::ok(&format!(
+                        "合并完成: 处理 {} 个文件 / {} 行 / {} 行含 USD 报价\n输出: {}",
+                        rep.files_processed,
+                        rep.total_rows,
+                        rep.usd_rows,
+                        out.display()
+                    )),
+                    Err(e) => CommandOutput::err(&format!("合并失败: {e}")),
+                }
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate", sub)),
         }
     }
 }

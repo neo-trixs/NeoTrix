@@ -563,3 +563,37 @@ fn get_project_root() -> String {
             .unwrap_or_else(|_| ".".to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cmd() -> SelfAuditCmd {
+        SelfAuditCmd
+    }
+
+    #[test]
+    fn test_help_lists_all_subcommands() {
+        let out = cmd().execute(&["help".to_string()], None);
+        assert!(out.success, "help 应成功");
+        assert!(out.message.contains("d31"));
+        assert!(out.message.contains("d50"));
+        assert!(out.message.contains("evolution"));
+        assert!(out.message.contains("NTIA"));
+    }
+
+    #[test]
+    fn test_unknown_subcommand_returns_help() {
+        let out = cmd().execute(&["not-a-command".to_string()], None);
+        assert!(out.success);
+        assert!(out.message.contains("NeoTrix Internal Audit"));
+    }
+
+    #[test]
+    fn test_evolution_subcommand_requires_kb_and_errors_gracefully() {
+        // evolution_todo 需要打开真实 KB; 无 KB 时应返回 err 而非 panic
+        let out = cmd().execute(&["evolution".to_string()], None);
+        // 结果取决于环境是否配置了 ~/.neotrix/knowledge.db — 只断言不 panic
+        assert!(!out.message.is_empty());
+    }
+}

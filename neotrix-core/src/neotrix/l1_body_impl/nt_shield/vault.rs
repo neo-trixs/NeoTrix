@@ -31,7 +31,11 @@ impl Vault {
     pub fn new() -> L1Result<Self> {
         let path = shellexpand::tilde(VAULT_PATH).parse::<PathBuf>()
             .map_err(|_| L1Error::Config("Failed to expand vault path".into()))?;
+        Self::with_path(path)
+    }
 
+    /// Construct a vault backed by an explicit file path (custom config / tests).
+    pub fn with_path(path: PathBuf) -> L1Result<Self> {
         let key_bytes = Self::load_key()?;
         let cipher = Aes256Gcm::new_from_slice(&key_bytes)
             .map_err(|e| L1Error::Config(format!("AES key init error: {}", e)))?;

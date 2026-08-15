@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use futures::stream::{self, BoxStream};
 use futures::StreamExt;
@@ -8,11 +10,15 @@ use super::{CloudResult, CloudRuntime};
 pub trait CloudSandboxProvider: Send + Sync {
     fn name(&self) -> &'static str;
 
+    /// Execute `code` in the sandbox. `env` carries vault-injected credentials
+    /// (`NEOTRIX_VAULT_*`) that must reach the workload's environment, but must
+    /// never be logged or returned in `CloudResult`.
     async fn execute(
         &self,
         session_id: &str,
         code: &str,
         runtime: CloudRuntime,
+        env: &HashMap<String, String>,
     ) -> Result<CloudResult, String>;
 
     async fn upload_file(
@@ -42,6 +48,7 @@ impl CloudSandboxProvider for NoopProvider {
         _session_id: &str,
         _code: &str,
         _runtime: CloudRuntime,
+        _env: &HashMap<String, String>,
     ) -> Result<CloudResult, String> {
         Err("No sandbox provider configured — install Docker or set NEOTRIX_CLOUD_ENDPOINT".to_string())
     }

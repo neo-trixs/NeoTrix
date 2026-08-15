@@ -150,6 +150,8 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Connector,
         "approval" | "review" | "plugin" | "profile" | "session-recovery" | "recover" | "snap" | "vc" | "vcs" | "chain"
             => CommandCategory::Other,
+        "qtest" | "quantum-test"
+            => CommandCategory::System,
         _ => CommandCategory::Other,
     }
 }

@@ -104,6 +104,182 @@ pub struct EvolutionReport {
 }
 
 // ============================================================
+// 独立 ground-truth Auditor (G8 — LongHorizon-Harness 吸收)
+// 三角色异模型: Evidence(地面真值) / Consistency(无副作用) / Governance(治理合规)
+// 独立于进化循环自身的裁决: verify→checkpoint→recover
+// ============================================================
+
+/// Auditor 三角色 — 三个独立评判视角, 全部通过才接受变更 (异模型共识)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditorRole {
+    /// 地面真值: 触发问题的指标必须下降或持平
+    Evidence,
+    /// 一致性: 变更不引入副作用 (unsafe/todo/规模不回归)
+    Consistency,
+    /// 治理: 不引入新的违规热点文件
+    Governance,
+}
+
+impl AuditorRole {
+    pub fn label(self) -> &'static str {
+        match self {
+            AuditorRole::Evidence => "Evidence",
+            AuditorRole::Consistency => "Consistency",
+            AuditorRole::Governance => "Governance",
+        }
+    }
+}
+
+/// 单角色裁决
+#[derive(Debug, Clone)]
+pub struct RoleVerdict {
+    pub role: AuditorRole,
+    pub pass: bool,
+    pub detail: String,
+}
+
+/// 一次完整审计裁决
+#[derive(Debug, Clone)]
+pub struct AuditVerdict {
+    pub passed: bool,
+    pub role_verdicts: Vec<RoleVerdict>,
+    pub recovered: bool,
+    pub checkpoint_cycle: u64,
+}
+
+impl AuditVerdict {
+    pub fn summary(&self) -> String {
+        let roles: Vec<String> = self
+            .role_verdicts
+            .iter()
+            .map(|v| format!("{}={}", v.role.label(), if v.pass { "PASS" } else { "FAIL" }))
+            .collect();
+        format!(
+            "audit {} (roles: {}) recovered={} checkpoint_cycle={}",
+            if self.passed { "PASS" } else { "REJECT" },
+            roles.join(","),
+            self.recovered,
+            self.checkpoint_cycle,
+        )
+    }
+}
+
+/// 独立审计器 — 与进化循环自身裁决解耦, 维护 last-good 检查点
+#[derive(Debug, Clone)]
+pub struct Auditor {
+    pub checkpoint_cycle: u64,
+    pub verdict_history: Vec<(u64, bool, String)>,
+    last_checkpoint: Option<ProjectSnapshot>,
+}
+
+impl Default for Auditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Auditor {
+    pub fn new() -> Self {
+        Self {
+            checkpoint_cycle: 0,
+            verdict_history: Vec::new(),
+            last_checkpoint: None,
+        }
+    }
+
+    /// verify→checkpoint: 变更前保存 last-good 快照
+    pub fn checkpoint(&mut self, cycle: u64, snap: &ProjectSnapshot) {
+        self.last_checkpoint = Some(snap.clone());
+        self.checkpoint_cycle = cycle;
+    }
+
+    /// 三角色异模型裁决 — 仅当前后快照均满足所有角色才接受; 否则标记 recover
+    pub fn verify_change(
+        &mut self,
+        cycle: u64,
+        before: &ProjectSnapshot,
+        after: &ProjectSnapshot,
+    ) -> AuditVerdict {
+        let mut verdicts = Vec::new();
+
+        // Evidence: 触发问题指标下降或持平
+        let evidence_pass = after.unwrap_count <= before.unwrap_count
+            && after.compile_errors <= before.compile_errors
+            && after.test_failures <= before.test_failures;
+        verdicts.push(RoleVerdict {
+            role: AuditorRole::Evidence,
+            pass: evidence_pass,
+            detail: format!(
+                "unwrap {}→{} compile_errors {}→{} test_failures {}→{}",
+                before.unwrap_count,
+                after.unwrap_count,
+                before.compile_errors,
+                after.compile_errors,
+                before.test_failures,
+                after.test_failures,
+            ),
+        });
+
+        // Consistency: 无副作用 — unsafe/todo 不回归 (容忍 ±1 噪声)
+        let consistency_pass =
+            after.unsafe_count <= before.unsafe_count + 1 && after.todo_count <= before.todo_count + 1;
+        verdicts.push(RoleVerdict {
+            role: AuditorRole::Consistency,
+            pass: consistency_pass,
+            detail: format!(
+                "unsafe {}→{} todo {}→{}",
+                before.unsafe_count, after.unsafe_count, before.todo_count, after.todo_count,
+            ),
+        });
+
+        // Governance: 不引入新的违规热点文件
+        let governance_pass = after.file_unsafe_hotspots.len() <= before.file_unsafe_hotspots.len();
+        verdicts.push(RoleVerdict {
+            role: AuditorRole::Governance,
+            pass: governance_pass,
+            detail: format!(
+                "unsafe_hotspots {}→{}",
+                before.file_unsafe_hotspots.len(),
+                after.file_unsafe_hotspots.len(),
+            ),
+        });
+
+        let passed = verdicts.iter().all(|v| v.pass);
+        let mut recovered = false;
+        if passed {
+            self.last_checkpoint = Some(after.clone());
+            self.checkpoint_cycle = cycle;
+        } else if self.last_checkpoint.is_some() {
+            // recover: 裁决拒绝 → 回滚到 last-good (last_checkpoint 保持不变)
+            recovered = true;
+        }
+
+        let summary = format!(
+            "{}: {}",
+            if passed { "PASS" } else { "REJECT" },
+            verdicts
+                .iter()
+                .map(|v| format!("{}={}", v.role.label(), if v.pass { "PASS" } else { "FAIL" }))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        self.verdict_history.push((cycle, passed, summary.clone()));
+
+        AuditVerdict {
+            passed,
+            role_verdicts: verdicts,
+            recovered,
+            checkpoint_cycle: self.checkpoint_cycle,
+        }
+    }
+
+    /// 当前 last-good 检查点
+    pub fn last_checkpoint(&self) -> Option<&ProjectSnapshot> {
+        self.last_checkpoint.as_ref()
+    }
+}
+
+// ============================================================
 // 精确计数函数
 // ============================================================
 
@@ -142,6 +318,12 @@ pub struct EvolutionLoop {
 
     // 上次扫描结果缓存
     last_snapshot: Option<ProjectSnapshot>,
+
+    /// 独立 ground-truth Auditor (G8) — verify→checkpoint→recover, 三角色异模型
+    pub auditor: Auditor,
+
+    /// 最近一次审计裁决
+    pub last_audit: Option<AuditVerdict>,
 }
 
 impl Default for EvolutionLoop {
@@ -160,6 +342,8 @@ impl EvolutionLoop {
             enabled: true,
             target_dir: None,
             last_snapshot: None,
+            auditor: Auditor::new(),
+            last_audit: None,
         }
     }
 
@@ -307,11 +491,29 @@ impl EvolutionLoop {
     ) -> EvolutionReport {
         let initial_report = self.run_cycle_in(target, world_fe, world_phi);
 
+        // 独立 Auditor (G8): 修复前打 last-good 检查点
+        self.auditor.checkpoint(initial_report.cycle, &initial_report.snapshot);
+
         // 使用 PipelineAutoFixer 管线处理所有 auto_fixable 问题
         let pipeline_result = PipelineAutoFixer::new().run_pipeline(self);
         let fixes_applied = pipeline_result.auto_applied as u32;
 
         let final_report = self.run_cycle_in(target, Some(initial_report.free_energy), Some(initial_report.phi));
+
+        // verify→recover: 三角色异模型裁决修复是否安全; 拒绝则标记回滚, 不计入 auto_fixes
+        let verdict = self.auditor.verify_change(
+            final_report.cycle,
+            &initial_report.snapshot,
+            &final_report.snapshot,
+        );
+        self.last_audit = Some(verdict.clone());
+        let mut new_patterns = final_report.new_patterns;
+        if !verdict.passed {
+            new_patterns.push(format!(
+                "进化周期 #{}: Auditor 拒绝自动修复 ({}), 回滚至 checkpoint #{} — 修复未接受",
+                final_report.cycle, verdict.summary(), verdict.checkpoint_cycle,
+            ));
+        }
 
         EvolutionReport {
             cycle: final_report.cycle,
@@ -322,8 +524,8 @@ impl EvolutionLoop {
             free_energy: final_report.free_energy,
             phi: final_report.phi,
             suggestions: final_report.suggestions,
-            new_patterns: final_report.new_patterns,
-            auto_fixes: fixes_applied,
+            new_patterns,
+            auto_fixes: if verdict.passed { fixes_applied } else { 0 },
         }
     }
 
@@ -953,5 +1155,110 @@ mod tests {
         let (fe_dirty, phi_dirty) = EvolutionLoop::derive_free_energy_phi(&dirty);
         assert!(fe_dirty > fe_clean, "dirty FE ({}) must exceed clean FE ({})", fe_dirty, fe_clean);
         assert!(fe_dirty.is_finite() && phi_dirty.is_finite());
+    }
+
+    // ── G8 独立 Auditor 测试 ──────────────────────────────────
+
+    fn snap(unwrap: usize, compile_errors: usize, unsafe_count: usize, todo: usize, hotspots: usize) -> ProjectSnapshot {
+        ProjectSnapshot {
+            total_files: 10,
+            total_lines: 1000,
+            large_files: vec![],
+            modules_without_tests: vec![],
+            file_unsafe_hotspots: (0..hotspots).map(|i| format!("hotspot_{}.rs", i)).collect(),
+            unsafe_count,
+            unwrap_count: unwrap,
+            todo_count: todo,
+            test_count: 20,
+            test_failures: 0,
+            compile_errors,
+            compile_warnings: 0,
+        }
+    }
+
+    #[test]
+    fn test_auditor_accepts_improvement() {
+        // 修复有效 (指标全面改善) → 三角色共识通过, checkpoint 前移
+        let mut auditor = Auditor::new();
+        let before = snap(40, 3, 8, 6, 2);
+        let after = snap(12, 0, 6, 4, 1);
+        auditor.checkpoint(1, &before);
+
+        let v = auditor.verify_change(2, &before, &after);
+        assert!(v.passed, "improvement must pass: {}", v.summary());
+        assert!(!v.recovered);
+        assert_eq!(v.checkpoint_cycle, 2, "pass 后 checkpoint 前移到新快照");
+        assert_eq!(auditor.last_checkpoint().unwrap().unwrap_count, 12);
+        assert_eq!(auditor.verdict_history.len(), 1);
+    }
+
+    #[test]
+    fn test_auditor_rejects_regression_and_recovers() {
+        // 修复反而引入回归 (unwrap 增加) → Evidence FAIL → 拒绝 + recover 标记
+        let mut auditor = Auditor::new();
+        let before = snap(10, 0, 5, 3, 1);
+        let regression = snap(30, 2, 5, 3, 1);
+        auditor.checkpoint(1, &before);
+
+        let v = auditor.verify_change(2, &before, &regression);
+        assert!(!v.passed, "regression must be rejected");
+        assert!(v.recovered, "拒绝时须标记 recover 回滚至 last-good");
+        assert_eq!(v.checkpoint_cycle, 1, "reject 后 checkpoint 保持 last-good");
+        assert_eq!(auditor.last_checkpoint().unwrap().unwrap_count, 10);
+        assert!(v.role_verdicts.iter().any(|r| !r.pass));
+    }
+
+    #[test]
+    fn test_auditor_consensus_requires_all_roles() {
+        // 仅 Evidence 通过但 Consistency 回归 (todo 激增) → 仍拒绝 (异模型共识)
+        let mut auditor = Auditor::new();
+        let before = snap(10, 0, 5, 3, 1);
+        let side_effect = snap(8, 0, 20, 30, 1);
+        auditor.checkpoint(1, &before);
+
+        let v = auditor.verify_change(2, &before, &side_effect);
+        assert!(!v.passed, "side-effect regression must fail consistency");
+        assert!(v.recovered);
+        let consistency = v
+            .role_verdicts
+            .iter()
+            .find(|r| r.role == AuditorRole::Consistency)
+            .expect("consistency role must be present");
+        assert!(!consistency.pass);
+    }
+
+    #[test]
+    fn test_auditor_governance_blocks_new_hotspots() {
+        // 治理角色: 新引入 unsafe 热点文件 → Governance FAIL
+        let mut auditor = Auditor::new();
+        let before = snap(10, 0, 5, 3, 1);
+        let new_hotspots = snap(10, 0, 12, 3, 4);
+        auditor.checkpoint(1, &before);
+
+        let v = auditor.verify_change(2, &before, &new_hotspots);
+        assert!(!v.passed);
+        let governance = v
+            .role_verdicts
+            .iter()
+            .find(|r| r.role == AuditorRole::Governance)
+            .expect("governance role must be present");
+        assert!(!governance.pass);
+    }
+
+    #[test]
+    fn test_autofix_cycle_zeroes_fixes_on_reject() {
+        // 接线验证: autofix_cycle_in 中 rejected 变更 → auto_fixes=0 + rollback 模式入报告
+        let mut el = EvolutionLoop::new();
+        let dir = std::env::temp_dir().join(format!("nt_audit_gate_{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("src")).expect("create mock src");
+        std::fs::write(dir.join("src").join("lib.rs"), "pub fn f() {}\n").expect("write mock lib");
+
+        // 无 auto_fixable 问题可修 → 修复数为 0, 且 auditor 已注册裁决 (验证接线编译 + 运行)
+        let report = el.autofix_cycle_in(Some(&dir), None, None);
+        assert!(el.last_audit.is_some(), "autofix_cycle_in 必须产生审计裁决");
+        assert_eq!(report.auto_fixes, 0);
+        assert!(report.evolution_score.is_finite());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

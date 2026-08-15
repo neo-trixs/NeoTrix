@@ -270,6 +270,198 @@ fn chrono_timestamp_stamp() -> String {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// MapeGate — 多指标验证门 + burn-in 回滚 (SEA absorb)
+// ═══════════════════════════════════════════════════════════════════
+// 任何候选变更 (经验/技能/检索调参) 需经多指标验证门 + burn-in (默认 20 次
+// 评估) 才能晋升 stable; burn-in 期表现未达阈值 → 回滚 last-good。
+// 状态存独立目录 (与备份同域, 绝不放 ~/.neotrix 内), 不依赖 KB。
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone)]
+pub struct MapeGateConfig {
+    /// burn-in 评估次数 (SEA: 20)
+    pub burn_in_cycles: u32,
+    /// 晋升所需最低通过指标数
+    pub min_metrics_pass: u32,
+    /// 判定失败的最小指标通过数 (低于则提前回滚)
+    pub min_metrics_to_continue: u32,
+}
+
+impl Default for MapeGateConfig {
+    fn default() -> Self {
+        Self {
+            burn_in_cycles: 20,
+            min_metrics_pass: 2,
+            min_metrics_to_continue: 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricEval {
+    pub name: String,
+    pub score: f64,
+    pub passed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MapeVerdict {
+    pub candidate: String,
+    pub evaluations: u32,
+    pub accepted: bool,
+    pub promoted: bool,
+    pub rollback: bool,
+    pub metrics: Vec<MetricEval>,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct BurnInState {
+    evaluations: u32,
+    pass_count: u32,
+    last_metrics: Vec<MetricEval>,
+    committed: bool,
+}
+
+#[derive(Debug)]
+pub struct MapeGate {
+    config: MapeGateConfig,
+    state_dir: PathBuf,
+}
+
+fn mape_state_dir() -> PathBuf {
+    backup_root().join("mape")
+}
+
+impl MapeGate {
+    pub fn new(config: MapeGateConfig) -> Self {
+        Self {
+            config,
+            state_dir: mape_state_dir(),
+        }
+    }
+
+    /// 测试/可注入状态目录 (隔离真实备份域)
+    pub fn with_state_dir(config: MapeGateConfig, state_dir: PathBuf) -> Self {
+        Self { config, state_dir }
+    }
+
+    fn state_path(&self, candidate: &str) -> PathBuf {
+        let safe: String = candidate
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .collect();
+        self.state_dir.join(format!("{safe}.json"))
+    }
+
+    fn load(&self, candidate: &str) -> BurnInState {
+        let path = self.state_path(candidate);
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self, candidate: &str, state: &BurnInState) {
+        let dir = &self.state_dir;
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            log::warn!("[mape-gate] mkdir {}: {e}", dir.display());
+            return;
+        }
+        if let Ok(json) = serde_json::to_string(state) {
+            let tmp = self.state_path(candidate).with_extension("tmp");
+            if std::fs::write(&tmp, json).is_ok() {
+                let _ = std::fs::rename(tmp, self.state_path(candidate));
+            }
+        }
+    }
+
+    /// 记录一次评估, 累计 burn-in; 达到阈值晋升, 未达回滚。幂等: 同一 candidate
+    /// 晋升后不再重复晋升 (committed 标记)。
+    pub fn evaluate(&mut self, candidate: &str, metrics: Vec<MetricEval>) -> MapeVerdict {
+        let mut state = self.load(candidate);
+        if state.committed {
+            return MapeVerdict {
+                candidate: candidate.to_string(),
+                evaluations: state.evaluations,
+                accepted: true,
+                promoted: false,
+                rollback: false,
+                metrics: state.last_metrics.clone(),
+                note: "already committed".to_string(),
+            };
+        }
+        state.evaluations += 1;
+        let pass = metrics.iter().filter(|m| m.passed).count() as u32;
+        state.pass_count += pass;
+        state.last_metrics = metrics.clone();
+
+        // burn-in 结束: 按累计平均通过指标数裁决 (promote / rollback)
+        if state.evaluations >= self.config.burn_in_cycles {
+            let avg_pass = state.pass_count as f64 / state.evaluations as f64;
+            let last_pass = state.last_metrics.iter().filter(|m| m.passed).count() as u32;
+            if avg_pass >= self.config.min_metrics_pass as f64 && last_pass >= self.config.min_metrics_pass {
+                state.committed = true;
+                self.save(candidate, &state);
+                return MapeVerdict {
+                    candidate: candidate.to_string(),
+                    evaluations: state.evaluations,
+                    accepted: true,
+                    promoted: true,
+                    rollback: false,
+                    metrics,
+                    note: format!("burn-in complete, avg_pass={:.2} → promoted", avg_pass),
+                };
+            }
+            let verdict = MapeVerdict {
+                candidate: candidate.to_string(),
+                evaluations: state.evaluations,
+                accepted: false,
+                promoted: false,
+                rollback: true,
+                metrics,
+                note: format!("burn-in complete, avg_pass={:.2} below threshold → rollback", avg_pass),
+            };
+            let _ = std::fs::remove_file(self.state_path(candidate));
+            return verdict;
+        }
+
+        // burn-in 早期提前回滚: 连续从未通过任何指标且已采样 ≥3 次 → 不值得继续
+        if state.pass_count == 0 && state.evaluations >= 3 {
+            let verdict = MapeVerdict {
+                candidate: candidate.to_string(),
+                evaluations: state.evaluations,
+                accepted: false,
+                promoted: false,
+                rollback: true,
+                metrics,
+                note: "burn-in early failure (never passed any metric)".to_string(),
+            };
+            let _ = std::fs::remove_file(self.state_path(candidate));
+            return verdict;
+        }
+
+        self.save(candidate, &state);
+        MapeVerdict {
+            candidate: candidate.to_string(),
+            evaluations: state.evaluations,
+            accepted: true,
+            promoted: false,
+            rollback: false,
+            metrics,
+            note: format!("burn-in {}/{}", state.evaluations, self.config.burn_in_cycles),
+        }
+    }
+
+    /// 显式回滚: 外部 (如目标失效) 主动回滚候选并清除状态
+    pub fn rollback(&self, candidate: &str) -> Result<(), String> {
+        std::fs::remove_file(self.state_path(candidate))
+            .map_err(|e| format!("rollback state: {e}"))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // WorkspaceGuard — git 工作区异常检测
 // ═══════════════════════════════════════════════════════════════════
 
@@ -602,4 +794,106 @@ mod tests {
         assert!(r2.is_ok());
         let _ = fs::remove_file(&tmp);
     }
+
+    #[test]
+    fn test_mape_gate_burn_in_promotes_good_candidate() {
+        let mut gate = MapeGate::with_state_dir(
+            MapeGateConfig {
+                burn_in_cycles: 3,
+                min_metrics_pass: 2,
+                min_metrics_to_continue: 1,
+            },
+            temp_mape_dir(),
+        );
+        for _ in 0..2 {
+            let v = gate.evaluate("exp-alpha", vec![
+                MetricEval { name: "confidence".into(), score: 0.8, passed: true },
+                MetricEval { name: "feedback".into(), score: 0.9, passed: true },
+            ]);
+            assert!(!v.rollback, "burn-in 期不应回滚");
+        }
+        let final_v = gate.evaluate("exp-alpha", vec![
+            MetricEval { name: "confidence".into(), score: 0.8, passed: true },
+            MetricEval { name: "feedback".into(), score: 0.9, passed: true },
+        ]);
+        assert!(final_v.promoted, "burn-in 满且指标通过应晋升");
+        let again = gate.evaluate("exp-alpha", vec![]);
+        assert!(!again.promoted);
+        assert!(again.accepted);
+    }
+
+    #[test]
+    fn test_mape_gate_early_rollback_on_persistent_failure() {
+        let mut gate = MapeGate::with_state_dir(
+            MapeGateConfig {
+                burn_in_cycles: 10,
+                min_metrics_pass: 2,
+                min_metrics_to_continue: 1,
+            },
+            temp_mape_dir(),
+        );
+        let v1 = gate.evaluate("exp-bad", vec![
+            MetricEval { name: "confidence".into(), score: 0.1, passed: false },
+        ]);
+        assert!(!v1.rollback, "前两次采样不应回滚");
+        let v2 = gate.evaluate("exp-bad", vec![
+            MetricEval { name: "confidence".into(), score: 0.1, passed: false },
+        ]);
+        assert!(!v2.rollback);
+        let v3 = gate.evaluate("exp-bad", vec![
+            MetricEval { name: "confidence".into(), score: 0.1, passed: false },
+        ]);
+        assert!(v3.rollback, "连续 3 次全失败应提前回滚");
+    }
+
+    #[test]
+    fn test_mape_gate_rollback_on_burn_in_underperformance() {
+        let mut gate = MapeGate::with_state_dir(
+            MapeGateConfig {
+                burn_in_cycles: 3,
+                min_metrics_pass: 2,
+                min_metrics_to_continue: 1,
+            },
+            temp_mape_dir(),
+        );
+        for _ in 0..2 {
+            let _ = gate.evaluate("exp-mid", vec![
+                MetricEval { name: "confidence".into(), score: 0.6, passed: true },
+                MetricEval { name: "feedback".into(), score: 0.2, passed: false },
+            ]);
+        }
+        let final_v = gate.evaluate("exp-mid", vec![
+            MetricEval { name: "confidence".into(), score: 0.6, passed: true },
+            MetricEval { name: "feedback".into(), score: 0.2, passed: false },
+        ]);
+        assert!(final_v.rollback, "avg_pass=1 < min_metrics_pass=2 应回滚");
+    }
+
+    #[test]
+    fn test_mape_gate_state_isolated_per_candidate() {
+        let mut gate = MapeGate::with_state_dir(
+            MapeGateConfig {
+                burn_in_cycles: 2,
+                min_metrics_pass: 1,
+                min_metrics_to_continue: 1,
+            },
+            temp_mape_dir(),
+        );
+        for _ in 0..2 {
+            let _ = gate.evaluate("exp-a", vec![MetricEval { name: "c".into(), score: 1.0, passed: true }]);
+        }
+        let vb = gate.evaluate("exp-b", vec![MetricEval { name: "c".into(), score: 0.0, passed: false }]);
+        assert!(!vb.promoted);
+    }
+}
+
+#[allow(dead_code)]
+fn temp_mape_dir() -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "neotrix-mape-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ))
 }

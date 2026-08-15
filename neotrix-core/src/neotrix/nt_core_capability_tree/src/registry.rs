@@ -1,7 +1,8 @@
 //! 能力注册表
 
 use crate::evolution::{EvolutionAction, EvolutionPlan};
-use crate::node::{CapabilityNode, Domain, NodeLayer};
+use crate::node::{Domain, NodeLayer};
+pub use crate::node::CapabilityNode;
 use indexmap::IndexMap;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
@@ -89,10 +90,12 @@ impl CapabilityRegistry {
         let idx = self.dag.add_node(node.id.clone());
         self.node_indices.insert(node.id.clone(), idx);
 
-        // 建立依赖边
+        // 建立依赖边 (幂等: requires 中重复或已存在的边跳过, 防平行边)
         for req in &node.requires {
             if let Some(&req_idx) = self.node_indices.get(req) {
-                self.dag.add_edge(idx, req_idx, ());
+                if self.dag.find_edge(idx, req_idx).is_none() {
+                    self.dag.add_edge(idx, req_idx, ());
+                }
             }
         }
 
@@ -186,6 +189,13 @@ impl CapabilityRegistry {
             ));
         }
 
+        // 幂等守卫: 边已存在则跳过 (petgraph Graph 是 multigraph, 允许平行边;
+        // load→save 循环会累加重复边, 污染能力网统计与最优解路由)。
+        if self.dag.find_edge(from_idx, to_idx).is_some() {
+            self.sync_dependency_fields(from, to);
+            return Ok(());
+        }
+
         self.dag.add_edge(from_idx, to_idx, ());
         
         if petgraph::algo::is_cyclic_directed(&self.dag) {
@@ -196,20 +206,24 @@ impl CapabilityRegistry {
             return Err(RegistryError::CircularDependency(from.into(), to.into()));
         }
 
-        // 更新双向索引
+        self.sync_dependency_fields(from, to);
+        Ok(())
+    }
+
+    /// 同步双向依赖字段 (dependents + requires)。
+    ///
+    /// 语义: 保证 DAG 边与节点字段一致 — dependents 记录"谁依赖我",
+    /// requires 记录"我依赖谁" (与 DAG node_indices 一致)。add_dependency
+    /// 新建边与幂等命中 (边已存在) 两条路径都调用, 确保字段同步。
+    fn sync_dependency_fields(&mut self, from: &str, to: &str) {
         if let Some(node) = self.nodes.get_mut(to) {
             node.add_dependent(from.into());
         }
-        // 同步 from.requires (LoopX 最优解修复): link 必须同时更新依赖方的
-        // requires 字段, 否则 DAG 有边但 requires 为空 → 算法误判 primitive。
-        // 语义: requires 存节点 ID (与 DAG node_indices 一致)。
         if let Some(node) = self.nodes.get_mut(from) {
             if !node.requires.iter().any(|r| r == to) {
                 node.requires.push(to.to_string());
             }
         }
-
-        Ok(())
     }
 
     /// 查询: 按领域
@@ -319,15 +333,19 @@ impl CapabilityRegistry {
         petgraph::algo::is_cyclic_directed(&self.dag)
     }
 
-    /// 导出为可序列化结构
+    /// 导出为可序列化结构 (边去重: petgraph multigraph 可能含平行边,
+    /// 历史遗留 load→save 循环产生的重复边不再写出)。
     pub fn export(&self) -> RegistryExport {
         let mut edges = Vec::new();
+        let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
         for edge in self.dag.edge_references() {
             let a_idx = edge.source();
             let b_idx = edge.target();
             let a = &self.dag[a_idx];
             let b = &self.dag[b_idx];
-            edges.push((a.clone(), b.clone()));
+            if seen.insert((a.clone(), b.clone())) {
+                edges.push((a.clone(), b.clone()));
+            }
         }
         RegistryExport {
             nodes: self.nodes.values().cloned().collect(),
@@ -749,5 +767,35 @@ mod tests {
         reg2.get_mut("p1").unwrap().evolution_log = vec![entry.clone(), entry.clone(), entry];
         let sp_p1_ev = reg2.shortest_path_to_primitive("c1").unwrap();
         assert!(sp_p1_ev.cost < cost_before, "evidence must reduce cost: {} < {}", sp_p1_ev.cost, cost_before);
+    }
+
+    /// 幂等守卫: add_dependency 对已存在的边必须跳过 (petgraph multigraph
+    /// 允许平行边, 无条件 add_edge 会让 load→save 循环累加重复边)。
+    #[test]
+    fn test_add_dependency_is_idempotent() {
+        let mut reg = build_test_registry();
+        // build_test_registry 有 4 条唯一边: c1->p1, c2->c1, c2->p2, c3->c2
+        let before = reg.export().edges.len();
+        reg.add_dependency("c1", "p1").unwrap();
+        reg.add_dependency("c1", "p1").unwrap();
+        reg.add_dependency("c1", "p1").unwrap();
+        let export = reg.export();
+        let dup = export.edges.iter().filter(|(a, b)| a == "c1" && b == "p1").count();
+        assert_eq!(dup, 1, "重复边必须被去重, 得到 {}", dup);
+        assert_eq!(export.edges.len(), before, "幂等命中不得新增边");
+    }
+
+    /// export 去重: 即使 DAG 内已混入平行边, 导出也必须去重。
+    #[test]
+    fn test_export_dedupes_parallel_edges() {
+        let mut reg = build_test_registry();
+        // 模拟历史遗留: 直接向 DAG 塞入平行边 (绕过 add_dependency 幂等)
+        let from_idx = *reg.node_indices.get("c2").unwrap();
+        let to_idx = *reg.node_indices.get("p2").unwrap();
+        reg.dag.add_edge(from_idx, to_idx, ());
+        reg.dag.add_edge(from_idx, to_idx, ());
+        let export = reg.export();
+        let dup = export.edges.iter().filter(|(a, b)| a == "c2" && b == "p2").count();
+        assert_eq!(dup, 1, "export 必须去重平行边, 得到 {}", dup);
     }
 }

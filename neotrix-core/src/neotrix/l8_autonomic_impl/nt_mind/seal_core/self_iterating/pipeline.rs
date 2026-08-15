@@ -2823,6 +2823,9 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::neotrix::l7_capability_impl::CapabilityClusterSelfTest,
         ));
+        for t in crate::core::nt_core_arch_fitness::arch_fitness_tests() {
+            registry.register(t);
+        }
         let results = registry.run_all();
         let passed = results.iter().filter(|r| r.passed).count();
         let total = results.len();

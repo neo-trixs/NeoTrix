@@ -42,6 +42,7 @@ use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
+use neotrix::neotrix::l8_autonomic_impl::nt_mind_guard::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::core::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };
@@ -838,6 +839,37 @@ fn validate_entry(e: &Value) -> Vec<String> {
     errors
 }
 
+/// P0-2 G3 质量门置信度 (SEA/SimpleMem absorb): 综合 verified_by / evidence /
+/// source / not 负例 → [0,1]。吸收时作为初始 confidence, 供质量门过滤低信号噪声。
+fn confidence_of(entry: &Value) -> f64 {
+    let mut c = 0.0f64;
+    if entry
+        .get("verified_by")
+        .and_then(|v| v.as_str())
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+    {
+        c += 0.25;
+    }
+    if entry
+        .get("evidence")
+        .and_then(|ev| ev.as_str())
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+    {
+        c += 0.25;
+    }
+    if entry.get("not").is_some() && entry.get("not").map(|n| n.is_string() || n.is_array()).unwrap_or(false) {
+        c += 0.10;
+    }
+    match entry.get("source").and_then(|s| s.as_str()) {
+        Some("experiment") | Some("code") | Some("trace") => c += 0.30,
+        Some("dialogue") => c += 0.15,
+        _ => c += 0.10,
+    }
+    c.min(1.0)
+}
+
 fn cmd_absorb(conn: &mut Connection, session_path: &str) {
     let mut hub = ensure_hub(conn);
     let raw = std::fs::read_to_string(session_path).expect("read session.json");
@@ -901,6 +933,20 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
             // P0-1: 独立审计者字段
             "verified_by": raw_entry.get("verified_by").cloned().unwrap_or(Value::Null),
             "verification_status": raw_entry.get("verification_status").cloned().unwrap_or(Value::Null),
+            // P0-2 G3: 经验三元组 (SEA/SimpleMem absorb): (context, decision, feedback)
+            "context": raw_entry.get("context").cloned().unwrap_or_else(|| {
+                json!(format!(
+                    "domain={} type={}",
+                    raw_entry.get("domain").or_else(|| session.get("domain"))
+                        .and_then(|d| d.as_str()).unwrap_or("unknown"),
+                    raw_entry.get("type").and_then(|t| t.as_str()).unwrap_or("insight")
+                ))
+            }),
+            "decision": raw_entry.get("decision").cloned()
+                .unwrap_or_else(|| raw_entry.get("content").cloned().unwrap_or(json!(""))),
+            "feedback": json!({"success": 0, "failure": 0, "reuse": 0}),
+            // P0-2 G3 质量门 confidence: verified_by + evidence + source 综合置信度
+            "confidence": confidence_of(raw_entry),
         });
         // D20: manifest — 内容 SHA-256, 落盘后可按哈希核对吸收内容未被篡改/漂移
         let raw_content = e.get("content").and_then(|c| c.as_str()).unwrap_or("");
@@ -977,6 +1023,24 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
                 continue;
             }
         }
+        // P0-2 G3 质量过滤门 (SEA/SimpleMem absorb): 低置信度 + 无证据 + 未验证
+        // → 纯噪声, 拒绝落盘 (审计决策 quality_gate)。
+        let confidence = e.get("confidence").and_then(|c| c.as_f64()).unwrap_or(0.0);
+        let has_evidence = e.get("evidence").and_then(|ev| ev.as_str())
+            .map(|s| !s.trim().is_empty()).unwrap_or(false);
+        let has_verifier = e.get("verified_by").and_then(|v| v.as_str())
+            .map(|s| !s.trim().is_empty()).unwrap_or(false);
+        if confidence < 0.15 && !has_evidence && !has_verifier {
+            println!(
+                "[absorb] ✗ quality gate 拒绝 entry #{} (confidence={:.2}, 无证据/无验证) — 低信号噪声",
+                i, confidence
+            );
+            audit_log.push(json!({
+                "idx": i, "decision": "quality_gate", "reason": format!("confidence={:.2}", confidence),
+                "content_hash": content_hash, "ts": ts,
+            }));
+            continue;
+        }
         let key = format!("branch_{}_{}_{}", cycle, i, uuid_hex(6));
         // 神经网络化: 提取概念 → 去重神经元 → 分支保存概念引用 (内容词不重复落盘)
         let concepts = extract_concepts(
@@ -1043,6 +1107,95 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
     // 自动消退蒸馏: 吸收后若未蒸馏分支累积超阈值, 自动触发 distill
     // (经验无限追加 → 维度膨胀 → 自动收敛为能力模式, "始终处于最优解状态")
     auto_distill_if_over_threshold(conn, &mut hub);
+}
+
+// ────────────────────────────────────────────────────────────────
+// P0-2 G3+G8: 经验反馈环 — reuse 结果记录 → MapeGate 多指标 burn-in 门
+// (SEA/SimpleMem absorb)。feedback success/failure 反向下调 confidence,
+// 触发主动回滚 (status=failing, confidence 减半) 或晋升 (status=stable)。
+// ────────────────────────────────────────────────────────────────
+fn cmd_feedback(conn: &mut Connection, key: &str, outcome: &str) {
+    let Some(value) = kv_get(conn, NS, key) else {
+        println!("[feedback] ✗ 分支 {key} 不存在 (kv_store experience namespace)");
+        return;
+    };
+    let Ok(mut v) = serde_json::from_str::<Value>(&value) else {
+        println!("[feedback] ✗ 分支 {key} 损坏 (非 JSON)");
+        return;
+    };
+    let content = v.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+    if content.trim().is_empty() {
+        println!("[feedback] ✗ 分支 {key} 无 content, 拒绝反馈");
+        return;
+    }
+
+    let obj = v.as_object_mut().expect("branch 是 JSON 对象");
+    let fb = obj.entry("feedback").or_insert_with(|| json!({"success": 0, "failure": 0, "reuse": 0}));
+    let mut success = fb.get("success").and_then(|x| x.as_i64()).unwrap_or(0);
+    let mut failure = fb.get("failure").and_then(|x| x.as_i64()).unwrap_or(0);
+    let mut reuse = fb.get("reuse").and_then(|x| x.as_i64()).unwrap_or(0);
+    match outcome {
+        "success" => {
+            success += 1;
+            reuse += 1;
+        }
+        "failure" => failure += 1,
+        other => {
+            println!("[feedback] ✗ outcome 必须为 success|failure, 收到: {other}");
+            return;
+        }
+    }
+    fb["success"] = json!(success);
+    fb["failure"] = json!(failure);
+    fb["reuse"] = json!(reuse);
+
+    // 反向下调/上调 confidence (feedback 负例 → 该经验可信度下降)
+    let total = (success + failure) as f64;
+    let base_conf = v.get("confidence").and_then(|c| c.as_f64()).unwrap_or(0.5);
+    let conf = if total > 0.0 {
+        let ratio = success as f64 / total;
+        (base_conf * 0.5 + ratio * 0.5).clamp(0.0, 1.0)
+    } else {
+        base_conf
+    };
+    v["confidence"] = json!(conf);
+
+    // G8 MapeGate 多指标验证门 (burn-in 20): 指标 = confidence / feedback / reuse
+    let mut gate = MapeGate::new(MapeGateConfig::default());
+    let metrics = vec![
+        MetricEval { name: "confidence".into(), score: conf, passed: conf >= 0.5 },
+        MetricEval {
+            name: "feedback".into(),
+            score: if total > 0.0 { success as f64 / total } else { 1.0 },
+            passed: failure == 0 || (success as f64 / total) >= 0.5,
+        },
+        MetricEval { name: "reuse".into(), score: reuse as f64, passed: reuse >= 3 },
+    ];
+    let verdict = gate.evaluate(key, metrics);
+    if verdict.rollback {
+        v["status"] = json!("failing");
+        v["rollback"] = json!(true);
+        let c = v.get("confidence").and_then(|c| c.as_f64()).unwrap_or(0.5) * 0.5;
+        v["confidence"] = json!(c);
+        println!(
+            "[feedback] ↺ 回滚 {key} (evaluations={}, reason: {}) → status=failing, confidence={:.2}",
+            verdict.evaluations, verdict.note, c
+        );
+    } else if verdict.promoted {
+        v["status"] = json!("stable");
+        v["rollback"] = json!(false);
+        println!(
+            "[feedback] ⬆ 晋升 {key} → stable (evaluations={}, {})",
+            verdict.evaluations, verdict.note
+        );
+    } else {
+        println!(
+            "[feedback] ◌ burn-in (evaluations={}, {}) confidence={:.2}, success={}, failure={}, reuse={}",
+            verdict.evaluations, verdict.note, conf, success, failure, reuse
+        );
+    }
+    kv_set(conn, NS, key, &v.to_string());
+    println!("[feedback] 已更新 {key} feedback={success}成功/{failure}失败 reuse={reuse}");
 }
 
 /// 吸收后自动蒸馏: 未蒸馏分支数 ≥ 阈值时触发 distill (min_group=3 默认)。
@@ -2881,6 +3034,13 @@ enum Cmd {
     Absorb {
         session: String,
     },
+    /// P0-2 G3+G8: 记录经验复用反馈 → MapeGate burn-in 门 (晋升/回滚)
+    Feedback {
+        key: String,
+        /// success | failure
+        #[arg(long, default_value = "success")]
+        outcome: String,
+    },
     /// 批量节点吸收 (R-P97: Python insert_node 的 Rust port — 知识写入单一事实源)
     /// 输入: JSON 文件 (节点数组或单节点), 每条含 node_type/title/summary/content/url/domain/
     ///       language/importance/meta; 可含 capability {branch,capability,evidence} 四元组。
@@ -3029,6 +3189,7 @@ fn main() {
         Cmd::Snapshot { cycle, task, domain } => cmd_snapshot(&conn, &cycle, &task, &domain),
         Cmd::Close { cycle } => cmd_close(&conn, &cycle),
         Cmd::Absorb { session } => cmd_absorb(&mut conn, &session),
+        Cmd::Feedback { key, outcome } => cmd_feedback(&mut conn, &key, &outcome),
         Cmd::AbsorbNode { input, dry_run, apply_capability } => {
             cmd_absorb_node(&conn, &input, dry_run, apply_capability)
         }

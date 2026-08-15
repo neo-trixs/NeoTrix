@@ -5,7 +5,11 @@ use crate::neotrix::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
 use crate::neotrix::nt_act_autonomy::awareness_monitor::SelfAwarenessMonitor;
 
 const HISTORY_CAPACITY: usize = 100;
-const ENTROPY_BASELINE: f64 = 3.46; // log2(11) for 11 specialist modules
+// log2(GWT MODULE_COUNT) — 从 GWT 真实模块数派生, 避免与 resonance.rs 漂移。
+// LazyLock: f64::log2 非 const fn, const 上下文无法求值 (Rust 稳定版限制)。
+static ENTROPY_BASELINE: std::sync::LazyLock<f64> = std::sync::LazyLock::new(|| {
+    (crate::core::nt_core_gwt::resonance::MODULE_COUNT as f64).log2()
+});
 
 pub struct ConsciousnessMonitor {
     /// IIT Phi calculator
@@ -338,7 +342,7 @@ impl ConsciousnessMonitor {
                 -p * p.log2()
             })
             .sum();
-        entropy / ENTROPY_BASELINE
+        entropy / *ENTROPY_BASELINE
     }
 
     fn estimate_conversation_stage(&self, turn_count: usize, topic_drift: f64) -> ConversationStage {

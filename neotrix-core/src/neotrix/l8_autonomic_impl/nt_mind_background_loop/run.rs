@@ -213,6 +213,138 @@ use crate::core::nt_core_event::CoreEvent;
 use crate::core::nt_core_state_substrate::StateSubstrate;
 use crate::core::nt_core_simulate_engine::SimulateEngine;
 
+// ============================================================
+// L1-L3 自治梯度 (G9 — loop-engineering 吸收)
+// 自治等级由 Loop Ready 评分派生: L3=自主进化 / L2=自动修复 / L1=监控报告
+// ============================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AutonomyTier {
+    /// 仅监控与报告, 不自动修复
+    L1 = 1,
+    /// 自动修复, 不自主进化
+    L2 = 2,
+    /// 自主进化 (checkpoint 齐备 + 门控健全)
+    L3 = 3,
+}
+
+impl AutonomyTier {
+    pub fn label(self) -> &'static str {
+        match self {
+            AutonomyTier::L1 => "监控报告",
+            AutonomyTier::L2 => "自动修复",
+            AutonomyTier::L3 => "自主进化",
+        }
+    }
+}
+
+/// Loop Ready 评分 — 从循环健康信号计算 (0-100)
+#[derive(Debug, Clone, Copy)]
+pub struct LoopReadyScore {
+    pub score: u8,
+    pub handlers_ok: bool,
+    pub kb_ok: bool,
+    pub no_stall: bool,
+    pub cadence_ok: bool,
+}
+
+impl Default for LoopReadyScore {
+    fn default() -> Self {
+        Self::compute(true, false, true, true)
+    }
+}
+
+impl LoopReadyScore {
+    /// 权重: handlers 40 / kb 25 / no_stall 20 / cadence 15
+    pub fn compute(handlers_ok: bool, kb_ok: bool, no_stall: bool, cadence_ok: bool) -> Self {
+        let mut score = 0u8;
+        if handlers_ok {
+            score += 40;
+        }
+        if kb_ok {
+            score += 25;
+        }
+        if no_stall {
+            score += 20;
+        }
+        if cadence_ok {
+            score += 15;
+        }
+        Self {
+            score,
+            handlers_ok,
+            kb_ok,
+            no_stall,
+            cadence_ok,
+        }
+    }
+
+    /// 派生自治梯度: >=80 → L3, >=50 → L2, else L1
+    pub fn autonomy_tier(&self) -> AutonomyTier {
+        if self.score >= 80 {
+            AutonomyTier::L3
+        } else if self.score >= 50 {
+            AutonomyTier::L2
+        } else {
+            AutonomyTier::L1
+        }
+    }
+}
+
+// ============================================================
+// 路径/动作 denylist gate (G12 — 机械执行, 呼应指针守恒 hook)
+// 每个后台 handler tick 在进入 body 前先过此门; 命中被禁模式 → fail-closed 跳过
+// ============================================================
+
+#[derive(Debug, Clone)]
+pub struct PathDenylist {
+    patterns: Vec<String>,
+}
+
+impl Default for PathDenylist {
+    fn default() -> Self {
+        Self::default_gates()
+    }
+}
+
+impl PathDenylist {
+    /// 默认禁止模式 — 破坏性/不可逆/越权动作
+    pub fn default_gates() -> Self {
+        Self {
+            patterns: vec![
+                "rm -rf".to_string(),
+                "git push --force".to_string(),
+                "git push -f".to_string(),
+                "mkfs".to_string(),
+                "dd if=".to_string(),
+                "shutdown".to_string(),
+                "reboot".to_string(),
+                "> /dev/sd".to_string(),
+            ],
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn add_pattern(&mut self, pattern: impl Into<String>) {
+        self.patterns.push(pattern.into());
+    }
+
+    #[allow(dead_code)]
+    pub fn patterns(&self) -> &[String] {
+        &self.patterns
+    }
+
+    /// 机械门禁 — 动作字符串含被禁模式 → Err (fail-closed)
+    pub fn check(&self, action: &str) -> Result<(), String> {
+        for p in &self.patterns {
+            if action.contains(p.as_str()) {
+                return Err(format!("denylist gate 拒绝: 动作含被禁模式 '{}'", p));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl BackgroundLoop {
     /// Spawn all background handlers as independent tokio tasks.
     /// Each handler runs in its own loop with its own ticker.
@@ -285,7 +417,7 @@ impl BackgroundLoop {
             use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_coeffect::{
                 persist_bindings, CoeffectBinding, CoeffectRegistry, CoeffectTx,
             };
-            if let Ok(mut conn) = kb_ref.raw_conn() {
+            if let Ok(conn) = kb_ref.raw_conn() {
                 let mut reg = CoeffectRegistry::new();
                 {
                     let mut tx = CoeffectTx::begin(&mut reg);
@@ -511,10 +643,13 @@ cognitive_load: self.cognitive_load.take(),
             ),
             last_consumed_fruit_cycle: 0,
             last_capability_evolve_ts: std::sync::atomic::AtomicU64::new(0),
+            denylist: PathDenylist::default_gates(),
+            readiness: LoopReadyScore::default(),
+            autonomy_tier: AutonomyTier::L1,
         }));
 
         macro_rules! spawn_handler {
-            ($interval:expr, $lock:ident, $body:expr) => {{
+            ($interval:expr, $name:literal, |$lock:ident| $body:expr) => {{
                 let h = this.clone();
                 let mut rx = shutdown_rx.clone();
                 self.handles.push(tokio::spawn(async move {
@@ -525,6 +660,11 @@ cognitive_load: self.cognitive_load.take(),
                             biased;
                             _ = ticker.tick() => {
                                 let mut $lock = h.lock().await;
+                                // G12 denylist gate — 机械执行, 每个 handler tick 前置 fail-closed
+                                if let Err(e) = $lock.denylist.check($name) {
+                                    log::warn!("[bg-loop] handler '{}' 被 denylist gate 拦截: {}", $name, e);
+                                    continue;
+                                }
                                 $body;
                             }
                             _ = rx.changed() => {
@@ -536,7 +676,10 @@ cognitive_load: self.cognitive_load.take(),
                 }));
             }};
             ($interval:expr, |$lock:ident| $body:expr) => {
-                spawn_handler!($interval, $lock, $body);
+                spawn_handler!($interval, "handler", |$lock| $body);
+            };
+            ($interval:expr, $lock:ident, $body:expr) => {
+                spawn_handler!($interval, "handler", |$lock| $body);
             };
         }
 
@@ -550,13 +693,13 @@ cognitive_load: self.cognitive_load.take(),
             };
         }
 
-        spawn_handler!(cfg.save_interval_secs, |h| {
+        spawn_handler!(cfg.save_interval_secs, "save", |h| {
             h.handle_save().await;
             emit_event!(h, crate::core::nt_core_event::CoreEvent::TaskSubmitted {
                 task: "save".into(), task_type: "storage".into(), priority: 2,
             });
         });
-        spawn_handler!(cfg.consolidate_interval_secs, |h| h.handle_consolidate().await);
+        spawn_handler!(cfg.consolidate_interval_secs, "consolidate", |h| h.handle_consolidate().await);
         spawn_handler!(cfg.goal_interval_secs, |h| h.handle_goal().await);
         spawn_handler!(cfg.knowledge_chain_interval_secs, |h| h.handle_knowledge_chain().await);
         spawn_handler!(cfg.knowledge_aging_interval_secs, |h| h.handle_knowledge_aging().await);
@@ -570,19 +713,19 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.cleanup_interval_secs, |h| h.handle_cleanup().await);
         spawn_handler!(21_600, |h| h.handle_backup().await); // every 6h
         // ── 守卫层 (Rust 化自 sh 守护脚本, cycle 207) ──
-        spawn_handler!(cfg.kb_guard_interval_secs, |h| h.handle_kb_guard().await);
-        spawn_handler!(cfg.kb_backup_interval_secs, |h| h.handle_kb_backup().await);
-        spawn_handler!(cfg.workspace_guard_interval_secs, |h| h.handle_workspace_guard().await);        spawn_handler!(60, |h| h.handle_agent_discovery().await);
+        spawn_handler!(cfg.kb_guard_interval_secs, "kb_guard", |h| h.handle_kb_guard().await);
+        spawn_handler!(cfg.kb_backup_interval_secs, "kb_backup", |h| h.handle_kb_backup().await);
+        spawn_handler!(cfg.workspace_guard_interval_secs, "workspace_guard", |h| h.handle_workspace_guard().await);        spawn_handler!(60, |h| h.handle_agent_discovery().await);
         // ── 意识能力网内化吸收 (cycle 1053): 60s 检查 pending-absorb.json,
         //    替代原 .opencode/plugins/experience-tree-absorption.js idle 插件。
         spawn_handler!(60, |h| h.handle_pending_absorption().await);
         // ── 每日信息例行感知检查 (cycle 1107): 每日 1 次检查今日信息是否落盘,
         //    缺失则记录感知盲区到 KB (NT-WORLD 感知缺失信号)。
-        spawn_handler!(86_400, |h| h.handle_daily_intel_check().await);
-        spawn_handler!(120, |h| h.handle_always_on().await);
-        spawn_handler!(cfg.scheduler_interval_secs, |h| h.handle_scheduler_tick().await);
-        spawn_handler!(cfg.evolution_interval_secs, |h| h.handle_evolve().await);
-        spawn_handler!(cfg.nt_world_sense_interval_secs, |h| h.handle_world_sense().await);
+        spawn_handler!(86_400, "daily_intel", |h| h.handle_daily_intel_check().await);
+        spawn_handler!(120, "always_on", |h| h.handle_always_on().await);
+        spawn_handler!(cfg.scheduler_interval_secs, "scheduler", |h| h.handle_scheduler_tick().await);
+        spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
+        spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         spawn_handler!(3600, |h| h.handle_skill_scan().await);
         spawn_handler!(600, |h| h.handle_avatar_auto_distill().await);
         spawn_handler!(7200, |h| {
@@ -591,11 +734,11 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(86400, |h| h.handle_seed_crawl_queue().await);
         spawn_handler!(600, |h| h.handle_session_recovery().await);
         spawn_handler!(300, |h| h.handle_crawl_queue().await);
-        spawn_handler!(3600, |h| h.handle_architecture_audit().await);
+        spawn_handler!(3600, "architecture_audit", |h| h.handle_architecture_audit().await);
         // 43200s — 网络小说世界构建吸收 (novel_queue drain + 离线重分类), 12h cadence
-        spawn_handler!(43_200, |h| h.handle_novel_ingest().await);
+        spawn_handler!(43_200, "novel_ingest", |h| h.handle_novel_ingest().await);
         // ── Constitution hot-reload ──
-        spawn_handler!(86400, |h| h.handle_constitution_reload().await);
+        spawn_handler!(86400, "constitution_reload", |h| h.handle_constitution_reload().await);
         // 缺陷1修复 (自我运转实际情况): 意识核心进化周期改为配置驱动
         // (cfg.consciousness_interval_secs, 默认 600s), 与 SEAL 果实消费节奏对齐。
         // 此前硬编码 3600s (1h) 且不可配置 — SEAL (goal_interval 180s) 在大部分
@@ -619,6 +762,13 @@ cognitive_load: self.cognitive_load.take(),
                 h.emotion_restored.store(true, std::sync::atomic::Ordering::Relaxed);
             }
         });
+        // ── G9 Loop Ready 巡检 — 5min 重算自治梯度; G12 denylist gate 每 tick 生效 ──
+        spawn_handler!(300, "loop_readiness", |h| h.handle_loop_readiness().await);
+        // ── Auto Exacto 市场重估 (R-P79): 5min cadence 周期驱动 GatewayV2
+        //    market_router 重算权重 (与 DEFAULT_INTERVAL=300s 对齐), 不再仅
+        //    依赖 route() 调用时的惰性重估。经 gateway::run_periodic_re_evaluation()
+        //    tick 进程级注册表中的活跃网关 ──
+        spawn_handler!(300, "market_re_eval", |h| h.handle_market_re_evaluation().await);
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {
@@ -740,11 +890,64 @@ pub struct BackgroundLoopHandle {
     /// 用时间门避免每 tick 触发 (handle_evolve 由 evolution_interval_secs 驱动,
     /// 但能力网补齐独立节流, 默认 3600s 一次)。
     last_capability_evolve_ts: std::sync::atomic::AtomicU64,
+    /// 路径/动作 denylist gate (G12) — 每个 handler tick 前置 fail-closed
+    denylist: PathDenylist,
+    /// Loop Ready 评分 (G9) — 最近一次重算值
+    readiness: LoopReadyScore,
+    /// L1-L3 自治梯度 (G9) — 由 readiness 派生
+    autonomy_tier: AutonomyTier,
 }
 
 impl BackgroundLoopHandle {
     fn try_emit(&self, event: crate::core::nt_core_event::CoreEvent) {
         if let Some(ref bus) = self.event_bus { bus.emit(event); }
+    }
+
+    /// G9: 从真实运行时信号重算 Loop Ready 评分 + 自治梯度
+    pub fn recompute_readiness(&mut self) -> LoopReadyScore {
+        let kb_ok = self.kb.is_some();
+        // handlers_ok/cadence_ok/no_stall: 循环启动即视为真 (本方法运行于 handler 内)
+        let score = LoopReadyScore::compute(true, kb_ok, true, true);
+        self.readiness = score;
+        self.autonomy_tier = score.autonomy_tier();
+        score
+    }
+
+    /// G12: 暴露 denylist 门禁供 handler 在执行风险动作前咨询
+    pub fn check_denylist(&self, action: &str) -> Result<(), String> {
+        self.denylist.check(action)
+    }
+
+    /// G9 巡检 handler — 每 tick 重算 readiness 并报告当前自治梯度;
+    /// 同时自检一次 denylist 命中率 (gate 日志)。
+    pub async fn handle_loop_readiness(&mut self) {
+        let score = self.recompute_readiness();
+        log::info!(
+            "[bg-loop] LoopReady score={} tier=L{} ({}) kb_ok={} handlers_ok={}",
+            score.score,
+            score.autonomy_tier() as u8,
+            score.autonomy_tier().label(),
+            score.kb_ok,
+            score.handlers_ok,
+        );
+        if !score.kb_ok {
+            log::warn!("[bg-loop] KB 未挂载 — 自治梯度受限 (L3 需 KB 作为检查点底座)");
+        }
+    }
+
+    /// Auto Exacto 市场重估 handler (R-P79 生产接线) — 5min cadence 周期驱动
+    /// 进程级 GatewayV2 的 market_router 重算市场权重, 不再仅依赖 route()
+    /// 调用时的惰性重估。注册表经 gateway::RE_EVALUATION_GATEWAYS 共享,
+    /// 未注册任何网关时是 no-op (返回 0), 安全无副作用。
+    pub async fn handle_market_re_evaluation(&mut self) {
+        let evaluated =
+            crate::neotrix::l1_body_impl::nt_io_provider::gateway::run_periodic_re_evaluation();
+        if evaluated > 0 {
+            log::info!(
+                "[bg-loop] market re-evaluation triggered for {} gateway(s)",
+                evaluated
+            );
+        }
     }
 }
 
@@ -770,6 +973,7 @@ mod tests {
     }
 
     use super::ConvergencePulse;
+    use super::{AutonomyTier, LoopReadyScore, PathDenylist};
     use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
@@ -811,5 +1015,63 @@ mod tests {
         assert!(p.verified, "no gaps must not clear external verification");
         let promoted = p.advance();
         assert!(promoted.is_some(), "externally-verified complete layer should promote");
+    }
+
+    // ── G9 Loop Ready / 自治梯度 ──────────────────────────────
+
+    #[test]
+    fn test_loop_ready_score_full_kit() {
+        let s = LoopReadyScore::compute(true, true, true, true);
+        assert_eq!(s.score, 100);
+        assert_eq!(s.autonomy_tier(), AutonomyTier::L3);
+    }
+
+    #[test]
+    fn test_loop_ready_score_no_kb_downgrades_tier() {
+        // KB 缺失 → 75 分 → L2 (自动修复), 不能 L3 自主进化
+        let s = LoopReadyScore::compute(true, false, true, true);
+        assert_eq!(s.score, 75);
+        assert_eq!(s.autonomy_tier(), AutonomyTier::L2);
+    }
+
+    #[test]
+    fn test_loop_ready_score_low_is_l1() {
+        let s = LoopReadyScore::compute(false, false, false, false);
+        assert_eq!(s.score, 0);
+        assert_eq!(s.autonomy_tier(), AutonomyTier::L1);
+    }
+
+    #[test]
+    fn test_loop_ready_bounds() {
+        assert!(AutonomyTier::L1 < AutonomyTier::L2);
+        assert!(AutonomyTier::L2 < AutonomyTier::L3);
+        assert_eq!(AutonomyTier::L3.label(), "自主进化");
+    }
+
+    // ── G12 路径/动作 denylist gate ───────────────────────────
+
+    #[test]
+    fn test_denylist_blocks_destructive_patterns() {
+        let gate = PathDenylist::default_gates();
+        assert!(gate.check("rm -rf /home/neo").is_err(), "rm -rf 必须被拒");
+        assert!(gate.check("git push --force origin main").is_err(), "force push 必须被拒");
+        assert!(gate.check("mkfs.ext4 /dev/sdb").is_err(), "mkfs 必须被拒");
+        assert!(gate.check("> /dev/sda2").is_err(), "磁盘直接写入必须被拒");
+    }
+
+    #[test]
+    fn test_denylist_allows_safe_actions() {
+        let gate = PathDenylist::default_gates();
+        assert!(gate.check("read ./src/main.rs").is_ok());
+        assert!(gate.check("search kb experience").is_ok());
+        assert!(gate.check("cargo check -p neotrix").is_ok());
+    }
+
+    #[test]
+    fn test_denylist_extensible_and_fail_closed() {
+        let mut gate = PathDenylist::default_gates();
+        gate.add_pattern("delete_branch");
+        assert!(gate.check("git delete_branch feature-x").is_err(), "自定义模式同样 fail-closed");
+        assert_eq!(gate.patterns().len(), 9, "默认8 + 自定义1");
     }
 }

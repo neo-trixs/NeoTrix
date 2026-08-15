@@ -325,6 +325,14 @@ pub fn global_shield() -> &'static Mutex<ShieldEnforcer> {
     &GLOBAL_SHIELD
 }
 
+/// Test-only serialization lock for `GLOBAL_SHIELD`. Every test that mutates the
+/// global singleton (and every state-sensitive reader, incl. `sandboxed_shell`)
+/// acquires this lock BEFORE touching the global, so parallel tests cannot race
+/// the mode fields. Mutating tests also save/restore the full mode state, so the
+/// singleton is always left in its default state.
+#[cfg(test)]
+pub(crate) static TEST_SHIELD_LOCK: Mutex<()> = Mutex::new(());
+
 pub fn init_shield(mode: ApprovalMode) {
     let mut s = global_shield().lock().unwrap_or_else(|e| e.into_inner());
     s.set_approval_mode(mode);
@@ -402,8 +410,31 @@ mod tests {
         assert!(violations.iter().any(|v| v.code == "L001"));
     }
 
+    /// Snapshot of the global shield's mode fields, used to save/restore state
+    /// around tests that mutate `GLOBAL_SHIELD`.
+    struct ShieldModeSnapshot {
+        approval: ApprovalMode,
+        sandbox: SandboxMode,
+        perm_chain: PermissionMode,
+    }
+
+    fn save_global_shield_modes(s: &ShieldEnforcer) -> ShieldModeSnapshot {
+        ShieldModeSnapshot {
+            approval: s.approval.mode(),
+            sandbox: s.sandbox.mode(),
+            perm_chain: s.perm_chain.mode(),
+        }
+    }
+
+    fn restore_global_shield_modes(s: &mut ShieldEnforcer, snapshot: ShieldModeSnapshot) {
+        s.set_approval_mode(snapshot.approval);
+        s.set_sandbox_mode(snapshot.sandbox);
+        s.perm_chain.set_mode(snapshot.perm_chain);
+    }
+
     #[test]
     fn test_global_shield() {
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let s = global_shield();
         if let Ok(guard) = s.try_lock() {
             assert_eq!(guard.policy.profile, "nt_shield");
@@ -412,20 +443,23 @@ mod tests {
 
     #[test]
     fn test_init_shield() {
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let prev = {
+            let g = global_shield().lock().unwrap_or_else(|e| e.into_inner());
+            save_global_shield_modes(&g)
+        };
         init_shield(ApprovalMode::FullAuto);
-        let s = global_shield();
-        if let Ok(guard) = s.try_lock() {
-            assert_eq!(guard.approval.mode(), ApprovalMode::FullAuto);
-            // Reset for other tests
-            drop(guard);
-            if let Ok(mut g) = s.try_lock() {
-                g.set_approval_mode(ApprovalMode::Suggest);
-            }
+        {
+            let g = global_shield().lock().unwrap_or_else(|e| e.into_inner());
+            assert_eq!(g.approval.mode(), ApprovalMode::FullAuto);
         }
+        let mut g = global_shield().lock().unwrap_or_else(|e| e.into_inner());
+        restore_global_shield_modes(&mut g, prev);
     }
 
     #[test]
     fn test_e2e_global_shield_singleton() {
+        let _lock = TEST_SHIELD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let s1 = global_shield();
         if let Ok(g1) = s1.try_lock() {
             let profile = g1.policy.profile.clone();
