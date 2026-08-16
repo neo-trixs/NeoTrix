@@ -2,6 +2,14 @@ use std::collections::HashMap;
 
 use crate::core::nt_core_self_constitution::global_constitution;
 
+/// 跨模块共享的测试环境锁 — 串行化所有 set_var(HOME/NEOTRIX_*) 的测试隔离。
+/// 原因: kb_cmds::with_temp_home / consciousness_core::isolate_home_once 等各自
+/// 用私有锁, 互不感知 → 并行测试窗口内 HOME 被对方覆盖 → QueryReturnedNoRows /
+/// roundtrip 读错库等 flaky (Rust set_var 进程级全局, 多线程竞争).
+/// 用法: 测试隔离入口先持此锁, 再 set/恢复 env。
+#[cfg(test)]
+pub static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub trait SelfTest: Send + Sync {
     fn name(&self) -> &str;
     fn self_test(&self) -> Result<(), Vec<String>>;
@@ -78,7 +86,12 @@ impl SelfTestResult {
         if self.passed {
             format!("[SELF-TEST] {} ✅ pass", self.name)
         } else {
-            format!("[SELF-TEST] {} ❌ FAIL ({} failures): {}", self.name, self.failures.len(), self.failures.join("; "))
+            format!(
+                "[SELF-TEST] {} ❌ FAIL ({} failures): {}",
+                self.name,
+                self.failures.len(),
+                self.failures.join("; ")
+            )
         }
     }
 }
@@ -87,7 +100,10 @@ pub fn report(results: &[SelfTestResult]) -> String {
     let total = results.len();
     let passed = results.iter().filter(|r| r.passed).count();
     let failed = total - passed;
-    let mut s = format!("SelfTestRegistry Report — {} total, {} passed, {} failed\n", total, passed, failed);
+    let mut s = format!(
+        "SelfTestRegistry Report — {} total, {} passed, {} failed\n",
+        total, passed, failed
+    );
     for r in results {
         s.push_str(&format!("  {}\n", r.summary()));
     }
@@ -100,14 +116,22 @@ mod tests {
 
     struct PassTest;
     impl SelfTest for PassTest {
-        fn name(&self) -> &str { "pass_test" }
-        fn self_test(&self) -> Result<(), Vec<String>> { Ok(()) }
+        fn name(&self) -> &str {
+            "pass_test"
+        }
+        fn self_test(&self) -> Result<(), Vec<String>> {
+            Ok(())
+        }
     }
 
     struct FailTest;
     impl SelfTest for FailTest {
-        fn name(&self) -> &str { "fail_test" }
-        fn self_test(&self) -> Result<(), Vec<String>> { Err(vec!["expected failure".into()]) }
+        fn name(&self) -> &str {
+            "fail_test"
+        }
+        fn self_test(&self) -> Result<(), Vec<String>> {
+            Err(vec!["expected failure".into()])
+        }
     }
 
     #[test]
@@ -141,7 +165,9 @@ mod tests {
 pub struct ExternalVerifier;
 
 impl SelfTest for ExternalVerifier {
-    fn name(&self) -> &str { "external_verifier" }
+    fn name(&self) -> &str {
+        "external_verifier"
+    }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let output = std::process::Command::new("cargo")
@@ -152,12 +178,16 @@ impl SelfTest for ExternalVerifier {
             Ok(())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let errors: Vec<String> = stderr.lines()
+            let errors: Vec<String> = stderr
+                .lines()
                 .filter(|l| l.contains("error"))
                 .take(5)
                 .map(|l| l.to_string())
                 .collect();
-            Err(vec![format!("cargo check failed ({} errors)", errors.len())])
+            Err(vec![format!(
+                "cargo check failed ({} errors)",
+                errors.len()
+            )])
         }
     }
 }
@@ -172,39 +202,44 @@ impl SelfTest for ConstitutionComplianceTest {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let constitution = global_constitution();
-        
+
         // Check that constitution was loaded
         if constitution.rules.is_empty() {
             return Err(vec!["Constitution has no rules loaded".into()]);
         }
-        
+
         // Check that tree growth rules exist (R-P42~R-P48)
         if constitution.tree_growth_rules().is_empty() {
             return Err(vec!["Missing tree growth rules (R-P42~R-P48)".into()]);
         }
-        
+
         // Check that absorption rules exist (R-P43)
         if constitution.absorption_rules().is_empty() {
             return Err(vec!["Missing absorption protocol rules (R-P43)".into()]);
         }
-        
+
         // Verify vector index is built
         if !constitution.has_vector_index() {
             return Err(vec!["Constitution vector index not built".into()]);
         }
-        
+
         // Test compliance check on a valid action
-        let report = constitution.verify_compliance("extend existing module nt_core_orch_agent with hexagram derivation");
+        let report = constitution.verify_compliance(
+            "extend existing module nt_core_orch_agent with hexagram derivation",
+        );
         if !report.compliant {
             // Some violations may be expected, but we check the check works
         }
-        
+
         // Test compliance check on a violation
-        let violation_report = constitution.verify_compliance("create new module without branch mapping");
+        let violation_report =
+            constitution.verify_compliance("create new module without branch mapping");
         if violation_report.compliant {
-            return Err(vec!["Compliance check failed to detect R-P42 violation".into()]);
+            return Err(vec![
+                "Compliance check failed to detect R-P42 violation".into()
+            ]);
         }
-        
+
         Ok(())
     }
 }

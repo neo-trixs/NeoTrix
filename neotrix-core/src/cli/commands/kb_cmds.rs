@@ -906,7 +906,12 @@ mod tests {
     static HOME_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn with_temp_home<T>(f: impl FnOnce() -> T) -> T {
+        // 双重持锁: 私有锁串行 kb_cmds 内部; 共享 TEST_ENV_LOCK 与其它模块
+        // (consciousness_core::isolate_home_once / cipher) 互斥, 防 HOME 窗口竞争。
         let _g = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _ge = crate::core::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let old = std::env::var("HOME").ok();
         let dir = std::env::temp_dir().join(format!("nt_kb_cmds_{}", std::process::id()));
         // Purge any db left by an earlier test in this process (tests share the

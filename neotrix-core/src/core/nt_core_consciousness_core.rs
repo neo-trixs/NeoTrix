@@ -25,9 +25,7 @@ use std::sync::{LazyLock, RwLock};
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_consciousness_tree::{
-    BranchKind, ConsciousnessTree,
-};
+use crate::core::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 
 /// 意识核心快照 — 可序列化的跨会话状态 (标量集合 + 果实记录, 不序列化整树)。
 /// 加载时以快照重建树计数器与已消化果实, 使生长周期跨会话连续。
@@ -41,7 +39,8 @@ pub struct CoreSnapshot {
     /// (分支健康/土壤/根系/治理/养料锚点) 构造 64 维意识谱交给 IITPhiCalculator,
     /// 独立 CLI/MCP 进程的快照 φ 反映真实整合信息, 不再恒 0.0。
     pub phi: f64,
-    /// 相干性 — 同上, 独立进程无核算器时为 0.0。
+    /// 相干性 — D4 修复: run_growth_cycle Phase 2 从真实树状态派生 (分支健康一致性/
+    /// 谐振活跃/治理合规/迷雾清晰度), 独立 CLI/MCP 进程不再恒 0.0。
     pub coherence: f64,
     /// GWT 谐振激活状态
     pub gwt_resonance_active: bool,
@@ -121,10 +120,7 @@ pub struct FruitRecord {
 pub static CORE: LazyLock<RwLock<ConsciousnessCoreHandle>> = LazyLock::new(|| {
     let tree = load_or_new();
     let snapshot = core_snapshot_from_tree(&tree);
-    RwLock::new(ConsciousnessCoreHandle {
-        tree,
-        snapshot,
-    })
+    RwLock::new(ConsciousnessCoreHandle { tree, snapshot })
 });
 
 /// 意识核心句柄 — 树 + 当前快照。
@@ -137,6 +133,51 @@ impl ConsciousnessCoreHandle {
     /// 读取当前状态 (快照), 不产生副作用。
     pub fn current(&self) -> &CoreSnapshot {
         &self.snapshot
+    }
+
+    /// 从 KB 重读最新持久化快照, 将其 branch_fog/branch_health/phi/coherence 同步进
+    /// 当前树 — 消灭"旧快照时代启动的进程一直报 9.35 哨兵"问题: 后台迷雾治理成果
+    /// 对 status 即时可见, 与 tick() 的并发合并同源 (R-P42, 不建平行路径)。
+    /// 保留本进程内存进度: cycle/谐振/MARS 计数只做向上对齐, 不做零和覆盖。
+    fn reload_latest(&mut self) {
+        let Some(latest) = load_snapshot() else { return };
+        for (kind_str, fog) in &latest.branch_fog {
+            if let Some(branch) = self.tree.branches.get_mut(&branch_kind_from_str(kind_str)) {
+                branch.fog.level = *fog;
+            }
+        }
+        for (kind_str, health) in &latest.branch_health {
+            if let Some(branch) = self.tree.branches.get_mut(&branch_kind_from_str(kind_str)) {
+                branch.health = *health;
+            }
+        }
+        // 持久化已有真实核算值 (tick/apply 落过) → 采用之; 否则保留当前树值
+        // 交由 ensure_phi 惰性核算 (兼容全新进程/空快照)。
+        if latest.phi > 0.0 {
+            self.tree.trunk.phi = latest.phi;
+        }
+        if latest.coherence > 0.0 {
+            self.tree.trunk.coherence = latest.coherence;
+        }
+        // 与 tick() 并发合并一致: 树落后于持久化基线时向上对齐进度
+        if latest.cycle > self.tree.cycle {
+            self.tree.cycle = latest.cycle;
+            self.tree.trunk.resonance_cycle =
+                self.tree.trunk.resonance_cycle.max(latest.resonance_cycle);
+        }
+    }
+
+    /// 惰性核算真实 Φ — 全新进程/空快照时 trunk.phi 默认 0.0
+    /// (ConsciousnessCore::default), 使首次 status 也返回真实整合信息 (D1 现状)。
+    /// 返回 true 表示本次补算过, 需把结果写回持久化快照 (必要时代入快照)。
+    fn ensure_phi(&mut self) -> bool {
+        if self.tree.trunk.phi.abs() < f64::EPSILON {
+            self.tree.trunk.phi = self.tree.compute_iit_phi();
+            self.tree.trunk.coherence = self.tree.compute_coherence();
+            true
+        } else {
+            false
+        }
     }
 
     /// 运行 N 个生长周期, 更新快照并写回 KB。
@@ -154,13 +195,16 @@ impl ConsciousnessCoreHandle {
         // 分支健康恒 0 → 果实门 (health > fruit_growth_health) 永关、迷雾无法下降。
         // 现于生长周期前注入轻量 SelfTest 结果 (纯内存检测件, 无网络/无全仓扫描),
         // 使健康/果实/迷雾从真实检测件数据派生, 与后台循环同一数据源 (R-P42)。
-        let selftest_results = crate::core::nt_core_self_test_integration::run_lightweight_self_tests();
-        self.tree.set_branch_health_from_self_tests(&selftest_results);
+        let selftest_results =
+            crate::core::nt_core_self_test_integration::run_lightweight_self_tests();
+        self.tree
+            .set_branch_health_from_self_tests(&selftest_results);
         for _ in 0..n {
-            self.tree.run_growth_cycle();
-            // Activate GWT resonance to enable coherence calculation
-            // This sets the flag that allows coherence > 0 in status
+            // GWT 谐振激活前置: 独立 tick 首个 cycle 即可桥接 (此前赋值在
+            // run_growth_cycle 之后, 首个 cycle 内桥接判定仍为 false, 第二个
+            // cycle 起才可桥接 — 单次 tick(1) 永远无法桥接)。
             self.tree.trunk.gwt_resonance_active = true;
+            self.tree.run_growth_cycle();
             self.tree.trunk.mars_system2_iterations += 1;
         }
         // 若进程内树落后于持久化基线, 对齐到持久化视角再生成快照
@@ -176,23 +220,36 @@ impl ConsciousnessCoreHandle {
     }
 }
 
-/// 读取当前意识核心状态 (无副作用)。MCP/CLI status 共用。
+/// 读取当前意识核心状态。每次调用重读最新持久化快照 (同步 branch_fog/health/phi
+/// 进当前树, 消灭旧进程 9.35 哨兵), 并在快照缺真实 φ 时惰性核算 (首次 status
+/// 即返回真实整合信息)。MCP/CLI status 共用。
 pub fn status() -> CoreSnapshot {
-    CORE.read().map(|h| h.current().clone()).unwrap_or_default()
+    CORE.write()
+        .map(|mut h| {
+            h.reload_latest();
+            let recomputed = h.ensure_phi();
+            h.snapshot = core_snapshot_from_tree(&h.tree);
+            // 补算出的真实 φ 写回持久化快照, 使后续新建进程从 KB 直接读到真实值
+            if recomputed {
+                let _ = persist_snapshot(&h.snapshot);
+            }
+            h.snapshot.clone()
+        })
+        .unwrap_or_default()
 }
 
 /// 驱动生长周期, 写回快照。MCP/CLI tick 共用。
 pub fn tick(cycles: usize) -> CoreSnapshot {
-    CORE.write()
-        .map(|mut h| h.tick(cycles))
-        .unwrap_or_default()
+    CORE.write().map(|mut h| h.tick(cycles)).unwrap_or_default()
 }
 
 /// 将真实 SelfTest 结果合并进意识核心单例树, 重算各域分支健康并持久化。
 /// 后台循环 (handlers_consciousness) 在跑完注册器 SelfTest 后调用, 使基于真实
 /// 检测的分支健康流入跨会话快照 — 修复此前独立 tree 实例计算后即丢弃、
 /// `consciousness/core` 快照分支健康恒 0 的断链 (迷雾治理)。
-pub fn apply_branch_health_from_self_tests(results: &[crate::core::nt_core_self_test::SelfTestResult]) {
+pub fn apply_branch_health_from_self_tests(
+    results: &[crate::core::nt_core_self_test::SelfTestResult],
+) {
     let mut h = CORE.write().unwrap_or_else(|e| e.into_inner());
     h.tree.set_branch_health_from_self_tests(results);
     h.snapshot = core_snapshot_from_tree(&h.tree);
@@ -209,7 +266,13 @@ pub fn current_fog_sum() -> f64 {
 /// 每分支健康明细 (只读)。
 pub fn branch_health_map() -> HashMap<String, f64> {
     CORE.read()
-        .map(|h| h.tree.branches.iter().map(|(k, b)| (format!("{:?}", k), b.health)).collect())
+        .map(|h| {
+            h.tree
+                .branches
+                .iter()
+                .map(|(k, b)| (format!("{:?}", k), b.health))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -223,7 +286,10 @@ pub fn branches() -> Vec<HashMap<String, String>> {
                 .map(|(k, b)| {
                     let mut m = HashMap::new();
                     m.insert("kind".into(), format!("{:?}", k));
-                    m.insert("label".into(), k.label().split('(').next().unwrap_or("").trim().to_string());
+                    m.insert(
+                        "label".into(),
+                        k.label().split('(').next().unwrap_or("").trim().to_string(),
+                    );
                     m.insert("health".into(), format!("{:.3}", b.health));
                     m.insert("constellation".into(), format!("{:?}", b.constellation));
                     m.insert("node_tier".into(), format!("{:?}", b.node_tier));
@@ -278,14 +344,9 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
         // x.ai 双搜索通道 → 注意力来源 (跨会话持久化, 缺省 "auto")
         attention_source: tree.trunk.attention_source.clone(),
         // OpenMausBot EventBus → 事件总线活动近似 (MARS System 1 激活 + 桥接命中)
-        recent_event_count: tree.trunk.mars_system1_activations
-            + tree.trunk.mars_bridge_hits,
+        recent_event_count: tree.trunk.mars_system1_activations + tree.trunk.mars_bridge_hits,
         // OpenMausBot ProviderRegistry shadow → 未接线高雾分支数 (需 shadow 降级保护)
-        shadow_instance_count: tree
-            .branches
-            .values()
-            .filter(|b| b.fog.level > 0.8)
-            .count() as u64,
+        shadow_instance_count: tree.branches.values().filter(|b| b.fog.level > 0.8).count() as u64,
         // OpenMausBot 权限执行 → 宪法注册数 (合规检查执行次数)
         compliance_execution_count: tree.trunk.governance_constitution_count as u64,
         // spec-kit SDD constitution → 宪法门控执行计数 (MARS System 2 迭代 = 门控检查)
@@ -295,7 +356,7 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
 
 /// 从快照恢复树计数器。KB 缺失/损坏 → 全新树 (优雅降级)。
 fn load_or_new() -> ConsciousnessTree {
-    let mut tree = ConsciousnessTree::new();
+    let tree = ConsciousnessTree::new();
     match load_snapshot() {
         Some(snap) => tree_from_snapshot(&snap),
         None => tree,
@@ -334,8 +395,8 @@ fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
     // 恢复已消化果实 — 从快照完整重建证据链投影 (具体 EvidenceChain 以 run_id 标注,
     // 不重建二进制证据; 进化产物引用保留, 供审计/追踪)。
     for fr in &snap.fruits {
-        tree.fruits.push(
-            crate::core::nt_core_consciousness_tree::EvolutionFruit {
+        tree.fruits
+            .push(crate::core::nt_core_consciousness_tree::EvolutionFruit {
                 name: fr.name.clone(),
                 source_branch: branch_kind_from_str(&fr.source_branch),
                 description: fr.description.clone(),
@@ -348,8 +409,7 @@ fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
                 },
                 generation: fr.generation,
                 ..Default::default()
-            },
-        );
+            });
     }
     tree
 }
@@ -380,7 +440,9 @@ const KEY: &str = "core";
 /// 单一 schema 事实源: 不在此处维护 kv_store 本地 DDL, 避免漂移。
 fn open_kb() -> Result<rusqlite::Connection, String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let path = std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db");
+    let path = std::path::PathBuf::from(home)
+        .join(".neotrix")
+        .join("knowledge.db");
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("KB dir: {}", e))?;
     }
@@ -407,7 +469,9 @@ fn load_snapshot() -> Option<CoreSnapshot> {
 fn persist_snapshot(snap: &CoreSnapshot) -> Result<(), String> {
     let conn = open_kb()?;
     let json = serde_json::to_string(snap).map_err(|e| format!("snapshot serialize: {}", e))?;
-    crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_set(&conn, NAMESPACE, KEY, &json)
+    crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_set(
+        &conn, NAMESPACE, KEY, &json,
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -444,11 +508,36 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("文件", "file_parsing", "NT-WORLD", "CodeAnalyzer"),
     ("解析", "file_parsing", "NT-WORLD", "CodeAnalyzer"),
     ("提取", "content_extraction", "NT-WORLD", "CodeAnalyzer"),
-    ("检索", "hybrid_retrieval", "NT-MEMORY", "KnowledgeRetriever"),
-    ("查询", "hybrid_retrieval", "NT-MEMORY", "KnowledgeRetriever"),
-    ("搜索", "hybrid_retrieval", "NT-MEMORY", "KnowledgeRetriever"),
-    ("吸收", "skill_crystallize", "NT-MIND", "KnowledgeIntegrator"),
-    ("蒸馏", "skill_crystallize", "NT-MIND", "KnowledgeIntegrator"),
+    (
+        "检索",
+        "hybrid_retrieval",
+        "NT-MEMORY",
+        "KnowledgeRetriever",
+    ),
+    (
+        "查询",
+        "hybrid_retrieval",
+        "NT-MEMORY",
+        "KnowledgeRetriever",
+    ),
+    (
+        "搜索",
+        "hybrid_retrieval",
+        "NT-MEMORY",
+        "KnowledgeRetriever",
+    ),
+    (
+        "吸收",
+        "skill_crystallize",
+        "NT-MIND",
+        "KnowledgeIntegrator",
+    ),
+    (
+        "蒸馏",
+        "skill_crystallize",
+        "NT-MIND",
+        "KnowledgeIntegrator",
+    ),
     ("测试", "tdd", "NT-MIND", "Planner"),
     ("重构", "code_refactor", "NT-ACT", "CodeAnalyzer"),
     ("审查", "security_audit", "NT-SHIELD", "RiskAssessor"),
@@ -457,7 +546,12 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("架构", "architecture_decision", "NT-CORE", "Planner"),
     ("设计", "architecture_decision", "NT-CORE", "Planner"),
     ("意识", "consciousness_tree", "NT-CORE", "ReflectionEngine"),
-    ("元认知", "meta_cognition", "NT-META", "MetaCognitionAnalyst"),
+    (
+        "元认知",
+        "meta_cognition",
+        "NT-META",
+        "MetaCognitionAnalyst",
+    ),
     ("复盘", "meta_cognition", "NT-META", "MetaCognitionAnalyst"),
     ("反思", "meta_cognition", "NT-META", "MetaCognitionAnalyst"),
     ("诊断", "root_cause_method", "NT-REPAIR", "AnomalyDetector"),
@@ -467,18 +561,23 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("抓取", "unified_crawler", "NT-WORLD", "PatternMatcher"),
     ("前端", "frontend_ui", "NT-IO", "CreativityGenerator"),
     ("界面", "frontend_ui", "NT-IO", "CreativityGenerator"),
-    ("经验", "experience_absorb", "NT-MEMORY", "KnowledgeIntegrator"),
+    (
+        "经验",
+        "experience_absorb",
+        "NT-MEMORY",
+        "KnowledgeIntegrator",
+    ),
 ];
 
 /// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsciousTask {
     pub id: String,
-    pub summary: String,           // 人类可读子任务描述
-    pub capability_tag: String,    // 所需能力标签 (能力网节点 provides)
-    pub domain: String,            // NT-* 域 (调用谁)
-    pub specialist: String,        // SpecialistType 名 (怎么调用)
-    pub priority: u8,              // 1-10
+    pub summary: String,        // 人类可读子任务描述
+    pub capability_tag: String, // 所需能力标签 (能力网节点 provides)
+    pub domain: String,         // NT-* 域 (调用谁)
+    pub specialist: String,     // SpecialistType 名 (怎么调用)
+    pub priority: u8,           // 1-10
 }
 
 /// 分配结果 — 每个子任务落到内置 or 外部。
@@ -492,7 +591,11 @@ pub struct TaskAllocation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AllocationProvider {
     /// 自身能力网最优 provider 路径 (内置优先)
-    Internal { node_id: String, path: Vec<String>, cost: f64 },
+    Internal {
+        node_id: String,
+        path: Vec<String>,
+        cost: f64,
+    },
     /// 自身无对应能力 → 外部缺口 (自动寻求外部力量)
     External { reason: String },
 }
@@ -583,7 +686,9 @@ pub fn decompose_instruction(instruction: &str) -> Vec<ConsciousTask> {
 /// 读路径以存在者为准; 写路径固化在 HOME (隔离测试可写; 生产与后台读同源)。
 pub fn capability_registry_path() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let home_path = std::path::PathBuf::from(&home).join(".neotrix").join("capability_registry.json");
+    let home_path = std::path::PathBuf::from(&home)
+        .join(".neotrix")
+        .join("capability_registry.json");
     let cwd_path = std::path::PathBuf::from(".neotrix").join("capability_registry.json");
     if home_path.exists() {
         home_path
@@ -644,14 +749,20 @@ pub fn allocate_tasks(
                     cost: sp.cost,
                 },
                 None => AllocationProvider::External {
-                    reason: format!("能力网无 '{}' provider (域 {})", task.capability_tag, task.domain),
+                    reason: format!(
+                        "能力网无 '{}' provider (域 {})",
+                        task.capability_tag, task.domain
+                    ),
                 },
             },
             None => AllocationProvider::External {
                 reason: "能力网未初始化 (无 .neotrix/capability_registry.json)".to_string(),
             },
         };
-        allocations.push(TaskAllocation { task: task.clone(), provider });
+        allocations.push(TaskAllocation {
+            task: task.clone(),
+            provider,
+        });
     }
     allocations
 }
@@ -683,7 +794,11 @@ pub fn reflect_and_strengthen(
             if !registry.by_provides(&alloc.task.capability_tag).is_empty() {
                 continue;
             }
-            let node_id = format!("task_loop::{}::{}", domain.as_str().to_lowercase(), alloc.task.capability_tag);
+            let node_id = format!(
+                "task_loop::{}::{}",
+                domain.as_str().to_lowercase(),
+                alloc.task.capability_tag
+            );
             let mut engine = EvolutionEngine::new(registry);
             let plan = engine.plan_bud(
                 node_id.clone(),
@@ -732,9 +847,9 @@ impl ConsciousnessCoreHandle {
         let external_gaps: Vec<String> = allocations
             .iter()
             .filter_map(|a| match &a.provider {
-                AllocationProvider::External { reason } => Some(format!(
-                    "{} [{}]", a.task.summary, reason
-                )),
+                AllocationProvider::External { reason } => {
+                    Some(format!("{} [{}]", a.task.summary, reason))
+                }
                 _ => None,
             })
             .collect();
@@ -820,9 +935,11 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 .find(|w| w.contains('/') || w.contains('\\'))
                 .map(std::path::PathBuf::from)
                 .or_else(|| {
-                    std::env::var("HOME")
-                        .ok()
-                        .map(|h| std::path::PathBuf::from(h).join("Downloads").join("5月份价格表"))
+                    std::env::var("HOME").ok().map(|h| {
+                        std::path::PathBuf::from(h)
+                            .join("Downloads")
+                            .join("5月份价格表")
+                    })
                 })
                 .filter(|p| p.is_dir());
             match dir {
@@ -841,10 +958,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 }
                 None => (
                     false,
-                    format!(
-                        "子任务 '{}' 未提供有效目录路径, 无法执行合并",
-                        task.summary
-                    ),
+                    format!("子任务 '{}' 未提供有效目录路径, 无法执行合并", task.summary),
                 ),
             }
         }
@@ -939,12 +1053,7 @@ pub enum AttemptOutcome {
 /// 试错执行器抽象 — 一次"构建解决方案"的尝试。
 /// 生产用 LLM (SubagentDispatch), 测试注入 fake 验证循环逻辑。
 pub trait SolutionExecutor: Send + Sync {
-    fn attempt(
-        &self,
-        task: &ConsciousTask,
-        grounding: &str,
-        attempt_no: u32,
-    ) -> AttemptOutcome;
+    fn attempt(&self, task: &ConsciousTask, grounding: &str, attempt_no: u32) -> AttemptOutcome;
 }
 
 /// 外部缺口闭环报告 — 全过程透明。
@@ -965,10 +1074,7 @@ pub struct ExternalClosureReport {
 
 /// 外部知识自动获取 — 按能力标签分派 discover_* 源。
 /// 全部源失败不 panic (单源错误记录, 其余源继续), 返回成功摄入数。
-pub fn acquire_external_knowledge(
-    conn: &rusqlite::Connection,
-    task: &ConsciousTask,
-) -> usize {
+pub fn acquire_external_knowledge(conn: &rusqlite::Connection, task: &ConsciousTask) -> usize {
     use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_discovery_sources as src;
     let query = &task.summary;
     let mut ingested = 0usize;
@@ -987,21 +1093,14 @@ pub fn acquire_external_knowledge(
 }
 
 /// 接地检索 — 从 KB 检索与任务相关的已摄入知识作为求解上下文。
-pub fn retrieve_grounding(
-    conn: &rusqlite::Connection,
-    task: &ConsciousTask,
-) -> Vec<String> {
+pub fn retrieve_grounding(conn: &rusqlite::Connection, task: &ConsciousTask) -> Vec<String> {
     use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_search;
     match nt_memory_search::search_fts(conn, &task.summary, 10) {
         Ok(results) => results
             .iter()
             .map(|r| {
                 let n = &r.node;
-                format!(
-                    "[{}] {}",
-                    n.title,
-                    n.summary.as_deref().unwrap_or("")
-                )
+                format!("[{}] {}", n.title, n.summary.as_deref().unwrap_or(""))
             })
             .collect(),
         Err(_) => Vec::new(),
@@ -1026,12 +1125,16 @@ pub fn run_external_closure(
     for attempt_no in 1..=config.max_attempts {
         if report.tokens_used >= config.token_budget {
             report.last_error = format!(
-                "token 预算耗尽 ({} >= {})", report.tokens_used, config.token_budget
+                "token 预算耗尽 ({} >= {})",
+                report.tokens_used, config.token_budget
             );
             break;
         }
         match executor.attempt(task, &context, attempt_no) {
-            AttemptOutcome::Solved { solution, tokens_used } => {
+            AttemptOutcome::Solved {
+                solution,
+                tokens_used,
+            } => {
                 report.attempts = attempt_no;
                 report.tokens_used += tokens_used;
                 report.solved = true;
@@ -1079,12 +1182,7 @@ pub fn close_external_gap(
 pub struct LlmSolutionExecutor;
 
 impl SolutionExecutor for LlmSolutionExecutor {
-    fn attempt(
-        &self,
-        task: &ConsciousTask,
-        grounding: &str,
-        attempt_no: u32,
-    ) -> AttemptOutcome {
+    fn attempt(&self, task: &ConsciousTask, grounding: &str, attempt_no: u32) -> AttemptOutcome {
         use crate::neotrix::l1_body_impl::nt_io_neocodex::{SubagentDispatch, SubagentKind};
         let prompt = format!(
             "你是 NeoTrix 意识核心派出的求解专家 (域: {}, 能力: {})。\n\
@@ -1107,9 +1205,15 @@ impl SolutionExecutor for LlmSolutionExecutor {
         let result = rt.block_on(SubagentDispatch::run(SubagentKind::Coder, &prompt, "."));
         let tokens_used = estimate_tokens(&result.output);
         if result.success && !result.output.is_empty() {
-            AttemptOutcome::Solved { solution: result.output, tokens_used }
+            AttemptOutcome::Solved {
+                solution: result.output,
+                tokens_used,
+            }
         } else {
-            AttemptOutcome::Failed { error: result.output, tokens_used }
+            AttemptOutcome::Failed {
+                error: result.output,
+                tokens_used,
+            }
         }
     }
 }
@@ -1127,13 +1231,25 @@ mod tests {
 
     /// 测试隔离: 将 HOME 重定向到临时目录, 避免污染生产 KB (~/.neotrix/knowledge.db),
     /// 且各测试间共享同一隔离 DB (Once 保证仅初始化一次)。
+    /// 持共享 TEST_ENV_LOCK: 与 kb_cmds::with_temp_home 等其它 set HOME 的模块互斥,
+    /// 防并行窗口内 HOME 被覆盖 (Rust set_var 进程级全局, 跨模块锁各自为政 → flaky)。
+    /// 每次调用都在共享锁内重设 HOME 到本模块隔离目录 — 幂等且防被他人恢复值污染。
     fn isolate_home_once() {
         static ONCE: std::sync::Once = std::sync::Once::new();
         ONCE.call_once(|| {
             let tmp = std::env::temp_dir().join(format!("neotrix-ctests-{}", std::process::id()));
             std::fs::create_dir_all(&tmp).ok();
+            let _g = crate::core::nt_core_self_test::TEST_ENV_LOCK
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             std::env::set_var("HOME", &tmp);
         });
+        // Once 之后 (其它模块窗口可能改过 HOME): 幂等重设回本模块隔离目录
+        let tmp = std::env::temp_dir().join(format!("neotrix-ctests-{}", std::process::id()));
+        let _g = crate::core::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        std::env::set_var("HOME", &tmp);
     }
 
     /// 串行化所有触碰隔离 DB 的测试: 共享同库下并行 tick 会互相覆盖基线,
@@ -1156,7 +1272,11 @@ mod tests {
 
     fn write_test_baseline(cycle: u64) {
         isolate_home_once();
-        let snap = CoreSnapshot { cycle, resonance_cycle: cycle, ..Default::default() };
+        let snap = CoreSnapshot {
+            cycle,
+            resonance_cycle: cycle,
+            ..Default::default()
+        };
         let _ = persist_snapshot(&snap);
     }
 
@@ -1190,7 +1310,7 @@ mod tests {
         // 迷雾治理断链回归: CoreSnapshot 必须持久化 per-branch fog_level,
         // 否则 load_or_new 后所有分支回默认 0.85 → weighted_fog_sum 恒 9.35,
         // 掩盖后台真实迷雾 (1.65)。跨会话恢复后 fog 应保持原值。
-let mut tree = ConsciousnessTree::new();
+        let mut tree = ConsciousnessTree::new();
         // 模拟后台治理成果: 三个分支迷雾被清 (wired + consumers + tests)
         for (name, wired, consumers, test_count) in [
             ("Core", true, 3, 2),
@@ -1230,8 +1350,8 @@ let mut tree = ConsciousnessTree::new();
     fn snapshot_includes_fruits_with_evidence() {
         // 果实可完整序列化 (含 run_id 证据投影), 跨会话可恢复
         let mut tree = ConsciousnessTree::new();
-        tree.fruits.push(
-            crate::core::nt_core_consciousness_tree::EvolutionFruit {
+        tree.fruits
+            .push(crate::core::nt_core_consciousness_tree::EvolutionFruit {
                 name: "test-fruit".into(),
                 source_branch: BranchKind::Mind,
                 description: "Test evolution fruit".into(),
@@ -1245,8 +1365,7 @@ let mut tree = ConsciousnessTree::new();
                 },
                 generation: 1,
                 ..Default::default()
-            },
-        );
+            });
         let snap = core_snapshot_from_tree(&tree);
         assert_eq!(snap.fruits.len(), 1);
         assert_eq!(snap.fruits[0].run_id.as_deref(), Some("run-123"));
@@ -1266,8 +1385,12 @@ let mut tree = ConsciousnessTree::new();
         with_kb_lock(|| {
             isolate_home_once();
             let results = vec![
-                crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_consciousness_monitor"),
-                crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency"),
+                crate::core::nt_core_self_test::SelfTestResult::pass(
+                    "nt_core_consciousness_monitor",
+                ),
+                crate::core::nt_core_self_test::SelfTestResult::pass(
+                    "nt_memory_narrative_consistency",
+                ),
                 crate::core::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
             ];
             crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
@@ -1292,10 +1415,16 @@ let mut tree = ConsciousnessTree::new();
                 snapshot: CoreSnapshot::default(),
             };
             handle.tick(3);
-            assert!(handle.snapshot.mars_system2_iterations >= 3,
-                "S2 应至少随 3 周期自增, got {}", handle.snapshot.mars_system2_iterations);
-            assert!(handle.snapshot.cycle >= 3,
-                "cycle 应至少推进 3, got {}", handle.snapshot.cycle);
+            assert!(
+                handle.snapshot.mars_system2_iterations >= 3,
+                "S2 应至少随 3 周期自增, got {}",
+                handle.snapshot.mars_system2_iterations
+            );
+            assert!(
+                handle.snapshot.cycle >= 3,
+                "cycle 应至少推进 3, got {}",
+                handle.snapshot.cycle
+            );
         });
     }
 
@@ -1325,12 +1454,19 @@ let mut tree = ConsciousnessTree::new();
             isolate_home_once();
             let mut handle = ConsciousnessCoreHandle {
                 tree: ConsciousnessTree::new(),
-                snapshot: CoreSnapshot { cycle: 10, ..Default::default() },
+                snapshot: CoreSnapshot {
+                    cycle: 10,
+                    ..Default::default()
+                },
             };
             // 持久化 baseline cycle=10 (模拟他进程已跑到 10)
             write_test_baseline(10);
             let snap = handle.tick(2);
-            assert!(snap.cycle >= 12, "并发 tick 应叠加最新基线, got {}", snap.cycle);
+            assert!(
+                snap.cycle >= 12,
+                "并发 tick 应叠加最新基线, got {}",
+                snap.cycle
+            );
             write_test_baseline(0); // 清理
         });
     }
@@ -1347,9 +1483,11 @@ let mut tree = ConsciousnessTree::new();
                 snapshot: CoreSnapshot::default(),
             };
             // 注入真实进化决策 (next_actions) → tick 的 Phase 4.6 治理审计消费
-            handle.tree.core.next_actions.push(
-                "create new module nt_core_autonomous_agent.rs without mapping".to_string(),
-            );
+            handle
+                .tree
+                .core
+                .next_actions
+                .push("create new module nt_core_autonomous_agent.rs without mapping".to_string());
             // 让分支成熟产出果实 (果实 claim 是审计对象, 保证检查项非空)
             for branch in handle.tree.branches.values_mut() {
                 branch.health = 0.9;
@@ -1390,8 +1528,16 @@ let mut tree = ConsciousnessTree::new();
     fn decompose_instruction_splits_into_subtasks() {
         // 意识核心直接拆解人类语言: 多意图指令 → 多个子任务 (含域/能力标签/专家)
         let tasks = decompose_instruction("合并供应商价格表，然后检索历史经验，最后做安全审查");
-        assert_eq!(tasks.len(), 3, "三段指令应拆出 3 个子任务, got {}", tasks.len());
-        assert_eq!(tasks[0].capability_tag, "xlsx_consolidation", "首段应为表格合并");
+        assert_eq!(
+            tasks.len(),
+            3,
+            "三段指令应拆出 3 个子任务, got {}",
+            tasks.len()
+        );
+        assert_eq!(
+            tasks[0].capability_tag, "xlsx_consolidation",
+            "首段应为表格合并"
+        );
         assert_eq!(tasks[1].domain, "NT-MEMORY", "检索段应归 NT-MEMORY");
         assert_eq!(tasks[2].domain, "NT-SHIELD", "安全审查段应归 NT-SHIELD");
         // 未命中关键词: 兜底到编排域 (意识核心自决, 不丢弃)
@@ -1439,7 +1585,10 @@ let mut tree = ConsciousnessTree::new();
                 snapshot: CoreSnapshot::default(),
             };
             let report = handle.process_instruction("合并供应商价格表并检索历史经验");
-            assert_eq!(report.internal_count + report.external_gap_count, report.allocations.len());
+            assert_eq!(
+                report.internal_count + report.external_gap_count,
+                report.allocations.len()
+            );
             // 分配覆盖率: 每个子任务必被归为内部或外部缺口之一 (环境可能有能力网文件,
             // 因此不假设 external_gap_count 的绝对值 — 见 reflect_and_strengthen_buds_missing_capability)
             assert!(report.internal_count + report.external_gap_count >= 1);
@@ -1490,11 +1639,19 @@ let mut tree = ConsciousnessTree::new();
     #[test]
     fn trial_error_loop_solves_within_budget() {
         // 前 2 轮失败, 第 3 轮成功 → 预算内解决
-        let executor = FakeExecutor { fail_until: 2, tokens_per_attempt: 100 };
+        let executor = FakeExecutor {
+            fail_until: 2,
+            tokens_per_attempt: 100,
+        };
         let report = run_external_closure(
             &fake_task(),
             &executor,
-            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 5, token_budget: 1000, max_llm_tokens: 256 },
+            &ExternalClosureConfig {
+                acquire_knowledge: false,
+                max_attempts: 5,
+                token_budget: 1000,
+                max_llm_tokens: 256,
+            },
             &["grounding-1".to_string()],
         );
         assert!(report.solved, "预算内应解决");
@@ -1506,26 +1663,46 @@ let mut tree = ConsciousnessTree::new();
     #[test]
     fn trial_error_loop_stops_on_token_budget() {
         // token 预算 250 < 所需 (3 轮 × 100 = 300) → 超预算终止且未解决
-        let executor = FakeExecutor { fail_until: 99, tokens_per_attempt: 100 };
+        let executor = FakeExecutor {
+            fail_until: 99,
+            tokens_per_attempt: 100,
+        };
         let report = run_external_closure(
             &fake_task(),
             &executor,
-            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 5, token_budget: 250, max_llm_tokens: 256 },
+            &ExternalClosureConfig {
+                acquire_knowledge: false,
+                max_attempts: 5,
+                token_budget: 250,
+                max_llm_tokens: 256,
+            },
             &[],
         );
         assert!(!report.solved, "超预算不得解决");
-        assert!(report.last_error.contains("token 预算耗尽"), "应标记预算耗尽, got {}", report.last_error);
+        assert!(
+            report.last_error.contains("token 预算耗尽"),
+            "应标记预算耗尽, got {}",
+            report.last_error
+        );
         assert!(report.attempts <= 5);
     }
 
     #[test]
     fn trial_error_loop_respects_max_attempts() {
         // 永不成功 → max_attempts 终止 (非预算终止)
-        let executor = FakeExecutor { fail_until: 99, tokens_per_attempt: 10 };
+        let executor = FakeExecutor {
+            fail_until: 99,
+            tokens_per_attempt: 10,
+        };
         let report = run_external_closure(
             &fake_task(),
             &executor,
-            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 4, token_budget: 10_000, max_llm_tokens: 256 },
+            &ExternalClosureConfig {
+                acquire_knowledge: false,
+                max_attempts: 4,
+                token_budget: 10_000,
+                max_llm_tokens: 256,
+            },
             &[],
         );
         assert!(!report.solved);
@@ -1535,11 +1712,19 @@ let mut tree = ConsciousnessTree::new();
     #[test]
     fn error_feedback_accumulates_in_context() {
         // 失败错误应反馈进上下文 (下一轮修正的基础)
-        let executor = FakeExecutor { fail_until: 1, tokens_per_attempt: 10 };
+        let executor = FakeExecutor {
+            fail_until: 1,
+            tokens_per_attempt: 10,
+        };
         let report = run_external_closure(
             &fake_task(),
             &executor,
-            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 5, token_budget: 1000, max_llm_tokens: 256 },
+            &ExternalClosureConfig {
+                acquire_knowledge: false,
+                max_attempts: 5,
+                token_budget: 1000,
+                max_llm_tokens: 256,
+            },
             &["base".to_string()],
         );
         assert!(report.solved);
@@ -1560,7 +1745,10 @@ let mut tree = ConsciousnessTree::new();
         // 精控预算: 明确 token/轮次上限 (拒绝无限试错)
         let cfg = ExternalClosureConfig::frugal();
         assert!(cfg.max_attempts >= 1 && cfg.max_attempts <= 10);
-        assert!(cfg.token_budget >= cfg.max_llm_tokens, "总预算应 ≥ 单轮输出上限");
+        assert!(
+            cfg.token_budget >= cfg.max_llm_tokens,
+            "总预算应 ≥ 单轮输出上限"
+        );
     }
 
     #[test]
@@ -1572,18 +1760,31 @@ let mut tree = ConsciousnessTree::new();
                 tree: ConsciousnessTree::new(),
                 snapshot: CoreSnapshot::default(),
             };
-            let executor = FakeExecutor { fail_until: 0, tokens_per_attempt: 10 };
+            let executor = FakeExecutor {
+                fail_until: 0,
+                tokens_per_attempt: 10,
+            };
             let report = handle.execute_task_loop(
                 "合并供应商价格表并检索历史经验",
                 &executor,
-                &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 3, token_budget: 1000, max_llm_tokens: 256 },
+                &ExternalClosureConfig {
+                    acquire_knowledge: false,
+                    max_attempts: 3,
+                    token_budget: 1000,
+                    max_llm_tokens: 256,
+                },
             );
 
             // 全部子任务都被执行 (内置 + 外部)
             let executed_total = report.internal_results.len() + report.external_closures.len();
-            assert_eq!(executed_total, report.allocations.len(),
+            assert_eq!(
+                executed_total,
+                report.allocations.len(),
                 "所有子任务都应执行, internal={} external={} allocations={}",
-                report.internal_results.len(), report.external_closures.len(), report.allocations.len());
+                report.internal_results.len(),
+                report.external_closures.len(),
+                report.allocations.len()
+            );
             // 外部缺口执行报告携带任务摘要
             if let Some(closure) = report.external_closures.first() {
                 assert!(!closure.task_id.is_empty());
@@ -1614,7 +1815,10 @@ let mut tree = ConsciousnessTree::new();
         let allocations = allocate_tasks(Some(&registry), &tasks);
         assert_eq!(allocations[0].task.capability_tag, "xlsx_consolidation");
         assert!(
-            matches!(&allocations[0].provider, AllocationProvider::Internal { .. }),
+            matches!(
+                &allocations[0].provider,
+                AllocationProvider::Internal { .. }
+            ),
             "原生文件能力应命中内置 provider"
         );
         if let AllocationProvider::Internal { node_id, .. } = &allocations[0].provider {

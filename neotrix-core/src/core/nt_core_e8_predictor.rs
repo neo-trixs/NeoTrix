@@ -308,8 +308,9 @@ mod tests {
 
     #[test]
     fn test_predict_next_after_observations() {
-        isolate_home();
-        let mut p = load();
+        with_kb_lock(|| {
+            isolate_home();
+            let mut p = load();
         // 建立一致转移: 1 → 2 出现 4 次 (>= 保守阈值, 达满置信)
         p.observe_trace(&[1, 2]);
         p.observe_trace(&[1, 2]);
@@ -318,18 +319,21 @@ mod tests {
         let (next, conf) = p.predict_next(1);
         assert_eq!(next, 2);
         assert!(conf > 0.9);
+        });
     }
 
     #[test]
     fn test_predict_next_sparse_conservative() {
-        isolate_home();
-        let mut p = load();
+        with_kb_lock(|| {
+            isolate_home();
+            let mut p = load();
         // 仅 1 次观测: 置信度被保守压低 (< 1.0)
         p.observe_trace(&[1, 2]);
         let (next, conf) = p.predict_next(1);
         assert_eq!(next, 2);
         assert!(conf < 0.5);
         assert!(conf > 0.0);
+        });
     }
 
     #[test]
