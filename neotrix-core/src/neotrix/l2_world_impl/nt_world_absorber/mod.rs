@@ -5,6 +5,8 @@
 
 pub mod self_curriculum;
 pub mod api_registry;
+pub mod metadata;
+pub mod repo_reverse_prompt;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

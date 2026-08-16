@@ -66,6 +66,103 @@ pub enum CloudSessionStatus {
     TimedOut,
 }
 
+/// Per-sandbox egress network policy (OpenSandbox absorption, Cycle 232+).
+/// Controls which outbound hosts/ports a sandbox session may reach before the
+/// workload runs — the sandbox's outbound trust boundary (R-P32 双观独立性).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EgressRule {
+    /// Host pattern: exact host, `*.example.com`, or `*` (all).
+    pub host: String,
+    /// Port range as `"443"` or `"443-8443"`; empty = any port.
+    pub port: String,
+    /// allow (whitelist) or deny (blacklist). Deny takes precedence.
+    pub allow: bool,
+}
+
+impl EgressRule {
+    pub fn allow(host: &str, port: &str) -> Self {
+        Self { host: host.into(), port: port.into(), allow: true }
+    }
+
+    pub fn deny(host: &str, port: &str) -> Self {
+        Self { host: host.into(), port: port.into(), allow: false }
+    }
+
+    fn host_matches(&self, host: &str) -> bool {
+        if self.host == "*" {
+            return true;
+        }
+        if let Some(suffix) = self.host.strip_prefix("*.") {
+            // `*.example.com` matches subdomains only — not the bare apex,
+            // and never across a dot boundary (example.com.evil.net).
+            return host.ends_with(&format!(".{}", suffix));
+        }
+        host == self.host
+    }
+
+    fn port_matches(&self, port: u16) -> bool {
+        if self.port.is_empty() {
+            return true;
+        }
+        if let Some((lo, hi)) = self.port.split_once('-') {
+            let (lo, hi): (u16, u16) = match (lo.parse(), hi.parse()) {
+                (Ok(a), Ok(b)) => (a, b),
+                _ => return false,
+            };
+            port >= lo && port <= hi
+        } else {
+            self.port.parse::<u16>().map(|p| p == port).unwrap_or(false)
+        }
+    }
+}
+
+/// Compiled egress policy over a rule list. Deny wins over allow; unmatched
+/// hosts fall back to the policy default.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EgressPolicy {
+    pub rules: Vec<EgressRule>,
+    /// Default for hosts not matched by any rule.
+    pub default_allow: bool,
+}
+
+impl EgressPolicy {
+    pub fn new(rules: Vec<EgressRule>, default_allow: bool) -> Self {
+        Self { rules, default_allow }
+    }
+
+    /// Everything out — matches legacy sandbox behaviour.
+    pub fn permissive() -> Self {
+        Self { rules: vec![], default_allow: true }
+    }
+
+    /// Nothing out — the closed trust boundary default for agent sandboxes.
+    pub fn deny_all() -> Self {
+        Self { rules: vec![], default_allow: false }
+    }
+
+    /// Evaluate one outbound connection. Deny rules shadow allow rules.
+    pub fn check(&self, host: &str, port: u16) -> bool {
+        let mut matched_allow = false;
+        for rule in &self.rules {
+            if rule.host_matches(host) && rule.port_matches(port) {
+                if !rule.allow {
+                    return false; // explicit deny wins
+                }
+                matched_allow = true;
+            }
+        }
+        matched_allow || self.default_allow
+    }
+
+    /// Sanity validation: deny-all + a localhost allow must pass only the allow.
+    pub fn sanity_check(&self) -> Result<(), String> {
+        if self.rules.iter().any(|r| r.host == "*" && !r.allow) {
+            return Err("egress: global deny-all rule would shadow every allow (use deny_all + specific allows)".into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResourceUsage {
     pub cpu_time: f64,
@@ -86,6 +183,8 @@ pub struct CloudSession {
     pub session_id: String,
     pub status: CloudSessionStatus,
     pub runtime: CloudRuntime,
+    /// Per-session egress policy (snapshot at creation; immutable for the run).
+    pub egress: EgressPolicy,
     provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
 }
 
@@ -93,12 +192,14 @@ impl CloudSession {
     pub fn new(
         session_id: String,
         runtime: CloudRuntime,
+        egress: EgressPolicy,
         provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
     ) -> Self {
         Self {
             session_id,
             status: CloudSessionStatus::Pending,
             runtime,
+            egress,
             provider,
         }
     }
@@ -143,6 +244,8 @@ pub struct CloudSandbox {
     pub api_key: Option<String>,
     pub max_runtime: Duration,
     pub supported_runtimes: Vec<CloudRuntime>,
+    /// Default egress policy applied to every new session.
+    pub egress: EgressPolicy,
     sessions: Vec<CloudSession>,
     provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
     /// AES-256-GCM 凭据保险库 — 执行前注入为容器环境变量 (NEOTRIX_VAULT_*)。
@@ -162,11 +265,17 @@ impl CloudSandbox {
             api_key,
             max_runtime,
             supported_runtimes: CloudRuntime::variants().to_vec(),
+            egress: EgressPolicy::permissive(),
             sessions: Vec::new(),
             provider,
             #[cfg(feature = "sandbox")]
             vault: None,
         }
+    }
+
+    /// Set the default egress policy for subsequent sessions.
+    pub fn set_egress(&mut self, policy: EgressPolicy) {
+        self.egress = policy;
     }
 
     pub fn default_local() -> Self {
@@ -236,7 +345,8 @@ impl CloudSandbox {
 
     pub fn create_session(&mut self, runtime: CloudRuntime) -> String {
         let session_id = uuid::Uuid::new_v4().to_string();
-        let session = CloudSession::new(session_id.clone(), runtime, Arc::clone(&self.provider));
+        let session =
+            CloudSession::new(session_id.clone(), runtime, self.egress.clone(), Arc::clone(&self.provider));
         self.sessions.push(session);
         session_id
     }
@@ -381,5 +491,77 @@ mod sandbox_vault_tests {
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
         let result = rt.block_on(cloud.run_code("echo hi", CloudRuntime::Python3)).expect("run");
         assert_eq!(result.exit_code, 0);
+    }
+}
+
+#[cfg(test)]
+mod egress_tests {
+    use super::*;
+
+    #[test]
+    fn test_egress_exact_host_allow() {
+        let policy = EgressPolicy::new(
+            vec![EgressRule::allow("api.github.com", "443")],
+            false,
+        );
+        assert!(policy.check("api.github.com", 443));
+        assert!(!policy.check("api.github.com", 80), "port must match");
+        assert!(!policy.check("evil.com", 443), "unlisted host denied by default");
+    }
+
+    #[test]
+    fn test_egress_wildcard_suffix() {
+        let policy = EgressPolicy::new(vec![EgressRule::allow("*.example.com", "443")], false);
+        assert!(policy.check("api.example.com", 443));
+        assert!(policy.check("a.b.example.com", 443));
+        assert!(!policy.check("example.com", 443), "bare apex must match exactly, not suffix");
+        assert!(!policy.check("example.com.evil.net", 443), "suffix must be dot-bounded");
+    }
+
+    #[test]
+    fn test_egress_deny_shadows_allow() {
+        let policy = EgressPolicy::new(
+            vec![
+                EgressRule::allow("*", "443"),
+                EgressRule::deny("blocked.example.com", "443"),
+            ],
+            false,
+        );
+        assert!(policy.check("ok.example.com", 443));
+        assert!(!policy.check("blocked.example.com", 443), "explicit deny wins");
+    }
+
+    #[test]
+    fn test_egress_port_range() {
+        let policy = EgressPolicy::new(vec![EgressRule::allow("db.internal", "5432-5433")], false);
+        assert!(policy.check("db.internal", 5432));
+        assert!(policy.check("db.internal", 5433));
+        assert!(!policy.check("db.internal", 5434));
+    }
+
+    #[test]
+    fn test_egress_permissive_and_deny_all() {
+        assert!(EgressPolicy::permissive().check("anything.com", 1));
+        assert!(!EgressPolicy::deny_all().check("anything.com", 1));
+    }
+
+    #[test]
+    fn test_sandbox_attaches_egress_to_session() {
+        let provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync> =
+            Arc::new(provider::NoopProvider);
+        let mut cloud = CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            provider,
+        );
+        cloud.set_egress(EgressPolicy::new(
+            vec![EgressRule::allow("api.openai.com", "443")],
+            false,
+        ));
+        let sid = cloud.create_session(CloudRuntime::Python3);
+        let session = cloud.get_session(&sid).expect("session exists");
+        assert!(session.egress.check("api.openai.com", 443));
+        assert!(!session.egress.check("fetch.other.com", 443));
     }
 }

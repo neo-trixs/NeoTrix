@@ -304,6 +304,212 @@ impl KnowledgeStorage {
     }
 }
 
+// ====== Context Graph (P14) ======
+// 吸收 semantica Context Graph + KG + 因果推理 + decision provenance。
+// 轻量图建模: 节点/边上下文切片 + 溯源链, 作为 KnowledgeStorage 之上的一层 (R-P42)。
+
+/// 图节点 — 上下文切片 (knowledge entry 的轻量投影)。
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphNode {
+    pub id: String,
+    pub kind: String,
+    pub content: String,
+}
+
+/// 图边 — 有向关系 + 权重 (权重钳制在 [0,1], R-P6)。
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphEdge {
+    pub from: String,
+    pub to: String,
+    pub relation: String,
+    pub weight: f64,
+}
+
+/// 溯源步 — decision provenance 链的节点。
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProvenanceStep {
+    pub node_id: String,
+    pub action: String,
+    pub ts: u64,
+}
+
+/// 上下文图 — 节点/边/溯源链, 支撑因果推理与决策溯源。
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ContextGraph {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+    pub provenance: Vec<ProvenanceStep>,
+}
+
+impl ContextGraph {
+    /// 添加节点; id 重复则替换旧节点。
+    pub fn add_node(&mut self, node: GraphNode) {
+        if let Some(existing) = self.nodes.iter_mut().find(|n| n.id == node.id) {
+            *existing = node;
+        } else {
+            self.nodes.push(node);
+        }
+    }
+
+    /// 连接两端节点 (必须均已存在), 否则 Err("missing node: X")。
+    /// 权重钳制到 [0,1] (R-P6)。
+    pub fn connect(&mut self, from: &str, to: &str, relation: &str, weight: f64) -> Result<(), String> {
+        let has = |id: &str| self.nodes.iter().any(|n| n.id == id);
+        if !has(from) {
+            return Err(format!("missing node: {from}"));
+        }
+        if !has(to) {
+            return Err(format!("missing node: {to}"));
+        }
+        self.edges.push(GraphEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            relation: relation.to_string(),
+            weight: weight.max(0.0).min(1.0),
+        });
+        Ok(())
+    }
+
+    /// 广度优先收集 depth 层内的邻居节点 (不包含 focus 自身)。
+    pub fn neighborhood(&self, id: &str, depth: usize) -> Vec<&GraphNode> {
+        if !self.nodes.iter().any(|n| n.id == id) || depth == 0 {
+            return Vec::new();
+        }
+        let mut visited = std::collections::HashSet::new();
+        visited.insert(id.to_string());
+        let mut frontier: Vec<String> = vec![id.to_string()];
+        let mut result: Vec<&GraphNode> = Vec::new();
+
+        for _ in 0..depth {
+            let mut next: Vec<String> = Vec::new();
+            for current in &frontier {
+                for edge in &self.edges {
+                    let neighbor = if &edge.from == current {
+                        Some(&edge.to)
+                    } else if &edge.to == current {
+                        Some(&edge.from)
+                    } else {
+                        None
+                    };
+                    if let Some(neighbor) = neighbor {
+                        if visited.insert(neighbor.clone()) {
+                            if let Some(node) = self.nodes.iter().find(|n| &n.id == neighbor) {
+                                result.push(node);
+                            }
+                            next.push(neighbor.clone());
+                        }
+                    }
+                }
+            }
+            frontier = next;
+            if frontier.is_empty() {
+                break;
+            }
+        }
+        result
+    }
+
+    /// focus 节点 1 跳邻接的内容切片 (content 截断 60 字符) — decision context。
+    pub fn decision_context(&self, focus: &str) -> Vec<&str> {
+        if !self.nodes.iter().any(|n| n.id == focus) {
+            return Vec::new();
+        }
+        let mut seen = std::collections::HashSet::new();
+        seen.insert(focus.to_string());
+        let mut result: Vec<&str> = Vec::new();
+        for edge in &self.edges {
+            let neighbor = if edge.from == focus && edge.to != focus {
+                Some(&edge.to)
+            } else if edge.to == focus && edge.from != focus {
+                Some(&edge.from)
+            } else {
+                None
+            };
+            if let Some(neighbor) = neighbor {
+                if !seen.insert(neighbor.clone()) {
+                    continue;
+                }
+                if let Some(node) = self.nodes.iter().find(|n| &n.id == neighbor) {
+                    let truncated: &str = if node.content.char_indices().count() > 60 {
+                        let mut end = 0;
+                        for (i, (idx, _)) in node.content.char_indices().enumerate() {
+                            if i == 60 {
+                                break;
+                            }
+                            end = idx + 1;
+                        }
+                        &node.content[..end.min(node.content.len())]
+                    } else {
+                        &node.content
+                    };
+                    result.push(truncated);
+                }
+            }
+        }
+        result
+    }
+
+    /// 过滤与 node_id 相关的溯源步。
+    pub fn provenance_chain(&self, node_id: &str) -> Vec<&ProvenanceStep> {
+        self.provenance
+            .iter()
+            .filter(|s| s.node_id == node_id)
+            .collect()
+    }
+
+    /// 追加溯源步 (decision provenance)。
+    pub fn trace(&mut self, node_id: &str, action: &str, ts: u64) {
+        self.provenance.push(ProvenanceStep {
+            node_id: node_id.to_string(),
+            action: action.to_string(),
+            ts,
+        });
+    }
+
+    /// 边数。
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+}
+
+/// SelfTest (T1): ContextGraph 能力自检。
+pub struct ContextGraphSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for ContextGraphSelfTest {
+    fn name(&self) -> &str {
+        "nt_memory_kb_context_graph"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut graph = ContextGraph::default();
+        graph.add_node(GraphNode {
+            id: "n1".into(),
+            kind: "fact".into(),
+            content: "alpha".into(),
+        });
+        graph.add_node(GraphNode {
+            id: "n2".into(),
+            kind: "fact".into(),
+            content: "beta".into(),
+        });
+        if let Err(e) = graph.connect("n1", "n2", "derives", 0.9) {
+            return Err(vec![format!("connect should succeed: {e}")]);
+        }
+        if graph.edge_count() != 1 {
+            return Err(vec!["edge_count should be 1".into()]);
+        }
+        let ctx = graph.decision_context("n1");
+        if ctx.len() != 1 || ctx[0] != "beta" {
+            return Err(vec!["decision_context should expose neighbor content".into()]);
+        }
+        graph.trace("n1", "decided", 1);
+        if graph.provenance_chain("n1").len() != 1 {
+            return Err(vec!["provenance_chain should filter by node".into()]);
+        }
+        Ok(())
+    }
+}
+
 // ====== 迁移工具 ======
 
 /// 从旧格式 (含 `entries` map 的 JSON) 迁移到新存储引擎。
@@ -439,5 +645,95 @@ mod tests {
         let reloaded = KnowledgeStorage::open(&path, 500).unwrap();
         assert_eq!(reloaded.entry_count(), 1);
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    // ── P14 ContextGraph ──
+
+    fn sample_graph() -> ContextGraph {
+        let mut g = ContextGraph::default();
+        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "alpha".into() });
+        g.add_node(GraphNode { id: "b".into(), kind: "fact".into(), content: "beta".into() });
+        g.add_node(GraphNode { id: "c".into(), kind: "fact".into(), content: "gamma".into() });
+        g.add_node(GraphNode { id: "d".into(), kind: "fact".into(), content: "delta".into() });
+        g.connect("a", "b", "relates", 0.8).unwrap();
+        g.connect("b", "c", "relates", 0.7).unwrap();
+        g.connect("c", "d", "relates", 0.6).unwrap();
+        g
+    }
+
+    #[test]
+    fn test_graph_add_node_replaces_duplicate_id() {
+        let mut g = ContextGraph::default();
+        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "old".into() });
+        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "new".into() });
+        assert_eq!(g.nodes.len(), 1, "重复 id 应替换而非追加");
+        assert_eq!(g.nodes[0].content, "new");
+    }
+
+    #[test]
+    fn test_graph_connect_missing_node_errors() {
+        let mut g = sample_graph();
+        let err = g.connect("a", "ghost", "relates", 0.5).unwrap_err();
+        assert_eq!(err, "missing node: ghost");
+        let err2 = g.connect("ghost", "a", "relates", 0.5).unwrap_err();
+        assert_eq!(err2, "missing node: ghost");
+        assert_eq!(g.edge_count(), 3, "失败连接不应产生边");
+    }
+
+    #[test]
+    fn test_graph_connect_clamps_weight() {
+        let mut g = sample_graph();
+        g.connect("a", "d", "chain", 1.7).unwrap();
+        assert!(g.edges.last().unwrap().weight <= 1.0);
+        g.connect("d", "a", "back", -0.5).unwrap();
+        assert!(g.edges.last().unwrap().weight >= 0.0);
+    }
+
+    #[test]
+    fn test_graph_neighborhood_depth() {
+        let g = sample_graph();
+        let d1 = g.neighborhood("a", 1);
+        assert_eq!(d1.len(), 1, "a 的 1 跳邻居应为 b");
+        assert_eq!(d1[0].id, "b");
+        let d2 = g.neighborhood("a", 2);
+        assert_eq!(d2.len(), 2, "a 的 2 跳邻居应为 b,c");
+        let d3 = g.neighborhood("a", 3);
+        assert_eq!(d3.len(), 3, "a 的 3 跳邻居应为 b,c,d");
+    }
+
+    #[test]
+    fn test_graph_decision_context_truncates_content() {
+        let mut g = ContextGraph::default();
+        g.add_node(GraphNode { id: "focus".into(), kind: "fact".into(), content: "focus body".into() });
+        let long = "x".repeat(120);
+        g.add_node(GraphNode { id: "nbr".into(), kind: "fact".into(), content: long.clone() });
+        g.connect("focus", "nbr", "relates", 0.5).unwrap();
+        let ctx = g.decision_context("focus");
+        assert_eq!(ctx.len(), 1, "应返回 1 跳邻接内容切片");
+        assert_eq!(ctx[0].chars().count(), 60, "内容应截断到 60 字符");
+        let empty = g.decision_context("ghost");
+        assert!(empty.is_empty(), "缺失 focus 应返回空");
+    }
+
+    #[test]
+    fn test_graph_provenance_chain_filters() {
+        let mut g = ContextGraph::default();
+        g.add_node(GraphNode { id: "a".into(), kind: "fact".into(), content: "alpha".into() });
+        g.add_node(GraphNode { id: "b".into(), kind: "fact".into(), content: "beta".into() });
+        g.trace("a", "created", 1);
+        g.trace("a", "decided", 2);
+        g.trace("b", "created", 3);
+        let chain = g.provenance_chain("a");
+        assert_eq!(chain.len(), 2, "应仅过滤出 a 相关 steps");
+        assert_eq!(chain[0].action, "created");
+        assert_eq!(chain[1].action, "decided");
+        assert_eq!(g.provenance_chain("ghost").len(), 0);
+    }
+
+    #[test]
+    fn test_graph_selftest_runs() {
+        use crate::core::nt_core_self_test::SelfTest;
+        let t = ContextGraphSelfTest;
+        assert!(t.self_test().is_ok());
     }
 }

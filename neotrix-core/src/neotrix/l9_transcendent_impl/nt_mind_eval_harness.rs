@@ -948,6 +948,122 @@ pub fn verify_constraint(policy: &str, actual: &str, forbidden: &[&str]) -> Self
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P10: SmallScaleMethod (吸收 arXiv 2608.11859v1 "Small-Scale Experiments:
+// Are We There Yet?")
+// 小模型实验被超参数敏感度混淆, 敏感度随规模增大而衰减;
+// scaling laws 只在 fully-tuned frontier 涌现; 超参数损失曲面
+// 随规模增大而降维。方法论: hyperparameter-first 的 holistic 视角。
+// ────────────────────────────────────────────────────────────────
+
+/// 超参数敏感度观测点 (scale: 模型规模, 如参数量或训练 FLOPs)
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct HyperparamSensitivity {
+    pub scale: f64,
+    pub loss_variance: f64,
+    pub dimensions: usize,
+}
+
+/// 小规模实验警告: 规模低于前沿时结果被超参数敏感度混淆
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SmallScaleWarning {
+    pub model_scale: f64,
+    pub sensitivity: f64,
+    pub needs_full_tuning: bool,
+    pub reason: String,
+}
+
+/// Small-Scale Method: 以超参数优先的 holistic 评测方法论
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct SmallScaleMethod {
+    pub sensitivity_decay_rate: f64, // loss_variance ∝ scale^(-rate)
+    pub dimension_decay_rate: f64,   // effective dims ∝ scale^(-rate)
+    pub tuning_budget: usize,        // max hyperparameter configs to run
+    pub full_tuning_frontier: bool,
+}
+
+impl Default for SmallScaleMethod {
+    fn default() -> Self {
+        Self {
+            sensitivity_decay_rate: 1.0,
+            dimension_decay_rate: 0.5,
+            tuning_budget: 32,
+            full_tuning_frontier: false,
+        }
+    }
+}
+
+impl SmallScaleMethod {
+    pub fn new(sensitivity_decay_rate: f64, dimension_decay_rate: f64, tuning_budget: usize) -> Self {
+        Self {
+            sensitivity_decay_rate,
+            dimension_decay_rate,
+            tuning_budget,
+            full_tuning_frontier: false,
+        }
+    }
+
+    /// 超参数敏感度随规模衰减: loss_variance ∝ scale^(-rate)
+    pub fn sensitivity_at_scale(&self, scale: f64) -> f64 {
+        scale.max(1.0).powf(-self.sensitivity_decay_rate)
+    }
+
+    /// 有效超参数维度随规模衰减 (下限 1 维)
+    pub fn effective_dimensions(&self, scale: f64) -> usize {
+        (self.tuning_budget as f64 * scale.max(1.0).powf(-self.dimension_decay_rate))
+            .max(1.0)
+            .round() as usize
+    }
+
+    /// 小规模警告: scale < 1e6 时需全量调参, 结果不可作为 scaling law 证据
+    pub fn warn_small_scale(&self, model_scale: f64) -> SmallScaleWarning {
+        let sensitivity = self.sensitivity_at_scale(model_scale);
+        let needs_full_tuning = model_scale < 1e6;
+        SmallScaleWarning {
+            model_scale,
+            sensitivity,
+            needs_full_tuning,
+            reason: if needs_full_tuning {
+                "hyperparameter sensitivity high; scaling laws only emerge on fully-tuned frontier".into()
+            } else {
+                "hyperparameter sensitivity low; frontier tuning reliable at this scale".into()
+            },
+        }
+    }
+
+    /// 是否到达 fully-tuned frontier: 敏感度低于阈值
+    pub fn tuned_frontier_reached(&self, sensitivity: f64, threshold: f64) -> bool {
+        sensitivity <= threshold
+    }
+
+    /// 调参优先级 rank: 高方差 + 高维度 = 更需优先调参
+    pub fn hyperparam_rank(&self, loss_variance: f64, dims: usize) -> f64 {
+        loss_variance * (dims as f64) / 100.0
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for SmallScaleMethod {
+    fn name(&self) -> &str {
+        "nt_mind_eval_harness_small_scale"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        let big = method.sensitivity_at_scale(1e9);
+        let small = method.sensitivity_at_scale(1e3);
+        if big >= small {
+            return Err(vec!["sensitivity must decrease with scale".into()]);
+        }
+        if method.effective_dimensions(1e3) >= method.effective_dimensions(10.0) {
+            return Err(vec!["effective dimensions must decrease with scale".into()]);
+        }
+        if !method.warn_small_scale(1e5).needs_full_tuning {
+            return Err(vec!["small scale must flag needs_full_tuning".into()]);
+        }
+        Ok(())
+    }
+}
+
 impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
     fn name(&self) -> &str {
         "nt_mind_eval_harness_self_verifiable"
@@ -1267,5 +1383,74 @@ mod tests {
     #[test]
     fn test_reward_selftest_passes() {
         assert!(harness().self_test().is_ok());
+    }
+
+    // ── P10 SmallScaleMethod ──
+    #[test]
+    fn test_small_scale_sensitivity_decreases_with_scale() {
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        assert!(
+            method.sensitivity_at_scale(1e9) < method.sensitivity_at_scale(1e3),
+            "sensitivity must fade with scale"
+        );
+        assert!(method.sensitivity_at_scale(1e3) < method.sensitivity_at_scale(10.0));
+        assert!(method.sensitivity_at_scale(1e9) > 0.0);
+    }
+
+    #[test]
+    fn test_small_scale_effective_dimensions_monotonic() {
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        let dims: Vec<usize> = vec![1e2, 1e3, 1e5, 1e7, 1e9]
+            .into_iter()
+            .map(|s| method.effective_dimensions(s))
+            .collect();
+        for w in dims.windows(2) {
+            assert!(w[0] >= w[1], "effective dims must monotonically decrease: {dims:?}");
+        }
+        // 下限 1 维
+        assert_eq!(method.effective_dimensions(1e12), 1);
+    }
+
+    #[test]
+    fn test_small_scale_warn_small_scale_flags() {
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        let small = method.warn_small_scale(1e5);
+        assert!(small.needs_full_tuning);
+        assert!(small.reason.contains("fully-tuned frontier"));
+        let big = method.warn_small_scale(1e9);
+        assert!(!big.needs_full_tuning);
+    }
+
+    #[test]
+    fn test_small_scale_tuned_frontier_threshold() {
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        assert!(method.tuned_frontier_reached(0.001, 0.01));
+        assert!(!method.tuned_frontier_reached(0.05, 0.01));
+        assert!(method.tuned_frontier_reached(0.01, 0.01)); // 边界: <= 视为达到
+    }
+
+    #[test]
+    fn test_small_scale_hyperparam_rank_ordering() {
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        let low = method.hyperparam_rank(0.2, 10);
+        let mid = method.hyperparam_rank(0.5, 20);
+        let high = method.hyperparam_rank(1.0, 50);
+        assert!(low < mid);
+        assert!(mid < high);
+        // 高方差 > 低方差 (同维度)
+        assert!(method.hyperparam_rank(0.9, 20) > method.hyperparam_rank(0.1, 20));
+        // 高维度 > 低维度 (同方差)
+        assert!(method.hyperparam_rank(0.5, 40) > method.hyperparam_rank(0.5, 10));
+    }
+
+    #[test]
+    fn test_small_scale_default_and_selftest() {
+        let d = SmallScaleMethod::default();
+        assert_eq!(d.sensitivity_decay_rate, 1.0);
+        assert_eq!(d.dimension_decay_rate, 0.5);
+        assert_eq!(d.tuning_budget, 32);
+        assert!(!d.full_tuning_frontier);
+        let method = SmallScaleMethod::new(1.0, 0.5, 32);
+        assert!(method.self_test().is_ok());
     }
 }

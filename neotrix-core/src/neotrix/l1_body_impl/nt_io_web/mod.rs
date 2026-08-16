@@ -1,4 +1,5 @@
 pub mod api;
+pub mod keyframe_motion;
 pub mod server;
 pub mod share;
 pub mod tiles;

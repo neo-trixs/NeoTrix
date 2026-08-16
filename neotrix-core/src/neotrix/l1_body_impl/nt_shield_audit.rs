@@ -648,6 +648,267 @@ impl crate::core::nt_core_self_test::SelfTest for ReasoningTraceGuard {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P9: ApiAttackSurface (吸收 BurpAPISecuritySuite 机制)
+// API 攻击面枚举 — 8 攻击类型 (对齐 OWASP API Top 10 2023) + payloads。
+// 扫描: 对每个 endpoint 应用匹配攻击类型的 payload, 上限 max_payloads_per_endpoint。
+// ────────────────────────────────────────────────────────────────
+
+/// 8 类 API 攻击类型, 对应 OWASP API Security Top 10。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ApiAttackType {
+    Bola,
+    BrokenAuth,
+    ExcessiveData,
+    RateLimit,
+    Injection,
+    MassAssignment,
+    SecurityMisconfig,
+    SSRF,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApiAttackPayload {
+    pub attack: ApiAttackType,
+    pub payload: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiAttackSurface {
+    pub attack_types: Vec<ApiAttackType>,
+    pub payloads: Vec<ApiAttackPayload>,
+    pub owasp_version: &'static str,
+}
+
+impl Default for ApiAttackSurface {
+    fn default() -> Self {
+        Self {
+            attack_types: vec![
+                ApiAttackType::Bola,
+                ApiAttackType::BrokenAuth,
+                ApiAttackType::ExcessiveData,
+                ApiAttackType::RateLimit,
+                ApiAttackType::Injection,
+                ApiAttackType::MassAssignment,
+                ApiAttackType::SecurityMisconfig,
+                ApiAttackType::SSRF,
+            ],
+            payloads: vec![
+                ApiAttackPayload {
+                    attack: ApiAttackType::Bola,
+                    payload: "/api/v1/users/1".into(),
+                    description: "Sequential object ID in path enables horizontal/vertical access".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::Bola,
+                    payload: "/api/v1/orders/100001".into(),
+                    description: "Direct object reference to another user's resource".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::BrokenAuth,
+                    payload: "{\"password\":\"password123\"}".into(),
+                    description: "Weak credential brute-force attempt".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::BrokenAuth,
+                    payload: "{\"token\":\"eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.e30.\"}".into(),
+                    description: "JWT with 'none' algorithm for forged tokens".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::ExcessiveData,
+                    payload: "?fields=all".into(),
+                    description: "Request for full object dump leaks excessive data".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::ExcessiveData,
+                    payload: "/full".into(),
+                    description: "Verbose response variant exposes internal fields".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::RateLimit,
+                    payload: "flood-1,flood-2,...,flood-N".into(),
+                    description: "Flood request pattern probes missing rate limiting".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::RateLimit,
+                    payload: "{\"ids\":[1,2,...,N]}".into(),
+                    description: "Batch array abuse bypasses per-request limits".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::Injection,
+                    payload: "' OR 1=1--".into(),
+                    description: "SQL injection probe".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::Injection,
+                    payload: "$(id)".into(),
+                    description: "Command injection probe".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::MassAssignment,
+                    payload: "{\"role\":\"admin\",\"is_admin\":true}".into(),
+                    description: "Privilege field injection via mass assignment".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::MassAssignment,
+                    payload: "{\"balance\":99999}".into(),
+                    description: "Sensitive field override in update body".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::SecurityMisconfig,
+                    payload: "/actuator/env".into(),
+                    description: "Exposed debug/actuator endpoint".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::SecurityMisconfig,
+                    payload: "OPTIONS *".into(),
+                    description: "Verb tampering / missing security headers probe".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::SSRF,
+                    payload: "http://169.254.169.254/latest/meta-data/".into(),
+                    description: "Cloud metadata endpoint SSRF probe".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::SSRF,
+                    payload: "http://localhost:6379/".into(),
+                    description: "Internal service reachability via SSRF".into(),
+                },
+            ],
+            owasp_version: "2023",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApiScanFinding {
+    pub endpoint: String,
+    pub attack: ApiAttackType,
+    pub severity: u8,
+    pub recommendation: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiScanner {
+    pub surface: ApiAttackSurface,
+    pub max_payloads_per_endpoint: usize,
+}
+
+impl Default for ApiScanner {
+    fn default() -> Self {
+        Self {
+            surface: ApiAttackSurface::default(),
+            max_payloads_per_endpoint: 16,
+        }
+    }
+}
+
+impl ApiScanner {
+    pub fn new(surface: ApiAttackSurface, max_payloads_per_endpoint: usize) -> Self {
+        Self {
+            surface,
+            max_payloads_per_endpoint,
+        }
+    }
+
+    fn severity_for(attack: ApiAttackType) -> u8 {
+        match attack {
+            ApiAttackType::Bola | ApiAttackType::BrokenAuth | ApiAttackType::SSRF => 3,
+            _ => 2,
+        }
+    }
+
+    fn owasp_category(attack: ApiAttackType) -> &'static str {
+        match attack {
+            ApiAttackType::Bola => "Broken Object Level Authorization",
+            ApiAttackType::BrokenAuth => "Broken Authentication",
+            ApiAttackType::ExcessiveData => "Excessive Data Exposure",
+            ApiAttackType::RateLimit => "Unrestricted Resource Consumption",
+            ApiAttackType::Injection => "Injection",
+            ApiAttackType::MassAssignment => "Mass Assignment",
+            ApiAttackType::SecurityMisconfig => "Security Misconfiguration",
+            ApiAttackType::SSRF => "Server-Side Request Forgery",
+        }
+    }
+
+    /// 对每个 endpoint 应用 surface 中匹配攻击类型的 payload
+    /// (最多 max_payloads_per_endpoint 个), 每条产出一个 finding。
+    pub fn scan(&self, endpoints: &[String]) -> Vec<ApiScanFinding> {
+        let mut findings = Vec::new();
+        for endpoint in endpoints {
+            let applicable: Vec<&ApiAttackPayload> = self
+                .surface
+                .payloads
+                .iter()
+                .filter(|p| self.surface.attack_types.contains(&p.attack))
+                .take(self.max_payloads_per_endpoint)
+                .collect();
+            for payload in applicable {
+                findings.push(ApiScanFinding {
+                    endpoint: endpoint.clone(),
+                    attack: payload.attack,
+                    severity: Self::severity_for(payload.attack),
+                    recommendation: payload.description.clone(),
+                });
+            }
+        }
+        findings
+    }
+
+    /// (覆盖的攻击类型数, 总类型数)。
+    pub fn coverage(&self) -> (usize, usize) {
+        let covered = self
+            .surface
+            .attack_types
+            .iter()
+            .filter(|at| self.surface.payloads.iter().any(|p| &p.attack == *at))
+            .count();
+        (covered, self.surface.attack_types.len())
+    }
+
+    /// 覆盖率归一化到 [0.0, 1.0] (R-P6)。
+    pub fn coverage_ratio(&self) -> f64 {
+        let (covered, total) = self.coverage();
+        if total == 0 {
+            return 0.0;
+        }
+        (covered as f64 / total as f64).max(0.0).min(1.0)
+    }
+
+    /// 返回命中 OWASP API Top 10 的类别名列表。
+    pub fn owasp_top10_aligned(&self) -> Vec<&'static str> {
+        self.surface
+            .attack_types
+            .iter()
+            .map(|at| Self::owasp_category(*at))
+            .collect()
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for ApiScanner {
+    fn name(&self) -> &str {
+        "nt_shield_api_attack_surface"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let scanner = ApiScanner::default();
+        let endpoints = vec!["/api/v1/users".to_string(), "/api/v1/orders".to_string()];
+        let findings = scanner.scan(&endpoints);
+        if findings.is_empty() {
+            return Err(vec!["scan produced no findings".into()]);
+        }
+        let (covered, total) = scanner.coverage();
+        if covered == 0 || total == 0 {
+            return Err(vec![format!("coverage broken: ({}, {})", covered, total)]);
+        }
+        if scanner.owasp_top10_aligned().is_empty() {
+            return Err(vec!["owasp alignment list empty".into()]);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -835,5 +1096,109 @@ mod tests {
     fn test_trace_selftest_passes() {
         let guard = ReasoningTraceGuard::default();
         assert!(guard.self_test().is_ok());
+    }
+
+    // ── P9 ApiAttackSurface ──
+    #[test]
+    fn test_default_surface_covers_five_types() {
+        let surface = ApiAttackSurface::default();
+        assert!(surface.attack_types.len() >= 5);
+        let covered: std::collections::HashSet<ApiAttackType> = surface
+            .payloads
+            .iter()
+            .map(|p| p.attack)
+            .collect();
+        assert!(covered.len() >= 5, "payloads cover only {} types", covered.len());
+        assert_eq!(surface.owasp_version, "2023");
+    }
+
+    #[test]
+    fn test_scan_proportional_to_endpoints() {
+        let scanner = ApiScanner::default();
+        let endpoints = vec![
+            "/api/v1/users".to_string(),
+            "/api/v1/orders".to_string(),
+            "/api/v1/admin".to_string(),
+        ];
+        let findings = scanner.scan(&endpoints);
+        assert!(!findings.is_empty());
+        assert_eq!(findings.len() % endpoints.len(), 0);
+        let per_endpoint = findings.len() / endpoints.len();
+        assert!(per_endpoint <= scanner.max_payloads_per_endpoint);
+    }
+
+    #[test]
+    fn test_max_payloads_cap() {
+        let scanner = ApiScanner::new(ApiAttackSurface::default(), 2);
+        let endpoints = vec!["/api/v1/users".to_string(), "/api/v1/orders".to_string()];
+        let findings = scanner.scan(&endpoints);
+        assert_eq!(findings.len(), 2 * 2);
+    }
+
+    #[test]
+    fn test_coverage_counts() {
+        let surface = ApiAttackSurface {
+            attack_types: vec![
+                ApiAttackType::Bola,
+                ApiAttackType::BrokenAuth,
+                ApiAttackType::ExcessiveData,
+                ApiAttackType::RateLimit,
+                ApiAttackType::Injection,
+                ApiAttackType::MassAssignment,
+                ApiAttackType::SecurityMisconfig,
+                ApiAttackType::SSRF,
+            ],
+            payloads: vec![
+                ApiAttackPayload {
+                    attack: ApiAttackType::Bola,
+                    payload: "/api/v1/users/1".into(),
+                    description: "BOLA probe".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::Injection,
+                    payload: "' OR 1=1--".into(),
+                    description: "SQLi probe".into(),
+                },
+                ApiAttackPayload {
+                    attack: ApiAttackType::SSRF,
+                    payload: "http://169.254.169.254/".into(),
+                    description: "SSRF probe".into(),
+                },
+            ],
+            owasp_version: "2023",
+        };
+        let scanner = ApiScanner::new(surface, 16);
+        assert_eq!(scanner.coverage(), (3, 8));
+        let ratio = scanner.coverage_ratio();
+        assert!(ratio > 0.0 && ratio <= 1.0);
+    }
+
+    #[test]
+    fn test_owasp_aligned_nonempty() {
+        let scanner = ApiScanner::default();
+        let aligned = scanner.owasp_top10_aligned();
+        assert!(!aligned.is_empty());
+        assert!(aligned.contains(&"Broken Object Level Authorization"));
+        assert!(aligned.contains(&"Server-Side Request Forgery"));
+    }
+
+    #[test]
+    fn test_severity_mapping() {
+        let scanner = ApiScanner::default();
+        let endpoints = vec!["/api/v1/users".to_string()];
+        let findings = scanner.scan(&endpoints);
+        assert!(findings
+            .iter()
+            .any(|f| f.attack == ApiAttackType::Bola && f.severity == 3));
+        assert!(findings
+            .iter()
+            .any(|f| f.attack == ApiAttackType::Injection && f.severity == 2));
+        assert!(findings.iter().all(|f| f.severity == 2 || f.severity == 3));
+    }
+
+    #[test]
+    fn test_api_scanner_selftest_passes() {
+        let scanner = ApiScanner::default();
+        assert!(scanner.self_test().is_ok());
     }
 }

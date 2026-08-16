@@ -145,6 +145,296 @@ impl SkillEntry {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P4: AnchorPromote (dsh-anchored-standard 吸收)
+// 渐进披露阶梯 (progressive disclosure ladder) 应用到工具预算: agent
+// session 首个模型请求锚定 Minimal 工具集 (真实 schema, 无自动注入上下文),
+// 一旦会话 durable (首个 durable 工具/调用 或 assistant 消息) 即 promote
+// 到更重的 Standard 工具集。
+// ────────────────────────────────────────────────────────────────
+
+/// 披露阶段描述: stage 0 = Minimal (锚定), stage >= 1 = Standard (提升后)。
+#[derive(Debug, Clone)]
+pub struct DisclosureStage {
+    pub stage: u8,
+    pub label: String,
+    pub tool_count: usize,
+    pub durable: bool,
+}
+
+impl Default for DisclosureStage {
+    fn default() -> Self {
+        Self {
+            stage: 0,
+            label: "Minimal".to_string(),
+            tool_count: 2,
+            durable: false,
+        }
+    }
+}
+
+/// 触发 promote 的 durable 信号 (dsh-anchored-standard 吸收)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromoteSignal {
+    FirstDurableCall,
+    FirstAssistantMessage,
+    Both,
+}
+
+/// 锚定-然后-promote 状态机: 先以 Minimal 工具集锚定会话, session 一旦
+/// durable (首个 durable 工具/调用 或 assistant 消息) 即提升到 Standard
+/// 工具集。minimal/standard 预算可配, 披露节省量 = 1 - minimal/standard。
+#[derive(Debug, Clone)]
+pub struct AnchorPromote {
+    pub minimal_tools: usize,
+    pub standard_tools: usize,
+    pub promote_on: PromoteSignal,
+    pub stage: u8,
+    pub durable_calls: usize,
+}
+
+impl Default for AnchorPromote {
+    fn default() -> Self {
+        Self {
+            minimal_tools: 2,
+            standard_tools: 10,
+            promote_on: PromoteSignal::FirstDurableCall,
+            stage: 0,
+            durable_calls: 0,
+        }
+    }
+}
+
+impl AnchorPromote {
+    pub fn new(minimal_tools: usize, standard_tools: usize, promote_on: PromoteSignal) -> Self {
+        Self {
+            minimal_tools,
+            standard_tools,
+            promote_on,
+            stage: 0,
+            durable_calls: 0,
+        }
+    }
+
+    /// 记录一次 durable 调用/assistant 消息。
+    pub fn record_call(&mut self) {
+        self.durable_calls += 1;
+    }
+
+    /// 当前生效的工具预算: stage 0 → minimal, stage >= 1 → standard。
+    pub fn active_tool_count(&self) -> usize {
+        if self.stage == 0 {
+            self.minimal_tools
+        } else {
+            self.standard_tools
+        }
+    }
+
+    /// 尝试提升: 仅在 stage 0 且 durable 信号满足 (durable_calls >= 1) 时
+    /// 提升到 stage 1。返回阶段是否发生变化。
+    pub fn maybe_promote(&mut self) -> bool {
+        if self.stage != 0 {
+            return false;
+        }
+        if self.durable_calls >= 1 {
+            self.stage = 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 披露节省量: Minimal 相对 Standard 省下的工具预算比例, 归一到 [0,1]。
+    pub fn disclosure_savings(&self) -> f64 {
+        (1.0 - self.minimal_tools as f64 / self.standard_tools.max(1) as f64)
+            .max(0.0)
+            .min(1.0)
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// P6: BookToSkill (book-to-skill 机制输入侧)
+// 书/文档 (PDF/EPUB/DOCX/MD/HTML/RTF/MOBI) → 统一 agent skill 铸造的
+// 输入建模与章节→技能候选映射。本层只做"输入归一化 + 章节→技能候选
+// 映射"; 产出路径复用既有 SkillEngine/SkillEntry, 禁止平行适配器 (R-P42)。
+// ────────────────────────────────────────────────────────────────
+
+/// 支持的文档格式 (输入归一化)。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DocFormat {
+    Pdf,
+    Epub,
+    Docx,
+    Markdown,
+    Html,
+    Rtf,
+    Mobi,
+}
+
+impl DocFormat {
+    pub fn label(self) -> &'static str {
+        match self {
+            DocFormat::Pdf => "pdf",
+            DocFormat::Epub => "epub",
+            DocFormat::Docx => "docx",
+            DocFormat::Markdown => "md",
+            DocFormat::Html => "html",
+            DocFormat::Rtf => "rtf",
+            DocFormat::Mobi => "mobi",
+        }
+    }
+}
+
+/// 归一化后的章节 (输入建模)。
+#[derive(Debug, Clone)]
+pub struct DocChapter {
+    pub title: String,
+    pub order: usize,
+    pub char_count: usize,
+    pub summary: String,
+}
+
+/// 一本书/文档的统一输入模型 (book-to-skill 输入侧)。
+#[derive(Debug, Clone)]
+pub struct BookInput {
+    pub title: String,
+    pub format: DocFormat,
+    pub chapters: Vec<DocChapter>,
+}
+
+/// 章节→技能候选映射结果。
+#[derive(Debug, Clone)]
+pub struct SkillCandidate {
+    pub name: String,
+    pub source_chapters: Vec<usize>,
+    pub priority: u8,
+}
+
+/// book-to-skill 输入侧配置: 短章节过滤阈值 + 候选数量上限。
+#[derive(Debug, Clone)]
+pub struct BookToSkill {
+    pub min_chapter_chars: usize,
+    pub max_candidates: usize,
+}
+
+impl Default for BookToSkill {
+    fn default() -> Self {
+        Self {
+            min_chapter_chars: 500,
+            max_candidates: 8,
+        }
+    }
+}
+
+impl BookToSkill {
+    pub fn new(min_chapter_chars: usize, max_candidates: usize) -> Self {
+        Self {
+            min_chapter_chars,
+            max_candidates,
+        }
+    }
+
+    /// 按扩展名推断文档格式; 未知扩展名回退 Markdown。
+    pub fn infer_format(path: &str) -> DocFormat {
+        let ext = path.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+        match ext.as_str() {
+            "pdf" => DocFormat::Pdf,
+            "epub" => DocFormat::Epub,
+            "docx" => DocFormat::Docx,
+            "md" | "markdown" => DocFormat::Markdown,
+            "html" | "htm" => DocFormat::Html,
+            "rtf" => DocFormat::Rtf,
+            "mobi" => DocFormat::Mobi,
+            _ => DocFormat::Markdown,
+        }
+    }
+
+    /// 过滤 char_count < min_chapter_chars 的章节, 保持原 order。
+    pub fn normalize(&self, input: &BookInput) -> Vec<DocChapter> {
+        input
+            .chapters
+            .iter()
+            .filter(|c| c.char_count >= self.min_chapter_chars)
+            .cloned()
+            .collect()
+    }
+
+    /// 对每个保留章节生成技能候选: 章节长度 > 2000 字符 → priority=2
+    /// (长章节=高价值技能), 否则 priority=1; 最多 max_candidates 个。
+    pub fn discover_candidates(&self, input: &BookInput) -> Vec<SkillCandidate> {
+        self.normalize(input)
+            .iter()
+            .take(self.max_candidates.max(0))
+            .map(|ch| SkillCandidate {
+                name: clean_chapter_title(&ch.title),
+                source_chapters: vec![ch.order],
+                priority: if ch.char_count > 2000 { 2 } else { 1 },
+            })
+            .collect()
+    }
+
+    /// 保留章节字符总数 / 全书字符总数, 归一到 [0,1]。
+    pub fn skill_yield(&self, input: &BookInput) -> f64 {
+        let total: usize = input.chapters.iter().map(|c| c.char_count).sum();
+        if total == 0 {
+            return 0.0;
+        }
+        let kept: usize = self.normalize(input).iter().map(|c| c.char_count).sum();
+        (kept as f64 / total as f64).max(0.0).min(1.0)
+    }
+}
+
+/// 章节标题清洗: 去数字前缀/特殊字符 → snake_case (skill 命名用)。
+fn clean_chapter_title(title: &str) -> String {
+    let mut cleaned = String::new();
+    let mut prev_sep = false;
+    for ch in title.trim().chars() {
+        let c = ch.to_ascii_lowercase();
+        if c.is_ascii_alphanumeric() {
+            cleaned.push(c);
+            prev_sep = false;
+        } else if !prev_sep && !cleaned.is_empty() {
+            cleaned.push('_');
+            prev_sep = true;
+        } else {
+            prev_sep = true;
+        }
+    }
+    let cleaned = cleaned.trim_matches('_');
+    // 去数字前缀 (如 "12. Introduction" → "introduction")
+    let cleaned = cleaned.trim_start_matches(|c: char| c.is_ascii_digit()).trim_start_matches('_');
+    if cleaned.is_empty() {
+        "chapter".to_string()
+    } else {
+        cleaned.to_string()
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for BookToSkill {
+    fn name(&self) -> &str {
+        "nt_mind_book_to_skill"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let bts = BookToSkill::default();
+        let input = BookInput {
+            title: "Test Book".into(),
+            format: DocFormat::Markdown,
+            chapters: vec![
+                DocChapter { title: "Intro".into(), order: 0, char_count: 600, summary: String::new() },
+                DocChapter { title: "Deep Dive".into(), order: 1, char_count: 3000, summary: String::new() },
+            ],
+        };
+        if bts.skill_yield(&input) != 1.0 {
+            return Err(vec!["yield should be 1.0 when all chapters retained".into()]);
+        }
+        if bts.discover_candidates(&input).len() != 2 {
+            return Err(vec!["should discover 2 candidates".into()]);
+        }
+        Ok(())
+    }
+}
+
 /// 差分归因记录 (arxiv 2608.11888 SkillTriage 吸收): 单个技能的激活统计与
 /// procedure-heavy 风险标记。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,6 +491,9 @@ pub struct SkillEngine {
     /// 差分归因 (arxiv 2608.11888 SkillTriage 吸收): 每 skill 的激活次数 /
     /// 过程过重标记, 识别 procedure-heavy 技能 (过度验证 = 强制劳动毒源)。
     attribution: HashMap<String, SkillAttribution>,
+    /// 锚定-然后-promote (dsh-anchored-standard 吸收): session 首个请求锚定
+    /// Minimal 工具集, durable 后提升到 Standard 工具集。
+    pub disclosure: AnchorPromote,
 }
 
 impl SkillEngine {
@@ -214,6 +507,7 @@ impl SkillEngine {
             gwt: None,
             kb: None,
             attribution: HashMap::new(),
+            disclosure: AnchorPromote::default(),
         }
     }
 
@@ -533,6 +827,13 @@ impl SkillEngine {
             ));
         }
         std::fs::read_to_string(&ref_path).map_err(|e| format!("read reference: {}", e))
+    }
+
+    /// 推进渐进披露阶梯 (P4, dsh-anchored-standard 吸收): 若 session 已
+    /// durable (首个 durable 工具/调用), 从 Minimal 提升到 Standard 工具集。
+    /// 返回阶段是否发生变化。
+    pub fn step_disclosure(&mut self) -> bool {
+        self.disclosure.maybe_promote()
     }
 
     /// Activate a skill by name. Fires HookEvent::SkillLoaded and GWT broadcast.
@@ -1961,5 +2262,194 @@ category: general
     fn test_prompt_selftest() {
         let lib = PromptLibrary::new();
         assert!(lib.self_test().is_ok());
+    }
+
+    // ── P4: AnchorPromote (dsh-anchored-standard 吸收) ──
+    #[test]
+    fn test_disclosure_default_stage_is_minimal() {
+        let ap = AnchorPromote::default();
+        assert_eq!(ap.stage, 0, "default anchors on stage 0");
+        assert_eq!(ap.minimal_tools, 2);
+        assert_eq!(ap.standard_tools, 10);
+        assert_eq!(ap.active_tool_count(), 2, "stage 0 → Minimal tool budget");
+    }
+
+    #[test]
+    fn test_disclosure_stage_default_fields() {
+        let ds = DisclosureStage::default();
+        assert_eq!(ds.stage, 0);
+        assert_eq!(ds.label, "Minimal");
+        assert_eq!(ds.tool_count, 2);
+        assert!(!ds.durable, "default stage not yet durable");
+    }
+
+    #[test]
+    fn test_disclosure_record_call_then_promote() {
+        let mut ap = AnchorPromote::default();
+        assert!(!ap.maybe_promote(), "no durable call → stay anchored");
+        ap.record_call();
+        assert_eq!(ap.durable_calls, 1);
+        assert!(ap.maybe_promote(), "first durable call → promote");
+        assert_eq!(ap.stage, 1);
+        assert!(!ap.maybe_promote(), "already promoted → no re-promote");
+    }
+
+    #[test]
+    fn test_disclosure_promoted_active_tool_count_is_standard() {
+        let mut ap = AnchorPromote::default();
+        assert_eq!(ap.active_tool_count(), 2);
+        ap.record_call();
+        assert!(ap.maybe_promote());
+        assert_eq!(ap.active_tool_count(), 10, "promoted → Standard tool budget");
+    }
+
+    #[test]
+    fn test_disclosure_savings_is_80_percent() {
+        let ap = AnchorPromote::default();
+        assert_eq!(ap.disclosure_savings(), 0.8, "(1 - 2/10) = 0.8");
+    }
+
+    #[test]
+    fn test_disclosure_engine_step_transitions_and_stays() {
+        let mut engine = SkillEngine::new(PathBuf::from("/nonexistent/skills"));
+        assert_eq!(engine.disclosure.stage, 0);
+        assert!(!engine.step_disclosure(), "no durable call yet → no transition");
+        engine.disclosure.record_call();
+        assert!(engine.step_disclosure(), "first durable call → transition");
+        assert_eq!(engine.disclosure.stage, 1);
+        assert_eq!(engine.disclosure.active_tool_count(), 10);
+        assert!(!engine.step_disclosure(), "second call stays promoted");
+        assert_eq!(engine.disclosure.stage, 1);
+    }
+
+    #[test]
+    fn test_disclosure_new_constructor_with_both_signal() {
+        let mut ap = AnchorPromote::new(3, 12, PromoteSignal::Both);
+        assert_eq!(ap.stage, 0);
+        assert_eq!(ap.minimal_tools, 3);
+        assert_eq!(ap.standard_tools, 12);
+        ap.record_call();
+        assert!(ap.maybe_promote(), "Both signal satisfied on first durable call");
+        assert_eq!(ap.active_tool_count(), 12);
+        assert_eq!(ap.disclosure_savings(), 0.75, "(1 - 3/12)");
+    }
+
+    // ── P6: BookToSkill (book-to-skill 输入侧) ──
+
+    fn sample_book(chapters: Vec<(usize, usize)>) -> BookInput {
+        BookInput {
+            title: "Sample Book".into(),
+            format: DocFormat::Markdown,
+            chapters: chapters
+                .into_iter()
+                .map(|(order, char_count)| DocChapter {
+                    title: format!("Chapter {}", order),
+                    order,
+                    char_count,
+                    summary: String::new(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn test_infer_format_by_extension() {
+        assert_eq!(BookToSkill::infer_format("a.pdf"), DocFormat::Pdf);
+        assert_eq!(BookToSkill::infer_format("a.epub"), DocFormat::Epub);
+        assert_eq!(BookToSkill::infer_format("a.docx"), DocFormat::Docx);
+        assert_eq!(BookToSkill::infer_format("a.md"), DocFormat::Markdown);
+        assert_eq!(BookToSkill::infer_format("a.MARKDOWN"), DocFormat::Markdown);
+        assert_eq!(BookToSkill::infer_format("a.html"), DocFormat::Html);
+        assert_eq!(BookToSkill::infer_format("a.htm"), DocFormat::Html);
+        assert_eq!(BookToSkill::infer_format("a.rtf"), DocFormat::Rtf);
+        assert_eq!(BookToSkill::infer_format("a.mobi"), DocFormat::Mobi);
+        assert_eq!(BookToSkill::infer_format("a.unknown"), DocFormat::Markdown);
+        assert_eq!(BookToSkill::infer_format("no_extension"), DocFormat::Markdown);
+        assert_eq!(BookToSkill::infer_format("a.pdf"), BookToSkill::infer_format("b.PDF"));
+        assert_eq!(DocFormat::Pdf.label(), "pdf");
+        assert_eq!(DocFormat::Html.label(), "html");
+    }
+
+    #[test]
+    fn test_normalize_filters_short_chapters_keeps_order() {
+        let bts = BookToSkill::new(500, 8);
+        let book = sample_book(vec![(0, 400), (1, 600), (2, 100), (3, 900)]);
+        let kept = bts.normalize(&book);
+        assert_eq!(kept.len(), 2);
+        assert_eq!(kept[0].order, 1, "order preserved");
+        assert_eq!(kept[0].char_count, 600);
+        assert_eq!(kept[1].order, 3);
+        assert_eq!(kept[1].char_count, 900);
+    }
+
+    #[test]
+    fn test_discover_candidates_caps_and_priority() {
+        let bts = BookToSkill::new(500, 3);
+        let book = sample_book(vec![(0, 600), (1, 3000), (2, 700), (3, 2500)]);
+        let candidates = bts.discover_candidates(&book);
+        assert_eq!(candidates.len(), 3, "capped at max_candidates=3");
+        assert_eq!(candidates[0].priority, 1, "600 chars ≤ 2000 → priority 1");
+        assert_eq!(candidates[1].priority, 2, "3000 chars > 2000 → priority 2");
+        assert_eq!(candidates[2].priority, 1);
+        assert_eq!(candidates[0].source_chapters, vec![0]);
+        assert_eq!(candidates[1].source_chapters, vec![1]);
+        // 短章节被 normalize 过滤, 不出现在候选中
+        assert!(!candidates.iter().any(|c| c.source_chapters == vec![4]));
+    }
+
+    #[test]
+    fn test_discover_candidates_cleans_titles() {
+        let bts = BookToSkill::default();
+        let book = BookInput {
+            title: "T".into(),
+            format: DocFormat::Pdf,
+            chapters: vec![DocChapter {
+                title: "12. Introduction to Skill Casting!".into(),
+                order: 0,
+                char_count: 1000,
+                summary: String::new(),
+            }],
+        };
+        let candidates = bts.discover_candidates(&book);
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].name, "introduction_to_skill_casting");
+    }
+
+    #[test]
+    fn test_skill_yield_in_range_and_less_than_one_after_filter() {
+        let bts = BookToSkill::new(500, 8);
+        let book = sample_book(vec![(0, 400), (1, 600), (2, 100), (3, 900)]);
+        let yield_ratio = bts.skill_yield(&book);
+        assert!(yield_ratio >= 0.0 && yield_ratio <= 1.0, "yield in [0,1]");
+        assert!((yield_ratio - 0.75).abs() < 1e-9, "kept 1500 / total 2000 = 0.75");
+        assert!(yield_ratio < 1.0, "filtered chapters → yield < 1");
+    }
+
+    #[test]
+    fn test_skill_yield_all_retained_is_one() {
+        let bts = BookToSkill::new(500, 8);
+        let book = sample_book(vec![(0, 600), (1, 3000)]);
+        assert_eq!(bts.skill_yield(&book), 1.0);
+    }
+
+    #[test]
+    fn test_skill_yield_empty_input_is_zero() {
+        let bts = BookToSkill::default();
+        let empty = BookInput {
+            title: "Empty".into(),
+            format: DocFormat::Markdown,
+            chapters: vec![],
+        };
+        assert_eq!(bts.skill_yield(&empty), 0.0, "no chapters → yield 0");
+        let all_short = sample_book(vec![(0, 100), (1, 200)]);
+        assert_eq!(bts.skill_yield(&all_short), 0.0, "all filtered → yield 0");
+    }
+
+    #[test]
+    fn test_book_to_skill_selftest() {
+        use crate::core::nt_core_self_test::SelfTest;
+        let bts = BookToSkill::default();
+        assert_eq!(bts.name(), "nt_mind_book_to_skill");
+        assert!(bts.self_test().is_ok());
     }
 }

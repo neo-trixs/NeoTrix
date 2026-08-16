@@ -644,6 +644,179 @@ impl crate::core::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P15: TrainPipeline (吸收 train-llm-from-scratch)
+// 端到端训练管线 (SFT→RM→{PPO,DPO,GRPO}) 编排的状态机建模 + 超参知识
+// (lr scale 法则) + 策略选择。只做管线编排, 不做真实训练。注入自进化
+// 循环作为"训练方法论"层。
+// ────────────────────────────────────────────────────────────────
+
+/// 训练阶段 — Pretrain→Sft→Rm→{Ppo,Dpo,Grpo 任一}→Done
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrainStage {
+    Pretrain,
+    Sft,
+    Rm,
+    Ppo,
+    Dpo,
+    Grpo,
+    Done,
+}
+
+impl TrainStage {
+    pub fn label(self) -> &'static str {
+        match self {
+            TrainStage::Pretrain => "pretrain",
+            TrainStage::Sft => "sft",
+            TrainStage::Rm => "rm",
+            TrainStage::Ppo => "ppo",
+            TrainStage::Dpo => "dpo",
+            TrainStage::Grpo => "grpo",
+            TrainStage::Done => "done",
+        }
+    }
+
+    /// 阶段推进: Pretrain→Sft→Rm→{Ppo,Dpo,Grpo 任一}→Done; Done 终止
+    pub fn next(self) -> Option<TrainStage> {
+        match self {
+            TrainStage::Pretrain => Some(TrainStage::Sft),
+            TrainStage::Sft => Some(TrainStage::Rm),
+            TrainStage::Rm => Some(TrainStage::Ppo),
+            TrainStage::Ppo => Some(TrainStage::Done),
+            TrainStage::Dpo => Some(TrainStage::Done),
+            TrainStage::Grpo => Some(TrainStage::Done),
+            TrainStage::Done => None,
+        }
+    }
+}
+
+/// 训练超参 — 端到端管线的全局配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainConfig {
+    /// 模型参数量 (scale), lr 缩放基准 1e9
+    pub model_scale: f64,
+    /// 学习率
+    pub lr: f64,
+    /// warmup 步数
+    pub warmup_steps: usize,
+    /// 每步 batch 大小
+    pub batch_size: usize,
+    /// 最大 epoch 数
+    pub max_epochs: usize,
+}
+
+impl Default for TrainConfig {
+    fn default() -> Self {
+        Self {
+            model_scale: 1e9,
+            lr: 3e-4,
+            warmup_steps: 500,
+            batch_size: 32,
+            max_epochs: 3,
+        }
+    }
+}
+
+/// 训练管线状态机 — 阶段推进 + 超参 + 历史追踪
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainPipeline {
+    pub current: TrainStage,
+    pub config: TrainConfig,
+    pub epochs_run: usize,
+    /// 每阶段完成时记录 (阶段, 当时 epoch 数)
+    pub history: Vec<(TrainStage, usize)>,
+}
+
+impl Default for TrainPipeline {
+    fn default() -> Self {
+        Self::new(TrainConfig::default())
+    }
+}
+
+impl TrainPipeline {
+    pub fn new(config: TrainConfig) -> Self {
+        Self {
+            current: TrainStage::Pretrain,
+            config,
+            epochs_run: 0,
+            history: Vec::new(),
+        }
+    }
+
+    /// 推进到下一阶段: epochs_run += 1, 记录 (current, epochs_run), current = next()?,
+    /// 返回新阶段。Done 之后返回 None (R-P3: ? 传播终止)。
+    pub fn advance(&mut self) -> Option<TrainStage> {
+        self.epochs_run += 1;
+        self.history.push((self.current, self.epochs_run));
+        let next = self.current.next()?;
+        self.current = next;
+        Some(next)
+    }
+
+    /// 训练策略选择 — 各阶段对应方法论 (train-llm-from-scratch 知识)
+    pub fn recommend_strategy(&self, stage: TrainStage) -> &'static str {
+        match stage {
+            TrainStage::Sft => "supervised fine-tuning: next-token",
+            TrainStage::Rm => "reward model: pairwise ranking",
+            TrainStage::Ppo => "PPO: on-policy RLHF",
+            TrainStage::Dpo => "DPO: off-policy preference",
+            TrainStage::Grpo => "GRPO: group relative policy optimization",
+            _ => "pretraining: next-token on corpus",
+        }
+    }
+
+    /// 依据模型规模缩放 lr (经验法则: lr ∝ scale^-0.15), 更新 config.lr 并返回。
+    /// 更大模型 → 更小 lr。
+    pub fn scale_lr(&mut self, scale: f64) -> f64 {
+        let scaled = self.config.lr * (scale / 1e9).powf(-0.15);
+        self.config.lr = scaled;
+        scaled
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.current == TrainStage::Done
+    }
+
+    /// 完成阶段占比 (6 阶段含 Done)。R-P6: max(0.0).min(1.0) 钳制。
+    pub fn stage_progress(&self) -> f64 {
+        let idx = match self.current {
+            TrainStage::Pretrain => 0,
+            TrainStage::Sft => 1,
+            TrainStage::Rm => 2,
+            TrainStage::Ppo => 3,
+            TrainStage::Dpo => 4,
+            TrainStage::Grpo => 5,
+            TrainStage::Done => 6,
+        };
+        (idx as f64 / 6.0).max(0.0).min(1.0)
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for TrainPipeline {
+    fn name(&self) -> &str {
+        "nt_mind_train_pipeline"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut pipe = TrainPipeline::new(TrainConfig::default());
+        if pipe.is_complete() {
+            return Err(vec!["pipeline must start incomplete".into()]);
+        }
+        pipe.advance()
+            .ok_or_else(|| vec!["advance from Pretrain must yield a stage".into()])?;
+        let base = pipe.config.lr;
+        let scaled = pipe.scale_lr(1e10);
+        if !scaled.is_finite() || scaled >= base {
+            return Err(vec!["scale_lr must lower lr for larger models".into()]);
+        }
+        let p = pipe.stage_progress();
+        if !(0.0..=1.0).contains(&p) {
+            return Err(vec![format!("stage_progress out of bounds: {p}")]);
+        }
+        Ok(())
+    }
+}
+
 /// 自进化循环引擎
 #[derive(Debug, Clone)]
 pub struct EvolutionLoop {
@@ -1784,5 +1957,93 @@ mod tests {
     fn test_harness_selftest() {
         let opt = MetaHarnessOptimizer::new();
         assert!(opt.self_test().is_ok());
+    }
+
+    // ── P15: TrainPipeline (train-llm-from-scratch 吸收) ──
+
+    #[test]
+    fn train_stage_ordering_advances() {
+        assert_eq!(TrainStage::Pretrain.next(), Some(TrainStage::Sft));
+        assert_eq!(TrainStage::Sft.next(), Some(TrainStage::Rm));
+        assert_eq!(TrainStage::Rm.next(), Some(TrainStage::Ppo));
+        assert_eq!(TrainStage::Ppo.next(), Some(TrainStage::Done));
+        assert_eq!(TrainStage::Dpo.next(), Some(TrainStage::Done));
+        assert_eq!(TrainStage::Grpo.next(), Some(TrainStage::Done));
+        assert_eq!(TrainStage::Done.next(), None);
+        assert_eq!(TrainStage::Ppo.label(), "ppo");
+        assert_eq!(TrainStage::Done.label(), "done");
+    }
+
+    #[test]
+    fn train_pipeline_advance_grows_history() {
+        let mut pipe = TrainPipeline::new(TrainConfig::default());
+        assert_eq!(pipe.current, TrainStage::Pretrain);
+        assert_eq!(pipe.history.len(), 0);
+        let next = pipe.advance().expect("advance from Pretrain");
+        assert_eq!(next, TrainStage::Sft);
+        assert_eq!(pipe.current, TrainStage::Sft);
+        assert_eq!(pipe.history.len(), 1);
+        assert_eq!(pipe.history[0], (TrainStage::Pretrain, 1));
+        assert_eq!(pipe.epochs_run, 1);
+    }
+
+    #[test]
+    fn train_recommend_strategy_per_stage() {
+        let pipe = TrainPipeline::default();
+        assert_eq!(pipe.recommend_strategy(TrainStage::Pretrain), "pretraining: next-token on corpus");
+        assert_eq!(pipe.recommend_strategy(TrainStage::Sft), "supervised fine-tuning: next-token");
+        assert_eq!(pipe.recommend_strategy(TrainStage::Rm), "reward model: pairwise ranking");
+        assert_eq!(pipe.recommend_strategy(TrainStage::Ppo), "PPO: on-policy RLHF");
+        assert_eq!(pipe.recommend_strategy(TrainStage::Dpo), "DPO: off-policy preference");
+        assert_eq!(pipe.recommend_strategy(TrainStage::Grpo), "GRPO: group relative policy optimization");
+        assert_eq!(pipe.recommend_strategy(TrainStage::Done), "pretraining: next-token on corpus");
+    }
+
+    #[test]
+    fn train_scale_lr_lowers_for_larger_models() {
+        let mut pipe = TrainPipeline::new(TrainConfig::default());
+        let base = pipe.config.lr;
+        let big = pipe.scale_lr(1e10);
+        assert!(big < base, "10B model lr ({big}) must be smaller than base ({base})");
+        assert_eq!(pipe.config.lr, big);
+
+        let mut small_pipe = TrainPipeline::new(TrainConfig::default());
+        let small_base = small_pipe.config.lr;
+        let small = small_pipe.scale_lr(1e8);
+        assert!(small > small_base, "100M model lr ({small}) must be larger than base ({small_base})");
+    }
+
+    #[test]
+    fn train_is_complete_only_when_done() {
+        let mut pipe = TrainPipeline::default();
+        assert!(!pipe.is_complete());
+        for _ in 0..4 {
+            pipe.advance();
+        }
+        assert_eq!(pipe.current, TrainStage::Done);
+        assert!(pipe.is_complete());
+        assert_eq!(pipe.advance(), None, "Done 之后 advance 返回 None");
+        assert!(pipe.is_complete());
+    }
+
+    #[test]
+    fn train_stage_progress_bounds_and_monotonic() {
+        let mut pipe = TrainPipeline::default();
+        assert_eq!(pipe.stage_progress(), 0.0);
+        assert!((0.0..=1.0).contains(&pipe.stage_progress()));
+        let mut last = 0.0;
+        for _ in 0..4 {
+            pipe.advance();
+            let p = pipe.stage_progress();
+            assert!(p >= last && p <= 1.0, "progress must stay in [0,1] and be monotonic");
+            last = p;
+        }
+        assert_eq!(pipe.stage_progress(), 1.0);
+    }
+
+    #[test]
+    fn train_pipeline_selftest_passes() {
+        let pipe = TrainPipeline::new(TrainConfig::default());
+        assert!(pipe.self_test().is_ok());
     }
 }
