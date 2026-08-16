@@ -334,7 +334,10 @@ mod tests {
         // 合并验证: /stats 接收 version|doctor, /e8 接收 consciousness 子命令
         assert_eq!(reg.execute("/stats version", None).success, true, "/stats version 应可执行");
         assert_eq!(reg.execute("/stats doctor", None).success, true, "/stats doctor 应可执行");
-        assert_eq!(reg.execute("/e8 consciousness", None).success, false, "/e8 consciousness 无 brain 时应报错 (意识状态需要 Brain)");
+        // /e8 consciousness 委派到独立 ConsciousnessCmd: 查询全局意识核心状态,
+        // 不依赖 brain 实例 (意识核心是进程级全局), 故无 brain 也应成功
+        let cns = reg.execute("/e8 consciousness", None);
+        assert_eq!(cns.success, true, "/e8 consciousness 应可查询意识状态 (全局意识核心), got: {}", cns.message);
         // complete 同样收敛: 被隐藏的命令不参与补全, 控制命令参与
         assert!(reg.complete("/read").is_empty(), "/read 是 agent 工具, 不应参与人类补全");
         assert!(reg.complete("/help").iter().any(|c| c == "/help"), "/help 控制命令应参与补全");

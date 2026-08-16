@@ -901,6 +901,16 @@ mod tests {
 
     #[test]
     fn test_production_path_reachability_via_registry() {
+        // env-gated: spawn 真实 sh 子进程; 全量并行/多会话负载下 fork 资源耗尽
+        // 会误报 "Spawn sh: No such file or directory (os error 2)"
+        if std::env::var("NT_E2E_SUBPROCESS")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+            != true
+        {
+            eprintln!("skipped: set NT_E2E_SUBPROCESS=1 to run real-subprocess MCP e2e");
+            return;
+        }
         // A real subprocess MCP server that answers a valid JSON-RPC response,
         // so the governed path executes end-to-end through the registry.
         let mut reg = McpRegistry::new();

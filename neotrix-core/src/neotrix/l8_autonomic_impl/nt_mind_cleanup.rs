@@ -230,17 +230,21 @@ impl Archiver {
         #[cfg(unix)]
         {
             let tar_path = dest.with_extension("tar.gz");
-            let status = std::process::Command::new("tar")
+            // tar 可用时压缩归档; spawn 失败/非零退出 → 落入 fallback (重命名),
+            // 而非静默空归档 (Spice Must Flow: 归档必须移动源, 不允许什么都不做)。
+            if let Ok(status) = std::process::Command::new("tar")
                 .args(["-czf", &tar_path.to_string_lossy(), "-C"])
                 .arg(src.parent().unwrap_or(Path::new(".")))
                 .arg(src.file_name().unwrap_or_default())
-                .status()?;
-            if status.success() {
-                let _ = fs::remove_dir_all(src);
-                return Ok(());
+                .status()
+            {
+                if status.success() {
+                    let _ = fs::remove_dir_all(src);
+                    return Ok(());
+                }
             }
         }
-        // fallback: 简单重命名 (当 tar 不可用时)
+        // fallback: 简单重命名 (当 tar 不可用/负载下 spawn 失败时)
         let renamed = dest.with_extension("dir");
         fs::rename(src, &renamed)
     }

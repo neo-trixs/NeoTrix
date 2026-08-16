@@ -57,7 +57,11 @@ impl E8Predictor {
         self.state_traces.push(trace.to_vec());
         self.sample_count += 1;
         // 根据累积样本重新计算覆盖度 (观测态数 / 样本数, 平滑防除零)
-        let unique = self.state_traces.iter().collect::<std::collections::HashSet<&Vec<u8>>>().len();
+        let unique = self
+            .state_traces
+            .iter()
+            .collect::<std::collections::HashSet<&Vec<u8>>>()
+            .len();
         self.coverage = (unique as f64) / (self.sample_count as f64).max(1.0);
     }
 
@@ -110,15 +114,34 @@ impl E8Predictor {
 const KB_NAMESPACE: &str = "e8_predictor";
 const KB_KEY: &str = "core";
 
+/// 测试注入的 KB 路径 (进程内静态, 线程安全) — 替代 env 覆盖,
+/// 消除 `set_var` 在并行测试间的全局 env 竞争 (Rust env 多线程不安全)。
+/// 生产路径恒为 None → 解析回落 env/默认, 零开销。
+static TEST_KB_PATH: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+
 /// 打开 KB 连接 (默认 `~/.neotrix/knowledge.db`), 复用 NT-MEMORY 统一 schema 初始化。
 /// 单一 schema 事实源: 不在此处维护 kv_store 本地 DDL, 避免漂移 (对齐 consciousness_core)。
-/// 测试隔离: `NEOTRIX_KB_PATH` 覆盖数据库路径, 避免污染生产 KB 且不触碰进程级 HOME。
+///
+/// 路径解析优先级:
+/// 1. 测试注入静态 `TEST_KB_PATH` (线程安全, 无 env 竞争)
+/// 2. `NEOTRIX_KB_PATH` env (生产/外部覆盖)
+/// 3. `~/.neotrix/knowledge.db` 默认
 fn open_kb() -> Result<rusqlite::Connection, String> {
-    let path = std::env::var("NEOTRIX_KB_PATH")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
+    let path = TEST_KB_PATH
+        .lock()
+        .map(|g| g.clone())
+        .ok()
+        .flatten()
+        .or_else(|| {
+            std::env::var("NEOTRIX_KB_PATH")
+                .map(std::path::PathBuf::from)
+                .ok()
+        })
+        .unwrap_or_else(|| {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-            std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db")
+            std::path::PathBuf::from(home)
+                .join(".neotrix")
+                .join("knowledge.db")
         });
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("KB dir: {}", e))?;
@@ -144,7 +167,9 @@ pub fn load() -> E8Predictor {
         Err(_) => return E8Predictor::new(),
     };
     let raw = match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_get(
-        &conn, KB_NAMESPACE, KB_KEY,
+        &conn,
+        KB_NAMESPACE,
+        KB_KEY,
     ) {
         Ok(Some(v)) => v,
         _ => return E8Predictor::new(),
@@ -170,7 +195,10 @@ pub fn persist(predictor: &E8Predictor) {
         Err(_) => return,
     };
     let _ = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_set(
-        &conn, KB_NAMESPACE, KB_KEY, &json,
+        &conn,
+        KB_NAMESPACE,
+        KB_KEY,
+        &json,
     );
 }
 
@@ -197,13 +225,13 @@ mod tests {
 
     /// 测试隔离: 为每个调用分配唯一临时 KB 路径,
     /// 避免污染生产 KB 且测试间状态互不干扰。
-    /// 不再修改进程级 HOME (跨模块并行测试读 HOME 会看到被污染值)。
+    /// 通过进程内静态注入 (非 env) — 并行测试间无 env 竞争。
     fn isolate_home() {
         static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let tmp = std::env::temp_dir().join(format!("neotrix-e8p-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&tmp).ok();
-        std::env::set_var("NEOTRIX_KB_PATH", tmp.join("knowledge.db"));
+        *TEST_KB_PATH.lock().unwrap() = Some(tmp.join("knowledge.db"));
     }
 
     /// 串行化所有触碰隔离 DB 的测试: 共享同库下并行写会互相覆盖基线,
@@ -224,7 +252,13 @@ mod tests {
         with_kb_lock(|| {
             isolate_home();
             let p = load();
-            assert!(matches!(p, E8Predictor { sample_count: 0, .. }));
+            assert!(matches!(
+                p,
+                E8Predictor {
+                    sample_count: 0,
+                    ..
+                }
+            ));
         });
     }
 
