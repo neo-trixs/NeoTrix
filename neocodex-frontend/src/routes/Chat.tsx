@@ -26,7 +26,7 @@ import { LivePreview } from '../components/LivePreview'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
-import { neocodex, system } from '../api'
+import { neocodex, system, unified } from '../api'
 import { subscribeStream, type UnlistenFn } from '../api/events'
 
 const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
@@ -164,6 +164,16 @@ export function Chat() {
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
   // ⌘K 命令面板（对标 Claude Code / Osaurus 命令菜单）：全局唤起，动作复用既有 handler
   const [paletteOpen, setPaletteOpen] = createSignal(false)
+  // 统一命令桥：CLI 命令目录（懒加载，供 ⌘K 面板执行 /help /config /stats 等）
+  const [unifiedCliCmds, setUnifiedCliCmds] = createSignal<PaletteCommand[]>([])
+  const execUnifiedCli = async (input: string) => {
+    try {
+      const r = await unified.execCli(input)
+      showInfo(r.message.length > 200 ? `${r.message.slice(0, 200)}…` : r.message, r.success ? 4000 : 5000)
+    } catch (e) {
+      showInfo(`CLI 命令执行失败：${e instanceof Error ? e.message : String(e)}`, 5000)
+    }
+  }
   // 长消息展开状态（任务4：内容折叠；message.id → 是否展开）
   const [expandedMsgIds, setExpandedMsgIds] = createSignal<Record<string, boolean>>({})
   // 上下文占用（任务3：/compact 自动提示数据源，只读轮询 agentStatus，不写入任何 store）
@@ -331,6 +341,27 @@ export function Chat() {
   createEffect(() => {
     const p = contextPct()
     if (p !== null && p < 80) setCompactHintDismissed(false)
+  })
+
+  // 统一命令桥懒加载：⌘K 面板注入 CLI 命令 (单一真源 unified_cli_list)
+  createEffect(() => {
+    if (!paletteOpen()) return
+    void (async () => {
+      try {
+        const cli = await unified.cliList()
+        setUnifiedCliCmds(
+          cli.map((s) => ({
+            id: `cli:${s.name}`,
+            label: s.name,
+            desc: s.description,
+            keywords: [s.name.replace(/^\//, ''), ...s.aliases.map((a) => a.replace(/^\//, ''))],
+            run: () => void execUnifiedCli(s.name),
+          })),
+        )
+      } catch {
+        setUnifiedCliCmds([])
+      }
+    })()
   })
   const compactHintVisible = () => {
     const p = contextPct()
@@ -974,6 +1005,7 @@ export function Chat() {
     { id: 'mode', label: '切换权限模式', desc: '自动 / 手动 / 接受编辑 / 规划', keywords: ['mode', '权限', '模式'], run: () => cyclePermissionMode() },
     { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '帮助', '快捷键'], run: () => runSlash(SLASH_COMMANDS[3]) },
     { id: 'settings', label: '打开设置', desc: '提供商配置与应用设置', keywords: ['settings', '设置', '配置'], run: () => setSettingsOpen(true) },
+    ...unifiedCliCmds(),
   ]
 
   return (
