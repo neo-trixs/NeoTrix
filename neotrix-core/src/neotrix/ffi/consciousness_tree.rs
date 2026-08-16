@@ -30,12 +30,15 @@ impl ConsciousnessTreeImpl {
             "NT-CORE", "NT-MIND", "NT-MEMORY", "NT-WORLD",
             "NT-ACT", "NT-IO", "NT-SHIELD",
         ];
-        for (i, id) in branch_ids.iter().enumerate() {
-            let maturity = if i < 4 { 3 } else { 4 };
+        // D16 修复: 分支健康/成熟度不再硬编码 (0.85 + i*0.01 / 3/4) —
+        // 从真实 SelfTest registry 运行结果派生, 与后台循环的真实树一致。
+        let (health_by_branch, maturity_base) = real_branch_health();
+        for id in branch_ids.iter() {
+            let health = health_by_branch.get(*id).copied().unwrap_or(0.6);
             branches.insert(id.to_string(), BranchState {
                 branch_id: id.to_string(),
-                health: 0.85 + (i as f32 * 0.01),
-                maturity,
+                health,
+                maturity: maturity_base,
                 last_activity: now_ms(),
                 metrics: HashMap::new(),
             });
@@ -191,6 +194,66 @@ fn now_ms() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+/// 从真实 SelfTest registry 派生分支健康基线与成熟度 (D16 修复)。
+///
+/// 旧实现硬编码 health=0.85+(i*0.01), maturity=3/4 — 与后台真实树脱节的虚假健康度
+/// (ffi/consciousness_tree.rs:34-41 theater)。此函数运行注册的全部 SelfTest 检测件,
+/// 按分支前缀统计真实通过率作为健康分; 成熟度由全局通过率映射 (全绿→C4/C5 区间)。
+/// 纯只读, 不产生副作用, 成本 = 一次 SelfTest 全量运行。
+fn real_branch_health() -> (HashMap<String, f32>, u8) {
+    use crate::core::nt_core_self_test::{SelfTestRegistry};
+    use crate::core::nt_core_self_test_integration::register_absorbed_modules;
+
+    let mut registry = SelfTestRegistry::new();
+    register_absorbed_modules(&mut registry);
+    let results = registry.run_all();
+    let total = results.len() as f32;
+    let passed = results.iter().filter(|r| r.passed).count() as f32;
+
+    let mut per_branch: HashMap<String, (usize, usize)> = HashMap::new();
+    for r in &results {
+        let branch = r
+            .name
+            .split(|c: char| c == '_' || c == ':' || c == '/')
+            .next()
+            .map(|s| s.to_uppercase())
+            .filter(|s| s.starts_with("NT"))
+            .unwrap_or_else(|| "NT-CORE".into());
+        let e = per_branch.entry(branch).or_insert((0, 0));
+        e.0 += 1;
+        if r.passed {
+            e.1 += 1;
+        }
+    }
+
+    let health_by_branch: HashMap<String, f32> = per_branch
+        .iter()
+        .map(|(k, (n, p))| {
+            let ratio = if *n > 0 { *p as f32 / *n as f32 } else { 0.0 };
+            // 无 SelfTest 覆盖的分支按全局平均给保守基线, 避免 0 健康误报
+            let h = if *n > 0 { ratio } else { passed / total.max(1.0) };
+            (k.clone(), h.clamp(0.0, 1.0))
+        })
+        .collect();
+
+    // 成熟度: 全局通过率映射到 C2-C5 (0.7→C2, 0.85→C3, 0.95→C4, 1.0→C5)
+    let maturity = if total == 0.0 {
+        2
+    } else {
+        let ratio = passed / total;
+        if ratio >= 0.99 {
+            5
+        } else if ratio >= 0.95 {
+            4
+        } else if ratio >= 0.85 {
+            3
+        } else {
+            2
+        }
+    };
+    (health_by_branch, maturity)
 }
 
 /// 从分支健康状态构造 64 维"意识谱"并用真实 IITPhiCalculator 计算整合信息 (D2)。

@@ -538,9 +538,10 @@ pub fn upsert_edge(
     upsert_edge_full(conn, source_id, target_id, relation_type, weight, description, None)
 }
 
-pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
-    conn.query_row("SELECT COUNT(*) FROM nodes", [], |row| row.get(0))
-}
+// D3 架构倒置: 基础 count 原语下沉至 core (nt_core_kb_primitives), re-export
+// 保持 `nt_memory_store::count_nodes/count_edges` 调用方路径不变。
+// 域级聚合 count (by_type/by_domain/...) 保留本模块 (依赖 nt_memory_types)。
+pub use crate::core::nt_core_kb_primitives::{count_edges, count_nodes};
 
 pub fn count_nodes_by_type(conn: &Connection, node_type: &str) -> rusqlite::Result<usize> {
     conn.query_row(
@@ -548,10 +549,6 @@ pub fn count_nodes_by_type(conn: &Connection, node_type: &str) -> rusqlite::Resu
         params![node_type],
         |row| row.get(0),
     )
-}
-
-pub fn count_edges(conn: &Connection) -> rusqlite::Result<usize> {
-    conn.query_row("SELECT COUNT(*) FROM edges", [], |row| row.get(0))
 }
 
 pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {

@@ -897,6 +897,21 @@ impl SkillEngine {
         self.skills.iter().filter(|s| s.active).collect()
     }
 
+    /// 披露门控的活跃技能视图 (P4 行为接线): 披露预算 active_tool_count()
+    /// 真实限制模型可见工具集 — stage 0 (Minimal) 时仅暴露预算数量的
+    /// 高优先级技能, promote 到 Standard 后暴露全部活跃技能。
+    /// 这是 active_tool_count() 从"展示"到"行为门控"的生产路径。
+    pub fn visible_active(&self) -> Vec<&SkillEntry> {
+        let mut active: Vec<&SkillEntry> = self.skills.iter().filter(|s| s.active).collect();
+        let budget = self.disclosure.active_tool_count();
+        if self.disclosure.stage == 0 && active.len() > budget {
+            // Minimal 阶段: 按 priority 升序 (高优先级在前) 截断到预算
+            active.sort_by_key(|s| s.priority);
+            active.truncate(budget);
+        }
+        active
+    }
+
     /// 技能树层级统计 (G6, AgentSkillOS 吸收): category 分布、根/叶/孤儿技能、
     /// 覆盖率与深度。供背景循环巡检报告使用。
     pub fn skill_tree_stats(&self) -> SkillTreeStats {
@@ -2386,6 +2401,45 @@ category: general
         assert_eq!(engine.disclosure.active_tool_count(), 10);
         assert!(!engine.step_disclosure(), "second call stays promoted");
         assert_eq!(engine.disclosure.stage, 1);
+    }
+
+    #[test]
+    fn test_disclosure_visible_active_gates_tool_set() {
+        // P4 行为接线回归: visible_active() 必须真实限制工具集 —
+        // Minimal 阶段只暴露预算(2)个高优先级技能, promote 后完整暴露。
+        let mut engine = SkillEngine::new(PathBuf::from("/nonexistent/skills"));
+        // 直接注入 4 个活跃技能 (优先级 4/3/2/1 → 1 最高)
+        for (name, prio) in [("low", 4u8), ("mid", 3), ("high", 2), ("top", 1)] {
+            engine.skills.push(SkillEntry {
+                name: name.to_string(),
+                description: format!("skill {}", name),
+                category: "test".into(),
+                triggers: vec![],
+                e8_modes: vec![],
+                tools: vec![],
+                hooks: vec![],
+                priority: prio,
+                path: PathBuf::new(),
+                content: String::new(),
+                active: true,
+                references: vec![],
+                parent: String::new(),
+                verified: false,
+            });
+        }
+        // Minimal 阶段: 预算 2 → 只暴露 top/high (priority 1,2)
+        assert_eq!(engine.disclosure.stage, 0);
+        let visible = engine.visible_active();
+        assert_eq!(visible.len(), 2, "Minimal budget gates to 2, got {}", visible.len());
+        assert_eq!(visible[0].name, "top", "highest priority first");
+        assert_eq!(visible[1].name, "high", "second highest priority");
+        // promote 后: 完整暴露全部 4 个
+        engine.disclosure.record_call();
+        assert!(engine.step_disclosure());
+        assert_eq!(engine.disclosure.stage, 1);
+        let visible_full = engine.visible_active();
+        assert_eq!(visible_full.len(), 4, "Standard stage exposes all active, got {}", visible_full.len());
+        // 未激活技能不受门控影响 (list_active 与 visible 一致: 都只含 active)
     }
 
     #[test]

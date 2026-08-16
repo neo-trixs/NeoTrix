@@ -453,13 +453,13 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
     conn.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| format!("KB busy_timeout: {}", e))?;
     let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
-    crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn)
+    crate::core::nt_core_kb_primitives::schema_initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
 }
 fn load_snapshot() -> Option<CoreSnapshot> {
     let conn = open_kb().ok()?;
-    let raw = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_get(
+    let raw = crate::core::nt_core_kb_primitives::kv_get(
         &conn, NAMESPACE, KEY,
     )
     .ok()??;
@@ -469,7 +469,7 @@ fn load_snapshot() -> Option<CoreSnapshot> {
 fn persist_snapshot(snap: &CoreSnapshot) -> Result<(), String> {
     let conn = open_kb()?;
     let json = serde_json::to_string(snap).map_err(|e| format!("snapshot serialize: {}", e))?;
-    crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_set(
+    crate::core::nt_core_kb_primitives::kv_set(
         &conn, NAMESPACE, KEY, &json,
     )
 }

@@ -92,8 +92,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-11T06:24:37.598236Z",
       "updated_at": "2026-08-16T12:32:31.833773Z",
@@ -133,10 +133,10 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "tests": "17 passed (nt_core_parallel::isolation)",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "tests": "17 passed (nt_core_parallel::isolation)"
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:45:37.672467Z",
@@ -179,10 +179,10 @@
         }
       ],
       "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
         "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
         "evidence_gated": "unknown",
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:33:55.945651Z",
@@ -607,8 +607,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T03:58:06.420110Z",
       "updated_at": "2026-08-16T07:33:56.160376Z",
@@ -666,8 +666,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T03:58:06.428234Z",
       "updated_at": "2026-08-16T07:35:04.200464Z",
@@ -857,8 +857,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T07:24:57.735635Z",
       "updated_at": "2026-08-16T12:39:38.480346Z",
@@ -915,8 +915,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T07:25:01.569883Z",
       "updated_at": "2026-08-16T12:32:02.255810Z",
@@ -967,8 +967,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T07:25:01.580480Z",
       "updated_at": "2026-08-16T12:34:35.302204Z",
@@ -1242,8 +1242,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T08:24:43.288598Z",
       "updated_at": "2026-08-16T12:32:02.769277Z",
@@ -1296,8 +1296,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T11:46:32.523575Z",
       "updated_at": "2026-08-16T12:32:03.277922Z",
@@ -1459,8 +1459,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T12:55:44.852663Z",
       "updated_at": "2026-08-16T10:57:30.281919Z",
@@ -1511,8 +1511,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T12:55:44.865493Z",
       "updated_at": "2026-08-16T12:32:04.832413Z",
@@ -1889,8 +1889,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T04:15:47.812468Z",
       "updated_at": "2026-08-16T07:33:56.072578Z",
@@ -2093,8 +2093,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-16T07:33:56.302392Z",
@@ -2135,8 +2135,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.107775Z",
@@ -2179,8 +2179,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.320410Z",
@@ -2265,8 +2265,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.553093Z",
@@ -2400,8 +2400,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "degraded"
       },
       "created_at": "2026-08-15T14:59:52Z",
       "updated_at": "2026-08-16T07:33:56.588817Z",
@@ -2444,9 +2444,9 @@
         }
       ],
       "metadata": {
+        "wiring_evidence": "code_graph_cmds.rs:13,50 CodeGraphMCP tools (search_hybrid wired 3a010aca)",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed",
-        "wiring_evidence": "code_graph_cmds.rs:13,50 CodeGraphMCP tools (search_hybrid wired 3a010aca)"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:59:52Z",
       "updated_at": "2026-08-16T14:59:38.572610Z",
@@ -2486,8 +2486,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:34.980757Z",
@@ -2649,8 +2649,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:29.213219Z",
@@ -2690,8 +2690,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:33.407300Z",
@@ -2730,8 +2730,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:05.342850Z",
@@ -2770,8 +2770,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:29.731073Z",
@@ -2810,8 +2810,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "self_test_integration SelfVerifiableRewardSelfTest",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "self_test_integration SelfVerifiableRewardSelfTest"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T13:01:59.805797Z",
@@ -2850,8 +2850,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:20.413819Z",
@@ -2930,8 +2930,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:20.918978Z",
@@ -3220,8 +3220,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:32.894527Z",
@@ -3260,8 +3260,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:30.260679Z",
@@ -3420,8 +3420,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:36.025976Z",
@@ -3460,8 +3460,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:30.782626Z",
@@ -3508,8 +3508,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs"
       },
       "created_at": "2026-08-16T02:50:22.160537Z",
       "updated_at": "2026-08-16T13:04:55.118339Z",
@@ -3555,8 +3555,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-16T02:50:22.749743Z",
       "updated_at": "2026-08-16T12:32:36.553841Z",
@@ -3860,8 +3860,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-16T07:45:11.165170Z",
       "updated_at": "2026-08-16T12:32:23.495703Z",
@@ -4173,8 +4173,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "unified_tauri_full_catalog L2 orchestrator"
+        "wiring_evidence": "unified_tauri_full_catalog L2 orchestrator",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T10:26:23.580698Z",
       "updated_at": "2026-08-16T10:28:51.196256Z",

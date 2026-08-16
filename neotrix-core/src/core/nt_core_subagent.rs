@@ -227,7 +227,7 @@ impl SubAgentDefParser {
             trigger: Option<String>,
         }
 
-        let raw: RawFrontmatter = serde_yaml::from_str(frontmatter).ok()?;
+        let raw: RawFrontmatter = serde_yml::from_str(frontmatter).ok()?;
         if raw.name.is_empty() || raw.description.is_empty() {
             return None;
         }

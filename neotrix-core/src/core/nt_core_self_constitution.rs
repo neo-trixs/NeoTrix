@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use crate::core::nt_core_hcube::fhrr_vsa::{similarity, FhrrVector};
-use crate::neotrix::l1_body_impl::nt_shield::guard_chain::{GuardChain, GuardVerdict};
+use crate::core::nt_core_guard_chain::{GuardChain, GuardVerdict};
 
 /// Rule categories for semantic indexing and retrieval
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

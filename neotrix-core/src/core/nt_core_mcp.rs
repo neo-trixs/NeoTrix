@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Write};
 
 use crate::core::nt_core_dispatch::{DispatchMode, Dispatcher};
-use crate::neotrix::l1_body_impl::nt_shield::guard_chain::{GuardChain, GuardVerdict};
+use crate::core::nt_core_guard_chain::{GuardChain, GuardVerdict};
 
 /// MCP Server for NeoTrix — exposes tools via stdio JSON-RPC 2.0 transport.
 pub struct McpServer {

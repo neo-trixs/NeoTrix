@@ -697,7 +697,7 @@ impl KanbanBoard {
             }).cloned().collect::<Vec<_>>(),
             "potential_conflict": false,
         })).collect();
-        let doc = serde_yaml::to_string(&serde_json::json!({
+        let doc = serde_yml::to_string(&serde_json::json!({
             "meta": {
                 "generated_at": iso_now(),
                 "total_items": self.items.len(),
@@ -1725,7 +1725,7 @@ mod tests {
         assert!(yml.contains("high"));
         assert!(yml.contains(&id));
         // Must be valid YAML
-        let v: serde_yaml::Value = serde_yaml::from_str(&yml).unwrap();
+        let v: serde_yml::Value = serde_yml::from_str(&yml).unwrap();
         assert!(v.get("items").is_some());
     }
 

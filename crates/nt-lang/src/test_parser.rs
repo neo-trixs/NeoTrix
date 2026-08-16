@@ -23,7 +23,7 @@ struct RawTest {
 pub fn parse_file(path: &Path) -> Result<TestSuite, String> {
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
-    let raw: RawSuite = serde_yaml::from_str(&content)
+    let raw: RawSuite = serde_yml::from_str(&content)
         .map_err(|e| format!("YAML parse error in {}: {}", path.display(), e))?;
 
     let tests = raw

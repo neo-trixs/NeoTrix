@@ -6,6 +6,11 @@
 //! `tool_permissions` (静态权限集) 的差异: 本模块是**纯判定聚合器** —
 //! 一组守卫单调收敛到单个裁决 (Deny > Ask > Allow), 无 I/O, 无会话状态,
 //! 供 McpServer 工具调用路径作为第一道闸 (R-P79 生产接线)。
+//!
+//! 归属说明: 本模块原驻 NT-SHIELD `l1_body_impl/nt_shield/guard_chain.rs`,
+//! 因被 core 层 (nt_core_mcp / nt_core_self_constitution) 消费构成反向依赖
+//! (D3 架构倒置)。守卫链是**纯判定聚合器** — 无 I/O、无会话状态, 可安全下沉
+//! 至 core 作为共享类型; NT-SHIELD 侧 re-export 保持调用方路径不变。
 
 use serde_json::Value;
 

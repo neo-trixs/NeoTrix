@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::agent::tool::mcp::McpRegistry;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
+use crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
 use crate::core::l7_capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
@@ -301,7 +302,7 @@ pub struct McpCmd;
 impl CliCommand for McpCmd {
     fn name(&self) -> &str { "/mcp" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "MCP: /mcp list|status|stubs|discover|search <q>|publish <name> <cmd>" }
+    fn description(&self) -> &str { "MCP: /mcp list|status|stubs|exec|discover|search <q>|publish <name> <cmd>" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -443,6 +444,69 @@ impl CliCommand for McpCmd {
                 }
                 CommandOutput::ok(&s)
             }
+            "exec" => {
+                // PTC 执行面接线 (programmatic_tool_calling): 从 stub 面进入执行面。
+                // 每个参数形如 `<tool>|<json>` (args 在 `|` 后), 空 json 用 "{}"。
+                // 同一 turn 内并行: 用 `--parallel` 分组 (全部 group=1, 单 stage fan-out),
+                // 默认顺序执行 (每调用独立 stage, 与后 stage 依赖天然顺序)。
+                if args.len() < 2 {
+                    return CommandOutput::err("用法: /mcp exec <tool>|<json> [...] [--parallel] [--json]");
+                }
+                let parallel = args.iter().any(|a| a == "--parallel");
+                let raw: Vec<&str> = args[1..].iter().filter(|a| *a != "--json" && *a != "--parallel").map(|a| a.as_str()).collect();
+                if raw.is_empty() {
+                    return CommandOutput::err("用法: /mcp exec <tool>|<json> [...] [--parallel] [--json]");
+                }
+                let registry = get_mcp_registry();
+                let registry = registry.blocking_read();
+                let mut calls: Vec<ProgrammaticCall> = Vec::new();
+                for item in &raw {
+                    let (tool, json) = match item.split_once('|') {
+                        Some((t, j)) => (t.trim(), j),
+                        None => (item.trim(), "{}"),
+                    };
+                    let parsed: serde_json::Value = match serde_json::from_str(json) {
+                        Ok(v) => v,
+                        Err(e) => return CommandOutput::err(&format!("[exec] 无效 JSON for '{}': {}", tool, e)),
+                    };
+                    calls.push(ProgrammaticCall {
+                        tool: tool.to_string(),
+                        args: parsed,
+                        group: if parallel { 1 } else { calls.len() },
+                    });
+                }
+                // 经 plan() 校验 (未知工具拒绝 = 校验门), 再走 governed 执行路径
+                let planner = ProgrammaticPlanner::new(&registry);
+                let plan = match planner.plan(calls) {
+                    Ok(p) => p,
+                    Err(e) => return CommandOutput::err(&format!("[exec] 校验失败: {}", e)),
+                };
+                let results = match registry.gateway().execute_plan(&plan) {
+                    Ok(r) => r,
+                    Err(e) => return CommandOutput::err(&format!("[exec] 执行失败: {}", e)),
+                };
+                let mut s = format!("⚡ PTC exec: {} stage(s), {} call(s)\n", plan.stages(), results.len());
+                for r in &results {
+                    s.push_str(&format!("  → {} [{}]\n", r.tool, if r.approved_by_hitl { "HITL-ok" } else { "auto" }));
+                    s.push_str(&format!("     {}\n", truncate_cli(&r.content, 300)));
+                }
+                if want_json {
+                    let items: Vec<serde_json::Value> = results.iter().map(|r| {
+                        serde_json::json!({
+                            "tool": r.tool,
+                            "approved_by_hitl": r.approved_by_hitl,
+                            "content": r.content,
+                            "evidence": r.evidence,
+                        })
+                    }).collect();
+                    return CommandOutput::ok(&s).with_json(serde_json::json!({
+                        "stages": plan.stages(),
+                        "count": results.len(),
+                        "results": items,
+                    }));
+                }
+                CommandOutput::ok(&s)
+            }
             "publish" | "add" => {
                 if args.len() < 3 {
                     return CommandOutput::err("用法: /mcp publish <name> <command> [args...] [--description <desc>]");
@@ -556,5 +620,36 @@ mod tests {
         assert!(r.success, "status should succeed: {:?}", r.message);
         assert!(r.message.contains("status-check"));
         assert!(r.message.contains("E8 Mode:     15"));
+    }
+
+    #[test]
+    fn test_mcp_exec_plan_runs_governed() {
+        // PTC 执行面: 经 ProgrammaticPlanner 校验门 (未知工具拒绝)。
+        // 执行行为在 gateway 单测 (test_execute_plan_wires_governed_path) 覆盖;
+        // 这里验证 CLI 层校验门控 + 命令形状 (避免 subprocess MCP 依赖)。
+        let mut registry = McpRegistry::new();
+        registry.publish("echo-server", "echo", &["hello"], "test echo server");
+        set_mcp_registry(registry);
+        let cmd = McpCmd;
+        // 未知工具应被 plan() 校验拒绝
+        let r2 = cmd.execute(&["exec".into(), "no_such_tool|{}".into()], None);
+        assert!(!r2.success, "unknown tool should fail validation");
+        assert!(r2.message.contains("校验失败"), "should report validation error: {}", r2.message);
+        // 空参数 → 用法错误
+        let r3 = cmd.execute(&["exec".into()], None);
+        assert!(!r3.success, "no args should show usage");
+        // 已知工具名通过校验 (执行经 governed 路径; 无 subprocess 时以 error 形态返回,
+        // 但不触发"校验失败" —— 证明 PTC 校验门与执行门分离)
+        let r4 = cmd.execute(&["exec".into(), "echo-server_tool|{\"msg\":\"hi\"}".into()], None);
+        assert!(!r4.message.contains("校验失败"), "known tool must pass validation gate: {}", r4.message);
+    }
+}
+
+fn truncate_cli(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_chars).collect();
+        format!("{}…", truncated)
     }
 }

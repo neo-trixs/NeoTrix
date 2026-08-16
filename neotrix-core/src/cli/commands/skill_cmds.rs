@@ -142,13 +142,26 @@ impl SkillCmd {
 
     fn list_active(&self) -> CommandOutput {
         let engine = self.engine();
-        let active = engine.list_active();
-        if active.is_empty() {
+        // P4 行为接线: 展示披露门控后的可见工具集 — stage 0 (Minimal) 时
+        // 预算限制可见数量, promote 后完整暴露。用户可看到门控真实生效。
+        let visible = engine.visible_active();
+        let all_active = engine.list_active();
+        let budget = engine.disclosure.active_tool_count();
+        if all_active.is_empty() {
             return CommandOutput::ok("No active skills. Use /skills load <name> to activate one.");
         }
-        let mut output = format!("Active skills ({}):\n", active.len());
-        for s in &active {
+        let mut output = format!(
+            "Active skills ({} visible / {} active, budget={}):\n",
+            visible.len(),
+            all_active.len(),
+            budget,
+        );
+        for s in &visible {
             output.push_str(&format!("  ✅ {} — {}\n", s.name, s.description));
+        }
+        if visible.len() < all_active.len() {
+            output.push_str(&format!("  … {} skill(s) gated by disclosure budget (Minimal stage)\n",
+                all_active.len() - visible.len()));
         }
         CommandOutput::ok(&output)
     }

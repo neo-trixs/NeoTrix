@@ -2114,7 +2114,7 @@ pub fn read_structured(path: impl AsRef<Path>) -> Result<StructuredData> {
                 .map_err(|e| FileAbilityError::Parse(e.to_string()))?,
         }),
         "yaml" | "yml" => {
-            let v: serde_yaml::Value = serde_yaml::from_str(&text)
+            let v: serde_yml::Value = serde_yml::from_str(&text)
                 .map_err(|e| FileAbilityError::Parse(e.to_string()))?;
             let value = serde_json::to_value(v)
                 .map_err(|e| FileAbilityError::Parse(e.to_string()))?;

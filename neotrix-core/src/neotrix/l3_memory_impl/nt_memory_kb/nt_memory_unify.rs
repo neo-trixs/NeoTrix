@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -14,95 +13,15 @@ use uuid::Uuid;
 
 pub const NONCE_LEN: usize = 12;
 
-/// kv_store value 透明压缩魔数 (neotrix-experience 的 _VALUE_MAGIC, 与旧 Python 版兼容)。
-/// 魔数前缀 + zlib 表示 value 已压缩。Rust 侧读到该前缀时
-/// 视为压缩数据: 不尝试解码为明文 (避免乱码), 按无数据跳过, 配合 neotrix-experience 完整解压读取。
-pub const VALUE_COMPRESSED_MAGIC: &[u8] = b"NTZ1";
+// D3 架构倒置: kv 原语下沉至 core (nt_core_kb_primitives), 此处 re-export
+// 保持 `nt_memory_unify::kv_*` 调用方路径不变。实现单一事实源在 core。
+pub use crate::core::nt_core_kb_primitives::{
+    VALUE_COMPRESSED_MAGIC, is_compressed_value, kv_delete, kv_get, kv_list,
+    kv_list_namespaces, kv_purge_namespace, kv_set,
+};
 
 pub(crate) fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
-}
-
-// ─── KV Store ───────────────────────────────────────────────────────────────
-
-/// 判断 value 是否为 Python 侧压缩存储 (魔数前缀)。压缩值 Rust 侧不解码 (无 zlib),
-/// 上层按"无明文数据"处理 — 避免把二进制当 UTF-8 解析产生乱码。
-fn is_compressed_value(raw: &str) -> bool {
-    raw.as_bytes().starts_with(VALUE_COMPRESSED_MAGIC)
-}
-
-pub fn kv_get(conn: &Connection, namespace: &str, key: &str) -> Result<Option<String>, String> {
-    let mut stmt = conn
-        .prepare("SELECT value FROM kv_store WHERE namespace=?1 AND key=?2")
-        .map_err(|e| format!("kv_get prepare: {}", e))?;
-    // 区分真实 SQL 错误与"无行"：无行是正常未命中，错误必须向上传播
-    // （否则 schema 漂移/DB 损坏会被静默当成"没有保存过状态"）
-    match stmt.query_row(rusqlite::params![namespace, key], |row| row.get::<_, String>(0)) {
-        Ok(v) => {
-            if is_compressed_value(&v) {
-                Ok(None) // 压缩值: Rust 侧不解码, 视为无明文
-            } else {
-                Ok(Some(v))
-            }
-        }
-        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(format!("kv_get query: {}", e)),
-    }
-}
-
-pub fn kv_set(conn: &Connection, namespace: &str, key: &str, value: &str) -> Result<(), String> {
-    let ts = now();
-    conn.execute(
-        "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT(namespace, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
-        rusqlite::params![namespace, key, value, ts],
-    )
-    .map_err(|e| format!("kv_set: {}", e))?;
-    Ok(())
-}
-
-pub fn kv_delete(conn: &Connection, namespace: &str, key: &str) -> Result<bool, String> {
-    let rows = conn
-        .execute(
-            "DELETE FROM kv_store WHERE namespace=?1 AND key=?2",
-            rusqlite::params![namespace, key],
-        )
-        .map_err(|e| format!("kv_delete: {}", e))?;
-    Ok(rows > 0)
-}
-
-pub fn kv_list(conn: &Connection, namespace: &str) -> Result<Vec<(String, String)>, String> {
-    let mut stmt = conn
-        .prepare("SELECT key, value FROM kv_store WHERE namespace=?1 ORDER BY key")
-        .map_err(|e| format!("kv_list prepare: {}", e))?;
-    let rows = stmt
-        .query_map(rusqlite::params![namespace], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|e| format!("kv_list query: {}", e))?;
-    let mut results = Vec::new();
-    for row in rows {
-        let (k, v) = row.map_err(|e| format!("kv_list row: {}", e))?;
-        if is_compressed_value(&v) {
-            continue; // 压缩值: Rust 侧不解码, 跳过 (Python 侧负责解压读取)
-        }
-        results.push((k, v));
-    }
-    Ok(results)
-}
-
-pub fn kv_list_namespaces(conn: &Connection) -> Result<Vec<String>, String> {
-    let mut stmt = conn
-        .prepare("SELECT DISTINCT namespace FROM kv_store ORDER BY namespace")
-        .map_err(|e| format!("kv_list_namespaces prepare: {}", e))?;
-    let rows = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| format!("kv_list_namespaces query: {}", e))?;
-    let mut results = Vec::new();
-    for row in rows {
-        results.push(row.map_err(|e| format!("kv_list_namespaces row: {}", e))?);
-    }
-    Ok(results)
+    crate::core::nt_core_kb_primitives::now()
 }
 
 // ─── Config Entries ─────────────────────────────────────────────────────────
@@ -1156,14 +1075,7 @@ fn extract_tags_from_content(content: &str) -> Option<String> {
 }
 
 // ─── Cleanup helpers ────────────────────────────────────────────────────────
-
-/// Delete all entries for a given namespace from kv_store (clean slate before re-import)
-pub fn kv_purge_namespace(conn: &Connection, namespace: &str) -> Result<usize, String> {
-    let rows = conn
-        .execute("DELETE FROM kv_store WHERE namespace=?1", rusqlite::params![namespace])
-        .map_err(|e| format!("kv_purge_namespace: {}", e))?;
-    Ok(rows)
-}
+// kv_purge_namespace 已下沉至 core (nt_core_kb_primitives), 经顶部 re-export。
 
 /// Get total size stats for the unified store
 pub fn store_stats(conn: &Connection) -> Result<HashMap<String, usize>, String> {
