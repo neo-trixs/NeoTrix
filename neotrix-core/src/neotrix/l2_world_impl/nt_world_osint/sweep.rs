@@ -80,7 +80,7 @@ impl SweepRunner {
         sources
             .iter()
             .flat_map(|src| {
-                let has_key = !src.needs_key || api_keys.iter().any(|k| *k == src.name);
+                let has_key = !src.needs_key || api_keys.contains(&src.name);
                 if !has_key {
                     return vec![SweepResult::Degraded { source: src.name, reason: "no_key" }];
                 }
@@ -116,9 +116,68 @@ pub struct DeltaEntry {
 #[derive(Debug, Clone, Default)]
 pub struct DeltaDetector;
 
+/// Delta 引擎可配置阈值 (吸收自 Crucix: configurable thresholds + semantic dedup)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeltaConfig {
+    /// 是否启用归一化去重 (semantic dedup): 数字/标点归一化后同条目只报一次
+    pub dedup_normalize: bool,
+    /// 低于该级别的 delta 不产出 (过滤噪声)
+    pub min_severity: Severity,
+    /// 跨源相关性窗口: 同 token 出现在 >= 该数量的源 → 视为强信号
+    pub correlation_window: usize,
+}
+
+impl Default for DeltaConfig {
+    fn default() -> Self {
+        Self {
+            dedup_normalize: true,
+            min_severity: Severity::Info,
+            correlation_window: 2,
+        }
+    }
+}
+
+/// 跨源相关信号 (吸收自 Crucix: cross-source signals)
+#[derive(Debug, Clone, PartialEq)]
+pub struct CorrelatedSignal {
+    pub keyword: String,
+    pub source_count: usize,
+    pub entries: Vec<String>,
+    pub confidence: f64,
+}
+
 impl DeltaDetector {
     pub fn new() -> Self {
         Self
+    }
+
+    /// 归一化条目用于语义去重: 小写 + 按非字母数字分词 + 纯数字 token 丢弃。
+    /// "CVE-2026-0001" → "cve" (去具体编号, 防同漏洞不同号重复)。
+    pub fn normalize(entry: &str) -> String {
+        let mut words: Vec<String> = Vec::new();
+        let mut cur = String::new();
+        for c in entry.to_lowercase().chars() {
+            if c.is_ascii_alphanumeric() {
+                cur.push(c);
+            } else if !cur.is_empty() {
+                words.push(std::mem::take(&mut cur));
+            }
+        }
+        if !cur.is_empty() {
+            words.push(cur);
+        }
+        words
+            .into_iter()
+            .map(|w| {
+                if w.chars().all(|c| c.is_ascii_digit()) {
+                    String::new() // 纯数字 token (编号/计数) 丢弃
+                } else {
+                    w.chars().filter(|c| !c.is_ascii_digit()).collect()
+                }
+            })
+            .filter(|w| !w.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     /// 分级启发: vuln/exploit→Critical, breach/leak→High, update/release→Info, 默认 Medium
@@ -145,6 +204,69 @@ impl DeltaDetector {
                 severity: Self::grade(entry),
             })
             .collect()
+    }
+
+    /// 带配置的检测: semantic dedup + 最小级别过滤 (R-P6: max/min 而非 clamp)
+    pub fn detect_with_config(
+        &self,
+        previous: &[&str],
+        current: &[&str],
+        config: &DeltaConfig,
+    ) -> Vec<DeltaEntry> {
+        let prev_norm: Vec<String> = if config.dedup_normalize {
+            previous.iter().map(|e| Self::normalize(e)).collect()
+        } else {
+            previous.iter().map(|e| e.to_string()).collect()
+        };
+        let mut seen = std::collections::HashSet::new();
+        current
+            .iter()
+            .filter_map(|entry| {
+                let key = if config.dedup_normalize {
+                    Self::normalize(entry)
+                } else {
+                    entry.to_string()
+                };
+                if prev_norm.contains(&key) || !seen.insert(key) {
+                    return None; // 已在 previous 或本批已报过 (semantic dedup)
+                }
+                let severity = Self::grade(entry);
+                // Severity 降序 (Critical=0 < Info=3): 保留 <= min_severity (更严重) 的条目
+                if severity > config.min_severity {
+                    return None; // 过滤低级别噪声
+                }
+                Some(DeltaEntry { entry: entry.to_string(), severity })
+            })
+            .collect()
+    }
+
+    /// 跨源相关性: 提取各条目关键词 token, 出现在 >= correlation_window 个条目 → 强信号。
+    pub fn correlate(&self, entries: &[DeltaEntry], window: usize) -> Vec<CorrelatedSignal> {
+        let window = window.max(1);
+        let mut freq: std::collections::HashMap<String, (usize, Vec<String>)> =
+            std::collections::HashMap::new();
+        for d in entries {
+            let norm = Self::normalize(&d.entry);
+            for kw in norm.split(' ') {
+                if kw.len() >= 4 && kw != "num" {
+                    let slot = freq.entry(kw.to_string()).or_insert_with(|| (0, Vec::new()));
+                    slot.0 += 1;
+                    if !slot.1.contains(&d.entry) {
+                        slot.1.push(d.entry.clone());
+                    }
+                }
+            }
+        }
+        let mut signals: Vec<CorrelatedSignal> = freq
+            .into_iter()
+            .filter(|(_, (count, _))| *count >= window)
+            .map(|(kw, (count, entries))| {
+                let confidence = (count as f64 / entries.len().max(1) as f64).max(0.0).min(1.0);
+                CorrelatedSignal { keyword: kw, source_count: count, entries, confidence }
+            })
+            .collect();
+        signals.sort_by(|a, b| b.source_count.cmp(&a.source_count));
+        signals
     }
 
     /// 按严重级别聚合告警计数
@@ -336,5 +458,71 @@ mod tests {
         let t = SweepDeltaSelfTest;
         assert_eq!(t.name(), "nt_world_osint_sweep_delta");
         assert!(t.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_normalize_digit_placeholder() {
+        assert_eq!(DeltaDetector::normalize("CVE-2026-0001"), "cve");
+        assert_eq!(DeltaDetector::normalize("cve-2026-0002"), "cve");
+        assert_eq!(DeltaDetector::normalize("Breach at Acme Corp"), "breach at acme corp");
+    }
+
+    #[test]
+    fn test_detect_with_config_semantic_dedup() {
+        let detector = DeltaDetector::new();
+        let config = DeltaConfig::default();
+        // CVE-2026-0001 与 CVE-2026-0002 归一化后同为 "cve" → 只报一条 (semantic dedup)
+        let deltas = detector.detect_with_config(
+            &["dns:item-0"],
+            &["dns:item-0", "vuln:CVE-2026-0001", "vuln:CVE-2026-0002"],
+            &config,
+        );
+        assert_eq!(deltas.len(), 1, "semantic dedup should collapse same-kind CVEs");
+        assert_eq!(deltas[0].severity, Severity::Critical);
+    }
+
+    #[test]
+    fn test_detect_with_config_min_severity_filter() {
+        let detector = DeltaDetector::new();
+        let config = DeltaConfig { min_severity: Severity::High, ..DeltaConfig::default() };
+        let deltas = detector.detect_with_config(
+            &[],
+            &["vuln:x", "update:y", "notice"],
+            &config,
+        );
+        // vuln→Critical ≥ High 保留; update→Info 与 notice→Medium 均 < High 被过滤
+        assert_eq!(deltas.len(), 1);
+        assert_eq!(deltas[0].entry, "vuln:x");
+    }
+
+    #[test]
+    fn test_correlate_cross_source_signal() {
+        let detector = DeltaDetector::new();
+        let entries = vec![
+            DeltaEntry { entry: "satellite:fire near reactor".into(), severity: Severity::High },
+            DeltaEntry { entry: "news:reactor incident report".into(), severity: Severity::High },
+            DeltaEntry { entry: "dns:unrelated item".into(), severity: Severity::Info },
+        ];
+        let signals = detector.correlate(&entries, 2);
+        assert!(
+            signals.iter().any(|s| s.keyword == "reactor" && s.source_count == 2),
+            "cross-source 'reactor' should correlate across satellite+news"
+        );
+        assert!(!signals.iter().any(|s| s.keyword == "unrelated"));
+        for s in &signals {
+            assert!((0.0..=1.0).contains(&s.confidence), "confidence in [0,1]");
+        }
+    }
+
+    #[test]
+    fn test_detect_with_config_no_dedup_preserves_all() {
+        let detector = DeltaDetector::new();
+        let config = DeltaConfig { dedup_normalize: false, ..DeltaConfig::default() };
+        let deltas = detector.detect_with_config(
+            &["dns:item-0"],
+            &["dns:item-0", "vuln:CVE-2026-0001", "vuln:CVE-2026-0002"],
+            &config,
+        );
+        assert_eq!(deltas.len(), 2, "raw mode keeps both distinct CVE entries");
     }
 }
