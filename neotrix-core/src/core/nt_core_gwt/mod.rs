@@ -1,34 +1,33 @@
+pub mod cognitive_hub;
+pub mod cognitive_type;
+pub mod compaction;
+pub mod competition_gate;
+pub mod ctm_verifier;
+pub mod independence;
+pub mod inner_speech;
+pub mod meta_workspace;
+pub mod modality_router;
+pub mod mode_router;
 pub mod module_def;
-pub mod workspace;
-pub mod resonance;
+pub mod moe_router;
 pub mod monitor;
 pub mod physics_attention;
-pub mod ctm_verifier;
-pub mod inner_speech;
-pub mod modality_router;
-pub mod cognitive_type;
-pub mod cognitive_hub;
-pub mod meta_workspace;
-pub mod competition_gate;
-pub mod compaction;
-pub mod moe_router;
+pub mod resonance;
 pub mod vsa_scorer;
-pub mod independence;
+pub mod workspace;
 
-pub use workspace::{AuditBlock, AuditEventType};
-pub use inner_speech::InnerSpeech;
-pub use modality_router::{Modality, ModalityRouter};
-pub use cognitive_type::{CognitiveProfile, CognitiveType};
 pub use cognitive_hub::{CognitiveHub, HUB_COUNT, HUB_TOPK};
-pub use meta_workspace::{MetaObservation, MetaWorkspace, PrimaryObservation};
+pub use cognitive_type::{CognitiveProfile, CognitiveType};
 pub use ctm_verifier::{CtmAlignmentReport, CtmCheck, CtmVerifier, E8_STATE_COUNT};
-pub use module_def::{
-    OrchestratorAgent, OrchestratorPhase, SpecialistModule,
-};
+pub use inner_speech::InnerSpeech;
+pub use meta_workspace::{MetaObservation, MetaWorkspace, PrimaryObservation};
+pub use modality_router::{Modality, ModalityRouter};
+pub use module_def::{OrchestratorAgent, OrchestratorPhase, SpecialistModule};
+pub use workspace::{AuditBlock, AuditEventType};
 
 #[cfg(test)]
 mod tests {
-    use super::module_def::{SpecialistType, SpecialistModule};
+    use super::module_def::{SpecialistModule, SpecialistType};
 
     #[test]
     fn test_specialist_type_debug() {

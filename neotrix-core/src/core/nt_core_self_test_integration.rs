@@ -108,6 +108,10 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
 ///   Act 3 atoms → ≥2:     agent_team / yagni_ladder / nt_act_sandbox
 ///   Shield 5 atoms → ≥3:  agentic_scan / reasoning_trace_guard / tls_fingerprint / device_sandbox
 ///   Io 4 atoms → ≥2:      digital_human / vision_preprocess / cpu_tts
+///   Repair 1 atom → ≥1:   repair_causal_trace
+///   Meta 1 atom → ≥1:     meta_transcendent_observer
+///   Governance 1 atom → ≥1: governance_constitution
+///   Nexus 1 atom → ≥1:    nexus_cross_session_memory
 pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     // NT-CORE (5)
     registry.register(Box::new(AnswerEngineSelfTest));
@@ -143,6 +147,19 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     ));
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
+    ));
+    // NT-REPAIR / NT-META / NT-GOVERNANCE / NT-NEXUS (4 分支迷雾治理, 每分支 ≥1)
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_repair_causal_trace::CausalTraceSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l10_transcendent_impl::meta_observer::MetaObserverSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_act_autonomy::cross_session_memory::CrossSessionMemorySelfTest,
     ));
     // NT-ACT (3)
     registry.register(Box::new(AgentTeamSelfTest));
@@ -183,7 +200,53 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
 pub fn run_lightweight_self_tests() -> Vec<crate::core::nt_core_self_test::SelfTestResult> {
     let mut registry = SelfTestRegistry::new();
     register_lightweight_modules(&mut registry);
-    registry.run_all()
+    let results = registry.run_all();
+    // B1 接线 (quantum_fusion 死模块 → 生产行为): 将多源 SelfTest 结果经
+    // 量子叠加融合产出单一可信信号 (多源 D-S 证据融合前端)。融合信号作为
+    // 额外检测结果注入 — 树健康计算消费其分支归属, 使 quantum_fusion 从
+    // 仅注册 (R-P79 违规) 转为真实生产路径 (行为接地: 结果被消费)。
+    fuse_self_test_results(&results)
+}
+
+/// 将多源 SelfTest 结果经 quantum_fusion 融合 (B1 接线 — R-P98 三态②:
+/// 能力独立且生产缺失 → 提炼并入最近生产节点, 禁平行适配器 R-P42)。
+/// 每个检测件 pass→signal 1.0/失败→0.0; 融合产出单一高可靠信号, 以
+/// `nt_core_quantum_fusion` 名义注册进结果集 (归属 NT-CORE 分支)。
+fn fuse_self_test_results(
+    results: &[crate::core::nt_core_self_test::SelfTestResult],
+) -> Vec<crate::core::nt_core_self_test::SelfTestResult> {
+    use crate::core::nt_core_quantum_fusion::{QuantumSignal, QuantumSuperposition};
+    use crate::core::nt_core_self_test::SelfTestResult;
+
+    if results.is_empty() {
+        return results.to_vec();
+    }
+    let mut superpos = QuantumSuperposition::new();
+    for r in results {
+        // 分支归属检测件按值注入; 无 nt_ 前缀的 (如 constitution) 以中性置信参与
+        let value = if r.passed { 1.0 } else { 0.0 };
+        let source = r.name.clone();
+        superpos.push(QuantumSignal::new(value, 0.8, source));
+    }
+    if superpos.is_empty() {
+        return results.to_vec();
+    }
+    let fused = superpos.fuse();
+    // 融合信号通过性 = 融合值 ≥ 0.5 且纠缠度支持 (非全冲突)
+    let passed = fused.value >= 0.5 && fused.entanglement >= 0.3;
+    let mut out = results.to_vec();
+    out.push(if passed {
+        SelfTestResult::pass("nt_core_quantum_fusion")
+    } else {
+        SelfTestResult::fail(
+            "nt_core_quantum_fusion",
+            vec![format!(
+                "多源融合未达可信阈值: value={:.2} entanglement={:.2}",
+                fused.value, fused.entanglement
+            )],
+        )
+    });
+    out
 }
 
 struct AnswerEngineSelfTest;
@@ -369,6 +432,21 @@ mod tests {
         register_absorbed_modules(&mut registry);
         for r in registry.run_all() {
             assert!(!r.name.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_lightweight_covers_four_branch_prefixes() {
+        // 迷雾治理四分支 (Repair/Meta/Governance/Nexus) 每 tick 必须有轻量
+        // SelfTest 喂入 — 否则 fog 卡 0.15。防止后续重构把四分支注册移除。
+        let results = run_lightweight_self_tests();
+        let prefixes = ["nt_repair_", "nt_meta_", "nt_governance_", "nt_nexus_"];
+        for prefix in prefixes {
+            assert!(
+                results.iter().any(|r| r.name.starts_with(prefix)),
+                "lightweight registry missing {} selftest",
+                prefix
+            );
         }
     }
 }

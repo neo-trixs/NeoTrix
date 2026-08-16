@@ -3436,4 +3436,8 @@ mod tests {
     }
 }
 
+// 2026-08-15 sweep absorption (P6/P15/P16/P17): 记忆层四能力注入
+pub mod nt_memory_sweep_20260815;
+pub use nt_memory_sweep_20260815::*;
+
 
