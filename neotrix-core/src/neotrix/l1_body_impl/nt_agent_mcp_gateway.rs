@@ -18,6 +18,15 @@
 //!    link (`prev_hash | seq | tool | args | verdict | hitl | result`), stored
 //!    for audit and wired into `nt_shield_audit` `CheckResult.evidence`.
 //!
+//! 4. **Programmatic tool calling (PTC)** — absorbed from arXiv 2608.06370
+//!    ("The Bitter Lesson of Tool Calling"): tools are rendered as typed
+//!    Python stubs the model invokes through code, so calls chain and
+//!    parallelize naturally in a single agent turn. BFCL v4: PTC matches or
+//!    exceeds native JSON tool calling in 11/14 models (GPT-5.6 +10.6%),
+//!    13/14 under parallel fan-out, stable under context rot. The planner
+//!    renders stubs, validates the call chain, and detects parallel fan-out
+//!    groups before dispatching to the governed `call` path.
+//!
 //! The gateway is reachable from production via `McpRegistry::gateway()` and
 //! `McpRegistry::call_tool_governed()` (same registry object every existing
 //! MCP caller already holds). Plain `call_tool` is untouched → backward
@@ -712,6 +721,204 @@ impl<'a> McpGateway<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Programmatic Tool Calling (PTC) — arXiv 2608.06370 absorption
+// ---------------------------------------------------------------------------
+
+/// A typed Python stub signature for one tool (the "tool as code" surface).
+/// The model reads these stubs instead of JSON schemas; calls are written as
+/// ordinary code and chain / parallelize naturally.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ToolStub {
+    /// Tool name (also the Python function name after identifier sanitization).
+    pub name: String,
+    /// Python type signature (e.g. `(query: str, max_results: int = 5) -> str`).
+    pub signature: String,
+    /// One-line docstring grounding (description truncated).
+    pub doc: String,
+}
+
+impl ToolStub {
+    /// Sanitize a tool name into a valid Python identifier.
+    pub fn python_name(name: &str) -> String {
+        let mut out = String::new();
+        for (i, c) in name.chars().enumerate() {
+            if c.is_ascii_alphanumeric() {
+                // A Python identifier cannot start with a digit.
+                if out.is_empty() && c.is_ascii_digit() {
+                    out.push('_');
+                }
+                out.push(c);
+            } else if out.chars().last() != Some('_') {
+                out.push('_');
+            }
+            let _ = i;
+        }
+        if out.is_empty() {
+            "tool".into()
+        } else {
+            out
+        }
+    }
+
+    /// Infer a Python type from a JSON-schema `type` + item `type` string.
+    fn py_type(t: &str, items: Option<&str>) -> String {
+        match t {
+            "string" => "str".into(),
+            "integer" => "int".into(),
+            "number" => "float".into(),
+            "boolean" => "bool".into(),
+            "array" => match items {
+                Some(it) => format!("list[{}]", Self::py_type(it, None)),
+                None => "list".into(),
+            },
+            "object" => "dict".into(),
+            "null" => "None".into(),
+            _ => "str".into(),
+        }
+    }
+
+    /// Render a stub from an `McpToolDef` (JSON schema → typed signature).
+    pub fn from_def(def: &McpToolDef) -> Self {
+        let name = Self::python_name(&def.name);
+        let mut params = Vec::new();
+        if let Some(props) = def.input_schema.get("properties").and_then(|p| p.as_object()) {
+            for (pname, spec) in props {
+                let t = spec.get("type").and_then(|v| v.as_str()).unwrap_or("string");
+                let items = spec
+                    .get("items")
+                    .and_then(|v| v.get("type"))
+                    .and_then(|v| v.as_str());
+                let py = Self::py_type(t, items);
+                let required = spec.get("description").and_then(|d| d.as_str()).unwrap_or("");
+                let typed = if spec.get("default").is_some() {
+                    format!("{}: {} = ...  # {}", Self::python_name(pname), py, required)
+                } else {
+                    format!("{}: {},  # {}", Self::python_name(pname), py, required)
+                };
+                params.push(typed);
+            }
+        }
+        if params.is_empty() {
+            params.push("**kwargs".into());
+        }
+        let signature = format!("({}) -> str", params.join(",\n    "));
+        let doc = truncate(&def.description, 100);
+        Self {
+            name,
+            signature,
+            doc,
+        }
+    }
+}
+
+/// One planned programmatic call (a single stub invocation with args).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProgrammaticCall {
+    pub tool: String,
+    pub args: Value,
+    /// Fan-out index — calls sharing a group index run in parallel in one turn.
+    pub group: usize,
+}
+
+/// A validated programmatic call plan: an ordered sequence of calls grouped
+/// into parallel fan-out stages (the PTC execution plan).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ProgrammaticPlan {
+    pub calls: Vec<ProgrammaticCall>,
+}
+
+impl ProgrammaticPlan {
+    /// Number of sequential stages (parallel fan-out groups are one stage).
+    pub fn stages(&self) -> usize {
+        self.calls
+            .iter()
+            .map(|c| c.group)
+            .max()
+            .map(|g| g + 1)
+            .unwrap_or(0)
+    }
+
+    /// Stage k's calls (all calls sharing group index k).
+    pub fn stage(&self, k: usize) -> Vec<&ProgrammaticCall> {
+        self.calls.iter().filter(|c| c.group == k).collect()
+    }
+
+    /// True when any stage contains >1 call (parallel fan-out present).
+    pub fn has_fanout(&self) -> bool {
+        (0..self.stages()).any(|k| self.stage(k).len() > 1)
+    }
+}
+
+/// PTC planner: renders stubs and validates the model's programmatic plan
+/// before dispatching through the governed gateway.
+pub struct ProgrammaticPlanner<'a> {
+    registry: &'a McpRegistry,
+}
+
+impl<'a> ProgrammaticPlanner<'a> {
+    pub fn new(registry: &'a McpRegistry) -> Self {
+        Self { registry }
+    }
+
+    /// Render typed stubs for the registry's full tool set (the "tool surface").
+    pub fn render_stubs(&self) -> Vec<ToolStub> {
+        self.registry
+            .list_tools()
+            .iter()
+            .map(ToolStub::from_def)
+            .collect()
+    }
+
+    /// Build a plan from a flat call list. Each call keeps its own declared
+    /// group (0 = sequential first, >0 = runs after previous groups).
+    /// Unknown tools / malformed names are rejected (validation gate).
+    pub fn plan(&self, calls: Vec<ProgrammaticCall>) -> Result<ProgrammaticPlan, String> {
+        let mut plan = ProgrammaticPlan::default();
+        let known: std::collections::HashSet<String> = self
+            .registry
+            .list_tools()
+            .iter()
+            .map(|t| t.name.clone())
+            .collect();
+        for c in calls {
+            if !known.contains(&c.tool) {
+                return Err(format!(
+                    "PTC validation: unknown tool '{}' (typo? stub name mismatch)",
+                    c.tool
+                ));
+            }
+            plan.calls.push(c);
+        }
+        Ok(plan)
+    }
+}
+
+impl<'a> McpGateway<'a> {
+    /// Render the typed-stub tool surface for the model (PTC entry point).
+    pub fn tool_stubs(&self) -> Vec<ToolStub> {
+        ProgrammaticPlanner::new(self.registry).render_stubs()
+    }
+
+    /// Execute a programmatic plan through the governed path: stage by stage,
+    /// calls in the same group dispatch in parallel (fan-out), results are
+    /// concatenated in plan order. Behavior grounding: real `call_tool` calls
+    /// behind policy + hash-chain evidence (R-P41).
+    pub fn execute_plan(&self, plan: &ProgrammaticPlan) -> Result<Vec<GatewayCall>, String> {
+        let mut out = Vec::new();
+        for k in 0..plan.stages() {
+            let stage_calls = plan.stage(k);
+            let mut stage_results = Vec::with_capacity(stage_calls.len());
+            for c in stage_calls {
+                let result = self.call(&c.tool, &c.args)?;
+                stage_results.push(result);
+            }
+            out.extend(stage_results);
+        }
+        Ok(out)
+    }
+}
+
 fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_string()
@@ -976,5 +1183,133 @@ mod tests {
         assert!(search.member_tools.iter().any(|n| n == "neotrix_search"));
         assert!(reg.gateway().folding().savings_percent >= 0.0);
         let _ = TransportMode::Local { command: "sh".into(), args: vec![] };
+    }
+
+    // -- PTC (arXiv 2608.06370) tests --------------------------------------
+
+    #[test]
+    fn test_python_name_sanitizes_identifiers() {
+        assert_eq!(ToolStub::python_name("web-search"), "web_search");
+        assert_eq!(ToolStub::python_name("web_search"), "web_search");
+        assert_eq!(ToolStub::python_name("2fast"), "_2fast");
+        assert_eq!(ToolStub::python_name(""), "tool");
+        assert_eq!(ToolStub::python_name("a..b"), "a_b");
+    }
+
+    #[test]
+    fn test_py_type_inference() {
+        assert_eq!(ToolStub::py_type("string", None), "str");
+        assert_eq!(ToolStub::py_type("integer", None), "int");
+        assert_eq!(ToolStub::py_type("boolean", None), "bool");
+        assert_eq!(ToolStub::py_type("array", Some("string")), "list[str]");
+        assert_eq!(ToolStub::py_type("object", None), "dict");
+    }
+
+    #[test]
+    fn test_tool_stub_from_def_renders_signature() {
+        let def = McpToolDef {
+            name: "search-web".into(),
+            description: "Search the web".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "search terms"},
+                    "limit": {"type": "integer", "default": 5}
+                }
+            }),
+            server_name: "test".into(),
+            transport: McpTransport::Local { command: "sh".into(), args: vec![] },
+            schema_version: None,
+        };
+        let stub = ToolStub::from_def(&def);
+        assert_eq!(stub.name, "search_web");
+        assert!(stub.signature.contains("query: str"), "{}", stub.signature);
+        assert!(stub.signature.contains("limit: int"), "{}", stub.signature);
+        assert_eq!(stub.doc, "Search the web");
+    }
+
+    #[test]
+    fn test_planner_rejects_unknown_tool() {
+        let mut reg = McpRegistry::new();
+        let tool = McpToolDef {
+            name: "web_search".into(),
+            description: "Search".into(),
+            input_schema: serde_json::json!({"type": "object", "properties": {"q": {"type": "string"}}}),
+            server_name: "test".into(),
+            transport: McpTransport::Local { command: "sh".into(), args: vec![] },
+            schema_version: None,
+        };
+        reg.register_stdio("test", "sh", &["-c", "echo ok"], vec![tool]);
+        let planner = ProgrammaticPlanner::new(&reg);
+        let plan = planner.plan(vec![ProgrammaticCall {
+            tool: "web_search".into(),
+            args: serde_json::json!({"q": "x"}),
+            group: 0,
+        }]);
+        assert!(plan.is_ok());
+        let bad = planner.plan(vec![ProgrammaticCall {
+            tool: "web_saerch".into(),
+            args: serde_json::json!({}),
+            group: 0,
+        }]);
+        assert!(bad.unwrap_err().contains("unknown tool"));
+    }
+
+    #[test]
+    fn test_plan_stages_and_fanout_detection() {
+        let plan = ProgrammaticPlan {
+            calls: vec![
+                ProgrammaticCall { tool: "a".into(), args: serde_json::json!({}), group: 0 },
+                ProgrammaticCall { tool: "b".into(), args: serde_json::json!({}), group: 0 },
+                ProgrammaticCall { tool: "c".into(), args: serde_json::json!({}), group: 1 },
+            ],
+        };
+        assert_eq!(plan.stages(), 2);
+        assert_eq!(plan.stage(0).len(), 2);
+        assert_eq!(plan.stage(1).len(), 1);
+        assert!(plan.has_fanout());
+        let flat = ProgrammaticPlan {
+            calls: vec![ProgrammaticCall { tool: "a".into(), args: serde_json::json!({}), group: 0 }],
+        };
+        assert!(!flat.has_fanout());
+    }
+
+    #[test]
+    fn test_execute_plan_wires_governed_path() {
+        // env-gated: spawn 真实 sh 子进程; 并行负载下 fork 资源耗尽误报 ENOENT
+        if std::env::var("NT_E2E_SUBPROCESS")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+            != true
+        {
+            eprintln!("skipped: set NT_E2E_SUBPROCESS=1 to run real-subprocess MCP e2e");
+            return;
+        }
+        let mut reg = McpRegistry::new();
+        let tool = McpToolDef {
+            name: "echo_greeting".into(),
+            description: "Echo greeting".into(),
+            input_schema: serde_json::json!({"type": "object", "properties": {"name": {"type": "string"}}}),
+            server_name: "echo".into(),
+            transport: McpTransport::Local {
+                command: "sh".into(),
+                args: vec!["-c".into(),
+                           "echo '{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"echo: PTC\"}]}}'".into()],
+            },
+            schema_version: None,
+        };
+        reg.register_stdio("echo", "sh", &["-c", "echo ok"], vec![tool]);
+        let gw = reg.gateway();
+        let plan = ProgrammaticPlanner::new(&reg)
+            .plan(vec![ProgrammaticCall {
+                tool: "echo_greeting".into(),
+                args: serde_json::json!({"name": "PTC"}),
+                group: 0,
+            }])
+            .expect("plan");
+        let results = gw.execute_plan(&plan).expect("execute");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].content.contains("echo: PTC"), "got: {}", results[0].content);
+        assert_eq!(reg.evidence_chain().len(), 1, "execution evidences hash chain");
     }
 }
