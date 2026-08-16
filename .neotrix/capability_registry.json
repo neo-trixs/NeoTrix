@@ -97,7 +97,9 @@
       ],
       "requires": [],
       "rune_sockets": [],
-      "dependents": [],
+      "dependents": [
+        "nt_core_parallel::atomic_decomposition"
+      ],
       "evolution_log": [
         {
           "cycle": "absorb-20260811-redteam",
@@ -117,11 +119,11 @@
         }
       ],
       "metadata": {
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
-        "tests": "17 passed (nt_core_parallel::isolation)"
+        "tests": "17 passed (nt_core_parallel::isolation)",
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct"
       },
       "created_at": "2026-08-11T17:40:00Z",
-      "updated_at": "2026-08-16T07:33:55.982407Z",
+      "updated_at": "2026-08-16T07:45:37.672467Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -135,8 +137,8 @@
         "output_contract"
       ],
       "requires": [
-        "intent_isolation",
-        "nt_core_gwt::mode_router"
+        "nt_core_gwt::mode_router",
+        "nt_core_parallel::intent_isolation"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -161,8 +163,8 @@
         }
       ],
       "metadata": {
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
-        "tests": "17 passed (nt_core_parallel::isolation)"
+        "tests": "17 passed (nt_core_parallel::isolation)",
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:33:55.945651Z",
@@ -1997,8 +1999,8 @@
         "g23"
       ],
       "requires": [
-        "nt_memory_kb::nt_memory_provenance::signed_provenance",
-        "nt_memory_historian::temporal_context_graph"
+        "nt_memory_historian::temporal_context_graph",
+        "nt_memory_kb::signed_provenance"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -3074,9 +3076,321 @@
       "updated_at": "2026-08-16T07:33:56.570931Z",
       "deprecated": false,
       "deprecated_reason": null
+    },
+    {
+      "id": "nt_io_provider::response_cache",
+      "domain": "io",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "response_caching",
+        "response_healing",
+        "key_normalization"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_io_provider::expert_cache_pin_prefetch"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::response_cache",
+          "note": "arch-audit: 悬空 requires 目标, 实体 ResponseCache gateway.rs:257",
+          "timestamp": "2026-08-16T07:45:07.725210Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::response_cache",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.084320Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:07.725209Z",
+      "updated_at": "2026-08-16T07:46:12.084322Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind_autofixer::autofixer",
+      "domain": "mind",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "auto_fix",
+        "cargo_fix",
+        "test_stub"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_mind_autofixer::healer_registry"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::autofixer",
+          "note": "arch-audit: 悬空 requires 目标, 实体 AutoFixer nt_mind_autofixer.rs:76",
+          "timestamp": "2026-08-16T07:45:11.146833Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::autofixer",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.105234Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:11.146832Z",
+      "updated_at": "2026-08-16T07:46:12.105237Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_code_search::symbol_index",
+      "domain": "world",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "symbol_indexing",
+        "ranked_hits"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_core_retrieval::code_graph_mcp"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::symbol_index",
+          "note": "arch-audit: 悬空 requires 目标, 实体 SymbolIndex nt_world_code_search.rs:86",
+          "timestamp": "2026-08-16T07:45:11.165172Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::symbol_index",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.125854Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:11.165170Z",
+      "updated_at": "2026-08-16T07:46:12.125857Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_absorber::unified_absorber",
+      "domain": "world",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "unified_absorption",
+        "webpage_report"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_world_absorber::api_registry_meta"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::unified_absorber",
+          "note": "arch-audit: 悬空 requires 目标, 实体 UnifiedAbsorber mod.rs:101, 消费者 nt_memory_crawl.rs",
+          "timestamp": "2026-08-16T07:45:11.183795Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::unified_absorber",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.146503Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:11.183785Z",
+      "updated_at": "2026-08-16T07:46:12.146509Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory_kb::signed_provenance",
+      "domain": "memory",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "signed_provenance",
+        "provenance_sign",
+        "record_audit"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_memory_kb::temporal_audit_ledger"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::signed_provenance",
+          "note": "arch-audit: 悬空 requires 目标, 实体 ProvenanceRecord nt_memory_provenance.rs:53",
+          "timestamp": "2026-08-16T07:45:26.666973Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::signed_provenance",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.167414Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:26.666971Z",
+      "updated_at": "2026-08-16T07:46:12.167416Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_video_pipeline::video_chain_runner",
+      "domain": "world",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "video_chain_runner",
+        "chain_execution"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_world_video_pipeline::video_production_chain"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_chain_runner",
+          "note": "arch-audit: 悬空 requires 目标, 实体 VideoChainRunner video_pipeline.rs:831",
+          "timestamp": "2026-08-16T07:45:26.688358Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_chain_runner",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.188227Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:26.688357Z",
+      "updated_at": "2026-08-16T07:46:12.188229Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_scrape::request_scraper",
+      "domain": "world",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "request_scraper",
+        "browser_scrape"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_world_scrape::design_token_extractor"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::request_scraper",
+          "note": "arch-audit: 悬空 requires 目标, 实体 BrowserScraper nt_world_scrape.rs:122",
+          "timestamp": "2026-08-16T07:45:26.709542Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::request_scraper",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.209053Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:26.709539Z",
+      "updated_at": "2026-08-16T07:46:12.209054Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_video_pipeline::video_pipeline",
+      "domain": "world",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "video_pipeline",
+        "pipeline_execution",
+        "pipeline_output"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_world_video_pipeline::asset_enricher"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_pipeline",
+          "note": "arch-audit: 悬空 requires 目标, 实体 VideoPipeline video_pipeline.rs:54",
+          "timestamp": "2026-08-16T07:45:34.006425Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_pipeline",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:46:12.229635Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T07:45:34.006424Z",
+      "updated_at": "2026-08-16T07:46:12.229637Z",
+      "deprecated": false,
+      "deprecated_reason": null
     }
   ],
   "edges": [
+    [
+      "nt_core_parallel::atomic_decomposition",
+      "nt_core_parallel::intent_isolation"
+    ],
     [
       "nt_mind_skill_engine::complementarity_attribution",
       "nt_mind_skill_engine::progressive_disclosure"
@@ -3236,6 +3550,38 @@
     [
       "nt_world_video_pipeline::checkpoint_resume",
       "nt_world_video_pipeline::video_production_chain"
+    ],
+    [
+      "nt_io_provider::expert_cache_pin_prefetch",
+      "nt_io_provider::response_cache"
+    ],
+    [
+      "nt_mind_autofixer::healer_registry",
+      "nt_mind_autofixer::autofixer"
+    ],
+    [
+      "nt_world_absorber::api_registry_meta",
+      "nt_world_absorber::unified_absorber"
+    ],
+    [
+      "nt_world_scrape::design_token_extractor",
+      "nt_world_scrape::request_scraper"
+    ],
+    [
+      "nt_memory_kb::temporal_audit_ledger",
+      "nt_memory_kb::signed_provenance"
+    ],
+    [
+      "nt_world_video_pipeline::video_production_chain",
+      "nt_world_video_pipeline::video_chain_runner"
+    ],
+    [
+      "nt_world_video_pipeline::asset_enricher",
+      "nt_world_video_pipeline::video_pipeline"
+    ],
+    [
+      "nt_core_retrieval::code_graph_mcp",
+      "nt_world_code_search::symbol_index"
     ]
   ],
   "experience_targets": [
