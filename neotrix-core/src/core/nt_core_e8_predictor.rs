@@ -127,11 +127,12 @@ static TEST_KB_PATH: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::M
 /// 2. `NEOTRIX_KB_PATH` env (生产/外部覆盖)
 /// 3. `~/.neotrix/knowledge.db` 默认
 fn open_kb() -> Result<rusqlite::Connection, String> {
+    // 抗 poison: 前一测试 panic 会污染锁, .ok() 会静默降级到 HOME 库 (读错库)。
+    // into_inner() 恢复继续, 保证测试注入路径始终生效。
     let path = TEST_KB_PATH
         .lock()
         .map(|g| g.clone())
-        .ok()
-        .flatten()
+        .unwrap_or_else(|e| e.into_inner().clone())
         .or_else(|| {
             std::env::var("NEOTRIX_KB_PATH")
                 .map(std::path::PathBuf::from)
@@ -231,7 +232,7 @@ mod tests {
         let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let tmp = std::env::temp_dir().join(format!("neotrix-e8p-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&tmp).ok();
-        *TEST_KB_PATH.lock().unwrap() = Some(tmp.join("knowledge.db"));
+        *TEST_KB_PATH.lock().unwrap_or_else(|e| e.into_inner()) = Some(tmp.join("knowledge.db"));
     }
 
     /// 串行化所有触碰隔离 DB 的测试: 共享同库下并行写会互相覆盖基线,
@@ -296,7 +297,9 @@ mod tests {
             persist(&p);
 
             // 新进程语义: 重新 load 应恢复累积样本 (跨进程保留)
+
             let reloaded = load();
+
             assert_eq!(reloaded.sample_count, 4);
             assert_eq!(reloaded.state_traces.len(), 4);
             // 预测能力也保留
