@@ -231,7 +231,7 @@ pub fn computer_mouse_move(x: u32, y: u32) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn computer_mouse_click(_button: Option<String>) -> Result<(), String> {
+pub fn computer_mouse_click(button: Option<String>) -> Result<(), String> {
     let pos_script = r#"tell application "System Events" to get position of mouse"#.to_string();
     let pos_output = Command::new("osascript")
         .args(["-e", &pos_script])
@@ -255,10 +255,20 @@ pub fn computer_mouse_click(_button: Option<String>) -> Result<(), String> {
         return Err(format!("Could not parse mouse position: {}", pos_str));
     }
 
-    let click_script = format!(
-        r#"tell application "System Events" to click at {{{}, {}}}"#,
-        coords[0], coords[1]
-    );
+    let is_right = button.as_deref() == Some("right");
+    let click_script = if is_right {
+        format!(
+            r#"tell application "System Events" to key down control
+            tell application "System Events" to click at {{{}, {}}}
+            tell application "System Events" to key up control"#,
+            coords[0], coords[1]
+        )
+    } else {
+        format!(
+            r#"tell application "System Events" to click at {{{}, {}}}"#,
+            coords[0], coords[1]
+        )
+    };
 
     let output = Command::new("osascript")
         .args(["-e", &click_script])
