@@ -754,6 +754,7 @@ commands::workflow_schedule_delete,
                     commands::unified_cli_list,
                     commands::unified_cli_lookup,
                     commands::unified_tauri_list,
+                    commands::unified_tauri_full_catalog,
                     // Unified Invoke — 极简统一 API 门面
                     commands::unified_invoke,
                     commands::unified_invoke_catalog,
