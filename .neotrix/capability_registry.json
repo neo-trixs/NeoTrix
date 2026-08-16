@@ -4,7 +4,7 @@
       "id": "exp::nt-repair::build_hygiene",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c2integrationtest",
       "provides": [
         "build_hygiene"
       ],
@@ -19,11 +19,27 @@
           "to_node": "exp::nt-repair::build_hygiene",
           "note": "经验驱动新节点: 经验 '[蒸馏-NT-REPAIR] 聚合 3 条经验的模式: opencode 在项目目录启动崩溃 'default agent \"nt-core\" not found': opencode.json 的 default_agent 指向从未注册的 agent。诊断链: opencode agent list 只有 build → agent 定义存文件系统非 DB (无 agent 表) → debug startu [关键词: agent, debug, default, list, opencode, run, startup, 看]' 命中能力标签 'build_hygiene' 于域 Repair, 应强化对应能力节点",
           "timestamp": "2026-08-11T06:24:37.598214Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:49.199641Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:55.836188Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-11T06:24:37.598213Z",
-      "updated_at": "2026-08-11T06:24:37.598214Z",
+      "updated_at": "2026-08-16T07:33:55.836189Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -31,7 +47,7 @@
       "id": "exp::nt-repair::root_cause_method",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "root_cause_method"
       ],
@@ -54,11 +70,19 @@
           "to_node": "exp::nt-repair::root_cause_method",
           "note": "2026-08-12 吸收代码质量审计知识 (R-P102-105 落 dev-rules, D69-72 落 rev-officer): ①认知复杂度门禁 (R-P102, >15审查/>30重构/>100禁入) ②Rust 12 维惯用化自检 (R-P103/D70) ③unsafe 独立 pass + cve-rs 意识 (R-P104/D71, forbid(unsafe_code) 防不了恶意作者) ④合并门禁 fmt+clippy+test+audit (R-P105/D72, #[expect]+reason 优先 #[allow])。首次实证: nt_mind_cleanup 1470 行生产函数 max branches=11 <15 阈值达标。",
           "timestamp": "2026-08-12T03:09:03.547173Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::root_cause_method",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:55.854558Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-11T06:24:37.598236Z",
-      "updated_at": "2026-08-12T03:09:03.547175Z",
+      "updated_at": "2026-08-16T07:33:55.854559Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -66,7 +90,7 @@
       "id": "nt_core_parallel::intent_isolation",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "intent_isolation",
         "need_to_know"
@@ -82,14 +106,22 @@
           "to_node": "nt_core_parallel::intent_isolation",
           "note": "外部吸收: codex-redteam-mode Prompt Rewrite 双层隔离 + gpt-5.6-instruct 意图路由 — need-to-know 上下文裁剪, 对外 LLM 调用时剥离核心目的, 主模型只收到动作+对象+输出要求 (片段级局部无损剥离)",
           "timestamp": "2026-08-11T17:40:00Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::intent_isolation",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:55.982405Z"
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct"
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
-      "updated_at": "2026-08-11T17:40:00Z",
+      "updated_at": "2026-08-16T07:33:55.982407Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -97,7 +129,7 @@
       "id": "nt_core_parallel::atomic_decomposition",
       "domain": "core",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "atomic_decomposition",
         "output_contract"
@@ -118,14 +150,22 @@
           "to_node": "nt_core_parallel::atomic_decomposition",
           "note": "外部吸收: gpt-5.6-instruct 归一化/语义分派/意图路由 + Awesome-Prompts SPEV — 任务路由 (Atomic/Research/Compare/Reasoning) 拆解为原子单元, 每单元带输出契约 (JSON/枚举/纯文本 + 成功准则), LLM 可直接返回结果",
           "timestamp": "2026-08-11T17:40:00Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::atomic_decomposition",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:55.945649Z"
         }
       ],
       "metadata": {
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
-        "tests": "17 passed (nt_core_parallel::isolation)"
+        "tests": "17 passed (nt_core_parallel::isolation)",
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
       },
       "created_at": "2026-08-11T17:40:00Z",
-      "updated_at": "2026-08-11T17:40:00Z",
+      "updated_at": "2026-08-16T07:33:55.945651Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -133,7 +173,7 @@
       "id": "nt_mind_cleanup::disk_cleanup_engine",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c4mainpipeline",
+      "constellation": "c5selfhealing",
       "provides": [
         "disk-cleanup",
         "archive",
@@ -171,11 +211,19 @@
           "to_node": "nt_mind_cleanup::disk_cleanup_engine",
           "note": "蜕皮机制融入意识能力网: ProjectMolting 蜕皮归档 (旧躯壳→_archive/), SelfTest T1/T2 注册 (background loop + SEAL pipeline), T3 生产接线 handle_cleanup; domain 修正 act→mind; C1→C4",
           "timestamp": "2026-08-12T05:09:18.287679Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_cleanup::disk_cleanup_engine",
+          "note": "Promoted to C5",
+          "timestamp": "2026-08-16T07:33:56.357513Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-12T02:05:21.974103Z",
-      "updated_at": "2026-08-12T05:09:18.287832Z",
+      "updated_at": "2026-08-16T07:33:56.357515Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -183,7 +231,7 @@
       "id": "nt_file_ability::unified_file_ops",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c4mainpipeline",
+      "constellation": "c5selfhealing",
       "provides": [
         "content_extraction",
         "content_similarity",
@@ -259,11 +307,19 @@
           "to_node": null,
           "note": "C3 基准建立 (capability_c3 bench 表格组, 2026-08-15): read_xlsx_sheets_all 24sheet/600rows=68.6ms, merge_tables_with 12files/24sheet=430.9ms, write_xlsx_table 600rows=34.5ms",
           "timestamp": "2026-08-15T03:00:00Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_file_ability::unified_file_ops",
+          "note": "Promoted to C5",
+          "timestamp": "2026-08-16T07:33:56.054892Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-13T13:02:47.046875Z",
-      "updated_at": "2026-08-15T03:00:00Z",
+      "updated_at": "2026-08-16T07:33:56.054893Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -271,7 +327,7 @@
       "id": "nt_core_parallel::dpp_diversity",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "parallel",
         "diversity",
@@ -297,13 +353,29 @@
           "to_node": "nt_core_parallel::dpp_diversity",
           "note": "Promoted to C1",
           "timestamp": "2026-08-14T03:07:57.844189Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::dpp_diversity",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:55.963960Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "pruning",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::dpp_diversity",
+          "note": "Deprecated: Folded into nt_core_absorb::incremental_merge",
+          "timestamp": "2026-08-16T07:35:04.200467Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:07:54.119406Z",
-      "updated_at": "2026-08-14T03:07:57.844190Z",
-      "deprecated": false,
-      "deprecated_reason": null
+      "updated_at": "2026-08-16T07:35:04.200467Z",
+      "deprecated": true,
+      "deprecated_reason": "Folded into nt_core_absorb::incremental_merge"
     },
     {
       "id": "nt_io_hotreload::revertible_effects",
@@ -373,7 +445,7 @@
       "id": "nt_io_multimodal_transform::intent_aware_vision",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "multimodal",
         "vision",
@@ -401,11 +473,19 @@
           "to_node": "nt_io_multimodal_transform::intent_aware_vision",
           "note": "Promoted to C1",
           "timestamp": "2026-08-14T03:07:57.860905Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::intent_aware_vision",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.090066Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:07:54.135702Z",
-      "updated_at": "2026-08-14T03:07:57.860906Z",
+      "updated_at": "2026-08-16T07:33:56.090067Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -453,7 +533,7 @@
       "id": "nt_memory_curation::fidelity_ledger",
       "domain": "memory",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "curation",
         "conflict",
@@ -479,11 +559,19 @@
           "to_node": "nt_memory_curation::fidelity_ledger",
           "note": "Promoted to C1",
           "timestamp": "2026-08-14T03:58:12.390061Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_curation::fidelity_ledger",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.160374Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:58:06.420110Z",
-      "updated_at": "2026-08-14T03:58:12.390062Z",
+      "updated_at": "2026-08-16T07:33:56.160376Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -491,7 +579,7 @@
       "id": "nt_core_absorb::incremental_merge",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "absorb",
         "incremental",
@@ -517,11 +605,29 @@
           "to_node": "nt_core_absorb::incremental_merge",
           "note": "Promoted to C1",
           "timestamp": "2026-08-14T03:58:12.398933Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_absorb::incremental_merge",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:55.908770Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "grafting",
+          "from_nodes": [
+            "nt_core_parallel::dpp_diversity"
+          ],
+          "to_node": "nt_core_absorb::incremental_merge",
+          "note": "Consolidate merge providers in NT-CORE/L1: dpp_diversity 折叠入 incremental_merge, 消除重复 merge provides",
+          "timestamp": "2026-08-16T07:35:04.200462Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:58:06.428234Z",
-      "updated_at": "2026-08-14T03:58:12.398935Z",
+      "updated_at": "2026-08-16T07:35:04.200464Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -529,7 +635,7 @@
       "id": "nt_memory_visibility::visibility_gate",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c4mainpipeline",
+      "constellation": "c5selfhealing",
       "provides": [
         "visibility",
         "filtering",
@@ -580,11 +686,19 @@
           "to_node": "nt_memory_visibility::visibility_gate",
           "note": "Promoted to C4",
           "timestamp": "2026-08-14T07:20:25.112621Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_visibility::visibility_gate",
+          "note": "Promoted to C5",
+          "timestamp": "2026-08-16T07:33:56.284683Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T04:22:16.588985Z",
-      "updated_at": "2026-08-14T07:20:25.112623Z",
+      "updated_at": "2026-08-16T07:33:56.284684Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -592,7 +706,7 @@
       "id": "nt_memory_provenance::decision_trail",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c4mainpipeline",
+      "constellation": "c5selfhealing",
       "provides": [
         "provenance",
         "traceability",
@@ -641,11 +755,19 @@
           "to_node": "nt_memory_provenance::decision_trail",
           "note": "Promoted to C4",
           "timestamp": "2026-08-14T06:55:09.488762Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_provenance::decision_trail",
+          "note": "Promoted to C5",
+          "timestamp": "2026-08-16T07:33:56.266814Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T04:22:19.107899Z",
-      "updated_at": "2026-08-14T06:55:09.488764Z",
+      "updated_at": "2026-08-16T07:33:56.266815Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -653,7 +775,7 @@
       "id": "nt_world_code_search::hybrid_symbol_search",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "代码语义搜索",
         "symbol索引",
@@ -673,11 +795,19 @@
           "to_node": "nt_world_code_search::hybrid_symbol_search",
           "note": "repowise/Semantic Kernel 吸收: SymbolIndex+混合检索;接线 evolution_daemon file_exists 检查",
           "timestamp": "2026-08-14T07:24:57.735637Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::hybrid_symbol_search",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.535032Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T07:24:57.735635Z",
-      "updated_at": "2026-08-14T07:24:57.735637Z",
+      "updated_at": "2026-08-16T07:33:56.535033Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -724,7 +854,7 @@
       "id": "nt_mind_skill_engine::complementarity_attribution",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "技能树",
         "互补检索",
@@ -745,11 +875,19 @@
           "to_node": "nt_mind_skill_engine::complementarity_attribution",
           "note": "AgentSkillOS+arxiv2608.11888吸收: category/parent树+互补路由+attribution;接线 skill_cmds activate/info",
           "timestamp": "2026-08-14T07:25:01.580482Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::complementarity_attribution",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.445598Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T07:25:01.580480Z",
-      "updated_at": "2026-08-14T07:25:01.580482Z",
+      "updated_at": "2026-08-16T07:33:56.445599Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -757,7 +895,7 @@
       "id": "nt_memory_kb::experience_triplet_pool",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "经验三元组",
         "质量过滤门",
@@ -784,11 +922,19 @@
           "to_node": "nt_memory_kb::experience_triplet_pool",
           "note": "cycle2026-08-14: G3落地 — absorb写(context,decision,feedback)+confidence质量门+feedback命令(cmd_feedback),接线MapeGate. cargo check exit0",
           "timestamp": "2026-08-14T08:24:59.134415Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::experience_triplet_pool",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.195736Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:18.424618Z",
-      "updated_at": "2026-08-14T08:24:59.134416Z",
+      "updated_at": "2026-08-16T07:33:56.195737Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -796,7 +942,7 @@
       "id": "nt_memory_kb::retrieval_self_evolution",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "检索自进化",
         "Evaluate",
@@ -825,11 +971,19 @@
           "to_node": "nt_memory_kb::retrieval_self_evolution",
           "note": "cycle2026-08-14: G4落地 — RetrievalEvolver Evaluate/Diagnose/Propose/Guard,recall_boost接线search(),5测试绿",
           "timestamp": "2026-08-14T08:24:59.146152Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::retrieval_self_evolution",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.231407Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:18.435537Z",
-      "updated_at": "2026-08-14T08:24:59.146153Z",
+      "updated_at": "2026-08-16T07:33:56.231408Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -837,7 +991,7 @@
       "id": "nt_memory_historian::temporal_context_graph",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "时序事实图",
         "valid_from_until",
@@ -874,11 +1028,19 @@
           "to_node": "nt_memory_historian::temporal_context_graph",
           "note": "第一梯队接线: TemporalFactLedger 接入 KB ingest — record_node_fact() 写入 insert_node/write_memory_entry, supersede走curation冲突路径, query_temporal生产查询; 集成测试 33 passed",
           "timestamp": "2026-08-15T01:57:03.966477Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_historian::temporal_context_graph",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.178078Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:43.277610Z",
-      "updated_at": "2026-08-15T01:57:03.966479Z",
+      "updated_at": "2026-08-16T07:33:56.178079Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1000,7 +1162,7 @@
       "id": "nt_mind_background_loop::path_denylist_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "路径denylist",
         "机械门",
@@ -1021,11 +1183,19 @@
           "to_node": "nt_mind_background_loop::path_denylist_gate",
           "note": "P1-1 G12: loop-engineering loop-gate 路径 denylist (8破坏性模式, fail-closed) + spawn_handler! 宏3臂命名门; 3测试绿; wired进全部关键handler",
           "timestamp": "2026-08-14T11:46:34.190536Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_background_loop::path_denylist_gate",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.338292Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T11:46:34.190535Z",
-      "updated_at": "2026-08-14T11:46:34.190537Z",
+      "updated_at": "2026-08-16T07:33:56.338294Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1033,7 +1203,7 @@
       "id": "nt_io_provider::provider_reliability_suite",
       "domain": "io",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "响应缓存",
         "ResponseCaching",
@@ -1055,11 +1225,19 @@
           "to_node": "nt_io_provider::provider_reliability_suite",
           "note": "统一构建迭代: OpenRouter 能力栈吸收 (Response Caching 零成本相同请求 + Response Healing JSON缺陷-80% + Auto Exacto 市场智慧路由每5min重评); wired进 GatewayV2; 8测试绿",
           "timestamp": "2026-08-14T12:55:44.852664Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::provider_reliability_suite",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.142803Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T12:55:44.852663Z",
-      "updated_at": "2026-08-14T12:55:44.852665Z",
+      "updated_at": "2026-08-16T07:33:56.142804Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1067,7 +1245,7 @@
       "id": "nt_mind_distiller::verbalized_sampling",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "VerbalizedSampling",
         "多样性采样",
@@ -1088,11 +1266,19 @@
           "to_node": "nt_mind_distiller::verbalized_sampling",
           "note": "统一构建迭代: arxiv 2510.01171 Verbalized Sampling 吸收 (verbalize候选概率分布→按分布采样, 创意多样性+1.6-2.1x 防坍缩); wired进 SessionDistiller 去重路径; 13测试绿",
           "timestamp": "2026-08-14T12:55:44.865496Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::verbalized_sampling",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.374912Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T12:55:44.865493Z",
-      "updated_at": "2026-08-14T12:55:44.865497Z",
+      "updated_at": "2026-08-16T07:33:56.374913Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1100,7 +1286,7 @@
       "id": "nt_mind_eval_harness::ap_acc_compliance_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "AP-Acc",
         "反巧合评估",
@@ -1124,11 +1310,19 @@
           "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
           "note": "统一构建迭代: Harness-IF 2608.11727 AP-Acc 反巧合指令遵循 (plain基线对照, 防巧合正确) + 五指令面分层合规门; wired进 EvalHarness; 16测试绿",
           "timestamp": "2026-08-14T12:55:44.878190Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.392460Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T12:55:44.878189Z",
-      "updated_at": "2026-08-14T12:55:44.878190Z",
+      "updated_at": "2026-08-16T07:33:56.392462Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1136,7 +1330,7 @@
       "id": "nt_shield_agentic_scan::poc_verification_gate",
       "domain": "shield",
       "layer": "l2orchestrator",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "poc验证",
         "真实HTTP验证",
@@ -1157,11 +1351,19 @@
           "to_node": "nt_shield_agentic_scan::poc_verification_gate",
           "note": "第一梯队接线: strix PoC门接AgenticScanner — validate_with_target() 用 PocEngine::verify() 真实HTTP验证替换静态cvss>6.0阈值; 3测试(正/负/预过滤) 27 passed",
           "timestamp": "2026-08-15T01:56:52.494680Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_agentic_scan::poc_verification_gate",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.463220Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T01:56:52.494679Z",
-      "updated_at": "2026-08-15T01:56:52.494680Z",
+      "updated_at": "2026-08-16T07:33:56.463222Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1169,7 +1371,7 @@
       "id": "nt_io_provider::market_re_evaluation_daemon",
       "domain": "io",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "市场重评",
         "周期驱动",
@@ -1189,11 +1391,19 @@
           "to_node": "nt_io_provider::market_re_evaluation_daemon",
           "note": "第一梯队接线: Auto Exacto 市场重评接入 background_loop 300s market_re_eval handler — Weak注册表 run_periodic_re_evaluation() 驱动 GatewayV2::maybe_re_evaluate; 3测试",
           "timestamp": "2026-08-15T01:56:57.858316Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::market_re_evaluation_daemon",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.125194Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T01:56:57.858315Z",
-      "updated_at": "2026-08-15T01:56:57.858317Z",
+      "updated_at": "2026-08-16T07:33:56.125195Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1201,7 +1411,7 @@
       "id": "nt_shield_sandbox::credential_vault_injection",
       "domain": "shield",
       "layer": "l2orchestrator",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "凭据注入",
         "env注入",
@@ -1222,11 +1432,19 @@
           "to_node": "nt_shield_sandbox::credential_vault_injection",
           "note": "第一梯队接线: Vault.inject_env 接沙箱工作负载 — attach_default_vault() 注入secrets到 workload env, Redactor确保不暴露LLM; 26 passed",
           "timestamp": "2026-08-15T01:56:57.873403Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::credential_vault_injection",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.481030Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T01:56:57.873400Z",
-      "updated_at": "2026-08-15T01:56:57.873403Z",
+      "updated_at": "2026-08-16T07:33:56.481032Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1265,7 +1483,7 @@
       "id": "nt_agent_mcp_gateway::governed_mcp",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c3benchmark",
       "provides": [
         "mcp_gateway",
         "evidence_chain",
@@ -1287,11 +1505,19 @@
           "to_node": "nt_agent_mcp_gateway::governed_mcp",
           "note": "tier-2 absorption wiring (output_governor/mcp_gateway/telemetry/diagram)",
           "timestamp": "2026-08-15T04:15:47.812468Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_mcp_gateway::governed_mcp",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-16T07:33:55.872733Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-15T04:15:47.812468Z",
+      "updated_at": "2026-08-16T07:33:55.872734Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1299,7 +1525,7 @@
       "id": "nt_core_telemetry::anomaly_detection",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c3benchmark",
       "provides": [
         "privacy_aggregation",
         "spike_drop_alerts",
@@ -1317,11 +1543,19 @@
           "to_node": "nt_core_telemetry::anomaly_detection",
           "note": "tier-2 absorption wiring (output_governor/mcp_gateway/telemetry/diagram)",
           "timestamp": "2026-08-15T04:15:47.812468Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_telemetry::anomaly_detection",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-16T07:33:56.036942Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-15T04:15:47.812468Z",
+      "updated_at": "2026-08-16T07:33:56.036944Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1329,7 +1563,7 @@
       "id": "nt_io_multimodal_transform::diagram_rendering",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "mermaid",
         "ascii_render",
@@ -1347,11 +1581,19 @@
           "to_node": "nt_io_multimodal_transform::diagram_rendering",
           "note": "tier-2 absorption wiring (output_governor/mcp_gateway/telemetry/diagram)",
           "timestamp": "2026-08-15T04:15:47.812468Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::diagram_rendering",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.072577Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-15T04:15:47.812468Z",
+      "updated_at": "2026-08-16T07:33:56.072578Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1391,7 +1633,7 @@
       "id": "nt_mind_evolution_loop::rst_flywheel",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "recursive_task_synthesis",
         "seed_extend_realign",
@@ -1412,11 +1654,19 @@
           "to_node": "nt_mind_evolution_loop::rst_flywheel",
           "note": "tier-3 absorption wiring (signed-prov/RST/staged-context/checkpoint/gauntlet)",
           "timestamp": "2026-08-15T05:25:53.646647Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::rst_flywheel",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.428013Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-15T05:25:53.646647Z",
+      "updated_at": "2026-08-16T07:33:56.428014Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1424,7 +1674,7 @@
       "id": "nt_core_parallel::staged_shared_context",
       "domain": "core",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c3benchmark",
       "provides": [
         "staged_context",
         "context_budget_hard",
@@ -1443,11 +1693,19 @@
           "to_node": "nt_core_parallel::staged_shared_context",
           "note": "tier-3 absorption wiring (signed-prov/RST/staged-context/checkpoint/gauntlet)",
           "timestamp": "2026-08-15T05:25:53.646647Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::staged_shared_context",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-16T07:33:56.000921Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-15T05:25:53.646647Z",
+      "updated_at": "2026-08-16T07:33:56.000922Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1455,7 +1713,7 @@
       "id": "nt_world_video_pipeline::checkpoint_resume",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "video_chain_checkpoint",
         "resume",
@@ -1472,11 +1730,19 @@
           "to_node": "nt_world_video_pipeline::checkpoint_resume",
           "note": "tier-3 absorption wiring (signed-prov/RST/staged-context/checkpoint/gauntlet)",
           "timestamp": "2026-08-15T05:25:53.646647Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::checkpoint_resume",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.606745Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-15T05:25:53.646647Z",
+      "updated_at": "2026-08-16T07:33:56.606746Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1484,7 +1750,7 @@
       "id": "nt_mind_autofixer::gauntlet_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "evidence_gated_delivery",
         "spec_red_green",
@@ -1505,11 +1771,19 @@
           "to_node": "nt_mind_autofixer::gauntlet_gate",
           "note": "tier-3 absorption wiring (signed-prov/RST/staged-context/checkpoint/gauntlet)",
           "timestamp": "2026-08-15T05:25:53.646647Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::gauntlet_gate",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.302391Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-15T05:25:53.646647Z",
+      "updated_at": "2026-08-16T07:33:56.302392Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1517,7 +1791,7 @@
       "id": "nt_io_provider::expert_cache_pin_prefetch",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "expert_cache_pin",
         "prefetch_refresh",
@@ -1536,11 +1810,19 @@
           "to_node": "nt_io_provider::expert_cache_pin_prefetch",
           "note": "G26 multi-tier expert cache (colibri): pinned keys escape LRU eviction + prefetch hit counting",
           "timestamp": "2026-08-15T14:34:28Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::expert_cache_pin_prefetch",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.107773Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-15T14:34:28Z",
+      "updated_at": "2026-08-16T07:33:56.107775Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1548,7 +1830,7 @@
       "id": "nt_mind_autofixer::healer_registry",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "code_health_scan",
         "todo_scan",
@@ -1569,11 +1851,19 @@
           "to_node": "nt_mind_autofixer::healer_registry",
           "note": "G28 healers (topics/code-health): multi-dim code health inspection pipeline wired to bg loop",
           "timestamp": "2026-08-15T14:34:28Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::healer_registry",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.320408Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-15T14:34:28Z",
+      "updated_at": "2026-08-16T07:33:56.320410Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1581,7 +1871,7 @@
       "id": "nt_world_absorber::api_registry_meta",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "api_registry_schema",
         "discovery_seed",
@@ -1602,11 +1892,19 @@
           "to_node": "nt_world_absorber::api_registry_meta",
           "note": "G30 discovery_registry_meta (public-apis/free-for-dev): API registry schema + category target tree + seed urls",
           "timestamp": "2026-08-15T14:34:28Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::api_registry_meta",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.516732Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-15T14:34:28Z",
+      "updated_at": "2026-08-16T07:33:56.516733Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1614,7 +1912,7 @@
       "id": "nt_world_scrape::design_token_extractor",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "design_token_extraction",
         "g21"
@@ -1633,11 +1931,19 @@
           "to_node": "nt_world_scrape::design_token_extractor",
           "note": "G21 design_token_extraction (dembrandt): colors/fonts/spacings extraction from HTML",
           "timestamp": "2026-08-15T14:34:28Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::design_token_extractor",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.553092Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-15T14:34:28Z",
+      "updated_at": "2026-08-16T07:33:56.553093Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1645,7 +1951,7 @@
       "id": "nt_memory_kb::temporal_audit_ledger",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "temporal_audit",
         "supersession_chain",
@@ -1665,11 +1971,19 @@
           "to_node": "nt_memory_kb::temporal_audit_ledger",
           "note": "G23 temporal_graph_audit (opencontext): NT-SHIELD audit with valid_from/valid_until + HMAC-signed supersession chain",
           "timestamp": "2026-08-15T14:34:28Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::temporal_audit_ledger",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.249154Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-15T14:34:28Z",
+      "updated_at": "2026-08-16T07:33:56.249155Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1711,7 +2025,7 @@
       "id": "nt_world_video_pipeline::asset_enricher",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "asset_ml_enrichment",
         "dedup",
@@ -1733,11 +2047,19 @@
           "to_node": "nt_world_video_pipeline::asset_enricher",
           "note": "G20 video_asset_enrichment (immich): content-fingerprint dedup + CLIP-style semantic tags",
           "timestamp": "2026-08-15T14:59:52Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::asset_enricher",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.588815Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-15T14:59:52Z",
+      "updated_at": "2026-08-16T07:33:56.588817Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1745,7 +2067,7 @@
       "id": "nt_core_retrieval::code_graph_mcp",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "code_graph_retrieval",
         "search_symbols",
@@ -1766,11 +2088,19 @@
           "to_node": "nt_core_retrieval::code_graph_mcp",
           "note": "G1 code_index_graph (codebase-memory-mcp): deterministic code-graph MCP bud wired to agent_mcp_registry",
           "timestamp": "2026-08-15T14:59:52Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_retrieval::code_graph_mcp",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.019287Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-15T14:59:52Z",
+      "updated_at": "2026-08-16T07:33:56.019288Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2177,11 +2507,19 @@
           "to_node": "nt_world_osint::sweep_delta",
           "note": "P14 Crucix: 多源并行 sweep + delta 检测 + 分级警报 + 无 key 降级; 10 单测 + SelfTest T1/T2",
           "timestamp": "2026-08-15T23:00:00Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_world_osint::sweep_delta",
+          "note": "Crucix 深化 (193c3f82): DeltaDetector 新增 normalize 数字占位语义去重 + DeltaConfig(dedup_normalize/min_severity/correlation_window) + detect_with_config + correlate→CorrelatedSignal 跨源相关性; 修复 Severity 降序过滤方向; 5 新测试 (77 全绿)",
+          "timestamp": "2026-08-16T07:35:57.684690Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-15T23:00:00Z",
+      "updated_at": "2026-08-16T07:35:57.684691Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2218,7 +2556,7 @@
       "id": "nt_memory_kb::retrieval_matrix",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "retrieval_matrix"
       ],
@@ -2235,11 +2573,19 @@
           "to_node": "nt_memory_kb::retrieval_matrix",
           "note": "P16 rag-from-scratch: hybrid 检索矩阵 (RRF/加权/去重); 单测 + SelfTest T1/T2",
           "timestamp": "2026-08-15T23:00:00Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::retrieval_matrix",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T07:33:56.213442Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-15T23:00:00Z",
+      "updated_at": "2026-08-16T07:33:56.213443Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2508,7 +2854,7 @@
       "id": "nt_agent_mcp_gateway::programmatic_tool_calling",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "tool_stub",
         "call_chain",
@@ -2525,11 +2871,19 @@
           "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
           "note": "arXiv 2608.06370 PTC: typed-stub tool calling, chain+parallel in single turn",
           "timestamp": "2026-08-16T02:50:22.160540Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:55.890634Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T02:50:22.160537Z",
-      "updated_at": "2026-08-16T02:50:22.160541Z",
+      "updated_at": "2026-08-16T07:33:55.890635Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2537,7 +2891,7 @@
       "id": "nt_shield_sandbox::egress_control",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "egress_policy",
         "trust_boundary"
@@ -2553,11 +2907,19 @@
           "to_node": "nt_shield_sandbox::egress_control",
           "note": "OpenSandbox absorption: per-sandbox egress allow/deny network policy",
           "timestamp": "2026-08-16T02:50:22.749746Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::egress_control",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.498679Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T02:50:22.749743Z",
-      "updated_at": "2026-08-16T02:50:22.749748Z",
+      "updated_at": "2026-08-16T07:33:56.498680Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2565,7 +2927,7 @@
       "id": "nt_core_hcube::bayesian_experiment_design",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "voi",
         "m_open",
@@ -2582,11 +2944,19 @@
           "to_node": "nt_core_hcube::bayesian_experiment_design",
           "note": "arXiv 2608.09696 MDA: value-of-information experiment selection + M-open predictive check",
           "timestamp": "2026-08-16T03:20:30.417694Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_hcube::bayesian_experiment_design",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:55.927180Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T03:20:30.417692Z",
-      "updated_at": "2026-08-16T03:20:30.417694Z",
+      "updated_at": "2026-08-16T07:33:55.927182Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2594,7 +2964,7 @@
       "id": "nt_mind_eval_harness::small_scale_method",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "hyperparam_sensitivity",
         "scale_frontier"
@@ -2610,11 +2980,19 @@
           "to_node": "nt_mind_eval_harness::small_scale_method",
           "note": "arXiv 2608.11859: small-scale confound, hyperparam-first methodology",
           "timestamp": "2026-08-16T03:20:31.705508Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::small_scale_method",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.410317Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T03:20:31.705506Z",
-      "updated_at": "2026-08-16T03:20:31.705509Z",
+      "updated_at": "2026-08-16T07:33:56.410318Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2622,7 +3000,7 @@
       "id": "nt_world_search::ordered_backend_router",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "backend_router",
         "fallback",
@@ -2639,11 +3017,19 @@
           "to_node": "nt_world_search::ordered_backend_router",
           "note": "Agent-Reach absorption (Maturation): DDG→Wikipedia ordered fallback, zero-API-cost unified search",
           "timestamp": "2026-08-16T04:54:35.520164Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_search::ordered_backend_router",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:33:56.570930Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T04:54:35.520163Z",
-      "updated_at": "2026-08-16T04:54:35.520165Z",
+      "updated_at": "2026-08-16T07:33:56.570931Z",
       "deprecated": false,
       "deprecated_reason": null
     }
