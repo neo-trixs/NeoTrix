@@ -178,6 +178,11 @@
 - **R-P104 (unsafe 独立审查 pass + cve-rs 意识)**: 任何含 `unsafe` 的改动, 每个块须有 SAFETY 式注释 (前提为何成立、不变式凭什么防重构), 禁复述代码。`forbid(unsafe_code)` 只防不小心的开发者, 防不了恶意作者 — cve-rs 证伪: RUSTSEC-2025-0028 在 100% safe Rust + `deny(unsafe_code)` 下实现 UAF/overflow/transmute。故安全边界的审查仍是读代码: 禁 safe code 走私未检查 unsafety。无 unsafe 的 PR ≠ 安全边界。
 - **R-P105 (合并门禁 — 红灯即滚回)**: PR/合并红线 (rev-officer D72): `cargo fmt --check` / `clippy -- -D warnings` / `test --all-targets` / `cargo audit`+`deny` 任一红 → 阻塞。lint 覆盖用 `#[expect(...)]`+`reason` (触到预期 lint 反而告警, 防陈旧积累), `#[allow]` 仅生成代码/宏。路由: 触碰 unsafe/FFI/Cargo.toml/Cargo.lock/crypto/未信任输入解析 → 必须安全评审人复核。
 
+## 双路径检测与契约审计 (R-P106, R-P107) — 2026-08-16 吸收 Crucix + oi-language/oi
+
+- **R-P106 (双路径检测审计 — Crucix OSINT terminal, 11.4k★)**: 任何检测/告警系统 (OSINT sweep/异常检测/自愈触发) 必须: ①≥2 独立判定路径 (LLM+规则) 或文档化单路径理由; ②severity 枚举方向一致 (Critical=0<High=1<...), 过滤方向必须匹配枚举序 (`severity > min_severity` 配降序, `<` 配升序) — **反例 bug 类**: 方向反转静默丢弃全部关键告警或保留全部 info 噪声; ③语义去重必须归一化实体 (数字占位 `CVE-2026-0001`→`cve`、变量 ID、时间戳), 否则同事件不同 ID 永不 dedup → 告警洪水; ④阈值可配置 (DeltaConfig 式: dedup_normalize/min_severity/correlation_window, R-P11), 硬编码阈值 = C1 smell; ⑤跨源相关性 (同一 token 跨 sweep 端点) 产生 CorrelatedSignal+confidence∈[0,1], 单源告警证据弱于多源相关; ⑥多级告警类 (FLASH/PRIORITY/ROUTINE ≈ Critical/High/Medium) 每类必须有消费者, 无消费者的类 = theater (D44); ⑦无 API key 时优雅降级 (限速/缓存) 不崩溃 (R-P48)。severity 过滤方向 = 必查项, 反转 = P0。
+- **R-P107 (契约完整性审计 — oi-language agent-native language)**: 任何被 agent 调用的能力/工具/MCP 必须声明显式契约, 7 项: ①意图 (做什么, 非名字推断); ②前置条件 (KB 开/网络可用/≥N 参数); ③失败语义 (重试?部分成功?回滚? — 含糊失败 = Critical, agent 无法决策恢复); ④停止条件 (循环/递归有界, max_iterations/retry_cap, R-P38; 无上限 loop = P0); ⑤作用域边界 (bounded freedom: allow/deny-wins/`default_allow` fallback, 借 oi.mod sandbox 语义); ⑥deliver-exactly-once (幂等键/外部写去重, R-P55 Egress Policy 幂等); ⑦版本化契约 (oi.mod 快照, R-P83 单一事实源)。审计清单: 每能力缺 ≥3/7 项 = Critical 能力缺口。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：

@@ -14,6 +14,9 @@ fn main() {
 
     let interval = Duration::from_secs(6 * 3600);
     let mut cycle = 0u64;
+    // D74/R-P38 停止条件: 连续失败熔断, 防止守护空转
+    const MAX_CONSECUTIVE_FAILURES: u32 = 5;
+    let mut consecutive_failures = 0u32;
 
     loop {
         cycle += 1;
@@ -24,6 +27,7 @@ fn main() {
 
         match kb.run_crawl_cycle(10) {
             Ok(report) => {
+                consecutive_failures = 0;
                 println!("  Crawl: attempted={}, completed={}, failed={}, nodes={}, edges={}",
                     report.attempted, report.completed, report.failed,
                     report.nodes_created, report.edges_created);
@@ -33,7 +37,14 @@ fn main() {
                     }
                 }
             },
-            Err(e) => println!("  ⚠ Crawl cycle: {}", e),
+            Err(e) => {
+                consecutive_failures += 1;
+                println!("  ⚠ Crawl cycle: {} (连续失败 {}/{})", e, consecutive_failures, MAX_CONSECUTIVE_FAILURES);
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES {
+                    println!("  ✗ 连续 {} 次 crawl 失败 — 熔断退出", MAX_CONSECUTIVE_FAILURES);
+                    std::process::exit(1);
+                }
+            },
         }
 
         let after = kb.stats().expect("Stats failed");
