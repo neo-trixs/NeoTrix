@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'solid-js'
 import { Router, Route } from '@solidjs/router'
 import { TrafficLights } from './components/TrafficLights'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 // 代码分割：重组件（Chat / 3D GlobeView）按需懒加载，配合 vite manualChunks 分包
 const Chat = lazy(() => import('./routes/Chat').then((m) => ({ default: m.Chat })))
@@ -24,11 +25,13 @@ export default function App() {
           </div>
         }
       >
-        <Router>
-          <Route path="/" component={Chat} />
-          <Route path="/chat" component={Chat} />
-          <Route path="/globe" component={GlobeRoute} />
-        </Router>
+        <ErrorBoundary>
+          <Router>
+            <Route path="/" component={Chat} />
+            <Route path="/chat" component={Chat} />
+            <Route path="/globe" component={GlobeRoute} />
+          </Router>
+        </ErrorBoundary>
       </Suspense>
     </>
   )
