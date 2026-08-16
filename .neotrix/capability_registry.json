@@ -247,13 +247,15 @@
           "cycle": "auto",
           "op": "strengthen",
           "note": "C4 增强 (calamine 读路径 + 多 sheet + 去重 + 输出校验): read_xlsx_sheets_all 全 sheet 遍历 (E13) 替换 office_oxide 单 sheet; merge_tables_with 同文件内跨 sheet 去重 (E14, key=口径+含税单价+产品小类); MergeSchema.column_types 输出校验 → ConsolidationReport.validation_warnings; 表格级编辑 API edit_xlsx_table/TableEdit; ContentSnapshot.table 多 sheet 存储。真实数据: 26 文件 6801→9082 行 (多 sheet 增益 2281 行 + 去重 4030), usd_rows 3267",
-          "timestamp": "2026-08-15T02:30:00.000Z"
+          "timestamp": "2026-08-15T02:30:00.000Z",
+          "from_nodes": []
         },
         {
           "cycle": "auto",
-          "op": "benchmarked",
+          "op": "maturation",
           "note": "C3 基准建立 (capability_c3 bench 表格组, 2026-08-15): read_xlsx_sheets_all 24sheet/600rows=68.6ms, merge_tables_with 12files/24sheet=430.9ms, write_xlsx_table 600rows=34.5ms",
-          "timestamp": "2026-08-15T03:00:00.000Z"
+          "timestamp": "2026-08-15T03:00:00.000Z",
+          "from_nodes": []
         }
       ],
       "metadata": {},
@@ -1209,8 +1211,8 @@
     {
       "id": "nt_io_output_style::output_governor",
       "domain": "io",
-      "layer": "l1body",
-      "constellation": "c2integration",
+      "layer": "l1composite",
+      "constellation": "c2integrationtest",
       "provides": [
         "output_governance",
         "r01_r10_rules",
@@ -1240,8 +1242,8 @@
     {
       "id": "nt_agent_mcp_gateway::governed_mcp",
       "domain": "io",
-      "layer": "l1body",
-      "constellation": "c2integration",
+      "layer": "l1composite",
+      "constellation": "c2integrationtest",
       "provides": [
         "mcp_gateway",
         "evidence_chain",
@@ -1272,7 +1274,7 @@
       "id": "nt_core_telemetry::anomaly_detection",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c2integration",
+      "constellation": "c2integrationtest",
       "provides": [
         "privacy_aggregation",
         "spike_drop_alerts",
@@ -1301,8 +1303,8 @@
     {
       "id": "nt_io_multimodal_transform::diagram_rendering",
       "domain": "io",
-      "layer": "l1body",
-      "constellation": "c1unit",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
       "provides": [
         "mermaid",
         "ascii_render",
@@ -1331,8 +1333,8 @@
     {
       "id": "nt_memory_provenance::signed_provenance",
       "domain": "memory",
-      "layer": "l3memory",
-      "constellation": "c2integration",
+      "layer": "l2orchestrator",
+      "constellation": "c2integrationtest",
       "provides": [
         "hmac_signature",
         "teacher_second_pass",
@@ -1361,8 +1363,8 @@
     {
       "id": "nt_mind_evolution_loop::rst_flywheel",
       "domain": "mind",
-      "layer": "l8autonomic",
-      "constellation": "c1unit",
+      "layer": "l3domainservice",
+      "constellation": "c1unittest",
       "provides": [
         "recursive_task_synthesis",
         "seed_extend_realign",
@@ -1391,8 +1393,8 @@
     {
       "id": "nt_core_parallel::staged_shared_context",
       "domain": "core",
-      "layer": "l4cognition",
-      "constellation": "c2integration",
+      "layer": "l2orchestrator",
+      "constellation": "c2integrationtest",
       "provides": [
         "staged_context",
         "context_budget_hard",
@@ -1420,8 +1422,8 @@
     {
       "id": "nt_world_video_pipeline::checkpoint_resume",
       "domain": "world",
-      "layer": "l2world",
-      "constellation": "c1unit",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
       "provides": [
         "video_chain_checkpoint",
         "resume",
@@ -1449,8 +1451,8 @@
     {
       "id": "nt_mind_autofixer::gauntlet_gate",
       "domain": "mind",
-      "layer": "l8autonomic",
-      "constellation": "c1unit",
+      "layer": "l3domainservice",
+      "constellation": "c1unittest",
       "provides": [
         "evidence_gated_delivery",
         "spec_red_green",
@@ -1479,8 +1481,8 @@
     {
       "id": "nt_io_provider::expert_cache_pin_prefetch",
       "domain": "io",
-      "layer": "l1body",
-      "constellation": "c1unit",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
       "provides": [
         "expert_cache_pin",
         "prefetch_refresh",
@@ -1510,8 +1512,8 @@
     {
       "id": "nt_mind_autofixer::healer_registry",
       "domain": "mind",
-      "layer": "l8autonomic",
-      "constellation": "c1unit",
+      "layer": "l3domainservice",
+      "constellation": "c1unittest",
       "provides": [
         "code_health_scan",
         "todo_scan",
@@ -1542,8 +1544,8 @@
     {
       "id": "nt_world_absorber::api_registry_meta",
       "domain": "world",
-      "layer": "l2world",
-      "constellation": "c1unit",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
       "provides": [
         "api_registry_schema",
         "discovery_seed",
@@ -1573,8 +1575,8 @@
     {
       "id": "nt_world_scrape::design_token_extractor",
       "domain": "world",
-      "layer": "l2world",
-      "constellation": "c1unit",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
       "provides": [
         "design_token_extraction",
         "g21"
@@ -1603,8 +1605,8 @@
     {
       "id": "nt_memory_kb::temporal_audit_ledger",
       "domain": "memory",
-      "layer": "l3memory",
-      "constellation": "c1unit",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
       "provides": [
         "temporal_audit",
         "supersession_chain",
@@ -1635,8 +1637,8 @@
     {
       "id": "nt_world_video_pipeline::video_production_chain",
       "domain": "world",
-      "layer": "l2world",
-      "constellation": "c1unit",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
       "provides": [
         "video_production_chain",
         "script_material_tts_compose_publish",
@@ -1666,8 +1668,8 @@
     {
       "id": "nt_world_video_pipeline::asset_enricher",
       "domain": "world",
-      "layer": "l2world",
-      "constellation": "c1unit",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
       "provides": [
         "asset_ml_enrichment",
         "dedup",
@@ -1698,8 +1700,8 @@
     {
       "id": "nt_core_retrieval::code_graph_mcp",
       "domain": "core",
-      "layer": "l0substrate",
-      "constellation": "c1unit",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
       "provides": [
         "code_graph_retrieval",
         "search_symbols",
@@ -2479,6 +2481,14 @@
       "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
       "signal": 0.76,
       "promoted_at": 1786783255
+    },
+    {
+      "domain": "NT-CORE",
+      "capability": "performance_concurrency",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: 并发会话协作风险: 另一会话在同一工作区反复 git reset: moving to HEAD, 两次抹掉本会话全部未提交修复 (reflog HEAD@{0}-{5} 可见)。缓解: 修复完成后立即 git add 仅本对话文件 + commit 固化, 不卷入并发会话的 ~20 个半成品改动。提交前必须核对 git diff --stat 每文件确为本 [关键词: git, head, reset, add, commit]' 命中能力标签 'performance_concurrency' 于域 Core, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786839075
     }
   ]
 }
