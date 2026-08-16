@@ -163,8 +163,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:33:55.945651Z",
@@ -1241,7 +1241,7 @@
       "id": "nt_io_provider::provider_reliability_suite",
       "domain": "io",
       "layer": "l3domainservice",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "响应缓存",
         "ResponseCaching",
@@ -1271,11 +1271,19 @@
           "to_node": "nt_io_provider::provider_reliability_suite",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:33:56.142803Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::provider_reliability_suite",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T10:57:30.281918Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T12:55:44.852663Z",
-      "updated_at": "2026-08-16T07:33:56.142804Z",
+      "updated_at": "2026-08-16T10:57:30.281919Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1409,7 +1417,7 @@
       "id": "nt_io_provider::market_re_evaluation_daemon",
       "domain": "io",
       "layer": "l3domainservice",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "市场重评",
         "周期驱动",
@@ -1437,11 +1445,19 @@
           "to_node": "nt_io_provider::market_re_evaluation_daemon",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:33:56.125194Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::market_re_evaluation_daemon",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T10:57:29.731485Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T01:56:57.858315Z",
-      "updated_at": "2026-08-16T07:33:56.125195Z",
+      "updated_at": "2026-08-16T10:57:29.731486Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3382,6 +3398,51 @@
       "metadata": {},
       "created_at": "2026-08-16T07:45:34.006424Z",
       "updated_at": "2026-08-16T07:46:12.229637Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io_unified::command_bridge",
+      "domain": "io",
+      "layer": "l2orchestrator",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "unified_catalog",
+        "cli_execute",
+        "bridge"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io_unified::command_bridge",
+          "note": "CLI↔app 统一命令桥: core unified_cmd 目录 + Tauri 桥接 + 前端消费闭环 (吸收 2026-08-16)",
+          "timestamp": "2026-08-16T10:26:23.580699Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_unified::command_bridge",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T10:28:50.670317Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_unified::command_bridge",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T10:28:51.196255Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-16T10:26:23.580698Z",
+      "updated_at": "2026-08-16T10:28:51.196256Z",
       "deprecated": false,
       "deprecated_reason": null
     }
