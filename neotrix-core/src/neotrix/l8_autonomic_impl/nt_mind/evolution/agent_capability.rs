@@ -2525,7 +2525,7 @@ mod tests {
             calls: std::cell::RefCell::new(Vec::new()),
             respond: AgentExecutionOutcome::Failure("consolidate unavailable".into()),
         };
-        let success_probe = ProbeExecutor {
+        let _success_probe = ProbeExecutor {
             calls: std::cell::RefCell::new(Vec::new()),
             respond: AgentExecutionOutcome::Success("search returned".into()),
         };
@@ -2605,7 +2605,7 @@ mod tests {
             respond: AgentExecutionOutcome::Success("probe did work".into()),
         };
         shell.stimulate(AttentionDomain::SelfReflection, 0.9);
-        let (agent, outcome) = shell.dispatch_and_execute(&probe, "review the codebase").expect("dispatch");
+        let (_agent, outcome) = shell.dispatch_and_execute(&probe, "review the codebase").expect("dispatch");
         assert!(outcome.is_success());
         // 技能级 bandit: learner 记录了 verifier@SelfReflection 一次成功。
         assert_eq!(shell.learner.rates(AttentionDomain::SelfReflection).len(), 1);

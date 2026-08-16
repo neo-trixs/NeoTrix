@@ -39,6 +39,7 @@ struct Observation {
     confidence: f64, // 0..1
     attrs: Map<String, Value>, // 学科特定属性
     source: String, // 可追溯
+    #[allow(dead_code)]
     classification: String, // 分类传播 (branch_215_4)
 }
 
@@ -124,7 +125,7 @@ fn ais_status_consistency(vessel_type: &str, reported_status: &str, sog_knots: f
 
 fn detect(obs: &[Observation], context: &Value) -> Vec<Value> {
     let mut events: Vec<Value> = Vec::new();
-    let mut sar_series: Vec<f64> = context["sar_series"]
+    let sar_series: Vec<f64> = context["sar_series"]
         .as_array()
         .map(|a| a.iter().filter_map(|x| x.as_f64()).collect())
         .unwrap_or_default();

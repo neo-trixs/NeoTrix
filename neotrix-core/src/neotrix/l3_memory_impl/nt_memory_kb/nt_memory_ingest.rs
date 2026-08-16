@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn test_relate_wires_edge_between_existing_nodes() {
         let path = temp_kb_path();
-        let mut ing = KBIngester::open(Some(path.clone())).expect("open");
+        let ing = KBIngester::open(Some(path.clone())).expect("open");
         ing.concept("起点A", "s", "test-domain");
         ing.concept("终点B", "s", "test-domain");
         assert!(ing.relate("起点A", "终点B", RelationType::RelatedTo, 0.8, "desc"));
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn test_relate_many_counts_successes() {
         let path = temp_kb_path();
-        let mut ing = KBIngester::open(Some(path.clone())).expect("open");
+        let ing = KBIngester::open(Some(path.clone())).expect("open");
         ing.concept("X1", "s", "d");
         ing.concept("X2", "s", "d");
         ing.concept("X3", "s", "d");

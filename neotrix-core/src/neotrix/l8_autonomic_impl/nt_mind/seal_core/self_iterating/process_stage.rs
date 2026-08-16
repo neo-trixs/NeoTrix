@@ -321,7 +321,7 @@ fn current_timestamp() -> u64 {
 mod tests {
     use super::*;
 
-    fn make_trace(steps: usize, quality: f64, actions: Vec<&str>) -> ReasoningTrace {
+    fn make_trace(_steps: usize, quality: f64, actions: Vec<&str>) -> ReasoningTrace {
         ReasoningTrace {
             trace_id: "test".into(),
             task: "test task".into(),

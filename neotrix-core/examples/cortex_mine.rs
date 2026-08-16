@@ -46,8 +46,7 @@ fn main() {
         "https://en.wikipedia.org/wiki/Future_of_the_Earth",
     ], &mut cortex, "⏳ 时间链 — 46亿年地球史");
 
-    let mut total = 0;
-    total += mine_to_cortex(&mut miner, &[
+    mine_to_cortex(&mut miner, &[
         "https://en.wikipedia.org/wiki/Civilization",
         "https://en.wikipedia.org/wiki/Axial_Age",
         "https://en.wikipedia.org/wiki/Clash_of_Civilizations",
@@ -55,7 +54,7 @@ fn main() {
         "https://en.wikipedia.org/wiki/The_Rise_and_Fall_of_the_Great_Powers",
     ], &mut cortex, "🏛️ 文明链 — 文明兴衰理论");
 
-    total += mine_to_cortex(&mut miner, &[
+    mine_to_cortex(&mut miner, &[
         "https://en.wikipedia.org/wiki/History_of_technology",
         "https://en.wikipedia.org/wiki/Agricultural_revolution",
         "https://en.wikipedia.org/wiki/Digital_Revolution",
@@ -63,7 +62,7 @@ fn main() {
         "https://en.wikipedia.org/wiki/Space_exploration",
     ], &mut cortex, "⚙️ 科技链 — 技术革命");
 
-    total += mine_to_cortex(&mut miner, &[
+    mine_to_cortex(&mut miner, &[
         "https://en.wikipedia.org/wiki/Evolution",
         "https://en.wikipedia.org/wiki/Natural_selection",
         "https://en.wikipedia.org/wiki/Mass_extinction",
@@ -71,7 +70,7 @@ fn main() {
         "https://en.wikipedia.org/wiki/Human_impact_on_the_environment",
     ], &mut cortex, "🧬 物种链 — 生命网络");
 
-    total += mine_to_cortex(&mut miner, &[
+    mine_to_cortex(&mut miner, &[
         "https://en.wikipedia.org/wiki/Plate_tectonics",
         "https://en.wikipedia.org/wiki/Climate_change_(general_concept)",
         "https://en.wikipedia.org/wiki/Anthropocene",
@@ -79,7 +78,7 @@ fn main() {
         "https://en.wikipedia.org/wiki/Earth_science",
     ], &mut cortex, "🌍 地理链 — 地球系统");
 
-    total += mine_to_cortex(&mut miner, &[
+    mine_to_cortex(&mut miner, &[
         "https://en.wikipedia.org/wiki/Spacetime",
         "https://en.wikipedia.org/wiki/Multiverse",
         "https://en.wikipedia.org/wiki/Dimension",
@@ -87,7 +86,7 @@ fn main() {
         "https://en.wikipedia.org/wiki/Philosophy_of_time",
     ], &mut cortex, "🌌 宇宙链 — 时空维度");
 
-    total += mine_to_cortex(&mut miner, &[
+    mine_to_cortex(&mut miner, &[
         "https://en.wikipedia.org/wiki/History_of_science",
         "https://en.wikipedia.org/wiki/Philosophy_of_history",
         "https://en.wikipedia.org/wiki/Collective_intelligence",

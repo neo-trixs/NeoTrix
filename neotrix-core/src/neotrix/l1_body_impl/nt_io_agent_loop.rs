@@ -1186,7 +1186,7 @@ mod tests {
     // ── G27 输出纪律治理接线: 每条最终输出经 OutputGovernor 检查 ──────
     #[tokio::test]
     async fn test_emit_final_wires_governance() {
-        use crate::neotrix::nt_io_provider::types::LlmResponse as Resp;
+        
         let mut loop_ = AgentLoop::new(
             Arc::new(ScriptedLlm {
                 script: Arc::new(Mutex::new(vec![(

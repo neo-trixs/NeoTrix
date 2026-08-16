@@ -9,9 +9,9 @@ use sha2::{Digest, Sha256};
 
 const ENC_PREFIX: &str = "enc:";
 const NONCE_LEN: usize = 12;
-#[cfg_attr(not(feature = "keyring"), allow(dead_code))]
+#[cfg(all(feature = "keyring", not(test)))]
 const KEYRING_SERVICE: &str = "neotrix";
-#[cfg_attr(not(feature = "keyring"), allow(dead_code))]
+#[cfg(all(feature = "keyring", not(test)))]
 const KEYRING_ENTRY: &str = "api-key-master";
 
 /// Check whether a stored value is encrypted (starts with `enc:`).
@@ -125,7 +125,7 @@ fn get_or_create_key() -> Result<[u8; 32], String> {
         .into())
 }
 
-#[cfg(feature = "keyring")]
+#[cfg(all(feature = "keyring", not(test)))]
 fn get_keyring_key() -> Result<[u8; 32], String> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ENTRY)
         .map_err(|e| format!("keyring entry creation failed: {}", e))?;

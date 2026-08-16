@@ -262,7 +262,7 @@ mod tests {
     fn test_render_once_does_not_store() {
         let u = InnerSpeech::render_once(&input(5, "EvidenceWeightedHypothesis", 1.0, true, false));
         assert!(u.contains("EvidenceWeightedHypothesis"));
-        let mut isp = InnerSpeech::default();
+        let isp = InnerSpeech::default();
         assert_eq!(isp.len(), 0);
         assert_eq!(isp.total_generated, 0);
     }

@@ -1053,7 +1053,7 @@ mod tests {
         // so a 64×64 and 63×63 rendering share an (almost) identical phash.
         fn half_png(w: u32, h: u32) -> Vec<u8> {
             let mut img = image::RgbImage::new(w, h);
-            for (px, py, p) in img.enumerate_pixels_mut() {
+            for (px, _py, p) in img.enumerate_pixels_mut() {
                 *p = if px < w / 2 {
                     image::Rgb([0, 0, 0])
                 } else {

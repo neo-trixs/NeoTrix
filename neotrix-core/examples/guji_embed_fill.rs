@@ -61,5 +61,5 @@ fn main() {
         }
     }
     println!("完成: {} 嵌入, {} 失败", done, failed);
-    conn.close();
+    let _ = conn.close();
 }

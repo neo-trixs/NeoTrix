@@ -51,7 +51,7 @@ use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
 use sha1::{Digest, Sha1};
-use sha2::{Digest as Sha2Digest, Sha256};
+use sha2::Sha256;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
@@ -2299,7 +2299,7 @@ fn cmd_dedup(conn: &Connection, dry_run: bool) {
 
     let mut to_delete: Vec<String> = Vec::new();
     let mut groups = 0;
-    for (n, group) in &norm {
+    for (_n, group) in &norm {
         if group.len() < 2 {
             continue;
         }

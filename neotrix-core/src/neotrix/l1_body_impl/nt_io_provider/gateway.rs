@@ -3921,7 +3921,7 @@ mod provider_reliability_tests {
 
     #[test]
     fn test_gateway_market_router_tick_hook() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         {
             let mut states = gw.states.write().unwrap();
             states.insert("p1".into(), ProviderState::new(true, ProviderCategory::Cloud));
@@ -3945,7 +3945,7 @@ mod provider_reliability_tests {
     fn test_periodic_re_evaluation_via_registry() {
         let _guard = REGISTRY_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // 注册的 GatewayV2 经 run_periodic_re_evaluation() 周期触发重估
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         {
             let mut states = gw.states.write().unwrap();
             states.insert("p1".into(), ProviderState::new(true, ProviderCategory::Cloud));

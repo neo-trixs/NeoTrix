@@ -983,11 +983,8 @@ mod tests {
             value: "user-document-body".into(),
         });
         // Aggregates must never expose raw payload strings — only scalars.
-        for (kind, agg) in store.window_aggregates(Duration::from_secs(60)) {
+        for (kind, _agg) in store.window_aggregates(Duration::from_secs(60)) {
             assert!(!kind.contains("secret-credential"));
-            assert!(agg.count >= 0);
-            assert!(agg.total_duration_ms >= 0);
-            assert!(agg.error_count >= 0);
         }
         let summary = store.summary();
         assert!(summary

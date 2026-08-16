@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_placeholder() {
-        let instance = WikiCmd;
+        let _instance = WikiCmd;
         assert!(true);
     }
 }

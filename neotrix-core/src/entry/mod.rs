@@ -2929,7 +2929,7 @@ mod tests {
     #[test]
     fn test_save_load_tui_session_roundtrip() {
         // 用隔离 base 目录验证 save/load 闭环（不污染真实 ~/.neotrix KB）。
-        use neotrix::cli::tui::TuiApp;
+        
         use neotrix::cli::tui::session_store::SessionStore;
 
         let tmp = std::env::temp_dir().join(format!("nt-tui-session-test-{}", std::process::id()));

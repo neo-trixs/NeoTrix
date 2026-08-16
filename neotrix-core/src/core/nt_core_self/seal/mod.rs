@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn test_run_two_iterations() {
         let mut p = SealPipeline::new(100, 32);
-        let r1 = p.run_iteration("a", &["fn a() {}"]);
+        let _r1 = p.run_iteration("a", &["fn a() {}"]);
         let r2 = p.run_iteration("b", &["fn b() {}"]);
         assert_eq!(r2.iteration, 2);
         assert!(r2.policy_improvement >= 0.0);

@@ -2189,7 +2189,7 @@ mod tests {
         // pattern and a solid black frame (blank → dropped).
         fn doc_frame() -> Vec<u8> {
             let mut img = image::RgbImage::new(64, 64);
-            for (px, py, p) in img.enumerate_pixels_mut() {
+            for (px, _py, p) in img.enumerate_pixels_mut() {
                 let band = px / 8;
                 let stripe = (band % 2) == 0;
                 *p = if stripe { image::Rgb([20, 20, 20]) } else { image::Rgb([240, 240, 240]) };

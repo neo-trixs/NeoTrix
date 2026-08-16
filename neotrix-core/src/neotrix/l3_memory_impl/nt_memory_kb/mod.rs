@@ -2745,13 +2745,13 @@ mod tests {
         // C2 集成测试: 打通 search_with_visibility 生产入口全链路 —
         // 先存知识节点 → hybrid_rerank_search → filter_visibility 三值裁定
         // → Drop 高风险/低相关, Allow 强相关。
-        use super::nt_memory_visibility::{self, Visibility};
+        use super::nt_memory_visibility::Visibility;
         let dir = std::env::temp_dir().join(format!("nt_kb_vis_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
         let db_path = dir.join("test_vis.db");
         let mut kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
 
-        let mut provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
+        let provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
         provider.store("visible_doc", "clean knowledge content about rust ownership").expect("store allow");
         provider.store("risky_doc", "clean content").expect("store risk");
 
@@ -2772,7 +2772,7 @@ mod tests {
         let db_path = dir.join("test_kb.db");
         let mut kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
 
-        let mut provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
+        let provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
         let id = provider.store("memory_provider_key", "memory provider value").expect("store");
         assert!(!id.is_empty());
 

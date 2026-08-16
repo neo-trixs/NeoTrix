@@ -12,7 +12,6 @@ fn main() {
     let mut engine = KnowledgeEngine::load_from(&kb_path);
     engine.set_persist_path(kb_path.clone());
     let before = engine.stats().total_entries;
-    let mut total_tags = 0usize;
 
     // ================================================================
     // 壹 · 天界 — 宇宙与时空
@@ -37,7 +36,6 @@ fn main() {
         let entry = KnowledgeEntry::new(title, body, SourceType::KnowledgeBase, "wiki:cosmos")
             .with_importance(*imp).with_tags(vec!["天界".to_string(), tag.to_string(), "real-world".to_string()]);
         heaven_ids.push(engine.add_entry(entry));
-        total_tags += 1;
     }
     for i in 1..heaven_ids.len() {
         engine.add_relation(&heaven_ids[i-1], &heaven_ids[i], RelationType::Related, 0.5, &format!("{} ↔ {}", heaven[i-1].0, heaven[i].0));
@@ -66,7 +64,6 @@ fn main() {
         let entry = KnowledgeEntry::new(title, body, SourceType::KnowledgeBase, "wiki:earth-system")
             .with_importance(*imp).with_tags(vec!["地界".to_string(), tag.to_string(), "real-world".to_string()]);
         engine.add_entry(entry);
-        total_tags += 1;
     }
     println!("  ✅ 地界 {} 条知识", earth.len());
 
@@ -92,7 +89,6 @@ fn main() {
         let entry = KnowledgeEntry::new(title, body, SourceType::KnowledgeBase, "wiki:humanity")
             .with_importance(*imp).with_tags(vec!["人界".to_string(), tag.to_string(), "real-world".to_string()]);
         engine.add_entry(entry);
-        total_tags += 1;
     }
     println!("  ✅ 人界 {} 条知识", humanity.len());
 

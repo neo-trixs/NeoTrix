@@ -368,7 +368,7 @@ mod tests {
     fn test_persist_and_load_roundtrip() {
         let conn = Connection::open_in_memory().unwrap();
         let _ = crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn);
-        let mut reg = CoeffectRegistry::new();
+        let _reg = CoeffectRegistry::new();
         let bindings = vec![CoeffectBinding::new("db", "knowledge", "{\"path\":\"kb.db\"}")];
         assert_eq!(persist_bindings(&conn, &bindings).unwrap(), 1);
         let mut restored = CoeffectRegistry::new();

@@ -343,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_placeholder() {
-        let instance = SkillCmd;
+        let _instance = SkillCmd;
         assert!(true);
     }
 }

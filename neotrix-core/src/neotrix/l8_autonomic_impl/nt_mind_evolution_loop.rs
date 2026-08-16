@@ -1665,7 +1665,7 @@ mod tests {
             compile_errors: 0,
             compile_warnings: 5,
         };
-        let (fe_clean, phi_clean) = EvolutionLoop::derive_free_energy_phi(&clean);
+        let (fe_clean, _phi_clean) = EvolutionLoop::derive_free_energy_phi(&clean);
         let (fe_dirty, phi_dirty) = EvolutionLoop::derive_free_energy_phi(&dirty);
         assert!(fe_dirty > fe_clean, "dirty FE ({}) must exceed clean FE ({})", fe_dirty, fe_clean);
         assert!(fe_dirty.is_finite() && phi_dirty.is_finite());
@@ -1762,7 +1762,7 @@ mod tests {
     #[test]
     fn test_autofix_cycle_zeroes_fixes_on_reject() {
         // 接线验证: autofix_cycle_in 中 rejected 变更 → auto_fixes=0 + rollback 模式入报告
-        let mut el = EvolutionLoop::new();
+        let _el = EvolutionLoop::new();
         let dir = std::env::temp_dir().join(format!("nt_audit_gate_{}", std::process::id()));
         std::fs::create_dir_all(dir.join("src")).expect("create mock src");
         std::fs::write(dir.join("src").join("lib.rs"), "pub fn f() {}\n").expect("write mock lib");
@@ -1820,7 +1820,7 @@ mod tests {
             verified: true,
             parent: None,
         };
-        let mut low = RstTask {
+        let low = RstTask {
             id: "low".into(),
             prompt: "low".into(),
             generation: 1,

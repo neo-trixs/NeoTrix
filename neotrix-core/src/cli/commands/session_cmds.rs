@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn test_placeholder() {
-        let instance = CompactCmd;
+        let _instance = CompactCmd;
         assert!(true);
     }
 }

@@ -1504,6 +1504,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
     fn test_vim_gg_and_G_line_edges() {
         let mut app = TuiApp::new(true);
         app.vim_mode.toggle();

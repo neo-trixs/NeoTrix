@@ -414,7 +414,6 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
 #[cfg(test)]
 mod tests {
     use super::*;
-use crate::core::nt_core_dispatch::Dispatcher;
 
     #[test]
     fn test_event_bus_new() {

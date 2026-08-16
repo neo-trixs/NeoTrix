@@ -1658,7 +1658,7 @@ mod tests {
 
     #[test]
     fn test_catalog_from_subagent_def() {
-        use crate::core::nt_core_subagent::{SubAgentDef, SubAgentDefParser};
+        use crate::core::nt_core_subagent::SubAgentDefParser;
         let content = r#"---
 name: nt-world
 description: NT-WORLD 虚空探索者（只读）
@@ -1713,7 +1713,7 @@ trigger: 探索,定位,梳理
     fn test_catalog_spawn_nt_domain_from_file() {
         let mut mgr = SubagentManager::new();
         // 文件驱动物化后 spawn
-        use crate::core::nt_core_subagent::{SubAgentDef, SubAgentDefParser};
+        use crate::core::nt_core_subagent::SubAgentDefParser;
         let content = r#"---
 name: nt-scout
 description: NT-SCOUT 虚空探查（只读）

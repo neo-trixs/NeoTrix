@@ -708,9 +708,9 @@ mod tests {
     #[test]
     fn test_pq_codebook_parse_in_memory() {
         // Build a synthetic codebook blob: m=2 subspaces, ks=2 centroids, sub_dim=2
-        let m = 2;
-        let ks = 2;
-        let sub_dim = 2;
+        let _m = 2;
+        let _ks = 2;
+        let _sub_dim = 2;
         let mut blob = Vec::new();
         // subspace 0: centroids [1,1],[9,9]; subspace 1: [2,2],[8,8]
         for cw in [1.0f32, 1.0, 9.0, 9.0, 2.0, 2.0, 8.0, 8.0] {

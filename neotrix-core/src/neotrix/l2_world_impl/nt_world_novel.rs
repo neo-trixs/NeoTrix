@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_enqueue_and_drain_novel_queue() {
-        let mut conn = Connection::open_in_memory().unwrap();
+        let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(NODES_EDGES).unwrap();
         conn.execute_batch(
             "CREATE TABLE novel_queue (

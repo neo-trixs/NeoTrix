@@ -44,6 +44,7 @@ fn main() {
     let mut total_absorbed: u64 = 0;
     let mut last_status_cycle: u64 = 0;
     let mut empty_count: u32 = 0;
+    #[allow(unused_assignments)]
     let mut cycle_count: u64 = 0;
 
     // ── 主循环 ──

@@ -160,10 +160,10 @@ fn open_memory_conn() -> rusqlite::Connection {
 
 // ─────────────────── 表格能力 (unified_file_ops) C3 基准 ───────────────────
 use neotrix::neotrix::{
-    merge_tables_with, read_xlsx_sheets_all, write_xlsx_table, MergeSchema, TableData,
+    merge_tables_with, read_xlsx_sheets_all, write_xlsx_table, TableData,
     PRICE_TABLE_SCHEMA,
 };
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// 构造临时多 sheet xlsx 目录, 返回目录路径 (bench 前一次性准备)。
 fn make_table_dir() -> PathBuf {
@@ -200,7 +200,7 @@ fn make_table_dir() -> PathBuf {
         // 每文件双 sheet 用 XlsxWriter 写
         use office_oxide::xlsx::write::{CellData, XlsxWriter};
         let mut xw = XlsxWriter::new();
-        for (si, t) in tables.iter().enumerate() {
+        for (_si, t) in tables.iter().enumerate() {
             let idx = xw.add_sheet_get_index(&t.name);
             for (c, h) in t.headers.iter().enumerate() {
                 xw.sheet_set_cell(idx, 0, c, CellData::String(h.clone()));
