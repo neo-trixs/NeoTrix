@@ -172,6 +172,18 @@ impl SkillCmd {
                         msg.push_str(&format!("\n  🔗 complementary: {}", top.join(", ")));
                     }
                 }
+                // 渐进披露接线 (P4 AnchorPromote): 首次真实加载 = durable 信号 →
+                // Minimal(2 tools) 可提升 Standard(10 tools); 披露节省入输出。
+                engine.disclosure.record_call();
+                let promoted = engine.step_disclosure();
+                let tools = engine.disclosure.active_tool_count();
+                let savings = engine.disclosure.disclosure_savings();
+                msg.push_str(&format!(
+                    "\n  📚 disclosure: tools={} savings={:.2}{}",
+                    tools,
+                    savings,
+                    if promoted { " PROMOTED→standard" } else { "" }
+                ));
                 CommandOutput::ok(&msg)
             }
             Err(e) => CommandOutput::err(&e),

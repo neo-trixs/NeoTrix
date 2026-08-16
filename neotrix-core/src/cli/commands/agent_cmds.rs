@@ -301,7 +301,7 @@ pub struct McpCmd;
 impl CliCommand for McpCmd {
     fn name(&self) -> &str { "/mcp" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "MCP: /mcp list|status|discover|search <q>|publish <name> <cmd>" }
+    fn description(&self) -> &str { "MCP: /mcp list|status|stubs|discover|search <q>|publish <name> <cmd>" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -354,6 +354,25 @@ impl CliCommand for McpCmd {
                 } else {
                     CommandOutput::ok("🔌 MCP Bridge: idle (no brain attached)")
                 }
+            }
+            "stubs" => {
+                // PTC 接线 (programmatic_tool_calling): 渲染 Python 类型签名桩,
+                // 供 agent 单 turn 内链式/并行调用 (typed-stub 工具调用)。
+                let registry = get_mcp_registry();
+                let registry = registry.blocking_read();
+                let stubs = registry.gateway().tool_stubs();
+                let mut s = format!("🐍 PTC stubs: {} typed signatures\n", stubs.len());
+                for stub in stubs {
+                    s.push_str(&format!("  def {}({}) -> str  # {}\n", stub.name, stub.signature, stub.doc));
+                }
+                if want_json {
+                    let json: Vec<serde_json::Value> = registry.gateway().tool_stubs()
+                        .iter()
+                        .map(|t| serde_json::json!({ "name": t.name, "signature": t.signature, "doc": t.doc }))
+                        .collect();
+                    return CommandOutput::ok(&s).with_json(serde_json::json!({ "stubs": json, "count": json.len() }));
+                }
+                CommandOutput::ok(&s)
             }
             "discover" | "scan" => {
                 use crate::neotrix::nt_agent_mcp_discovery::McpDiscovery;

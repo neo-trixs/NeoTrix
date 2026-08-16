@@ -652,6 +652,15 @@ async fn probe_ollama() -> bool {
 /// 3. Cloud (客体): 根据环境变量自动注册所有可用云端 API
 pub async fn create_gateway_async() -> GatewayV2 {
     let mut gateway = GatewayV2::new();
+    // R-P79 接线 (response_cache): 主工厂启用 LRU 响应缓存 (读 complete_with_selection
+    // :1595 写 heal_and_cache_response :924 已就位仅缺 flag)。默认开启, 可经环境变量关闭。
+    let cache_enabled = std::env::var("NEOTRIX_RESPONSE_CACHE")
+        .map(|v| v != "0" && !v.eq_ignore_ascii_case("off"))
+        .unwrap_or(true);
+    if cache_enabled {
+        gateway.enable_response_cache(true);
+        log::info!("[gateway] response cache enabled (LRU, fingerprint-keyed)");
+    }
 
     // ── 1. Local (主体): 自动探测本地推理端点 ──
     if probe_ollama().await {

@@ -1082,6 +1082,55 @@ impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
     }
 }
 
+/// SelfTest 包装件 (T2 注册): HDA 归因纯函数健康检测。
+/// 无需 provider, 轻量可进 Lightweight registry。
+#[derive(Default)]
+pub struct HdaAttributionSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for HdaAttributionSelfTest {
+    fn name(&self) -> &str {
+        "nt_mind_eval_harness_hda_attribution"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let report = hda_attribution(0.3, 0.1, 0.05, 0.45);
+        if !report.is_complete() {
+            return Err(vec!["hda attribution must be complete".into()]);
+        }
+        if report.top(2).is_empty() {
+            return Err(vec!["top attribution must not be empty".into()]);
+        }
+        Ok(())
+    }
+}
+
+/// SelfTest 包装件 (T2 注册): 可自验证奖励纯函数健康检测。
+/// 复用 EvalHarness SelfTest 的 verify_* 逻辑, 但无 provider 构造依赖。
+#[derive(Default)]
+pub struct SelfVerifiableRewardSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for SelfVerifiableRewardSelfTest {
+    fn name(&self) -> &str {
+        "nt_mind_eval_harness_self_verifiable_reward"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let r = verify_deterministic("42", "42");
+        if !r.verifiable || r.score != 1.0 {
+            return Err(vec!["deterministic channel failed".into()]);
+        }
+        let e = verify_extractable("json", r#"{"answer": 42}"#);
+        if !e.verifiable {
+            return Err(vec!["extractable channel failed".into()]);
+        }
+        let c = verify_constraint("no-pii", "user@example.com", &["@example.com"]);
+        if c.score != 0.0 {
+            return Err(vec!["constraint channel should reject PII".into()]);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

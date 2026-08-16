@@ -95,7 +95,7 @@ fn run_eval(args: &[String]) -> CommandOutput {
         None,
     );
 
-    let harness = EvalHarness::new_default(vec![model], vec![dataset], Arc::from(judge_provider), model_id.clone())
+    let mut harness = EvalHarness::new_default(vec![model], vec![dataset], Arc::from(judge_provider), model_id.clone())
         .with_budget_grid(budget_grid);
 
     match rt.block_on(harness.run()) {
@@ -106,8 +106,20 @@ fn run_eval(args: &[String]) -> CommandOutput {
                 let audc = r.audc_scores.get(&curve.model_name).unwrap_or(&0.0);
                 let peak = r.peak_quality.get(&curve.model_name).unwrap_or(&0.0);
                 lines.push(format!("  {}: AUDC={:.3} Peak={:.3} points={}", curve.model_name, audc, peak, curve.points.len()));
+                // ComplianceGate 接线: plain (低预算) vs aided (高预算) 通过率 → AP-Acc 合规门
+                if curve.points.len() >= 2 {
+                    let plain = curve.points[0].quality_score;
+                    let aided = curve.points[curve.points.len() - 1].quality_score;
+                    harness.record_withholding(plain, aided, curve.points.len());
+                }
             }
             lines.push(r.summary.clone());
+            // 追加合规门报告 (conformance / mean_ap_acc / passes)
+            let (conformance, ap_acc, passes) = harness.compliance_report();
+            lines.push(format!(
+                "ComplianceGate: conformance={:.3} mean_ap_acc={:.3} passes={}",
+                conformance, ap_acc, passes
+            ));
             CommandOutput::ok(&lines.join("\n"))
         }
         Ok(_) => CommandOutput::ok("eval: no reports generated"),

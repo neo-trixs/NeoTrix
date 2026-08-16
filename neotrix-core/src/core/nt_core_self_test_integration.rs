@@ -37,6 +37,21 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
     ));
+    // 2026-08-16 T2 补齐: 贝叶斯实验设计 (SelfTest 存在但漏注册, C1→C2)
+    registry.register(Box::new(
+        crate::core::nt_core_hcube::bayesian_experiment::BayesianExperimentDesign::new(
+            crate::core::nt_core_hcube::bayesian_experiment::VoIConfig::default(),
+            Vec::new(),
+        ),
+    ));
+    // 2026-08-16 T2 补齐: HDA 归因 (纯函数, 评估域原子 2/3→3/3)
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::HdaAttributionSelfTest,
+    ));
+    // 2026-08-16 T2 补齐: 可自验证奖励 (verify_* 纯函数, SelfTest 逻辑搬入独立件)
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
+    ));
     // 2026-08-15 sweep absorption batch (Phase C): 模式路由 / 潜循环 / 记忆四能力
     registry.register(Box::new(
         crate::core::nt_core_gwt::mode_router::ModeRouter::new(),
@@ -76,6 +91,8 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l2_world_impl::nt_world_osint::sweep::SweepDeltaSelfTest,
     ));
+    // 2026-08-16 T2 补齐: UnifiedAbsorber (in-memory KB, 无网络)
+    registry.register(Box::new(UnifiedAbsorberSelfTest));
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_io_multimodal_transform::VisionPreprocessor::new(),
     ));
@@ -131,11 +148,19 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
         crate::core::nt_core_quantum_fusion::QuantumFusionSelfTest,
     ));
     registry.register(Box::new(ConstitutionComplianceTest));
-    // NT-WORLD (2)
+    // 2026-08-16 T2 补齐 (lightweight): 贝叶斯实验设计
+    registry.register(Box::new(
+        crate::core::nt_core_hcube::bayesian_experiment::BayesianExperimentDesign::new(
+            crate::core::nt_core_hcube::bayesian_experiment::VoIConfig::default(),
+            Vec::new(),
+        ),
+    ));
+    // NT-WORLD (3)
     registry.register(Box::new(VideoPipelineSelfTest));
     registry.register(Box::new(
         crate::neotrix::l2_world_impl::nt_world_video_pipeline::MediaSniffer::new(),
     ));
+    registry.register(Box::new(UnifiedAbsorberSelfTest));
     // NT-MEMORY (4)
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(
@@ -145,12 +170,22 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
         crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
     ));
     registry.register(Box::new(Bm25IndexSelfTest));
-    // NT-MIND (2)
+    // NT-MIND (5)
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
     ));
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
+    ));
+    // 2026-08-16 T2 补齐 (lightweight): 小规模方法 / HDA 归因 / 可自验证奖励
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::HdaAttributionSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
     ));
     // NT-REPAIR / NT-META / NT-GOVERNANCE / NT-NEXUS (4 分支迷雾治理, 每分支 ≥1)
     registry.register(Box::new(
@@ -400,8 +435,49 @@ impl SelfTest for VideoPipelineSelfTest {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         use crate::neotrix::l2_world_impl::nt_world_video_pipeline::*;
-        let orch = VideoOrchestrator::new(TranscodeConfig::default());
-        orch.self_test()
+        let mut orch = VideoOrchestrator::new(TranscodeConfig::default());
+        orch.self_test()?;
+        // VideoProductionChain 接线 (C1→T2/T3): 纯内存确定性 produce_video 自检。
+        let manifest = orch.produce_video("self-check").map_err(|e| vec![e])?;
+        if manifest.len() < 5 {
+            return Err(vec![format!("produce_video must yield full 5-stage manifest, got {}", manifest.len())]);
+        }
+        // VideoChainRunner 接线: run_all + checkpoint JSON roundtrip (纯内存)。
+        let mut runner = VideoChainRunner::new("self-check");
+        let stages = runner.run_all().map_err(|e| vec![e])?;
+        if stages.is_empty() {
+            return Err(vec!["video chain runner produced no stages".into()]);
+        }
+        let serialized = runner.checkpoint.to_json().map_err(|e| vec![e])?;
+        let restored = VideoChainCheckpoint::from_json(&serialized).map_err(|e| vec![e])?;
+        if restored.source != runner.checkpoint.source {
+            return Err(vec!["video chain checkpoint roundtrip mismatch".into()]);
+        }
+        if !restored.all_done() {
+            return Err(vec!["restored checkpoint must be all-done after full run".into()]);
+        }
+        Ok(())
+    }
+}
+
+/// UnifiedAbsorber 接线 (C1→T2/T3): in-memory KB 构造 + 纯 DB 状态自检 (无网络)。
+struct UnifiedAbsorberSelfTest;
+
+impl SelfTest for UnifiedAbsorberSelfTest {
+    fn name(&self) -> &str {
+        "nt_world_absorber_unified"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        use crate::neotrix::l2_world_impl::nt_memory_kb_bridge::KnowledgeBase;
+        use crate::neotrix::l2_world_impl::nt_world_absorber::{AbsorberConfig, UnifiedAbsorber};
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
+            .map_err(|e| vec![e])?;
+        let absorber = UnifiedAbsorber::new(kb, AbsorberConfig::default())
+            .map_err(|e| vec![e])?;
+        let _ = absorber.status().map_err(|e| vec![e])?;
+        let _ = absorber.api_registry_stats();
+        Ok(())
     }
 }
 

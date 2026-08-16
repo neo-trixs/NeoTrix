@@ -295,6 +295,13 @@ impl ResponseCache {
         format!("{}|{}", model_id, body)
     }
 
+    /// 指纹硬化 key: model + 请求语义指纹 (max_tokens/tools/structured_output)。
+    /// 修复: 旧 key_for 仅拼 messages, 同提示词不同 max_tokens/工具集会错误共享
+    /// 缓存 → 可能命中截断输出 (Length) 或带 tool_calls 的响应。
+    pub fn key_for_request(model_id: &str, fingerprint: &str) -> String {
+        format!("{}|fp={}", model_id, fingerprint)
+    }
+
     /// 确定性哈希 (std DefaultHasher, 无外部依赖)
     fn hash_key(key: &str) -> u64 {
         use std::hash::{Hash, Hasher};
@@ -914,7 +921,7 @@ impl GatewayV2 {
             }
         }
         if self.response_cache_enabled {
-            let rc_key = ResponseCache::key_for(&request.model, &request.messages);
+            let rc_key = ResponseCache::key_for_request(&request.model, &self.prompt_cache_key(request));
             if let Ok(mut rc) = self.response_cache.lock() {
                 match serde_json::to_string(&response) {
                     Ok(serialized) => rc.insert(&rc_key, serialized),
@@ -1585,7 +1592,7 @@ impl GatewayV2 {
 
         // Layer 1.5: LRU response cache (G: Response Caching) — 命中直接返回
         if self.response_cache_enabled {
-            let rc_key = ResponseCache::key_for(&request.model, &request.messages);
+            let rc_key = ResponseCache::key_for_request(&request.model, &self.prompt_cache_key(request));
             if let Ok(mut rc) = self.response_cache.lock() {
                 if let Some(cached) = rc.cache(&rc_key) {
                     // G26 分层 expert 缓存 (colibri): 高频命中 key 自动 pin 热集,

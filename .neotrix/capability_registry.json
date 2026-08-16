@@ -503,7 +503,7 @@
       "id": "nt_mind_skill_engine::progressive_disclosure",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "skill",
         "progressive",
@@ -531,11 +531,19 @@
           "to_node": "nt_mind_skill_engine::progressive_disclosure",
           "note": "Promoted to C1",
           "timestamp": "2026-08-14T03:58:12.381498Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::progressive_disclosure",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:04:12.954238Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:58:06.411029Z",
-      "updated_at": "2026-08-14T07:25:10.492938Z",
+      "updated_at": "2026-08-16T13:04:12.954239Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1460,7 +1468,7 @@
       "id": "nt_mind_eval_harness::ap_acc_compliance_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "AP-Acc",
         "反巧合评估",
@@ -1492,11 +1500,19 @@
           "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:33:56.392460Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:03:35.168047Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T12:55:44.878189Z",
-      "updated_at": "2026-08-16T07:33:56.392462Z",
+      "updated_at": "2026-08-16T13:03:35.168048Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2208,7 +2224,7 @@
       "id": "nt_world_video_pipeline::video_production_chain",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "video_production_chain",
         "script_material_tts_compose_publish",
@@ -2231,11 +2247,19 @@
           "to_node": "nt_world_video_pipeline::video_production_chain",
           "note": "G19 video_publish_pipeline (MoneyPrinterTurbo): script→material→TTS→compose→publish full chain",
           "timestamp": "2026-08-15T14:59:52Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_production_chain",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:11:22.998036Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-16T07:39:55.351093Z",
+      "updated_at": "2026-08-16T13:11:22.998037Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2364,7 +2388,7 @@
       "id": "nt_mind_eval_harness::hda_attribution",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "attribution",
         "heldout"
@@ -2382,11 +2406,19 @@
           "to_node": "nt_mind_eval_harness::hda_attribution",
           "note": "P2 HDA blog: O/T/G 归因门控 + held-out 报告; 4 单测 + SelfTest T1/T2",
           "timestamp": "2026-08-15T23:00:00Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::hda_attribution",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:01:59.341862Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-15T23:00:00Z",
+      "updated_at": "2026-08-16T13:01:59.341863Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2619,7 +2651,7 @@
       "id": "nt_mind_eval_harness::self_verifiable_reward",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "self_verify"
       ],
@@ -2636,11 +2668,19 @@
           "to_node": "nt_mind_eval_harness::self_verifiable_reward",
           "note": "P9 RLSVR: 任务转换→自验证奖励 (隐变量+规则交互); 单测 + SelfTest T1/T2",
           "timestamp": "2026-08-15T23:00:00Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::self_verifiable_reward",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:01:59.805796Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-15T23:00:00Z",
+      "updated_at": "2026-08-16T13:01:59.805797Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3250,7 +3290,7 @@
       "id": "nt_agent_mcp_gateway::programmatic_tool_calling",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "tool_stub",
         "call_chain",
@@ -3275,11 +3315,19 @@
           "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:33:55.890634Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:04:55.118338Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T02:50:22.160537Z",
-      "updated_at": "2026-08-16T07:33:55.890635Z",
+      "updated_at": "2026-08-16T13:04:55.118339Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3331,7 +3379,7 @@
       "id": "nt_core_hcube::bayesian_experiment_design",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "voi",
         "m_open",
@@ -3356,11 +3404,19 @@
           "to_node": "nt_core_hcube::bayesian_experiment_design",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:33:55.927180Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_hcube::bayesian_experiment_design",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:01:58.868700Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T03:20:30.417692Z",
-      "updated_at": "2026-08-16T07:33:55.927182Z",
+      "updated_at": "2026-08-16T13:01:58.868701Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3473,7 +3529,7 @@
       "id": "nt_io_provider::response_cache",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "response_caching",
         "response_healing",
@@ -3500,11 +3556,19 @@
           "to_node": "nt_io_provider::response_cache",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:46:12.084320Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::response_cache",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:08:10.626516Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T07:45:07.725209Z",
-      "updated_at": "2026-08-16T07:46:12.084322Z",
+      "updated_at": "2026-08-16T13:08:10.626517Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3605,7 +3669,7 @@
       "id": "nt_world_absorber::unified_absorber",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "unified_absorption",
         "webpage_report"
@@ -3631,11 +3695,19 @@
           "to_node": "nt_world_absorber::unified_absorber",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:46:12.146503Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::unified_absorber",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:15:24.032791Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T07:45:11.183785Z",
-      "updated_at": "2026-08-16T07:46:12.146509Z",
+      "updated_at": "2026-08-16T13:15:24.032792Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3698,7 +3770,7 @@
       "id": "nt_world_video_pipeline::video_chain_runner",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "video_chain_runner",
         "chain_execution"
@@ -3724,11 +3796,19 @@
           "to_node": "nt_world_video_pipeline::video_chain_runner",
           "note": "Promoted to C1",
           "timestamp": "2026-08-16T07:46:12.188227Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_chain_runner",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-16T13:11:23.448658Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-16T07:45:26.688357Z",
-      "updated_at": "2026-08-16T07:46:12.188229Z",
+      "updated_at": "2026-08-16T13:11:23.448660Z",
       "deprecated": false,
       "deprecated_reason": null
     },
