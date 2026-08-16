@@ -165,6 +165,7 @@ pub mod nt_core_bounded_collections;
 pub mod nt_core_telemetry;
 pub mod nt_core_qtest;
 pub mod nt_core_arch_fitness;
+pub mod nt_core_quantum_fusion;
 pub mod nt_core_answer_engine;
 pub mod nt_core_self_test_integration;
 pub mod nt_core_second_brain;
