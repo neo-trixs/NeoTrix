@@ -29,7 +29,7 @@ pub struct SandboxRule {
     pub requires_approval: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ActionSandbox {
     /// Prefix rules: most-specific prefix wins
     rules: Vec<SandboxRule>,
@@ -41,6 +41,16 @@ pub struct ActionSandbox {
     pub evaluated_count: u64,
     /// 磁盘沙盒 — 任务 allowlist 越界检查 (nt_act_disk_guard 接线)
     pub disk_guard: Option<DiskGuard>,
+}
+
+impl Default for ActionSandbox {
+    /// 与 `new()` 等价: 默认实例也必须携带保守防护规则。
+    /// 此前 derive(Default) 的 rules 恒空 → SelfTest "no sandbox rules
+    /// configured" 失败 → NT-ACT 分支 health 恒 0.667 (3 检测 2 过 1 败)。
+    /// 注册表以 `ActionSandbox::default()` 构造检测件, 空规则即无防护语义。
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ActionSandbox {
