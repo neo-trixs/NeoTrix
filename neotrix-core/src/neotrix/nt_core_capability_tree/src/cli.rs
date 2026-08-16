@@ -1,6 +1,6 @@
 //! CLI: neotrix-capability 子命令
 
-use crate::node::{CapabilityNode, Domain, NodeLayer};
+use crate::node::{CapabilityNode, ConstellationLevel, Domain, NodeLayer};
 use crate::registry::{CapabilityRegistry, RegistryError};
 use crate::evolution::{EvolutionAction, EvolutionEngine, EvolutionPlan};
 use clap::{Parser, Subcommand};
@@ -91,6 +91,12 @@ pub enum Commands {
         /// 节点 ID
         #[arg(long)]
         id: String,
+        /// 生产接线证据 (file:line 描述生产消费路径, C1→C2 必填)
+        #[arg(long)]
+        wiring: Option<String>,
+        /// 显式确认证据门禁已通过 (C2→C3 及以上)
+        #[arg(long)]
+        evidence: bool,
     },
 
     /// 强化: 吸收经验强化既有节点 (R-P42)
@@ -227,8 +233,8 @@ impl CapabilityCli {
             Commands::Prune { id, reason, force } => {
                 self.cmd_prune(&mut registry, id, reason, *force)?;
             }
-            Commands::Mature { id } => {
-                self.cmd_mature(&mut registry, id)?;
+            Commands::Mature { id, wiring, evidence } => {
+                self.cmd_mature(&mut registry, id, wiring.as_deref(), *evidence)?;
             }
             Commands::Strengthen { id, note } => {
                 self.cmd_strengthen(&mut registry, id, note)?;
@@ -497,7 +503,28 @@ impl CapabilityCli {
         Ok(())
     }
 
-    fn cmd_mature(&self, registry: &mut CapabilityRegistry, id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    fn cmd_mature(&self, registry: &mut CapabilityRegistry, id: &str, wiring: Option<&str>, evidence: bool) -> Result<(), Box<dyn std::error::Error>> {
+        // 写入晋升证据 (D16 门禁): C1→C2 需 wiring_evidence; C2+ 需 evidence_gated
+        if let Some(node) = registry.get_mut(id) {
+            if let Some(w) = wiring {
+                node.metadata.insert("wiring_evidence".into(), serde_json::Value::String(w.to_string()));
+            }
+            if evidence {
+                node.metadata.insert("evidence_gated".into(), serde_json::Value::String("passed".into()));
+            }
+            if node.constellation == ConstellationLevel::C1UnitTest && wiring.is_none() {
+                return Err(format!(
+                    "mature {} requires --wiring '<file:line> production wiring evidence' for C1→C2 (D16 gate)",
+                    id
+                ).into());
+            }
+            if node.constellation >= ConstellationLevel::C2IntegrationTest && !evidence {
+                return Err(format!(
+                    "mature {} requires --evidence for C2+ promotion (benchmark/pipeline/self-healing proof, D16 gate)",
+                    id
+                ).into());
+            }
+        }
         let plan = EvolutionEngine::new(registry).plan_mature(id.to_string());
         EvolutionEngine::new(registry).execute(plan)?;
         if let Some(node) = registry.get(id) {

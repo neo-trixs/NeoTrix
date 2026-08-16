@@ -215,7 +215,9 @@ impl<'a> EvolutionEngine<'a> {
                 }
                 EvolutionAction::Mature { node_id } => {
                     if let Some(node) = self.registry.get_mut(&node_id) {
-                        node.promote_constellation();
+                        node.promote_constellation().map_err(|reason| {
+                            RegistryError::Validation(format!("mature {} rejected by evidence gate: {}", node_id, reason))
+                        })?;
                     }
                 }
                 EvolutionAction::Strengthen { node_id, note } => {
@@ -271,15 +273,14 @@ impl<'a> EvolutionEngine<'a> {
             ));
         }
 
-        // 3. 发现可晋升节点
+        // 3. 发现可晋升节点 — 仅自动晋升 C0→C1 (编译→单元测试, 拓扑/测试证据足够)。
+        //    C1→C2 (生产接线) 及以上必须人工 cmd_mature 提供 wiring_evidence / evidence_gated
+        //    (D16 自欺防线: dependents 是设计依赖非运行接线, 自动晋升会虚标 C2)。
         for node in self.registry.promotable_nodes() {
-            // 简化: 所有 dependents 都在生产即可晋升
-            let all_deps_prod = node.dependents.iter().all(|d| {
-                self.registry.get(d).map(|n| n.constellation as u8 >= 3).unwrap_or(false)
-            });
-            if all_deps_prod || node.dependents.is_empty() {
-                plans.push(self.plan_mature(node.id.clone()));
+            if node.constellation as u8 >= 1 {
+                continue;
             }
+            plans.push(self.plan_mature(node.id.clone()));
         }
 
         // 4. 发现分散重复能力 (同 provides 标签下有多个同层节点)

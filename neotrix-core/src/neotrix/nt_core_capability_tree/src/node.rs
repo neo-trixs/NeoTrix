@@ -330,8 +330,63 @@ impl CapabilityNode {
         self.updated_at = chrono::Utc::now();
     }
 
-    /// 晋升星座等级
-    pub fn promote_constellation(&mut self) -> bool {
+    /// 晋升证据门禁 (D16 自欺防线) — 阻止无证据晋升。
+    ///
+    /// 判定标准 (与 Constellation 晋级条件对齐):
+    /// - C0→C1: 必须提供能力标签 (provides 非空), 证明节点有真实职责
+    /// - C1→C2: 必须存在生产接线证据 (metadata.wiring_evidence 非空, 描述
+    ///   生产消费路径 file:line)。注意 dependents 仅记录设计依赖 (DAG 边),
+    ///   不等于运行时接线 — 接线证据必须显式声明 (审查 D2/D16 发现)。
+    /// - ≥C2: 需 evidence_gated='passed' 显式标记 (集成测试 + benchmark + 流水线)。
+    ///
+    /// 返回 (通过?, 拒绝原因)。原因非空即拒绝。
+    pub fn promotion_evidence_gate(&self) -> (bool, Option<String>) {
+        match self.constellation {
+            ConstellationLevel::C0Compile => {
+                if self.provides.is_empty() {
+                    (false, Some("C0→C1 gate: node provides no capability labels".into()))
+                } else {
+                    (true, None)
+                }
+            }
+            ConstellationLevel::C1UnitTest => {
+                let has_wiring = self
+                    .metadata
+                    .get("wiring_evidence")
+                    .map(|v| v.is_string() && !v.as_str().unwrap_or("").is_empty())
+                    .unwrap_or(false);
+                if !has_wiring {
+                    (false, Some("C1→C2 gate: no production wiring evidence (set metadata.wiring_evidence)".into()))
+                } else {
+                    (true, None)
+                }
+            }
+            ConstellationLevel::C2IntegrationTest
+            | ConstellationLevel::C3Benchmark
+            | ConstellationLevel::C4MainPipeline => {
+                if self
+                    .metadata
+                    .get("evidence_gated")
+                    .map(|v| v == "passed")
+                    .unwrap_or(false)
+                {
+                    (true, None)
+                } else {
+                    (false, Some("C2+ gate: requires evidence_gated='passed' in metadata".into()))
+                }
+            }
+            ConstellationLevel::C5SelfHealing | ConstellationLevel::C6EvolutionLoop => {
+                (true, None)
+            }
+        }
+    }
+
+    /// 晋升星座等级 (受证据门禁约束)
+    pub fn promote_constellation(&mut self) -> Result<bool, String> {
+        let (gate_ok, reason) = self.promotion_evidence_gate();
+        if !gate_ok {
+            return Err(reason.unwrap_or_else(|| "evidence gate rejected".into()));
+        }
         if let Some(next) = self.constellation.next() {
             self.constellation = next;
             self.record_evolution(EvolutionLogEntry {
@@ -342,9 +397,9 @@ impl CapabilityNode {
                 note: format!("Promoted to {}", next.as_str()),
                 timestamp: chrono::Utc::now(),
             });
-            true
+            Ok(true)
         } else {
-            false
+            Ok(false)
         }
     }
 

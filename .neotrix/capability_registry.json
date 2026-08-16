@@ -37,7 +37,10 @@
           "timestamp": "2026-08-16T07:33:55.836188Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-11T06:24:37.598213Z",
       "updated_at": "2026-08-16T07:33:55.836189Z",
       "deprecated": false,
@@ -88,7 +91,10 @@
           "timestamp": "2026-08-16T12:32:31.833772Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-11T06:24:37.598236Z",
       "updated_at": "2026-08-16T12:32:31.833773Z",
       "deprecated": false,
@@ -127,7 +133,9 @@
         }
       ],
       "metadata": {
+        "evidence_gated": "unknown",
         "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
         "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
@@ -171,8 +179,10 @@
         }
       ],
       "metadata": {
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
+        "evidence_gated": "unknown",
         "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:33:55.945651Z",
@@ -381,7 +391,10 @@
           "timestamp": "2026-08-16T07:35:04.200467Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T03:07:54.119406Z",
       "updated_at": "2026-08-16T07:35:04.200467Z",
       "deprecated": true,
@@ -493,7 +506,10 @@
           "timestamp": "2026-08-16T07:33:56.090066Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-14T03:07:54.135702Z",
       "updated_at": "2026-08-16T07:33:56.090067Z",
       "deprecated": false,
@@ -541,7 +557,10 @@
           "timestamp": "2026-08-16T13:04:12.954238Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "skill_cmds.rs:175-186 record_call+step_disclosure"
+      },
       "created_at": "2026-08-14T03:58:06.411029Z",
       "updated_at": "2026-08-16T13:04:12.954239Z",
       "deprecated": false,
@@ -587,7 +606,10 @@
           "timestamp": "2026-08-16T07:33:56.160374Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-14T03:58:06.420110Z",
       "updated_at": "2026-08-16T07:33:56.160376Z",
       "deprecated": false,
@@ -643,7 +665,10 @@
           "timestamp": "2026-08-16T07:35:04.200462Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-14T03:58:06.428234Z",
       "updated_at": "2026-08-16T07:35:04.200464Z",
       "deprecated": false,
@@ -831,7 +856,10 @@
           "timestamp": "2026-08-16T12:39:38.480344Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-14T07:24:57.735635Z",
       "updated_at": "2026-08-16T12:39:38.480346Z",
       "deprecated": false,
@@ -886,7 +914,10 @@
           "timestamp": "2026-08-16T12:32:02.255810Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-14T07:25:01.569883Z",
       "updated_at": "2026-08-16T12:32:02.255810Z",
       "deprecated": false,
@@ -935,7 +966,10 @@
           "timestamp": "2026-08-16T12:34:35.302202Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T07:25:01.580480Z",
       "updated_at": "2026-08-16T12:34:35.302204Z",
       "deprecated": false,
@@ -990,7 +1024,10 @@
           "timestamp": "2026-08-16T12:43:34.910495Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T08:24:18.424618Z",
       "updated_at": "2026-08-16T12:43:34.910496Z",
       "deprecated": false,
@@ -1204,7 +1241,10 @@
           "timestamp": "2026-08-16T12:32:02.769276Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T08:24:43.288598Z",
       "updated_at": "2026-08-16T12:32:02.769277Z",
       "deprecated": false,
@@ -1255,7 +1295,10 @@
           "timestamp": "2026-08-16T12:32:03.277921Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T11:46:32.523575Z",
       "updated_at": "2026-08-16T12:32:03.277922Z",
       "deprecated": false,
@@ -1310,7 +1353,10 @@
           "timestamp": "2026-08-16T12:32:03.793075Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-14T11:46:33.420325Z",
       "updated_at": "2026-08-16T12:32:03.793076Z",
       "deprecated": false,
@@ -1359,7 +1405,10 @@
           "timestamp": "2026-08-16T12:32:04.315539Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T11:46:34.190535Z",
       "updated_at": "2026-08-16T12:32:04.315539Z",
       "deprecated": false,
@@ -1409,7 +1458,10 @@
           "timestamp": "2026-08-16T10:57:30.281918Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T12:55:44.852663Z",
       "updated_at": "2026-08-16T10:57:30.281919Z",
       "deprecated": false,
@@ -1458,7 +1510,10 @@
           "timestamp": "2026-08-16T12:32:04.832412Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-14T12:55:44.865493Z",
       "updated_at": "2026-08-16T12:32:04.832413Z",
       "deprecated": false,
@@ -1510,7 +1565,10 @@
           "timestamp": "2026-08-16T13:03:35.168047Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "bench_cmds.rs:113 record_withholding + compliance_report"
+      },
       "created_at": "2026-08-14T12:55:44.878189Z",
       "updated_at": "2026-08-16T13:03:35.168048Z",
       "deprecated": false,
@@ -1559,7 +1617,10 @@
           "timestamp": "2026-08-16T12:32:34.469580Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T01:56:52.494679Z",
       "updated_at": "2026-08-16T12:32:34.469581Z",
       "deprecated": false,
@@ -1607,7 +1668,10 @@
           "timestamp": "2026-08-16T10:57:29.731485Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T01:56:57.858315Z",
       "updated_at": "2026-08-16T10:57:29.731486Z",
       "deprecated": false,
@@ -1703,7 +1767,10 @@
           "timestamp": "2026-08-15T04:15:47.812468Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T04:15:47.812468Z",
       "updated_at": "2026-08-16T00:25:21.783488Z",
       "deprecated": false,
@@ -1821,7 +1888,10 @@
           "timestamp": "2026-08-16T07:33:56.072577Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T04:15:47.812468Z",
       "updated_at": "2026-08-16T07:33:56.072578Z",
       "deprecated": false,
@@ -1853,7 +1923,10 @@
           "timestamp": "2026-08-15T05:25:53.646647Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-16T00:25:21.783506Z",
       "deprecated": false,
@@ -1894,7 +1967,10 @@
           "timestamp": "2026-08-16T07:33:56.428013Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-16T07:33:56.428014Z",
       "deprecated": false,
@@ -1943,7 +2019,7 @@
       "id": "nt_world_video_pipeline::checkpoint_resume",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "video_chain_checkpoint",
         "resume",
@@ -1972,7 +2048,10 @@
           "timestamp": "2026-08-16T07:33:56.606745Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "degraded",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+      },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-16T07:33:56.606746Z",
       "deprecated": false,
@@ -2013,7 +2092,10 @@
           "timestamp": "2026-08-16T07:33:56.302391Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-16T07:33:56.302392Z",
       "deprecated": false,
@@ -2052,7 +2134,10 @@
           "timestamp": "2026-08-16T07:33:56.107773Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.107775Z",
       "deprecated": false,
@@ -2093,7 +2178,10 @@
           "timestamp": "2026-08-16T07:33:56.320408Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.320410Z",
       "deprecated": false,
@@ -2103,7 +2191,7 @@
       "id": "nt_world_absorber::api_registry_meta",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "api_registry_schema",
         "discovery_seed",
@@ -2134,7 +2222,10 @@
           "timestamp": "2026-08-16T07:33:56.516732Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "degraded",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+      },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.516733Z",
       "deprecated": false,
@@ -2173,7 +2264,10 @@
           "timestamp": "2026-08-16T07:33:56.553092Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.553093Z",
       "deprecated": false,
@@ -2214,7 +2308,10 @@
           "timestamp": "2026-08-16T07:33:56.249154Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.249155Z",
       "deprecated": false,
@@ -2224,7 +2321,7 @@
       "id": "nt_world_video_pipeline::video_production_chain",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "video_production_chain",
         "script_material_tts_compose_publish",
@@ -2257,7 +2354,10 @@
           "timestamp": "2026-08-16T13:11:22.998036Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "degraded",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+      },
       "created_at": "2026-08-15T14:59:52Z",
       "updated_at": "2026-08-16T13:11:22.998037Z",
       "deprecated": false,
@@ -2267,7 +2367,7 @@
       "id": "nt_world_video_pipeline::asset_enricher",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "asset_ml_enrichment",
         "dedup",
@@ -2299,7 +2399,10 @@
           "timestamp": "2026-08-16T07:33:56.588815Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "degraded",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+      },
       "created_at": "2026-08-15T14:59:52Z",
       "updated_at": "2026-08-16T07:33:56.588817Z",
       "deprecated": false,
@@ -2340,9 +2443,13 @@
           "timestamp": "2026-08-16T07:33:56.019287Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed",
+        "wiring_evidence": "code_graph_cmds.rs:13,50 CodeGraphMCP tools (search_hybrid wired 3a010aca)"
+      },
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-16T07:33:56.019288Z",
+      "updated_at": "2026-08-16T14:59:38.572610Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2378,7 +2485,10 @@
           "timestamp": "2026-08-16T12:32:34.980756Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:34.980757Z",
       "deprecated": false,
@@ -2416,7 +2526,10 @@
           "timestamp": "2026-08-16T13:01:59.341862Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "self_test_integration HdaAttributionSelfTest"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T13:01:59.341863Z",
       "deprecated": false,
@@ -2454,7 +2567,10 @@
           "timestamp": "2026-08-16T12:32:28.654926Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:28.654927Z",
       "deprecated": false,
@@ -2492,7 +2608,10 @@
           "timestamp": "2026-08-16T12:32:31.309498Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:31.309498Z",
       "deprecated": false,
@@ -2529,7 +2648,10 @@
           "timestamp": "2026-08-16T12:32:29.213218Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:29.213219Z",
       "deprecated": false,
@@ -2567,7 +2689,10 @@
           "timestamp": "2026-08-16T12:32:33.407300Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:33.407300Z",
       "deprecated": false,
@@ -2604,7 +2729,10 @@
           "timestamp": "2026-08-16T12:32:05.342849Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:05.342850Z",
       "deprecated": false,
@@ -2641,7 +2769,10 @@
           "timestamp": "2026-08-16T12:32:29.731072Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:29.731073Z",
       "deprecated": false,
@@ -2678,7 +2809,10 @@
           "timestamp": "2026-08-16T13:01:59.805796Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "wiring_evidence": "self_test_integration SelfVerifiableRewardSelfTest",
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T13:01:59.805797Z",
       "deprecated": false,
@@ -2715,7 +2849,10 @@
           "timestamp": "2026-08-16T12:32:20.413818Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:20.413819Z",
       "deprecated": false,
@@ -2752,7 +2889,10 @@
           "timestamp": "2026-08-16T12:42:42.867229Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:42:42.867230Z",
       "deprecated": false,
@@ -2789,7 +2929,10 @@
           "timestamp": "2026-08-16T12:32:20.918977Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:20.918978Z",
       "deprecated": false,
@@ -2826,7 +2969,10 @@
           "timestamp": "2026-08-16T12:32:35.503914Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:35.503915Z",
       "deprecated": false,
@@ -2871,7 +3017,10 @@
           "timestamp": "2026-08-16T12:32:21.429565Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:21.429566Z",
       "deprecated": false,
@@ -2910,7 +3059,10 @@
           "timestamp": "2026-08-16T12:34:35.917481Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:34:35.917482Z",
       "deprecated": false,
@@ -2947,7 +3099,10 @@
           "timestamp": "2026-08-16T07:33:56.213442Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T07:33:56.213443Z",
       "deprecated": false,
@@ -2984,7 +3139,10 @@
           "timestamp": "2026-08-16T12:32:33.942052Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:33.942052Z",
       "deprecated": false,
@@ -3021,7 +3179,10 @@
           "timestamp": "2026-08-16T12:32:32.361256Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:32.361257Z",
       "deprecated": false,
@@ -3058,7 +3219,10 @@
           "timestamp": "2026-08-16T12:32:32.894526Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:32.894527Z",
       "deprecated": false,
@@ -3095,7 +3259,10 @@
           "timestamp": "2026-08-16T12:32:30.260678Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:30.260679Z",
       "deprecated": false,
@@ -3105,7 +3272,7 @@
       "id": "nt_world_absorber::metadata_aggregate",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "metadata_aggregate"
       ],
@@ -3132,7 +3299,10 @@
           "timestamp": "2026-08-16T12:32:22.444862Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "degraded"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:22.444863Z",
       "deprecated": false,
@@ -3142,7 +3312,7 @@
       "id": "nt_world_video_pipeline::media_sniff",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "media_sniff"
       ],
@@ -3169,7 +3339,10 @@
           "timestamp": "2026-08-16T12:32:21.933842Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "degraded",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:21.933843Z",
       "deprecated": false,
@@ -3206,7 +3379,10 @@
           "timestamp": "2026-08-16T12:32:05.852151Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:05.852152Z",
       "deprecated": false,
@@ -3243,7 +3419,10 @@
           "timestamp": "2026-08-16T12:32:36.025975Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:36.025976Z",
       "deprecated": false,
@@ -3280,7 +3459,10 @@
           "timestamp": "2026-08-16T12:32:30.782625Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:30.782626Z",
       "deprecated": false,
@@ -3325,7 +3507,10 @@
           "timestamp": "2026-08-16T13:04:55.118338Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs",
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-16T02:50:22.160537Z",
       "updated_at": "2026-08-16T13:04:55.118339Z",
       "deprecated": false,
@@ -3369,7 +3554,10 @@
           "timestamp": "2026-08-16T12:32:36.553840Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-16T02:50:22.749743Z",
       "updated_at": "2026-08-16T12:32:36.553841Z",
       "deprecated": false,
@@ -3414,7 +3602,10 @@
           "timestamp": "2026-08-16T13:01:58.868700Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "self_test_integration registered dual registry"
+      },
       "created_at": "2026-08-16T03:20:30.417692Z",
       "updated_at": "2026-08-16T13:01:58.868701Z",
       "deprecated": false,
@@ -3458,7 +3649,10 @@
           "timestamp": "2026-08-16T12:40:48.842557Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-16T03:20:31.705506Z",
       "updated_at": "2026-08-16T12:40:48.842558Z",
       "deprecated": false,
@@ -3566,7 +3760,10 @@
           "timestamp": "2026-08-16T13:08:10.626516Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "factory.rs:655 enable_response_cache + gateway.rs:1595/924 read-write"
+      },
       "created_at": "2026-08-16T07:45:07.725209Z",
       "updated_at": "2026-08-16T13:08:10.626517Z",
       "deprecated": false,
@@ -3613,7 +3810,10 @@
           "timestamp": "2026-08-16T12:43:22.200932Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
+      },
       "created_at": "2026-08-16T07:45:11.146832Z",
       "updated_at": "2026-08-16T12:43:22.200933Z",
       "deprecated": false,
@@ -3659,7 +3859,10 @@
           "timestamp": "2026-08-16T12:32:23.495702Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-16T07:45:11.165170Z",
       "updated_at": "2026-08-16T12:32:23.495703Z",
       "deprecated": false,
@@ -3669,7 +3872,7 @@
       "id": "nt_world_absorber::unified_absorber",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "unified_absorption",
         "webpage_report"
@@ -3705,7 +3908,10 @@
           "timestamp": "2026-08-16T13:15:24.032791Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "degraded"
+      },
       "created_at": "2026-08-16T07:45:11.183785Z",
       "updated_at": "2026-08-16T13:15:24.032792Z",
       "deprecated": false,
@@ -3770,7 +3976,7 @@
       "id": "nt_world_video_pipeline::video_chain_runner",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "video_chain_runner",
         "chain_execution"
@@ -3806,7 +4012,10 @@
           "timestamp": "2026-08-16T13:11:23.448658Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "degraded"
+      },
       "created_at": "2026-08-16T07:45:26.688357Z",
       "updated_at": "2026-08-16T13:11:23.448660Z",
       "deprecated": false,
@@ -3915,7 +4124,10 @@
           "timestamp": "2026-08-16T12:32:22.969831Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+      },
       "created_at": "2026-08-16T07:45:34.006424Z",
       "updated_at": "2026-08-16T12:32:22.969831Z",
       "deprecated": false,
@@ -3960,7 +4172,10 @@
           "timestamp": "2026-08-16T10:28:51.196255Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "unified_tauri_full_catalog L2 orchestrator"
+      },
       "created_at": "2026-08-16T10:26:23.580698Z",
       "updated_at": "2026-08-16T10:28:51.196256Z",
       "deprecated": false,

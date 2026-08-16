@@ -35,6 +35,8 @@ pub enum RegistryError {
     Serde(#[from] serde_json::Error),
     #[error("IO 错误: {0}")]
     Io(#[from] std::io::Error),
+    #[error("验证失败: {0}")]
+    Validation(String),
 }
 
 /// 注册表核心

@@ -164,4 +164,53 @@ mod tests {
         .collect();
         assert_eq!(costs.len(), 7, "7 级代价应互不相同");
     }
+
+    #[test]
+    fn test_promotion_evidence_gate_c0_to_c1() {
+        // C0→C1: provides 非空即通过
+        let mut node = CapabilityNode::new_primitive("t::a".into(), Domain::Core, vec!["alpha".into()]);
+        let (ok, reason) = node.promotion_evidence_gate();
+        assert!(ok, "C0 with provides should pass: {:?}", reason);
+        // 无 provides 拒绝
+        let bare = CapabilityNode::new_primitive("t::b".into(), Domain::Core, vec![]);
+        let (ok2, reason2) = bare.promotion_evidence_gate();
+        assert!(!ok2, "C0 without provides must be rejected");
+        assert!(reason2.is_some());
+        // 晋升成功
+        assert!(node.promote_constellation().is_ok());
+        assert_eq!(node.constellation, ConstellationLevel::C1UnitTest);
+    }
+
+    #[test]
+    fn test_promotion_evidence_gate_c1_to_c2_requires_wiring() {
+        // C1→C2: 无 wiring_evidence 拒绝 (D16: dependents 非运行接线)
+        let mut node = CapabilityNode::new_primitive("t::c".into(), Domain::Io, vec!["beta".into()]);
+        node.promote_constellation().unwrap();
+        node.add_dependent("external_consumer".into());
+        let (ok, reason) = node.promotion_evidence_gate();
+        assert!(!ok, "C1 with only dependents must be rejected (wiring evidence required): {:?}", reason);
+        // 写入 wiring_evidence 后通过
+        node.metadata.insert("wiring_evidence".into(), serde_json::Value::String("src/cli/commands/x.rs:10".into()));
+        let (ok2, _) = node.promotion_evidence_gate();
+        assert!(ok2);
+        assert!(node.promote_constellation().is_ok());
+        assert_eq!(node.constellation, ConstellationLevel::C2IntegrationTest);
+    }
+
+    #[test]
+    fn test_promotion_evidence_gate_c2_plus_requires_gated() {
+        // C2→C3: 需 evidence_gated='passed'
+        let mut node = CapabilityNode::new_primitive("t::d".into(), Domain::Memory, vec!["gamma".into()]);
+        node.metadata.insert("wiring_evidence".into(), serde_json::Value::String("wired".into()));
+        node.promote_constellation().unwrap();
+        node.promote_constellation().unwrap();
+        assert_eq!(node.constellation, ConstellationLevel::C2IntegrationTest);
+        let (ok, _) = node.promotion_evidence_gate();
+        assert!(!ok, "C2 without evidence_gated must be rejected");
+        node.metadata.insert("evidence_gated".into(), serde_json::Value::String("passed".into()));
+        let (ok2, _) = node.promotion_evidence_gate();
+        assert!(ok2);
+        assert!(node.promote_constellation().is_ok());
+        assert_eq!(node.constellation, ConstellationLevel::C3Benchmark);
+    }
 }
