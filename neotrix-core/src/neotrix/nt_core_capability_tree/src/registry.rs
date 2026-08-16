@@ -78,9 +78,11 @@ impl CapabilityRegistry {
             return Err(RegistryError::AlreadyExists(node.id));
         }
 
-        // 验证依赖存在
+        // 验证依赖存在: requires 可引用节点 ID 或 provides tag (双命名空间)。
+        // 修复: 仅查 provides_index 会误报所有节点 ID 引用 (requires 语义是 ID)。
         for req in &node.requires {
-            if !self.provides_index.contains_key(req) {
+            let resolved = self.nodes.contains_key(req) || self.provides_index.contains_key(req);
+            if !resolved {
                 // 允许前向声明，但发出警告
                 eprintln!("[capability_tree] WARNING: dependency '{}' not yet registered for node '{}'", req, node.id);
             }
@@ -736,6 +738,35 @@ mod tests {
         let reg = build_test_registry();
         assert!(reg.shortest_path_to_primitive("ghost").is_none());
         assert!(reg.optimal_path_between("c2", "ghost").is_none());
+    }
+
+    /// requires 语义: 引用节点 ID (非 provides tag)。注册校验需同时接受
+    /// 节点 ID 与 tag 双命名空间 — 仅查 provides_index 会误报节点 ID 引用。
+    #[test]
+    fn test_requires_node_id_resolves_without_false_warning() {
+        let mut reg = CapabilityRegistry::new();
+        // 依赖先注册 (全路径 ID, 提供 tag 'mode_routing')
+        let dep = CapabilityNode::new_primitive(
+            "nt_core_gwt::mode_router".into(), Domain::Core, vec!["mode_routing".into()],
+        );
+        reg.register(dep).unwrap();
+
+        // 消费者 requires 引用节点 ID (非 tag) → 应无警告、DAG 边成立
+        let mut consumer = CapabilityNode::new_primitive(
+            "nt_core_parallel::atomic_decomposition".into(), Domain::Core, vec!["atomic".into()],
+        );
+        consumer.requires = vec!["nt_core_gwt::mode_router".into()];
+        reg.register(consumer).unwrap();
+
+        // requires 字段被保留 (字段级, 与 DAG 边互补)
+        let c = reg.get("nt_core_parallel::atomic_decomposition").unwrap();
+        assert_eq!(c.requires, vec!["nt_core_gwt::mode_router".to_string()]);
+        // DAG 边建立: 消费者 → 依赖
+        let from = reg.node_indices.get("nt_core_parallel::atomic_decomposition").unwrap();
+        let to = reg.node_indices.get("nt_core_gwt::mode_router").unwrap();
+        assert!(reg.dag.find_edge(*from, *to).is_some(), "ID 引用应建 DAG 边");
+        // 依赖节点可被 ID 解析 (not yet registered 误报根源)
+        assert!(reg.get("nt_core_gwt::mode_router").is_some());
     }
 
     /// 多维最优解: deprecated 节点 (gates) 应被避开 — Dijkstra 加权路由。
