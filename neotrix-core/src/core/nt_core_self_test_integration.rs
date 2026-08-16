@@ -33,6 +33,10 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
     ));
+    // 2026-08-16 T2 补齐: 小规模方法评估 (sweep absorption 声明 Phase B 但未注册)
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
+    ));
     // 2026-08-15 sweep absorption batch (Phase C): 模式路由 / 潜循环 / 记忆四能力
     registry.register(Box::new(
         crate::core::nt_core_gwt::mode_router::ModeRouter::new(),

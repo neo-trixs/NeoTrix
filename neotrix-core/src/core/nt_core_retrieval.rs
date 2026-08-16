@@ -9,7 +9,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::neotrix::l2_world_impl::nt_world_code_search::SymbolIndex;
+use crate::neotrix::l2_world_impl::nt_world_code_search::{CodeSearchEngine, SymbolIndex};
 use crate::neotrix::l8_autonomic_impl::nt_mind::infrastructure::code_graph::CodeGraph;
 
 /// MCP 工具调用结果 (确定性, 可缓存/可审计)。
@@ -148,9 +148,38 @@ impl CodeGraphMCP {
         }
     }
 
+    /// MCP 工具: 混合检索 — ripgrep 文本搜索 + 符号排名 (search_hybrid 接线)。
+    /// 复用已建 SymbolIndex 做 rank, 需显式传 path 供 CodeSearchEngine::search。
+    pub fn tool_hybrid_search(&self, query: &str, path: &Path) -> MCPToolResult {
+        let Some(index) = &self.index else {
+            return MCPToolResult::err("hybrid_search", "index not built; call build first");
+        };
+        if !path.exists() {
+            return MCPToolResult::err("hybrid_search", format!("path not found: {}", path.display()));
+        }
+        let results = CodeSearchEngine::search(query, path);
+        let hits = index.rank(results, query);
+        let detail: Vec<serde_json::Value> = hits
+            .iter()
+            .map(|h| {
+                serde_json::json!({
+                    "file": h.result.file,
+                    "line": h.result.line,
+                    "content": h.result.content,
+                    "score": h.score,
+                })
+            })
+            .collect();
+        MCPToolResult::ok(
+            "hybrid_search",
+            format!("{} ranked hits for {:?}", detail.len(), query),
+            serde_json::json!(detail),
+        )
+    }
+
     /// 汇总: 已登记工具名列表 (供 registry 登记)。
     pub fn tool_names() -> &'static [&'static str] {
-        &["search_symbols", "file_stats", "graph_topology", "get_node"]
+        &["search_symbols", "file_stats", "graph_topology", "get_node", "hybrid_search"]
     }
 }
 
@@ -214,6 +243,34 @@ mod tests {
     fn tool_names_registry_contract() {
         assert!(CodeGraphMCP::tool_names().contains(&"search_symbols"));
         assert!(CodeGraphMCP::tool_names().contains(&"graph_topology"));
-        assert_eq!(CodeGraphMCP::tool_names().len(), 4);
+        assert!(CodeGraphMCP::tool_names().contains(&"hybrid_search"));
+        assert_eq!(CodeGraphMCP::tool_names().len(), 5);
+    }
+
+    #[test]
+    fn hybrid_search_returns_ranked_hits() {
+        let dir = fixture();
+        let mut mcp = CodeGraphMCP::new();
+        mcp.build(&dir).unwrap();
+        let r = mcp.tool_hybrid_search("add", &dir);
+        assert!(r.ok, "{}", r.summary);
+        assert!(r.summary.contains("ranked hits"));
+        let hits = r.detail.as_array().unwrap();
+        assert!(!hits.is_empty());
+    }
+
+    #[test]
+    fn hybrid_search_requires_build_and_path() {
+        let mcp = CodeGraphMCP::new();
+        let r = mcp.tool_hybrid_search("x", Path::new("/nonexistent"));
+        assert!(!r.ok);
+        assert!(r.summary.contains("index not built"));
+
+        let dir = fixture();
+        let mut mcp2 = CodeGraphMCP::new();
+        mcp2.build(&dir).unwrap();
+        let r2 = mcp2.tool_hybrid_search("x", Path::new("/nonexistent"));
+        assert!(!r2.ok);
+        assert!(r2.summary.contains("path not found"));
     }
 }

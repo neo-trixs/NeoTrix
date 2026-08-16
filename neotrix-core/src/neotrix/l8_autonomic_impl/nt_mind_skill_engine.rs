@@ -2090,6 +2090,72 @@ body"#;
     }
 
     #[test]
+    fn test_find_matching_complementary_no_active_keeps_priority_order() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let high = r#"---
+name: rust-analyzer
+description: rust analysis
+triggers: ["rust"]
+category: coding
+priority: 90
+---
+body"#;
+        let low = r#"---
+name: security-review
+description: security review
+triggers: ["rust"]
+category: security
+priority: 40
+---
+body"#;
+        std::fs::write(skills_dir.join("a.md"), high).unwrap();
+        std::fs::write(skills_dir.join("b.md"), low).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+
+        // 无已激活技能 → 无互补偏好, 保持优先级降序
+        let comp = engine.find_matching_complementary("rust", None, &[]);
+        assert_eq!(comp[0].name, "rust-analyzer");
+    }
+
+    #[test]
+    fn test_find_matching_complementary_all_covered_falls_back_to_priority() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let coding = r#"---
+name: rust-analyzer
+description: rust analysis
+triggers: ["rust"]
+category: coding
+priority: 90
+---
+body"#;
+        let security = r#"---
+name: security-review
+description: security review
+triggers: ["rust"]
+category: security
+priority: 40
+---
+body"#;
+        std::fs::write(skills_dir.join("a.md"), coding).unwrap();
+        std::fs::write(skills_dir.join("b.md"), security).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+
+        // active 覆盖全部候选类别 → 无互补空间, 退回优先级排序 (coding 90 优先)
+        let comp = engine.find_matching_complementary("rust", None, &["rust-analyzer", "security-review"]);
+        assert_eq!(comp[0].name, "rust-analyzer");
+    }
+
+    #[test]
     fn test_over_validation_score_flags_procedure_heavy() {
         let dir = setup_temp_dir();
         let skills_dir = dir.path().join("skills");

@@ -514,6 +514,33 @@ mod tests {
         assert!(guard.approve(&ev2), "independent targets share no budget");
     }
 
+    #[test]
+    fn test_mutation_budget_exact_boundary_allows() {
+        let mut guard = MutationGuard::with_budget(10);
+        let mut ev = MutationEvent::new(MutationKind::Insert, "t", "origin");
+        ev.size_bytes = 10;
+        assert!(guard.approve(&ev), "exact budget boundary must allow");
+        assert_eq!(guard.usage("t"), 10);
+        // 再进 1 字节 → 超预算拦截
+        ev.size_bytes = 1;
+        assert!(!guard.approve(&ev));
+    }
+
+    #[test]
+    fn test_mutation_budget_approve_accumulates_allowed() {
+        let mut guard = MutationGuard::with_budget(100);
+        let mut ev = MutationEvent::new(MutationKind::Rewrite, "t", "o");
+        ev.size_bytes = 4;
+        assert!(guard.approve(&ev));
+        assert!(guard.approve(&ev));
+        assert_eq!(guard.blocked_count(), 0);
+        assert_eq!(guard.usage("t"), 8, "allowed bytes accumulate per target");
+        // blocked_count 语义: 仅拦截计 (供审计/自愈触发器)
+        ev.size_bytes = 500;
+        assert!(!guard.approve(&ev));
+        assert_eq!(guard.blocked_count(), 1);
+    }
+
     // ── P16 ──
     #[test]
     fn test_matrix_semantic_rank() {
