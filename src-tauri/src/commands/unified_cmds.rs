@@ -105,14 +105,14 @@ mod tests {
 
     #[test]
     fn test_cli_lookup_finds() {
-        let found = unified_cli_lookup("kb".into()).unwrap();
+        let found = unified_cli_lookup("help".into()).unwrap();
         assert!(found.is_some());
-        assert_eq!(found.unwrap().name, "/kb");
+        assert_eq!(found.unwrap().name, "/help");
     }
 
     #[test]
     fn test_cli_lookup_alias() {
-        let found = unified_cli_lookup("/b".into()).unwrap();
+        let found = unified_cli_lookup("/config".into()).unwrap();
         assert!(found.is_some());
     }
 

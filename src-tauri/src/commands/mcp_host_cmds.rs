@@ -922,7 +922,10 @@ mod tests {
 
     #[test]
     fn test_jsonrpc_tools_call_read_file() {
-        let tmp = std::env::temp_dir().join(format!("mcp_host_cmds_read_{}.txt", std::process::id()));
+        let home = std::env::var("HOME").expect("HOME set");
+        let dir = std::path::Path::new(&home).join(".neotrix");
+        std::fs::create_dir_all(&dir).expect("create .neotrix dir");
+        let tmp = dir.join(format!("mcp_host_cmds_read_{}.txt", std::process::id()));
         std::fs::write(&tmp, "mcp hello").expect("write temp file");
         let line = format!(
             r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"read_file","arguments":{{"path":"{}"}}}}}}"#,
@@ -975,7 +978,10 @@ mod tests {
 
     #[test]
     fn test_call_tool_write_file() {
-        let tmp = std::env::temp_dir().join(format!("mcp_host_cmds_write_{}.txt", std::process::id()));
+        let home = std::env::var("HOME").expect("HOME set");
+        let dir = std::path::Path::new(&home).join(".neotrix");
+        std::fs::create_dir_all(&dir).expect("create .neotrix dir");
+        let tmp = dir.join(format!("mcp_host_cmds_write_{}.txt", std::process::id()));
         let args = serde_json::json!({ "path": tmp.to_string_lossy(), "content": "write test" });
         let out = call_tool("write_file", &args).unwrap();
         assert!(out.contains("Wrote 10 bytes"));
