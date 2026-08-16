@@ -103,3 +103,14 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | "self-test" | Use **SelfTest** (trait + registry for detection modules) or **converge_check** (architecture self-audit). |
 | "audit" | Use **D1-D50** (specific dimension) or **rev-officer** (full health check) or **self_audit** (module-level scan). |
 | "module" | Use **Rust module** (`.rs` file + `mod` declaration) or **domain module** (`nt_*` subsystem) or **detection module** (implements SelfTest). |
+
+## Absorbed Terminology (2026-08-16, 22-source batch)
+
+| Term | Definition | Avoid |
+|------|-----------|-------|
+| **PTC** | Programmatic Tool Calling — typed-stub tool invocation: JSON tool schema exposed as Python signature stubs, chained + parallel calls in a single agent turn. Lives in `nt_agent_mcp_gateway` (P1). | "tool stubs", "code tool calling" |
+| **Egress Policy** | Per-sandbox outbound network trust boundary: allow/deny host/port rules, deny-wins, `default_allow` fallback. `*.suffix` matches subdomains only, never bare apex. Lives in `nt_shield_sandbox` (P2). | "network policy", "firewall rules" |
+| **VoI** | Value-of-Information — expected KL (prior‖posterior) used to select the next experiment in Bayesian experiment design. Lives in `nt_core_hcube::bayesian_experiment` (P3). | "information gain" (when referring to VoI specifically) |
+| **M-open check** | Predictive adequacy check in Bayesian experiment design: when posterior concentrates on < threshold of hypotheses, the hypothesis space is expanded. (P3) | "expansion trigger" |
+| **Disclosure Ladder** | Anchor-then-promote: first request anchors on a Minimal tool budget, promotes to Standard once the session is durable. Implemented as `AnchorPromote` in `nt_mind_skill_engine` (P4). | "tool budget", "context budget" |
+| **Ordered Backend Router** | Single search interface routing across backends (DDG→Wikipedia) with ordered fallback, zero external API cost. Lives in `nt_world_search` (P16). | "search router", "fallback chain" |
