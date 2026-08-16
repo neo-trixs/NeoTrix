@@ -135,7 +135,9 @@ impl BuildRunner {
             BuildLayer::Heavy
         } else {
             // 未知工具拒绝执行 (Deterministic Tools First: 只跑已知确定性工具)
-            return Err(format!("BuildRunner: unknown cargo tool '{tool}' (must be in L1/L2/L3)"));
+            return Err(format!(
+                "BuildRunner: unknown cargo tool '{tool}' (must be in L1/L2/L3)"
+            ));
         };
         let timeout = match layer {
             BuildLayer::Fast => self.timeout_secs.min(180),
@@ -172,7 +174,8 @@ impl BuildRunner {
         }
 
         let child = std::sync::Arc::new(std::sync::Mutex::new(
-            cmd.spawn().map_err(|e| format!("cargo {tool} spawn failed: {}", e))?,
+            cmd.spawn()
+                .map_err(|e| format!("cargo {tool} spawn failed: {}", e))?,
         ));
         let (tx, rx) = std::sync::mpsc::channel::<Output>();
         let c2 = child.clone();
@@ -276,10 +279,17 @@ mod tests {
 
     #[test]
     fn layer_inference() {
+        // env-gated: spawn 真实 cargo, 全量并行时与外部 cargo 会话竞争 target 锁
+        if std::env::var("NT_E2E_CARGO")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+            != true
+        {
+            eprintln!("skipped: set NT_E2E_CARGO=1 to run real-cargo layer inference");
+            return;
+        }
         assert_eq!(
-            BuildRunner::new()
-                .run("check", &["--lib"])
-                .map(|e| e.layer),
+            BuildRunner::new().run("check", &["--lib"]).map(|e| e.layer),
             Ok(BuildLayer::Fast)
         );
         assert_eq!(
@@ -294,7 +304,15 @@ mod tests {
 
     #[test]
     fn run_check_collects_evidence() {
-        // 真实 cargo check 证据收集 (可能慢; 小 target 下应秒级完成)
+        // env-gated: spawn 真实 cargo check (可能慢; 小 target 下应秒级完成)
+        if std::env::var("NT_E2E_CARGO")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+            != true
+        {
+            eprintln!("skipped: set NT_E2E_CARGO=1 to run real-cargo evidence collection");
+            return;
+        }
         let runner = BuildRunner::new().with_timeout(300);
         match runner.run("check", &["--lib"]) {
             Ok(ev) => {

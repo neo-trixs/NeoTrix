@@ -17,10 +17,10 @@
 //!   │   └── manifest.json       备份清单
 //!   └── index.json              备份索引
 
-use std::fs;
-use std::path::{Path, PathBuf};
 use chrono::{Local, Utc};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 // ============================================================
 // Cleanup 目录布局管理
@@ -28,11 +28,11 @@ use serde::{Deserialize, Serialize};
 
 /// 项目清理系统目录
 pub struct CleanupDirs {
-    pub root: PathBuf,         // project/.cleanup/
-    pub archive: PathBuf,      // project/.cleanup/archive/
-    pub log: PathBuf,          // project/.cleanup/log/
-    pub rules_file: PathBuf,   // project/.cleanup/rules.toml
-    pub index_file: PathBuf,   // project/.cleanup/log/index.json
+    pub root: PathBuf,       // project/.cleanup/
+    pub archive: PathBuf,    // project/.cleanup/archive/
+    pub log: PathBuf,        // project/.cleanup/log/
+    pub rules_file: PathBuf, // project/.cleanup/rules.toml
+    pub index_file: PathBuf, // project/.cleanup/log/index.json
 }
 
 impl CleanupDirs {
@@ -70,19 +70,19 @@ impl CleanupDirs {
 /// 归档清单条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArchiveEntry {
-    pub source_path: String,       // 原始路径 (相对于项目根)
-    pub archived_path: String,     // 归档后路径
+    pub source_path: String,   // 原始路径 (相对于项目根)
+    pub archived_path: String, // 归档后路径
     pub size_bytes: u64,
     pub is_dir: bool,
-    pub archived_at: i64,          // Unix timestamp
-    pub cleanup_kind: String,      // 清理类型标签
-    pub sha256: Option<String>,    // 文件哈希 (可选)
+    pub archived_at: i64,       // Unix timestamp
+    pub cleanup_kind: String,   // 清理类型标签
+    pub sha256: Option<String>, // 文件哈希 (可选)
 }
 
 /// 归档清单 (每个批次一个)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArchiveManifest {
-    pub batch_id: String,          // YYYY-MM-DD_HHMMSS
+    pub batch_id: String, // YYYY-MM-DD_HHMMSS
     pub created_at: i64,
     pub entries: Vec<ArchiveEntry>,
     pub total_bytes: u64,
@@ -148,11 +148,14 @@ impl Archiver {
 
         for path_str in paths {
             let src = Path::new(path_str);
-            if !src.exists() { continue; }
+            if !src.exists() {
+                continue;
+            }
 
             let is_dir = src.is_dir();
             let size = fs::metadata(src).map(|m| m.len()).unwrap_or(0);
-            let fname = src.file_name()
+            let fname = src
+                .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "unknown".to_string());
             let dest = batch_dir.join(&fname);
@@ -169,9 +172,8 @@ impl Archiver {
                 // 对目录: 压缩为 tar.gz 再归档
                 Self::archive_dir(src, &dest)
             } else {
-                fs::rename(src, &dest).or_else(|_| {
-                    fs::copy(src, &dest).and_then(|_| fs::remove_file(src))
-                })
+                fs::rename(src, &dest)
+                    .or_else(|_| fs::copy(src, &dest).and_then(|_| fs::remove_file(src)))
             };
 
             match result {
@@ -208,15 +210,18 @@ impl Archiver {
         }
 
         // 记录日志
-        CleanupLog::log(&self.dirs.log, &CleanupLogEntry {
-            action: "archive".into(),
-            kind: kind.into(),
-            items: manifest.total_items,
-            bytes: manifest.total_bytes,
-            batch_id: batch_id.clone(),
-            success: true,
-            error: None,
-        });
+        CleanupLog::log(
+            &self.dirs.log,
+            &CleanupLogEntry {
+                action: "archive".into(),
+                kind: kind.into(),
+                items: manifest.total_items,
+                bytes: manifest.total_bytes,
+                batch_id: batch_id.clone(),
+                success: true,
+                error: None,
+            },
+        );
 
         Ok(manifest)
     }
@@ -243,9 +248,13 @@ impl Archiver {
     /// 搜索归档: 按关键词查找已归档条目
     pub fn search(&self, query: &str) -> Vec<&ArchiveEntry> {
         let q = query.to_lowercase();
-        self.index.entries.iter()
-            .filter(|e| e.source_path.to_lowercase().contains(&q)
-                || e.cleanup_kind.to_lowercase().contains(&q))
+        self.index
+            .entries
+            .iter()
+            .filter(|e| {
+                e.source_path.to_lowercase().contains(&q)
+                    || e.cleanup_kind.to_lowercase().contains(&q)
+            })
             .collect()
     }
 }
@@ -256,7 +265,7 @@ impl Archiver {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CleanupLogEntry {
-    pub action: String,      // "scan" | "clean" | "archive" | "backup"
+    pub action: String, // "scan" | "clean" | "archive" | "backup"
     pub kind: String,
     pub items: usize,
     pub bytes: u64,
@@ -271,9 +280,7 @@ impl CleanupLog {
     pub fn log(log_dir: &Path, entry: &CleanupLogEntry) {
         let file = log_dir.join("history.jsonl");
         let line = serde_json::to_string(&entry).unwrap_or_default();
-        if let Ok(mut f) = fs::OpenOptions::new()
-            .create(true).append(true).open(&file)
-        {
+        if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&file) {
             use std::io::Write;
             let _ = writeln!(f, "{}", line);
         }
@@ -286,7 +293,8 @@ impl CleanupLog {
             Ok(c) => c,
             Err(_) => return Vec::new(),
         };
-        content.lines()
+        content
+            .lines()
             .filter_map(|l| serde_json::from_str(l).ok())
             .rev()
             .take(n)
@@ -340,8 +348,11 @@ impl BackupEngine {
             project_root: project_root.to_path_buf(),
             backup_root: project_root.join(".backup"),
             exclude_patterns: vec![
-                ".backup".into(), ".cleanup".into(), "target".into(),
-                "node_modules".into(), ".git".into(),
+                ".backup".into(),
+                ".cleanup".into(),
+                "target".into(),
+                "node_modules".into(),
+                ".git".into(),
             ],
             max_backups: 28,
         }
@@ -358,7 +369,12 @@ impl BackupEngine {
         let mut file_count = 0usize;
         let mut total_bytes = 0u64;
 
-        self.collect_files(&self.project_root, &backup_dir, &mut file_count, &mut total_bytes)?;
+        self.collect_files(
+            &self.project_root,
+            &backup_dir,
+            &mut file_count,
+            &mut total_bytes,
+        )?;
 
         let manifest = BackupManifest {
             backup_id: backup_id.clone(),
@@ -389,15 +405,18 @@ impl BackupEngine {
 
         // 记录日志
         let log_dir = self.project_root.join(".cleanup").join("log");
-        CleanupLog::log(&log_dir, &CleanupLogEntry {
-            action: "backup".into(),
-            kind: "code".into(),
-            items: file_count,
-            bytes: total_bytes,
-            batch_id: backup_id,
-            success: true,
-            error: None,
-        });
+        CleanupLog::log(
+            &log_dir,
+            &CleanupLogEntry {
+                action: "backup".into(),
+                kind: "code".into(),
+                items: file_count,
+                bytes: total_bytes,
+                batch_id: backup_id,
+                success: true,
+                error: None,
+            },
+        );
 
         Ok(manifest)
     }
@@ -409,7 +428,9 @@ impl BackupEngine {
         file_count: &mut usize,
         total_bytes: &mut u64,
     ) -> std::io::Result<()> {
-        if !src_dir.is_dir() { return Ok(()); }
+        if !src_dir.is_dir() {
+            return Ok(());
+        }
 
         for entry in fs::read_dir(src_dir)? {
             let entry = entry?;
@@ -417,7 +438,11 @@ impl BackupEngine {
             let name_str = name.to_string_lossy().to_string();
 
             // 跳过排除项
-            if self.exclude_patterns.iter().any(|p| name_str == *p || name_str.starts_with(p)) {
+            if self
+                .exclude_patterns
+                .iter()
+                .any(|p| name_str == *p || name_str.starts_with(p))
+            {
                 continue;
             }
             // 跳过隐藏目录 (除了 .cleanup 的 rules.toml)
@@ -426,7 +451,9 @@ impl BackupEngine {
             }
 
             let src_path = entry.path();
-            let rel = src_path.strip_prefix(&self.project_root).unwrap_or(&src_path);
+            let rel = src_path
+                .strip_prefix(&self.project_root)
+                .unwrap_or(&src_path);
             let dst_path = dst_dir.join(rel);
 
             if src_path.is_dir() {
@@ -434,16 +461,43 @@ impl BackupEngine {
                 self.collect_files(&src_path, dst_dir, file_count, total_bytes)?;
             } else {
                 // 只备份代码文件
-                let ext = src_path.extension()
+                let ext = src_path
+                    .extension()
                     .map(|e| e.to_string_lossy().to_lowercase())
                     .unwrap_or_default();
-                let is_code = matches!(ext.as_str(),
-                    "rs" | "toml" | "py" | "js" | "ts" | "tsx" | "jsx" | "json"
-                    | "css" | "scss" | "html" | "md" | "sh" | "yml" | "yaml"
-                    | "sql" | "proto" | "vue" | "svelte" | "rb" | "go" | "mod"
-                    | "sum" | "lock" | "conf" | "cfg" | "ini" | "plist"
+                let is_code = matches!(
+                    ext.as_str(),
+                    "rs" | "toml"
+                        | "py"
+                        | "js"
+                        | "ts"
+                        | "tsx"
+                        | "jsx"
+                        | "json"
+                        | "css"
+                        | "scss"
+                        | "html"
+                        | "md"
+                        | "sh"
+                        | "yml"
+                        | "yaml"
+                        | "sql"
+                        | "proto"
+                        | "vue"
+                        | "svelte"
+                        | "rb"
+                        | "go"
+                        | "mod"
+                        | "sum"
+                        | "lock"
+                        | "conf"
+                        | "cfg"
+                        | "ini"
+                        | "plist"
                 );
-                if !is_code { continue; }
+                if !is_code {
+                    continue;
+                }
 
                 if let Some(parent) = dst_path.parent() {
                     fs::create_dir_all(parent)?;
@@ -474,7 +528,9 @@ impl BackupEngine {
     }
 
     fn prune_old_backups(&self, index: &BackupIndex) {
-        if index.backups.len() <= self.max_backups { return; }
+        if index.backups.len() <= self.max_backups {
+            return;
+        }
         let to_remove = index.backups.len() - self.max_backups;
         for backup in index.backups.iter().take(to_remove) {
             let path = self.backup_root.join(&backup.backup_id);
@@ -507,15 +563,21 @@ pub enum CleanupKind {
 impl CleanupKind {
     pub fn description(&self) -> &'static str {
         match self {
-            CleanupKind::ProjectArtifacts => "项目构建产物 (target/, node_modules/, .build/, dist/, venv/)",
+            CleanupKind::ProjectArtifacts => {
+                "项目构建产物 (target/, node_modules/, .build/, dist/, venv/)"
+            }
             CleanupKind::Cache => "系统缓存 (~/Library/Caches, .cache, pip, cargo, AI 模型缓存)",
             CleanupKind::Logs => "日志文件 (*.log, *.out, 系统日志)",
             CleanupKind::TempFiles => "临时文件 (/tmp, /var/tmp, ~/tmp)",
             CleanupKind::MemoryPrune => "推理记忆修剪 (低奖励记忆, 过期轨迹)",
             CleanupKind::BrainSnapshot => "大脑快照清理 (保留最近 N 个快照)",
             CleanupKind::IDECaches => "IDE 缓存 (Cursor, VS Code, IntelliJ, Xcode derived data)",
-            CleanupKind::SystemServices => "系统服务命令清理 (brew cleanup, tmutil 快照, docker system prune)",
-            CleanupKind::ProjectMolting => "项目蜕皮归档 (旧躯壳目录 → _archive/, 活动树只留最新态)",
+            CleanupKind::SystemServices => {
+                "系统服务命令清理 (brew cleanup, tmutil 快照, docker system prune)"
+            }
+            CleanupKind::ProjectMolting => {
+                "项目蜕皮归档 (旧躯壳目录 → _archive/, 活动树只留最新态)"
+            }
             CleanupKind::All => "全部清理 (包含以上所有类别)",
         }
     }
@@ -536,13 +598,21 @@ pub enum Platform {
 impl Platform {
     pub fn current() -> Platform {
         #[cfg(target_os = "macos")]
-        { return Platform::MacOS; }
+        {
+            return Platform::MacOS;
+        }
         #[cfg(target_os = "windows")]
-        { return Platform::Windows; }
+        {
+            return Platform::Windows;
+        }
         #[cfg(target_os = "linux")]
-        { return Platform::Linux; }
+        {
+            return Platform::Linux;
+        }
         #[allow(unreachable_code)]
-        { Platform::All }
+        {
+            Platform::All
+        }
     }
 
     pub fn name(&self) -> &'static str {
@@ -581,7 +651,9 @@ impl RiskLevel {
 }
 
 impl Default for RiskLevel {
-    fn default() -> Self { RiskLevel::Low }
+    fn default() -> Self {
+        RiskLevel::Low
+    }
 }
 
 /// 跨平台清理规则 — platform 门控 + risk 分级
@@ -600,7 +672,9 @@ pub struct CleanupPattern {
     pub description: Option<&'static str>,
 }
 
-fn platform_all() -> Platform { Platform::All }
+fn platform_all() -> Platform {
+    Platform::All
+}
 
 impl CleanupPattern {
     /// 当前平台生效的规则 (平台门控 + 风险阀)
@@ -609,7 +683,9 @@ impl CleanupPattern {
     }
 
     pub fn all_patterns() -> Vec<Self> {
-        let mac = Platform::MacOS; let win = Platform::Windows; let lin = Platform::Linux;
+        let mac = Platform::MacOS;
+        let win = Platform::Windows;
+        let lin = Platform::Linux;
         let all = Platform::All;
         vec![
             // ---- 项目构建产物 (跨平台, Mole 34 目标) ----
@@ -663,17 +739,30 @@ impl CleanupPattern {
 
     /// 展开路径占位符 (~, %OS% 专用变量), 供 scan 使用
     pub fn expand(pat: &str) -> String {
-        let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        let home = dirs::home_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         #[allow(unused_mut)] // windows 块被 cfg 移除时无需 mut
         let mut s = pat.replace("~", &home);
         #[cfg(target_os = "windows")]
         {
-            s = s.replace("%LOCALAPPDATA%", &std::env::var("LOCALAPPDATA").unwrap_or_else(|_| {
-                std::env::var("USERPROFILE").map(|u| format!("{}\\AppData\\Local", u)).unwrap_or_default()
-            }));
+            s = s.replace(
+                "%LOCALAPPDATA%",
+                &std::env::var("LOCALAPPDATA").unwrap_or_else(|_| {
+                    std::env::var("USERPROFILE")
+                        .map(|u| format!("{}\\AppData\\Local", u))
+                        .unwrap_or_default()
+                }),
+            );
             s = s.replace("%APPDATA%", &std::env::var("APPDATA").unwrap_or_default());
-            s = s.replace("%TEMP%", &std::env::var("TEMP").unwrap_or_else(|_| std::env::var("TMP").unwrap_or_default()));
-            s = s.replace("%WINDIR%", &std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".into()));
+            s = s.replace(
+                "%TEMP%",
+                &std::env::var("TEMP").unwrap_or_else(|_| std::env::var("TMP").unwrap_or_default()),
+            );
+            s = s.replace(
+                "%WINDIR%",
+                &std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".into()),
+            );
         }
         s
     }
@@ -683,7 +772,8 @@ impl CleanupPattern {
         let tag = dir.join("CACHEDIR.TAG");
         if let Ok(content) = fs::read_to_string(&tag) {
             if let Some(first) = content.lines().next() {
-                return first.trim_start() == "Signature: 8a477f597d02d456d45674aa7d611ef7b6c14a01bccaebbd4e53c5d4f";
+                return first.trim_start()
+                    == "Signature: 8a477f597d02d456d45674aa7d611ef7b6c14a01bccaebbd4e53c5d4f";
             }
         }
         false
@@ -717,7 +807,10 @@ impl CleanupPattern {
                     for e in entries {
                         let ep = e.path();
                         // 符号链接不跟随 (防循环), 仅累加真实子目录/文件
-                        if std::fs::symlink_metadata(&ep).map(|sm| sm.file_type().is_symlink()).unwrap_or(false) {
+                        if std::fs::symlink_metadata(&ep)
+                            .map(|sm| sm.file_type().is_symlink())
+                            .unwrap_or(false)
+                        {
                             continue;
                         }
                         if ep.is_dir() {
@@ -764,7 +857,10 @@ impl CleanupResult {
         let mode = if self.dry_run { "预览" } else { "已清理" };
         format!(
             "[{}] {:?}: 扫描 {} 项, 可删除 {} 项 (约 {:.1} MB), {} 个错误",
-            mode, self.kind, self.scanned_count, self.deletable_count,
+            mode,
+            self.kind,
+            self.scanned_count,
+            self.deletable_count,
             self.estimated_bytes as f64 / 1_048_576.0,
             self.errors.len()
         )
@@ -776,9 +872,9 @@ pub struct CleanupEngine {
     pub whitelist: Vec<PathBuf>,
     pub history: Vec<CleanupResult>,
     pub dry_run_default: bool,
-    pub archive_on_clean: bool,       // true = 归档而非删除
+    pub archive_on_clean: bool, // true = 归档而非删除
     pub project_root: PathBuf,
-    pub risk_gate: RiskLevel,         // 默认仅执行 <= 该风险级规则
+    pub risk_gate: RiskLevel, // 默认仅执行 <= 该风险级规则
     pub command_cleaner: Option<CommandCleaner>, // 命令式清理 (SystemServices)
     max_history: usize,
 }
@@ -839,7 +935,9 @@ impl CleanupEngine {
         let mut result = CleanupResult::new(kind);
         result.dry_run = dry_run;
 
-        let relevant: Vec<&CleanupPattern> = self.patterns.iter()
+        let relevant: Vec<&CleanupPattern> = self
+            .patterns
+            .iter()
             .filter(|p| kind == CleanupKind::All || p.kind == kind)
             .filter(|p| p.risk <= self.risk_gate)
             .collect();
@@ -849,30 +947,41 @@ impl CleanupEngine {
                 let pat_str = CleanupPattern::expand(glob_pat);
                 if let Ok(entries) = glob::glob(&pat_str) {
                     for entry in entries.flatten() {
-                        if self.is_whitelisted(&entry) { continue; }
+                        if self.is_whitelisted(&entry) {
+                            continue;
+                        }
                         // 路径安全护栏: 拒绝系统根目录
-                        if CleanupPattern::is_system_root_dir(&entry) { continue; }
+                        if CleanupPattern::is_system_root_dir(&entry) {
+                            continue;
+                        }
                         let is_old = if let Some(max_days) = pattern.max_age_days {
                             match std::fs::metadata(&entry) {
                                 Ok(meta) => {
                                     if let Ok(modified) = meta.modified() {
                                         // age = now - modified；未来 mtime (时钟偏移/解包) 视为 0，绝不删除
-                                        let age = modified.elapsed()
+                                        let age = modified
+                                            .elapsed()
                                             .map(|d| d.as_secs() as i64)
                                             .unwrap_or(0);
                                         age > max_days * 86400
-                                    } else { false }
+                                    } else {
+                                        false
+                                    }
                                 }
                                 Err(_) => false,
                             }
-                        } else { true };
+                        } else {
+                            true
+                        };
 
                         if is_old {
                             result.deletable_count += 1;
                             let size = CleanupPattern::entry_size(&entry);
                             result.estimated_bytes += size;
                             if result.pattern_matches.len() < 20 {
-                                result.pattern_matches.push(entry.to_string_lossy().to_string());
+                                result
+                                    .pattern_matches
+                                    .push(entry.to_string_lossy().to_string());
                             }
                         }
                     }
@@ -897,7 +1006,11 @@ impl CleanupEngine {
                 match archiver.archive_paths(&result.pattern_matches, &format!("{:?}", kind)) {
                     Ok(manifest) => {
                         result.estimated_bytes = manifest.total_bytes;
-                        log::info!("[cleanup] 已归档 {} 项到 .cleanup/archive/{}", manifest.total_items, manifest.batch_id);
+                        log::info!(
+                            "[cleanup] 已归档 {} 项到 .cleanup/archive/{}",
+                            manifest.total_items,
+                            manifest.batch_id
+                        );
                     }
                     Err(e) => {
                         log::warn!("[cleanup] 归档失败, 回退到直接删除: {}", e);
@@ -911,15 +1024,27 @@ impl CleanupEngine {
 
         // 记录日志
         let log_dir = self.project_root.join(".cleanup").join("log");
-        CleanupLog::log(&log_dir, &CleanupLogEntry {
-            action: if self.archive_on_clean { "archive" } else { "clean" }.into(),
-            kind: format!("{:?}", kind),
-            items: result.deletable_count,
-            bytes: result.estimated_bytes,
-            batch_id: Local::now().format("%Y-%m-%d_%H%M%S").to_string(),
-            success: result.errors.is_empty(),
-            error: if result.errors.is_empty() { None } else { Some(result.errors.join("; ")) },
-        });
+        CleanupLog::log(
+            &log_dir,
+            &CleanupLogEntry {
+                action: if self.archive_on_clean {
+                    "archive"
+                } else {
+                    "clean"
+                }
+                .into(),
+                kind: format!("{:?}", kind),
+                items: result.deletable_count,
+                bytes: result.estimated_bytes,
+                batch_id: Local::now().format("%Y-%m-%d_%H%M%S").to_string(),
+                success: result.errors.is_empty(),
+                error: if result.errors.is_empty() {
+                    None
+                } else {
+                    Some(result.errors.join("; "))
+                },
+            },
+        );
 
         self.history.push(result.clone());
         if self.history.len() > self.max_history {
@@ -934,7 +1059,10 @@ impl CleanupEngine {
         result.dry_run = self.dry_run_default;
         let cleaner = match self.command_cleaner.as_ref() {
             Some(c) => c,
-            None => { result.errors.push("无 command_cleaner".into()); return result; }
+            None => {
+                result.errors.push("无 command_cleaner".into());
+                return result;
+            }
         };
         let confirm = !result.dry_run; // dry-run 无需确认; 实删需确认 (由调用方传 --confirm)
         for (item, _) in cleaner.scan() {
@@ -944,12 +1072,16 @@ impl CleanupEngine {
                 "executed" => {
                     result.deletable_count += 1;
                     if result.pattern_matches.len() < 20 {
-                        result.pattern_matches.push(format!("{}: {}", item.name, r.output.trim()));
+                        result
+                            .pattern_matches
+                            .push(format!("{}: {}", item.name, r.output.trim()));
                     }
                 }
                 "needs_confirm" => {
                     if result.pattern_matches.len() < 20 {
-                        result.pattern_matches.push(format!("{}: 需 --confirm", item.name));
+                        result
+                            .pattern_matches
+                            .push(format!("{}: 需 --confirm", item.name));
                     }
                 }
                 "failed" => result.errors.push(format!("{}: {}", item.name, r.output)),
@@ -957,7 +1089,9 @@ impl CleanupEngine {
                 _ => {
                     if result.pattern_matches.len() < 20 && r.status == "dry_run" {
                         let head = r.output.lines().take(1).next().unwrap_or("");
-                        result.pattern_matches.push(format!("{} (dry-run): {}", item.name, head));
+                        result
+                            .pattern_matches
+                            .push(format!("{} (dry-run): {}", item.name, head));
                     }
                 }
             }
@@ -968,23 +1102,32 @@ impl CleanupEngine {
     fn delete_paths(&self, result: &mut CleanupResult) {
         for path_str in &result.pattern_matches {
             let path = Path::new(path_str);
-            if self.is_whitelisted(path) { continue; }
-            if CleanupPattern::is_system_root_dir(path) { continue; }
+            if self.is_whitelisted(path) {
+                continue;
+            }
+            if CleanupPattern::is_system_root_dir(path) {
+                continue;
+            }
             if path.is_dir() {
                 if let Err(e) = std::fs::remove_dir_all(path) {
-                    result.errors.push(format!("删除目录失败 {}: {}", path_str, e));
+                    result
+                        .errors
+                        .push(format!("删除目录失败 {}: {}", path_str, e));
                 }
             } else if let Err(e) = std::fs::remove_file(path) {
-                result.errors.push(format!("删除文件失败 {}: {}", path_str, e));
+                result
+                    .errors
+                    .push(format!("删除文件失败 {}: {}", path_str, e));
             }
         }
     }
 
-
     pub fn prune_brain_snapshots(max_keep: usize) -> usize {
         let home = dirs::home_dir().unwrap_or_default();
         let snap_dir = home.join(".neotrix").join("snapshots");
-        if !snap_dir.exists() { return 0; }
+        if !snap_dir.exists() {
+            return 0;
+        }
         let mut entries: Vec<_> = std::fs::read_dir(&snap_dir)
             .map(|d| d.filter_map(|e| e.ok()).collect::<Vec<_>>())
             .unwrap_or_default();
@@ -1016,12 +1159,17 @@ impl CleanupEngine {
         if let Ok(rd) = fs::read_dir(&root) {
             for entry in rd.flatten() {
                 let p = entry.path();
-                if !p.is_dir() { continue; }
+                if !p.is_dir() {
+                    continue;
+                }
                 let name = entry.file_name().to_string_lossy().to_lowercase();
                 let is_shell = name == "legacy"
-                    || name.contains("_legacy") || name.starts_with("legacy_")
-                    || name.starts_with("old_") || name.ends_with("_old")
-                    || name.contains("_v0") || name.contains("_v1")
+                    || name.contains("_legacy")
+                    || name.starts_with("legacy_")
+                    || name.starts_with("old_")
+                    || name.ends_with("_old")
+                    || name.contains("_v0")
+                    || name.contains("_v1")
                     || name.contains("_backup");
                 if is_shell {
                     shells.push(p);
@@ -1030,14 +1178,14 @@ impl CleanupEngine {
         }
         // 安全护栏: 过滤白名单/系统根/root 自身
         shells.retain(|s| {
-            !self.is_whitelisted(s)
-                && !CleanupPattern::is_system_root_dir(s)
-                && s != &root
+            !self.is_whitelisted(s) && !CleanupPattern::is_system_root_dir(s) && s != &root
         });
         result.scanned_count = shells.len();
         result.deletable_count = shells.len();
         for s in &shells {
-            result.estimated_bytes = result.estimated_bytes.saturating_add(CleanupPattern::entry_size(s));
+            result.estimated_bytes = result
+                .estimated_bytes
+                .saturating_add(CleanupPattern::entry_size(s));
             if result.pattern_matches.len() < 20 {
                 result.pattern_matches.push(s.to_string_lossy().to_string());
             }
@@ -1045,14 +1193,19 @@ impl CleanupEngine {
 
         // 非 dry-run + 归档模式: 执行蜕皮归档
         if !result.dry_run && !shells.is_empty() && self.archive_on_clean {
-            let path_strs: Vec<String> = shells.iter()
+            let path_strs: Vec<String> = shells
+                .iter()
                 .map(|s| s.to_string_lossy().to_string())
                 .collect();
             let mut archiver = Archiver::new(&root);
             match archiver.archive_paths(&path_strs, "ProjectMolting") {
                 Ok(m) => {
                     result.estimated_bytes = m.total_bytes;
-                    log::info!("[molting] 归档 {} 个旧躯壳到 .cleanup/archive/{}", m.total_items, m.batch_id);
+                    log::info!(
+                        "[molting] 归档 {} 个旧躯壳到 .cleanup/archive/{}",
+                        m.total_items,
+                        m.batch_id
+                    );
                 }
                 Err(e) => result.errors.push(format!("蜕皮归档失败: {}", e)),
             }
@@ -1060,15 +1213,22 @@ impl CleanupEngine {
 
         // 记录日志
         let log_dir = root.join(".cleanup").join("log");
-        CleanupLog::log(&log_dir, &CleanupLogEntry {
-            action: "molt".into(),
-            kind: "ProjectMolting".into(),
-            items: shells.len(),
-            bytes: result.estimated_bytes,
-            batch_id: Local::now().format("%Y-%m-%d_%H%M%S").to_string(),
-            success: result.errors.is_empty(),
-            error: if result.errors.is_empty() { None } else { Some(result.errors.join("; ")) },
-        });
+        CleanupLog::log(
+            &log_dir,
+            &CleanupLogEntry {
+                action: "molt".into(),
+                kind: "ProjectMolting".into(),
+                items: shells.len(),
+                bytes: result.estimated_bytes,
+                batch_id: Local::now().format("%Y-%m-%d_%H%M%S").to_string(),
+                success: result.errors.is_empty(),
+                error: if result.errors.is_empty() {
+                    None
+                } else {
+                    Some(result.errors.join("; "))
+                },
+            },
+        );
 
         self.history.push(result.clone());
         if self.history.len() > self.max_history {
@@ -1111,7 +1271,12 @@ impl crate::core::nt_core_self_test::SelfTest for CleanupEngineSelfTest {
         if engine.whitelist.is_empty() {
             failures.push("白名单为空: is_whitelisted 永假, 受保护路径可被误删".into());
         }
-        if !engine.is_whitelisted(&dirs::home_dir().unwrap_or_default().join(".config").join("app")) {
+        if !engine.is_whitelisted(
+            &dirs::home_dir()
+                .unwrap_or_default()
+                .join(".config")
+                .join("app"),
+        ) {
             failures.push("白名单 ~/.config 未匹配绝对路径: expand 失效".into());
         }
 
@@ -1123,7 +1288,11 @@ impl crate::core::nt_core_self_test::SelfTest for CleanupEngineSelfTest {
             failures.push("系统根目录安全护栏失效 ($HOME)".into());
         }
 
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -1136,7 +1305,11 @@ fn run_output(cmd: &str, args: &[&str]) -> Result<String, String> {
                 Ok(String::from_utf8_lossy(&o.stdout).to_string())
             } else {
                 let stderr = String::from_utf8_lossy(&o.stderr);
-                let code = o.status.code().map(|c| c.to_string()).unwrap_or_else(|| "?".into());
+                let code = o
+                    .status
+                    .code()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "?".into());
                 Err(format!("{} 退出码 {}: {}", cmd, code, stderr.trim()))
             }
         }
@@ -1180,30 +1353,39 @@ impl CommandCleanup {
             Self {
                 name: "Homebrew cleanup",
                 kind: CleanupKind::SystemServices,
-                cmd: "brew", args: vec!["cleanup", "--prune=all"],
-                dry_run_cmd: "brew", dry_run_args: vec!["cleanup", "--dry-run"],
+                cmd: "brew",
+                args: vec!["cleanup", "--prune=all"],
+                dry_run_cmd: "brew",
+                dry_run_args: vec!["cleanup", "--dry-run"],
                 requires_confirm: false,
-                platform: Platform::MacOS, risk: RiskLevel::Low,
+                platform: Platform::MacOS,
+                risk: RiskLevel::Low,
                 description: "brew cleanup --prune=all: 清理旧版本与下载缓存",
             },
             // Docker 未使用资源 (PureMac: docker prune) — 中危, 需确认
             Self {
                 name: "Docker system prune",
                 kind: CleanupKind::SystemServices,
-                cmd: "docker", args: vec!["system", "prune", "-f"],
-                dry_run_cmd: "docker", dry_run_args: vec!["system", "df"],
+                cmd: "docker",
+                args: vec!["system", "prune", "-f"],
+                dry_run_cmd: "docker",
+                dry_run_args: vec!["system", "df"],
                 requires_confirm: true,
-                platform: Platform::All, risk: RiskLevel::Medium,
+                platform: Platform::All,
+                risk: RiskLevel::Medium,
                 description: "docker system prune -f: 移除停止容器/悬空镜像/未用网络与构建缓存",
             },
             // Time Machine 本地快照 (mac-janitor/GuacSweep) — 高危, 需确认
             Self {
                 name: "Time Machine local snapshots",
                 kind: CleanupKind::SystemServices,
-                cmd: "tmutil", args: vec!["deletelocalsnapshots"],
-                dry_run_cmd: "tmutil", dry_run_args: vec!["listlocalsnapshots", "/"],
+                cmd: "tmutil",
+                args: vec!["deletelocalsnapshots"],
+                dry_run_cmd: "tmutil",
+                dry_run_args: vec!["listlocalsnapshots", "/"],
                 requires_confirm: true,
-                platform: Platform::MacOS, risk: RiskLevel::High,
+                platform: Platform::MacOS,
+                risk: RiskLevel::High,
                 description: "删除 Time Machine 本地快照 (需显式快照名, 执行前先列示)",
             },
         ]
@@ -1219,7 +1401,7 @@ impl CommandCleanup {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandResult {
     pub name: String,
-    pub status: String,        // "skipped" | "dry_run" | "executed" | "failed" | "needs_confirm"
+    pub status: String, // "skipped" | "dry_run" | "executed" | "failed" | "needs_confirm"
     pub output: String,
     pub dry_run: bool,
     pub error: Option<String>,
@@ -1233,7 +1415,9 @@ pub struct CommandCleaner {
 }
 
 impl Default for CommandCleaner {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CommandCleaner {
@@ -1245,12 +1429,19 @@ impl CommandCleaner {
         }
     }
 
-    pub fn with_dry_run(mut self, dry: bool) -> Self { self.dry_run = dry; self }
-    pub fn with_risk_gate(mut self, gate: RiskLevel) -> Self { self.risk_gate = gate; self }
+    pub fn with_dry_run(mut self, dry: bool) -> Self {
+        self.dry_run = dry;
+        self
+    }
+    pub fn with_risk_gate(mut self, gate: RiskLevel) -> Self {
+        self.risk_gate = gate;
+        self
+    }
 
     /// 扫描可执行项 (平台 + 风险过滤), 返回 (名称, 是否可用)
     pub fn scan(&self) -> Vec<(&CommandCleanup, bool)> {
-        self.items.iter()
+        self.items
+            .iter()
             .filter(|i| i.active_on_current(self.risk_gate))
             .map(|i| (i, true))
             .collect()
@@ -1260,23 +1451,31 @@ impl CommandCleaner {
     pub fn execute(&self, item: &CommandCleanup, confirm: bool) -> CommandResult {
         if !item.active_on_current(self.risk_gate) {
             return CommandResult {
-                name: item.name.into(), status: "skipped".into(),
-                output: "平台/风险不适用".into(), dry_run: self.dry_run, error: None,
+                name: item.name.into(),
+                status: "skipped".into(),
+                output: "平台/风险不适用".into(),
+                dry_run: self.dry_run,
+                error: None,
             };
         }
         if self.dry_run {
             // dry-run 变体: brew cleanup --dry-run / docker system df / tmutil listlocalsnapshots
             let out = run_output(item.dry_run_cmd, &item.dry_run_args).unwrap_or_else(|e| e);
             return CommandResult {
-                name: item.name.into(), status: "dry_run".into(),
-                output: out, dry_run: true, error: None,
+                name: item.name.into(),
+                status: "dry_run".into(),
+                output: out,
+                dry_run: true,
+                error: None,
             };
         }
         if item.requires_confirm && !confirm {
             return CommandResult {
-                name: item.name.into(), status: "needs_confirm".into(),
+                name: item.name.into(),
+                status: "needs_confirm".into(),
                 output: format!("需要显式确认 (--confirm) 才执行: {}", item.description),
-                dry_run: false, error: None,
+                dry_run: false,
+                error: None,
             };
         }
         // TM 快照: 先列示再逐个删除
@@ -1284,8 +1483,11 @@ impl CommandCleaner {
             let snapshots = self.list_tm_snapshots();
             if snapshots.is_empty() {
                 return CommandResult {
-                    name: item.name.into(), status: "executed".into(),
-                    output: "无本地快照可删".into(), dry_run: false, error: None,
+                    name: item.name.into(),
+                    status: "executed".into(),
+                    output: "无本地快照可删".into(),
+                    dry_run: false,
+                    error: None,
                 };
             }
             let mut log = Vec::new();
@@ -1295,15 +1497,25 @@ impl CommandCleaner {
                 log.push(format!("{}: {}", snap, out.trim()));
             }
             return CommandResult {
-                name: item.name.into(), status: "executed".into(),
-                output: log.join("\n"), dry_run: false, error: None,
+                name: item.name.into(),
+                status: "executed".into(),
+                output: log.join("\n"),
+                dry_run: false,
+                error: None,
             };
         }
         let out = run_output(item.cmd, &item.args).unwrap_or_else(|e| e);
         CommandResult {
             name: item.name.into(),
-            status: if out.contains("ERR") || out.contains("error") { "failed" } else { "executed" }.into(),
-            output: out, dry_run: false, error: None,
+            status: if out.contains("ERR") || out.contains("error") {
+                "failed"
+            } else {
+                "executed"
+            }
+            .into(),
+            output: out,
+            dry_run: false,
+            error: None,
         }
     }
 
@@ -1311,10 +1523,12 @@ impl CommandCleaner {
     pub fn list_tm_snapshots(&self) -> Vec<String> {
         run_output("tmutil", &["listlocalsnapshots", "/"])
             .ok()
-            .map(|o| o.lines()
-                .filter_map(|l| l.trim().strip_prefix("com.apple.TimeMachine."))
-                .map(|s| s.trim().to_string())
-                .collect())
+            .map(|o| {
+                o.lines()
+                    .filter_map(|l| l.trim().strip_prefix("com.apple.TimeMachine."))
+                    .map(|s| s.trim().to_string())
+                    .collect()
+            })
             .unwrap_or_default()
     }
 }
@@ -1328,11 +1542,18 @@ mod tests {
     use super::*;
     use crate::core::nt_core_self_test::SelfTest;
 
+    /// 进程级唯一临时目录 — 防并行会话同跑 cargo test 时共享固定 temp 目录互相删除。
+    fn unique_tmp(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("{}_pid{}", name, std::process::id()))
+    }
+
     #[test]
     fn test_cleanup_patterns() {
         let patterns = CleanupPattern::all_patterns();
         assert!(!patterns.is_empty());
-        assert!(patterns.iter().any(|p| p.kind == CleanupKind::ProjectArtifacts));
+        assert!(patterns
+            .iter()
+            .any(|p| p.kind == CleanupKind::ProjectArtifacts));
         assert!(patterns.iter().any(|p| p.kind == CleanupKind::IDECaches));
     }
 
@@ -1362,7 +1583,7 @@ mod tests {
 
     #[test]
     fn test_cleanup_dirs_creation() {
-        let tmp = std::env::temp_dir().join("neotrix_test_cleanup_dirs");
+        let tmp = unique_tmp("neotrix_test_cleanup_dirs");
         let _ = fs::remove_dir_all(&tmp);
         let dirs = CleanupDirs::new(&tmp);
         dirs.ensure().expect("ensure cleanup dirs");
@@ -1373,7 +1594,7 @@ mod tests {
 
     #[test]
     fn test_archiver_archive_paths() {
-        let tmp = std::env::temp_dir().join("neotrix_test_archiver");
+        let tmp = unique_tmp("neotrix_test_archiver");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
@@ -1383,7 +1604,8 @@ mod tests {
 
         let mut archiver = Archiver::new(&tmp);
         let paths = vec![test_file.to_string_lossy().to_string()];
-        let manifest = archiver.archive_paths(&paths, "test")
+        let manifest = archiver
+            .archive_paths(&paths, "test")
             .expect("archive paths");
         assert_eq!(manifest.total_items, 1);
         assert_eq!(manifest.entries[0].source_path, paths[0]);
@@ -1400,7 +1622,7 @@ mod tests {
 
     #[test]
     fn test_backup_engine() {
-        let tmp = std::env::temp_dir().join("neotrix_test_backup");
+        let tmp = unique_tmp("neotrix_test_backup");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
@@ -1425,14 +1647,22 @@ mod tests {
 
     #[test]
     fn test_cleanup_log() {
-        let tmp = std::env::temp_dir().join("neotrix_test_cleanup_log");
+        let tmp = unique_tmp("neotrix_test_cleanup_log");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("log")).unwrap();
 
-        CleanupLog::log(&tmp.join("log"), &CleanupLogEntry {
-            action: "test".into(), kind: "test".into(), items: 1, bytes: 100,
-            batch_id: "batch_1".into(), success: true, error: None,
-        });
+        CleanupLog::log(
+            &tmp.join("log"),
+            &CleanupLogEntry {
+                action: "test".into(),
+                kind: "test".into(),
+                items: 1,
+                bytes: 100,
+                batch_id: "batch_1".into(),
+                success: true,
+                error: None,
+            },
+        );
 
         let recent = CleanupLog::recent(&tmp.join("log"), 10);
         assert_eq!(recent.len(), 1);
@@ -1446,7 +1676,10 @@ mod tests {
     #[test]
     fn test_platform_current_and_matches() {
         let cur = Platform::current();
-        assert!(matches!(cur, Platform::MacOS | Platform::Windows | Platform::Linux | Platform::All));
+        assert!(matches!(
+            cur,
+            Platform::MacOS | Platform::Windows | Platform::Linux | Platform::All
+        ));
         assert!(Platform::All.matches(cur));
         assert!(cur.matches(cur));
     }
@@ -1456,7 +1689,11 @@ mod tests {
         // 当前平台生效, 非当前平台规则应被 new() 过滤
         let engine = CleanupEngine::new();
         for p in &engine.patterns {
-            assert!(p.platform.matches(Platform::current()), "规则 {} 未按平台过滤", p.name);
+            assert!(
+                p.platform.matches(Platform::current()),
+                "规则 {} 未按平台过滤",
+                p.name
+            );
         }
         // 全量列表应同时含 mac/win/linux 规则 (用于跨平台目标)
         let all = CleanupPattern::all_patterns();
@@ -1486,11 +1723,15 @@ mod tests {
 
     #[test]
     fn test_cachedir_tag_detection() {
-        let tmp = std::env::temp_dir().join("neotrix_test_cachedir_tag");
+        let tmp = unique_tmp("neotrix_test_cachedir_tag");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         // 带合法签名的 CACHEDIR.TAG → 应被识别为缓存
-        fs::write(tmp.join("CACHEDIR.TAG"), "Signature: 8a477f597d02d456d45674aa7d611ef7b6c14a01bccaebbd4e53c5d4f\ncomment").unwrap();
+        fs::write(
+            tmp.join("CACHEDIR.TAG"),
+            "Signature: 8a477f597d02d456d45674aa7d611ef7b6c14a01bccaebbd4e53c5d4f\ncomment",
+        )
+        .unwrap();
         assert!(CleanupPattern::has_cachedir_tag(&tmp));
         // 不带签名 → 不是
         fs::write(tmp.join("CACHEDIR.TAG"), "random").unwrap();
@@ -1501,15 +1742,16 @@ mod tests {
     #[test]
     fn test_system_root_guard() {
         // 拒绝删除系统根目录
-        assert!(CleanupPattern::is_system_root_dir(std::path::Path::new("/")));
+        assert!(CleanupPattern::is_system_root_dir(std::path::Path::new(
+            "/"
+        )));
         let home = dirs::home_dir().unwrap();
         assert!(CleanupPattern::is_system_root_dir(&home));
         // 普通目录不受影响
-        assert!(!CleanupPattern::is_system_root_dir(std::path::Path::new("/tmp/neotrix_test_x")));
+        assert!(!CleanupPattern::is_system_root_dir(std::path::Path::new(
+            "/tmp/neotrix_test_x"
+        )));
     }
-
-
-
 
     // ---- 吸收增强测试 (AI 缓存 / Homebrew / Xcode / 命令式清理) ----
 
@@ -1539,7 +1781,9 @@ mod tests {
         let cmds = CommandCleanup::all();
         assert!(cmds.iter().any(|c| c.name == "Homebrew cleanup"));
         assert!(cmds.iter().any(|c| c.name == "Docker system prune"));
-        assert!(cmds.iter().any(|c| c.name == "Time Machine local snapshots"));
+        assert!(cmds
+            .iter()
+            .any(|c| c.name == "Time Machine local snapshots"));
     }
 
     #[test]
@@ -1556,7 +1800,11 @@ mod tests {
         }
         // 非 dry-run + 需确认项 → needs_confirm
         let real = CommandCleaner::new().with_dry_run(false);
-        if let Some((docker, _)) = real.scan().iter().find(|(i, _)| i.name == "Docker system prune") {
+        if let Some((docker, _)) = real
+            .scan()
+            .iter()
+            .find(|(i, _)| i.name == "Docker system prune")
+        {
             let r = real.execute(docker, false);
             assert_eq!(r.status, "needs_confirm");
         }
@@ -1579,9 +1827,15 @@ mod tests {
         engine.dry_run_default = true;
         let r = engine.clean(CleanupKind::SystemServices);
         assert!(r.dry_run, "clean 应继承 dry_run_default");
-        assert!(!r.pattern_matches.is_empty(), "dry-run 报告应含可用项, 但为空");
-        assert!(r.pattern_matches.iter().any(|m| m.contains("dry-run")),
-            "报告应标注 dry-run 状态: {:?}", r.pattern_matches);
+        assert!(
+            !r.pattern_matches.is_empty(),
+            "dry-run 报告应含可用项, 但为空"
+        );
+        assert!(
+            r.pattern_matches.iter().any(|m| m.contains("dry-run")),
+            "报告应标注 dry-run 状态: {:?}",
+            r.pattern_matches
+        );
     }
 
     #[test]
@@ -1591,8 +1845,11 @@ mod tests {
         let home = dirs::home_dir().unwrap();
         // 模拟扫描路径: ~/.config 下的真实绝对路径
         let abs = home.join(".config").join("some_app");
-        assert!(engine.is_whitelisted(&abs),
-            "白名单 ~/.config 应匹配绝对路径 {:?} (expand 后)", abs);
+        assert!(
+            engine.is_whitelisted(&abs),
+            "白名单 ~/.config 应匹配绝对路径 {:?} (expand 后)",
+            abs
+        );
     }
 
     #[test]
@@ -1606,31 +1863,37 @@ mod tests {
     #[test]
     fn test_project_molting_kind_registered() {
         let all = CleanupPattern::all_patterns();
-        assert!(all.iter().any(|p| p.kind == CleanupKind::ProjectMolting),
-            "ProjectMolting 蜕皮规则必须注册");
+        assert!(
+            all.iter().any(|p| p.kind == CleanupKind::ProjectMolting),
+            "ProjectMolting 蜕皮规则必须注册"
+        );
         assert!(!CleanupKind::ProjectMolting.description().is_empty());
     }
 
     #[test]
     fn test_molt_project_detects_legacy_shells() {
-        let tmp = std::env::temp_dir().join("neotrix_test_molting");
+        let tmp = unique_tmp("neotrix_test_molting");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("legacy")).unwrap();
         fs::create_dir_all(tmp.join("old_proto")).unwrap();
         fs::create_dir_all(tmp.join("active")).unwrap();
         fs::write(tmp.join("legacy").join("old.rs"), b"// old").unwrap();
 
-        let mut engine = CleanupEngine::new()
-            .with_project_root(tmp.clone());
+        let mut engine = CleanupEngine::new().with_project_root(tmp.clone());
         engine.dry_run_default = true; // 预览模式
         let r = engine.molt_project();
 
         assert!(r.dry_run);
-        assert_eq!(r.deletable_count, 2, "legacy + old_proto 应被识别, active 不应");
+        assert_eq!(
+            r.deletable_count, 2,
+            "legacy + old_proto 应被识别, active 不应"
+        );
         assert!(r.pattern_matches.iter().any(|m| m.contains("legacy")));
         assert!(r.pattern_matches.iter().any(|m| m.contains("old_proto")));
-        assert!(r.pattern_matches.iter().all(|m| !m.contains("active")),
-            "active 目录不得被蜕皮");
+        assert!(
+            r.pattern_matches.iter().all(|m| !m.contains("active")),
+            "active 目录不得被蜕皮"
+        );
         // 预览模式不产生归档副作用
         assert!(!tmp.join(".cleanup").exists());
 
@@ -1639,12 +1902,11 @@ mod tests {
 
     #[test]
     fn test_molt_project_never_molts_project_root() {
-        let tmp = std::env::temp_dir().join("neotrix_test_molt_root_guard");
+        let tmp = unique_tmp("neotrix_test_molt_root_guard");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
-        let mut engine = CleanupEngine::new()
-            .with_project_root(tmp.clone());
+        let mut engine = CleanupEngine::new().with_project_root(tmp.clone());
         engine.dry_run_default = true;
         let r = engine.molt_project();
 
@@ -1656,21 +1918,22 @@ mod tests {
         engine.dry_run_default = true;
         let r2 = engine.molt_project();
         // 扫描的是 root 下一级, old_project 是 root 的子目录不是 root 自身
-        assert!(r2.pattern_matches.iter().any(|m| m.contains("old_project")),
-            "old_project 作为 root 的子目录应被识别为旧躯壳");
+        assert!(
+            r2.pattern_matches.iter().any(|m| m.contains("old_project")),
+            "old_project 作为 root 的子目录应被识别为旧躯壳"
+        );
 
         let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
     fn test_molt_project_archives_in_archive_mode() {
-        let tmp = std::env::temp_dir().join("neotrix_test_molt_archive");
+        let tmp = unique_tmp("neotrix_test_molt_archive");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("legacy")).unwrap();
         fs::write(tmp.join("legacy").join("stale.rs"), b"// stale").unwrap();
 
-        let mut engine = CleanupEngine::new()
-            .with_project_root(tmp.clone());
+        let mut engine = CleanupEngine::new().with_project_root(tmp.clone());
         engine.dry_run_default = false;
         engine.archive_on_clean = true;
         let r = engine.molt_project();
@@ -1695,7 +1958,12 @@ mod tests {
         // 模拟规则库缺蜕皮 → SelfTest 必须报失败 (R-P23 检测系统自审计)
         // 通过向 all_patterns 打补丁不可行 (static), 验证护栏检测本身:
         let engine = CleanupEngine::new();
-        assert!(engine.patterns.iter().any(|p| p.kind == CleanupKind::ProjectMolting),
-            "生产规则库应含蜕皮规则");
+        assert!(
+            engine
+                .patterns
+                .iter()
+                .any(|p| p.kind == CleanupKind::ProjectMolting),
+            "生产规则库应含蜕皮规则"
+        );
     }
 }
