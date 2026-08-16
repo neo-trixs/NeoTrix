@@ -161,8 +161,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:33:55.945651Z",
@@ -954,7 +954,9 @@
         "nt_memory_kb::kv_cache_memory"
       ],
       "rune_sockets": [],
-      "dependents": [],
+      "dependents": [
+        "nt_memory_kb::guard_mutation"
+      ],
       "evolution_log": [
         {
           "cycle": "pending",
@@ -983,7 +985,7 @@
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:18.435537Z",
-      "updated_at": "2026-08-16T07:33:56.231408Z",
+      "updated_at": "2026-08-16T07:39:55.369723Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1003,7 +1005,9 @@
         "nt_memory_kb::single_file_memory"
       ],
       "rune_sockets": [],
-      "dependents": [],
+      "dependents": [
+        "nt_memory_kb::temporal_audit_ledger"
+      ],
       "evolution_log": [
         {
           "cycle": "pending",
@@ -1040,7 +1044,7 @@
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:43.277610Z",
-      "updated_at": "2026-08-16T07:33:56.178079Z",
+      "updated_at": "2026-08-16T07:39:55.388447Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1719,7 +1723,9 @@
         "resume",
         "p2_8"
       ],
-      "requires": [],
+      "requires": [
+        "nt_world_video_pipeline::video_production_chain"
+      ],
       "rune_sockets": [],
       "dependents": [],
       "evolution_log": [
@@ -1959,7 +1965,8 @@
         "g23"
       ],
       "requires": [
-        "nt_memory_kb::nt_memory_provenance::signed_provenance"
+        "nt_memory_kb::nt_memory_provenance::signed_provenance",
+        "nt_memory_historian::temporal_context_graph"
       ],
       "rune_sockets": [],
       "dependents": [],
@@ -2003,7 +2010,8 @@
       ],
       "rune_sockets": [],
       "dependents": [
-        "nt_world_video_pipeline::asset_enricher"
+        "nt_world_video_pipeline::asset_enricher",
+        "nt_world_video_pipeline::checkpoint_resume"
       ],
       "evolution_log": [
         {
@@ -2017,7 +2025,7 @@
       ],
       "metadata": {},
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-16T00:25:21.783560Z",
+      "updated_at": "2026-08-16T07:39:55.351093Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2531,7 +2539,9 @@
       "provides": [
         "mutation_guard"
       ],
-      "requires": [],
+      "requires": [
+        "nt_memory_kb::retrieval_self_evolution"
+      ],
       "rune_sockets": [],
       "dependents": [
         "nt_memory_kb::experience_triplet_pool"
@@ -3080,8 +3090,16 @@
       "nt_memory_provenance::signed_provenance"
     ],
     [
+      "nt_memory_kb::temporal_audit_ledger",
+      "nt_memory_historian::temporal_context_graph"
+    ],
+    [
       "nt_world_video_pipeline::asset_enricher",
       "nt_world_video_pipeline::video_production_chain"
+    ],
+    [
+      "nt_memory_kb::guard_mutation",
+      "nt_memory_kb::retrieval_self_evolution"
     ],
     [
       "nt_mind_background_loop::loop_ready_scoring",
@@ -3182,6 +3200,10 @@
     [
       "nt_mind_autofixer::gauntlet_gate",
       "nt_agent_orchestrator::expert_team_diff"
+    ],
+    [
+      "nt_world_video_pipeline::checkpoint_resume",
+      "nt_world_video_pipeline::video_production_chain"
     ]
   ],
   "experience_targets": [
