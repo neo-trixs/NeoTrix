@@ -97,7 +97,12 @@ impl ProvenanceChain {
         let earliest = layers.iter().map(|(_, ts)| *ts).min().unwrap_or(0);
         let latest = layers.iter().map(|(_, ts)| *ts).max().unwrap_or(0);
         let depth = layers.len();
-        Self { layers, earliest, latest, depth }
+        Self {
+            layers,
+            earliest,
+            latest,
+            depth,
+        }
     }
 
     /// Validate the layer isolation rule:
@@ -217,13 +222,13 @@ pub fn deduce_layer(source: &PerceptionSource, confidence: f64) -> KnowledgeLaye
                 })
             }
         }
-        PerceptionSource::WebFetch
-        | PerceptionSource::ToolOutput
-        | PerceptionSource::FileRead => KnowledgeLayer::Raw(PerceptionMeta {
-            source_type: source.clone(),
-            raw_confidence: confidence,
-            timestamp: 0,
-        }),
+        PerceptionSource::WebFetch | PerceptionSource::ToolOutput | PerceptionSource::FileRead => {
+            KnowledgeLayer::Raw(PerceptionMeta {
+                source_type: source.clone(),
+                raw_confidence: confidence,
+                timestamp: 0,
+            })
+        }
         PerceptionSource::Sensor => KnowledgeLayer::Raw(PerceptionMeta {
             source_type: source.clone(),
             raw_confidence: confidence,
@@ -321,28 +326,21 @@ mod tests {
 
     #[test]
     fn test_chain_validation_raw_structured() {
-        let chain = ProvenanceChain::new(vec![
-            (raw_layer(0.9), 1000),
-            (structured_layer(0.8), 2000),
-        ]);
+        let chain =
+            ProvenanceChain::new(vec![(raw_layer(0.9), 1000), (structured_layer(0.8), 2000)]);
         assert!(chain.validate_chain());
     }
 
     #[test]
     fn test_chain_validation_invalid_skip() {
-        let chain = ProvenanceChain::new(vec![
-            (raw_layer(0.9), 1000),
-            (semantic_layer(0.7), 3000),
-        ]);
+        let chain = ProvenanceChain::new(vec![(raw_layer(0.9), 1000), (semantic_layer(0.7), 3000)]);
         assert!(!chain.validate_chain());
     }
 
     #[test]
     fn test_chain_validation_invalid_reorder() {
-        let chain = ProvenanceChain::new(vec![
-            (structured_layer(0.8), 2000),
-            (raw_layer(0.9), 1000),
-        ]);
+        let chain =
+            ProvenanceChain::new(vec![(structured_layer(0.8), 2000), (raw_layer(0.9), 1000)]);
         assert!(!chain.validate_chain());
     }
 
@@ -354,34 +352,29 @@ mod tests {
 
     #[test]
     fn test_isolation_rule_raw_first() {
-        let chain = ProvenanceChain::new(vec![
-            (structured_layer(0.8), 2000),
-        ]);
+        let chain = ProvenanceChain::new(vec![(structured_layer(0.8), 2000)]);
         assert!(!chain.validate_chain());
     }
 
     #[test]
     fn test_isolation_rule_semantic_after_raw() {
-        let chain = ProvenanceChain::new(vec![
-            (raw_layer(0.9), 1000),
-            (semantic_layer(0.7), 3000),
-        ]);
+        let chain = ProvenanceChain::new(vec![(raw_layer(0.9), 1000), (semantic_layer(0.7), 3000)]);
         assert!(!chain.validate_chain());
     }
 
     #[test]
     fn test_upgrade_rule_direct() {
-        let rule = UpgradeRule::Direct(vec![
-            PerceptionSource::WebFetch,
-            PerceptionSource::FileRead,
-        ]);
+        let rule =
+            UpgradeRule::Direct(vec![PerceptionSource::WebFetch, PerceptionSource::FileRead]);
         assert!(rule.can_upgrade(&PerceptionSource::WebFetch, 0.5));
         assert!(!rule.can_upgrade(&PerceptionSource::UserInput, 0.9));
     }
 
     #[test]
     fn test_upgrade_rule_inferred() {
-        let rule = UpgradeRule::Inferred { min_confidence: 0.75 };
+        let rule = UpgradeRule::Inferred {
+            min_confidence: 0.75,
+        };
         assert!(rule.can_upgrade(&PerceptionSource::WebFetch, 0.8));
         assert!(!rule.can_upgrade(&PerceptionSource::UserInput, 0.5));
     }
@@ -432,10 +425,8 @@ mod tests {
 
     #[test]
     fn test_source_hierarchy_trait() {
-        let chain = ProvenanceChain::new(vec![
-            (raw_layer(0.9), 1000),
-            (structured_layer(0.8), 2000),
-        ]);
+        let chain =
+            ProvenanceChain::new(vec![(raw_layer(0.9), 1000), (structured_layer(0.8), 2000)]);
         assert!(!chain.is_semantic());
         assert!((chain.effective_confidence() - 0.68).abs() < 1e-9);
     }

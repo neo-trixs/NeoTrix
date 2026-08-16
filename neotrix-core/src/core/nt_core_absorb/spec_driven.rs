@@ -137,7 +137,10 @@ impl SpecDrivenPipeline {
     /// 追加合并 (描述/约束增量并集, 版本递增, 旧版本标记 Superseded 留证据链)。
     /// 返回 (合并结果, 是否新建)。新建返回 (Some(id), true); 已存在并合并返回
     /// (Some(id), false); 目标已被 Rejected 时返回 Err (拒绝复活, 须显式重建)。
-    pub fn submit_spec_incremental(&mut self, spec: EvolutionSpec) -> Result<(String, bool), String> {
+    pub fn submit_spec_incremental(
+        &mut self,
+        spec: EvolutionSpec,
+    ) -> Result<(String, bool), String> {
         if spec.id.is_empty() {
             return Err("spec id must not be empty".to_string());
         }
@@ -248,10 +251,26 @@ impl SpecDrivenPipeline {
 
     pub fn stats(&self) -> SpecPipelineStats {
         let total = self.specs.len() as u32;
-        let active = self.specs.iter().filter(|s| s.status == SpecStatus::Active).count() as u32;
-        let pending = self.specs.iter().filter(|s| s.status == SpecStatus::Pending).count() as u32;
-        let rejected = self.specs.iter().filter(|s| s.status == SpecStatus::Rejected).count() as u32;
-        let superseded = self.specs.iter().filter(|s| s.status == SpecStatus::Superseded).count() as u32;
+        let active = self
+            .specs
+            .iter()
+            .filter(|s| s.status == SpecStatus::Active)
+            .count() as u32;
+        let pending = self
+            .specs
+            .iter()
+            .filter(|s| s.status == SpecStatus::Pending)
+            .count() as u32;
+        let rejected = self
+            .specs
+            .iter()
+            .filter(|s| s.status == SpecStatus::Rejected)
+            .count() as u32;
+        let superseded = self
+            .specs
+            .iter()
+            .filter(|s| s.status == SpecStatus::Superseded)
+            .count() as u32;
         let avg_confidence = if total == 0 { 0.0 } else { 0.75 };
         SpecPipelineStats {
             total,
@@ -277,7 +296,12 @@ mod tests {
     #[test]
     fn test_submit_and_verify_pending() {
         let mut pipeline = SpecDrivenPipeline::default();
-        let spec = EvolutionSpec::new("s1", "add logging", "add structured logging to core", "core");
+        let spec = EvolutionSpec::new(
+            "s1",
+            "add logging",
+            "add structured logging to core",
+            "core",
+        );
         pipeline.submit_spec(spec);
         let pending = pipeline.get_pending_specs();
         assert_eq!(pending.len(), 1);
@@ -337,9 +361,21 @@ mod tests {
         assert!(!created2, "existing spec merges, not new");
 
         // 旧版本归档 Superseded (证据链)
-        assert_eq!(pipeline.specs.iter().filter(|s| s.status == SpecStatus::Superseded).count(), 1);
+        assert_eq!(
+            pipeline
+                .specs
+                .iter()
+                .filter(|s| s.status == SpecStatus::Superseded)
+                .count(),
+            1
+        );
         // 最新版本约束 = 并集 (compiles + tests pass)
-        let latest = pipeline.specs.iter().filter(|s| s.status == SpecStatus::Pending).last().unwrap();
+        let latest = pipeline
+            .specs
+            .iter()
+            .filter(|s| s.status == SpecStatus::Pending)
+            .last()
+            .unwrap();
         assert_eq!(latest.version, 2);
         assert!(latest.constraints.contains(&"compiles".to_string()));
         assert!(latest.constraints.contains(&"tests pass".to_string()));
@@ -353,7 +389,10 @@ mod tests {
         assert!(pipeline.reject("dead"));
         let reopen = EvolutionSpec::new("dead", "y", "reopen attempt", "m");
         let err = pipeline.submit_spec_incremental(reopen).unwrap_err();
-        assert!(err.contains("Rejected"), "rejected spec cannot reopen via merge");
+        assert!(
+            err.contains("Rejected"),
+            "rejected spec cannot reopen via merge"
+        );
     }
 
     #[test]

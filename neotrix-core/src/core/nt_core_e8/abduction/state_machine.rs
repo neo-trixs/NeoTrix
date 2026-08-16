@@ -44,13 +44,24 @@ impl AbductiveStateMachine {
     }
 
     pub fn can_transition(&self, from: &AbductiveState, to: &AbductiveState) -> bool {
-        matches!((from, to),
-            (AbductiveState::Observation, AbductiveState::HypothesisGeneration) |
-            (AbductiveState::HypothesisGeneration, AbductiveState::Evaluation) |
-            (AbductiveState::Evaluation, AbductiveState::Revision) |
-            (AbductiveState::Evaluation, AbductiveState::HypothesisGeneration) |
-            (AbductiveState::Revision, AbductiveState::Acceptance) |
-            (AbductiveState::Revision, AbductiveState::HypothesisGeneration)
+        matches!(
+            (from, to),
+            (
+                AbductiveState::Observation,
+                AbductiveState::HypothesisGeneration
+            ) | (
+                AbductiveState::HypothesisGeneration,
+                AbductiveState::Evaluation
+            ) | (AbductiveState::Evaluation, AbductiveState::Revision)
+                | (
+                    AbductiveState::Evaluation,
+                    AbductiveState::HypothesisGeneration
+                )
+                | (AbductiveState::Revision, AbductiveState::Acceptance)
+                | (
+                    AbductiveState::Revision,
+                    AbductiveState::HypothesisGeneration
+                )
         )
     }
 

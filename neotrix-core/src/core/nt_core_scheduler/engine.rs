@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::history::{JobRunHistory, JobRunRecord, SchedulerStats};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduledJob {
@@ -52,7 +52,11 @@ pub struct SchedulerEngine {
 
 impl SchedulerEngine {
     pub fn new() -> Self {
-        Self { jobs: Vec::new(), history: JobRunHistory::new(1000), tick_count: 0 }
+        Self {
+            jobs: Vec::new(),
+            history: JobRunHistory::new(1000),
+            tick_count: 0,
+        }
     }
 
     pub fn add_job(&mut self, job: ScheduledJob) {
@@ -89,18 +93,20 @@ impl SchedulerEngine {
         let mut due = Vec::new();
         let mut i = 0;
         while i < self.jobs.len() {
-        let pass = {
-            let j = &self.jobs[i];
-            j.enabled && j.next_run <= now_ts
-                && j.last_run.is_none_or(|lr| now_ts.saturating_sub(lr) >= j.cooldown_secs)
-                && match j.context_gate {
-                    ContextGate::Any => true,
-                    ContextGate::LowCogLoad(max) => cog_load <= max,
-                    ContextGate::MinDaLevel(min) => da_level >= min,
-                    ContextGate::SleepPressure(max) => sleep_pressure <= max,
-                    ContextGate::ExplorationMode => curiosity_level >= 0.5,
-                }
-        };
+            let pass = {
+                let j = &self.jobs[i];
+                j.enabled
+                    && j.next_run <= now_ts
+                    && j.last_run
+                        .is_none_or(|lr| now_ts.saturating_sub(lr) >= j.cooldown_secs)
+                    && match j.context_gate {
+                        ContextGate::Any => true,
+                        ContextGate::LowCogLoad(max) => cog_load <= max,
+                        ContextGate::MinDaLevel(min) => da_level >= min,
+                        ContextGate::SleepPressure(max) => sleep_pressure <= max,
+                        ContextGate::ExplorationMode => curiosity_level >= 0.5,
+                    }
+            };
             if pass {
                 let job = &mut self.jobs[i];
                 job.last_run = Some(now_ts);
@@ -117,7 +123,10 @@ impl SchedulerEngine {
     /// must periodically report liveness; `stale_jobs` detects silent death.
     pub fn report_heartbeat(&mut self, job_id: &str, ts: u64) -> bool {
         match self.get_job_mut(job_id) {
-            Some(job) => { job.last_heartbeat = Some(ts); true }
+            Some(job) => {
+                job.last_heartbeat = Some(ts);
+                true
+            }
             None => false,
         }
     }
@@ -126,13 +135,13 @@ impl SchedulerEngine {
     /// older than `heartbeat_secs`. These are considered silently dead and
     /// can be surfaced for repair/restart (NT-REPAIR self-healing loop).
     pub fn stale_jobs(&self, now_ts: u64) -> Vec<String> {
-        self.jobs.iter()
-            .filter(|j| {
-                match j.heartbeat_secs {
-                    Some(secs) if secs > 0 => j.last_heartbeat
-                        .is_none_or(|hb| now_ts.saturating_sub(hb) > secs),
-                    _ => false,
-                }
+        self.jobs
+            .iter()
+            .filter(|j| match j.heartbeat_secs {
+                Some(secs) if secs > 0 => j
+                    .last_heartbeat
+                    .is_none_or(|hb| now_ts.saturating_sub(hb) > secs),
+                _ => false,
             })
             .map(|j| j.id.clone())
             .collect()
@@ -140,8 +149,11 @@ impl SchedulerEngine {
 
     /// (monitored_count, stale_count) snapshot for telemetry/audit.
     pub fn heartbeat_stats(&self, now_ts: u64) -> (u32, u32) {
-        let monitored = self.jobs.iter()
-            .filter(|j| j.heartbeat_secs.is_some_and(|s| s > 0)).count();
+        let monitored = self
+            .jobs
+            .iter()
+            .filter(|j| j.heartbeat_secs.is_some_and(|s| s > 0))
+            .count();
         (monitored as u32, self.stale_jobs(now_ts).len() as u32)
     }
 
@@ -158,19 +170,32 @@ impl SchedulerEngine {
     }
 
     pub fn record_run(
-        &mut self, job_id: &str, started_at: u64,
-        duration_ms: u64, success: bool, error: Option<String>,
+        &mut self,
+        job_id: &str,
+        started_at: u64,
+        duration_ms: u64,
+        success: bool,
+        error: Option<String>,
     ) {
-        let retry_count = self.history.last_run(job_id)
-            .map(|r| r.retry_count).unwrap_or(0u32);
+        let retry_count = self
+            .history
+            .last_run(job_id)
+            .map(|r| r.retry_count)
+            .unwrap_or(0u32);
         let new_retry_count = if success { 0 } else { retry_count + 1 };
         self.history.push(JobRunRecord {
-            job_id: job_id.to_string(), started_at, duration_ms,
-            success, error, retry_count: new_retry_count,
+            job_id: job_id.to_string(),
+            started_at,
+            duration_ms,
+            success,
+            error,
+            retry_count: new_retry_count,
         });
         if !success {
             if let Some(job) = self.get_job_mut(job_id) {
-                if new_retry_count >= job.max_retries { job.enabled = false; }
+                if new_retry_count >= job.max_retries {
+                    job.enabled = false;
+                }
             }
         }
     }
@@ -182,9 +207,12 @@ impl SchedulerEngine {
             total_runs: self.history.total_runs(),
             failed_runs: self.history.total_failures(),
             success_rate: self.history.success_rate(),
-            registered_handler_count: self.jobs.iter()
+            registered_handler_count: self
+                .jobs
+                .iter()
                 .map(|j| j.handler.as_str())
-                .collect::<std::collections::HashSet<_>>().len(),
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
         }
     }
 
@@ -194,16 +222,22 @@ impl SchedulerEngine {
     }
 
     pub fn load_json(&mut self, json: &str) -> Result<(), String> {
-        let jobs: Vec<ScheduledJob> = serde_json::from_str(json)
-            .map_err(|e| format!("scheduler deserialization: {}", e))?;
+        let jobs: Vec<ScheduledJob> =
+            serde_json::from_str(json).map_err(|e| format!("scheduler deserialization: {}", e))?;
         self.jobs = jobs;
         Ok(())
     }
 
-    pub fn tick_count(&self) -> u64 { self.tick_count }
+    pub fn tick_count(&self) -> u64 {
+        self.tick_count
+    }
 }
 
-impl Default for SchedulerEngine { fn default() -> Self { Self::new() } }
+impl Default for SchedulerEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 pub fn compute_next_run(schedule: &ScheduleType, anchor_ts: Option<u64>, now_ts: u64) -> u64 {
     match schedule {
@@ -211,18 +245,28 @@ pub fn compute_next_run(schedule: &ScheduleType, anchor_ts: Option<u64>, now_ts:
         ScheduleType::Interval { secs } => {
             let interval = *secs;
             let anchor = anchor_ts.unwrap_or(now_ts);
-            if now_ts < anchor { return anchor; }
+            if now_ts < anchor {
+                return anchor;
+            }
             let steps = (now_ts - anchor) / interval;
             anchor + (steps + 1) * interval
         }
         ScheduleType::Cron(expr) => next_cron(expr, now_ts).unwrap_or(now_ts + 3600),
-        ScheduleType::OneTime(ts) => if *ts > now_ts { *ts } else { now_ts + 86400 * 365 },
+        ScheduleType::OneTime(ts) => {
+            if *ts > now_ts {
+                *ts
+            } else {
+                now_ts + 86400 * 365
+            }
+        }
     }
 }
 
 fn next_cron(expr: &str, now_ts: u64) -> Option<u64> {
     let parts: Vec<&str> = expr.split_whitespace().collect();
-    if parts.len() != 5 { return None; }
+    if parts.len() != 5 {
+        return None;
+    }
     let minutes = parse_cron_field(parts[0], 0, 59)?;
     let hours = parse_cron_field(parts[1], 0, 23)?;
     let days = parse_cron_field(parts[2], 1, 31)?;
@@ -232,12 +276,15 @@ fn next_cron(expr: &str, now_ts: u64) -> Option<u64> {
     let mut ts = start;
     for _ in 0..(525600 * 5) {
         let (y, m, d, h, min) = ts_to_calendar(ts);
-        if y == 0 { break; }
-        if months.contains(&m) && days.contains(&d)
-            && hours.contains(&h) && minutes.contains(&min)
+        if y == 0 {
+            break;
+        }
+        if months.contains(&m) && days.contains(&d) && hours.contains(&h) && minutes.contains(&min)
         {
             let dow = day_of_week(y, m, d);
-            if weekdays.contains(&dow) { return Some(ts); }
+            if weekdays.contains(&dow) {
+                return Some(ts);
+            }
         }
         ts += 60;
     }
@@ -245,14 +292,22 @@ fn next_cron(expr: &str, now_ts: u64) -> Option<u64> {
 }
 
 fn parse_cron_field(field: &str, min_val: i64, max_val: i64) -> Option<Vec<i64>> {
-    if field == "*" { return Some((min_val..=max_val).collect()); }
+    if field == "*" {
+        return Some((min_val..=max_val).collect());
+    }
     let mut values = Vec::new();
     for part in field.split(',') {
         let v: i64 = part.trim().parse().ok()?;
-        if v < min_val || v > max_val { return None; }
+        if v < min_val || v > max_val {
+            return None;
+        }
         values.push(v);
     }
-    if values.is_empty() { None } else { Some(values) }
+    if values.is_empty() {
+        None
+    } else {
+        Some(values)
+    }
 }
 
 fn ts_to_calendar(ts: u64) -> (i64, i64, i64, i64, i64) {
@@ -264,22 +319,43 @@ fn ts_to_calendar(ts: u64) -> (i64, i64, i64, i64, i64) {
     let mut remaining = days as i64;
     loop {
         let days_in_year = if is_leap(y) { 366 } else { 365 };
-        if remaining < days_in_year { break; }
+        if remaining < days_in_year {
+            break;
+        }
         remaining -= days_in_year;
         y += 1;
-        if y > 2100 { return (0, 0, 0, 0, 0); }
+        if y > 2100 {
+            return (0, 0, 0, 0, 0);
+        }
     }
-    let month_days = [31, if is_leap(y) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let month_days = [
+        31,
+        if is_leap(y) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
     let mut m = 1i64;
     for &md in &month_days {
-        if remaining < md { break; }
+        if remaining < md {
+            break;
+        }
         remaining -= md;
         m += 1;
     }
     (y, m, remaining + 1, hour, minute)
 }
 
-fn is_leap(y: i64) -> bool { (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 }
+fn is_leap(y: i64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
 
 fn day_of_week(y: i64, m: i64, d: i64) -> i64 {
     let (y_adj, m_adj) = if m < 3 { (y - 1, m + 12) } else { (y, m) };
@@ -291,7 +367,8 @@ fn day_of_week(y: i64, m: i64, d: i64) -> i64 {
 fn current_unix_ts() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default().as_secs()
+        .unwrap_or_default()
+        .as_secs()
 }
 
 // ---- Tests ----
@@ -302,7 +379,10 @@ mod tests {
 
     #[test]
     fn test_compute_next_run_interval_basic() {
-        assert_eq!(compute_next_run(&ScheduleType::Interval { secs: 3600 }, None, 0), 3600);
+        assert_eq!(
+            compute_next_run(&ScheduleType::Interval { secs: 3600 }, None, 0),
+            3600
+        );
     }
 
     #[test]
@@ -315,12 +395,18 @@ mod tests {
 
     #[test]
     fn test_compute_next_run_zero_interval() {
-        assert_eq!(compute_next_run(&ScheduleType::Interval { secs: 0 }, None, 100), 100);
+        assert_eq!(
+            compute_next_run(&ScheduleType::Interval { secs: 0 }, None, 100),
+            100
+        );
     }
 
     #[test]
     fn test_compute_next_run_one_time() {
-        assert_eq!(compute_next_run(&ScheduleType::OneTime(5000), None, 1000), 5000);
+        assert_eq!(
+            compute_next_run(&ScheduleType::OneTime(5000), None, 1000),
+            5000
+        );
         assert!(compute_next_run(&ScheduleType::OneTime(5000), None, 6000) > 5000);
     }
 
@@ -348,19 +434,31 @@ mod tests {
 
     #[test]
     fn test_is_leap() {
-        assert!(is_leap(2000)); assert!(is_leap(2024));
-        assert!(!is_leap(2100)); assert!(!is_leap(2023));
+        assert!(is_leap(2000));
+        assert!(is_leap(2024));
+        assert!(!is_leap(2100));
+        assert!(!is_leap(2023));
     }
 
     #[test]
     fn test_scheduler_add_and_get() {
         let mut s = SchedulerEngine::new();
         s.add_job(ScheduledJob {
-            id: "t".into(), name: "T".into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: 100,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "t".into(),
+            name: "T".into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: 100,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         assert!(s.get_job("t").is_some());
         assert!(s.get_job("x").is_none());
@@ -370,13 +468,24 @@ mod tests {
     fn test_scheduler_remove() {
         let mut s = SchedulerEngine::new();
         s.add_job(ScheduledJob {
-            id: "x".into(), name: "X".into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: 100,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "x".into(),
+            name: "X".into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: 100,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
-        assert!(s.remove_job("x")); assert!(!s.remove_job("nonexistent"));
+        assert!(s.remove_job("x"));
+        assert!(!s.remove_job("nonexistent"));
         assert_eq!(s.stats().total_jobs, 0);
     }
 
@@ -385,18 +494,38 @@ mod tests {
         let mut s = SchedulerEngine::new();
         let now = 1000;
         s.add_job(ScheduledJob {
-            id: "due_now".into(), name: "D".into(), schedule: ScheduleType::Interval { secs: 3600 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: now - 1,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "due_now".into(),
+            name: "D".into(),
+            schedule: ScheduleType::Interval { secs: 3600 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: now - 1,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         s.add_job(ScheduledJob {
-            id: "not_due".into(), name: "N".into(), schedule: ScheduleType::Interval { secs: 3600 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: now + 1000,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "not_due".into(),
+            name: "N".into(),
+            schedule: ScheduleType::Interval { secs: 3600 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: now + 1000,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         let due = s.tick(now, 0.0, 0.5, 0.0, 0.5);
         assert_eq!(due.len(), 1);
@@ -407,11 +536,21 @@ mod tests {
         let mut s = SchedulerEngine::new();
         let now = 1000;
         s.add_job(ScheduledJob {
-            id: "cog".into(), name: "C".into(), schedule: ScheduleType::Interval { secs: 3600 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: now - 1,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::LowCogLoad(0.5), description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "cog".into(),
+            name: "C".into(),
+            schedule: ScheduleType::Interval { secs: 3600 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: now - 1,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::LowCogLoad(0.5),
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         assert_eq!(s.tick(now, 0.8, 0.5, 0.0, 0.5).len(), 0); // blocked
         assert_eq!(s.tick(now, 0.3, 0.5, 0.0, 0.5).len(), 1); // passes
@@ -421,11 +560,21 @@ mod tests {
     fn test_scheduler_disabled_job_not_ticked() {
         let mut s = SchedulerEngine::new();
         s.add_job(ScheduledJob {
-            id: "off".into(), name: "O".into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: false, last_run: None, next_run: 0,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "off".into(),
+            name: "O".into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: false,
+            last_run: None,
+            next_run: 0,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         assert_eq!(s.tick(100, 0.0, 0.5, 0.0, 0.5).len(), 0);
     }
@@ -435,11 +584,21 @@ mod tests {
         let mut s = SchedulerEngine::new();
         let now = 1000;
         s.add_job(ScheduledJob {
-            id: "flaky".into(), name: "F".into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: now - 1,
-            max_retries: 2, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "flaky".into(),
+            name: "F".into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: now - 1,
+            max_retries: 2,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         s.record_run("flaky", now, 100, false, Some("fail1".into()));
         assert!(s.get_job("flaky").unwrap().enabled);
@@ -461,18 +620,38 @@ mod tests {
     fn test_scheduler_stats() {
         let mut s = SchedulerEngine::new();
         s.add_job(ScheduledJob {
-            id: "a".into(), name: "A".into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: 0,
-            max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "a".into(),
+            name: "A".into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: 0,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         s.add_job(ScheduledJob {
-            id: "b".into(), name: "B".into(), schedule: ScheduleType::Interval { secs: 120 },
-            handler: "h2".into(), enabled: false, last_run: None, next_run: 9999,
-            max_retries: 1, retry_count: 0, cooldown_secs: 5, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "b".into(),
+            name: "B".into(),
+            schedule: ScheduleType::Interval { secs: 120 },
+            handler: "h2".into(),
+            enabled: false,
+            last_run: None,
+            next_run: 9999,
+            max_retries: 1,
+            retry_count: 0,
+            cooldown_secs: 5,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         let stats = s.stats();
         assert_eq!(stats.total_jobs, 2);
@@ -491,11 +670,21 @@ mod tests {
     fn test_scheduler_save_load_json() {
         let mut s = SchedulerEngine::new();
         s.add_job(ScheduledJob {
-            id: "j".into(), name: "J".into(), schedule: ScheduleType::Interval { secs: 3600 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: 9999,
-            max_retries: 2, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "desc".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "j".into(),
+            name: "J".into(),
+            schedule: ScheduleType::Interval { secs: 3600 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: 9999,
+            max_retries: 2,
+            retry_count: 0,
+            cooldown_secs: 10,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "desc".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         let json = s.save_json().unwrap();
         let mut s2 = SchedulerEngine::new();
@@ -509,13 +698,21 @@ mod tests {
         let now = current_unix_ts();
         let mut s = SchedulerEngine::new();
         s.add_job(ScheduledJob {
-            id: "build_cleanup".into(), name: "Cleanup".into(),
+            id: "build_cleanup".into(),
+            name: "Cleanup".into(),
             schedule: ScheduleType::Interval { secs: 86400 },
-            handler: "handle_build_cleanup".into(), enabled: true,
-            last_run: None, next_run: 0, max_retries: 2, retry_count: 0,
-            cooldown_secs: 3600, anchor_ts: Some(now),
-            context_gate: ContextGate::LowCogLoad(0.6), description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            handler: "handle_build_cleanup".into(),
+            enabled: true,
+            last_run: None,
+            next_run: 0,
+            max_retries: 2,
+            retry_count: 0,
+            cooldown_secs: 3600,
+            anchor_ts: Some(now),
+            context_gate: ContextGate::LowCogLoad(0.6),
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         // Not due yet (anchor + 86400 > now since anchor = now)
         assert_eq!(s.tick(now, 0.3, 0.5, 0.0, 0.5).len(), 0);
@@ -525,11 +722,21 @@ mod tests {
 
     fn hb_job(id: &str, hb: Option<u64>, last_hb: Option<u64>) -> ScheduledJob {
         ScheduledJob {
-            id: id.into(), name: id.into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: 0,
-            max_retries: 3, retry_count: 0, cooldown_secs: 0, anchor_ts: None,
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: hb, last_heartbeat: last_hb,
+            id: id.into(),
+            name: id.into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: 0,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 0,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: hb,
+            last_heartbeat: last_hb,
         }
     }
 
@@ -545,10 +752,10 @@ mod tests {
     #[test]
     fn test_stale_jobs_detection() {
         let mut s = SchedulerEngine::new();
-        s.add_job(hb_job("never_hb", Some(60), None));          // stale: never reported
-        s.add_job(hb_job("fresh", Some(60), Some(1000)));      // ok: 1000 + 60 > 1050
-        s.add_job(hb_job("expired", Some(60), Some(900)));     // stale: 1050 - 900 > 60
-        s.add_job(hb_job("unmonitored", None, None));          // not monitored
+        s.add_job(hb_job("never_hb", Some(60), None)); // stale: never reported
+        s.add_job(hb_job("fresh", Some(60), Some(1000))); // ok: 1000 + 60 > 1050
+        s.add_job(hb_job("expired", Some(60), Some(900))); // stale: 1050 - 900 > 60
+        s.add_job(hb_job("unmonitored", None, None)); // not monitored
         let stale = s.stale_jobs(1050);
         assert!(stale.contains(&"never_hb".to_string()));
         assert!(stale.contains(&"expired".to_string()));
@@ -572,11 +779,21 @@ mod tests {
         let mut s = SchedulerEngine::new();
         let now = 1000;
         s.add_job(ScheduledJob {
-            id: "cd".into(), name: "CD".into(), schedule: ScheduleType::Interval { secs: 60 },
-            handler: "h".into(), enabled: true, last_run: Some(now - 5),
-            next_run: now - 1, max_retries: 3, retry_count: 0, cooldown_secs: 60,
-            anchor_ts: None, context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "cd".into(),
+            name: "CD".into(),
+            schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: Some(now - 5),
+            next_run: now - 1,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 60,
+            anchor_ts: None,
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         // last_run 5s ago < cooldown 60s -> blocked despite next_run due
         assert_eq!(s.tick(now, 0.0, 0.5, 0.0, 0.5).len(), 0);
@@ -589,11 +806,21 @@ mod tests {
         let mut s = SchedulerEngine::new();
         let now = 1000;
         s.add_job(ScheduledJob {
-            id: "overdue".into(), name: "O".into(), schedule: ScheduleType::Interval { secs: 3600 },
-            handler: "h".into(), enabled: true, last_run: None, next_run: now - 500,
-            max_retries: 3, retry_count: 0, cooldown_secs: 0, anchor_ts: Some(0),
-            context_gate: ContextGate::Any, description: "".into(),
-            heartbeat_secs: None, last_heartbeat: None,
+            id: "overdue".into(),
+            name: "O".into(),
+            schedule: ScheduleType::Interval { secs: 3600 },
+            handler: "h".into(),
+            enabled: true,
+            last_run: None,
+            next_run: now - 500,
+            max_retries: 3,
+            retry_count: 0,
+            cooldown_secs: 0,
+            anchor_ts: Some(0),
+            context_gate: ContextGate::Any,
+            description: "".into(),
+            heartbeat_secs: None,
+            last_heartbeat: None,
         });
         s.resume(now);
         // re-anchored forward: next run is the next interval boundary after now

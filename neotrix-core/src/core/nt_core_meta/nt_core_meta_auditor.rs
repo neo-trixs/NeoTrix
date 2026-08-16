@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone)]
 pub struct AuditorFinding {
     pub file: String,
@@ -41,7 +40,9 @@ impl MetaAuditor {
         if self.total_findings == 0 {
             return 1.0;
         }
-        (self.total_findings.saturating_sub(self.total_false_positives)) as f64
+        (self
+            .total_findings
+            .saturating_sub(self.total_false_positives)) as f64
             / self.total_findings as f64
     }
 
@@ -64,11 +65,15 @@ impl MetaAuditor {
 }
 
 impl Default for MetaAuditor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl crate::core::nt_core_self_test::SelfTest for MetaAuditor {
-    fn name(&self) -> &str { "meta_auditor" }
+    fn name(&self) -> &str {
+        "meta_auditor"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         if self.accuracy() < 0.0 || self.accuracy() > 1.0 {
@@ -77,7 +82,11 @@ impl crate::core::nt_core_self_test::SelfTest for MetaAuditor {
         if self.false_positive_rate() < 0.0 || self.false_positive_rate() > 1.0 {
             failures.push("meta_auditor: false_positive_rate out of range".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 

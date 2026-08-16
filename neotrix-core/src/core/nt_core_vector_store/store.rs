@@ -51,7 +51,10 @@ impl VectorStore for IvfVectorStore {
     }
 
     fn search(&self, query: &[u8], k: usize) -> Vec<SearchResult> {
-        let index = self.index.lock().unwrap_or_else(|e| { log::warn!("[vector_store] mutex poisoned: {}", e); e.into_inner() });
+        let index = self.index.lock().unwrap_or_else(|e| {
+            log::warn!("[vector_store] mutex poisoned: {}", e);
+            e.into_inner()
+        });
         index.search(query, k)
     }
 
@@ -78,7 +81,10 @@ impl VectorStore for IvfVectorStore {
         k: usize,
         filter: &HashMap<String, String>,
     ) -> Vec<SearchResult> {
-        let index = self.index.lock().unwrap_or_else(|e| { log::warn!("[vector_store] mutex poisoned: {}", e); e.into_inner() });
+        let index = self.index.lock().unwrap_or_else(|e| {
+            log::warn!("[vector_store] mutex poisoned: {}", e);
+            e.into_inner()
+        });
         let all_results = index.search(query, index.len().max(k * 10));
         let mut filtered: Vec<SearchResult> = all_results
             .into_iter()
@@ -88,7 +94,11 @@ impl VectorStore for IvfVectorStore {
                     .all(|(fk, fv)| r.metadata.get(fk).map(|mv| mv == fv).unwrap_or(false))
             })
             .collect();
-        filtered.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
+        filtered.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         filtered.truncate(k);
         filtered
     }
@@ -135,7 +145,11 @@ impl VectorStore for BruteForceVectorStore {
                 }
             })
             .collect();
-        results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
         results
     }
@@ -185,10 +199,14 @@ impl VectorStore for BruteForceVectorStore {
                 }
             })
             .collect();
-        results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(k);
         results
-}
+    }
 }
 
 #[cfg(test)]

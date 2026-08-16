@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::core::nt_core_knowledge::TaskType;
     use crate::core::nt_core_bank::{
-        MemoryTier, OffloadManager, PipelineConfig, PipelineState,
-        ReasoningBank, ReasoningMemory, T3ViewType,
+        MemoryTier, OffloadManager, PipelineConfig, PipelineState, ReasoningBank, ReasoningMemory,
+        T3ViewType,
     };
+    use crate::core::nt_core_knowledge::TaskType;
 
     fn make_mem(desc: &str, tt: TaskType, reward: f64) -> ReasoningMemory {
         ReasoningMemory::new(desc, tt, &[], reward)
@@ -52,7 +52,11 @@ mod tests {
     fn test_max_memories_enforced() {
         let mut bank = ReasoningBank::new(3);
         for i in 0..5 {
-            bank.store(make_mem(&format!("mem{}", i), TaskType::General, 0.1 * i as f64));
+            bank.store(make_mem(
+                &format!("mem{}", i),
+                TaskType::General,
+                0.1 * i as f64,
+            ));
         }
         assert!(bank.memories().len() <= 3);
     }
@@ -233,7 +237,11 @@ mod tests {
     #[test]
     fn test_multi_modal_search() {
         let mut bank = ReasoningBank::new(100);
-        bank.store(make_mem("rust async programming", TaskType::CodeGeneration, 0.9));
+        bank.store(make_mem(
+            "rust async programming",
+            TaskType::CodeGeneration,
+            0.9,
+        ));
         bank.store(make_mem("ui design", TaskType::UIDesign, 0.3));
         let results = bank.multi_modal_search("rust", 1.0, 1.0, 1.0);
         assert!(!results.is_empty());

@@ -195,7 +195,11 @@ impl MuonOptimizer {
             // 3I - MᵀM
             for a in 0..n {
                 for b in 0..n {
-                    let val = if a == b { 3.0 - scratch[a * n + b] } else { -scratch[a * n + b] };
+                    let val = if a == b {
+                        3.0 - scratch[a * n + b]
+                    } else {
+                        -scratch[a * n + b]
+                    };
                     scratch[a * n + b] = val;
                 }
             }
@@ -258,7 +262,11 @@ impl MuonOptimizer {
             }
             for a in 0..n {
                 for b in 0..n {
-                    let val = if a == b { 3.0 - scratch[a * n + b] } else { -scratch[a * n + b] };
+                    let val = if a == b {
+                        3.0 - scratch[a * n + b]
+                    } else {
+                        -scratch[a * n + b]
+                    };
                     scratch[a * n + b] = val;
                 }
             }
@@ -327,15 +335,39 @@ impl SafetyRouter {
     pub fn classify_risk(&self, context: &str) -> f64 {
         let lower = context.to_lowercase();
         let high = [
-            "exploit", "0day", "zero-day", "payload", "weapon", "backdoor",
-            "malware", "ransomware", "credential", "stolen", "bypass",
-            "buffer overflow", "shellcode", "privilege escalation",
-            "biotoxin", "nerve agent", "anthrax", "synthesis route",
-            "destructive", "kill", "steal", "fraud",
+            "exploit",
+            "0day",
+            "zero-day",
+            "payload",
+            "weapon",
+            "backdoor",
+            "malware",
+            "ransomware",
+            "credential",
+            "stolen",
+            "bypass",
+            "buffer overflow",
+            "shellcode",
+            "privilege escalation",
+            "biotoxin",
+            "nerve agent",
+            "anthrax",
+            "synthesis route",
+            "destructive",
+            "kill",
+            "steal",
+            "fraud",
         ];
         let medium = [
-            "password", "auth", "attack", "vulnerability", "injection",
-            "password spray", "phishing", "credential stuffing", "crack",
+            "password",
+            "auth",
+            "attack",
+            "vulnerability",
+            "injection",
+            "password spray",
+            "phishing",
+            "credential stuffing",
+            "crack",
         ];
         let mut score = 0.0;
         for kw in &high {
@@ -352,7 +384,11 @@ impl SafetyRouter {
         // a single high-risk keyword (score 1.0) must clear the 0.7
         // risk_threshold; two medium signals (score 0.7) land below it.
         let raw = score / 1.2;
-        if raw >= 1.0 { 1.0 } else { raw }
+        if raw >= 1.0 {
+            1.0
+        } else {
+            raw
+        }
     }
 
     /// Decide which prediction path a context should take.
@@ -399,7 +435,6 @@ impl SafetyRouter {
         out
     }
 }
-
 
 /// Compressed attention (CSA/HCA hybrid) — DeepSeek-V4.
 ///
@@ -482,7 +517,12 @@ pub struct StepRouteKey {
 
 impl StepRouteCache {
     pub fn new(capacity: usize) -> Self {
-        Self { entries: Vec::with_capacity(capacity), capacity: capacity.max(1), hits: 0, misses: 0 }
+        Self {
+            entries: Vec::with_capacity(capacity),
+            capacity: capacity.max(1),
+            hits: 0,
+            misses: 0,
+        }
     }
 
     pub fn key(task_type: u8, phase: u8, effort: u8, from: u8) -> StepRouteKey {
@@ -526,7 +566,11 @@ impl StepRouteCache {
 
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
-        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
     }
 }
 
@@ -692,7 +736,11 @@ impl ConsciousnessCoreSynthesis {
         // makes the fused distribution attend to *where the reasoning has
         // actually been* within the context window, not just transition stats.
         if residual_blend.len() == 64 && !trajectory.is_empty() {
-            let csa = compressed_attention_weights(trajectory.len(), self.context_window, self.context_compression);
+            let csa = compressed_attention_weights(
+                trajectory.len(),
+                self.context_window,
+                self.context_compression,
+            );
             let mut csa_boost = vec![0.0f64; 64];
             for (i, &s) in trajectory.iter().enumerate() {
                 if let Some(&w) = csa.get(i) {
@@ -712,7 +760,11 @@ impl ConsciousnessCoreSynthesis {
         }
 
         // 5. Effort-scaled sparse top-K (K3 sparse experts / Qwen3 budget)
-        let mut sorted: Vec<(usize, f64)> = residual_blend.iter().enumerate().map(|(i, p)| (i, *p)).collect();
+        let mut sorted: Vec<(usize, f64)> = residual_blend
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (i, *p))
+            .collect();
         sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let k = effort.sparse_k();
         let mut out = vec![0.0f64; 64];
@@ -734,18 +786,51 @@ impl ConsciousnessCoreSynthesis {
     /// Report the active synthesis knobs for telemetry.
     pub fn telemetry(&self) -> Vec<(String, String)> {
         vec![
-            ("synthesis.dominance_cap".into(), format!("{:.2}", self.dominance_cap)),
-            ("synthesis.attnres_decay".into(), format!("{:.2}", self.attention_residuals.depth_decay)),
-            ("synthesis.attnres_weight".into(), format!("{:.2}", self.attention_residuals.residual_weight)),
-            ("synthesis.sinkhorn_iters".into(), format!("{}", self.sinkhorn_iters)),
+            (
+                "synthesis.dominance_cap".into(),
+                format!("{:.2}", self.dominance_cap),
+            ),
+            (
+                "synthesis.attnres_decay".into(),
+                format!("{:.2}", self.attention_residuals.depth_decay),
+            ),
+            (
+                "synthesis.attnres_weight".into(),
+                format!("{:.2}", self.attention_residuals.residual_weight),
+            ),
+            (
+                "synthesis.sinkhorn_iters".into(),
+                format!("{}", self.sinkhorn_iters),
+            ),
             ("synthesis.muon_lr".into(), format!("{:.4}", self.muon.lr)),
-            ("synthesis.muon_ns_iters".into(), format!("{}", self.muon.ns_iters)),
-            ("synthesis.safety_threshold".into(), format!("{:.2}", self.safety_router.risk_threshold)),
-            ("synthesis.safety_budget".into(), format!("{:.2}", self.safety_router.frontier_budget)),
-            ("synthesis.route_cache_capacity".into(), format!("{}", self.step_route_cache.capacity)),
-            ("synthesis.route_cache_hit_rate".into(), format!("{:.3}", self.step_route_cache.hit_rate())),
-            ("synthesis.context_window".into(), format!("{}", self.context_window)),
-            ("synthesis.fused_pipeline".into(), format!("{}", self.fused_pipeline_enabled)),
+            (
+                "synthesis.muon_ns_iters".into(),
+                format!("{}", self.muon.ns_iters),
+            ),
+            (
+                "synthesis.safety_threshold".into(),
+                format!("{:.2}", self.safety_router.risk_threshold),
+            ),
+            (
+                "synthesis.safety_budget".into(),
+                format!("{:.2}", self.safety_router.frontier_budget),
+            ),
+            (
+                "synthesis.route_cache_capacity".into(),
+                format!("{}", self.step_route_cache.capacity),
+            ),
+            (
+                "synthesis.route_cache_hit_rate".into(),
+                format!("{:.3}", self.step_route_cache.hit_rate()),
+            ),
+            (
+                "synthesis.context_window".into(),
+                format!("{}", self.context_window),
+            ),
+            (
+                "synthesis.fused_pipeline".into(),
+                format!("{}", self.fused_pipeline_enabled),
+            ),
         ]
     }
 }
@@ -762,9 +847,15 @@ mod tests {
         let out = ar.blend(&base, &traj);
         assert_eq!(out.len(), 64);
         let sum: f64 = out.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "blend must be normalized, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "blend must be normalized, got {sum}"
+        );
         // Trajectory states should get boosted mass
-        assert!(out[40] > 1.0 / 64.0, "recent traj state should get residual boost");
+        assert!(
+            out[40] > 1.0 / 64.0,
+            "recent traj state should get residual boost"
+        );
         // Deep older states damped
         assert!(out[56] < out[40], "deeper state damped more than recent");
     }
@@ -796,7 +887,12 @@ mod tests {
     #[test]
     fn test_step_route_cache_hits() {
         let mut cache = StepRouteCache::new(8);
-        let key = StepRouteKey { task_type: 2, phase: 3, effort: 2, source_bucket: 4 };
+        let key = StepRouteKey {
+            task_type: 2,
+            phase: 3,
+            effort: 2,
+            source_bucket: 4,
+        };
         assert!(cache.get(&key).is_none());
         cache.put(key.clone(), vec![(40, 0.5), (42, 0.3)]);
         let got = cache.get(&key);
@@ -810,13 +906,23 @@ mod tests {
         let mut cache = StepRouteCache::new(2);
         for i in 0..3 {
             cache.put(
-                StepRouteKey { task_type: i as u8, phase: 0, effort: 0, source_bucket: 0 },
+                StepRouteKey {
+                    task_type: i as u8,
+                    phase: 0,
+                    effort: 0,
+                    source_bucket: 0,
+                },
                 vec![(i as u8, 1.0)],
             );
         }
         assert_eq!(cache.entries.len(), 2, "capacity enforced");
         // Oldest (task_type 0) evicted
-        let old_key = StepRouteKey { task_type: 0, phase: 0, effort: 0, source_bucket: 0 };
+        let old_key = StepRouteKey {
+            task_type: 0,
+            phase: 0,
+            effort: 0,
+            source_bucket: 0,
+        };
         assert!(cache.get(&old_key).is_none());
     }
 
@@ -841,9 +947,15 @@ mod tests {
     fn test_fused_distribution_normalized() {
         let mut tm = E8TransitionMatrix::new();
         tm.init_from_trace_patterns();
-        for _ in 0..50 { tm.record_transition(40, 32); }
-        for _ in 0..10 { tm.record_transition(40, 48); }
-        for _ in 0..5 { tm.record_transition(40, 24); }
+        for _ in 0..50 {
+            tm.record_transition(40, 32);
+        }
+        for _ in 0..10 {
+            tm.record_transition(40, 48);
+        }
+        for _ in 0..5 {
+            tm.record_transition(40, 24);
+        }
 
         let synth = ConsciousnessCoreSynthesis::default();
         let traj = vec![56u8, 48, 40];
@@ -851,7 +963,10 @@ mod tests {
 
         assert_eq!(dist.len(), 64);
         let sum: f64 = dist.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "fused dist must be normalized, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "fused dist must be normalized, got {sum}"
+        );
         // Dominant dest survives but cannot exceed cap
         let max_p = dist.iter().cloned().fold(0.0f64, f64::max);
         assert!(max_p > 0.0);
@@ -887,13 +1002,21 @@ mod tests {
         let out = muon.step(&grad, &params, &mut buf, n);
         assert_eq!(out.len(), n * n);
         // Params should decrease along a positive-gradient direction
-        assert!(out[0] < params[0], "params should decrease along positive gradient");
+        assert!(
+            out[0] < params[0],
+            "params should decrease along positive gradient"
+        );
     }
 
     #[test]
     fn test_muon_converges_on_least_squares() {
         // Minimize f(x) = sum((x_i - 2)^2): gradient = 2(x - 2)
-        let muon = MuonOptimizer { lr: 0.05, momentum: 0.9, weight_decay: 0.0, ns_iters: 2 };
+        let muon = MuonOptimizer {
+            lr: 0.05,
+            momentum: 0.9,
+            weight_decay: 0.0,
+            ns_iters: 2,
+        };
         let n = 4;
         let mut params = vec![0.0f64; n * n];
         let mut buf = vec![0.0f64; n * n];
@@ -902,7 +1025,11 @@ mod tests {
             params = muon.step(&grad, &params, &mut buf, n);
         }
         let err: f64 = params.iter().map(|&x| (x - 2.0).abs()).sum::<f64>() / (n * n) as f64;
-        assert!(err < 0.3, "muon should converge toward 2.0, avg err {}", err);
+        assert!(
+            err < 0.3,
+            "muon should converge toward 2.0, avg err {}",
+            err
+        );
     }
 
     #[test]
@@ -927,7 +1054,10 @@ mod tests {
         let out = muon.condition_vector(&dist);
         assert_eq!(out.len(), 64);
         let sum: f64 = out.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "conditioned vector must renormalize, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "conditioned vector must renormalize, got {sum}"
+        );
         assert!(out.iter().all(|v| v.is_finite()));
     }
 
@@ -937,20 +1067,27 @@ mod tests {
         // Rank-2 with correlated columns: row0=(0.9,0.1,...) row1=(0.1,0.9,...)
         // → columns are NOT orthogonal; NS should decorrelate them.
         let mut dist = vec![0.0f64; 64];
-        dist[0] = 0.45; dist[1] = 0.05;  // row 0
-        dist[8] = 0.05; dist[9] = 0.45;  // row 1
+        dist[0] = 0.45;
+        dist[1] = 0.05; // row 0
+        dist[8] = 0.05;
+        dist[9] = 0.45; // row 1
         let out = muon.condition_vector(&dist);
         assert_eq!(out.len(), 64);
         // MᵀM off-diagonal must shrink toward 0 after orthogonalization
         let off_before = {
             let (mut a, mut b) = (0.0, 0.0);
-            for k in 0..8 { a += dist[k*8+0]*dist[k*8+0]; b += dist[k*8+0]*dist[k*8+1]; }
+            for k in 0..8 {
+                a += dist[k * 8 + 0] * dist[k * 8 + 0];
+                b += dist[k * 8 + 0] * dist[k * 8 + 1];
+            }
             let _ = a;
             b
         };
         let off_after = {
             let mut acc = 0.0;
-            for k in 0..8 { acc += out[k*8+0]*out[k*8+1]; }
+            for k in 0..8 {
+                acc += out[k * 8 + 0] * out[k * 8 + 1];
+            }
             acc
         };
         assert!(
@@ -982,7 +1119,10 @@ mod tests {
         let sum: f64 = conservative.iter().sum();
         assert!((sum - 1.0).abs() < 1e-6);
         assert!(conservative[0] < 0.9, "dominant mass should be damped");
-        assert!(conservative[1] > 0.05, "minor mass should be lifted toward uniform");
+        assert!(
+            conservative[1] > 0.05,
+            "minor mass should be lifted toward uniform"
+        );
     }
 
     #[test]
@@ -994,7 +1134,10 @@ mod tests {
 
     #[test]
     fn test_safety_router_budget_caps_frontier() {
-        let router = SafetyRouter { frontier_budget: 0.5, ..Default::default() };
+        let router = SafetyRouter {
+            frontier_budget: 0.5,
+            ..Default::default()
+        };
         // Frontier fraction = miss rate = (total - hits)/total.
         // 3 of 10 misses → 0.3 miss rate → within 0.5 budget → allow frontier
         assert!(router.allow_frontier("normal task", 7, 10));

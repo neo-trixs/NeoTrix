@@ -10,41 +10,40 @@
 //!   成熟度由 Constellation 承载（原 GreatFilterGate 已归档，输入指标无生产源）
 //! - L7 不执行能力，只调度
 
-pub mod registry;
-pub mod protocol;
-pub mod mature;
-pub mod observer;
-pub mod skill_acquire;
-pub mod group_evolve;
-pub mod nt_act_orch_patterns;
 pub mod a2a;
+pub mod group_evolve;
+pub mod mature;
+pub mod nt_act_orch_patterns;
 pub mod nt_core_antidistil;
+pub mod observer;
+pub mod protocol;
+pub mod registry;
+pub mod skill_acquire;
 
-pub mod nt_cap_media;
-pub mod nt_cap_geo;
-pub mod nt_core_orch_agent;
-pub mod nt_core_grounded_gate;
 pub mod cluster_self_test;
+pub mod nt_cap_geo;
+pub mod nt_cap_media;
+pub mod nt_core_grounded_gate;
+pub mod nt_core_orch_agent;
 
-pub use registry::*;
-pub use protocol::*;
-pub use mature::*;
-pub use observer::*;
-pub use skill_acquire::{
-    SkillDoc, SkillMetrics, SkillBank, BankStats,
-    SkillExtractor, SkillOptimizer, ValidationGate, RejectedEditBuffer,
-    BoundedEdit, EditType, Trajectory, TrajectoryStep, TrajectoryOutcome,
-    SkillManifest, SkillRegistry, ProgressiveDisclosure, DisclosureLevel,
-};
+pub use cluster_self_test::CapabilityClusterSelfTest;
 pub use group_evolve::{
-    GroupCoordinator, GroupCoordinatorConfig, GroupCoordinatorStats,
-    PeerState, PeerStatus, ConsensusProposal, ConsensusState, Vote,
+    ConsensusProposal, ConsensusState, GroupCoordinator, GroupCoordinatorConfig,
+    GroupCoordinatorStats, PeerState, PeerStatus, Vote,
+};
+pub use mature::*;
+pub use nt_core_grounded_gate::{
+    AgentContract, Domain, Field, FieldType, GroundedCheck, GroundedDecision, GroundedGate,
 };
 pub use nt_core_orch_agent::{
-    SubagentConfig, SubagentInstance, SubagentStatus, AgentMessage, MessageType,
-    SubagentManager, AgentPoolStats,
+    AgentMessage, AgentPoolStats, MessageType, SubagentConfig, SubagentInstance, SubagentManager,
+    SubagentStatus,
 };
-pub use nt_core_grounded_gate::{
-    GroundedCheck, GroundedGate, GroundedDecision, AgentContract, Field, FieldType, Domain,
+pub use observer::*;
+pub use protocol::*;
+pub use registry::*;
+pub use skill_acquire::{
+    BankStats, BoundedEdit, DisclosureLevel, EditType, ProgressiveDisclosure, RejectedEditBuffer,
+    SkillBank, SkillDoc, SkillExtractor, SkillManifest, SkillMetrics, SkillOptimizer,
+    SkillRegistry, Trajectory, TrajectoryOutcome, TrajectoryStep, ValidationGate,
 };
-pub use cluster_self_test::CapabilityClusterSelfTest;

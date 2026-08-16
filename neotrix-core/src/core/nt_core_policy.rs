@@ -4,14 +4,12 @@
 //! state transitions are effective for which task types over time.
 //! Uses the 64-hexagram state space as an experiment design space.
 
-use super::nt_core_hex::{
-    ReasoningHexagram, evolve_strategy_entry,
-};
-use super::nt_core_prm::{AgentTrajectory, ProcessScore};
-use rand::Rng;
 #[cfg(test)]
 use super::nt_core_hex::strategy_matrix;
+use super::nt_core_hex::{evolve_strategy_entry, ReasoningHexagram};
+use super::nt_core_prm::{AgentTrajectory, ProcessScore};
 use crate::core::nt_core_knowledge::TaskType;
+use rand::Rng;
 
 /// Number of factorized energy dimensions per mode.
 /// Corresponds to E8's 6 binary reasoning axes.
@@ -34,10 +32,10 @@ pub fn compute_task_demand(factor_context: &[f64; NUM_E8_FACTORS]) -> f64 {
     // WARNING: This mapping assumes factor index convention:
     //   idx 0 = STANCE (N_obs), 1 = MODE, 2 = DEPTH (L),
     //   3 = METH (H_tool), 4 = SCOPE (1-V_oracle), 5 = ABST (S_state)
-    let l = factor_context[2].abs().clamp(0.1, 1.0);      // DEPTH → L
+    let l = factor_context[2].abs().clamp(0.1, 1.0); // DEPTH → L
     let h_tool = factor_context[3].abs().clamp(0.1, 1.0); // METH → H_tool
     let s_state = factor_context[5].abs().clamp(0.1, 1.0); // ABST → S_state
-    let n_obs = factor_context[0].abs().clamp(0.0, 1.0);   // STANCE → N_obs (can be 0)
+    let n_obs = factor_context[0].abs().clamp(0.0, 1.0); // STANCE → N_obs (can be 0)
     let v_oracle = factor_context[4].abs().clamp(0.0, 0.9); // SCOPE → V_oracle (cap at 0.9)
 
     l * h_tool * s_state * (1.0 + n_obs) * (1.0 - v_oracle)
@@ -73,11 +71,18 @@ impl Default for E8Policy {
 
 impl E8Policy {
     pub fn new(
-        epsilon: f64, epsilon_decay: f64, min_epsilon: f64,
-        learning_rate: f64, discount: f64,
+        epsilon: f64,
+        epsilon_decay: f64,
+        min_epsilon: f64,
+        learning_rate: f64,
+        discount: f64,
     ) -> Self {
         Self {
-            epsilon, epsilon_decay, min_epsilon, learning_rate, discount,
+            epsilon,
+            epsilon_decay,
+            min_epsilon,
+            learning_rate,
+            discount,
             mode_values: [0.0; 64],
             mode_counts: [0; 64],
             factor_energies: [[0.0; NUM_E8_FACTORS]; 64],
@@ -99,7 +104,10 @@ impl E8Policy {
     ///
     /// Reference: GTS (arXiv:2602.14077) — learnable latent exploration sampling
     pub fn select_mode(
-        &mut self, task: &str, task_type: TaskType, learner: &E8TransitionLearner,
+        &mut self,
+        task: &str,
+        task_type: TaskType,
+        learner: &E8TransitionLearner,
     ) -> ReasoningHexagram {
         let mut rng = rand::thread_rng();
         if rng.gen::<f64>() < self.epsilon {
@@ -107,7 +115,10 @@ impl E8Policy {
             let center = if let Some(best) = learner.best_known_mode(task) {
                 best.0 as f64
             } else {
-                let (best_idx, _) = self.mode_values.iter().enumerate()
+                let (best_idx, _) = self
+                    .mode_values
+                    .iter()
+                    .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                     .unwrap_or((0, &0.0));
                 best_idx as f64
@@ -125,7 +136,10 @@ impl E8Policy {
             self.previous_mode = Some(best);
             return best;
         }
-        let (best_idx, _) = self.mode_values.iter().enumerate()
+        let (best_idx, _) = self
+            .mode_values
+            .iter()
+            .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((task_type as usize % 64, &0.0));
         let mode = ReasoningHexagram(best_idx as u8);
@@ -135,7 +149,10 @@ impl E8Policy {
 
     /// Factor-aware mode selection: choose mode whose factor energy profile
     /// best matches the given factor context vector.
-    pub fn select_mode_by_factors(&mut self, factor_context: &[f64; NUM_E8_FACTORS]) -> ReasoningHexagram {
+    pub fn select_mode_by_factors(
+        &mut self,
+        factor_context: &[f64; NUM_E8_FACTORS],
+    ) -> ReasoningHexagram {
         if factor_context.iter().all(|&v| v.abs() < 1e-9) {
             return self.best_mode();
         }
@@ -145,9 +162,14 @@ impl E8Policy {
             self.previous_mode = Some(ReasoningHexagram(sample));
             return ReasoningHexagram(sample);
         }
-        let best_idx = self.factor_energies.iter().enumerate()
+        let best_idx = self
+            .factor_energies
+            .iter()
+            .enumerate()
             .map(|(i, energies)| {
-                let match_score: f64 = energies.iter().zip(factor_context.iter())
+                let match_score: f64 = energies
+                    .iter()
+                    .zip(factor_context.iter())
                     .map(|(e, c)| e * c)
                     .sum();
                 (i, match_score)
@@ -170,9 +192,16 @@ impl E8Policy {
             let lr = self.learning_rate / (1.0 + n.sqrt());
             let eval_max = if self.mode_values.iter().any(|&v| v > 0.0) {
                 let mean = self.mode_values.iter().sum::<f64>() / 64.0;
-                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max).min(mean * 1.5)
+                self.mode_values
+                    .iter()
+                    .cloned()
+                    .fold(f64::NEG_INFINITY, f64::max)
+                    .min(mean * 1.5)
             } else {
-                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+                self.mode_values
+                    .iter()
+                    .cloned()
+                    .fold(f64::NEG_INFINITY, f64::max)
             };
             let td_error = reward + self.discount * eval_max - self.mode_values[idx];
             self.mode_values[idx] += lr * td_error;
@@ -192,9 +221,16 @@ impl E8Policy {
             // Update overall mode value (Double Q-learning capped estimate)
             let eval_max = if self.mode_values.iter().any(|&v| v > 0.0) {
                 let mean = self.mode_values.iter().sum::<f64>() / 64.0;
-                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max).min(mean * 1.5)
+                self.mode_values
+                    .iter()
+                    .cloned()
+                    .fold(f64::NEG_INFINITY, f64::max)
+                    .min(mean * 1.5)
             } else {
-                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+                self.mode_values
+                    .iter()
+                    .cloned()
+                    .fold(f64::NEG_INFINITY, f64::max)
             };
             let td_error = reward + self.discount * eval_max - self.mode_values[idx];
             self.mode_values[idx] += lr * td_error;
@@ -219,7 +255,10 @@ impl E8Policy {
     /// Find the best mode for a specific factor index.
     pub fn best_mode_by_factor(&self, factor_idx: usize) -> ReasoningHexagram {
         let factor_idx = factor_idx.min(NUM_E8_FACTORS - 1);
-        let (best_idx, _) = self.factor_energies.iter().enumerate()
+        let (best_idx, _) = self
+            .factor_energies
+            .iter()
+            .enumerate()
             .map(|(i, energies)| (i, energies[factor_idx]))
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, 0.0));
@@ -230,7 +269,10 @@ impl E8Policy {
     /// Computes D_task from factor_context, then selects mode maximizing
     /// factor_energy[mode] · factor_context / D_task.
     /// Drops to best_mode() if D_task is zero.
-    pub fn select_mode_by_task_demand(&mut self, factor_context: &[f64; NUM_E8_FACTORS]) -> ReasoningHexagram {
+    pub fn select_mode_by_task_demand(
+        &mut self,
+        factor_context: &[f64; NUM_E8_FACTORS],
+    ) -> ReasoningHexagram {
         // If context is near-zero, fall back to best_mode()
         if factor_context.iter().all(|&v| v.abs() < 1e-9) {
             return self.best_mode();
@@ -242,12 +284,17 @@ impl E8Policy {
             self.previous_mode = Some(ReasoningHexagram(sample));
             return ReasoningHexagram(sample);
         }
-        let best_idx = self.factor_energies.iter().enumerate()
+        let best_idx = self
+            .factor_energies
+            .iter()
+            .enumerate()
             .map(|(i, energies)| {
-                let match_score: f64 = energies.iter().zip(factor_context.iter())
+                let match_score: f64 = energies
+                    .iter()
+                    .zip(factor_context.iter())
                     .map(|(e, c)| e * c)
                     .sum();
-                (i, match_score / d_task)  // Normalize by task demand
+                (i, match_score / d_task) // Normalize by task demand
             })
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
@@ -263,14 +310,21 @@ impl E8Policy {
     }
 
     pub fn best_mode(&self) -> ReasoningHexagram {
-        let (idx, _) = self.mode_values.iter().enumerate()
+        let (idx, _) = self
+            .mode_values
+            .iter()
+            .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, &0.0));
         ReasoningHexagram(idx as u8)
     }
 
-    pub fn epsilon(&self) -> f64 { self.epsilon }
-    pub fn reset_previous(&mut self) { self.previous_mode = None; }
+    pub fn epsilon(&self) -> f64 {
+        self.epsilon
+    }
+    pub fn reset_previous(&mut self) {
+        self.previous_mode = None;
+    }
     pub fn set_previous(&mut self, mode: ReasoningHexagram) {
         self.previous_mode = Some(mode);
     }
@@ -500,7 +554,9 @@ impl E8TransitionLearner {
         fn word_match(query: &str, target: &str) -> bool {
             let query_words: Vec<&str> = query.split_whitespace().collect();
             let target_words: Vec<&str> = target.split_whitespace().collect();
-            query_words.iter().any(|qw| target_words.iter().any(|tw| tw == qw))
+            query_words
+                .iter()
+                .any(|qw| target_words.iter().any(|tw| tw == qw))
                 || query_words.iter().all(|qw| target.contains(qw))
         }
         let mut best_score = f64::NEG_INFINITY;
@@ -528,10 +584,10 @@ impl E8TransitionLearner {
         // Compare with the cell's 4 neighbors (flip axes 4, 3, 2, 1)
         let base_mode = ReasoningHexagram(((approach as u8) << 3) | (domain as u8));
         let candidates: [(u8, &str); 4] = [
-            (1 << 4, "Oscillation"),    // flip scope
-            (1 << 3, "Inefficient"),    // flip method
-            (1 << 2, "Fast"),           // flip depth
-            (1 << 1, "Collaborative"),  // flip mode
+            (1 << 4, "Oscillation"),   // flip scope
+            (1 << 3, "Inefficient"),   // flip method
+            (1 << 2, "Fast"),          // flip depth
+            (1 << 1, "Collaborative"), // flip mode
         ];
 
         for (flip, name) in candidates {
@@ -712,7 +768,10 @@ mod tests {
         let mode = policy.select_mode("test", TaskType::General, &learner);
         let prev_val = policy.mode_values[mode.0 as usize];
         policy.update(1.0);
-        assert!(policy.mode_values[mode.0 as usize] > prev_val, "positive reward should increase value");
+        assert!(
+            policy.mode_values[mode.0 as usize] > prev_val,
+            "positive reward should increase value"
+        );
     }
 
     #[test]
@@ -748,8 +807,11 @@ mod tests {
         policy.update_factorized(1.0, &deltas);
         for f in 0..NUM_E8_FACTORS {
             if deltas[f].abs() > 0.01 {
-                assert!(policy.factor_energies[0][f] != 0.0,
-                    "factor {} should have non-zero energy after update", f);
+                assert!(
+                    policy.factor_energies[0][f] != 0.0,
+                    "factor {} should have non-zero energy after update",
+                    f
+                );
             }
         }
     }
@@ -763,8 +825,10 @@ mod tests {
         for _ in 0..10 {
             policy.update_factorized(1.0, &deltas);
         }
-        assert!(policy.factor_control[0] > policy.factor_control[1],
-            "factor 0 should have higher control than factor 1");
+        assert!(
+            policy.factor_control[0] > policy.factor_control[1],
+            "factor 0 should have higher control than factor 1"
+        );
     }
 
     #[test]
@@ -811,7 +875,10 @@ mod tests {
         let d = compute_task_demand(&ctx);
         // L=0.5, H_tool=0.5, S_state=0.5, (1+N_obs)=1.5, (1-V_oracle)=0.5
         // Expected: 0.5 * 0.5 * 0.5 * 1.5 * 0.5 = 0.09375
-        assert!((d - 0.09375).abs() < 0.001, "D_task should be ~0.09375, got {d}");
+        assert!(
+            (d - 0.09375).abs() < 0.001,
+            "D_task should be ~0.09375, got {d}"
+        );
     }
 
     #[test]
@@ -819,7 +886,10 @@ mod tests {
         // High depth, high tool entropy, high abstraction, noisy, low verification
         let ctx = [0.9, 0.5, 0.9, 0.9, 0.1, 0.9];
         let d = compute_task_demand(&ctx);
-        assert!(d > 0.2, "high-demand task should have D_task > 0.2, got {d}");
+        assert!(
+            d > 0.2,
+            "high-demand task should have D_task > 0.2, got {d}"
+        );
     }
 
     #[test]
@@ -827,7 +897,10 @@ mod tests {
         // Low depth, low entropy, concrete, clear, high verifiability
         let ctx = [0.1, 0.5, 0.1, 0.1, 0.9, 0.1];
         let d = compute_task_demand(&ctx);
-        assert!(d < 0.05, "low-demand task should have D_task < 0.05, got {d}");
+        assert!(
+            d < 0.05,
+            "low-demand task should have D_task < 0.05, got {d}"
+        );
     }
 
     #[test]

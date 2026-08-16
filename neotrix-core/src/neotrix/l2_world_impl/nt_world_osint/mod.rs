@@ -19,6 +19,7 @@ pub mod vuln;
 pub mod network;
 pub mod dark;
 pub mod backend_router;
+pub mod sweep;
 
 #[derive(Debug, Clone)]
 pub struct OsintConfig {

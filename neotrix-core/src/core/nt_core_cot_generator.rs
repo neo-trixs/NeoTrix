@@ -5,7 +5,9 @@
 //! 这是 Kernel 与 LLM 解耦的关键桥梁：Kernel 做"推理骨架"，CoTGenerator 做"语言肉"。
 
 use crate::core::nt_core_reasoning::ReasoningTrace;
-use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmProvider, LlmRequest, LlmError, Message, Role};
+use crate::neotrix::l1_body_impl::nt_io_provider::types::{
+    LlmError, LlmProvider, LlmRequest, Message, Role,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -170,28 +172,36 @@ impl DefaultCoTGenerator {
         prompt.push_str(&self.config.system_prompt);
         prompt.push_str("\n\n---\n\n");
         prompt.push_str(&format!("Task: {}\n\n", task));
-        
+
         // Kernel 状态摘要
         prompt.push_str("Kernel State:\n");
         prompt.push_str(&format!("- Method: {:?}\n", kernel_trace.method));
         prompt.push_str(&format!("- Stage: {}\n", kernel_trace.stage));
         prompt.push_str(&format!("- Hexagram: {:?}\n", kernel_trace.hexagram));
         prompt.push_str(&format!("- Convergence: {:.3}\n", kernel_trace.convergence));
-        prompt.push_str(&format!("- Intermediate states: {}\n", kernel_trace.intermediate_states.len()));
-        
+        prompt.push_str(&format!(
+            "- Intermediate states: {}\n",
+            kernel_trace.intermediate_states.len()
+        ));
+
         // 步骤详情（如果有）
         if !kernel_trace.steps.is_empty() {
             prompt.push_str("\nReasoning Steps:\n");
             for step in &kernel_trace.steps {
-                prompt.push_str(&format!("- Step {}: {} (confidence: {:.2})\n", step.step_index, step.description, step.reward.unwrap_or(0.0)));
+                prompt.push_str(&format!(
+                    "- Step {}: {} (confidence: {:.2})\n",
+                    step.step_index,
+                    step.description,
+                    step.reward.unwrap_or(0.0)
+                ));
             }
         }
-        
+
         // Context 向量摘要
         if let Some(ctx) = context {
             prompt.push_str(&format!("\nContext vectors: {} entries\n", ctx.len()));
         }
-        
+
         prompt.push_str("\nGenerate CoT now:\n");
         prompt
     }
@@ -202,7 +212,7 @@ impl DefaultCoTGenerator {
         if let Ok(parsed) = serde_json::from_str::<CoTOutput>(response) {
             return Ok(parsed);
         }
-        
+
         // 如果不是标准 JSON，尝试提取 JSON 部分
         if let Some(start) = response.find('{') {
             if let Some(end) = response.rfind('}') {
@@ -212,7 +222,7 @@ impl DefaultCoTGenerator {
                 }
             }
         }
-        
+
         // 兜底：将整个响应作为 final_answer
         Ok(CoTOutput {
             reasoning_steps: vec![],
@@ -232,7 +242,7 @@ impl CoTGenerator for DefaultCoTGenerator {
         context: Option<HashMap<String, Vector>>,
     ) -> Result<CoTOutput, CoTError> {
         let prompt = self.build_prompt(task, kernel_trace, context);
-        
+
         let request = LlmRequest {
             model: self.config.model.clone(),
             messages: vec![
@@ -252,7 +262,7 @@ impl CoTGenerator for DefaultCoTGenerator {
                 None
             },
         };
-        
+
         let response = self.provider.complete(&request).await?;
         let text = response.content;
         if text.is_empty() {
@@ -270,20 +280,22 @@ pub fn create_cot_generator(provider: Arc<dyn LlmProvider>) -> DefaultCoTGenerat
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_cot_config_default() {
         let config = CoTConfig::default();
         assert_eq!(config.thinking_budget, Some(2048));
         assert!(config.structured_output);
     }
-    
+
     #[test]
     fn test_cot_output_serialization() {
         let output = CoTOutput {
-            reasoning_steps: vec![
-                CoTStep { step: 1, description: "test".to_string(), confidence: 0.9 },
-            ],
+            reasoning_steps: vec![CoTStep {
+                step: 1,
+                description: "test".to_string(),
+                confidence: 0.9,
+            }],
             final_answer: "answer".to_string(),
             overall_confidence: 0.9,
             raw_response: "raw".to_string(),

@@ -1,9 +1,9 @@
 #![deny(clippy::unwrap_used)]
 
-use std::collections::HashMap;
 use crate::core::nt_core_consciousness_tree::{
     BranchKind, CapabilityBranch, ConsciousnessTree, VulnerabilityFinding, VulnerabilitySeverity,
 };
+use std::collections::HashMap;
 
 /// 意识全景审查 — 7域能力网络拓扑进化路线 + 漏洞扫描 + 健康链路图
 pub struct ConsciousnessReview {
@@ -46,7 +46,9 @@ pub struct EvolutionStep {
 
 impl ConsciousnessReview {
     pub fn new() -> Self {
-        Self { scan_history: Vec::new() }
+        Self {
+            scan_history: Vec::new(),
+        }
     }
 
     /// Full panoramic review of consciousness tree:
@@ -63,13 +65,31 @@ impl ConsciousnessReview {
         let evolution_path = self.plan_evolution_path(tree, &vulns);
         let health_chain = self.build_health_chain(tree);
 
-        let critical = vulns.iter().filter(|v| matches!(v.severity, VulnerabilitySeverity::Critical)).count();
-        let high = vulns.iter().filter(|v| matches!(v.severity, VulnerabilitySeverity::High)).count();
-        let medium = vulns.iter().filter(|v| matches!(v.severity, VulnerabilitySeverity::Medium)).count();
-        let low = vulns.iter().filter(|v| matches!(v.severity, VulnerabilitySeverity::Low) || matches!(v.severity, VulnerabilitySeverity::Info)).count();
+        let critical = vulns
+            .iter()
+            .filter(|v| matches!(v.severity, VulnerabilitySeverity::Critical))
+            .count();
+        let high = vulns
+            .iter()
+            .filter(|v| matches!(v.severity, VulnerabilitySeverity::High))
+            .count();
+        let medium = vulns
+            .iter()
+            .filter(|v| matches!(v.severity, VulnerabilitySeverity::Medium))
+            .count();
+        let low = vulns
+            .iter()
+            .filter(|v| {
+                matches!(v.severity, VulnerabilitySeverity::Low)
+                    || matches!(v.severity, VulnerabilitySeverity::Info)
+            })
+            .count();
 
         let report = ScanReport {
-            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             total_vulnerabilities: vulns.len(),
             critical_count: critical,
             high_count: high,
@@ -88,7 +108,9 @@ impl ConsciousnessReview {
     /// 拓扑评分: 模块间的依赖是否健康、有无孤立节点、有无循环依赖
     fn compute_topology_score(&self, tree: &ConsciousnessTree) -> f64 {
         let total_branches = tree.branches.len() as f64;
-        if total_branches == 0.0 { return 0.0; }
+        if total_branches == 0.0 {
+            return 0.0;
+        }
 
         let healthy_branches = tree.branches.values().filter(|b| b.health > 0.5).count() as f64;
         let wired_leaves = tree.leaves.iter().filter(|l| l.is_wired).count() as f64;
@@ -105,8 +127,16 @@ impl ConsciousnessReview {
     fn compute_connectivity_score(&self, tree: &ConsciousnessTree) -> f64 {
         let soil_alive = if tree.soil.health() > 0.0 { 1.0 } else { 0.0 };
         let roots_alive = if tree.roots.health() > 0.0 { 1.0 } else { 0.0 };
-        let trunk_alive = if tree.trunk.gwt_resonance_active { 1.0 } else { 0.0 };
-        let branches_alive = if tree.branches.values().any(|b| b.health > 0.3) { 1.0 } else { 0.0 };
+        let trunk_alive = if tree.trunk.gwt_resonance_active {
+            1.0
+        } else {
+            0.0
+        };
+        let branches_alive = if tree.branches.values().any(|b| b.health > 0.3) {
+            1.0
+        } else {
+            0.0
+        };
         let fruits_exist = if !tree.fruits.is_empty() { 1.0 } else { 0.0 };
         let core_active = if tree.cycle > 0 { 1.0 } else { 0.0 };
 
@@ -114,7 +144,11 @@ impl ConsciousnessReview {
     }
 
     /// 进化路径规划: 基于漏洞扫描产生最优拓扑进化路线
-    fn plan_evolution_path(&self, tree: &ConsciousnessTree, _vulns: &[VulnerabilityFinding]) -> Vec<EvolutionStep> {
+    fn plan_evolution_path(
+        &self,
+        tree: &ConsciousnessTree,
+        _vulns: &[VulnerabilityFinding],
+    ) -> Vec<EvolutionStep> {
         let mut path = Vec::new();
         let mut phase = 0;
 
@@ -123,7 +157,8 @@ impl ConsciousnessReview {
             phase += 1;
             path.push(EvolutionStep {
                 phase,
-                action: "Seed crawl queue with Wikipedia/ArXiv URLs; enable embedding API key".into(),
+                action: "Seed crawl queue with Wikipedia/ArXiv URLs; enable embedding API key"
+                    .into(),
                 target_domain: "DataFoundation".into(),
                 expected_impact: 0.9,
                 priority: 1,
@@ -155,7 +190,8 @@ impl ConsciousnessReview {
             phase += 1;
             path.push(EvolutionStep {
                 phase,
-                action: "Connect IITPhiCalculator to consciousness pipeline for real phi values".into(),
+                action: "Connect IITPhiCalculator to consciousness pipeline for real phi values"
+                    .into(),
                 target_domain: "ConsciousnessCore".into(),
                 expected_impact: 0.7,
                 priority: 2,
@@ -163,7 +199,9 @@ impl ConsciousnessReview {
         }
 
         // Phase 3: P2 — 分支层修复 (修复各领域模块成熟度)
-        let mut low_maturity_branches: Vec<(&BranchKind, &CapabilityBranch)> = tree.branches.iter()
+        let mut low_maturity_branches: Vec<(&BranchKind, &CapabilityBranch)> = tree
+            .branches
+            .iter()
             .filter(|(_, b)| b.maturity_score() < 0.33)
             .collect();
         low_maturity_branches.sort_by(|a, b| a.1.maturity_score().total_cmp(&b.1.maturity_score()));
@@ -171,7 +209,10 @@ impl ConsciousnessReview {
             phase += 1;
             path.push(EvolutionStep {
                 phase,
-                action: format!("Add unit tests + integration tests + benchmarks for {:?} domain", kind),
+                action: format!(
+                    "Add unit tests + integration tests + benchmarks for {:?} domain",
+                    kind
+                ),
                 target_domain: format!("{:?}", kind),
                 expected_impact: 0.5 + (1.0 - branch.maturity_score()) * 0.4,
                 priority: 3,
@@ -215,11 +256,17 @@ impl ConsciousnessReview {
         let soil_health = tree.soil.health();
         let root_health = tree.roots.health();
 
-        let trunk_health = (if tree.trunk.gwt_resonance_active { 0.4 } else { 0.0 }
-            + tree.trunk.phi * 0.3
-            + tree.trunk.coherence * 0.3).clamp(0.0, 1.0);
+        let trunk_health = (if tree.trunk.gwt_resonance_active {
+            0.4
+        } else {
+            0.0
+        } + tree.trunk.phi * 0.3
+            + tree.trunk.coherence * 0.3)
+            .clamp(0.0, 1.0);
 
-        let branches_health: HashMap<String, f64> = tree.branches.iter()
+        let branches_health: HashMap<String, f64> = tree
+            .branches
+            .iter()
             .map(|(k, b)| (format!("{:?}", k), b.health))
             .collect();
 
@@ -230,14 +277,27 @@ impl ConsciousnessReview {
         };
 
         let core_health = (tree.core.iteration as f64 * 0.1).min(1.0)
-            * (if tree.core.next_actions.is_empty() { 0.5 } else { 1.0 });
+            * (if tree.core.next_actions.is_empty() {
+                0.5
+            } else {
+                1.0
+            });
 
-        let overall = (soil_health + root_health + trunk_health + fruit_quality + core_health) / 5.0
-            * (1.0 + branches_health.values().sum::<f64>() / branches_health.len().max(1) as f64 * 0.5).min(1.0);
+        let overall = (soil_health + root_health + trunk_health + fruit_quality + core_health)
+            / 5.0
+            * (1.0
+                + branches_health.values().sum::<f64>() / branches_health.len().max(1) as f64
+                    * 0.5)
+                .min(1.0);
 
         HealthChainReport {
-            soil_health, root_health, trunk_health, branches_health,
-            fruit_quality, core_health, overall,
+            soil_health,
+            root_health,
+            trunk_health,
+            branches_health,
+            fruit_quality,
+            core_health,
+            overall,
         }
     }
 
@@ -247,7 +307,11 @@ impl ConsciousnessReview {
         if self.scan_history.is_empty() {
             failures.push("no scan history — run full_review() first".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 

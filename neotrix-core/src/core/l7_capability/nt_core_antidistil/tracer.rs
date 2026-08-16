@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -68,7 +68,9 @@ impl ResponseTracer {
                 if max_len == 0 {
                     return 0.0;
                 }
-                let matches = expected.chars().zip(found.chars())
+                let matches = expected
+                    .chars()
+                    .zip(found.chars())
                     .filter(|(a, b)| a == b)
                     .count();
                 return (matches as f64 / max_len as f64).max(0.0);
@@ -78,7 +80,13 @@ impl ResponseTracer {
     }
 
     /// Register a trace record for a response.
-    pub fn register_trace(&mut self, response: &str, bits: u8, model: &str, prompt_prefix: &str) -> TraceRecord {
+    pub fn register_trace(
+        &mut self,
+        response: &str,
+        bits: u8,
+        model: &str,
+        prompt_prefix: &str,
+    ) -> TraceRecord {
         self.tracing_id += 1;
         let hash = hash_response(response);
         let record = TraceRecord {
@@ -140,7 +148,11 @@ fn hash_response(response: &str) -> u64 {
 }
 
 /// Check if a KB collection contains watermarked responses (distillation detection).
-pub fn detect_watermarked_in_corpus(corpus: &[String], tracer: &ResponseTracer, threshold: f64) -> Vec<(usize, f64)> {
+pub fn detect_watermarked_in_corpus(
+    corpus: &[String],
+    tracer: &ResponseTracer,
+    threshold: f64,
+) -> Vec<(usize, f64)> {
     let mut detections = Vec::new();
     for (i, text) in corpus.iter().enumerate() {
         let sim = tracer.detect_response_watermark(text);
@@ -186,13 +198,18 @@ mod tests {
         let tracer = ResponseTracer::new();
         let clean = "This is a clean text with no watermark.";
         let sim = tracer.detect_response_watermark(clean);
-        assert!(sim < 0.1, "clean text should have near-zero similarity, got {}", sim);
+        assert!(
+            sim < 0.1,
+            "clean text should have near-zero similarity, got {}",
+            sim
+        );
     }
 
     #[test]
     fn test_register_trace() {
         let mut tracer = ResponseTracer::new();
-        let record = tracer.register_trace("test response", 0b001011, "neotrix-v1", "You are NeoTrix");
+        let record =
+            tracer.register_trace("test response", 0b001011, "neotrix-v1", "You are NeoTrix");
         assert_eq!(record.watermark_bits, 0b001011);
         assert_eq!(record.model, "neotrix-v1");
         assert_eq!(tracer.tracing_id, 1);
@@ -201,7 +218,12 @@ mod tests {
     #[test]
     fn test_lookup_trace_exact() {
         let mut tracer = ResponseTracer::new();
-        tracer.register_trace("original response content", 0b101, "model-x", "system prompt");
+        tracer.register_trace(
+            "original response content",
+            0b101,
+            "model-x",
+            "system prompt",
+        );
         let found = tracer.lookup_trace("original response content");
         assert!(found.is_some());
         assert_eq!(found.unwrap().watermark_bits, 0b101);
@@ -225,7 +247,10 @@ mod tests {
         };
         let corpus = vec![clean, wm_response];
         let detections = detect_watermarked_in_corpus(&corpus, &tracer, 0.9);
-        assert!(!detections.is_empty(), "should detect at least one watermark");
+        assert!(
+            !detections.is_empty(),
+            "should detect at least one watermark"
+        );
     }
 
     #[test]

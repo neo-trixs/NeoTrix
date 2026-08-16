@@ -78,7 +78,8 @@ impl AneProgramCache {
         self.evict_expired();
         let key = (model_id.to_string(), target.to_string());
         let is_new = !self.entries.contains_key(&key);
-        self.entries.insert(key, CacheEntry::new(program_bytes, target.to_string()));
+        self.entries
+            .insert(key, CacheEntry::new(program_bytes, target.to_string()));
         self.evict_lru();
         is_new
     }
@@ -97,7 +98,9 @@ impl AneProgramCache {
     /// Check if a cached entry exists (without touching)
     pub fn contains(&self, model_id: &str, target: &str) -> bool {
         let key = (model_id.to_string(), target.to_string());
-        self.entries.get(&key).is_some_and(|e| e.created_at.elapsed() <= self.policy.ttl)
+        self.entries
+            .get(&key)
+            .is_some_and(|e| e.created_at.elapsed() <= self.policy.ttl)
     }
 
     /// Remove a specific entry
@@ -114,7 +117,10 @@ impl AneProgramCache {
     /// Number of valid (non-expired) entries
     pub fn len(&self) -> usize {
         let now = Instant::now();
-        self.entries.values().filter(|e| now.duration_since(e.created_at) <= self.policy.ttl).count()
+        self.entries
+            .values()
+            .filter(|e| now.duration_since(e.created_at) <= self.policy.ttl)
+            .count()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -123,12 +129,15 @@ impl AneProgramCache {
 
     fn evict_expired(&mut self) {
         let now = Instant::now();
-        self.entries.retain(|_, e| now.duration_since(e.created_at) <= self.policy.ttl);
+        self.entries
+            .retain(|_, e| now.duration_since(e.created_at) <= self.policy.ttl);
     }
 
     fn evict_lru(&mut self) {
         while self.entries.len() > self.policy.max_entries {
-            let lru_key = self.entries.iter()
+            let lru_key = self
+                .entries
+                .iter()
                 .min_by_key(|(_, e)| e.last_access)
                 .map(|(k, _)| k.clone());
             if let Some(key) = lru_key {
@@ -187,7 +196,10 @@ mod tests {
 
     #[test]
     fn test_cache_policy_evicts_lru() {
-        let policy = CachePolicy { max_entries: 2, ttl: Duration::from_secs(3600) };
+        let policy = CachePolicy {
+            max_entries: 2,
+            ttl: Duration::from_secs(3600),
+        };
         let mut cache = AneProgramCache::new(policy);
         cache.cache_compile("a", "ane", vec![0x00]);
         cache.cache_compile("b", "ane", vec![0x01]);

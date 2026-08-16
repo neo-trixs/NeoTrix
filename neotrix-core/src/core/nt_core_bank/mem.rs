@@ -1,8 +1,8 @@
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier};
 use crate::core::nt_core_edit::{MicroEdit, SelfEdit};
 use crate::core::{RewardSource, TaskType};
-use crate::core::nt_core_bank::{MemoryTier, MemoryLifecycle};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum T3ViewType {
@@ -13,7 +13,11 @@ pub enum T3ViewType {
 
 impl T3ViewType {
     pub fn all() -> &'static [T3ViewType] {
-        &[T3ViewType::Struct, T3ViewType::Semantic, T3ViewType::Reflect]
+        &[
+            T3ViewType::Struct,
+            T3ViewType::Semantic,
+            T3ViewType::Reflect,
+        ]
     }
 }
 
@@ -32,7 +36,11 @@ impl Default for T3Views {
 
 impl T3Views {
     pub fn new() -> Self {
-        Self { struct_view: None, semantic_view: None, reflect_view: None }
+        Self {
+            struct_view: None,
+            semantic_view: None,
+            reflect_view: None,
+        }
     }
 
     pub fn get(&self, view_type: T3ViewType) -> Option<&str> {
@@ -47,30 +55,60 @@ impl T3Views {
         let struct_view = Self::generate_struct(mem);
         let semantic_view = Self::generate_semantic(mem);
         let reflect_view = Self::generate_reflect(mem);
-        Self { struct_view, semantic_view, reflect_view }
+        Self {
+            struct_view,
+            semantic_view,
+            reflect_view,
+        }
     }
 
     fn generate_struct(mem: &ReasoningMemory) -> Option<String> {
-        if mem.micro_edits.is_empty() { return None; }
+        if mem.micro_edits.is_empty() {
+            return None;
+        }
         let mut steps: Vec<String> = Vec::new();
         for (i, edit) in mem.micro_edits.iter().enumerate() {
             steps.push(format!("  {}. {}", i + 1, edit.summary()));
         }
-        Some(format!("Task: {}\nSteps:\n{}", mem.task_description, steps.join("\n")))
+        Some(format!(
+            "Task: {}\nSteps:\n{}",
+            mem.task_description,
+            steps.join("\n")
+        ))
     }
 
     fn generate_semantic(mem: &ReasoningMemory) -> Option<String> {
-        let outcome = if mem.reward > 0.7 { "successful" } else if mem.reward > 0.4 { "partial" } else { "failed" };
-        let key_idea = mem.micro_edits.first().map(|e| format!(" key action: {}", e.summary())).unwrap_or_default();
-        Some(format!("[{}] {} (reward={:.2}){}", outcome, mem.task_description, mem.reward, key_idea))
+        let outcome = if mem.reward > 0.7 {
+            "successful"
+        } else if mem.reward > 0.4 {
+            "partial"
+        } else {
+            "failed"
+        };
+        let key_idea = mem
+            .micro_edits
+            .first()
+            .map(|e| format!(" key action: {}", e.summary()))
+            .unwrap_or_default();
+        Some(format!(
+            "[{}] {} (reward={:.2}){}",
+            outcome, mem.task_description, mem.reward, key_idea
+        ))
     }
 
     fn generate_reflect(mem: &ReasoningMemory) -> Option<String> {
-        if mem.success { return None; }
-        let mistake_desc = mem.micro_edits.last()
+        if mem.success {
+            return None;
+        }
+        let mistake_desc = mem
+            .micro_edits
+            .last()
             .map(|e| format!("possible misstep: {}", e.summary()))
             .unwrap_or_else(|| "unknown failure pattern".to_string());
-        Some(format!("FAILURE: {} — reward={:.2}\n  {}", mem.task_description, mem.reward, mistake_desc))
+        Some(format!(
+            "FAILURE: {} — reward={:.2}\n  {}",
+            mem.task_description, mem.reward, mistake_desc
+        ))
     }
 }
 
@@ -111,7 +149,12 @@ impl ReasoningMemory {
         mem
     }
 
-    pub fn with_external_reward(task: &str, task_type: TaskType, edits: &[MicroEdit], reward: f64) -> Self {
+    pub fn with_external_reward(
+        task: &str,
+        task_type: TaskType,
+        edits: &[MicroEdit],
+        reward: f64,
+    ) -> Self {
         let mut m = Self::new(task, task_type, edits, reward);
         m.reward_source = RewardSource::External;
         m
@@ -120,9 +163,14 @@ impl ReasoningMemory {
     pub fn from_self_edit(task: &str, task_type: TaskType, edit: &SelfEdit, reward: f64) -> Self {
         let mut micro_edits = Vec::new();
         for dim in &edit.target_dimensions {
-            micro_edits.push(MicroEdit::AdjustDimension(dim.clone(), edit.adjustment_magnitude));
+            micro_edits.push(MicroEdit::AdjustDimension(
+                dim.clone(),
+                edit.adjustment_magnitude,
+            ));
         }
-        micro_edits.push(MicroEdit::UpdateLearningRate(*edit.config_overrides.get("learning_rate").unwrap_or(&0.05)));
+        micro_edits.push(MicroEdit::UpdateLearningRate(
+            *edit.config_overrides.get("learning_rate").unwrap_or(&0.05),
+        ));
         micro_edits.push(MicroEdit::NormalizeVector);
         Self::new(task, task_type, &micro_edits, reward)
     }
@@ -155,7 +203,14 @@ pub struct TemporalContext {
 
 impl TemporalContext {
     pub fn new(task_id: &str) -> Self {
-        Self { task_id: task_id.to_string(), recent_memories: Vec::new(), trend: "stable".to_string(), last_reward: 0.0, avg_reward: 0.0, memory_count: 0 }
+        Self {
+            task_id: task_id.to_string(),
+            recent_memories: Vec::new(),
+            trend: "stable".to_string(),
+            last_reward: 0.0,
+            avg_reward: 0.0,
+            memory_count: 0,
+        }
     }
 
     pub fn to_prompt_hint(&self) -> String {
@@ -234,8 +289,7 @@ mod tests {
 
     #[test]
     fn test_reasoning_memory_with_ttl() {
-        let mem = ReasoningMemory::new("test", TaskType::General, &[], 0.6)
-            .with_ttl(3600);
+        let mem = ReasoningMemory::new("test", TaskType::General, &[], 0.6).with_ttl(3600);
         assert_eq!(mem.lifecycle.ttl_seconds, Some(3600));
     }
 

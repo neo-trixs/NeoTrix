@@ -325,13 +325,15 @@ impl BackgroundLoopHandle {
                 pano.gwt.resonant_broadcast("[consciousness_tick] growth cycle resonance", &hexagram_states);
             }
             // Real GWT resonance signal: active only when the GWT has actually
-            // run a resonance broadcast (last_resonance set) and specialists
-            // are above threshold. Previously a fake `panorama.is_some()` that
-            // reported resonance as active even when no broadcast had fired.
+            // run a resonance broadcast (last_resonance set). The resonant_specialists
+            // sub-condition is relaxed (S1): the broadcast above is forced every tick
+            // (line 325), so resonant_specialists() is non-empty by construction and
+            // added no information — keeping it made gwt_resonance_active a tautology
+            // while masking genuine resonance absence (last_resonance unset).
             tree.trunk.gwt_resonance_active = self
                 .panorama
                 .as_ref()
-                .map(|p| p.gwt.last_resonance.is_some() && !p.gwt.resonant_specialists().is_empty())
+                .map(|p| p.gwt.last_resonance.is_some())
                 .unwrap_or(false);
             tree.trunk.workspace_size = crate::core::nt_core_gwt::resonance::MODULE_COUNT;
             // Branch health is now set from SelfTest results in handle_architecture_audit
@@ -1681,6 +1683,64 @@ impl BackgroundLoopHandle {
             crate::core::nt_core_self_test::SelfTestResult::fail(
                 "nt_shield_check_registry",
                 vec!["check registry selftest failed".into()],
+            )
+        });
+
+        // NT-REPAIR / NT-META / NT-GOVERNANCE / NT-NEXUS: 四分支迷雾治理 —
+        // 每 tick 喂真实检测件结果, 使四分支 self_test_count > 0 → fog 从
+        // 0.15 (无测试) 收敛至 0.05 (全满足)。此前这些前缀无 SelfTest 喂入,
+        // 分支健康恒 0 → 迷雾卡在 0.15。
+        let repair_ok =
+            crate::neotrix::l8_autonomic_impl::nt_repair_causal_trace::CausalTraceSelfTest
+                .self_test()
+                .is_ok();
+        results.push(if repair_ok {
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_repair_causal_trace")
+        } else {
+            crate::core::nt_core_self_test::SelfTestResult::fail(
+                "nt_repair_causal_trace",
+                vec!["causal trace selftest failed".into()],
+            )
+        });
+        let meta_ok =
+            crate::neotrix::l10_transcendent_impl::meta_observer::MetaObserverSelfTest
+                .self_test()
+                .is_ok();
+        results.push(if meta_ok {
+            crate::core::nt_core_self_test::SelfTestResult::pass(
+                "nt_meta_transcendent_observer",
+            )
+        } else {
+            crate::core::nt_core_self_test::SelfTestResult::fail(
+                "nt_meta_transcendent_observer",
+                vec!["meta observer selftest failed".into()],
+            )
+        });
+        let gov_ok = crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest
+            .self_test()
+            .is_ok();
+        results.push(if gov_ok {
+            crate::core::nt_core_self_test::SelfTestResult::pass(
+                "nt_governance_constitution",
+            )
+        } else {
+            crate::core::nt_core_self_test::SelfTestResult::fail(
+                "nt_governance_constitution",
+                vec!["constitution governance selftest failed".into()],
+            )
+        });
+        let nexus_ok =
+            crate::neotrix::l1_body_impl::nt_act_autonomy::cross_session_memory::CrossSessionMemorySelfTest
+                .self_test()
+                .is_ok();
+        results.push(if nexus_ok {
+            crate::core::nt_core_self_test::SelfTestResult::pass(
+                "nt_nexus_cross_session_memory",
+            )
+        } else {
+            crate::core::nt_core_self_test::SelfTestResult::fail(
+                "nt_nexus_cross_session_memory",
+                vec!["cross-session memory selftest failed".into()],
             )
         });
 

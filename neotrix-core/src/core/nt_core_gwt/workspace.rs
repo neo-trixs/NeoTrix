@@ -1,21 +1,21 @@
-use std::collections::BTreeMap;
-use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
-use sha2::{Digest, Sha256};
+use super::compaction::CompactionPipeline;
+use super::competition_gate::{CompetitionGate, CompetitionResult};
+use super::independence::{EffectSpec, IndependenceGate, IndependenceVerdict};
 use super::module_def::{SpecialistModule, SpecialistType};
+use super::moe_router::MoERouter;
 use super::monitor::EntropyMonitor;
 use super::physics_attention::AdaptiveSlicer;
 use super::resonance::{
-    OscillationEnhancedReport, OscillatorNetwork, ResonanceMatrix, ResonanceReport,
-    resonate_cycle, resonate_cycle_with_matrix, resonate_cycle_with_physics, MODULE_COUNT,
+    resonate_cycle, resonate_cycle_with_matrix, resonate_cycle_with_physics,
+    OscillationEnhancedReport, OscillatorNetwork, ResonanceMatrix, ResonanceReport, MODULE_COUNT,
 };
-use super::competition_gate::{CompetitionGate, CompetitionResult};
-use super::compaction::CompactionPipeline;
-use super::moe_router::MoERouter;
-use super::independence::{EffectSpec, IndependenceGate, IndependenceVerdict};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::collections::VecDeque;
 
-use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_harness::HarnessAdapter;
+use crate::core::nt_core_hex::ReasoningHexagram;
 
 /// 按 SpecialistType 声明序取 module 索引（与 default_specialist_states / hexagram_states 同序）。
 /// BTreeMap<String, _> 的 values() 是 name-sort 序，与声明序不一致，绝不能按位置互用。
@@ -260,19 +260,25 @@ impl GlobalWorkspace {
     }
 
     pub fn specialist_by_type_mut(&mut self, st: &SpecialistType) -> Option<&mut SpecialistModule> {
-        self.specialists.values_mut().find(|m| m.specialist_type == *st)
+        self.specialists
+            .values_mut()
+            .find(|m| m.specialist_type == *st)
     }
 
     /// 按 SpecialistType 声明序定位 specialist (与 default_specialist_states / hexagram_states 同序)。
     /// BTreeMap<String, _> 的 values() 是 name-sort 序，与声明序不一致，绝不能按位置互用。
     fn specialist_at_index(&self, idx: usize) -> Option<&SpecialistModule> {
-        self.specialists.values()
+        self.specialists
+            .values()
             .find(|m| m.specialist_type as usize == idx)
     }
 
     /// Pre-resonance: returns specialists with raw activation above threshold.
     pub fn active_specialists(&self) -> Vec<&SpecialistModule> {
-        self.specialists.values().filter(|m| m.activation >= self.threshold).collect()
+        self.specialists
+            .values()
+            .filter(|m| m.activation >= self.threshold)
+            .collect()
     }
 
     /// Resonance-aware: returns specialists whose effective salience exceeds threshold.
@@ -281,11 +287,13 @@ impl GlobalWorkspace {
             Some(ref r) => r,
             None => return self.active_specialists(),
         };
-        self.specialists.values()
+        self.specialists
+            .values()
             .filter(|m| {
                 module_index(m)
                     .and_then(|idx| report.effective_saliences.get(idx).copied())
-                    .unwrap_or(0.0) >= self.threshold
+                    .unwrap_or(0.0)
+                    >= self.threshold
             })
             .collect()
     }
@@ -309,7 +317,9 @@ impl GlobalWorkspace {
     fn workspace_embedding_for_gate(&self, content: &str, raw: &[f64; MODULE_COUNT]) -> Vec<f64> {
         let mut enc = vec![0.0f64; MODULE_COUNT];
         // Content signal: coarse hash spread across the embedding slots.
-        let hash = content.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        let hash = content
+            .bytes()
+            .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         for (i, slot) in enc.iter_mut().enumerate() {
             *slot = ((hash >> ((i % 8) * 8)) & 0xFF) as f64 / 255.0;
         }
@@ -382,7 +392,12 @@ impl GlobalWorkspace {
         // strength scores that vary smoothly with E8 state similarity.
         let mut report = if let Some(ref scorer) = self.vsa_scorer {
             let vsa_matrix = ResonanceMatrix::from_states_with_vsa(hexagram_states, scorer);
-            resonate_cycle_with_matrix(&raw, hexagram_states, &vsa_matrix, Some(&mut self.moe_router))
+            resonate_cycle_with_matrix(
+                &raw,
+                hexagram_states,
+                &vsa_matrix,
+                Some(&mut self.moe_router),
+            )
         } else if self.use_physics_attention {
             resonate_cycle_with_physics(&raw, hexagram_states, &mut self.physics_slicer)
         } else {
@@ -395,7 +410,12 @@ impl GlobalWorkspace {
             let stimulus = self.entropy_monitor.inject_stimulus(&mut raw);
             report = if let Some(ref scorer) = self.vsa_scorer {
                 let vsa_matrix = ResonanceMatrix::from_states_with_vsa(hexagram_states, scorer);
-                resonate_cycle_with_matrix(&raw, hexagram_states, &vsa_matrix, Some(&mut self.moe_router))
+                resonate_cycle_with_matrix(
+                    &raw,
+                    hexagram_states,
+                    &vsa_matrix,
+                    Some(&mut self.moe_router),
+                )
             } else if self.use_physics_attention {
                 resonate_cycle_with_physics(&raw, hexagram_states, &mut self.physics_slicer)
             } else {
@@ -409,7 +429,8 @@ impl GlobalWorkspace {
 
         // Step 3b: compute oscillation-enhanced report from synchronized network
         {
-            let oscillation_enhanced = self.oscillator_network
+            let oscillation_enhanced = self
+                .oscillator_network
                 .as_ref()
                 .map(|net| report.with_oscillation(net));
             self.last_oscillation_report = oscillation_enhanced;
@@ -438,7 +459,9 @@ impl GlobalWorkspace {
                 if let Some(profile) = self.harness_adapter.active_profile() {
                     for (_, m) in self.specialists.iter_mut() {
                         m.apply_harness_boost(&env, 0.05);
-                        if let Some(adaptations) = profile.specialist_adaptations.get(&m.specialist_type) {
+                        if let Some(adaptations) =
+                            profile.specialist_adaptations.get(&m.specialist_type)
+                        {
                             m.activation *= 1.0 + (adaptations.len() as f64 * 0.02).min(0.2);
                         }
                     }
@@ -460,13 +483,18 @@ impl GlobalWorkspace {
         // attending to, how focused, entropy health) and feeds it back into the
         // workspace so subsequent specialists reason over their own broadcast.
         {
-            let winner_name = self.specialist_at_index(report.winner)
+            let winner_name = self
+                .specialist_at_index(report.winner)
                 .map(|m| m.name.clone())
                 .unwrap_or_else(|| format!("specialist_{}", report.winner));
             // Phase 9.1 — Meta-Workspace: second-order observation of the primary
             // workspace (winner, entropy, sparse-gate choices), registered before
             // inner speech so the self-talk can reference its own behavior.
-            let gated = self.last_sparse_gate.as_ref().map(|(g, _)| g.clone()).unwrap_or_default();
+            let gated = self
+                .last_sparse_gate
+                .as_ref()
+                .map(|(g, _)| g.clone())
+                .unwrap_or_default();
             let obs = super::meta_workspace::PrimaryObservation {
                 winner: report.winner,
                 winner_name: winner_name.clone(),
@@ -524,8 +552,7 @@ impl GlobalWorkspace {
             if !aligned.aligned {
                 self.broadcast_history.push(format!(
                     "[ctm_verifier] MISALIGNED: {}/{} axioms held",
-                    aligned.passed_checks,
-                    aligned.total_checks,
+                    aligned.passed_checks, aligned.total_checks,
                 ));
             }
         }
@@ -555,7 +582,8 @@ impl GlobalWorkspace {
             // Phase 8.2 — CognitiveHub: record cross-group collaborations from
             // the post-resonance winners so hub-to-hub weights learn which
             // cognitive types actually co-activate together (structured topology).
-            self.cognitive_hub.record_broadcast_collaborations(&activations);
+            self.cognitive_hub
+                .record_broadcast_collaborations(&activations);
             // Consume learned routing: build the per-specialist bias from the
             // dominant type's top-2 hub targets so the NEXT broadcast steers
             // attention toward those hubs. Closes the record→route loop.
@@ -587,7 +615,8 @@ impl GlobalWorkspace {
 
         // Step 5b: Competition Gate — WTA ignition override if enabled
         if let Some(ref gate) = self.competition_gate {
-            let resonance_matrix = crate::core::nt_core_gwt::resonance::ResonanceMatrix::from_states(hexagram_states);
+            let resonance_matrix =
+                crate::core::nt_core_gwt::resonance::ResonanceMatrix::from_states(hexagram_states);
             let competition_result = gate.compete(&raw, &resonance_matrix);
             if competition_result.ignition {
                 // Override winner and effective saliences with competition result
@@ -601,8 +630,18 @@ impl GlobalWorkspace {
             self.last_competition = Some(competition_result);
         }
 
-        let ignition = self.last_competition.as_ref().map(|c| c.ignition).unwrap_or(false);
-        self.append_audit_block(AuditEventType::CompetitionOverride, report.winner, report.entropy, ignition, false);
+        let ignition = self
+            .last_competition
+            .as_ref()
+            .map(|c| c.ignition)
+            .unwrap_or(false);
+        self.append_audit_block(
+            AuditEventType::CompetitionOverride,
+            report.winner,
+            report.entropy,
+            ignition,
+            false,
+        );
 
         // Step 5c: MoE Router — REINFORCE update using effective salience as reward
         self.moe_router.routing_update(&report.effective_saliences);
@@ -619,13 +658,23 @@ impl GlobalWorkspace {
                     compaction_report.entries_before,
                 ));
             }
-            self.append_audit_block(AuditEventType::Compaction, report.winner, report.entropy, ignition, compaction_report.auto_compacted);
+            self.append_audit_block(
+                AuditEventType::Compaction,
+                report.winner,
+                report.entropy,
+                ignition,
+                compaction_report.auto_compacted,
+            );
         }
 
         // Step 5d: Independence audit — winner 集群是否可任意序撤回
         // (§3.3.2 Theorem 42): 独立 → Corollary 21 任意序撤回; 否则须外部次序。
         {
-            let gated = self.last_sparse_gate.as_ref().map(|(g, _)| g.clone()).unwrap_or_default();
+            let gated = self
+                .last_sparse_gate
+                .as_ref()
+                .map(|(g, _)| g.clone())
+                .unwrap_or_default();
             let ids: Vec<&str> = gated
                 .iter()
                 .filter_map(|&i| self.specialist_at_index(i).map(|m| m.name.as_str()))
@@ -639,7 +688,8 @@ impl GlobalWorkspace {
                         ));
                     }
                     IndependenceVerdict::OrderedRequired { conflicts } => {
-                        let c: Vec<String> = conflicts.iter().map(|(a, b)| format!("{a}<{b}")).collect();
+                        let c: Vec<String> =
+                            conflicts.iter().map(|(a, b)| format!("{a}<{b}")).collect();
                         self.broadcast_history.push(format!(
                             "[independence] ORDER REQUIRED: {} ({})",
                             ids.join(","),
@@ -654,7 +704,8 @@ impl GlobalWorkspace {
         self.last_resonance = Some(report.clone());
         self.resonance_history.push(report.clone());
         if self.resonance_history.len() > RESONANCE_HISTORY_LIMIT {
-            self.resonance_history.drain(..self.resonance_history.len() - RESONANCE_HISTORY_LIMIT);
+            self.resonance_history
+                .drain(..self.resonance_history.len() - RESONANCE_HISTORY_LIMIT);
         }
         self.tick += 1;
 
@@ -690,11 +741,15 @@ impl GlobalWorkspace {
 
     /// Map resonance effective saliences to per-modality representation strengths.
     /// Specialist modules are categorized by type into the five modalities.
-    fn modality_strengths(&self, saliences: &[f64]) -> std::collections::BTreeMap<super::modality_router::Modality, f64> {
+    fn modality_strengths(
+        &self,
+        saliences: &[f64],
+    ) -> std::collections::BTreeMap<super::modality_router::Modality, f64> {
         use super::modality_router::Modality;
         let mut strengths = std::collections::BTreeMap::new();
         for (modality, strength) in self.specialists.values().filter_map(|m| {
-            module_index(m).and_then(|idx| saliences.get(idx).copied())
+            module_index(m)
+                .and_then(|idx| saliences.get(idx).copied())
                 .map(|s| (self.specialist_modality(m.specialist_type), s))
         }) {
             *strengths.entry(modality).or_insert(0.0) += strength;
@@ -708,15 +763,21 @@ impl GlobalWorkspace {
 
     /// Map a SpecialistType to its dominant representation modality.
     fn specialist_modality(&self, st: SpecialistType) -> super::modality_router::Modality {
-        use super::module_def::SpecialistType as ST;
         use super::modality_router::Modality as M;
+        use super::module_def::SpecialistType as ST;
         match st {
             ST::ImageGenerator | ST::CreativityGenerator => M::Image,
             ST::AISecurity => M::Code,
             ST::CodeAnalyzer | ST::EvidenceWeightedHypothesis => M::Code,
-            ST::PatternMatcher | ST::AnomalyDetector | ST::Planner
-            | ST::KnowledgeIntegrator | ST::GoalPrioritizer | ST::RiskAssessor
-            | ST::ReflectionEngine | ST::MetaCognitionAnalyst | ST::Orchestrator => M::Text,
+            ST::PatternMatcher
+            | ST::AnomalyDetector
+            | ST::Planner
+            | ST::KnowledgeIntegrator
+            | ST::GoalPrioritizer
+            | ST::RiskAssessor
+            | ST::ReflectionEngine
+            | ST::MetaCognitionAnalyst
+            | ST::Orchestrator => M::Text,
             ST::KnowledgeRetriever => M::Latent,
         }
     }
@@ -730,7 +791,11 @@ impl GlobalWorkspace {
     /// Run the CTM-AI formal alignment verification over a resonance snapshot.
     /// Returns the alignment report and stores it in `last_ctm_report`.
     /// `specialists_active` is the count of registered specialists (|A| witness).
-    pub fn verify_ctm(&mut self, hexagram_states: &[ReasoningHexagram], specialists_active: usize) -> super::ctm_verifier::CtmAlignmentReport {
+    pub fn verify_ctm(
+        &mut self,
+        hexagram_states: &[ReasoningHexagram],
+        specialists_active: usize,
+    ) -> super::ctm_verifier::CtmAlignmentReport {
         let report = match self.last_resonance.clone() {
             Some(r) => r,
             None => {
@@ -747,7 +812,9 @@ impl GlobalWorkspace {
             }
         };
         let tape_len = self.broadcast_history.len();
-        let aligned = self.ctm_verifier.verify(hexagram_states, specialists_active, &report, tape_len);
+        let aligned =
+            self.ctm_verifier
+                .verify(hexagram_states, specialists_active, &report, tape_len);
         let ret = aligned.clone();
         self.last_ctm_report = Some(aligned);
         ret
@@ -755,9 +822,16 @@ impl GlobalWorkspace {
 
     /// Verify an in-flight resonance report (used mid-cycle in resonant_broadcast,
     /// before `last_resonance` is stored at Step 6).
-    fn verify_ctm_report(&mut self, hexagram_states: &[ReasoningHexagram], specialists_active: usize, report: &ResonanceReport) -> super::ctm_verifier::CtmAlignmentReport {
+    fn verify_ctm_report(
+        &mut self,
+        hexagram_states: &[ReasoningHexagram],
+        specialists_active: usize,
+        report: &ResonanceReport,
+    ) -> super::ctm_verifier::CtmAlignmentReport {
         let tape_len = self.broadcast_history.len();
-        let aligned = self.ctm_verifier.verify(hexagram_states, specialists_active, report, tape_len);
+        let aligned =
+            self.ctm_verifier
+                .verify(hexagram_states, specialists_active, report, tape_len);
         let ret = aligned.clone();
         self.last_ctm_report = Some(aligned);
         ret
@@ -769,9 +843,12 @@ impl GlobalWorkspace {
             Some(ref r) => r,
             None => return vec![],
         };
-        report.resonator_clusters.iter()
+        report
+            .resonator_clusters
+            .iter()
             .map(|cluster| {
-                cluster.iter()
+                cluster
+                    .iter()
                     .filter_map(|&i| self.specialist_at_index(i))
                     .collect()
             })
@@ -792,11 +869,20 @@ impl GlobalWorkspace {
     pub fn register_default_specialists(&mut self) {
         use super::module_def::SpecialistType::*;
         for st in &[
-            PatternMatcher, AnomalyDetector, KnowledgeRetriever,
-            CodeAnalyzer, Planner, KnowledgeIntegrator,
-            GoalPrioritizer, RiskAssessor, CreativityGenerator,
-            ReflectionEngine, MetaCognitionAnalyst, AISecurity,
-            ImageGenerator, EvidenceWeightedHypothesis,
+            PatternMatcher,
+            AnomalyDetector,
+            KnowledgeRetriever,
+            CodeAnalyzer,
+            Planner,
+            KnowledgeIntegrator,
+            GoalPrioritizer,
+            RiskAssessor,
+            CreativityGenerator,
+            ReflectionEngine,
+            MetaCognitionAnalyst,
+            AISecurity,
+            ImageGenerator,
+            EvidenceWeightedHypothesis,
         ] {
             let name = format!("{:?}", st);
             if !self.specialists.contains_key(&name) {
@@ -813,11 +899,19 @@ impl GlobalWorkspace {
         // (plan), 即跨组件撤回须外部强加次序。
         use super::module_def::SpecialistType as ST;
         for st in &[
-            ST::PatternMatcher, ST::AnomalyDetector, ST::KnowledgeRetriever,
-            ST::CodeAnalyzer, ST::KnowledgeIntegrator,
-            ST::GoalPrioritizer, ST::RiskAssessor, ST::CreativityGenerator,
-            ST::ReflectionEngine, ST::MetaCognitionAnalyst, ST::AISecurity,
-            ST::ImageGenerator, ST::EvidenceWeightedHypothesis,
+            ST::PatternMatcher,
+            ST::AnomalyDetector,
+            ST::KnowledgeRetriever,
+            ST::CodeAnalyzer,
+            ST::KnowledgeIntegrator,
+            ST::GoalPrioritizer,
+            ST::RiskAssessor,
+            ST::CreativityGenerator,
+            ST::ReflectionEngine,
+            ST::MetaCognitionAnalyst,
+            ST::AISecurity,
+            ST::ImageGenerator,
+            ST::EvidenceWeightedHypothesis,
         ] {
             self.independence.register(EffectSpec::commutative(
                 Box::leak(format!("{st:?}").into_boxed_str()),
@@ -834,11 +928,18 @@ impl GlobalWorkspace {
 
     /// Enable WTA competition gate with given threshold and suppression.
     pub fn enable_competition_gate(&mut self, ignition_threshold: f64, suppression_strength: f64) {
-        self.competition_gate = Some(CompetitionGate::new(ignition_threshold, suppression_strength));
+        self.competition_gate = Some(CompetitionGate::new(
+            ignition_threshold,
+            suppression_strength,
+        ));
     }
 
     /// Enable softmax competition mode.
-    pub fn enable_softmax_competition(&mut self, ignition_threshold: f64, suppression_strength: f64) {
+    pub fn enable_softmax_competition(
+        &mut self,
+        ignition_threshold: f64,
+        suppression_strength: f64,
+    ) {
         let mut gate = CompetitionGate::new(ignition_threshold, suppression_strength);
         gate.softmax_mode = true;
         self.competition_gate = Some(gate);
@@ -858,7 +959,14 @@ impl GlobalWorkspace {
             .unwrap_or(false)
     }
 
-    pub fn append_audit_block(&mut self, event_type: AuditEventType, winner: usize, entropy: f64, ignition: bool, compaction_triggered: bool) {
+    pub fn append_audit_block(
+        &mut self,
+        event_type: AuditEventType,
+        winner: usize,
+        entropy: f64,
+        ignition: bool,
+        compaction_triggered: bool,
+    ) {
         let index = self.audit_chain.len() as u64;
         let previous_hash = self.audit_chain.back().map(|b| b.hash).unwrap_or([0u8; 32]);
         let tick = self.tick;
@@ -952,8 +1060,14 @@ mod tests {
         // 容量已满 → 拒绝第三条广播 (不覆盖已有内容)
         assert!(!ws.broadcast("third"));
         assert_eq!(ws.active_broadcast.len(), 2);
-        assert_eq!(ws.active_broadcast.front().map(String::as_str), Some("first"));
-        assert_eq!(ws.active_broadcast.back().map(String::as_str), Some("second"));
+        assert_eq!(
+            ws.active_broadcast.front().map(String::as_str),
+            Some("first")
+        );
+        assert_eq!(
+            ws.active_broadcast.back().map(String::as_str),
+            Some("second")
+        );
     }
 
     #[test]
@@ -989,7 +1103,8 @@ mod tests {
 
         // Set one module high activation
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
 
         ws.resonant_broadcast("test content", &states);
 
@@ -1003,12 +1118,15 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.5;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.5;
 
         ws.resonant_broadcast("content", &states);
 
         // Activations should be updated with effective salience
-        let pm = ws.specialist_by_type_mut(&SpecialistType::PatternMatcher).expect("PatternMatcher should be registered for activation check");
+        let pm = ws
+            .specialist_by_type_mut(&SpecialistType::PatternMatcher)
+            .expect("PatternMatcher should be registered for activation check");
         assert!(pm.activation > 0.0);
     }
 
@@ -1018,13 +1136,18 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
         ws.resonant_broadcast("ctm probe", &states);
 
         // Every resonance cycle runs CTM-AI formal alignment verification
         assert!(ws.last_ctm_report.is_some());
         let rep = ws.last_ctm_report.as_ref().unwrap();
-        assert!(rep.aligned, "GWT should satisfy CTM axioms: {:#?}", rep.checks);
+        assert!(
+            rep.aligned,
+            "GWT should satisfy CTM axioms: {:#?}",
+            rep.checks
+        );
         assert_eq!(rep.total_checks, 5);
         assert_eq!(rep.passed_checks, 5);
     }
@@ -1034,7 +1157,8 @@ mod tests {
         let mut ws = make_workspace();
         let states = default_specialist_states();
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.8;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.8;
         ws.resonant_broadcast("manual", &states);
 
         // Re-run verification directly with the current snapshot's action space
@@ -1050,7 +1174,8 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::KnowledgeRetriever)
-            .expect("KnowledgeRetriever should be registered").activation = 0.95;
+            .expect("KnowledgeRetriever should be registered")
+            .activation = 0.95;
 
         ws.resonant_broadcast("query", &states);
 
@@ -1068,7 +1193,8 @@ mod tests {
 
         // After broadcast, should be focused (one module dominates)
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered for attention test").activation = 1.0;
+            .expect("PatternMatcher should be registered for attention test")
+            .activation = 1.0;
         ws.resonant_broadcast("test", &states);
         assert_ne!(ws.attention_state(), AttentionState::Idle);
     }
@@ -1084,7 +1210,8 @@ mod tests {
 
         // Activate one module at threshold level
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered for resonant test").activation = 0.5;
+            .expect("PatternMatcher should be registered for resonant test")
+            .activation = 0.5;
 
         // Before resonance cycle, resonant_specialists falls back to active
         let before = ws.resonant_specialists().len();
@@ -1103,7 +1230,8 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::AnomalyDetector)
-            .expect("AnomalyDetector should be registered").activation = 0.8;
+            .expect("AnomalyDetector should be registered")
+            .activation = 0.8;
         ws.resonant_broadcast("data", &states);
 
         let winner_before = ws.resonance_winner().map(|m| m.name.clone());
@@ -1198,9 +1326,11 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
         ws.specialist_by_type_mut(&SpecialistType::AnomalyDetector)
-            .expect("AnomalyDetector should be registered").activation = 0.3;
+            .expect("AnomalyDetector should be registered")
+            .activation = 0.3;
 
         ws.resonant_broadcast("test", &states);
         assert!(ws.last_competition.is_some());
@@ -1213,7 +1343,8 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.8;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.8;
 
         ws.resonant_broadcast("test", &states);
         assert!(ws.last_competition.is_some());
@@ -1257,9 +1388,13 @@ mod tests {
         let mut ws = make_workspace();
         let states = default_specialist_states();
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
         ws.resonant_broadcast("test", &states);
-        assert!(!ws.audit_chain.is_empty(), "audit chain should have at least one block after broadcast");
+        assert!(
+            !ws.audit_chain.is_empty(),
+            "audit chain should have at least one block after broadcast"
+        );
     }
 
     #[test]
@@ -1267,9 +1402,13 @@ mod tests {
         let mut ws = make_workspace();
         let states = default_specialist_states();
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
         ws.resonant_broadcast("test", &states);
-        assert!(ws.verify_chain(), "audit chain should verify correctly after broadcast");
+        assert!(
+            ws.verify_chain(),
+            "audit chain should verify correctly after broadcast"
+        );
     }
 
     #[test]
@@ -1277,13 +1416,17 @@ mod tests {
         let mut ws = make_workspace();
         let states = default_specialist_states();
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
         ws.resonant_broadcast("test", &states);
         // Corrupt the last block's hash
         if let Some(last) = ws.audit_chain.back_mut() {
             last.hash[0] ^= 0xFF;
         }
-        assert!(!ws.verify_chain(), "tampered chain should fail verification");
+        assert!(
+            !ws.verify_chain(),
+            "tampered chain should fail verification"
+        );
     }
 
     #[test]
@@ -1291,16 +1434,25 @@ mod tests {
         let mut ws = make_workspace();
         let states = default_specialist_states();
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.9;
         ws.resonant_broadcast("test1", &states);
         ws.resonant_broadcast("test2", &states);
         // Should have blocks from both broadcasts
-        assert!(ws.audit_chain.len() >= 2, "chain should have at least 2 blocks after 2 broadcasts");
+        assert!(
+            ws.audit_chain.len() >= 2,
+            "chain should have at least 2 blocks after 2 broadcasts"
+        );
         // Check sequential linking
         let blocks: Vec<_> = ws.audit_chain.iter().collect();
         for i in 1..blocks.len() {
-            assert_eq!(blocks[i].previous_hash, blocks[i-1].hash,
-                "block {} should link to block {}", i, i-1);
+            assert_eq!(
+                blocks[i].previous_hash,
+                blocks[i - 1].hash,
+                "block {} should link to block {}",
+                i,
+                i - 1
+            );
         }
     }
 
@@ -1312,13 +1464,17 @@ mod tests {
 
         // Boost a Logical specialist so the cognitive type profile is meaningful
         ws.specialist_by_type_mut(&SpecialistType::CodeAnalyzer)
-            .expect("CodeAnalyzer should be registered").activation = 0.95;
+            .expect("CodeAnalyzer should be registered")
+            .activation = 0.95;
         ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.1;
+            .expect("PatternMatcher should be registered")
+            .activation = 0.1;
 
         ws.resonant_broadcast("cognitive probe", &states);
 
-        let profile = ws.cognitive_profile.expect("cognitive_profile should be set after broadcast");
+        let profile = ws
+            .cognitive_profile
+            .expect("cognitive_profile should be set after broadcast");
         // Distribution normalizes to 1
         let sum: f64 = profile.distribution.iter().sum();
         assert!((sum - 1.0).abs() < 1e-9, "distribution sum={sum}");
@@ -1331,9 +1487,10 @@ mod tests {
         assert!(profile.entropy >= 0.0);
 
         // The dominant cognitive type is surfaced in the broadcast
-        assert!(ws.broadcast_history.iter().any(|b| {
-            b.contains("[cognitive_type]") && b.contains("logical")
-        }));
+        assert!(ws
+            .broadcast_history
+            .iter()
+            .any(|b| { b.contains("[cognitive_type]") && b.contains("logical") }));
     }
 
     #[test]
@@ -1343,16 +1500,21 @@ mod tests {
         let states = default_specialist_states();
 
         ws.specialist_by_type_mut(&SpecialistType::CodeAnalyzer)
-            .expect("CodeAnalyzer").activation = 0.95;
+            .expect("CodeAnalyzer")
+            .activation = 0.95;
         ws.specialist_by_type_mut(&SpecialistType::Planner)
-            .expect("Planner").activation = 0.9;
+            .expect("Planner")
+            .activation = 0.9;
         ws.specialist_by_type_mut(&SpecialistType::KnowledgeRetriever)
-            .expect("KnowledgeRetriever").activation = 0.85;
+            .expect("KnowledgeRetriever")
+            .activation = 0.85;
 
         ws.resonant_broadcast("sparse gate probe", &states);
 
         // Sparse gate must have run and frozen all but top-3 experts.
-        let (gated, sparse) = ws.last_sparse_gate.expect("sparse gate should be set after broadcast");
+        let (gated, sparse) = ws
+            .last_sparse_gate
+            .expect("sparse gate should be set after broadcast");
         assert_eq!(gated.len(), 3);
         assert_eq!(sparse.len(), MODULE_COUNT);
         // Exactly 3 experts retain mass.

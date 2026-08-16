@@ -86,7 +86,9 @@ impl CognitiveLoadMonitor {
         if self.recent_load.len() > cfg.load_history_size {
             self.recent_load.pop_front();
         }
-        self.thinking_budget = (self.thinking_budget - clamped * cfg.step_load_factor + cfg.budget_recharge_rate).clamp(0.0, 1.0);
+        self.thinking_budget = (self.thinking_budget - clamped * cfg.step_load_factor
+            + cfg.budget_recharge_rate)
+            .clamp(0.0, 1.0);
         self.update_mode();
     }
 
@@ -97,9 +99,13 @@ impl CognitiveLoadMonitor {
 
     fn update_mode(&mut self) {
         let cfg = &self.config;
-        if self.thinking_budget > cfg.deep_mode_budget * 0.5 && self.average_load() < cfg.deep_mode_load_threshold {
+        if self.thinking_budget > cfg.deep_mode_budget * 0.5
+            && self.average_load() < cfg.deep_mode_load_threshold
+        {
             self.mode = ThinkingMode::Deep;
-        } else if self.thinking_budget < cfg.fast_mode_budget * 0.5 || self.average_load() > cfg.fast_mode_load_threshold {
+        } else if self.thinking_budget < cfg.fast_mode_budget * 0.5
+            || self.average_load() > cfg.fast_mode_load_threshold
+        {
             self.mode = ThinkingMode::Fast;
         } else {
             self.mode = ThinkingMode::Balanced;
@@ -223,7 +229,9 @@ mod tests {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for CognitiveLoadMonitor {
-    fn name(&self) -> &str { "cognitive_load" }
+    fn name(&self) -> &str {
+        "cognitive_load"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         let cfg = &COGNITIVE_LOAD_CONFIG;
@@ -236,6 +244,10 @@ impl crate::core::nt_core_self_test::SelfTest for CognitiveLoadMonitor {
         if self.total_steps < self.deep_steps {
             failures.push("cognitive_load: deep_steps > total_steps".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }

@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::core::nt_core_self::emotion_state::EmotionEngine;
+use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrainSnapshot {
@@ -233,9 +233,20 @@ impl SecondBrain {
         })
     }
 
-    fn read_brain_kv(&self, kb: &KnowledgeBase) -> (HashMap<String, String>, HashMap<String, String>) {
-        let emotion_kv = kb.kv_list("emotion").unwrap_or_default().into_iter().collect();
-        let session_kv = kb.kv_list("session_notes").unwrap_or_default().into_iter().collect();
+    fn read_brain_kv(
+        &self,
+        kb: &KnowledgeBase,
+    ) -> (HashMap<String, String>, HashMap<String, String>) {
+        let emotion_kv = kb
+            .kv_list("emotion")
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        let session_kv = kb
+            .kv_list("session_notes")
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
         (emotion_kv, session_kv)
     }
 
@@ -259,8 +270,12 @@ impl SecondBrain {
         let emotion_json = kb.kv_get("emotion", "engine_state").ok().flatten();
         let session_notes = kb.kv_list("session_notes").unwrap_or_default();
         let conn = kb.conn.lock().map_err(|e| e.to_string())?;
-        let node_count = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_nodes(&conn).map_err(|e| e.to_string())?;
-        let edge_count = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_edges(&conn).map_err(|e| e.to_string())?;
+        let node_count =
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_nodes(&conn)
+                .map_err(|e| e.to_string())?;
+        let edge_count =
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_edges(&conn)
+                .map_err(|e| e.to_string())?;
         let wiki_pages = kb.search_by_type(
             &crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::WikiPage,
             10000,
@@ -289,9 +304,14 @@ impl SecondBrain {
 
         let snapshot = BrainSnapshot {
             timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
             emotion_json,
-            session_notes: session_notes.into_iter().map(|(k, v)| format!("{}: {}", k, v)).collect(),
+            session_notes: session_notes
+                .into_iter()
+                .map(|(k, v)| format!("{}: {}", k, v))
+                .collect(),
             wiki_page_count: wiki_pages.len(),
             edge_count: edge_count as usize,
             node_count: node_count as usize,
@@ -304,19 +324,26 @@ impl SecondBrain {
     fn compute_dimension_coverage(&self, kb: &KnowledgeBase, _dim: &str) -> f64 {
         let total = kb.kv_list("emotion").unwrap_or_default().len()
             + kb.kv_list("session_notes").unwrap_or_default().len();
-        if total > 0 { 1.0 } else { 0.0 }
+        if total > 0 {
+            1.0
+        } else {
+            0.0
+        }
     }
 
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<BrainSearchResult>, String> {
         let kb = self.kb.as_ref().ok_or("KB not attached")?;
         let results = kb.search(query, limit)?;
-        Ok(results.into_iter().map(|r| BrainSearchResult {
-            id: r.node.id,
-            title: r.node.title,
-            summary: r.node.summary.unwrap_or_default(),
-            score: r.score,
-            node_type: r.node.node_type.as_str().to_string(),
-        }).collect())
+        Ok(results
+            .into_iter()
+            .map(|r| BrainSearchResult {
+                id: r.node.id,
+                title: r.node.title,
+                summary: r.node.summary.unwrap_or_default(),
+                score: r.score,
+                node_type: r.node.node_type.as_str().to_string(),
+            })
+            .collect())
     }
 }
 
@@ -364,7 +391,8 @@ fn generate_brain_graph_html(graph: &BrainWikiGraph) -> String {
     let edges_json = serde_json::to_string(&graph.edges).unwrap_or_default();
     let emotion_json = serde_json::to_string(&graph.emotion_kv).unwrap_or_default();
 
-    format!(r##"<!DOCTYPE html>
+    format!(
+        r##"<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Second Brain Graph</title>
 <style>
@@ -440,7 +468,9 @@ svg.call(d3.zoom().scaleExtent([0.1,8]).on("zoom",(e)=>{{ g.attr("transform",e.t
 }
 
 impl crate::core::nt_core_self_test::SelfTest for SecondBrain {
-    fn name(&self) -> &str { "second_brain" }
+    fn name(&self) -> &str {
+        "second_brain"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let failures = Vec::new();
         if !self.is_attached() {
@@ -448,7 +478,11 @@ impl crate::core::nt_core_self_test::SelfTest for SecondBrain {
             brain.auto_sync_enabled = false;
             let _ = brain.status();
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -458,8 +492,14 @@ mod tests {
 
     #[test]
     fn test_brain_relation_types() {
-        assert_eq!(BrainRelationType::TemporalSequence.as_str(), "temporal_sequence");
-        assert_eq!(BrainRelationType::EmotionalAffinity.as_str(), "emotional_affinity");
+        assert_eq!(
+            BrainRelationType::TemporalSequence.as_str(),
+            "temporal_sequence"
+        );
+        assert_eq!(
+            BrainRelationType::EmotionalAffinity.as_str(),
+            "emotional_affinity"
+        );
     }
 
     #[test]
@@ -497,12 +537,27 @@ mod tests {
     fn test_generate_html_no_crash() {
         let graph = BrainWikiGraph {
             nodes: vec![
-                BrainGraphNode { id: "1".into(), title: "A".into(), node_type: "wiki".into(), importance: 0.5, summary: "".into() },
-                BrainGraphNode { id: "2".into(), title: "B".into(), node_type: "note".into(), importance: 0.8, summary: "".into() },
+                BrainGraphNode {
+                    id: "1".into(),
+                    title: "A".into(),
+                    node_type: "wiki".into(),
+                    importance: 0.5,
+                    summary: "".into(),
+                },
+                BrainGraphNode {
+                    id: "2".into(),
+                    title: "B".into(),
+                    node_type: "note".into(),
+                    importance: 0.8,
+                    summary: "".into(),
+                },
             ],
-            edges: vec![
-                BrainGraphEdge { source: "1".into(), target: "2".into(), relation: "link".into(), weight: 0.7 },
-            ],
+            edges: vec![BrainGraphEdge {
+                source: "1".into(),
+                target: "2".into(),
+                relation: "link".into(),
+                weight: 0.7,
+            }],
             emotion_kv: HashMap::new(),
         };
         let html = generate_brain_graph_html(&graph);
@@ -554,11 +609,20 @@ mod tests {
     #[test]
     fn test_emotion_engine_serde_roundtrip() {
         let mut engine = crate::core::nt_core_self::emotion_state::EmotionEngine::default();
-        engine.observe(crate::core::nt_core_self::emotion_state::EmotionDimension::Confidence, 0.8, "test");
-        engine.observe(crate::core::nt_core_self::emotion_state::EmotionDimension::Curiosity, 0.6, "explore");
+        engine.observe(
+            crate::core::nt_core_self::emotion_state::EmotionDimension::Confidence,
+            0.8,
+            "test",
+        );
+        engine.observe(
+            crate::core::nt_core_self::emotion_state::EmotionDimension::Curiosity,
+            0.6,
+            "explore",
+        );
         engine.tick();
         let json = engine.to_json().expect("to_json");
-        let deser = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json).expect("from_json");
+        let deser = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json)
+            .expect("from_json");
         let r1 = engine.report();
         let r2 = deser.report();
         assert!((r1.confidence - r2.confidence).abs() < 0.01);

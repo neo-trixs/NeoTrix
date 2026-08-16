@@ -29,7 +29,11 @@ pub struct MediaScore {
 
 pub trait MediaCapability: Send + Sync {
     fn modality(&self) -> Modality;
-    fn produce(&self, prompt: &[f64], params: &std::collections::HashMap<String, String>) -> Result<MediaOutput, String>;
+    fn produce(
+        &self,
+        prompt: &[f64],
+        params: &std::collections::HashMap<String, String>,
+    ) -> Result<MediaOutput, String>;
     fn score(&self, output: &MediaOutput) -> MediaScore;
     fn embed(&self, output: &MediaOutput) -> Result<Vec<f64>, String>;
     fn name(&self) -> &str;
@@ -52,7 +56,9 @@ pub struct MediaCapabilityDescriptor {
 
 impl MediaRegistry {
     pub fn new() -> Self {
-        Self { capabilities: Vec::new() }
+        Self {
+            capabilities: Vec::new(),
+        }
     }
 
     pub fn register(&mut self, desc: MediaCapabilityDescriptor) {
@@ -60,16 +66,23 @@ impl MediaRegistry {
     }
 
     pub fn find_by_modality(&self, modality: &Modality) -> Vec<&MediaCapabilityDescriptor> {
-        self.capabilities.iter()
+        self.capabilities
+            .iter()
             .filter(|c| c.modality == *modality && c.is_available)
             .collect()
     }
 
     pub fn best_for_modality(&self, modality: &Modality) -> Option<&MediaCapabilityDescriptor> {
-        let mut candidates: Vec<&MediaCapabilityDescriptor> = self.capabilities.iter()
+        let mut candidates: Vec<&MediaCapabilityDescriptor> = self
+            .capabilities
+            .iter()
             .filter(|c| c.modality == *modality && c.is_available)
             .collect();
-        candidates.sort_by(|a, b| b.quality_score.partial_cmp(&a.quality_score).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| {
+            b.quality_score
+                .partial_cmp(&a.quality_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         candidates.into_iter().next()
     }
 
@@ -100,7 +113,12 @@ mod tests {
 
     #[test]
     fn test_media_score_defaults() {
-        let s = MediaScore { overall: 0.85, relevance: 0.9, quality: 0.8, coherence: 0.85 };
+        let s = MediaScore {
+            overall: 0.85,
+            relevance: 0.9,
+            quality: 0.8,
+            coherence: 0.85,
+        };
         assert!((s.overall - 0.85).abs() < 1e-10);
     }
 
@@ -108,14 +126,20 @@ mod tests {
     fn test_media_registry_register_and_find() {
         let mut reg = MediaRegistry::new();
         reg.register(MediaCapabilityDescriptor {
-            name: "sd-txt2img".into(), modality: Modality::Image,
-            provider: "Stable Diffusion MCP".into(), is_available: true,
-            avg_latency_ms: 2500.0, quality_score: 0.85,
+            name: "sd-txt2img".into(),
+            modality: Modality::Image,
+            provider: "Stable Diffusion MCP".into(),
+            is_available: true,
+            avg_latency_ms: 2500.0,
+            quality_score: 0.85,
         });
         reg.register(MediaCapabilityDescriptor {
-            name: "voicebox-tts".into(), modality: Modality::Audio,
-            provider: "Voicebox MCP".into(), is_available: true,
-            avg_latency_ms: 800.0, quality_score: 0.92,
+            name: "voicebox-tts".into(),
+            modality: Modality::Audio,
+            provider: "Voicebox MCP".into(),
+            is_available: true,
+            avg_latency_ms: 800.0,
+            quality_score: 0.92,
         });
         let images = reg.find_by_modality(&Modality::Image);
         assert_eq!(images.len(), 1);
@@ -127,14 +151,20 @@ mod tests {
     fn test_best_for_modality_returns_highest_quality() {
         let mut reg = MediaRegistry::new();
         reg.register(MediaCapabilityDescriptor {
-            name: "fast".into(), modality: Modality::Text,
-            provider: "P1".into(), is_available: true,
-            avg_latency_ms: 100.0, quality_score: 0.7,
+            name: "fast".into(),
+            modality: Modality::Text,
+            provider: "P1".into(),
+            is_available: true,
+            avg_latency_ms: 100.0,
+            quality_score: 0.7,
         });
         reg.register(MediaCapabilityDescriptor {
-            name: "quality".into(), modality: Modality::Text,
-            provider: "P2".into(), is_available: true,
-            avg_latency_ms: 500.0, quality_score: 0.95,
+            name: "quality".into(),
+            modality: Modality::Text,
+            provider: "P2".into(),
+            is_available: true,
+            avg_latency_ms: 500.0,
+            quality_score: 0.95,
         });
         let best = reg.best_for_modality(&Modality::Text).unwrap();
         assert_eq!(best.name, "quality");
@@ -144,9 +174,12 @@ mod tests {
     fn test_find_by_modality_ignores_unavailable() {
         let mut reg = MediaRegistry::new();
         reg.register(MediaCapabilityDescriptor {
-            name: "offline".into(), modality: Modality::Video,
-            provider: "Offline".into(), is_available: false,
-            avg_latency_ms: 0.0, quality_score: 0.9,
+            name: "offline".into(),
+            modality: Modality::Video,
+            provider: "Offline".into(),
+            is_available: false,
+            avg_latency_ms: 0.0,
+            quality_score: 0.9,
         });
         let videos = reg.find_by_modality(&Modality::Video);
         assert!(videos.is_empty());

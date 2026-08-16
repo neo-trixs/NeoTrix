@@ -3,6 +3,7 @@
 
 pub mod fingerprint;   // Canvas/WebGL/UA随机化
 pub mod camofox;     // Camofox集成、自愈DOM、Stealth
+pub mod agentic_browse; // Agentic浏览器任务循环 (browser-use + firecrawl吸收)
 
 use neotrix_types::core::CapabilityVector;
 

@@ -155,16 +155,30 @@ impl DifficultyEstimator {
     /// Count constraint-indicating keywords in the prompt.
     fn count_constraints(prompt: &str) -> usize {
         let indicators = [
-            "must", "should", "required", "need", "cannot", "can't",
-            "constraint", "condition", "ensure", "guarantee", "rule",
-            "if", "unless", "except", "only", "minimum", "maximum",
-            "at least", "at most", "not allowed", "forbidden",
+            "must",
+            "should",
+            "required",
+            "need",
+            "cannot",
+            "can't",
+            "constraint",
+            "condition",
+            "ensure",
+            "guarantee",
+            "rule",
+            "if",
+            "unless",
+            "except",
+            "only",
+            "minimum",
+            "maximum",
+            "at least",
+            "at most",
+            "not allowed",
+            "forbidden",
         ];
         let lower = prompt.to_lowercase();
-        indicators
-            .iter()
-            .filter(|&&kw| lower.contains(kw))
-            .count()
+        indicators.iter().filter(|&&kw| lower.contains(kw)).count()
     }
 }
 
@@ -222,8 +236,9 @@ impl BudgetStats {
 
     fn update_compute_saved(&mut self, total_fixed_cost: f64, total_actual_cost: f64) {
         if total_fixed_cost > 0.0 {
-            self.compute_saved_ratio =
-                ((total_fixed_cost - total_actual_cost) / total_fixed_cost).max(0.0).min(1.0);
+            self.compute_saved_ratio = ((total_fixed_cost - total_actual_cost) / total_fixed_cost)
+                .max(0.0)
+                .min(1.0);
         }
     }
 }
@@ -282,7 +297,11 @@ impl ThinkingBudget {
     pub fn allocate(&self, prompt: &str, task_type: &str) -> usize {
         match &self.budget_type {
             BudgetType::Fixed(n) => *n,
-            BudgetType::Adaptive { easy_budget, medium_budget, hard_budget } => {
+            BudgetType::Adaptive {
+                easy_budget,
+                medium_budget,
+                hard_budget,
+            } => {
                 let difficulty = self.estimate_difficulty(prompt, task_type);
                 if difficulty < 0.33 {
                     *easy_budget
@@ -393,7 +412,10 @@ mod tests {
         let prompt = "Write a recursive Fibonacci function in Rust and analyze its time complexity. Ensure it handles large inputs efficiently. Must be tail-recursive. Need to compare with iterative approach. Must handle edge cases like overflow. Must implement memoization for performance. Cannot use recursion without caching. Must guarantee constant-time lookups. Should minimize memory usage. Must not use dynamic dispatch.";
         let steps = budget.allocate(prompt, "code");
         // Hard-ish prompt lands on medium budget (16) by heuristic
-        assert!(steps >= 16, "expected >= 16 for code+constraints prompt, got {steps}");
+        assert!(
+            steps >= 16,
+            "expected >= 16 for code+constraints prompt, got {steps}"
+        );
     }
 
     #[test]
@@ -434,7 +456,10 @@ mod tests {
              network overhead while maximizing parallelism across distributed nodes.",
             "code",
         );
-        assert!(d > 0.3, "Hard coding task should have moderate difficulty, got {d}");
+        assert!(
+            d > 0.3,
+            "Hard coding task should have moderate difficulty, got {d}"
+        );
     }
 
     #[test]

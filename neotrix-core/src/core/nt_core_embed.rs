@@ -3,17 +3,15 @@ use std::collections::HashMap;
 pub const EMBEDDING_DIM: usize = 64;
 
 static STOP_WORDS: &[&str] = &[
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "dare", "ought",
-    "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
-    "as", "into", "through", "during", "before", "after", "above", "below",
-    "between", "out", "off", "over", "under", "again", "further", "then",
-    "once", "here", "there", "when", "where", "why", "how", "all", "each",
-    "every", "both", "few", "more", "most", "other", "some", "such", "no",
-    "nor", "not", "only", "own", "same", "so", "than", "too", "very",
-    "just", "because", "but", "and", "or", "if", "while", "that", "this",
-    "these", "those", "it", "its", "what", "which", "who", "whom",
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall", "can",
+    "need", "dare", "ought", "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
+    "as", "into", "through", "during", "before", "after", "above", "below", "between", "out",
+    "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where",
+    "why", "how", "all", "each", "every", "both", "few", "more", "most", "other", "some", "such",
+    "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "just", "because",
+    "but", "and", "or", "if", "while", "that", "this", "these", "those", "it", "its", "what",
+    "which", "who", "whom",
 ];
 
 fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
@@ -77,7 +75,11 @@ impl TextEmbedder {
         cosine_similarity(&va, &vb)
     }
 
-    pub fn find_most_similar<'a>(&mut self, query: &str, candidates: &[&'a str]) -> Option<(usize, f64, &'a str)> {
+    pub fn find_most_similar<'a>(
+        &mut self,
+        query: &str,
+        candidates: &[&'a str],
+    ) -> Option<(usize, f64, &'a str)> {
         if candidates.is_empty() {
             return None;
         }

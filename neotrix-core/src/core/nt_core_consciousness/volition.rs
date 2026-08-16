@@ -57,7 +57,9 @@ impl VolitionEngine {
     pub fn propose(&mut self, candidate: ActionCandidate) {
         if self.candidates.len() >= MAX_CANDIDATES {
             self.candidates.sort_by(|a, b| {
-                b.expected_value.partial_cmp(&a.expected_value).unwrap_or(std::cmp::Ordering::Equal)
+                b.expected_value
+                    .partial_cmp(&a.expected_value)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
             if let Some(last) = self.candidates.last() {
                 if candidate.expected_value > last.expected_value {
@@ -85,7 +87,9 @@ impl VolitionEngine {
             candidate.expected_value = value;
         }
         self.candidates.sort_by(|a, b| {
-            b.expected_value.partial_cmp(&a.expected_value).unwrap_or(std::cmp::Ordering::Equal)
+            b.expected_value
+                .partial_cmp(&a.expected_value)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         self.selection_count += 1;
         Some(self.candidates.remove(0))
@@ -104,7 +108,9 @@ impl VolitionEngine {
             candidate.expected_value = candidate.expected_value * 0.5 + goal_sim * 0.5;
         }
         self.candidates.sort_by(|a, b| {
-            b.expected_value.partial_cmp(&a.expected_value).unwrap_or(std::cmp::Ordering::Equal)
+            b.expected_value
+                .partial_cmp(&a.expected_value)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         self.selection_count += 1;
         Some(self.candidates.remove(0))
@@ -221,8 +227,7 @@ mod tests {
     fn test_evaluate_outcome_accuracy() {
         let mut ve = VolitionEngine::new();
         let action = vec![1; 100];
-        let candidate = ActionCandidate::new(action.clone(), "test")
-            .with_prediction(vec![1; 100]);
+        let candidate = ActionCandidate::new(action.clone(), "test").with_prediction(vec![1; 100]);
         let accuracy = ve.evaluate_outcome(&candidate, &vec![1; 100]);
         assert!((accuracy - 1.0).abs() < 1e-10);
     }

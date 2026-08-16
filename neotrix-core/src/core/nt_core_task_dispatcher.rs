@@ -7,14 +7,15 @@
 /// 4. 智能选择合适的 LLM 模型/策略执行子任务
 /// 5. 自动聚合子任务结果，生成最终答案
 /// 6. 对用户完全隐藏意识核心内部实现细节（E8、CRT、GWT 等）
-
-use crate::core::l7_capability::nt_core_antidistil::decompose::{TaskDecomposer, DecomposeSuggestion};
-use crate::core::nt_core_crt::{CrtTimeScale, CrtPlan};
-use crate::core::nt_core_reasoning::{ReasoningMethod, TraceSource};
-use crate::core::nt_core_cot_generator::{CoTGenerator, DefaultCoTGenerator, CoTConfig};
-use crate::neotrix::{LlmProvider, LlmRequest, Message, Role, ReasoningKernel, KERNEL_DIM, Vector};
-use crate::neotrix::l8_autonomic_impl::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
+use crate::core::l7_capability::nt_core_antidistil::decompose::{
+    DecomposeSuggestion, TaskDecomposer,
+};
+use crate::core::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGenerator};
+use crate::core::nt_core_crt::{CrtPlan, CrtTimeScale};
 use crate::core::nt_core_policy::E8Policy;
+use crate::core::nt_core_reasoning::{ReasoningMethod, TraceSource};
+use crate::neotrix::l8_autonomic_impl::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
+use crate::neotrix::{LlmProvider, LlmRequest, Message, ReasoningKernel, Role, Vector, KERNEL_DIM};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -26,14 +27,14 @@ pub struct SubTask {
     pub id: String,
     pub title: String,
     pub description: String,
-    pub prompt: String,           // 发送给 LLM 的精准提示词
-    pub context: HashMap<String, String>, // 上下文信息
-    pub priority: u8,             // 优先级 1-10
-    pub estimated_complexity: f64, // 0.0-1.0
+    pub prompt: String,                     // 发送给 LLM 的精准提示词
+    pub context: HashMap<String, String>,   // 上下文信息
+    pub priority: u8,                       // 优先级 1-10
+    pub estimated_complexity: f64,          // 0.0-1.0
     pub required_capabilities: Vec<String>, // 所需能力标签
-    pub dependencies: Vec<String>, // 依赖的子任务 ID
-    pub crt_scale: CrtTimeScale,  // 所属 CRT 时间尺度
-    pub hexagram_bias: Option<u8>, // E8 hexagram 偏好
+    pub dependencies: Vec<String>,          // 依赖的子任务 ID
+    pub crt_scale: CrtTimeScale,            // 所属 CRT 时间尺度
+    pub hexagram_bias: Option<u8>,          // E8 hexagram 偏好
 }
 
 /// 任务拆解结果
@@ -44,7 +45,7 @@ pub struct DecompositionResult {
     pub execution_order: Vec<String>, // 执行顺序（拓扑排序）
     pub crt_plan: CrtPlan,
     pub estimated_total_time: f64, // 预估总耗时（秒）
-    pub confidence: f64, // 拆解置信度 0.0-1.0
+    pub confidence: f64,           // 拆解置信度 0.0-1.0
 }
 
 /// 子任务执行结果
@@ -163,7 +164,10 @@ impl DispatcherConfig {
 impl TaskDecomposerDispatcher {
     pub fn new(provider: Arc<dyn LlmProvider>, config: DispatcherConfig) -> Self {
         let cot_generator = if config.enable_cot {
-            Some(DefaultCoTGenerator::new(provider.clone(), CoTConfig::default()))
+            Some(DefaultCoTGenerator::new(
+                provider.clone(),
+                CoTConfig::default(),
+            ))
         } else {
             None
         };
@@ -215,7 +219,10 @@ impl TaskDecomposerDispatcher {
     }
 
     /// 仅拆解任务（不执行）
-    pub async fn decompose_task(&self, task: &str) -> Result<DecompositionResult, TaskDispatchError> {
+    pub async fn decompose_task(
+        &self,
+        task: &str,
+    ) -> Result<DecompositionResult, TaskDispatchError> {
         // 1. 使用现有的 TaskDecomposer 进行基础拆解
         let suggestions = TaskDecomposer::analyze(task, self.config.decomposition_aggression);
 
@@ -225,7 +232,9 @@ impl TaskDecomposerDispatcher {
         crt_plan.decompose();
 
         // 3. 生成子任务
-        let sub_tasks = self.generate_sub_tasks(task, &suggestions, &crt_plan).await?;
+        let sub_tasks = self
+            .generate_sub_tasks(task, &suggestions, &crt_plan)
+            .await?;
 
         // 3. 确定执行顺序（拓扑排序）
         let execution_order = self.topological_sort(&sub_tasks);
@@ -250,11 +259,21 @@ impl TaskDecomposerDispatcher {
         let word_count = task.split_whitespace().count();
 
         // 关键词启发式判断
-        if lower.contains("strategic") || lower.contains("roadmap") || lower.contains("architecture") ||
-           lower.contains("long-term") || lower.contains("year") || word_count > 100 {
+        if lower.contains("strategic")
+            || lower.contains("roadmap")
+            || lower.contains("architecture")
+            || lower.contains("long-term")
+            || lower.contains("year")
+            || word_count > 100
+        {
             CrtTimeScale::Xuanye
-        } else if lower.contains("plan") || lower.contains("design") || lower.contains("implement") ||
-                  lower.contains("week") || lower.contains("month") || word_count > 30 {
+        } else if lower.contains("plan")
+            || lower.contains("design")
+            || lower.contains("implement")
+            || lower.contains("week")
+            || lower.contains("month")
+            || word_count > 30
+        {
             CrtTimeScale::Huntian
         } else {
             CrtTimeScale::Gaitian
@@ -285,12 +304,9 @@ impl TaskDecomposerDispatcher {
                     break;
                 }
 
-                let sub_task = self.create_sub_task_from_suggestion(
-                    task,
-                    suggestion,
-                    i,
-                    crt_plan,
-                ).await?;
+                let sub_task = self
+                    .create_sub_task_from_suggestion(task, suggestion, i, crt_plan)
+                    .await?;
                 sub_tasks.push(sub_task);
             }
         }
@@ -365,7 +381,10 @@ Output ONLY the JSON array, no extra text."#,
         let request = LlmRequest {
             model: "default".to_string(),
             messages: vec![
-                Message::new(Role::System, "You are an expert task decomposition assistant."),
+                Message::new(
+                    Role::System,
+                    "You are an expert task decomposition assistant.",
+                ),
                 Message::new(Role::User, &prompt),
             ],
             temperature: Some(0.3),
@@ -378,7 +397,9 @@ Output ONLY the JSON array, no extra text."#,
             structured_output: None,
         };
 
-        let response = provider.complete(&request).await
+        let response = provider
+            .complete(&request)
+            .await
             .map_err(|e| TaskDispatchError::LlmError(e.to_string()))?;
 
         let text = response.content;
@@ -389,7 +410,12 @@ Output ONLY the JSON array, no extra text."#,
     }
 
     /// 为子任务构建精准提示词
-    fn build_sub_task_prompt(&self, original_task: &str, suggestion: &DecomposeSuggestion, index: usize) -> String {
+    fn build_sub_task_prompt(
+        &self,
+        original_task: &str,
+        suggestion: &DecomposeSuggestion,
+        index: usize,
+    ) -> String {
         format!(
             r#"You are executing a subtask as part of a larger task decomposition.
 
@@ -419,22 +445,29 @@ Output your result for this subtask only."#,
             // 根据子任务在计划中的位置分配 CRT 尺度
             sub_task.crt_scale = match crt_plan.scale {
                 CrtTimeScale::Xuanye => {
-                    if i < 4 { CrtTimeScale::Xuanye }
-                    else if i < 8 { CrtTimeScale::Huntian }
-                    else { CrtTimeScale::Gaitian }
+                    if i < 4 {
+                        CrtTimeScale::Xuanye
+                    } else if i < 8 {
+                        CrtTimeScale::Huntian
+                    } else {
+                        CrtTimeScale::Gaitian
+                    }
                 }
                 CrtTimeScale::Huntian => {
-                    if i < 3 { CrtTimeScale::Huntian }
-                    else { CrtTimeScale::Gaitian }
+                    if i < 3 {
+                        CrtTimeScale::Huntian
+                    } else {
+                        CrtTimeScale::Gaitian
+                    }
                 }
                 CrtTimeScale::Gaitian => CrtTimeScale::Gaitian,
             };
 
             // 根据 CRT 尺度分配 hexagram 偏好
             sub_task.hexagram_bias = Some(match sub_task.crt_scale {
-                CrtTimeScale::Gaitian => 3,   // 0-7: analytical, concrete
-                CrtTimeScale::Huntian => 27,  // 24-31: balanced
-                CrtTimeScale::Xuanye => 51,   // 48-55: abstract, strategic
+                CrtTimeScale::Gaitian => 3,  // 0-7: analytical, concrete
+                CrtTimeScale::Huntian => 27, // 24-31: balanced
+                CrtTimeScale::Xuanye => 51,  // 48-55: abstract, strategic
             });
         }
     }
@@ -443,13 +476,20 @@ Output your result for this subtask only."#,
     fn select_crt_scale_for_subtask(&self, index: usize, crt_plan: &CrtPlan) -> CrtTimeScale {
         match crt_plan.scale {
             CrtTimeScale::Xuanye => {
-                if index < 4 { CrtTimeScale::Xuanye }
-                else if index < 8 { CrtTimeScale::Huntian }
-                else { CrtTimeScale::Gaitian }
+                if index < 4 {
+                    CrtTimeScale::Xuanye
+                } else if index < 8 {
+                    CrtTimeScale::Huntian
+                } else {
+                    CrtTimeScale::Gaitian
+                }
             }
             CrtTimeScale::Huntian => {
-                if index < 3 { CrtTimeScale::Huntian }
-                else { CrtTimeScale::Gaitian }
+                if index < 3 {
+                    CrtTimeScale::Huntian
+                } else {
+                    CrtTimeScale::Gaitian
+                }
             }
             CrtTimeScale::Gaitian => CrtTimeScale::Gaitian,
         }
@@ -513,34 +553,49 @@ Output your result for this subtask only."#,
     }
 
     /// 计算拆解置信度
-    fn calculate_confidence(&self, sub_tasks: &[SubTask], suggestions: &Option<Vec<DecomposeSuggestion>>) -> f64 {
+    fn calculate_confidence(
+        &self,
+        sub_tasks: &[SubTask],
+        suggestions: &Option<Vec<DecomposeSuggestion>>,
+    ) -> f64 {
         let base = 0.5;
-        let suggestion_bonus = suggestions.as_ref().map(|s| s.len() as f64 * 0.1).unwrap_or(0.0);
+        let suggestion_bonus = suggestions
+            .as_ref()
+            .map(|s| s.len() as f64 * 0.1)
+            .unwrap_or(0.0);
         let task_count_bonus = (sub_tasks.len() as f64 * 0.05).min(0.3);
         (base + suggestion_bonus + task_count_bonus).min(1.0)
     }
 
     /// 估算总耗时
     fn estimate_total_time(&self, sub_tasks: &[SubTask]) -> f64 {
-        sub_tasks.iter()
+        sub_tasks
+            .iter()
             .map(|t| t.estimated_complexity * 30.0) // 每个子任务基础 30 秒
             .sum::<f64>()
             .min(1800.0) // 最大 30 分钟
     }
 
     /// 执行子任务
-    async fn execute_sub_tasks(&mut self, decomposition: &DecompositionResult) -> Result<Vec<SubTaskResult>, TaskDispatchError> {
+    async fn execute_sub_tasks(
+        &mut self,
+        decomposition: &DecompositionResult,
+    ) -> Result<Vec<SubTaskResult>, TaskDispatchError> {
         let mut results = Vec::new();
         let mut completed = HashMap::new();
 
         for task_id in &decomposition.execution_order {
             if let Some(sub_task) = decomposition.sub_tasks.iter().find(|t| t.id == *task_id) {
                 // 检查依赖是否满足
-                let deps_satisfied = sub_task.dependencies.iter().all(|dep| completed.contains_key(dep));
+                let deps_satisfied = sub_task
+                    .dependencies
+                    .iter()
+                    .all(|dep| completed.contains_key(dep));
                 if !deps_satisfied {
                     // 依赖未满足，跳过稍后重试（简化处理：这里直接报错）
                     return Err(TaskDispatchError::DependencyNotMet(format!(
-                        "Task {} has unmet dependencies", sub_task.id
+                        "Task {} has unmet dependencies",
+                        sub_task.id
                     )));
                 }
 
@@ -558,7 +613,11 @@ Output your result for this subtask only."#,
     }
 
     /// 构建执行上下文
-    fn build_execution_context(&self, sub_task: &SubTask, completed: &HashMap<String, SubTaskResult>) -> HashMap<String, String> {
+    fn build_execution_context(
+        &self,
+        sub_task: &SubTask,
+        completed: &HashMap<String, SubTaskResult>,
+    ) -> HashMap<String, String> {
         let mut context = sub_task.context.clone();
 
         // 添加已完成任务的结果作为上下文
@@ -570,7 +629,11 @@ Output your result for this subtask only."#,
     }
 
     /// 执行单个子任务
-    async fn execute_single_sub_task(&mut self, sub_task: &SubTask, context: &HashMap<String, String>) -> Result<SubTaskResult, TaskDispatchError> {
+    async fn execute_single_sub_task(
+        &mut self,
+        sub_task: &SubTask,
+        context: &HashMap<String, String>,
+    ) -> Result<SubTaskResult, TaskDispatchError> {
         let start = SystemTime::now();
 
         // ── E8 预测驱动分发 (P0: 高置信本地执行 / 低置信分发 LLM) ──────────
@@ -578,7 +641,9 @@ Output your result for this subtask only."#,
         // 高置信 + 确定性分类 → 走本地 kernel 快路径 (省 LLM 推理预算);
         // 其余情况回退到原有策略链。每次执行后观察实际转移并持久化
         // (The Spice Must Flow: 观测 → 预测 → 决策 → 再观测闭环)。
-        use crate::core::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};
+        use crate::core::nt_core_e8_predictor::{
+            load as predictor_load, persist as predictor_persist,
+        };
         let mut predictor = predictor_load();
         let current_state = sub_task.hexagram_bias.unwrap_or(0) & 0x3f;
         let (predicted_next, pred_confidence) = predictor.predict_next(current_state);
@@ -587,7 +652,10 @@ Output your result for this subtask only."#,
 
         // 选择执行策略 (H8: 确定性任务走代码/kernel 快路径, 推理任务走 LLM 链)
         let class = classify_sub_task(sub_task);
-        let result = if pred_confidence >= 0.65 && class == SubTaskClass::Deterministic && self.kernel.is_some() {
+        let result = if pred_confidence >= 0.65
+            && class == SubTaskClass::Deterministic
+            && self.kernel.is_some()
+        {
             // 预测高置信 + 确定性: 本地 kernel 结构化执行 (E8 预测增强快路径)
             self.execute_with_kernel(sub_task, context).await
         } else if class == SubTaskClass::Deterministic && self.kernel.is_some() {
@@ -608,12 +676,19 @@ Output your result for this subtask only."#,
         };
 
         // 观察实际执行结果: 成功 → 记录预测-实际转移 (current → predicted/实际成功态)
-        let outcome_state = if result.is_ok() { predicted_next } else { current_state };
+        let outcome_state = if result.is_ok() {
+            predicted_next
+        } else {
+            current_state
+        };
         let actual_trace = vec![current_state, outcome_state];
         predictor.observe_trace(&actual_trace);
         predictor_persist(&predictor);
 
-        let duration = SystemTime::now().duration_since(start).unwrap_or_default().as_millis() as u64;
+        let duration = SystemTime::now()
+            .duration_since(start)
+            .unwrap_or_default()
+            .as_millis() as u64;
 
         match result {
             Ok(output) => Ok(SubTaskResult {
@@ -638,15 +713,23 @@ Output your result for this subtask only."#,
     }
 
     /// 使用 CoT 生成器执行
-    async fn execute_with_cot(&mut self, sub_task: &SubTask, _context: &HashMap<String, String>) -> Result<String, TaskDispatchError> {
-        let cot_context: HashMap<String, Vector> = sub_task.context.iter()
+    async fn execute_with_cot(
+        &mut self,
+        sub_task: &SubTask,
+        _context: &HashMap<String, String>,
+    ) -> Result<String, TaskDispatchError> {
+        let cot_context: HashMap<String, Vector> = sub_task
+            .context
+            .iter()
             .map(|(k, v)| (k.clone(), self.text_to_vector(v, KERNEL_DIM)))
             .collect();
         let kernel_trace = crate::core::nt_core_reasoning::ReasoningTrace {
             trace_id: format!("cot_{}", uuid::Uuid::new_v4().simple()),
             task: sub_task.title.clone(),
             method: ReasoningMethod::Deductive,
-            hexagram: crate::core::nt_core_hex::ReasoningHexagram::new(sub_task.hexagram_bias.unwrap_or(0)),
+            hexagram: crate::core::nt_core_hex::ReasoningHexagram::new(
+                sub_task.hexagram_bias.unwrap_or(0),
+            ),
             stage: sub_task.crt_scale as usize,
             steps: Vec::new(),
             intermediate_states: Vec::new(),
@@ -654,48 +737,85 @@ Output your result for this subtask only."#,
             final_quality: 0.5,
             llm_response: None,
             source: TraceSource::LLMDriven,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         };
 
-        let cot_gen = self.cot_generator.as_mut().ok_or(TaskDispatchError::ConfigError("CoT generator not initialized".to_string()))?;
-        let cot_output = cot_gen.generate_cot(&sub_task.prompt, &kernel_trace, Some(cot_context)).await
+        let cot_gen = self
+            .cot_generator
+            .as_mut()
+            .ok_or(TaskDispatchError::ConfigError(
+                "CoT generator not initialized".to_string(),
+            ))?;
+        let cot_output = cot_gen
+            .generate_cot(&sub_task.prompt, &kernel_trace, Some(cot_context))
+            .await
             .map_err(|e| TaskDispatchError::CotError(e.to_string()))?;
 
         Ok(cot_output.final_answer)
     }
 
     /// 使用 Reasoning Engine 执行
-    async fn execute_with_reasoning_engine(&mut self, sub_task: &SubTask, _context: &HashMap<String, String>) -> Result<String, TaskDispatchError> {
+    async fn execute_with_reasoning_engine(
+        &mut self,
+        sub_task: &SubTask,
+        _context: &HashMap<String, String>,
+    ) -> Result<String, TaskDispatchError> {
         let full_prompt = self.build_full_prompt(sub_task, &HashMap::new());
 
-        let engine = self.reasoning_engine.as_mut().ok_or(TaskDispatchError::ConfigError("Reasoning engine not initialized".to_string()))?;
-        engine.reason(&full_prompt)
+        let engine = self
+            .reasoning_engine
+            .as_mut()
+            .ok_or(TaskDispatchError::ConfigError(
+                "Reasoning engine not initialized".to_string(),
+            ))?;
+        engine
+            .reason(&full_prompt)
             .map_err(|e| TaskDispatchError::ReasoningError(e.to_string()))
     }
 
     /// 使用 Kernel 执行
-    async fn execute_with_kernel(&mut self, sub_task: &SubTask, context: &HashMap<String, String>) -> Result<String, TaskDispatchError> {
+    async fn execute_with_kernel(
+        &mut self,
+        sub_task: &SubTask,
+        context: &HashMap<String, String>,
+    ) -> Result<String, TaskDispatchError> {
         // 将提示词转为向量
         let query = self.text_to_vector(&sub_task.prompt, KERNEL_DIM);
-        let kernel_context: HashMap<String, Vector> = context.iter()
+        let kernel_context: HashMap<String, Vector> = context
+            .iter()
             .map(|(k, v)| (k.clone(), self.text_to_vector(v, KERNEL_DIM)))
             .collect();
 
-        let kernel = self.kernel.as_mut().ok_or(TaskDispatchError::ConfigError("Kernel not initialized".to_string()))?;
+        let kernel = self.kernel.as_mut().ok_or(TaskDispatchError::ConfigError(
+            "Kernel not initialized".to_string(),
+        ))?;
         let output = kernel.reason(&query, Some(kernel_context), None);
 
         // 将向量转回文本（简化）
-        Ok(format!("Kernel output: confidence={:.2}, method={:?}", output.confidence, output.trace.method))
+        Ok(format!(
+            "Kernel output: confidence={:.2}, method={:?}",
+            output.confidence, output.trace.method
+        ))
     }
 
     /// 直接调用 LLM
-    async fn execute_direct_llm(&self, sub_task: &SubTask, context: &HashMap<String, String>) -> Result<String, TaskDispatchError> {
+    async fn execute_direct_llm(
+        &self,
+        sub_task: &SubTask,
+        context: &HashMap<String, String>,
+    ) -> Result<String, TaskDispatchError> {
         let full_prompt = self.build_full_prompt(sub_task, context);
 
         let request = LlmRequest {
             model: "default".to_string(),
             messages: vec![
-                Message::new(Role::System, "You are a helpful assistant executing a specific subtask."),
+                Message::new(
+                    Role::System,
+                    "You are a helpful assistant executing a specific subtask.",
+                ),
                 Message::new(Role::User, &full_prompt),
             ],
             temperature: Some(0.3),
@@ -708,7 +828,10 @@ Output your result for this subtask only."#,
             structured_output: None,
         };
 
-        let response = self.provider.complete(&request).await
+        let response = self
+            .provider
+            .complete(&request)
+            .await
             .map_err(|e| TaskDispatchError::LlmError(e.to_string()))?;
 
         Ok(response.content)
@@ -731,17 +854,26 @@ Output your result for this subtask only."#,
 
         // 如果隐藏内部细节，不添加技术细节
         if !self.config.hide_internal_details {
-            prompt.push_str(&format!("\n\n[Internal: CRT={:?}, Hexagram={:?}]", sub_task.crt_scale, sub_task.hexagram_bias));
+            prompt.push_str(&format!(
+                "\n\n[Internal: CRT={:?}, Hexagram={:?}]",
+                sub_task.crt_scale, sub_task.hexagram_bias
+            ));
         }
 
         sub_task.prompt.clone()
     }
 
     /// 聚合结果 (H4-H6): 调用确定性 Reducer 压缩输入, 注入一致性/矛盾信号后交 LLM 综合。
-    async fn aggregate_results(&self, decomposition: &DecompositionResult, results: &[SubTaskResult]) -> Result<String, TaskDispatchError> {
+    async fn aggregate_results(
+        &self,
+        decomposition: &DecompositionResult,
+        results: &[SubTaskResult],
+    ) -> Result<String, TaskDispatchError> {
         let successful: Vec<_> = results.iter().filter(|r| r.success).collect();
         if successful.is_empty() {
-            return Err(TaskDispatchError::ExecutionError("All sub-tasks failed".to_string()));
+            return Err(TaskDispatchError::ExecutionError(
+                "All sub-tasks failed".to_string(),
+            ));
         }
 
         // 确定性 Reducer: 过滤 malformed / 去重归并 / 组内保留最高 confidence / 一致性显式化
@@ -766,9 +898,19 @@ If some sub-tasks failed, note what's missing but provide the best answer possib
 Output ONLY the final synthesized answer."#,
             decomposition.original_task,
             field_signals,
-            results.iter().enumerate().map(|(i, r)| {
-                format!("{}. {}: {}", i + 1, if r.success { "SUCCESS" } else { "FAILED" }, r.output)
-            }).collect::<Vec<_>>().join("\n\n")
+            results
+                .iter()
+                .enumerate()
+                .map(|(i, r)| {
+                    format!(
+                        "{}. {}: {}",
+                        i + 1,
+                        if r.success { "SUCCESS" } else { "FAILED" },
+                        r.output
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n")
         );
 
         let request = LlmRequest {
@@ -787,7 +929,10 @@ Output ONLY the final synthesized answer."#,
             structured_output: None,
         };
 
-        let response = self.provider.complete(&request).await
+        let response = self
+            .provider
+            .complete(&request)
+            .await
             .map_err(|e| TaskDispatchError::LlmError(e.to_string()))?;
 
         Ok(response.content)
@@ -906,7 +1051,10 @@ fn jaccard(a: &[String], b: &[String]) -> f64 {
 /// 对齐文章 H2-H6: malformed 过滤 / normalize 分组 / 组内保留最高 confidence /
 /// 一致性 (consensus) 显式标注。纯函数, 无 LLM 调用。
 pub fn reduce_subtask_results(results: &[SubTaskResult]) -> ReduceReport {
-    let mut report = ReduceReport { raw: results.len(), ..Default::default() };
+    let mut report = ReduceReport {
+        raw: results.len(),
+        ..Default::default()
+    };
     let mut claims: Vec<(String, String, f64)> = Vec::new();
 
     for r in results {
@@ -1002,8 +1150,18 @@ pub enum SubTaskClass {
 /// 确定性特征: 结构化/机械化能力 (testing/verification) + 短 prompt。
 pub fn classify_sub_task(sub_task: &SubTask) -> SubTaskClass {
     use crate::core::nt_core_crt::CrtTimeScale::*;
-    let caps: Vec<&str> = sub_task.required_capabilities.iter().map(|s| s.as_str()).collect();
-    let reasoning_caps = ["code_generation", "design", "analysis", "research", "writing"];
+    let caps: Vec<&str> = sub_task
+        .required_capabilities
+        .iter()
+        .map(|s| s.as_str())
+        .collect();
+    let reasoning_caps = [
+        "code_generation",
+        "design",
+        "analysis",
+        "research",
+        "writing",
+    ];
     let deterministic_caps = ["testing", "verification"];
 
     if caps.iter().any(|c| reasoning_caps.contains(c)) {
@@ -1109,7 +1267,11 @@ mod tests {
 
     #[test]
     fn test_reducer_happy_path_keeps_all() {
-        let results = vec![result("a", true, "The system uses a vector database for retrieval.")];
+        let results = vec![result(
+            "a",
+            true,
+            "The system uses a vector database for retrieval.",
+        )];
         let report = reduce_subtask_results(&results);
         assert_eq!(report.raw, 1);
         assert_eq!(report.clusters.len(), 1);
@@ -1129,7 +1291,14 @@ mod tests {
 
     #[test]
     fn test_reducer_failed_filtered() {
-        let results = vec![result("a", false, "should be dropped"), result("b", true, "active finding that is long enough to keep as a valid claim")];
+        let results = vec![
+            result("a", false, "should be dropped"),
+            result(
+                "b",
+                true,
+                "active finding that is long enough to keep as a valid claim",
+            ),
+        ];
         let report = reduce_subtask_results(&results);
         assert_eq!(report.filtered_failed, 1);
         assert_eq!(report.clusters.len(), 1);
@@ -1142,9 +1311,15 @@ mod tests {
         let r1 = result("w2", true, "The architecture uses vector symbolic storage for knowledge retrieval with semantic lookup");
         let report = reduce_subtask_results(&[r0, r1]);
         assert_eq!(report.raw, 2);
-        assert_eq!(report.deduped, 1, "two near-dup claims merge into one cluster");
+        assert_eq!(
+            report.deduped, 1,
+            "two near-dup claims merge into one cluster"
+        );
         assert_eq!(report.clusters.len(), 1);
-        assert_eq!(report.clusters[0].consensus, 2, "independent workers confirming same claim");
+        assert_eq!(
+            report.clusters[0].consensus, 2,
+            "independent workers confirming same claim"
+        );
     }
 
     #[test]
@@ -1163,7 +1338,10 @@ mod tests {
         let r1 = result("w2", true, "The architecture uses vector symbolic storage for knowledge retrieval with semantic lookup");
         let report = reduce_subtask_results(&[r0, r1]);
         let signals = format_reducer_signals(&report);
-        assert!(signals.contains("<CONSENSUS n=2>"), "consensus marker for multi-worker confirmation");
+        assert!(
+            signals.contains("<CONSENSUS n=2>"),
+            "consensus marker for multi-worker confirmation"
+        );
         assert!(signals.contains("clusters=1"));
     }
 
@@ -1191,7 +1369,12 @@ mod tests {
 
     #[test]
     fn test_classify_deterministic_verification() {
-        let st = sub_task("s2", "Verify output passes format check", vec!["testing"], 100);
+        let st = sub_task(
+            "s2",
+            "Verify output passes format check",
+            vec!["testing"],
+            100,
+        );
         assert_eq!(classify_sub_task(&st), SubTaskClass::Deterministic);
     }
 

@@ -68,8 +68,15 @@ impl ResourceNormalizer for ProxyUrlNormalizer {
         }
 
         let supported = [
-            "ss://", "ssr://", "vmess://", "trojan://", "vless://",
-            "socks5://", "socks4://", "http://", "https://",
+            "ss://",
+            "ssr://",
+            "vmess://",
+            "trojan://",
+            "vless://",
+            "socks5://",
+            "socks4://",
+            "http://",
+            "https://",
         ];
         if !supported.iter().any(|p| line.starts_with(p)) {
             return Vec::new();
@@ -133,7 +140,10 @@ mod tests {
         let r = n.normalize("vless://uuid@example.com:443?security=tls#TAG");
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].label, "TAG");
-        assert_eq!(r[0].resource_id, "vless://uuid@example.com:443?security=tls#TAG");
+        assert_eq!(
+            r[0].resource_id,
+            "vless://uuid@example.com:443?security=tls#TAG"
+        );
     }
 
     #[test]

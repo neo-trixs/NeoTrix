@@ -1,5 +1,5 @@
-use rand::Rng;
 use rand::rngs::StdRng;
+use rand::Rng;
 use rand::SeedableRng;
 
 const DEFAULT_BLOCK_SIZE: usize = 2;
@@ -160,9 +160,18 @@ mod tests {
         let cleanup = KroneckerCleanup::new(8);
         let query = vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let items = vec![
-            ("a".to_string(), vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-            ("b".to_string(), vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-            ("c".to_string(), vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            (
+                "a".to_string(),
+                vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
+            (
+                "b".to_string(),
+                vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
+            (
+                "c".to_string(),
+                vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
         ];
         let result = cleanup.cleanup(&query, &items, 2);
         assert_eq!(result.len(), 2);

@@ -147,7 +147,13 @@ impl Orchestrator for SupervisorOrchestrator {
 
         if self.workers.is_empty() {
             let duration = start.elapsed().as_secs_f64() * 1000.0;
-            self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).record_success(plan.token_usage, duration);
+            self.stats
+                .lock()
+                .unwrap_or_else(|e| {
+                    log::warn!("[orch] mutex poisoned: {}", e);
+                    e.into_inner()
+                })
+                .record_success(plan.token_usage, duration);
             return Ok(plan);
         }
 
@@ -163,11 +169,14 @@ impl Orchestrator for SupervisorOrchestrator {
                 Err(e) => {
                     if !self.config.delegate_on_error {
                         let duration = start.elapsed().as_secs_f64() * 1000.0;
-                        self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).record_failure(duration);
-                        return Err(AgentError::ExecutionFailed(format!(
-                            "worker failed: {}",
-                            e
-                        )));
+                        self.stats
+                            .lock()
+                            .unwrap_or_else(|e| {
+                                log::warn!("[orch] mutex poisoned: {}", e);
+                                e.into_inner()
+                            })
+                            .record_failure(duration);
+                        return Err(AgentError::ExecutionFailed(format!("worker failed: {}", e)));
                     }
                 }
             }
@@ -175,7 +184,13 @@ impl Orchestrator for SupervisorOrchestrator {
 
         if self.config.require_all_complete && results.len() < self.workers.len() {
             let duration = start.elapsed().as_secs_f64() * 1000.0;
-            self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).record_failure(duration);
+            self.stats
+                .lock()
+                .unwrap_or_else(|e| {
+                    log::warn!("[orch] mutex poisoned: {}", e);
+                    e.into_inner()
+                })
+                .record_failure(duration);
             return Err(AgentError::ExecutionFailed(
                 "not all workers completed".into(),
             ));
@@ -189,7 +204,13 @@ impl Orchestrator for SupervisorOrchestrator {
         let total_tokens: u64 = results.iter().map(|r| r.token_usage).sum();
         let duration = start.elapsed().as_secs_f64() * 1000.0;
 
-        self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).record_success(total_tokens, duration);
+        self.stats
+            .lock()
+            .unwrap_or_else(|e| {
+                log::warn!("[orch] mutex poisoned: {}", e);
+                e.into_inner()
+            })
+            .record_success(total_tokens, duration);
 
         Ok(AgentOutput {
             agent_name: self.supervisor.name().to_string(),
@@ -206,7 +227,13 @@ impl Orchestrator for SupervisorOrchestrator {
     }
 
     fn stats(&self) -> OrchestratorStats {
-        self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).clone()
+        self.stats
+            .lock()
+            .unwrap_or_else(|e| {
+                log::warn!("[orch] mutex poisoned: {}", e);
+                e.into_inner()
+            })
+            .clone()
     }
 }
 
@@ -252,7 +279,10 @@ impl SwarmOrchestrator {
         let from_exists = self.agents.iter().any(|a| a.name() == from);
         let to_exists = self.agents.iter().any(|a| a.name() == to);
         if from_exists && to_exists {
-            *self.handoff_count.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }) += 1;
+            *self.handoff_count.lock().unwrap_or_else(|e| {
+                log::warn!("[orch] mutex poisoned: {}", e);
+                e.into_inner()
+            }) += 1;
             true
         } else {
             false
@@ -289,7 +319,13 @@ impl Orchestrator for SwarmOrchestrator {
             handoffs += 1;
             if handoffs >= self.config.max_handoffs {
                 let duration = start.elapsed().as_secs_f64() * 1000.0;
-                self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).record_success(total_tokens, duration);
+                self.stats
+                    .lock()
+                    .unwrap_or_else(|e| {
+                        log::warn!("[orch] mutex poisoned: {}", e);
+                        e.into_inner()
+                    })
+                    .record_success(total_tokens, duration);
                 return Ok(AgentOutput {
                     agent_name: agent.name().to_string(),
                     content: current_input,
@@ -309,7 +345,13 @@ impl Orchestrator for SwarmOrchestrator {
     }
 
     fn stats(&self) -> OrchestratorStats {
-        self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).clone()
+        self.stats
+            .lock()
+            .unwrap_or_else(|e| {
+                log::warn!("[orch] mutex poisoned: {}", e);
+                e.into_inner()
+            })
+            .clone()
     }
 }
 
@@ -386,7 +428,13 @@ impl Orchestrator for PipelineOrchestrator {
         }
 
         let duration = start.elapsed().as_secs_f64() * 1000.0;
-        self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).record_success(total_tokens, duration);
+        self.stats
+            .lock()
+            .unwrap_or_else(|e| {
+                log::warn!("[orch] mutex poisoned: {}", e);
+                e.into_inner()
+            })
+            .record_success(total_tokens, duration);
 
         Ok(AgentOutput {
             agent_name: last_agent,
@@ -403,7 +451,13 @@ impl Orchestrator for PipelineOrchestrator {
     }
 
     fn stats(&self) -> OrchestratorStats {
-        self.stats.lock().unwrap_or_else(|e| { log::warn!("[orch] mutex poisoned: {}", e); e.into_inner() }).clone()
+        self.stats
+            .lock()
+            .unwrap_or_else(|e| {
+                log::warn!("[orch] mutex poisoned: {}", e);
+                e.into_inner()
+            })
+            .clone()
     }
 }
 
@@ -424,13 +478,17 @@ pub fn create_orchestrator(
         OrchestrationPattern::Supervisor(config) => {
             if agents.len() < 2 {
                 return Err(AgentError::InvalidConfig(
-                    "supervisor pattern requires at least 2 agents (1 supervisor + 1 worker)".into(),
+                    "supervisor pattern requires at least 2 agents (1 supervisor + 1 worker)"
+                        .into(),
                 ));
             }
             let mut agents_iter = agents.into_iter();
-            let supervisor = agents_iter.next().ok_or_else(|| AgentError::InvalidConfig(
-                "supervisor pattern requires at least 2 agents (1 supervisor + 1 worker)".into(),
-            ))?;
+            let supervisor = agents_iter.next().ok_or_else(|| {
+                AgentError::InvalidConfig(
+                    "supervisor pattern requires at least 2 agents (1 supervisor + 1 worker)"
+                        .into(),
+                )
+            })?;
             let mut orch = SupervisorOrchestrator::new(supervisor, config);
             for worker in agents_iter {
                 orch.add_worker(worker);
@@ -705,8 +763,7 @@ mod tests {
             max_handoffs: 2,
             ..SwarmConfig::default()
         };
-        let orch =
-            create_orchestrator(OrchestrationPattern::Swarm(config), agents).unwrap();
+        let orch = create_orchestrator(OrchestrationPattern::Swarm(config), agents).unwrap();
         assert_eq!(orch.pattern_name(), "swarm");
         let result = orch.execute("task").unwrap();
         assert_eq!(result.token_usage, 20);

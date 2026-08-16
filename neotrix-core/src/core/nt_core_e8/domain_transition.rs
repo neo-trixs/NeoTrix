@@ -51,35 +51,96 @@ impl E8TaskType {
         let words: Vec<&str> = lower.split_whitespace().collect();
 
         // Math keywords (computation-heavy tasks)
-        let math_kw = ["math", "calculat", "equation", "proof", "theorem",
-                       "arithmetic", "algebra", "geometry", "derivative",
-                       "integral", "matrix", "vector", "numerical", "compute"];
+        let math_kw = [
+            "math",
+            "calculat",
+            "equation",
+            "proof",
+            "theorem",
+            "arithmetic",
+            "algebra",
+            "geometry",
+            "derivative",
+            "integral",
+            "matrix",
+            "vector",
+            "numerical",
+            "compute",
+        ];
         // Coding keywords
-        let code_kw = ["code", "program", "function", "implement", "debug",
-                       "compile", "rust", "python", "javascript", "typescript",
-                       "refactor", "test", "build", "deploy"];
+        let code_kw = [
+            "code",
+            "program",
+            "function",
+            "implement",
+            "debug",
+            "compile",
+            "rust",
+            "python",
+            "javascript",
+            "typescript",
+            "refactor",
+            "test",
+            "build",
+            "deploy",
+        ];
         // Agentic keywords (tool-use / multi-step)
-        let agent_kw = ["agent", "tool", "search", "browse", "crawl",
-                        "scrape", "automate", "workflow", "pipeline",
-                        "execute", "run", "shell", "command"];
+        let agent_kw = [
+            "agent", "tool", "search", "browse", "crawl", "scrape", "automate", "workflow",
+            "pipeline", "execute", "run", "shell", "command",
+        ];
         // Creative keywords
-        let creative_kw = ["creative", "design", "brainstorm", "imagine",
-                           "generate", "write", "compose", "artistic",
-                           "explore", "novel", "innovative", "ideate"];
+        let creative_kw = [
+            "creative",
+            "design",
+            "brainstorm",
+            "imagine",
+            "generate",
+            "write",
+            "compose",
+            "artistic",
+            "explore",
+            "novel",
+            "innovative",
+            "ideate",
+        ];
 
-        let math_score = math_kw.iter().filter(|kw| words.iter().any(|w| word_starts_with(w, kw))).count();
-        let code_score = code_kw.iter().filter(|kw| words.iter().any(|w| word_starts_with(w, kw))).count();
-        let agent_score = agent_kw.iter().filter(|kw| words.iter().any(|w| word_starts_with(w, kw))).count();
-        let creative_score = creative_kw.iter().filter(|kw| words.iter().any(|w| word_starts_with(w, kw))).count();
+        let math_score = math_kw
+            .iter()
+            .filter(|kw| words.iter().any(|w| word_starts_with(w, kw)))
+            .count();
+        let code_score = code_kw
+            .iter()
+            .filter(|kw| words.iter().any(|w| word_starts_with(w, kw)))
+            .count();
+        let agent_score = agent_kw
+            .iter()
+            .filter(|kw| words.iter().any(|w| word_starts_with(w, kw)))
+            .count();
+        let creative_score = creative_kw
+            .iter()
+            .filter(|kw| words.iter().any(|w| word_starts_with(w, kw)))
+            .count();
 
-        let max_score = math_score.max(code_score).max(agent_score).max(creative_score);
-        if max_score == 0 { return E8TaskType::General; }
+        let max_score = math_score
+            .max(code_score)
+            .max(agent_score)
+            .max(creative_score);
+        if max_score == 0 {
+            return E8TaskType::General;
+        }
 
-        if max_score == math_score { E8TaskType::Math }
-        else if max_score == code_score { E8TaskType::Coding }
-        else if max_score == agent_score { E8TaskType::Agentic }
-        else if max_score == creative_score { E8TaskType::Creative }
-        else { E8TaskType::General }
+        if max_score == math_score {
+            E8TaskType::Math
+        } else if max_score == code_score {
+            E8TaskType::Coding
+        } else if max_score == agent_score {
+            E8TaskType::Agentic
+        } else if max_score == creative_score {
+            E8TaskType::Creative
+        } else {
+            E8TaskType::General
+        }
     }
 
     /// Get the canonical E8 transition chain for this task type.
@@ -140,10 +201,15 @@ pub enum CoTLength {
 impl CoTLength {
     /// Detect CoT length from estimated token count.
     pub fn from_tokens(tokens: usize) -> Self {
-        if tokens < 1_000 { CoTLength::Short }
-        else if tokens < 10_000 { CoTLength::Medium }
-        else if tokens < 100_000 { CoTLength::Long }
-        else { CoTLength::Max }
+        if tokens < 1_000 {
+            CoTLength::Short
+        } else if tokens < 10_000 {
+            CoTLength::Medium
+        } else if tokens < 100_000 {
+            CoTLength::Long
+        } else {
+            CoTLength::Max
+        }
     }
 
     /// Depth multiplier: longer thinking allows deeper transitions.
@@ -295,9 +361,11 @@ impl E8DomainTransitionModel {
                 total_general = total_general.saturating_add(gc);
             }
             blended.row_totals.0[i] = (total_domain as f64 * effective_w
-                + total_general as f64 * (1.0 - effective_w)).round() as u64;
+                + total_general as f64 * (1.0 - effective_w))
+                .round() as u64;
             blended.visit_counts.0[i] = (domain.visit_counts.0[i] as f64 * effective_w
-                + general.visit_counts.0[i] as f64 * (1.0 - effective_w)).round() as u64;
+                + general.visit_counts.0[i] as f64 * (1.0 - effective_w))
+                .round() as u64;
         }
         blended
     }
@@ -341,8 +409,11 @@ impl E8DomainTransitionModel {
         // For long/max thinking, allow deeper jumps
         if matches!(cot_length, CoTLength::Long | CoTLength::Max) {
             let jump_size = ((state as f64 - from as f64).abs() * depth_bias) as u8;
-            let deeper = if state > from { state.saturating_add(jump_size).min(63) }
-                         else { state.saturating_sub(jump_size) };
+            let deeper = if state > from {
+                state.saturating_add(jump_size).min(63)
+            } else {
+                state.saturating_sub(jump_size)
+            };
             return (deeper, confidence * 0.9);
         }
 
@@ -352,7 +423,8 @@ impl E8DomainTransitionModel {
     /// Record a transition for a specific task type.
     pub fn record_transition(&mut self, task_type: E8TaskType, from: u8, to: u8) {
         self.dirty = true;
-        self.domain_matrix_mut(task_type).record_transition(from, to);
+        self.domain_matrix_mut(task_type)
+            .record_transition(from, to);
         self.general_matrix.record_transition(from, to);
     }
 
@@ -381,9 +453,13 @@ impl std::fmt::Display for E8DomainTransitionModel {
         for task_type in &E8TaskType::ALL {
             let dm = self.domain_matrix(*task_type);
             let visits: u64 = dm.visit_counts.0.iter().sum();
-            writeln!(f, "  {}: {} visits, {} transitions",
-                     task_type.label(), visits,
-                     dm.recent_transitions.len())?;
+            writeln!(
+                f,
+                "  {}: {} visits, {} transitions",
+                task_type.label(),
+                visits,
+                dm.recent_transitions.len()
+            )?;
         }
         Ok(())
     }
@@ -432,11 +508,26 @@ mod tests {
 
     #[test]
     fn test_task_type_detection() {
-        assert_eq!(E8TaskType::detect("solve math equation x^2 + y^2 = z^2"), E8TaskType::Math);
-        assert_eq!(E8TaskType::detect("write a Python function to sort"), E8TaskType::Coding);
-        assert_eq!(E8TaskType::detect("search the web for research"), E8TaskType::Agentic);
-        assert_eq!(E8TaskType::detect("design a creative logo"), E8TaskType::Creative);
-        assert_eq!(E8TaskType::detect("what is the capital of France"), E8TaskType::General);
+        assert_eq!(
+            E8TaskType::detect("solve math equation x^2 + y^2 = z^2"),
+            E8TaskType::Math
+        );
+        assert_eq!(
+            E8TaskType::detect("write a Python function to sort"),
+            E8TaskType::Coding
+        );
+        assert_eq!(
+            E8TaskType::detect("search the web for research"),
+            E8TaskType::Agentic
+        );
+        assert_eq!(
+            E8TaskType::detect("design a creative logo"),
+            E8TaskType::Creative
+        );
+        assert_eq!(
+            E8TaskType::detect("what is the capital of France"),
+            E8TaskType::General
+        );
     }
 
     #[test]
@@ -444,7 +535,11 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         for task_type in &E8TaskType::ALL {
             let chain = task_type.e8_chain();
-            assert!(chain.iter().all(|&s| s < 64), "{} chain has invalid state", task_type);
+            assert!(
+                chain.iter().all(|&s| s < 64),
+                "{} chain has invalid state",
+                task_type
+            );
             seen.insert(chain);
         }
         // Not all chains need to be unique (General and Reasoning may overlap)
@@ -480,12 +575,22 @@ mod tests {
     #[test]
     fn test_record_transition_updates_both() {
         let mut model = E8DomainTransitionModel::default();
-        let before_visits: u64 = model.domain_matrix(E8TaskType::Coding).visit_counts.0.iter().sum();
+        let before_visits: u64 = model
+            .domain_matrix(E8TaskType::Coding)
+            .visit_counts
+            .0
+            .iter()
+            .sum();
         let before_general: u64 = model.general_matrix.visit_counts.0.iter().sum();
 
         model.record_transition(E8TaskType::Coding, 42, 26);
 
-        let after_visits: u64 = model.domain_matrix(E8TaskType::Coding).visit_counts.0.iter().sum();
+        let after_visits: u64 = model
+            .domain_matrix(E8TaskType::Coding)
+            .visit_counts
+            .0
+            .iter()
+            .sum();
         let after_general: u64 = model.general_matrix.visit_counts.0.iter().sum();
         assert!(after_visits > before_visits, "domain visits not updated");
         assert!(after_general > before_general, "general visits not updated");
@@ -506,9 +611,19 @@ mod tests {
         model2.record_transition(E8TaskType::Math, 35, 26);
         model2.record_transition(E8TaskType::Math, 26, 34);
 
-        let before: u64 = model1.domain_matrix(E8TaskType::Math).visit_counts.0.iter().sum();
+        let before: u64 = model1
+            .domain_matrix(E8TaskType::Math)
+            .visit_counts
+            .0
+            .iter()
+            .sum();
         model1.merge(&model2);
-        let after: u64 = model1.domain_matrix(E8TaskType::Math).visit_counts.0.iter().sum();
+        let after: u64 = model1
+            .domain_matrix(E8TaskType::Math)
+            .visit_counts
+            .0
+            .iter()
+            .sum();
         assert!(after > before, "merge did not add visits");
     }
 
@@ -518,14 +633,19 @@ mod tests {
         let (state, _) = model.predict_next(32, E8TaskType::General, CoTLength::Short);
         // Short CoT should bias toward the next chain stage, not alternatives block (16-23)
         let block = state & 0xF8;
-        assert!(block != 16 || state == 16, "short CoT should avoid alternatives block");
+        assert!(
+            block != 16 || state == 16,
+            "short CoT should avoid alternatives block"
+        );
     }
 
     #[test]
     fn test_long_cot_allows_deeper_jumps() {
         let mut model = E8DomainTransitionModel::new(0.5);
-        let (_state_medium, conf_medium) = model.predict_next(56, E8TaskType::Reasoning, CoTLength::Medium);
-        let (_state_long, conf_long) = model.predict_next(56, E8TaskType::Reasoning, CoTLength::Long);
+        let (_state_medium, conf_medium) =
+            model.predict_next(56, E8TaskType::Reasoning, CoTLength::Medium);
+        let (_state_long, conf_long) =
+            model.predict_next(56, E8TaskType::Reasoning, CoTLength::Long);
         // Long CoT should have comparable confidence (depth means more exploration)
         assert!(conf_long > 0.0 && conf_medium > 0.0);
     }
@@ -540,7 +660,12 @@ mod tests {
     fn test_model_does_not_panic_for_all_calls() {
         let mut model = E8DomainTransitionModel::default();
         for task_type in &E8TaskType::ALL {
-            for &cot in &[CoTLength::Short, CoTLength::Medium, CoTLength::Long, CoTLength::Max] {
+            for &cot in &[
+                CoTLength::Short,
+                CoTLength::Medium,
+                CoTLength::Long,
+                CoTLength::Max,
+            ] {
                 let (s, c) = model.predict_next(0, *task_type, cot);
                 assert!(s < 64 && c > 0.0);
                 let (s, c) = model.predict_next(63, *task_type, cot);

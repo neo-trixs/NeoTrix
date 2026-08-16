@@ -89,7 +89,7 @@ url = "2"
 rand = "0.8"
 async-trait = "0.1"
 rmcp = { version = "1.4", features = ["server", "macros"] }
-lru = "0.12"
+lru = "0.18"
 base64 = "0.22"
 hex = "0.4"
 filetime = "0.2"

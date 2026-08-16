@@ -8,9 +8,9 @@
 //!
 //! Uses MAP-BSC (Multiply-Add-Permute) VSA operations via VSAEngine.
 
-use serde::{Serialize, Deserialize};
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 
 /// Default hypervector dimension.
 pub const E8_VSA_DIM: usize = 1024;
@@ -155,7 +155,10 @@ mod tests {
         let emb2 = E8VsaEmbedding::new(256);
         let hv1 = emb1.embed(42).to_vec();
         let hv2 = emb2.embed(42);
-        assert_eq!(hv1, hv2, "deterministic seed should produce identical vectors");
+        assert_eq!(
+            hv1, hv2,
+            "deterministic seed should produce identical vectors"
+        );
     }
 
     #[test]
@@ -164,7 +167,11 @@ mod tests {
         let hv0 = emb.embed(0);
         let hv1 = emb.embed(1);
         let sim = emb.similarity(hv0, hv1);
-        assert!(sim.abs() < 0.5, "different states should have low similarity, got {}", sim);
+        assert!(
+            sim.abs() < 0.5,
+            "different states should have low similarity, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -183,7 +190,10 @@ mod tests {
         let bound = emb.bind(a, b);
         let sim_to_a = emb.similarity(&bound, a);
         let sim_to_b = emb.similarity(&bound, b);
-        assert!(sim_to_a.abs() < 0.3, "bound vector should be dissimilar to inputs");
+        assert!(
+            sim_to_a.abs() < 0.3,
+            "bound vector should be dissimilar to inputs"
+        );
         assert!(sim_to_b.abs() < 0.3);
     }
 
@@ -225,7 +235,11 @@ mod tests {
         let with_meta_1 = emb.embed_with_meta(10, 1);
         let sim = emb.similarity(&with_meta_0, &with_meta_1);
         // Different meta bits should produce different bundled vectors
-        assert!(sim < 0.8, "different meta should give different vectors, sim={}", sim);
+        assert!(
+            sim < 0.8,
+            "different meta should give different vectors, sim={}",
+            sim
+        );
     }
 
     #[test]

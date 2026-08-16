@@ -137,7 +137,10 @@ impl ImageEvidence {
     pub fn to_evidence_text(&self) -> String {
         let mut out = String::from("<image_evidence>\n");
         out.push_str(&format!("  source: {}\n", self.source));
-        out.push_str(&format!("  classification: {}\n", self.classification.as_str()));
+        out.push_str(&format!(
+            "  classification: {}\n",
+            self.classification.as_str()
+        ));
         out.push_str(&format!("  dimensions: {}x{}\n", self.width, self.height));
         out.push_str(&format!("  aspect_ratio: {:.3}\n", self.aspect_ratio));
         out.push_str(&format!("  mean_luminance: {:.3}\n", self.mean_luminance));
@@ -145,7 +148,10 @@ impl ImageEvidence {
         out.push_str(&format!("  text_density: {:.3}\n", self.text_density));
         out.push_str(&format!("  edge_density: {:.3}\n", self.edge_density));
         out.push_str(&format!("  phash: {:016x}\n", self.phash));
-        out.push_str(&format!("  content_tag: {}\n", &self.sha256[..self.sha256.len().min(12)]));
+        out.push_str(&format!(
+            "  content_tag: {}\n",
+            &self.sha256[..self.sha256.len().min(12)]
+        ));
         out.push_str(&format!("  confidence: {:.3}\n", self.confidence));
         if !self.dominant_colors.is_empty() {
             let colors = self
@@ -179,8 +185,8 @@ impl VisionBridge {
     /// Decode image bytes and produce structured evidence + a fixed-dim image
     /// feature vector (the missing upstream extractor for `MultimodalInput::image`).
     pub fn analyze(bytes: &[u8]) -> Result<(ImageEvidence, Vec<f64>), String> {
-        let img = image::load_from_memory(bytes)
-            .map_err(|e| format!("image decode failed: {}", e))?;
+        let img =
+            image::load_from_memory(bytes).map_err(|e| format!("image decode failed: {}", e))?;
         let rgb = img.to_rgb8();
         let (w, h) = (rgb.width(), rgb.height());
         if w == 0 || h == 0 {
@@ -217,11 +223,7 @@ impl VisionBridge {
                         cell += lum;
                         cell_n += 1.0;
                         // Quantize color to 32-bucket histogram for dominance.
-                        let key = [
-                            (p[0] >> 3) as u8,
-                            (p[1] >> 3) as u8,
-                            (p[2] >> 3) as u8,
-                        ];
+                        let key = [(p[0] >> 3) as u8, (p[1] >> 3) as u8, (p[2] >> 3) as u8];
                         *color_hist.entry(key).or_insert(0) += 1;
                         py += 1;
                     }
@@ -236,7 +238,11 @@ impl VisionBridge {
         }
 
         let mean_lum = if n > 0.0 { lum_sum / n } else { 0.0 };
-        let var = if n > 0.0 { (lum_sq / n) - mean_lum * mean_lum } else { 0.0 };
+        let var = if n > 0.0 {
+            (lum_sq / n) - mean_lum * mean_lum
+        } else {
+            0.0
+        };
         let contrast = var.clamp(0.0, 1.0).sqrt();
 
         // Dominant colors: take top-4 by frequency.
@@ -264,7 +270,13 @@ impl VisionBridge {
             }
         }
 
-        let confidence = if w >= 32 && h >= 32 { 1.0 } else if w >= 8 && h >= 8 { 0.6 } else { 0.3 };
+        let confidence = if w >= 32 && h >= 32 {
+            1.0
+        } else if w >= 8 && h >= 8 {
+            0.6
+        } else {
+            0.3
+        };
 
         // Text-ish density: fraction of tiles whose local variance is high —
         // text regions flicker between ink and paper across adjacent pixels.
@@ -296,7 +308,15 @@ impl VisionBridge {
         let edge_density = if edge_n > 0.0 { edge_sum / edge_n } else { 0.0 };
 
         // Deterministic classification (classification-first routing).
-        let classification = classify_image(w, h, mean_lum, contrast, text_density, edge_density, &dominant_colors);
+        let classification = classify_image(
+            w,
+            h,
+            mean_lum,
+            contrast,
+            text_density,
+            edge_density,
+            &dominant_colors,
+        );
 
         // Perceptual hash (dHash variant): compare adjacent luminance on an
         // 8×8 tile sample, pack exactly 64 bits (56 horizontal + 8 vertical
@@ -364,7 +384,11 @@ impl VisionBridge {
     pub fn analyze_cached(bytes: &[u8]) -> Result<(ImageEvidence, Vec<f64>), String> {
         let digest = hex::encode(Sha256::digest(bytes));
         // 毒化锁 → 视为缓存不可用，直接重算（cache 只是性能优化，非正确性依赖）。
-        if let Some(hit) = EVIDENCE_CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&digest) {
+        if let Some(hit) = EVIDENCE_CACHE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&digest)
+        {
             return Ok(hit.clone());
         }
         let result = Self::analyze(bytes)?;
@@ -384,7 +408,8 @@ impl VisionBridge {
 }
 
 /// Bounded cross-turn evidence cache: SHA-256 → (ImageEvidence, features).
-static EVIDENCE_CACHE: Mutex<BTreeMap<String, (ImageEvidence, Vec<f64>)>> = Mutex::new(BTreeMap::new());
+static EVIDENCE_CACHE: Mutex<BTreeMap<String, (ImageEvidence, Vec<f64>)>> =
+    Mutex::new(BTreeMap::new());
 const CACHE_CAPACITY: usize = 128;
 
 /// Deterministic classification heuristics (research: classification-first).
@@ -421,7 +446,10 @@ fn classify_image(
             mx - mn > 80
         })
         .count();
-    let light_dominant = dominant_colors.first().map(|c| c[0] > 200 && c[1] > 200 && c[2] > 200).unwrap_or(false);
+    let light_dominant = dominant_colors
+        .first()
+        .map(|c| c[0] > 200 && c[1] > 200 && c[2] > 200)
+        .unwrap_or(false);
 
     if text_density > 0.35 && light_dominant {
         ImageClass::Document
@@ -504,7 +532,9 @@ impl MultimodalEncoder {
         let mut out = vec![0.0f64; TEXT_EMBED_DIM];
         let mut h: u64 = 0xC0FFEE;
         for (i, ch) in text.chars().enumerate() {
-            h = h.wrapping_mul(6364136223846793005).wrapping_add(ch as u64 + 0x9E3779B97F4A7C15);
+            h = h
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(ch as u64 + 0x9E3779B97F4A7C15);
             let bucket = ((h >> 33) as usize) % TEXT_EMBED_DIM;
             out[bucket] += 1.0;
             // Bigram + trigram context via a second hash lane.
@@ -540,7 +570,9 @@ impl MultimodalEncoder {
                 self.unified.project_vsa(&padded)
             }
             // Code and Latent already have vector-native representations.
-            _ => self.unified.project_vsa(&self.pad_to(raw, self.unified.dim)),
+            _ => self
+                .unified
+                .project_vsa(&self.pad_to(raw, self.unified.dim)),
         }
     }
 
@@ -571,7 +603,11 @@ impl MultimodalEncoder {
     /// `router` supplies per-modality attention weights (Phase 7.5); the fused
     /// vector is the salience-weighted sum, normalized into the unified space.
     /// Returns `(fused_vector, per_modality_weights)`.
-    pub fn fuse(&self, router_weights: &BTreeMap<Modality, f64>, embeddings: &BTreeMap<Modality, Vec<f64>>) -> (Vec<f64>, Vec<(Modality, f64)>) {
+    pub fn fuse(
+        &self,
+        router_weights: &BTreeMap<Modality, f64>,
+        embeddings: &BTreeMap<Modality, Vec<f64>>,
+    ) -> (Vec<f64>, Vec<(Modality, f64)>) {
         let mut fused = vec![0.0f64; self.unified.dim];
         let mut weights = Vec::new();
         for (m, v) in embeddings {
@@ -690,7 +726,10 @@ mod tests {
         let (fused, _) = enc.fuse(&router, &embeddings);
         let text_emb = &embeddings[&Modality::Text];
         let sim = enc.unified.cosine(&fused, text_emb);
-        assert!(sim > 0.99, "fusion should preserve dominant modality, sim={sim}");
+        assert!(
+            sim > 0.99,
+            "fusion should preserve dominant modality, sim={sim}"
+        );
     }
 
     #[test]
@@ -713,9 +752,15 @@ mod tests {
     #[test]
     fn test_image_embedding_stable_and_discriminative() {
         let enc = MultimodalEncoder::new();
-        let va: Vec<f64> = (0..IMAGE_FEATURE_DIM).map(|i| (i as f64 * 0.01).sin()).collect();
-        let vb: Vec<f64> = (0..IMAGE_FEATURE_DIM).map(|i| (i as f64 * 0.01).sin()).collect();
-        let vc: Vec<f64> = (0..IMAGE_FEATURE_DIM).map(|i| (i as f64 * 0.01).cos()).collect();
+        let va: Vec<f64> = (0..IMAGE_FEATURE_DIM)
+            .map(|i| (i as f64 * 0.01).sin())
+            .collect();
+        let vb: Vec<f64> = (0..IMAGE_FEATURE_DIM)
+            .map(|i| (i as f64 * 0.01).sin())
+            .collect();
+        let vc: Vec<f64> = (0..IMAGE_FEATURE_DIM)
+            .map(|i| (i as f64 * 0.01).cos())
+            .collect();
         let a = enc.encode_modality(Modality::Image, &va);
         let b = enc.encode_modality(Modality::Image, &vb);
         let c = enc.encode_modality(Modality::Image, &vc);
@@ -741,7 +786,11 @@ mod tests {
         let (ev, feat) = VisionBridge::analyze(&png).expect("decode");
         assert_eq!((ev.width, ev.height), (64, 64));
         assert!((ev.aspect_ratio - 1.0).abs() < 1e-9);
-        assert!(ev.mean_luminance < 0.05, "black image mean {}", ev.mean_luminance);
+        assert!(
+            ev.mean_luminance < 0.05,
+            "black image mean {}",
+            ev.mean_luminance
+        );
         assert_eq!(feat.len(), IMAGE_FEATURE_DIM);
         assert!(ev.confidence > 0.9);
         assert!(ev.source.starts_with("png"));
@@ -808,33 +857,66 @@ mod tests {
 
     // ─── classification-first routing ────────────────────────────────────
 
-    fn classify(w: u32, h: u32, lum: f64, contrast: f64, text: f64, edge: f64, colors: &[[u8; 3]]) -> ImageClass {
+    fn classify(
+        w: u32,
+        h: u32,
+        lum: f64,
+        contrast: f64,
+        text: f64,
+        edge: f64,
+        colors: &[[u8; 3]],
+    ) -> ImageClass {
         classify_image(w, h, lum, contrast, text, edge, colors)
     }
 
     #[test]
     fn test_classify_blank_via_low_contrast() {
-        assert_eq!(classify(64, 64, 0.2, 0.01, 0.0, 0.0, &[[100, 100, 100]]), ImageClass::Blank);
+        assert_eq!(
+            classify(64, 64, 0.2, 0.01, 0.0, 0.0, &[[100, 100, 100]]),
+            ImageClass::Blank
+        );
     }
 
     #[test]
     fn test_classify_blank_via_near_black_luminance() {
         // Logo/black-screen intro frames: solid near-black even with faint noise.
-        assert_eq!(classify(64, 64, 0.005, 0.1, 0.0, 0.0, &[[0, 0, 0]]), ImageClass::Blank);
+        assert_eq!(
+            classify(64, 64, 0.005, 0.1, 0.0, 0.0, &[[0, 0, 0]]),
+            ImageClass::Blank
+        );
         // Near-white flash frames.
-        assert_eq!(classify(64, 64, 0.995, 0.1, 0.0, 0.0, &[[255, 255, 255]]), ImageClass::Blank);
+        assert_eq!(
+            classify(64, 64, 0.995, 0.1, 0.0, 0.0, &[[255, 255, 255]]),
+            ImageClass::Blank
+        );
     }
 
     #[test]
     fn test_classify_document_needs_light_bg_and_text() {
         // Light dominant + high text density -> Document.
         assert_eq!(
-            classify(256, 256, 0.8, 0.4, 0.5, 0.05, &[[248, 248, 248], [10, 10, 10]]),
+            classify(
+                256,
+                256,
+                0.8,
+                0.4,
+                0.5,
+                0.05,
+                &[[248, 248, 248], [10, 10, 10]]
+            ),
             ImageClass::Document
         );
         // Dark dominant must NOT be a document.
         assert_eq!(
-            classify(256, 256, 0.2, 0.4, 0.5, 0.05, &[[10, 10, 10], [248, 248, 248]]),
+            classify(
+                256,
+                256,
+                0.2,
+                0.4,
+                0.5,
+                0.05,
+                &[[10, 10, 10], [248, 248, 248]]
+            ),
             ImageClass::Screenshot
         );
     }
@@ -843,7 +925,15 @@ mod tests {
     fn test_classify_screenshot_via_saturated_palette() {
         // Two saturated accent colors + some text -> UI screenshot.
         assert_eq!(
-            classify(256, 256, 0.5, 0.4, 0.2, 0.1, &[[200, 60, 60], [60, 60, 220], [240, 240, 240]]),
+            classify(
+                256,
+                256,
+                0.5,
+                0.4,
+                0.2,
+                0.1,
+                &[[200, 60, 60], [60, 60, 220], [240, 240, 240]]
+            ),
             ImageClass::Screenshot
         );
     }
@@ -851,15 +941,29 @@ mod tests {
     #[test]
     fn test_classify_photo_low_saturation_low_edge() {
         assert_eq!(
-            classify(256, 256, 0.5, 0.3, 0.05, 0.06, &[[120, 130, 140], [90, 100, 110]]),
+            classify(
+                256,
+                256,
+                0.5,
+                0.3,
+                0.05,
+                0.06,
+                &[[120, 130, 140], [90, 100, 110]]
+            ),
             ImageClass::Photo
         );
     }
 
     #[test]
     fn test_classify_tiny_or_ambiguous_is_unknown() {
-        assert_eq!(classify(4, 4, 0.5, 0.4, 0.5, 0.1, &[[10, 10, 10]]), ImageClass::Unknown);
-        assert_eq!(classify(64, 64, 0.5, 0.3, 0.15, 0.3, &[[120, 130, 140]]), ImageClass::Unknown);
+        assert_eq!(
+            classify(4, 4, 0.5, 0.4, 0.5, 0.1, &[[10, 10, 10]]),
+            ImageClass::Unknown
+        );
+        assert_eq!(
+            classify(64, 64, 0.5, 0.3, 0.15, 0.3, &[[120, 130, 140]]),
+            ImageClass::Unknown
+        );
     }
 
     #[test]
@@ -950,7 +1054,11 @@ mod tests {
         fn half_png(w: u32, h: u32) -> Vec<u8> {
             let mut img = image::RgbImage::new(w, h);
             for (px, py, p) in img.enumerate_pixels_mut() {
-                *p = if px < w / 2 { image::Rgb([0, 0, 0]) } else { image::Rgb([255, 255, 255]) };
+                *p = if px < w / 2 {
+                    image::Rgb([0, 0, 0])
+                } else {
+                    image::Rgb([255, 255, 255])
+                };
             }
             let mut buf = std::io::Cursor::new(Vec::new());
             image::DynamicImage::ImageRgb8(img)

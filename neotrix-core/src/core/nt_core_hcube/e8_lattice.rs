@@ -60,7 +60,10 @@ impl E8Lattice {
     pub fn new() -> Self {
         let roots = generate_roots();
         let weyl_generators = simple_roots();
-        Self { roots, weyl_generators }
+        Self {
+            roots,
+            weyl_generators,
+        }
     }
 
     pub fn root_count(&self) -> usize {
@@ -248,7 +251,12 @@ mod tests {
         let l = E8Lattice::new();
         for r in l.roots() {
             let n2 = r.norm_squared();
-            assert!(approx_eq(n2, 2.0, 1e-9), "root {:?} has |r|² = {}", r.components, n2);
+            assert!(
+                approx_eq(n2, 2.0, 1e-9),
+                "root {:?} has |r|² = {}",
+                r.components,
+                n2
+            );
         }
     }
 

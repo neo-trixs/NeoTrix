@@ -61,9 +61,7 @@ impl WatermarkEngine {
             self.proxy_domain_match = domain_list
                 .iter()
                 .any(|d| host_lower == *d || host_lower.ends_with(&format!(".{}", d)));
-            self.lab_keyword_match = keyword_list
-                .iter()
-                .any(|k| host_lower.contains(k));
+            self.lab_keyword_match = keyword_list.iter().any(|k| host_lower.contains(k));
         }
 
         self
@@ -149,11 +147,19 @@ impl WatermarkEngine {
     /// Convert watermark state to a 6-bit value.
     pub fn to_bits(&self) -> u8 {
         let mut bits = 0u8;
-        if self.cn_timezone { bits |= 1 << 0; }
-        if self.proxy_domain_match { bits |= 1 << 1; }
-        if self.lab_keyword_match { bits |= 1 << 2; }
+        if self.cn_timezone {
+            bits |= 1 << 0;
+        }
+        if self.proxy_domain_match {
+            bits |= 1 << 1;
+        }
+        if self.lab_keyword_match {
+            bits |= 1 << 2;
+        }
         bits |= (self.routing_class & 0x03) << 3;
-        if self.reserve_flag { bits |= 1 << 5; }
+        if self.reserve_flag {
+            bits |= 1 << 5;
+        }
         bits
     }
 
@@ -190,18 +196,18 @@ impl WatermarkEngine {
         let domain_match = domain_list
             .iter()
             .any(|d| host_lower == *d || host_lower.ends_with(&format!(".{}", d)));
-        let keyword_match = keyword_list
-            .iter()
-            .any(|k| host_lower.contains(k));
+        let keyword_match = keyword_list.iter().any(|k| host_lower.contains(k));
         (domain_match, keyword_match)
     }
 
     /// Probe using runtime-updatable config instead of static decode lists.
     pub fn probe_with_config(&self, host: &str) -> (bool, bool) {
         let host_lower = host.to_lowercase();
-        let domain_match = self.config.domains.iter().any(|d| {
-            host_lower == *d || host_lower.ends_with(&format!(".{}", d))
-        });
+        let domain_match = self
+            .config
+            .domains
+            .iter()
+            .any(|d| host_lower == *d || host_lower.ends_with(&format!(".{}", d)));
         let keyword_match = self.config.keywords.iter().any(|k| host_lower.contains(k));
         (domain_match, keyword_match)
     }
@@ -260,7 +266,10 @@ fn decode_xor91_b64(b64: &str) -> Vec<String> {
         .unwrap_or_default();
     let decoded: Vec<u8> = bytes.iter().map(|b| b ^ key).collect();
     let s = String::from_utf8_lossy(&decoded);
-    s.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
+    s.split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 /// Watermark configuration stored as obfuscated config
@@ -394,9 +403,13 @@ mod tests {
             let date = "Today's date is 2026-07-02.";
             let encoded = wm.encode_date_line(date);
             let expected_spaces = class as usize;
-            assert!(encoded.ends_with(&(" ".repeat(expected_spaces) + ".")) ||
-                    encoded.ends_with(&(" ".repeat(expected_spaces) + ".\n")),
-                    "class={}: {:?}", class, encoded);
+            assert!(
+                encoded.ends_with(&(" ".repeat(expected_spaces) + "."))
+                    || encoded.ends_with(&(" ".repeat(expected_spaces) + ".\n")),
+                "class={}: {:?}",
+                class,
+                encoded
+            );
         }
     }
 
@@ -441,7 +454,8 @@ mod tests {
 
     #[test]
     fn test_watermark_preserves_sentence_structure() {
-        let wm = WatermarkEngine::new().with_probe(Some("minimax.example.com"), Some("Asia/Shanghai"));
+        let wm =
+            WatermarkEngine::new().with_probe(Some("minimax.example.com"), Some("Asia/Shanghai"));
         let date = "Today's date is 2026-07-02.";
         let encoded = wm.encode_date_line(date);
         assert!(encoded.starts_with("Today"));
@@ -470,9 +484,14 @@ mod tests {
             };
             let date = "Today's date is 2026-07-02.";
             let encoded = wm.encode_date_line(date);
-            assert!(encoded.contains(expected_char),
-                    "domain={}, keyword={}: expected U+{:04X}, got {:?}",
-                    domain, keyword, expected_char as u32, encoded);
+            assert!(
+                encoded.contains(expected_char),
+                "domain={}, keyword={}: expected U+{:04X}, got {:?}",
+                domain,
+                keyword,
+                expected_char as u32,
+                encoded
+            );
         }
     }
 }

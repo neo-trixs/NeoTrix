@@ -49,7 +49,10 @@ impl Span {
 
     /// Record the requested GenAI model as a span attribute (GenAI semconv `gen_ai.request.model`).
     pub fn set_gen_ai_request_model(&self, model: &str) {
-        self.set_attribute("gen_ai.request.model", AttributeValue::String(model.to_string()));
+        self.set_attribute(
+            "gen_ai.request.model",
+            AttributeValue::String(model.to_string()),
+        );
     }
 
     /// Record the GenAI system name as a span attribute (`gen_ai.system`).
@@ -88,7 +91,9 @@ impl Tracer for ConsoleTracer {
         let elapsed = span.start.elapsed();
         log::debug!(
             "[tracer] end span={} kind={:?} elapsed={:?}",
-            span.name, span.kind, elapsed
+            span.name,
+            span.kind,
+            elapsed
         );
     }
 }
@@ -169,10 +174,7 @@ mod tests {
         ct.record("gpt-4", 100, 50);
         ct.record("gpt-4", 200, 100);
         assert_eq!(ct.total_prompt_tokens.load(Ordering::Relaxed), 300);
-        assert_eq!(
-            ct.total_completion_tokens.load(Ordering::Relaxed),
-            150
-        );
+        assert_eq!(ct.total_completion_tokens.load(Ordering::Relaxed), 150);
     }
 
     #[test]

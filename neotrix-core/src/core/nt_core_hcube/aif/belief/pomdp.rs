@@ -26,7 +26,11 @@ impl POMDPBeliefUpdater {
 
         for s in 0..self.num_states {
             // 防 OOB: observation 越界视为无观测
-            let l = likelihood.get(s).and_then(|row| row.get(observation)).copied().unwrap_or(0.0);
+            let l = likelihood
+                .get(s)
+                .and_then(|row| row.get(observation))
+                .copied()
+                .unwrap_or(0.0);
             posterior[s] = l * belief.get(s).copied().unwrap_or(0.0);
             evidence += posterior[s];
         }
@@ -48,7 +52,11 @@ impl POMDPBeliefUpdater {
         for i in 0..self.num_states {
             let b = belief.get(i).copied().unwrap_or(0.0);
             for j in 0..self.num_states {
-                let t = transition.get(i).and_then(|row| row.get(j)).copied().unwrap_or(0.0);
+                let t = transition
+                    .get(i)
+                    .and_then(|row| row.get(j))
+                    .copied()
+                    .unwrap_or(0.0);
                 next[j] += b * t;
             }
         }
@@ -85,11 +93,7 @@ mod tests {
     fn test_update_belief_zero_evidence() {
         let updater = POMDPBeliefUpdater::new(3);
         let belief = vec![0.0, 0.0, 1.0];
-        let likelihood = vec![
-            vec![1.0, 0.0],
-            vec![1.0, 0.0],
-            vec![0.0, 1.0],
-        ];
+        let likelihood = vec![vec![1.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]];
         let posterior = updater.update_belief(&belief, 0, &likelihood);
         let sum: f64 = posterior.iter().sum();
         assert!((sum - 1.0).abs() < 1e-10);

@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use super::axis::DimensionAxis;
 use super::coord::HyperCoord;
 use crate::core::nt_core_knowledge::TaskType;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CubeEntry {
@@ -35,28 +35,47 @@ impl Default for KnowledgeHyperCube {
 
 impl KnowledgeHyperCube {
     pub fn new() -> Self {
-        Self { entries: HashMap::new() }
+        Self {
+            entries: HashMap::new(),
+        }
     }
 
     pub fn insert(&mut self, coord: &HyperCoord, source: &str, title: &str) {
         let key = format!("{}-{}", source, title);
-        self.entries.insert(key.clone(), CubeEntry {
-            key, coord: coord.clone(), value: 0.0,
-            label: title.to_string(), source: source.to_string(),
-            access_count: 0, task_type: None,
-        });
+        self.entries.insert(
+            key.clone(),
+            CubeEntry {
+                key,
+                coord: coord.clone(),
+                value: 0.0,
+                label: title.to_string(),
+                source: source.to_string(),
+                access_count: 0,
+                task_type: None,
+            },
+        );
     }
 
     pub fn insert_with_task_type(
-        &mut self, coord: &HyperCoord, source: &str, title: &str,
+        &mut self,
+        coord: &HyperCoord,
+        source: &str,
+        title: &str,
         task_type: TaskType,
     ) {
         let key = format!("{}-{}", source, title);
-        self.entries.insert(key.clone(), CubeEntry {
-            key, coord: coord.clone(), value: 0.0,
-            label: title.to_string(), source: source.to_string(),
-            access_count: 0, task_type: Some(task_type),
-        });
+        self.entries.insert(
+            key.clone(),
+            CubeEntry {
+                key,
+                coord: coord.clone(),
+                value: 0.0,
+                label: title.to_string(),
+                source: source.to_string(),
+                access_count: 0,
+                task_type: Some(task_type),
+            },
+        );
     }
 
     pub fn query(&self, coord: &HyperCoord, top_k: usize) -> Vec<&CubeEntry> {
@@ -64,17 +83,19 @@ impl KnowledgeHyperCube {
             return Vec::new();
         }
         let coord_dense = coord.to_dense();
-        let mut scored: Vec<(&str, f64)> = self.entries.keys().map(|k| {
-            let entry = &self.entries[k];
-            let entry_dense = entry.coord.to_dense();
-            let dist = euclidean_16d(&coord_dense, &entry_dense);
-            (k.as_str(), dist)
-        }).collect();
+        let mut scored: Vec<(&str, f64)> = self
+            .entries
+            .keys()
+            .map(|k| {
+                let entry = &self.entries[k];
+                let entry_dense = entry.coord.to_dense();
+                let dist = euclidean_16d(&coord_dense, &entry_dense);
+                (k.as_str(), dist)
+            })
+            .collect();
         scored.sort_by(|a, b| a.1.total_cmp(&b.1));
         scored.truncate(top_k);
-        let results: Vec<&CubeEntry> = scored.into_iter()
-            .map(|(k, _)| &self.entries[k])
-            .collect();
+        let results: Vec<&CubeEntry> = scored.into_iter().map(|(k, _)| &self.entries[k]).collect();
         results
     }
 
@@ -83,16 +104,20 @@ impl KnowledgeHyperCube {
             return Vec::new();
         }
         let coord_dense = coord.to_dense();
-        let mut scored: Vec<QueryResult> = self.entries.values().map(|entry| {
-            let entry_dense = entry.coord.to_dense();
-            let distance = euclidean_16d(&coord_dense, &entry_dense);
-            let similarity = cosine_16d(&coord_dense, &entry_dense);
-            QueryResult {
-                entry: entry.clone(),
-                distance,
-                similarity,
-            }
-        }).collect();
+        let mut scored: Vec<QueryResult> = self
+            .entries
+            .values()
+            .map(|entry| {
+                let entry_dense = entry.coord.to_dense();
+                let distance = euclidean_16d(&coord_dense, &entry_dense);
+                let similarity = cosine_16d(&coord_dense, &entry_dense);
+                QueryResult {
+                    entry: entry.clone(),
+                    distance,
+                    similarity,
+                }
+            })
+            .collect();
         scored.sort_by(|a, b| a.distance.total_cmp(&b.distance));
         scored.truncate(top_k);
         for qr in &mut scored {
@@ -102,19 +127,28 @@ impl KnowledgeHyperCube {
     }
 
     pub fn query_by_task_type(
-        &self, coord: &HyperCoord, task_type: TaskType, top_k: usize,
+        &self,
+        coord: &HyperCoord,
+        task_type: TaskType,
+        top_k: usize,
     ) -> Vec<&CubeEntry> {
         if self.entries.is_empty() || top_k == 0 {
             return Vec::new();
         }
         let coord_dense = coord.to_dense();
-        let mut scored: Vec<(&str, f64)> = self.entries.keys().filter_map(|k| {
-            let entry = &self.entries[k];
-            if entry.task_type != Some(task_type) { return None; }
-            let entry_dense = entry.coord.to_dense();
-            let dist = euclidean_16d(&coord_dense, &entry_dense);
-            Some((k.as_str(), dist))
-        }).collect();
+        let mut scored: Vec<(&str, f64)> = self
+            .entries
+            .keys()
+            .filter_map(|k| {
+                let entry = &self.entries[k];
+                if entry.task_type != Some(task_type) {
+                    return None;
+                }
+                let entry_dense = entry.coord.to_dense();
+                let dist = euclidean_16d(&coord_dense, &entry_dense);
+                Some((k.as_str(), dist))
+            })
+            .collect();
         scored.sort_by(|a, b| a.1.total_cmp(&b.1));
         scored.truncate(top_k);
         scored.into_iter().map(|(k, _)| &self.entries[k]).collect()
@@ -122,11 +156,18 @@ impl KnowledgeHyperCube {
 
     pub fn insert_with_value(&mut self, coord: &HyperCoord, source: &str, title: &str, value: f64) {
         let key = format!("{}-{}", source, title);
-        self.entries.insert(key.clone(), CubeEntry {
-            key, coord: coord.clone(), value,
-            label: title.to_string(), source: source.to_string(),
-            access_count: 0, task_type: None,
-        });
+        self.entries.insert(
+            key.clone(),
+            CubeEntry {
+                key,
+                coord: coord.clone(),
+                value,
+                label: title.to_string(),
+                source: source.to_string(),
+                access_count: 0,
+                task_type: None,
+            },
+        );
     }
 
     pub fn remove_entry(&mut self, key: &str) -> Option<CubeEntry> {
@@ -176,7 +217,9 @@ impl KnowledgeHyperCube {
             Some(a) => a,
             None => return 0.0,
         };
-        let active = self.entries.values()
+        let active = self
+            .entries
+            .values()
             .filter(|e| e.coord.get(axis).abs() > 1e-9)
             .count();
         active as f64 / self.entries.len() as f64
@@ -212,7 +255,11 @@ fn cosine_16d(a: &[f64; 16], b: &[f64; 16]) -> f64 {
         mag_b += b[i] * b[i];
     }
     let denom = mag_a.sqrt() * mag_b.sqrt();
-    if denom < 1e-12 { 0.0 } else { dot / denom }
+    if denom < 1e-12 {
+        0.0
+    } else {
+        dot / denom
+    }
 }
 
 #[cfg(test)]
@@ -321,9 +368,21 @@ mod tests {
         let cre_idx = DimensionAxis::Creativity as usize;
         let code_idx = DimensionAxis::CodeUnderstanding as usize;
 
-        assert_eq!(cube.coord_density(abs_idx), 1.0, "both entries set Abstraction");
-        assert_eq!(cube.coord_density(cre_idx), 0.5, "one of two entries sets Creativity");
-        assert_eq!(cube.coord_density(code_idx), 0.0, "no entry sets CodeUnderstanding");
+        assert_eq!(
+            cube.coord_density(abs_idx),
+            1.0,
+            "both entries set Abstraction"
+        );
+        assert_eq!(
+            cube.coord_density(cre_idx),
+            0.5,
+            "one of two entries sets Creativity"
+        );
+        assert_eq!(
+            cube.coord_density(code_idx),
+            0.0,
+            "no entry sets CodeUnderstanding"
+        );
         assert_eq!(cube.coord_density(99), 0.0, "out-of-range dim is safe");
     }
 
@@ -333,8 +392,14 @@ mod tests {
         cube.insert(&test_coord(0.5), "src", "entry");
         let qr = cube.query_with_scores(&test_coord(0.5), 1);
         assert_eq!(qr.len(), 1);
-        assert!((qr[0].distance).abs() < 1e-9, "identical coord should have distance 0");
-        assert!((qr[0].similarity - 1.0).abs() < 1e-9, "identical coord should have similarity 1");
+        assert!(
+            (qr[0].distance).abs() < 1e-9,
+            "identical coord should have distance 0"
+        );
+        assert!(
+            (qr[0].similarity - 1.0).abs() < 1e-9,
+            "identical coord should have similarity 1"
+        );
     }
 
     #[test]
@@ -373,7 +438,10 @@ mod tests {
         cube.insert_with_task_type(&test_coord(0.5), "s3", "other", TaskType::Security);
         let results = cube.query_by_task_type(&test_coord(0.95), TaskType::Design, 5);
         assert_eq!(results.len(), 2);
-        assert_eq!(results[0].label, "near", "closest Design entry should be first");
+        assert_eq!(
+            results[0].label, "near",
+            "closest Design entry should be first"
+        );
     }
 
     #[test]

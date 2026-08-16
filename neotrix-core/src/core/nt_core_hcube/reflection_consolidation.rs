@@ -1,6 +1,6 @@
 #![deny(clippy::unwrap_used)]
 
-use super::fhrr_vsa::{FhrrHyperCube, similarity, bundle_two};
+use super::fhrr_vsa::{bundle_two, similarity, FhrrHyperCube};
 use rand::Rng;
 
 /// B129: HeLa-Mem inspired reflection consolidation agent.
@@ -113,7 +113,9 @@ impl ReflectionConsolidation {
             if let Some(vec) = hc.get_symbol(&name) {
                 if vec.len() == dim {
                     // Check that the vector contains valid phase angles
-                    let valid = vec.iter().all(|&v| v.is_finite() && (0.0..=std::f64::consts::TAU).contains(&v));
+                    let valid = vec
+                        .iter()
+                        .all(|&v| v.is_finite() && (0.0..=std::f64::consts::TAU).contains(&v));
                     if valid {
                         verified += 1;
                     }
@@ -151,7 +153,8 @@ impl ReflectionConsolidation {
             let mut similarities: Vec<(usize, f64)> = (0..names.len())
                 .filter(|&j| j != i && !names[j].starts_with("composite:"))
                 .filter_map(|j| {
-                    hc.get_symbol(&names[j]).map(|vec_b| (j, similarity(&vec_a, vec_b)))
+                    hc.get_symbol(&names[j])
+                        .map(|vec_b| (j, similarity(&vec_a, vec_b)))
                 })
                 .filter(|(_, sim)| *sim >= self.cross_link_threshold)
                 .collect();
@@ -161,7 +164,9 @@ impl ReflectionConsolidation {
 
             for (j, _) in similarities {
                 let name_b = &names[j];
-                let Some(vec_b) = hc.get_symbol(name_b) else { continue };
+                let Some(vec_b) = hc.get_symbol(name_b) else {
+                    continue;
+                };
                 let vec_b = vec_b.to_vec();
                 let composite = bundle_two(&vec_a, &vec_b);
                 let link_name = if name_a < name_b {
@@ -298,7 +303,11 @@ mod tests {
         assert!(report.cross_links > 0, "should create cross-links");
         // Check that composite symbols were created
         let names = hc.symbol_names();
-        let composites: Vec<&str> = names.iter().map(|s| s.as_str()).filter(|n| n.starts_with("composite:")).collect();
+        let composites: Vec<&str> = names
+            .iter()
+            .map(|s| s.as_str())
+            .filter(|n| n.starts_with("composite:"))
+            .collect();
         assert!(composites.len() > 0, "should have composite symbols");
     }
 
@@ -332,8 +341,14 @@ mod tests {
             ..Default::default()
         };
         // Verify "original" and "copy" have high similarity
-        let sim = similarity(hc.get_symbol("original").unwrap(), hc.get_symbol("copy").unwrap());
-        assert!(sim > 0.99, "identical vectors should have near-1.0 similarity");
+        let sim = similarity(
+            hc.get_symbol("original").unwrap(),
+            hc.get_symbol("copy").unwrap(),
+        );
+        assert!(
+            sim > 0.99,
+            "identical vectors should have near-1.0 similarity"
+        );
 
         let report = agent.consolidate(&mut hc);
         assert!(report.merged > 0, "should merge near-identical symbols");
@@ -370,8 +385,11 @@ mod tests {
         let r1 = agent.consolidate(&mut hc);
         // Second pass should not add the same composites again (at most same count)
         let r2 = agent.consolidate(&mut hc);
-        assert!(r2.cross_links <= r1.cross_links,
+        assert!(
+            r2.cross_links <= r1.cross_links,
             "second pass should not add more new cross-links than first pass ({} <= {})",
-            r2.cross_links, r1.cross_links);
+            r2.cross_links,
+            r1.cross_links
+        );
     }
 }

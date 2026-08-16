@@ -1,7 +1,7 @@
+use crate::core::nt_core_knowledge::KnowledgeSource;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
-use serde::{Deserialize, Serialize};
-use crate::core::nt_core_knowledge::KnowledgeSource;
 
 /// Records a single absorption event: which source, when, and the applied weight.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,13 +27,19 @@ pub struct SourceAccessTracker {
 
 impl Default for SourceAccessTracker {
     fn default() -> Self {
-        Self { records: HashMap::new(), decay_threshold: 3 }
+        Self {
+            records: HashMap::new(),
+            decay_threshold: 3,
+        }
     }
 }
 
 impl SourceAccessTracker {
     pub fn new(decay_threshold: usize) -> Self {
-        Self { records: HashMap::new(), decay_threshold }
+        Self {
+            records: HashMap::new(),
+            decay_threshold,
+        }
     }
 
     /// Records one access to the given source, updating its timestamp and count.
@@ -50,15 +56,20 @@ impl SourceAccessTracker {
     /// Returns true if the source has been accessed at least `decay_threshold` times.
     pub fn is_hot(&self, source: &KnowledgeSource) -> bool {
         let key = format!("{:?}", source);
-        self.records.get(&key).is_some_and(|r| r.access_count >= self.decay_threshold)
+        self.records
+            .get(&key)
+            .is_some_and(|r| r.access_count >= self.decay_threshold)
     }
 
     /// Returns sources that have been accessed fewer than `min_accesses` times.
     pub fn prune_cold(&self, min_accesses: usize) -> Vec<KnowledgeSource> {
-        KnowledgeSource::all().into_iter()
+        KnowledgeSource::all()
+            .into_iter()
             .filter(|s| {
                 let key = format!("{:?}", s);
-                self.records.get(&key).is_none_or(|r| r.access_count < min_accesses)
+                self.records
+                    .get(&key)
+                    .is_none_or(|r| r.access_count < min_accesses)
             })
             .collect()
     }

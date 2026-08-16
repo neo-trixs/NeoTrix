@@ -10,42 +10,35 @@
 
 pub use crate::core::nt_core_meta as meta;
 
-pub use crate::core::nt_core_meta::self_model::{
-    SelfModel, ModuleInfo, FileInfo, DepGraph, DepEdge, DepKind,
-    TestCoverage, CompilationHealth, TechDebtInventory,
-    TechDebtItem, TechDebtKind, DebtSeverity,
-    EvolutionEvent, EventKind, ComponentMap, ComponentNode,
-};
-pub use crate::core::nt_core_meta::scanner::CodeScanner;
+pub use crate::core::nt_core_meta::metacognition_loop::{MetaCognitiveLoop, MetaCycleResult};
 pub use crate::core::nt_core_meta::monitor::{
-    MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,
-};
-pub use crate::core::nt_core_meta::weakness::{
-    WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary,
+    AlertSeverity, HealthCheck, HealthTrend, MetaAlert, MetaMonitor,
 };
 pub use crate::core::nt_core_meta::planner::{
-    EvolutionPlanner, PlannedEvolution, ImpactEstimate,
-    RiskLevel, EvolutionAction, ActionStatus, MetaGoal, MetaGoalBridge,
+    ActionStatus, EvolutionAction, EvolutionPlanner, ImpactEstimate, MetaGoal, MetaGoalBridge,
+    PlannedEvolution, RiskLevel,
 };
-pub use crate::core::nt_core_meta::metacognition_loop::{
-    MetaCognitiveLoop, MetaCycleResult,
+pub use crate::core::nt_core_meta::scanner::CodeScanner;
+pub use crate::core::nt_core_meta::self_model::{
+    CompilationHealth, ComponentMap, ComponentNode, DebtSeverity, DepEdge, DepGraph, DepKind,
+    EventKind, EvolutionEvent, FileInfo, ModuleInfo, SelfModel, TechDebtInventory, TechDebtItem,
+    TechDebtKind, TestCoverage,
+};
+pub use crate::core::nt_core_meta::weakness::{
+    Weakness, WeaknessAnalyzer, WeaknessReport, WeaknessSummary,
 };
 
 // +1 Observer（元认知+PRM头合并）
-pub use crate::core::nt_core_observer::{
-    OneObserver, ObserverReport, E8Observer,
-};
+pub use crate::core::nt_core_observer::{E8Observer, ObserverReport, OneObserver};
 pub use crate::core::nt_core_observer_error::{
-    ObserverErrorRecovery, RetryConfig, CircuitBreaker, CircuitState,
-    FallbackHandler, ErrorRecoveryError,
+    CircuitBreaker, CircuitState, ErrorRecoveryError, FallbackHandler, ObserverErrorRecovery,
+    RetryConfig,
 };
 
 // 知识缺口检测
 pub use crate::core::nt_core_meta::knowledge_gap_detector::{
-    KnowledgeGapDetector, KnowledgeGap, GapReport, GapCluster, GapCategory,
+    GapCategory, GapCluster, GapReport, KnowledgeGap, KnowledgeGapDetector,
 };
 
 // 能力观察者（TurkeyScientist - 在 l7_capability/observer.rs 中）
-pub use crate::core::l7_capability::{
-    TurkeyScientist, IllusionRisk, IllusionReport,
-};
+pub use crate::core::l7_capability::{IllusionReport, IllusionRisk, TurkeyScientist};

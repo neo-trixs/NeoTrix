@@ -310,7 +310,6 @@ impl Default for ConversationObserver {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 

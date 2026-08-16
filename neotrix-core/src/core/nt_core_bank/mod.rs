@@ -1,20 +1,20 @@
-mod tier;
-mod mem;
-mod stats;
-mod iteration;
-mod pipeline;
-mod offload;
-mod l1;
 mod bank;
+mod iteration;
+mod l1;
+mod mem;
+mod offload;
+mod pipeline;
+mod stats;
+mod tier;
 
-pub use tier::{MemoryTier, MemoryLifecycle};
-pub use mem::{ReasoningMemory, T3ViewType, T3Views, TemporalContext};
-pub use stats::{ReasoningBankStats, MemoryDetailedStats};
 pub use bank::ReasoningBank;
 pub use iteration::MemoryIterationResult;
-pub use pipeline::{PipelineConfig, PipelineState};
+pub use l1::{ExtractionPrompt, L1Memory, Persona, SceneBlock};
+pub use mem::{ReasoningMemory, T3ViewType, T3Views, TemporalContext};
 pub use offload::OffloadManager;
-pub use l1::{L1Memory, SceneBlock, Persona, ExtractionPrompt};
+pub use pipeline::{PipelineConfig, PipelineState};
+pub use stats::{MemoryDetailedStats, ReasoningBankStats};
+pub use tier::{MemoryLifecycle, MemoryTier};
 
 #[cfg(test)]
 mod tests {

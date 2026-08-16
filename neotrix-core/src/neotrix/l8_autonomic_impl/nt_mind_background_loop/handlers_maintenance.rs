@@ -351,7 +351,8 @@ impl BackgroundLoopHandle {
     /// 不再只计数不执行 — 巡检从"报告"升级为"自愈闭环"。
     pub(crate) async fn handle_healer_scan(&mut self) {
         let dir = std::path::Path::new(".");
-        let report = self.healer_registry.run_full_scan(dir);
+        // run_full_scan 结果不在此处直接消费 — 后续经 last_report 读取
+        let _ = self.healer_registry.run_full_scan(dir);
         let applied = self.healer_registry.apply_auto_fixable();
         if applied > 0 {
             log::info!("[bg] healers: {} auto-fixes landed (total {})", applied, self.healer_registry.auto_fixes_applied);

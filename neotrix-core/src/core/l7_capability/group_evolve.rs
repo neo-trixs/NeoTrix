@@ -54,7 +54,12 @@ pub struct ConsensusProposal {
 }
 
 impl ConsensusProposal {
-    pub fn new(id: impl Into<String>, proposer: impl Into<String>, title: impl Into<String>, description: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        proposer: impl Into<String>,
+        title: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             proposer: proposer.into(),
@@ -191,7 +196,9 @@ impl GroupCoordinator {
         let mut candidates: Vec<&PeerState> = self
             .peers
             .values()
-            .filter(|p| p.status == PeerStatus::Online && p.capabilities.iter().any(|c| c == capability))
+            .filter(|p| {
+                p.status == PeerStatus::Online && p.capabilities.iter().any(|c| c == capability)
+            })
             .collect();
         candidates.sort_by(|a, b| {
             b.trust_score
@@ -212,13 +219,29 @@ impl GroupCoordinator {
 
     pub fn stats(&self) -> GroupCoordinatorStats {
         let peers = self.peers.len() as u32;
-        let online = self.peers.values().filter(|p| p.status == PeerStatus::Online).count() as u32;
+        let online = self
+            .peers
+            .values()
+            .filter(|p| p.status == PeerStatus::Online)
+            .count() as u32;
         let total_proposals = self.proposals.len() as u32;
-        let accepted = self.proposals.iter().filter(|p| p.state == ConsensusState::Accepted).count() as u32;
+        let accepted = self
+            .proposals
+            .iter()
+            .filter(|p| p.state == ConsensusState::Accepted)
+            .count() as u32;
         let trust_sum: f64 = self.peers.values().map(|p| p.trust_score).sum();
-        let avg_trust = if self.peers.is_empty() { 0.0 } else { trust_sum / self.peers.len() as f64 };
+        let avg_trust = if self.peers.is_empty() {
+            0.0
+        } else {
+            trust_sum / self.peers.len() as f64
+        };
         let latency_sum: u64 = self.peers.values().map(|p| p.latency_ms).sum();
-        let avg_latency_ms = if self.peers.is_empty() { 0 } else { latency_sum / self.peers.len() as u64 };
+        let avg_latency_ms = if self.peers.is_empty() {
+            0
+        } else {
+            latency_sum / self.peers.len() as u64
+        };
         GroupCoordinatorStats {
             peers,
             online,
@@ -255,13 +278,26 @@ mod tests {
         coord.register_peer(PeerState::new("bob"));
         coord.register_peer(PeerState::new("charlie"));
 
-        coord.submit_proposal(ConsensusProposal::new("p1", "alice", "refactor", "refactor core"));
-        let vote1 = Vote { peer_id: "alice".into(), approve: true, rationale: "".into() };
-        let vote2 = Vote { peer_id: "bob".into(), approve: true, rationale: "".into() };
+        coord.submit_proposal(ConsensusProposal::new(
+            "p1",
+            "alice",
+            "refactor",
+            "refactor core",
+        ));
+        let vote1 = Vote {
+            peer_id: "alice".into(),
+            approve: true,
+            rationale: "".into(),
+        };
+        let vote2 = Vote {
+            peer_id: "bob".into(),
+            approve: true,
+            rationale: "".into(),
+        };
         coord.vote("p1", vote1);
         match coord.vote("p1", vote2) {
-            Some(ConsensusState::Accepted) => {},
-            _ => {},
+            Some(ConsensusState::Accepted) => {}
+            _ => {}
         }
     }
 

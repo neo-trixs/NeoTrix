@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use crate::core::nt_core_e8_vsa::E8VsaEmbedding;
+use serde::{Deserialize, Serialize};
 
 /// VSA-aware content scorer for GWT.
 ///
@@ -28,13 +28,18 @@ impl VsaContentScorer {
         if task_embedding.len() != self.embedding.dim {
             return 0.5;
         }
-        self.embedding.similarity(state_hv, task_embedding).max(0.0).min(1.0)
+        self.embedding
+            .similarity(state_hv, task_embedding)
+            .max(0.0)
+            .min(1.0)
     }
 
     /// Score a transition between two E8 states (for GWT resonance).
     pub fn score_transition(&self, from: u8, to: u8) -> f64 {
-        self.embedding.similarity(self.embedding.embed(from), self.embedding.embed(to))
-            .max(0.0).min(1.0)
+        self.embedding
+            .similarity(self.embedding.embed(from), self.embedding.embed(to))
+            .max(0.0)
+            .min(1.0)
     }
 
     pub fn embedding(&self) -> &E8VsaEmbedding {
@@ -65,6 +70,9 @@ mod tests {
         let scorer = VsaContentScorer::new(64);
         let same = scorer.score_transition(5, 5);
         let diff = scorer.score_transition(5, 37);
-        assert!(diff <= same, "different states should have lower or equal score");
+        assert!(
+            diff <= same,
+            "different states should have lower or equal score"
+        );
     }
 }

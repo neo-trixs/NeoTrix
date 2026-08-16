@@ -75,7 +75,10 @@ impl AgentPatternRegistry {
     }
 
     pub fn find_by_category(&self, category: AgentPatternCategory) -> Vec<&AgentPatternMetadata> {
-        self.patterns.values().filter(|p| p.category == category).collect()
+        self.patterns
+            .values()
+            .filter(|p| p.category == category)
+            .collect()
     }
 
     pub fn categories(&self) -> Vec<AgentPatternCategory> {
@@ -105,7 +108,8 @@ impl Default for AgentPatternRegistry {
     }
 }
 
-static BUILTIN_PATTERNS: LazyLock<Vec<AgentPatternMetadata>> = LazyLock::new(|| vec![
+static BUILTIN_PATTERNS: LazyLock<Vec<AgentPatternMetadata>> = LazyLock::new(|| {
+    vec![
     AgentPatternMetadata {
         name: "ai-travel-agent".to_string(),
         description: "Personalized day-by-day travel itineraries with API integrations".to_string(),
@@ -259,7 +263,8 @@ static BUILTIN_PATTERNS: LazyLock<Vec<AgentPatternMetadata>> = LazyLock::new(|| 
         requires_voice: false,
         tags: vec!["research".to_string(), "synthesis".to_string(), "report".to_string()],
     },
-]);
+]
+});
 
 #[cfg(test)]
 mod tests {

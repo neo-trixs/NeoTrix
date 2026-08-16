@@ -1,14 +1,12 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum EvictionPolicy {
     #[default]
     Lfu,
     Lru,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct CacheConfig {
@@ -133,7 +131,13 @@ impl SemanticCache {
     }
 
     /// Store with both exact and embedding-based lookup.
-    pub fn set_with_embedding(&mut self, namespace: &str, key: &str, value: String, embedding: Vec<f64>) {
+    pub fn set_with_embedding(
+        &mut self,
+        namespace: &str,
+        key: &str,
+        value: String,
+        embedding: Vec<f64>,
+    ) {
         // Exact tier
         let _full_key = format!("{}:{}", namespace, key);
         self.set_exact(namespace, key, value.clone());
@@ -144,12 +148,15 @@ impl SemanticCache {
         if total >= self.capacity * 2 {
             self.evict_semantic();
         }
-        self.embedding_entries.insert(embed_key, EmbeddingEntry {
-            value,
-            embedding,
-            inserted_at: Instant::now(),
-            hit_count: 0,
-        });
+        self.embedding_entries.insert(
+            embed_key,
+            EmbeddingEntry {
+                value,
+                embedding,
+                inserted_at: Instant::now(),
+                hit_count: 0,
+            },
+        );
     }
 
     fn hash_embedding(embedding: &[f64]) -> u64 {

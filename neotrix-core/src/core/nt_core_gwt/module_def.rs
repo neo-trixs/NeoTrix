@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// L0 共享专型枚举（定义在 nt_core_traits 中以防 L4→L5 反向依赖）
@@ -90,17 +90,22 @@ impl OrchestratorAgent {
     pub fn current_specialist_for_phase(&self) -> Option<SpecialistType> {
         match self.phase {
             OrchestratorPhase::Backlog => None,
-            OrchestratorPhase::Planning => {
-                self.assigned_specialists.iter().find(|s| matches!(s,
-                    SpecialistType::Planner | SpecialistType::GoalPrioritizer)).copied()
-            }
-            OrchestratorPhase::Running => {
-                self.assigned_specialists.first().copied()
-            }
-            OrchestratorPhase::Review => {
-                self.assigned_specialists.iter().find(|s| matches!(s,
-                    SpecialistType::ReflectionEngine | SpecialistType::MetaCognitionAnalyst)).copied()
-            }
+            OrchestratorPhase::Planning => self
+                .assigned_specialists
+                .iter()
+                .find(|s| matches!(s, SpecialistType::Planner | SpecialistType::GoalPrioritizer))
+                .copied(),
+            OrchestratorPhase::Running => self.assigned_specialists.first().copied(),
+            OrchestratorPhase::Review => self
+                .assigned_specialists
+                .iter()
+                .find(|s| {
+                    matches!(
+                        s,
+                        SpecialistType::ReflectionEngine | SpecialistType::MetaCognitionAnalyst
+                    )
+                })
+                .copied(),
             OrchestratorPhase::Done | OrchestratorPhase::Cancelled => None,
         }
     }
@@ -113,7 +118,13 @@ impl OrchestratorAgent {
 impl SpecialistModule {
     pub fn new(specialist_type: SpecialistType, name: String) -> Self {
         let module_type = specialist_type;
-        Self { name, specialist_type, module_type, activation: 0.0, harness_evidence: HashMap::new() }
+        Self {
+            name,
+            specialist_type,
+            module_type,
+            activation: 0.0,
+            harness_evidence: HashMap::new(),
+        }
     }
 
     pub fn activate(&mut self, salience: f64) {
@@ -139,7 +150,10 @@ impl SpecialistModule {
     }
 
     pub fn record_harness_evidence(&mut self, env: &str, pattern: &str) {
-        self.harness_evidence.entry(env.to_string()).or_default().push(pattern.to_string());
+        self.harness_evidence
+            .entry(env.to_string())
+            .or_default()
+            .push(pattern.to_string());
     }
 }
 

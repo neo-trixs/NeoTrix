@@ -1,5 +1,5 @@
-use std::time::{SystemTime, UNIX_EPOCH};
 use super::SensoryEvent;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Result from a real sensor capture.
 #[derive(Debug, Clone)]
@@ -13,7 +13,10 @@ pub struct SensorSample {
 impl SensorSample {
     pub fn new(raw: Vec<u8>) -> Self {
         Self {
-            timestamp_ms: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
+            timestamp_ms: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
             raw_bytes: raw,
             metadata: std::collections::HashMap::new(),
             confidence: 0.9,
@@ -25,7 +28,9 @@ impl SensorSample {
         self
     }
 
-    pub fn size(&self) -> usize { self.raw_bytes.len() }
+    pub fn size(&self) -> usize {
+        self.raw_bytes.len()
+    }
 }
 
 /// Trait for real (non-simulated) sensor implementations.

@@ -47,8 +47,13 @@ impl SkillManifest {
             return None;
         }
         Some(Self {
-            name, description, version, author,
-            allowed_tools, tags, path: path.to_path_buf(),
+            name,
+            description,
+            version,
+            author,
+            allowed_tools,
+            tags,
+            path: path.to_path_buf(),
         })
     }
 
@@ -82,7 +87,11 @@ pub struct ProgressiveDisclosure {
 
 impl ProgressiveDisclosure {
     pub fn new() -> Self {
-        Self { level: DisclosureLevel::Index, manifest: None, full_body: None }
+        Self {
+            level: DisclosureLevel::Index,
+            manifest: None,
+            full_body: None,
+        }
     }
 
     pub fn load_manifest(&mut self, path: &Path, content: &str) {
@@ -126,7 +135,9 @@ impl ProgressiveDisclosure {
 }
 
 impl Default for ProgressiveDisclosure {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct SkillRegistry {
@@ -136,7 +147,10 @@ pub struct SkillRegistry {
 
 impl SkillRegistry {
     pub fn new() -> Self {
-        Self { skills: HashMap::new(), paths: Vec::new() }
+        Self {
+            skills: HashMap::new(),
+            paths: Vec::new(),
+        }
     }
 
     pub fn scan_directory(&mut self, dir: &Path) -> std::io::Result<Vec<String>> {
@@ -176,13 +190,17 @@ impl SkillRegistry {
         let q = query.to_lowercase();
         self.skills
             .values()
-            .filter(|s| s.name.to_lowercase().contains(&q) || s.description.to_lowercase().contains(&q))
+            .filter(|s| {
+                s.name.to_lowercase().contains(&q) || s.description.to_lowercase().contains(&q)
+            })
             .collect()
     }
 }
 
 impl Default for SkillRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -215,7 +233,11 @@ pub struct SkillDoc {
 }
 
 impl SkillDoc {
-    pub fn new(id: impl Into<String>, content: impl Into<String>, domain: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        domain: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             content: content.into(),
@@ -304,11 +326,7 @@ impl SkillExtractor {
             successes.len() as f64 / trajectories.len() as f64
         };
 
-        let doc = SkillDoc::new(
-            format!("skill-{}-v1", domain),
-            content,
-            domain,
-        );
+        let doc = SkillDoc::new(format!("skill-{}-v1", domain), content, domain);
         SkillDoc {
             metrics: SkillMetrics {
                 success_rate,
@@ -378,7 +396,12 @@ impl RejectedEditBuffer {
     pub fn get_feedback(&self) -> Vec<String> {
         self.edits
             .iter()
-            .map(|e| format!("{:?} on '{}' (delta: {:.3})", e.edit_type, e.target, e.score_delta))
+            .map(|e| {
+                format!(
+                    "{:?} on '{}' (delta: {:.3})",
+                    e.edit_type, e.target, e.score_delta
+                )
+            })
             .collect()
     }
 }
@@ -487,7 +510,12 @@ impl SkillBank {
             .collect()
     }
 
-    pub fn evolve(&mut self, id: &str, batch: &[Trajectory], optimizer: &mut SkillOptimizer) -> bool {
+    pub fn evolve(
+        &mut self,
+        id: &str,
+        batch: &[Trajectory],
+        optimizer: &mut SkillOptimizer,
+    ) -> bool {
         if let Some(doc) = self.skills.get(id).cloned() {
             let updated = optimizer.optimize(&doc, batch);
             if updated.version != doc.version {
@@ -575,10 +603,16 @@ mod tests {
     fn test_validation_gate_rejects_bad() {
         let doc = SkillDoc::new("test", "bad skill", "test");
         let held_out = vec![sample_trajectory("test", false)];
-        assert!(!ValidationGate::validate(&SkillDoc {
-            metrics: SkillMetrics { success_rate: 0.8, ..Default::default() },
-            ..doc
-        }, &held_out));
+        assert!(!ValidationGate::validate(
+            &SkillDoc {
+                metrics: SkillMetrics {
+                    success_rate: 0.8,
+                    ..Default::default()
+                },
+                ..doc
+            },
+            &held_out
+        ));
     }
 
     #[test]

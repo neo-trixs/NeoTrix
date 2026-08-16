@@ -188,7 +188,10 @@ impl SparseMoERouter {
         });
         let mut active = [order[0], order[1]];
         active.sort_unstable();
-        let routing = SparseRouting { active_groups: active, scores };
+        let routing = SparseRouting {
+            active_groups: active,
+            scores,
+        };
         self.last_routing = Some(routing);
         routing
     }
@@ -257,7 +260,9 @@ mod tests {
     #[test]
     fn test_group_size_is_eight() {
         for g in 0..NUM_GROUPS {
-            let count = (0..64u8).filter(|s| (*s as usize) / GROUP_SIZE == g).count();
+            let count = (0..64u8)
+                .filter(|s| (*s as usize) / GROUP_SIZE == g)
+                .count();
             assert_eq!(count, GROUP_SIZE);
         }
     }
@@ -338,7 +343,11 @@ mod tests {
         // the computation-heavy groups (1 = Deep Dive, 3 = First-Principles).
         let routing = r.route(0, E8TaskType::Math, None);
         let has_compute = routing.active_groups.contains(&1) || routing.active_groups.contains(&3);
-        assert!(has_compute, "Math should activate a computation group, got {:?}", routing.active_groups);
+        assert!(
+            has_compute,
+            "Math should activate a computation group, got {:?}",
+            routing.active_groups
+        );
     }
 
     #[test]
@@ -359,7 +368,11 @@ mod tests {
         let mut r = SparseMoERouter::new();
         let routing = r.route(56, E8TaskType::Agentic, None);
         // State 56 lives in group 7; Agentic affinity favors it (0.8).
-        assert!(routing.is_active(56), "current state's group should be active, got {:?}", routing.active_groups);
+        assert!(
+            routing.is_active(56),
+            "current state's group should be active, got {:?}",
+            routing.active_groups
+        );
     }
 
     #[test]
@@ -370,11 +383,16 @@ mod tests {
         // scores[g] 必须 ≤ 两个激活组各自的分数。
         let mut r = SparseMoERouter::new();
         for task in E8TaskType::ALL {
-            for state in [0u8, 3, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63, 11, 37, 61] {
+            for state in [
+                0u8, 3, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63, 11, 37, 61,
+            ] {
                 let routing = r.route(state, task, None);
                 let a0 = routing.active_groups[0];
                 let a1 = routing.active_groups[1];
-                assert_ne!(a0, a1, "top-2 must be distinct (task={task:?}, state={state})");
+                assert_ne!(
+                    a0, a1,
+                    "top-2 must be distinct (task={task:?}, state={state})"
+                );
                 // 两个激活组互为 top-2: 任何未激活组不得超过其中任一激活组
                 for g in 0..NUM_GROUPS {
                     if g != a0 && g != a1 {
@@ -400,7 +418,11 @@ mod tests {
         let mut router = SparseMoERouter::new();
         for task in E8TaskType::ALL {
             let routing = router.route(24, task, None);
-            assert_eq!(routing.sparsity(), 0.75, "sparsity must equal 1 - TOP_K/NUM_GROUPS (task={task:?})");
+            assert_eq!(
+                routing.sparsity(),
+                0.75,
+                "sparsity must equal 1 - TOP_K/NUM_GROUPS (task={task:?})"
+            );
             let masked = router.apply_mask(&routing, &uniform());
             let frozen = masked
                 .iter()
@@ -419,7 +441,11 @@ mod tests {
             }
             // 激活 slot 数恰为 TOP_K * GROUP_SIZE = 16
             let active = masked.iter().filter(|&&x| x > 0.0).count();
-            assert_eq!(active, TOP_K * GROUP_SIZE, "active slots count (task={task:?})");
+            assert_eq!(
+                active,
+                TOP_K * GROUP_SIZE,
+                "active slots count (task={task:?})"
+            );
         }
     }
 
@@ -438,9 +464,12 @@ mod tests {
             );
         }
         // Math: 起始态在全部 8 组时, 组 1 或 3 (计算组) 必须被激活
-        for state in [0u8, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63] {
+        for state in [
+            0u8, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63,
+        ] {
             let routing = r.route(state, E8TaskType::Math, None);
-            let has_compute = routing.active_groups.contains(&1) || routing.active_groups.contains(&3);
+            let has_compute =
+                routing.active_groups.contains(&1) || routing.active_groups.contains(&3);
             assert!(
                 has_compute,
                 "Math should activate a computation group (1 or 3), got {:?} (state={state})",

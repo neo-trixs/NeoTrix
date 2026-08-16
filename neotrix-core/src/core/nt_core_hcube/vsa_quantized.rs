@@ -20,10 +20,7 @@ impl Complex {
 }
 
 fn complex_mul(a: Complex, b: Complex) -> Complex {
-    Complex::new(
-        a.re * b.re - a.im * b.im,
-        a.re * b.im + a.im * b.re,
-    )
+    Complex::new(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re)
 }
 
 fn is_power_of_two(n: usize) -> bool {
@@ -35,7 +32,11 @@ fn fft_inplace(x: &mut [Complex]) {
     if n <= 1 {
         return;
     }
-    debug_assert!(is_power_of_two(n), "FFT requires power of 2 length, got {}", n);
+    debug_assert!(
+        is_power_of_two(n),
+        "FFT requires power of 2 length, got {}",
+        n
+    );
 
     // Bit-reversal permutation
     let mut j = 0;
@@ -108,7 +109,11 @@ fn u8_to_f64(x: u8) -> f64 {
 fn f64_to_binary(x: f64) -> u8 {
     let clamped = x.max(-1.0).min(1.0);
     let u8val = ((clamped + 1.0) * 127.5) as u8;
-    if u8val >= 128 { 1 } else { 0 }
+    if u8val >= 128 {
+        1
+    } else {
+        0
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -140,15 +145,21 @@ impl QuantizedVSA {
 
     pub fn random_binary() -> Vec<u8> {
         let mut rng = rand::thread_rng();
-        (0..VSA_DIM).map(|_| if rng.gen_bool(0.5) { 255 } else { 0 }).collect()
+        (0..VSA_DIM)
+            .map(|_| if rng.gen_bool(0.5) { 255 } else { 0 })
+            .collect()
     }
     pub fn random_bit_vector() -> Vec<u8> {
         let mut rng = rand::thread_rng();
-        (0..VSA_DIM).map(|_| if rng.gen_bool(0.5) { 1 } else { 0 }).collect()
+        (0..VSA_DIM)
+            .map(|_| if rng.gen_bool(0.5) { 1 } else { 0 })
+            .collect()
     }
 
     pub fn binarize(v: &[u8]) -> Vec<u8> {
-        v.iter().map(|&x| if x >= BINARY_THRESHOLD { 1 } else { 0 }).collect()
+        v.iter()
+            .map(|&x| if x >= BINARY_THRESHOLD { 1 } else { 0 })
+            .collect()
     }
 
     pub fn bind(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -224,7 +235,10 @@ impl QuantizedVSA {
         // 多数投票标准 (Kanerva)：count*2 >= n，平局判 1。
         // 旧实现 count > n/2 在偶数 n 时要求全票 → 密度逐层衰减坍缩到全零。
         // n=1 → 返回原向量；n=3 → 需 2 票；n=2 → 任 1 票即通过。
-        counts.iter().map(|&c| if c * 2 >= n as i32 { 1 } else { 0 }).collect()
+        counts
+            .iter()
+            .map(|&c| if c * 2 >= n as i32 { 1 } else { 0 })
+            .collect()
     }
 
     pub fn permute(v: &[u8], shift: isize) -> Vec<u8> {
@@ -315,7 +329,10 @@ impl QuantizedVSA {
             }
         }
         // 同 bundle：count*2 >= n，平局判 1（输出 {0,255} 编码）
-        counts.iter().map(|&c| if c * 2 >= n as i32 { 255 } else { 0 }).collect()
+        counts
+            .iter()
+            .map(|&c| if c * 2 >= n as i32 { 255 } else { 0 })
+            .collect()
     }
 
     pub fn xor_bind(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -326,28 +343,35 @@ impl QuantizedVSA {
 /// Pack 8 binary values (each 0 or 1) into each byte for fast hamming distance.
 /// Input length must be multiple of 8. Output is input.len() / 8.
 pub fn pack_binary(v: &[u8]) -> Vec<u8> {
-    v.chunks(8).map(|chunk| {
-        let mut byte = 0u8;
-        for (i, &bit) in chunk.iter().enumerate() {
-            if bit != 0 {
-                byte |= 1 << i;
+    v.chunks(8)
+        .map(|chunk| {
+            let mut byte = 0u8;
+            for (i, &bit) in chunk.iter().enumerate() {
+                if bit != 0 {
+                    byte |= 1 << i;
+                }
             }
-        }
-        byte
-    }).collect()
+            byte
+        })
+        .collect()
 }
 
 /// Hamming distance on packed binary vectors using POPCNT via u8::count_ones().
 /// Both inputs must be same length.
 pub fn hamming_distance_packed(a: &[u8], b: &[u8]) -> u32 {
-    a.iter().zip(b.iter()).map(|(&x, &y)| (x ^ y).count_ones()).sum()
+    a.iter()
+        .zip(b.iter())
+        .map(|(&x, &y)| (x ^ y).count_ones())
+        .sum()
 }
 
 /// Normalized similarity [0,1] from packed hamming distance.
 /// 1.0 = identical, 0.0 = all bits differ.
 pub fn similarity_packed(a: &[u8], b: &[u8]) -> f64 {
     let total_bits = (a.len().min(b.len()) * 8) as f64;
-    if total_bits == 0.0 { return 0.0; }
+    if total_bits == 0.0 {
+        return 0.0;
+    }
     let dist = hamming_distance_packed(a, b) as f64;
     1.0 - dist / total_bits
 }
@@ -380,7 +404,10 @@ mod tests {
         let bound = QuantizedVSA::bind(&a, &a);
         // FHRR self-bind ≠ all zeros (unlike XOR). Check output is valid binary.
         assert_eq!(bound.len(), VSA_DIM);
-        assert!(!bound.iter().all(|&x| x == 0), "FHRR self-bind should NOT be all zeros");
+        assert!(
+            !bound.iter().all(|&x| x == 0),
+            "FHRR self-bind should NOT be all zeros"
+        );
         for &x in &bound {
             assert!(x == 0 || x == 1, "FHRR output must be binary");
         }
@@ -394,8 +421,11 @@ mod tests {
         let recovered = QuantizedVSA::unbind(&bound, &a);
         let sim = QuantizedVSA::similarity(&recovered, &b);
         // unbind(bind(a,b), a) ≈ b (circular deconvolution approximate inverse)
-        assert!(sim > 0.5,
-            "unbind(bind(a,b), a) should recover b approximately; sim = {}", sim);
+        assert!(
+            sim > 0.5,
+            "unbind(bind(a,b), a) should recover b approximately; sim = {}",
+            sim
+        );
     }
 
     #[test]
@@ -406,8 +436,10 @@ mod tests {
         assert_eq!(bundled.len(), VSA_DIM);
         let sim_a = QuantizedVSA::similarity(&bundled, &a);
         let sim_b = QuantizedVSA::similarity(&bundled, &b);
-        assert!(sim_a > 0.4 || sim_b > 0.4,
-            "bundled should be similar to at least one component");
+        assert!(
+            sim_a > 0.4 || sim_b > 0.4,
+            "bundled should be similar to at least one component"
+        );
     }
 
     #[test]
@@ -521,7 +553,9 @@ mod tests {
     #[test]
     fn test_pack_preserves_information() {
         let mut v = vec![0u8; VSA_DIM];
-        for i in (0..VSA_DIM).step_by(2) { v[i] = 1; }
+        for i in (0..VSA_DIM).step_by(2) {
+            v[i] = 1;
+        }
         let packed = pack_binary(&v);
         assert_eq!(packed.len(), VSA_DIM / 8);
         // Every other bit is 1 → each byte = 0b01010101 = 85

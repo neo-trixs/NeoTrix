@@ -52,7 +52,11 @@ impl<S> RevertibleEffect<S> for ClosureEffect<S> {
 }
 
 /// 便捷构造: 单个效果 (track 一次变更)。
-pub fn add_effect<S>(name: &str, forward: impl Fn(&mut S) + Send + Sync + 'static, inverse: impl Fn(&mut S) + Send + Sync + 'static) -> ClosureEffect<S> {
+pub fn add_effect<S>(
+    name: &str,
+    forward: impl Fn(&mut S) + Send + Sync + 'static,
+    inverse: impl Fn(&mut S) + Send + Sync + 'static,
+) -> ClosureEffect<S> {
     ClosureEffect::new(name, forward, inverse)
 }
 
@@ -138,8 +142,16 @@ mod tests {
     #[test]
     fn test_track_and_undo() {
         let mut ctx = RevertibleContext::new(0i32);
-        ctx.track(add_effect("inc", |s: &mut i32| *s += 1, |s: &mut i32| *s -= 1));
-        ctx.track(add_effect("inc2", |s: &mut i32| *s += 2, |s: &mut i32| *s -= 2));
+        ctx.track(add_effect(
+            "inc",
+            |s: &mut i32| *s += 1,
+            |s: &mut i32| *s -= 1,
+        ));
+        ctx.track(add_effect(
+            "inc2",
+            |s: &mut i32| *s += 2,
+            |s: &mut i32| *s -= 2,
+        ));
         assert_eq!(*ctx.state(), 3);
         assert_eq!(ctx.depth(), 2);
         assert_eq!(ctx.keys(), vec!["inc", "inc2"]);
@@ -153,8 +165,16 @@ mod tests {
     #[test]
     fn test_revert_key_removes_middle() {
         let mut ctx = RevertibleContext::new(10i32);
-        ctx.track(add_effect("a", |s: &mut i32| *s += 1, |s: &mut i32| *s -= 1));
-        ctx.track(add_effect("b", |s: &mut i32| *s += 100, |s: &mut i32| *s -= 100));
+        ctx.track(add_effect(
+            "a",
+            |s: &mut i32| *s += 1,
+            |s: &mut i32| *s -= 1,
+        ));
+        ctx.track(add_effect(
+            "b",
+            |s: &mut i32| *s += 100,
+            |s: &mut i32| *s -= 100,
+        ));
         assert!(ctx.revert_key("a"));
         assert_eq!(*ctx.state(), 110);
         assert_eq!(ctx.keys(), vec!["b"]);
@@ -163,9 +183,21 @@ mod tests {
     #[test]
     fn test_revert_keys_batch() {
         let mut ctx = RevertibleContext::new(0i32);
-        ctx.track(add_effect("x", |s: &mut i32| *s += 1, |s: &mut i32| *s -= 1));
-        ctx.track(add_effect("y", |s: &mut i32| *s += 10, |s: &mut i32| *s -= 10));
-        ctx.track(add_effect("z", |s: &mut i32| *s += 100, |s: &mut i32| *s -= 100));
+        ctx.track(add_effect(
+            "x",
+            |s: &mut i32| *s += 1,
+            |s: &mut i32| *s -= 1,
+        ));
+        ctx.track(add_effect(
+            "y",
+            |s: &mut i32| *s += 10,
+            |s: &mut i32| *s -= 10,
+        ));
+        ctx.track(add_effect(
+            "z",
+            |s: &mut i32| *s += 100,
+            |s: &mut i32| *s -= 100,
+        ));
         let n = ctx.revert_keys(&["x", "z"]);
         assert_eq!(n, 2);
         assert_eq!(*ctx.state(), 10);
@@ -175,8 +207,16 @@ mod tests {
     #[test]
     fn test_recover_rolls_back_everything() {
         let mut ctx = RevertibleContext::new(7i32);
-        ctx.track(add_effect("a", |s: &mut i32| *s += 3, |s: &mut i32| *s -= 3));
-        ctx.track(add_effect("b", |s: &mut i32| *s *= 2, |s: &mut i32| *s /= 2));
+        ctx.track(add_effect(
+            "a",
+            |s: &mut i32| *s += 3,
+            |s: &mut i32| *s -= 3,
+        ));
+        ctx.track(add_effect(
+            "b",
+            |s: &mut i32| *s *= 2,
+            |s: &mut i32| *s /= 2,
+        ));
         ctx.recover();
         assert_eq!(*ctx.state(), 7);
         assert!(ctx.is_clean());
@@ -185,7 +225,11 @@ mod tests {
     #[test]
     fn test_revert_unknown_key() {
         let mut ctx = RevertibleContext::new(0i32);
-        ctx.track(add_effect("a", |s: &mut i32| *s += 1, |s: &mut i32| *s -= 1));
+        ctx.track(add_effect(
+            "a",
+            |s: &mut i32| *s += 1,
+            |s: &mut i32| *s -= 1,
+        ));
         assert!(!ctx.revert_key("nope"));
         assert_eq!(ctx.depth(), 1);
     }
@@ -215,8 +259,20 @@ mod tests {
     #[test]
     fn test_string_state() {
         let mut ctx = RevertibleContext::new(String::new());
-        ctx.track(add_effect("push_hi", |s: &mut String| s.push_str("hi"), |s: &mut String| { s.truncate(s.len() - 2); }));
-        ctx.track(add_effect("push_bang", |s: &mut String| s.push('!'), |s: &mut String| { s.pop(); }));
+        ctx.track(add_effect(
+            "push_hi",
+            |s: &mut String| s.push_str("hi"),
+            |s: &mut String| {
+                s.truncate(s.len() - 2);
+            },
+        ));
+        ctx.track(add_effect(
+            "push_bang",
+            |s: &mut String| s.push('!'),
+            |s: &mut String| {
+                s.pop();
+            },
+        ));
         assert_eq!(*ctx.state(), "hi!");
         ctx.undo_last();
         assert_eq!(*ctx.state(), "hi");
@@ -243,14 +299,21 @@ mod tests {
             let mut ctx = RevertibleContext::new(&mut reg);
             ctx.track(add_effect(
                 "load:alpha",
-                |r: &mut &mut FakeRegistry| { r.plugins.insert("alpha".into(), "v1".into()); },
-                |r: &mut &mut FakeRegistry| { r.plugins.remove("alpha"); },
+                |r: &mut &mut FakeRegistry| {
+                    r.plugins.insert("alpha".into(), "v1".into());
+                },
+                |r: &mut &mut FakeRegistry| {
+                    r.plugins.remove("alpha");
+                },
             ));
             assert!(ctx.state().plugins.contains_key("alpha"));
             // 模拟第二个插件 on_load 失败 → 整批回滚
             ctx.recover();
         }
-        assert!(!reg.plugins.contains_key("alpha"), "transaction rolled back");
+        assert!(
+            !reg.plugins.contains_key("alpha"),
+            "transaction rolled back"
+        );
     }
 
     #[test]
@@ -260,13 +323,21 @@ mod tests {
             let mut ctx = RevertibleContext::new(&mut reg);
             ctx.track(add_effect(
                 "load:a",
-                |r: &mut &mut FakeRegistry| { r.plugins.insert("a".into(), "1".into()); },
-                |r: &mut &mut FakeRegistry| { r.plugins.remove("a"); },
+                |r: &mut &mut FakeRegistry| {
+                    r.plugins.insert("a".into(), "1".into());
+                },
+                |r: &mut &mut FakeRegistry| {
+                    r.plugins.remove("a");
+                },
             ));
             ctx.track(add_effect(
                 "load:b",
-                |r: &mut &mut FakeRegistry| { r.plugins.insert("b".into(), "2".into()); },
-                |r: &mut &mut FakeRegistry| { r.plugins.remove("b"); },
+                |r: &mut &mut FakeRegistry| {
+                    r.plugins.insert("b".into(), "2".into());
+                },
+                |r: &mut &mut FakeRegistry| {
+                    r.plugins.remove("b");
+                },
             ));
             // 撤销 a (栈中间) — 模拟 revert_key 在借用状态下的消费
             assert!(ctx.revert_key("load:a"));

@@ -1,4 +1,4 @@
-use super::self_model::{SelfModel};
+use super::self_model::SelfModel;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GapCategory {
@@ -76,16 +76,23 @@ pub struct KnowledgeGapDetector {
 }
 
 impl Default for KnowledgeGapDetector {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl KnowledgeGapDetector {
     pub fn new() -> Self {
         Self {
             known_sources: vec![
-                "dreamerv3".to_string(), "jepa".to_string(), "mirror".to_string(),
-                "camoufox".to_string(), "cua".to_string(), "playwright".to_string(),
-                "opencode".to_string(), "mcp".to_string(),
+                "dreamerv3".to_string(),
+                "jepa".to_string(),
+                "mirror".to_string(),
+                "camoufox".to_string(),
+                "cua".to_string(),
+                "playwright".to_string(),
+                "opencode".to_string(),
+                "mcp".to_string(),
             ],
             target_categories: vec![
                 GapCategory::MissingModule,
@@ -104,7 +111,11 @@ impl KnowledgeGapDetector {
     }
 
     /// Full gap detection run: scan → cluster → suggest
-    pub fn detect_gaps(&self, model: &SelfModel, weaknesses: &[super::weakness::Weakness]) -> GapReport {
+    pub fn detect_gaps(
+        &self,
+        model: &SelfModel,
+        weaknesses: &[super::weakness::Weakness],
+    ) -> GapReport {
         let gaps = self.scan_all_gaps(model, weaknesses);
         let clusters = self.cluster_gaps(&gaps);
         let suggestions = self.generate_exploration_suggestions(&gaps, &clusters);
@@ -120,7 +131,11 @@ impl KnowledgeGapDetector {
         }
     }
 
-    fn scan_all_gaps(&self, model: &SelfModel, weaknesses: &[super::weakness::Weakness]) -> Vec<KnowledgeGap> {
+    fn scan_all_gaps(
+        &self,
+        model: &SelfModel,
+        weaknesses: &[super::weakness::Weakness],
+    ) -> Vec<KnowledgeGap> {
         let mut gaps = Vec::new();
         let mut id = 0;
 
@@ -135,16 +150,31 @@ impl KnowledgeGapDetector {
         let integration = self.scan_integration_gaps(model, &mut id);
         gaps.extend(integration);
 
-        gaps.sort_by(|a, b| b.exploration_priority.partial_cmp(&a.exploration_priority).unwrap_or(std::cmp::Ordering::Equal));
+        gaps.sort_by(|a, b| {
+            b.exploration_priority
+                .partial_cmp(&a.exploration_priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         gaps
     }
 
-    fn scan_category(&self, category: &GapCategory, model: &SelfModel, _weaknesses: &[super::weakness::Weakness], id: &mut usize) -> Vec<KnowledgeGap> {
+    fn scan_category(
+        &self,
+        category: &GapCategory,
+        model: &SelfModel,
+        _weaknesses: &[super::weakness::Weakness],
+        id: &mut usize,
+    ) -> Vec<KnowledgeGap> {
         let mut gaps = Vec::new();
 
         match category {
             GapCategory::MissingModule => {
-                let expected = vec!["intra_reflection", "knowledge_gap_detector", "world_model_predictor", "stealth_manager"];
+                let expected = vec![
+                    "intra_reflection",
+                    "knowledge_gap_detector",
+                    "world_model_predictor",
+                    "stealth_manager",
+                ];
                 for name in expected {
                     let exists = model.modules.iter().any(|m| m.name.contains(name));
                     if !exists {
@@ -156,13 +186,17 @@ impl KnowledgeGapDetector {
                             affected_modules: vec!["core".to_string()],
                             severity: 0.85,
                             exploration_priority: 0.9,
-                            fill_strategy: format!("Implement {} with JEPA/DreamerV3 patterns", name),
+                            fill_strategy: format!(
+                                "Implement {} with JEPA/DreamerV3 patterns",
+                                name
+                            ),
                             suggested_sources: vec!["dreamerv3".to_string(), "jepa".to_string()],
                         });
                     }
                 }
 
-                let module_names: Vec<String> = model.modules.iter().map(|m| m.name.clone()).collect();
+                let module_names: Vec<String> =
+                    model.modules.iter().map(|m| m.name.clone()).collect();
                 if !module_names.iter().any(|n| n.contains("predict")) {
                     *id += 1;
                     gaps.push(KnowledgeGap {
@@ -184,11 +218,17 @@ impl KnowledgeGapDetector {
                         gaps.push(KnowledgeGap {
                             id: *id,
                             category: GapCategory::LowCoverage,
-                            description: format!("{} ({} lines) has no tests", module.name, module.total_lines),
+                            description: format!(
+                                "{} ({} lines) has no tests",
+                                module.name, module.total_lines
+                            ),
                             affected_modules: vec![module.name.clone()],
                             severity: 0.5,
                             exploration_priority: 0.6,
-                            fill_strategy: format!("Add {} test stubs for {}", module.test_count, module.name),
+                            fill_strategy: format!(
+                                "Add {} test stubs for {}",
+                                module.test_count, module.name
+                            ),
                             suggested_sources: vec!["standard".to_string()],
                         });
                     }
@@ -196,9 +236,18 @@ impl KnowledgeGapDetector {
             }
             GapCategory::MissingKnowledgeSource => {
                 let current = self.known_sources.clone();
-                let expected = vec!["dreamerv3_rssm", "jepa_vicreg", "camoufox_stealth", "cua_browser", "mcp_tools"];
+                let expected = vec![
+                    "dreamerv3_rssm",
+                    "jepa_vicreg",
+                    "camoufox_stealth",
+                    "cua_browser",
+                    "mcp_tools",
+                ];
                 for name in expected {
-                    if !current.iter().any(|s| s.contains(&name[..name.len().min(6)])) {
+                    if !current
+                        .iter()
+                        .any(|s| s.contains(&name[..name.len().min(6)]))
+                    {
                         *id += 1;
                         gaps.push(KnowledgeGap {
                             id: *id,
@@ -207,7 +256,10 @@ impl KnowledgeGapDetector {
                             affected_modules: vec!["nt_mind".to_string()],
                             severity: 0.6,
                             exploration_priority: 0.7,
-                            fill_strategy: format!("Register {} as KnowledgeSource with seed knowledge", name),
+                            fill_strategy: format!(
+                                "Register {} as KnowledgeSource with seed knowledge",
+                                name
+                            ),
                             suggested_sources: vec![name.to_string()],
                         });
                     }
@@ -222,13 +274,17 @@ impl KnowledgeGapDetector {
     fn scan_known_source_gaps(&self, model: &SelfModel, id: &mut usize) -> Vec<KnowledgeGap> {
         let mut gaps = Vec::new();
 
-        let known: Vec<String> = self.known_sources.iter()
+        let known: Vec<String> = self
+            .known_sources
+            .iter()
             .flat_map(|s| model.modules.iter().map(move |m| (s, m)))
             .filter(|(s, m)| m.name.to_lowercase().contains(&s.to_lowercase()))
             .map(|(s, _)| s.clone())
             .collect();
 
-        let missing: Vec<&String> = self.known_sources.iter()
+        let missing: Vec<&String> = self
+            .known_sources
+            .iter()
             .filter(|s| !known.contains(s))
             .collect();
 
@@ -286,7 +342,9 @@ impl KnowledgeGapDetector {
         let mut assigned: Vec<bool> = vec![false; gaps.len()];
 
         for (i, gap) in gaps.iter().enumerate() {
-            if assigned[i] { continue; }
+            if assigned[i] {
+                continue;
+            }
 
             let mut cluster_members = vec![gap.clone()];
             assigned[i] = true;
@@ -301,7 +359,8 @@ impl KnowledgeGapDetector {
                 }
             }
 
-            let centroid = cluster_members.first()
+            let centroid = cluster_members
+                .first()
                 .map(|g| g.description.clone())
                 .unwrap_or_default();
 
@@ -333,18 +392,32 @@ impl KnowledgeGapDetector {
         clusters
     }
 
-    fn generate_exploration_suggestions(&self, gaps: &[KnowledgeGap], clusters: &[GapCluster]) -> Vec<String> {
+    fn generate_exploration_suggestions(
+        &self,
+        gaps: &[KnowledgeGap],
+        clusters: &[GapCluster],
+    ) -> Vec<String> {
         let mut suggestions = Vec::new();
 
         for cluster in clusters {
-            let avg_priority = cluster.gaps.iter().map(|g| g.exploration_priority).sum::<f64>() / cluster.gaps.len() as f64;
+            let avg_priority = cluster
+                .gaps
+                .iter()
+                .map(|g| g.exploration_priority)
+                .sum::<f64>()
+                / cluster.gaps.len() as f64;
             if avg_priority > 0.7 {
                 suggestions.push(format!(
                     "[HIGH] {} — {} ({:.1} avg priority): {}",
                     cluster.centroid_description,
                     cluster.exploration_route,
                     avg_priority,
-                    cluster.gaps.iter().map(|g| g.fill_strategy.clone()).collect::<Vec<_>>().join("; ")
+                    cluster
+                        .gaps
+                        .iter()
+                        .map(|g| g.fill_strategy.clone())
+                        .collect::<Vec<_>>()
+                        .join("; ")
                 ));
             }
         }
@@ -352,7 +425,10 @@ impl KnowledgeGapDetector {
         for gap in gaps.iter().filter(|g| g.exploration_priority > 0.8) {
             let already = suggestions.iter().any(|s| s.contains(&gap.description));
             if !already {
-                suggestions.push(format!("[CRITICAL] {} → {}", gap.description, gap.fill_strategy));
+                suggestions.push(format!(
+                    "[CRITICAL] {} → {}",
+                    gap.description, gap.fill_strategy
+                ));
             }
         }
 
@@ -360,8 +436,12 @@ impl KnowledgeGapDetector {
     }
 
     fn calculate_coherence(&self, gaps: &[KnowledgeGap], clusters: &[GapCluster]) -> f64 {
-        if gaps.is_empty() { return 1.0; }
-        if clusters.is_empty() { return 0.0; }
+        if gaps.is_empty() {
+            return 1.0;
+        }
+        if clusters.is_empty() {
+            return 0.0;
+        }
 
         let unique_categories = clusters.len();
         let total = gaps.len();
@@ -384,7 +464,12 @@ impl KnowledgeGapDetector {
     pub fn exploration_plan(&self, report: &GapReport) -> Vec<String> {
         let mut plan = Vec::new();
         for cluster in &report.clusters {
-            let priority = cluster.gaps.iter().map(|g| g.exploration_priority).sum::<f64>() / cluster.gaps.len() as f64;
+            let priority = cluster
+                .gaps
+                .iter()
+                .map(|g| g.exploration_priority)
+                .sum::<f64>()
+                / cluster.gaps.len() as f64;
             plan.push(format!(
                 "[p={:.2}] {} → {} ({} gaps)",
                 priority,
@@ -414,14 +499,24 @@ impl crate::core::nt_core_self_test::SelfTest for KnowledgeGapDetector {
         if self.min_severity_threshold <= 0.0 {
             failures.push("min_severity_threshold must be > 0.0".into());
         }
-        if !self.target_categories.contains(&super::GapCategory::MissingModule) {
+        if !self
+            .target_categories
+            .contains(&super::GapCategory::MissingModule)
+        {
             failures.push("MissingModule must be in target_categories".into());
         }
-        if !self.target_categories.contains(&super::GapCategory::MissingKnowledgeSource) {
+        if !self
+            .target_categories
+            .contains(&super::GapCategory::MissingKnowledgeSource)
+        {
             failures.push("MissingKnowledgeSource must be in target_categories".into());
         }
 
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -456,7 +551,9 @@ mod tests {
         let weaknesses = Vec::new();
         let report = detector.detect_gaps(&model, &weaknesses);
 
-        let missing_mods: Vec<_> = report.gaps.iter()
+        let missing_mods: Vec<_> = report
+            .gaps
+            .iter()
             .filter(|g| g.category == GapCategory::MissingModule)
             .collect();
         assert!(!missing_mods.is_empty(), "should find missing modules");
@@ -480,7 +577,10 @@ mod tests {
         let report = detector.detect_gaps(&model, &weaknesses);
 
         let suggestions = detector.exploration_plan(&report);
-        assert!(!suggestions.is_empty(), "should produce an exploration plan");
+        assert!(
+            !suggestions.is_empty(),
+            "should produce an exploration plan"
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::core::CapabilityVector;
+use serde::{Deserialize, Serialize};
 
 /// Maturity level of a KnowledgeSource, per TENSA multi-fidelity epistemology.
 ///
@@ -148,11 +148,11 @@ pub enum KnowledgeSource {
     OrchOR,
     AttentionSchema,
     // 🆕 2026-05-30: SIA — Self-Improving AI (arXiv 2605.27276)
-    SiaHarnessUpdate,       // scaffold 改写能力
-    SiaWeightUpdate,        // RL weight 更新能力
-    SiaFeedbackLoop,        // 三体反馈循环架构
+    SiaHarnessUpdate, // scaffold 改写能力
+    SiaWeightUpdate,  // RL weight 更新能力
+    SiaFeedbackLoop,  // 三体反馈循环架构
     // 🆕 2026-05-30: DGM-HyperAgents (arXiv 2603.19461, Meta FAIR)
-    HyperAgents,            // 自指涉自我改进
+    HyperAgents, // 自指涉自我改进
     // 🆕 2026-06-06: 对话经验反哺 — DialogueAbsorbBridge 把 KB 近期 session/experience
     // 条目蒸馏出的能力向量以该源身份吸收, 让对话经历参与 SelfIteratingBrain 进化。
     DialogueExperience,
@@ -168,17 +168,26 @@ mod tests {
 
     #[test]
     fn test_maturity_promote_candidate_to_reviewed() {
-        assert_eq!(MaturityLevel::Candidate.promote(), Some(MaturityLevel::Reviewed));
+        assert_eq!(
+            MaturityLevel::Candidate.promote(),
+            Some(MaturityLevel::Reviewed)
+        );
     }
 
     #[test]
     fn test_maturity_promote_reviewed_to_validated() {
-        assert_eq!(MaturityLevel::Reviewed.promote(), Some(MaturityLevel::Validated));
+        assert_eq!(
+            MaturityLevel::Reviewed.promote(),
+            Some(MaturityLevel::Validated)
+        );
     }
 
     #[test]
     fn test_maturity_promote_validated_to_ground_truth() {
-        assert_eq!(MaturityLevel::Validated.promote(), Some(MaturityLevel::GroundTruth));
+        assert_eq!(
+            MaturityLevel::Validated.promote(),
+            Some(MaturityLevel::GroundTruth)
+        );
     }
 
     #[test]
@@ -220,8 +229,11 @@ mod tests {
     #[test]
     fn test_knowledge_source_count() {
         let sources = vec![
-            KnowledgeSource::HeroUI, KnowledgeSource::BaseUI, KnowledgeSource::ArcUI,
-            KnowledgeSource::CortexUI, KnowledgeSource::AgenticDS,
+            KnowledgeSource::HeroUI,
+            KnowledgeSource::BaseUI,
+            KnowledgeSource::ArcUI,
+            KnowledgeSource::CortexUI,
+            KnowledgeSource::AgenticDS,
         ];
         assert_eq!(sources.len(), 5);
     }

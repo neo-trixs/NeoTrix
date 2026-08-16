@@ -45,7 +45,9 @@ pub struct GRPOLoop {
 fn simple_lcg(seed: u64) -> impl Iterator<Item = u64> {
     let mut state = seed;
     std::iter::from_fn(move || {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         Some(state)
     })
 }
@@ -98,10 +100,7 @@ impl GRPOLoop {
             let surr = ratio * advantages[i];
             let surr_clipped = clipped_ratio * advantages[i];
             let loss = -surr.min(surr_clipped)
-                + beta * Self::kl_divergence(
-                    &[old_log_probs[i].exp()],
-                    &[new_log_probs[i].exp()],
-                );
+                + beta * Self::kl_divergence(&[old_log_probs[i].exp()], &[new_log_probs[i].exp()]);
             total_policy_loss += loss;
             total_kl += (new_log_probs[i] - old_log_probs[i]).abs();
             let p = new_log_probs[i].exp().max(1e-10);
@@ -111,7 +110,8 @@ impl GRPOLoop {
         let count = n as f64;
         self.old_policy = self.policy.clone();
         for i in 0..self.policy.len().min(n) {
-            let delta = advantages[i.min(advantages.len().saturating_sub(1))] * self.config.learning_rate;
+            let delta =
+                advantages[i.min(advantages.len().saturating_sub(1))] * self.config.learning_rate;
             self.policy[i] = (self.policy[i] + delta).max(0.0).min(1.0);
         }
         self.step_count += 1;
@@ -225,7 +225,11 @@ mod tests {
         let mut loop_ = GRPOLoop::new(cfg, 3);
         let old = loop_.policy.clone();
         loop_.update(&[1.0], &[-0.5], &[-0.4], &[1.0]);
-        assert!(loop_.policy.iter().zip(old.iter()).any(|(a, b)| (a - b).abs() > 1e-9));
+        assert!(loop_
+            .policy
+            .iter()
+            .zip(old.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-9));
     }
 
     #[test]
@@ -328,7 +332,13 @@ mod tests {
 
     #[test]
     fn test_update_kl_penalty() {
-        let mut loop_ = GRPOLoop::new(GrpoConfig { kl_beta: 10.0, ..Default::default() }, 5);
+        let mut loop_ = GRPOLoop::new(
+            GrpoConfig {
+                kl_beta: 10.0,
+                ..Default::default()
+            },
+            5,
+        );
         let report = loop_.update(&[1.0], &[-2.0], &[-0.1], &[0.5]);
         assert!(report.kl_divergence > 0.0);
     }

@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::source_hierarchy::{KnowledgeLayer, ProvenanceChain, SourceHierarchy};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum VsaOrigin {
@@ -289,7 +289,10 @@ mod tests {
         let chain = ProvenanceChain::new(vec![(raw, 1000), (structured, 2000)]);
         let tagged = VsaTagged::new(vec![1; 16], VsaOrigin::Self_(VsaSelfCategory::Thought))
             .with_provenance(chain);
-        assert!(matches!(tagged.knowledge_layer(), Some(KnowledgeLayer::Structured(_))));
+        assert!(matches!(
+            tagged.knowledge_layer(),
+            Some(KnowledgeLayer::Structured(_))
+        ));
     }
 
     #[test]

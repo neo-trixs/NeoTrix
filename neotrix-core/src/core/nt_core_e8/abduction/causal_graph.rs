@@ -74,19 +74,27 @@ impl CausalGraph {
     }
 
     pub fn find_effects(&self, node: usize) -> Vec<(usize, f64)> {
-        self.adjacency
-            .get(&node).cloned()
-            .unwrap_or_default()
+        self.adjacency.get(&node).cloned().unwrap_or_default()
     }
 
-    pub fn find_abductive_explanations(&self, observation: usize, max_depth: usize) -> Vec<Vec<usize>> {
+    pub fn find_abductive_explanations(
+        &self,
+        observation: usize,
+        max_depth: usize,
+    ) -> Vec<Vec<usize>> {
         let mut results = Vec::new();
         let mut current_path = vec![observation];
         self.dfs_backward(observation, max_depth, &mut current_path, &mut results);
         results
     }
 
-    fn dfs_backward(&self, node: usize, max_depth: usize, current_path: &mut Vec<usize>, results: &mut Vec<Vec<usize>>) {
+    fn dfs_backward(
+        &self,
+        node: usize,
+        max_depth: usize,
+        current_path: &mut Vec<usize>,
+        results: &mut Vec<Vec<usize>>,
+    ) {
         if current_path.len() > max_depth {
             return;
         }

@@ -6,8 +6,8 @@
 //! - Winner's content is broadcast globally
 //! - Non-winners are suppressed proportionally to their distance from the winner
 
-use serde::{Serialize, Deserialize};
 use super::resonance::{ResonanceMatrix, MODULE_COUNT};
+use serde::{Deserialize, Serialize};
 
 /// Result of a single competition round.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,7 +98,11 @@ impl CompetitionGate {
             winner_score,
             final_scores,
             ignition,
-            suppression_factor: if ignition { self.suppression_strength } else { 0.0 },
+            suppression_factor: if ignition {
+                self.suppression_strength
+            } else {
+                0.0
+            },
         }
     }
 
@@ -138,7 +142,11 @@ impl CompetitionGate {
             winner_score,
             final_scores,
             ignition,
-            suppression_factor: if ignition { self.suppression_strength } else { 0.0 },
+            suppression_factor: if ignition {
+                self.suppression_strength
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -248,8 +256,14 @@ mod tests {
         }
         raw[0] = 0.65;
         let result = gate.compete(&raw, &resonance);
-        assert!(result.ignition, "0.65 salience should ignite with threshold");
-        assert!(result.winner_score >= 0.4, "winner score should be meaningful");
+        assert!(
+            result.ignition,
+            "0.65 salience should ignite with threshold"
+        );
+        assert!(
+            result.winner_score >= 0.4,
+            "winner score should be meaningful"
+        );
     }
 
     #[test]

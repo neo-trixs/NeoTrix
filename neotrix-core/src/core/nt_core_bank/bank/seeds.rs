@@ -1,6 +1,6 @@
-use crate::core::nt_core_knowledge::TaskType;
-use crate::core::nt_core_bank::ReasoningMemory;
 use super::ReasoningBank;
+use crate::core::nt_core_bank::ReasoningMemory;
+use crate::core::nt_core_knowledge::TaskType;
 
 impl ReasoningBank {
     pub fn initialize_all_knowledge_sources(&mut self) -> usize {
@@ -17,7 +17,9 @@ impl ReasoningBank {
 
     fn init_seeds(&mut self, seeds: Vec<(&str, TaskType, f64)>) -> usize {
         let count = seeds.len();
-        for (desc, tt, reward) in seeds { self.store(ReasoningMemory::new(desc, tt, &[], reward)); }
+        for (desc, tt, reward) in seeds {
+            self.store(ReasoningMemory::new(desc, tt, &[], reward));
+        }
         count
     }
 

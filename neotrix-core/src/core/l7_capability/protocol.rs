@@ -9,8 +9,8 @@
 //! - Unicast:   starpulse.<layer>.<module>.<sender>.<target> (发送给指定模块实例)
 //! - Anycast:   starpulse.anycast.<role>.<sender>            (任意一个具有该角色的模块处理)
 
-use std::collections::HashMap;
 use crate::core::nt_core_self::emotion_state::EmotionReport;
+use std::collections::HashMap;
 
 /// Unique module/agent identifier in the layer topology
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -22,7 +22,11 @@ pub struct ModuleId {
 
 impl ModuleId {
     pub fn new(layer: u8, name: &str, instance: &str) -> Self {
-        Self { layer, name: name.to_string(), instance: instance.to_string() }
+        Self {
+            layer,
+            name: name.to_string(),
+            instance: instance.to_string(),
+        }
     }
 
     pub fn to_subject(&self) -> String {
@@ -61,18 +65,31 @@ pub struct StarPulse {
 }
 
 impl StarPulse {
-    pub fn new_broadcast(kind: PulseKind, sender: ModuleId, target_layer: u8, payload: PulsePayload) -> Self {
+    pub fn new_broadcast(
+        kind: PulseKind,
+        sender: ModuleId,
+        target_layer: u8,
+        payload: PulsePayload,
+    ) -> Self {
         Self {
             id: next_pulse_id(),
             ts: now_ms(),
             kind,
-            addressing: AddressingMode::Broadcast { target_layer, target_module: None },
+            addressing: AddressingMode::Broadcast {
+                target_layer,
+                target_module: None,
+            },
             sender,
             payload,
         }
     }
 
-    pub fn new_unicast(kind: PulseKind, sender: ModuleId, target: ModuleId, payload: PulsePayload) -> Self {
+    pub fn new_unicast(
+        kind: PulseKind,
+        sender: ModuleId,
+        target: ModuleId,
+        payload: PulsePayload,
+    ) -> Self {
         Self {
             id: next_pulse_id(),
             ts: now_ms(),
@@ -83,12 +100,20 @@ impl StarPulse {
         }
     }
 
-    pub fn new_anycast(kind: PulseKind, sender: ModuleId, role: &str, payload: PulsePayload) -> Self {
+    pub fn new_anycast(
+        kind: PulseKind,
+        sender: ModuleId,
+        role: &str,
+        payload: PulsePayload,
+    ) -> Self {
         Self {
             id: next_pulse_id(),
             ts: now_ms(),
             kind,
-            addressing: AddressingMode::Anycast { role: role.to_string(), required_layer: None },
+            addressing: AddressingMode::Anycast {
+                role: role.to_string(),
+                required_layer: None,
+            },
             sender,
             payload,
         }
@@ -181,13 +206,18 @@ pub struct PresenceRegistry {
 
 impl PresenceRegistry {
     pub fn new() -> Self {
-        Self { modules: HashMap::new(), max_entries: 1000 }
+        Self {
+            modules: HashMap::new(),
+            max_entries: 1000,
+        }
     }
 
     pub fn register(&mut self, id: &ModuleId, status: ModuleStatus) {
         if self.modules.len() >= self.max_entries {
             // Evict oldest offline module first
-            if let Some(oldest_offline) = self.modules.iter()
+            if let Some(oldest_offline) = self
+                .modules
+                .iter()
                 .find(|(_, m)| m.status == ModuleStatus::Offline)
                 .map(|(k, _)| k.clone())
             {
@@ -197,13 +227,16 @@ impl PresenceRegistry {
             }
         }
         let key = id.to_subject();
-        self.modules.insert(key, HeartbeatPayload {
-            layer: id.layer,
-            module: id.name.clone(),
-            status,
-            load: 0.0,
-            active_capabilities: vec![],
-        });
+        self.modules.insert(
+            key,
+            HeartbeatPayload {
+                layer: id.layer,
+                module: id.name.clone(),
+                status,
+                load: 0.0,
+                active_capabilities: vec![],
+            },
+        );
     }
 
     pub fn heartbeat(&mut self, id: &ModuleId, payload: HeartbeatPayload) {
@@ -219,12 +252,16 @@ impl PresenceRegistry {
     }
 
     pub fn live_modules(&self) -> Vec<&HeartbeatPayload> {
-        self.modules.values().filter(|m| m.status != ModuleStatus::Offline).collect()
+        self.modules
+            .values()
+            .filter(|m| m.status != ModuleStatus::Offline)
+            .collect()
     }
 
     /// Anycast resolution: find any module that provides the given role
     pub fn resolve_anycast(&self, role: &str, layer: Option<u8>) -> Option<HeartbeatPayload> {
-        self.modules.values()
+        self.modules
+            .values()
             .filter(|m| m.status != ModuleStatus::Offline)
             .filter(|m| layer.map(|l| m.layer == l).unwrap_or(true))
             .find(|m| m.active_capabilities.iter().any(|c| c.contains(role)))
@@ -233,7 +270,9 @@ impl PresenceRegistry {
 }
 
 impl Default for PresenceRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 static PULSE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -245,7 +284,8 @@ fn now_ms() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs_f64() * 1000.0
+        .as_secs_f64()
+        * 1000.0
 }
 
 #[derive(Debug, Clone)]
@@ -269,12 +309,21 @@ impl PulseBus {
     /// Broadcast pulse to all modules on a target layer
     pub fn broadcast(&self, pulse: &StarPulse) -> Vec<&HeartbeatPayload> {
         match &pulse.addressing {
-            AddressingMode::Broadcast { target_layer, target_module } => {
-                self.presence.live_modules().into_iter()
-                    .filter(|m| m.layer == *target_layer)
-                    .filter(|m| target_module.as_ref().map(|t| m.module == *t).unwrap_or(true))
-                    .collect()
-            }
+            AddressingMode::Broadcast {
+                target_layer,
+                target_module,
+            } => self
+                .presence
+                .live_modules()
+                .into_iter()
+                .filter(|m| m.layer == *target_layer)
+                .filter(|m| {
+                    target_module
+                        .as_ref()
+                        .map(|t| m.module == *t)
+                        .unwrap_or(true)
+                })
+                .collect(),
             _ => vec![],
         }
     }
@@ -290,15 +339,17 @@ impl PulseBus {
     /// Anycast pulse to the first available module with the target role
     pub fn anycast(&self, pulse: &StarPulse) -> Option<HeartbeatPayload> {
         match &pulse.addressing {
-            AddressingMode::Anycast { role, required_layer } => {
-                self.presence.resolve_anycast(role, *required_layer)
-            }
+            AddressingMode::Anycast {
+                role,
+                required_layer,
+            } => self.presence.resolve_anycast(role, *required_layer),
             _ => None,
         }
     }
 
     pub fn subscribe(&mut self, id: &ModuleId, pulse_kind: &str) {
-        self.subscribers.entry(pulse_kind.to_string())
+        self.subscribers
+            .entry(pulse_kind.to_string())
             .or_default()
             .push((id.clone(), id.to_subject()));
     }
@@ -310,14 +361,18 @@ impl PulseBus {
     }
 
     pub fn subscribers_for(&self, pulse_kind: &str) -> Vec<&ModuleId> {
-        self.subscribers.get(pulse_kind)
+        self.subscribers
+            .get(pulse_kind)
             .map(|v| v.iter().map(|(m, _)| m).collect())
             .unwrap_or_default()
     }
 
     pub fn register_module(&mut self, id: &ModuleId, status: ModuleStatus) {
         self.presence.register(id, status);
-        self.log(PulseKind::Discovery, format!("module registered: {}", id.to_subject()));
+        self.log(
+            PulseKind::Discovery,
+            format!("module registered: {}", id.to_subject()),
+        );
     }
 
     pub fn heartbeat_pulse(&mut self, id: &ModuleId, status: ModuleStatus, load: f64) {
@@ -370,7 +425,6 @@ impl Default for PulseBus {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests {

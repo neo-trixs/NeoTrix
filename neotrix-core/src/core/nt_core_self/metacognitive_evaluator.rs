@@ -1,6 +1,6 @@
-use std::collections::HashSet;
-use super::silicon_self::SiliconSelfModel;
 use super::reasoning_strategy::StrategyKind;
+use super::silicon_self::SiliconSelfModel;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct CognitiveHealthReport {
@@ -84,20 +84,25 @@ impl CognitiveEvaluator {
         let trace_quality = self.compute_trace_quality(model);
         let context_pressure = self.compute_context_pressure(model);
 
-        let flags = self.generate_flags(attention_health, strategy_diversity, trace_quality, context_pressure, model);
+        let flags = self.generate_flags(
+            attention_health,
+            strategy_diversity,
+            trace_quality,
+            context_pressure,
+            model,
+        );
 
         let repair_suggestions = Self::generate_repair_suggestions(&flags);
 
-        let stability_score = if attention_health > 0.0 || strategy_diversity > 0.0
-            || trace_quality > 0.0
-        {
-            attention_health * 0.25
-                + strategy_diversity * 0.25
-                + trace_quality * 0.25
-                + (1.0 - context_pressure) * 0.25
-        } else {
-            0.0
-        };
+        let stability_score =
+            if attention_health > 0.0 || strategy_diversity > 0.0 || trace_quality > 0.0 {
+                attention_health * 0.25
+                    + strategy_diversity * 0.25
+                    + trace_quality * 0.25
+                    + (1.0 - context_pressure) * 0.25
+            } else {
+                0.0
+            };
 
         let report = CognitiveHealthReport {
             attention_health,
@@ -124,7 +129,10 @@ impl CognitiveEvaluator {
         if total == 0 {
             return 0.0;
         }
-        let active = model.attention_manager.heads.iter()
+        let active = model
+            .attention_manager
+            .heads
+            .iter()
             .filter(|h| h.activation > 0.1)
             .count();
         active as f64 / total as f64
@@ -175,7 +183,10 @@ impl CognitiveEvaluator {
             flags.push(CognitiveFlag {
                 severity: FlagSeverity::Critical,
                 category: FlagCategory::Attention,
-                message: format!("Attention health is critically low: {:.2}", attention_health),
+                message: format!(
+                    "Attention health is critically low: {:.2}",
+                    attention_health
+                ),
                 metric_value: attention_health,
             });
         }
@@ -229,7 +240,8 @@ impl CognitiveEvaluator {
                 FlagCategory::Attention => {
                     suggestions.push(RepairSuggestion {
                         target: RepairTarget::AttentionStimulus,
-                        action: "Stimulate underactive attention domains to broaden coverage".into(),
+                        action: "Stimulate underactive attention domains to broaden coverage"
+                            .into(),
                         priority: 1,
                         expected_impact: 0.6,
                     });
@@ -282,7 +294,11 @@ impl CognitiveEvaluator {
             return false;
         }
         let prev = self.history[self.history.len() - 2].stability_score;
-        let current = self.history.last().unwrap_or(&self.history[self.history.len() - 2]).stability_score;
+        let current = self
+            .history
+            .last()
+            .unwrap_or(&self.history[self.history.len() - 2])
+            .stability_score;
         current <= prev - threshold
     }
 
@@ -290,13 +306,28 @@ impl CognitiveEvaluator {
         if self.history.is_empty() {
             return "CognitiveEvaluator: no evaluations performed".to_string();
         }
-        let latest = self.history.last().unwrap_or(&self.history[self.history.len() - 1]);
+        let latest = self
+            .history
+            .last()
+            .unwrap_or(&self.history[self.history.len() - 1]);
         let flag_summary = if latest.flags.is_empty() {
             "no flags".to_string()
         } else {
-            let critical = latest.flags.iter().filter(|f| matches!(f.severity, FlagSeverity::Critical)).count();
-            let warning = latest.flags.iter().filter(|f| matches!(f.severity, FlagSeverity::Warning)).count();
-            let info = latest.flags.iter().filter(|f| matches!(f.severity, FlagSeverity::Info)).count();
+            let critical = latest
+                .flags
+                .iter()
+                .filter(|f| matches!(f.severity, FlagSeverity::Critical))
+                .count();
+            let warning = latest
+                .flags
+                .iter()
+                .filter(|f| matches!(f.severity, FlagSeverity::Warning))
+                .count();
+            let info = latest
+                .flags
+                .iter()
+                .filter(|f| matches!(f.severity, FlagSeverity::Info))
+                .count();
             format!("{} critical, {} warning, {} info", critical, warning, info)
         };
         format!(
@@ -314,10 +345,10 @@ impl CognitiveEvaluator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::silicon_self::SiliconSelfModel;
-    use super::super::thinking_trace::{ThinkingTrace, ThinkingStep};
     use super::super::reasoning_strategy::StrategyKind;
+    use super::super::silicon_self::SiliconSelfModel;
+    use super::super::thinking_trace::{ThinkingStep, ThinkingTrace};
+    use super::*;
 
     #[test]
     fn test_evaluator_new() {
@@ -341,13 +372,16 @@ mod tests {
 
         assert_eq!(report.flags.len(), 3);
         let has_critical_attention = report.flags.iter().any(|f| {
-            matches!(f.severity, FlagSeverity::Critical) && matches!(f.category, FlagCategory::Attention)
+            matches!(f.severity, FlagSeverity::Critical)
+                && matches!(f.category, FlagCategory::Attention)
         });
         let has_warning_strategy = report.flags.iter().any(|f| {
-            matches!(f.severity, FlagSeverity::Warning) && matches!(f.category, FlagCategory::Strategy)
+            matches!(f.severity, FlagSeverity::Warning)
+                && matches!(f.category, FlagCategory::Strategy)
         });
         let has_critical_trace = report.flags.iter().any(|f| {
-            matches!(f.severity, FlagSeverity::Critical) && matches!(f.category, FlagCategory::Trace)
+            matches!(f.severity, FlagSeverity::Critical)
+                && matches!(f.category, FlagCategory::Trace)
         });
         assert!(has_critical_attention);
         assert!(has_warning_strategy);
@@ -394,7 +428,10 @@ mod tests {
         let model = SiliconSelfModel::new();
         let mut evaluator = CognitiveEvaluator::new();
         let _empty_summary = evaluator.summary();
-        assert_eq!(_empty_summary, "CognitiveEvaluator: no evaluations performed");
+        assert_eq!(
+            _empty_summary,
+            "CognitiveEvaluator: no evaluations performed"
+        );
 
         evaluator.evaluate(&model);
         let summary = evaluator.summary();
@@ -415,19 +452,32 @@ mod tests {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for CognitiveEvaluator {
-    fn name(&self) -> &str { "cognitive_evaluator" }
+    fn name(&self) -> &str {
+        "cognitive_evaluator"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut evaluator = CognitiveEvaluator::new();
         let model = SiliconSelfModel::new();
 
         let report = evaluator.evaluate(&model);
         let mut failures = Vec::new();
-        if report.flags.iter().any(|f| f.severity == FlagSeverity::Critical && f.metric_value > 1.0) {
+        if report
+            .flags
+            .iter()
+            .any(|f| f.severity == FlagSeverity::Critical && f.metric_value > 1.0)
+        {
             failures.push("cognitive_evaluator: critical flag with impossible metric".into());
         }
         if !(0.0..=1.0).contains(&report.stability_score) {
-            failures.push(format!("cognitive_evaluator: stability {} out of [0,1]", report.stability_score));
+            failures.push(format!(
+                "cognitive_evaluator: stability {} out of [0,1]",
+                report.stability_score
+            ));
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }

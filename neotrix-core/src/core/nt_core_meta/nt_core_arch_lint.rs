@@ -1,4 +1,3 @@
-
 /// ArchLint — 架构规则检查器
 ///
 /// 已有规则:
@@ -41,12 +40,36 @@ impl ArchLint {
 
     fn default_rules() -> Vec<LintRule> {
         vec![
-            LintRule { id: "ARC-LYR-001".into(), description: "L0 cannot import L1+".into(), check_fn: "layer_check(0, 1)".into() },
-            LintRule { id: "ARC-LYR-002".into(), description: "L1 cannot import L2+".into(), check_fn: "layer_check(1, 2)".into() },
-            LintRule { id: "ARC-LYR-003".into(), description: "L2 cannot import L3+".into(), check_fn: "layer_check(2, 3)".into() },
-            LintRule { id: "ARC-LYR-004".into(), description: "L3 cannot import L4+".into(), check_fn: "layer_check(3, 4)".into() },
-            LintRule { id: "ARC-LYR-005".into(), description: "L5- cannot import L6+".into(), check_fn: "layer_check(5, 6)".into() },
-            LintRule { id: "ARC-LYR-006".into(), description: "L1→L3+ and L2→L4+ cross-layer imports".into(), check_fn: "cross_layer_check(1, 3; 2, 4)".into() },
+            LintRule {
+                id: "ARC-LYR-001".into(),
+                description: "L0 cannot import L1+".into(),
+                check_fn: "layer_check(0, 1)".into(),
+            },
+            LintRule {
+                id: "ARC-LYR-002".into(),
+                description: "L1 cannot import L2+".into(),
+                check_fn: "layer_check(1, 2)".into(),
+            },
+            LintRule {
+                id: "ARC-LYR-003".into(),
+                description: "L2 cannot import L3+".into(),
+                check_fn: "layer_check(2, 3)".into(),
+            },
+            LintRule {
+                id: "ARC-LYR-004".into(),
+                description: "L3 cannot import L4+".into(),
+                check_fn: "layer_check(3, 4)".into(),
+            },
+            LintRule {
+                id: "ARC-LYR-005".into(),
+                description: "L5- cannot import L6+".into(),
+                check_fn: "layer_check(5, 6)".into(),
+            },
+            LintRule {
+                id: "ARC-LYR-006".into(),
+                description: "L1→L3+ and L2→L4+ cross-layer imports".into(),
+                check_fn: "cross_layer_check(1, 3; 2, 4)".into(),
+            },
         ]
     }
 
@@ -59,7 +82,10 @@ impl ArchLint {
                     source_layer,
                     target_module: target_module.into(),
                     target_layer,
-                    description: format!("L0 '{}' imports L{} '{}'", source_file, target_layer, target_module),
+                    description: format!(
+                        "L0 '{}' imports L{} '{}'",
+                        source_file, target_layer, target_module
+                    ),
                 });
             }
             if source_layer == 1 && target_layer >= 3 {
@@ -69,7 +95,10 @@ impl ArchLint {
                     source_layer,
                     target_module: target_module.into(),
                     target_layer,
-                    description: format!("L1 '{}' jumps to L{} '{}' (ARC-LYR-006)", source_file, target_layer, target_module),
+                    description: format!(
+                        "L1 '{}' jumps to L{} '{}' (ARC-LYR-006)",
+                        source_file, target_layer, target_module
+                    ),
                 });
             }
             if source_layer == 2 && target_layer >= 4 {
@@ -79,7 +108,10 @@ impl ArchLint {
                     source_layer,
                     target_module: target_module.into(),
                     target_layer,
-                    description: format!("L2 '{}' jumps to L{} '{}' (ARC-LYR-006)", source_file, target_layer, target_module),
+                    description: format!(
+                        "L2 '{}' jumps to L{} '{}' (ARC-LYR-006)",
+                        source_file, target_layer, target_module
+                    ),
                 });
             }
         }
@@ -90,20 +122,31 @@ impl ArchLint {
     }
 
     pub fn report(&self) -> String {
-        let mut s = format!("ArchLint: {} rules, {} violations\n", self.rules.len(), self.violations.len());
+        let mut s = format!(
+            "ArchLint: {} rules, {} violations\n",
+            self.rules.len(),
+            self.violations.len()
+        );
         for v in &self.violations {
-            s.push_str(&format!("  [{}] {} (L{} → L{})\n", v.rule_id, v.source_file, v.source_layer, v.target_layer));
+            s.push_str(&format!(
+                "  [{}] {} (L{} → L{})\n",
+                v.rule_id, v.source_file, v.source_layer, v.target_layer
+            ));
         }
         s
     }
 }
 
 impl Default for ArchLint {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl crate::core::nt_core_self_test::SelfTest for ArchLint {
-    fn name(&self) -> &str { "arch_lint" }
+    fn name(&self) -> &str {
+        "arch_lint"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         if self.rules.is_empty() {
@@ -112,7 +155,11 @@ impl crate::core::nt_core_self_test::SelfTest for ArchLint {
         if self.rules.len() < 6 {
             failures.push("arch_lint: expected at least 6 rules".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 

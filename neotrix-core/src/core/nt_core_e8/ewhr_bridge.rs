@@ -8,14 +8,13 @@ pub struct E8EwhrBridge {
 
 impl E8EwhrBridge {
     pub fn new() -> Self {
-        Self { enabled: true, min_confidence: 0.3 }
+        Self {
+            enabled: true,
+            min_confidence: 0.3,
+        }
     }
 
-    pub fn analyze_trajectory(
-        &self,
-        trajectory: &[FullReasoningState],
-        task: &str,
-    ) -> Vec<String> {
+    pub fn analyze_trajectory(&self, trajectory: &[FullReasoningState], task: &str) -> Vec<String> {
         if !self.enabled || trajectory.len() < 2 {
             return vec![];
         }
@@ -124,7 +123,10 @@ mod tests {
 
     #[test]
     fn test_bridge_disabled_returns_empty() {
-        let bridge = E8EwhrBridge { enabled: false, min_confidence: 0.3 };
+        let bridge = E8EwhrBridge {
+            enabled: false,
+            min_confidence: 0.3,
+        };
         let traj = vec![make_state(1, 1), make_state(2, 2)];
         let findings = bridge.analyze_trajectory(&traj, "test");
         assert!(findings.is_empty());
@@ -154,7 +156,11 @@ mod tests {
             make_state(6, 0),
         ];
         let findings = bridge.analyze_trajectory(&traj, "stuck test");
-        let stuck: Vec<&str> = findings.iter().filter(|f| f.contains("Stuck state")).map(|s| s.as_str()).collect();
+        let stuck: Vec<&str> = findings
+            .iter()
+            .filter(|f| f.contains("Stuck state"))
+            .map(|s| s.as_str())
+            .collect();
         assert_eq!(stuck.len(), 1);
         assert!(stuck[0].contains("mode=5"));
     }
@@ -163,12 +169,19 @@ mod tests {
     fn test_multiple_stuck_runs_detected() {
         let bridge = E8EwhrBridge::new();
         let traj = vec![
-            make_state(1, 0), make_state(1, 0),
+            make_state(1, 0),
+            make_state(1, 0),
             make_state(2, 0),
-            make_state(3, 0), make_state(3, 0), make_state(3, 0),
+            make_state(3, 0),
+            make_state(3, 0),
+            make_state(3, 0),
         ];
         let findings = bridge.analyze_trajectory(&traj, "multi stuck");
-        let stuck: Vec<&str> = findings.iter().filter(|f| f.contains("Stuck state")).map(|s| s.as_str()).collect();
+        let stuck: Vec<&str> = findings
+            .iter()
+            .filter(|f| f.contains("Stuck state"))
+            .map(|s| s.as_str())
+            .collect();
         assert_eq!(stuck.len(), 2);
     }
 
@@ -176,11 +189,17 @@ mod tests {
     fn test_oscillation_detected() {
         let bridge = E8EwhrBridge::new();
         let traj = vec![
-            make_state(10, 0), make_state(11, 0),
-            make_state(10, 0), make_state(11, 0),
+            make_state(10, 0),
+            make_state(11, 0),
+            make_state(10, 0),
+            make_state(11, 0),
         ];
         let findings = bridge.analyze_trajectory(&traj, "osc test");
-        let osc: Vec<&str> = findings.iter().filter(|f| f.contains("Oscillation")).map(|s| s.as_str()).collect();
+        let osc: Vec<&str> = findings
+            .iter()
+            .filter(|f| f.contains("Oscillation"))
+            .map(|s| s.as_str())
+            .collect();
         assert!(!osc.is_empty(), "Should detect ABAB oscillation");
     }
 
@@ -189,7 +208,11 @@ mod tests {
         let bridge = E8EwhrBridge::new();
         let traj = vec![make_state(10, 0), make_state(11, 0), make_state(10, 0)];
         let findings = bridge.analyze_trajectory(&traj, "short osc");
-        let osc: Vec<&str> = findings.iter().filter(|f| f.contains("Oscillation")).map(|s| s.as_str()).collect();
+        let osc: Vec<&str> = findings
+            .iter()
+            .filter(|f| f.contains("Oscillation"))
+            .map(|s| s.as_str())
+            .collect();
         assert!(osc.is_empty(), "3-step is too short for oscillation");
     }
 
@@ -198,10 +221,13 @@ mod tests {
         let bridge = E8EwhrBridge::new();
         let traj = vec![make_state(1, 0), make_state(2, 0), make_state(3, 0)];
         let findings = bridge.analyze_trajectory(&traj, "summary check");
-        let summary: Vec<&str> = findings.iter().filter(|f| f.contains("Task")).map(|s| s.as_str()).collect();
+        let summary: Vec<&str> = findings
+            .iter()
+            .filter(|f| f.contains("Task"))
+            .map(|s| s.as_str())
+            .collect();
         assert_eq!(summary.len(), 1);
         assert!(summary[0].contains("summary check"));
         assert!(summary[0].contains("3 steps"));
     }
 }
-

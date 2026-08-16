@@ -37,8 +37,8 @@
 //! - `create_llm_provider_pipeline()` — LLM discovery → validate → gateway
 //! - `create_knowledge_pipeline()` — GitHub/ArXiv/Wiki → absorb → KB → distill
 
-mod pipeline;
 mod lineage;
+mod pipeline;
 
-pub use pipeline::{PipelineStage, StageResult, PipelineOrchestrator, PipelineRunReport};
 pub use lineage::{DataLineage, LineageEntry};
+pub use pipeline::{PipelineOrchestrator, PipelineRunReport, PipelineStage, StageResult};

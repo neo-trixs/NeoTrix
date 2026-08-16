@@ -102,7 +102,9 @@ pub struct QuantumSuperposition {
 
 impl QuantumSuperposition {
     pub fn new() -> Self {
-        Self { signals: Vec::new() }
+        Self {
+            signals: Vec::new(),
+        }
     }
 
     /// 加入一个检测源信号。
@@ -162,11 +164,7 @@ impl QuantumSuperposition {
     /// 信号熵：基于有效信号值分桶的香农熵（归一化到 [0,1]）。
     /// 单一确定信号 → 0.0；均匀分散 → 1.0。
     pub fn entropy(&self) -> f64 {
-        let effective: Vec<f64> = self
-            .signals
-            .iter()
-            .map(|s| s.value)
-            .collect();
+        let effective: Vec<f64> = self.signals.iter().map(|s| s.value).collect();
         if effective.is_empty() {
             return 0.0;
         }
@@ -220,11 +218,8 @@ impl QuantumSuperposition {
 
         let ent = self.entanglement();
         // 纠缠调节：冲突惩罚 / 高纠缠加成
-        let mut confidence = effective
-            .iter()
-            .map(|s| s.confidence)
-            .sum::<f64>()
-            / effective.len() as f64;
+        let mut confidence =
+            effective.iter().map(|s| s.confidence).sum::<f64>() / effective.len() as f64;
         if ent < cfg.conflict_threshold {
             confidence *= ent / cfg.conflict_threshold; // 冲突 → 线性惩罚
         } else if ent > cfg.high_entanglement {
@@ -277,11 +272,8 @@ impl QuantumSuperposition {
             / total_conf;
 
         let ent = self.entanglement();
-        let mut confidence = effective
-            .iter()
-            .map(|s| s.confidence)
-            .sum::<f64>()
-            / effective.len() as f64;
+        let mut confidence =
+            effective.iter().map(|s| s.confidence).sum::<f64>() / effective.len() as f64;
         if ent < cfg.conflict_threshold {
             confidence *= ent / cfg.conflict_threshold;
         } else if ent > cfg.high_entanglement {
@@ -478,7 +470,10 @@ impl SelfTest for QuantumFusionSelfTest {
             failures.push(format!("高纠缠场景纠缠度异常: {}", fused.entanglement));
         }
         if fused.fused_count != 3 {
-            failures.push(format!("高纠缠场景应融合 3 信号, 实际 {}", fused.fused_count));
+            failures.push(format!(
+                "高纠缠场景应融合 3 信号, 实际 {}",
+                fused.fused_count
+            ));
         }
         if (fused.value - 0.80).abs() > 0.06 {
             failures.push(format!("高纠缠融合值偏离期望: {}", fused.value));
@@ -564,7 +559,11 @@ mod tests {
         sup.push(QuantumSignal::new(0.0, 0.95, "a"));
         sup.push(QuantumSignal::new(1.0, 0.95, "b"));
         let fused = sup.fuse();
-        assert!(fused.confidence < 0.8, "冲突应惩罚置信度, got {}", fused.confidence);
+        assert!(
+            fused.confidence < 0.8,
+            "冲突应惩罚置信度, got {}",
+            fused.confidence
+        );
     }
 
     #[test]
@@ -610,9 +609,21 @@ mod tests {
         sup.push(QuantumSignal::new(0.85, 0.9, "b"));
         sup.push(QuantumSignal::new(0.95, 0.9, "c"));
         let ev = sup.fuse_evidence(&cfg);
-        assert!(ev.belief_healthy > 0.9, "全健康信号 belief 应高, got {}", ev.belief_healthy);
-        assert!(ev.m_unknown < 0.2, "一致信号未知质量应低, got {}", ev.m_unknown);
-        assert!(ev.m_degraded < 0.2, "一致信号退化质量应低, got {}", ev.m_degraded);
+        assert!(
+            ev.belief_healthy > 0.9,
+            "全健康信号 belief 应高, got {}",
+            ev.belief_healthy
+        );
+        assert!(
+            ev.m_unknown < 0.2,
+            "一致信号未知质量应低, got {}",
+            ev.m_unknown
+        );
+        assert!(
+            ev.m_degraded < 0.2,
+            "一致信号退化质量应低, got {}",
+            ev.m_degraded
+        );
     }
 
     #[test]
@@ -622,8 +633,16 @@ mod tests {
         sup.push(QuantumSignal::new(0.0, 0.95, "a"));
         sup.push(QuantumSignal::new(1.0, 0.95, "b"));
         let ev = sup.fuse_evidence(&cfg);
-        assert!(ev.conflict > 0.5, "冲突信号冲突系数应高, got {}", ev.conflict);
-        assert!(ev.belief_healthy < 0.7, "冲突下 belief 不应过高, got {}", ev.belief_healthy);
+        assert!(
+            ev.conflict > 0.5,
+            "冲突信号冲突系数应高, got {}",
+            ev.conflict
+        );
+        assert!(
+            ev.belief_healthy < 0.7,
+            "冲突下 belief 不应过高, got {}",
+            ev.belief_healthy
+        );
     }
 
     #[test]
@@ -633,7 +652,11 @@ mod tests {
         sup.push(QuantumSignal::new(0.9, 0.95, "trusted"));
         sup.push(QuantumSignal::new(0.88, 0.9, "aux"));
         let fused = sup.collapse_evidence(&cfg);
-        assert!(fused.value > 0.8, "collapse 应反映健康 belief, got {}", fused.value);
+        assert!(
+            fused.value > 0.8,
+            "collapse 应反映健康 belief, got {}",
+            fused.value
+        );
         assert!(fused.confidence > 0.5);
     }
 }

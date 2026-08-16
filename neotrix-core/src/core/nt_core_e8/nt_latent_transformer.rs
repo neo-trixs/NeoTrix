@@ -85,7 +85,12 @@ impl LatentReasoningTransformer {
     }
 
     /// 显式参数 + 温度构造。
-    pub fn with_temperature(layers: usize, hidden_dim: usize, max_depth: usize, temperature: f64) -> Self {
+    pub fn with_temperature(
+        layers: usize,
+        hidden_dim: usize,
+        max_depth: usize,
+        temperature: f64,
+    ) -> Self {
         let layers = layers.max(1);
         let hidden_dim = hidden_dim.max(1);
         let max_depth = max_depth.max(1);
@@ -250,10 +255,16 @@ struct Lcg(u64);
 
 impl Lcg {
     fn new(seed: u64) -> Self {
-        Self(seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407))
+        Self(
+            seed.wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407),
+        )
     }
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.0 >> 33) & 0x7FFF_FFFF
     }
     fn next01(&mut self) -> f64 {
@@ -344,9 +355,17 @@ mod tests {
 
     #[test]
     fn test_convergence_detection() {
-        let mut t = LatentReasoningTransformer::with_temperature(2, LATENT_HIDDEN_DIM, 400, DEFAULT_LATENT_TEMPERATURE);
+        let mut t = LatentReasoningTransformer::with_temperature(
+            2,
+            LATENT_HIDDEN_DIM,
+            400,
+            DEFAULT_LATENT_TEMPERATURE,
+        );
         t.reason(&vec![1.0f64; LATENT_HIDDEN_DIM], 400);
-        assert!(t.is_converged(1e-4), "contraction should drive steps toward a fixed point");
+        assert!(
+            t.is_converged(1e-4),
+            "contraction should drive steps toward a fixed point"
+        );
     }
 
     #[test]
@@ -403,7 +422,10 @@ mod tests {
         let mut t2 = LatentReasoningTransformer::new();
         let s1 = t1.reason(&input, 5);
         let s2 = t2.reason(&input, 5);
-        assert_eq!(s1.vector, s2.vector, "same params must reproduce the same trajectory");
+        assert_eq!(
+            s1.vector, s2.vector,
+            "same params must reproduce the same trajectory"
+        );
         assert!((s1.accumulated_reward - s2.accumulated_reward).abs() < 1e-12);
     }
 }

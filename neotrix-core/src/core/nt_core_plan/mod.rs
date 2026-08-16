@@ -1,8 +1,8 @@
 #![deny(clippy::unwrap_used)]
 
-use serde::{Deserialize, Serialize};
 use crate::core::nt_core_hex::FullReasoningState;
 use crate::core::nt_core_policy::E8Policy;
+use serde::{Deserialize, Serialize};
 
 /// E8 Plan Mode — 将推理轨迹编码为结构化计划，每个步骤是对应 E8 卦象状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,10 +74,16 @@ impl PlanGenerator {
     pub fn generate_plan(&self, goal: &str, context: &[FullReasoningState]) -> E8Plan {
         let steps = self.generate_steps(goal, context);
         let scores: Vec<f64> = steps.iter().map(|s| s.prm_score).collect();
-        let avg_prm = if scores.is_empty() { 0.0 } else { scores.iter().sum::<f64>() / scores.len() as f64 };
+        let avg_prm = if scores.is_empty() {
+            0.0
+        } else {
+            scores.iter().sum::<f64>() / scores.len() as f64
+        };
         let id = uuid::Uuid::new_v4().to_string();
         let created_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
 
         E8Plan {
             id,
@@ -164,12 +170,17 @@ impl PlanGenerator {
         if steps.len() < 2 {
             return 1.0;
         }
-        let transitions = steps.windows(2).filter(|w| w[0].e8_mode != w[1].e8_mode).count();
+        let transitions = steps
+            .windows(2)
+            .filter(|w| w[0].e8_mode != w[1].e8_mode)
+            .count();
         1.0 - transitions as f64 / steps.len() as f64
     }
 
     fn compute_goal_alignment(&self, steps: &[PlanStep], _goal: &str) -> f64 {
-        if steps.is_empty() { return 0.0; }
+        if steps.is_empty() {
+            return 0.0;
+        }
         steps.iter().map(|s| s.prm_score).sum::<f64>() / steps.len() as f64
     }
 
@@ -192,16 +203,26 @@ impl Default for PlanGenerator {
 
 impl E8Plan {
     pub fn next_pending(&self) -> Option<&PlanStep> {
-        self.steps.iter().find(|s| matches!(s.status, StepStatus::Pending))
+        self.steps
+            .iter()
+            .find(|s| matches!(s.status, StepStatus::Pending))
     }
 
     pub fn completion_pct(&self) -> f64 {
-        if self.steps.is_empty() { return 1.0; }
-        self.steps.iter().filter(|s| matches!(s.status, StepStatus::Completed)).count() as f64 / self.steps.len() as f64
+        if self.steps.is_empty() {
+            return 1.0;
+        }
+        self.steps
+            .iter()
+            .filter(|s| matches!(s.status, StepStatus::Completed))
+            .count() as f64
+            / self.steps.len() as f64
     }
 
     pub fn is_complete(&self) -> bool {
-        self.steps.iter().all(|s| matches!(s.status, StepStatus::Completed | StepStatus::Skipped))
+        self.steps
+            .iter()
+            .all(|s| matches!(s.status, StepStatus::Completed | StepStatus::Skipped))
     }
 
     pub fn duration_ms(&self) -> u64 {

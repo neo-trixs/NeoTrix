@@ -53,7 +53,8 @@ pub struct CognitiveUnit {
 impl CognitiveUnit {
     pub fn new(id: usize, kind: CognitiveUnitKind, content: &str) -> Self {
         Self {
-            id, kind,
+            id,
+            kind,
             content: content.to_string(),
             domain: String::new(),
             salience: 0.5,
@@ -80,7 +81,9 @@ impl CognitiveUnit {
 
     /// Rough content-based token estimate (chars / 4 for English-like text)
     pub fn estimate_tokens(&self) -> usize {
-        if self.token_estimate > 0 { return self.token_estimate; }
+        if self.token_estimate > 0 {
+            return self.token_estimate;
+        }
         self.content.len().div_ceil(4)
     }
 }
@@ -121,14 +124,15 @@ impl ContextWindow {
         let id = self.next_id;
         self.next_id += 1;
         let est_tokens = content.len().div_ceil(4);
-        let unit = CognitiveUnit::new(id, kind, content)
-            .with_token_estimate(est_tokens);
+        let unit = CognitiveUnit::new(id, kind, content).with_token_estimate(est_tokens);
         self.total_token_budget += est_tokens;
 
         // Evict from front when over capacity (unit-wise or token-wise)
         while self.units.len() >= self.capacity || self.total_token_budget > self.capacity * 4 {
             if let Some(evicted) = self.units.pop_front() {
-                self.total_token_budget = self.total_token_budget.saturating_sub(evicted.estimate_tokens());
+                self.total_token_budget = self
+                    .total_token_budget
+                    .saturating_sub(evicted.estimate_tokens());
             } else {
                 break;
             }
@@ -169,7 +173,9 @@ impl ContextWindow {
         self.units.len()
     }
 
-    pub fn is_empty(&self) -> bool { self.units.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.units.is_empty()
+    }
 
     pub fn clear_attention(&mut self) {
         self.attention_mask.clear();
@@ -177,7 +183,9 @@ impl ContextWindow {
 
     /// Token budget utilization ratio (0.0 - 1.0+)
     pub fn utilization(&self) -> f64 {
-        if self.capacity == 0 { return 0.0; }
+        if self.capacity == 0 {
+            return 0.0;
+        }
         self.total_token_budget as f64 / (self.capacity as f64 * 4.0)
     }
 }
@@ -251,8 +259,13 @@ mod tests {
     #[test]
     fn test_by_domain_filter() {
         let mut w = ContextWindow::new(10);
-        w.units.push_back(CognitiveUnit::new(0, CognitiveUnitKind::Observation, "rust code").with_domain("code"));
-        w.units.push_back(CognitiveUnit::new(1, CognitiveUnitKind::Observation, "design notes").with_domain("design"));
+        w.units.push_back(
+            CognitiveUnit::new(0, CognitiveUnitKind::Observation, "rust code").with_domain("code"),
+        );
+        w.units.push_back(
+            CognitiveUnit::new(1, CognitiveUnitKind::Observation, "design notes")
+                .with_domain("design"),
+        );
         let code_units = w.by_domain("code");
         assert_eq!(code_units.len(), 1);
         assert_eq!(code_units[0].content, "rust code");

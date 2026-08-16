@@ -182,7 +182,11 @@ mod tests {
         for _ in 0..20 {
             m.tick(0.95, 0.0, 0);
         }
-        assert!(m.state.capability > 0.8, "capability should rise, got {}", m.state.capability);
+        assert!(
+            m.state.capability > 0.8,
+            "capability should rise, got {}",
+            m.state.capability
+        );
     }
 
     #[test]
@@ -191,7 +195,11 @@ mod tests {
         for _ in 0..50 {
             m.tick(0.6, 0.2, 0);
         }
-        assert!(m.state.fatigue > 0.2, "fatigue should accumulate, got {}", m.state.fatigue);
+        assert!(
+            m.state.fatigue > 0.2,
+            "fatigue should accumulate, got {}",
+            m.state.fatigue
+        );
     }
 
     #[test]
@@ -201,7 +209,11 @@ mod tests {
         for _ in 0..10 {
             m.tick(0.05, 0.0, 0);
         }
-        assert!(m.last_self_error > 0.2, "self-error should be high, got {}", m.last_self_error);
+        assert!(
+            m.last_self_error > 0.2,
+            "self-error should be high, got {}",
+            m.last_self_error
+        );
         assert!(m.self_reward() < 0.0);
     }
 
@@ -212,7 +224,11 @@ mod tests {
         for _ in 0..20 {
             m.tick(0.5, 0.0, 0);
         }
-        assert!(m.last_self_error < 0.15, "calibrated self-error should be low, got {}", m.last_self_error);
+        assert!(
+            m.last_self_error < 0.15,
+            "calibrated self-error should be low, got {}",
+            m.last_self_error
+        );
     }
 
     #[test]
@@ -238,7 +254,10 @@ mod tests {
             m2.tick(0.5, 0.5, 0);
         }
         let tired = m2.combined_intrinsic_reward();
-        assert!(tired <= fresh, "fatigued reward ({tired}) should be ≤ fresh ({fresh})");
+        assert!(
+            tired <= fresh,
+            "fatigued reward ({tired}) should be ≤ fresh ({fresh})"
+        );
     }
 
     #[test]

@@ -162,8 +162,8 @@ impl crate::core::nt_core_self_test::SelfTest for SpeciousPresent {
 #[cfg(test)]
 mod tests {
     use super::*;
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
     use crate::core::nt_core_consciousness::vsa_tag::{VsaOrigin, VsaSelfCategory};
+    use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
     fn tagged(v: Vec<u8>) -> VsaTagged {
         VsaTagged::new(v, VsaOrigin::Self_(VsaSelfCategory::Thought))

@@ -15,11 +15,8 @@ pub use crate::core::nt_core_deploy_cache as deploy_cache;
 
 #[cfg(feature = "research")]
 pub use crate::core::nt_core_deploy::{
-    EdgeDeployPipeline, Quantizer, HardwareDetector, AotCompiler,
-    Quantization, OsType, AotTarget, HardwareProfile, LoraAdapter,
-    QuantizedModel, AotResult, DeployReport,
-    AWQQuantization, AWQConfig, GGUFLevel, GGUFQuantization, GGUFConfig,
-    QuantizationPipeline,
-    PowerState, PowerProfile, HardwarePowerProfile, PowerThermalModel,
-    AneProgramCache, CacheEntry, CachePolicy,
+    AWQConfig, AWQQuantization, AneProgramCache, AotCompiler, AotResult, AotTarget, CacheEntry,
+    CachePolicy, DeployReport, EdgeDeployPipeline, GGUFConfig, GGUFLevel, GGUFQuantization,
+    HardwareDetector, HardwarePowerProfile, HardwareProfile, LoraAdapter, OsType, PowerProfile,
+    PowerState, PowerThermalModel, Quantization, QuantizationPipeline, QuantizedModel, Quantizer,
 };

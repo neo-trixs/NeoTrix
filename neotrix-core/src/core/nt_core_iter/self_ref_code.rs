@@ -97,14 +97,20 @@ impl SelfCodeMonitor {
     }
 
     pub fn approve_request(&mut self, id: &str) -> Option<CodeMutation> {
-        let pos = self.pending_requests.iter().position(|r| r.mutation.id == id)?;
+        let pos = self
+            .pending_requests
+            .iter()
+            .position(|r| r.mutation.id == id)?;
         self.pending_requests.remove(pos).map(|r| r.mutation)
     }
 
     pub fn record_result(&mut self, result: MutationResult) {
-        self.active_mutations.insert(result.mutation_id.clone(), result);
+        self.active_mutations
+            .insert(result.mutation_id.clone(), result);
         if self.active_mutations.len() > self.max_history {
-            if let Some(oldest) = self.active_mutations.keys()
+            if let Some(oldest) = self
+                .active_mutations
+                .keys()
                 .cloned()
                 .min_by_key(|k| self.active_mutations[k].applied_at)
             {
@@ -131,7 +137,9 @@ impl SelfCodeMonitor {
         let success_rate = if total_mutations == 0 {
             0.0
         } else {
-            (successful as f64 / total_mutations as f64).max(0.0).min(1.0)
+            (successful as f64 / total_mutations as f64)
+                .max(0.0)
+                .min(1.0)
         };
         let pending_count = self.pending_requests.len() as u32;
 

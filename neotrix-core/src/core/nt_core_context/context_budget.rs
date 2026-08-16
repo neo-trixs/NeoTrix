@@ -183,7 +183,12 @@ impl ContextBudget {
     ) -> AssembledContext {
         let intent_reserve: usize = intents
             .iter()
-            .filter(|i| matches!(i.priority, CompactionPriority::Critical | CompactionPriority::High))
+            .filter(|i| {
+                matches!(
+                    i.priority,
+                    CompactionPriority::Critical | CompactionPriority::High
+                )
+            })
             .map(|i| i.reserve_tokens)
             .sum();
 
@@ -424,7 +429,11 @@ mod tests {
             .iter()
             .filter(|s| matches!(s.source, SourceType::Stream))
             .collect();
-        assert_eq!(stream_slices.len(), 2, "should have original + critical injection");
+        assert_eq!(
+            stream_slices.len(),
+            2,
+            "should have original + critical injection"
+        );
         let injected = &stream_slices[1];
         assert!(injected.content.contains("preserved content"));
     }
@@ -487,7 +496,9 @@ mod tests {
             .collect();
         // Low priority should not have its content injected
         assert!(
-            !stream_slices.iter().any(|s| s.content.contains("low priority")),
+            !stream_slices
+                .iter()
+                .any(|s| s.content.contains("low priority")),
             "Low priority intent should not be injected"
         );
     }

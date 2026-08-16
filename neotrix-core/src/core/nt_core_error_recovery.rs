@@ -79,29 +79,48 @@ pub struct ExponentialBackoffStrategy {
 
 impl ExponentialBackoffStrategy {
     pub fn new(base_delay_ms: u64, max_delay_ms: u64, jitter_factor: f64) -> Self {
-        Self { base_delay_ms, max_delay_ms, jitter_factor }
+        Self {
+            base_delay_ms,
+            max_delay_ms,
+            jitter_factor,
+        }
     }
 }
 
 impl ErrorRecoveryStrategy for ExponentialBackoffStrategy {
-    fn name(&self) -> &str { "exponential_backoff" }
-    fn layer(&self) -> usize { 1 }
+    fn name(&self) -> &str {
+        "exponential_backoff"
+    }
+    fn layer(&self) -> usize {
+        1
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
-        matches!(ctx.error_type, ErrorType::RateLimit { .. } | ErrorType::ServerError { .. } | ErrorType::Timeout { .. })
+        matches!(
+            ctx.error_type,
+            ErrorType::RateLimit { .. } | ErrorType::ServerError { .. } | ErrorType::Timeout { .. }
+        )
     }
 
     fn recover(&self, ctx: &ErrorContext) -> Option<RecoveryAction> {
         if ctx.attempt >= ctx.max_retries {
             return None;
         }
-        if let ErrorType::RateLimit { retry_after: Some(ra) } = &ctx.error_type {
+        if let ErrorType::RateLimit {
+            retry_after: Some(ra),
+        } = &ctx.error_type
+        {
             return Some(RecoveryAction::Retry {
                 delay_ms: *ra,
                 reason: format!("rate limit: retry after {}ms", ra),
             });
         }
-        let delay = compute_backoff(self.base_delay_ms, ctx.attempt, self.max_delay_ms, self.jitter_factor);
+        let delay = compute_backoff(
+            self.base_delay_ms,
+            ctx.attempt,
+            self.max_delay_ms,
+            self.jitter_factor,
+        );
         Some(RecoveryAction::Retry {
             delay_ms: delay,
             reason: format!("backoff retry attempt {}", ctx.attempt + 1),
@@ -129,18 +148,29 @@ pub struct CircuitBreakerStrategy {
 
 impl CircuitBreakerStrategy {
     pub fn new(threshold: usize, cooldown_ms: u64) -> Self {
-        Self { threshold, cooldown_ms, failure_counts: HashMap::new(), last_failure: HashMap::new() }
+        Self {
+            threshold,
+            cooldown_ms,
+            failure_counts: HashMap::new(),
+            last_failure: HashMap::new(),
+        }
     }
 }
 
 impl ErrorRecoveryStrategy for CircuitBreakerStrategy {
-    fn name(&self) -> &str { "circuit_breaker" }
-    fn layer(&self) -> usize { 2 }
+    fn name(&self) -> &str {
+        "circuit_breaker"
+    }
+    fn layer(&self) -> usize {
+        2
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
         let key = &ctx.model;
         let count = self.failure_counts.get(key).copied().unwrap_or(0);
-        let cooldown_ok = self.last_failure.get(key)
+        let cooldown_ok = self
+            .last_failure
+            .get(key)
             .map(|t| t.elapsed() >= Duration::from_millis(self.cooldown_ms))
             .unwrap_or(true);
         count >= self.threshold && cooldown_ok
@@ -153,8 +183,7 @@ impl ErrorRecoveryStrategy for CircuitBreakerStrategy {
                 reason: "circuit breaker cooldown".to_string(),
             });
         }
-        let next = ctx.available_models.iter()
-            .find(|m| *m != &ctx.model)?;
+        let next = ctx.available_models.iter().find(|m| *m != &ctx.model)?;
         Some(RecoveryAction::FallbackToModel(next.clone()))
     }
 }
@@ -162,18 +191,26 @@ impl ErrorRecoveryStrategy for CircuitBreakerStrategy {
 pub struct ModelFallbackStrategy;
 
 impl ErrorRecoveryStrategy for ModelFallbackStrategy {
-    fn name(&self) -> &str { "model_fallback" }
-    fn layer(&self) -> usize { 3 }
+    fn name(&self) -> &str {
+        "model_fallback"
+    }
+    fn layer(&self) -> usize {
+        3
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
-        matches!(ctx.error_type, ErrorType::ServerError { .. } | ErrorType::Timeout { .. } | ErrorType::RateLimit { .. })
-            && ctx.available_models.iter().any(|m| *m != ctx.model)
+        matches!(
+            ctx.error_type,
+            ErrorType::ServerError { .. } | ErrorType::Timeout { .. } | ErrorType::RateLimit { .. }
+        ) && ctx.available_models.iter().any(|m| *m != ctx.model)
     }
 
     fn recover(&self, ctx: &ErrorContext) -> Option<RecoveryAction> {
         // Use a simple priority: prefer different provider
         let current_family = model_family(&ctx.model);
-        let best = ctx.available_models.iter()
+        let best = ctx
+            .available_models
+            .iter()
             .find(|m| model_family(m) != current_family)
             .or_else(|| ctx.available_models.iter().find(|m| *m != &ctx.model))?;
         Some(RecoveryAction::FallbackToModel(best.clone()))
@@ -181,23 +218,40 @@ impl ErrorRecoveryStrategy for ModelFallbackStrategy {
 }
 
 fn model_family(model: &str) -> &str {
-    if model.contains("claude") || model.contains("sonnet") || model.contains("opus") || model.contains("haiku") { "anthropic" }
-    else if model.contains("gpt") || model.contains("o1") || model.contains("o3") { "openai" }
-    else if model.contains("gemini") { "gemini" }
-    else if model.contains("deepseek") { "deepseek" }
-    else if model.contains("llama") || model.contains("mixtral") { "open_source" }
-    else { "other" }
+    if model.contains("claude")
+        || model.contains("sonnet")
+        || model.contains("opus")
+        || model.contains("haiku")
+    {
+        "anthropic"
+    } else if model.contains("gpt") || model.contains("o1") || model.contains("o3") {
+        "openai"
+    } else if model.contains("gemini") {
+        "gemini"
+    } else if model.contains("deepseek") {
+        "deepseek"
+    } else if model.contains("llama") || model.contains("mixtral") {
+        "open_source"
+    } else {
+        "other"
+    }
 }
 
 pub struct SemanticFallbackStrategy;
 
 impl ErrorRecoveryStrategy for SemanticFallbackStrategy {
-    fn name(&self) -> &str { "semantic_fallback" }
-    fn layer(&self) -> usize { 4 }
+    fn name(&self) -> &str {
+        "semantic_fallback"
+    }
+    fn layer(&self) -> usize {
+        4
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
-        matches!(ctx.error_type, ErrorType::InvalidOutput { .. } | ErrorType::Hallucination { .. })
-            && !ctx.prompt_variants.is_empty()
+        matches!(
+            ctx.error_type,
+            ErrorType::InvalidOutput { .. } | ErrorType::Hallucination { .. }
+        ) && !ctx.prompt_variants.is_empty()
     }
 
     fn recover(&self, ctx: &ErrorContext) -> Option<RecoveryAction> {
@@ -210,8 +264,12 @@ impl ErrorRecoveryStrategy for SemanticFallbackStrategy {
 pub struct ValidationGateStrategy;
 
 impl ErrorRecoveryStrategy for ValidationGateStrategy {
-    fn name(&self) -> &str { "validation_gate" }
-    fn layer(&self) -> usize { 5 }
+    fn name(&self) -> &str {
+        "validation_gate"
+    }
+    fn layer(&self) -> usize {
+        5
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
         matches!(ctx.error_type, ErrorType::InvalidOutput { .. })
@@ -219,23 +277,35 @@ impl ErrorRecoveryStrategy for ValidationGateStrategy {
 
     fn recover(&self, ctx: &ErrorContext) -> Option<RecoveryAction> {
         let msg = if let ErrorType::InvalidOutput { details, raw: _ } = &ctx.error_type {
-            format!("validation failed: {}. retry with stricter constraints", details)
+            format!(
+                "validation failed: {}. retry with stricter constraints",
+                details
+            )
         } else {
             "output validation failed".to_string()
         };
-        Some(RecoveryAction::Retry { delay_ms: 0, reason: msg })
+        Some(RecoveryAction::Retry {
+            delay_ms: 0,
+            reason: msg,
+        })
     }
 }
 
 pub struct CheckpointResumeStrategy;
 
 impl ErrorRecoveryStrategy for CheckpointResumeStrategy {
-    fn name(&self) -> &str { "checkpoint_resume" }
-    fn layer(&self) -> usize { 6 }
+    fn name(&self) -> &str {
+        "checkpoint_resume"
+    }
+    fn layer(&self) -> usize {
+        6
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
-        matches!(ctx.error_type, ErrorType::Timeout { .. } | ErrorType::ContextOverflow { .. })
-            && ctx.state_snapshot.is_some()
+        matches!(
+            ctx.error_type,
+            ErrorType::Timeout { .. } | ErrorType::ContextOverflow { .. }
+        ) && ctx.state_snapshot.is_some()
     }
 
     fn recover(&self, ctx: &ErrorContext) -> Option<RecoveryAction> {
@@ -249,12 +319,18 @@ pub struct HumanEscalationStrategy {
 }
 
 impl HumanEscalationStrategy {
-    pub fn new(threshold: usize) -> Self { Self { threshold } }
+    pub fn new(threshold: usize) -> Self {
+        Self { threshold }
+    }
 }
 
 impl ErrorRecoveryStrategy for HumanEscalationStrategy {
-    fn name(&self) -> &str { "human_escalation" }
-    fn layer(&self) -> usize { 7 }
+    fn name(&self) -> &str {
+        "human_escalation"
+    }
+    fn layer(&self) -> usize {
+        7
+    }
 
     fn can_handle(&self, ctx: &ErrorContext) -> bool {
         ctx.attempt >= self.threshold
@@ -322,12 +398,16 @@ impl RecoveryStats {
     }
 
     pub fn recovery_rate(&self) -> f64 {
-        if self.total_errors == 0 { return 1.0; }
+        if self.total_errors == 0 {
+            return 1.0;
+        }
         self.successful_recoveries as f64 / self.total_errors as f64
     }
 
     pub fn avg_recovery_time_ms(&self) -> f64 {
-        if self.successful_recoveries == 0 { return 0.0; }
+        if self.successful_recoveries == 0 {
+            return 0.0;
+        }
         self.total_recovery_time_ms as f64 / self.successful_recoveries as f64
     }
 }
@@ -341,15 +421,25 @@ pub struct RecoveryOrchestrator {
 impl RecoveryOrchestrator {
     pub fn new(config: RecoveryConfig) -> Self {
         let strategies: Vec<Box<dyn ErrorRecoveryStrategy>> = vec![
-            Box::new(ExponentialBackoffStrategy::new(config.base_delay_ms, config.max_delay_ms, config.jitter_factor)),
+            Box::new(ExponentialBackoffStrategy::new(
+                config.base_delay_ms,
+                config.max_delay_ms,
+                config.jitter_factor,
+            )),
             Box::new(CircuitBreakerStrategy::new(5, 60_000)),
             Box::new(ModelFallbackStrategy),
             Box::new(SemanticFallbackStrategy),
             Box::new(ValidationGateStrategy),
             Box::new(CheckpointResumeStrategy),
-            Box::new(HumanEscalationStrategy::new(config.human_escalation_threshold)),
+            Box::new(HumanEscalationStrategy::new(
+                config.human_escalation_threshold,
+            )),
         ];
-        Self { strategies, config, stats: RecoveryStats::new() }
+        Self {
+            strategies,
+            config,
+            stats: RecoveryStats::new(),
+        }
     }
 
     pub fn add_strategy(&mut self, strategy: Box<dyn ErrorRecoveryStrategy>) {
@@ -372,7 +462,10 @@ impl RecoveryOrchestrator {
             }
         }
         self.stats.aborts += 1;
-        RecoveryAction::Abort(format!("no recovery strategy for error after {} attempts", ctx.attempt))
+        RecoveryAction::Abort(format!(
+            "no recovery strategy for error after {} attempts",
+            ctx.attempt
+        ))
     }
 
     fn record_action(&mut self, action: &RecoveryAction) {
@@ -386,8 +479,12 @@ impl RecoveryOrchestrator {
         }
     }
 
-    pub fn stats(&self) -> &RecoveryStats { &self.stats }
-    pub fn config(&self) -> &RecoveryConfig { &self.config }
+    pub fn stats(&self) -> &RecoveryStats {
+        &self.stats
+    }
+    pub fn config(&self) -> &RecoveryConfig {
+        &self.config
+    }
 }
 
 #[cfg(test)]
@@ -413,7 +510,11 @@ mod tests {
     #[test]
     fn test_backoff_layer1_rate_limit() {
         let s = ExponentialBackoffStrategy::new(1000, 60000, 0.1);
-        let ctx = make_ctx(ErrorType::RateLimit { retry_after: None }, "claude-sonnet-4", 0);
+        let ctx = make_ctx(
+            ErrorType::RateLimit { retry_after: None },
+            "claude-sonnet-4",
+            0,
+        );
         assert!(s.can_handle(&ctx));
         let action = s.recover(&ctx);
         assert!(matches!(action, Some(RecoveryAction::Retry { .. })));
@@ -422,17 +523,29 @@ mod tests {
     #[test]
     fn test_backoff_exhausted_retries() {
         let s = ExponentialBackoffStrategy::new(1000, 60000, 0.1);
-        let ctx = make_ctx(ErrorType::RateLimit { retry_after: None }, "claude-sonnet-4", 5);
+        let ctx = make_ctx(
+            ErrorType::RateLimit { retry_after: None },
+            "claude-sonnet-4",
+            5,
+        );
         assert!(s.recover(&ctx).is_none());
     }
 
     #[test]
     fn test_backoff_respects_retry_after() {
         let s = ExponentialBackoffStrategy::new(1000, 60000, 0.1);
-        let ctx = make_ctx(ErrorType::RateLimit { retry_after: Some(5000) }, "claude-sonnet-4", 0);
+        let ctx = make_ctx(
+            ErrorType::RateLimit {
+                retry_after: Some(5000),
+            },
+            "claude-sonnet-4",
+            0,
+        );
         if let Some(RecoveryAction::Retry { delay_ms, .. }) = s.recover(&ctx) {
             assert_eq!(delay_ms, 5000);
-        } else { panic!("expected retry with retry_after"); }
+        } else {
+            panic!("expected retry with retry_after");
+        }
     }
 
     #[test]
@@ -469,7 +582,14 @@ mod tests {
     #[test]
     fn test_semantic_fallback_layer4() {
         let s = SemanticFallbackStrategy;
-        let ctx = make_ctx(ErrorType::InvalidOutput { details: "bad json".into(), raw: "{{{".into() }, "gpt-4o", 0);
+        let ctx = make_ctx(
+            ErrorType::InvalidOutput {
+                details: "bad json".into(),
+                raw: "{{{".into(),
+            },
+            "gpt-4o",
+            0,
+        );
         assert!(s.can_handle(&ctx));
         let action = s.recover(&ctx);
         assert!(matches!(action, Some(RecoveryAction::FallbackToPrompt(_))));
@@ -478,7 +598,14 @@ mod tests {
     #[test]
     fn test_semantic_fallback_no_variants() {
         let s = SemanticFallbackStrategy;
-        let mut ctx = make_ctx(ErrorType::InvalidOutput { details: "bad json".into(), raw: "{{{".into() }, "gpt-4o", 0);
+        let mut ctx = make_ctx(
+            ErrorType::InvalidOutput {
+                details: "bad json".into(),
+                raw: "{{{".into(),
+            },
+            "gpt-4o",
+            0,
+        );
         ctx.prompt_variants.clear();
         assert!(!s.can_handle(&ctx));
     }
@@ -486,9 +613,19 @@ mod tests {
     #[test]
     fn test_validation_gate_layer5() {
         let s = ValidationGateStrategy;
-        let ctx = make_ctx(ErrorType::InvalidOutput { details: "schema violation".into(), raw: "{}".into() }, "gpt-4o", 0);
+        let ctx = make_ctx(
+            ErrorType::InvalidOutput {
+                details: "schema violation".into(),
+                raw: "{}".into(),
+            },
+            "gpt-4o",
+            0,
+        );
         assert!(s.can_handle(&ctx));
-        assert!(matches!(s.recover(&ctx), Some(RecoveryAction::Retry { .. })));
+        assert!(matches!(
+            s.recover(&ctx),
+            Some(RecoveryAction::Retry { .. })
+        ));
     }
 
     #[test]
@@ -501,15 +638,26 @@ mod tests {
     #[test]
     fn test_checkpoint_resume_layer6() {
         let s = CheckpointResumeStrategy;
-        let ctx = make_ctx(ErrorType::Timeout { elapsed_ms: 30000 }, "claude-sonnet-4", 0);
+        let ctx = make_ctx(
+            ErrorType::Timeout { elapsed_ms: 30000 },
+            "claude-sonnet-4",
+            0,
+        );
         assert!(s.can_handle(&ctx));
-        assert!(matches!(s.recover(&ctx), Some(RecoveryAction::RestoreFromCheckpoint(_))));
+        assert!(matches!(
+            s.recover(&ctx),
+            Some(RecoveryAction::RestoreFromCheckpoint(_))
+        ));
     }
 
     #[test]
     fn test_checkpoint_no_snapshot() {
         let s = CheckpointResumeStrategy;
-        let mut ctx = make_ctx(ErrorType::Timeout { elapsed_ms: 30000 }, "claude-sonnet-4", 0);
+        let mut ctx = make_ctx(
+            ErrorType::Timeout { elapsed_ms: 30000 },
+            "claude-sonnet-4",
+            0,
+        );
         ctx.state_snapshot = None;
         assert!(!s.can_handle(&ctx));
     }
@@ -519,7 +667,10 @@ mod tests {
         let s = HumanEscalationStrategy::new(3);
         let ctx = make_ctx(ErrorType::Unknown("critical".into()), "gpt-4o", 3);
         assert!(s.can_handle(&ctx));
-        assert!(matches!(s.recover(&ctx), Some(RecoveryAction::EscalateToHuman(_))));
+        assert!(matches!(
+            s.recover(&ctx),
+            Some(RecoveryAction::EscalateToHuman(_))
+        ));
     }
 
     #[test]
@@ -532,7 +683,13 @@ mod tests {
     #[test]
     fn test_orchestrator_handles_rate_limit() {
         let mut orch = RecoveryOrchestrator::new(RecoveryConfig::default());
-        let ctx = make_ctx(ErrorType::RateLimit { retry_after: Some(2000) }, "claude-sonnet-4", 0);
+        let ctx = make_ctx(
+            ErrorType::RateLimit {
+                retry_after: Some(2000),
+            },
+            "claude-sonnet-4",
+            0,
+        );
         let action = orch.handle(&ctx);
         assert!(matches!(action, RecoveryAction::Retry { .. }));
         assert_eq!(orch.stats().retries, 1);
@@ -542,7 +699,8 @@ mod tests {
     #[test]
     fn test_orchestrator_escalates_after_many_failures() {
         let mut orch = RecoveryOrchestrator::new(RecoveryConfig {
-            human_escalation_threshold: 2, ..Default::default()
+            human_escalation_threshold: 2,
+            ..Default::default()
         });
         let ctx = make_ctx(ErrorType::Unknown("persistent".into()), "gpt-4o", 5);
         let action = orch.handle(&ctx);
@@ -563,9 +721,20 @@ mod tests {
     #[test]
     fn test_orchestrator_stats_tracking() {
         let mut orch = RecoveryOrchestrator::new(RecoveryConfig::default());
-        let ctx1 = make_ctx(ErrorType::RateLimit { retry_after: None }, "claude-sonnet-4", 0);
+        let ctx1 = make_ctx(
+            ErrorType::RateLimit { retry_after: None },
+            "claude-sonnet-4",
+            0,
+        );
         orch.handle(&ctx1);
-        let mut ctx2 = make_ctx(ErrorType::InvalidOutput { details: "bad".into(), raw: "x".into() }, "gpt-4o", 0);
+        let mut ctx2 = make_ctx(
+            ErrorType::InvalidOutput {
+                details: "bad".into(),
+                raw: "x".into(),
+            },
+            "gpt-4o",
+            0,
+        );
         ctx2.prompt_variants.clear();
         let ctx3 = make_ctx(ErrorType::ServerError { code: 503 }, "gpt-4o", 1);
         orch.handle(&ctx2);

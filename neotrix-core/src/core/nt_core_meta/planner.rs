@@ -563,7 +563,7 @@ mod tests {
         planner.record_action("EVO-1", ActionStatus::Completed, &mut model);
         planner.record_action("EVO-2", ActionStatus::InProgress, &mut model);
         let rate = planner.completion_rate();
-        assert!((rate - 1.0/3.0).abs() < 0.001, "rate={}", rate);
+        assert!((rate - 1.0 / 3.0).abs() < 0.001, "rate={}", rate);
         assert_eq!(planner.pending_count(), 1);
     }
 

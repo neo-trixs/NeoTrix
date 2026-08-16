@@ -33,7 +33,12 @@ impl DirectedSearch {
         }
     }
 
-    pub fn search(&mut self, graph: &CausalGraph, start: usize, goal: impl Fn(&CausalNode) -> bool) -> Vec<Vec<usize>> {
+    pub fn search(
+        &mut self,
+        graph: &CausalGraph,
+        start: usize,
+        goal: impl Fn(&CausalNode) -> bool,
+    ) -> Vec<Vec<usize>> {
         self.reset();
         match &self.strategy {
             SearchStrategy::Beam { width } => self.beam_search(graph, start, &goal, *width),
@@ -43,7 +48,12 @@ impl DirectedSearch {
         }
     }
 
-    pub fn bfs_search(&mut self, graph: &CausalGraph, start: usize, goal: &impl Fn(&CausalNode) -> bool) -> Vec<Vec<usize>> {
+    pub fn bfs_search(
+        &mut self,
+        graph: &CausalGraph,
+        start: usize,
+        goal: &impl Fn(&CausalNode) -> bool,
+    ) -> Vec<Vec<usize>> {
         let mut results = Vec::new();
         let mut queue = VecDeque::new();
         queue.push_back(vec![start]);
@@ -52,12 +62,16 @@ impl DirectedSearch {
             if path.len() > self.max_depth {
                 continue;
             }
-            if let Some(node) = graph.nodes.iter().find(|n| n.id == path.last().copied().unwrap_or(start)) {
+            if let Some(node) = graph
+                .nodes
+                .iter()
+                .find(|n| n.id == path.last().copied().unwrap_or(start))
+            {
                 if goal(node) {
                     results.push(path.clone());
                 }
             }
-                let last = path.last().copied().unwrap_or(start);
+            let last = path.last().copied().unwrap_or(start);
             if let Some(neighbors) = graph.adjacency.get(&last) {
                 for &(next, _) in neighbors {
                     if !path.contains(&next) {
@@ -72,14 +86,26 @@ impl DirectedSearch {
         results
     }
 
-    pub fn dfs_search(&mut self, graph: &CausalGraph, start: usize, goal: &impl Fn(&CausalNode) -> bool) -> Vec<Vec<usize>> {
+    pub fn dfs_search(
+        &mut self,
+        graph: &CausalGraph,
+        start: usize,
+        goal: &impl Fn(&CausalNode) -> bool,
+    ) -> Vec<Vec<usize>> {
         let mut results = Vec::new();
         let mut current_path = vec![start];
         self.dfs_recursive(graph, start, goal, &mut current_path, &mut results);
         results
     }
 
-    fn dfs_recursive(&self, graph: &CausalGraph, node: usize, goal: &impl Fn(&CausalNode) -> bool, current_path: &mut Vec<usize>, results: &mut Vec<Vec<usize>>) {
+    fn dfs_recursive(
+        &self,
+        graph: &CausalGraph,
+        node: usize,
+        goal: &impl Fn(&CausalNode) -> bool,
+        current_path: &mut Vec<usize>,
+        results: &mut Vec<Vec<usize>>,
+    ) {
         if current_path.len() > self.max_depth {
             return;
         }
@@ -99,7 +125,13 @@ impl DirectedSearch {
         }
     }
 
-    pub fn beam_search(&mut self, graph: &CausalGraph, start: usize, goal: &impl Fn(&CausalNode) -> bool, width: usize) -> Vec<Vec<usize>> {
+    pub fn beam_search(
+        &mut self,
+        graph: &CausalGraph,
+        start: usize,
+        goal: &impl Fn(&CausalNode) -> bool,
+        width: usize,
+    ) -> Vec<Vec<usize>> {
         let mut results = Vec::new();
         let mut candidates = vec![vec![start]];
 
@@ -109,7 +141,7 @@ impl DirectedSearch {
             }
             let mut all_extensions = Vec::new();
             for path in &candidates {
-            let last = path.last().copied().unwrap_or(start);
+                let last = path.last().copied().unwrap_or(start);
                 if let Some(n) = graph.nodes.iter().find(|n| n.id == last) {
                     if goal(n) {
                         results.push(path.clone());
@@ -131,8 +163,13 @@ impl DirectedSearch {
                     }
                 }
             }
-            all_extensions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            candidates = all_extensions.into_iter().take(width).map(|(p, _)| p).collect();
+            all_extensions
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            candidates = all_extensions
+                .into_iter()
+                .take(width)
+                .map(|(p, _)| p)
+                .collect();
         }
 
         results

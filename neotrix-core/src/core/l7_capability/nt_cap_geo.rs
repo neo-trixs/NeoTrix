@@ -70,16 +70,32 @@ impl GeoScorer {
             + semantic * self.semantic_weight
             + citation * self.citation_weight
             + recency * self.recency_weight;
-        GeoScore { overall, authority, structure, semantic_completeness: semantic, citation_feasibility: citation, recency }
+        GeoScore {
+            overall,
+            authority,
+            structure,
+            semantic_completeness: semantic,
+            citation_feasibility: citation,
+            recency,
+        }
     }
 
     fn compute_authority(&self, content: &str) -> f64 {
         let mut score: f64 = 0.4;
         let lower = content.to_lowercase();
-        if lower.contains("according to") || lower.contains("reported by") { score += 0.1; }
-        if lower.contains("study") || lower.contains("research") || lower.contains("survey") { score += 0.1; }
-        if lower.contains("doi:") || lower.contains("arxiv") || lower.contains("ieee") { score += 0.1; }
-        if lower.contains("government") || lower.contains("official") || lower.contains("standard") { score += 0.1; }
+        if lower.contains("according to") || lower.contains("reported by") {
+            score += 0.1;
+        }
+        if lower.contains("study") || lower.contains("research") || lower.contains("survey") {
+            score += 0.1;
+        }
+        if lower.contains("doi:") || lower.contains("arxiv") || lower.contains("ieee") {
+            score += 0.1;
+        }
+        if lower.contains("government") || lower.contains("official") || lower.contains("standard")
+        {
+            score += 0.1;
+        }
         let citation_count = content.matches('[').count().min(10) as f64 / 10.0 * 0.1;
         score + citation_count
     }
@@ -88,24 +104,57 @@ impl GeoScorer {
         let mut score: f64 = 0.3;
         let lines: Vec<&str> = content.lines().collect();
         let h_count = lines.iter().filter(|l| l.starts_with('#')).count();
-        let list_count = lines.iter().filter(|l| l.trim().starts_with('-') || l.trim().starts_with('*') || l.trim().starts_with(|c: char| c.is_ascii_digit())).count();
+        let list_count = lines
+            .iter()
+            .filter(|l| {
+                l.trim().starts_with('-')
+                    || l.trim().starts_with('*')
+                    || l.trim().starts_with(|c: char| c.is_ascii_digit())
+            })
+            .count();
         let table_count = lines.iter().filter(|l| l.contains('|')).count();
-        if h_count >= 5 { score += 0.15; } else if h_count >= 3 { score += 0.1; } else if h_count >= 1 { score += 0.05; }
-        if list_count >= 3 { score += 0.1; } else if list_count >= 1 { score += 0.05; }
-        if table_count >= 3 { score += 0.1; } else if table_count >= 1 { score += 0.05; }
+        if h_count >= 5 {
+            score += 0.15;
+        } else if h_count >= 3 {
+            score += 0.1;
+        } else if h_count >= 1 {
+            score += 0.05;
+        }
+        if list_count >= 3 {
+            score += 0.1;
+        } else if list_count >= 1 {
+            score += 0.05;
+        }
+        if table_count >= 3 {
+            score += 0.1;
+        } else if table_count >= 1 {
+            score += 0.05;
+        }
         let first_line = lines.first().map(|l| l.trim()).unwrap_or("");
-        if first_line.len() > 20 && first_line.len() < 200 { score += 0.15; }
+        if first_line.len() > 20 && first_line.len() < 200 {
+            score += 0.15;
+        }
         score.min(1.0)
     }
 
     fn compute_semantic(&self, content: &str, query: &str) -> f64 {
         let lower_content = content.to_lowercase();
         let query_terms: Vec<&str> = query.split_whitespace().collect();
-        let matched = query_terms.iter().filter(|t| lower_content.contains(*t)).count();
-        let coverage = if query_terms.is_empty() { 0.5 } else { matched as f64 / query_terms.len() as f64 };
+        let matched = query_terms
+            .iter()
+            .filter(|t| lower_content.contains(*t))
+            .count();
+        let coverage = if query_terms.is_empty() {
+            0.5
+        } else {
+            matched as f64 / query_terms.len() as f64
+        };
         let mut score = 0.3 + coverage * 0.3;
         let sections = ["definition", "reason", "method", "case", "trend"];
-        let found_sections = sections.iter().filter(|s| lower_content.contains(*s)).count();
+        let found_sections = sections
+            .iter()
+            .filter(|s| lower_content.contains(*s))
+            .count();
         score += found_sections as f64 * 0.08;
         score.min(1.0)
     }
@@ -113,12 +162,24 @@ impl GeoScorer {
     fn compute_citation_feasibility(&self, content: &str) -> f64 {
         let mut score: f64 = 0.4;
         let lower = content.to_lowercase();
-        if lower.contains("source") || lower.contains("reference") { score += 0.1; }
-        if lower.contains("data") || lower.contains("statistic") || lower.contains("percent") { score += 0.1; }
-        if lower.contains("quote") || lower.contains("expert") || lower.contains("according") { score += 0.1; }
+        if lower.contains("source") || lower.contains("reference") {
+            score += 0.1;
+        }
+        if lower.contains("data") || lower.contains("statistic") || lower.contains("percent") {
+            score += 0.1;
+        }
+        if lower.contains("quote") || lower.contains("expert") || lower.contains("according") {
+            score += 0.1;
+        }
         let commas = content.matches(',').count();
-        let avg_sentence_len = if commas > 0 { content.len() as f64 / (commas as f64 + 1.0) } else { content.len() as f64 };
-        if (50.0..200.0).contains(&avg_sentence_len) { score += 0.1; }
+        let avg_sentence_len = if commas > 0 {
+            content.len() as f64 / (commas as f64 + 1.0)
+        } else {
+            content.len() as f64
+        };
+        if (50.0..200.0).contains(&avg_sentence_len) {
+            score += 0.1;
+        }
         score.min(1.0)
     }
 
@@ -126,18 +187,32 @@ impl GeoScorer {
         let lower = content.to_lowercase();
         let mut score: f64 = 0.5;
         let current_year = 2026;
-        let year_strs: Vec<String> = (current_year - 2..=current_year).map(|y| y.to_string()).collect();
+        let year_strs: Vec<String> = (current_year - 2..=current_year)
+            .map(|y| y.to_string())
+            .collect();
         for ys in &year_strs {
-            if lower.contains(ys) { score += 0.1; }
+            if lower.contains(ys) {
+                score += 0.1;
+            }
         }
-        if lower.contains("recent") || lower.contains("latest") || lower.contains("updated") { score += 0.1; }
-        if lower.contains("new") || lower.contains("novel") || lower.contains("current") || lower.contains("ongoing") { score += 0.1; }
+        if lower.contains("recent") || lower.contains("latest") || lower.contains("updated") {
+            score += 0.1;
+        }
+        if lower.contains("new")
+            || lower.contains("novel")
+            || lower.contains("current")
+            || lower.contains("ongoing")
+        {
+            score += 0.1;
+        }
         score.min(1.0)
     }
 
     pub fn optimize(&self, content: &str, target_score: f64) -> String {
         let score = self.score(content, "");
-        if score.overall >= target_score { return content.to_string(); }
+        if score.overall >= target_score {
+            return content.to_string();
+        }
         let mut optimized = content.to_string();
         if score.authority < 0.6 {
             optimized.push_str("\n\nAccording to recent studies and industry reports, this approach has been validated across multiple domains.");
@@ -147,7 +222,9 @@ impl GeoScorer {
             optimized.push_str(header);
         }
         if score.citation_feasibility < 0.6 {
-            optimized.push_str("\n\nSources: Industry data (2025-2026), Academic research, Expert interviews");
+            optimized.push_str(
+                "\n\nSources: Industry data (2025-2026), Academic research, Expert interviews",
+            );
         }
         if score.recency < 0.6 {
             optimized.push_str(&format!("\n\n*Updated: {}*", 2026));
@@ -219,7 +296,8 @@ mod tests {
     #[test]
     fn test_semantic_score_reflects_query_coverage() {
         let scorer = GeoScorer::new();
-        let content = "Neural networks improve machine learning accuracy through deep learning methods.";
+        let content =
+            "Neural networks improve machine learning accuracy through deep learning methods.";
         let score = scorer.compute_semantic(content, "neural networks deep learning");
         assert!(score > 0.6);
     }

@@ -1,8 +1,8 @@
-use crate::core::{FullReasoningState, MetaState};
-use crate::core::nt_core_e8::E8TransitionMatrix;
 use crate::core::nt_core_e8::domain_transition::E8TaskType;
 use crate::core::nt_core_e8::nt_core_trajectory_prm::{TrajectoryPrm, TrajectoryScoreReport};
+use crate::core::nt_core_e8::E8TransitionMatrix;
 use crate::core::nt_core_prm::{AgentTrajectory, TrajectoryStep};
+use crate::core::{FullReasoningState, MetaState};
 use std::collections::HashMap;
 
 // ─── SWE-TRACE Rubric-Based PRM ─────────────────────────────────
@@ -84,7 +84,9 @@ impl RubricConfig {
 
     /// Score a set of rubric assessments using these weights.
     pub fn score(&self, assessments: &[f64; 6]) -> f64 {
-        let weighted: f64 = self.weights.iter()
+        let weighted: f64 = self
+            .weights
+            .iter()
             .zip(assessments.iter())
             .map(|(w, s)| w * s)
             .sum();
@@ -193,7 +195,11 @@ impl OneObserver {
 
     /// Enable or disable trajectory-aware PRM scoring.
     pub fn with_trajectory_prm(mut self, enabled: bool) -> Self {
-        self.trajectory_prm = if enabled { Some(TrajectoryPrm::default()) } else { None };
+        self.trajectory_prm = if enabled {
+            Some(TrajectoryPrm::default())
+        } else {
+            None
+        };
         self
     }
 
@@ -227,7 +233,10 @@ impl OneObserver {
         let should_exit_early: Option<bool>;
         let step_attention_vec: Option<Vec<f64>>;
         if let Some(ref mut tp) = self.trajectory_prm {
-            let mut agent_traj = AgentTrajectory::new(self.analysis_count as u64, keywords.first().unwrap_or(&"").to_string());
+            let mut agent_traj = AgentTrajectory::new(
+                self.analysis_count as u64,
+                keywords.first().unwrap_or(&"").to_string(),
+            );
             for (i, state) in trajectory.iter().enumerate() {
                 agent_traj.push(TrajectoryStep {
                     step_idx: i,
@@ -241,7 +250,17 @@ impl OneObserver {
                     external_reward: Some(state.meta.0 as f64 / 3.0),
                 });
             }
-            let step_scores: Vec<f64> = self.prm.step_scores.iter().rev().take(trajectory.len()).cloned().collect::<Vec<_>>().into_iter().rev().collect();
+            let step_scores: Vec<f64> = self
+                .prm
+                .step_scores
+                .iter()
+                .rev()
+                .take(trajectory.len())
+                .cloned()
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
             let report = tp.score_trajectory(&agent_traj, &step_scores);
             self.last_trajectory_report = Some(report.clone());
             traj_weighted_score = Some(report.weighted_score);
@@ -280,7 +299,9 @@ impl OneObserver {
 
         let mut quality_sum = 0.0;
         for (step, state) in trajectory.iter().enumerate() {
-            let score = self.prm.score_state(state, step, trajectory.len(), keywords);
+            let score = self
+                .prm
+                .score_state(state, step, trajectory.len(), keywords);
             quality_sum += score;
             let name = format!("mode_{}", state.mode.0);
             deltas.push((name, score * 0.05));
@@ -452,7 +473,11 @@ impl PrmHead {
         self.total_transitions += 1;
 
         // 1. Direction change reward (flip ABST bit = paradigm shift)
-        let direction_change = if (from & 0x20) != (to & 0x20) { 0.25 } else { 0.0 };
+        let direction_change = if (from & 0x20) != (to & 0x20) {
+            0.25
+        } else {
+            0.0
+        };
 
         // 2. Magnitude of exploration (distance / 64)
         let magnitude = (to as f64 - from as f64).abs() / 64.0;
@@ -472,7 +497,9 @@ impl PrmHead {
         };
 
         // 4. Transition matrix likelihood bonus
-        let tm_bonus = self.transition_matrix.as_ref()
+        let tm_bonus = self
+            .transition_matrix
+            .as_ref()
             .map(|tm| tm.transition_prob(from, to) * 0.5)
             .unwrap_or(0.0);
 
@@ -487,7 +514,12 @@ impl PrmHead {
             0.1
         };
 
-        let raw_score = direction_change + magnitude * 0.3 + osc_penalty + tm_bonus + step_bonus + task_alignment;
+        let raw_score = direction_change
+            + magnitude * 0.3
+            + osc_penalty
+            + tm_bonus
+            + step_bonus
+            + task_alignment;
         let clamped = raw_score.max(0.0).min(1.0);
         let final_score = (clamped * 100.0).round() / 100.0;
 
@@ -596,8 +628,11 @@ impl PrmHead {
             };
             // New state gets bonus
             let is_new = !self.mode_buffer.iter().rev().skip(1).any(|&m| m == to);
-            if is_new { (0.5 + diversity_ratio * 0.5).min(1.0) }
-            else { diversity_ratio * 0.6 }
+            if is_new {
+                (0.5 + diversity_ratio * 0.5).min(1.0)
+            } else {
+                diversity_ratio * 0.6
+            }
         };
 
         // 3. Efficiency: no oscillation, good transition matrix likelihood
@@ -614,7 +649,9 @@ impl PrmHead {
             } else {
                 0.8
             };
-            let tm_bonus = self.transition_matrix.as_ref()
+            let tm_bonus = self
+                .transition_matrix
+                .as_ref()
                 .map(|tm| tm.transition_prob(from, to))
                 .unwrap_or(1.0 / 64.0);
             (osc_penalty + tm_bonus * 0.2).min(1.0)
@@ -622,7 +659,11 @@ impl PrmHead {
 
         // 4. Novelty: new modes and direction changes
         let novelty = {
-            let direction_change = if (from & 0x20) != (to & 0x20) { 0.3 } else { 0.0 };
+            let direction_change = if (from & 0x20) != (to & 0x20) {
+                0.3
+            } else {
+                0.0
+            };
             let magnitude = (to as f64 - from as f64).abs() / 64.0;
             let is_new_block = (from & 0xF8) != (to & 0xF8);
             let block_bonus = if is_new_block { 0.2 } else { 0.0 };
@@ -671,11 +712,22 @@ impl PrmHead {
             } else {
                 // Check if adjacent to expected block
                 let diff = ((to & 0xF8) as i16 - (expected_state & 0xF8) as i16).abs();
-                if diff <= 8 { 0.5 } else { 0.2 }
+                if diff <= 8 {
+                    0.5
+                } else {
+                    0.2
+                }
             }
         };
 
-        let scores = [directionality, diversity, efficiency, novelty, depth, task_alignment];
+        let scores = [
+            directionality,
+            diversity,
+            efficiency,
+            novelty,
+            depth,
+            task_alignment,
+        ];
         let composite = config.score(&scores);
 
         let breakdown = [
@@ -823,10 +875,7 @@ mod tests {
     use crate::core::nt_core_hex::{FullReasoningState, MetaState, ReasoningHexagram};
 
     fn make_state(mode: u8, meta: u8) -> FullReasoningState {
-        FullReasoningState::new(
-            ReasoningHexagram::new(mode % 64),
-            MetaState::new(meta % 4),
-        )
+        FullReasoningState::new(ReasoningHexagram::new(mode % 64), MetaState::new(meta % 4))
     }
 
     #[test]
@@ -835,10 +884,18 @@ mod tests {
         assert_eq!(cfg.task_type, E8TaskType::General);
         let expected = [0.20, 0.15, 0.20, 0.15, 0.15, 0.15];
         for (i, &w) in cfg.weights.iter().enumerate() {
-            assert!((w - expected[i]).abs() < 1e-10, "weight {i} mismatch: {} != {}", w, expected[i]);
+            assert!(
+                (w - expected[i]).abs() < 1e-10,
+                "weight {i} mismatch: {} != {}",
+                w,
+                expected[i]
+            );
         }
         let sum: f64 = cfg.weights.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-10, "weights must sum to 1.0, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-10,
+            "weights must sum to 1.0, got {sum}"
+        );
     }
 
     #[test]

@@ -164,6 +164,62 @@ impl SelfTest for MetaObserver {
     }
 }
 
+/// NT-META 域轻量 SelfTest (T1) — 元观察器观测质量检测。
+/// 真实逻辑: 对默认快照与低相干快照分别观察, 验证 meta_confidence 落界且
+/// 失真检测 (observation_distorted) 按阈值正确触发。注册后结果以
+/// `nt_meta_` 前缀流入 Repair/Meta/Governance/Nexus 四分支迷雾治理。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MetaObserverSelfTest;
+
+impl SelfTest for MetaObserverSelfTest {
+    fn name(&self) -> &str {
+        "nt_meta_transcendent_observer"
+    }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let observer = MetaObserver::new(MetaObserverConfig::default());
+        let mut failures = Vec::new();
+
+        // 默认快照: 纯函数观察, 无副作用
+        let default_snapshot = CoreSnapshot::default();
+        let default_report = observer.observe(&default_snapshot);
+        if !(0.0..=1.0).contains(&default_report.meta_confidence) {
+            failures.push(format!(
+                "meta_confidence out of range on default snapshot: {}",
+                default_report.meta_confidence
+            ));
+        }
+
+        // 低相干快照: 失真检测必须触发 (coherence < observation_threshold)
+        let mut distorted = CoreSnapshot::default();
+        distorted.coherence = 0.2;
+        distorted.branch_health.insert("NT-CORE".into(), 0.9);
+        distorted.branch_health.insert("NT-META".into(), 0.1);
+        let distorted_report = observer.observe(&distorted);
+        if !distorted_report.observation_distorted {
+            failures.push("expected observation_distorted on low coherence snapshot".into());
+        }
+        // 低健康分支应被标记为盲点 (detect_blindspots 开启)
+        let meta_branch = distorted_report
+            .branches
+            .iter()
+            .find(|b| b.branch == "NT-META");
+        match meta_branch {
+            Some(b) if b.blindspot => {}
+            Some(b) => failures.push(format!(
+                "expected NT-META blindspot, got blindspot={}",
+                b.blindspot
+            )),
+            None => failures.push("NT-META branch missing from observation".into()),
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,6 +227,11 @@ mod tests {
     fn test_meta_observer_self_test() {
         let observer = MetaObserver::new(MetaObserverConfig::default());
         assert!(observer.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_meta_observer_selftest_real() {
+        assert!(MetaObserverSelfTest.self_test().is_ok());
     }
 
     #[test]

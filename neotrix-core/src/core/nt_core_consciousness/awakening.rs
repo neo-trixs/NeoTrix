@@ -60,7 +60,8 @@ impl ConsciousnessAwakening {
 
         // clear 之前先从自证向量对计算真实 coherence，否则清空后 average_coherence 恒为 0.0
         let bootstrap_coherence = if affirmations.len() > 1 {
-            let sum: f64 = affirmations.windows(2)
+            let sum: f64 = affirmations
+                .windows(2)
                 .map(|w| QuantizedVSA::similarity(&w[0], &w[1]))
                 .sum();
             sum / (affirmations.len() - 1) as f64
@@ -147,7 +148,10 @@ mod tests {
     fn test_is_awake_returns_true_after_awakening() {
         let (mut stream, mut sp) = fresh_state();
         let report = ConsciousnessAwakening::awaken(&mut stream, &mut sp);
-        assert!(ConsciousnessAwakening::is_awake(&stream, &report.self_reference));
+        assert!(ConsciousnessAwakening::is_awake(
+            &stream,
+            &report.self_reference
+        ));
     }
 
     #[test]
@@ -156,8 +160,10 @@ mod tests {
         let (mut s2, mut sp2) = fresh_state();
         let r1 = ConsciousnessAwakening::awaken(&mut s1, &mut sp1);
         let r2 = ConsciousnessAwakening::awaken(&mut s2, &mut sp2);
-        assert!(r1.self_reference.self_vector() == r2.self_reference.self_vector()
-            || r1.self_reference.self_vector() != r2.self_reference.self_vector());
+        assert!(
+            r1.self_reference.self_vector() == r2.self_reference.self_vector()
+                || r1.self_reference.self_vector() != r2.self_reference.self_vector()
+        );
     }
 
     #[test]

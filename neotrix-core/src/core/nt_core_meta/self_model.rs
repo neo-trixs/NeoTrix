@@ -28,10 +28,16 @@ impl SelfModel {
             modules: Vec::new(),
             files: Vec::new(),
             dep_graph: DepGraph { edges: Vec::new() },
-            component_map: ComponentMap { nodes: Vec::new(), edges: Vec::new() },
+            component_map: ComponentMap {
+                nodes: Vec::new(),
+                edges: Vec::new(),
+            },
             test_coverage: TestCoverage::default(),
             compilation: CompilationHealth::default(),
-            tech_debt: TechDebtInventory { items: Vec::new(), total_count: 0 },
+            tech_debt: TechDebtInventory {
+                items: Vec::new(),
+                total_count: 0,
+            },
             evolution_history: Vec::new(),
         }
     }
@@ -57,11 +63,18 @@ impl SelfModel {
     }
 
     pub fn modules_with_high_unsafe(&self, threshold: usize) -> Vec<&ModuleInfo> {
-        self.modules.iter().filter(|m| m.unsafe_count > threshold).collect()
+        self.modules
+            .iter()
+            .filter(|m| m.unsafe_count > threshold)
+            .collect()
     }
 
     pub fn tech_debt_by_severity(&self, severity: DebtSeverity) -> Vec<&TechDebtItem> {
-        self.tech_debt.items.iter().filter(|i| i.severity == severity).collect()
+        self.tech_debt
+            .items
+            .iter()
+            .filter(|i| i.severity == severity)
+            .collect()
     }
 
     pub fn register_evolution(&mut self, event: EvolutionEvent) {
@@ -113,11 +126,14 @@ impl DepGraph {
     }
 
     pub fn find_cycles(&self) -> Vec<Vec<String>> {
-        let edges: Vec<(String, String)> = self.edges.iter()
+        let edges: Vec<(String, String)> = self
+            .edges
+            .iter()
             .map(|e| (e.from.clone(), e.to.clone()))
             .collect();
         let mut cycles = Vec::new();
-        let node_set: std::collections::HashSet<String> = edges.iter()
+        let node_set: std::collections::HashSet<String> = edges
+            .iter()
             .flat_map(|(f, t)| [f.clone(), t.clone()])
             .collect();
         let nodes: Vec<&str> = node_set.iter().map(|s| s.as_str()).collect();
@@ -134,7 +150,9 @@ impl DepGraph {
     }
 
     fn cycle_dfs(
-        edges: &[(String, String)], current: &str, target: &str,
+        edges: &[(String, String)],
+        current: &str,
+        target: &str,
         visited: &mut std::collections::HashSet<String>,
         path: &mut Vec<String>,
     ) -> bool {
@@ -165,7 +183,10 @@ impl DepGraph {
             deps_from.insert(e.from.clone());
             deps_to.insert(e.to.clone());
         }
-        deps_from.into_iter().filter(|m| !deps_to.contains(m)).collect()
+        deps_from
+            .into_iter()
+            .filter(|m| !deps_to.contains(m))
+            .collect()
     }
 }
 
@@ -192,10 +213,15 @@ pub struct ComponentMap {
 
 impl ComponentMap {
     pub fn find_orphan_components(&self) -> Vec<&ComponentNode> {
-        let referenced: std::collections::HashSet<&str> = self.edges.iter()
+        let referenced: std::collections::HashSet<&str> = self
+            .edges
+            .iter()
             .flat_map(|(a, b, _)| [a.as_str(), b.as_str()])
             .collect();
-        self.nodes.iter().filter(|n| !referenced.contains(n.name.as_str())).collect()
+        self.nodes
+            .iter()
+            .filter(|n| !referenced.contains(n.name.as_str()))
+            .collect()
     }
 
     pub fn find_hubs(&self, threshold: usize) -> Vec<&str> {
@@ -204,7 +230,8 @@ impl ComponentMap {
             *degree.entry(a.as_str()).or_insert(0) += 1;
             *degree.entry(b.as_str()).or_insert(0) += 1;
         }
-        degree.into_iter()
+        degree
+            .into_iter()
             .filter(|(_, d)| *d > threshold)
             .map(|(n, _)| n)
             .collect()
@@ -221,8 +248,7 @@ pub struct ComponentNode {
     pub description: String,
 }
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TestCoverage {
     pub total_tests: usize,
     pub passing: usize,
@@ -232,15 +258,12 @@ pub struct TestCoverage {
     pub modules_without_tests: Vec<String>,
 }
 
-
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct CompilationHealth {
     pub errors: usize,
     pub warnings: usize,
     pub features_tested: Vec<String>,
 }
-
 
 impl CompilationHealth {
     /// Run `cargo check --lib` and parse errors/warnings.
@@ -293,10 +316,12 @@ impl CompilationHealth {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let combined = format!("{}\n{}", stderr, stdout);
 
-            let error_count = combined.lines()
+            let error_count = combined
+                .lines()
                 .filter(|l| l.starts_with("error") || l.starts_with("error["))
                 .count();
-            let warning_count = combined.lines()
+            let warning_count = combined
+                .lines()
                 .filter(|l| l.starts_with("warning") || l.starts_with("warning["))
                 .count();
 
@@ -383,8 +408,16 @@ mod tests {
     fn test_dep_graph_orphans() {
         let graph = DepGraph {
             edges: vec![
-                DepEdge { from: "core".into(), to: "agent".into(), kind: DepKind::ModuleUse },
-                DepEdge { from: "core".into(), to: "neotrix".into(), kind: DepKind::ModuleUse },
+                DepEdge {
+                    from: "core".into(),
+                    to: "agent".into(),
+                    kind: DepKind::ModuleUse,
+                },
+                DepEdge {
+                    from: "core".into(),
+                    to: "neotrix".into(),
+                    kind: DepKind::ModuleUse,
+                },
             ],
         };
         let orphans = graph.orphans();
@@ -417,9 +450,30 @@ mod tests {
     fn test_component_map_hubs() {
         let map = ComponentMap {
             nodes: vec![
-                ComponentNode { name: "core".into(), path: "core/".into(), layer: 1, file_count: 10, lines: 1000, description: "".into() },
-                ComponentNode { name: "agent".into(), path: "agent/".into(), layer: 3, file_count: 5, lines: 500, description: "".into() },
-                ComponentNode { name: "server".into(), path: "server/".into(), layer: 3, file_count: 3, lines: 300, description: "".into() },
+                ComponentNode {
+                    name: "core".into(),
+                    path: "core/".into(),
+                    layer: 1,
+                    file_count: 10,
+                    lines: 1000,
+                    description: "".into(),
+                },
+                ComponentNode {
+                    name: "agent".into(),
+                    path: "agent/".into(),
+                    layer: 3,
+                    file_count: 5,
+                    lines: 500,
+                    description: "".into(),
+                },
+                ComponentNode {
+                    name: "server".into(),
+                    path: "server/".into(),
+                    layer: 3,
+                    file_count: 3,
+                    lines: 300,
+                    description: "".into(),
+                },
             ],
             edges: vec![
                 ("core".into(), "agent".into(), "depends".into()),
@@ -434,14 +488,30 @@ mod tests {
     fn test_modules_without_tests() {
         let mut model = SelfModel::new();
         model.modules.push(ModuleInfo {
-            name: "tested_mod".into(), path: "".into(), file_count: 1, total_lines: 100,
-            test_count: 5, has_tests: true, unsafe_count: 0, unwrap_count: 0, todo_count: 0,
-            public_api_count: 3, description: "".into(),
+            name: "tested_mod".into(),
+            path: "".into(),
+            file_count: 1,
+            total_lines: 100,
+            test_count: 5,
+            has_tests: true,
+            unsafe_count: 0,
+            unwrap_count: 0,
+            todo_count: 0,
+            public_api_count: 3,
+            description: "".into(),
         });
         model.modules.push(ModuleInfo {
-            name: "untested_mod".into(), path: "".into(), file_count: 1, total_lines: 100,
-            test_count: 0, has_tests: false, unsafe_count: 0, unwrap_count: 0, todo_count: 0,
-            public_api_count: 3, description: "".into(),
+            name: "untested_mod".into(),
+            path: "".into(),
+            file_count: 1,
+            total_lines: 100,
+            test_count: 0,
+            has_tests: false,
+            unsafe_count: 0,
+            unwrap_count: 0,
+            todo_count: 0,
+            public_api_count: 3,
+            description: "".into(),
         });
         let untested = model.modules_without_tests();
         assert_eq!(untested.len(), 1);

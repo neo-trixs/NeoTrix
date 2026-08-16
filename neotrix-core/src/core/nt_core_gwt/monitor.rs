@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 
 /// Entropy-based deadlock monitor for GWT resonance cycles.
 ///
@@ -84,10 +84,16 @@ impl EntropyMonitor {
             self.history.iter().sum::<f64>() / self.history.len() as f64
         };
 
-        let stuck_count = self.history.iter().take(self.stuck_min_cycles).filter(|&&e| e < self.deadlock_threshold).count();
+        let stuck_count = self
+            .history
+            .iter()
+            .take(self.stuck_min_cycles)
+            .filter(|&&e| e < self.deadlock_threshold)
+            .count();
 
         let previously_deadlocked = self.in_deadlock;
-        self.in_deadlock = self.history.len() >= self.stuck_min_cycles && stuck_count >= self.stuck_min_cycles;
+        self.in_deadlock =
+            self.history.len() >= self.stuck_min_cycles && stuck_count >= self.stuck_min_cycles;
 
         if self.in_deadlock && !previously_deadlocked {
             self.deadlock_count += 1;
@@ -109,7 +115,11 @@ impl EntropyMonitor {
         if self.history.is_empty() {
             return 0.0;
         }
-        let stuck = self.history.iter().filter(|&&e| e < self.deadlock_threshold).count();
+        let stuck = self
+            .history
+            .iter()
+            .filter(|&&e| e < self.deadlock_threshold)
+            .count();
         stuck as f64 / self.history.len() as f64
     }
 
@@ -140,7 +150,8 @@ impl EntropyMonitor {
     pub fn crisis_level(&self) -> f64 {
         let base = self.stuck_ratio();
         if self.in_deadlock {
-            let attempt_ratio = (self.stimulus_attempts as f64 / self.max_stimulus_before_rollback as f64).min(1.0);
+            let attempt_ratio =
+                (self.stimulus_attempts as f64 / self.max_stimulus_before_rollback as f64).min(1.0);
             (base * 0.5 + attempt_ratio * 0.5).min(1.0)
         } else {
             base * 0.3
@@ -178,7 +189,10 @@ impl crate::core::nt_core_self_test::SelfTest for EntropyMonitor {
         m.feed(0.3);
         m.feed(0.6);
         if m.history.len() != 3 {
-            failures.push(format!("expected 3 history entries, got {}", m.history.len()));
+            failures.push(format!(
+                "expected 3 history entries, got {}",
+                m.history.len()
+            ));
         }
 
         // Test 3: stimulus injection must not panic
@@ -194,14 +208,18 @@ impl crate::core::nt_core_self_test::SelfTest for EntropyMonitor {
             failures.push("reset should clear stimulus_attempts".into());
         }
 
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::resonance::MODULE_COUNT;
+    use super::*;
 
     #[test]
     fn test_entropy_monitor_default() {
@@ -303,7 +321,10 @@ mod tests {
         let mut raw = [0.3; MODULE_COUNT];
         let before = raw;
         m.inject_stimulus(&mut raw);
-        let changed = raw.iter().zip(before.iter()).any(|(a, b)| (*a - *b).abs() > 1e-9);
+        let changed = raw
+            .iter()
+            .zip(before.iter())
+            .any(|(a, b)| (*a - *b).abs() > 1e-9);
         assert!(changed, "stimulus should change at least one element");
     }
 
@@ -371,7 +392,9 @@ mod tests {
         m.max_stimulus_before_rollback = 2;
         assert!(!m.should_rollback());
         // deadlock first
-        for _ in 0..3 { m.feed(0.1); }
+        for _ in 0..3 {
+            m.feed(0.1);
+        }
         assert!(m.is_deadlocked());
         m.inject_stimulus(&mut [0.3; MODULE_COUNT]);
         assert!(!m.should_rollback());
@@ -389,11 +412,15 @@ mod tests {
     #[test]
     fn test_stimulus_succeeded_flag_on_recovery() {
         let mut m = EntropyMonitor::new(5, 0.5, 3);
-        for _ in 0..3 { m.feed(0.1); }
+        for _ in 0..3 {
+            m.feed(0.1);
+        }
         assert!(m.is_deadlocked());
         m.inject_stimulus(&mut [0.3; MODULE_COUNT]);
         assert!(!m.stimulus_succeeded);
-        for _ in 0..3 { m.feed(1.0); }
+        for _ in 0..3 {
+            m.feed(1.0);
+        }
         assert!(!m.is_deadlocked());
         assert!(m.stimulus_succeeded);
         assert_eq!(m.stimulus_attempts, 0);
@@ -409,18 +436,27 @@ mod tests {
     fn test_crisis_level_increases_with_attempts() {
         let mut m = EntropyMonitor::new(10, 0.5, 3);
         m.max_stimulus_before_rollback = 2;
-        for _ in 0..3 { m.feed(0.1); }
+        for _ in 0..3 {
+            m.feed(0.1);
+        }
         m.inject_stimulus(&mut [0.3; MODULE_COUNT]);
         let level1 = m.crisis_level();
         m.inject_stimulus(&mut [0.3; MODULE_COUNT]);
         let level2 = m.crisis_level();
-        assert!(level2 >= level1, "crisis should increase: {:.4} vs {:.4}", level1, level2);
+        assert!(
+            level2 >= level1,
+            "crisis should increase: {:.4} vs {:.4}",
+            level1,
+            level2
+        );
     }
 
     #[test]
     fn test_reset_clears_stimulus_state() {
         let mut m = EntropyMonitor::new(10, 0.5, 3);
-        for _ in 0..3 { m.feed(0.1); }
+        for _ in 0..3 {
+            m.feed(0.1);
+        }
         m.inject_stimulus(&mut [0.3; MODULE_COUNT]);
         m.reset();
         assert_eq!(m.stimulus_attempts, 0);

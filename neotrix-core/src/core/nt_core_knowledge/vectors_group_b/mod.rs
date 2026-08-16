@@ -1,8 +1,8 @@
 mod general;
 mod specialized;
 
-use crate::core::CapabilityVector;
 use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::core::CapabilityVector;
 
 pub(super) fn capability_vector_group_b(s: &KnowledgeSource) -> CapabilityVector {
     match s {
@@ -47,7 +47,7 @@ pub(super) fn capability_vector_group_b(s: &KnowledgeSource) -> CapabilityVector
         | KnowledgeSource::PredictiveCoding
         | KnowledgeSource::OrchOR
         | KnowledgeSource::AttentionSchema
-        |         KnowledgeSource::SiaHarnessUpdate
+        | KnowledgeSource::SiaHarnessUpdate
         | KnowledgeSource::SiaWeightUpdate
         | KnowledgeSource::SiaFeedbackLoop
         | KnowledgeSource::HyperAgents => specialized::cap_vec_specialized(s),

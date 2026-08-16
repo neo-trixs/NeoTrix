@@ -14,7 +14,9 @@ pub struct GapReport {
 impl GapReport {
     pub fn new(dim_index: usize, current_value: f64, target_value: f64) -> Self {
         Self {
-            dim_index, current_value, target_value,
+            dim_index,
+            current_value,
+            target_value,
             gap: target_value - current_value,
             empty_regions: HashSet::new(),
             underpopulated_regions: HashSet::new(),
@@ -25,11 +27,16 @@ impl GapReport {
     pub fn analyze(&self) -> Vec<String> {
         let mut findings = Vec::new();
         if self.gap > 0.0 {
-            findings.push(format!("dim {} gap: {:.3} (cur={:.3}, target={:.3})",
-                self.dim_index, self.gap, self.current_value, self.target_value));
+            findings.push(format!(
+                "dim {} gap: {:.3} (cur={:.3}, target={:.3})",
+                self.dim_index, self.gap, self.current_value, self.target_value
+            ));
         }
         if self.sparsity_score > 0.5 {
-            findings.push(format!("sparsity {:.3} exceeds threshold", self.sparsity_score));
+            findings.push(format!(
+                "sparsity {:.3} exceeds threshold",
+                self.sparsity_score
+            ));
         }
         findings
     }

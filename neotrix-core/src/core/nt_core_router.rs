@@ -5,9 +5,8 @@ use std::sync::Mutex;
 
 /// Global smart router singleton
 // TODO: inject via DI — pass &SmartRouter through ReasoningEngine constructor
-pub static SMART_ROUTER: LazyLock<Mutex<SmartRouter>> = LazyLock::new(|| {
-    Mutex::new(SmartRouter::new())
-});
+pub static SMART_ROUTER: LazyLock<Mutex<SmartRouter>> =
+    LazyLock::new(|| Mutex::new(SmartRouter::new()));
 
 /// Task complexity levels for routing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -41,7 +40,13 @@ impl TaskComplexity {
     }
 
     pub fn all() -> Vec<Self> {
-        vec![Self::Trivial, Self::Simple, Self::Moderate, Self::Complex, Self::Critical]
+        vec![
+            Self::Trivial,
+            Self::Simple,
+            Self::Moderate,
+            Self::Complex,
+            Self::Critical,
+        ]
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
@@ -87,19 +92,26 @@ impl TaskComplexity {
         let moderate_keywords = ["debug", "fix", "implement", "feature", "add ", "integrat"];
 
         for kw in &critical_keywords {
-            if lower.contains(kw) { score += 3; }
+            if lower.contains(kw) {
+                score += 3;
+            }
         }
         for kw in &complex_keywords {
-            if lower.contains(kw) { score += 2; }
+            if lower.contains(kw) {
+                score += 2;
+            }
         }
         for kw in &moderate_keywords {
-            if lower.contains(kw) { score += 1; }
+            if lower.contains(kw) {
+                score += 1;
+            }
         }
 
         // 5. Technical terms density
-        let tech_terms = ["api", "database", "function", "class", "struct", "impl",
-                           "trait", "async", "generic", "macro", "thread", "mutex",
-                           "http", "json", "serde", "tokio", "wasm"];
+        let tech_terms = [
+            "api", "database", "function", "class", "struct", "impl", "trait", "async", "generic",
+            "macro", "thread", "mutex", "http", "json", "serde", "tokio", "wasm",
+        ];
         let term_count = tech_terms.iter().filter(|t| lower.contains(*t)).count();
         if term_count > 5 {
             score += 2;
@@ -129,25 +141,47 @@ pub struct TaskContext {
 impl TaskContext {
     pub fn new(prompt: &str) -> Self {
         let lower = prompt.to_lowercase();
-        let common_keywords = ["api", "function", "class", "struct", "impl", "trait",
-                                "debug", "fix", "refactor", "design", "architect",
-                                "security", "deploy", "test", "feature", "migrate"];
-        let keywords: Vec<String> = common_keywords.iter()
+        let common_keywords = [
+            "api",
+            "function",
+            "class",
+            "struct",
+            "impl",
+            "trait",
+            "debug",
+            "fix",
+            "refactor",
+            "design",
+            "architect",
+            "security",
+            "deploy",
+            "test",
+            "feature",
+            "migrate",
+        ];
+        let keywords: Vec<String> = common_keywords
+            .iter()
             .filter(|kw| lower.contains(*kw))
             .map(|s| s.to_string())
             .collect();
 
-        let file_extensions = [".rs", ".py", ".js", ".ts", ".json", ".toml", ".md",
-                               ".html", ".css", ".go", ".rb", ".java", ".cpp", ".h"];
+        let file_extensions = [
+            ".rs", ".py", ".js", ".ts", ".json", ".toml", ".md", ".html", ".css", ".go", ".rb",
+            ".java", ".cpp", ".h",
+        ];
         let mentions_files = file_extensions.iter().any(|ext| lower.contains(ext));
-        let file_count = file_extensions.iter()
+        let file_count = file_extensions
+            .iter()
             .filter(|ext| lower.contains(*ext))
             .count();
 
-        let has_git_context = lower.contains("git ") || lower.contains("commit") ||
-                              lower.contains("branch") || lower.contains("diff ") ||
-                              lower.contains("stash") || lower.contains("pr ") ||
-                              lower.contains("merge");
+        let has_git_context = lower.contains("git ")
+            || lower.contains("commit")
+            || lower.contains("branch")
+            || lower.contains("diff ")
+            || lower.contains("stash")
+            || lower.contains("pr ")
+            || lower.contains("merge");
 
         Self {
             prompt_length: prompt.len(),
@@ -216,27 +250,36 @@ pub struct SmartRouter {
 impl SmartRouter {
     pub fn new() -> Self {
         let mut rules = HashMap::new();
-        rules.insert(TaskComplexity::Trivial, RoutingRule {
-            complexity: TaskComplexity::Trivial,
-            provider: "opencode".to_string(),
-            model: "gpt-4o-mini".to_string(),
-            cost_per_1k_in: 0.0015,
-            cost_per_1k_out: 0.006,
-        });
-        rules.insert(TaskComplexity::Simple, RoutingRule {
-            complexity: TaskComplexity::Simple,
-            provider: "opencode".to_string(),
-            model: "gpt-4o-mini".to_string(),
-            cost_per_1k_in: 0.0015,
-            cost_per_1k_out: 0.006,
-        });
-        rules.insert(TaskComplexity::Moderate, RoutingRule {
-            complexity: TaskComplexity::Moderate,
-            provider: "opencode".to_string(),
-            model: "gpt-4o".to_string(),
-            cost_per_1k_in: 0.01,
-            cost_per_1k_out: 0.03,
-        });
+        rules.insert(
+            TaskComplexity::Trivial,
+            RoutingRule {
+                complexity: TaskComplexity::Trivial,
+                provider: "opencode".to_string(),
+                model: "gpt-4o-mini".to_string(),
+                cost_per_1k_in: 0.0015,
+                cost_per_1k_out: 0.006,
+            },
+        );
+        rules.insert(
+            TaskComplexity::Simple,
+            RoutingRule {
+                complexity: TaskComplexity::Simple,
+                provider: "opencode".to_string(),
+                model: "gpt-4o-mini".to_string(),
+                cost_per_1k_in: 0.0015,
+                cost_per_1k_out: 0.006,
+            },
+        );
+        rules.insert(
+            TaskComplexity::Moderate,
+            RoutingRule {
+                complexity: TaskComplexity::Moderate,
+                provider: "opencode".to_string(),
+                model: "gpt-4o".to_string(),
+                cost_per_1k_in: 0.01,
+                cost_per_1k_out: 0.03,
+            },
+        );
         let flagship = RoutingRule {
             complexity: TaskComplexity::Complex,
             provider: "opencode".to_string(),
@@ -245,13 +288,16 @@ impl SmartRouter {
             cost_per_1k_out: 0.03,
         };
         rules.insert(TaskComplexity::Complex, flagship.clone());
-        rules.insert(TaskComplexity::Critical, RoutingRule {
-            complexity: TaskComplexity::Critical,
-            provider: "opencode".to_string(),
-            model: "flagship".to_string(),
-            cost_per_1k_in: 0.01,
-            cost_per_1k_out: 0.03,
-        });
+        rules.insert(
+            TaskComplexity::Critical,
+            RoutingRule {
+                complexity: TaskComplexity::Critical,
+                provider: "opencode".to_string(),
+                model: "flagship".to_string(),
+                cost_per_1k_in: 0.01,
+                cost_per_1k_out: 0.03,
+            },
+        );
 
         Self {
             rules,
@@ -268,18 +314,25 @@ impl SmartRouter {
     /// Route a task to the appropriate provider/model
     pub fn route(&mut self, _prompt: &str, context: &TaskContext) -> RoutingDecision {
         let complexity = TaskComplexity::classify(_prompt, context);
-        let rule = self.rules.get(&complexity)
+        let rule = self
+            .rules
+            .get(&complexity)
             .cloned()
             .unwrap_or_else(|| self.flagship_reference.clone());
 
         let estimated_tokens = (context.prompt_length / 4).max(100) as f64;
-        let estimated_cost = (estimated_tokens / 1000.0) * (rule.cost_per_1k_in + rule.cost_per_1k_out);
-        let flagship_cost = (estimated_tokens / 1000.0) *
-            (self.flagship_reference.cost_per_1k_in + self.flagship_reference.cost_per_1k_out);
+        let estimated_cost =
+            (estimated_tokens / 1000.0) * (rule.cost_per_1k_in + rule.cost_per_1k_out);
+        let flagship_cost = (estimated_tokens / 1000.0)
+            * (self.flagship_reference.cost_per_1k_in + self.flagship_reference.cost_per_1k_out);
         let savings = flagship_cost - estimated_cost;
 
         self.stats.total_routes += 1;
-        *self.stats.routes_by_complexity.entry(complexity.label().to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .routes_by_complexity
+            .entry(complexity.label().to_string())
+            .or_insert(0) += 1;
         self.stats.estimated_savings += savings.max(0.0);
         self.stats.total_tokens_saved += (savings.max(0.0) * 1000.0) as u64;
         self.stats.flagship_cost += flagship_cost;
@@ -310,14 +363,24 @@ impl SmartRouter {
         self.rules.get(&complexity)
     }
 
-    pub fn set_rule(&mut self, complexity: TaskComplexity, provider: &str, model: &str, cost_in: f64, cost_out: f64) {
-        self.rules.insert(complexity, RoutingRule {
+    pub fn set_rule(
+        &mut self,
+        complexity: TaskComplexity,
+        provider: &str,
+        model: &str,
+        cost_in: f64,
+        cost_out: f64,
+    ) {
+        self.rules.insert(
             complexity,
-            provider: provider.to_string(),
-            model: model.to_string(),
-            cost_per_1k_in: cost_in,
-            cost_per_1k_out: cost_out,
-        });
+            RoutingRule {
+                complexity,
+                provider: provider.to_string(),
+                model: model.to_string(),
+                cost_per_1k_in: cost_in,
+                cost_per_1k_out: cost_out,
+            },
+        );
     }
 
     pub fn set_enabled(&mut self, enabled: bool) {
@@ -325,10 +388,18 @@ impl SmartRouter {
     }
 
     pub fn savings_report(&self) -> String {
-        let names: Vec<String> = TaskComplexity::all().iter().map(|c| {
-            let count = self.stats.routes_by_complexity.get(c.label()).copied().unwrap_or(0);
-            format!("  {}: {} routes", c.label(), count)
-        }).collect();
+        let names: Vec<String> = TaskComplexity::all()
+            .iter()
+            .map(|c| {
+                let count = self
+                    .stats
+                    .routes_by_complexity
+                    .get(c.label())
+                    .copied()
+                    .unwrap_or(0);
+                format!("  {}: {} routes", c.label(), count)
+            })
+            .collect();
 
         format!(
             "📊 Smart Router Report\n\
@@ -341,7 +412,11 @@ impl SmartRouter {
              Flagship cost:     ${:.6}\n\
              Estimated savings: ${:.6}\n\
              Tokens saved:      {}",
-            if self.enabled { "✅ enabled" } else { "⛔ disabled" },
+            if self.enabled {
+                "✅ enabled"
+            } else {
+                "⛔ disabled"
+            },
             self.stats.total_routes,
             names.join("\n"),
             self.stats.actual_cost,
@@ -370,11 +445,11 @@ impl SmartRouter {
             Ok(h) => h,
             Err(_) => return Self::new(),
         };
-        let path = std::path::Path::new(&home).join(".neotrix").join("smart_router.json");
+        let path = std::path::Path::new(&home)
+            .join(".neotrix")
+            .join("smart_router.json");
         match std::fs::read_to_string(&path) {
-            Ok(json) => {
-                serde_json::from_str(&json).unwrap_or_else(|_| Self::new())
-            }
+            Ok(json) => serde_json::from_str(&json).unwrap_or_else(|_| Self::new()),
             Err(_) => Self::new(),
         }
     }
@@ -404,8 +479,14 @@ mod tests {
 
     #[test]
     fn test_complexity_from_str() {
-        assert_eq!(TaskComplexity::from_str("trivial"), Some(TaskComplexity::Trivial));
-        assert_eq!(TaskComplexity::from_str("Complex"), Some(TaskComplexity::Complex));
+        assert_eq!(
+            TaskComplexity::from_str("trivial"),
+            Some(TaskComplexity::Trivial)
+        );
+        assert_eq!(
+            TaskComplexity::from_str("Complex"),
+            Some(TaskComplexity::Complex)
+        );
         assert_eq!(TaskComplexity::from_str("unknown"), None);
     }
 
@@ -422,7 +503,12 @@ mod tests {
         let prompt = "what is an api and how does it work";
         let ctx = TaskContext::new(prompt);
         let result = TaskComplexity::classify(prompt, &ctx);
-        assert_eq!(result, TaskComplexity::Simple, "what/how question with tech term 'api' should be Simple, got {:?}", result);
+        assert_eq!(
+            result,
+            TaskComplexity::Simple,
+            "what/how question with tech term 'api' should be Simple, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -430,8 +516,11 @@ mod tests {
         let prompt = "refactor the database module to use async traits and implement connection pooling with tokio";
         let ctx = TaskContext::new(prompt);
         let result = TaskComplexity::classify(prompt, &ctx);
-        assert!(result == TaskComplexity::Complex || result == TaskComplexity::Moderate,
-            "refactor+async+tokio should be Moderate+, got {:?}", result);
+        assert!(
+            result == TaskComplexity::Complex || result == TaskComplexity::Moderate,
+            "refactor+async+tokio should be Moderate+, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -439,8 +528,12 @@ mod tests {
         let prompt = "security audit of the authentication system before production deployment";
         let ctx = TaskContext::new(prompt);
         let result = TaskComplexity::classify(prompt, &ctx);
-        assert_eq!(result, TaskComplexity::Critical,
-            "security+production+deployment should be Critical, got {:?}", result);
+        assert_eq!(
+            result,
+            TaskComplexity::Critical,
+            "security+production+deployment should be Critical, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -523,7 +616,13 @@ mod tests {
     #[test]
     fn test_persistence() {
         let mut router = SmartRouter::new();
-        router.set_rule(TaskComplexity::Simple, "test-provider", "test-model", 0.01, 0.02);
+        router.set_rule(
+            TaskComplexity::Simple,
+            "test-provider",
+            "test-model",
+            0.01,
+            0.02,
+        );
         assert!(router.save().is_ok());
         let loaded = SmartRouter::load();
         let rule = loaded.get_provider_config(TaskComplexity::Simple).unwrap();

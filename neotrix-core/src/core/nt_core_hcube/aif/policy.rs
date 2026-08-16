@@ -13,7 +13,10 @@ pub struct PolicyEvaluator {
 
 impl PolicyEvaluator {
     pub fn new(num_states: usize, horizon: usize) -> Self {
-        PolicyEvaluator { num_states, horizon }
+        PolicyEvaluator {
+            num_states,
+            horizon,
+        }
     }
 
     pub fn evaluate_policy(
@@ -40,8 +43,8 @@ impl PolicyEvaluator {
             let mut inaccuracy = 0.0;
             for s in 0..self.num_states {
                 if next_belief[s] > 0.0 {
-                    let log_val = (next_belief[s] / (model.prior_over_states[s] + 1e-10) + 1e-10)
-                        .ln();
+                    let log_val =
+                        (next_belief[s] / (model.prior_over_states[s] + 1e-10) + 1e-10).ln();
                     inaccuracy += next_belief[s] * log_val;
                 }
             }
@@ -91,7 +94,8 @@ impl PolicyEvaluator {
         for &action in policy {
             let mut next_belief = vec![0.0; current_belief.len()];
             if action < model.num_states && current_belief.len() >= model.num_states {
-                next_belief[..model.num_states].copy_from_slice(&model.transition_matrix[action][..model.num_states]);
+                next_belief[..model.num_states]
+                    .copy_from_slice(&model.transition_matrix[action][..model.num_states]);
             }
 
             let predicted_obs = model.predict_observation(&next_belief);
@@ -161,11 +165,7 @@ mod tests {
             vec![0.3, 0.4, 0.3],
             vec![0.1, 0.2, 0.7],
         ];
-        model.likelihood_matrix = vec![
-            vec![0.9, 0.1],
-            vec![0.5, 0.5],
-            vec![0.1, 0.9],
-        ];
+        model.likelihood_matrix = vec![vec![0.9, 0.1], vec![0.5, 0.5], vec![0.1, 0.9]];
         model
     }
 
@@ -184,11 +184,7 @@ mod tests {
         let evaluator = PolicyEvaluator::new(3, 5);
         let model = make_test_model();
         let belief = vec![0.5, 0.3, 0.2];
-        let policies = vec![
-            vec![0, 0, 0],
-            vec![1, 1, 1],
-            vec![2, 2, 2],
-        ];
+        let policies = vec![vec![0, 0, 0], vec![1, 1, 1], vec![2, 2, 2]];
         let results = evaluator.evaluate_policies(&policies, &belief, &model);
         assert_eq!(results.len(), 3);
         for (idx, efe) in &results {
@@ -202,11 +198,7 @@ mod tests {
         let evaluator = PolicyEvaluator::new(3, 5);
         let model = make_test_model();
         let belief = vec![0.5, 0.3, 0.2];
-        let policies = vec![
-            vec![0, 0, 0],
-            vec![1, 1, 1],
-            vec![2, 2, 2],
-        ];
+        let policies = vec![vec![0, 0, 0], vec![1, 1, 1], vec![2, 2, 2]];
         let (best_idx, _best_efe) = evaluator.select_best_policy(&policies, &belief, &model);
         assert!(best_idx < 3);
     }

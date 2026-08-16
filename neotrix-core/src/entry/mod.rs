@@ -2019,6 +2019,7 @@ pub fn run_wallet_export(label: &str) {
 ///   1. 初始化 GatewayV2（provider 路由/熔断/限流）
 ///   2. 装配 MCP 原生工具（ToolOrchestrator → AgentLoop 工具集）
 ///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
+#[allow(dead_code)]
 pub fn run_agent_mode(profile: &str) {
     use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
     use neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop;
@@ -2122,7 +2123,7 @@ pub fn run_agent_tui(profile: &str) {
     use neotrix::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
     use neotrix::cli::tui::TuiApp;
     use neotrix::cli::tui::app::KeyAction;
-    use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+    use crossterm::event::{self, Event};
     use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
     use crossterm::execute;
     use ratatui::backend::CrosstermBackend;

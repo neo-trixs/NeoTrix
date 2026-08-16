@@ -12,8 +12,8 @@
 //! FHRR enables higher capacity than MAP-bipolar at the same dimension
 //! due to the continuous phase space (infinite codewords per dimension).
 
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -75,7 +75,11 @@ pub fn bundle(vectors: &[&[f64]]) -> Vec<f64> {
             sum_sin += s;
         }
         let theta = sum_sin.atan2(sum_cos);
-        result.push(if theta < 0.0 { theta + std::f64::consts::TAU } else { theta });
+        result.push(if theta < 0.0 {
+            theta + std::f64::consts::TAU
+        } else {
+            theta
+        });
     }
     result
 }
@@ -264,10 +268,7 @@ impl FhrrHyperCube {
     ///
     /// Returns an N×N matrix where entry [i][j] = similarity(symbols[i], symbols[j]).
     /// All symbols must exist in the codebook.
-    pub fn compute_similarity_matrix(
-        &self,
-        symbols: &[&str],
-    ) -> Result<Vec<Vec<f64>>, String> {
+    pub fn compute_similarity_matrix(&self, symbols: &[&str]) -> Result<Vec<Vec<f64>>, String> {
         let n = symbols.len();
         let vecs: Vec<&[f64]> = symbols
             .iter()
@@ -401,7 +402,10 @@ impl FhrrHyperCube {
         }
 
         let symbols: Vec<&str> = self.codebook.keys().map(|s| s.as_str()).collect();
-        let vecs: Vec<&[f64]> = symbols.iter().map(|&name| &self.codebook[name][..]).collect();
+        let vecs: Vec<&[f64]> = symbols
+            .iter()
+            .map(|&name| &self.codebook[name][..])
+            .collect();
 
         // Step 1: compute seed activations and similarity matrix
         let mut seed_act: Vec<f64> = Vec::with_capacity(n);
@@ -420,7 +424,11 @@ impl FhrrHyperCube {
                     1.0
                 } else {
                     let s = similarity(vecs[i], vecs[j]);
-                    if s >= config.edge_threshold { s } else { 0.0 }
+                    if s >= config.edge_threshold {
+                        s
+                    } else {
+                        0.0
+                    }
                 };
                 row.push(sim);
             }
@@ -565,7 +573,11 @@ mod tests {
         let b = random_vector_dim(2048, 20);
         let sim = similarity(&a, &b);
         // Random independent phase vectors should have near-zero similarity
-        assert!(sim.abs() < 0.1, "random vectors should have near-zero similarity, got {}", sim);
+        assert!(
+            sim.abs() < 0.1,
+            "random vectors should have near-zero similarity, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -584,14 +596,16 @@ mod tests {
         let a = random_vector_dim(256, 50);
         let p = permute(&a, 7);
         let sim_to_orig = similarity(&a, &p);
-        assert!(sim_to_orig.abs() < 0.5, "permuted vector should differ from original");
+        assert!(
+            sim_to_orig.abs() < 0.5,
+            "permuted vector should differ from original"
+        );
     }
 
     #[test]
     fn test_cleanup_finds_correct() {
-        let candidates_vec: Vec<Vec<f64>> = (0..20)
-            .map(|i| random_vector_dim(256, i as u64))
-            .collect();
+        let candidates_vec: Vec<Vec<f64>> =
+            (0..20).map(|i| random_vector_dim(256, i as u64)).collect();
         let candidates: Vec<&[f64]> = candidates_vec.iter().map(|v| v.as_slice()).collect();
         let query = &candidates_vec[7];
         let idx = cleanup_always(query, &candidates);
@@ -629,7 +643,11 @@ mod tests {
         let v1 = encode_scalar(1.0);
         let v2 = encode_scalar(2.0);
         let sim = similarity(&v1, &v2);
-        assert!(sim < 0.3, "different scalars should have low similarity, got {}", sim);
+        assert!(
+            sim < 0.3,
+            "different scalars should have low similarity, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -692,8 +710,16 @@ mod tests {
         let filler_v = hc.get_symbol("filler").unwrap();
         let sim_to_role = similarity(&bound, role_v);
         let sim_to_filler = similarity(&bound, filler_v);
-        assert!(sim_to_role.abs() < 0.3, "bound dissimilar to role, sim={}", sim_to_role);
-        assert!(sim_to_filler.abs() < 0.3, "bound dissimilar to filler, sim={}", sim_to_filler);
+        assert!(
+            sim_to_role.abs() < 0.3,
+            "bound dissimilar to role, sim={}",
+            sim_to_role
+        );
+        assert!(
+            sim_to_filler.abs() < 0.3,
+            "bound dissimilar to filler, sim={}",
+            sim_to_filler
+        );
     }
 
     #[test]
@@ -773,7 +799,10 @@ mod tests {
         let hc = FhrrHyperCube::new(128);
         let query = random_vector_dim(128, 0);
         let results = hc.diffusion_retrieve(&query, &DiffusionConfig::default());
-        assert!(results.is_empty(), "empty codebook should return empty results");
+        assert!(
+            results.is_empty(),
+            "empty codebook should return empty results"
+        );
     }
 
     #[test]
@@ -791,7 +820,10 @@ mod tests {
         let results = hc.diffusion_retrieve(&query, &config);
         assert_eq!(results.len(), 1, "should find the only symbol");
         assert_eq!(results[0].name, "only");
-        assert!(results[0].activation > 0.8, "activation should be high for exact match");
+        assert!(
+            results[0].activation > 0.8,
+            "activation should be high for exact match"
+        );
     }
 
     #[test]
@@ -825,7 +857,8 @@ mod tests {
 
         // Create seed and friend that are similar (friend = seed + small noise)
         let base = random_vector_dim(256, 42);
-        let friend: Vec<f64> = base.iter()
+        let friend: Vec<f64> = base
+            .iter()
             .map(|theta| (theta + 0.1 * (rand::random::<f64>() - 0.5)) % std::f64::consts::TAU)
             .collect();
         let unrelated = random_vector_dim(256, 99);
@@ -840,20 +873,34 @@ mod tests {
         let unrelated_vec = hc.get_symbol("unrelated").unwrap();
         let sim_friend = similarity(seed_vec, friend_vec);
         let sim_unrelated = similarity(seed_vec, unrelated_vec);
-        assert!(sim_friend > sim_unrelated, "friend should be more similar to seed than unrelated");
+        assert!(
+            sim_friend > sim_unrelated,
+            "friend should be more similar to seed than unrelated"
+        );
 
         // Seed should activate friend_of_seed more than unrelated via diffusion
         let query = seed_vec.to_vec();
-        let results = hc.diffusion_retrieve(&query, &DiffusionConfig {
-            steps: 2,
-            decay: 0.5,
-            top_k: 3,
-            edge_threshold: sim_friend * 0.5, // include seed-friend edge
-            activation_threshold: 0.0,
-        });
+        let results = hc.diffusion_retrieve(
+            &query,
+            &DiffusionConfig {
+                steps: 2,
+                decay: 0.5,
+                top_k: 3,
+                edge_threshold: sim_friend * 0.5, // include seed-friend edge
+                activation_threshold: 0.0,
+            },
+        );
 
-        let friend_act = results.iter().find(|r| r.name == "friend_of_seed").map(|r| r.activation).unwrap_or(0.0);
-        let unrelated_act = results.iter().find(|r| r.name == "unrelated").map(|r| r.activation).unwrap_or(0.0);
+        let friend_act = results
+            .iter()
+            .find(|r| r.name == "friend_of_seed")
+            .map(|r| r.activation)
+            .unwrap_or(0.0);
+        let unrelated_act = results
+            .iter()
+            .find(|r| r.name == "unrelated")
+            .map(|r| r.activation)
+            .unwrap_or(0.0);
         assert!(friend_act > unrelated_act,
             "friend_of_seed ({friend_act}) should have higher activation than unrelated ({unrelated_act})");
     }
@@ -882,7 +929,11 @@ mod tests {
             activation_threshold: 0.0,
         };
         let results = hc.diffusion_retrieve(&query, &config);
-        assert!(results.len() <= 3, "should return at most top_k=3 results, got {}", results.len());
+        assert!(
+            results.len() <= 3,
+            "should return at most top_k=3 results, got {}",
+            results.len()
+        );
     }
 
     #[test]
@@ -899,13 +950,24 @@ mod tests {
         hc.set_symbol("c", vc);
 
         let query = hc.get_symbol("a").unwrap().to_vec();
-        let config_1step = DiffusionConfig { steps: 1, top_k: 3, ..Default::default() };
-        let config_3step = DiffusionConfig { steps: 3, top_k: 3, ..Default::default() };
+        let config_1step = DiffusionConfig {
+            steps: 1,
+            top_k: 3,
+            ..Default::default()
+        };
+        let config_3step = DiffusionConfig {
+            steps: 3,
+            top_k: 3,
+            ..Default::default()
+        };
 
         let r1 = hc.diffusion_retrieve(&query, &config_1step);
         let r3 = hc.diffusion_retrieve(&query, &config_3step);
         // More steps should not reduce the result count
-        assert!(r3.len() >= r1.len(), "more steps should spread activation further");
+        assert!(
+            r3.len() >= r1.len(),
+            "more steps should spread activation further"
+        );
     }
     #[test]
     fn test_permute_unpermute_roundtrip() {
@@ -919,5 +981,4 @@ mod tests {
             assert!(wrapped < 1e-9, "roundtrip failed: {a} -> {b}");
         }
     }
-
 }

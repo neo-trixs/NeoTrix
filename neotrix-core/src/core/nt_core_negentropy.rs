@@ -80,14 +80,24 @@ impl NegentropyMetric {
     pub fn summary_lines(&self) -> Vec<String> {
         let c = &self.components;
         vec![
-            format!("  N_total={:.4} ({}) trend={:+.4}/iter",
-                self.total, self.health(), self.trend),
-            format!("  Φ={:.4}  VSA_coh={:.4}  KB_order={:.4}  Pred={:.4}",
-                c.phi, c.vsa_coherence, c.kb_order, c.prediction_acc),
-            format!("  Attn={:.4}  Strat_diff={:.4}  Temp_coh={:.4}",
-                c.attention_focus, c.strategy_diff, c.temporal_coherence),
-            format!("  Flux: import={:.2}/s  export={:.2}/s  η_demon={:.4}",
-                self.flux.import_rate, self.flux.export_rate, self.demon_efficiency),
+            format!(
+                "  N_total={:.4} ({}) trend={:+.4}/iter",
+                self.total,
+                self.health(),
+                self.trend
+            ),
+            format!(
+                "  Φ={:.4}  VSA_coh={:.4}  KB_order={:.4}  Pred={:.4}",
+                c.phi, c.vsa_coherence, c.kb_order, c.prediction_acc
+            ),
+            format!(
+                "  Attn={:.4}  Strat_diff={:.4}  Temp_coh={:.4}",
+                c.attention_focus, c.strategy_diff, c.temporal_coherence
+            ),
+            format!(
+                "  Flux: import={:.2}/s  export={:.2}/s  η_demon={:.4}",
+                self.flux.import_rate, self.flux.export_rate, self.demon_efficiency
+            ),
         ]
     }
 }

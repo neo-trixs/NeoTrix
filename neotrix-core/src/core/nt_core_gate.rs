@@ -506,14 +506,20 @@ impl InsightDetector {
             self.last_step = step;
             return None;
         }
-        if score > self.running_best && (score - self.running_best) / (1.0 - self.running_best) >= self.threshold {
+        if score > self.running_best
+            && (score - self.running_best) / (1.0 - self.running_best) >= self.threshold
+        {
             let prev = self.running_best;
             self.running_best = score;
             self.last_step = step;
             return Some(InsightEvent {
                 score,
                 previous_best: prev,
-                strength: if prev == 1.0 { 0.0 } else { (score - prev) / (1.0 - prev) },
+                strength: if prev == 1.0 {
+                    0.0
+                } else {
+                    (score - prev) / (1.0 - prev)
+                },
                 step,
             });
         }
@@ -558,7 +564,11 @@ impl Attestation {
 
     /// 与观测比对: 声明与观测矛盾 → 0.5 扣分; 未自证 (声明为 None) → 0.1 轻微扣分;
     /// 一致 → 无扣分。返回 0..1 的矛盾惩罚系数。
-    pub fn contradiction_score(&self, observed_budget: Option<f64>, observed_seeds: Option<u32>) -> f64 {
+    pub fn contradiction_score(
+        &self,
+        observed_budget: Option<f64>,
+        observed_seeds: Option<u32>,
+    ) -> f64 {
         let mut penalty = 0.0f64;
         if let Some(declared) = self.budget_used {
             if let Some(obs) = observed_budget {
@@ -3041,7 +3051,7 @@ mod tests {
     fn insight_detector_saturates_and_resets() {
         let mut d = InsightDetector::new(0.1);
         d.record(0.95, 1); // 建立基线
-        // 接近饱和后小幅增长 → 强度低于阈值 → 不再触发
+                           // 接近饱和后小幅增长 → 强度低于阈值 → 不再触发
         assert!(d.record(0.952, 2).is_none(), "饱和后小步幅应静默");
         d.reset();
         assert_eq!(d.best(), 0.0);

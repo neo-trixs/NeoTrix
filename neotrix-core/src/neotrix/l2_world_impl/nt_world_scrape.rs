@@ -839,3 +839,336 @@ mod tests {
         assert_eq!(find_hex_color("no color here"), None);
     }
 }
+
+// ────────────────────────────────────────────────────────────────
+// P10 Fit Extraction (crawl4ai + webclaw 吸收) —
+// LLM-ready 内容提取: BM25-style 关键词相关性评分 + 阈值剪枝 + markdown 拼接
+// ────────────────────────────────────────────────────────────────
+
+/// 单块 BM25 评分结果。
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockScore {
+    pub block: String,
+    pub score: f64,
+}
+
+/// 内容提取计划: 整体拟合度 + 保留/剪枝块清单。
+#[derive(Debug, Clone)]
+pub struct ExtractionPlan {
+    pub fit_score: f64,
+    pub keep_blocks: Vec<String>,
+    pub pruned: Vec<String>,
+    scored: Vec<BlockScore>,
+}
+
+impl ExtractionPlan {
+    /// 全部块的评分 (含剪枝块), 供下游细粒度决策。
+    pub fn block_scores(&self) -> &[BlockScore] {
+        &self.scored
+    }
+}
+
+/// 提取前后差异摘要。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExtractionDiff {
+    pub removed_blocks: usize,
+    pub kept_blocks: usize,
+}
+
+/// LLM-ready 内容提取器 — BM25-style 关键词相关性评分 (crawl4ai/webclaw 吸收)。
+pub struct FitExtractor {
+    /// `analyze()` 默认剪枝阈值。
+    pub threshold: f64,
+    /// BM25 词频饱和参数 k1。
+    pub k1: f64,
+    /// BM25 长度归一参数 b。
+    pub b: f64,
+}
+
+impl Default for FitExtractor {
+    fn default() -> Self {
+        Self {
+            threshold: 0.5,
+            k1: 1.5,
+            b: 0.75,
+        }
+    }
+}
+
+impl FitExtractor {
+    pub fn new(threshold: f64) -> Self {
+        Self {
+            threshold,
+            ..Self::default()
+        }
+    }
+
+    fn tokenize(block: &str) -> Vec<&str> {
+        block
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|t| !t.is_empty())
+            .collect()
+    }
+
+    fn word_count(block: &str) -> f64 {
+        Self::tokenize(block).len() as f64
+    }
+
+    /// 每个关键词出现的文档数 (块数)。
+    fn doc_frequencies(blocks: &[String], keywords: &[&str]) -> Vec<usize> {
+        keywords
+            .iter()
+            .map(|&kw| {
+                let lower = kw.to_lowercase();
+                blocks
+                    .iter()
+                    .filter(|b| b.to_lowercase().contains(&lower))
+                    .count()
+            })
+            .collect()
+    }
+
+    /// BM25 IDF (平滑, 恒正)。
+    fn idf(num_docs: usize, df: usize) -> f64 {
+        let df = df as f64;
+        ((num_docs as f64 - df + 0.5) / (df + 0.5) + 1.0).ln()
+    }
+
+    /// 单块 BM25 得分: Σ idf × tf(饱和+长度归一)。
+    fn block_score(block: &str, keywords: &[&str], idfs: &[f64], avgdl: f64, k1: f64, b: f64) -> f64 {
+        let lower = block.to_lowercase();
+        let dl = Self::word_count(block);
+        let mut score = 0.0;
+        for (i, &kw) in keywords.iter().enumerate() {
+            let tf = lower.matches(&kw.to_lowercase()).count() as f64;
+            if tf > 0.0 && idfs[i] > 0.0 {
+                let norm = 1.0 - b + b * dl / avgdl.max(1.0);
+                score += idfs[i] * (tf * (k1 + 1.0)) / (tf + k1 * norm);
+            }
+        }
+        score
+    }
+
+    /// BM25-style 关键词相关性评分 (确定性): 每块 tf×idf 求和,
+    /// `fit_score` 为按块词数加权的平均块分。
+    pub fn analyze(&self, html_blocks: &[String], keywords: &[&str]) -> ExtractionPlan {
+        let n = html_blocks.len();
+        let df = Self::doc_frequencies(html_blocks, keywords);
+        let idfs: Vec<f64> = df.iter().map(|&d| Self::idf(n, d)).collect();
+        let total_len: f64 = html_blocks.iter().map(|b| Self::word_count(b)).sum();
+        let avgdl = total_len / (n.max(1) as f64);
+
+        let scored: Vec<BlockScore> = html_blocks
+            .iter()
+            .map(|b| BlockScore {
+                block: b.clone(),
+                score: Self::block_score(b, keywords, &idfs, avgdl, self.k1, self.b),
+            })
+            .collect();
+
+        let total_weight: f64 = scored.iter().map(|s| Self::word_count(&s.block)).sum();
+        let fit_score = if total_weight > 0.0 {
+            scored
+                .iter()
+                .map(|s| s.score * Self::word_count(&s.block))
+                .sum::<f64>()
+                / total_weight
+        } else {
+            0.0
+        };
+
+        let mut keep_blocks = Vec::new();
+        let mut pruned = Vec::new();
+        for s in &scored {
+            if s.score >= self.threshold {
+                keep_blocks.push(s.block.clone());
+            } else {
+                pruned.push(s.block.clone());
+            }
+        }
+        ExtractionPlan {
+            fit_score,
+            keep_blocks,
+            pruned,
+            scored,
+        }
+    }
+
+    /// 按给定阈值剪枝 (对全部块评分重应用阈值, 确定性)。
+    pub fn prune(&self, plan: &ExtractionPlan, threshold: f64) -> Vec<String> {
+        plan.scored
+            .iter()
+            .filter(|s| s.score >= threshold)
+            .map(|s| s.block.clone())
+            .collect()
+    }
+
+    /// LLM-ready markdown: 保留块以空行拼接; 剪枝块剔除。
+    pub fn fit_markdown(&self, blocks: &[String], keywords: &[&str], threshold: f64) -> String {
+        let plan = self.analyze(blocks, keywords);
+        self.prune(&plan, threshold).join("\n\n")
+    }
+
+    /// 差异摘要: 保留块 vs 原块列表。
+    pub fn diff(original: &[String], plan: &ExtractionPlan) -> ExtractionDiff {
+        ExtractionDiff {
+            removed_blocks: original.len().saturating_sub(plan.keep_blocks.len()),
+            kept_blocks: plan.keep_blocks.len(),
+        }
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for FitExtractor {
+    fn name(&self) -> &str {
+        "nt_world_scrape_fit_extraction"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let extractor = FitExtractor::default();
+        let blocks = vec![
+            "machine learning model training pipeline".to_string(),
+            "recipe for chocolate cake".to_string(),
+            "machine learning inference serving".to_string(),
+        ];
+        let plan = extractor.analyze(&blocks, &["machine", "learning"]);
+        if plan.keep_blocks.len() != 2 {
+            failures.push(format!("expected 2 keep blocks, got {}", plan.keep_blocks.len()));
+        }
+        if plan.pruned.len() != 1 {
+            failures.push(format!("expected 1 pruned block, got {}", plan.pruned.len()));
+        }
+        if !(0.0..=100.0).contains(&plan.fit_score) {
+            failures.push("fit_score out of sane range".into());
+        }
+        if plan.keep_blocks.iter().any(|b| b.contains("recipe")) {
+            failures.push("keyword-free block must be pruned".into());
+        }
+        let md = extractor.fit_markdown(&blocks, &["machine"], 0.001);
+        if md.split("\n\n").count() < 2 {
+            failures.push("markdown join must include multiple blocks".into());
+        }
+        if md.contains("recipe") {
+            failures.push("markdown must exclude pruned block".into());
+        }
+        let diff = FitExtractor::diff(&blocks, &plan);
+        if diff.kept_blocks + diff.removed_blocks != blocks.len() {
+            failures.push("diff counts inconsistent".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+#[cfg(test)]
+mod fit_extraction_tests {
+    use super::*;
+
+    #[test]
+    fn test_bm25_scoring_ordering() {
+        let blocks = vec![
+            "rust rust rust rust rust rust".to_string(),
+            "rust learning".to_string(),
+            "nothing relevant here".to_string(),
+        ];
+        let extractor = FitExtractor::default();
+        let plan = extractor.analyze(&blocks, &["rust", "learning"]);
+        let scores = plan.block_scores();
+        // 双关键词块 (rust+learning) > 单关键词重复块 > 无关块
+        assert!(scores[1].score > scores[0].score, "both-keyword block must rank higher");
+        assert!(scores[0].score > 0.0, "keyword block must be scored > 0");
+        assert_eq!(scores[2].score, 0.0, "keyword-free block must score 0");
+        assert!(plan.keep_blocks.len() == 2, "only keyword blocks kept");
+        assert!(plan.pruned.contains(&"nothing relevant here".to_string()));
+    }
+
+    #[test]
+    fn test_prune_threshold_edges() {
+        let blocks = vec!["rust is great".to_string(), "cats are cute".to_string()];
+        let extractor = FitExtractor::new(0.5);
+        let plan = extractor.analyze(&blocks, &["rust"]);
+        let exact = plan.block_scores()[0].score; // ln(2) 附近
+        // 阈值 0.0: 全部保留
+        assert_eq!(extractor.prune(&plan, 0.0).len(), 2);
+        // 阈值恰好等于分数: 边界块保留
+        assert!(extractor.prune(&plan, exact).contains(&"rust is great".to_string()));
+        // 阈值高于分数: 全部剪枝
+        assert!(extractor.prune(&plan, exact + 1e-9).is_empty());
+        // 阈值 0.001: 只保留有关键词的块
+        let kept = extractor.prune(&plan, 0.001);
+        assert_eq!(kept, vec!["rust is great".to_string()]);
+    }
+
+    #[test]
+    fn test_fit_markdown_join() {
+        let blocks = vec![
+            "introduction to scaling laws".to_string(),
+            "recipe for banana bread".to_string(),
+            "scaling law numbers over time".to_string(),
+        ];
+        let extractor = FitExtractor::new(0.5);
+        let md = extractor.fit_markdown(&blocks, &["scaling", "law"], 0.001);
+        assert!(md.contains("introduction to scaling laws"));
+        assert!(md.contains("scaling law numbers over time"));
+        assert!(!md.contains("recipe"), "pruned block must be absent from markdown");
+        // 保留块以空行拼接
+        assert!(md.contains("introduction to scaling laws\n\nscaling law numbers over time"));
+    }
+
+    #[test]
+    fn test_diff_counts() {
+        let blocks = vec![
+            "alpha rust docs".to_string(),
+            "beta unrelated".to_string(),
+            "gamma rust book".to_string(),
+            "delta unrelated".to_string(),
+        ];
+        let extractor = FitExtractor::new(0.5);
+        let plan = extractor.analyze(&blocks, &["rust"]);
+        let diff = FitExtractor::diff(&blocks, &plan);
+        assert_eq!(diff.kept_blocks, plan.keep_blocks.len());
+        assert_eq!(diff.removed_blocks + diff.kept_blocks, blocks.len());
+        assert!(diff.removed_blocks > 0, "unrelated blocks must be counted as removed");
+        assert_eq!(diff.removed_blocks, plan.pruned.len());
+    }
+
+    #[test]
+    fn test_analyze_empty_blocks_and_keywords() {
+        let extractor = FitExtractor::default();
+        let empty_blocks = extractor.analyze(&[], &["rust"]);
+        assert_eq!(empty_blocks.fit_score, 0.0);
+        assert!(empty_blocks.keep_blocks.is_empty());
+        assert!(empty_blocks.pruned.is_empty());
+        let blocks = vec!["a".to_string(), "b".to_string()];
+        let no_kw = extractor.analyze(&blocks, &[]);
+        assert_eq!(no_kw.fit_score, 0.0);
+        assert!(no_kw.keep_blocks.is_empty(), "no keywords -> nothing kept at positive threshold");
+        assert_eq!(no_kw.pruned.len(), 2);
+    }
+
+    #[test]
+    fn test_fit_extraction_deterministic() {
+        let blocks = vec![
+            "machine learning inference".to_string(),
+            "just another block".to_string(),
+            "machine learning training loop".to_string(),
+        ];
+        let a = FitExtractor::default().analyze(&blocks, &["machine", "learning"]);
+        let b = FitExtractor::default().analyze(&blocks, &["machine", "learning"]);
+        assert_eq!(a.fit_score, b.fit_score);
+        assert_eq!(a.keep_blocks, b.keep_blocks);
+        assert_eq!(a.pruned, b.pruned);
+        assert_eq!(a.block_scores(), b.block_scores());
+    }
+
+    #[test]
+    fn test_fit_extraction_self_test_name() {
+        let e = FitExtractor::default();
+        let name = crate::core::nt_core_self_test::SelfTest::name(&e);
+        assert_eq!(name, "nt_world_scrape_fit_extraction");
+        assert!(crate::core::nt_core_self_test::SelfTest::self_test(&e).is_ok());
+    }
+}

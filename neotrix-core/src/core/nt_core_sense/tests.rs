@@ -96,11 +96,14 @@ fn test_nt_world_sense_event_kind_eq() {
 
 #[test]
 fn test_nt_world_sense_event_creation() {
-    let ev = dummy_event(1, SensoryEventKind::Data(FileChange {
-        path: "/tmp/f".into(),
-        change_type: ChangeType::Created,
-        size_delta: 100,
-    }));
+    let ev = dummy_event(
+        1,
+        SensoryEventKind::Data(FileChange {
+            path: "/tmp/f".into(),
+            change_type: ChangeType::Created,
+            size_delta: 100,
+        }),
+    );
     assert_eq!(ev.id, 1);
     assert_eq!(ev.priority, 5);
     assert!((ev.confidence - 0.9).abs() < 1e-9);
@@ -110,11 +113,14 @@ fn test_nt_world_sense_event_creation() {
 fn test_nt_world_sense_memory_push_latest() {
     let mut mem = SensoryMemory::new();
     for i in 0..5 {
-        mem.push(dummy_event(i, SensoryEventKind::Data(FileChange {
-            path: i.to_string(),
-            change_type: ChangeType::Created,
-            size_delta: 0,
-        })));
+        mem.push(dummy_event(
+            i,
+            SensoryEventKind::Data(FileChange {
+                path: i.to_string(),
+                change_type: ChangeType::Created,
+                size_delta: 0,
+            }),
+        ));
     }
     let latest = mem.latest(3);
     assert_eq!(latest.len(), 3);
@@ -126,13 +132,20 @@ fn test_nt_world_sense_memory_push_latest() {
 fn test_nt_world_sense_memory_by_kind() {
     let mut mem = SensoryMemory::new();
     let visual_kind = SensoryEventKind::Visual(AnalysisReport {
-        description: "".into(), detected_elements: vec![],
-        dominant_colors: vec![], layout_summary: "".into(),
+        description: "".into(),
+        detected_elements: vec![],
+        dominant_colors: vec![],
+        layout_summary: "".into(),
     });
     mem.push(dummy_event(0, visual_kind.clone()));
-    mem.push(dummy_event(1, SensoryEventKind::Data(FileChange {
-        path: "".into(), change_type: ChangeType::Created, size_delta: 0,
-    })));
+    mem.push(dummy_event(
+        1,
+        SensoryEventKind::Data(FileChange {
+            path: "".into(),
+            change_type: ChangeType::Created,
+            size_delta: 0,
+        }),
+    ));
     let found = mem.by_kind(&visual_kind);
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].id, 0);
@@ -142,9 +155,14 @@ fn test_nt_world_sense_memory_by_kind() {
 fn test_nt_world_sense_memory_capacity() {
     let mut mem = SensoryMemory::with_capacity(3);
     for i in 0..5 {
-        mem.push(dummy_event(i, SensoryEventKind::Data(FileChange {
-            path: "".into(), change_type: ChangeType::Created, size_delta: 0,
-        })));
+        mem.push(dummy_event(
+            i,
+            SensoryEventKind::Data(FileChange {
+                path: "".into(),
+                change_type: ChangeType::Created,
+                size_delta: 0,
+            }),
+        ));
     }
     assert_eq!(mem.len(), 3);
     assert_eq!(mem.events[0].id, 2);
@@ -154,9 +172,14 @@ fn test_nt_world_sense_memory_capacity() {
 fn test_nt_world_sense_memory_clear_len() {
     let mut mem = SensoryMemory::new();
     assert!(mem.is_empty());
-    mem.push(dummy_event(0, SensoryEventKind::Data(FileChange {
-        path: "".into(), change_type: ChangeType::Created, size_delta: 0,
-    })));
+    mem.push(dummy_event(
+        0,
+        SensoryEventKind::Data(FileChange {
+            path: "".into(),
+            change_type: ChangeType::Created,
+            size_delta: 0,
+        }),
+    ));
     assert_eq!(mem.len(), 1);
     mem.clear();
     assert!(mem.is_empty());
@@ -182,8 +205,14 @@ fn test_change_type_variants() {
 #[test]
 fn test_trigger_mapping_insert() {
     let mut map = std::collections::HashMap::new();
-    map.insert("visual".to_string(), vec![AttentionTrigger::HighPriority, AttentionTrigger::NovelEvent]);
-    map.insert("auditory".to_string(), vec![AttentionTrigger::AnomalyDetected]);
+    map.insert(
+        "visual".to_string(),
+        vec![AttentionTrigger::HighPriority, AttentionTrigger::NovelEvent],
+    );
+    map.insert(
+        "auditory".to_string(),
+        vec![AttentionTrigger::AnomalyDetected],
+    );
     let tm = TriggerMapping { mappings: map };
     assert_eq!(tm.mappings.len(), 2);
     assert!(tm.mappings.contains_key("visual"));
@@ -336,12 +365,19 @@ fn test_god_view_report_dimensions() {
 #[test]
 fn test_nt_world_sense_memory_by_kind_no_match() {
     let mut mem = SensoryMemory::new();
-    mem.push(dummy_event(0, SensoryEventKind::Data(FileChange {
-        path: "".into(), change_type: ChangeType::Created, size_delta: 0,
-    })));
+    mem.push(dummy_event(
+        0,
+        SensoryEventKind::Data(FileChange {
+            path: "".into(),
+            change_type: ChangeType::Created,
+            size_delta: 0,
+        }),
+    ));
     let visual_kind = SensoryEventKind::Visual(AnalysisReport {
-        description: "".into(), detected_elements: vec![],
-        dominant_colors: vec![], layout_summary: "".into(),
+        description: "".into(),
+        detected_elements: vec![],
+        dominant_colors: vec![],
+        layout_summary: "".into(),
     });
     assert!(mem.by_kind(&visual_kind).is_empty());
 }
@@ -350,9 +386,14 @@ fn test_nt_world_sense_memory_by_kind_no_match() {
 fn test_nt_world_sense_memory_latest_exceeds_len() {
     let mut mem = SensoryMemory::new();
     for i in 0..3 {
-        mem.push(dummy_event(i, SensoryEventKind::Data(FileChange {
-            path: i.to_string(), change_type: ChangeType::Created, size_delta: 0,
-        })));
+        mem.push(dummy_event(
+            i,
+            SensoryEventKind::Data(FileChange {
+                path: i.to_string(),
+                change_type: ChangeType::Created,
+                size_delta: 0,
+            }),
+        ));
     }
     let latest = mem.latest(10);
     assert_eq!(latest.len(), 3);
@@ -363,24 +404,49 @@ fn test_nt_world_sense_memory_latest_exceeds_len() {
 fn test_conversation_observer_many_turns_topic_detection() {
     let mut obs = ConversationObserver::new(20);
     obs.record_turn(ConversationTurn {
-        turn_number: 1, user_message: "hi".into(), system_response: "hello".into(),
-        intent_label: None, user_satisfaction: None, duration_ms: 10, tools_used: vec![],
+        turn_number: 1,
+        user_message: "hi".into(),
+        system_response: "hello".into(),
+        intent_label: None,
+        user_satisfaction: None,
+        duration_ms: 10,
+        tools_used: vec![],
     });
     obs.record_turn(ConversationTurn {
-        turn_number: 2, user_message: "what is rust?".into(), system_response: "a lang".into(),
-        intent_label: Some("question".into()), user_satisfaction: Some(0.8), duration_ms: 50, tools_used: vec!["search".into()],
+        turn_number: 2,
+        user_message: "what is rust?".into(),
+        system_response: "a lang".into(),
+        intent_label: Some("question".into()),
+        user_satisfaction: Some(0.8),
+        duration_ms: 50,
+        tools_used: vec!["search".into()],
     });
     obs.record_turn(ConversationTurn {
-        turn_number: 3, user_message: "write a parser".into(), system_response: "done".into(),
-        intent_label: Some("code".into()), user_satisfaction: Some(0.9), duration_ms: 200, tools_used: vec!["compile".into(), "test".into()],
+        turn_number: 3,
+        user_message: "write a parser".into(),
+        system_response: "done".into(),
+        intent_label: Some("code".into()),
+        user_satisfaction: Some(0.9),
+        duration_ms: 200,
+        tools_used: vec!["compile".into(), "test".into()],
     });
     obs.record_turn(ConversationTurn {
-        turn_number: 4, user_message: "fix the bug".into(), system_response: "fixed".into(),
-        intent_label: Some("debug".into()), user_satisfaction: Some(0.7), duration_ms: 100, tools_used: vec!["lint".into()],
+        turn_number: 4,
+        user_message: "fix the bug".into(),
+        system_response: "fixed".into(),
+        intent_label: Some("debug".into()),
+        user_satisfaction: Some(0.7),
+        duration_ms: 100,
+        tools_used: vec!["lint".into()],
     });
     obs.record_turn(ConversationTurn {
-        turn_number: 5, user_message: "check the tests".into(), system_response: "all pass".into(),
-        intent_label: Some("verify".into()), user_satisfaction: Some(0.95), duration_ms: 60, tools_used: vec![],
+        turn_number: 5,
+        user_message: "check the tests".into(),
+        system_response: "all pass".into(),
+        intent_label: Some("verify".into()),
+        user_satisfaction: Some(0.95),
+        duration_ms: 60,
+        tools_used: vec![],
     });
 
     let report = obs.god_view_report();
@@ -398,8 +464,13 @@ fn test_conversation_observer_many_turns_topic_detection() {
 #[test]
 fn test_conversation_turn_empty_tools() {
     let turn = ConversationTurn {
-        turn_number: 1, user_message: "hello".into(), system_response: "hi".into(),
-        intent_label: None, user_satisfaction: None, duration_ms: 0, tools_used: vec![],
+        turn_number: 1,
+        user_message: "hello".into(),
+        system_response: "hi".into(),
+        intent_label: None,
+        user_satisfaction: None,
+        duration_ms: 0,
+        tools_used: vec![],
     };
     assert!(turn.tools_used.is_empty());
     assert!(turn.intent_label.is_none());
@@ -434,7 +505,13 @@ fn test_god_view_report_all_fields() {
         patterns_detected: vec!["repeat".into(), "escalation".into()],
         meta_insight: "user is exploring options".into(),
         consciousness_dimension_scores: [0.9, 0.7, 0.5],
-        dialogue_arc: vec!["greeting".into(), "query".into(), "build".into(), "debug".into(), "verify".into()],
+        dialogue_arc: vec![
+            "greeting".into(),
+            "query".into(),
+            "build".into(),
+            "debug".into(),
+            "verify".into(),
+        ],
         sentiment_trend: 0.25,
         repetition_detected: true,
         repeated_topics: vec!["bug".into(), "performance".into()],
@@ -456,11 +533,19 @@ fn test_god_view_report_all_fields() {
 
 #[test]
 fn test_nt_world_sense_event_priority_range() {
-    let ev = dummy_event(1, SensoryEventKind::Data(FileChange {
-        path: "/tmp/f".into(), change_type: ChangeType::Created, size_delta: 0,
-    }));
+    let ev = dummy_event(
+        1,
+        SensoryEventKind::Data(FileChange {
+            path: "/tmp/f".into(),
+            change_type: ChangeType::Created,
+            size_delta: 0,
+        }),
+    );
     assert_eq!(ev.priority, 5);
-    let high = SensoryEvent { priority: 255, ..ev.clone() };
+    let high = SensoryEvent {
+        priority: 255,
+        ..ev.clone()
+    };
     assert_eq!(high.priority, 255);
     let low = SensoryEvent { priority: 0, ..ev };
     assert_eq!(low.priority, 0);
@@ -469,15 +554,24 @@ fn test_nt_world_sense_event_priority_range() {
 #[test]
 fn test_nt_world_sense_event_source_string() {
     let ev = SensoryEvent {
-        id: 1, timestamp_ms: 1000,
+        id: 1,
+        timestamp_ms: 1000,
         kind: SensoryEventKind::Data(FileChange {
-            path: "".into(), change_type: ChangeType::Created, size_delta: 0,
+            path: "".into(),
+            change_type: ChangeType::Created,
+            size_delta: 0,
         }),
-        source: "camera:0".into(), priority: 5, confidence: 0.9,
-        description: "camera capture".into(), raw_data_size: 1024,
+        source: "camera:0".into(),
+        priority: 5,
+        confidence: 0.9,
+        description: "camera capture".into(),
+        raw_data_size: 1024,
     };
     assert_eq!(ev.source, "camera:0");
-    let ev2 = SensoryEvent { source: "mic:1".into(), ..ev };
+    let ev2 = SensoryEvent {
+        source: "mic:1".into(),
+        ..ev
+    };
     assert_eq!(ev2.source, "mic:1");
 }
 

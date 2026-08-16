@@ -170,11 +170,32 @@ impl DomainCategory {
     pub fn all() -> &'static [DomainCategory; 26] {
         use DomainCategory::*;
         &[
-            Debugging, Testing, Security, Spreadsheet, Document, Presentation,
-            Api, Database, CodeGeneration, Reasoning, KnowledgeQA, ToolUse,
-            Safety, InstructionFollowing, MultiTurn, ImageGeneration,
-            VideoGeneration, TextToSpeech, MusicGeneration, DataAnalysis,
-            WebSearch, Communication, Planning, Creative, Design, General,
+            Debugging,
+            Testing,
+            Security,
+            Spreadsheet,
+            Document,
+            Presentation,
+            Api,
+            Database,
+            CodeGeneration,
+            Reasoning,
+            KnowledgeQA,
+            ToolUse,
+            Safety,
+            InstructionFollowing,
+            MultiTurn,
+            ImageGeneration,
+            VideoGeneration,
+            TextToSpeech,
+            MusicGeneration,
+            DataAnalysis,
+            WebSearch,
+            Communication,
+            Planning,
+            Creative,
+            Design,
+            General,
         ]
     }
 
@@ -338,7 +359,11 @@ pub struct CapabilityCost {
 
 impl Default for CapabilityCost {
     fn default() -> Self {
-        Self { estimated_tokens: 1000, estimated_ms: 500, estimated_memory_kb: 64 }
+        Self {
+            estimated_tokens: 1000,
+            estimated_ms: 500,
+            estimated_memory_kb: 64,
+        }
     }
 }
 
@@ -358,9 +383,15 @@ pub struct CapabilityStats {
 impl Default for CapabilityStats {
     fn default() -> Self {
         Self {
-            call_count: 0, success_count: 0, failure_count: 0,
-            avg_latency_ms: 0.0, avg_prm_score: 0.0, diversity_score: 0.0,
-            last_called: None, total_tokens: 0, success_rate: 0.0,
+            call_count: 0,
+            success_count: 0,
+            failure_count: 0,
+            avg_latency_ms: 0.0,
+            avg_prm_score: 0.0,
+            diversity_score: 0.0,
+            last_called: None,
+            total_tokens: 0,
+            success_rate: 0.0,
         }
     }
 }
@@ -368,9 +399,15 @@ impl Default for CapabilityStats {
 impl CapabilityStats {
     pub fn record_call(&mut self, success: bool, latency_ms: f64, prm_score: f64) {
         self.call_count += 1;
-        if success { self.success_count += 1; } else { self.failure_count += 1; }
-        self.avg_latency_ms = (self.avg_latency_ms * (self.call_count as f64 - 1.0) + latency_ms) / self.call_count as f64;
-        self.avg_prm_score = (self.avg_prm_score * (self.call_count as f64 - 1.0) + prm_score) / self.call_count as f64;
+        if success {
+            self.success_count += 1;
+        } else {
+            self.failure_count += 1;
+        }
+        self.avg_latency_ms = (self.avg_latency_ms * (self.call_count as f64 - 1.0) + latency_ms)
+            / self.call_count as f64;
+        self.avg_prm_score = (self.avg_prm_score * (self.call_count as f64 - 1.0) + prm_score)
+            / self.call_count as f64;
         self.success_rate = self.success_count as f64 / self.call_count as f64;
         self.last_called = Some(
             std::time::SystemTime::now()
@@ -418,11 +455,18 @@ pub struct CapabilityRegistry {
     tag_index: std::collections::HashMap<String, Vec<CapabilityId>>,
 }
 
-impl Default for CapabilityRegistry { fn default() -> Self { Self::new() } }
+impl Default for CapabilityRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CapabilityRegistry {
     pub fn new() -> Self {
-        Self { capabilities: Vec::new(), tag_index: std::collections::HashMap::new() }
+        Self {
+            capabilities: Vec::new(),
+            tag_index: std::collections::HashMap::new(),
+        }
     }
 
     pub fn register(&mut self, cap: Capability) {
@@ -445,23 +489,39 @@ impl CapabilityRegistry {
     }
 
     pub fn find_by_tag(&self, tag: &str) -> Vec<&Capability> {
-        self.tag_index.get(tag).map(|ids| ids.iter().filter_map(|id| self.get(id)).collect()).unwrap_or_default()
+        self.tag_index
+            .get(tag)
+            .map(|ids| ids.iter().filter_map(|id| self.get(id)).collect())
+            .unwrap_or_default()
     }
 
     pub fn find_by_kind(&self, kind: CapabilityKind) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| c.kind == kind).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| c.kind == kind)
+            .collect()
     }
 
     pub fn find_by_layer(&self, layer: u8) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| c.layer == layer).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| c.layer == layer)
+            .collect()
     }
 
     pub fn search_by_e8_state(&self, hexagram: u8) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| c.e8_triggers.contains(&hexagram)).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| c.e8_triggers.contains(&hexagram))
+            .collect()
     }
 
-    pub fn all(&self) -> &[Capability] { &self.capabilities }
-    pub fn count(&self) -> usize { self.capabilities.len() }
+    pub fn all(&self) -> &[Capability] {
+        &self.capabilities
+    }
+    pub fn count(&self) -> usize {
+        self.capabilities.len()
+    }
 
     /// 桥接 nt_core_model_skills 模型能力注册表 → L7 能力网。
     /// 把模型能力 (vision/context_window/provider) 注册为 Cognitive 类 capability,
@@ -520,43 +580,68 @@ impl CapabilityRegistry {
         if let Some(pos) = self.capabilities.iter().position(|c| &c.id == id) {
             let cap = self.capabilities.remove(pos);
             for tag in &cap.tags {
-                if let Some(ids) = self.tag_index.get_mut(tag) { ids.retain(|i| i != id); }
+                if let Some(ids) = self.tag_index.get_mut(tag) {
+                    ids.retain(|i| i != id);
+                }
             }
             Some(cap)
-        } else { None }
+        } else {
+            None
+        }
     }
 
     // ── Domain-based search (SkillForge-inspired) ──
 
     /// Find capabilities by domain category
     pub fn find_by_domain(&self, domain: DomainCategory) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| c.domain == domain).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| c.domain == domain)
+            .collect()
     }
 
     /// Multi-factor domain matching: match by domain + kind + tags with confidence
     pub fn match_by_domain(
-        &self, domain: DomainCategory, tags: &[String], kind: Option<CapabilityKind>
+        &self,
+        domain: DomainCategory,
+        tags: &[String],
+        kind: Option<CapabilityKind>,
     ) -> Vec<(f64, &Capability)> {
-        let mut scored: Vec<(f64, &Capability)> = self.capabilities.iter()
+        let mut scored: Vec<(f64, &Capability)> = self
+            .capabilities
+            .iter()
             .map(|c| {
                 let mut score = 0.0;
                 // Exact domain match: +0.5
-                if c.domain == domain { score += 0.5; }
+                if c.domain == domain {
+                    score += 0.5;
+                }
                 // Domain synonym overlap: +0.2
                 let domain_syns = domain.synonyms();
-                let match_count = c.tags.iter()
-                    .filter(|t| domain_syns.contains(&t.as_str())).count();
+                let match_count = c
+                    .tags
+                    .iter()
+                    .filter(|t| domain_syns.contains(&t.as_str()))
+                    .count();
                 score += match_count as f64 * 0.1;
                 // Tag overlap: +0.15 per matching tag
                 let tag_overlap = tags.iter().filter(|t| c.tags.contains(t)).count();
                 score += tag_overlap as f64 * 0.15;
                 // Kind match: +0.2
-                if let Some(k) = kind { if c.kind == k { score += 0.2; } }
+                if let Some(k) = kind {
+                    if c.kind == k {
+                        score += 0.2;
+                    }
+                }
                 // Maturity bonus: +0.05 per level
                 score += (c.maturity as u8) as f64 * 0.05;
                 // Stability penalty for experimental
-                if c.stability == CapabilityStability::Experimental { score *= 0.8; }
-                if c.stability == CapabilityStability::Deprecated { score *= 0.5; }
+                if c.stability == CapabilityStability::Experimental {
+                    score *= 0.8;
+                }
+                if c.stability == CapabilityStability::Deprecated {
+                    score *= 0.5;
+                }
                 (score.min(1.0), c)
             })
             .collect();
@@ -571,7 +656,9 @@ impl CapabilityRegistry {
         let cap = self.get(cap_id)?;
         for entry in &cap.fallback_chain {
             if let Some(fallback) = self.find_by_name(&entry.fallback_name) {
-                if fallback.stability == CapabilityStability::Deprecated { continue; }
+                if fallback.stability == CapabilityStability::Deprecated {
+                    continue;
+                }
                 return Some(fallback);
             }
         }
@@ -580,33 +667,46 @@ impl CapabilityRegistry {
 
     /// Get all capabilities with a specific runtime
     pub fn find_by_runtime(&self, runtime: CapabilityRuntime) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| c.runtime == runtime).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| c.runtime == runtime)
+            .collect()
     }
 
     /// Get all capabilities by tier
     pub fn find_by_tier(&self, tier: CapabilityTier) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| c.tier == tier).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| c.tier == tier)
+            .collect()
     }
 
     /// Get all capabilities with stability >= given level
     pub fn find_stable(&self, min_stability: CapabilityStability) -> Vec<&Capability> {
-        self.capabilities.iter().filter(|c| {
-            let order = |s: CapabilityStability| -> u8 {
-                match s {
-                    CapabilityStability::Deprecated => 0,
-                    CapabilityStability::Experimental => 1,
-                    CapabilityStability::Beta => 2,
-                    CapabilityStability::Production => 3,
-                }
-            };
-            order(c.stability) >= order(min_stability)
-        }).collect()
+        self.capabilities
+            .iter()
+            .filter(|c| {
+                let order = |s: CapabilityStability| -> u8 {
+                    match s {
+                        CapabilityStability::Deprecated => 0,
+                        CapabilityStability::Experimental => 1,
+                        CapabilityStability::Beta => 2,
+                        CapabilityStability::Production => 3,
+                    }
+                };
+                order(c.stability) >= order(min_stability)
+            })
+            .collect()
     }
 
     // ── Selector-style routing (OpenMontage-inspired) ──
 
     /// Route by domain and kind — returns sorted (score, cap) pairs
-    pub fn route_by_capability(&self, target: &str, domain: DomainCategory) -> Vec<(f64, &Capability)> {
+    pub fn route_by_capability(
+        &self,
+        target: &str,
+        domain: DomainCategory,
+    ) -> Vec<(f64, &Capability)> {
         let tags = vec![target.to_string()];
         self.match_by_domain(domain, &tags, None)
     }
@@ -645,20 +745,25 @@ mod tests {
         }
     }
 
-    #[test] fn test_register_and_get() {
+    #[test]
+    fn test_register_and_get() {
         let mut reg = CapabilityRegistry::new();
         let cap = test_cap("test", CapabilityKind::Cognitive, 4);
-        let id = cap.id; reg.register(cap);
-        assert!(reg.get(&id).is_some()); assert_eq!(reg.count(), 1);
+        let id = cap.id;
+        reg.register(cap);
+        assert!(reg.get(&id).is_some());
+        assert_eq!(reg.count(), 1);
     }
 
-    #[test] fn test_find_by_name() {
+    #[test]
+    fn test_find_by_name() {
         let mut reg = CapabilityRegistry::new();
         reg.register(test_cap("finder", CapabilityKind::Physical, 1));
         assert!(reg.find_by_name("finder").is_some());
     }
 
-    #[test] fn test_find_by_tag() {
+    #[test]
+    fn test_find_by_tag() {
         let mut reg = CapabilityRegistry::new();
         let mut cap = test_cap("t", CapabilityKind::Social, 2);
         cap.tags = vec!["alpha".into(), "beta".into()];
@@ -667,7 +772,8 @@ mod tests {
         assert_eq!(reg.find_by_tag("gamma").len(), 0);
     }
 
-    #[test] fn test_find_by_kind() {
+    #[test]
+    fn test_find_by_kind() {
         let mut reg = CapabilityRegistry::new();
         reg.register(test_cap("c1", CapabilityKind::Cognitive, 4));
         reg.register(test_cap("c2", CapabilityKind::Cognitive, 4));
@@ -676,7 +782,8 @@ mod tests {
         assert_eq!(reg.find_by_kind(CapabilityKind::Physical).len(), 1);
     }
 
-    #[test] fn test_search_by_e8_state() {
+    #[test]
+    fn test_search_by_e8_state() {
         let mut reg = CapabilityRegistry::new();
         let mut cap = test_cap("e8cap", CapabilityKind::Cognitive, 4);
         cap.e8_triggers = vec![0x42];
@@ -684,7 +791,8 @@ mod tests {
         assert_eq!(reg.search_by_e8_state(0x42).len(), 1);
     }
 
-    #[test] fn test_remove() {
+    #[test]
+    fn test_remove() {
         let mut reg = CapabilityRegistry::new();
         reg.register(test_cap("r", CapabilityKind::Shield, 1));
         let id = capability_id_from_name("r");
@@ -693,22 +801,29 @@ mod tests {
         assert_eq!(reg.count(), 0);
     }
 
-    #[test] fn test_maturity_promotion() {
-        assert_eq!(MaturityLevel::Primitive.promote(), Some(MaturityLevel::Candidate));
+    #[test]
+    fn test_maturity_promotion() {
+        assert_eq!(
+            MaturityLevel::Primitive.promote(),
+            Some(MaturityLevel::Candidate)
+        );
         assert_eq!(MaturityLevel::Transcendent.promote(), None);
     }
 
-    #[test] fn test_domain_category_all() {
+    #[test]
+    fn test_domain_category_all() {
         let all = DomainCategory::all();
         assert_eq!(all.len(), 26);
     }
 
-    #[test] fn test_domain_category_str() {
+    #[test]
+    fn test_domain_category_str() {
         assert_eq!(DomainCategory::Debugging.as_str(), "debugging");
         assert_eq!(DomainCategory::ImageGeneration.as_str(), "image_generation");
     }
 
-    #[test] fn test_domain_synonyms() {
+    #[test]
+    fn test_domain_synonyms() {
         let syns = DomainCategory::ImageGeneration.synonyms();
         assert!(syns.contains(&"image"));
         assert!(syns.contains(&"art"));
@@ -716,27 +831,32 @@ mod tests {
         assert!(dbg.contains(&"bug"));
     }
 
-    #[test] fn test_capability_tier_str() {
+    #[test]
+    fn test_capability_tier_str() {
         assert_eq!(CapabilityTier::Core.as_str(), "Core");
         assert_eq!(CapabilityTier::Generate.as_str(), "Generate");
     }
 
-    #[test] fn test_capability_runtime_str() {
+    #[test]
+    fn test_capability_runtime_str() {
         assert_eq!(CapabilityRuntime::Mcp.as_str(), "mcp");
         assert_eq!(CapabilityRuntime::LocalGpu.as_str(), "local_gpu");
     }
 
-    #[test] fn test_capability_stability_confidence() {
+    #[test]
+    fn test_capability_stability_confidence() {
         assert!((CapabilityStability::Experimental.confidence() - 0.3).abs() < 0.01);
         assert!((CapabilityStability::Production.confidence() - 0.95).abs() < 0.01);
     }
 
-    #[test] fn test_fallback_condition_str() {
+    #[test]
+    fn test_fallback_condition_str() {
         assert_eq!(FallbackCondition::OnError.as_str(), "on_error");
         assert_eq!(FallbackCondition::OnRateLimit.as_str(), "on_rate_limit");
     }
 
-    #[test] fn test_find_by_domain() {
+    #[test]
+    fn test_find_by_domain() {
         let mut reg = CapabilityRegistry::new();
         let mut cap = test_cap("img_gen", CapabilityKind::Physical, 1);
         cap.domain = DomainCategory::ImageGeneration;
@@ -755,7 +875,8 @@ mod tests {
         assert_eq!(prod.len(), 0);
     }
 
-    #[test] fn test_domain_matching_scoring() {
+    #[test]
+    fn test_domain_matching_scoring() {
         let mut reg = CapabilityRegistry::new();
         let mut cap = test_cap("debug1", CapabilityKind::Cognitive, 4);
         cap.domain = DomainCategory::Debugging;
@@ -763,12 +884,17 @@ mod tests {
         cap.maturity = MaturityLevel::Validated;
         cap.stability = CapabilityStability::Production;
         reg.register(cap);
-        let results = reg.match_by_domain(DomainCategory::Debugging, &["fix".into()], Some(CapabilityKind::Cognitive));
+        let results = reg.match_by_domain(
+            DomainCategory::Debugging,
+            &["fix".into()],
+            Some(CapabilityKind::Cognitive),
+        );
         assert!(!results.is_empty());
         assert!(results[0].0 > 0.5);
     }
 
-    #[test] fn test_fallback_chain_resolution() {
+    #[test]
+    fn test_fallback_chain_resolution() {
         let mut reg = CapabilityRegistry::new();
         let mut primary = test_cap("primary", CapabilityKind::Physical, 1);
         primary.domain = DomainCategory::ImageGeneration;
@@ -786,14 +912,16 @@ mod tests {
         assert!(reg.resolve_fallback(&bid).is_none());
     }
 
-    #[test] fn test_capability_stats_record_call() {
+    #[test]
+    fn test_capability_stats_record_call() {
         let mut s = CapabilityStats::default();
         s.record_call(true, 100.0, 0.85);
         assert_eq!(s.call_count, 1);
         assert!((s.success_rate - 1.0).abs() < 0.001);
     }
 
-    #[test] fn test_id_deterministic() {
+    #[test]
+    fn test_id_deterministic() {
         assert_eq!(capability_id_from_name("a"), capability_id_from_name("a"));
         assert_ne!(capability_id_from_name("a"), capability_id_from_name("b"));
     }
@@ -813,6 +941,8 @@ mod tests {
         assert!(!model_caps.is_empty());
         // vision 模型带 vision tag
         let vision_caps = reg.find_by_tag("vision");
-        assert!(vision_caps.iter().any(|c| c.tags.contains(&"vision".to_string())));
+        assert!(vision_caps
+            .iter()
+            .any(|c| c.tags.contains(&"vision".to_string())));
     }
 }

@@ -111,9 +111,8 @@ impl ResourceDiscoveryEngine {
             let info = discoverer.info();
             result.source_name = info.name.clone();
             result.discovered.retain(|r| {
-                let is_new = futures::executor::block_on(
-                    self.cache.check_and_mark(&r.kind, &r.resource_id),
-                );
+                let is_new =
+                    futures::executor::block_on(self.cache.check_and_mark(&r.kind, &r.resource_id));
                 is_new
             });
             results.push(result);
@@ -132,9 +131,7 @@ impl ResourceDiscoveryEngine {
             let mut result = discoverer.discover().await;
             result.source_name = info.name.clone();
             result.discovered.retain(|r| {
-                futures::executor::block_on(
-                    self.cache.check_and_mark(&r.kind, &r.resource_id),
-                )
+                futures::executor::block_on(self.cache.check_and_mark(&r.kind, &r.resource_id))
             });
             results.push(result);
         }

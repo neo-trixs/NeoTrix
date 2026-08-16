@@ -9,7 +9,13 @@ pub struct PipelineConfig {
 
 impl Default for PipelineConfig {
     fn default() -> Self {
-        Self { l1_trigger_count: 5, l2_trigger_count: 3, l3_trigger_count: 5, offload_threshold: 20, max_ref_files: 100 }
+        Self {
+            l1_trigger_count: 5,
+            l2_trigger_count: 3,
+            l3_trigger_count: 5,
+            offload_threshold: 20,
+            max_ref_files: 100,
+        }
     }
 }
 
@@ -33,7 +39,16 @@ impl Default for PipelineState {
 
 impl PipelineState {
     pub fn new() -> Self {
-        Self { total_memories: 0, l1_count: 0, l2_count: 0, l3_count: 0, last_l1_time: 0, last_l2_time: 0, last_l3_time: 0, pending_memories: 0 }
+        Self {
+            total_memories: 0,
+            l1_count: 0,
+            l2_count: 0,
+            l3_count: 0,
+            last_l1_time: 0,
+            last_l2_time: 0,
+            last_l3_time: 0,
+            pending_memories: 0,
+        }
     }
 
     pub fn record_memory(&mut self) {
@@ -46,12 +61,14 @@ impl PipelineState {
     }
 
     pub fn should_trigger_l2(&self, config: &PipelineConfig) -> bool {
-        self.l1_count > 0 && self.l1_count.is_multiple_of(config.l2_trigger_count)
+        self.l1_count > 0
+            && self.l1_count.is_multiple_of(config.l2_trigger_count)
             && self.l2_count < self.l1_count / config.l2_trigger_count
     }
 
     pub fn should_trigger_l3(&self, config: &PipelineConfig) -> bool {
-        self.l2_count > 0 && self.l2_count.is_multiple_of(config.l2_trigger_count)
+        self.l2_count > 0
+            && self.l2_count.is_multiple_of(config.l2_trigger_count)
             && self.l3_count < self.l2_count / config.l3_trigger_count
     }
 }
@@ -86,9 +103,14 @@ mod tests {
 
     #[test]
     fn test_should_trigger_l1_when_pending_reaches_threshold() {
-        let config = PipelineConfig { l1_trigger_count: 3, ..Default::default() };
+        let config = PipelineConfig {
+            l1_trigger_count: 3,
+            ..Default::default()
+        };
         let mut s = PipelineState::new();
-        for _ in 0..2 { s.record_memory(); }
+        for _ in 0..2 {
+            s.record_memory();
+        }
         assert!(!s.should_trigger_l1(&config));
         s.record_memory();
         assert!(s.should_trigger_l1(&config));

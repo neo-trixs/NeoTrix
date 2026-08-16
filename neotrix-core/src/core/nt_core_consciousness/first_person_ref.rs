@@ -62,8 +62,8 @@ impl FirstPersonRef {
         if self.coherence_history.len() > 100 {
             self.coherence_history.remove(0);
         }
-        let avg_coherence: f64 = self.coherence_history.iter().sum::<f64>()
-            / self.coherence_history.len().max(1) as f64;
+        let avg_coherence: f64 =
+            self.coherence_history.iter().sum::<f64>() / self.coherence_history.len().max(1) as f64;
         self.self_similarity_threshold = (avg_coherence * 0.5).max(0.3);
     }
 
@@ -103,7 +103,9 @@ mod tests {
         let fpr = FirstPersonRef::bootstrap(0);
         let world_tagged = VsaTagged::new(
             QuantizedVSA::random_binary(),
-            VsaOrigin::World(crate::core::nt_core_consciousness::vsa_tag::VsaWorldCategory::UserInput),
+            VsaOrigin::World(
+                crate::core::nt_core_consciousness::vsa_tag::VsaWorldCategory::UserInput,
+            ),
         );
         assert!(!fpr.is_self_coherent(&world_tagged));
     }

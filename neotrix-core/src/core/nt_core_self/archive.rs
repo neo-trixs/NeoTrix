@@ -19,7 +19,9 @@ pub struct SiliconSnapshot {
 impl SiliconSnapshot {
     pub fn to_json_line(&self) -> String {
         let escaped_label = self.label.replace('\\', "\\\\").replace('"', "\\\"");
-        let caps: Vec<String> = self.capabilities.iter()
+        let caps: Vec<String> = self
+            .capabilities
+            .iter()
             .map(|(k, v)| format!("[\"{}\",{}]", k, v))
             .collect();
         format!(
@@ -59,7 +61,9 @@ impl SiliconSnapshot {
         fn parse_f64_from_str(s: &str) -> Option<(f64, &str)> {
             let start = s.find(|c: char| c.is_ascii_digit() || c == '-')?;
             let tail = &s[start..];
-            let end = tail.find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-' && c != 'e' && c != 'E' && c != '+')?;
+            let end = tail.find(|c: char| {
+                !c.is_ascii_digit() && c != '.' && c != '-' && c != 'e' && c != 'E' && c != '+'
+            })?;
             let val: f64 = tail[..end].parse().ok()?;
             Some((val, &tail[end..]))
         }
@@ -143,18 +147,28 @@ impl SiliconSnapshot {
     }
 
     pub fn from_model(iteration: usize, label: &str, model: &SiliconSelfModel) -> Self {
-        let dominant_domain = model.attention_manager.dominant_domain()
+        let dominant_domain = model
+            .attention_manager
+            .dominant_domain()
             .map(|d| d.label().to_string())
             .unwrap_or_else(|| "none".to_string());
         let active_count = model.attention_manager.active_heads().len();
         let avg_activation = if model.attention_manager.heads.is_empty() {
             0.0
         } else {
-            model.attention_manager.heads.iter().map(|h| h.activation).sum::<f64>()
+            model
+                .attention_manager
+                .heads
+                .iter()
+                .map(|h| h.activation)
+                .sum::<f64>()
                 / model.attention_manager.heads.len() as f64
         };
 
-        let capabilities: Vec<(String, f64)> = model.identity.capabilities.iter()
+        let capabilities: Vec<(String, f64)> = model
+            .identity
+            .capabilities
+            .iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect();
 
@@ -176,7 +190,9 @@ impl SiliconSnapshot {
     pub fn diff_capabilities(&self, other: &SiliconSnapshot) -> Vec<(String, f64, f64)> {
         let mut result = Vec::new();
         for (name, level) in &self.capabilities {
-            let other_level = other.capabilities.iter()
+            let other_level = other
+                .capabilities
+                .iter()
                 .find(|(n, _)| n == name)
                 .map(|(_, v)| *v)
                 .unwrap_or(0.0);
@@ -240,7 +256,10 @@ impl SiliconArchive {
     }
 
     pub fn by_iteration(&self, iteration: usize) -> Option<&SiliconSnapshot> {
-        self.snapshots.iter().rev().find(|s| s.iteration == iteration)
+        self.snapshots
+            .iter()
+            .rev()
+            .find(|s| s.iteration == iteration)
     }
 
     pub fn diff_range(&self, from_id: usize, to_id: usize) -> Vec<(String, f64, f64)> {
@@ -301,8 +320,8 @@ impl SiliconArchive {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::silicon_self::SiliconSelfModel;
+    use super::*;
 
     #[test]
     fn test_archive_new() {

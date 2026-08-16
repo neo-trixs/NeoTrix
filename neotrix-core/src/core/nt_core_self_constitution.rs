@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use crate::core::nt_core_hcube::fhrr_vsa::{FhrrVector, similarity};
+use crate::core::nt_core_hcube::fhrr_vsa::{similarity, FhrrVector};
 use crate::neotrix::l1_body_impl::nt_shield::guard_chain::{GuardChain, GuardVerdict};
 
 /// Rule categories for semantic indexing and retrieval
@@ -44,7 +44,7 @@ impl RuleCategory {
             10 | 19 | 23 | 26 | 28 | 37 | 39 => RuleCategory::MetaCognition,
             43 => RuleCategory::AbsorptionProtocol,
             42 | 44 | 45 | 46 | 47 | 48 => RuleCategory::TreeGrowth,
-             11 | 31 | 40 => RuleCategory::CodeQualityPattern,
+            11 | 31 | 40 => RuleCategory::CodeQualityPattern,
             14 | 15 | 16 | 18 | 38 => RuleCategory::Reliability,
             _ => RuleCategory::CodeQualityPattern,
         }
@@ -52,7 +52,7 @@ impl RuleCategory {
 
     pub fn priority_weight(&self) -> f64 {
         match self {
-            RuleCategory::TreeGrowth => 1.0,        // Highest: governs how we grow
+            RuleCategory::TreeGrowth => 1.0, // Highest: governs how we grow
             RuleCategory::AbsorptionProtocol => 0.95,
             RuleCategory::BehavioralGrounding => 0.9,
             RuleCategory::ArchitectureConstraint => 0.85,
@@ -67,11 +67,11 @@ impl RuleCategory {
 /// A single dev rule extracted from AGENTS.md
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DevRule {
-    pub id: String,              // "R-P42"
-    pub title: String,           // "Tree-Grafting"
-    pub content: String,         // Full rule text
+    pub id: String,      // "R-P42"
+    pub title: String,   // "Tree-Grafting"
+    pub content: String, // Full rule text
     pub category: RuleCategory,
-    pub source_cycle: u32,       // Cycle when added
+    pub source_cycle: u32,          // Cycle when added
     pub vector: Option<FhrrVector>, // Semantic vector for retrieval
 }
 
@@ -101,8 +101,8 @@ pub struct BuildBaseline {
 pub struct Constitution {
     pub rules: HashMap<String, DevRule>,
     pub experiences: Vec<ExperienceEntry>,
-    pub tree_growth_rules: Vec<DevRule>,      // R-P42~R-P46
-    pub absorption_rules: Vec<DevRule>,        // R-P43
+    pub tree_growth_rules: Vec<DevRule>, // R-P42~R-P46
+    pub absorption_rules: Vec<DevRule>,  // R-P43
     pub loaded_at: u64,
     pub source_hash: String,
     #[serde(skip)]
@@ -146,7 +146,8 @@ impl ConstitutionVectorIndex {
 
     /// Find rules semantically relevant to a query
     pub fn query_rules(&self, query_vector: &FhrrVector, top_k: usize) -> Vec<(String, f64)> {
-        let mut results: Vec<(String, f64)> = self.rule_vectors
+        let mut results: Vec<(String, f64)> = self
+            .rule_vectors
             .iter()
             .map(|(id, v)| (id.clone(), similarity(query_vector.phases(), v.phases())))
             .collect();
@@ -156,7 +157,8 @@ impl ConstitutionVectorIndex {
 
     /// Find relevant experiences
     pub fn query_experiences(&self, query_vector: &FhrrVector, top_k: usize) -> Vec<(u32, f64)> {
-        let mut results: Vec<(u32, f64)> = self.experience_vectors
+        let mut results: Vec<(u32, f64)> = self
+            .experience_vectors
             .iter()
             .map(|(cycle, v)| (*cycle, similarity(query_vector.phases(), v.phases())))
             .collect();
@@ -211,10 +213,13 @@ impl Constitution {
 
     /// Get rules relevant to a task description
     pub fn relevant_rules_for_task(&self, task_desc: &str, top_k: usize) -> Vec<&DevRule> {
-        let Some(index) = &self.vector_index else { return Vec::new(); };
+        let Some(index) = &self.vector_index else {
+            return Vec::new();
+        };
         let query_vec = FhrrVector::from_scalar(task_desc.len() as f64);
         let results = index.query_rules(&query_vec, top_k);
-        results.into_iter()
+        results
+            .into_iter()
             .filter_map(|(id, _)| self.rules.get(&id))
             .collect()
     }
@@ -257,9 +262,10 @@ impl Constitution {
 
         // 单调授权守卫聚合 (三态治理): Deny → Critical, Ask → High。
         // 与逐条 keyword 检查并存, 提供授权类规则的单调收敛裁决。
-        let (verdict, reasons) = self
-            .guard
-            .evaluate("constitution", &serde_json::json!({ "action": action_desc }));
+        let (verdict, reasons) = self.guard.evaluate(
+            "constitution",
+            &serde_json::json!({ "action": action_desc }),
+        );
         match verdict {
             GuardVerdict::Deny => {
                 violations.push(ComplianceViolation {
@@ -291,13 +297,36 @@ impl Constitution {
     pub(crate) fn check_violation(&self, rule: &DevRule, action_desc: &str) -> bool {
         let desc_lower = action_desc.to_lowercase();
         match rule.id.as_str() {
-            "R-P42" => desc_lower.contains("new module") && !desc_lower.contains("branch") && !desc_lower.contains("extend"),
-            "R-P43" => desc_lower.contains("copy") && (desc_lower.contains("claude") || desc_lower.contains("codex")) && !desc_lower.contains("distill"),
+            "R-P42" => {
+                desc_lower.contains("new module")
+                    && !desc_lower.contains("branch")
+                    && !desc_lower.contains("extend")
+            }
+            "R-P43" => {
+                desc_lower.contains("copy")
+                    && (desc_lower.contains("claude") || desc_lower.contains("codex"))
+                    && !desc_lower.contains("distill")
+            }
             "R-P44" => desc_lower.contains("cargo check") && !desc_lower.contains("register"),
             "R-P45" => desc_lower.contains("nt-mind") && !desc_lower.contains("health"),
-            "R-P46" => desc_lower.contains("yaml") && desc_lower.contains("tool") && !desc_lower.contains("hexagram"),
-            "R-P47" => (desc_lower.contains("adapter") || desc_lower.contains("wrapper") || desc_lower.contains("new mod")) && !desc_lower.contains("node") && !desc_lower.contains("reinforce"),
-            "R-P48" => (desc_lower.contains("command::new") || desc_lower.contains("binary dep") || desc_lower.contains("external bin")) && !desc_lower.contains("reqwest"),
+            "R-P46" => {
+                desc_lower.contains("yaml")
+                    && desc_lower.contains("tool")
+                    && !desc_lower.contains("hexagram")
+            }
+            "R-P47" => {
+                (desc_lower.contains("adapter")
+                    || desc_lower.contains("wrapper")
+                    || desc_lower.contains("new mod"))
+                    && !desc_lower.contains("node")
+                    && !desc_lower.contains("reinforce")
+            }
+            "R-P48" => {
+                (desc_lower.contains("command::new")
+                    || desc_lower.contains("binary dep")
+                    || desc_lower.contains("external bin"))
+                    && !desc_lower.contains("reqwest")
+            }
             _ => false,
         }
     }
@@ -384,7 +413,10 @@ impl ConstitutionLoader {
         .map_err(|e| format!("Regex error: {}", e))?;
 
         for cap in rule_regex.captures_iter(dev_rules_section) {
-            let title = cap.get(3).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
+            let title = cap
+                .get(3)
+                .map(|m| m.as_str().trim().to_string())
+                .unwrap_or_default();
             let content_text = cap[4].trim().to_string();
             // 主规则 + 可选组合规则 (R-P42 / R-P47 → 两条规则共享正文)
             let mut ids = vec![format!("R-P{}", &cap[1])];
@@ -487,7 +519,9 @@ impl ConstitutionLoader {
                 if let Some(num) = Self::extract_number(line) {
                     baseline.all_targets_errors = num;
                 }
-            } else if line.to_lowercase().contains("test") && (line.contains("pass") || line.contains("fail")) {
+            } else if line.to_lowercase().contains("test")
+                && (line.contains("pass") || line.contains("fail"))
+            {
                 baseline.test_status = line.to_string();
             }
         }
@@ -495,7 +529,8 @@ impl ConstitutionLoader {
     }
 
     fn extract_number(text: &str) -> Option<u32> {
-        regex::Regex::new(r"\d+").ok()?
+        regex::Regex::new(r"\d+")
+            .ok()?
             .find(text)?
             .as_str()
             .parse()
@@ -528,7 +563,9 @@ impl ConstitutionLoader {
         for rule in constitution.rules.values() {
             match rule.category {
                 RuleCategory::TreeGrowth => constitution.tree_growth_rules.push(rule.clone()),
-                RuleCategory::AbsorptionProtocol => constitution.absorption_rules.push(rule.clone()),
+                RuleCategory::AbsorptionProtocol => {
+                    constitution.absorption_rules.push(rule.clone())
+                }
                 _ => {}
             }
         }
@@ -604,14 +641,20 @@ static GLOBAL_CONSTITUTION: LazyLock<Constitution> = LazyLock::new(|| {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Failed to load constitution from {}: {}", search_path.display(), e);
+                        eprintln!(
+                            "Failed to load constitution from {}: {}",
+                            search_path.display(),
+                            e
+                        );
                     }
                 }
             }
             search_path = std::path::Path::new("..").join(search_path);
         }
     }
-    eprintln!("Failed to load constitution: dev-rules.md and AGENTS.md not found (CWD and parents)");
+    eprintln!(
+        "Failed to load constitution: dev-rules.md and AGENTS.md not found (CWD and parents)"
+    );
     Constitution::new()
 });
 
@@ -625,6 +668,47 @@ pub fn global_constitution() -> &'static Constitution {
     &GLOBAL_CONSTITUTION
 }
 
+/// NT-GOVERNANCE 域轻量 SelfTest (T1) — 宪法合规治理检测。
+/// 真实逻辑: 校验全局宪法已加载规则 (R-P42~R-P48 tree_growth_rules),
+/// 且合规检测能识别已知违规动作 (R-P42 新模块无分支映射)。注册后结果以
+/// `nt_governance_` 前缀流入 Repair/Meta/Governance/Nexus 四分支迷雾治理。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GovernanceConstitutionSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for GovernanceConstitutionSelfTest {
+    fn name(&self) -> &str {
+        "nt_governance_constitution"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let constitution = global_constitution();
+        let mut failures = Vec::new();
+
+        // 规则已加载 (单一事实源: dev-rules.md / AGENTS.md)
+        if constitution.rules.is_empty() {
+            failures.push("constitution has no rules loaded".into());
+        }
+        // 生长治理规则 (R-P42~R-P48) 必须存在
+        if constitution.tree_growth_rules().is_empty() {
+            failures.push("missing tree growth rules (R-P42~R-P48)".into());
+        }
+        // 合规检测必须识别已知违规 (新模块无分支映射 → R-P42)
+        let violation_report =
+            constitution.verify_compliance("create new module without branch mapping");
+        if violation_report.compliant {
+            failures.push("compliance check failed to detect R-P42 violation".into());
+        } else if violation_report.violations.is_empty() {
+            failures.push("violations list empty for non-compliant action".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 /// Reload constitution from file (for hot reload)
 pub fn reload_constitution(path: &Path) -> Result<(), String> {
     // Note: Can't actually replace LazyLock, but can return new instance
@@ -636,20 +720,39 @@ pub fn reload_constitution(path: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
     use std::path::Path;
 
     #[test]
     fn test_rule_category_priority() {
-        assert!(RuleCategory::TreeGrowth.priority_weight() > RuleCategory::BuildDiscipline.priority_weight());
-        assert!(RuleCategory::AbsorptionProtocol.priority_weight() > RuleCategory::ArchitectureConstraint.priority_weight());
+        assert!(
+            RuleCategory::TreeGrowth.priority_weight()
+                > RuleCategory::BuildDiscipline.priority_weight()
+        );
+        assert!(
+            RuleCategory::AbsorptionProtocol.priority_weight()
+                > RuleCategory::ArchitectureConstraint.priority_weight()
+        );
     }
 
     #[test]
     fn test_rule_categorization() {
-        assert_eq!(RuleCategory::from_rule_id("R-P42"), RuleCategory::TreeGrowth);
-        assert_eq!(RuleCategory::from_rule_id("R-P43"), RuleCategory::AbsorptionProtocol);
-        assert_eq!(RuleCategory::from_rule_id("R-P24"), RuleCategory::BehavioralGrounding);
-        assert_eq!(RuleCategory::from_rule_id("R-P10"), RuleCategory::MetaCognition);
+        assert_eq!(
+            RuleCategory::from_rule_id("R-P42"),
+            RuleCategory::TreeGrowth
+        );
+        assert_eq!(
+            RuleCategory::from_rule_id("R-P43"),
+            RuleCategory::AbsorptionProtocol
+        );
+        assert_eq!(
+            RuleCategory::from_rule_id("R-P24"),
+            RuleCategory::BehavioralGrounding
+        );
+        assert_eq!(
+            RuleCategory::from_rule_id("R-P10"),
+            RuleCategory::MetaCognition
+        );
     }
 
     #[test]
@@ -664,13 +767,27 @@ mod tests {
         let path = Path::new("../../../AGENTS.md");
         if path.exists() {
             let result = ConstitutionLoader::load_from_file(path);
-            assert!(result.is_ok(), "Failed to load real AGENTS.md: {:?}", result.err());
+            assert!(
+                result.is_ok(),
+                "Failed to load real AGENTS.md: {:?}",
+                result.err()
+            );
             let constitution = result.unwrap();
             assert!(!constitution.rules.is_empty(), "Should extract rules");
-            assert!(!constitution.experiences.is_empty(), "Should extract experiences");
-            assert!(!constitution.tree_growth_rules.is_empty(), "Should have tree growth rules");
-            assert!(!constitution.absorption_rules.is_empty(), "Should have absorption rules");
-            println!("Loaded {} rules, {} experiences, {} tree-growth, {} absorption",
+            assert!(
+                !constitution.experiences.is_empty(),
+                "Should extract experiences"
+            );
+            assert!(
+                !constitution.tree_growth_rules.is_empty(),
+                "Should have tree growth rules"
+            );
+            assert!(
+                !constitution.absorption_rules.is_empty(),
+                "Should have absorption rules"
+            );
+            println!(
+                "Loaded {} rules, {} experiences, {} tree-growth, {} absorption",
                 constitution.rules.len(),
                 constitution.experiences.len(),
                 constitution.tree_growth_rules.len(),
@@ -685,7 +802,9 @@ mod tests {
         if path.exists() {
             let constitution = ConstitutionLoader::load_from_file(path).unwrap();
             // Action that violates R-P42: creating new module without branch mapping
-            let report = constitution.verify_compliance("create new module nt_core_subagent.rs without mapping to any branch");
+            let report = constitution.verify_compliance(
+                "create new module nt_core_subagent.rs without mapping to any branch",
+            );
             assert!(!report.compliant);
             assert!(report.violations.iter().any(|v| v.rule_id == "R-P42"));
         }
@@ -697,7 +816,9 @@ mod tests {
         if path.exists() {
             let constitution = ConstitutionLoader::load_from_file(path).unwrap();
             // Action that violates R-P43: copying Claude Code design without distillation
-            let report = constitution.verify_compliance("copy claude code subagent design directly without distillation");
+            let report = constitution.verify_compliance(
+                "copy claude code subagent design directly without distillation",
+            );
             assert!(!report.compliant);
             assert!(report.violations.iter().any(|v| v.rule_id == "R-P43"));
         }
@@ -733,9 +854,13 @@ mod tests {
     fn test_governance_guard_allows_extension() {
         // 扩展已有节点 → Allow, guard 不追加 violation
         let constitution = Constitution::new();
-        let report = constitution.verify_compliance("extend existing module nt_core_orch_agent with a branch mapping");
+        let report = constitution
+            .verify_compliance("extend existing module nt_core_orch_agent with a branch mapping");
         assert!(
-            !report.violations.iter().any(|v| v.rule_id.starts_with("GUARD-")),
+            !report
+                .violations
+                .iter()
+                .any(|v| v.rule_id.starts_with("GUARD-")),
             "扩展动作不应触发 guard violation: {:?}",
             report.violations
         );
@@ -747,9 +872,21 @@ mod tests {
         if path.exists() {
             let constitution = ConstitutionLoader::load_from_file(path).unwrap();
             // Action that violates R-P46: YAML tools config without hexagram derivation
-            let report = constitution.verify_compliance("define agent tools in yaml file without hexagram derivation");
+            let report = constitution
+                .verify_compliance("define agent tools in yaml file without hexagram derivation");
             assert!(!report.compliant);
             assert!(report.violations.iter().any(|v| v.rule_id == "R-P46"));
         }
+    }
+
+    #[test]
+    fn test_governance_constitution_selftest_real() {
+        // NT-GOVERNANCE 域 SelfTest 必须通过 — 全局宪法在仓库根 (dev-rules.md /
+        // AGENTS.md) 可加载, R-P42 违规可检出。
+        assert!(
+            GovernanceConstitutionSelfTest.self_test().is_ok(),
+            "governance selftest failed: {:?}",
+            GovernanceConstitutionSelfTest.self_test().err()
+        );
     }
 }

@@ -126,7 +126,9 @@ impl SemanticCache {
                 self.lru.push_front(key);
 
                 // Phase 1: Check expiration with immutable borrow
-                let is_expired = self.entries.get(&key)
+                let is_expired = self
+                    .entries
+                    .get(&key)
                     .map(|e| e.created_at.elapsed() > e.ttl)
                     .unwrap_or(true);
 

@@ -1,4 +1,3 @@
-
 /// Precomputed E8 root system — 240 non-zero roots in 8D.
 /// Each root is `[i8; 8]` with values in {-2,-1,0,1,2}.
 pub struct E8RootSystem {
@@ -34,7 +33,8 @@ impl E8RootSystem {
             }
         }
         debug_assert_eq!(roots.len(), 240, "E8 must have exactly 240 roots");
-        let norms: Vec<f32> = roots.iter()
+        let norms: Vec<f32> = roots
+            .iter()
             .map(|r| (r.iter().map(|&x| (x * x) as f32).sum::<f32>()).sqrt())
             .collect();
         E8RootSystem { roots, norms }
@@ -45,15 +45,23 @@ impl E8RootSystem {
     }
 
     pub fn dot_prod_i8(a: &[i8; 8], b: &[i8; 8]) -> i16 {
-        a.iter().zip(b.iter()).map(|(&x, &y)| (x as i16) * (y as i16)).sum()
+        a.iter()
+            .zip(b.iter())
+            .map(|(&x, &y)| (x as i16) * (y as i16))
+            .sum()
     }
 
     pub fn nearest_root(&self, state: &[f32; 8]) -> (usize, f32) {
         let mut best = 0usize;
         let mut best_dist = f32::INFINITY;
         for (i, root) in self.roots.iter().enumerate() {
-            let dist: f32 = root.iter().zip(state.iter())
-                .map(|(&r, &s)| { let d = r as f32 - s; d * d })
+            let dist: f32 = root
+                .iter()
+                .zip(state.iter())
+                .map(|(&r, &s)| {
+                    let d = r as f32 - s;
+                    d * d
+                })
                 .sum();
             if dist < best_dist {
                 best_dist = dist;
@@ -64,7 +72,11 @@ impl E8RootSystem {
     }
 }
 
-impl Default for E8RootSystem { fn default() -> Self { Self::new() } }
+impl Default for E8RootSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// E8 Lattice Quantizer — soft quantization of hidden states into 240 E8 roots.
 /// Implements the Sovereign-Lila-E8 approach with straight-through estimator.
@@ -114,12 +126,17 @@ impl E8LatticeQuantizer {
 
     pub fn geometric_attention_bias(&self, query: &[f32; 8], keys: &[[f32; 8]]) -> Vec<f32> {
         let (q_nearest, _, _) = self.quantize(query);
-        keys.iter().map(|key| {
-            let (k_nearest, _, _) = self.quantize(key);
-            let bias: f32 = q_nearest.iter().zip(k_nearest.iter())
-                .map(|(&q, &k)| q * k).sum();
-            bias * self.scale
-        }).collect()
+        keys.iter()
+            .map(|key| {
+                let (k_nearest, _, _) = self.quantize(key);
+                let bias: f32 = q_nearest
+                    .iter()
+                    .zip(k_nearest.iter())
+                    .map(|(&q, &k)| q * k)
+                    .sum();
+                bias * self.scale
+            })
+            .collect()
     }
 
     pub fn root_distance_matrix(&self) -> [[f32; 240]; 240] {
@@ -128,8 +145,13 @@ impl E8LatticeQuantizer {
             let ri = self.root_system.root(i);
             for j in 0..240 {
                 let rj = self.root_system.root(j);
-                let dist: f32 = ri.iter().zip(rj.iter())
-                    .map(|(&a, &b)| { let d = a as f32 - b as f32; d * d })
+                let dist: f32 = ri
+                    .iter()
+                    .zip(rj.iter())
+                    .map(|(&a, &b)| {
+                        let d = a as f32 - b as f32;
+                        d * d
+                    })
                     .sum();
                 mat[i][j] = dist.sqrt();
             }
@@ -199,7 +221,9 @@ impl E8LoraScale {
         }
         let scale = self.layer_scales[layer % self.layer_scales.len()];
         let root_bias = self.compute_root_bias(base_logits);
-        base_logits.iter().zip(root_bias.iter())
+        base_logits
+            .iter()
+            .zip(root_bias.iter())
             .map(|(&logit, &bias)| logit + scale * bias)
             .collect()
     }
@@ -207,16 +231,21 @@ impl E8LoraScale {
     fn compute_root_bias(&self, _logits: &[f32]) -> Vec<f32> {
         let rs = E8RootSystem::new();
         let n = _logits.len();
-        (0..n).map(|i| {
-            let ri = rs.root(i % 240);
-            let mut sum = 0.0f32;
-            for j in 0..n.min(8) {
-                let rj = rs.root(j % 240);
-                sum += ri.iter().zip(rj.iter())
-                    .map(|(&a, &b)| (a as f32) * (b as f32)).sum::<f32>();
-            }
-            sum / n.max(1) as f32
-        }).collect()
+        (0..n)
+            .map(|i| {
+                let ri = rs.root(i % 240);
+                let mut sum = 0.0f32;
+                for j in 0..n.min(8) {
+                    let rj = rs.root(j % 240);
+                    sum += ri
+                        .iter()
+                        .zip(rj.iter())
+                        .map(|(&a, &b)| (a as f32) * (b as f32))
+                        .sum::<f32>();
+                }
+                sum / n.max(1) as f32
+            })
+            .collect()
     }
 }
 
@@ -236,8 +265,12 @@ mod tests {
         let rs = E8RootSystem::new();
         for (&r, &_n) in rs.roots.iter().zip(rs.norms.iter()) {
             let sq_norm: i16 = r.iter().map(|&x| (x * x) as i16).sum();
-            assert!(sq_norm == 4 || sq_norm == 8,
-                "E8 root norm must be 4 (type II) or 8 (type I), got {} for {:?}", sq_norm, r);
+            assert!(
+                sq_norm == 4 || sq_norm == 8,
+                "E8 root norm must be 4 (type II) or 8 (type I), got {} for {:?}",
+                sq_norm,
+                r
+            );
         }
     }
 
@@ -277,8 +310,12 @@ mod tests {
         let mat = quantizer.root_distance_matrix();
         for i in 0..240 {
             for j in 0..240 {
-                assert!((mat[i][j] - mat[j][i]).abs() < 1e-6,
-                    "distance matrix must be symmetric at {},{}", i, j);
+                assert!(
+                    (mat[i][j] - mat[j][i]).abs() < 1e-6,
+                    "distance matrix must be symmetric at {},{}",
+                    i,
+                    j
+                );
             }
         }
     }

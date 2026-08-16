@@ -162,6 +162,59 @@ impl Drop for CrossSessionMemory {
     }
 }
 
+/// NT-NEXUS 域轻量 SelfTest (T1) — 跨 session 记忆连接数检测。
+/// 真实逻辑: 写入多条跨 session 记忆并校验连接数 (len) / 检索 / 遗忘语义。
+/// 注册后结果以 `nt_nexus_` 前缀流入 Repair/Meta/Governance/Nexus 四分支迷雾治理。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CrossSessionMemorySelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for CrossSessionMemorySelfTest {
+    fn name(&self) -> &str {
+        "nt_nexus_cross_session_memory"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        // 纯内存实例, 不落盘: 空 storage_path 使 Drop 的 auto_save (写盘失败被
+        // 忽略) 不产生任何磁盘副作用
+        let mut memory = CrossSessionMemory::new(PathBuf::new());
+        memory.remember("session_a", "pattern", MemoryCategory::Pattern);
+        memory.remember("session_b", "principle", MemoryCategory::Principle);
+        memory.remember("session_c", "task", MemoryCategory::TaskOutcome);
+        if memory.len() != 3 {
+            failures.push(format!("expected 3 cross-session connections, got {}", memory.len()));
+        }
+        let recall = memory.recall("session_a");
+        if recall.map(|e| e.value.as_str()) != Some("pattern") {
+            failures.push("cross-session recall returned wrong value".into());
+        }
+        let recalled = memory.recall_by_category(MemoryCategory::Principle);
+        if recalled.len() != 1 {
+            failures.push(format!(
+                "expected 1 principle-category connection, got {}",
+                recalled.len()
+            ));
+        }
+        if !memory.forget("session_b") {
+            failures.push("forget should remove existing entry".into());
+        }
+        if memory.len() != 2 {
+            failures.push(format!("expected 2 after forget, got {}", memory.len()));
+        }
+        // 跨 session 计数语义 (generate_key 含时间戳, 必以前缀开头)
+        if !CrossSessionMemory::generate_key("nt_nexus").starts_with("nt_nexus_") {
+            failures.push("generate_key should preserve prefix".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

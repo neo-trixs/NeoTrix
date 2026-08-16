@@ -8,6 +8,7 @@
 //!   5. 384 lines = 64 × 6 = total degrees of freedom in E₈ root system
 //!   6. 50 (Dayan) - 1 (observer) = 49 (observable dof) ↔ 49 = 7² = 248-199
 
+pub mod abduction;
 pub mod domain_transition;
 pub mod e8_abduction_bridge;
 pub mod e8_lattice_quantizer;
@@ -16,33 +17,31 @@ pub mod nt_core_community_ingester;
 pub mod nt_core_e8_prediction;
 pub mod nt_core_fable_pattern;
 pub mod nt_core_synthesis;
-pub mod nt_latent_thought;
 pub mod nt_core_trajectory_prm;
-pub mod sparse_moe;
-pub mod unified_latent;
 pub mod nt_latent_reasoning;
+pub mod nt_latent_thought;
 pub mod nt_latent_transformer;
 pub mod nt_multimodal;
+pub mod sparse_moe;
 pub mod state_machine;
 pub mod thinking_budget;
-pub mod abduction;
+pub mod unified_latent;
 
-pub use nt_latent_thought::LatentThoughtVector;
-pub use sparse_moe::{SparseMoERouter, SparseRouting};
-pub use unified_latent::{UnifiedLatentSpace, UNIFIED_LATENT_DIM, SeededProjection};
 pub use nt_latent_reasoning::{
-    LatentReasoningPipeline, LatentRetrieval, LatentEpisodicEntry,
-    LATENT_MEMORY_SIZE, TOP_K_NEIGHBORS,
+    LatentEpisodicEntry, LatentReasoningPipeline, LatentRetrieval, LATENT_MEMORY_SIZE,
+    TOP_K_NEIGHBORS,
 };
+pub use nt_latent_thought::LatentThoughtVector;
 pub use nt_latent_transformer::{
-    LatentReasoningTransformer, LatentState,
-    MAX_LATENT_DEPTH, LATENT_HIDDEN_DIM, NUM_LATENT_LAYERS,
-    RECURSIVE_REWARD_DISCOUNT, DEFAULT_LATENT_TEMPERATURE,
+    LatentReasoningTransformer, LatentState, DEFAULT_LATENT_TEMPERATURE, LATENT_HIDDEN_DIM,
+    MAX_LATENT_DEPTH, NUM_LATENT_LAYERS, RECURSIVE_REWARD_DISCOUNT,
 };
 pub use nt_multimodal::{
-    MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM, VisionBridge, ImageEvidence, ImageClass,
-    model_supports_vision,
+    model_supports_vision, ImageClass, ImageEvidence, MultimodalEncoder, MultimodalInput,
+    VisionBridge, TEXT_EMBED_DIM,
 };
+pub use sparse_moe::{SparseMoERouter, SparseRouting};
+pub use unified_latent::{SeededProjection, UnifiedLatentSpace, UNIFIED_LATENT_DIM};
 
 #[cfg(test)]
 use std::collections::HashSet;
@@ -133,11 +132,7 @@ pub fn verify_seven_squared() -> bool {
 /// Verify: Lo Shu 3×3 sum = 15 (every row/col/diag).
 pub fn verify_lo_shu() -> bool {
     // Standard Lo Shu: 4 9 2 / 3 5 7 / 8 1 6
-    let square = [
-        [4, 9, 2],
-        [3, 5, 7],
-        [8, 1, 6],
-    ];
+    let square = [[4, 9, 2], [3, 5, 7], [8, 1, 6]];
     for i in 0..3 {
         let row_sum: usize = square[i].iter().sum();
         let col_sum: usize = square.iter().map(|r| r[i]).sum();
@@ -189,7 +184,9 @@ impl Hexagram {
 
     /// Bitwise NOT = 错卦 (opposite hexagram).
     pub fn opposite(&self) -> Self {
-        Self { bits: !self.bits & 0x3F }
+        Self {
+            bits: !self.bits & 0x3F,
+        }
     }
 
     /// Is this hexagram pure yang (all 1s) = 乾 ☰.
@@ -235,8 +232,7 @@ pub fn hexagram_matrix() -> [[Hexagram; 8]; 8] {
 
 /// Trigram names in Shao Yong order: 0=坤, 1=艮, 2=坎, 3=巽, 4=震, 5=离, 6=兑, 7=乾.
 pub const TRIGRAM_NAMES: [&str; 8] = [
-    "坤 ☷", "艮 ☶", "坎 ☵", "巽 ☴",
-    "震 ☳", "离 ☲", "兑 ☱", "乾 ☰",
+    "坤 ☷", "艮 ☶", "坎 ☵", "巽 ☴", "震 ☳", "离 ☲", "兑 ☱", "乾 ☰",
 ];
 
 /// Fuxi binary trigram: 3-bit value for each trigram.
@@ -331,10 +327,14 @@ pub fn e8_root_norm_counts() -> (usize, usize) {
 /// Represented as Gell-Mann matrices (symbolic structure constants).
 pub fn su3_generators() -> Vec<&'static str> {
     vec![
-        "λ₁ (gluon R̄G)", "λ₂ (gluon RḠ)",
-        "λ₃ (gluon R̄R-ḠG)", "λ₄ (gluon R̄B)",
-        "λ₅ (gluon RB̄)", "λ₆ (gluon ḠB)",
-        "λ₇ (gluon GB̄)", "λ₈ (gluon R̄R+ḠG-2B̄B)/√3",
+        "λ₁ (gluon R̄G)",
+        "λ₂ (gluon RḠ)",
+        "λ₃ (gluon R̄R-ḠG)",
+        "λ₄ (gluon R̄B)",
+        "λ₅ (gluon RB̄)",
+        "λ₆ (gluon ḠB)",
+        "λ₇ (gluon GB̄)",
+        "λ₈ (gluon R̄R+ḠG-2B̄B)/√3",
     ]
 }
 
@@ -371,7 +371,13 @@ pub struct FermionState {
 
 impl FermionState {
     pub fn new(weight: [i8; 8], q: f64, i3: f64, color: &str, is_particle: bool) -> Self {
-        Self { weight, q, i3, color: color.to_string(), is_particle }
+        Self {
+            weight,
+            q,
+            i3,
+            color: color.to_string(),
+            is_particle,
+        }
     }
 }
 
@@ -402,23 +408,18 @@ pub fn fermion_states_for_generation(_gen: usize) -> Vec<FermionState> {
         };
 
         let (i3, q) = match weak_bits {
-            0 => (0.5, 2.0 / 3.0),    // up-type left
-            1 => (-0.5, -1.0 / 3.0),  // down-type left
-            2 => (0.0, 2.0 / 3.0),    // up-type right
-            3 => (0.0, -1.0 / 3.0),   // down-type right
+            0 => (0.5, 2.0 / 3.0),   // up-type left
+            1 => (-0.5, -1.0 / 3.0), // down-type left
+            2 => (0.0, 2.0 / 3.0),   // up-type right
+            3 => (0.0, -1.0 / 3.0),  // down-type right
             _ => (0.0, 0.0),
         };
 
         let q_adj = if hyper_sign == 1 { q } else { -q };
 
-        let weight = [
-            r, g, b,
-            0, 0, 0, 0, 0,
-        ];
+        let weight = [r, g, b, 0, 0, 0, 0, 0];
 
-        states.push(FermionState::new(
-            weight, q_adj, i3, color, hyper_sign == 0,
-        ));
+        states.push(FermionState::new(weight, q_adj, i3, color, hyper_sign == 0));
     }
 
     states
@@ -471,7 +472,11 @@ pub fn verify_hadamard_orthogonality() -> bool {
     let n = h.len();
     for i in 0..n {
         for j in (i + 1)..n {
-            let dot: i32 = h[i].iter().zip(h[j].iter()).map(|(&a, &b)| a as i32 * b as i32).sum();
+            let dot: i32 = h[i]
+                .iter()
+                .zip(h[j].iter())
+                .map(|(&a, &b)| a as i32 * b as i32)
+                .sum();
             if dot != 0 {
                 return false;
             }
@@ -486,12 +491,10 @@ pub fn verify_hadamard_orthogonality() -> bool {
 /// This is the traditional received order.
 pub const WEN_SEQUENCE: [u8; 64] = [
     // 上经 (1-30)
-    1, 0, 3, 2, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12,
-    19, 18, 17, 16, 23, 22, 21, 20, 27, 26, 25, 24, 31, 30,
-    // 下经 (31-64)
-    29, 28, 35, 34, 33, 32, 39, 38, 37, 36, 43, 42, 41, 40,
-    47, 46, 45, 44, 51, 50, 49, 48, 55, 54, 53, 52, 59, 58,
-    57, 56, 63, 62, 61, 60,
+    1, 0, 3, 2, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12, 19, 18, 17, 16, 23, 22, 21, 20, 27, 26,
+    25, 24, 31, 30, // 下经 (31-64)
+    29, 28, 35, 34, 33, 32, 39, 38, 37, 36, 43, 42, 41, 40, 47, 46, 45, 44, 51, 50, 49, 48, 55, 54,
+    53, 52, 59, 58, 57, 56, 63, 62, 61, 60,
 ];
 
 // ─── E₈ × 64 Model ──────────────────────────────────────────────────
@@ -578,35 +581,79 @@ impl E8HexagramHomology {
 
 /// Mythos 9-stage reasoning chain: stage index → (block_start, label, function_tags)
 pub const MYTHOS_STAGE_MAP: [(usize, &str, &[&str]); 9] = [
-    (56, "Acknowledgment — scope/intent framing", &["problem_setup"]),
-    (48, "Restatement — reformulate problem", &["plan_generation"]),
-    (40, "Decomposition — break into sub-problems", &["plan_generation", "problem_setup"]),
-    (32, "First-Principles — fundamental analysis", &["active_computation", "fact_retrieval"]),
-    (24, "Self-Verification — check own understanding", &["self_checking"]),
-    (16, "Alternative — alternate approaches", &["uncertainty_management", "plan_generation"]),
-    (8, "Deep Dive — detailed exploration", &["active_computation", "fact_retrieval"]),
-    (0, "Synthesis — integrate findings", &["result_consolidation"]),
+    (
+        56,
+        "Acknowledgment — scope/intent framing",
+        &["problem_setup"],
+    ),
+    (
+        48,
+        "Restatement — reformulate problem",
+        &["plan_generation"],
+    ),
+    (
+        40,
+        "Decomposition — break into sub-problems",
+        &["plan_generation", "problem_setup"],
+    ),
+    (
+        32,
+        "First-Principles — fundamental analysis",
+        &["active_computation", "fact_retrieval"],
+    ),
+    (
+        24,
+        "Self-Verification — check own understanding",
+        &["self_checking"],
+    ),
+    (
+        16,
+        "Alternative — alternate approaches",
+        &["uncertainty_management", "plan_generation"],
+    ),
+    (
+        8,
+        "Deep Dive — detailed exploration",
+        &["active_computation", "fact_retrieval"],
+    ),
+    (
+        0,
+        "Synthesis — integrate findings",
+        &["result_consolidation"],
+    ),
     (4, "Conclusion — final answer", &["final_answer_emission"]),
 ];
 
 /// Legacy Fable 5 4-stage block map (backward-compatible).
 pub const FABLE5_BLOCK_MAP: [(usize, &str); 4] = [
-    (56, "Goal — Trace/Meta: system design, meta-cognition, intent framing"),
-    (48, "Reason — Pattern/Generate: pattern matching, generation, analysis"),
-    (24, "Boundaries — Data/Architecture: constraints, architecture, vision"),
-    (40, "Verification — Test/Scaffold: unit test, integration, validation"),
+    (
+        56,
+        "Goal — Trace/Meta: system design, meta-cognition, intent framing",
+    ),
+    (
+        48,
+        "Reason — Pattern/Generate: pattern matching, generation, analysis",
+    ),
+    (
+        24,
+        "Boundaries — Data/Architecture: constraints, architecture, vision",
+    ),
+    (
+        40,
+        "Verification — Test/Scaffold: unit test, integration, validation",
+    ),
 ];
 
 /// Function tag → E8 hexagram block mapping.
 /// Each tag selects a 2-entry range (base..base+2) where offset 0 = analytical, offset 1 = generative.
 pub const FUNCTION_TAG_BLOCKS: [(&str, usize); 8] = [
-    ("problem_setup", 56),           // 56-57: Trace/Meta analytical → generative
-    ("plan_generation", 48),         // 48-49: Pattern Match → Refactor
-    ("fact_retrieval", 40),          // 40-41: Unit Test → Integration
-    ("active_computation", 32),      // 32-33: Syntax Check → Quick Fix
-    ("result_consolidation", 24),    // 24-25: Boundaries → Safety
-    ("uncertainty_management", 16),  // 16-17: Formal Proof → Model Check
-    ("final_answer_emission", 8),    // 8-9: Deep Dive Analysis
+    ("problem_setup", 56),          // 56-57: Trace/Meta analytical → generative
+    ("plan_generation", 48),        // 48-49: Pattern Match → Refactor
+    ("fact_retrieval", 40),         // 40-41: Unit Test → Integration
+    ("active_computation", 32),     // 32-33: Syntax Check → Quick Fix
+    ("result_consolidation", 24),   // 24-25: Boundaries → Safety
+    ("uncertainty_management", 16), // 16-17: Formal Proof → Model Check
+    ("final_answer_emission", 8),   // 8-9: Deep Dive Analysis
     ("self_checking", 0),           // 0-1: Deep Debug → Guided Debug
 ];
 
@@ -616,24 +663,121 @@ pub const FUNCTION_TAG_BLOCKS: [(&str, usize); 8] = [
 /// — empty strings for missing stages.
 pub fn parse_mythos_reasoning(text: &str) -> [String; 9] {
     let markers: [(&[&str], usize); 9] = [
-        (&["acknowledg", "**acknowledg**", "## acknowledg", "scope:", "frame:"], 0),
-        (&["restatement", "**restatement**", "## restate", "rephrase:", "in other words"], 1),
-        (&["decompos", "**decompos**", "## decompos", "break down", "sub-problem", "subproblem"], 2),
-        (&["first-principle", "first principle", "**first-principle**", "## first-principle", "fundamental", "root cause"], 3),
-        (&["self-verif", "self verif", "**self-verif**", "## self-verif", "check my", "double-check"], 4),
-        (&["alternat", "**alternat**", "## alternat", "other approach", "different way"], 5),
-        (&["deep dive", "**deep dive**", "## deep dive", "detailed", "deep analysis"], 6),
-        (&["synthesis", "**synthesis**", "## synthesis", "integrat", "combine", "pull together"], 7),
-        (&["conclusion", "**conclusion**", "## conclusion", "summary:", "final:", "answer:"], 8),
+        (
+            &[
+                "acknowledg",
+                "**acknowledg**",
+                "## acknowledg",
+                "scope:",
+                "frame:",
+            ],
+            0,
+        ),
+        (
+            &[
+                "restatement",
+                "**restatement**",
+                "## restate",
+                "rephrase:",
+                "in other words",
+            ],
+            1,
+        ),
+        (
+            &[
+                "decompos",
+                "**decompos**",
+                "## decompos",
+                "break down",
+                "sub-problem",
+                "subproblem",
+            ],
+            2,
+        ),
+        (
+            &[
+                "first-principle",
+                "first principle",
+                "**first-principle**",
+                "## first-principle",
+                "fundamental",
+                "root cause",
+            ],
+            3,
+        ),
+        (
+            &[
+                "self-verif",
+                "self verif",
+                "**self-verif**",
+                "## self-verif",
+                "check my",
+                "double-check",
+            ],
+            4,
+        ),
+        (
+            &[
+                "alternat",
+                "**alternat**",
+                "## alternat",
+                "other approach",
+                "different way",
+            ],
+            5,
+        ),
+        (
+            &[
+                "deep dive",
+                "**deep dive**",
+                "## deep dive",
+                "detailed",
+                "deep analysis",
+            ],
+            6,
+        ),
+        (
+            &[
+                "synthesis",
+                "**synthesis**",
+                "## synthesis",
+                "integrat",
+                "combine",
+                "pull together",
+            ],
+            7,
+        ),
+        (
+            &[
+                "conclusion",
+                "**conclusion**",
+                "## conclusion",
+                "summary:",
+                "final:",
+                "answer:",
+            ],
+            8,
+        ),
     ];
 
-    let mut stages = [String::new(), String::new(), String::new(), String::new(),
-                      String::new(), String::new(), String::new(), String::new(), String::new()];
+    let mut stages = [
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+    ];
     let mut current = 9usize;
 
     for line in text.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
+        if trimmed.is_empty() {
+            continue;
+        }
         let low = trimmed.to_lowercase();
 
         let mut matched = false;
@@ -649,7 +793,9 @@ pub fn parse_mythos_reasoning(text: &str) -> [String; 9] {
                 break;
             }
         }
-        if matched { continue; }
+        if matched {
+            continue;
+        }
 
         if current < 9 {
             if stages[current].is_empty() {
@@ -670,42 +816,67 @@ pub fn parse_mythos_reasoning(text: &str) -> [String; 9] {
 pub fn parse_structured_reasoning(text: &str) -> [String; 4] {
     let goal_markers = ["goal:", "**goal:**", "## goal", "objective:", "aim:"];
     let reason_markers = ["reason:", "**reason:**", "## reason", "context:", "why:"];
-    let boundary_markers = ["boundar", "**boundar", "## boundar", "constraint:", "don't:", "avoid:"];
-    let verify_markers = ["verif:", "**verif:", "## verif", "verification:", "check:", "validation:", "test:"];
+    let boundary_markers = [
+        "boundar",
+        "**boundar",
+        "## boundar",
+        "constraint:",
+        "don't:",
+        "avoid:",
+    ];
+    let verify_markers = [
+        "verif:",
+        "**verif:",
+        "## verif",
+        "verification:",
+        "check:",
+        "validation:",
+        "test:",
+    ];
 
     let mut stages = [String::new(), String::new(), String::new(), String::new()];
     let mut current = 4usize;
 
     for line in text.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() { continue; }
+        if trimmed.is_empty() {
+            continue;
+        }
         let low = trimmed.to_lowercase();
 
         if goal_markers.iter().any(|m| low.starts_with(m)) {
             current = 0;
             if let Some(content) = trimmed.split(':').nth(1).map(|s| s.trim()) {
-                if !content.is_empty() { stages[0].push_str(content); }
+                if !content.is_empty() {
+                    stages[0].push_str(content);
+                }
             }
             continue;
         }
         if reason_markers.iter().any(|m| low.starts_with(m)) {
             current = 1;
             if let Some(content) = trimmed.split(':').nth(1).map(|s| s.trim()) {
-                if !content.is_empty() { stages[1].push_str(content); }
+                if !content.is_empty() {
+                    stages[1].push_str(content);
+                }
             }
             continue;
         }
         if boundary_markers.iter().any(|m| low.starts_with(m)) {
             current = 2;
             if let Some(content) = trimmed.split(':').nth(1).map(|s| s.trim()) {
-                if !content.is_empty() { stages[2].push_str(content); }
+                if !content.is_empty() {
+                    stages[2].push_str(content);
+                }
             }
             continue;
         }
         if verify_markers.iter().any(|m| low.starts_with(m)) {
             current = 3;
             if let Some(content) = trimmed.split(':').nth(1).map(|s| s.trim()) {
-                if !content.is_empty() { stages[3].push_str(content); }
+                if !content.is_empty() {
+                    stages[3].push_str(content);
+                }
             }
             continue;
         }
@@ -726,41 +897,104 @@ pub fn parse_structured_reasoning(text: &str) -> [String; 4] {
 pub fn estimate_e8_from_mythos(stages: &[String; 9]) -> Vec<u8> {
     const MYTHOS_KEYWORDS: [[&[&str]; 8]; 9] = [
         // Block 56-63 (Acknowledgment): scope/intent
-        [&["system", "overview"], &["scope", "range"], &["intent", "purpose"],
-         &["boundary", "limit"], &["stakeholder", "actor"], &["context", "background"],
-         &["problem", "issue"], &["question", "query"]],
+        [
+            &["system", "overview"],
+            &["scope", "range"],
+            &["intent", "purpose"],
+            &["boundary", "limit"],
+            &["stakeholder", "actor"],
+            &["context", "background"],
+            &["problem", "issue"],
+            &["question", "query"],
+        ],
         // Block 48-55 (Restatement): rephrase
-        [&["rephrase", "restate"], &["simplify", "condense"], &["clarify", "elaborate"],
-         &["paraphrase", "rewrite"], &["translate", "convert"], &["extract", "distill"],
-         &["identify", "highlight"], &["define", "specify"]],
+        [
+            &["rephrase", "restate"],
+            &["simplify", "condense"],
+            &["clarify", "elaborate"],
+            &["paraphrase", "rewrite"],
+            &["translate", "convert"],
+            &["extract", "distill"],
+            &["identify", "highlight"],
+            &["define", "specify"],
+        ],
         // Block 40-47 (Decomposition): sub-problems
-        [&["decompose", "break"], &["sub-problem", "subproblem"], &["component", "module"],
-         &["dependency", "depends"], &["hierarchy", "nested"], &["layer", "tier"],
-         &["step", "phase"], &["separate", "isolate"]],
+        [
+            &["decompose", "break"],
+            &["sub-problem", "subproblem"],
+            &["component", "module"],
+            &["dependency", "depends"],
+            &["hierarchy", "nested"],
+            &["layer", "tier"],
+            &["step", "phase"],
+            &["separate", "isolate"],
+        ],
         // Block 32-39 (First-Principles): fundamental
-        [&["fundamental", "first"], &["principle", "axiom", "law"], &["reason", "cause"],
-         &["root", "origin"], &["essence", "core"], &["invariant", "immutable"],
-         &["derive", "deduce"], &["assumption", "premise"]],
+        [
+            &["fundamental", "first"],
+            &["principle", "axiom", "law"],
+            &["reason", "cause"],
+            &["root", "origin"],
+            &["essence", "core"],
+            &["invariant", "immutable"],
+            &["derive", "deduce"],
+            &["assumption", "premise"],
+        ],
         // Block 24-31 (Self-Verification): check
-        [&["verify", "check"], &["confirm", "ensure"], &["validate", "prove"],
-         &["review", "audit"], &["test", "assert"], &["trace", "walk through"],
-         &["gap", "missing"], &["consist", "coherent"]],
+        [
+            &["verify", "check"],
+            &["confirm", "ensure"],
+            &["validate", "prove"],
+            &["review", "audit"],
+            &["test", "assert"],
+            &["trace", "walk through"],
+            &["gap", "missing"],
+            &["consist", "coherent"],
+        ],
         // Block 16-23 (Alternative): alternate
-        [&["alternative", "alternate"], &["option", "choice"], &["trade-off", "tradeoff"],
-         &["compare", "contrast"], &["pros", "cons"], &["scenario", "what if"],
-         &["fallback", "backup"], &["plan b", "second"]],
+        [
+            &["alternative", "alternate"],
+            &["option", "choice"],
+            &["trade-off", "tradeoff"],
+            &["compare", "contrast"],
+            &["pros", "cons"],
+            &["scenario", "what if"],
+            &["fallback", "backup"],
+            &["plan b", "second"],
+        ],
         // Block 8-15 (Deep Dive): detailed
-        [&["detail", "depth"], &["analyze", "examine"], &["explore", "investigate"],
-         &["compute", "calculate"], &["evidence", "data"], &["example", "instance"],
-         &["mechanism", "how"], &["trace", "timeline"]],
+        [
+            &["detail", "depth"],
+            &["analyze", "examine"],
+            &["explore", "investigate"],
+            &["compute", "calculate"],
+            &["evidence", "data"],
+            &["example", "instance"],
+            &["mechanism", "how"],
+            &["trace", "timeline"],
+        ],
         // Block 0-7 (Synthesis): integrate
-        [&["synthesize", "integrate"], &["combine", "merge"], &["summary", "overview"],
-         &["pattern", "theme"], &["insight", "finding"], &["conclude", "infer"],
-         &["framework", "model"], &["map", "bridge"]],
+        [
+            &["synthesize", "integrate"],
+            &["combine", "merge"],
+            &["summary", "overview"],
+            &["pattern", "theme"],
+            &["insight", "finding"],
+            &["conclude", "infer"],
+            &["framework", "model"],
+            &["map", "bridge"],
+        ],
         // Block 4-11 (Conclusion): final answer (uses blocks 4-11, accessible via offset wrapping)
-        [&["answer", "result"], &["final", "conclusion"], &["recommend", "suggest"],
-         &["next step", "follow up"], &["action", "decision"], &["outcome", "output"],
-         &["implication", "impact"], &["summary", "tl;dr"]],
+        [
+            &["answer", "result"],
+            &["final", "conclusion"],
+            &["recommend", "suggest"],
+            &["next step", "follow up"],
+            &["action", "decision"],
+            &["outcome", "output"],
+            &["implication", "impact"],
+            &["summary", "tl;dr"],
+        ],
     ];
 
     let blocks: [usize; 9] = [56, 48, 40, 32, 24, 16, 8, 0, 4];
@@ -802,7 +1036,11 @@ pub fn function_tags_to_e8(tags: &[&str]) -> Vec<u8> {
         let mut found = false;
         for &(known, block) in &FUNCTION_TAG_BLOCKS {
             if tag == known {
-                let offset = if tag.contains("generation") || tag.contains("emission") { 1 } else { 0 };
+                let offset = if tag.contains("generation") || tag.contains("emission") {
+                    1
+                } else {
+                    0
+                };
                 seq.push((block as u8 + offset).min(63));
                 found = true;
                 break;
@@ -818,38 +1056,46 @@ pub fn function_tags_to_e8(tags: &[&str]) -> Vec<u8> {
 /// Map 4-stage structured reasoning to E8 hexagram sequence (legacy).
 pub fn estimate_e8_from_structured(stages: &[String; 4]) -> Vec<u8> {
     const E8_KEYWORDS: [[&[&str]; 8]; 4] = [
-        [&["system design", "architecture", "overview"],
-         &["reduce", "eliminate", "fix"],
-         &["create", "build", "implement"],
-         &["design", "plan", "blueprint"],
-         &["optimize", "improve", "enhance"],
-         &["understand", "analyze", "investigate"],
-         &["integrate", "connect", "bridge"],
-         &["migrate", "upgrade", "transform"]],
-        [&["pattern", "template", "recurring"],
-         &["generate", "create", "produce"],
-         &["analyze", "examine", "study"],
-         &["reason", "why", "because"],
-         &["compare", "contrast", "evaluate"],
-         &["principle", "fundamental", "theory"],
-         &["context", "background", "motivation"],
-         &["trade-off", "balance", "cost"]],
-        [&["constraint", "limit", "boundary"],
-         &["avoid", "don't", "never"],
-         &["assume", "presume", "given"],
-         &["scope", "range", "coverage"],
-         &["safety", "secure", "protect"],
-         &["privacy", "confidential", "permission"],
-         &["resource", "memory", "time"],
-         &["compatible", "support", "platform"]],
-        [&["test", "verify", "check"],
-         &["validate", "confirm", "ensure"],
-         &["benchmark", "measure", "metric"],
-         &["review", "audit", "inspect"],
-         &["coverage", "complete", "exhaustive"],
-         &["correct", "accuracy", "precision"],
-         &["monitor", "observe", "track"],
-         &["regression", "stability", "consistent"]],
+        [
+            &["system design", "architecture", "overview"],
+            &["reduce", "eliminate", "fix"],
+            &["create", "build", "implement"],
+            &["design", "plan", "blueprint"],
+            &["optimize", "improve", "enhance"],
+            &["understand", "analyze", "investigate"],
+            &["integrate", "connect", "bridge"],
+            &["migrate", "upgrade", "transform"],
+        ],
+        [
+            &["pattern", "template", "recurring"],
+            &["generate", "create", "produce"],
+            &["analyze", "examine", "study"],
+            &["reason", "why", "because"],
+            &["compare", "contrast", "evaluate"],
+            &["principle", "fundamental", "theory"],
+            &["context", "background", "motivation"],
+            &["trade-off", "balance", "cost"],
+        ],
+        [
+            &["constraint", "limit", "boundary"],
+            &["avoid", "don't", "never"],
+            &["assume", "presume", "given"],
+            &["scope", "range", "coverage"],
+            &["safety", "secure", "protect"],
+            &["privacy", "confidential", "permission"],
+            &["resource", "memory", "time"],
+            &["compatible", "support", "platform"],
+        ],
+        [
+            &["test", "verify", "check"],
+            &["validate", "confirm", "ensure"],
+            &["benchmark", "measure", "metric"],
+            &["review", "audit", "inspect"],
+            &["coverage", "complete", "exhaustive"],
+            &["correct", "accuracy", "precision"],
+            &["monitor", "observe", "track"],
+            &["regression", "stability", "consistent"],
+        ],
     ];
 
     let blocks: [usize; 4] = [56, 48, 24, 40];
@@ -1063,7 +1309,9 @@ impl E8TransitionMatrix {
                 freed += raw[t] - cap;
             }
         }
-        let uncapped_raw_sum: f64 = raw.iter().zip(clamped.iter())
+        let uncapped_raw_sum: f64 = raw
+            .iter()
+            .zip(clamped.iter())
             .filter(|(r, c)| r <= c)
             .map(|(r, _)| r)
             .sum();
@@ -1125,7 +1373,9 @@ impl E8TransitionMatrix {
         let fi = from.min(63) as usize;
         let ti = to.min(63) as usize;
         let total = self.row_totals.0[fi];
-        if total == 0 { return 1.0 / 64.0; }
+        if total == 0 {
+            return 1.0 / 64.0;
+        }
         self.counts.get(fi, ti) as f64 / total as f64
     }
 
@@ -1149,14 +1399,21 @@ impl E8TransitionMatrix {
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((from, 0.0));
 
-        let confidence = if total > 0 { best.1 / total as f64 } else { 0.0 };
+        let confidence = if total > 0 {
+            best.1 / total as f64
+        } else {
+            0.0
+        };
 
         if let Some(block) = target_block {
             let block_end = (block as usize + 8).min(64);
             let block_probs: Vec<(usize, f64)> = (block as usize..block_end)
                 .map(|t| (t, self.counts.get(fi, t) as f64 / total as f64))
                 .collect();
-            if let Some(&(best_block_idx, _)) = block_probs.iter().max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)) {
+            if let Some(&(best_block_idx, _)) = block_probs
+                .iter()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            {
                 let blended = (best.0 as f64 * 0.7 + best_block_idx as f64 * 0.3).round() as u8;
                 return (blended.min(63), confidence.max(0.3));
             }
@@ -1167,7 +1424,9 @@ impl E8TransitionMatrix {
 
     /// Detect oscillation patterns in recent transitions.
     pub fn detect_oscillation(&self, period: usize) -> Option<usize> {
-        if self.recent_transitions.len() < period * 2 { return None; }
+        if self.recent_transitions.len() < period * 2 {
+            return None;
+        }
         let recent: Vec<u8> = self.recent_transitions.iter().map(|(_, t)| *t).collect();
         let start = recent.len() - period * 2;
         if recent[start..start + period] == recent[start + period..start + period * 2] {
@@ -1182,7 +1441,9 @@ impl E8TransitionMatrix {
         let total_visits: u64 = self.visit_counts.0.iter().sum();
         if total_visits == 0 {
             let mut uniform = [0.0; 64];
-            for v in &mut uniform { *v = 1.0 / 64.0; }
+            for v in &mut uniform {
+                *v = 1.0 / 64.0;
+            }
             return uniform;
         }
         let mut dist = [0.0f64; 64];
@@ -1266,7 +1527,9 @@ impl E8TransitionMatrix {
         for i in 0..64 {
             let ri = self.row_totals.0[i];
             if ri == 0 {
-                for j in 0..64 { mat[i][j] = 1.0 / 64.0; }
+                for j in 0..64 {
+                    mat[i][j] = 1.0 / 64.0;
+                }
             } else {
                 for j in 0..64 {
                     mat[i][j] = self.counts.get(i, j) as f64 / ri as f64;
@@ -1361,7 +1624,12 @@ mod tests {
         assert_eq!(roots.len(), 240);
         // All E₈ roots have norm² = 2
         for root in &roots {
-            assert!((root.norm_sq() - 2.0).abs() < 1e-10, "E8 root {:?} has norm² != 2 (norm²={})", root, root.norm_sq());
+            assert!(
+                (root.norm_sq() - 2.0).abs() < 1e-10,
+                "E8 root {:?} has norm² != 2 (norm²={})",
+                root,
+                root.norm_sq()
+            );
         }
     }
 
@@ -1386,7 +1654,10 @@ mod tests {
     #[test]
     fn test_three_generations() {
         assert!(verify_three_generations());
-        assert_eq!(FERMION_GENERATIONS * FERMIONS_PER_GENERATION, TOTAL_SM_FERMIONS);
+        assert_eq!(
+            FERMION_GENERATIONS * FERMIONS_PER_GENERATION,
+            TOTAL_SM_FERMIONS
+        );
         assert_eq!(E8_DIM - TOTAL_SM_FERMIONS, REMAINING_E8_GENERATORS);
     }
 
@@ -1491,7 +1762,11 @@ mod tests {
         let mut unique = roots.clone();
         unique.sort();
         unique.dedup();
-        assert_eq!(unique.len(), 8, "All 8 trigrams must map to distinct SU(3) roots");
+        assert_eq!(
+            unique.len(),
+            8,
+            "All 8 trigrams must map to distinct SU(3) roots"
+        );
     }
 
     #[test]
@@ -1571,11 +1846,17 @@ mod tests {
         // routing mass (columns must be balanced, not just rows).
         for i in 0..64 {
             let row_sum: f64 = proj_mat[i].iter().sum();
-            assert!((row_sum - 1.0).abs() < 1e-3, "Proj row {i} sum = {row_sum:.4}");
+            assert!(
+                (row_sum - 1.0).abs() < 1e-3,
+                "Proj row {i} sum = {row_sum:.4}"
+            );
         }
         for j in 0..64 {
             let col_sum: f64 = (0..64).map(|i| proj_mat[i][j]).sum();
-            assert!((col_sum - 1.0).abs() < 1e-3, "Proj column {j} sum = {col_sum:.4}");
+            assert!(
+                (col_sum - 1.0).abs() < 1e-3,
+                "Proj column {j} sum = {col_sum:.4}"
+            );
         }
 
         // Anti-monopolization: the projection must REDUCE the peak column
@@ -1587,7 +1868,9 @@ mod tests {
                 if total_col == 0 {
                     0.0
                 } else {
-                    (0..64).map(|i| tm.counts.get(i, j) as f64 / total_col as f64).fold(0.0, f64::max)
+                    (0..64)
+                        .map(|i| tm.counts.get(i, j) as f64 / total_col as f64)
+                        .fold(0.0, f64::max)
                 }
             })
             .fold(0.0, f64::max);

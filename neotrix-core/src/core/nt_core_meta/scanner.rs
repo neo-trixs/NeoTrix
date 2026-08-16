@@ -1,5 +1,7 @@
+use super::self_model::{
+    CompilationHealth, ComponentMap, ComponentNode, DepGraph, FileInfo, ModuleInfo, SelfModel,
+};
 use std::path::Path;
-use super::self_model::{ModuleInfo, FileInfo, SelfModel, DepGraph, ComponentMap, ComponentNode, CompilationHealth};
 
 static SKIP_DIRS: &[&str] = &["target", ".git", "node_modules", ".fingerprint", "build"];
 
@@ -10,7 +12,9 @@ pub struct CodeScanner {
 
 impl CodeScanner {
     pub fn new(project_root: &str) -> Self {
-        Self { project_root: project_root.to_string() }
+        Self {
+            project_root: project_root.to_string(),
+        }
     }
 
     pub fn scan(&self) -> SelfModel {
@@ -39,9 +43,15 @@ impl CodeScanner {
     fn source_roots(&self) -> Vec<std::path::PathBuf> {
         let mut roots = Vec::new();
         let direct = Path::new(&self.project_root).join("src");
-        if direct.exists() { roots.push(direct); }
-        let alt = Path::new(&self.project_root).join("neotrix-core").join("src");
-        if alt.exists() { roots.push(alt); }
+        if direct.exists() {
+            roots.push(direct);
+        }
+        let alt = Path::new(&self.project_root)
+            .join("neotrix-core")
+            .join("src");
+        if alt.exists() {
+            roots.push(alt);
+        }
         roots
     }
 
@@ -61,7 +71,8 @@ impl CodeScanner {
             for entry in entries.flatten() {
                 let fpath = entry.path();
                 if fpath.is_dir() {
-                    let name = fpath.file_name()
+                    let name = fpath
+                        .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
                     if SKIP_DIRS.contains(&name.as_str()) || name.starts_with('.') {
@@ -74,7 +85,8 @@ impl CodeScanner {
     }
 
     fn module_name(rel_path: &Path) -> String {
-        let components: Vec<String> = rel_path.components()
+        let components: Vec<String> = rel_path
+            .components()
             .map(|c| c.as_os_str().to_string_lossy().to_string())
             .collect();
         components.join("::")
@@ -103,7 +115,8 @@ impl CodeScanner {
                         total_lines += line_count;
                         unsafe_count += content.matches("unsafe").count();
                         unwrap_count += content.matches(".unwrap()").count();
-                        todo_count += content.matches("TODO").count() + content.matches("todo!").count();
+                        todo_count +=
+                            content.matches("TODO").count() + content.matches("todo!").count();
                         public_api_count += content.matches("pub fn").count();
                         if content.contains("#[cfg(test)]") || content.contains("#[test]") {
                             has_tests = true;
@@ -131,20 +144,25 @@ impl CodeScanner {
 
     pub fn scan_single_module(&self, name: &str) -> Option<ModuleInfo> {
         let modules = self.scan_modules();
-        modules.into_iter().find(|m| m.name == name)
-            .or_else(|| {
-                let path = self.module_path(name);
-                if path.exists() {
-                    let root = if Path::new(&self.project_root).join("src").join(name).exists() {
-                        Path::new(&self.project_root).join("src")
-                    } else {
-                        Path::new(&self.project_root).join("neotrix-core").join("src")
-                    };
-                    self.build_module_info_from_dir(&path, &root)
+        modules.into_iter().find(|m| m.name == name).or_else(|| {
+            let path = self.module_path(name);
+            if path.exists() {
+                let root = if Path::new(&self.project_root)
+                    .join("src")
+                    .join(name)
+                    .exists()
+                {
+                    Path::new(&self.project_root).join("src")
                 } else {
-                    None
-                }
-            })
+                    Path::new(&self.project_root)
+                        .join("neotrix-core")
+                        .join("src")
+                };
+                self.build_module_info_from_dir(&path, &root)
+            } else {
+                None
+            }
+        })
     }
 
     fn module_path(&self, name: &str) -> std::path::PathBuf {
@@ -153,7 +171,9 @@ impl CodeScanner {
             return direct;
         }
         let alt = Path::new(&self.project_root)
-            .join("neotrix-core").join("src").join(name);
+            .join("neotrix-core")
+            .join("src")
+            .join(name);
         if alt.exists() {
             return alt;
         }
@@ -166,7 +186,8 @@ impl CodeScanner {
             for entry in entries.flatten() {
                 let fpath = entry.path();
                 if fpath.is_dir() {
-                    let name = fpath.file_name()
+                    let name = fpath
+                        .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
                     if SKIP_DIRS.contains(&name.as_str()) || name.starts_with('.') {
@@ -180,7 +201,8 @@ impl CodeScanner {
                             path: path_str.clone(),
                             module: self.guess_module(&path_str),
                             lines: content.lines().count(),
-                            is_test_file: path_str.ends_with("_test.rs") || path_str.ends_with("tests.rs"),
+                            is_test_file: path_str.ends_with("_test.rs")
+                                || path_str.ends_with("tests.rs"),
                             has_unsafe: content.contains("unsafe"),
                             has_todos: content.contains("TODO") || content.contains("todo!"),
                             pub_fns: content.matches("pub fn").count(),
@@ -210,14 +232,18 @@ impl CodeScanner {
         let mut edges = Vec::new();
         for module in modules {
             let path = Path::new(&module.path);
-            if !path.exists() { continue; }
+            if !path.exists() {
+                continue;
+            }
             if let Ok(entries) = std::fs::read_dir(path) {
                 for entry in entries.flatten() {
                     let fpath = entry.path();
                     if fpath.extension().map(|e| e == "rs").unwrap_or(false) {
                         if let Ok(content) = std::fs::read_to_string(&fpath) {
                             for target in modules {
-                                if target.name == module.name { continue; }
+                                if target.name == module.name {
+                                    continue;
+                                }
                                 let crate_pattern = format!("use crate::{}", target.name);
                                 if content.contains(&crate_pattern) {
                                     edges.push(DepEdge {
@@ -236,25 +262,31 @@ impl CodeScanner {
     }
 
     fn build_component_map(&self, modules: &[ModuleInfo]) -> ComponentMap {
-        let nodes: Vec<ComponentNode> = modules.iter().map(|module| {
-            let top = module.name.split("::").next().unwrap_or("");
-            let layer = match top {
-                "core" => 1,
-                "nt_mind" | "neotrix" => 2,
-                "agent" => 3,
-                "security" | "sandbox" | "orchestrator" | "background_loop" => 4,
-                _ => 5,
-            };
-            ComponentNode {
-                name: module.name.clone(),
-                path: module.path.clone(),
-                layer,
-                file_count: module.file_count,
-                lines: module.total_lines,
-                description: module.description.clone(),
-            }
-        }).collect();
-        ComponentMap { nodes, edges: Vec::new() }
+        let nodes: Vec<ComponentNode> = modules
+            .iter()
+            .map(|module| {
+                let top = module.name.split("::").next().unwrap_or("");
+                let layer = match top {
+                    "core" => 1,
+                    "nt_mind" | "neotrix" => 2,
+                    "agent" => 3,
+                    "security" | "sandbox" | "orchestrator" | "background_loop" => 4,
+                    _ => 5,
+                };
+                ComponentNode {
+                    name: module.name.clone(),
+                    path: module.path.clone(),
+                    layer,
+                    file_count: module.file_count,
+                    lines: module.total_lines,
+                    description: module.description.clone(),
+                }
+            })
+            .collect();
+        ComponentMap {
+            nodes,
+            edges: Vec::new(),
+        }
     }
 }
 
@@ -270,7 +302,9 @@ impl crate::core::nt_core_self_test::SelfTest for CodeScanner {
         let model = self.scan();
         let self_found = model.modules.iter().any(|m| m.name.contains("scanner"));
         if !self_found {
-            failures.push("CodeScanner: scanner module not found in its own scan (self-referential)".into());
+            failures.push(
+                "CodeScanner: scanner module not found in its own scan (self-referential)".into(),
+            );
         }
 
         // Must find core modules
@@ -284,7 +318,11 @@ impl crate::core::nt_core_self_test::SelfTest for CodeScanner {
             failures.push("CodeScanner: dependency graph empty despite having modules".into());
         }
 
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -295,8 +333,14 @@ mod tests {
     #[test]
     fn test_scanner_guess_module() {
         let scanner = CodeScanner::new("/test");
-        assert_eq!(scanner.guess_module("/project/src/core/capability.rs"), "core");
-        assert_eq!(scanner.guess_module("/project/src/agent/sub_agent.rs"), "agent");
+        assert_eq!(
+            scanner.guess_module("/project/src/core/capability.rs"),
+            "core"
+        );
+        assert_eq!(
+            scanner.guess_module("/project/src/agent/sub_agent.rs"),
+            "agent"
+        );
     }
 
     #[test]
@@ -304,14 +348,30 @@ mod tests {
         let scanner = CodeScanner::new("/test");
         let modules = vec![
             ModuleInfo {
-                name: "core".into(), path: "".into(), file_count: 10, total_lines: 1000,
-                test_count: 20, has_tests: true, unsafe_count: 0, unwrap_count: 0,
-                todo_count: 0, public_api_count: 30, description: "".into(),
+                name: "core".into(),
+                path: "".into(),
+                file_count: 10,
+                total_lines: 1000,
+                test_count: 20,
+                has_tests: true,
+                unsafe_count: 0,
+                unwrap_count: 0,
+                todo_count: 0,
+                public_api_count: 30,
+                description: "".into(),
             },
             ModuleInfo {
-                name: "agent".into(), path: "".into(), file_count: 5, total_lines: 500,
-                test_count: 10, has_tests: true, unsafe_count: 0, unwrap_count: 0,
-                todo_count: 0, public_api_count: 15, description: "".into(),
+                name: "agent".into(),
+                path: "".into(),
+                file_count: 5,
+                total_lines: 500,
+                test_count: 10,
+                has_tests: true,
+                unsafe_count: 0,
+                unwrap_count: 0,
+                todo_count: 0,
+                public_api_count: 15,
+                description: "".into(),
             },
         ];
         let map = scanner.build_component_map(&modules);
@@ -339,8 +399,11 @@ mod tests {
 
     #[test]
     fn test_dynamic_discovery_no_crash() {
-        let scanner = CodeScanner::new(&std::env::current_dir().expect("value should be ok in test")
-            .to_string_lossy());
+        let scanner = CodeScanner::new(
+            &std::env::current_dir()
+                .expect("value should be ok in test")
+                .to_string_lossy(),
+        );
         let modules = scanner.scan_modules();
         assert!(!modules.is_empty());
     }

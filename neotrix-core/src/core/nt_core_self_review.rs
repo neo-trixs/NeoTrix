@@ -124,17 +124,29 @@ pub enum ArchLayer {
 impl ArchLayer {
     pub fn from_path(path: &Path) -> Self {
         let p = path.to_string_lossy();
-        if p.contains("l0_core") || p.contains("/core/") { Self::L0Core }
-        else if p.contains("l1_body") || p.contains("l1_act") { Self::L1Act }
-        else if p.contains("l2_world") { Self::L2World }
-        else if p.contains("l3_memory") { Self::L3Memory }
-        else if p.contains("l4_cognition") { Self::L4Cognition }
-        else if p.contains("l5_prm") || p.contains("nt_core_prm") { Self::L5Prm }
-        else if p.contains("l6_self") || p.contains("l6_autonomic") { Self::L6Self }
-        else if p.contains("l7_capability") { Self::L7Capability }
-        else if p.contains("l8_autonomic") || p.contains("l8_seal") { Self::L8Seal }
-        else if p.contains("l9_transcendent") { Self::L9Transcendent }
-        else { Self::Unknown }
+        if p.contains("l0_core") || p.contains("/core/") {
+            Self::L0Core
+        } else if p.contains("l1_body") || p.contains("l1_act") {
+            Self::L1Act
+        } else if p.contains("l2_world") {
+            Self::L2World
+        } else if p.contains("l3_memory") {
+            Self::L3Memory
+        } else if p.contains("l4_cognition") {
+            Self::L4Cognition
+        } else if p.contains("l5_prm") || p.contains("nt_core_prm") {
+            Self::L5Prm
+        } else if p.contains("l6_self") || p.contains("l6_autonomic") {
+            Self::L6Self
+        } else if p.contains("l7_capability") {
+            Self::L7Capability
+        } else if p.contains("l8_autonomic") || p.contains("l8_seal") {
+            Self::L8Seal
+        } else if p.contains("l9_transcendent") {
+            Self::L9Transcendent
+        } else {
+            Self::Unknown
+        }
     }
 
     pub fn layer_index(&self) -> i32 {
@@ -233,7 +245,9 @@ impl Default for SelfReviewGate {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for SelfReviewGate {
-    fn name(&self) -> &str { "self_review_gate" }
+    fn name(&self) -> &str {
+        "self_review_gate"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         if self.config.min_test_line_count < 1 {
@@ -242,7 +256,11 @@ impl crate::core::nt_core_self_test::SelfTest for SelfReviewGate {
         if self.config.scan_safety_bound < 1 {
             failures.push("self_review_gate: scan_safety_bound must be >= 1".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -270,7 +288,15 @@ impl SelfReviewGate {
         }
     }
 
-    pub fn check(&mut self, condition: bool, severity: Severity, category: impl Into<String>, message: String, file: impl Into<String>, line: u32) {
+    pub fn check(
+        &mut self,
+        condition: bool,
+        severity: Severity,
+        category: impl Into<String>,
+        message: String,
+        file: impl Into<String>,
+        line: u32,
+    ) {
         if !condition {
             self.findings.push(ReviewFinding {
                 severity,
@@ -293,7 +319,12 @@ impl SelfReviewGate {
             }
         }
         let passed = self.findings.len().saturating_sub(failed + warnings);
-        SelfReviewReport { findings: self.findings.clone(), passed, failed, warnings }
+        SelfReviewReport {
+            findings: self.findings.clone(),
+            passed,
+            failed,
+            warnings,
+        }
     }
 
     /// Compute blast-radius from current findings.
@@ -304,10 +335,15 @@ impl SelfReviewGate {
         affected.sort();
         affected.dedup();
         let affected_files = affected.len();
-        let module_crossings = self.findings.iter()
+        let module_crossings = self
+            .findings
+            .iter()
             .filter(|f| f.category == "layer_violation" || f.category == "cross_file_impact")
             .count();
-        let risk = if self.findings.iter().any(|f| f.severity == Severity::Error && (f.category == "panic_audit" || f.category == "layer_violation")) {
+        let risk = if self.findings.iter().any(|f| {
+            f.severity == Severity::Error
+                && (f.category == "panic_audit" || f.category == "layer_violation")
+        }) {
             BlastRisk::Critical
         } else if self.findings.len() > 10 {
             BlastRisk::High
@@ -377,8 +413,24 @@ impl SelfReviewGate {
 
     fn check_no_unwrap_in_production(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let unwrap_count = scan_for_patterns("", &[PatternConfig { name: "unwrap".into(), pattern: regex::escape(".unwrap(") }], Some(&src_dir)).len();
-        let expect_count = scan_for_patterns("", &[PatternConfig { name: "expect".into(), pattern: regex::escape(".expect(") }], Some(&src_dir)).len();
+        let unwrap_count = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "unwrap".into(),
+                pattern: regex::escape(".unwrap("),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let expect_count = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "expect".into(),
+                pattern: regex::escape(".expect("),
+            }],
+            Some(&src_dir),
+        )
+        .len();
         let msg = format!(
             "PA001-PA002: {} .unwrap() and {} .expect() calls in src/ (excludes #[cfg(test)])",
             unwrap_count, expect_count
@@ -413,7 +465,15 @@ impl SelfReviewGate {
 
     fn check_no_dead_code_without_allow(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let allow_dead = scan_for_patterns("", &[PatternConfig { name: "allow_dead_code".into(), pattern: regex::escape("#[allow(dead_code)]") }], Some(&src_dir)).len();
+        let allow_dead = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "allow_dead_code".into(),
+                pattern: regex::escape("#[allow(dead_code)]"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
         let msg = format!(
             "Found {} #[allow(dead_code)] annotations in src/ (potential dead code)",
             allow_dead
@@ -430,15 +490,43 @@ impl SelfReviewGate {
 
     fn check_public_api_has_docs(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let pub_fn = scan_for_patterns("", &[PatternConfig { name: "pub_fn".into(), pattern: regex::escape("pub fn ") }], Some(&src_dir)).len();
-        let pub_struct = scan_for_patterns("", &[PatternConfig { name: "pub_struct".into(), pattern: regex::escape("pub struct ") }], Some(&src_dir)).len();
-        let doc_lines = scan_for_patterns("", &[PatternConfig { name: "doc_comment".into(), pattern: regex::escape("///") }], Some(&src_dir)).len();
+        let pub_fn = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "pub_fn".into(),
+                pattern: regex::escape("pub fn "),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let pub_struct = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "pub_struct".into(),
+                pattern: regex::escape("pub struct "),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let doc_lines = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "doc_comment".into(),
+                pattern: regex::escape("///"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
         let msg = format!(
             "{} pub fn, {} pub struct, {} doc comments — doc ratio: {:.1}%",
             pub_fn,
             pub_struct,
             doc_lines,
-            if pub_fn + pub_struct > 0 { doc_lines as f64 / (pub_fn + pub_struct) as f64 * 100.0 } else { 0.0 }
+            if pub_fn + pub_struct > 0 {
+                doc_lines as f64 / (pub_fn + pub_struct) as f64 * 100.0
+            } else {
+                0.0
+            }
         );
         self.check(
             doc_lines >= (pub_fn + pub_struct) / 2,
@@ -452,11 +540,16 @@ impl SelfReviewGate {
 
     fn check_no_empty_match_arms(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let empty_match = scan_for_patterns("", &[PatternConfig { name: "empty_match".into(), pattern: regex::escape(" => {},") }], Some(&src_dir)).len();
-        let msg = format!(
-            "Found {} empty match arms ( => {{}},) in src/",
-            empty_match
-        );
+        let empty_match = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "empty_match".into(),
+                pattern: regex::escape(" => {},"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let msg = format!("Found {} empty match arms ( => {{}},) in src/", empty_match);
         self.check(
             empty_match < self.config.empty_match_max,
             Severity::Warning,
@@ -500,7 +593,8 @@ impl SelfReviewGate {
             raw_idx, get_calls
         );
         self.check(
-            raw_idx < get_calls * self.config.index_multiplier || raw_idx < self.config.index_absolute,
+            raw_idx < get_calls * self.config.index_multiplier
+                || raw_idx < self.config.index_absolute,
             Severity::Info,
             "indexing_panic",
             msg,
@@ -567,11 +661,21 @@ impl SelfReviewGate {
 
     /// Layer violation check — verifies core/ does not import from neotrix/.
     fn check_layer_violations(&mut self) {
-        let core_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("core");
+        let core_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("core");
         if !core_dir.exists() {
             return;
         }
-        let violation_count = scan_for_patterns("", &[PatternConfig { name: "layer_violation".into(), pattern: regex::escape("use crate::neotrix") }], Some(&core_dir)).len();
+        let violation_count = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "layer_violation".into(),
+                pattern: regex::escape("use crate::neotrix"),
+            }],
+            Some(&core_dir),
+        )
+        .len();
         let msg = format!(
             "Layer violation: {} `use crate::neotrix` imports found in core/ (L0→L9 violation)",
             violation_count
@@ -594,9 +698,13 @@ impl SelfReviewGate {
         if let Ok(entries) = std::fs::read_dir(&src_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().is_none_or(|e| e != "rs") { continue; }
+                if path.extension().is_none_or(|e| e != "rs") {
+                    continue;
+                }
                 let source_layer = ArchLayer::from_path(&path);
-                if source_layer.layer_index() < 0 { continue; }
+                if source_layer.layer_index() < 0 {
+                    continue;
+                }
                 if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
                         if line.starts_with("use crate::") {
@@ -626,27 +734,43 @@ impl SelfReviewGate {
     }
 
     fn detect_import_layer(&self, line: &str) -> ArchLayer {
-        if line.contains("core::") || line.contains("::core::") { ArchLayer::L0Core }
-        else if line.contains("l1_body") || line.contains("::act::") { ArchLayer::L1Act }
-        else if line.contains("l2_world") || line.contains("::world::") { ArchLayer::L2World }
-        else if line.contains("l3_memory") || line.contains("::memory::") { ArchLayer::L3Memory }
-        else if line.contains("l4_cognition") || line.contains("::cognition::") { ArchLayer::L4Cognition }
-        else if line.contains("::prm::") || line.contains("nt_core_prm") { ArchLayer::L5Prm }
-        else if line.contains("l6_self") || line.contains("::self") || line.contains("::mind::") { ArchLayer::L6Self }
-        else if line.contains("l7_capability") || line.contains("::capability::") { ArchLayer::L7Capability }
-        else if line.contains("l8_autonomic") || line.contains("l8_seal") { ArchLayer::L8Seal }
-        else if line.contains("l9_transcendent") || line.contains("::transcendent::") { ArchLayer::L9Transcendent }
-        else { ArchLayer::Unknown }
+        if line.contains("core::") || line.contains("::core::") {
+            ArchLayer::L0Core
+        } else if line.contains("l1_body") || line.contains("::act::") {
+            ArchLayer::L1Act
+        } else if line.contains("l2_world") || line.contains("::world::") {
+            ArchLayer::L2World
+        } else if line.contains("l3_memory") || line.contains("::memory::") {
+            ArchLayer::L3Memory
+        } else if line.contains("l4_cognition") || line.contains("::cognition::") {
+            ArchLayer::L4Cognition
+        } else if line.contains("::prm::") || line.contains("nt_core_prm") {
+            ArchLayer::L5Prm
+        } else if line.contains("l6_self") || line.contains("::self") || line.contains("::mind::") {
+            ArchLayer::L6Self
+        } else if line.contains("l7_capability") || line.contains("::capability::") {
+            ArchLayer::L7Capability
+        } else if line.contains("l8_autonomic") || line.contains("l8_seal") {
+            ArchLayer::L8Seal
+        } else if line.contains("l9_transcendent") || line.contains("::transcendent::") {
+            ArchLayer::L9Transcendent
+        } else {
+            ArchLayer::Unknown
+        }
     }
 
     /// Observer feedback integration — consumes OneObserver quality/patterns from reasoning engine.
     /// If observer detects trajectory quality < 0.3 or critical patterns, flag as warning.
     fn check_observer_feedback(&mut self) {
         let observer_feedback = self.observer_quality;
-        let has_critical = self.observer_patterns.iter().any(|p| p.contains("oscillation") || p.contains("stuck"));
+        let has_critical = self
+            .observer_patterns
+            .iter()
+            .any(|p| p.contains("oscillation") || p.contains("stuck"));
         if let Some(q) = observer_feedback {
             let degraded = q < self.config.observer_quality_threshold;
-            let msg = format!(
+            let msg =
+                format!(
                 "Observer feedback: quality={:.2}, critical_patterns={} — reasoning trajectory {}",
                 q,
                 self.observer_patterns.len(),
@@ -654,7 +778,11 @@ impl SelfReviewGate {
             );
             self.check(
                 !degraded,
-                if degraded { Severity::Warning } else { Severity::Info },
+                if degraded {
+                    Severity::Warning
+                } else {
+                    Severity::Info
+                },
                 "observer_feedback",
                 msg,
                 file!(),
@@ -783,7 +911,15 @@ impl SelfReviewGate {
     /// Distilled from Cycle 24 fix: 7 LazyLock unwrap→expect in session.rs, fetcher.rs.
     fn check_init_safety(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let lazy_unwrap = scan_for_patterns("", &[PatternConfig { name: "lazy_lock_init".into(), pattern: regex::escape("LazyLock::new(||") }], Some(&src_dir)).len();
+        let lazy_unwrap = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "lazy_lock_init".into(),
+                pattern: regex::escape("LazyLock::new(||"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
         let unwrap_in_lazy = scan_for_pattern_in_lazy_init(&src_dir);
         let msg = format!(
             "Init safety: {} LazyLock inits, {} with unwrap/expect in closure — prefer expect() or fallback",
@@ -807,15 +943,24 @@ impl SelfReviewGate {
         if let Ok(entries) = std::fs::read_dir(&src_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_dir() || path.extension().is_none_or(|e| e != "rs") { continue; }
+                if path.is_dir() || path.extension().is_none_or(|e| e != "rs") {
+                    continue;
+                }
                 let content = match read_source_cached(&path) {
                     Ok(c) => c,
                     Err(_) => continue,
                 };
                 for line in content.lines() {
-                    if line.trim_start().starts_with("pub mod ") || line.trim_start().starts_with("mod ") {
-                        if let Some(name) = line.trim().strip_prefix("pub mod ").or_else(|| line.trim().strip_prefix("mod ")) {
-                            if let Some(end) = name.find(|c: char| !c.is_alphanumeric() && c != '_') {
+                    if line.trim_start().starts_with("pub mod ")
+                        || line.trim_start().starts_with("mod ")
+                    {
+                        if let Some(name) = line
+                            .trim()
+                            .strip_prefix("pub mod ")
+                            .or_else(|| line.trim().strip_prefix("mod "))
+                        {
+                            if let Some(end) = name.find(|c: char| !c.is_alphanumeric() && c != '_')
+                            {
                                 declared.push(name[..end].to_string());
                             }
                         }
@@ -827,7 +972,8 @@ impl SelfReviewGate {
         let mut all_files: Vec<String> = Vec::new();
         collect_rs_stems(&src_dir, &mut all_files);
         // Exclude lib.rs, main.rs, bin/ entries
-        let orphans: Vec<String> = all_files.into_iter()
+        let orphans: Vec<String> = all_files
+            .into_iter()
             .filter(|f| !declared.contains(f) && f != "lib" && f != "main")
             .collect();
         let msg = format!(
@@ -848,7 +994,15 @@ impl SelfReviewGate {
     /// (simple heuristic: count `use crate::` and `use std::` patterns not followed by usage).
     fn check_unused_imports(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let total_imports = scan_for_patterns("", &[PatternConfig { name: "use_statement".into(), pattern: regex::escape("use ") }], Some(&src_dir)).len();
+        let total_imports = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "use_statement".into(),
+                pattern: regex::escape("use "),
+            }],
+            Some(&src_dir),
+        )
+        .len();
         // Simple heuristic: detect "dead use" patterns where import is the only reference
         let unused_imports = scan_for_unused_import_patterns(&src_dir);
         let msg = format!(
@@ -870,8 +1024,12 @@ impl SelfReviewGate {
     /// PA016: Python bare except — scan scripts/ for `except:` without Exception type.
     /// This can mask KeyboardInterrupt, SystemExit, and other non-Exception errors.
     fn check_python_bare_except(&mut self) {
-        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("scripts");
-        if !scripts_dir.exists() { return; }
+        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("scripts");
+        if !scripts_dir.exists() {
+            return;
+        }
         let bare_except_count = scan_python_for_bare_except(&scripts_dir);
         let msg = format!(
             "PA016: {} bare `except:` clauses in scripts/ (should specify exception type)",
@@ -890,8 +1048,12 @@ impl SelfReviewGate {
     /// PA017: Python SQL injection — scan scripts/ for f-string patterns in SQL queries.
     /// True parametrized queries use `?` or `%s` placeholders, not `{value}`.
     fn check_python_sql_injection(&mut self) {
-        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("scripts");
-        if !scripts_dir.exists() { return; }
+        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("scripts");
+        if !scripts_dir.exists() {
+            return;
+        }
         let fstring_sql = scan_python_fstring_in_sql(&scripts_dir);
         let msg = format!(
             "PA017: {} f-string patterns in SQL statements in scripts/ (use parametrized queries)",
@@ -909,8 +1071,12 @@ impl SelfReviewGate {
 
     /// PA018: Python legacy table writes — scan scripts/ for writes to knowledge_nodes/knowledge_edges.
     fn check_python_legacy_tables(&mut self) {
-        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("scripts");
-        if !scripts_dir.exists() { return; }
+        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("scripts");
+        if !scripts_dir.exists() {
+            return;
+        }
         let mut count = 0usize;
         if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
             for entry in entries.flatten() {
@@ -919,8 +1085,11 @@ impl SelfReviewGate {
                     if let Ok(content) = read_source_cached(&path) {
                         for line in content.lines() {
                             let trimmed = line.trim().to_uppercase();
-                            if (trimmed.contains("KNOWLEDGE_NODES") || trimmed.contains("KNOWLEDGE_EDGES"))
-                                && (trimmed.starts_with("INSERT") || trimmed.starts_with("UPDATE") || trimmed.starts_with("DELETE"))
+                            if (trimmed.contains("KNOWLEDGE_NODES")
+                                || trimmed.contains("KNOWLEDGE_EDGES"))
+                                && (trimmed.starts_with("INSERT")
+                                    || trimmed.starts_with("UPDATE")
+                                    || trimmed.starts_with("DELETE"))
                             {
                                 count += 1;
                             }
@@ -945,8 +1114,12 @@ impl SelfReviewGate {
 
     /// PA019: Python main guard — scan scripts/ for missing `if __name__ == '__main__'`.
     fn check_python_main_guard(&mut self) {
-        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("scripts");
-        if !scripts_dir.exists() { return; }
+        let scripts_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("scripts");
+        if !scripts_dir.exists() {
+            return;
+        }
         let mut missing = 0usize;
         let mut total = 0usize;
         if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
@@ -1007,27 +1180,85 @@ impl SelfReviewGate {
     /// Bug found at: nt_memory_store.rs:38-46, 51-72 (insert_node skip, update_node no sync)
     fn check_fts_desync(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let nodes_inserts = scan_for_patterns("", &[PatternConfig { name: "nodes_insert".into(), pattern: regex::escape("INSERT INTO nodes") }], Some(&src_dir)).len();
-        let nodes_fts_inserts = scan_for_patterns("", &[PatternConfig { name: "nodes_fts_insert".into(), pattern: regex::escape("INSERT INTO nodes_fts") }], Some(&src_dir)).len();
-        let nodes_updates = scan_for_patterns("", &[PatternConfig { name: "nodes_update".into(), pattern: regex::escape("UPDATE nodes SET") }], Some(&src_dir)).len();
-        let nodes_fts_updates = scan_for_patterns("", &[PatternConfig { name: "nodes_fts_update".into(), pattern: regex::escape("UPDATE nodes_fts SET") }], Some(&src_dir)).len();
-        let nodes_deletes = scan_for_patterns("", &[PatternConfig { name: "nodes_delete".into(), pattern: regex::escape("DELETE FROM nodes WHERE") }], Some(&src_dir)).len();
-        let nodes_fts_deletes = scan_for_patterns("", &[PatternConfig { name: "nodes_fts_delete".into(), pattern: regex::escape("DELETE FROM nodes_fts") }], Some(&src_dir)).len();
+        let nodes_inserts = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "nodes_insert".into(),
+                pattern: regex::escape("INSERT INTO nodes"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let nodes_fts_inserts = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "nodes_fts_insert".into(),
+                pattern: regex::escape("INSERT INTO nodes_fts"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let nodes_updates = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "nodes_update".into(),
+                pattern: regex::escape("UPDATE nodes SET"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let nodes_fts_updates = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "nodes_fts_update".into(),
+                pattern: regex::escape("UPDATE nodes_fts SET"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let nodes_deletes = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "nodes_delete".into(),
+                pattern: regex::escape("DELETE FROM nodes WHERE"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
+        let nodes_fts_deletes = scan_for_patterns(
+            "",
+            &[PatternConfig {
+                name: "nodes_fts_delete".into(),
+                pattern: regex::escape("DELETE FROM nodes_fts"),
+            }],
+            Some(&src_dir),
+        )
+        .len();
 
         let mut msgs = Vec::new();
         if nodes_inserts > nodes_fts_inserts {
-            msgs.push(format!("INSERT: nodes={} > nodes_fts={}", nodes_inserts, nodes_fts_inserts));
+            msgs.push(format!(
+                "INSERT: nodes={} > nodes_fts={}",
+                nodes_inserts, nodes_fts_inserts
+            ));
         }
         if nodes_updates > nodes_fts_updates {
-            msgs.push(format!("UPDATE: nodes={} > nodes_fts={}", nodes_updates, nodes_fts_updates));
+            msgs.push(format!(
+                "UPDATE: nodes={} > nodes_fts={}",
+                nodes_updates, nodes_fts_updates
+            ));
         }
         if nodes_deletes > nodes_fts_deletes {
-            msgs.push(format!("DELETE: nodes={} > nodes_fts={}", nodes_deletes, nodes_fts_deletes));
+            msgs.push(format!(
+                "DELETE: nodes={} > nodes_fts={}",
+                nodes_deletes, nodes_fts_deletes
+            ));
         }
 
         let clean = msgs.is_empty();
         let msg = if clean {
-            "PA011: FTS desync check — all nodes operations have paired nodes_fts operations".to_string()
+            "PA011: FTS desync check — all nodes operations have paired nodes_fts operations"
+                .to_string()
         } else {
             format!("PA011: FTS desync — {}", msgs.join("; "))
         };
@@ -1046,7 +1277,8 @@ impl SelfReviewGate {
     /// Bug found at: nt_core_prm.rs:856-866 (zscore_normalize returning shorter vec)
     fn check_zscore_length_mismatch(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let filter_finite = scan_for_pattern_excluding_tests(&src_dir, ".filter(|v| v.is_finite())");
+        let filter_finite =
+            scan_for_pattern_excluding_tests(&src_dir, ".filter(|v| v.is_finite())");
         let normalize_fns = scan_for_pattern_excluding_tests(&src_dir, "fn zscore_normalize");
         let msg = format!(
             "PA012: {} filter(is_finite) in normalization — output length may mismatch input \
@@ -1054,7 +1286,7 @@ impl SelfReviewGate {
             filter_finite,
         );
         self.check(
-            filter_finite < normalize_fns,  // Each normalize fn should have 0 filter_finite
+            filter_finite < normalize_fns, // Each normalize fn should have 0 filter_finite
             Severity::Warning,
             "zscore_length_mismatch",
             msg,
@@ -1173,7 +1405,8 @@ impl SelfReviewGate {
             files_changed, lines_added,
         );
         self.check(
-            files_changed <= self.config.karpathy_surgical_files && lines_added <= self.config.karpathy_surgical_lines,
+            files_changed <= self.config.karpathy_surgical_files
+                && lines_added <= self.config.karpathy_surgical_lines,
             Severity::Info,
             "karpathy_surgical_changes",
             msg,
@@ -1253,9 +1486,13 @@ impl SelfReviewGate {
                     let mut real_ops = 0usize;
                     for j in (i + 1)..lines.len().min(i + 15) {
                         let t = lines[j].trim();
-                        if t.starts_with("Ok(") || t.starts_with('}') { break; }
+                        if t.starts_with("Ok(") || t.starts_with('}') {
+                            break;
+                        }
                         body_lines += 1;
-                        if t.starts_with("log::") { continue; }
+                        if t.starts_with("log::") {
+                            continue;
+                        }
                         if !t.is_empty() && !t.starts_with("//") {
                             real_ops += 1;
                         }
@@ -1282,7 +1519,10 @@ impl SelfReviewGate {
 
     /// PA025 (CI Workflow Coverage): Check that essential CI workflows exist.
     fn check_ci_workflow_coverage(&mut self) {
-        let workflows_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(".github").join("workflows");
+        let workflows_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(".github")
+            .join("workflows");
         let mut found = Vec::new();
         if workflows_dir.exists() {
             if let Ok(entries) = std::fs::read_dir(&workflows_dir) {
@@ -1294,7 +1534,9 @@ impl SelfReviewGate {
             }
         }
         let has_deny = found.iter().any(|f| f.contains("deny"));
-        let has_build = found.iter().any(|f| f.contains("build") || f.contains("ci"));
+        let has_build = found
+            .iter()
+            .any(|f| f.contains("build") || f.contains("ci"));
         let msg = format!(
             "PA025: CI workflows found: {:?} — cargo-deny={}, build={}",
             found, has_deny, has_build,
@@ -1318,7 +1560,9 @@ impl SelfReviewGate {
         if let Ok(entries) = std::fs::read_dir(&src_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_dir() { continue; }
+                if path.is_dir() {
+                    continue;
+                }
                 if path.file_name().is_some_and(|n| {
                     let s = n.to_string_lossy();
                     s.contains("integration_test") || s.contains("e2e_test")
@@ -1328,7 +1572,9 @@ impl SelfReviewGate {
                         for line in content.lines() {
                             let t = line.trim();
                             if (t.starts_with("assert_eq!(") || t.starts_with("assert!("))
-                                && t.contains("Status") || t.contains("status") || t.contains("error")
+                                && t.contains("Status")
+                                || t.contains("status")
+                                || t.contains("error")
                             {
                                 brittle += 1;
                             }
@@ -1472,7 +1718,9 @@ fn collect_rs_files_recursive(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
+                if path.ends_with("target") || path.ends_with("bin-archive") {
+                    continue;
+                }
                 collect_rs_files_recursive(&path, out);
             } else if path.extension().is_some_and(|e| e == "rs") {
                 out.push(path);
@@ -1529,7 +1777,10 @@ fn read_source_cached(path: &Path) -> std::io::Result<String> {
         }
     }
     let content = std::fs::read_to_string(path)?;
-    guard.insert(path.to_path_buf(), (mtime, len, Arc::from(content.as_str())));
+    guard.insert(
+        path.to_path_buf(),
+        (mtime, len, Arc::from(content.as_str())),
+    );
     Ok(content)
 }
 
@@ -1577,13 +1828,18 @@ fn production_lines_cached(path: &Path) -> Option<Arc<Vec<String>>> {
                 match ch {
                     '{' => depth += 1,
                     '}' => {
-                        if depth == 0 { in_test = false; break; }
+                        if depth == 0 {
+                            in_test = false;
+                            break;
+                        }
                         depth -= 1;
                     }
                     _ => {}
                 }
             }
-            if in_test { continue; }
+            if in_test {
+                continue;
+            }
         }
         prod.push(line.to_string());
     }
@@ -1612,10 +1868,13 @@ fn scan_for_unused_import_patterns(dir: &Path) -> usize {
         if let Ok(content) = read_source_cached(path) {
             for line in content.lines() {
                 if let Some(stripped) = line.trim().strip_prefix("use ") {
-                    let import_name: String = stripped.chars()
+                    let import_name: String = stripped
+                        .chars()
                         .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
                         .collect();
-                    if import_name.contains("::") { continue; }
+                    if import_name.contains("::") {
+                        continue;
+                    }
                     // Check if the imported name appears outside of use statements
                     let usage_count = content.matches(&import_name).count();
                     if import_name.len() > 3 && usage_count <= 1 {
@@ -1643,7 +1902,9 @@ fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
     for path in cached_rs_files(dir).iter() {
         if let Ok(content) = read_source_cached(path) {
             let line_count = content.lines().count();
-            if line_count > SelfReviewConfig::default().min_test_line_count && !content.contains("#[test]") {
+            if line_count > SelfReviewConfig::default().min_test_line_count
+                && !content.contains("#[test]")
+            {
                 if let Some(stem) = path.file_stem() {
                     uncovered.push(stem.to_string_lossy().to_string());
                 }
@@ -1686,7 +1947,9 @@ fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() { continue; }
+            if path.is_dir() {
+                continue;
+            }
             if path.extension().is_some_and(|e| e == "py") {
                 if let Ok(content) = read_source_cached(&path) {
                     count += content.matches(pattern).count();
@@ -1703,7 +1966,9 @@ fn scan_python_for_bare_except(dir: &Path) -> usize {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() { continue; }
+            if path.is_dir() {
+                continue;
+            }
             if path.extension().is_some_and(|e| e == "py") {
                 if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
@@ -1729,15 +1994,21 @@ fn scan_python_fstring_in_sql(dir: &Path) -> usize {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() { continue; }
+            if path.is_dir() {
+                continue;
+            }
             if path.extension().is_some_and(|e| e == "py") {
                 if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
                         let trimmed = line.trim();
                         // Detect f-strings containing SQL keywords with curly-brace interpolation
                         if (trimmed.starts_with("f\"") || trimmed.starts_with("f'"))
-                            && (trimmed.contains("SELECT") || trimmed.contains("INSERT") || trimmed.contains("UPDATE") || trimmed.contains("DELETE"))
-                            && trimmed.contains('{') && trimmed.contains('}')
+                            && (trimmed.contains("SELECT")
+                                || trimmed.contains("INSERT")
+                                || trimmed.contains("UPDATE")
+                                || trimmed.contains("DELETE"))
+                            && trimmed.contains('{')
+                            && trimmed.contains('}')
                         {
                             count += 1;
                         }
@@ -1855,8 +2126,12 @@ fn count_long_functions_in_content(content: &str, max_lines: usize) -> usize {
         #[allow(clippy::mut_range_bound)]
         for j in i..lines.len() {
             for ch in lines[j].chars() {
-                if ch == '{' { brace_depth += 1; found_open = true; }
-                else if ch == '}' { brace_depth -= 1; }
+                if ch == '{' {
+                    brace_depth += 1;
+                    found_open = true;
+                } else if ch == '}' {
+                    brace_depth -= 1;
+                }
             }
             if found_open && brace_depth == 0 {
                 let fn_len = j - fn_start;
@@ -1878,7 +2153,9 @@ fn count_long_functions_in_content(content: &str, max_lines: usize) -> usize {
                 break;
             }
         }
-        if !closed { i = fn_start + 1; }
+        if !closed {
+            i = fn_start + 1;
+        }
     }
     count
 }
@@ -1891,17 +2168,20 @@ fn count_single_impl_traits(dir: &Path) -> usize {
         if let Ok(content) = read_source_cached(path) {
             for line in content.lines() {
                 let trimmed = line.trim();
-                if let Some(trait_name) = trimmed.strip_prefix("pub trait ")
+                if let Some(trait_name) = trimmed
+                    .strip_prefix("pub trait ")
                     .or_else(|| trimmed.strip_prefix("trait "))
                 {
-                    let name: String = trait_name.chars()
+                    let name: String = trait_name
+                        .chars()
                         .take_while(|c| c.is_alphanumeric() || *c == '_')
                         .collect();
                     if !name.is_empty() {
                         names.push((name, path.to_string_lossy().to_string()));
                     }
                 }
-                if let Some(impl_str) = trimmed.strip_prefix("impl ")
+                if let Some(impl_str) = trimmed
+                    .strip_prefix("impl ")
                     .or_else(|| trimmed.strip_prefix("pub impl "))
                 {
                     if let Some(for_str) = impl_str.find(" for ") {
@@ -1918,7 +2198,8 @@ fn count_single_impl_traits(dir: &Path) -> usize {
         }
     }
     // Count declared traits with exactly one implementation
-    names.iter()
+    names
+        .iter()
         .filter(|(name, _)| impl_counts.get(name.as_str()).copied().unwrap_or(0) == 1)
         .count()
 }
@@ -1932,10 +2213,16 @@ fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
             let mut chain = 0usize;
             for line in &lines {
                 let trimmed = line.trim();
-                if trimmed.starts_with("} else if ") || trimmed.starts_with("else if ") || trimmed == "} else {" || trimmed.starts_with("else {") {
+                if trimmed.starts_with("} else if ")
+                    || trimmed.starts_with("else if ")
+                    || trimmed == "} else {"
+                    || trimmed.starts_with("else {")
+                {
                     chain += 1;
                 } else {
-                    if chain > max_chain { count += 1; }
+                    if chain > max_chain {
+                        count += 1;
+                    }
                     chain = 0;
                 }
             }
@@ -1961,7 +2248,9 @@ fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
                         for ch in lines[j].chars() {
                             if ch == '{' {
                                 brace_depth += 1;
-                                if !in_match { in_match = true; }
+                                if !in_match {
+                                    in_match = true;
+                                }
                             } else if ch == '}' {
                                 brace_depth -= 1;
                             }
@@ -1976,9 +2265,14 @@ fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
                                 arms += 1;
                             }
                         }
-                        if j - i > SelfReviewConfig::default().scan_safety_bound { i = j; break; }
+                        if j - i > SelfReviewConfig::default().scan_safety_bound {
+                            i = j;
+                            break;
+                        }
                     }
-                    if arms > max_arms { count += 1; }
+                    if arms > max_arms {
+                        count += 1;
+                    }
                 }
                 i += 1;
             }
@@ -2000,8 +2294,11 @@ fn count_excessive_param_count(dir: &Path, max_params: usize) -> usize {
                 if let Some(paren_open) = trimmed.find('(') {
                     if let Some(paren_close) = trimmed[paren_open..].find(')') {
                         let params_str = &trimmed[paren_open + 1..paren_open + paren_close];
-                        if params_str.is_empty() { continue; }
-                        let params: Vec<&str> = params_str.split(',')
+                        if params_str.is_empty() {
+                            continue;
+                        }
+                        let params: Vec<&str> = params_str
+                            .split(',')
                             .map(|s| s.trim())
                             .filter(|s| !s.is_empty() && !s.contains("self"))
                             .collect();
@@ -2042,9 +2339,10 @@ fn count_state_mutation_no_result(dir: &Path) -> usize {
                 let trimmed = line.trim();
                 if (trimmed.starts_with("fn ") || trimmed.starts_with("pub fn "))
                     && trimmed.contains("&mut self")
-                    && !trimmed.contains("Result") {
-                        count += 1;
-                    }
+                    && !trimmed.contains("Result")
+                {
+                    count += 1;
+                }
             }
         }
     }
@@ -2060,13 +2358,17 @@ fn count_pub_fn_without_goal_doc(dir: &Path) -> usize {
             let lines: Vec<&str> = content.lines().collect();
             for i in 0..lines.len() {
                 let trimmed = lines[i].trim();
-                if !trimmed.starts_with("pub fn ") { continue; }
+                if !trimmed.starts_with("pub fn ") {
+                    continue;
+                }
                 let mut has_goal = false;
                 for j in (0.max(i.saturating_sub(10)))..i {
                     let d = lines[j].trim();
                     if d.starts_with("///") {
-                        if d.contains("Returns") || d.contains("Goal")
-                            || d.contains("Purpose") || d.contains("Success")
+                        if d.contains("Returns")
+                            || d.contains("Goal")
+                            || d.contains("Purpose")
+                            || d.contains("Success")
                             || d.contains("Output")
                         {
                             has_goal = true;
@@ -2076,7 +2378,9 @@ fn count_pub_fn_without_goal_doc(dir: &Path) -> usize {
                         break;
                     }
                 }
-                if !has_goal { count += 1; }
+                if !has_goal {
+                    count += 1;
+                }
             }
         }
     }
@@ -2108,11 +2412,11 @@ fn count_lines_in_last_commit(repo_dir: &Path) -> usize {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let s = stdout.trim();
-            if s.is_empty() { return 0; }
+            if s.is_empty() {
+                return 0;
+            }
             if let Some(ins_part) = s.split(',').nth(1) {
-                let cleaned: String = ins_part.chars()
-                    .filter(|c| c.is_ascii_digit())
-                    .collect();
+                let cleaned: String = ins_part.chars().filter(|c| c.is_ascii_digit()).collect();
                 return cleaned.parse().unwrap_or(0);
             }
             0
@@ -2136,7 +2440,8 @@ fn estimate_brace_depth(code: &str) -> usize {
 }
 
 fn syn_file_max_depth(file: &syn::File) -> usize {
-    file.items.iter()
+    file.items
+        .iter()
         .map(|item| syn_item_max_depth(item, 0))
         .max()
         .unwrap_or(0)
@@ -2147,36 +2452,46 @@ fn syn_item_max_depth(item: &syn::Item, depth: usize) -> usize {
         syn::Item::Fn(f) => syn_block_max_depth(&f.block, depth),
         syn::Item::Impl(imp) => {
             let d = depth + 1;
-            d.max(imp.items.iter()
-                .map(|ii| syn_impl_item_max_depth(ii, d))
-                .max()
-                .unwrap_or(d))
+            d.max(
+                imp.items
+                    .iter()
+                    .map(|ii| syn_impl_item_max_depth(ii, d))
+                    .max()
+                    .unwrap_or(d),
+            )
         }
         syn::Item::Trait(t) => {
             let d = depth + 1;
-            d.max(t.items.iter()
-                .map(|ti| syn_trait_item_max_depth(ti, d))
-                .max()
-                .unwrap_or(d))
+            d.max(
+                t.items
+                    .iter()
+                    .map(|ti| syn_trait_item_max_depth(ti, d))
+                    .max()
+                    .unwrap_or(d),
+            )
         }
-        syn::Item::Mod(m) => {
-            match &m.content {
-                Some((_, items)) => {
-                    let d = depth + 1;
-                    d.max(items.iter()
+        syn::Item::Mod(m) => match &m.content {
+            Some((_, items)) => {
+                let d = depth + 1;
+                d.max(
+                    items
+                        .iter()
                         .map(|i| syn_item_max_depth(i, d))
                         .max()
-                        .unwrap_or(d))
-                }
-                None => depth,
+                        .unwrap_or(d),
+                )
             }
-        }
+            None => depth,
+        },
         syn::Item::ForeignMod(fm) => {
             let d = depth + 1;
-            d.max(fm.items.iter()
-                .map(|fi| syn_foreign_item_max_depth(fi, d))
-                .max()
-                .unwrap_or(d))
+            d.max(
+                fm.items
+                    .iter()
+                    .map(|fi| syn_foreign_item_max_depth(fi, d))
+                    .max()
+                    .unwrap_or(d),
+            )
         }
         syn::Item::Const(c) => syn_expr_max_depth(&c.expr, depth),
         syn::Item::Static(s) => syn_expr_max_depth(&s.expr, depth),
@@ -2194,10 +2509,14 @@ fn syn_impl_item_max_depth(item: &syn::ImplItem, depth: usize) -> usize {
 
 fn syn_trait_item_max_depth(item: &syn::TraitItem, depth: usize) -> usize {
     match item {
-        syn::TraitItem::Fn(f) => f.default.as_ref()
+        syn::TraitItem::Fn(f) => f
+            .default
+            .as_ref()
             .map(|b| syn_block_max_depth(b, depth))
             .unwrap_or(depth),
-        syn::TraitItem::Const(c) => c.default.as_ref()
+        syn::TraitItem::Const(c) => c
+            .default
+            .as_ref()
             .map(|(_, e)| syn_expr_max_depth(e, depth))
             .unwrap_or(depth),
         _ => depth,
@@ -2214,7 +2533,8 @@ fn syn_block_max_depth(block: &syn::Block, depth: usize) -> usize {
 }
 
 fn syn_stmts_max_depth(stmts: &[syn::Stmt], depth: usize) -> usize {
-    stmts.iter()
+    stmts
+        .iter()
         .map(|s| syn_stmt_max_depth(s, depth))
         .max()
         .unwrap_or(depth)
@@ -2224,7 +2544,9 @@ fn syn_stmt_max_depth(stmt: &syn::Stmt, depth: usize) -> usize {
     match stmt {
         syn::Stmt::Item(item) => syn_item_max_depth(item, depth),
         syn::Stmt::Expr(expr, _) => syn_expr_max_depth(expr, depth),
-        syn::Stmt::Local(local) => local.init.as_ref()
+        syn::Stmt::Local(local) => local
+            .init
+            .as_ref()
             .map(|init| syn_expr_max_depth(&init.expr, depth))
             .unwrap_or(depth),
         _ => depth,
@@ -2236,7 +2558,9 @@ fn syn_expr_max_depth(expr: &syn::Expr, depth: usize) -> usize {
         syn::Expr::Block(eb) => syn_block_max_depth(&eb.block, depth),
         syn::Expr::If(ei) => {
             let then_max = syn_block_max_depth(&ei.then_branch, depth);
-            let else_max = ei.else_branch.as_ref()
+            let else_max = ei
+                .else_branch
+                .as_ref()
                 .map(|(_, e)| syn_expr_max_depth(e, depth))
                 .unwrap_or(0);
             then_max.max(else_max)
@@ -2246,10 +2570,13 @@ fn syn_expr_max_depth(expr: &syn::Expr, depth: usize) -> usize {
         syn::Expr::Loop(l) => syn_block_max_depth(&l.body, depth),
         syn::Expr::Match(m) => {
             let d = depth + 1;
-            d.max(m.arms.iter()
-                .map(|arm| syn_expr_max_depth(&arm.body, d))
-                .max()
-                .unwrap_or(d))
+            d.max(
+                m.arms
+                    .iter()
+                    .map(|arm| syn_expr_max_depth(&arm.body, d))
+                    .max()
+                    .unwrap_or(d),
+            )
         }
         syn::Expr::Unsafe(u) => syn_block_max_depth(&u.block, depth),
         syn::Expr::Closure(c) => syn_expr_max_depth(&c.body, depth),
@@ -2267,14 +2594,24 @@ mod tests {
         let report = gate.run_all();
         // Verify the report structure is correct (not a specific pass/fail, since
         // real codebase state varies). Key invariant: no panic during execution.
-        assert!(report.findings.len() > 0, "Should have at least informational findings");
+        assert!(
+            report.findings.len() > 0,
+            "Should have at least informational findings"
+        );
         assert!(report.passed + report.failed + report.warnings <= report.findings.len());
     }
 
     #[test]
     fn test_self_review_findings_report() {
         let mut gate = SelfReviewGate::new(false);
-        gate.check(false, Severity::Error, "test", "forced error".into(), file!(), line!());
+        gate.check(
+            false,
+            Severity::Error,
+            "test",
+            "forced error".into(),
+            file!(),
+            line!(),
+        );
         let report = gate.report();
         assert_eq!(report.failed, 1);
         assert_eq!(report.summary().contains("FAIL"), true);
@@ -2304,8 +2641,22 @@ mod tests {
     #[test]
     fn test_blast_radius_with_findings() {
         let mut gate = SelfReviewGate::new(false);
-        gate.check(false, Severity::Error, "panic_audit", "test".to_string(), "a.rs".to_string(), 1);
-        gate.check(false, Severity::Error, "layer_violation", "test".to_string(), "b.rs".to_string(), 2);
+        gate.check(
+            false,
+            Severity::Error,
+            "panic_audit",
+            "test".to_string(),
+            "a.rs".to_string(),
+            1,
+        );
+        gate.check(
+            false,
+            Severity::Error,
+            "layer_violation",
+            "test".to_string(),
+            "b.rs".to_string(),
+            2,
+        );
         let br = gate.blast_radius();
         assert_eq!(br.risk, BlastRisk::Critical);
         // Only "layer_violation" counts as module crossing
@@ -2314,35 +2665,62 @@ mod tests {
 
     #[test]
     fn test_arch_layer_detection() {
-        assert_eq!(ArchLayer::from_path(Path::new("/src/core/foo.rs")), ArchLayer::L0Core);
-        assert_eq!(ArchLayer::from_path(Path::new("/src/neotrix/l1_body_impl/bar.rs")), ArchLayer::L1Act);
-        assert_eq!(ArchLayer::from_path(Path::new("/src/neotrix/l2_world_impl/baz.rs")), ArchLayer::L2World);
-        assert_eq!(ArchLayer::from_path(Path::new("/src/neotrix/l3_memory_impl/qux.rs")), ArchLayer::L3Memory);
-        assert_eq!(ArchLayer::from_path(Path::new("/src/neotrix/l8_autonomic_impl/quux.rs")), ArchLayer::L8Seal);
+        assert_eq!(
+            ArchLayer::from_path(Path::new("/src/core/foo.rs")),
+            ArchLayer::L0Core
+        );
+        assert_eq!(
+            ArchLayer::from_path(Path::new("/src/neotrix/l1_body_impl/bar.rs")),
+            ArchLayer::L1Act
+        );
+        assert_eq!(
+            ArchLayer::from_path(Path::new("/src/neotrix/l2_world_impl/baz.rs")),
+            ArchLayer::L2World
+        );
+        assert_eq!(
+            ArchLayer::from_path(Path::new("/src/neotrix/l3_memory_impl/qux.rs")),
+            ArchLayer::L3Memory
+        );
+        assert_eq!(
+            ArchLayer::from_path(Path::new("/src/neotrix/l8_autonomic_impl/quux.rs")),
+            ArchLayer::L8Seal
+        );
     }
 
     #[test]
     fn test_observer_feedback_degraded() {
-        let mut gate = SelfReviewGate::new(true)
-            .with_observer_feedback(0.25, vec!["oscillation".into()]);
+        let mut gate =
+            SelfReviewGate::new(true).with_observer_feedback(0.25, vec!["oscillation".into()]);
         let report = gate.run_all();
-        let obs_findings: Vec<_> = report.findings.iter()
+        let obs_findings: Vec<_> = report
+            .findings
+            .iter()
             .filter(|f| f.category == "observer_feedback" || f.category == "observer_pattern")
             .collect();
-        assert!(!obs_findings.is_empty(), "Should have observer findings when degraded");
+        assert!(
+            !obs_findings.is_empty(),
+            "Should have observer findings when degraded"
+        );
     }
 
     #[test]
     fn test_observer_feedback_healthy() {
-        let mut gate = SelfReviewGate::new(true)
-            .with_observer_feedback(0.85, vec![]);
+        let mut gate = SelfReviewGate::new(true).with_observer_feedback(0.85, vec![]);
         let report = gate.run_all();
-        let obs_findings: Vec<_> = report.findings.iter()
+        let obs_findings: Vec<_> = report
+            .findings
+            .iter()
             .filter(|f| f.category == "observer_feedback")
             .collect();
         // Healthy quality should NOT produce a warning
-        let warnings: Vec<_> = obs_findings.iter().filter(|f| f.severity == Severity::Warning || f.severity == Severity::Error).collect();
-        assert!(warnings.is_empty(), "Should not warn on healthy observer quality");
+        let warnings: Vec<_> = obs_findings
+            .iter()
+            .filter(|f| f.severity == Severity::Warning || f.severity == Severity::Error)
+            .collect();
+        assert!(
+            warnings.is_empty(),
+            "Should not warn on healthy observer quality"
+        );
     }
 
     #[test]
@@ -2351,10 +2729,15 @@ mod tests {
         gate.check_karpathy_simplicity_first();
         // Verify the check runs without panics and produces at least info-level findings
         let report = gate.report();
-        let findings: Vec<_> = report.findings.iter()
+        let findings: Vec<_> = report
+            .findings
+            .iter()
             .filter(|f| f.category == "karpathy_simplicity_first")
             .collect();
-        assert!(findings.len() <= 1, "Should have at most 1 finding for simplicity_first check");
+        assert!(
+            findings.len() <= 1,
+            "Should have at most 1 finding for simplicity_first check"
+        );
     }
 
     #[test]
@@ -2363,10 +2746,15 @@ mod tests {
         gate.check_karpathy_surgical_changes();
         // Verify the check runs without panics (git commands may not always succeed)
         let report = gate.report();
-        let findings: Vec<_> = report.findings.iter()
+        let findings: Vec<_> = report
+            .findings
+            .iter()
             .filter(|f| f.category == "karpathy_surgical_changes")
             .collect();
-        assert!(findings.len() <= 1, "Should have at most 1 finding for surgical_changes check");
+        assert!(
+            findings.len() <= 1,
+            "Should have at most 1 finding for surgical_changes check"
+        );
     }
 
     #[test]
@@ -2375,10 +2763,15 @@ mod tests {
         gate.check_karpathy_complexity_budget();
         // Verify the check runs without panics
         let report = gate.report();
-        let findings: Vec<_> = report.findings.iter()
+        let findings: Vec<_> = report
+            .findings
+            .iter()
             .filter(|f| f.category == "karpathy_complexity_budget")
             .collect();
-        assert!(findings.len() <= 1, "Should have at most 1 finding for complexity_budget check");
+        assert!(
+            findings.len() <= 1,
+            "Should have at most 1 finding for complexity_budget check"
+        );
     }
 
     #[test]
@@ -2387,10 +2780,15 @@ mod tests {
         gate.check_karpathy_goal_driven_execution();
         // Verify the check runs without panics
         let report = gate.report();
-        let findings: Vec<_> = report.findings.iter()
+        let findings: Vec<_> = report
+            .findings
+            .iter()
             .filter(|f| f.category == "karpathy_goal_driven_execution")
             .collect();
-        assert!(findings.len() <= 1, "Should have at most 1 finding for goal_driven_execution check");
+        assert!(
+            findings.len() <= 1,
+            "Should have at most 1 finding for goal_driven_execution check"
+        );
     }
 
     #[test]
@@ -2447,9 +2845,11 @@ fn prod() { let x = 1; }
 
         // 生产代码无 todo! — 全部在测试上下文内
         let count = scan_for_pattern_excluding_tests(&dir, "todo!(");
-        assert_eq!(count, 0, "all todo!() are inside test contexts; scan returned {count}");
+        assert_eq!(
+            count, 0,
+            "all todo!() are inside test contexts; scan returned {count}"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
-

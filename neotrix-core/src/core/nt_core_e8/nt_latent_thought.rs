@@ -34,7 +34,9 @@ pub struct LatentThoughtVector {
 
 impl Default for LatentThoughtVector {
     fn default() -> Self {
-        Self { dim: DEFAULT_LATENT_DIM }
+        Self {
+            dim: DEFAULT_LATENT_DIM,
+        }
     }
 }
 
@@ -53,8 +55,7 @@ impl LatentThoughtVector {
     /// and deterministic across calls.
     pub fn embed(&self, state: ReasoningHexagram) -> Vec<f64> {
         debug_assert_eq!(
-            self.dim,
-            DEFAULT_LATENT_DIM,
+            self.dim, DEFAULT_LATENT_DIM,
             "kernel embedding is defined over the 64 E8 states; dim must be 64"
         );
         let mut v = vec![0.0f64; self.dim];
@@ -196,8 +197,14 @@ mod tests {
         let a = ltv.embed(ReasoningHexagram(7));
         let b = ltv.embed(ReasoningHexagram(7));
         assert_eq!(a, b, "embedding must be deterministic");
-        assert!(a.iter().any(|&x| x > 0.0), "embedding must be non-degenerate");
-        assert!(a.iter().all(|&x| x >= 0.0), "Gaussian kernel is non-negative");
+        assert!(
+            a.iter().any(|&x| x > 0.0),
+            "embedding must be non-degenerate"
+        );
+        assert!(
+            a.iter().all(|&x| x >= 0.0),
+            "Gaussian kernel is non-negative"
+        );
         let sum: f64 = a.iter().sum();
         assert!((sum - 1.0).abs() < EPS, "L1-normalized kernel sums to 1");
         // Peak on the source state itself.
@@ -208,8 +215,8 @@ mod tests {
     fn test_adjacent_similarity_exceeds_distant() {
         let ltv = LatentThoughtVector::default();
         let base = ltv.embed(ReasoningHexagram(0));
-        let near = ltv.embed(ReasoningHexagram(1));   // hamming distance 1
-        let far = ltv.embed(ReasoningHexagram(63));   // hamming distance 6
+        let near = ltv.embed(ReasoningHexagram(1)); // hamming distance 1
+        let far = ltv.embed(ReasoningHexagram(63)); // hamming distance 6
         let c_near = ltv.cosine(&base, &near);
         let c_far = ltv.cosine(&base, &far);
         assert!(
@@ -321,7 +328,10 @@ mod tests {
         ];
         let avg = ltv.average_thought(&states);
         assert_eq!(avg.len(), ltv.dim);
-        assert!(avg.iter().any(|&x| x > 0.0), "average must be non-degenerate");
+        assert!(
+            avg.iter().any(|&x| x > 0.0),
+            "average must be non-degenerate"
+        );
         let re_embedded = ltv.average_thought(&states);
         assert_eq!(avg, re_embedded, "average must be stable / deterministic");
         // Empty trajectory degrades to the zero vector.

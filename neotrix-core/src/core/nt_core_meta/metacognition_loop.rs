@@ -1,7 +1,7 @@
-use super::self_model::{SelfModel, EvolutionEvent, EventKind};
-use super::monitor::{MetaMonitor, HealthCheck, MetaAlert};
-use super::weakness::{WeaknessAnalyzer, WeaknessReport};
+use super::monitor::{HealthCheck, MetaAlert, MetaMonitor};
 use super::planner::{EvolutionPlanner, PlannedEvolution};
+use super::self_model::{EventKind, EvolutionEvent, SelfModel};
+use super::weakness::{WeaknessAnalyzer, WeaknessReport};
 
 /// The main metacognitive loop that orchestrates self-awareness.
 ///
@@ -55,9 +55,13 @@ impl MetaCognitiveLoop {
         self.self_model.register_evolution(EvolutionEvent {
             timestamp: chrono::Utc::now(),
             kind: EventKind::MetaCognitionUpdated,
-            description: format!("Cycle {}: {} weaknesses found, {} alerts, {} plans generated",
-                self.iteration, report.summary.total_count,
-                self.monitor.alerts.len(), plans.len()),
+            description: format!(
+                "Cycle {}: {} weaknesses found, {} alerts, {} plans generated",
+                self.iteration,
+                report.summary.total_count,
+                self.monitor.alerts.len(),
+                plans.len()
+            ),
             affected_modules: Vec::new(),
         });
 
@@ -84,7 +88,10 @@ impl MetaCognitiveLoop {
     }
 
     /// Run continuous cycles until a stopping condition is met.
-    pub fn run_until(&mut self, mut should_stop: impl FnMut(&MetaCycleResult) -> bool) -> Vec<MetaCycleResult> {
+    pub fn run_until(
+        &mut self,
+        mut should_stop: impl FnMut(&MetaCycleResult) -> bool,
+    ) -> Vec<MetaCycleResult> {
         let mut results = Vec::new();
         while self.iteration < self.max_iterations {
             let result = self.run_cycle();
@@ -107,7 +114,8 @@ impl MetaCognitiveLoop {
         let trend = self.monitor.trend_analysis();
         format!(
             "MetaCognition Cycle {}/{} | {} weaknesses | {} alerts | {} plans pending | trend: {}",
-            self.iteration, self.max_iterations,
+            self.iteration,
+            self.max_iterations,
             self.self_model.tech_debt.total_count,
             self.monitor.alerts.len(),
             self.planner.pending_count(),
@@ -189,7 +197,9 @@ mod tests {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for MetaCognitiveLoop {
-    fn name(&self) -> &str { "metacognitive_loop" }
+    fn name(&self) -> &str {
+        "metacognitive_loop"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         if self.max_iterations == 0 {
@@ -198,6 +208,10 @@ impl crate::core::nt_core_self_test::SelfTest for MetaCognitiveLoop {
         if self.iteration > self.max_iterations {
             failures.push("metacognitive_loop: iteration exceeded max_iterations".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }

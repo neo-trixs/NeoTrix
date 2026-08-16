@@ -40,7 +40,10 @@ impl MetaMonitor {
                 new_alerts.push(MetaAlert {
                     timestamp: chrono::Utc::now(),
                     severity: AlertSeverity::Warning,
-                    message: format!("Module '{}' has {} lines, exceeding 1500-line threshold", module.name, module.total_lines),
+                    message: format!(
+                        "Module '{}' has {} lines, exceeding 1500-line threshold",
+                        module.name, module.total_lines
+                    ),
                     module: Some(module.name.clone()),
                     suggestion: "Consider refactoring into sub-modules".into(),
                 });
@@ -49,7 +52,10 @@ impl MetaMonitor {
                 new_alerts.push(MetaAlert {
                     timestamp: chrono::Utc::now(),
                     severity: AlertSeverity::Warning,
-                    message: format!("Module '{}' has {} lines but zero tests", module.name, module.total_lines),
+                    message: format!(
+                        "Module '{}' has {} lines but zero tests",
+                        module.name, module.total_lines
+                    ),
                     module: Some(module.name.clone()),
                     suggestion: "Add test coverage for this module".into(),
                 });
@@ -58,7 +64,10 @@ impl MetaMonitor {
                 new_alerts.push(MetaAlert {
                     timestamp: chrono::Utc::now(),
                     severity: AlertSeverity::Critical,
-                    message: format!("Module '{}' has {} unsafe blocks, review required", module.name, module.unsafe_count),
+                    message: format!(
+                        "Module '{}' has {} unsafe blocks, review required",
+                        module.name, module.unsafe_count
+                    ),
                     module: Some(module.name.clone()),
                     suggestion: "Audit and minimize unsafe usage".into(),
                 });
@@ -70,7 +79,10 @@ impl MetaMonitor {
                 new_alerts.push(MetaAlert {
                     timestamp: chrono::Utc::now(),
                     severity: AlertSeverity::Info,
-                    message: format!("File '{}' has {} lines, consider splitting", file.path, file.lines),
+                    message: format!(
+                        "File '{}' has {} lines, consider splitting",
+                        file.path, file.lines
+                    ),
                     module: Some(file.module.clone()),
                     suggestion: "Split into smaller focused files".into(),
                 });
@@ -78,7 +90,11 @@ impl MetaMonitor {
         }
 
         if !self.self_model.compilation.features_tested.is_empty() {
-            let all_ok = self.self_model.compilation.features_tested.iter()
+            let all_ok = self
+                .self_model
+                .compilation
+                .features_tested
+                .iter()
                 .all(|_f| self.self_model.compilation.errors == 0);
             if !all_ok {
                 new_alerts.push(MetaAlert {
@@ -91,7 +107,15 @@ impl MetaMonitor {
             }
         }
 
-        if self.self_model.tech_debt.items.iter().filter(|i| i.severity == DebtSeverity::Critical).count() > 10 {
+        if self
+            .self_model
+            .tech_debt
+            .items
+            .iter()
+            .filter(|i| i.severity == DebtSeverity::Critical)
+            .count()
+            > 10
+        {
             new_alerts.push(MetaAlert {
                 timestamp: chrono::Utc::now(),
                 severity: AlertSeverity::Warning,
@@ -120,8 +144,16 @@ impl MetaMonitor {
 
         HealthTrend {
             compilation_stable: last.compilation_ok,
-            test_count_trend: if last.test_count >= first.test_count { 1 } else { -1 },
-            alert_trend: if last.alert_count <= first.alert_count { 1 } else { -1 },
+            test_count_trend: if last.test_count >= first.test_count {
+                1
+            } else {
+                -1
+            },
+            alert_trend: if last.alert_count <= first.alert_count {
+                1
+            } else {
+                -1
+            },
             overall: if last.compilation_ok && last.test_count >= first.test_count {
                 "improving".into()
             } else if last.compilation_ok {
@@ -143,10 +175,14 @@ impl MetaMonitor {
                 timestamp: chrono::Utc::now(),
                 severity,
                 message: w.description.clone(),
-                module: w.file.as_ref().map(|f| self.self_model.modules.iter()
-                    .find(|m| f.contains(&m.name))
-                    .map(|m| m.name.clone())
-                    .unwrap_or_else(|| "unknown".into())),
+                module: w.file.as_ref().map(|f| {
+                    self.self_model
+                        .modules
+                        .iter()
+                        .find(|m| f.contains(&m.name))
+                        .map(|m| m.name.clone())
+                        .unwrap_or_else(|| "unknown".into())
+                }),
                 suggestion: w.suggestion.clone(),
             });
         }
@@ -194,10 +230,17 @@ mod tests {
     fn make_test_model() -> SelfModel {
         let mut model = SelfModel::new();
         model.modules.push(ModuleInfo {
-            name: "huge_module".into(), path: "src/huge/".into(), file_count: 1,
-            total_lines: 2000, test_count: 0, has_tests: false,
-            unsafe_count: 10, unwrap_count: 5, todo_count: 3,
-            public_api_count: 20, description: "".into(),
+            name: "huge_module".into(),
+            path: "src/huge/".into(),
+            file_count: 1,
+            total_lines: 2000,
+            test_count: 0,
+            has_tests: false,
+            unsafe_count: 10,
+            unwrap_count: 5,
+            todo_count: 3,
+            public_api_count: 20,
+            description: "".into(),
         });
         model.compilation.errors = 0;
         model.compilation.features_tested = vec!["default".into(), "full".into()];
@@ -210,7 +253,8 @@ mod tests {
         let model = make_test_model();
         let mut monitor = MetaMonitor::new(model);
         let alerts = monitor.generate_alerts();
-        let large_module_alerts: Vec<_> = alerts.iter()
+        let large_module_alerts: Vec<_> = alerts
+            .iter()
             .filter(|a| a.message.contains("huge_module"))
             .collect();
         assert!(!large_module_alerts.is_empty());
@@ -244,7 +288,9 @@ mod tests {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for MetaMonitor {
-    fn name(&self) -> &str { "meta_monitor" }
+    fn name(&self) -> &str {
+        "meta_monitor"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         for alert in &self.alerts {
@@ -252,6 +298,10 @@ impl crate::core::nt_core_self_test::SelfTest for MetaMonitor {
                 failures.push("meta_monitor: alert with empty module name".into());
             }
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }

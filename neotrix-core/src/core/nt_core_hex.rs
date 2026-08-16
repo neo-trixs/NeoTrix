@@ -15,9 +15,9 @@
 //! | 1 | Mode | Solo | Collaborative |
 //! | 0 | Stance | Certain | Exploratory |
 
+use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::collections::HashSet;
-use serde::{Serialize, Deserialize};
 
 /// A reasoning state represented as a 6-bit value (0-63), isomorphic to a hexagram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -37,17 +37,29 @@ impl ReasoningHexagram {
     // ─── Axis accessors ───
 
     /// Abstraction: 0=Concrete, 1=Abstract.
-    pub fn abstraction(&self) -> u8 { self.axis(5) }
+    pub fn abstraction(&self) -> u8 {
+        self.axis(5)
+    }
     /// Scope: 0=Focused, 1=Broad.
-    pub fn scope(&self) -> u8 { self.axis(4) }
+    pub fn scope(&self) -> u8 {
+        self.axis(4)
+    }
     /// Method: 0=Analytical, 1=Generative.
-    pub fn method(&self) -> u8 { self.axis(3) }
+    pub fn method(&self) -> u8 {
+        self.axis(3)
+    }
     /// Depth: 0=Deep, 1=Fast.
-    pub fn depth(&self) -> u8 { self.axis(2) }
+    pub fn depth(&self) -> u8 {
+        self.axis(2)
+    }
     /// Mode: 0=Solo, 1=Collaborative.
-    pub fn reasoning_mode(&self) -> u8 { self.axis(1) }
+    pub fn reasoning_mode(&self) -> u8 {
+        self.axis(1)
+    }
     /// Stance: 0=Certain, 1=Exploratory.
-    pub fn stance(&self) -> u8 { self.axis(0) }
+    pub fn stance(&self) -> u8 {
+        self.axis(0)
+    }
 
     // ─── State transitions ───
 
@@ -134,25 +146,73 @@ impl ReasoningHexagram {
 /// All 64 reasoning mode names.
 pub const MODE_NAMES: [&str; 64] = [
     // 0-7: Concrete-Focused-Analytical-Deep-Solo-Certain → Abstract-Broad-Generative-Fast-Collaborative-Exploratory
-    "Deep Debug",       "Guided Debug",     "Experiment",       "Guided Experiment",
-    "Code Review",      "Pair Review",      "Rapid Prototype",  "Co-creation",
-    "Root Cause",       "Guided RCA",       "Hypothesis Test",  "Guided Hypothesis",
-    "Design Audit",     "Pair Audit",       "Brainstorm",       "Jam Session",
+    "Deep Debug",
+    "Guided Debug",
+    "Experiment",
+    "Guided Experiment",
+    "Code Review",
+    "Pair Review",
+    "Rapid Prototype",
+    "Co-creation",
+    "Root Cause",
+    "Guided RCA",
+    "Hypothesis Test",
+    "Guided Hypothesis",
+    "Design Audit",
+    "Pair Audit",
+    "Brainstorm",
+    "Jam Session",
     // 16-31
-    "Formal Proof",     "Guided Proof",     "Model Check",      "Guided Model Check",
-    "Spec Review",      "Spec Pairing",     "Exploration",      "Guided Exploration",
-    "Data Analysis",    "Pair Analysis",    "Statistical Run",  "Guided Statistics",
-    "Architecture",     "Pair Arch",        "Visioning",        "Guided Visioning",
+    "Formal Proof",
+    "Guided Proof",
+    "Model Check",
+    "Guided Model Check",
+    "Spec Review",
+    "Spec Pairing",
+    "Exploration",
+    "Guided Exploration",
+    "Data Analysis",
+    "Pair Analysis",
+    "Statistical Run",
+    "Guided Statistics",
+    "Architecture",
+    "Pair Arch",
+    "Visioning",
+    "Guided Visioning",
     // 32-47
-    "Syntax Check",     "Guided Check",     "Quick Fix",        "Guided Quick Fix",
-    "Lint Review",      "Lint Pairing",     "Fast Iteration",   "Paired Iteration",
-    "Unit Test",        "Guided Test",      "Fuzz Run",         "Guided Fuzz",
-    "Integration",      "Pair Integration", "Scaffold",         "Guided Scaffold",
+    "Syntax Check",
+    "Guided Check",
+    "Quick Fix",
+    "Guided Quick Fix",
+    "Lint Review",
+    "Lint Pairing",
+    "Fast Iteration",
+    "Paired Iteration",
+    "Unit Test",
+    "Guided Test",
+    "Fuzz Run",
+    "Guided Fuzz",
+    "Integration",
+    "Pair Integration",
+    "Scaffold",
+    "Guided Scaffold",
     // 48-63
-    "Pattern Match",    "Guided Pattern",   "Refactor",         "Guided Refactor",
-    "Style Guide",      "Style Pairing",    "Generate",         "Co-generate",
-    "Trace Analysis",   "Pair Tracing",     "Benchmark",        "Guided Benchmark",
-    "System Design",    "Pair System",      "Meta-cognition",   "Guided Meta",
+    "Pattern Match",
+    "Guided Pattern",
+    "Refactor",
+    "Guided Refactor",
+    "Style Guide",
+    "Style Pairing",
+    "Generate",
+    "Co-generate",
+    "Trace Analysis",
+    "Pair Tracing",
+    "Benchmark",
+    "Guided Benchmark",
+    "System Design",
+    "Pair System",
+    "Meta-cognition",
+    "Guided Meta",
 ];
 
 /// Detailed descriptions for all 64 reasoning modes.
@@ -225,7 +285,13 @@ pub const MODE_DESCRIPTIONS: [&str; 64] = [
 
 /// Recommended task keywords per mode.
 pub const MODE_TASKS: [&[&str]; 64] = [
-    &["crash", "panic", "null pointer", "segfault", "index out of bounds"],
+    &[
+        "crash",
+        "panic",
+        "null pointer",
+        "segfault",
+        "index out of bounds",
+    ],
     &["debug", "trace", "log", "error message", "stack trace"],
     &["experiment", "A/B test", "hypothesis test", "validate"],
     &["tutorial", "learn", "try", "explore syntax"],
@@ -239,15 +305,34 @@ pub const MODE_TASKS: [&[&str]; 64] = [
     &["assumption check", "theory validation"],
     &["design review", "architecture review", "design critique"],
     &["stakeholder review", "cross-team design"],
-    &["brainstorm", "idea generation", "creative", "image idea", "visual concept", "design concept"],
+    &[
+        "brainstorm",
+        "idea generation",
+        "creative",
+        "image idea",
+        "visual concept",
+        "design concept",
+    ],
     &["workshop", "ideation", "creative session"],
-    &["formal proof", "theorem", "verification", "correctness proof"],
+    &[
+        "formal proof",
+        "theorem",
+        "verification",
+        "correctness proof",
+    ],
     &["proof assistant", "coq", "lean", "isabelle"],
     &["model check", "state space", "formal verification"],
     &["specification check", "requirement verification"],
     &["spec review", "requirement review", "specification"],
     &["spec collaboration", "requirement workshop"],
-    &["explore", "investigate", "research", "discover", "visual search", "image explore"],
+    &[
+        "explore",
+        "investigate",
+        "research",
+        "discover",
+        "visual search",
+        "image explore",
+    ],
     &["guided research", "structured exploration"],
     &["data analysis", "statistics", "metrics", "analytics"],
     &["collaborative analysis", "data review"],
@@ -279,7 +364,16 @@ pub const MODE_TASKS: [&[&str]; 64] = [
     &["guided refactor", "safe refactor", "restructure with tests"],
     &["style compliance", "code style", "naming convention"],
     &["style automation", "linting pipeline"],
-    &["generate", "code gen", "implement", "create", "image gen", "visual generation", "text2img", "img2img"],
+    &[
+        "generate",
+        "code gen",
+        "implement",
+        "create",
+        "image gen",
+        "visual generation",
+        "text2img",
+        "img2img",
+    ],
     &["co-generate", "interactive generation"],
     &["trace", "performance trace", "execution trace", "profiling"],
     &["trace visualization", "waterfall", "flame graph"],
@@ -296,7 +390,9 @@ pub const MODE_TASKS: [&[&str]; 64] = [
 /// NeoTrix's E8 engine has a binary Depth axis (0=Deep, 1=Fast). This enum
 /// provides 5 graduated levels (matching GPT-5's none/low/medium/high/xhigh),
 /// which can be projected onto the E8 6-axis space for mode selection.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum ReasoningEffort {
     /// Fastest, cheapest. No chain-of-thought. Simple transformations.
     None,
@@ -325,18 +421,18 @@ impl ReasoningEffort {
     /// - SCOPE (bit 4, factor idx 4): higher effort = broader scope
     pub fn to_e8_factors(&self) -> [f64; 6] {
         match self {
-            Self::None   => [0.0, 0.0, 1.0, 1.0, 0.0, 0.0],
-            Self::Low    => [0.2, 0.2, 0.8, 0.7, 0.2, 0.2],
+            Self::None => [0.0, 0.0, 1.0, 1.0, 0.0, 0.0],
+            Self::Low => [0.2, 0.2, 0.8, 0.7, 0.2, 0.2],
             Self::Medium => [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-            Self::High   => [0.7, 0.7, 0.2, 0.3, 0.7, 0.7],
-            Self::XHigh  => [0.9, 0.9, 0.0, 0.1, 0.9, 0.9],
+            Self::High => [0.7, 0.7, 0.2, 0.3, 0.7, 0.7],
+            Self::XHigh => [0.9, 0.9, 0.0, 0.1, 0.9, 0.9],
         }
     }
 
     /// Map to the binary E8 depth axis value (0=Deep, 1=Fast).
     pub fn to_e8_depth(&self) -> u8 {
         match self {
-            Self::None | Self::Low => 1, // Fast
+            Self::None | Self::Low => 1,                  // Fast
             Self::Medium | Self::High | Self::XHigh => 0, // Deep
         }
     }
@@ -344,22 +440,22 @@ impl ReasoningEffort {
     /// Cost multiplier: how many "reasoning tokens" to allocate relative to Medium.
     pub fn cost_multiplier(&self) -> f64 {
         match self {
-            Self::None   => 0.1,
-            Self::Low    => 0.3,
+            Self::None => 0.1,
+            Self::Low => 0.3,
             Self::Medium => 1.0,
-            Self::High   => 2.5,
-            Self::XHigh  => 5.0,
+            Self::High => 2.5,
+            Self::XHigh => 5.0,
         }
     }
 
     /// Recommended task types for this effort level.
     pub fn recommendation(&self) -> &'static [&'static str] {
         match self {
-            Self::None   => &["format", "translate", "extract", "transform", "simple qa"],
-            Self::Low    => &["classify", "summarize", "quick fix", "boilerplate"],
+            Self::None => &["format", "translate", "extract", "transform", "simple qa"],
+            Self::Low => &["classify", "summarize", "quick fix", "boilerplate"],
             Self::Medium => &["code", "debug", "analyze", "review", "design"],
-            Self::High   => &["refactor", "architecture", "complex debug", "optimize"],
-            Self::XHigh  => &["security audit", "hard math", "research", "deep analysis"],
+            Self::High => &["refactor", "architecture", "complex debug", "optimize"],
+            Self::XHigh => &["security audit", "hard math", "research", "deep analysis"],
         }
     }
 }
@@ -367,11 +463,11 @@ impl ReasoningEffort {
 impl std::fmt::Display for ReasoningEffort {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::None   => write!(f, "none"),
-            Self::Low    => write!(f, "low"),
+            Self::None => write!(f, "none"),
+            Self::Low => write!(f, "low"),
             Self::Medium => write!(f, "medium"),
-            Self::High   => write!(f, "high"),
-            Self::XHigh  => write!(f, "xhigh"),
+            Self::High => write!(f, "high"),
+            Self::XHigh => write!(f, "xhigh"),
         }
     }
 }
@@ -412,7 +508,10 @@ impl IntentionContext {
 
     /// Generate a combined task string for keyword-based mode matching.
     pub fn to_task_string(&self) -> String {
-        format!("{} {} {} {}", self.goal, self.reason, self.boundaries, self.verification)
+        format!(
+            "{} {} {} {}",
+            self.goal, self.reason, self.boundaries, self.verification
+        )
     }
 
     /// Convert intention context into an E8 6-factor context vector.
@@ -448,7 +547,14 @@ impl IntentionContext {
         // Stance: weak verification → exploratory
         let exploratory = if verify_len < 20.0 { 0.8 } else { 0.2 };
 
-        [exploratory, collaborative, depth, method, scope, abstraction]
+        [
+            exploratory,
+            collaborative,
+            depth,
+            method,
+            scope,
+            abstraction,
+        ]
     }
 }
 
@@ -470,7 +576,15 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
     for m in &goal_markers {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
-            let end = find_next_marker(&lower[start..], &[&reason_markers[..], &boundary_markers[..], &verify_markers[..]].concat()) + start;
+            let end = find_next_marker(
+                &lower[start..],
+                &[
+                    &reason_markers[..],
+                    &boundary_markers[..],
+                    &verify_markers[..],
+                ]
+                .concat(),
+            ) + start;
             ctx.goal = slice_task(task, &lower, start, end);
             break;
         }
@@ -482,7 +596,15 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
     for m in &reason_markers {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
-            let end = find_next_marker(&lower[start..], &[&goal_markers[..], &boundary_markers[..], &verify_markers[..]].concat()) + start;
+            let end = find_next_marker(
+                &lower[start..],
+                &[
+                    &goal_markers[..],
+                    &boundary_markers[..],
+                    &verify_markers[..],
+                ]
+                .concat(),
+            ) + start;
             ctx.reason = slice_task(task, &lower, start, end);
             break;
         }
@@ -491,7 +613,10 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
     for m in &boundary_markers {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
-            let end = find_next_marker(&lower[start..], &[&goal_markers[..], &reason_markers[..], &verify_markers[..]].concat()) + start;
+            let end = find_next_marker(
+                &lower[start..],
+                &[&goal_markers[..], &reason_markers[..], &verify_markers[..]].concat(),
+            ) + start;
             ctx.boundaries = slice_task(task, &lower, start, end);
             break;
         }
@@ -500,7 +625,15 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
     for m in &verify_markers {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
-            let end = find_next_marker(&lower[start..], &[&goal_markers[..], &reason_markers[..], &boundary_markers[..]].concat()) + start;
+            let end = find_next_marker(
+                &lower[start..],
+                &[
+                    &goal_markers[..],
+                    &reason_markers[..],
+                    &boundary_markers[..],
+                ]
+                .concat(),
+            ) + start;
             ctx.verification = slice_task(task, &lower, start, end);
             break;
         }
@@ -549,7 +682,10 @@ pub struct MultipleHypothesisEvaluator {
 
 impl Default for MultipleHypothesisEvaluator {
     fn default() -> Self {
-        Self { k: 5, min_confidence: 0.3 }
+        Self {
+            k: 5,
+            min_confidence: 0.3,
+        }
     }
 }
 
@@ -569,38 +705,51 @@ impl MultipleHypothesisEvaluator {
         let task_str = intent.to_task_string();
         let lower = task_str.to_lowercase();
 
-        let mut fits: Vec<ModeFit> = (0..64).map(|bits| {
-            let state = ReasoningHexagram(bits);
-            let keywords = state.task_recommendation();
+        let mut fits: Vec<ModeFit> = (0..64)
+            .map(|bits| {
+                let state = ReasoningHexagram(bits);
+                let keywords = state.task_recommendation();
 
-            // Keyword match
-            let keyword_score: f64 = keywords.iter().map(|kw| {
-                if lower.contains(kw) { 1.0 } else { 0.0 }
-            }).sum();
+                // Keyword match
+                let keyword_score: f64 = keywords
+                    .iter()
+                    .map(|kw| if lower.contains(kw) { 1.0 } else { 0.0 })
+                    .sum();
 
-            // Effort keyword bonus
-            let effort_kw_bonus: f64 = effort.recommendation().iter().map(|ew| {
-                if lower.contains(*ew) { 2.0 } else { 0.0 }
-            }).sum();
+                // Effort keyword bonus
+                let effort_kw_bonus: f64 = effort
+                    .recommendation()
+                    .iter()
+                    .map(|ew| if lower.contains(*ew) { 2.0 } else { 0.0 })
+                    .sum();
 
-            // Factor alignment: combine intent factors with effort
-            let factor_alignment: f64 = (0..6).map(|i| {
-                let axis_val = state.axis(i) as f64;
-                let blended = factors[i] * 0.6 + effort_factors[i] * 0.4;
-                1.0 - (axis_val - blended).abs()
-            }).sum::<f64>() / 6.0;
+                // Factor alignment: combine intent factors with effort
+                let factor_alignment: f64 = (0..6)
+                    .map(|i| {
+                        let axis_val = state.axis(i) as f64;
+                        let blended = factors[i] * 0.6 + effort_factors[i] * 0.4;
+                        1.0 - (axis_val - blended).abs()
+                    })
+                    .sum::<f64>()
+                    / 6.0;
 
-            // Total score
-            let score = keyword_score * 2.0 + effort_kw_bonus + factor_alignment * 5.0;
-            let max_possible = keywords.len() as f64 * 2.0 + effort.recommendation().len() as f64 * 2.0 + 5.0;
-            let confidence = if max_possible > 0.0 {
-                (score / max_possible).min(1.0)
-            } else {
-                0.0
-            };
+                // Total score
+                let score = keyword_score * 2.0 + effort_kw_bonus + factor_alignment * 5.0;
+                let max_possible =
+                    keywords.len() as f64 * 2.0 + effort.recommendation().len() as f64 * 2.0 + 5.0;
+                let confidence = if max_possible > 0.0 {
+                    (score / max_possible).min(1.0)
+                } else {
+                    0.0
+                };
 
-            ModeFit { state, score: score as u32, confidence }
-        }).collect();
+                ModeFit {
+                    state,
+                    score: score as u32,
+                    confidence,
+                }
+            })
+            .collect();
 
         // Sort by score descending, filter by confidence, take top K
         fits.sort_by(|a, b| b.score.cmp(&a.score));
@@ -629,7 +778,10 @@ pub fn select_mode_by_intent(intent: &IntentionContext) -> ReasoningHexagram {
 ///
 /// Effort level is projected onto the E8 factor space and combined with the
 /// intention-derived factor context to bias mode selection.
-pub fn select_mode_by_intent_with_effort(intent: &IntentionContext, effort: ReasoningEffort) -> ReasoningHexagram {
+pub fn select_mode_by_intent_with_effort(
+    intent: &IntentionContext,
+    effort: ReasoningEffort,
+) -> ReasoningHexagram {
     let mut factors = intent.to_e8_factor_context();
     let effort_factors = effort.to_e8_factors();
 
@@ -649,21 +801,27 @@ pub fn select_mode_by_intent_with_effort(intent: &IntentionContext, effort: Reas
         let keywords = state.task_recommendation();
 
         // Keyword match score
-        let keyword_score: f64 = keywords.iter().map(|kw| {
-            if lower.contains(kw) { 1.0 } else { 0.0 }
-        }).sum();
+        let keyword_score: f64 = keywords
+            .iter()
+            .map(|kw| if lower.contains(kw) { 1.0 } else { 0.0 })
+            .sum();
 
         // Effort keyword bonus: matches against effort.recommendation()
-        let effort_kw_bonus: f64 = effort.recommendation().iter().map(|ew| {
-            if lower.contains(*ew) { 2.0 } else { 0.0 }
-        }).sum();
+        let effort_kw_bonus: f64 = effort
+            .recommendation()
+            .iter()
+            .map(|ew| if lower.contains(*ew) { 2.0 } else { 0.0 })
+            .sum();
 
         // Factor alignment: continuous from 0.0 to 1.0 per axis
-        let factor_alignment: f64 = (0..6).map(|i| {
-            let axis_val = state.axis(i) as f64;
-            let factor_val = factors[i];
-            1.0 - (axis_val - factor_val).abs()
-        }).sum::<f64>() / 6.0;
+        let factor_alignment: f64 = (0..6)
+            .map(|i| {
+                let axis_val = state.axis(i) as f64;
+                let factor_val = factors[i];
+                1.0 - (axis_val - factor_val).abs()
+            })
+            .sum::<f64>()
+            / 6.0;
 
         let total = keyword_score * 2.0 + effort_kw_bonus + factor_alignment * 5.0;
         if total > best_score {
@@ -684,9 +842,10 @@ pub fn optimal_starting_mode(task: &str) -> ReasoningHexagram {
     for bits in 0..64u8 {
         let state = ReasoningHexagram(bits);
         let keywords = state.task_recommendation();
-        let score: u32 = keywords.iter().map(|kw| {
-            if lower.contains(kw) { 1 } else { 0 }
-        }).sum();
+        let score: u32 = keywords
+            .iter()
+            .map(|kw| if lower.contains(kw) { 1 } else { 0 })
+            .sum();
         if score > best_score {
             best_score = score;
             best_idx = bits;
@@ -707,20 +866,27 @@ pub struct ModeFit {
 /// Rank all 64 modes by fit for a task, return top-k.
 pub fn rank_modes_for_task(task: &str, top_k: usize) -> Vec<ModeFit> {
     let lower = task.to_lowercase();
-    let mut fits: Vec<ModeFit> = (0..64).map(|bits| {
-        let state = ReasoningHexagram(bits);
-        let keywords = state.task_recommendation();
-        let score: u32 = keywords.iter().map(|kw| {
-            if lower.contains(kw) { 1 } else { 0 }
-        }).sum();
-        let max_possible = keywords.len() as u32;
-        let confidence = if max_possible > 0 {
-            score as f64 / max_possible as f64
-        } else {
-            0.0
-        };
-        ModeFit { state, score, confidence }
-    }).collect();
+    let mut fits: Vec<ModeFit> = (0..64)
+        .map(|bits| {
+            let state = ReasoningHexagram(bits);
+            let keywords = state.task_recommendation();
+            let score: u32 = keywords
+                .iter()
+                .map(|kw| if lower.contains(kw) { 1 } else { 0 })
+                .sum();
+            let max_possible = keywords.len() as u32;
+            let confidence = if max_possible > 0 {
+                score as f64 / max_possible as f64
+            } else {
+                0.0
+            };
+            ModeFit {
+                state,
+                score,
+                confidence,
+            }
+        })
+        .collect();
 
     fits.sort_by_key(|b| std::cmp::Reverse(b.score));
     fits.truncate(top_k);
@@ -731,7 +897,7 @@ pub fn rank_modes_for_task(task: &str, top_k: usize) -> Vec<ModeFit> {
 /// Each step flips one or more bits, representing a shift in reasoning approach.
 pub struct ReasoningPath {
     pub states: Vec<ReasoningHexagram>,
-    pub transitions: Vec<u8>,  // which bits were flipped at each step
+    pub transitions: Vec<u8>, // which bits were flipped at each step
 }
 
 impl ReasoningPath {
@@ -749,7 +915,10 @@ impl ReasoningPath {
                 transitions.push(1 << i);
             }
         }
-        Self { states, transitions }
+        Self {
+            states,
+            transitions,
+        }
     }
 
     /// Length of the path (number of transitions).
@@ -778,9 +947,13 @@ impl MetaState {
     }
 
     /// Is the engine in meta-cognitive mode?
-    pub fn is_reflecting(&self) -> bool { self.0 & 1 == 1 }
+    pub fn is_reflecting(&self) -> bool {
+        self.0 & 1 == 1
+    }
     /// Is the engine planning ahead?
-    pub fn is_planning(&self) -> bool { (self.0 >> 1) & 1 == 1 }
+    pub fn is_planning(&self) -> bool {
+        (self.0 >> 1) & 1 == 1
+    }
 }
 
 /// Full 8-bit reasoning state: 6-bit hexagram + 2-bit meta.
@@ -806,12 +979,18 @@ impl FullReasoningState {
 
     /// Transition to a new mode while keeping meta-state.
     pub fn transition_to(&self, new_mode: ReasoningHexagram) -> Self {
-        Self { mode: new_mode, meta: self.meta }
+        Self {
+            mode: new_mode,
+            meta: self.meta,
+        }
     }
 
     /// Enter reflection mode.
     pub fn reflect(&self) -> Self {
-        Self { mode: self.mode, meta: MetaState(self.meta.0 | 1) }
+        Self {
+            mode: self.mode,
+            meta: MetaState(self.meta.0 | 1),
+        }
     }
 
     pub fn mode_name(&self) -> &'static str {
@@ -824,7 +1003,10 @@ impl FullReasoningState {
 
     /// Enter planning mode.
     pub fn plan(&self) -> Self {
-        Self { mode: self.mode, meta: MetaState(self.meta.0 | 2) }
+        Self {
+            mode: self.mode,
+            meta: MetaState(self.meta.0 | 2),
+        }
     }
 }
 
@@ -833,27 +1015,27 @@ impl FullReasoningState {
 /// 8 reasoning approaches (upper trigram).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReasoningApproach {
-    Debug,      // 坤 — find and fix defects
-    Test,       // 艮 — validate correctness
-    Analyze,    // 坎 — deep quantitative analysis
-    Design,     // 巽 — architectural design
-    Generate,   // 震 — code generation
-    Review,     // 离 — code review
-    Prototype,  // 兑 — rapid prototyping
-    Meta,       // 乾 — meta-cognitive reflection
+    Debug,     // 坤 — find and fix defects
+    Test,      // 艮 — validate correctness
+    Analyze,   // 坎 — deep quantitative analysis
+    Design,    // 巽 — architectural design
+    Generate,  // 震 — code generation
+    Review,    // 离 — code review
+    Prototype, // 兑 — rapid prototyping
+    Meta,      // 乾 — meta-cognitive reflection
 }
 
 /// 8 problem domains (lower trigram).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProblemDomain {
-    Bug,        // 坤 — defects and errors
-    Syntax,     // 艮 — syntax and types
-    Logic,      // 坎 — logic and correctness
-    Data,       // 巽 — data and state
-    Perf,       // 震 — performance
-    Security,   // 离 — security
-    Design,     // 兑 — code quality
-    System,     // 乾 — architecture and system
+    Bug,      // 坤 — defects and errors
+    Syntax,   // 艮 — syntax and types
+    Logic,    // 坎 — logic and correctness
+    Data,     // 巽 — data and state
+    Perf,     // 震 — performance
+    Security, // 离 — security
+    Design,   // 兑 — code quality
+    System,   // 乾 — architecture and system
 }
 
 /// 8×8 reasoning strategy matrix: approach × domain → hexagram.
@@ -881,15 +1063,30 @@ pub fn evolve_strategy_entry(
     match pattern_name {
         "Oscillation" | "LoopBack" => {
             let evolved = entry.flip_axis(4);
-            if evolved != *entry { *entry = evolved; true } else { false }
+            if evolved != *entry {
+                *entry = evolved;
+                true
+            } else {
+                false
+            }
         }
         "Stuck" => {
             let evolved = entry.flip_axes(0b001111);
-            if evolved != *entry { *entry = evolved; true } else { false }
+            if evolved != *entry {
+                *entry = evolved;
+                true
+            } else {
+                false
+            }
         }
         "Inefficient" => {
             let evolved = entry.flip_axis(3);
-            if evolved != *entry { *entry = evolved; true } else { false }
+            if evolved != *entry {
+                *entry = evolved;
+                true
+            } else {
+                false
+            }
         }
         _ => false,
     }
@@ -898,7 +1095,9 @@ pub fn evolve_strategy_entry(
 impl ReasoningApproach {
     pub fn all() -> [Self; 8] {
         use ReasoningApproach::*;
-        [Debug, Test, Analyze, Design, Generate, Review, Prototype, Meta]
+        [
+            Debug, Test, Analyze, Design, Generate, Review, Prototype, Meta,
+        ]
     }
 }
 
@@ -996,14 +1195,17 @@ mod tests {
         let goal = ReasoningHexagram(0b001011);
         let path = ReasoningPath::shortest(start, goal);
         assert_eq!(path.len(), 3); // 3 bits differ
-        assert_eq!(*path.states.last().expect("value should be ok in test"), goal);
+        assert_eq!(
+            *path.states.last().expect("value should be ok in test"),
+            goal
+        );
     }
 
     #[test]
     fn test_optimal_starting_mode() {
         let mode = optimal_starting_mode("fix this crash bug");
         assert!(mode.0 < 64);
-         // "crash" is in mode 0 (Deep Debug) keywords
+        // "crash" is in mode 0 (Deep Debug) keywords
         // but could also match others
     }
 
@@ -1029,7 +1231,7 @@ mod tests {
         let matrix = strategy_matrix();
         assert_eq!(matrix.len(), 8);
         assert_eq!(matrix[0].len(), 8);
-        assert_eq!(matrix[0][0], ReasoningHexagram(0));  // Debug × Bug
+        assert_eq!(matrix[0][0], ReasoningHexagram(0)); // Debug × Bug
         assert_eq!(matrix[7][7], ReasoningHexagram(63)); // Meta × System
     }
 
@@ -1046,7 +1248,10 @@ mod tests {
         let mut matrix = strategy_matrix();
         let current = ReasoningHexagram(0b010_011); // approach=2, domain=3
         assert!(evolve_strategy_entry(&mut matrix, current, "Stuck"));
-        assert_eq!(matrix[2][3], ReasoningHexagram(0b010_011).flip_axes(0b001111));
+        assert_eq!(
+            matrix[2][3],
+            ReasoningHexagram(0b010_011).flip_axes(0b001111)
+        );
     }
 
     #[test]
@@ -1122,7 +1327,10 @@ mod tests {
 
     #[test]
     fn test_reasoning_effort_cost_monotonic() {
-        let costs: Vec<f64> = ReasoningEffort::all().iter().map(|e| e.cost_multiplier()).collect();
+        let costs: Vec<f64> = ReasoningEffort::all()
+            .iter()
+            .map(|e| e.cost_multiplier())
+            .collect();
         for w in costs.windows(2) {
             assert!(w[0] < w[1], "cost should be strictly increasing");
         }
@@ -1157,7 +1365,8 @@ mod tests {
         assert!(
             xhigh.depth() <= none.depth(),
             "XHigh (depth={}) should be ≤ None (depth={}) for a refactoring task",
-            xhigh.depth(), none.depth()
+            xhigh.depth(),
+            none.depth()
         );
     }
 
@@ -1172,7 +1381,10 @@ mod tests {
 
         let with_effort = select_mode_by_intent_with_effort(&intent, ReasoningEffort::Medium);
         let default = select_mode_by_intent(&intent);
-        assert_eq!(with_effort, default, "Medium effort should match default select_mode_by_intent");
+        assert_eq!(
+            with_effort, default,
+            "Medium effort should match default select_mode_by_intent"
+        );
     }
 
     #[test]
@@ -1193,7 +1405,8 @@ mod tests {
         assert!(
             high_depth <= low_depth,
             "High effort should select deeper modes (depth={}) than low (depth={})",
-            high_depth, low_depth
+            high_depth,
+            low_depth
         );
     }
 
@@ -1208,7 +1421,11 @@ mod tests {
 
         // None effort should select a Fast mode for simple QA
         let result = select_mode_by_intent_with_effort(&intent, ReasoningEffort::None);
-        assert_eq!(result.depth(), 1, "None effort should select Fast (depth=1) for simple Q&A");
+        assert_eq!(
+            result.depth(),
+            1,
+            "None effort should select Fast (depth=1) for simple Q&A"
+        );
 
         // For a complex research task, XHigh should bias toward Deep
         let research = IntentionContext {
@@ -1218,7 +1435,11 @@ mod tests {
             verification: "verify deadlock-free for 24h load test".into(),
         };
         let result_xh = select_mode_by_intent_with_effort(&research, ReasoningEffort::XHigh);
-        assert_eq!(result_xh.depth(), 0, "XHigh effort should select Deep (depth=0) for research task");
+        assert_eq!(
+            result_xh.depth(),
+            0,
+            "XHigh effort should select Deep (depth=0) for research task"
+        );
     }
 
     #[test]
@@ -1260,7 +1481,10 @@ mod tests {
         let results = evaluator.evaluate_default(&intent);
         assert!(results.len() <= 10, "should return at most k=10 results");
         for r in &results {
-            assert!(r.confidence >= 0.0, "confidence should be >= min_confidence");
+            assert!(
+                r.confidence >= 0.0,
+                "confidence should be >= min_confidence"
+            );
         }
     }
 
@@ -1275,7 +1499,10 @@ mod tests {
         };
         let results = evaluator.evaluate_default(&intent);
         for w in results.windows(2) {
-            assert!(w[0].score >= w[1].score, "should be sorted descending by score");
+            assert!(
+                w[0].score >= w[1].score,
+                "should be sorted descending by score"
+            );
         }
     }
 
@@ -1296,7 +1523,8 @@ mod tests {
         assert!(
             xh_depth <= med_depth,
             "XHigh effort should prefer equally or more deep modes vs Medium (xh={}, med={})",
-            xh_depth, med_depth
+            xh_depth,
+            med_depth
         );
     }
 }

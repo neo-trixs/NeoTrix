@@ -110,7 +110,8 @@ impl KnowledgeVersion {
     pub fn update(&mut self, description: &str) {
         self.version += 1;
         self.updated_at = Instant::now();
-        self.change_log.push(format!("v{}: {}", self.version, description));
+        self.change_log
+            .push(format!("v{}: {}", self.version, description));
         if self.change_log.len() > STALENESS_CONFIG.change_log_max {
             self.change_log.remove(0);
         }
@@ -161,7 +162,9 @@ impl VersionManager {
     pub fn create_version(&mut self) -> Result<&KnowledgeVersion, String> {
         let version = KnowledgeVersion::new(self.versions.len() as u64 + 1);
         self.versions.push(version);
-        self.versions.last().ok_or_else(|| "version push failed unexpectedly".to_string())
+        self.versions
+            .last()
+            .ok_or_else(|| "version push failed unexpectedly".to_string())
     }
 
     pub fn current_version(&self) -> Option<&KnowledgeVersion> {
@@ -187,14 +190,18 @@ impl VersionManager {
     }
 
     pub fn fresh_count(&self) -> usize {
-        self.versions.iter().filter(|v| v.staleness == StalenessLevel::Fresh).count()
+        self.versions
+            .iter()
+            .filter(|v| v.staleness == StalenessLevel::Fresh)
+            .count()
     }
 
     pub fn archive_obsolete(&mut self) {
         if !self.auto_archive {
             return;
         }
-        self.versions.retain(|v| v.staleness != StalenessLevel::Obsolete);
+        self.versions
+            .retain(|v| v.staleness != StalenessLevel::Obsolete);
         while self.versions.len() > self.max_versions {
             self.versions.remove(0);
         }
@@ -272,22 +279,43 @@ mod tests {
         mgr.update_current("patch applied");
         let current = mgr.current_version().unwrap();
         assert_eq!(current.version, 2);
-        assert!(current.change_log.iter().any(|l| l.contains("patch applied")));
+        assert!(current
+            .change_log
+            .iter()
+            .any(|l| l.contains("patch applied")));
     }
 
     #[test]
     fn test_staleness_level_from_age() {
-        assert_eq!(StalenessLevel::from_age(Duration::from_secs(30)), StalenessLevel::Fresh);
-        assert_eq!(StalenessLevel::from_age(Duration::from_secs(120)), StalenessLevel::Recent);
-        assert_eq!(StalenessLevel::from_age(Duration::from_secs(600)), StalenessLevel::Aging);
-        assert_eq!(StalenessLevel::from_age(Duration::from_secs(7200)), StalenessLevel::Stale);
-        assert_eq!(StalenessLevel::from_age(Duration::from_secs(90000)), StalenessLevel::Obsolete);
+        assert_eq!(
+            StalenessLevel::from_age(Duration::from_secs(30)),
+            StalenessLevel::Fresh
+        );
+        assert_eq!(
+            StalenessLevel::from_age(Duration::from_secs(120)),
+            StalenessLevel::Recent
+        );
+        assert_eq!(
+            StalenessLevel::from_age(Duration::from_secs(600)),
+            StalenessLevel::Aging
+        );
+        assert_eq!(
+            StalenessLevel::from_age(Duration::from_secs(7200)),
+            StalenessLevel::Stale
+        );
+        assert_eq!(
+            StalenessLevel::from_age(Duration::from_secs(90000)),
+            StalenessLevel::Obsolete
+        );
     }
 
     #[test]
     fn test_retention_multiplier_decreases() {
         assert!((StalenessLevel::Fresh.retention_multiplier() - 1.0).abs() < 1e-9);
-        assert!(StalenessLevel::Fresh.retention_multiplier() > StalenessLevel::Obsolete.retention_multiplier());
+        assert!(
+            StalenessLevel::Fresh.retention_multiplier()
+                > StalenessLevel::Obsolete.retention_multiplier()
+        );
     }
 
     #[test]

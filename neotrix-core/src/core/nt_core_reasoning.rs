@@ -4,8 +4,8 @@
 //! 提供 KB/经验 → Kernel context 自动注入的 ContextBuilder。
 
 use crate::core::nt_core_hex::ReasoningHexagram;
-pub use crate::neotrix::{ReasoningMethod, EVOLUTION, KERNEL_DIM, Vector};
 use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+pub use crate::neotrix::{ReasoningMethod, Vector, EVOLUTION, KERNEL_DIM};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -72,10 +72,10 @@ pub struct MethodRegistry {
 
 #[derive(Debug, Clone)]
 pub struct MethodSpec {
-    pub stage_range: (usize, usize),           // 该 method 适用的 stage 范围
-    pub preferred_hexagrams: Vec<u8>,          // 偏好 hexagram 位掩码
-    pub complexity_ceiling: f64,               // 复杂度上限
-    pub is_generative: bool,                   // 是否生成式
+    pub stage_range: (usize, usize),  // 该 method 适用的 stage 范围
+    pub preferred_hexagrams: Vec<u8>, // 偏好 hexagram 位掩码
+    pub complexity_ceiling: f64,      // 复杂度上限
+    pub is_generative: bool,          // 是否生成式
 }
 
 impl Default for MethodRegistry {
@@ -99,33 +99,153 @@ impl MethodRegistry {
         // 基于现有 EVOLUTION stage 与 ReasoningMethod 的语义对应建立映射
         let mappings = [
             // Stage 0-2: 基础推理
-            (ReasoningMethod::Deductive, (0, 2), vec![0b000000, 0b000001], 0.3, false),
-            (ReasoningMethod::Inductive, (0, 3), vec![0b000010, 0b000011], 0.4, false),
-            (ReasoningMethod::KnowledgeRetrieval, (0, 3), vec![0b000100], 0.2, false),
+            (
+                ReasoningMethod::Deductive,
+                (0, 2),
+                vec![0b000000, 0b000001],
+                0.3,
+                false,
+            ),
+            (
+                ReasoningMethod::Inductive,
+                (0, 3),
+                vec![0b000010, 0b000011],
+                0.4,
+                false,
+            ),
+            (
+                ReasoningMethod::KnowledgeRetrieval,
+                (0, 3),
+                vec![0b000100],
+                0.2,
+                false,
+            ),
             // Stage 3-4: 类比/递归
-            (ReasoningMethod::Analogical, (3, 4), vec![0b001000, 0b001001], 0.5, true),
-            (ReasoningMethod::Recursive, (3, 5), vec![0b001010, 0b001011], 0.6, true),
+            (
+                ReasoningMethod::Analogical,
+                (3, 4),
+                vec![0b001000, 0b001001],
+                0.5,
+                true,
+            ),
+            (
+                ReasoningMethod::Recursive,
+                (3, 5),
+                vec![0b001010, 0b001011],
+                0.6,
+                true,
+            ),
             // Stage 5-6: 组合/对抗
-            (ReasoningMethod::Compositional, (5, 6), vec![0b010000, 0b010001], 0.7, true),
-            (ReasoningMethod::Adversarial, (5, 7), vec![0b010010, 0b010011], 0.7, true),
+            (
+                ReasoningMethod::Compositional,
+                (5, 6),
+                vec![0b010000, 0b010001],
+                0.7,
+                true,
+            ),
+            (
+                ReasoningMethod::Adversarial,
+                (5, 7),
+                vec![0b010010, 0b010011],
+                0.7,
+                true,
+            ),
             // Stage 7-9: 第一性原理/自动获取
-            (ReasoningMethod::FirstPrinciples, (7, 9), vec![0b100000, 0b100001], 0.8, true),
-            (ReasoningMethod::AutoFetch, (7, 8), vec![0b100010], 0.5, false),
+            (
+                ReasoningMethod::FirstPrinciples,
+                (7, 9),
+                vec![0b100000, 0b100001],
+                0.8,
+                true,
+            ),
+            (
+                ReasoningMethod::AutoFetch,
+                (7, 8),
+                vec![0b100010],
+                0.5,
+                false,
+            ),
             // Stage 10-13: 学习/搜索
-            (ReasoningMethod::GradientLearning, (10, 13), vec![0b110000], 0.9, true),
-            (ReasoningMethod::ArchitectureSearch, (10, 13), vec![0b110001], 0.9, true),
-            (ReasoningMethod::GpuCompute, (11, 13), vec![0b110010], 1.0, true),
+            (
+                ReasoningMethod::GradientLearning,
+                (10, 13),
+                vec![0b110000],
+                0.9,
+                true,
+            ),
+            (
+                ReasoningMethod::ArchitectureSearch,
+                (10, 13),
+                vec![0b110001],
+                0.9,
+                true,
+            ),
+            (
+                ReasoningMethod::GpuCompute,
+                (11, 13),
+                vec![0b110010],
+                1.0,
+                true,
+            ),
             // Stage 14-16: 整合/涌现
-            (ReasoningMethod::ExperienceDistill, (14, 16), vec![0b111000], 0.8, true),
-            (ReasoningMethod::EmergentAnalysis, (14, 16), vec![0b111001], 0.9, true),
-            (ReasoningMethod::SystemIntegration, (14, 16), vec![0b111010], 0.9, true),
+            (
+                ReasoningMethod::ExperienceDistill,
+                (14, 16),
+                vec![0b111000],
+                0.8,
+                true,
+            ),
+            (
+                ReasoningMethod::EmergentAnalysis,
+                (14, 16),
+                vec![0b111001],
+                0.9,
+                true,
+            ),
+            (
+                ReasoningMethod::SystemIntegration,
+                (14, 16),
+                vec![0b111010],
+                0.9,
+                true,
+            ),
             // Stage 17-18: 元推理
-            (ReasoningMethod::EnsembleVoting, (17, 18), vec![0b111100], 1.0, true),
-            (ReasoningMethod::SelfImprovement, (17, 18), vec![0b111101], 1.0, true),
-            (ReasoningMethod::SparseRouting, (17, 18), vec![0b111110], 1.0, true),
+            (
+                ReasoningMethod::EnsembleVoting,
+                (17, 18),
+                vec![0b111100],
+                1.0,
+                true,
+            ),
+            (
+                ReasoningMethod::SelfImprovement,
+                (17, 18),
+                vec![0b111101],
+                1.0,
+                true,
+            ),
+            (
+                ReasoningMethod::SparseRouting,
+                (17, 18),
+                vec![0b111110],
+                1.0,
+                true,
+            ),
             // 其余 method 兜底
-            (ReasoningMethod::Abductive, (2, 5), vec![0b000110], 0.4, true),
-            (ReasoningMethod::DistributedConsensus, (12, 15), vec![0b110100], 0.8, true),
+            (
+                ReasoningMethod::Abductive,
+                (2, 5),
+                vec![0b000110],
+                0.4,
+                true,
+            ),
+            (
+                ReasoningMethod::DistributedConsensus,
+                (12, 15),
+                vec![0b110100],
+                0.8,
+                true,
+            ),
         ];
 
         for (method, (stage_min, stage_max), hexagrams, complexity, generative) in mappings {
@@ -140,7 +260,8 @@ impl MethodRegistry {
                 self.stage_methods[stage].push(method);
             }
             for h in hexagrams {
-                self.hexagram_reverse.insert(h, (method, (stage_min + stage_max) / 2));
+                self.hexagram_reverse
+                    .insert(h, (method, (stage_min + stage_max) / 2));
             }
         }
 
@@ -170,7 +291,8 @@ impl MethodRegistry {
     /// 根据 task 复杂度推荐 method
     pub fn recommend_method(&self, complexity: f64, current_stage: usize) -> ReasoningMethod {
         let methods = self.methods_for_stage(current_stage);
-        methods.iter()
+        methods
+            .iter()
             .filter(|m| self.method_map[m].complexity_ceiling >= complexity)
             .max_by_key(|m| self.method_map[m].complexity_ceiling as u32)
             .copied()
@@ -213,7 +335,10 @@ impl ContextBuilder {
             for (i, r) in results.iter().enumerate() {
                 if r.score >= self.relevance_threshold {
                     // 优先用 content，回退 summary，再回退 title
-                    let text = r.node.content.as_deref()
+                    let text = r
+                        .node
+                        .content
+                        .as_deref()
                         .or(r.node.summary.as_deref())
                         .unwrap_or(&r.node.title);
                     let vec = self.text_to_vector(text, KERNEL_DIM);

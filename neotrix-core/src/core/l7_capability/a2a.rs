@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TaskState {
@@ -13,7 +13,10 @@ pub enum TaskState {
 
 impl TaskState {
     pub fn is_terminal(&self) -> bool {
-        matches!(self, TaskState::Completed | TaskState::Failed { .. } | TaskState::Canceled)
+        matches!(
+            self,
+            TaskState::Completed | TaskState::Failed { .. } | TaskState::Canceled
+        )
     }
 
     pub fn label(&self) -> &str {
@@ -43,9 +46,18 @@ pub enum A2ARole {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum A2APart {
-    Text { text: String },
-    File { mime_type: String, data: String, name: String },
-    Data { key: String, value: serde_json::Value },
+    Text {
+        text: String,
+    },
+    File {
+        mime_type: String,
+        data: String,
+        name: String,
+    },
+    Data {
+        key: String,
+        value: serde_json::Value,
+    },
 }
 
 impl A2AMessage {
@@ -209,23 +221,26 @@ impl A2ARegistry {
     }
 
     pub fn find_by_capability(&self, capability: &str) -> Vec<&AgentCard> {
-        self.agents.values()
-            .filter(|card| card.capabilities.iter().any(|c| c.id == capability || c.name == capability))
+        self.agents
+            .values()
+            .filter(|card| {
+                card.capabilities
+                    .iter()
+                    .any(|c| c.id == capability || c.name == capability)
+            })
             .collect()
     }
 
     pub fn find_by_skill(&self, skill: &str) -> Vec<&AgentCard> {
-        self.agents.values()
+        self.agents
+            .values()
             .filter(|card| card.skills.iter().any(|s| s.name == skill))
             .collect()
     }
 
     pub fn create_task(&mut self, task: A2ATask) {
         if self.tasks.len() >= self.max_tasks {
-            if let Some(oldest) = self.tasks.keys()
-                .next()
-                .cloned()
-            {
+            if let Some(oldest) = self.tasks.keys().next().cloned() {
                 self.tasks.remove(&oldest);
             }
         }
@@ -241,7 +256,8 @@ impl A2ARegistry {
     }
 
     pub fn active_tasks(&self) -> Vec<&A2ATask> {
-        self.tasks.values()
+        self.tasks
+            .values()
             .filter(|t| !t.state.is_terminal())
             .collect()
     }
@@ -257,7 +273,9 @@ impl A2ARegistry {
 
     pub fn fail_task(&mut self, task_id: &str, error: &str) -> Option<A2ATask> {
         if let Some(task) = self.tasks.get_mut(task_id) {
-            task.transition(TaskState::Failed { error: error.to_string() });
+            task.transition(TaskState::Failed {
+                error: error.to_string(),
+            });
             return Some(task.clone());
         }
         None
@@ -292,7 +310,11 @@ mod tests {
     #[test]
     fn test_agent_card_new() {
         let card = AgentCard::new("test-agent")
-            .capability("code-gen", "Code Generation", "Generates code from descriptions")
+            .capability(
+                "code-gen",
+                "Code Generation",
+                "Generates code from descriptions",
+            )
             .endpoint("a2a", "http://localhost:8080/a2a");
         assert_eq!(card.agent_name, "test-agent");
         assert_eq!(card.capabilities.len(), 1);
@@ -302,8 +324,7 @@ mod tests {
 
     #[test]
     fn test_agent_card_to_json() {
-        let card = AgentCard::new("json-agent")
-            .capability("echo", "Echo", "Echoes input");
+        let card = AgentCard::new("json-agent").capability("echo", "Echo", "Echoes input");
         let json = card.to_json();
         assert!(json.is_object());
         assert_eq!(json["agent_name"], "json-agent");
@@ -333,7 +354,10 @@ mod tests {
         assert_eq!(TaskState::Submitted.label(), "submitted");
         assert_eq!(TaskState::Completed.label(), "completed");
         assert_eq!(
-            TaskState::Failed { error: "err".to_string() }.label(),
+            TaskState::Failed {
+                error: "err".to_string()
+            }
+            .label(),
             "failed"
         );
     }
@@ -341,8 +365,7 @@ mod tests {
     #[test]
     fn test_a2a_registry_register_and_find() {
         let mut registry = A2ARegistry::new();
-        let card = AgentCard::new("finder")
-            .capability("search", "Search", "Search capability");
+        let card = AgentCard::new("finder").capability("search", "Search", "Search capability");
         registry.register(card);
 
         assert_eq!(registry.agent_count(), 1);
@@ -378,22 +401,22 @@ mod tests {
         assert!(failed.is_some());
         assert_eq!(
             failed.unwrap().state,
-            TaskState::Failed { error: "something went wrong".to_string() }
+            TaskState::Failed {
+                error: "something went wrong".to_string()
+            }
         );
     }
 
     #[test]
     fn test_a2a_message_with_metadata() {
-        let msg = A2AMessage::text(A2ARole::Agent, "hi")
-            .with_metadata("lang", "en");
+        let msg = A2AMessage::text(A2ARole::Agent, "hi").with_metadata("lang", "en");
         assert_eq!(msg.metadata.get("lang").unwrap(), "en");
         assert_eq!(msg.role, A2ARole::Agent);
     }
 
     #[test]
     fn test_agent_skill() {
-        let card = AgentCard::new("skilled-agent")
-            .capability("code", "Code", "Coding");
+        let card = AgentCard::new("skilled-agent").capability("code", "Code", "Coding");
         let mut card_with_skill = card.clone();
         card_with_skill.skills.push(AgentSkill {
             id: "s1".to_string(),
@@ -413,7 +436,9 @@ mod tests {
     #[test]
     fn test_task_add_message() {
         let mut task = A2ATask::new("t3", "s1");
-        let text_part = A2APart::Text { text: "hello".to_string() };
+        let text_part = A2APart::Text {
+            text: "hello".to_string(),
+        };
         let file_part = A2APart::File {
             mime_type: "text/plain".to_string(),
             data: "base64data".to_string(),

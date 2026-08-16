@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,14 +39,20 @@ impl MicroEdit {
     /// 人类可读的摘要（供 T3 视图生成使用）
     pub fn summary(&self) -> String {
         match self {
-            MicroEdit::AdjustDimension(name, val) => format!("adjust dimension '{}' by {}", name, val),
+            MicroEdit::AdjustDimension(name, val) => {
+                format!("adjust dimension '{}' by {}", name, val)
+            }
             MicroEdit::UpdateLearningRate(lr) => format!("update learning rate to {}", lr),
             MicroEdit::NormalizeVector => "normalize capability vector".into(),
             MicroEdit::AddExtension(exts) => format!("add {} extensions", exts.len()),
             MicroEdit::SetProvenance(src) => format!("set provenance to '{}'", src),
-            MicroEdit::BatchAdjust(adjustments) => format!("batch adjust {} dimensions", adjustments.len()),
+            MicroEdit::BatchAdjust(adjustments) => {
+                format!("batch adjust {} dimensions", adjustments.len())
+            }
             MicroEdit::AddedDimension(name, val) => format!("add dimension '{}' = {}", name, val),
-            MicroEdit::ModifiedDimension(name, old, new) => format!("modify '{}': {} → {}", name, old, new),
+            MicroEdit::ModifiedDimension(name, old, new) => {
+                format!("modify '{}': {} → {}", name, old, new)
+            }
             MicroEdit::RemovedDimension(name) => format!("remove dimension '{}'", name),
         }
     }
@@ -163,6 +169,9 @@ mod tests {
             params,
         };
         assert_eq!(tc.tool, "web_scrape");
-        assert_eq!(tc.params.get("url").expect("value should be ok in test"), "https://example.com");
+        assert_eq!(
+            tc.params.get("url").expect("value should be ok in test"),
+            "https://example.com"
+        );
     }
 }

@@ -286,7 +286,8 @@ impl DreamConsolidation {
         let mut count = 0;
         for i in 0..self.consolidated.len() {
             for j in i + 1..self.consolidated.len() {
-                total_sim += QuantizedVSA::similarity(&self.consolidated[i].0, &self.consolidated[j].0);
+                total_sim +=
+                    QuantizedVSA::similarity(&self.consolidated[i].0, &self.consolidated[j].0);
                 count += 1;
             }
         }
@@ -426,7 +427,7 @@ mod tests {
         // Run enough cycles so pattern frequency triggers abstraction (min_abstraction_freq=2)
         let mut total_abs = 0;
         for _ in 0..6 {
-        let r = dc.run_consolidation_cycle();
+            let r = dc.run_consolidation_cycle();
             total_abs += r.abstractions_formed;
         }
         assert!(total_abs > 0, "should form at least 1 abstraction");

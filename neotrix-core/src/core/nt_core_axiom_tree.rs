@@ -146,29 +146,89 @@ impl AxiomTree {
         ];
 
         let constraints = vec![
-            ModuleConstraint { id: "MC-1.1.1", law_id: "LW-1.1", module: "nt_core_*", constraint: "每个核心 crate 顶部 #![forbid(unsafe_code)]" },
-            ModuleConstraint { id: "MC-1.2.1", law_id: "LW-1.2", module: "nt_shield", constraint: "SafetyDecision 带 kernel_version + 证据签名" },
-            ModuleConstraint { id: "MC-2.1.1", law_id: "LW-2.1", module: "nt_memory", constraint: "experience 命名空间唯一存储路径" },
-            ModuleConstraint { id: "MC-2.2.1", law_id: "LW-2.2", module: "AGENTS.md", constraint: "agents-guard.js 门禁校验结构" },
-            ModuleConstraint { id: "MC-3.1.1", law_id: "LW-3.1", module: "nt_world", constraint: "每个爬取模块有消费方" },
-            ModuleConstraint { id: "MC-3.2.1", law_id: "LW-3.2", module: "全部模块", constraint: "cargo check + cargo test 双验证" },
-            ModuleConstraint { id: "MC-4.1.1", law_id: "LW-4.1", module: "SEAL pipeline", constraint: "每阶段输入→变换→输出显式" },
-            ModuleConstraint { id: "MC-4.2.1", law_id: "LW-4.2", module: "converge_check", constraint: "Phase-0 检测断点" },
-            ModuleConstraint { id: "MC-5.1.1", law_id: "LW-5.1", module: "nt_mind", constraint: "吸收同 session 接线" },
-            ModuleConstraint { id: "MC-5.2.1", law_id: "LW-5.2", module: "nt_mind", constraint: "强化现有节点不建平行模块" },
+            ModuleConstraint {
+                id: "MC-1.1.1",
+                law_id: "LW-1.1",
+                module: "nt_core_*",
+                constraint: "每个核心 crate 顶部 #![forbid(unsafe_code)]",
+            },
+            ModuleConstraint {
+                id: "MC-1.2.1",
+                law_id: "LW-1.2",
+                module: "nt_shield",
+                constraint: "SafetyDecision 带 kernel_version + 证据签名",
+            },
+            ModuleConstraint {
+                id: "MC-2.1.1",
+                law_id: "LW-2.1",
+                module: "nt_memory",
+                constraint: "experience 命名空间唯一存储路径",
+            },
+            ModuleConstraint {
+                id: "MC-2.2.1",
+                law_id: "LW-2.2",
+                module: "AGENTS.md",
+                constraint: "agents-guard.js 门禁校验结构",
+            },
+            ModuleConstraint {
+                id: "MC-3.1.1",
+                law_id: "LW-3.1",
+                module: "nt_world",
+                constraint: "每个爬取模块有消费方",
+            },
+            ModuleConstraint {
+                id: "MC-3.2.1",
+                law_id: "LW-3.2",
+                module: "全部模块",
+                constraint: "cargo check + cargo test 双验证",
+            },
+            ModuleConstraint {
+                id: "MC-4.1.1",
+                law_id: "LW-4.1",
+                module: "SEAL pipeline",
+                constraint: "每阶段输入→变换→输出显式",
+            },
+            ModuleConstraint {
+                id: "MC-4.2.1",
+                law_id: "LW-4.2",
+                module: "converge_check",
+                constraint: "Phase-0 检测断点",
+            },
+            ModuleConstraint {
+                id: "MC-5.1.1",
+                law_id: "LW-5.1",
+                module: "nt_mind",
+                constraint: "吸收同 session 接线",
+            },
+            ModuleConstraint {
+                id: "MC-5.2.1",
+                law_id: "LW-5.2",
+                module: "nt_mind",
+                constraint: "强化现有节点不建平行模块",
+            },
         ];
 
-        Self { axioms, laws, constraints }
+        Self {
+            axioms,
+            laws,
+            constraints,
+        }
     }
 
     /// 从公理推演其定律（对标乌贼"一条规则推演整个社会"）
     pub fn derive(&self, axiom_id: &str) -> Vec<&DerivedLaw> {
-        self.laws.iter().filter(|l| l.axiom_id == axiom_id).collect()
+        self.laws
+            .iter()
+            .filter(|l| l.axiom_id == axiom_id)
+            .collect()
     }
 
     /// 从定律推演模块约束
     pub fn constraints_for(&self, law_id: &str) -> Vec<&ModuleConstraint> {
-        self.constraints.iter().filter(|c| c.law_id == law_id).collect()
+        self.constraints
+            .iter()
+            .filter(|c| c.law_id == law_id)
+            .collect()
     }
 
     /// 公理 → 完整推演链（定律 + 约束）
@@ -197,9 +257,15 @@ impl AxiomTree {
                 axiom.id, axiom.name, axiom.statement, axiom.violation_consequence
             ));
             for (law, cons) in self.trace(axiom.id) {
-                out.push_str(&format!("  └─ {} {} — {}\n", law.id, law.name, law.statement));
+                out.push_str(&format!(
+                    "  └─ {} {} — {}\n",
+                    law.id, law.name, law.statement
+                ));
                 for c in cons {
-                    out.push_str(&format!("       └─ {} [{}] {}\n", c.id, c.module, c.constraint));
+                    out.push_str(&format!(
+                        "       └─ {} [{}] {}\n",
+                        c.id, c.module, c.constraint
+                    ));
                 }
             }
         }

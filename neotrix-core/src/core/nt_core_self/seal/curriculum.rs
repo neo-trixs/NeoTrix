@@ -78,11 +78,7 @@ impl CalibratedCurriculumGenerator {
         if self.tasks_completed.is_empty() {
             return self.difficulty_level;
         }
-        let success_count = self
-            .tasks_completed
-            .iter()
-            .filter(|r| r.success)
-            .count();
+        let success_count = self.tasks_completed.iter().filter(|r| r.success).count();
         let rate = success_count as f64 / self.tasks_completed.len() as f64;
         if rate >= self.mastery_threshold {
             self.difficulty_level = (self.difficulty_level + 0.1).min(1.0);
@@ -96,11 +92,7 @@ impl CalibratedCurriculumGenerator {
         if self.tasks_completed.is_empty() {
             return 0.0;
         }
-        let success_count = self
-            .tasks_completed
-            .iter()
-            .filter(|r| r.success)
-            .count();
+        let success_count = self.tasks_completed.iter().filter(|r| r.success).count();
         success_count as f64 / self.tasks_completed.len() as f64
     }
 
@@ -111,7 +103,12 @@ impl CalibratedCurriculumGenerator {
         let w = self.window_size.min(self.tasks_completed.len());
         let chunk_size = self.tasks_completed.len().div_ceil(w);
         let mut curve = Vec::new();
-        for chunk in self.tasks_completed.iter().collect::<Vec<_>>().chunks(chunk_size) {
+        for chunk in self
+            .tasks_completed
+            .iter()
+            .collect::<Vec<_>>()
+            .chunks(chunk_size)
+        {
             let successes = chunk.iter().filter(|r| r.success).count();
             curve.push(successes as f64 / chunk.len() as f64);
         }

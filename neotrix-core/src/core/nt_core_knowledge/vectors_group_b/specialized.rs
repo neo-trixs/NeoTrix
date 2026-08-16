@@ -1,16 +1,12 @@
-use crate::core::CapabilityVector;
 use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::core::CapabilityVector;
 
 pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
     match s {
         KnowledgeSource::IntegratedInformationTheory => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.4, 0.3,
-                0.5, 0.4, 0.3, 0.4,
-                0.95, 0.9, 0.92, 0.93, 0.95,
-                0.3, 0.3, 0.2,
-                0.3, 0.4, 0.3,
-                0.7, 0.9, 0.92, 0.85,
+                0.3, 0.3, 0.4, 0.3, 0.5, 0.4, 0.3, 0.4, 0.95, 0.9, 0.92, 0.93, 0.95, 0.3, 0.3, 0.2,
+                0.3, 0.4, 0.3, 0.7, 0.9, 0.92, 0.85,
             );
             cv.extend_named(&[
                 ("integrated_information_phi".into(), 0.98),
@@ -25,12 +21,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::GlobalWorkspaceTheory => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.3, 0.2,
-                0.4, 0.3, 0.2, 0.5,
-                0.93, 0.85, 0.9, 0.92, 0.93,
-                0.3, 0.3, 0.2,
-                0.2, 0.3, 0.2,
-                0.8, 0.9, 0.92, 0.88,
+                0.2, 0.2, 0.3, 0.2, 0.4, 0.3, 0.2, 0.5, 0.93, 0.85, 0.9, 0.92, 0.93, 0.3, 0.3, 0.2,
+                0.2, 0.3, 0.2, 0.8, 0.9, 0.92, 0.88,
             );
             cv.extend_named(&[
                 ("global_workspace_broadcast".into(), 0.97),
@@ -45,12 +37,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::ActiveInference => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.4, 0.3,
-                0.5, 0.5, 0.3, 0.4,
-                0.94, 0.92, 0.93, 0.9, 0.95,
-                0.3, 0.4, 0.3,
-                0.2, 0.3, 0.2,
-                0.9, 0.95, 0.93, 0.9,
+                0.3, 0.3, 0.4, 0.3, 0.5, 0.5, 0.3, 0.4, 0.94, 0.92, 0.93, 0.9, 0.95, 0.3, 0.4, 0.3,
+                0.2, 0.3, 0.2, 0.9, 0.95, 0.93, 0.9,
             );
             cv.extend_named(&[
                 ("free_energy_minimization".into(), 0.98),
@@ -66,12 +54,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::VSAHyperdim => {
             let mut cv = CapabilityVector::from_values(
-                0.4, 0.4, 0.5, 0.4,
-                0.5, 0.5, 0.4, 0.5,
-                0.92, 0.88, 0.9, 0.85, 0.92,
-                0.4, 0.4, 0.3,
-                0.3, 0.4, 0.3,
-                0.85, 0.9, 0.9, 0.88,
+                0.4, 0.4, 0.5, 0.4, 0.5, 0.5, 0.4, 0.5, 0.92, 0.88, 0.9, 0.85, 0.92, 0.4, 0.4, 0.3,
+                0.3, 0.4, 0.3, 0.85, 0.9, 0.9, 0.88,
             );
             cv.extend_named(&[
                 ("hyperdimensional_computing".into(), 0.98),
@@ -87,12 +71,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::JEPAWorldModel => {
             let mut cv = CapabilityVector::from_values(
-                0.4, 0.4, 0.5, 0.4,
-                0.6, 0.5, 0.4, 0.4,
-                0.95, 0.9, 0.93, 0.92, 0.94,
-                0.4, 0.5, 0.3,
-                0.3, 0.4, 0.3,
-                0.95, 0.93, 0.92, 0.9,
+                0.4, 0.4, 0.5, 0.4, 0.6, 0.5, 0.4, 0.4, 0.95, 0.9, 0.93, 0.92, 0.94, 0.4, 0.5, 0.3,
+                0.3, 0.4, 0.3, 0.95, 0.93, 0.92, 0.9,
             );
             cv.extend_named(&[
                 ("joint_embedding".into(), 0.98),
@@ -107,12 +87,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::PredictiveCoding => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.4, 0.3,
-                0.5, 0.4, 0.3, 0.4,
-                0.93, 0.9, 0.92, 0.9, 0.93,
-                0.3, 0.4, 0.3,
-                0.2, 0.3, 0.2,
-                0.88, 0.9, 0.92, 0.85,
+                0.3, 0.3, 0.4, 0.3, 0.5, 0.4, 0.3, 0.4, 0.93, 0.9, 0.92, 0.9, 0.93, 0.3, 0.4, 0.3,
+                0.2, 0.3, 0.2, 0.88, 0.9, 0.92, 0.85,
             );
             cv.extend_named(&[
                 ("prediction_error_minimization".into(), 0.98),
@@ -126,12 +102,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::OrchOR => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.3, 0.2,
-                0.3, 0.3, 0.2, 0.2,
-                0.85, 0.8, 0.88, 0.85, 0.9,
-                0.2, 0.2, 0.1,
-                0.2, 0.2, 0.1,
-                0.4, 0.8, 0.85, 0.7,
+                0.2, 0.2, 0.3, 0.2, 0.3, 0.3, 0.2, 0.2, 0.85, 0.8, 0.88, 0.85, 0.9, 0.2, 0.2, 0.1,
+                0.2, 0.2, 0.1, 0.4, 0.8, 0.85, 0.7,
             );
             cv.extend_named(&[
                 ("orchestrated_reduction".into(), 0.96),
@@ -145,12 +117,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::AttentionSchema => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.3, 0.2,
-                0.4, 0.3, 0.3, 0.4,
-                0.9, 0.85, 0.88, 0.9, 0.9,
-                0.2, 0.3, 0.2,
-                0.2, 0.2, 0.2,
-                0.7, 0.85, 0.88, 0.85,
+                0.2, 0.2, 0.3, 0.2, 0.4, 0.3, 0.3, 0.4, 0.9, 0.85, 0.88, 0.9, 0.9, 0.2, 0.3, 0.2,
+                0.2, 0.2, 0.2, 0.7, 0.85, 0.88, 0.85,
             );
             cv.extend_named(&[
                 ("attention_schema".into(), 0.97),
@@ -164,12 +132,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::SiaHarnessUpdate => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.2, 0.1, 0.1,
-                0.3, 0.2, 0.2, 0.1,
-                0.6, 0.7, 0.5, 0.6, 0.5,
-                0.2, 0.3, 0.2,
-                0.1, 0.2, 0.1,
-                0.88, 0.82, 0.5, 0.4,
+                0.1, 0.2, 0.1, 0.1, 0.3, 0.2, 0.2, 0.1, 0.6, 0.7, 0.5, 0.6, 0.5, 0.2, 0.3, 0.2,
+                0.1, 0.2, 0.1, 0.88, 0.82, 0.5, 0.4,
             );
             cv.extend_named(&[
                 ("scaffold_rewrite".into(), 0.90),
@@ -180,12 +144,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::SiaWeightUpdate => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.3, 0.1, 0.1,
-                0.4, 0.2, 0.2, 0.2,
-                0.85, 0.6, 0.7, 0.5, 0.5,
-                0.2, 0.2, 0.2,
-                0.1, 0.2, 0.1,
-                0.4, 0.5, 0.85, 0.8,
+                0.1, 0.3, 0.1, 0.1, 0.4, 0.2, 0.2, 0.2, 0.85, 0.6, 0.7, 0.5, 0.5, 0.2, 0.2, 0.2,
+                0.1, 0.2, 0.1, 0.4, 0.5, 0.85, 0.8,
             );
             cv.extend_named(&[
                 ("rl_training".into(), 0.88),
@@ -196,12 +156,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::SiaFeedbackLoop => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.2, 0.2, 0.1,
-                0.3, 0.2, 0.3, 0.1,
-                0.5, 0.6, 0.5, 0.7, 0.6,
-                0.2, 0.2, 0.2,
-                0.1, 0.1, 0.1,
-                0.9, 0.85, 0.6, 0.5,
+                0.1, 0.2, 0.2, 0.1, 0.3, 0.2, 0.3, 0.1, 0.5, 0.6, 0.5, 0.7, 0.6, 0.2, 0.2, 0.2,
+                0.1, 0.1, 0.1, 0.9, 0.85, 0.6, 0.5,
             );
             cv.extend_named(&[
                 ("trajectory_analysis".into(), 0.92),
@@ -212,12 +168,8 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HyperAgents => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.3, 0.2, 0.2,
-                0.4, 0.3, 0.3, 0.2,
-                0.7, 0.8, 0.7, 0.8, 0.7,
-                0.2, 0.3, 0.2,
-                0.2, 0.2, 0.2,
-                0.7, 0.6, 0.7, 0.6,
+                0.2, 0.3, 0.2, 0.2, 0.4, 0.3, 0.3, 0.2, 0.7, 0.8, 0.7, 0.8, 0.7, 0.2, 0.3, 0.2,
+                0.2, 0.2, 0.2, 0.7, 0.6, 0.7, 0.6,
             );
             cv.extend_named(&[
                 ("self_referential_loop".into(), 0.95),

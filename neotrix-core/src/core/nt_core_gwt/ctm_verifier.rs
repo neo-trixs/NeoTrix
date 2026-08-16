@@ -19,9 +19,9 @@
 //! 4. **Deterministic transition**: δ picks a single winning action (no ties /
 //!    out-of-bound winner), and saliences are finite.
 //! 5. **Bounded workspace tape**: Γ never grows unbounded (finiteness of ω output).
-use serde::{Deserialize, Serialize};
 use super::resonance::{ResonanceReport, MODULE_COUNT};
 use crate::core::nt_core_hex::ReasoningHexagram;
+use serde::{Deserialize, Serialize};
 
 /// Number of possible E8 hexagram modes (6-bit states).
 pub const E8_STATE_COUNT: usize = 64;
@@ -126,9 +126,7 @@ impl CtmVerifier {
                 passed: bounded,
                 detail: format!(
                     "|A| observed = {} (max {}): {}",
-                    specialists_active,
-                    self.max_actions,
-                    bounded,
+                    specialists_active, self.max_actions, bounded,
                 ),
             });
         }
@@ -140,23 +138,27 @@ impl CtmVerifier {
         //    non-zero is a tuning detail gated by the deterministic-delta axiom).
         {
             let in_bounds = report.winner < self.max_actions;
-            let winner_salience = report.effective_saliences.get(report.winner).copied().unwrap_or(0.0);
+            let winner_salience = report
+                .effective_saliences
+                .get(report.winner)
+                .copied()
+                .unwrap_or(0.0);
             checks.push(CtmCheck {
                 axiom: "globality".to_string(),
                 passed: in_bounds,
                 detail: format!(
                     "ω winner = {} (bounds {}), salience = {:.4}, global broadcast fired: {}",
-                    report.winner,
-                    self.max_actions,
-                    winner_salience,
-                    in_bounds,
+                    report.winner, self.max_actions, winner_salience, in_bounds,
                 ),
             });
         }
 
         // 4. Deterministic transition δ — saliences finite and winner unique.
         {
-            let finite_saliences = report.effective_saliences.iter().all(|s| s.is_finite() && *s >= 0.0);
+            let finite_saliences = report
+                .effective_saliences
+                .iter()
+                .all(|s| s.is_finite() && *s >= 0.0);
             checks.push(CtmCheck {
                 axiom: "deterministic-delta".to_string(),
                 passed: finite_saliences,
@@ -176,9 +178,7 @@ impl CtmVerifier {
                 passed: bounded,
                 detail: format!(
                     "|Γ| = {} (limit {}): {}",
-                    workspace_tape_len,
-                    self.tape_limit,
-                    bounded,
+                    workspace_tape_len, self.tape_limit, bounded,
                 ),
             });
         }
@@ -213,7 +213,9 @@ mod tests {
     }
 
     fn mk_states() -> Vec<ReasoningHexagram> {
-        (0..MODULE_COUNT).map(|i| ReasoningHexagram::new(i as u8)).collect()
+        (0..MODULE_COUNT)
+            .map(|i| ReasoningHexagram::new(i as u8))
+            .collect()
     }
 
     #[test]
@@ -247,7 +249,11 @@ mod tests {
         let report = mk_report(1, 0.8);
         let rep = v.verify(&states, MODULE_COUNT + 5, &report, 10);
         assert!(!rep.aligned);
-        let action = rep.checks.iter().find(|c| c.axiom == "finite-action").unwrap();
+        let action = rep
+            .checks
+            .iter()
+            .find(|c| c.axiom == "finite-action")
+            .unwrap();
         assert!(!action.passed);
     }
 
@@ -259,7 +265,11 @@ mod tests {
         let report = mk_report(1, 0.8);
         let rep = v.verify(&states, MODULE_COUNT, &report, 10);
         assert!(!rep.aligned);
-        let state = rep.checks.iter().find(|c| c.axiom == "finite-state").unwrap();
+        let state = rep
+            .checks
+            .iter()
+            .find(|c| c.axiom == "finite-state")
+            .unwrap();
         assert!(!state.passed);
     }
 
@@ -270,7 +280,11 @@ mod tests {
         let report = mk_report(1, 0.8);
         let rep = v.verify(&states, MODULE_COUNT, &report, 10_000);
         assert!(!rep.aligned);
-        let tape = rep.checks.iter().find(|c| c.axiom == "bounded-tape").unwrap();
+        let tape = rep
+            .checks
+            .iter()
+            .find(|c| c.axiom == "bounded-tape")
+            .unwrap();
         assert!(!tape.passed);
     }
 
@@ -281,7 +295,11 @@ mod tests {
         let report = mk_report(1, f64::NAN);
         let rep = v.verify(&states, MODULE_COUNT, &report, 10);
         assert!(!rep.aligned);
-        let delta = rep.checks.iter().find(|c| c.axiom == "deterministic-delta").unwrap();
+        let delta = rep
+            .checks
+            .iter()
+            .find(|c| c.axiom == "deterministic-delta")
+            .unwrap();
         assert!(!delta.passed);
     }
 

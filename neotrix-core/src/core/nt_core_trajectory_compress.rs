@@ -1,5 +1,5 @@
-use crate::core::nt_core_prm::{AgentTrajectory, TrajectoryStep};
 use crate::core::nt_core_hex::FullReasoningState;
+use crate::core::nt_core_prm::{AgentTrajectory, TrajectoryStep};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CompressionLevel {
@@ -21,7 +21,9 @@ pub struct TrajectoryCompressionReport {
 
 impl TrajectoryCompressionReport {
     pub fn compression_ratio(&self) -> f64 {
-        if self.original_chars == 0 { return 1.0; }
+        if self.original_chars == 0 {
+            return 1.0;
+        }
         self.compressed_chars as f64 / self.original_chars as f64
     }
 }
@@ -44,16 +46,31 @@ impl Default for TrajectoryCompressor {
 
 impl TrajectoryCompressor {
     pub fn new(level: CompressionLevel) -> Self {
-        Self { level, ..Default::default() }
+        Self {
+            level,
+            ..Default::default()
+        }
     }
 
-    pub fn with_io_limit(mut self, limit: usize) -> Self { self.max_io_chars = limit; self }
-    pub fn with_score_threshold(mut self, threshold: f64) -> Self { self.min_score_threshold = threshold; self }
+    pub fn with_io_limit(mut self, limit: usize) -> Self {
+        self.max_io_chars = limit;
+        self
+    }
+    pub fn with_score_threshold(mut self, threshold: f64) -> Self {
+        self.min_score_threshold = threshold;
+        self
+    }
 
-    pub fn compress_trajectory(&self, trajectory: &AgentTrajectory) -> (AgentTrajectory, TrajectoryCompressionReport) {
+    pub fn compress_trajectory(
+        &self,
+        trajectory: &AgentTrajectory,
+    ) -> (AgentTrajectory, TrajectoryCompressionReport) {
         let original_steps = trajectory.steps.len();
-        let original_chars: usize = trajectory.steps.iter()
-            .map(|s| s.input.len() + s.output.len()).sum();
+        let original_chars: usize = trajectory
+            .steps
+            .iter()
+            .map(|s| s.input.len() + s.output.len())
+            .sum();
 
         let mut compressed: Vec<TrajectoryStep> = Vec::new();
         let mut removed_redundant = 0;
@@ -97,8 +114,10 @@ impl TrajectoryCompressor {
             compressed.push(s);
         }
 
-        let compressed_chars: usize = compressed.iter()
-            .map(|s| s.input.len() + s.output.len()).sum();
+        let compressed_chars: usize = compressed
+            .iter()
+            .map(|s| s.input.len() + s.output.len())
+            .sum();
 
         let mut result = trajectory.clone();
         result.steps = compressed;
@@ -115,7 +134,10 @@ impl TrajectoryCompressor {
         (result, report)
     }
 
-    pub fn compress_state_trajectory(&self, states: &[FullReasoningState]) -> Vec<FullReasoningState> {
+    pub fn compress_state_trajectory(
+        &self,
+        states: &[FullReasoningState],
+    ) -> Vec<FullReasoningState> {
         if self.level as u8 >= CompressionLevel::Light as u8 {
             let mut compressed: Vec<FullReasoningState> = Vec::new();
             for state in states {
@@ -139,21 +161,58 @@ mod tests {
     use crate::core::nt_core_hex::ReasoningHexagram;
     use crate::core::nt_core_traits::SpecialistType;
 
-    fn mk_step(idx: usize, sp: SpecialistType, mode: u8, inp: &str, out: &str, ok: bool, r: Option<f64>) -> TrajectoryStep {
+    fn mk_step(
+        idx: usize,
+        sp: SpecialistType,
+        mode: u8,
+        inp: &str,
+        out: &str,
+        ok: bool,
+        r: Option<f64>,
+    ) -> TrajectoryStep {
         TrajectoryStep {
-            step_idx: idx, specialist: sp,
+            step_idx: idx,
+            specialist: sp,
             e8_mode: ReasoningHexagram::new(mode),
-            action: "act".into(), input: inp.into(), output: out.into(),
-            duration_ms: Some(100), success: ok, external_reward: r,
+            action: "act".into(),
+            input: inp.into(),
+            output: out.into(),
+            duration_ms: Some(100),
+            success: ok,
+            external_reward: r,
         }
     }
 
     #[test]
     fn test_light_removes_redundant_consecutive() {
         let mut t = AgentTrajectory::new(1, "t".into());
-        t.push(mk_step(0, SpecialistType::PatternMatcher, 1, "a", "b", false, None));
-        t.push(mk_step(1, SpecialistType::PatternMatcher, 1, "c", "d", false, None));
-        t.push(mk_step(2, SpecialistType::AnomalyDetector, 1, "e", "f", true, None));
+        t.push(mk_step(
+            0,
+            SpecialistType::PatternMatcher,
+            1,
+            "a",
+            "b",
+            false,
+            None,
+        ));
+        t.push(mk_step(
+            1,
+            SpecialistType::PatternMatcher,
+            1,
+            "c",
+            "d",
+            false,
+            None,
+        ));
+        t.push(mk_step(
+            2,
+            SpecialistType::AnomalyDetector,
+            1,
+            "e",
+            "f",
+            true,
+            None,
+        ));
         let c = TrajectoryCompressor::new(CompressionLevel::Light);
         let (r, rep) = c.compress_trajectory(&t);
         assert_eq!(r.steps.len(), 2);
@@ -163,7 +222,15 @@ mod tests {
     #[test]
     fn test_medium_truncates_long_io() {
         let mut t = AgentTrajectory::new(1, "t".into());
-        t.push(mk_step(0, SpecialistType::Planner, 1, &"x".repeat(1000), &"y".repeat(1000), true, None));
+        t.push(mk_step(
+            0,
+            SpecialistType::Planner,
+            1,
+            &"x".repeat(1000),
+            &"y".repeat(1000),
+            true,
+            None,
+        ));
         let c = TrajectoryCompressor::new(CompressionLevel::Medium).with_io_limit(100);
         let (r, _) = c.compress_trajectory(&t);
         assert!(r.steps[0].input.len() <= 200);
@@ -173,8 +240,24 @@ mod tests {
     #[test]
     fn test_aggressive_drops_low_reward() {
         let mut t = AgentTrajectory::new(1, "t".into());
-        t.push(mk_step(0, SpecialistType::Planner, 1, "a", "b", true, Some(0.9)));
-        t.push(mk_step(1, SpecialistType::RiskAssessor, 1, "c", "d", true, Some(0.1)));
+        t.push(mk_step(
+            0,
+            SpecialistType::Planner,
+            1,
+            "a",
+            "b",
+            true,
+            Some(0.9),
+        ));
+        t.push(mk_step(
+            1,
+            SpecialistType::RiskAssessor,
+            1,
+            "c",
+            "d",
+            true,
+            Some(0.1),
+        ));
         let c = TrajectoryCompressor::new(CompressionLevel::Aggressive).with_score_threshold(0.3);
         let (r, rep) = c.compress_trajectory(&t);
         assert_eq!(r.steps.len(), 1);
@@ -184,9 +267,18 @@ mod tests {
     #[test]
     fn test_compress_state_trajectory_deduplicates() {
         let s = vec![
-            FullReasoningState::new(ReasoningHexagram::new(0), crate::core::nt_core_hex::MetaState::new(0)),
-            FullReasoningState::new(ReasoningHexagram::new(0), crate::core::nt_core_hex::MetaState::new(0)),
-            FullReasoningState::new(ReasoningHexagram::new(1), crate::core::nt_core_hex::MetaState::new(0)),
+            FullReasoningState::new(
+                ReasoningHexagram::new(0),
+                crate::core::nt_core_hex::MetaState::new(0),
+            ),
+            FullReasoningState::new(
+                ReasoningHexagram::new(0),
+                crate::core::nt_core_hex::MetaState::new(0),
+            ),
+            FullReasoningState::new(
+                ReasoningHexagram::new(1),
+                crate::core::nt_core_hex::MetaState::new(0),
+            ),
         ];
         let c = TrajectoryCompressor::new(CompressionLevel::Light);
         assert_eq!(c.compress_state_trajectory(&s).len(), 2);
@@ -195,8 +287,24 @@ mod tests {
     #[test]
     fn test_report_has_compression_ratio() {
         let mut t = AgentTrajectory::new(1, "t".into());
-        t.push(mk_step(0, SpecialistType::PatternMatcher, 1, "in", "out", true, None));
-        t.push(mk_step(1, SpecialistType::PatternMatcher, 1, "in2", "out2", false, None));
+        t.push(mk_step(
+            0,
+            SpecialistType::PatternMatcher,
+            1,
+            "in",
+            "out",
+            true,
+            None,
+        ));
+        t.push(mk_step(
+            1,
+            SpecialistType::PatternMatcher,
+            1,
+            "in2",
+            "out2",
+            false,
+            None,
+        ));
         let c = TrajectoryCompressor::new(CompressionLevel::Light);
         let (_, rep) = c.compress_trajectory(&t);
         assert_eq!(rep.original_steps, 2);
@@ -207,8 +315,24 @@ mod tests {
     #[test]
     fn test_no_redundant_removal_with_different_specialist() {
         let mut t = AgentTrajectory::new(1, "t".into());
-        t.push(mk_step(0, SpecialistType::PatternMatcher, 1, "a", "b", true, None));
-        t.push(mk_step(1, SpecialistType::AnomalyDetector, 1, "c", "d", false, None));
+        t.push(mk_step(
+            0,
+            SpecialistType::PatternMatcher,
+            1,
+            "a",
+            "b",
+            true,
+            None,
+        ));
+        t.push(mk_step(
+            1,
+            SpecialistType::AnomalyDetector,
+            1,
+            "c",
+            "d",
+            false,
+            None,
+        ));
         let c = TrajectoryCompressor::new(CompressionLevel::Light);
         let (r, rep) = c.compress_trajectory(&t);
         assert_eq!(r.steps.len(), 2);

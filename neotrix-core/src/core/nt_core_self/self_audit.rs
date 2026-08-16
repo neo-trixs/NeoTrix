@@ -74,17 +74,17 @@ fn walk_mod_files(src: &Path, dir: &Path, findings: &mut Vec<AuditFinding>, dept
             cfg = true;
             i += 1;
         }
-        if i >= lines.len() { break; }
-        let decl = if cfg {
-            lines[i]
-        } else {
-            line
-        };
+        if i >= lines.len() {
+            break;
+        }
+        let decl = if cfg { lines[i] } else { line };
         let trimmed = decl.trim();
-        if let Some(name) = trimmed.strip_prefix("pub(crate) mod ")
+        if let Some(name) = trimmed
+            .strip_prefix("pub(crate) mod ")
             .or_else(|| trimmed.strip_prefix("pub mod "))
             .or_else(|| trimmed.strip_prefix("mod "))
-            .and_then(|s| s.strip_suffix(';')) {
+            .and_then(|s| s.strip_suffix(';'))
+        {
             let name = name.trim();
             let rs_file = dir.join(format!("{}.rs", name));
             let sub_mod = dir.join(name).join("mod.rs");
@@ -95,8 +95,12 @@ fn walk_mod_files(src: &Path, dir: &Path, findings: &mut Vec<AuditFinding>, dept
                     severity: AuditSeverity::Error,
                     file: rel.to_string_lossy().to_string(),
                     line: Some(i + 1),
-                    message: format!("Module `{}` declared but no file found (searched: {}, {})",
-                        name, rs_file.display(), sub_mod.display()),
+                    message: format!(
+                        "Module `{}` declared but no file found (searched: {}, {})",
+                        name,
+                        rs_file.display(),
+                        sub_mod.display()
+                    ),
                 });
             }
         }
@@ -143,7 +147,9 @@ pub fn scan_orphan_files<P: AsRef<Path>>(root: P) -> Vec<AuditFinding> {
 
 fn walk_rs_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    if !dir.is_dir() { return files; }
+    if !dir.is_dir() {
+        return files;
+    }
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -159,7 +165,8 @@ fn walk_rs_files(dir: &Path) -> Vec<PathBuf> {
 
 fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
     let mut declared = HashSet::new();
-    let all_mods: Vec<PathBuf> = walk_rs_files(src).into_iter()
+    let all_mods: Vec<PathBuf> = walk_rs_files(src)
+        .into_iter()
         .filter(|p| p.file_name().and_then(|n| n.to_str()) == Some("mod.rs"))
         .collect();
 
@@ -168,12 +175,21 @@ fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
         if let Ok(content) = fs::read_to_string(mod_rs) {
             for line in content.lines() {
                 let trimmed = line.trim();
-                if let Some(name) = trimmed.strip_prefix("pub(crate) mod ").or_else(|| trimmed.strip_prefix("pub mod ")).or_else(|| trimmed.strip_prefix("mod ")).and_then(|s| s.strip_suffix(';')) {
+                if let Some(name) = trimmed
+                    .strip_prefix("pub(crate) mod ")
+                    .or_else(|| trimmed.strip_prefix("pub mod "))
+                    .or_else(|| trimmed.strip_prefix("mod "))
+                    .and_then(|s| s.strip_suffix(';'))
+                {
                     let name = name.trim();
                     let rs = dir.join(format!("{}.rs", name));
                     let sub = dir.join(name).join("mod.rs");
-                    if rs.exists() { declared.insert(rs); }
-                    if sub.exists() { declared.insert(sub); }
+                    if rs.exists() {
+                        declared.insert(rs);
+                    }
+                    if sub.exists() {
+                        declared.insert(sub);
+                    }
                 }
             }
         }
@@ -185,7 +201,10 @@ pub fn verify_persistence(file_path: &str, expected_pattern: &str) -> bool {
     match fs::read_to_string(file_path) {
         Ok(content) => content.lines().any(|l| l.contains(expected_pattern)),
         Err(e) => {
-            eprintln!("  [Audit] Cannot read {} for persistence check: {}", file_path, e);
+            eprintln!(
+                "  [Audit] Cannot read {} for persistence check: {}",
+                file_path, e
+            );
             false
         }
     }
@@ -246,7 +265,11 @@ pub struct ToolRecord {
 impl ToolRecord {
     pub fn failure_rate(&self) -> f64 {
         let total = self.claimed_ok + self.failures;
-        if total == 0 { 0.0 } else { self.failures as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            self.failures as f64 / total as f64
+        }
     }
 }
 
@@ -261,7 +284,11 @@ pub struct ToolGroundingMonitor {
 
 impl ToolGroundingMonitor {
     pub fn new() -> Self {
-        Self { tools: std::collections::HashMap::new(), total_calls: 0, grounding_failures: 0 }
+        Self {
+            tools: std::collections::HashMap::new(),
+            total_calls: 0,
+            grounding_failures: 0,
+        }
     }
 
     /// Record a tool call result: claimed_ok = tool-reported success, actual_ok = true outcome.
@@ -286,12 +313,19 @@ impl ToolGroundingMonitor {
 
     /// 根据调用次数自适应收紧阈值: 0-999 次用 5%, 1000+ 用 2%。
     fn effective_threshold(&self) -> f64 {
-        if self.total_calls > 1000 { 0.02 } else { 0.05 }
+        if self.total_calls > 1000 {
+            0.02
+        } else {
+            0.05
+        }
     }
 
     /// 检查某工具是否触发接地失效阈值。
     pub fn is_degraded(&self, tool: &str) -> bool {
-        self.tools.get(tool).map(|r| r.failure_rate() > self.effective_threshold()).unwrap_or(false)
+        self.tools
+            .get(tool)
+            .map(|r| r.failure_rate() > self.effective_threshold())
+            .unwrap_or(false)
     }
 
     /// 全工具中是否有任一达到阈值。
@@ -303,7 +337,9 @@ impl ToolGroundingMonitor {
     /// 生成降级工具清单 (名称, 失败率)。
     pub fn degraded_tools(&self) -> Vec<(String, f64)> {
         let t = self.effective_threshold();
-        let mut out: Vec<(String, f64)> = self.tools.iter()
+        let mut out: Vec<(String, f64)> = self
+            .tools
+            .iter()
             .filter(|(_, r)| r.failure_rate() > t)
             .map(|(tool, r)| (tool.clone(), r.failure_rate()))
             .collect();
@@ -316,8 +352,15 @@ impl ToolGroundingMonitor {
         if deg.is_empty() {
             format!("tool_grounding: {} calls, 0 degraded", self.total_calls)
         } else {
-            let list: Vec<String> = deg.iter().map(|(t, r)| format!("{}={:.0}%", t, r * 100.0)).collect();
-            format!("tool_grounding: {} calls, DEGRADED [{}]", self.total_calls, list.join(", "))
+            let list: Vec<String> = deg
+                .iter()
+                .map(|(t, r)| format!("{}={:.0}%", t, r * 100.0))
+                .collect();
+            format!(
+                "tool_grounding: {} calls, DEGRADED [{}]",
+                self.total_calls,
+                list.join(", ")
+            )
         }
     }
 }
@@ -339,7 +382,11 @@ impl crate::core::nt_core_self_test::SelfTest for ToolGroundingMonitor {
         if m.summary().is_empty() {
             failures.push("summary() should be non-empty".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -354,14 +401,18 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergeCheckFn {
 
         // Test 1: scan current tree — should find 0 ghosts if clean
         let ghosts = scan_ghost_modules(root);
-        let ghost_count = ghosts.iter().filter(|f| f.category == "ghost-module").count();
+        let ghost_count = ghosts
+            .iter()
+            .filter(|f| f.category == "ghost-module")
+            .count();
         if ghost_count > 0 {
             failures.push(format!("Expected 0 ghost modules, found {}", ghost_count));
         }
 
         // Test 2: scan current tree — orphans should be 0 (excluding bin/ and legacy)
         let orphans = scan_orphan_files(root);
-        let orphan_count = orphans.iter()
+        let orphan_count = orphans
+            .iter()
             .filter(|f| !f.file.contains("/bin/") && !f.file.contains("target/"))
             .count();
         if orphan_count > 0 {
@@ -376,18 +427,25 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergeCheckFn {
         // Test 4: P68 — Session Re-entry Blindspot: verify claimed prior-session modules
         // This test checks modules that were "created and tested" in prior sessions
         // but might not have persisted to disk.
-        let prior_session_claims: &[(&str, &str)] = &[
-            ("nt_mind_absorption_registry",
-             "neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind_absorption_registry.rs"),
-        ];
+        let prior_session_claims: &[(&str, &str)] = &[(
+            "nt_mind_absorption_registry",
+            "neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind_absorption_registry.rs",
+        )];
         let phantom_claims = verify_prior_session_claims(prior_session_claims);
         if !phantom_claims.is_empty() {
             for claim in &phantom_claims {
-                failures.push(format!("P68 phantom-claim: {} — {}", claim.file, claim.message));
+                failures.push(format!(
+                    "P68 phantom-claim: {} — {}",
+                    claim.file, claim.message
+                ));
             }
         }
 
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -401,10 +459,16 @@ mod tests {
     #[test]
     fn test_scan_ghost_modules() {
         let findings = scan_ghost_modules(".");
-        let ghost_modules: Vec<_> = findings.iter().filter(|f| f.category == "ghost-module").collect();
-        assert!(ghost_modules.is_empty(), "Ghost modules found: {:?}", ghost_modules);
+        let ghost_modules: Vec<_> = findings
+            .iter()
+            .filter(|f| f.category == "ghost-module")
+            .collect();
+        assert!(
+            ghost_modules.is_empty(),
+            "Ghost modules found: {:?}",
+            ghost_modules
+        );
     }
-
 
     #[test]
     fn test_no_new_python_kb_scripts() {
@@ -415,9 +479,9 @@ mod tests {
         let whitelist: Vec<&str> = vec![
             "crawl-queue-absorb.sh",
             // 以下 Python 脚本为 R-P97 保留的活跃工具链 (Rust CLI 委托):
-            "absorb_to_capability.py",// 写回委托 Rust update-node-metadata (R-P97)
-            "kb_batch_absorb.py",     // 写回委托 Rust absorb-node (R-P97)
-            "kb-embed-pq.py",         // Rust pq_ann_search 的上游 codebook 生产者 (nt_memory_embed.rs)
+            "absorb_to_capability.py", // 写回委托 Rust update-node-metadata (R-P97)
+            "kb_batch_absorb.py",      // 写回委托 Rust absorb-node (R-P97)
+            "kb-embed-pq.py", // Rust pq_ann_search 的上游 codebook 生产者 (nt_memory_embed.rs)
         ];
         let mut violators = Vec::new();
         for entry in std::fs::read_dir(scripts_dir).unwrap() {
@@ -441,19 +505,20 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_no_orphans_in_core() {
         let src = Path::new("src/core");
         if src.exists() {
             let findings = scan_orphan_files(src);
-            let orphans: Vec<_> = findings.iter().filter(|f| f.category == "orphan-file")
+            let orphans: Vec<_> = findings
+                .iter()
+                .filter(|f| f.category == "orphan-file")
                 .filter(|f| {
                     !f.file.contains("/bin/")
-                    && !f.file.contains("/tests.")
-                    && !f.file.contains("target/")
-                    && !f.file.contains("/_archived/")
-                    && f.file != "mod.rs"
+                        && !f.file.contains("/tests.")
+                        && !f.file.contains("target/")
+                        && !f.file.contains("/_archived/")
+                        && f.file != "mod.rs"
                 })
                 .collect();
             assert!(orphans.is_empty(), "Orphan files in core: {:?}", orphans);
@@ -475,13 +540,19 @@ mod tests {
         // Known-existing file should pass
         let claims = &[("Cargo.toml", "Cargo.toml")];
         let findings = verify_prior_session_claims(claims);
-        let phantom: Vec<_> = findings.iter().filter(|f| f.category == "phantom-claim").collect();
+        let phantom: Vec<_> = findings
+            .iter()
+            .filter(|f| f.category == "phantom-claim")
+            .collect();
         assert!(phantom.is_empty(), "Cargo.toml should exist: {:?}", phantom);
 
         // Non-existent file should fail
         let bad_claims = &[("phantom_module", "/tmp/neotrix_phantom.rs")];
         let findings = verify_prior_session_claims(bad_claims);
-        let phantom: Vec<_> = findings.iter().filter(|f| f.category == "phantom-claim").collect();
+        let phantom: Vec<_> = findings
+            .iter()
+            .filter(|f| f.category == "phantom-claim")
+            .collect();
         assert_eq!(phantom.len(), 1, "Should find 1 phantom claim");
         assert!(phantom[0].message.contains("P68"));
     }
@@ -503,6 +574,3 @@ mod tests {
         assert!(!m.summary().is_empty());
     }
 }
-
-
-

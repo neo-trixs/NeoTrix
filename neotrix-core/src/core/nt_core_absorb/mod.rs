@@ -1,8 +1,8 @@
 pub mod spec_driven;
 
 pub use spec_driven::{
-    EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecPipelineStats,
-    SpecStatus, SpecVerification, SpecVerifier,
+    EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecPipelineStats, SpecStatus,
+    SpecVerification, SpecVerifier,
 };
 
 use crate::core::nt_core_cap::CapabilityVector;
@@ -18,12 +18,16 @@ mod tests {
 
     struct AlwaysValid;
     impl AbsorbValidator for AlwaysValid {
-        fn validate_absorb(&self, _after: &CapabilityVector) -> bool { true }
+        fn validate_absorb(&self, _after: &CapabilityVector) -> bool {
+            true
+        }
     }
 
     struct NeverValid;
     impl AbsorbValidator for NeverValid {
-        fn validate_absorb(&self, _after: &CapabilityVector) -> bool { false }
+        fn validate_absorb(&self, _after: &CapabilityVector) -> bool {
+            false
+        }
     }
 
     #[test]

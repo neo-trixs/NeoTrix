@@ -42,7 +42,14 @@ pub struct MemoryLifecycle {
 impl MemoryLifecycle {
     pub fn new(importance: f64) -> Self {
         let now = Utc::now().timestamp();
-        Self { importance, confidence: importance, access_count: 0, created_at: now, last_accessed: now, ttl_seconds: None }
+        Self {
+            importance,
+            confidence: importance,
+            access_count: 0,
+            created_at: now,
+            last_accessed: now,
+            ttl_seconds: None,
+        }
     }
 
     pub fn with_ttl(importance: f64, ttl_seconds: i64) -> Self {

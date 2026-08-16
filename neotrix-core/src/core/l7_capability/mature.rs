@@ -1,6 +1,4 @@
-use crate::core::l7_capability::registry::{
-    Capability, MaturityLevel,
-};
+use crate::core::l7_capability::registry::{Capability, MaturityLevel};
 use crate::core::l7_capability::SkillBank;
 
 #[derive(Debug, Clone)]
@@ -51,11 +49,7 @@ impl MaturityEngine {
         Self::default()
     }
 
-    pub fn evaluate(
-        &self,
-        cap: &Capability,
-        _feedback: &MaturityFeedback,
-    ) -> EvolveResult {
+    pub fn evaluate(&self, cap: &Capability, _feedback: &MaturityFeedback) -> EvolveResult {
         let stats = &cap.stats;
         let m = cap.maturity;
 
@@ -113,7 +107,8 @@ impl MaturityEngine {
         cap: &mut Capability,
         feedback: &MaturityFeedback,
     ) -> EvolveResult {
-        cap.stats.record_call(feedback.success, feedback.latency_ms, feedback.prm_score);
+        cap.stats
+            .record_call(feedback.success, feedback.latency_ms, feedback.prm_score);
         let result = self.evaluate(cap, feedback);
         if let EvolveResult::Promoted(new_level) = result {
             cap.maturity = new_level;
@@ -151,9 +146,8 @@ impl MaturityEngine {
 mod tests {
     use super::*;
     use crate::core::l7_capability::registry::{
-        capability_id_from_name, CapabilityCost, CapabilityKind,
-        CapabilityStats, CapabilityVector, CapabilityTier, CapabilityRuntime,
-        CapabilityStability, DomainCategory,
+        capability_id_from_name, CapabilityCost, CapabilityKind, CapabilityRuntime,
+        CapabilityStability, CapabilityStats, CapabilityTier, CapabilityVector, DomainCategory,
     };
 
     fn test_cap(maturity: MaturityLevel) -> Capability {
@@ -170,12 +164,17 @@ mod tests {
             stats: CapabilityStats::default(),
             version: "0.1.0".to_string(),
             layer: 4,
-            tier: CapabilityTier::Core, runtime: CapabilityRuntime::Local,
+            tier: CapabilityTier::Core,
+            runtime: CapabilityRuntime::Local,
             stability: CapabilityStability::Production,
-            fallback_chain: vec![], provider: None,
+            fallback_chain: vec![],
+            provider: None,
             domain: DomainCategory::General,
-            input_schema: None, output_schema: None,
-            resource_cpu: 1.0, resource_ram_mb: 64.0, resource_vram_mb: 0.0,
+            input_schema: None,
+            output_schema: None,
+            resource_cpu: 1.0,
+            resource_ram_mb: 64.0,
+            resource_vram_mb: 0.0,
             dependencies: vec![],
         }
     }
@@ -186,7 +185,10 @@ mod tests {
         let mut cap = test_cap(MaturityLevel::Primitive);
         cap.stats.call_count = 1;
         let feedback = MaturityFeedback {
-            prm_score: 0.5, success: true, latency_ms: 100.0, diversity: 0.0,
+            prm_score: 0.5,
+            success: true,
+            latency_ms: 100.0,
+            diversity: 0.0,
         };
         let result = engine.evaluate(&cap, &feedback);
         assert_eq!(result, EvolveResult::Promoted(MaturityLevel::Candidate));
@@ -200,7 +202,10 @@ mod tests {
             cap.stats.record_call(true, 100.0, 0.7);
         }
         let feedback = MaturityFeedback {
-            prm_score: 0.7, success: true, latency_ms: 100.0, diversity: 0.4,
+            prm_score: 0.7,
+            success: true,
+            latency_ms: 100.0,
+            diversity: 0.4,
         };
         let result = engine.evaluate(&cap, &feedback);
         assert_eq!(result, EvolveResult::Promoted(MaturityLevel::Reviewed));
@@ -212,7 +217,10 @@ mod tests {
         let mut cap = test_cap(MaturityLevel::Candidate);
         cap.stats.record_call(true, 100.0, 0.7);
         let feedback = MaturityFeedback {
-            prm_score: 0.7, success: true, latency_ms: 100.0, diversity: 0.0,
+            prm_score: 0.7,
+            success: true,
+            latency_ms: 100.0,
+            diversity: 0.0,
         };
         let result = engine.evaluate(&cap, &feedback);
         assert_eq!(result, EvolveResult::Stable);
@@ -226,7 +234,10 @@ mod tests {
             cap.stats.record_call(false, 100.0, 0.3);
         }
         let feedback = MaturityFeedback {
-            prm_score: 0.3, success: false, latency_ms: 100.0, diversity: 0.0,
+            prm_score: 0.3,
+            success: false,
+            latency_ms: 100.0,
+            diversity: 0.0,
         };
         let result = engine.evaluate(&cap, &feedback);
         assert_eq!(result, EvolveResult::Stagnated);
@@ -237,7 +248,10 @@ mod tests {
         let engine = MaturityEngine::default();
         let cap = test_cap(MaturityLevel::Transcendent);
         let feedback = MaturityFeedback {
-            prm_score: 1.0, success: true, latency_ms: 10.0, diversity: 1.0,
+            prm_score: 1.0,
+            success: true,
+            latency_ms: 10.0,
+            diversity: 1.0,
         };
         let result = engine.evaluate(&cap, &feedback);
         assert_eq!(result, EvolveResult::Stable);
@@ -249,7 +263,10 @@ mod tests {
         let mut cap = test_cap(MaturityLevel::Primitive);
         cap.stats.call_count = 1;
         let feedback = MaturityFeedback {
-            prm_score: 0.8, success: true, latency_ms: 50.0, diversity: 0.5,
+            prm_score: 0.8,
+            success: true,
+            latency_ms: 50.0,
+            diversity: 0.5,
         };
         engine.apply_feedback(&mut cap, &feedback);
         assert_eq!(cap.maturity, MaturityLevel::Candidate);

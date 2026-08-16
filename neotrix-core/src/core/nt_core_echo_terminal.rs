@@ -89,11 +89,18 @@ impl EchoFeatures {
         Self {
             stdout_entropy: Self::shannon_entropy(&obs.stdout),
             stderr_entropy: Self::shannon_entropy(&obs.stderr),
-            error_density: if obs.stderr.is_empty() { 0.0 }
-                else { (obs.stderr.len() as f64 / obs.stdout.len().max(1) as f64).min(1.0) },
+            error_density: if obs.stderr.is_empty() {
+                0.0
+            } else {
+                (obs.stderr.len() as f64 / obs.stdout.len().max(1) as f64).min(1.0)
+            },
             action_success_rate: if obs.success { 1.0 } else { 0.0 },
             file_change_count: obs.file_changes.len(),
-            lines_changed: obs.file_changes.iter().map(|f| f.lines_added + f.lines_removed).sum(),
+            lines_changed: obs
+                .file_changes
+                .iter()
+                .map(|f| f.lines_added + f.lines_removed)
+                .sum(),
             exit_code: obs.exit_code,
             duration_ms: obs.duration_ms,
             signal_strength: obs.signal_strength(),
@@ -102,7 +109,9 @@ impl EchoFeatures {
 
     /// Shannon entropy of a string (byte-level)
     fn shannon_entropy(data: &str) -> f64 {
-        if data.is_empty() { return 0.0; }
+        if data.is_empty() {
+            return 0.0;
+        }
         let bytes = data.as_bytes();
         let len = bytes.len() as f64;
         let mut counts = [0usize; 256];
@@ -111,7 +120,9 @@ impl EchoFeatures {
         }
         let mut entropy = 0.0;
         for &count in counts.iter() {
-            if count == 0 { continue; }
+            if count == 0 {
+                continue;
+            }
             let p = count as f64 / len;
             entropy -= p * p.log2();
         }
@@ -165,10 +176,10 @@ impl EchoTrajectory {
 
     /// Compute ECHO score: average of composite + cross-entropy signals
     pub fn compute_echo_score(&self) -> f64 {
-        if self.features.is_empty() { return 0.0; }
-        let scores: Vec<f64> = self.features.iter()
-            .map(|f| f.composite_score())
-            .collect();
+        if self.features.is_empty() {
+            return 0.0;
+        }
+        let scores: Vec<f64> = self.features.iter().map(|f| f.composite_score()).collect();
         let mean = scores.iter().sum::<f64>() / scores.len() as f64;
         let decay = 0.95_f64.powi(self.features.len() as i32);
         mean * (1.0 - decay) + scores.last().copied().unwrap_or(0.0) * decay
@@ -183,7 +194,9 @@ impl EchoTrajectory {
     pub fn prediction_loss(&self, predicted_scores: &[f64]) -> f64 {
         let targets = self.echo_targets();
         let n = targets.len().min(predicted_scores.len());
-        if n == 0 { return 0.0; }
+        if n == 0 {
+            return 0.0;
+        }
         let mut loss = 0.0;
         for i in 0..n {
             let diff = targets[i] - predicted_scores[i];
@@ -217,7 +230,10 @@ impl Default for EchoController {
 
 impl EchoController {
     pub fn new(max_history: usize) -> Self {
-        Self { max_history, ..Default::default() }
+        Self {
+            max_history,
+            ..Default::default()
+        }
     }
 
     /// Record a terminal observation and add to current trajectory
@@ -227,7 +243,9 @@ impl EchoController {
         action: &str,
         obs: TerminalObservation,
     ) {
-        let existing = self.history.iter_mut()
+        let existing = self
+            .history
+            .iter_mut()
             .find(|t: &&mut EchoTrajectory| t.trajectory_id == trajectory_id);
         if let Some(traj) = existing {
             traj.record_step(action, obs);
@@ -243,18 +261,16 @@ impl EchoController {
 
     /// Get an ECHO training target for a given trajectory step
     pub fn echo_signal(&self, trajectory_id: &str) -> Option<Vec<f64>> {
-        self.history.iter()
+        self.history
+            .iter()
             .find(|t| t.trajectory_id == trajectory_id)
             .map(|t| t.echo_targets())
     }
 
     /// Compute terminal prediction loss for model improvement
-    pub fn terminal_prediction_loss(
-        &self,
-        trajectory_id: &str,
-        predicted: &[f64],
-    ) -> Option<f64> {
-        self.history.iter()
+    pub fn terminal_prediction_loss(&self, trajectory_id: &str, predicted: &[f64]) -> Option<f64> {
+        self.history
+            .iter()
             .find(|t| t.trajectory_id == trajectory_id)
             .map(|t| t.prediction_loss(predicted))
     }
@@ -262,7 +278,8 @@ impl EchoController {
     /// PRM-compatible reward signal from terminal observations
     /// Used to augment the sparse outcome-level reward with dense per-step signals
     pub fn prm_augmented_reward(&self, trajectory_id: &str) -> Option<Vec<f64>> {
-        self.history.iter()
+        self.history
+            .iter()
             .find(|t| t.trajectory_id == trajectory_id)
             .map(|t| {
                 let base = t.echo_targets();
@@ -276,16 +293,20 @@ impl EchoController {
     /// When enable_verifier_free is true, the environment prediction loss alone
     /// enables improvement on unseen OOD tasks
     pub fn verifier_free_signal(&self, trajectory_id: &str) -> Option<f64> {
-        if !self.enable_verifier_free { return None; }
-        self.history.iter()
+        if !self.enable_verifier_free {
+            return None;
+        }
+        self.history
+            .iter()
             .find(|t| t.trajectory_id == trajectory_id)
             .map(|t| {
                 let echo_targets = t.echo_targets();
-                if echo_targets.is_empty() { return 0.0; }
+                if echo_targets.is_empty() {
+                    return 0.0;
+                }
                 let mean = echo_targets.iter().sum::<f64>() / echo_targets.len() as f64;
-                let variance = echo_targets.iter()
-                    .map(|s| (s - mean).powi(2))
-                    .sum::<f64>() / echo_targets.len() as f64;
+                let variance = echo_targets.iter().map(|s| (s - mean).powi(2)).sum::<f64>()
+                    / echo_targets.len() as f64;
                 // Higher variance = more learning potential
                 (mean * 0.6 + variance.sqrt() * 0.4).max(0.0).min(1.0)
             })
@@ -298,7 +319,9 @@ impl EchoController {
         }
     }
 
-    pub fn total_trajectories(&self) -> usize { self.history.len() }
+    pub fn total_trajectories(&self) -> usize {
+        self.history.len()
+    }
     pub fn total_observations(&self) -> usize {
         self.history.iter().map(|t| t.observations.len()).sum()
     }
@@ -332,8 +355,9 @@ impl EchoController {
             report.total_observations += traj.observations.len();
             let echo_score = traj.compute_echo_score();
             report.avg_echo_score += echo_score;
-            report.avg_signal_strength += traj.features.iter()
-                .map(|f| f.signal_strength).sum::<f64>() / traj.features.len().max(1) as f64;
+            report.avg_signal_strength +=
+                traj.features.iter().map(|f| f.signal_strength).sum::<f64>()
+                    / traj.features.len().max(1) as f64;
             if traj.observations.iter().any(|o| o.exit_code != 0) {
                 report.error_trajectories += 1;
             }
@@ -359,12 +383,16 @@ pub struct EchoBatchReport {
 
 impl EchoBatchReport {
     pub fn signal_coverage(&self) -> f64 {
-        if self.total_observations == 0 { return 0.0; }
+        if self.total_observations == 0 {
+            return 0.0;
+        }
         self.total_trajectories as f64 / self.total_observations as f64
     }
 
     pub fn error_rate(&self) -> f64 {
-        if self.total_trajectories == 0 { return 0.0; }
+        if self.total_trajectories == 0 {
+            return 0.0;
+        }
         self.error_trajectories as f64 / self.total_trajectories as f64
     }
 }
@@ -391,7 +419,9 @@ impl Default for EchoPrmBridge {
 }
 
 impl EchoPrmBridge {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Record an observation and generate PRM-augmented reward
     pub fn record_and_reward(
@@ -401,11 +431,14 @@ impl EchoPrmBridge {
         obs: TerminalObservation,
     ) -> f64 {
         self.echo.record_observation(trajectory_id, action, obs);
-        let reward = self.echo.prm_augmented_reward(trajectory_id)
+        let reward = self
+            .echo
+            .prm_augmented_reward(trajectory_id)
             .and_then(|r| r.last().copied())
             .unwrap_or(0.0);
         self.total_signals_count += 1;
-        self.signal_buffer.push_back((trajectory_id.to_string(), reward));
+        self.signal_buffer
+            .push_back((trajectory_id.to_string(), reward));
         while self.signal_buffer.len() > self.max_buffer {
             self.signal_buffer.pop_front();
         }
@@ -414,20 +447,35 @@ impl EchoPrmBridge {
 
     /// Get the average recent ECHO reward
     pub fn avg_recent_reward(&self, n: usize) -> f64 {
-        let recent: Vec<&f64> = self.signal_buffer.iter().rev()
-            .take(n).map(|(_, r)| r).collect();
-        if recent.is_empty() { return 0.0; }
+        let recent: Vec<&f64> = self
+            .signal_buffer
+            .iter()
+            .rev()
+            .take(n)
+            .map(|(_, r)| r)
+            .collect();
+        if recent.is_empty() {
+            return 0.0;
+        }
         recent.iter().copied().sum::<f64>() / recent.len() as f64
     }
 
-    pub fn total_signals(&self) -> usize { self.total_signals_count }
+    pub fn total_signals(&self) -> usize {
+        self.total_signals_count
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn make_obs(cmd: &str, stdout: &str, stderr: &str, code: i32, success: bool) -> TerminalObservation {
+    fn make_obs(
+        cmd: &str,
+        stdout: &str,
+        stderr: &str,
+        code: i32,
+        success: bool,
+    ) -> TerminalObservation {
         EchoController::observe_command(cmd, stdout, stderr, code, 100, success)
     }
 
@@ -566,8 +614,7 @@ mod tests {
     #[test]
     fn test_echo_prm_bridge() {
         let mut bridge = EchoPrmBridge::new();
-        let reward = bridge.record_and_reward("t1", "ls",
-            make_obs("ls", "files", "", 0, true));
+        let reward = bridge.record_and_reward("t1", "ls", make_obs("ls", "files", "", 0, true));
         assert!(reward > 0.0);
         assert_eq!(bridge.total_signals(), 1);
     }
@@ -682,8 +729,7 @@ mod tests {
             ..EchoPrmBridge::default()
         };
         for i in 0..10 {
-            bridge.record_and_reward(&format!("t{}", i), "x",
-                make_obs("x", "", "", 0, true));
+            bridge.record_and_reward(&format!("t{}", i), "x", make_obs("x", "", "", 0, true));
         }
         assert_eq!(bridge.total_signals(), 10);
         assert_eq!(bridge.signal_buffer.len(), 5);

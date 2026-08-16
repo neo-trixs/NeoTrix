@@ -178,11 +178,15 @@ impl WidgetProvider {
             self.widgets.push(WidgetKind::Weather);
             return WidgetKind::Weather;
         }
-        if (lower.contains("+") || lower.contains("-") || lower.contains("*") || lower.contains("/"))
-            && lower.chars().any(|c| c.is_ascii_digit()) {
-                self.widgets.push(WidgetKind::Calculator);
-                return WidgetKind::Calculator;
-            }
+        if (lower.contains("+")
+            || lower.contains("-")
+            || lower.contains("*")
+            || lower.contains("/"))
+            && lower.chars().any(|c| c.is_ascii_digit())
+        {
+            self.widgets.push(WidgetKind::Calculator);
+            return WidgetKind::Calculator;
+        }
         if lower.contains("stock") || lower.contains("price") || lower.contains("$") {
             self.widgets.push(WidgetKind::Stock);
             return WidgetKind::Stock;
@@ -244,7 +248,12 @@ impl AnswerEngine {
     pub fn prepare_query(&self, query: &str) -> PreparedQuery {
         let mode = self.config.mode;
         let sources = self.context.source_count();
-        let widget = self.widgets.active_widgets().first().copied().unwrap_or(WidgetKind::None);
+        let widget = self
+            .widgets
+            .active_widgets()
+            .first()
+            .copied()
+            .unwrap_or(WidgetKind::None);
         PreparedQuery {
             query: query.to_string(),
             mode,
@@ -279,7 +288,9 @@ impl AnswerEngine {
                 self.config.mode
             ),
             citations: ranked.iter().map(|r| r.url.clone()).collect(),
-            confidence: if ranked.is_empty() { 0.0 } else {
+            confidence: if ranked.is_empty() {
+                0.0
+            } else {
                 (ranked.iter().map(|r| r.relevance).sum::<f64>() / ranked.len() as f64)
                     .max(0.0)
                     .min(1.0)
@@ -363,12 +374,20 @@ mod tests {
         let engine = AnswerEngine::with_mode(AnswerMode::Balanced);
         let results = vec![
             SearchResult {
-                title: "a".into(), url: "http://a.com".into(), snippet: "".into(),
-                source: SourceType::Web, relevance: 0.5, cached: false,
+                title: "a".into(),
+                url: "http://a.com".into(),
+                snippet: "".into(),
+                source: SourceType::Web,
+                relevance: 0.5,
+                cached: false,
             },
             SearchResult {
-                title: "b".into(), url: "http://b.com".into(), snippet: "".into(),
-                source: SourceType::Academic, relevance: 0.9, cached: false,
+                title: "b".into(),
+                url: "http://b.com".into(),
+                snippet: "".into(),
+                source: SourceType::Academic,
+                relevance: 0.9,
+                cached: false,
             },
         ];
         let ranked = engine.rank_results(&results);
@@ -378,15 +397,19 @@ mod tests {
     #[test]
     fn test_build_answer() {
         let engine = AnswerEngine::with_mode(AnswerMode::Speed);
-        let results = vec![
-            SearchResult {
-                title: "test".into(), url: "http://test.com".into(), snippet: "content".into(),
-                source: SourceType::Web, relevance: 0.8, cached: false,
-            },
-        ];
+        let results = vec![SearchResult {
+            title: "test".into(),
+            url: "http://test.com".into(),
+            snippet: "content".into(),
+            source: SourceType::Web,
+            relevance: 0.8,
+            cached: false,
+        }];
         let answer = engine.build_answer("test query", &results);
         assert_eq!(answer.sources_used.len(), 1);
-        assert!(answer.segments[0].citations.contains(&"http://test.com".to_string()));
+        assert!(answer.segments[0]
+            .citations
+            .contains(&"http://test.com".to_string()));
     }
 
     #[test]

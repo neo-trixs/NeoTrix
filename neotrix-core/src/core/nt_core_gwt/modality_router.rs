@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use serde::{Serialize, Deserialize};
 
 /// Modalities that can carry workspace content for attention routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -74,11 +74,13 @@ impl ModalityRouter {
         for m in Modality::ALL {
             // deterministic distinct init per modality (so routing isn't degenerate)
             let seed = (m as usize * 7 + 1) as f64;
-            let vec: Vec<f64> = (0..dim).map(|i| {
-                let phase = ((i + 1) as f64) * 0.37 + seed;
-                let val = phase.sin();
-                val.max(0.0).min(1.0)
-            }).collect();
+            let vec: Vec<f64> = (0..dim)
+                .map(|i| {
+                    let phase = ((i + 1) as f64) * 0.37 + seed;
+                    let val = phase.sin();
+                    val.max(0.0).min(1.0)
+                })
+                .collect();
             keys.insert(m, vec);
         }
         Self {
@@ -95,7 +97,8 @@ impl ModalityRouter {
     /// Returns (modality, weight) pairs sorted by descending weight.
     pub fn route(&mut self, query: &[f64]) -> Vec<(Modality, f64)> {
         self.total_decisions += 1;
-        let logits: Vec<(Modality, f64)> = Modality::ALL.iter()
+        let logits: Vec<(Modality, f64)> = Modality::ALL
+            .iter()
             .map(|&m| {
                 let dot = self.dot(query, &self.keys[&m]);
                 let scaled = dot / self.temperature.max(1e-6);
@@ -103,10 +106,13 @@ impl ModalityRouter {
             })
             .collect();
 
-        let max = logits.iter().map(|(_, s)| *s).fold(f64::MIN, f64::max).max(0.0);
-        let exps: Vec<(Modality, f64)> = logits.iter()
-            .map(|&(m, s)| (m, (s - max).exp()))
-            .collect();
+        let max = logits
+            .iter()
+            .map(|(_, s)| *s)
+            .fold(f64::MIN, f64::max)
+            .max(0.0);
+        let exps: Vec<(Modality, f64)> =
+            logits.iter().map(|&(m, s)| (m, (s - max).exp())).collect();
         let sum: f64 = exps.iter().map(|(_, e)| e).sum();
         let weights: Vec<(Modality, f64)> = if sum > 1e-12 {
             exps.iter().map(|&(m, e)| (m, e / sum)).collect()
@@ -125,7 +131,11 @@ impl ModalityRouter {
     /// Apply routing weights to per-modality representation strengths.
     /// Input: current strength per modality (e.g. logit magnitudes already in workspace).
     /// Output: gated strengths = raw * weight, plus the shared scalar attention sum.
-    pub fn gate(&mut self, query: &[f64], raw: &BTreeMap<Modality, f64>) -> BTreeMap<Modality, f64> {
+    pub fn gate(
+        &mut self,
+        query: &[f64],
+        raw: &BTreeMap<Modality, f64>,
+    ) -> BTreeMap<Modality, f64> {
         let weights = self.route(query);
         let mut out = BTreeMap::new();
         for (m, w) in weights {
@@ -166,8 +176,11 @@ impl ModalityRouter {
 
     /// The winning modality (highest weight) from the last route.
     pub fn winner(&self) -> Option<Modality> {
-        self.last_weights.as_ref()
-            .and_then(|ws| ws.iter().max_by(|a, b| a.1.total_cmp(&b.1)).map(|(m, _)| *m))
+        self.last_weights.as_ref().and_then(|ws| {
+            ws.iter()
+                .max_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(m, _)| *m)
+        })
     }
 
     fn dot(&self, a: &[f64], b: &[f64]) -> f64 {
@@ -177,7 +190,8 @@ impl ModalityRouter {
 
     /// Weight for a specific modality from the last route decision.
     pub fn weight_of(&self, m: Modality) -> f64 {
-        self.last_weights.as_ref()
+        self.last_weights
+            .as_ref()
             .and_then(|ws| ws.iter().find(|(x, _)| *x == m).map(|(_, w)| *w))
             .unwrap_or(0.0)
     }
@@ -269,7 +283,10 @@ mod tests {
             (0..key.len()).map(|i| key[i] * query[i]).sum::<f64>()
         };
         // chosen key should be pulled toward query → alignment increases or stable
-        assert!(after >= before - 1e-6, "chosen key alert should not decrease: before {before}, after {after}");
+        assert!(
+            after >= before - 1e-6,
+            "chosen key alert should not decrease: before {before}, after {after}"
+        );
     }
 
     #[test]
@@ -289,7 +306,12 @@ mod tests {
         r.reinforce(winner, &vec_of(1.0, 8), 1.0);
         for (m, key) in &r.keys {
             for &v in key {
-                assert!((0.0..=1.0).contains(&v), "{} key out of range: {}", m.label(), v);
+                assert!(
+                    (0.0..=1.0).contains(&v),
+                    "{} key out of range: {}",
+                    m.label(),
+                    v
+                );
             }
         }
     }
@@ -307,7 +329,11 @@ mod tests {
         let text_key = r.keys[&Modality::Text].clone();
         // align query to code modality by constructing a strong text-like query
         let weights = r.route(&text_key);
-        let text_w = weights.iter().find(|(m, _)| *m == Modality::Code).map(|(_, w)| *w).unwrap_or(0.0);
+        let text_w = weights
+            .iter()
+            .find(|(m, _)| *m == Modality::Code)
+            .map(|(_, w)| *w)
+            .unwrap_or(0.0);
         // There is at least one modality with decent weight; assert winner is deterministic
         let _ = text_w;
         assert!(weights[0].1 > 0.0);

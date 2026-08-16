@@ -77,12 +77,7 @@ impl FactorGraphBeliefPropagation {
         }
     }
 
-    pub fn run(
-        &self,
-        beliefs: &[Vec<f64>],
-        max_iters: usize,
-        tol: f64,
-    ) -> Vec<Vec<f64>> {
+    pub fn run(&self, beliefs: &[Vec<f64>], max_iters: usize, tol: f64) -> Vec<Vec<f64>> {
         if beliefs.is_empty() {
             return beliefs.to_vec();
         }
@@ -154,20 +149,26 @@ mod tests {
         }
 
         fn transition(&self, from: usize, to: usize) -> f64 {
-            if from == to { 0.9 } else { 0.1 / (self.n as f64 - 1.0) }
+            if from == to {
+                0.9
+            } else {
+                0.1 / (self.n as f64 - 1.0)
+            }
         }
 
         fn likelihood(&self, state: usize, obs: usize) -> f64 {
-            if state == obs { 0.9 } else { 0.1 / (self.n as f64 - 1.0) }
+            if state == obs {
+                0.9
+            } else {
+                0.1 / (self.n as f64 - 1.0)
+            }
         }
     }
 
     #[test]
     fn test_factorial_pomdp_update() {
-        let factors: Vec<Box<dyn POMDPFactor>> = vec![
-            Box::new(TestFactor { n: 2 }),
-            Box::new(TestFactor { n: 2 }),
-        ];
+        let factors: Vec<Box<dyn POMDPFactor>> =
+            vec![Box::new(TestFactor { n: 2 }), Box::new(TestFactor { n: 2 })];
         let pomdp = FactorialPOMDP::new(factors);
         let beliefs = vec![vec![0.5, 0.5], vec![0.5, 0.5]];
         let updated = pomdp.update(&beliefs, &[0, 1]);
@@ -200,10 +201,8 @@ mod tests {
 
     #[test]
     fn test_factorial_pomdp_evidence_zero() {
-        let factors: Vec<Box<dyn POMDPFactor>> = vec![
-            Box::new(TestFactor { n: 2 }),
-            Box::new(TestFactor { n: 2 }),
-        ];
+        let factors: Vec<Box<dyn POMDPFactor>> =
+            vec![Box::new(TestFactor { n: 2 }), Box::new(TestFactor { n: 2 })];
         let pomdp = FactorialPOMDP::new(factors);
         let bad_beliefs = vec![vec![0.0, 0.0], vec![0.0, 1.0]];
         let updated = pomdp.update(&bad_beliefs, &[0, 1]);

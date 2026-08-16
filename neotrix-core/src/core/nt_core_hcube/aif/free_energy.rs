@@ -10,12 +10,7 @@ impl FreeEnergyCalculator {
         Self
     }
 
-    pub fn compute_vfe(
-        &self,
-        belief: &[f64],
-        observation: &[f64],
-        likelihood: &[Vec<f64>],
-    ) -> f64 {
+    pub fn compute_vfe(&self, belief: &[f64], observation: &[f64], likelihood: &[Vec<f64>]) -> f64 {
         let uniform_prior = vec![1.0 / belief.len() as f64; belief.len()];
         let complexity = self.compute_complexity(belief, &uniform_prior);
         let accuracy = self.compute_accuracy(belief, observation, likelihood);

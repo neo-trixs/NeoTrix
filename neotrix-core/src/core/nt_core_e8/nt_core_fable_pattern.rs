@@ -66,7 +66,9 @@ impl FablePhase {
     pub fn description(&self) -> &'static str {
         match self {
             FablePhase::Acknowledgment => "Opens with careful framing of the problem",
-            FablePhase::ProblemRestatement => "Restates the task in own words to ground the reasoning",
+            FablePhase::ProblemRestatement => {
+                "Restates the task in own words to ground the reasoning"
+            }
             FablePhase::Decomposition => "Breaks the problem into constituent subproblems",
             FablePhase::FirstPrinciples => "Reason from fundamentals before applying heuristics",
             FablePhase::SelfVerification => "Checks logic with verification questions",
@@ -142,31 +144,85 @@ impl PhaseProfile {
     pub fn for_phase(phase: FablePhase) -> Self {
         match phase {
             FablePhase::Acknowledgment => Self {
-                phase, stance: 0.8, mode: 0.3, depth: 0.2, meth: 0.2, scope: 0.3, abst: 0.2,
+                phase,
+                stance: 0.8,
+                mode: 0.3,
+                depth: 0.2,
+                meth: 0.2,
+                scope: 0.3,
+                abst: 0.2,
             },
             FablePhase::ProblemRestatement => Self {
-                phase, stance: 0.6, mode: 0.5, depth: 0.3, meth: 0.3, scope: 0.5, abst: 0.5,
+                phase,
+                stance: 0.6,
+                mode: 0.5,
+                depth: 0.3,
+                meth: 0.3,
+                scope: 0.5,
+                abst: 0.5,
             },
             FablePhase::Decomposition => Self {
-                phase, stance: 0.3, mode: 0.7, depth: 0.4, meth: 0.6, scope: 0.6, abst: 0.4,
+                phase,
+                stance: 0.3,
+                mode: 0.7,
+                depth: 0.4,
+                meth: 0.6,
+                scope: 0.6,
+                abst: 0.4,
             },
             FablePhase::FirstPrinciples => Self {
-                phase, stance: 0.4, mode: 0.8, depth: 0.8, meth: 0.4, scope: 0.7, abst: 0.8,
+                phase,
+                stance: 0.4,
+                mode: 0.8,
+                depth: 0.8,
+                meth: 0.4,
+                scope: 0.7,
+                abst: 0.8,
             },
             FablePhase::SelfVerification => Self {
-                phase, stance: 0.8, mode: 0.6, depth: 0.5, meth: 0.3, scope: 0.4, abst: 0.3,
+                phase,
+                stance: 0.8,
+                mode: 0.6,
+                depth: 0.5,
+                meth: 0.3,
+                scope: 0.4,
+                abst: 0.3,
             },
             FablePhase::AlternativeConsideration => Self {
-                phase, stance: 0.2, mode: 0.5, depth: 0.5, meth: 0.9, scope: 0.8, abst: 0.5,
+                phase,
+                stance: 0.2,
+                mode: 0.5,
+                depth: 0.5,
+                meth: 0.9,
+                scope: 0.8,
+                abst: 0.5,
             },
             FablePhase::DeepDive => Self {
-                phase, stance: 0.6, mode: 0.8, depth: 0.9, meth: 0.3, scope: 0.3, abst: 0.3,
+                phase,
+                stance: 0.6,
+                mode: 0.8,
+                depth: 0.9,
+                meth: 0.3,
+                scope: 0.3,
+                abst: 0.3,
             },
             FablePhase::Synthesis => Self {
-                phase, stance: 0.7, mode: 0.5, depth: 0.6, meth: 0.4, scope: 0.6, abst: 0.6,
+                phase,
+                stance: 0.7,
+                mode: 0.5,
+                depth: 0.6,
+                meth: 0.4,
+                scope: 0.6,
+                abst: 0.6,
             },
             FablePhase::Conclusion => Self {
-                phase, stance: 0.9, mode: 0.3, depth: 0.3, meth: 0.2, scope: 0.3, abst: 0.2,
+                phase,
+                stance: 0.9,
+                mode: 0.3,
+                depth: 0.3,
+                meth: 0.2,
+                scope: 0.3,
+                abst: 0.2,
             },
         }
     }
@@ -210,7 +266,7 @@ impl Default for PhaseTransitionMatrix {
         t[4][6] = 0.40;
         t[4][7] = 0.15;
         t[4][2] = 0.10; // backtrack to decomposition
-        // AlternativeConsideration → DeepDive (strong)
+                        // AlternativeConsideration → DeepDive (strong)
         t[5][6] = 0.60;
         t[5][7] = 0.20;
         t[5][3] = 0.15;
@@ -234,12 +290,18 @@ impl Default for PhaseTransitionMatrix {
 impl PhaseTransitionMatrix {
     /// Probability of transitioning from phase `from` to phase `to`.
     pub fn prob(&self, from: usize, to: usize) -> f64 {
-        if from < 9 && to < 9 { self.transitions[from][to] } else { 0.0 }
+        if from < 9 && to < 9 {
+            self.transitions[from][to]
+        } else {
+            0.0
+        }
     }
 
     /// Score a sequence of phase indices against the transition matrix.
     pub fn score_sequence(&self, phases: &[usize]) -> f64 {
-        if phases.len() < 2 { return 0.5; }
+        if phases.len() < 2 {
+            return 0.5;
+        }
         let mut log_prob = 0.0;
         for pair in phases.windows(2) {
             let p = self.prob(pair[0], pair[1]);
@@ -300,7 +362,10 @@ impl PhaseTransitionMatrix {
     /// stale self-loop-heavy row traps the E8 trajectory at one mode.
     pub fn calibrate_from_cognitive_modes(&mut self, modes: &[&str]) {
         for pair in modes.windows(2) {
-            if let (Some(f), Some(t)) = (self.phase_from_cognitive(pair[0]), self.phase_from_cognitive(pair[1])) {
+            if let (Some(f), Some(t)) = (
+                self.phase_from_cognitive(pair[0]),
+                self.phase_from_cognitive(pair[1]),
+            ) {
                 self.record(f, t);
             }
         }
@@ -310,15 +375,25 @@ impl PhaseTransitionMatrix {
     /// Map a `cognitive_mode` string to a Fable phase index.
     fn phase_from_cognitive(&self, mode: &str) -> Option<usize> {
         let m = mode.to_ascii_lowercase();
-        if m.contains("understand") || m.contains("problem") || m.contains("parse") { Some(1) }
-        else if m.contains("decompos") || m.contains("plan") || m.contains("link") { Some(2) }
-        else if m.contains("first") || m.contains("principle") || m.contains("strategy") { Some(3) }
-        else if m.contains("calcul") || m.contains("execut") || m.contains("derive") { Some(6) }
-        else if m.contains("verif") || m.contains("check") || m.contains("reflect") { Some(4) }
-        else if m.contains("synthes") || m.contains("conclud") || m.contains("final") { Some(7) }
-        else if m.contains("alternat") || m.contains("consider") { Some(5) }
-        else if m.contains("acknowledg") || m.contains("context") { Some(0) }
-        else { None }
+        if m.contains("understand") || m.contains("problem") || m.contains("parse") {
+            Some(1)
+        } else if m.contains("decompos") || m.contains("plan") || m.contains("link") {
+            Some(2)
+        } else if m.contains("first") || m.contains("principle") || m.contains("strategy") {
+            Some(3)
+        } else if m.contains("calcul") || m.contains("execut") || m.contains("derive") {
+            Some(6)
+        } else if m.contains("verif") || m.contains("check") || m.contains("reflect") {
+            Some(4)
+        } else if m.contains("synthes") || m.contains("conclud") || m.contains("final") {
+            Some(7)
+        } else if m.contains("alternat") || m.contains("consider") {
+            Some(5)
+        } else if m.contains("acknowledg") || m.contains("context") {
+            Some(0)
+        } else {
+            None
+        }
     }
 }
 
@@ -347,7 +422,9 @@ impl NonLinearPattern {
     /// Uses hexagram distance and direction changes as proxies.
     pub fn detect(trajectory: &[u8]) -> Vec<(usize, NonLinearPattern)> {
         let mut patterns = Vec::new();
-        if trajectory.len() < 3 { return patterns; }
+        if trajectory.len() < 3 {
+            return patterns;
+        }
 
         for i in 2..trajectory.len() {
             let prev = trajectory[i - 1];
@@ -454,7 +531,8 @@ impl FablePatternMatcher {
         for (i, canon_state) in canon.iter().enumerate() {
             if let Some(&actual) = trajectory.get(i) {
                 let exact: f64 = if actual == *canon_state { 1.0 } else { 0.0 };
-                let proximity = 1.0 - (actual as i16 - *canon_state as i16).unsigned_abs() as f64 / 63.0;
+                let proximity =
+                    1.0 - (actual as i16 - *canon_state as i16).unsigned_abs() as f64 / 63.0;
                 phase_scores[i] = exact.max(proximity * 0.5);
                 if exact > 0.5 {
                     match_count += 1;
@@ -485,7 +563,10 @@ impl FablePatternMatcher {
     /// If a `FableDistillationSeeder` is attached, multi-model community trace data
     /// (GLM-5.2, GPT-5.5, Qwable SDFT, Complete-2M, etc.) is blended into the alignment.
     pub fn score_alignment_full(
-        &self, trajectory: &[u8], task_type_idx: usize, task_difficulty: f64,
+        &self,
+        trajectory: &[u8],
+        task_type_idx: usize,
+        task_difficulty: f64,
     ) -> FableAlignmentReport {
         let mut report = self.score_alignment(trajectory, task_type_idx);
 
@@ -518,16 +599,18 @@ impl FablePatternMatcher {
             + report.transition_score * 0.2
             + report.non_linear_score * 0.2
             + report.difficulty_weight * 0.1)
-            .max(0.0).min(1.0);
+            .max(0.0)
+            .min(1.0);
 
         // Multi-model distillation seeder: adjust composite using community dataset knowledge
         if let Some(ref seeder) = self.seeder {
-            let cross_model_bias = seeder.chain_from_multimodel_traces(task_type_idx, task_difficulty);
+            let cross_model_bias =
+                seeder.chain_from_multimodel_traces(task_type_idx, task_difficulty);
             let dataset_influence = (cross_model_bias as f64 / 63.0) * 0.1;
-            report.composite = (report.composite + dataset_influence)
-                .max(0.0).min(1.0);
+            report.composite = (report.composite + dataset_influence).max(0.0).min(1.0);
             report.transition_score = (report.transition_score + dataset_influence * 0.5)
-                .max(0.0).min(1.0);
+                .max(0.0)
+                .min(1.0);
         }
 
         report
@@ -536,7 +619,9 @@ impl FablePatternMatcher {
     /// Trajectory-level advantage (Step-GRPO inspired attention weighting).
     pub fn trajectory_advantage(&self, report: &FableAlignmentReport) -> f64 {
         let attention_weights = [0.05, 0.05, 0.15, 0.20, 0.10, 0.10, 0.10, 0.15, 0.10];
-        let weighted: f64 = report.phase_scores.iter()
+        let weighted: f64 = report
+            .phase_scores
+            .iter()
             .zip(attention_weights.iter())
             .map(|(s, w)| s * w)
             .sum();
@@ -545,19 +630,37 @@ impl FablePatternMatcher {
 
     /// PDDL2PRM-style reward: map a phase score to 5 discrete levels.
     pub fn discretize_reward(score: f64) -> f64 {
-        if score >= 0.95 { 1.0 }      // optimal
-        else if score >= 0.7 { 0.75 } // suboptimal
-        else if score >= 0.4 { 0.5 }  // backtrack
-        else if score >= 0.1 { 0.25 } // dead-end
-        else { 0.0 }                  // invalid
+        if score >= 0.95 {
+            1.0
+        }
+        // optimal
+        else if score >= 0.7 {
+            0.75
+        }
+        // suboptimal
+        else if score >= 0.4 {
+            0.5
+        }
+        // backtrack
+        else if score >= 0.1 {
+            0.25
+        }
+        // dead-end
+        else {
+            0.0
+        } // invalid
     }
 
     /// Score an AgentTrajectory using combined Fable alignment + non-linear patterns.
     pub fn score_trajectory(
-        &self, trajectory: &AgentTrajectory, task_type_idx: usize, task_difficulty: f64,
+        &self,
+        trajectory: &AgentTrajectory,
+        task_type_idx: usize,
+        task_difficulty: f64,
     ) -> f64 {
         let hex_seq: Vec<u8> = trajectory.steps.iter().map(|s| s.e8_mode.0).collect();
-        self.score_alignment_full(&hex_seq, task_type_idx, task_difficulty).composite
+        self.score_alignment_full(&hex_seq, task_type_idx, task_difficulty)
+            .composite
     }
 
     // ─────────────────────────────────────────────────────────
@@ -578,7 +681,9 @@ impl FablePatternMatcher {
     ///   - Verification → Synthesis: return toward original with METH refinement
     pub fn detect_sqv_pattern(&self, trajectory: &[u8]) -> Vec<(usize, &'static str)> {
         let mut sqv_steps = Vec::new();
-        if trajectory.len() < 4 { return sqv_steps; }
+        if trajectory.len() < 4 {
+            return sqv_steps;
+        }
 
         for i in 0..trajectory.len().saturating_sub(3) {
             let t0 = trajectory[i];
@@ -589,11 +694,15 @@ impl FablePatternMatcher {
             // Thesis (bit5=ABST): stable, moderate depth
             let thesis_abst = (t0 >> 5) & 1;
             let thesis_depth = (t0 >> 2) & 1;
-            if thesis_depth == 0 { continue; }
+            if thesis_depth == 0 {
+                continue;
+            }
 
             // Antithesis: ABST flip
             let anti_abst = (t1 >> 5) & 1;
-            if anti_abst == thesis_abst { continue; } // no flip → not SQV
+            if anti_abst == thesis_abst {
+                continue;
+            } // no flip → not SQV
 
             // Verification: SCOPE (bit4) + METH (bit3) adjustment
             let verif_scope = (t2 >> 4) & 1;
@@ -602,7 +711,9 @@ impl FablePatternMatcher {
             let prev_meth = (t1 >> 3) & 1;
             let scope_changed = verif_scope != prev_scope;
             let meth_changed = verif_meth != prev_meth;
-            if !scope_changed && !meth_changed { continue; }
+            if !scope_changed && !meth_changed {
+                continue;
+            }
 
             // Synthesis: return toward thesis ABST with refined bits
             let syn_abst = (t3 >> 5) & 1;
@@ -618,11 +729,18 @@ impl FablePatternMatcher {
     /// Score trajectory for SQV dialectical depth.
     /// Returns a score in [0, 1] where higher = more self-questioning refinement.
     pub fn sqv_score(&self, trajectory: &[u8]) -> f64 {
-        if trajectory.len() < 4 { return 0.0; }
+        if trajectory.len() < 4 {
+            return 0.0;
+        }
         let patterns = self.detect_sqv_pattern(trajectory);
-        if patterns.is_empty() { return 0.2; } // no SQV = shallow reasoning
+        if patterns.is_empty() {
+            return 0.2;
+        } // no SQV = shallow reasoning
 
-        let full_cycles = patterns.iter().filter(|(_, t)| *t == "full_sqv_cycle").count() as f64;
+        let full_cycles = patterns
+            .iter()
+            .filter(|(_, t)| *t == "full_sqv_cycle")
+            .count() as f64;
         let partial = patterns.iter().filter(|(_, t)| *t == "partial_sqv").count() as f64;
         let max_possible = (trajectory.len() / 4) as f64;
         let coverage = (full_cycles + partial * 0.5) / max_possible.max(1.0);
@@ -633,7 +751,10 @@ impl FablePatternMatcher {
 
     /// Enhanced alignment that includes SQV dialectical depth.
     pub fn score_alignment_with_sqv(
-        &self, trajectory: &[u8], task_type_idx: usize, difficulty: f64,
+        &self,
+        trajectory: &[u8],
+        task_type_idx: usize,
+        difficulty: f64,
     ) -> FableAlignmentReport {
         let mut report = self.score_alignment_full(trajectory, task_type_idx, difficulty);
         let sqv = self.sqv_score(trajectory);
@@ -661,7 +782,9 @@ impl FablePatternMatcher {
     ///   - Self-correction patterns without oscillation penalty
     ///   - Broad SCOPE exploration early (bit4 fluctuates)
     pub fn detect_deep_reason_pattern(&self, trajectory: &[u8]) -> f64 {
-        if trajectory.len() < 6 { return 0.0; }
+        if trajectory.len() < 6 {
+            return 0.0;
+        }
 
         // Metric 1: Long ABST-high stretches (bit5 = paradigm depth)
         let mut max_abst_run = 0usize;
@@ -702,21 +825,27 @@ impl FablePatternMatcher {
         let scope_exploration = (early_scope_flips as f64 / mid.max(1) as f64).min(1.0);
 
         // Composite: deep reason models score high on all three
-        (depth_score * 0.4 + correction_score * 0.35 + scope_exploration * 0.25).max(0.0).min(1.0)
+        (depth_score * 0.4 + correction_score * 0.35 + scope_exploration * 0.25)
+            .max(0.0)
+            .min(1.0)
     }
 
     /// Full alignment with both SQV and DeepReason enhancements.
     /// If a `FableDistillationSeeder` is attached, community dataset knowledge
     /// (HelioAI DeepReason 462×105M, uka-balanced, Fable-5 25k, etc.) is blended in.
     pub fn score_alignment_advanced(
-        &self, trajectory: &[u8], task_type_idx: usize, difficulty: f64,
+        &self,
+        trajectory: &[u8],
+        task_type_idx: usize,
+        difficulty: f64,
     ) -> FableAlignmentReport {
         let mut report = self.score_alignment_with_sqv(trajectory, task_type_idx, difficulty);
         let deep_reason_score = self.detect_deep_reason_pattern(trajectory);
         // DeepReason bonus: longer context + deeper reasoning = higher quality
         let depth_bonus = deep_reason_score * 0.1;
         report.non_linear_score = (report.non_linear_score + deep_reason_score * 0.3)
-            .max(0.0).min(1.0);
+            .max(0.0)
+            .min(1.0);
         report.composite = (report.composite + depth_bonus).max(0.0).min(1.0);
 
         // Cross-model seeder enhancement: amplify composite when multi-model
@@ -725,13 +854,16 @@ impl FablePatternMatcher {
             let w = &seeder.dataset_weights;
             let cross_model_weight = w.glm52_traces + w.qwable_sdft + w.agentic_distillation;
             if cross_model_weight > 0.1 {
-                let consensus = (w.glm52_traces * 0.4 + w.qwable_sdft * 0.3 + w.agentic_distillation * 0.3)
-                    .max(0.0).min(1.0);
+                let consensus =
+                    (w.glm52_traces * 0.4 + w.qwable_sdft * 0.3 + w.agentic_distillation * 0.3)
+                        .max(0.0)
+                        .min(1.0);
                 let deep_reason_bias = w.deep_reason * 0.08;
                 let enhancement = consensus * 0.06 + deep_reason_bias;
                 report.composite = (report.composite + enhancement).max(0.0).min(1.0);
                 report.non_linear_score = (report.non_linear_score + deep_reason_bias * 2.0)
-                    .max(0.0).min(1.0);
+                    .max(0.0)
+                    .min(1.0);
             }
         }
 
@@ -819,12 +951,12 @@ impl Default for CommunityDatasetWeights {
             glint_2m: 0.11,
             base: 0.04,
             // Real HF sources (2026) — calibrated to complement synthetic sources
-            mlr_structured: 0.12,      // ICLR 2026, high-quality cognitive_mode labels
-            reasoningflow: 0.09,       // DAG-structured, rich transition semantics
-            harmonic_reasoning: 0.06,  // Quality metrics for PRM
-            qyrou_5m: 0.08,            // 3.67M rows, diverse model coverage
-            ccf_reasoning: 0.05,       // 6-stage CCF, Fable phase alignment
-            swap: 0.03,                // Process supervision, smaller but high-signal
+            mlr_structured: 0.12, // ICLR 2026, high-quality cognitive_mode labels
+            reasoningflow: 0.09,  // DAG-structured, rich transition semantics
+            harmonic_reasoning: 0.06, // Quality metrics for PRM
+            qyrou_5m: 0.08,       // 3.67M rows, diverse model coverage
+            ccf_reasoning: 0.05,  // 6-stage CCF, Fable phase alignment
+            swap: 0.03,           // Process supervision, smaller but high-signal
         }
     }
 }
@@ -837,12 +969,12 @@ impl Default for FableDistillationSeeder {
             let depth = (i & 0x04) as f64 / 4.0;
             let meth = (i & 0x08) as f64 / 8.0;
             factor_biases.push([
-                0.3 + abstraction * 0.4,                  // STANCE
-                0.4 + (1.0 - abstraction) * 0.3,          // MODE
-                0.2 + abstraction * 0.6 + depth * 0.2,    // DEPTH (local depth bonus)
+                0.3 + abstraction * 0.4,                      // STANCE
+                0.4 + (1.0 - abstraction) * 0.3,              // MODE
+                0.2 + abstraction * 0.6 + depth * 0.2,        // DEPTH (local depth bonus)
                 0.3 + (1.0 - abstraction) * 0.4 + meth * 0.2, // METH
-                0.4 + abstraction * 0.3,                  // SCOPE
-                0.2 + abstraction * 0.7,                  // ABST
+                0.4 + abstraction * 0.3,                      // SCOPE
+                0.2 + abstraction * 0.7,                      // ABST
             ]);
         }
         Self {
@@ -869,15 +1001,17 @@ impl FableDistillationSeeder {
     pub fn seed_with_dataset_blend(&self, target: &mut [[f64; 6]; 64], total_blend: f64) {
         let w = &self.dataset_weights;
         // Multi-model blend: Fable-5 primary (55%) + cross-model traces (30%) + base (15%)
-        let model_diversity = w.glm52_traces * 0.25 + w.qwable_sdft * 0.25 + w.agentic_distillation * 0.25 + w.glint_2m * 0.25;
-        let adjusted_blend = total_blend * (
-            w.fable5_25k * 0.25
-            + w.complete_2m * 0.15
-            + w.uka_balanced * 0.10
-            + w.deep_reason * 0.08
-            + model_diversity * 0.30
-            + w.base * 0.12
-        );
+        let model_diversity = w.glm52_traces * 0.25
+            + w.qwable_sdft * 0.25
+            + w.agentic_distillation * 0.25
+            + w.glint_2m * 0.25;
+        let adjusted_blend = total_blend
+            * (w.fable5_25k * 0.25
+                + w.complete_2m * 0.15
+                + w.uka_balanced * 0.10
+                + w.deep_reason * 0.08
+                + model_diversity * 0.30
+                + w.base * 0.12);
         self.seed_factors(target, adjusted_blend.max(0.0).min(1.0));
     }
 
@@ -893,8 +1027,13 @@ impl FableDistillationSeeder {
         if cross_model_weight > 0.1 {
             // GLM-5.2 tends to favor slightly higher abstraction (+2 hexagrams on average)
             // Qwable SDFT aligns closely with Fable-5 base
-            let consensus_bias = (w.glm52_traces * 2.0 - w.agentic_distillation * 1.0).max(-2.0).min(4.0);
-            (base as f64 + consensus_bias + difficulty * 2.0).round().max(0.0).min(63.0) as u8
+            let consensus_bias = (w.glm52_traces * 2.0 - w.agentic_distillation * 1.0)
+                .max(-2.0)
+                .min(4.0);
+            (base as f64 + consensus_bias + difficulty * 2.0)
+                .round()
+                .max(0.0)
+                .min(63.0) as u8
         } else {
             base
         }
@@ -909,7 +1048,9 @@ impl FableDistillationSeeder {
     pub fn start_for_difficulty(&self, task_type_idx: usize, difficulty: f64) -> u8 {
         let base = self.start_for(task_type_idx);
         if difficulty > 0.7 {
-            (base as f64 + 8.0 * (difficulty - 0.7) * 2.0).round().min(63.0) as u8
+            (base as f64 + 8.0 * (difficulty - 0.7) * 2.0)
+                .round()
+                .min(63.0) as u8
         } else {
             base
         }
@@ -983,7 +1124,9 @@ mod tests {
     fn test_non_linear_backtrack_detection() {
         let trajectory = vec![56u8, 48, 40, 48]; // 48→40→48 → backtrack to 48
         let patterns = NonLinearPattern::detect(&trajectory);
-        assert!(patterns.iter().any(|(_, p)| *p == NonLinearPattern::Backtrack));
+        assert!(patterns
+            .iter()
+            .any(|(_, p)| *p == NonLinearPattern::Backtrack));
     }
 
     #[test]
@@ -991,7 +1134,9 @@ mod tests {
         // STANCE axis flip (bit5): 0x20 set → cleared, with large magnitude
         let trajectory = vec![56u8, 48, 10]; // 56(0x38, stance=1)→48(0x30, stance=1)→10(0x0A, stance=0): stance flips at end
         let patterns = NonLinearPattern::detect(&trajectory);
-        assert!(patterns.iter().any(|(_, p)| *p == NonLinearPattern::SelfCorrection));
+        assert!(patterns
+            .iter()
+            .any(|(_, p)| *p == NonLinearPattern::SelfCorrection));
     }
 
     #[test]
@@ -1034,15 +1179,38 @@ mod tests {
     #[test]
     fn test_community_dataset_weights() {
         let w = CommunityDatasetWeights::default();
-        let sum: f64 = w.fable5_25k + w.complete_2m + w.uka_balanced + w.deep_reason
-            + w.glm52_traces + w.qwable_sdft + w.agentic_distillation + w.glint_2m + w.base
-            + w.mlr_structured + w.reasoningflow + w.harmonic_reasoning + w.qyrou_5m
-            + w.ccf_reasoning + w.swap;
+        let sum: f64 = w.fable5_25k
+            + w.complete_2m
+            + w.uka_balanced
+            + w.deep_reason
+            + w.glm52_traces
+            + w.qwable_sdft
+            + w.agentic_distillation
+            + w.glint_2m
+            + w.base
+            + w.mlr_structured
+            + w.reasoningflow
+            + w.harmonic_reasoning
+            + w.qyrou_5m
+            + w.ccf_reasoning
+            + w.swap;
         assert!((sum - 1.0).abs() < 0.01);
-        assert!(w.glm52_traces > 0.0, "GLM-5.2 cross-model traces should have non-zero weight");
-        assert!(w.qwable_sdft > 0.0, "Qwable SDFT should have non-zero weight");
-        assert!(w.agentic_distillation > 0.0, "Agentic distillation should have non-zero weight");
-        assert!(w.glint_2m > 0.0, "Glint 2M corpus should have non-zero weight");
+        assert!(
+            w.glm52_traces > 0.0,
+            "GLM-5.2 cross-model traces should have non-zero weight"
+        );
+        assert!(
+            w.qwable_sdft > 0.0,
+            "Qwable SDFT should have non-zero weight"
+        );
+        assert!(
+            w.agentic_distillation > 0.0,
+            "Agentic distillation should have non-zero weight"
+        );
+        assert!(
+            w.glint_2m > 0.0,
+            "Glint 2M corpus should have non-zero weight"
+        );
     }
 
     #[test]
@@ -1060,7 +1228,10 @@ mod tests {
         let seeder = FableDistillationSeeder::default();
         // With default cross-model weights (glm52=0.08, qwable=0.06, agentic=0.05 > 0.1 total)
         let result = seeder.chain_from_multimodel_traces(0, 0.5);
-        assert!(result >= 56, "multimodel chain should produce valid hexagram");
+        assert!(
+            result >= 56,
+            "multimodel chain should produce valid hexagram"
+        );
         // Low difficulty should keep close to base
         let result_easy = seeder.chain_from_multimodel_traces(0, 0.0);
         assert!(result_easy >= 56, "easy task should stay near base");
@@ -1071,7 +1242,10 @@ mod tests {
         let seeder = FableDistillationSeeder::default();
         let _normal = seeder.start_for_difficulty(0, 0.3);
         let hard = seeder.start_for_difficulty(0, 0.85);
-        assert!(hard == 56 || hard > 56, "hard task should start at higher abstraction");
+        assert!(
+            hard == 56 || hard > 56,
+            "hard task should start at higher abstraction"
+        );
     }
 
     #[test]
@@ -1098,7 +1272,10 @@ mod tests {
         let ptm = PhaseTransitionMatrix::default();
         let linear = ptm.score_sequence(&[0, 1, 2, 3, 6, 7, 8]);
         let random = ptm.score_sequence(&[8, 7, 6, 5, 4, 3, 2, 1, 0]);
-        assert!(linear > random, "linear sequence should score higher than reversed");
+        assert!(
+            linear > random,
+            "linear sequence should score higher than reversed"
+        );
     }
 
     #[test]
@@ -1106,7 +1283,10 @@ mod tests {
         // Block jump: 0xF8 masked diff > 8
         let trajectory = vec![48u8, 40, 16]; // 40→16: block 40→16 = 24 > 8
         let patterns = NonLinearPattern::detect(&trajectory);
-        let skips: Vec<_> = patterns.iter().filter(|(_, p)| *p == NonLinearPattern::ForwardSkip).collect();
+        let skips: Vec<_> = patterns
+            .iter()
+            .filter(|(_, p)| *p == NonLinearPattern::ForwardSkip)
+            .collect();
         assert!(!skips.is_empty(), "should detect forward skip");
     }
 
@@ -1135,8 +1315,11 @@ mod tests {
             0b001000u8, // Synthesis: 8 (ABST=0, scope=1, meth=0, depth=0) ← ABST back
         ];
         let patterns = matcher.detect_sqv_pattern(&traj);
-        assert!(patterns.iter().any(|(_, t)| *t == "full_sqv_cycle"),
-            "should detect full SQV cycle, got {:?}", patterns);
+        assert!(
+            patterns.iter().any(|(_, t)| *t == "full_sqv_cycle"),
+            "should detect full SQV cycle, got {:?}",
+            patterns
+        );
     }
 
     #[test]
@@ -1159,7 +1342,10 @@ mod tests {
         // No antithesis = no SQV
         let traj = vec![12, 14, 16, 18]; // all ABST=0
         let patterns = matcher.detect_sqv_pattern(&traj);
-        assert!(patterns.is_empty(), "should not detect SQV without antithesis");
+        assert!(
+            patterns.is_empty(),
+            "should not detect SQV without antithesis"
+        );
     }
 
     #[test]
@@ -1172,7 +1358,11 @@ mod tests {
         // Cycle 2: ABST=0→1→0
         traj.extend_from_slice(&[0b001000, 0b101000, 0b100100, 0b000100]);
         let score = matcher.sqv_score(&traj);
-        assert!(score > 0.3, "SQV score should be non-trivial with 2 cycles, got {}", score);
+        assert!(
+            score > 0.3,
+            "SQV score should be non-trivial with 2 cycles, got {}",
+            score
+        );
     }
 
     #[test]
@@ -1189,7 +1379,11 @@ mod tests {
         // Long ABST=1 run (all states have bit5=1)
         let traj: Vec<u8> = (0..12).map(|i| 32 + i * 2).collect(); // 32,34,36,... all ≥32 = ABST=1
         let score = matcher.detect_deep_reason_pattern(&traj);
-        assert!(score > 0.3, "long ABST run should score high, got {}", score);
+        assert!(
+            score > 0.3,
+            "long ABST run should score high, got {}",
+            score
+        );
     }
 
     #[test]
@@ -1215,11 +1409,19 @@ mod tests {
         let mut traj = Vec::new();
         for i in 0..8 {
             let base = 32 + i;
-            let scope = if i % 2 == 0 { base | 0x10 } else { base & !0x10 };
+            let scope = if i % 2 == 0 {
+                base | 0x10
+            } else {
+                base & !0x10
+            };
             traj.push(scope as u8);
         }
         let score = matcher.detect_deep_reason_pattern(&traj);
-        assert!(score > 0.1, "scope exploration should contribute, got {}", score);
+        assert!(
+            score > 0.1,
+            "scope exploration should contribute, got {}",
+            score
+        );
     }
 
     #[test]
@@ -1229,8 +1431,11 @@ mod tests {
         let basic = matcher.score_alignment_full(&traj, 0, 0.5);
         let advanced = matcher.score_alignment_advanced(&traj, 0, 0.5);
         // Advanced should include additional signals
-        assert!(advanced.non_linear_score >= basic.non_linear_score,
+        assert!(
+            advanced.non_linear_score >= basic.non_linear_score,
             "advanced should have >= non_linear score: {} vs {}",
-            advanced.non_linear_score, basic.non_linear_score);
+            advanced.non_linear_score,
+            basic.non_linear_score
+        );
     }
 }

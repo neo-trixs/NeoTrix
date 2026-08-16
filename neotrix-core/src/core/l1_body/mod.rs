@@ -18,8 +18,7 @@
 // 公开 re-exports of telemetry types from core layer
 #[cfg(feature = "telemetry")]
 pub use crate::core::nt_io_telemetry::{
-    AttributeValue, ConsoleTracer, CostTracker, NoopTracer,
-    SpanKind, Tracer,
+    AttributeValue, ConsoleTracer, CostTracker, NoopTracer, SpanKind, Tracer,
 };
 
 // L1 的纯数据模型当前在 neotrix/ 中定义

@@ -79,7 +79,11 @@ impl SaeEncoder {
             return;
         }
         let mut indices: Vec<usize> = (0..latent.len()).collect();
-        indices.sort_by(|&a, &b| latent[b].partial_cmp(&latent[a]).unwrap_or(std::cmp::Ordering::Equal));
+        indices.sort_by(|&a, &b| {
+            latent[b]
+                .partial_cmp(&latent[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         for &idx in indices.iter().skip(k) {
             latent[idx] = 0.0;
         }
@@ -264,7 +268,11 @@ mod tests {
 
     #[test]
     fn test_sae_forward_pass() {
-        let config = SaeConfig { input_dim: 8, latent_dim: 16, ..Default::default() };
+        let config = SaeConfig {
+            input_dim: 8,
+            latent_dim: 16,
+            ..Default::default()
+        };
         let mut sae = SparseAutoencoder::new(config);
         for i in 0..8 {
             sae.encoder.weights[i][i] = 1.0;
@@ -281,7 +289,11 @@ mod tests {
 
     #[test]
     fn test_sae_feature_activation() {
-        let config = SaeConfig { input_dim: 8, latent_dim: 16, ..Default::default() };
+        let config = SaeConfig {
+            input_dim: 8,
+            latent_dim: 16,
+            ..Default::default()
+        };
         let mut sae = SparseAutoencoder::new(config);
         sae.encoder.weights[5] = vec![1.0; 8];
         sae.decoder.weights[0][5] = 1.0;
@@ -311,7 +323,11 @@ mod tests {
 
     #[test]
     fn test_sae_encode_decode_identity() {
-        let config = SaeConfig { input_dim: 4, latent_dim: 40, ..Default::default() };
+        let config = SaeConfig {
+            input_dim: 4,
+            latent_dim: 40,
+            ..Default::default()
+        };
         let mut sae = SparseAutoencoder::new(config);
         for i in 0..4 {
             sae.encoder.weights[i][i] = 1.0;
@@ -328,7 +344,11 @@ mod tests {
 
     #[test]
     fn test_steering_controller_steer() {
-        let config = SaeConfig { input_dim: 8, latent_dim: 16, ..Default::default() };
+        let config = SaeConfig {
+            input_dim: 8,
+            latent_dim: 16,
+            ..Default::default()
+        };
         let mut sae = SparseAutoencoder::new(config);
         sae.encoder.weights[3] = vec![1.0; 8];
         sae.decoder.weights[0][3] = 1.0;
@@ -337,9 +357,10 @@ mod tests {
         assert!((latent[3] - 42.0).abs() < 1e-10);
         let controller = SteeringController {
             active_steering: Some(SteeringVector {
-                targets: vec![
-                    SteeringTarget { feature_idx: 3, strength: 10.0 },
-                ],
+                targets: vec![SteeringTarget {
+                    feature_idx: 3,
+                    strength: 10.0,
+                }],
                 description: "test".into(),
             }),
         };

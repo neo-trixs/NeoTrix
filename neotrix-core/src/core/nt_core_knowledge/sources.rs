@@ -1,7 +1,7 @@
-use crate::core::CapabilityVector;
-use crate::core::nt_core_knowledge::KnowledgeSource;
 use super::vectors_group_a;
 use super::vectors_group_b;
+use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::core::CapabilityVector;
 
 impl KnowledgeSource {
     /// Human-readable name of this knowledge source (GitHub repo path or project name).
@@ -32,7 +32,9 @@ impl KnowledgeSource {
             KnowledgeSource::Cairn => "oritera/Cairn",
             KnowledgeSource::Orca => "stablyai/orca",
             KnowledgeSource::RedRun => "blacklanternsecurity/red-run",
-            KnowledgeSource::AutonomousSpeedrunning => "PrimeIntellect-ai/experiments-autonomous-speedrunning",
+            KnowledgeSource::AutonomousSpeedrunning => {
+                "PrimeIntellect-ai/experiments-autonomous-speedrunning"
+            }
             KnowledgeSource::Synesis => "andreycpu/synesis",
             KnowledgeSource::MemOS => "MemTensor/MemOS",
             KnowledgeSource::Reflexio => "ReflexioAI/reflexio",
@@ -49,29 +51,37 @@ impl KnowledgeSource {
             KnowledgeSource::HashCortxSwarm => "hashcortx-swarm-patterns",
             KnowledgeSource::HashCortxFailover => "hashcortx-failover-routing",
             KnowledgeSource::HetuLuoshu => "河图洛书 (Yellow River Map / Luo River Writing)",
-//            KnowledgeSource::YijingBinary => "易经二进制 (Yijing Binary Encoding — Shao Yong / Leibniz / Bouvet)",
-//            KnowledgeSource::FivePhasesGauge => "五行规范场 (Five Phases Gauge Theory — Standard Model mapping)",
-            KnowledgeSource::ThreeCosmologies => "三大宇宙论 (Gai Tian / Hun Tian / Xuan Ye cosmology)",
-            KnowledgeSource::HuainanziCalendar => "淮南子历法 (Huainanzi astronomical calendar / universal embedding)",
-//            KnowledgeSource::ZhangHengSeismoscope => "张衡地动仪 (Zhang Heng seismoscope — 2025 scientific restoration)",
-//            KnowledgeSource::MawangduiAstronomy => "马王堆天文 (Mawangdui silk manuscripts — 五星占/彗星图/导引图)",
-//            KnowledgeSource::ShaoYongCosmology => "皇极经世 (Shao Yong's cosmic cycle — 129600-year cosmology)",
-//            KnowledgeSource::DayanNumber => "大衍之数 (Dayan number 50→49 — Zhao Shuang / Jiao Weifang proof)",
-//            KnowledgeSource::AdamsLaw => "Adam's Law (arXiv 2604.02176) — Textual Frequency Law",
-//            KnowledgeSource::IntegratedInformationTheory => "Integrated Information Theory (Tononi IIT 3.0) — pyphi causal power",
-//            KnowledgeSource::GlobalWorkspaceTheory => "Global Workspace Theory (Baars / Dehaene GNW) — conscious access",
-//            KnowledgeSource::ActiveInference => "Active Inference / Free Energy Principle (Friston FEP) — generative models",
-//            KnowledgeSource::VSAHyperdim => "Hyperdimensional Computing (Kanerva HD/VSA) — bundle/bind/permute",
-            KnowledgeSource::JEPAWorldModel => "JEPA World Model (LeCun Joint Embedding Predictive Architecture)",
+            //            KnowledgeSource::YijingBinary => "易经二进制 (Yijing Binary Encoding — Shao Yong / Leibniz / Bouvet)",
+            //            KnowledgeSource::FivePhasesGauge => "五行规范场 (Five Phases Gauge Theory — Standard Model mapping)",
+            KnowledgeSource::ThreeCosmologies => {
+                "三大宇宙论 (Gai Tian / Hun Tian / Xuan Ye cosmology)"
+            }
+            KnowledgeSource::HuainanziCalendar => {
+                "淮南子历法 (Huainanzi astronomical calendar / universal embedding)"
+            }
+            //            KnowledgeSource::ZhangHengSeismoscope => "张衡地动仪 (Zhang Heng seismoscope — 2025 scientific restoration)",
+            //            KnowledgeSource::MawangduiAstronomy => "马王堆天文 (Mawangdui silk manuscripts — 五星占/彗星图/导引图)",
+            //            KnowledgeSource::ShaoYongCosmology => "皇极经世 (Shao Yong's cosmic cycle — 129600-year cosmology)",
+            //            KnowledgeSource::DayanNumber => "大衍之数 (Dayan number 50→49 — Zhao Shuang / Jiao Weifang proof)",
+            //            KnowledgeSource::AdamsLaw => "Adam's Law (arXiv 2604.02176) — Textual Frequency Law",
+            //            KnowledgeSource::IntegratedInformationTheory => "Integrated Information Theory (Tononi IIT 3.0) — pyphi causal power",
+            //            KnowledgeSource::GlobalWorkspaceTheory => "Global Workspace Theory (Baars / Dehaene GNW) — conscious access",
+            //            KnowledgeSource::ActiveInference => "Active Inference / Free Energy Principle (Friston FEP) — generative models",
+            //            KnowledgeSource::VSAHyperdim => "Hyperdimensional Computing (Kanerva HD/VSA) — bundle/bind/permute",
+            KnowledgeSource::JEPAWorldModel => {
+                "JEPA World Model (LeCun Joint Embedding Predictive Architecture)"
+            }
             KnowledgeSource::DialogueExperience => "neotrix-dialogue-experience",
             KnowledgeSource::ResearchFindings => "neotrix-research-findings",
-//            KnowledgeSource::PredictiveCoding => "Predictive Coding (Rao & Ballard) — hierarchical inference",
-            KnowledgeSource::OrchOR => "Orchestrated Objective Reduction (Penrose & Hameroff Orch-OR)",
-//            KnowledgeSource::AttentionSchema => "Attention Schema Theory (Graziano) — awareness as attention model",
-//            KnowledgeSource::SiaHarnessUpdate => "SIA Harness Update (arXiv 2605.27276) — scaffold rewrite capability",
-//            KnowledgeSource::SiaWeightUpdate => "SIA Weight Update (arXiv 2605.27276) — RL weight update capability",
-//            KnowledgeSource::SiaFeedbackLoop => "SIA Feedback Loop (arXiv 2605.27276) — three-body feedback architecture",
-//            KnowledgeSource::HyperAgents => "DGM-HyperAgents (arXiv 2603.19461) — self-referential self-improving agents",
+            //            KnowledgeSource::PredictiveCoding => "Predictive Coding (Rao & Ballard) — hierarchical inference",
+            KnowledgeSource::OrchOR => {
+                "Orchestrated Objective Reduction (Penrose & Hameroff Orch-OR)"
+            }
+            //            KnowledgeSource::AttentionSchema => "Attention Schema Theory (Graziano) — awareness as attention model",
+            //            KnowledgeSource::SiaHarnessUpdate => "SIA Harness Update (arXiv 2605.27276) — scaffold rewrite capability",
+            //            KnowledgeSource::SiaWeightUpdate => "SIA Weight Update (arXiv 2605.27276) — RL weight update capability",
+            //            KnowledgeSource::SiaFeedbackLoop => "SIA Feedback Loop (arXiv 2605.27276) — three-body feedback architecture",
+            //            KnowledgeSource::HyperAgents => "DGM-HyperAgents (arXiv 2603.19461) — self-referential self-improving agents",
             _ => "external/unknown",
         }
     }
@@ -87,31 +97,55 @@ impl KnowledgeSource {
     /// Returns all known knowledge sources as a flat vector.
     pub fn all() -> Vec<KnowledgeSource> {
         vec![
-            KnowledgeSource::HeroUI, KnowledgeSource::BaseUI,
-            KnowledgeSource::ArcUI, KnowledgeSource::CortexUI,
-            KnowledgeSource::AgenticDS, KnowledgeSource::DesignPhilosophy,
-            KnowledgeSource::Hyperframes, KnowledgeSource::Betterleaks,
-            KnowledgeSource::YaoWebsecurity, KnowledgeSource::Botasaurus,
-            KnowledgeSource::ReactDoctor, KnowledgeSource::OpenPencil,
-            KnowledgeSource::AiTrader, KnowledgeSource::SesameRobot,
-            KnowledgeSource::EverOS, KnowledgeSource::MattPocockSkills,
-            KnowledgeSource::NestedLearning, KnowledgeSource::AutonomousGoal,
-            KnowledgeSource::AwesomeDesignSkills, KnowledgeSource::DeepSeekTui,
-            KnowledgeSource::Codebuff, KnowledgeSource::OpenClaude,
-            KnowledgeSource::Cairn, KnowledgeSource::Orca,
-            KnowledgeSource::RedRun, KnowledgeSource::AutonomousSpeedrunning,
-            KnowledgeSource::Synesis, KnowledgeSource::MemOS,
-            KnowledgeSource::Reflexio, KnowledgeSource::Mem0,
-            KnowledgeSource::Mnemosyne, KnowledgeSource::OriMnemos,
-            KnowledgeSource::OPSD, KnowledgeSource::AttentionMechanism,
-            KnowledgeSource::PatchFile, KnowledgeSource::KeyVault,
+            KnowledgeSource::HeroUI,
+            KnowledgeSource::BaseUI,
+            KnowledgeSource::ArcUI,
+            KnowledgeSource::CortexUI,
+            KnowledgeSource::AgenticDS,
+            KnowledgeSource::DesignPhilosophy,
+            KnowledgeSource::Hyperframes,
+            KnowledgeSource::Betterleaks,
+            KnowledgeSource::YaoWebsecurity,
+            KnowledgeSource::Botasaurus,
+            KnowledgeSource::ReactDoctor,
+            KnowledgeSource::OpenPencil,
+            KnowledgeSource::AiTrader,
+            KnowledgeSource::SesameRobot,
+            KnowledgeSource::EverOS,
+            KnowledgeSource::MattPocockSkills,
+            KnowledgeSource::NestedLearning,
+            KnowledgeSource::AutonomousGoal,
+            KnowledgeSource::AwesomeDesignSkills,
+            KnowledgeSource::DeepSeekTui,
+            KnowledgeSource::Codebuff,
+            KnowledgeSource::OpenClaude,
+            KnowledgeSource::Cairn,
+            KnowledgeSource::Orca,
+            KnowledgeSource::RedRun,
+            KnowledgeSource::AutonomousSpeedrunning,
+            KnowledgeSource::Synesis,
+            KnowledgeSource::MemOS,
+            KnowledgeSource::Reflexio,
+            KnowledgeSource::Mem0,
+            KnowledgeSource::Mnemosyne,
+            KnowledgeSource::OriMnemos,
+            KnowledgeSource::OPSD,
+            KnowledgeSource::AttentionMechanism,
+            KnowledgeSource::PatchFile,
+            KnowledgeSource::KeyVault,
             KnowledgeSource::SealLoop,
-            KnowledgeSource::HashCortxAgents, KnowledgeSource::HashCortxSecurity,
-            KnowledgeSource::HashCortxSwarm, KnowledgeSource::HashCortxFailover,
-            KnowledgeSource::HetuLuoshu, KnowledgeSource::YijingBinary,
-            KnowledgeSource::FivePhasesGauge, KnowledgeSource::ThreeCosmologies,
-            KnowledgeSource::HuainanziCalendar, KnowledgeSource::ZhangHengSeismoscope,
-            KnowledgeSource::MawangduiAstronomy, KnowledgeSource::ShaoYongCosmology,
+            KnowledgeSource::HashCortxAgents,
+            KnowledgeSource::HashCortxSecurity,
+            KnowledgeSource::HashCortxSwarm,
+            KnowledgeSource::HashCortxFailover,
+            KnowledgeSource::HetuLuoshu,
+            KnowledgeSource::YijingBinary,
+            KnowledgeSource::FivePhasesGauge,
+            KnowledgeSource::ThreeCosmologies,
+            KnowledgeSource::HuainanziCalendar,
+            KnowledgeSource::ZhangHengSeismoscope,
+            KnowledgeSource::MawangduiAstronomy,
+            KnowledgeSource::ShaoYongCosmology,
             KnowledgeSource::DayanNumber,
             KnowledgeSource::AdamsLaw,
             KnowledgeSource::IntegratedInformationTheory,
@@ -212,11 +246,12 @@ impl KnowledgeSource {
     }
 
     /// Returns sources sorted by access frequency — hot sources first
-    pub fn sort_by_access<'a>(sources: &'a [KnowledgeSource], tracker: &super::SourceAccessTracker) -> Vec<&'a KnowledgeSource> {
+    pub fn sort_by_access<'a>(
+        sources: &'a [KnowledgeSource],
+        tracker: &super::SourceAccessTracker,
+    ) -> Vec<&'a KnowledgeSource> {
         let mut sorted: Vec<&'a KnowledgeSource> = sources.iter().collect();
-        sorted.sort_by(|a, b| {
-            tracker.access_count(b).cmp(&tracker.access_count(a))
-        });
+        sorted.sort_by(|a, b| tracker.access_count(b).cmp(&tracker.access_count(a)));
         sorted
     }
 }

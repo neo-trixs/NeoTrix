@@ -1,15 +1,15 @@
 #![deny(clippy::unwrap_used)]
 
-use super::stream_buffer::ConsciousnessStream;
-use super::specious_present::SpeciousPresent;
-use super::volition::{ActionCandidate, VolitionEngine};
-use super::inner_critic::{CritiqueResult, InnerCritic};
 use super::awakening::{AwakeningReport, ConsciousnessAwakening};
-use super::vsa_tag::{VsaTagged, VsaOrigin, VsaSelfCategory};
+use super::inner_critic::{CritiqueResult, InnerCritic};
 use super::source_hierarchy::{
     ContextMeta, KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
 };
-use crate::core::nt_core_self::emotion_state::{EmotionEngine, EmotionReport, EmotionDimension};
+use super::specious_present::SpeciousPresent;
+use super::stream_buffer::ConsciousnessStream;
+use super::volition::{ActionCandidate, VolitionEngine};
+use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
+use crate::core::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 /// 每次 tick 最多注入的 KB 知识条目数，防止无界流入意识流。
@@ -24,10 +24,15 @@ struct KbQueryCache {
 
 impl KbQueryCache {
     fn new() -> Self {
-        Self { entries: std::collections::VecDeque::new() }
+        Self {
+            entries: std::collections::VecDeque::new(),
+        }
     }
     fn get(&self, query: &str) -> Option<&Vec<(String, f64)>> {
-        self.entries.iter().find(|(k, _)| k == query).map(|(_, v)| v)
+        self.entries
+            .iter()
+            .find(|(k, _)| k == query)
+            .map(|(_, v)| v)
     }
     fn put(&mut self, query: &str, results: Vec<(String, f64)>) {
         if self.entries.iter().any(|(k, _)| k == query) {
@@ -98,7 +103,8 @@ impl ConsciousnessRuntime {
             None => return Vec::new(),
         };
         match kb.search(query, limit) {
-            Ok(results) => results.into_iter()
+            Ok(results) => results
+                .into_iter()
                 .map(|r| (r.node.title.clone(), r.score))
                 .collect(),
             Err(_) => Vec::new(),
@@ -117,12 +123,17 @@ impl ConsciousnessRuntime {
                 Ok(r) => r,
                 Err(_) => return 0,
             };
-            let mapped: Vec<(String, f64)> = fresh.iter().map(|r| (r.node.title.clone(), r.score)).collect();
+            let mapped: Vec<(String, f64)> = fresh
+                .iter()
+                .map(|r| (r.node.title.clone(), r.score))
+                .collect();
             self.kb_cache.put(query, mapped.clone());
             mapped
         };
         let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos() as i64;
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as i64;
         let mut injected = Vec::new();
         for (title, score) in results {
             if title.is_empty() {
@@ -167,13 +178,19 @@ impl ConsciousnessRuntime {
     pub fn observe_from_critique(&mut self, critique: &CritiqueResult) {
         let quality = critique.overall_quality;
         self.last_quality = quality;
-        self.emotion_engine.observe(EmotionDimension::Confidence, quality, "critique_quality");
+        self.emotion_engine
+            .observe(EmotionDimension::Confidence, quality, "critique_quality");
         if quality < 0.3 {
-            self.emotion_engine.observe(EmotionDimension::Frustration, 0.7 - quality, "low_quality_critique");
+            self.emotion_engine.observe(
+                EmotionDimension::Frustration,
+                0.7 - quality,
+                "low_quality_critique",
+            );
         }
         if let Some(ref action) = critique.selected_action {
             if action.contains("explore") || action.contains("curious") {
-                self.emotion_engine.observe(EmotionDimension::Curiosity, 0.8, action);
+                self.emotion_engine
+                    .observe(EmotionDimension::Curiosity, 0.8, action);
             }
         }
     }
@@ -187,7 +204,11 @@ impl ConsciousnessRuntime {
     }
 
     pub fn last_quality(&self) -> Option<f64> {
-        if self.tick_count > 0 { Some(self.last_quality) } else { None }
+        if self.tick_count > 0 {
+            Some(self.last_quality)
+        } else {
+            None
+        }
     }
 
     pub fn set_emotion_engine(&mut self, engine: EmotionEngine) {
@@ -207,9 +228,8 @@ impl ConsciousnessRuntime {
         self.inject_kb_knowledge(resonance_content);
         // Run volition: propose candidates from the specious present window
         for item in self.specious_present.window().iter() {
-            let desc = String::from_utf8_lossy(
-                &item.vector[..item.vector.len().min(64)],
-            ).to_string();
+            let desc =
+                String::from_utf8_lossy(&item.vector[..item.vector.len().min(64)]).to_string();
             if !desc.is_empty() {
                 let candidate = ActionCandidate::new(item.vector.clone(), &desc);
                 self.volition.propose(candidate);
@@ -224,7 +244,8 @@ impl ConsciousnessRuntime {
         let mut critique = match self.specious_present.current() {
             Some(current) => {
                 let context = self.specious_present.previous(1).unwrap_or(current);
-                self.critic.evaluate(current, context, Some(&self.specious_present))
+                self.critic
+                    .evaluate(current, context, Some(&self.specious_present))
             }
             None => return None,
         };
@@ -259,7 +280,9 @@ impl ConsciousnessRuntime {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for ConsciousnessRuntime {
-    fn name(&self) -> &str { "consciousness_runtime" }
+    fn name(&self) -> &str {
+        "consciousness_runtime"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         // Test 1: new runtime is not awakened
@@ -295,7 +318,11 @@ impl crate::core::nt_core_self_test::SelfTest for ConsciousnessRuntime {
         if !cr.query_kb("anything", 3).is_empty() {
             failures.push("query_kb without KB should return empty".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -324,8 +351,16 @@ mod tests {
         };
         cr.observe_from_critique(&critique);
         let report = cr.emotion_engine.report();
-        assert!(report.confidence < 0.5, "confidence={} should have dropped from 0.5", report.confidence);
-        assert!(report.frustration > 0.49, "frustration={} should be above neutral", report.frustration);
+        assert!(
+            report.confidence < 0.5,
+            "confidence={} should have dropped from 0.5",
+            report.confidence
+        );
+        assert!(
+            report.frustration > 0.49,
+            "frustration={} should be above neutral",
+            report.frustration
+        );
         assert_eq!(cr.last_quality, 0.2);
     }
 
@@ -344,8 +379,16 @@ mod tests {
         };
         cr.observe_from_critique(&critique);
         let report = cr.emotion_engine.report();
-        assert!(report.confidence > 0.55, "confidence={} should be above neutral", report.confidence);
-        assert!(report.curiosity > 0.55, "curiosity={} should be above neutral", report.curiosity);
+        assert!(
+            report.confidence > 0.55,
+            "confidence={} should be above neutral",
+            report.confidence
+        );
+        assert!(
+            report.curiosity > 0.55,
+            "curiosity={} should be above neutral",
+            report.curiosity
+        );
         assert_eq!(cr.last_quality, 0.9);
     }
 
@@ -366,14 +409,19 @@ mod tests {
         engine.observe(EmotionDimension::Confidence, 0.9, "test");
         cr.set_emotion_engine(engine);
         let report = cr.emotion_engine.report();
-        assert!(report.confidence > 0.55, "confidence={} should reflect observed 0.9", report.confidence);
+        assert!(
+            report.confidence > 0.55,
+            "confidence={} should reflect observed 0.9",
+            report.confidence
+        );
     }
 
     #[test]
     fn test_tick_wires_observe_from_critique() {
         let mut cr = ConsciousnessRuntime::new();
         cr.awaken();
-        let result = cr.tick("high quality content that is meaningful long enough to produce a critique");
+        let result =
+            cr.tick("high quality content that is meaningful long enough to produce a critique");
         assert!(result.is_some());
         let report = cr.emotion_engine.report();
         assert!(report.confidence >= 0.0); // tick wired observe_from_critique

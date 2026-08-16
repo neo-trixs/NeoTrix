@@ -1,8 +1,8 @@
 pub mod engine;
 pub mod history;
 
-pub use engine::{SchedulerEngine, ScheduledJob, ScheduleType, ContextGate};
-pub use history::{JobRunRecord, JobRunHistory, SchedulerStats};
+pub use engine::{ContextGate, ScheduleType, ScheduledJob, SchedulerEngine};
+pub use history::{JobRunHistory, JobRunRecord, SchedulerStats};
 
 /// Convenience function: create a scheduler with the default cleanup job pre-registered.
 ///
@@ -27,8 +27,7 @@ pub fn default_scheduler(anchor_now: u64) -> SchedulerEngine {
         cooldown_secs: 3600,
         anchor_ts: Some(anchor_now),
         context_gate: ContextGate::LowCogLoad(0.6),
-        description: "Remove stale target/, node_modules/, dist/ build artifacts every 24h"
-            .into(),
+        description: "Remove stale target/, node_modules/, dist/ build artifacts every 24h".into(),
         heartbeat_secs: None,
         last_heartbeat: None,
     });

@@ -55,10 +55,19 @@ fn connectors_path() -> PathBuf {
 
 impl ConnectorManager {
     pub fn new() -> Self {
-        Self { connectors: Vec::new(), server_running: false, server_port: 9090 }
+        Self {
+            connectors: Vec::new(),
+            server_running: false,
+            server_port: 9090,
+        }
     }
 
-    pub fn add_connector(&mut self, name: &str, kind: ConnectorKind, config: ConnectorConfig) -> String {
+    pub fn add_connector(
+        &mut self,
+        name: &str,
+        kind: ConnectorKind,
+        config: ConnectorConfig,
+    ) -> String {
         let id = uuid::Uuid::new_v4().to_string();
         self.connectors.push(Connector {
             id: id.clone(),
@@ -155,9 +164,7 @@ impl ConnectorManager {
                     Ok("Slack event received".to_string())
                 }
             }
-            ConnectorKind::Webhook => {
-                Ok(format!("Webhook event processed ({} bytes)", body.len()))
-            }
+            ConnectorKind::Webhook => Ok(format!("Webhook event processed ({} bytes)", body.len())),
         }
     }
 
@@ -166,8 +173,8 @@ impl ConnectorManager {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
         }
-        let json =
-            serde_json::to_string_pretty(&self.connectors).map_err(|e| format!("Serialize error: {}", e))?;
+        let json = serde_json::to_string_pretty(&self.connectors)
+            .map_err(|e| format!("Serialize error: {}", e))?;
         fs::write(&path, json).map_err(|e| format!("Write error: {}", e))?;
         Ok(())
     }
@@ -177,9 +184,11 @@ impl ConnectorManager {
         if path.exists() {
             match fs::read_to_string(&path) {
                 Ok(content) => match serde_json::from_str::<Vec<Connector>>(&content) {
-                    Ok(connectors) => {
-                        Self { connectors, server_running: false, server_port: 9090 }
-                    }
+                    Ok(connectors) => Self {
+                        connectors,
+                        server_running: false,
+                        server_port: 9090,
+                    },
                     Err(e) => {
                         log::warn!("Failed to parse connectors.json: {}", e);
                         Self::new()
@@ -288,7 +297,11 @@ mod tests {
     fn test_handle_event_github() {
         let mgr = ConnectorManager::new();
         let headers = HashMap::new();
-        let result = mgr.handle_event(&ConnectorKind::GitHub, r#"{"zen":"test","hook_id":1}"#, &headers);
+        let result = mgr.handle_event(
+            &ConnectorKind::GitHub,
+            r#"{"zen":"test","hook_id":1}"#,
+            &headers,
+        );
         assert!(result.is_ok());
         assert!(result.unwrap().contains("GitHub"));
     }
@@ -297,8 +310,11 @@ mod tests {
     fn test_handle_event_slack() {
         let mgr = ConnectorManager::new();
         let headers = HashMap::new();
-        let result =
-            mgr.handle_event(&ConnectorKind::Slack, r#"{"challenge":"abc123","type":"url_verification"}"#, &headers);
+        let result = mgr.handle_event(
+            &ConnectorKind::Slack,
+            r#"{"challenge":"abc123","type":"url_verification"}"#,
+            &headers,
+        );
         assert!(result.is_ok());
         assert!(result.unwrap().contains("challenge"));
     }

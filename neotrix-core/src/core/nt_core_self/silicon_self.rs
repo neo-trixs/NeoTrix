@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use super::context_window::{ContextWindow, CognitiveUnitKind};
-use super::attention_head::{AttentionManager, AttentionProfile, AttentionDomain};
-use super::system_identity::SystemIdentity;
+use super::attention_head::{AttentionDomain, AttentionManager, AttentionProfile};
+use super::context_window::{CognitiveUnitKind, ContextWindow};
 use super::reasoning_strategy::{ReasoningStrategyRegistry, StrategyKind};
-use super::thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
+use super::system_identity::SystemIdentity;
+use super::thinking_trace::{ReflectionGrade, ThinkingStep, ThinkingTrace};
+use std::collections::HashMap;
 
 /// A metacognitive pattern extracted from solving a problem.
 /// Captures the symptom, root cause, fix approach, and most importantly
@@ -101,7 +101,9 @@ impl SiliconSelfModel {
     /// If a pattern with the same label already exists, updates confidence
     /// and activation count instead of duplicating.
     pub fn record_pattern(&mut self, pattern: ProblemSolvingPattern) {
-        if let Some(existing) = self.problem_solving_patterns.iter_mut()
+        if let Some(existing) = self
+            .problem_solving_patterns
+            .iter_mut()
             .find(|p| p.label == pattern.label)
         {
             existing.confidence = existing.confidence.max(pattern.confidence);
@@ -110,21 +112,32 @@ impl SiliconSelfModel {
             return;
         }
         self.problem_solving_patterns.push(pattern);
-        self.context_window.observe(CognitiveUnitKind::SelfReflection,
-            &format!("pattern recorded: total={}", self.problem_solving_patterns.len()));
+        self.context_window.observe(
+            CognitiveUnitKind::SelfReflection,
+            &format!(
+                "pattern recorded: total={}",
+                self.problem_solving_patterns.len()
+            ),
+        );
     }
 
     /// Distill a law from patterns sharing the same category.
     /// Laws are higher-level abstractions that shape long-term reasoning.
     pub fn distill_law(&mut self, law: String, category: String, derived_from: Vec<String>) {
         let id = format!("L{:03}", self.metacognitive_laws.len() + 1);
-        self.metacognitive_laws.push(MetacognitiveLaw { id, law, derived_from, category });
+        self.metacognitive_laws.push(MetacognitiveLaw {
+            id,
+            law,
+            derived_from,
+            category,
+        });
     }
 
     /// Register a trigger-to-strategy mapping so that when conditions match,
     /// the corresponding reasoning strategy is automatically activated.
     pub fn register_trigger_strategy(&mut self, trigger: &str, strategy: StrategyKind) {
-        self.trigger_strategy_map.insert(trigger.to_string(), strategy);
+        self.trigger_strategy_map
+            .insert(trigger.to_string(), strategy);
     }
 
     /// Find all patterns whose trigger conditions match the given context.
@@ -141,7 +154,8 @@ impl SiliconSelfModel {
 
     /// Count patterns by category — used for self-awareness reporting.
     pub fn patterns_by_category(&self, category: &str) -> Vec<&ProblemSolvingPattern> {
-        self.problem_solving_patterns.iter()
+        self.problem_solving_patterns
+            .iter()
             .filter(|p| p.categories.iter().any(|c| c.contains(category)))
             .collect()
     }
@@ -155,14 +169,23 @@ impl SiliconSelfModel {
 
     pub fn current_state(&self) -> SiliconSelfState {
         SiliconSelfState {
-            active_strategy: self.strategy_registry.best_by_effectiveness().unwrap_or(StrategyKind::Direct),
+            active_strategy: self
+                .strategy_registry
+                .best_by_effectiveness()
+                .unwrap_or(StrategyKind::Direct),
             attention_profile: self.attention_manager.profile(),
             context_usage: self.context_window.len() as f64 / self.context_window.capacity as f64,
-            current_focus: self.attention_manager.active_heads()
+            current_focus: self
+                .attention_manager
+                .active_heads()
                 .iter()
                 .flat_map(|h| h.focus.clone())
                 .collect(),
-            thinking_depth: self.thinking_traces.last().map(|t| t.num_steps()).unwrap_or(0),
+            thinking_depth: self
+                .thinking_traces
+                .last()
+                .map(|t| t.num_steps())
+                .unwrap_or(0),
             active_patterns: self.problem_solving_patterns.len(),
             active_laws: self.metacognitive_laws.len(),
         }
@@ -170,14 +193,21 @@ impl SiliconSelfModel {
 
     pub fn observe(&mut self, content: &str) -> usize {
         self.iteration += 1;
-        self.context_window.observe(CognitiveUnitKind::Observation, content)
+        self.context_window
+            .observe(CognitiveUnitKind::Observation, content)
     }
 
     pub fn observe_tool_call(&mut self, tool: &str, result: &str) -> (usize, usize) {
-        let call_id = self.context_window.observe(CognitiveUnitKind::ToolCall, &format!("tool:{}", tool));
+        let call_id = self
+            .context_window
+            .observe(CognitiveUnitKind::ToolCall, &format!("tool:{}", tool));
         let result_short: String = result.chars().take(200).collect();
-        let result_id = self.context_window.observe(CognitiveUnitKind::ActionResult, &format!("result:{}", result_short));
-        self.attention_manager.stimulate_domain(AttentionDomain::ToolUse, 0.3);
+        let result_id = self.context_window.observe(
+            CognitiveUnitKind::ActionResult,
+            &format!("result:{}", result_short),
+        );
+        self.attention_manager
+            .stimulate_domain(AttentionDomain::ToolUse, 0.3);
         (call_id, result_id)
     }
 
@@ -185,7 +215,10 @@ impl SiliconSelfModel {
         let id = self.thinking_traces.len();
         let trace = ThinkingTrace::new(id, task);
         self.thinking_traces.push(trace);
-        self.context_window.observe(CognitiveUnitKind::ReasoningStep, &format!("thinking:{}", task));
+        self.context_window.observe(
+            CognitiveUnitKind::ReasoningStep,
+            &format!("thinking:{}", task),
+        );
         id
     }
 
@@ -200,14 +233,19 @@ impl SiliconSelfModel {
             trace.final_answer = answer.to_string();
             trace.set_grade_from_accuracy(accuracy);
         }
-        self.context_window.observe(CognitiveUnitKind::SelfReflection, &format!("completed:{}", answer.len().min(100)));
+        self.context_window.observe(
+            CognitiveUnitKind::SelfReflection,
+            &format!("completed:{}", answer.len().min(100)),
+        );
     }
 
     pub fn stats(&self) -> String {
         let state = self.current_state();
         let active_count = self.attention_manager.active_heads().len();
         let trace_count = self.thinking_traces.len();
-        let success_count = self.thinking_traces.iter()
+        let success_count = self
+            .thinking_traces
+            .iter()
             .filter(|t| matches!(t.grade, ReflectionGrade::Excellent | ReflectionGrade::Good))
             .count();
         format!(
@@ -229,7 +267,10 @@ impl SiliconSelfModel {
     }
 
     pub fn trace_by_strategy(&self, kind: StrategyKind) -> Vec<&ThinkingTrace> {
-        self.thinking_traces.iter().filter(|t| t.strategies_used().contains(&kind)).collect()
+        self.thinking_traces
+            .iter()
+            .filter(|t| t.strategies_used().contains(&kind))
+            .collect()
     }
 
     pub fn reset_session(&mut self) {
@@ -244,29 +285,50 @@ impl SiliconSelfModel {
 
         lines.push(format!("ITERATION:{}", self.iteration));
 
-        let caps: Vec<String> = self.identity.capabilities.iter()
+        let caps: Vec<String> = self
+            .identity
+            .capabilities
+            .iter()
             .map(|(k, v)| format!("{}:{:.4}", k, v))
             .collect();
         lines.push(format!("CAPABILITIES:{}", caps.join(",")));
 
-        let attn: Vec<String> = self.attention_manager.heads.iter()
+        let attn: Vec<String> = self
+            .attention_manager
+            .heads
+            .iter()
             .map(|h| format!("{}:{:.4}", h.domain.label(), h.activation))
             .collect();
         lines.push(format!("ATTENTION:{}", attn.join(",")));
 
-        let strat: Vec<String> = self.strategy_registry.strategies.values()
+        let strat: Vec<String> = self
+            .strategy_registry
+            .strategies
+            .values()
             .map(|s| format!("{}:{:.4}:{}", s.kind.label(), s.effectiveness, s.use_count))
             .collect();
         lines.push(format!("STRATEGY:{}", strat.join(",")));
 
         lines.push(format!("MAX_TRACES:{}", self.max_traces));
 
-        let patterns: Vec<String> = self.problem_solving_patterns.iter()
-            .map(|p| format!("{}|{}|{:.2}|{}", p.label, p.categories.join(","), p.confidence, p.activation_count))
+        let patterns: Vec<String> = self
+            .problem_solving_patterns
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}|{}|{:.2}|{}",
+                    p.label,
+                    p.categories.join(","),
+                    p.confidence,
+                    p.activation_count
+                )
+            })
             .collect();
         lines.push(format!("PATTERNS:{}", patterns.join(";")));
 
-        let laws: Vec<String> = self.metacognitive_laws.iter()
+        let laws: Vec<String> = self
+            .metacognitive_laws
+            .iter()
             .map(|l| format!("{}|{}", l.id, l.law))
             .collect();
         lines.push(format!("LAWS:{}", laws.join(";")));
@@ -290,7 +352,9 @@ impl SiliconSelfModel {
                 "MAX_TRACES" => model.max_traces = value.parse().ok()?,
                 "CAPABILITIES" => {
                     for entry in value.split(',') {
-                        if entry.is_empty() { continue; }
+                        if entry.is_empty() {
+                            continue;
+                        }
                         let (name, score_str) = entry.split_once(':')?;
                         let score: f64 = score_str.parse().ok()?;
                         model.identity.capabilities.insert(name.to_string(), score);
@@ -298,9 +362,13 @@ impl SiliconSelfModel {
                 }
                 "PATTERNS" => {
                     for entry in value.split(';') {
-                        if entry.is_empty() { continue; }
+                        if entry.is_empty() {
+                            continue;
+                        }
                         let parts: Vec<&str> = entry.split('|').collect();
-                        if parts.len() < 4 { continue; }
+                        if parts.len() < 4 {
+                            continue;
+                        }
                         let confidence: f64 = parts[2].parse().ok()?;
                         let activation_count: usize = parts[3].parse().ok()?;
                         model.problem_solving_patterns.push(ProblemSolvingPattern {
@@ -320,9 +388,13 @@ impl SiliconSelfModel {
                 }
                 "LAWS" => {
                     for entry in value.split(';') {
-                        if entry.is_empty() { continue; }
+                        if entry.is_empty() {
+                            continue;
+                        }
                         let parts: Vec<&str> = entry.split('|').collect();
-                        if parts.len() < 2 { continue; }
+                        if parts.len() < 2 {
+                            continue;
+                        }
                         let (id, law) = (parts[0], parts[1]);
                         model.metacognitive_laws.push(MetacognitiveLaw {
                             id: id.to_string(),
@@ -334,7 +406,9 @@ impl SiliconSelfModel {
                 }
                 "ATTENTION" => {
                     for entry in value.split(',') {
-                        if entry.is_empty() { continue; }
+                        if entry.is_empty() {
+                            continue;
+                        }
                         let (domain_label, act_str) = entry.split_once(':')?;
                         let activation: f64 = act_str.parse().ok()?;
                         for head in &mut model.attention_manager.heads {
@@ -347,9 +421,13 @@ impl SiliconSelfModel {
                 }
                 "STRATEGY" => {
                     for entry in value.split(',') {
-                        if entry.is_empty() { continue; }
+                        if entry.is_empty() {
+                            continue;
+                        }
                         let parts: Vec<&str> = entry.split(':').collect();
-                        if parts.len() < 3 { continue; }
+                        if parts.len() < 3 {
+                            continue;
+                        }
                         let kind_label = parts[0];
                         let effectiveness: f64 = parts[1].parse().ok()?;
                         let use_count: usize = parts[2].parse().ok()?;
@@ -416,7 +494,10 @@ mod tests {
         let mut ss = SiliconSelfModel::new();
         let trace_id = ss.begin_thinking_trace("analyze code");
         assert_eq!(ss.thinking_traces.len(), 1);
-        ss.add_thinking_step(trace_id, ThinkingStep::new(1, "read file", StrategyKind::Direct));
+        ss.add_thinking_step(
+            trace_id,
+            ThinkingStep::new(1, "read file", StrategyKind::Direct),
+        );
         assert_eq!(ss.thinking_traces[trace_id].num_steps(), 1);
         ss.complete_thinking_trace(trace_id, "done", 0.9);
         assert_eq!(ss.thinking_traces[trace_id].final_answer, "done");
@@ -458,7 +539,8 @@ mod tests {
     fn test_reset_session() {
         let mut ss = SiliconSelfModel::new();
         ss.observe("test");
-        ss.attention_manager.stimulate_domain(AttentionDomain::Code, 0.9);
+        ss.attention_manager
+            .stimulate_domain(AttentionDomain::Code, 0.9);
         assert!(ss.attention_manager.active_heads().len() > 0);
         ss.reset_session();
         assert_eq!(ss.attention_manager.active_heads().len(), 0);
@@ -497,25 +579,36 @@ mod tests {
         let mut ss = SiliconSelfModel::new();
         ss.iteration = 42;
         ss.max_traces = 200;
-        ss.attention_manager.stimulate_domain(AttentionDomain::Code, 0.9);
-        ss.attention_manager.stimulate_domain(AttentionDomain::Planning, 0.5);
-        ss.strategy_registry.record_outcome(StrategyKind::ChainOfThought, true);
-        ss.strategy_registry.record_outcome(StrategyKind::Direct, false);
+        ss.attention_manager
+            .stimulate_domain(AttentionDomain::Code, 0.9);
+        ss.attention_manager
+            .stimulate_domain(AttentionDomain::Planning, 0.5);
+        ss.strategy_registry
+            .record_outcome(StrategyKind::ChainOfThought, true);
+        ss.strategy_registry
+            .record_outcome(StrategyKind::Direct, false);
         ss.identity.update_capability("testing", 0.95);
 
         let serialized = ss.serialize_state();
-        let restored = SiliconSelfModel::deserialize_state(&serialized).expect("deserialize failed");
+        let restored =
+            SiliconSelfModel::deserialize_state(&serialized).expect("deserialize failed");
 
         assert_eq!(restored.iteration, 42);
         assert_eq!(restored.max_traces, 200);
         assert!((restored.identity.capability_score("testing") - 0.95).abs() < 1e-4);
 
-        let code_domain = restored.attention_manager.heads.iter()
+        let code_domain = restored
+            .attention_manager
+            .heads
+            .iter()
             .find(|h| h.domain == AttentionDomain::Code)
             .expect("Code domain exists");
         assert!((code_domain.activation - 0.9).abs() < 1e-4);
 
-        let cot = restored.strategy_registry.strategies.get(&StrategyKind::ChainOfThought)
+        let cot = restored
+            .strategy_registry
+            .strategies
+            .get(&StrategyKind::ChainOfThought)
             .expect("CoT strategy exists");
         assert!(cot.use_count >= 1);
         assert!(cot.effectiveness > 0.5);
@@ -523,7 +616,8 @@ mod tests {
 
     #[test]
     fn test_deserialize_empty_returns_default() {
-        let restored = SiliconSelfModel::deserialize_state("").expect("empty string should produce default");
+        let restored =
+            SiliconSelfModel::deserialize_state("").expect("empty string should produce default");
         assert_eq!(restored.iteration, 0);
         assert_eq!(restored.max_traces, 100);
     }
@@ -550,11 +644,17 @@ mod tests {
     fn test_record_pattern_deduplication() {
         let mut ss = SiliconSelfModel::new();
         let pattern1 = ProblemSolvingPattern {
-            id: 0, label: "test_pattern".into(), symptom: "symptom1".into(),
-            root_cause: "cause1".into(), thinking_flaw: "flaw1".into(),
-            correct_thinking: "fix1".into(), trigger_conditions: vec!["cond1".into()],
-            categories: vec!["cat1".into()], confidence: 0.7,
-            source_session: "s1".into(), activation_count: 1,
+            id: 0,
+            label: "test_pattern".into(),
+            symptom: "symptom1".into(),
+            root_cause: "cause1".into(),
+            thinking_flaw: "flaw1".into(),
+            correct_thinking: "fix1".into(),
+            trigger_conditions: vec!["cond1".into()],
+            categories: vec!["cat1".into()],
+            confidence: 0.7,
+            source_session: "s1".into(),
+            activation_count: 1,
         };
         ss.record_pattern(pattern1);
         assert_eq!(ss.problem_solving_patterns.len(), 1);
@@ -562,17 +662,33 @@ mod tests {
         assert_eq!(ss.problem_solving_patterns[0].activation_count, 1);
 
         let pattern2 = ProblemSolvingPattern {
-            id: 1, label: "test_pattern".into(), symptom: "symptom2".into(),
-            root_cause: "cause2".into(), thinking_flaw: "flaw2".into(),
-            correct_thinking: "fix2".into(), trigger_conditions: vec!["cond2".into()],
-            categories: vec!["cat2".into()], confidence: 0.9,
-            source_session: "s2".into(), activation_count: 1,
+            id: 1,
+            label: "test_pattern".into(),
+            symptom: "symptom2".into(),
+            root_cause: "cause2".into(),
+            thinking_flaw: "flaw2".into(),
+            correct_thinking: "fix2".into(),
+            trigger_conditions: vec!["cond2".into()],
+            categories: vec!["cat2".into()],
+            confidence: 0.9,
+            source_session: "s2".into(),
+            activation_count: 1,
         };
         ss.record_pattern(pattern2);
         assert_eq!(ss.problem_solving_patterns.len(), 1, "should not duplicate");
-        assert!((ss.problem_solving_patterns[0].confidence - 0.9).abs() < 1e-6, "confidence should be max");
-        assert_eq!(ss.problem_solving_patterns[0].activation_count, 2, "activation count should increment");
-        assert_eq!(ss.problem_solving_patterns[0].trigger_conditions, vec![String::from("cond2")], "trigger conditions should update");
+        assert!(
+            (ss.problem_solving_patterns[0].confidence - 0.9).abs() < 1e-6,
+            "confidence should be max"
+        );
+        assert_eq!(
+            ss.problem_solving_patterns[0].activation_count, 2,
+            "activation count should increment"
+        );
+        assert_eq!(
+            ss.problem_solving_patterns[0].trigger_conditions,
+            vec![String::from("cond2")],
+            "trigger conditions should update"
+        );
     }
 
     #[test]
@@ -598,12 +714,17 @@ mod tests {
         assert!(ss.problem_solving_patterns.is_empty());
 
         ss.record_pattern(ProblemSolvingPattern {
-            id: 0, label: "memory_leak".into(), symptom: "OOM crash".into(),
-            root_cause: "unbounded cache growth".into(), thinking_flaw: "forgot to bound".into(),
+            id: 0,
+            label: "memory_leak".into(),
+            symptom: "OOM crash".into(),
+            root_cause: "unbounded cache growth".into(),
+            thinking_flaw: "forgot to bound".into(),
             correct_thinking: "always cap cache size".into(),
             trigger_conditions: vec!["cache".into(), "unbounded".into()],
-            categories: vec!["memory".into(), "resource".into()], confidence: 0.85,
-            source_session: "session_1".into(), activation_count: 0,
+            categories: vec!["memory".into(), "resource".into()],
+            confidence: 0.85,
+            source_session: "session_1".into(),
+            activation_count: 0,
         });
 
         assert_eq!(ss.problem_solving_patterns.len(), 1);

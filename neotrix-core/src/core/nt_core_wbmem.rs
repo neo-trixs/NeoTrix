@@ -1,7 +1,7 @@
-use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
-use chrono::{DateTime, Utc};
 
 use crate::core::nt_core_bank::ReasoningBank;
 
@@ -99,7 +99,10 @@ impl WhiteBoxMemory {
     }
 
     pub fn view(&self, id: &str) -> Result<&MemoryEntry, String> {
-        self.entries.iter().find(|e| e.id == id).ok_or_else(|| format!("Memory entry not found: {}", id))
+        self.entries
+            .iter()
+            .find(|e| e.id == id)
+            .ok_or_else(|| format!("Memory entry not found: {}", id))
     }
 
     pub fn list(&self, filter: Option<&str>) -> Vec<&MemoryEntry> {
@@ -113,11 +116,14 @@ impl WhiteBoxMemory {
 
     pub fn search(&self, query: &str) -> Vec<&MemoryEntry> {
         let q = query.to_lowercase();
-        self.entries.iter().filter(|e| {
-            e.content.to_lowercase().contains(&q)
-                || e.tags.iter().any(|t| t.to_lowercase().contains(&q))
-                || e.source.to_lowercase().contains(&q)
-        }).collect()
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.content.to_lowercase().contains(&q)
+                    || e.tags.iter().any(|t| t.to_lowercase().contains(&q))
+                    || e.source.to_lowercase().contains(&q)
+            })
+            .collect()
     }
 
     pub fn stats(&self) -> MemoryStats {
@@ -145,8 +151,18 @@ impl WhiteBoxMemory {
         top_tags.sort_by(|a, b| b.1.cmp(&a.1));
         top_tags.truncate(10);
 
-        let oldest = self.entries.iter().map(|e| e.created_at).min().unwrap_or_else(Utc::now);
-        let newest = self.entries.iter().map(|e| e.created_at).max().unwrap_or_else(Utc::now);
+        let oldest = self
+            .entries
+            .iter()
+            .map(|e| e.created_at)
+            .min()
+            .unwrap_or_else(Utc::now);
+        let newest = self
+            .entries
+            .iter()
+            .map(|e| e.created_at)
+            .max()
+            .unwrap_or_else(Utc::now);
 
         MemoryStats {
             total_entries: total,
@@ -163,7 +179,11 @@ impl WhiteBoxMemory {
     }
 
     pub fn edit_content(&mut self, id: &str, new_content: &str) -> Result<(), String> {
-        let entry = self.entries.iter_mut().find(|e| e.id == id).ok_or_else(|| format!("Entry not found: {}", id))?;
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .ok_or_else(|| format!("Entry not found: {}", id))?;
         if !entry.edited {
             entry.original_content = Some(entry.content.clone());
         }
@@ -174,20 +194,32 @@ impl WhiteBoxMemory {
     }
 
     pub fn edit_tags(&mut self, id: &str, tags: Vec<String>) -> Result<(), String> {
-        let entry = self.entries.iter_mut().find(|e| e.id == id).ok_or_else(|| format!("Entry not found: {}", id))?;
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .ok_or_else(|| format!("Entry not found: {}", id))?;
         entry.tags = tags;
         entry.touch();
         Ok(())
     }
 
     pub fn delete(&mut self, id: &str) -> Result<(), String> {
-        let idx = self.entries.iter().position(|e| e.id == id).ok_or_else(|| format!("Entry not found: {}", id))?;
+        let idx = self
+            .entries
+            .iter()
+            .position(|e| e.id == id)
+            .ok_or_else(|| format!("Entry not found: {}", id))?;
         self.entries.remove(idx);
         Ok(())
     }
 
     pub fn pin(&mut self, id: &str) -> Result<(), String> {
-        let entry = self.entries.iter_mut().find(|e| e.id == id).ok_or_else(|| format!("Entry not found: {}", id))?;
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .ok_or_else(|| format!("Entry not found: {}", id))?;
         entry.pinned = !entry.pinned;
         entry.touch();
         Ok(())
@@ -204,7 +236,9 @@ impl WhiteBoxMemory {
     }
 
     pub fn rollback(&mut self, checkpoint_id: &str) -> Result<(), String> {
-        let checkpoint = self.checkpoints.iter()
+        let checkpoint = self
+            .checkpoints
+            .iter()
             .find(|c| c.id == checkpoint_id)
             .ok_or_else(|| format!("Checkpoint not found: {}", checkpoint_id))?;
         self.entries = checkpoint.entries.clone();
@@ -245,13 +279,25 @@ impl WhiteBoxMemory {
                 if similar {
                     let mut combined_tags: Vec<String> = Vec::new();
                     for t in &a.tags {
-                        if !combined_tags.contains(t) { combined_tags.push(t.clone()); }
+                        if !combined_tags.contains(t) {
+                            combined_tags.push(t.clone());
+                        }
                     }
                     for t in &b.tags {
-                        if !combined_tags.contains(t) { combined_tags.push(t.clone()); }
+                        if !combined_tags.contains(t) {
+                            combined_tags.push(t.clone());
+                        }
                     }
-                    let created = if a.created_at < b.created_at { a.created_at } else { b.created_at };
-                    let last_acc = if a.last_accessed >= b.last_accessed { a.last_accessed } else { b.last_accessed };
+                    let created = if a.created_at < b.created_at {
+                        a.created_at
+                    } else {
+                        b.created_at
+                    };
+                    let last_acc = if a.last_accessed >= b.last_accessed {
+                        a.last_accessed
+                    } else {
+                        b.last_accessed
+                    };
                     self.entries[i].content = format!("{}\n\n{}", a.content, b.content);
                     self.entries[i].tags = combined_tags;
                     self.entries[i].confidence = (a.confidence + b.confidence) / 2.0;
@@ -271,8 +317,12 @@ impl WhiteBoxMemory {
         let now = Utc::now();
         let pruned_before = self.entries.len();
         self.entries.retain(|e| {
-            if e.pinned { return true; }
-            if e.confidence < prune_threshold && now.signed_duration_since(e.last_accessed) > prune_age {
+            if e.pinned {
+                return true;
+            }
+            if e.confidence < prune_threshold
+                && now.signed_duration_since(e.last_accessed) > prune_age
+            {
                 return false;
             }
             true
@@ -303,7 +353,8 @@ impl WhiteBoxMemory {
                     content: mem.task_description.clone(),
                     source: format!("{:?}", mem.task_type),
                     created_at: DateTime::from_timestamp(mem.timestamp, 0).unwrap_or(now),
-                    last_accessed: DateTime::from_timestamp(mem.lifecycle.last_accessed, 0).unwrap_or(now),
+                    last_accessed: DateTime::from_timestamp(mem.lifecycle.last_accessed, 0)
+                        .unwrap_or(now),
                     access_count: mem.lifecycle.access_count as u32,
                     tags: vec![format!("{:?}", mem.tier)],
                     confidence: mem.lifecycle.confidence,
@@ -343,13 +394,16 @@ impl WhiteBoxMemory {
         });
         let json = serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize: {}", e))?;
         // 原子写：crash 中途不截断原文件，checkpoints/entries 不丢失
-        neotrix_types::fs_util::atomic_write(&path, json.as_bytes()).map_err(|e| format!("Write: {}", e))?;
+        neotrix_types::fs_util::atomic_write(&path, json.as_bytes())
+            .map_err(|e| format!("Write: {}", e))?;
         Ok(())
     }
 
     pub fn load() -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let path = std::path::Path::new(&home).join(".neotrix").join("whitebox_memory.json");
+        let path = std::path::Path::new(&home)
+            .join(".neotrix")
+            .join("whitebox_memory.json");
         if !path.exists() {
             return Self::new();
         }
@@ -361,11 +415,19 @@ impl WhiteBoxMemory {
             Ok(v) => v,
             Err(_) => return Self::new(),
         };
-        let entries: Vec<MemoryEntry> = serde_json::from_value(data["entries"].clone()).unwrap_or_default();
-        let checkpoints: Vec<MemoryCheckpoint> = serde_json::from_value(data["checkpoints"].clone()).unwrap_or_default();
+        let entries: Vec<MemoryEntry> =
+            serde_json::from_value(data["entries"].clone()).unwrap_or_default();
+        let checkpoints: Vec<MemoryCheckpoint> =
+            serde_json::from_value(data["checkpoints"].clone()).unwrap_or_default();
         let auto_consolidate = data["auto_consolidate"].as_bool().unwrap_or(false);
-        let last_dream_time: Option<DateTime<Utc>> = serde_json::from_value(data["last_dream_time"].clone()).unwrap_or(None);
-        Self { entries, checkpoints, auto_consolidate, last_dream_time }
+        let last_dream_time: Option<DateTime<Utc>> =
+            serde_json::from_value(data["last_dream_time"].clone()).unwrap_or(None);
+        Self {
+            entries,
+            checkpoints,
+            auto_consolidate,
+            last_dream_time,
+        }
     }
 }
 
@@ -438,7 +500,8 @@ mod tests {
     #[test]
     fn test_search_by_content() {
         let mut wbm = WhiteBoxMemory::new();
-        wbm.entries.push(MemoryEntry::new("a", "hello world", "test"));
+        wbm.entries
+            .push(MemoryEntry::new("a", "hello world", "test"));
         wbm.entries.push(MemoryEntry::new("b", "foo bar", "test"));
         let results = wbm.search("hello");
         assert_eq!(results.len(), 1);
@@ -459,7 +522,8 @@ mod tests {
     #[test]
     fn test_edit_content_stores_original() {
         let mut wbm = WhiteBoxMemory::new();
-        wbm.entries.push(MemoryEntry::new("id-1", "original", "test"));
+        wbm.entries
+            .push(MemoryEntry::new("id-1", "original", "test"));
         wbm.edit_content("id-1", "edited").unwrap();
         let entry = wbm.view("id-1").unwrap();
         assert_eq!(entry.content, "edited");
@@ -470,7 +534,8 @@ mod tests {
     #[test]
     fn test_edit_content_idempotent_original() {
         let mut wbm = WhiteBoxMemory::new();
-        wbm.entries.push(MemoryEntry::new("id-1", "original", "test"));
+        wbm.entries
+            .push(MemoryEntry::new("id-1", "original", "test"));
         wbm.edit_content("id-1", "v1").unwrap();
         wbm.edit_content("id-1", "v2").unwrap();
         let entry = wbm.view("id-1").unwrap();
@@ -521,7 +586,8 @@ mod tests {
     #[test]
     fn test_checkpoint_and_rollback() {
         let mut wbm = WhiteBoxMemory::new();
-        wbm.entries.push(MemoryEntry::new("id-1", "original", "test"));
+        wbm.entries
+            .push(MemoryEntry::new("id-1", "original", "test"));
         wbm.create_checkpoint("before edit");
         wbm.edit_content("id-1", "edited").unwrap();
         assert_eq!(wbm.entries.len(), 1);
@@ -576,7 +642,8 @@ mod tests {
         old_entry.confidence = 0.1;
         old_entry.last_accessed = Utc::now() - chrono::Duration::days(60);
         wbm.entries.push(old_entry);
-        wbm.entries.push(MemoryEntry::new("fresh", "good data", "source"));
+        wbm.entries
+            .push(MemoryEntry::new("fresh", "good data", "source"));
         let report = wbm.dream_cycle();
         assert_eq!(report.pruned, 1);
         assert_eq!(wbm.entries.len(), 1);
@@ -641,7 +708,8 @@ mod tests {
     #[test]
     fn test_search_case_insensitive() {
         let mut wbm = WhiteBoxMemory::new();
-        wbm.entries.push(MemoryEntry::new("a", "Hello World", "test"));
+        wbm.entries
+            .push(MemoryEntry::new("a", "Hello World", "test"));
         let results = wbm.search("hello");
         assert_eq!(results.len(), 1);
     }
@@ -671,7 +739,8 @@ mod tests {
 
         let _ = std::fs::remove_file(
             std::path::Path::new(&std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-                .join(".neotrix").join("whitebox_memory.json")
+                .join(".neotrix")
+                .join("whitebox_memory.json"),
         );
     }
 
@@ -684,7 +753,12 @@ mod tests {
     #[test]
     fn test_sync_from_brain_adds_entries() {
         let mut bank = ReasoningBank::new(100);
-        let mem = crate::core::nt_core_bank::ReasoningMemory::new("test memory", crate::core::nt_core_knowledge::TaskType::General, &[], 0.8);
+        let mem = crate::core::nt_core_bank::ReasoningMemory::new(
+            "test memory",
+            crate::core::nt_core_knowledge::TaskType::General,
+            &[],
+            0.8,
+        );
         bank.store(mem);
 
         let mut wbm = WhiteBoxMemory::new();
@@ -696,7 +770,12 @@ mod tests {
     #[test]
     fn test_sync_from_brain_idempotent() {
         let mut bank = ReasoningBank::new(100);
-        let mem = crate::core::nt_core_bank::ReasoningMemory::new("test", crate::core::nt_core_knowledge::TaskType::General, &[], 0.8);
+        let mem = crate::core::nt_core_bank::ReasoningMemory::new(
+            "test",
+            crate::core::nt_core_knowledge::TaskType::General,
+            &[],
+            0.8,
+        );
         bank.store(mem);
         let mut wbm = WhiteBoxMemory::new();
         wbm.sync_from_brain(&bank);
@@ -710,7 +789,8 @@ mod tests {
         let mut e1 = MemoryEntry::new("a", "original", "test");
         e1.edited = true;
         wbm.entries.push(e1);
-        wbm.entries.push(MemoryEntry::new("b", "never edited", "test"));
+        wbm.entries
+            .push(MemoryEntry::new("b", "never edited", "test"));
         let listed = wbm.list(Some("edited"));
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, "a");

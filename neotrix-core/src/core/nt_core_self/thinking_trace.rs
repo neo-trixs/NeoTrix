@@ -1,5 +1,5 @@
-use super::reasoning_strategy::StrategyKind;
 use super::attention_head::AttentionDomain;
+use super::reasoning_strategy::StrategyKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReflectionGrade {
@@ -129,7 +129,9 @@ impl ThinkingTrace {
     }
 
     pub fn tools_used(&self) -> Vec<String> {
-        let mut tools: Vec<String> = self.steps.iter()
+        let mut tools: Vec<String> = self
+            .steps
+            .iter()
             .flat_map(|s| s.tools_used.clone())
             .collect();
         tools.sort();
@@ -138,7 +140,9 @@ impl ThinkingTrace {
     }
 
     pub fn avg_confidence(&self) -> f64 {
-        if self.steps.is_empty() { return 0.0; }
+        if self.steps.is_empty() {
+            return 0.0;
+        }
         self.steps.iter().map(|s| s.confidence).sum::<f64>() / self.steps.len() as f64
     }
 
@@ -167,9 +171,9 @@ impl ThinkingTrace {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::reasoning_strategy::StrategyKind;
     use super::super::attention_head::AttentionDomain;
+    use super::super::reasoning_strategy::StrategyKind;
+    use super::*;
 
     #[test]
     fn test_thinking_trace_new() {
@@ -231,8 +235,11 @@ mod tests {
     #[test]
     fn test_tools_used_dedup() {
         let mut trace = ThinkingTrace::new(0, "test");
-        trace.add_step(ThinkingStep::new(1, "search", StrategyKind::ToolAssisted).with_tool("grep"));
-        trace.add_step(ThinkingStep::new(2, "analyze", StrategyKind::ToolAssisted).with_tool("grep"));
+        trace
+            .add_step(ThinkingStep::new(1, "search", StrategyKind::ToolAssisted).with_tool("grep"));
+        trace.add_step(
+            ThinkingStep::new(2, "analyze", StrategyKind::ToolAssisted).with_tool("grep"),
+        );
         trace.add_step(ThinkingStep::new(3, "read", StrategyKind::ToolAssisted).with_tool("read"));
         let tools = trace.tools_used();
         assert_eq!(tools.len(), 2);

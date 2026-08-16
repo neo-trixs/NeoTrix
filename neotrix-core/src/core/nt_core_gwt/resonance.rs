@@ -6,13 +6,13 @@
 //! - Complementary modules (错卦) automatically trigger opposing perspectives
 //! - The +1 observer tracks the overall resonance landscape
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 
-use crate::core::nt_core_hex::ReasoningHexagram;
 use super::moe_router::MoERouter;
 use super::physics_attention::AdaptiveSlicer;
 use super::vsa_scorer::VsaContentScorer;
+use crate::core::nt_core_hex::ReasoningHexagram;
 
 /// Compute Shannon entropy of a probability distribution.
 /// Returns normalized entropy (0..1) where 0 = certain, 1 = uniform.
@@ -25,12 +25,17 @@ pub fn compute_semantic_entropy(data: &[f64]) -> f64 {
         return 0.0;
     }
     let normalized: Vec<f64> = data.iter().map(|v| v / sum).collect();
-    let entropy: f64 = normalized.iter()
+    let entropy: f64 = normalized
+        .iter()
         .filter(|&&p| p > 0.0)
         .map(|&p| -p * p.ln())
         .sum();
     let max_entropy = (data.len() as f64).ln();
-    if max_entropy <= 0.0 { 0.0 } else { entropy / max_entropy }
+    if max_entropy <= 0.0 {
+        0.0
+    } else {
+        entropy / max_entropy
+    }
 }
 
 /// Maximum resonance distance (hamming dist ≤ 2 → in resonance).
@@ -72,10 +77,7 @@ impl ResonanceMatrix {
         for i in 0..MODULE_COUNT {
             for j in 0..MODULE_COUNT {
                 // Map continuous VSA cosine similarity [0,1] → u32 strength [0,6]
-                let vsa_sim = scorer.score_transition(
-                    states[i].0,
-                    states[j].0,
-                );
+                let vsa_sim = scorer.score_transition(states[i].0, states[j].0);
                 strengths[i][j] = (vsa_sim * 6.0).round() as u32;
             }
         }
@@ -94,7 +96,9 @@ impl ResonanceMatrix {
         for (i, item) in eff.iter_mut().enumerate() {
             let mut resonance_boost = 0.0;
             for (j, &raw_j) in raw.iter().enumerate() {
-                if i == j { continue; }
+                if i == j {
+                    continue;
+                }
                 let boost = self.strengths[i][j] as f64 * raw_j * 0.1;
                 resonance_boost += boost;
             }
@@ -115,13 +119,19 @@ impl ResonanceMatrix {
     /// hexagram assignments, almost always returned None. Now uses distance metric:
     /// any specialist within Hamming distance 3 of the true complement is a match,
     /// and the closest match wins.
-    pub fn complement_of(&self, idx: usize, states: &[ReasoningHexagram; MODULE_COUNT]) -> Option<usize> {
+    pub fn complement_of(
+        &self,
+        idx: usize,
+        states: &[ReasoningHexagram; MODULE_COUNT],
+    ) -> Option<usize> {
         let true_comp = states[idx].complement();
         // Find the nearest specialist (by Hamming distance) to the true complement
         let mut best_dist = 7u32; // max Hamming dist for 6-bit is 6
         let mut best_idx = None;
         for (j, state) in states.iter().enumerate() {
-            if j == idx { continue; }
+            if j == idx {
+                continue;
+            }
             let dist = (state.0 ^ true_comp.0).count_ones();
             if dist <= 3 && dist < best_dist {
                 best_dist = dist;
@@ -188,7 +198,7 @@ pub fn default_specialist_states() -> [ReasoningHexagram; MODULE_COUNT] {
         s(14), // CreativityGenerator: Brainstorm (abstract+generative+broad)
         s(63), // ReflectionEngine: Guided Meta (meta+broad+collaborative)
         s(62), // MetaCognitionAnalyst: Meta-cognition (reflective)
-        s(2),  // AISecurity: Vulnerability Analysis (concrete+focused+analytical+deep+collaborative)
+        s(2), // AISecurity: Vulnerability Analysis (concrete+focused+analytical+deep+collaborative)
         s(54), // ImageGenerator: Generate (abstract+broad+generative+fast+solo+certain)
         s(12), // EvidenceWeightedHypothesis: Evidence weighting (concrete+analytical+deep)
     ]
@@ -297,7 +307,8 @@ pub fn resonate_cycle_with_physics(
         eff[i] = (eff[i] + slice_sal[i] * 0.15).min(1.0);
     }
 
-    let winner = eff.iter()
+    let winner = eff
+        .iter()
         .enumerate()
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(i, _)| i)
@@ -317,7 +328,9 @@ pub fn resonate_cycle_with_physics(
     };
 
     // Build resonator clusters from physics slices instead of fixed Hamming
-    let resonator_clusters: Vec<Vec<usize>> = slicer.slices.iter()
+    let resonator_clusters: Vec<Vec<usize>> = slicer
+        .slices
+        .iter()
         .filter(|sl| sl.members.len() > 1)
         .map(|sl| sl.members.clone())
         .collect();
@@ -486,8 +499,12 @@ impl OscillatorNetwork {
         for i in 0..self.oscillators.len() {
             let mut sync_sum = 0.0;
             for j in 0..self.oscillators.len() {
-                if i == j { continue; }
-                let k_ij = self.coupling_matrix.as_ref()
+                if i == j {
+                    continue;
+                }
+                let k_ij = self
+                    .coupling_matrix
+                    .as_ref()
                     .and_then(|m| m.get(i))
                     .and_then(|row| row.get(j))
                     .copied()
@@ -495,8 +512,8 @@ impl OscillatorNetwork {
                 sync_sum += k_ij * (phases[j] - phases[i]).sin();
             }
             let dtheta = self.oscillators[i].natural_freq + sync_sum / n;
-            self.oscillators[i].phase = (self.oscillators[i].phase + DT * dtheta)
-                % (2.0 * std::f64::consts::PI);
+            self.oscillators[i].phase =
+                (self.oscillators[i].phase + DT * dtheta) % (2.0 * std::f64::consts::PI);
         }
     }
 
@@ -512,7 +529,9 @@ impl OscillatorNetwork {
     /// R → 0: 完全异步 (无绑定)
     pub fn phase_coherence(&self) -> f64 {
         let n = self.oscillators.len() as f64;
-        let (sum_cos, sum_sin): (f64, f64) = self.oscillators.iter()
+        let (sum_cos, sum_sin): (f64, f64) = self
+            .oscillators
+            .iter()
             .map(|o| (o.phase.cos(), o.phase.sin()))
             .fold((0.0, 0.0), |(c, s), (cc, ss)| (c + cc, s + ss));
         (sum_cos.powi(2) + sum_sin.powi(2)).sqrt() / n.max(1.0)
@@ -520,7 +539,9 @@ impl OscillatorNetwork {
 
     /// 平均相位 (序参量方向)
     pub fn mean_phase(&self) -> f64 {
-        let (sum_cos, sum_sin): (f64, f64) = self.oscillators.iter()
+        let (sum_cos, sum_sin): (f64, f64) = self
+            .oscillators
+            .iter()
             .map(|o| (o.phase.cos(), o.phase.sin()))
             .fold((0.0, 0.0), |(c, s), (cc, ss)| (c + cc, s + ss));
         sum_sin.atan2(sum_cos)
@@ -537,7 +558,8 @@ impl OscillatorNetwork {
     /// 同步后广播权重: 高相干模块获得更高广播权重
     pub fn broadcast_weights(&self) -> Vec<f64> {
         let mean_ph = self.mean_phase();
-        self.oscillators.iter()
+        self.oscillators
+            .iter()
             .map(|o| {
                 let phase_diff = (o.phase - mean_ph).abs();
                 let sync_factor = (-phase_diff * 4.0).exp();
@@ -623,22 +645,26 @@ mod tests {
     fn test_resonance_cluster_overtakes_solo() {
         // Two modules with identical state (strong mutual resonance) vs one solo
         let mut states = default_specialist_states();
-        states[9] = ReasoningHexagram(0);  // ReflectionEngine → state 0
+        states[9] = ReasoningHexagram(0); // ReflectionEngine → state 0
         states[10] = ReasoningHexagram(0); // MetaCognitionAnalyst → same state 0
         states[0] = ReasoningHexagram(63); // PatternMatcher → state 63 (opposite to 0)
 
         let matrix = ResonanceMatrix::from_states(&states);
         let mut raw = [0.1; MODULE_COUNT];
-        raw[0] = 0.5;                     // Isolated (state 63, opposite to state 0)
-        raw[9] = 0.5;                     // In resonance cluster with module 10
-        raw[10] = 0.5;                    // Same state as 9 → mutual resonance 6
+        raw[0] = 0.5; // Isolated (state 63, opposite to state 0)
+        raw[9] = 0.5; // In resonance cluster with module 10
+        raw[10] = 0.5; // Same state as 9 → mutual resonance 6
 
         let (_, eff, _) = resonate_and_select(&raw, &matrix, None);
         // Both cluster members should benefit from mutual resonance
         // eff[9] gets boost from 10: 0.5 × 6 × 0.1 = 0.30 extra
         // eff[0] gets no boost from 9,10: hamming distance 6 → strength 0
-        assert!(eff[9] > eff[0],
-            "Resonant cluster should beat isolated. eff9={}, eff0={}", eff[9], eff[0]);
+        assert!(
+            eff[9] > eff[0],
+            "Resonant cluster should beat isolated. eff9={}, eff0={}",
+            eff[9],
+            eff[0]
+        );
     }
 
     #[test]
@@ -664,7 +690,10 @@ mod tests {
         let mut raw = [0.3; MODULE_COUNT];
         raw[0] = 0.9;
         let report = resonate_cycle(&raw, &states, None);
-        assert!(report.winner < MODULE_COUNT, "Winner must be a valid module index");
+        assert!(
+            report.winner < MODULE_COUNT,
+            "Winner must be a valid module index"
+        );
         assert!(report.effective_saliences[report.winner] > 0.5);
         assert!(report.entropy > 0.0);
     }
@@ -730,21 +759,28 @@ mod tests {
         let before = net.phase_coherence();
         net.synchronize(50);
         let after = net.phase_coherence();
-        assert!(after >= before - 0.1,
-            "coherence should not decrease significantly: before={:.4}, after={:.4}", before, after);
+        assert!(
+            after >= before - 0.1,
+            "coherence should not decrease significantly: before={:.4}, after={:.4}",
+            before,
+            after
+        );
     }
 
     #[test]
     fn test_broadcast_weights_higher_for_synchronized() {
         let mut net = OscillatorNetwork::new(3);
         for o in &mut net.oscillators {
-            o.phase = 0.1;  // 近乎同步
+            o.phase = 0.1; // 近乎同步
             o.amplitude = 1.0;
         }
         let weights = net.broadcast_weights();
         assert_eq!(weights.len(), 3);
         for w in &weights {
-            assert!(*w > 0.0, "synchronized oscillators should have positive weight");
+            assert!(
+                *w > 0.0,
+                "synchronized oscillators should have positive weight"
+            );
         }
     }
 
@@ -861,8 +897,7 @@ mod tests {
         for i in 0..MODULE_COUNT {
             for j in 0..MODULE_COUNT {
                 assert_eq!(
-                    efc_matrix.strengths[i][j],
-                    adjusted.strengths[i][j],
+                    efc_matrix.strengths[i][j], adjusted.strengths[i][j],
                     "resonate_with_efc should match apply_to_resonance"
                 );
             }

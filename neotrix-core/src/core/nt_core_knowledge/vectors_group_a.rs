@@ -1,70 +1,36 @@
-use crate::core::CapabilityVector;
 use crate::core::nt_core_knowledge::KnowledgeSource;
+use crate::core::CapabilityVector;
 
 pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<CapabilityVector> {
     match s {
         KnowledgeSource::HeroUI => Some(CapabilityVector::from_values(
-            0.6, 0.7, 0.8, 0.6,
-            0.4, 0.5, 0.5, 0.3,
-            0.8, 0.7, 0.7, 0.8,
-            0.9,
-            0.7, 0.98, 0.7,
-            0.6, 0.9, 0.7,
-            0.5, 0.5, 0.6, 0.6,
+            0.6, 0.7, 0.8, 0.6, 0.4, 0.5, 0.5, 0.3, 0.8, 0.7, 0.7, 0.8, 0.9, 0.7, 0.98, 0.7, 0.6,
+            0.9, 0.7, 0.5, 0.5, 0.6, 0.6,
         )),
         KnowledgeSource::BaseUI => Some(CapabilityVector::from_values(
-            0.5, 0.6, 0.5, 0.7,
-            0.3, 0.4, 0.6, 0.2,
-            0.9, 0.5, 0.8, 0.7,
-            0.95,
-            0.98, 0.7, 0.3,
-            0.99, 0.6, 0.3,
-            0.4, 0.5, 0.7, 0.8,
+            0.5, 0.6, 0.5, 0.7, 0.3, 0.4, 0.6, 0.2, 0.9, 0.5, 0.8, 0.7, 0.95, 0.98, 0.7, 0.3, 0.99,
+            0.6, 0.3, 0.4, 0.5, 0.7, 0.8,
         )),
         KnowledgeSource::ArcUI => Some(CapabilityVector::from_values(
-            0.5, 0.5, 0.4, 0.6,
-            0.3, 0.6, 0.5, 0.4,
-            0.8, 0.6, 0.7, 0.8,
-            0.85,
-            0.8, 0.9, 0.4,
-            0.7, 0.5, 0.3,
-            0.98, 0.6, 0.7, 0.7,
+            0.5, 0.5, 0.4, 0.6, 0.3, 0.6, 0.5, 0.4, 0.8, 0.6, 0.7, 0.8, 0.85, 0.8, 0.9, 0.4, 0.7,
+            0.5, 0.3, 0.98, 0.6, 0.7, 0.7,
         )),
         KnowledgeSource::CortexUI => Some(CapabilityVector::from_values(
-            0.5, 0.6, 0.4, 0.6,
-            0.3, 0.5, 0.6, 0.5,
-            0.85, 0.6, 0.8, 0.8,
-            0.9,
-            0.9, 0.8, 0.4,
-            0.8, 0.5, 0.3,
-            0.7, 0.99, 0.8, 0.8,
+            0.5, 0.6, 0.4, 0.6, 0.3, 0.5, 0.6, 0.5, 0.85, 0.6, 0.8, 0.8, 0.9, 0.9, 0.8, 0.4, 0.8,
+            0.5, 0.3, 0.7, 0.99, 0.8, 0.8,
         )),
         KnowledgeSource::AgenticDS => Some(CapabilityVector::from_values(
-            0.6, 0.7, 0.5, 0.6,
-            0.4, 0.5, 0.6, 0.4,
-            0.9, 0.6, 0.85, 0.8,
-            0.95,
-            0.85, 0.8, 0.5,
-            0.7, 0.6, 0.4,
-            0.7, 0.8, 0.99, 0.99,
+            0.6, 0.7, 0.5, 0.6, 0.4, 0.5, 0.6, 0.4, 0.9, 0.6, 0.85, 0.8, 0.95, 0.85, 0.8, 0.5, 0.7,
+            0.6, 0.4, 0.7, 0.8, 0.99, 0.99,
         )),
         KnowledgeSource::DesignPhilosophy => Some(CapabilityVector::from_values(
-            0.8, 0.85, 0.6, 0.7,
-            0.7, 0.8, 0.75, 0.7,
-            0.8, 0.85, 0.75, 0.8,
-            0.95,
-            0.5, 0.6, 0.5,
-            0.4, 0.6, 0.5,
-            0.3, 0.4, 0.5, 0.5,
+            0.8, 0.85, 0.6, 0.7, 0.7, 0.8, 0.75, 0.7, 0.8, 0.85, 0.75, 0.8, 0.95, 0.5, 0.6, 0.5,
+            0.4, 0.6, 0.5, 0.3, 0.4, 0.5, 0.5,
         )),
         KnowledgeSource::Hyperframes => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.5, 0.3,
-                0.2, 0.6, 0.2, 0.5,
-                0.85, 0.7, 0.8, 0.7, 0.6,
-                0.3, 0.3, 0.2,
-                0.2, 0.9, 0.3,
-                0.4, 0.5, 0.6, 0.0,
+                0.3, 0.3, 0.5, 0.3, 0.2, 0.6, 0.2, 0.5, 0.85, 0.7, 0.8, 0.7, 0.6, 0.3, 0.3, 0.2,
+                0.2, 0.9, 0.3, 0.4, 0.5, 0.6, 0.0,
             );
             cv.extend_named(&[
                 ("video_rendering".into(), 0.95),
@@ -77,12 +43,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::Betterleaks => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.1, 0.1,
-                0.1, 0.1, 0.1, 0.1,
-                0.7, 0.3, 0.9, 0.6, 0.95,
-                0.1, 0.1, 0.1,
-                0.1, 0.1, 0.1,
-                0.5, 0.8, 0.95, 0.0,
+                0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7, 0.3, 0.9, 0.6, 0.95, 0.1, 0.1, 0.1,
+                0.1, 0.1, 0.1, 0.5, 0.8, 0.95, 0.0,
             );
             cv.extend_named(&[
                 ("secret_detection".into(), 0.95),
@@ -95,12 +57,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::YaoWebsecurity => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.1, 0.2,
-                0.1, 0.2, 0.2, 0.2,
-                0.8, 0.5, 0.85, 0.7, 0.9,
-                0.1, 0.2, 0.1,
-                0.1, 0.2, 0.1,
-                0.3, 0.4, 0.8, 0.0,
+                0.2, 0.2, 0.1, 0.2, 0.1, 0.2, 0.2, 0.2, 0.8, 0.5, 0.85, 0.7, 0.9, 0.1, 0.2, 0.1,
+                0.1, 0.2, 0.1, 0.3, 0.4, 0.8, 0.0,
             );
             cv.extend_named(&[
                 ("security_audit".into(), 0.95),
@@ -113,12 +71,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::Botasaurus => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.3,
-                0.6, 0.5, 0.7, 0.5, 0.6,
-                0.2, 0.7, 0.4,
-                0.2, 0.3, 0.2,
-                0.3, 0.5, 0.7, 0.0,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.6, 0.5, 0.7, 0.5, 0.6, 0.2, 0.7, 0.4,
+                0.2, 0.3, 0.2, 0.3, 0.5, 0.7, 0.0,
             );
             cv.extend_named(&[
                 ("anti_detection".into(), 0.95),
@@ -131,12 +85,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::ReactDoctor => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.85, 0.4, 0.85, 0.7, 0.8,
-                0.6, 0.8, 0.7,
-                0.3, 0.4, 0.2,
-                0.7, 0.9, 0.9, 0.0,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.85, 0.4, 0.85, 0.7, 0.8, 0.6, 0.8, 0.7,
+                0.3, 0.4, 0.2, 0.7, 0.9, 0.9, 0.0,
             );
             cv.extend_named(&[
                 ("react_lint".into(), 0.95),
@@ -149,12 +99,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::OpenPencil => {
             let mut cv = CapabilityVector::from_values(
-                0.7, 0.8, 0.6, 0.7,
-                0.5, 0.7, 0.5, 0.8,
-                0.8, 0.9, 0.7, 0.8, 0.7,
-                0.5, 0.6, 0.5,
-                0.4, 0.8, 0.9,
-                0.6, 0.9, 0.7, 0.0,
+                0.7, 0.8, 0.6, 0.7, 0.5, 0.7, 0.5, 0.8, 0.8, 0.9, 0.7, 0.8, 0.7, 0.5, 0.6, 0.5,
+                0.4, 0.8, 0.9, 0.6, 0.9, 0.7, 0.0,
             );
             cv.extend_named(&[
                 ("vector_design_canvas".into(), 0.95),
@@ -167,12 +113,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::AiTrader => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.1, 0.1,
-                0.3, 0.1, 0.1, 0.1,
-                0.7, 0.5, 0.8, 0.6, 0.8,
-                0.1, 0.1, 0.1,
-                0.1, 0.1, 0.1,
-                0.2, 0.3, 0.5, 0.0,
+                0.1, 0.1, 0.1, 0.1, 0.3, 0.1, 0.1, 0.1, 0.7, 0.5, 0.8, 0.6, 0.8, 0.1, 0.1, 0.1,
+                0.1, 0.1, 0.1, 0.2, 0.3, 0.5, 0.0,
             );
             cv.extend_named(&[
                 ("agent_trading".into(), 0.95),
@@ -185,12 +127,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::SesameRobot => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.6, 0.2, 0.7,
-                0.5, 0.6, 0.5, 0.4, 0.7,
-                0.2, 0.2, 0.1,
-                0.1, 0.2, 0.1,
-                0.2, 0.2, 0.3, 0.0,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.6, 0.2, 0.7, 0.5, 0.6, 0.5, 0.4, 0.7, 0.2, 0.2, 0.1,
+                0.1, 0.2, 0.1, 0.2, 0.2, 0.3, 0.0,
             );
             cv.extend_named(&[
                 ("esp32_firmware".into(), 0.9),
@@ -203,12 +141,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::EverOS => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.3, 0.3,
-                0.2, 0.3, 0.2, 0.3,
-                0.9, 0.6, 0.85, 0.9, 0.85,
-                0.7, 0.3, 0.2,
-                0.3, 0.3, 0.2,
-                0.7, 0.9, 0.75, 0.8,
+                0.3, 0.3, 0.3, 0.3, 0.2, 0.3, 0.2, 0.3, 0.9, 0.6, 0.85, 0.9, 0.85, 0.7, 0.3, 0.2,
+                0.3, 0.3, 0.2, 0.7, 0.9, 0.75, 0.8,
             );
             cv.extend_named(&[
                 ("long_term_memory".into(), 0.95),
@@ -221,12 +155,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::MattPocockSkills => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.9, 0.7, 0.9, 0.85, 0.8,
-                0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.5, 0.6, 0.95, 0.9,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.9, 0.7, 0.9, 0.85, 0.8, 0.2, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.5, 0.6, 0.95, 0.9,
             );
             cv.extend_named(&[
                 ("agent_skill_protocol".into(), 0.95),
@@ -239,12 +169,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::NestedLearning => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.95, 0.6, 0.9, 0.95, 0.9,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.85, 0.8, 0.8, 0.85,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.95, 0.6, 0.9, 0.95, 0.9, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.85, 0.8, 0.8, 0.85,
             );
             cv.extend_named(&[
                 ("nested_optimization".into(), 0.95),
@@ -257,12 +183,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::AutonomousGoal => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.3,
-                0.2, 0.3, 0.2, 0.3,
-                0.9, 0.85, 0.9, 0.85, 0.85,
-                0.4, 0.3, 0.2,
-                0.2, 0.3, 0.2,
-                0.8, 0.9, 0.95, 0.85,
+                0.3, 0.3, 0.2, 0.3, 0.2, 0.3, 0.2, 0.3, 0.9, 0.85, 0.9, 0.85, 0.85, 0.4, 0.3, 0.2,
+                0.2, 0.3, 0.2, 0.8, 0.9, 0.95, 0.85,
             );
             cv.extend_named(&[
                 ("goal_lifecycle".into(), 0.95),
@@ -275,12 +197,8 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         }
         KnowledgeSource::AwesomeDesignSkills => {
             let mut cv = CapabilityVector::from_values(
-                0.5, 0.6, 0.4, 0.5,
-                0.4, 0.5, 0.5, 0.4,
-                0.85, 0.6, 0.85, 0.8, 0.8,
-                0.4, 0.3, 0.2,
-                0.3, 0.4, 0.3,
-                0.5, 0.6, 0.7, 0.5,
+                0.5, 0.6, 0.4, 0.5, 0.4, 0.5, 0.5, 0.4, 0.85, 0.6, 0.85, 0.8, 0.8, 0.4, 0.3, 0.2,
+                0.3, 0.4, 0.3, 0.5, 0.6, 0.7, 0.5,
             );
             cv.extend_named(&[
                 ("figma_tokens".into(), 0.85),
@@ -311,7 +229,6 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
         _ => None,
     }
 }
-
 
 #[cfg(test)]
 mod tests {

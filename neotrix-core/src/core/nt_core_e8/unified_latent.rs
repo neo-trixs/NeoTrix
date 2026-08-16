@@ -92,10 +92,16 @@ struct Lcg(u64);
 
 impl Lcg {
     fn new(seed: u64) -> Self {
-        Self(seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407))
+        Self(
+            seed.wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407),
+        )
     }
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.0 >> 33) & 0x7FFF_FFFF
     }
 }
@@ -235,7 +241,10 @@ mod tests {
         let v = u.project_e8_state(ReasoningHexagram::new(0));
         assert_eq!(v.len(), UNIFIED_LATENT_DIM);
         let norm: f64 = v.iter().map(|x| x * x).sum::<f64>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-6, "projected vector should be unit norm, got {norm}");
+        assert!(
+            (norm - 1.0).abs() < 1e-6,
+            "projected vector should be unit norm, got {norm}"
+        );
     }
 
     #[test]
@@ -257,7 +266,9 @@ mod tests {
     fn test_vsa_projection_preserves_similarity_ordering() {
         let u = UnifiedLatentSpace::new();
         // Two VSA vectors: identical-ish vs unrelated.
-        let base: Vec<f64> = (0..DEFAULT_VSA_DIM).map(|i| ((i * 7) % 13) as f64).collect();
+        let base: Vec<f64> = (0..DEFAULT_VSA_DIM)
+            .map(|i| ((i * 7) % 13) as f64)
+            .collect();
         let mut close = base.clone();
         close[0] += 1.0;
         let mut far = base.clone();

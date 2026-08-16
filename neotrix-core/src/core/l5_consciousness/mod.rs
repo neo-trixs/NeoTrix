@@ -9,19 +9,18 @@
 //! - 由 L8 自主进化层驱动反馈，L6 自我层观察
 
 // --- 子模块转发别名 ---
-pub use crate::core::nt_core_gwt as gwt;
-pub use crate::core::nt_core_context as context;
 pub use crate::core::nt_core_consciousness as conscious;
-pub use crate::core::nt_core_gwt::resonance as resonance;
+pub use crate::core::nt_core_context as context;
+pub use crate::core::nt_core_gwt as gwt;
+pub use crate::core::nt_core_gwt::resonance;
 
 // --- GWT 共鸣 re-export (接 core/mod.rs 现有面) ---
 pub use crate::core::nt_core_gwt::resonance::{
-    ResonanceMatrix, ResonanceReport, MODULE_COUNT,
-    resonate_and_select, resonate_cycle, default_specialist_states,
-    RESONANCE_THRESHOLD,
+    default_specialist_states, resonate_and_select, resonate_cycle, ResonanceMatrix,
+    ResonanceReport, MODULE_COUNT, RESONANCE_THRESHOLD,
 };
 
 // --- 单文件意识模块 (tree / review / echo_terminal) ---
-pub use crate::core::nt_core_consciousness_tree as consciousness_tree;
 pub use crate::core::nt_core_consciousness_review as consciousness_review;
+pub use crate::core::nt_core_consciousness_tree as consciousness_tree;
 pub use crate::core::nt_core_echo_terminal as echo_terminal;

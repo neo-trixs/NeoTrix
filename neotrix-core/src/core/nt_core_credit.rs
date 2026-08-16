@@ -57,7 +57,10 @@ impl Default for CreditGraph {
 
 impl CreditGraph {
     pub fn new() -> Self {
-        Self { events: HashMap::new(), edges: Vec::new() }
+        Self {
+            events: HashMap::new(),
+            edges: Vec::new(),
+        }
     }
 
     pub fn add_event(&mut self, event: CreditEvent) {
@@ -98,7 +101,9 @@ impl CreditGraph {
     /// Uses temporal discounting: closer events get more credit.
     pub fn backpropagate(&self, gamma: f64) -> HashMap<String, f64> {
         let mut credits: HashMap<String, f64> = HashMap::new();
-        let outcomes: Vec<&CreditEvent> = self.events.values()
+        let outcomes: Vec<&CreditEvent> = self
+            .events
+            .values()
             .filter(|e| e.role == CreditRole::Outcome)
             .collect();
 
@@ -106,11 +111,12 @@ impl CreditGraph {
             let mut visited = vec![outcome.id.as_str()];
             let mut stack = vec![(outcome.id.as_str(), 1.0f64)];
             while let Some((node_id, chain_discount)) = stack.pop() {
-                let predecessors: Vec<&CreditEdge> = self.edges.iter()
-                    .filter(|e| e.to == *node_id)
-                    .collect();
+                let predecessors: Vec<&CreditEdge> =
+                    self.edges.iter().filter(|e| e.to == *node_id).collect();
                 for edge in &predecessors {
-                    if visited.contains(&edge.from.as_str()) { continue; }
+                    if visited.contains(&edge.from.as_str()) {
+                        continue;
+                    }
                     visited.push(edge.from.as_str());
                     let contrib = edge.discounted_attribution() * chain_discount * gamma;
                     *credits.entry(edge.from.clone()).or_insert(0.0) += contrib;
@@ -143,7 +149,11 @@ impl Default for E8CreditPolicy {
 impl E8CreditPolicy {
     pub fn compute_attribution(&self, steps_ago: usize, visit_count: u64) -> f64 {
         let time_discount = self.step_discount.powi(steps_ago as i32);
-        let novelty = if visit_count <= 1 { self.novelty_bonus } else { 0.0 };
+        let novelty = if visit_count <= 1 {
+            self.novelty_bonus
+        } else {
+            0.0
+        };
         (time_discount + novelty).min(1.0)
     }
 }
@@ -154,15 +164,24 @@ mod tests {
 
     fn make_event(id: &str, role: CreditRole, state: u8, ts: i64, weight: f64) -> CreditEvent {
         CreditEvent {
-            id: id.into(), parent_id: None, role,
+            id: id.into(),
+            parent_id: None,
+            role,
             label: format!("{}_{}", id, ts),
-            e8_state: state, timestamp: ts, weight,
+            e8_state: state,
+            timestamp: ts,
+            weight,
             metadata: HashMap::new(),
         }
     }
 
     fn make_edge(from: &str, to: &str, attr: f64, disc: f64) -> CreditEdge {
-        CreditEdge { from: from.into(), to: to.into(), attribution: attr, discount: disc }
+        CreditEdge {
+            from: from.into(),
+            to: to.into(),
+            attribution: attr,
+            discount: disc,
+        }
     }
 
     #[test]
@@ -326,8 +345,10 @@ mod tests {
     #[test]
     fn test_credit_edge_discounted() {
         let e = CreditEdge {
-            from: "a".into(), to: "b".into(),
-            attribution: 0.8, discount: 0.9,
+            from: "a".into(),
+            to: "b".into(),
+            attribution: 0.8,
+            discount: 0.9,
         };
         assert!((e.discounted_attribution() - 0.72).abs() < 0.01);
     }

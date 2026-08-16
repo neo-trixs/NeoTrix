@@ -298,7 +298,10 @@ mod tests {
         let b = Octonion::basis(2);
         let c = Octonion::basis(5);
         let assoc = engine.associator(&a, &b, &c);
-        assert!(assoc.norm() > 1e-9, "octonion associator must be non-zero for general triples");
+        assert!(
+            assoc.norm() > 1e-9,
+            "octonion associator must be non-zero for general triples"
+        );
     }
 
     #[test]

@@ -133,7 +133,13 @@ impl HebbianGraph {
     /// Hebbian update for a single pair with an explicit target weight.
     /// Δw = lr · (target_weight - w)
     /// Useful for supervised association learning.
-    pub fn hebbian_update(&mut self, symbol_a: &str, symbol_b: &str, target_weight: f64, importance: f64) {
+    pub fn hebbian_update(
+        &mut self,
+        symbol_a: &str,
+        symbol_b: &str,
+        target_weight: f64,
+        importance: f64,
+    ) {
         if importance < self.importance_threshold {
             return;
         }
@@ -171,7 +177,13 @@ impl HebbianGraph {
     /// At each hop, a node's activation is the weighted sum of its neighbors'
     /// activations from the previous hop. Decay factor reduces activation
     /// per hop to prevent infinite spread.
-    pub fn diffusion_retrieve(&self, seeds: &[String], steps: usize, top_k: usize, decay: f64) -> HebbianRetrievalResult {
+    pub fn diffusion_retrieve(
+        &self,
+        seeds: &[String],
+        steps: usize,
+        top_k: usize,
+        decay: f64,
+    ) -> HebbianRetrievalResult {
         let mut activation: HashMap<String, f64> = HashMap::new();
         for seed in seeds {
             if self.edges.contains_key(seed) {
@@ -208,7 +220,10 @@ impl HebbianGraph {
         results.sort_by(|(_, a), (_, b)| b.total_cmp(a));
         results.truncate(top_k);
 
-        HebbianRetrievalResult { results, hops: max_hops }
+        HebbianRetrievalResult {
+            results,
+            hops: max_hops,
+        }
     }
 
     /// Apply exponential decay to all edges.
@@ -295,7 +310,11 @@ impl HebbianGraph {
                 count += 1;
             }
         }
-        let avg_weight = if count > 0 { total_weight / count as f64 } else { 0.0 };
+        let avg_weight = if count > 0 {
+            total_weight / count as f64
+        } else {
+            0.0
+        };
         HebbianStats {
             nodes: self.edges.len(),
             edges: count / 2,
@@ -335,7 +354,10 @@ mod tests {
         let mut graph = HebbianGraph::new(0.5, 0.0, 0.0);
         graph.observe_co_occurrence("a", "b", 1.0);
         let w = graph.get_edge_weight("a", "b");
-        assert!(w > 0.0, "co-occurrence should create edge with positive weight");
+        assert!(
+            w > 0.0,
+            "co-occurrence should create edge with positive weight"
+        );
     }
 
     #[test]
@@ -363,7 +385,10 @@ mod tests {
             graph.hebbian_update("a", "b", 0.8, 1.0);
         }
         let w = graph.get_edge_weight("a", "b");
-        assert!((w - 0.8).abs() < 0.05, "weight should approach 0.8, got {w}");
+        assert!(
+            (w - 0.8).abs() < 0.05,
+            "weight should approach 0.8, got {w}"
+        );
     }
 
     #[test]
@@ -373,7 +398,10 @@ mod tests {
         graph.observe_co_occurrence("seed", "other", 0.5);
         let seeds = vec!["seed".to_string()];
         let result = graph.diffusion_retrieve(&seeds, 1, 5, 0.8);
-        assert!(!result.results.is_empty(), "diffusion should return results");
+        assert!(
+            !result.results.is_empty(),
+            "diffusion should return results"
+        );
         // seed itself should have highest activation (initial 1.0 + spread back)
         let seed_act = result.results.iter().find(|(n, _)| n == "seed");
         assert!(seed_act.is_some(), "seed should be in results");
@@ -389,7 +417,10 @@ mod tests {
         let result = graph.diffusion_retrieve(&seeds, 2, 5, 0.5);
         // c should be reachable in 2 hops
         let c_act = result.results.iter().find(|(n, _)| n == "c");
-        assert!(c_act.is_some() || graph.node_count() >= 3, "c should be reachable via diffusion");
+        assert!(
+            c_act.is_some() || graph.node_count() >= 3,
+            "c should be reachable via diffusion"
+        );
     }
 
     #[test]

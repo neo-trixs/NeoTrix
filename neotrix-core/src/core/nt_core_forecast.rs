@@ -16,8 +16,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
 use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
+use crate::core::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
 use crate::core::nt_core_self_test::SelfTest;
 use crate::neotrix::l1_body_impl::nt_io_provider::types::LlmRequest;
 
@@ -55,13 +55,7 @@ impl StructuredEvent {
     }
 
     /// 带方向的构造器 — 情报摄取时显式指定利多/利空/中性。
-    pub fn new_signed(
-        actor: &str,
-        action: &str,
-        object: &str,
-        impact: f64,
-        valence: f64,
-    ) -> Self {
+    pub fn new_signed(actor: &str, action: &str, object: &str, impact: f64, valence: f64) -> Self {
         let mut ev = Self::new(actor, action, object, impact);
         ev.valence = valence.clamp(-1.0, 1.0);
         ev
@@ -152,13 +146,11 @@ impl EventStream {
 
     /// 主导事件（影响力最大者）。
     pub fn dominant_event(&self) -> Option<&StructuredEvent> {
-        self.events
-            .iter()
-            .max_by(|a, b| {
-                a.effective_impact(self.current_time)
-                    .partial_cmp(&b.effective_impact(self.current_time))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+        self.events.iter().max_by(|a, b| {
+            a.effective_impact(self.current_time)
+                .partial_cmp(&b.effective_impact(self.current_time))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 }
 
@@ -197,13 +189,7 @@ impl ScenarioTree {
         Self::default()
     }
 
-    pub fn add_node(
-        &mut self,
-        name: &str,
-        state: &str,
-        probability: f64,
-        confidence: f64,
-    ) -> u64 {
+    pub fn add_node(&mut self, name: &str, state: &str, probability: f64, confidence: f64) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         self.nodes.push(ScenarioNode {
@@ -277,7 +263,8 @@ impl CalibrationTracker {
     }
 
     pub fn record(&mut self, prob: f64, outcome: bool) {
-        self.records.push((prob.clamp(0.0, 1.0), if outcome { 1.0 } else { 0.0 }));
+        self.records
+            .push((prob.clamp(0.0, 1.0), if outcome { 1.0 } else { 0.0 }));
         if self.records.len() > 4096 {
             self.records.remove(0);
         }
@@ -288,11 +275,7 @@ impl CalibrationTracker {
         if self.records.is_empty() {
             return 0.0;
         }
-        let sum: f64 = self
-            .records
-            .iter()
-            .map(|(p, y)| (p - y) * (p - y))
-            .sum();
+        let sum: f64 = self.records.iter().map(|(p, y)| (p - y) * (p - y)).sum();
         sum / self.records.len() as f64
     }
 
@@ -376,7 +359,11 @@ mod gateway_handle {
         }
 
         /// 单次调用指定 provider — 无重试连打，调用方自行节流（适配 keyless free 限流）。
-        pub fn complete_single(&self, provider_name: &str, request: &LlmRequest) -> Result<LlmResponse, String> {
+        pub fn complete_single(
+            &self,
+            provider_name: &str,
+            request: &LlmRequest,
+        ) -> Result<LlmResponse, String> {
             let rt = match tokio::runtime::Handle::try_current() {
                 Ok(handle) => handle.block_on(self.0.complete_single(provider_name, request)),
                 Err(_) => {
@@ -414,13 +401,15 @@ impl LlmNarrator {
     /// 某个候选非限流失败/空 content 时切下一个候选；全部失败返回 None
     /// （调用方降级到确定性模板）。
     pub fn narrate_scenarios(&self, context: &str) -> Option<String> {
-        let handle = self
-            .gateway
-            .get_or_init(gateway_handle::GatewayHandle::new);
+        let handle = self.gateway.get_or_init(gateway_handle::GatewayHandle::new);
 
         // ── 构建候选链 (provider注册名, model)：按可用性优先级排序 ──
         let candidates = if let Some(m) = &self.model {
-            vec![(self.default_provider(handle.providers()).unwrap_or_default(), m.clone())]
+            vec![(
+                self.default_provider(handle.providers())
+                    .unwrap_or_default(),
+                m.clone(),
+            )]
         } else {
             Self::build_candidates(handle.providers())
         };
@@ -485,7 +474,9 @@ impl LlmNarrator {
                         let retry_after = msg
                             .split("\"retry_after\":")
                             .nth(1)
-                            .and_then(|s| s.trim_start().split(|c: char| !c.is_ascii_digit()).next())
+                            .and_then(|s| {
+                                s.trim_start().split(|c: char| !c.is_ascii_digit()).next()
+                            })
                             .and_then(|s| s.parse::<u64>().ok())
                             .unwrap_or(2u64.pow(attempt as u32) * 3);
                         log::info!(
@@ -497,7 +488,9 @@ impl LlmNarrator {
                 }
             }
             if let Some(e) = last_err {
-                log::warn!("[nt_core_forecast] LLM narrate candidate {provider}/{model} exhausted: {e}");
+                log::warn!(
+                    "[nt_core_forecast] LLM narrate candidate {provider}/{model} exhausted: {e}"
+                );
             }
         }
         None
@@ -537,7 +530,10 @@ impl LlmNarrator {
             c.push((n.clone(), "openai".to_string()));
         }
         // 3) api-airforce — 有模型条目时用其 model_id
-        if let Some(n) = names.iter().find(|n| n.starts_with("api-airforce") && n.contains('/')) {
+        if let Some(n) = names
+            .iter()
+            .find(|n| n.starts_with("api-airforce") && n.contains('/'))
+        {
             if let Some((_, m)) = n.rsplit_once('/') {
                 c.push((n.clone(), m.to_string()));
             }
@@ -656,7 +652,8 @@ impl ForecastEngine {
 
     /// 情报摄取 — 注入结构化事件（默认利多方向）。
     pub fn ingest_event(&mut self, actor: &str, action: &str, object: &str, impact: f64) {
-        self.events.push(StructuredEvent::new(actor, action, object, impact));
+        self.events
+            .push(StructuredEvent::new(actor, action, object, impact));
     }
 
     /// 情报摄取（带方向）— +1 利多 / -1 利空 / 0 中性。
@@ -668,8 +665,9 @@ impl ForecastEngine {
         impact: f64,
         valence: f64,
     ) {
-        self.events
-            .push(StructuredEvent::new_signed(actor, action, object, impact, valence));
+        self.events.push(StructuredEvent::new_signed(
+            actor, action, object, impact, valence,
+        ));
     }
 
     /// 时间推进。
@@ -721,7 +719,12 @@ impl ForecastEngine {
         let bull_p = (directional * (0.5 + 0.5 * direction)).clamp(0.05, 0.95);
         let bear_p = (directional * (0.5 - 0.5 * direction)).clamp(0.05, 0.95);
 
-        let bull = tree.add_node("bull", &format!("state {} (bullish)", predicted), bull_p, calibrated);
+        let bull = tree.add_node(
+            "bull",
+            &format!("state {} (bullish)", predicted),
+            bull_p,
+            calibrated,
+        );
         let bear = tree.add_node(
             "bear",
             &format!("state {} (bearish)", predicted.saturating_sub(1)),
@@ -757,7 +760,8 @@ impl ForecastEngine {
         // LLM 叙事层 — 内部自动调用 NT-IO LLM 池子生成每个情景的演化叙事。
         // 无 narrator / 调用失败 / 返回空 → 降级到确定性描述（不阻塞推演）。
         if let Some(narrator) = &self.narrator {
-            let context = self.build_narrative_context(target, base_state, strength, direction, consensus);
+            let context =
+                self.build_narrative_context(target, base_state, strength, direction, consensus);
             if let Some(narrative) = narrator.narrate_scenarios(&context) {
                 let lines: Vec<&str> = narrative.lines().collect();
                 let mut section = 0usize;
@@ -771,8 +775,13 @@ impl ForecastEngine {
                         section += 1;
                     }
                     if section < lines.len() {
-                        let text = lines[section].trim().trim_start_matches(|c| matches!(c, '1'..='9' | '.' | '-' | ' ' | ':' | '•'));
-                        if !text.is_empty() && !text.contains("scenario") && !text.contains("Scenario") {
+                        let text = lines[section].trim().trim_start_matches(|c| {
+                            matches!(c, '1'..='9' | '.' | '-' | ' ' | ':' | '•')
+                        });
+                        if !text.is_empty()
+                            && !text.contains("scenario")
+                            && !text.contains("Scenario")
+                        {
                             if let Some(n) = tree.node_mut(node_id) {
                                 n.narrative = Some(text.to_string());
                             }
@@ -833,7 +842,9 @@ impl ForecastEngine {
     ) -> String {
         let mut ctx = String::new();
         ctx.push_str("You are a scenario forecaster. Given the target and the structured intelligence events, ");
-        ctx.push_str("write exactly three short scenario narratives, one per line, in this order:\n");
+        ctx.push_str(
+            "write exactly three short scenario narratives, one per line, in this order:\n",
+        );
         ctx.push_str("1. Bullish scenario (positive driver)\n2. Bearish scenario (negative driver)\n3. Sideways scenario (consensus/confusion)\n");
         ctx.push_str("Each line: max 60 words, concrete and specific to the events. No labels, no bullets, no numbering.\n\n");
         ctx.push_str(&format!("TARGET: {target}\nBASE_STATE: {base_state}\n"));
@@ -842,7 +853,13 @@ impl ForecastEngine {
         ));
         ctx.push_str("EVENTS:\n");
         for ev in &self.events.events {
-            let valence = if ev.valence > 0.0 { "bullish" } else if ev.valence < 0.0 { "bearish" } else { "neutral" };
+            let valence = if ev.valence > 0.0 {
+                "bullish"
+            } else if ev.valence < 0.0 {
+                "bearish"
+            } else {
+                "neutral"
+            };
             ctx.push_str(&format!(
                 "- [{}] {} {} {} (impact {:.2})\n",
                 valence, ev.actor, ev.action, ev.object, ev.impact
@@ -909,9 +926,12 @@ impl ForecastEngine {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let db_path = format!("{}/.neotrix/knowledge.db", home);
         let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
-        conn.busy_timeout(std::time::Duration::from_secs(30)).map_err(|e| e.to_string())?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=30000; PRAGMA synchronous=NORMAL;")
+        conn.busy_timeout(std::time::Duration::from_secs(30))
             .map_err(|e| e.to_string())?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=30000; PRAGMA synchronous=NORMAL;",
+        )
+        .map_err(|e| e.to_string())?;
 
         let record = ForecastRecord {
             target: forecast.target.clone(),
@@ -955,7 +975,9 @@ impl ForecastEngine {
         ) else {
             return Vec::new();
         };
-        let Ok(rows) = stmt.query_map(rusqlite::params![pattern, limit as i64], |r| r.get::<_, String>(0)) else {
+        let Ok(rows) = stmt.query_map(rusqlite::params![pattern, limit as i64], |r| {
+            r.get::<_, String>(0)
+        }) else {
             return Vec::new();
         };
         let mut out = Vec::new();
@@ -989,7 +1011,10 @@ pub struct CallBudgetImpl {
 impl CallBudgetImpl {
     /// 构造预算门。
     pub fn new(max_calls: u32) -> Self {
-        Self { spent: 0, max_calls }
+        Self {
+            spent: 0,
+            max_calls,
+        }
     }
 
     /// 尝试花费一次调用; 超预算返回 false。
@@ -1133,7 +1158,10 @@ mod tests {
         let bear_bear_prob = f_bear.tree.node(2).map(|n| n.probability).unwrap_or(0.0);
 
         assert!(bull_prob > 0.5, "利多事件牛概率应 >0.5, got {bull_prob}");
-        assert!(bear_bear_prob > 0.5, "利空事件熊概率应 >0.5, got {bear_bear_prob}");
+        assert!(
+            bear_bear_prob > 0.5,
+            "利空事件熊概率应 >0.5, got {bear_bear_prob}"
+        );
     }
 
     /// 缺陷回归 3：多空对冲 → 震荡分支概率高。
@@ -1146,7 +1174,10 @@ mod tests {
         // 三叶节点：bull=1, bear=2, sideways=3
         let sideways = f.tree.node(3).map(|n| n.probability).unwrap_or(0.0);
         let bull = f.tree.node(1).map(|n| n.probability).unwrap_or(0.0);
-        assert!(sideways > bull, "对冲时震荡概率应高于单一牛分支: s={sideways:.2} b={bull:.2}");
+        assert!(
+            sideways > bull,
+            "对冲时震荡概率应高于单一牛分支: s={sideways:.2} b={bull:.2}"
+        );
     }
 
     /// 缺陷回归 4：resolve_outcome 记录主导叶子概率（信息量），而非恒 1 的和。
@@ -1193,7 +1224,10 @@ mod tests {
         engine.ingest_signed_event("fed", "cut", "rates", 0.9, 1.0);
         engine.ingest_signed_event("war", "escalate", "oil", 0.8, -1.0);
         let ctx = engine.build_narrative_context("gold", 1, 0.9, 0.2, 0.3);
-        assert!(ctx.contains("[bullish] fed cut rates"), "利多事件应编码, got: {ctx}");
+        assert!(
+            ctx.contains("[bullish] fed cut rates"),
+            "利多事件应编码, got: {ctx}"
+        );
         assert!(ctx.contains("[bearish] war escalate oil"), "利空事件应编码");
         assert!(ctx.contains("TARGET: gold"));
     }
@@ -1209,7 +1243,10 @@ mod tests {
         let f = engine.generate_forecast("gold", 1);
         for leaf in f.tree.leaves() {
             let narr = leaf.narrative.as_deref().unwrap_or("");
-            assert!(!narr.trim().is_empty(), "每个叶子都应有叙事（LLM 或确定性）");
+            assert!(
+                !narr.trim().is_empty(),
+                "每个叶子都应有叙事（LLM 或确定性）"
+            );
         }
     }
 
@@ -1249,12 +1286,30 @@ mod tests {
         ];
         let c = LlmNarrator::build_candidates(names);
         // llm7 优先，且 codestral 在 gpt-oss 前（非 reasoning 优先）
-        assert_eq!(c[0], ("llm7/codestral-latest".to_string(), "codestral-latest".to_string()));
-        assert_eq!(c[1], ("llm7/codestral-latest".to_string(), "gpt-oss:20b".to_string()));
+        assert_eq!(
+            c[0],
+            (
+                "llm7/codestral-latest".to_string(),
+                "codestral-latest".to_string()
+            )
+        );
+        assert_eq!(
+            c[1],
+            (
+                "llm7/codestral-latest".to_string(),
+                "gpt-oss:20b".to_string()
+            )
+        );
         // pollinations 次选
         assert_eq!(c[2], ("pollinations".to_string(), "openai".to_string()));
         // api-airforce 有模型条目时用其 model_id
-        assert_eq!(c[3], ("api-airforce/grok-4.1-mini:free".to_string(), "grok-4.1-mini:free".to_string()));
+        assert_eq!(
+            c[3],
+            (
+                "api-airforce/grok-4.1-mini:free".to_string(),
+                "grok-4.1-mini:free".to_string()
+            )
+        );
     }
 
     #[test]
@@ -1300,7 +1355,11 @@ mod tests {
         // 长 context 应被截断到预算内 (保留开头, 附截断标记)
         let long = "这是很长的中文内容".repeat(200); // 2000+ 字
         let truncated = LlmNarrator::truncate_context(&long, 100);
-        assert!(LlmNarrator::estimate_tokens(&truncated) <= 110, "应在预算内: {} tokens", LlmNarrator::estimate_tokens(&truncated));
+        assert!(
+            LlmNarrator::estimate_tokens(&truncated) <= 110,
+            "应在预算内: {} tokens",
+            LlmNarrator::estimate_tokens(&truncated)
+        );
         assert!(truncated.contains("…(截断)"), "应带截断标记");
         assert!(truncated.starts_with("这是"), "保留开头");
 
@@ -1329,6 +1388,11 @@ mod tests {
         let budget = LlmNarrator::DEFAULT_CONTEXT_TOKEN_BUDGET;
         let truncated = LlmNarrator::truncate_context(&context, budget);
         let est = LlmNarrator::estimate_tokens(&truncated);
-        assert!(est <= budget + 10, "截断后 {} tokens 应 ≤ 预算 {}+10", est, budget);
+        assert!(
+            est <= budget + 10,
+            "截断后 {} tokens 应 ≤ 预算 {}+10",
+            est,
+            budget
+        );
     }
 }

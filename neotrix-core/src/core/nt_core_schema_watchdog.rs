@@ -29,31 +29,109 @@ pub struct SchemaWatchdog {
 impl SchemaWatchdog {
     pub fn new() -> Self {
         let mut w = Self::default();
-        w.register("KnowledgeNode", vec![
-            "id", "title", "body", "url", "source", "node_type",
-            "created_at", "updated_at", "confidence", "embedding_id",
-            "access_count", "last_accessed", "provenance", "domain",
-            "language", "importance", "ttl",
-        ]);
-        w.register("NodeType", vec![
-            "Concept", "Fact", "Claim", "Article", "Document", "Source",
-            "Person", "Organization", "Location", "Event", "Technology",
-            "Tool", "Framework", "Language", "Protocol", "Methodology",
-            "Pattern", "Skill", "Capability", "Defect", "Fix", "Improvement",
-            "ArchitectureComponent", "DataFlow", "Algorithm", "Benchmark",
-            "Paper", "Tutorial", "API", "Config", "Query", "Response",
-            "WikiPage",
-        ]);
-        w.register("RelationType", vec![
-            "related_to", "derived_from", "part_of", "uses", "implemented_by",
-            "depends_on", "conflicts_with", "improves", "fixes", "causes",
-            "examples", "supports", "contradicts", "subtype_of", "instance_of",
-            "maps_to", "references", "mentions", "follows", "precedes",
-            "requires", "produces", "consumes", "equivalent_to", "generalizes",
-            "specializes", "bridges", "enables", "constrains", "subclass",
-            "provenance", "documents", "describes", "validates", "deprecates",
-            "replaces", "supersedes", "translates",
-        ]);
+        w.register(
+            "KnowledgeNode",
+            vec![
+                "id",
+                "title",
+                "body",
+                "url",
+                "source",
+                "node_type",
+                "created_at",
+                "updated_at",
+                "confidence",
+                "embedding_id",
+                "access_count",
+                "last_accessed",
+                "provenance",
+                "domain",
+                "language",
+                "importance",
+                "ttl",
+            ],
+        );
+        w.register(
+            "NodeType",
+            vec![
+                "Concept",
+                "Fact",
+                "Claim",
+                "Article",
+                "Document",
+                "Source",
+                "Person",
+                "Organization",
+                "Location",
+                "Event",
+                "Technology",
+                "Tool",
+                "Framework",
+                "Language",
+                "Protocol",
+                "Methodology",
+                "Pattern",
+                "Skill",
+                "Capability",
+                "Defect",
+                "Fix",
+                "Improvement",
+                "ArchitectureComponent",
+                "DataFlow",
+                "Algorithm",
+                "Benchmark",
+                "Paper",
+                "Tutorial",
+                "API",
+                "Config",
+                "Query",
+                "Response",
+                "WikiPage",
+            ],
+        );
+        w.register(
+            "RelationType",
+            vec![
+                "related_to",
+                "derived_from",
+                "part_of",
+                "uses",
+                "implemented_by",
+                "depends_on",
+                "conflicts_with",
+                "improves",
+                "fixes",
+                "causes",
+                "examples",
+                "supports",
+                "contradicts",
+                "subtype_of",
+                "instance_of",
+                "maps_to",
+                "references",
+                "mentions",
+                "follows",
+                "precedes",
+                "requires",
+                "produces",
+                "consumes",
+                "equivalent_to",
+                "generalizes",
+                "specializes",
+                "bridges",
+                "enables",
+                "constrains",
+                "subclass",
+                "provenance",
+                "documents",
+                "describes",
+                "validates",
+                "deprecates",
+                "replaces",
+                "supersedes",
+                "translates",
+            ],
+        );
         w
     }
 
@@ -64,13 +142,23 @@ impl SchemaWatchdog {
         );
     }
 
-    pub fn detect_drift(&mut self, type_name: &str, actual_fields: &[String]) -> Option<SchemaDrift> {
+    pub fn detect_drift(
+        &mut self,
+        type_name: &str,
+        actual_fields: &[String],
+    ) -> Option<SchemaDrift> {
         let expected = self.known_schemas.get(type_name)?;
         let actual_set: HashSet<&str> = actual_fields.iter().map(|s| s.as_str()).collect();
         let expected_set: HashSet<&str> = expected.iter().map(|s| s.as_str()).collect();
 
-        let missing: Vec<String> = expected_set.difference(&actual_set).map(|s| s.to_string()).collect();
-        let extra: Vec<String> = actual_set.difference(&expected_set).map(|s| s.to_string()).collect();
+        let missing: Vec<String> = expected_set
+            .difference(&actual_set)
+            .map(|s| s.to_string())
+            .collect();
+        let extra: Vec<String> = actual_set
+            .difference(&expected_set)
+            .map(|s| s.to_string())
+            .collect();
 
         if missing.is_empty() && extra.is_empty() {
             return None;
@@ -90,12 +178,18 @@ impl SchemaWatchdog {
 
     pub fn report(&self) -> String {
         let mut r = String::new();
-        r.push_str(&format!("Schema Watchdog Report -- {} schemas tracked\n", self.known_schemas.len()));
+        r.push_str(&format!(
+            "Schema Watchdog Report -- {} schemas tracked\n",
+            self.known_schemas.len()
+        ));
         if self.drifts.is_empty() {
             r.push_str("No schema drift detected\n");
         } else {
             for d in &self.drifts {
-                r.push_str(&format!("Drift in {}: missing={:?}, extra={:?}\n", d.module, d.missing, d.extra));
+                r.push_str(&format!(
+                    "Drift in {}: missing={:?}, extra={:?}\n",
+                    d.module, d.missing, d.extra
+                ));
             }
         }
         r
@@ -104,7 +198,9 @@ impl SchemaWatchdog {
     pub fn verify_db_schema(conn: &Connection) -> Vec<String> {
         fn get_column_names(conn: &Connection, table: &str) -> Result<Vec<String>, String> {
             let sql = format!("PRAGMA table_info({table})");
-            let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare {sql}: {e}"))?;
+            let mut stmt = conn
+                .prepare(&sql)
+                .map_err(|e| format!("prepare {sql}: {e}"))?;
             let names = stmt
                 .query_map([], |row| row.get::<_, String>(1))
                 .map_err(|e| format!("query {sql}: {e}"))?
@@ -116,17 +212,39 @@ impl SchemaWatchdog {
         let mut mismatches = Vec::new();
 
         let knowledge_expected: &[&str] = &[
-            "id", "title", "node_type", "content", "summary", "url",
-            "domain", "language", "confidence", "importance", "access_count",
-            "metadata", "created_at", "updated_at",
+            "id",
+            "title",
+            "node_type",
+            "content",
+            "summary",
+            "url",
+            "domain",
+            "language",
+            "confidence",
+            "importance",
+            "access_count",
+            "metadata",
+            "created_at",
+            "updated_at",
         ];
 
         let crawl_queue_expected: &[&str] = &[
-            "id", "url", "domain", "status", "priority", "depth",
-            "error_count", "last_error", "created_at", "updated_at",
+            "id",
+            "url",
+            "domain",
+            "status",
+            "priority",
+            "depth",
+            "error_count",
+            "last_error",
+            "created_at",
+            "updated_at",
         ];
 
-        for (table, expected) in [("knowledge_nodes", knowledge_expected), ("crawl_queue", crawl_queue_expected)] {
+        for (table, expected) in [
+            ("knowledge_nodes", knowledge_expected),
+            ("crawl_queue", crawl_queue_expected),
+        ] {
             match get_column_names(conn, table) {
                 Ok(actual) => {
                     let actual_set: HashSet<&str> = actual.iter().map(|s| s.as_str()).collect();
@@ -176,7 +294,11 @@ impl crate::core::nt_core_self_test::SelfTest for SchemaWatchdog {
             failures.push("KnowledgeNode: false negative on empty fields".into());
         }
 
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -218,8 +340,9 @@ mod tests {
                 id INTEGER PRIMARY KEY, url TEXT, domain TEXT, status TEXT,
                 priority INTEGER, depth INTEGER, error_count INTEGER,
                 last_error TEXT, created_at TEXT, updated_at TEXT
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         let mismatches = SchemaWatchdog::verify_db_schema(&conn);
         assert!(mismatches.is_empty(), "mismatches: {:?}", mismatches);
     }
@@ -233,8 +356,9 @@ mod tests {
             );
             CREATE TABLE crawl_queue (
                 id INTEGER PRIMARY KEY, url TEXT, status TEXT
-            );"
-        ).unwrap();
+            );",
+        )
+        .unwrap();
         let mismatches = SchemaWatchdog::verify_db_schema(&conn);
         assert!(!mismatches.is_empty());
         assert!(mismatches.iter().any(|m| m.contains("missing column")));

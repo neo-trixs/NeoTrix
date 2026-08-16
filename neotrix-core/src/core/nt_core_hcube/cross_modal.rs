@@ -24,10 +24,7 @@ impl CrossModalAligner {
     /// Matches the pattern in `QuantizedVSA::text_to_vsa`.
     pub fn text_to_vsa(&self, text: &str) -> Vec<u8> {
         use std::hash::{Hash, Hasher};
-        let words: Vec<&str> = text
-            .split_whitespace()
-            .filter(|w| !w.is_empty())
-            .collect();
+        let words: Vec<&str> = text.split_whitespace().filter(|w| !w.is_empty()).collect();
         if words.is_empty() {
             return vec![0; self.dim];
         }
@@ -128,7 +125,10 @@ mod tests {
         let a = aligner();
         let v1 = a.text_to_vsa("hello world");
         let v2 = a.text_to_vsa("goodbye world");
-        assert_ne!(v1, v2, "different inputs must produce different VSA vectors");
+        assert_ne!(
+            v1, v2,
+            "different inputs must produce different VSA vectors"
+        );
     }
 
     #[test]
@@ -145,7 +145,11 @@ mod tests {
         let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
         let vsa = a.image_embed_to_vsa(&embed);
         for &x in &vsa {
-            assert!(x == 0 || x == 1, "each element must be binary (0 or 1), got {}", x);
+            assert!(
+                x == 0 || x == 1,
+                "each element must be binary (0 or 1), got {}",
+                x
+            );
         }
     }
 
@@ -166,7 +170,10 @@ mod tests {
         let v = a.image_embed_to_vsa(&embed);
         let sim_ab = CrossModalAligner::cross_modal_similarity(&v, &v);
         let sim_ba = CrossModalAligner::cross_modal_similarity(&v, &v);
-        assert!((sim_ab - sim_ba).abs() < 1e-12, "similarity must be symmetric");
+        assert!(
+            (sim_ab - sim_ba).abs() < 1e-12,
+            "similarity must be symmetric"
+        );
     }
 
     #[test]
@@ -196,7 +203,10 @@ mod tests {
         let embed_b: Vec<f32> = (0..512).map(|i| (i as f32).cos()).collect();
         let vsa_a = a.image_embed_to_vsa(&embed_a);
         let vsa_b = a.image_embed_to_vsa(&embed_b);
-        assert_ne!(vsa_a, vsa_b, "different embeddings must produce different VSA vectors");
+        assert_ne!(
+            vsa_a, vsa_b,
+            "different embeddings must produce different VSA vectors"
+        );
     }
 
     #[test]
@@ -204,7 +214,10 @@ mod tests {
         let a = aligner();
         let v = a.text_to_vsa("");
         assert_eq!(v.len(), VSA_DIM);
-        assert!(v.iter().all(|&x| x == 0), "empty text should return zero vector");
+        assert!(
+            v.iter().all(|&x| x == 0),
+            "empty text should return zero vector"
+        );
     }
 
     #[test]
@@ -226,8 +239,10 @@ mod tests {
         let bound_b = a.bind_with_modality(&vsa_b, "image");
         let raw_sim = CrossModalAligner::cross_modal_similarity(&vsa_a, &vsa_b);
         let bound_sim = CrossModalAligner::cross_modal_similarity(&bound_a, &bound_b);
-        assert!((raw_sim - bound_sim).abs() < 0.01,
-            "same-modality binding should preserve similarity");
+        assert!(
+            (raw_sim - bound_sim).abs() < 0.01,
+            "same-modality binding should preserve similarity"
+        );
     }
 
     #[test]

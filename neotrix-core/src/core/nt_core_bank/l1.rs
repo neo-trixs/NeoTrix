@@ -37,7 +37,12 @@ impl Default for Persona {
 
 impl Persona {
     pub fn new() -> Self {
-        Self { base_anchors: Vec::new(), interest_map: Vec::new(), interaction_protocol: Vec::new(), cognitive_kernel: Vec::new() }
+        Self {
+            base_anchors: Vec::new(),
+            interest_map: Vec::new(),
+            interaction_protocol: Vec::new(),
+            cognitive_kernel: Vec::new(),
+        }
     }
 }
 
@@ -49,9 +54,15 @@ pub struct ExtractionPrompt {
 
 impl ExtractionPrompt {
     pub fn l1_prompt(memories: &[ReasoningMemory]) -> String {
-        let mem_str: Vec<String> = memories.iter().map(|m|
-            format!("[{}] {} (reward={:.2}, type={:?})", m.id, m.task_description, m.reward, m.task_type)
-        ).collect();
+        let mem_str: Vec<String> = memories
+            .iter()
+            .map(|m| {
+                format!(
+                    "[{}] {} (reward={:.2}, type={:?})",
+                    m.id, m.task_description, m.reward, m.task_type
+                )
+            })
+            .collect();
         format!(
             r#"Extract structured memories from the following reasoning traces.
 For each trace, identify:
@@ -68,9 +79,15 @@ Output JSON array: [{{"content":"...","mem_type":"persona|episodic|instruction",
     }
 
     pub fn l2_prompt(l1_memories: &[L1Memory]) -> String {
-        let mem_str: Vec<String> = l1_memories.iter().map(|m|
-            format!("[{}] ({}) {} (priority={:.2})", m.id, m.mem_type, m.content, m.priority)
-        ).collect();
+        let mem_str: Vec<String> = l1_memories
+            .iter()
+            .map(|m| {
+                format!(
+                    "[{}] ({}) {} (priority={:.2})",
+                    m.id, m.mem_type, m.content, m.priority
+                )
+            })
+            .collect();
         format!(
             r#"Group the following atomic memories into coherent scenes.
 Each scene represents a coherent topic or task session.
@@ -84,8 +101,14 @@ Output JSON array: [{{"summary":"...","memory_ids":["..."],"content":["..."],"he
     }
 
     pub fn l3_prompt(scenes: &[SceneBlock], existing_persona: &Option<String>) -> String {
-        let scene_str: Vec<String> = scenes.iter().map(|s| format!("Scene {}: {}", s.id, s.summary)).collect();
-        let existing = existing_persona.as_ref().map(|p| format!("\nExisting persona:\n{}", p)).unwrap_or_default();
+        let scene_str: Vec<String> = scenes
+            .iter()
+            .map(|s| format!("Scene {}: {}", s.id, s.summary))
+            .collect();
+        let existing = existing_persona
+            .as_ref()
+            .map(|p| format!("\nExisting persona:\n{}", p))
+            .unwrap_or_default();
         format!(
             r#"Based on the following scene summaries, generate a user persona.
 The persona has 4 layers:
@@ -98,7 +121,8 @@ Scenes:
 {}{}
 
 Output JSON: {{"base_anchors":[],"interest_map":[],"interaction_protocol":[],"cognitive_kernel":[]}}"#,
-            scene_str.join("\n"), existing
+            scene_str.join("\n"),
+            existing
         )
     }
 }
@@ -137,8 +161,8 @@ mod tests {
 
     #[test]
     fn test_l1_prompt_contains_memories() {
+        use crate::core::nt_core_bank::{MemoryLifecycle, MemoryTier, T3Views};
         use crate::core::{RewardSource, TaskType};
-        use crate::core::nt_core_bank::{MemoryTier, MemoryLifecycle, T3Views};
         let mem = ReasoningMemory {
             id: "mem-1".into(),
             task_description: "test task".into(),

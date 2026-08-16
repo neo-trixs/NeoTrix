@@ -72,16 +72,10 @@ pub trait ResourcePool: Send + Sync {
     ) -> impl std::future::Future<Output = Option<Self::Resource>> + Send;
 
     /// Report a successful use of a resource
-    fn report_success(
-        &self,
-        resource_id: &str,
-    ) -> impl std::future::Future<Output = ()> + Send;
+    fn report_success(&self, resource_id: &str) -> impl std::future::Future<Output = ()> + Send;
 
     /// Report a failed use of a resource
-    fn report_failure(
-        &self,
-        resource_id: &str,
-    ) -> impl std::future::Future<Output = ()> + Send;
+    fn report_failure(&self, resource_id: &str) -> impl std::future::Future<Output = ()> + Send;
 
     /// Health-check all managed resources, updating their state
     fn health_check(&self) -> impl std::future::Future<Output = PoolHealthReport> + Send;

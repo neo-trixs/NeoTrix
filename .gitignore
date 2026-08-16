@@ -68,3 +68,7 @@ src-tauri/frontend/node_modules
 /neotrix-core/LaurentMazare-ocaml-torch/
 /huggingface-candle/
 /rust-ml-linfa/
+
+# Test worktrees and nested test artifacts
+neotrix-core/test-worktree-branch/
+neotrix-core/.neotrix/

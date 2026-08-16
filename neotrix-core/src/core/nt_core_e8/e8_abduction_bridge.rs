@@ -2,12 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::abduction::{
-    AbductiveReasoningEngine, AbductiveHypothesis,
-};
-use super::domain_transition::{
-    E8DomainTransitionModel, E8TaskType, CoTLength,
-};
+use super::abduction::{AbductiveHypothesis, AbductiveReasoningEngine};
+use super::domain_transition::{CoTLength, E8DomainTransitionModel, E8TaskType};
 
 pub struct E8AbductionBridge {
     pub transition_model: E8DomainTransitionModel,
@@ -40,11 +36,14 @@ impl E8AbductionBridge {
         task_type: E8TaskType,
         cot_length: CoTLength,
     ) -> (u8, f64) {
-        let (predicted, base_conf) = self.transition_model.predict_next(from, task_type, cot_length);
+        let (predicted, base_conf) = self
+            .transition_model
+            .predict_next(from, task_type, cot_length);
         let mut adjusted_conf = base_conf;
 
         if !self.active_hypotheses.is_empty() {
-            let best_plausibility = self.active_hypotheses
+            let best_plausibility = self
+                .active_hypotheses
                 .iter()
                 .map(|h| h.plausibility)
                 .fold(0.0f64, |a, b| a.max(b));
@@ -85,9 +84,9 @@ impl E8AbductionBridge {
             ));
         }
 
-        let (predicted, pred_conf) = self.transition_model.predict_next(
-            from, task_type, CoTLength::Medium,
-        );
+        let (predicted, pred_conf) =
+            self.transition_model
+                .predict_next(from, task_type, CoTLength::Medium);
 
         AbductiveTransitionReport {
             predicted_next: predicted,
@@ -118,9 +117,8 @@ mod tests {
     #[test]
     fn test_predict_without_hypotheses() {
         let mut bridge = E8AbductionBridge::new(0.5);
-        let (state, confidence) = bridge.predict_with_abduction(
-            0, E8TaskType::Reasoning, CoTLength::Medium,
-        );
+        let (state, confidence) =
+            bridge.predict_with_abduction(0, E8TaskType::Reasoning, CoTLength::Medium);
         assert!(state < 64);
         assert!(confidence >= 0.0 && confidence <= 1.0);
     }
@@ -129,7 +127,9 @@ mod tests {
     fn test_record_transition_generates_hypothesis() {
         let mut bridge = E8AbductionBridge::new(0.5);
         let report = bridge.record_transition_with_abduction(
-            E8TaskType::Reasoning, 0, 1,
+            E8TaskType::Reasoning,
+            0,
+            1,
             "initial transition test",
         );
         assert_eq!(report.actual_next, 1);
@@ -146,7 +146,9 @@ mod tests {
         let mut bridge = E8AbductionBridge::new(0.5);
         for i in 0..5 {
             let report = bridge.record_transition_with_abduction(
-                E8TaskType::Agentic, i, i + 1,
+                E8TaskType::Agentic,
+                i,
+                i + 1,
                 &format!("step {}", i),
             );
             assert_eq!(report.actual_next, i + 1);
@@ -157,7 +159,9 @@ mod tests {
     fn test_hypothesis_plausibility_ranges() {
         let mut bridge = E8AbductionBridge::new(0.5);
         let report = bridge.record_transition_with_abduction(
-            E8TaskType::Reasoning, 10, 20,
+            E8TaskType::Reasoning,
+            10,
+            20,
             "test plausibility",
         );
         assert!(report.best_hypothesis_plausibility >= 0.0);
@@ -167,24 +171,21 @@ mod tests {
     #[test]
     fn test_predict_with_active_hypotheses() {
         let mut bridge = E8AbductionBridge::new(0.5);
-        bridge.record_transition_with_abduction(
-            E8TaskType::Reasoning, 5, 10,
-            "build hypotheses",
-        );
+        bridge.record_transition_with_abduction(E8TaskType::Reasoning, 5, 10, "build hypotheses");
         let before_conf = {
-            let (_, conf) = bridge.predict_with_abduction(
-                10, E8TaskType::Reasoning, CoTLength::Medium,
-            );
+            let (_, conf) =
+                bridge.predict_with_abduction(10, E8TaskType::Reasoning, CoTLength::Medium);
             conf
         };
         bridge.record_transition_with_abduction(
-            E8TaskType::Reasoning, 10, 15,
+            E8TaskType::Reasoning,
+            10,
+            15,
             "strengthen hypothesis",
         );
         let after_conf = {
-            let (_, conf) = bridge.predict_with_abduction(
-                15, E8TaskType::Reasoning, CoTLength::Medium,
-            );
+            let (_, conf) =
+                bridge.predict_with_abduction(15, E8TaskType::Reasoning, CoTLength::Medium);
             conf
         };
         assert!(after_conf >= 0.0);
@@ -203,7 +204,9 @@ mod tests {
     fn test_unexpected_transition_triggers_second_observation() {
         let mut bridge = E8AbductionBridge::new(0.5);
         let report = bridge.record_transition_with_abduction(
-            E8TaskType::Agentic, 30, 31,
+            E8TaskType::Agentic,
+            30,
+            31,
             "routine transition",
         );
         assert!(report.hypothesis_count > 0 || report.prediction_confidence > 0.0);
@@ -212,10 +215,8 @@ mod tests {
     #[test]
     fn test_report_full_coverage() {
         let mut bridge = E8AbductionBridge::new(0.5);
-        let report = bridge.record_transition_with_abduction(
-            E8TaskType::General, 42, 7,
-            "full report test",
-        );
+        let report =
+            bridge.record_transition_with_abduction(E8TaskType::General, 42, 7, "full report test");
         assert!(report.predicted_next < 64);
         assert!(report.prediction_confidence >= 0.0);
         // 无假设时 explained 必须为 false; 有假设时由 plausibility 决定

@@ -1,7 +1,7 @@
+use super::thinking_budget::DifficultyEstimator;
 use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
 use crate::core::nt_core_ttc::{Allocation, TtcEngine};
 use serde::{Deserialize, Serialize};
-use super::thinking_budget::DifficultyEstimator;
 
 /// E₈ state machine wrapping FullReasoningState with TTC integration and multi-modal output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,9 +64,9 @@ impl E8StateMachine {
     /// Returns true if the convergence signal indicates exit.
     pub fn check_early_exit(&mut self, score: f64) -> bool {
         self.scores.push(score);
-        self.ttc_engine.as_ref().is_some_and(|ttc| {
-            ttc.is_enabled() && ttc.check_early_exit(&self.scores).should_exit()
-        })
+        self.ttc_engine
+            .as_ref()
+            .is_some_and(|ttc| ttc.is_enabled() && ttc.check_early_exit(&self.scores).should_exit())
     }
 
     /// Reset TTC tracking (budget + scores) for a new reasoning session.

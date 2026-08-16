@@ -22,14 +22,35 @@ pub struct ComputeBudget {
 
 impl ComputeBudget {
     pub const fn free() -> Self {
-        Self { max_tokens: 0, max_steps: 0, beam_width: 1, parallel_trajectories: 1, mcts_simulations: 0 }
+        Self {
+            max_tokens: 0,
+            max_steps: 0,
+            beam_width: 1,
+            parallel_trajectories: 1,
+            mcts_simulations: 0,
+        }
     }
 
-    pub fn with_tokens(mut self, tokens: u64) -> Self { self.max_tokens = tokens; self }
-    pub fn with_steps(mut self, steps: u64) -> Self { self.max_steps = steps; self }
-    pub fn with_beam(mut self, width: usize) -> Self { self.beam_width = width; self }
-    pub fn with_parallel(mut self, n: usize) -> Self { self.parallel_trajectories = n; self }
-    pub fn with_mcts(mut self, sims: usize) -> Self { self.mcts_simulations = sims; self }
+    pub fn with_tokens(mut self, tokens: u64) -> Self {
+        self.max_tokens = tokens;
+        self
+    }
+    pub fn with_steps(mut self, steps: u64) -> Self {
+        self.max_steps = steps;
+        self
+    }
+    pub fn with_beam(mut self, width: usize) -> Self {
+        self.beam_width = width;
+        self
+    }
+    pub fn with_parallel(mut self, n: usize) -> Self {
+        self.parallel_trajectories = n;
+        self
+    }
+    pub fn with_mcts(mut self, sims: usize) -> Self {
+        self.mcts_simulations = sims;
+        self
+    }
 }
 
 /// Difficulty factors for compute allocation
@@ -64,7 +85,13 @@ pub struct LagrangianAllocator {
 impl Default for LagrangianAllocator {
     fn default() -> Self {
         Self {
-            base_budget: ComputeBudget { max_tokens: 4096, max_steps: 32, beam_width: 2, parallel_trajectories: 2, mcts_simulations: 32 },
+            base_budget: ComputeBudget {
+                max_tokens: 4096,
+                max_steps: 32,
+                beam_width: 2,
+                parallel_trajectories: 2,
+                mcts_simulations: 32,
+            },
             max_multiplier: 8.0,
             lambda: 0.5,
         }
@@ -75,14 +102,19 @@ impl LagrangianAllocator {
     pub fn allocate(&self, difficulty: f64, remaining_budget: f64) -> ComputeBudget {
         let multiplier = 1.0 + (self.max_multiplier - 1.0) * difficulty;
         let budget_ratio = (remaining_budget * self.lambda).max(0.1).min(1.0);
-        let effective = (multiplier * budget_ratio).max(1.0).min(self.max_multiplier);
+        let effective = (multiplier * budget_ratio)
+            .max(1.0)
+            .min(self.max_multiplier);
 
         ComputeBudget {
             max_tokens: (self.base_budget.max_tokens as f64 * effective) as u64,
             max_steps: (self.base_budget.max_steps as f64 * (1.0 + (effective - 1.0) * 0.5)) as u64,
             beam_width: self.base_budget.beam_width.max(1),
-            parallel_trajectories: (self.base_budget.parallel_trajectories as f64 * (1.0 + (effective - 1.0) * 0.3)).ceil() as usize,
-            mcts_simulations: (self.base_budget.mcts_simulations as f64 * effective).ceil() as usize,
+            parallel_trajectories: (self.base_budget.parallel_trajectories as f64
+                * (1.0 + (effective - 1.0) * 0.3))
+                .ceil() as usize,
+            mcts_simulations: (self.base_budget.mcts_simulations as f64 * effective).ceil()
+                as usize,
         }
     }
 }
@@ -112,7 +144,11 @@ impl Default for BeamState {
 
 impl BeamState {
     pub fn new() -> Self {
-        Self { steps: Vec::new(), cumulative_score: 0.0, is_terminal: false }
+        Self {
+            steps: Vec::new(),
+            cumulative_score: 0.0,
+            is_terminal: false,
+        }
     }
 
     pub fn last_score(&self) -> f64 {
@@ -129,7 +165,10 @@ pub struct PrmBeamSearch {
 
 impl PrmBeamSearch {
     pub fn new(beam_width: usize, max_steps: usize) -> Self {
-        Self { beam_width: beam_width.max(1), max_steps }
+        Self {
+            beam_width: beam_width.max(1),
+            max_steps,
+        }
     }
 
     pub fn search<F>(&self, initial_state: BeamState, scorer: F) -> Vec<BeamState>
@@ -141,16 +180,24 @@ impl PrmBeamSearch {
             let mut candidates: Vec<BeamState> = beam
                 .into_iter()
                 .flat_map(|state| {
-                    if state.is_terminal { return vec![state]; }
+                    if state.is_terminal {
+                        return vec![state];
+                    }
                     scorer(&state)
                 })
                 .collect();
 
-            candidates.sort_by(|a, b| b.cumulative_score.partial_cmp(&a.cumulative_score).unwrap_or(std::cmp::Ordering::Equal));
+            candidates.sort_by(|a, b| {
+                b.cumulative_score
+                    .partial_cmp(&a.cumulative_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             candidates.truncate(self.beam_width);
             beam = candidates;
 
-            if beam.iter().all(|b| b.is_terminal) { break; }
+            if beam.iter().all(|b| b.is_terminal) {
+                break;
+            }
         }
         beam
     }
@@ -177,13 +224,23 @@ pub struct ParallelReasoner {
 
 impl Default for ParallelReasoner {
     fn default() -> Self {
-        Self { num_trajectories: 4, max_steps: 32, coordination_interval: 4, convergence_threshold: 0.9 }
+        Self {
+            num_trajectories: 4,
+            max_steps: 32,
+            coordination_interval: 4,
+            convergence_threshold: 0.9,
+        }
     }
 }
 
 impl ParallelReasoner {
     pub fn new(num_trajectories: usize, max_steps: usize) -> Self {
-        Self { num_trajectories: num_trajectories.max(1), max_steps, coordination_interval: 4, convergence_threshold: 0.9 }
+        Self {
+            num_trajectories: num_trajectories.max(1),
+            max_steps,
+            coordination_interval: 4,
+            convergence_threshold: 0.9,
+        }
     }
 
     pub fn run<F>(&self, step_fn: F) -> Vec<ParallelTrajectory>
@@ -191,31 +248,46 @@ impl ParallelReasoner {
         F: Fn(usize, usize, &[ParallelTrajectory]) -> (f64, bool),
     {
         let mut trajectories: Vec<ParallelTrajectory> = (0..self.num_trajectories)
-            .map(|i| ParallelTrajectory { trajectory_id: i, steps: Vec::new(), final_score: 0.0, token_count: 0, converged: false })
+            .map(|i| ParallelTrajectory {
+                trajectory_id: i,
+                steps: Vec::new(),
+                final_score: 0.0,
+                token_count: 0,
+                converged: false,
+            })
             .collect();
 
         for step in 0..self.max_steps {
             let mut all_converged = true;
             for t in 0..self.num_trajectories {
-                if trajectories[t].converged { continue; }
+                if trajectories[t].converged {
+                    continue;
+                }
                 let (score, converged) = step_fn(t, step, &trajectories);
                 trajectories[t].final_score = score;
                 trajectories[t].converged = converged;
-                if !converged { all_converged = false; }
+                if !converged {
+                    all_converged = false;
+                }
             }
 
             if trajectories.iter().filter(|t| t.converged).count() >= self.num_trajectories / 2 {
                 break;
             }
-            if all_converged && step > 0 { break; }
+            if all_converged && step > 0 {
+                break;
+            }
         }
         trajectories
     }
 
     /// Coordinate across trajectories (average scores, share insights)
     pub fn coordinate(&self, trajectories: &mut [ParallelTrajectory]) {
-        if trajectories.len() < 2 { return; }
-        let avg_score: f64 = trajectories.iter().map(|t| t.final_score).sum::<f64>() / trajectories.len() as f64;
+        if trajectories.len() < 2 {
+            return;
+        }
+        let avg_score: f64 =
+            trajectories.iter().map(|t| t.final_score).sum::<f64>() / trajectories.len() as f64;
         for t in trajectories.iter_mut() {
             if (t.final_score - avg_score).abs() > self.convergence_threshold * 0.3 {
                 t.final_score = t.final_score * 0.7 + avg_score * 0.3;
@@ -234,19 +306,31 @@ pub struct EarlyExitDetector {
 
 impl Default for EarlyExitDetector {
     fn default() -> Self {
-        Self { window_size: 5, stability_threshold: 0.05, min_steps: 3 }
+        Self {
+            window_size: 5,
+            stability_threshold: 0.05,
+            min_steps: 3,
+        }
     }
 }
 
 impl EarlyExitDetector {
     pub fn new(window_size: usize, threshold: f64, min_steps: usize) -> Self {
-        Self { window_size: window_size.max(2), stability_threshold: threshold.max(0.0).min(1.0), min_steps: min_steps.max(1) }
+        Self {
+            window_size: window_size.max(2),
+            stability_threshold: threshold.max(0.0).min(1.0),
+            min_steps: min_steps.max(1),
+        }
     }
 
     /// Check if reasoning has converged (scores stable over window)
     pub fn should_exit(&self, scores: &[f64]) -> bool {
-        if scores.len() < self.min_steps { return false; }
-        if scores.len() < self.window_size { return false; }
+        if scores.len() < self.min_steps {
+            return false;
+        }
+        if scores.len() < self.window_size {
+            return false;
+        }
 
         let start = scores.len().saturating_sub(self.window_size);
         let recent: Vec<f64> = scores[start..].to_vec();
@@ -267,12 +351,21 @@ impl EarlyExitDetector {
             let first = recent.first().copied().unwrap_or(0.0);
             let last = recent.last().copied().unwrap_or(0.0);
             last - first
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
         if variance < self.stability_threshold * 0.5 && trend.abs() < self.stability_threshold {
-            ConvergenceSignal::Converged { reason: "High stability with no trend".into(), token_saving: (scores.len() as f64 * 0.25) as u64 }
-        } else if variance < self.stability_threshold && trend.abs() < self.stability_threshold * 2.0 {
-            ConvergenceSignal::StableEnough { remaining_variance: variance }
+            ConvergenceSignal::Converged {
+                reason: "High stability with no trend".into(),
+                token_saving: (scores.len() as f64 * 0.25) as u64,
+            }
+        } else if variance < self.stability_threshold
+            && trend.abs() < self.stability_threshold * 2.0
+        {
+            ConvergenceSignal::StableEnough {
+                remaining_variance: variance,
+            }
         } else if trend < -self.stability_threshold * 3.0 {
             ConvergenceSignal::Degrading { trend }
         } else {
@@ -281,10 +374,15 @@ impl EarlyExitDetector {
     }
 
     fn variance(values: &[f64]) -> f64 {
-        if values.is_empty() { return 1.0; }
-        if values.len() == 1 { return 0.0; }
+        if values.is_empty() {
+            return 1.0;
+        }
+        if values.len() == 1 {
+            return 0.0;
+        }
         let mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
-        let variance: f64 = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+        let variance: f64 =
+            values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         variance
     }
 }
@@ -301,7 +399,10 @@ pub enum ConvergenceSignal {
 
 impl ConvergenceSignal {
     pub fn should_exit(&self) -> bool {
-        matches!(self, ConvergenceSignal::Converged { .. } | ConvergenceSignal::Degrading { .. })
+        matches!(
+            self,
+            ConvergenceSignal::Converged { .. } | ConvergenceSignal::Degrading { .. }
+        )
     }
 }
 
@@ -317,9 +418,12 @@ pub struct MctsNode {
 
 impl MctsNode {
     pub fn ucb_score(&self, parent_visits: u64, exploration_weight: f64) -> f64 {
-        if self.visits == 0 { return f64::MAX; }
+        if self.visits == 0 {
+            return f64::MAX;
+        }
         let exploitation = self.score / self.visits as f64;
-        let exploration = exploration_weight * (parent_visits as f64).ln().sqrt() / (1.0 + self.visits as f64).sqrt();
+        let exploration = exploration_weight * (parent_visits as f64).ln().sqrt()
+            / (1.0 + self.visits as f64).sqrt();
         exploitation + exploration
     }
 }
@@ -333,7 +437,10 @@ pub struct PrmMcts {
 
 impl PrmMcts {
     pub fn new(num_simulations: usize, exploration_weight: f64) -> Self {
-        Self { num_simulations: num_simulations.max(1), exploration_weight: exploration_weight.max(0.0) }
+        Self {
+            num_simulations: num_simulations.max(1),
+            exploration_weight: exploration_weight.max(0.0),
+        }
     }
 
     pub fn search<F, G>(&self, root: MctsNode, expand: F, evaluate: G) -> MctsNode
@@ -345,8 +452,12 @@ impl PrmMcts {
         for _sim in 0..self.num_simulations {
             let expanded = expand(&best);
             if !expanded.is_empty() {
-                let mut scored: Vec<(f64, MctsNode)> = expanded.into_iter()
-                    .map(|child| { let score = evaluate(&child); (score, child) })
+                let mut scored: Vec<(f64, MctsNode)> = expanded
+                    .into_iter()
+                    .map(|child| {
+                        let score = evaluate(&child);
+                        (score, child)
+                    })
                     .collect();
                 scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
                 if let Some((_, node)) = scored.into_iter().next() {
@@ -402,11 +513,17 @@ pub enum AllocationStrategy {
 
 impl AllocationStrategy {
     pub fn select(difficulty: f64, budget: &ComputeBudget) -> Self {
-        if difficulty < 0.3 { Self::Direct }
-        else if difficulty < 0.5 { Self::Beam }
-        else if difficulty < 0.7 { Self::Parallel }
-        else if budget.mcts_simulations > 0 { Self::Mcts }
-        else { Self::Hybrid }
+        if difficulty < 0.3 {
+            Self::Direct
+        } else if difficulty < 0.5 {
+            Self::Beam
+        } else if difficulty < 0.7 {
+            Self::Parallel
+        } else if budget.mcts_simulations > 0 {
+            Self::Mcts
+        } else {
+            Self::Hybrid
+        }
     }
 }
 
@@ -431,7 +548,10 @@ pub struct TtcEngine {
 
 impl TtcEngine {
     pub fn new(config: TtcConfig) -> Self {
-        Self { early_exit_detector: config.early_exit.clone(), config }
+        Self {
+            early_exit_detector: config.early_exit.clone(),
+            config,
+        }
     }
 
     /// Allocate compute budget for a task based on difficulty
@@ -439,7 +559,12 @@ impl TtcEngine {
         let budget = self.config.allocator.allocate(difficulty, remaining);
         let strategy = AllocationStrategy::select(difficulty, &budget);
         let expected = budget.max_tokens;
-        Allocation { budget, difficulty, strategy, expected_tokens: expected }
+        Allocation {
+            budget,
+            difficulty,
+            strategy,
+            expected_tokens: expected,
+        }
     }
 
     /// Run PRM-guided beam search
@@ -473,11 +598,15 @@ impl TtcEngine {
     }
 
     /// Whether TTC is enabled
-    pub fn is_enabled(&self) -> bool { self.config.enabled }
+    pub fn is_enabled(&self) -> bool {
+        self.config.enabled
+    }
 
     /// Token savings estimate from early exit
     pub fn estimate_savings(&self, total_tokens: u64, scores: &[f64]) -> u64 {
-        if scores.len() < 3 { return 0; }
+        if scores.len() < 3 {
+            return 0;
+        }
         let signal = self.early_exit_detector.detect_convergence(scores);
         match signal {
             ConvergenceSignal::Converged { token_saving, .. } => token_saving.min(total_tokens / 2),
@@ -487,7 +616,9 @@ impl TtcEngine {
 }
 
 impl Default for TtcEngine {
-    fn default() -> Self { Self::new(TtcConfig::default()) }
+    fn default() -> Self {
+        Self::new(TtcConfig::default())
+    }
 }
 
 // ── PRM Adapter ─────────────────────────────────────────────────────────────
@@ -506,7 +637,12 @@ impl Default for PrmAdapter {
 }
 
 impl PrmAdapter {
-    pub fn new() -> Self { Self { prm_scores: Vec::new(), step_scores: HashMap::new() } }
+    pub fn new() -> Self {
+        Self {
+            prm_scores: Vec::new(),
+            step_scores: HashMap::new(),
+        }
+    }
 
     pub fn record_step(&mut self, step_idx: usize, score: f64) {
         self.step_scores.insert(step_idx, score.max(0.0).min(1.0));
@@ -514,21 +650,32 @@ impl PrmAdapter {
     }
 
     pub fn cumulative_score(&self) -> f64 {
-        if self.prm_scores.is_empty() { return 0.0; }
+        if self.prm_scores.is_empty() {
+            return 0.0;
+        }
         self.prm_scores.iter().sum::<f64>() / self.prm_scores.len() as f64
     }
 
     pub fn trajectory_score(&self, discount: f64) -> f64 {
         let d = discount.max(0.0).min(1.0);
-        self.prm_scores.iter().enumerate().map(|(i, s)| s * d.powi(i as i32)).sum::<f64>()
+        self.prm_scores
+            .iter()
+            .enumerate()
+            .map(|(i, s)| s * d.powi(i as i32))
+            .sum::<f64>()
     }
 
     pub fn best_step(&self) -> Option<(usize, f64)> {
-        self.step_scores.iter().max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        self.step_scores
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(&idx, &score)| (idx, score))
     }
 
-    pub fn clear(&mut self) { self.prm_scores.clear(); self.step_scores.clear(); }
+    pub fn clear(&mut self) {
+        self.prm_scores.clear();
+        self.step_scores.clear();
+    }
 }
 
 /// Fable 5 effort tiers mapped to TTC rollout depths.
@@ -558,11 +705,17 @@ impl EffortTier {
     pub fn from_difficulty(difficulty: f64, task_length: usize) -> Self {
         let length_factor = (task_length as f64 / 500.0).min(1.0);
         let combined = difficulty * 0.7 + length_factor * 0.3;
-        if combined < 0.2 { EffortTier::Low }
-        else if combined < 0.4 { EffortTier::Medium }
-        else if combined < 0.6 { EffortTier::High }
-        else if combined < 0.8 { EffortTier::XHigh }
-        else { EffortTier::Max }
+        if combined < 0.2 {
+            EffortTier::Low
+        } else if combined < 0.4 {
+            EffortTier::Medium
+        } else if combined < 0.6 {
+            EffortTier::High
+        } else if combined < 0.8 {
+            EffortTier::XHigh
+        } else {
+            EffortTier::Max
+        }
     }
 
     /// TTC rollout depth for this effort tier.
@@ -671,11 +824,17 @@ impl EffortTierSelector {
     /// Select effort tier from difficulty score.
     pub fn select(&self, difficulty: f64) -> EffortTier {
         let d = difficulty.clamp(0.0, 1.0);
-        if d < self.tier_thresholds[0] { EffortTier::Low }
-        else if d < self.tier_thresholds[1] { EffortTier::Medium }
-        else if d < self.tier_thresholds[2] { EffortTier::High }
-        else if d < self.tier_thresholds[3] { EffortTier::XHigh }
-        else { EffortTier::Max }
+        if d < self.tier_thresholds[0] {
+            EffortTier::Low
+        } else if d < self.tier_thresholds[1] {
+            EffortTier::Medium
+        } else if d < self.tier_thresholds[2] {
+            EffortTier::High
+        } else if d < self.tier_thresholds[3] {
+            EffortTier::XHigh
+        } else {
+            EffortTier::Max
+        }
     }
 
     /// Select effort tier from difficulty and task length.
@@ -755,7 +914,13 @@ mod tests {
 
     #[test]
     fn test_difficulty_factors_composite() {
-        let f = DifficultyFactors { prompt_length: 0.5, question_density: 0.3, task_weight: 0.8, constraint_count: 0.2, novelty: 0.1 };
+        let f = DifficultyFactors {
+            prompt_length: 0.5,
+            question_density: 0.3,
+            task_weight: 0.8,
+            constraint_count: 0.2,
+            novelty: 0.1,
+        };
         let c = f.composite();
         assert!(c > 0.0 && c <= 1.0);
         assert!((c - 0.5 * 0.2 - 0.3 * 0.25 - 0.8 * 0.25 - 0.2 * 0.2 - 0.1 * 0.1).abs() < 1e-6);
@@ -766,7 +931,10 @@ mod tests {
         let alloc = LagrangianAllocator::default();
         let budget = alloc.allocate(0.1, 1.0);
         assert!(budget.max_tokens >= alloc.base_budget.max_tokens);
-        assert!(budget.max_tokens <= (alloc.base_budget.max_tokens as f64 * alloc.max_multiplier) as u64);
+        assert!(
+            budget.max_tokens
+                <= (alloc.base_budget.max_tokens as f64 * alloc.max_multiplier) as u64
+        );
     }
 
     #[test]
@@ -792,8 +960,26 @@ mod tests {
         let initial = BeamState::new();
         let results = beam.search(initial, |_state| {
             vec![
-                BeamState { steps: vec![ReasoningStep { step_idx: 0, content: "A".into(), prm_score: 0.8, cumulative_score: 0.8 }], cumulative_score: 0.8, is_terminal: false },
-                BeamState { steps: vec![ReasoningStep { step_idx: 0, content: "B".into(), prm_score: 0.6, cumulative_score: 0.6 }], cumulative_score: 0.6, is_terminal: false },
+                BeamState {
+                    steps: vec![ReasoningStep {
+                        step_idx: 0,
+                        content: "A".into(),
+                        prm_score: 0.8,
+                        cumulative_score: 0.8,
+                    }],
+                    cumulative_score: 0.8,
+                    is_terminal: false,
+                },
+                BeamState {
+                    steps: vec![ReasoningStep {
+                        step_idx: 0,
+                        content: "B".into(),
+                        prm_score: 0.6,
+                        cumulative_score: 0.6,
+                    }],
+                    cumulative_score: 0.6,
+                    is_terminal: false,
+                },
             ]
         });
         assert!(!results.is_empty());
@@ -805,10 +991,18 @@ mod tests {
         let beam = PrmBeamSearch::new(2, 10);
         let initial = BeamState::new();
         let results = beam.search(initial, |_state| {
-            (0..5).map(|i| BeamState {
-                steps: vec![ReasoningStep { step_idx: 0, content: i.to_string(), prm_score: i as f64 / 5.0, cumulative_score: i as f64 / 5.0 }],
-                cumulative_score: i as f64 / 5.0, is_terminal: false,
-            }).collect()
+            (0..5)
+                .map(|i| BeamState {
+                    steps: vec![ReasoningStep {
+                        step_idx: 0,
+                        content: i.to_string(),
+                        prm_score: i as f64 / 5.0,
+                        cumulative_score: i as f64 / 5.0,
+                    }],
+                    cumulative_score: i as f64 / 5.0,
+                    is_terminal: false,
+                })
+                .collect()
         });
         assert!(results.len() <= 2);
     }
@@ -816,9 +1010,7 @@ mod tests {
     #[test]
     fn test_parallel_reasoner_runs_all_trajectories() {
         let pr = ParallelReasoner::new(3, 10);
-        let results = pr.run(|t, _step, _all| {
-            (0.5 + t as f64 * 0.1, false)
-        });
+        let results = pr.run(|t, _step, _all| (0.5 + t as f64 * 0.1, false));
         assert_eq!(results.len(), 3);
     }
 
@@ -826,7 +1018,11 @@ mod tests {
     fn test_parallel_reasoner_convergence() {
         let pr = ParallelReasoner::new(2, 20);
         let results = pr.run(|_t, step, _all| {
-            if step >= 5 { (0.95, true) } else { (0.5, false) }
+            if step >= 5 {
+                (0.95, true)
+            } else {
+                (0.5, false)
+            }
         });
         assert!(results.iter().all(|t| t.converged));
     }
@@ -835,8 +1031,20 @@ mod tests {
     fn test_parallel_coordination_smooths_scores() {
         let pr = ParallelReasoner::default();
         let mut trajectories = vec![
-            ParallelTrajectory { trajectory_id: 0, steps: vec![], final_score: 0.2, token_count: 100, converged: false },
-            ParallelTrajectory { trajectory_id: 1, steps: vec![], final_score: 0.9, token_count: 100, converged: false },
+            ParallelTrajectory {
+                trajectory_id: 0,
+                steps: vec![],
+                final_score: 0.2,
+                token_count: 100,
+                converged: false,
+            },
+            ParallelTrajectory {
+                trajectory_id: 1,
+                steps: vec![],
+                final_score: 0.9,
+                token_count: 100,
+                converged: false,
+            },
         ];
         pr.coordinate(&mut trajectories);
         assert!((trajectories[0].final_score - 0.2).abs() > 1e-6);
@@ -845,7 +1053,10 @@ mod tests {
     #[test]
     fn test_early_exit_detector_insufficient_steps() {
         let detector = EarlyExitDetector::default();
-        assert_eq!(detector.detect_convergence(&[0.5, 0.6]), ConvergenceSignal::InsufficientSteps);
+        assert_eq!(
+            detector.detect_convergence(&[0.5, 0.6]),
+            ConvergenceSignal::InsufficientSteps
+        );
     }
 
     #[test]
@@ -874,7 +1085,13 @@ mod tests {
 
     #[test]
     fn test_mcts_ucb_score() {
-        let node = MctsNode { state_id: "root".into(), score: 5.0, visits: 10, children: vec![], parent: None };
+        let node = MctsNode {
+            state_id: "root".into(),
+            score: 5.0,
+            visits: 10,
+            children: vec![],
+            parent: None,
+        };
         let score = node.ucb_score(20, 1.41);
         assert!(score.is_finite());
         assert!(score > 0.0);
@@ -883,12 +1100,33 @@ mod tests {
     #[test]
     fn test_mcts_search_basic() {
         let mcts = PrmMcts::new(10, 1.41);
-        let root = MctsNode { state_id: "root".into(), score: 0.0, visits: 0, children: vec![], parent: None };
-        let result = mcts.search(root,
-            |_node| vec![
-                MctsNode { state_id: "a".into(), score: 0.0, visits: 0, children: vec![], parent: None },
-                MctsNode { state_id: "b".into(), score: 0.0, visits: 0, children: vec![], parent: None },
-            ],
+        let root = MctsNode {
+            state_id: "root".into(),
+            score: 0.0,
+            visits: 0,
+            children: vec![],
+            parent: None,
+        };
+        let result = mcts.search(
+            root,
+            |_node| {
+                vec![
+                    MctsNode {
+                        state_id: "a".into(),
+                        score: 0.0,
+                        visits: 0,
+                        children: vec![],
+                        parent: None,
+                    },
+                    MctsNode {
+                        state_id: "b".into(),
+                        score: 0.0,
+                        visits: 0,
+                        children: vec![],
+                        parent: None,
+                    },
+                ]
+            },
             |node| if node.state_id == "a" { 0.9 } else { 0.5 },
         );
         assert!(result.state_id == "a" || result.state_id == "b");
@@ -896,9 +1134,18 @@ mod tests {
 
     #[test]
     fn test_allocation_strategy_selection() {
-        assert_eq!(AllocationStrategy::select(0.2, &ComputeBudget::free()), AllocationStrategy::Direct);
-        assert_eq!(AllocationStrategy::select(0.4, &ComputeBudget::free()), AllocationStrategy::Beam);
-        assert_eq!(AllocationStrategy::select(0.6, &ComputeBudget::free()), AllocationStrategy::Parallel);
+        assert_eq!(
+            AllocationStrategy::select(0.2, &ComputeBudget::free()),
+            AllocationStrategy::Direct
+        );
+        assert_eq!(
+            AllocationStrategy::select(0.4, &ComputeBudget::free()),
+            AllocationStrategy::Beam
+        );
+        assert_eq!(
+            AllocationStrategy::select(0.6, &ComputeBudget::free()),
+            AllocationStrategy::Parallel
+        );
     }
 
     #[test]
@@ -958,7 +1205,11 @@ mod tests {
 
     #[test]
     fn test_compute_budget_builder() {
-        let budget = ComputeBudget::free().with_tokens(8192).with_beam(4).with_parallel(8).with_mcts(64);
+        let budget = ComputeBudget::free()
+            .with_tokens(8192)
+            .with_beam(4)
+            .with_parallel(8)
+            .with_mcts(64);
         assert_eq!(budget.max_tokens, 8192);
         assert_eq!(budget.beam_width, 4);
         assert_eq!(budget.parallel_trajectories, 8);
@@ -971,9 +1222,22 @@ mod tests {
         let initial = BeamState::new();
         let results = beam.search(initial, |state| {
             if state.last_score() > 0.8 {
-                vec![BeamState { steps: state.steps.clone(), cumulative_score: state.cumulative_score, is_terminal: true }]
+                vec![BeamState {
+                    steps: state.steps.clone(),
+                    cumulative_score: state.cumulative_score,
+                    is_terminal: true,
+                }]
             } else {
-                vec![BeamState { steps: vec![ReasoningStep { step_idx: 0, content: "step".into(), prm_score: 0.9, cumulative_score: 0.9 }], cumulative_score: 0.9, is_terminal: true }]
+                vec![BeamState {
+                    steps: vec![ReasoningStep {
+                        step_idx: 0,
+                        content: "step".into(),
+                        prm_score: 0.9,
+                        cumulative_score: 0.9,
+                    }],
+                    cumulative_score: 0.9,
+                    is_terminal: true,
+                }]
             }
         });
         assert!(!results.is_empty());
@@ -981,21 +1245,40 @@ mod tests {
 
     #[test]
     fn test_difficulty_factors_zero() {
-        let f = DifficultyFactors { prompt_length: 0.0, question_density: 0.0, task_weight: 0.0, constraint_count: 0.0, novelty: 0.0 };
+        let f = DifficultyFactors {
+            prompt_length: 0.0,
+            question_density: 0.0,
+            task_weight: 0.0,
+            constraint_count: 0.0,
+            novelty: 0.0,
+        };
         assert!((f.composite() - 0.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_difficulty_factors_max() {
-        let f = DifficultyFactors { prompt_length: 1.0, question_density: 1.0, task_weight: 1.0, constraint_count: 1.0, novelty: 1.0 };
+        let f = DifficultyFactors {
+            prompt_length: 1.0,
+            question_density: 1.0,
+            task_weight: 1.0,
+            constraint_count: 1.0,
+            novelty: 1.0,
+        };
         assert!((f.composite() - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_convergence_signal_methods() {
-        assert!(ConvergenceSignal::Converged { reason: "done".into(), token_saving: 100 }.should_exit());
+        assert!(ConvergenceSignal::Converged {
+            reason: "done".into(),
+            token_saving: 100
+        }
+        .should_exit());
         assert!(ConvergenceSignal::Degrading { trend: -0.5 }.should_exit());
-        assert!(!ConvergenceSignal::StableEnough { remaining_variance: 0.1 }.should_exit());
+        assert!(!ConvergenceSignal::StableEnough {
+            remaining_variance: 0.1
+        }
+        .should_exit());
         assert!(!ConvergenceSignal::NeedsMoreSteps { variance: 0.5 }.should_exit());
         assert!(!ConvergenceSignal::InsufficientSteps.should_exit());
     }

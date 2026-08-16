@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use super::resonance::MODULE_COUNT;
+use serde::{Deserialize, Serialize};
 
 /// Learned routing weights: weights[i][j] = routing strength from expert i to j.
 /// Each row is a probability distribution over target experts.
@@ -178,7 +178,11 @@ impl MoERouter {
     /// a sparse probability vector where only those experts retain mass (the
     /// rest are zeroed and the surviving mass is renormalized). Only the top-k
     /// experts "participate in broadcast", the rest are frozen.
-    pub fn sparse_gate(&mut self, task_embedding: &[f64], top_k: usize) -> (Vec<usize>, [f64; MODULE_COUNT]) {
+    pub fn sparse_gate(
+        &mut self,
+        task_embedding: &[f64],
+        top_k: usize,
+    ) -> (Vec<usize>, [f64; MODULE_COUNT]) {
         let gate_probs = self.gate.forward(task_embedding);
         self.last_gate_probs = gate_probs;
 
@@ -417,7 +421,9 @@ mod tests {
         let _ = router.select_experts(&dummy_embedding(), 1);
         let before: [[f64; MODULE_COUNT]; MODULE_COUNT] = router.route_weights.weights;
 
-        let rewards: Vec<f64> = (0..MODULE_COUNT).map(|i| i as f64 / MODULE_COUNT as f64).collect();
+        let rewards: Vec<f64> = (0..MODULE_COUNT)
+            .map(|i| i as f64 / MODULE_COUNT as f64)
+            .collect();
         router.routing_update(&rewards);
 
         // Weights should have changed
@@ -439,12 +445,17 @@ mod tests {
         let mut router = MoERouter::new(64);
         let _ = router.select_experts(&dummy_embedding(), 2);
 
-        let rewards: Vec<f64> = (0..MODULE_COUNT).map(|i| i as f64 / MODULE_COUNT as f64).collect();
+        let rewards: Vec<f64> = (0..MODULE_COUNT)
+            .map(|i| i as f64 / MODULE_COUNT as f64)
+            .collect();
         router.routing_update(&rewards);
 
         for i in 0..MODULE_COUNT {
             let sum: f64 = router.route_weights.weights[i].iter().sum();
-            assert!((sum - 1.0).abs() < 1e-6, "row {i} should sum to 1.0, got {sum}");
+            assert!(
+                (sum - 1.0).abs() < 1e-6,
+                "row {i} should sum to 1.0, got {sum}"
+            );
         }
     }
 
@@ -501,11 +512,16 @@ mod tests {
 
     #[test]
     fn test_softmax_normalized() {
-        let logits = [2.0, 1.0, 0.5, 0.0, -1.0, -2.0, 0.0, 0.1, 0.3, 0.8, -0.5, 1.5, -1.0, 0.5];
+        let logits = [
+            2.0, 1.0, 0.5, 0.0, -1.0, -2.0, 0.0, 0.1, 0.3, 0.8, -0.5, 1.5, -1.0, 0.5,
+        ];
         let probs = softmax(&logits);
         let sum: f64 = probs.iter().sum();
         assert!((sum - 1.0).abs() < 1e-6);
-        assert!(probs[0] > probs[1], "highest logit should have highest prob");
+        assert!(
+            probs[0] > probs[1],
+            "highest logit should have highest prob"
+        );
     }
 
     #[test]
@@ -633,7 +649,10 @@ mod tests {
             }
         }
         let entropy = balancer.load_entropy();
-        assert!(entropy > 0.0, "entropy should be positive for balanced distribution");
+        assert!(
+            entropy > 0.0,
+            "entropy should be positive for balanced distribution"
+        );
     }
 
     #[test]
@@ -647,7 +666,10 @@ mod tests {
             balancer.record_selection(1);
         }
         let ratio = balancer.imbalance_ratio();
-        assert!(ratio >= 1.0, "imbalance ratio should be >= 1.0, got {ratio}");
+        assert!(
+            ratio >= 1.0,
+            "imbalance ratio should be >= 1.0, got {ratio}"
+        );
     }
 
     #[test]
@@ -700,7 +722,10 @@ mod tests {
         let original = logits;
         balancer.apply_biases(&mut logits);
 
-        let changed = logits.iter().zip(original.iter()).any(|(a, b)| (a - b).abs() > 1e-10);
+        let changed = logits
+            .iter()
+            .zip(original.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-10);
         assert!(changed, "apply_biases should modify logits");
     }
 

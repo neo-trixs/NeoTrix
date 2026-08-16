@@ -42,7 +42,6 @@ use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -65,26 +64,26 @@ const TWO_PI: f64 = std::f64::consts::TAU;
 
 /// Cosine of each quantized phase angle `cos(idx / 8 * 2π)`.
 pub const COS_TABLE: [f64; QFHRR_LEVELS as usize] = [
-    1.0,                            // idx=0:  cos(0)
-    0.7071067811865476,     // idx=1:  cos(π/4)
-    0.0,                            // idx=2:  cos(π/2)
-    -0.7071067811865476,    // idx=3:  cos(3π/4)
-    -1.0,                           // idx=4:  cos(π)
-    -0.7071067811865476,    // idx=5:  cos(5π/4)
-    -0.0,                           // idx=6:  cos(3π/2)
-    0.7071067811865476,     // idx=7:  cos(7π/4)
+    1.0,                 // idx=0:  cos(0)
+    0.7071067811865476,  // idx=1:  cos(π/4)
+    0.0,                 // idx=2:  cos(π/2)
+    -0.7071067811865476, // idx=3:  cos(3π/4)
+    -1.0,                // idx=4:  cos(π)
+    -0.7071067811865476, // idx=5:  cos(5π/4)
+    -0.0,                // idx=6:  cos(3π/2)
+    0.7071067811865476,  // idx=7:  cos(7π/4)
 ];
 
 /// Sine of each quantized phase angle `sin(idx / 8 * 2π)`.
 pub const SIN_TABLE: [f64; QFHRR_LEVELS as usize] = [
-    0.0,                            // idx=0:  sin(0)
-    0.7071067811865476,     // idx=1:  sin(π/4)
-    1.0,                            // idx=2:  sin(π/2)
-    0.7071067811865476,     // idx=3:  sin(3π/4)
-    0.0,                            // idx=4:  sin(π)
-    -0.7071067811865476,    // idx=5:  sin(5π/4)
-    -1.0,                           // idx=6:  sin(3π/2)
-    -0.7071067811865476,    // idx=7:  sin(7π/4)
+    0.0,                 // idx=0:  sin(0)
+    0.7071067811865476,  // idx=1:  sin(π/4)
+    1.0,                 // idx=2:  sin(π/2)
+    0.7071067811865476,  // idx=3:  sin(3π/4)
+    0.0,                 // idx=4:  sin(π)
+    -0.7071067811865476, // idx=5:  sin(5π/4)
+    -1.0,                // idx=6:  sin(3π/2)
+    -0.7071067811865476, // idx=7:  sin(7π/4)
 ];
 
 /// 3-bit quantized phase index (0-7, stored in i8).
@@ -176,12 +175,12 @@ pub fn qsimilarity(a: &[i8], b: &[i8]) -> f64 {
 
     let levels_f = QFHRR_LEVELS as f64;
 
-        let sum: f64 = a
-            .iter()
-            .zip(b.iter())
-            .map(|(x, y)| {
-                let diff_u = (*x).abs_diff(*y);
-                let diff_f = diff_u as f64;
+    let sum: f64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(x, y)| {
+            let diff_u = (*x).abs_diff(*y);
+            let diff_f = diff_u as f64;
             let circular = diff_f.min(levels_f - diff_f);
             1.0 - circular / QFHRR_HALF
         })
@@ -207,9 +206,7 @@ pub fn random_qfhrr(seed: u64) -> Vec<i8> {
 /// Generate a random qFHRR vector with custom dimension.
 pub fn random_qfhrr_dim(dim: usize, seed: u64) -> Vec<i8> {
     let mut rng = StdRng::seed_from_u64(seed);
-    (0..dim)
-        .map(|_| rng.gen_range(0..QFHRR_LEVELS))
-        .collect()
+    (0..dim).map(|_| rng.gen_range(0..QFHRR_LEVELS)).collect()
 }
 
 /// Deterministically encode a scalar f64 value into a qFHRR vector.
@@ -467,11 +464,7 @@ impl QuantizedFhrrHyperCube {
     }
 
     /// Find the closest codebook symbol above a threshold.
-    pub fn nearest_symbol_threshold(
-        &self,
-        query: &[i8],
-        threshold: f64,
-    ) -> Option<(&str, f64)> {
+    pub fn nearest_symbol_threshold(&self, query: &[i8], threshold: f64) -> Option<(&str, f64)> {
         self.nearest_symbol(query)
             .filter(|(_, sim)| *sim >= threshold)
     }
@@ -480,10 +473,7 @@ impl QuantizedFhrrHyperCube {
     ///
     /// Returns an NxN matrix where entry `[i][j] = qsimilarity(symbols[i], symbols[j])`.
     /// All symbols must exist in the codebook.
-    pub fn compute_similarity_matrix(
-        &self,
-        symbols: &[&str],
-    ) -> Result<Vec<Vec<f64>>, String> {
+    pub fn compute_similarity_matrix(&self, symbols: &[&str]) -> Result<Vec<Vec<f64>>, String> {
         let n = symbols.len();
         let vecs: Vec<&[i8]> = symbols
             .iter()
@@ -626,7 +616,10 @@ impl QuantizedFhrrHyperCube {
         }
 
         let symbols: Vec<&str> = self.codebook.keys().map(|s| s.as_str()).collect();
-        let vecs: Vec<&[i8]> = symbols.iter().map(|&name| &self.codebook[name][..]).collect();
+        let vecs: Vec<&[i8]> = symbols
+            .iter()
+            .map(|&name| &self.codebook[name][..])
+            .collect();
 
         // Step 1: compute seed activations and similarity matrix
         let mut seed_act: Vec<f64> = Vec::with_capacity(n);
@@ -860,7 +853,10 @@ mod tests {
         assert_eq!(std::mem::size_of::<f64>(), 8);
         assert!(qmem < fmem / 4, "qFHRR should use < 1/4 of f64 FHRR memory");
         assert_eq!(qmem, 2048, "qFHRR Vec<i8> at dim=2048 should be 2048 bytes");
-        assert_eq!(fmem, 16384, "f64 Vec<f64> at dim=2048 should be 16384 bytes");
+        assert_eq!(
+            fmem, 16384,
+            "f64 Vec<f64> at dim=2048 should be 16384 bytes"
+        );
     }
 
     // -- Additional correctness tests --

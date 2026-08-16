@@ -2,11 +2,17 @@ use std::sync::atomic::Ordering;
 
 use chrono::Utc;
 
+use crate::core::nt_core_bank::{
+    MemoryIterationResult, MemoryTier, ReasoningBank, ReasoningMemory,
+};
 use crate::core::nt_core_knowledge::TaskType;
-use crate::core::nt_core_bank::{MemoryIterationResult, MemoryTier, ReasoningBank, ReasoningMemory};
 
 impl ReasoningBank {
-    pub fn iterate_memories(&mut self, similarity_threshold: f64, min_reward: f64) -> MemoryIterationResult {
+    pub fn iterate_memories(
+        &mut self,
+        similarity_threshold: f64,
+        min_reward: f64,
+    ) -> MemoryIterationResult {
         let before = self.stats();
         let merged = self.consolidate_similar(similarity_threshold);
         let pruned = self.prune_low_value(min_reward);
@@ -49,7 +55,11 @@ impl ReasoningBank {
     pub fn prune_expired(&mut self, now: i64) -> usize {
         let before = self.memories.len();
         self.memories.retain(|m| {
-            if let Some(ttl) = m.lifecycle.ttl_seconds { now - m.lifecycle.created_at <= ttl } else { true }
+            if let Some(ttl) = m.lifecycle.ttl_seconds {
+                now - m.lifecycle.created_at <= ttl
+            } else {
+                true
+            }
         });
         before - self.memories.len()
     }
@@ -61,8 +71,16 @@ impl ReasoningBank {
         let one_week: i64 = 604800;
         self.memories.retain(|m| {
             let age = now - m.timestamp;
-            if age > one_week && m.lifecycle.importance < 0.3 && m.lifecycle.access_count < 2 && m.reward < 0.4 { return false; }
-            if age > one_week * 4 && m.lifecycle.importance < 0.5 && m.reward < 0.3 { return false; }
+            if age > one_week
+                && m.lifecycle.importance < 0.3
+                && m.lifecycle.access_count < 2
+                && m.reward < 0.4
+            {
+                return false;
+            }
+            if age > one_week * 4 && m.lifecycle.importance < 0.5 && m.reward < 0.3 {
+                return false;
+            }
             true
         });
         expired + (before2 - self.memories.len())
@@ -78,11 +96,17 @@ impl ReasoningBank {
                 let reward_sim = 1.0 - (self.memories[i].reward - self.memories[j].reward).abs();
                 if same_type && reward_sim > threshold {
                     let reward = (self.memories[i].reward + self.memories[j].reward) / 2.0;
-                    let desc = format!("{}; {}", self.memories[i].task_description, self.memories[j].task_description);
+                    let desc = format!(
+                        "{}; {}",
+                        self.memories[i].task_description, self.memories[j].task_description
+                    );
                     let mut edits = self.memories[i].micro_edits.clone();
                     edits.extend(self.memories[j].micro_edits.clone());
-                    let mut memory = ReasoningMemory::new(&desc, self.memories[i].task_type, &edits, reward);
-                    if let Some(ref emb) = self.memories[i].embedding { memory.embedding = Some(emb.clone()); }
+                    let mut memory =
+                        ReasoningMemory::new(&desc, self.memories[i].task_type, &edits, reward);
+                    if let Some(ref emb) = self.memories[i].embedding {
+                        memory.embedding = Some(emb.clone());
+                    }
                     self.memories[i] = memory;
                     self.memories.remove(j);
                     merged += 1;
@@ -104,8 +128,12 @@ impl ReasoningBank {
     pub fn replay_high_value(&mut self) -> usize {
         let threshold = 0.8;
         let mut replayed = 0;
-        let high_value: Vec<ReasoningMemory> = self.memories.iter()
-            .filter(|m| m.reward > threshold).cloned().collect();
+        let high_value: Vec<ReasoningMemory> = self
+            .memories
+            .iter()
+            .filter(|m| m.reward > threshold)
+            .cloned()
+            .collect();
         for mut mem in high_value {
             mem.timestamp = Utc::now().timestamp();
             if self.memories.len() < self.max_memories {
@@ -117,7 +145,9 @@ impl ReasoningBank {
     }
 
     pub fn initialize_with_design_knowledge(&mut self) {
-        if !self.memories.is_empty() { return; }
+        if !self.memories.is_empty() {
+            return;
+        }
         let design_knowledge = vec![
             ("OpenCodeX 18-parameter layout system: messageSeparation, messagePaddingTop/Bottom, containerPaddingTop/Bottom, containerGap, toolMarginTop, agentInfoMarginTop, containerPaddingLeft/Right, messagePaddingLeft, textIndent, toolIndent, showHeader, showFooter, forceSidebarHidden, showInputAgentInfo, showInputBorder, inputAgentInfoPaddingTop, inputBoxPaddingTop/Bottom", TaskType::UIDesign, 0.95),
             ("macOS design: translucent background (rgba), backdrop-filter: blur(20px), border-radius: 10px, subtle borders (rgba(0,0,0,0.08)), smooth transitions (0.2s cubic-bezier), font: Inter/system-ui", TaskType::UIDesign, 0.92),

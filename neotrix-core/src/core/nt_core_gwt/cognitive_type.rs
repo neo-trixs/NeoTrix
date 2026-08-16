@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::module_def::{SpecialistModule, SpecialistType};
 
@@ -192,7 +192,10 @@ mod tests {
         ] {
             seen[classify(st).index()] = true;
         }
-        assert!(seen.iter().all(|&b| b), "each cognitive type must cover ≥1 specialist");
+        assert!(
+            seen.iter().all(|&b| b),
+            "each cognitive type must cover ≥1 specialist"
+        );
     }
 
     #[test]
@@ -214,9 +217,21 @@ mod tests {
             (SpecialistType::ImageGenerator, 0.75),    // Social
         ];
         let grouped = group_activation(&acts);
-        assert!((grouped[0] - 0.5).abs() < 1e-9, "linguistic sum={}", grouped[0]);
-        assert!((grouped[1] - 0.5).abs() < 1e-9, "logical sum={}", grouped[1]);
-        assert!((grouped[2] - 1.0).abs() < 1e-9, "knowledge sum={}", grouped[2]);
+        assert!(
+            (grouped[0] - 0.5).abs() < 1e-9,
+            "linguistic sum={}",
+            grouped[0]
+        );
+        assert!(
+            (grouped[1] - 0.5).abs() < 1e-9,
+            "logical sum={}",
+            grouped[1]
+        );
+        assert!(
+            (grouped[2] - 1.0).abs() < 1e-9,
+            "knowledge sum={}",
+            grouped[2]
+        );
         assert!((grouped[3] - 1.0).abs() < 1e-9, "social sum={}", grouped[3]);
     }
 
@@ -283,7 +298,11 @@ mod tests {
                 entropy: 0.0,
             }
             .profile();
-            assert!(profile.entropy >= 0.0, "entropy must be ≥0, got {}", profile.entropy);
+            assert!(
+                profile.entropy >= 0.0,
+                "entropy must be ≥0, got {}",
+                profile.entropy
+            );
         }
         // uniform distribution → max entropy ln(4)
         let uniform = CognitiveProfile {
@@ -300,7 +319,11 @@ mod tests {
             entropy: 0.0,
         }
         .profile();
-        assert!(onehot.entropy.abs() < 1e-6, "one-hot entropy should ≈0, got {}", onehot.entropy);
+        assert!(
+            onehot.entropy.abs() < 1e-6,
+            "one-hot entropy should ≈0, got {}",
+            onehot.entropy
+        );
     }
 
     #[test]

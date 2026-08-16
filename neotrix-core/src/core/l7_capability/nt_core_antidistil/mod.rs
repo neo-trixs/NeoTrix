@@ -25,24 +25,19 @@
 //! - L7 → L3 (KB): Trace records stored for later detection
 //! - L7 → L8 (SEAL): AntiDistillationStage in pipeline (defined in L8)
 
-mod watermark;
-mod tracer;
-mod detector;
 pub mod decompose;
+mod detector;
+mod tracer;
+mod watermark;
 
-pub use watermark::{
-    WatermarkEngine, WatermarkBits, ApostropheVariant, WatermarkConfig,
-};
-pub use tracer::{
-    ResponseTracer, TraceRecord, TracerStats,
-    detect_watermarked_in_corpus,
-};
 pub use detector::{
-    DistillationDetector, DistillationAlert, AlertType, DetectorStats,
-    ResponseAnalysis, analyze_response_pattern,
+    analyze_response_pattern, AlertType, DetectorStats, DistillationAlert, DistillationDetector,
+    ResponseAnalysis,
 };
+pub use tracer::{detect_watermarked_in_corpus, ResponseTracer, TraceRecord, TracerStats};
+pub use watermark::{ApostropheVariant, WatermarkBits, WatermarkConfig, WatermarkEngine};
 
-pub use decompose::{TaskDecomposer, DecomposeSuggestion};
+pub use decompose::{DecomposeSuggestion, TaskDecomposer};
 
 /// Anti-distillation storage interface — injected by L8 runtime.
 /// Decouples AntiDistillationSystem from the concrete KnowledgeBase type
@@ -115,7 +110,8 @@ impl AntiDistillationSystem {
 
     /// Register a trace record.
     pub fn register_trace(&mut self, response: &str, bits: u8, model: &str, prompt_prefix: &str) {
-        self.tracer.register_trace(response, bits, model, prompt_prefix);
+        self.tracer
+            .register_trace(response, bits, model, prompt_prefix);
     }
 
     /// Record a request in the detector.
@@ -130,10 +126,15 @@ impl AntiDistillationSystem {
         if !self.enabled {
             return None;
         }
-        self.detector.record_request(source, prompt, temperature, max_tokens, response_length)
+        self.detector
+            .record_request(source, prompt, temperature, max_tokens, response_length)
     }
 
-    pub fn detect_watermarked_in_corpus(&self, corpus: &[String], threshold: f64) -> Vec<(usize, f64)> {
+    pub fn detect_watermarked_in_corpus(
+        &self,
+        corpus: &[String],
+        threshold: f64,
+    ) -> Vec<(usize, f64)> {
         detect_watermarked_in_corpus(corpus, &self.tracer, threshold)
     }
 
@@ -147,8 +148,11 @@ impl AntiDistillationSystem {
 
     /// Refusal rate over total calls (0.0-1.0).
     pub fn refusal_rate(&self) -> f64 {
-        if self.total_calls == 0 { 0.0 }
-        else { self.refused_calls as f64 / self.total_calls as f64 }
+        if self.total_calls == 0 {
+            0.0
+        } else {
+            self.refused_calls as f64 / self.total_calls as f64
+        }
     }
 
     /// Check if a task should be decomposed to avoid LLM refusal.
@@ -218,9 +222,18 @@ impl AntiDistillationSystem {
         let records: Vec<serde_json::Value> = kb.get_trace_data(1).unwrap_or_default();
         if let Some(rec) = records.first() {
             self.total_calls = rec.get("total_calls").and_then(|v| v.as_u64()).unwrap_or(0);
-            self.refused_calls = rec.get("refused_calls").and_then(|v| v.as_u64()).unwrap_or(0);
-            self.watermark_strength = rec.get("watermark_strength").and_then(|v| v.as_f64()).unwrap_or(1.0);
-            self.decomplex_aggression = rec.get("decomplex_aggression").and_then(|v| v.as_f64()).unwrap_or(0.3);
+            self.refused_calls = rec
+                .get("refused_calls")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            self.watermark_strength = rec
+                .get("watermark_strength")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(1.0);
+            self.decomplex_aggression = rec
+                .get("decomplex_aggression")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.3);
         }
     }
 
@@ -277,8 +290,8 @@ mod tests {
 
     #[test]
     fn test_antidistil_encode_decode() {
-        let ads = AntiDistillationSystem::new()
-            .with_probe(Some("minimax.cn"), Some("Asia/Shanghai"));
+        let ads =
+            AntiDistillationSystem::new().with_probe(Some("minimax.cn"), Some("Asia/Shanghai"));
         let date = "Today's date is 2026-07-02.";
         let encoded = ads.encode_date_line(date);
         assert_ne!(encoded, date);
@@ -361,9 +374,18 @@ mod tests {
         let mut ads2 = AntiDistillationSystem::new();
         let json_str = serde_json::to_string(&json).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-        ads2.total_calls = parsed.get("total_calls").and_then(|v| v.as_u64()).unwrap_or(0);
-        ads2.refused_calls = parsed.get("refused_calls").and_then(|v| v.as_u64()).unwrap_or(0);
-        ads2.watermark_strength = parsed.get("watermark_strength").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        ads2.total_calls = parsed
+            .get("total_calls")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        ads2.refused_calls = parsed
+            .get("refused_calls")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        ads2.watermark_strength = parsed
+            .get("watermark_strength")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         assert_eq!(ads2.total_calls, 3);
         assert_eq!(ads2.refused_calls, 1);
         assert_eq!(ads2.watermark_strength, 1.0);

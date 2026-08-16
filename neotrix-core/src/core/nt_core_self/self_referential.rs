@@ -51,7 +51,8 @@ impl SelfReferentialMonitor {
             return 0.0;
         }
 
-        let avg_grade: f64 = recent.iter().map(|t| t.grade.score()).sum::<f64>() / recent.len() as f64;
+        let avg_grade: f64 =
+            recent.iter().map(|t| t.grade.score()).sum::<f64>() / recent.len() as f64;
 
         let mut total_effectiveness = 0.0;
         let mut count = 0;
@@ -63,7 +64,11 @@ impl SelfReferentialMonitor {
                 }
             }
         }
-        let avg_effectiveness = if count > 0 { total_effectiveness / count as f64 } else { 0.5 };
+        let avg_effectiveness = if count > 0 {
+            total_effectiveness / count as f64
+        } else {
+            0.5
+        };
 
         0.7 * avg_grade + 0.3 * avg_effectiveness
     }
@@ -83,8 +88,14 @@ impl SelfReferentialMonitor {
             return adjustments;
         }
 
-        let recent_quality: f64 = self.plan_history.iter().rev().take(3)
-            .map(|r| r.execution_quality).sum::<f64>() / 3.0;
+        let recent_quality: f64 = self
+            .plan_history
+            .iter()
+            .rev()
+            .take(3)
+            .map(|r| r.execution_quality)
+            .sum::<f64>()
+            / 3.0;
 
         if recent_quality >= 0.5 {
             return adjustments;
@@ -148,11 +159,17 @@ impl SelfReferentialMonitor {
 
         let sum_x: f64 = (0..recent.len()).map(|i| i as f64).sum();
         let sum_y: f64 = recent.iter().map(|r| r.execution_quality).sum();
-        let sum_xy: f64 = recent.iter().enumerate().map(|(i, r)| i as f64 * r.execution_quality).sum();
+        let sum_xy: f64 = recent
+            .iter()
+            .enumerate()
+            .map(|(i, r)| i as f64 * r.execution_quality)
+            .sum();
         let sum_x2: f64 = (0..recent.len()).map(|i| (i as f64).powi(2)).sum();
 
         let denom = m * sum_x2 - sum_x * sum_x;
-        if denom.abs() < 1e-12 { return 0.0; }
+        if denom.abs() < 1e-12 {
+            return 0.0;
+        }
 
         (m * sum_xy - sum_x * sum_y) / denom
     }
@@ -178,10 +195,10 @@ impl SelfReferentialMonitor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::silicon_self::SiliconSelfModel;
-    use super::super::thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
     use super::super::reasoning_strategy::StrategyKind;
+    use super::super::silicon_self::SiliconSelfModel;
+    use super::super::thinking_trace::{ReflectionGrade, ThinkingStep, ThinkingTrace};
+    use super::*;
 
     fn make_model_with_grades(grades: &[ReflectionGrade]) -> SiliconSelfModel {
         let mut model = SiliconSelfModel::new();

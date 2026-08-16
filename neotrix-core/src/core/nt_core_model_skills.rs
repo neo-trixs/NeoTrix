@@ -56,11 +56,15 @@ impl ModelSkillRegistry {
     }
 
     pub fn models_by_provider(&self, provider: &str) -> Vec<&ModelCapability> {
-        self.models.values().filter(|m| m.provider == provider).collect()
+        self.models
+            .values()
+            .filter(|m| m.provider == provider)
+            .collect()
     }
 
     pub fn find_by_capability(&self, supports_vision: bool, min_context: usize) -> Vec<String> {
-        self.models.values()
+        self.models
+            .values()
             .filter(|m| m.supports_vision == supports_vision && m.context_window >= min_context)
             .map(|m| m.model_name.clone())
             .collect()
@@ -74,17 +78,53 @@ impl Default for ModelSkillRegistry {
 }
 
 const BUILTIN_MODELS: &[(&str, &str, usize, bool, bool, &[&str])] = &[
-    ("gemma-2-2b-it", "google", 8192, false, false, &["sft", "dpo"]),
-    ("gemma-2-9b-it", "google", 8192, false, false, &["sft", "dpo", "rlhf"]),
-    ("gemma-2-27b-it", "google", 8192, false, false, &["sft", "dpo", "rlhf"]),
-    ("gemma-3-12b-it", "google", 32768, true, false, &["sft", "dpo", "rlhf"]),
-    ("gemma-3-27b-it", "google", 32768, true, false, &["sft", "dpo", "rlhf"]),
+    (
+        "gemma-2-2b-it",
+        "google",
+        8192,
+        false,
+        false,
+        &["sft", "dpo"],
+    ),
+    (
+        "gemma-2-9b-it",
+        "google",
+        8192,
+        false,
+        false,
+        &["sft", "dpo", "rlhf"],
+    ),
+    (
+        "gemma-2-27b-it",
+        "google",
+        8192,
+        false,
+        false,
+        &["sft", "dpo", "rlhf"],
+    ),
+    (
+        "gemma-3-12b-it",
+        "google",
+        32768,
+        true,
+        false,
+        &["sft", "dpo", "rlhf"],
+    ),
+    (
+        "gemma-3-27b-it",
+        "google",
+        32768,
+        true,
+        false,
+        &["sft", "dpo", "rlhf"],
+    ),
     ("gemma-2-2b", "google", 8192, false, false, &["sft", "dpo"]),
 ];
 
 pub static REGISTRY: LazyLock<ModelSkillRegistry> = LazyLock::new(ModelSkillRegistry::new);
 
-static SKILLS: LazyLock<Vec<ModelSkill>> = LazyLock::new(|| vec![
+static SKILLS: LazyLock<Vec<ModelSkill>> = LazyLock::new(|| {
+    vec![
     ModelSkill {
         skill_name: "gemma-dev".to_string(),
         description: "Guidance for building applications with Gemma models, including model selection and integration patterns".to_string(),
@@ -93,7 +133,8 @@ static SKILLS: LazyLock<Vec<ModelSkill>> = LazyLock::new(|| vec![
         skill_name: "gemma-trainer".to_string(),
         description: "Fine-tuning Gemma models with SFT, DPO, RLHF, and reward modeling on local hardware".to_string(),
     },
-]);
+]
+});
 
 pub fn query_model(model_name: &str) -> Option<&'static ModelCapability> {
     REGISTRY.query_model(model_name)

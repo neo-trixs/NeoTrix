@@ -141,11 +141,16 @@ impl QTestIndex {
 
     /// 递归收集目录下所有 .rs 文件。
     fn collect_rs_files(&self, dir: &Path, out: &mut Vec<PathBuf>) {
-        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 if name == "target" || name == ".git" || name == "node_modules" {
                     continue;
                 }
@@ -163,7 +168,9 @@ impl QTestIndex {
             self.collect_rs_files(root, &mut files);
         }
         for file in &files {
-            let Ok(content) = std::fs::read_to_string(file) else { continue };
+            let Ok(content) = std::fs::read_to_string(file) else {
+                continue;
+            };
             let lines: Vec<&str> = content.lines().collect();
             let mut i = 0;
             let mut tests: Vec<String> = Vec::new();
@@ -366,7 +373,11 @@ impl QTestIndex {
         let reason = if low_layer_triggered {
             "低层变更 → 放大为全测试集 (保守)".into()
         } else {
-            format!("纠缠测试坍缩: Δ*={} 文件, 命中 {} 测试文件", closure.len(), entangled_files.len())
+            format!(
+                "纠缠测试坍缩: Δ*={} 文件, 命中 {} 测试文件",
+                closure.len(),
+                entangled_files.len()
+            )
         };
 
         SelectionReport {
@@ -408,7 +419,9 @@ impl crate::core::nt_core_self_test::SelfTest for QTestEngineSelfTest {
         let mut idx = QTestIndex::new(vec![root]);
         let files = idx.build();
         if files == 0 {
-            return Err(vec!["qtest 索引为空: 扫描失效, 量子坍缩将静默回退全量".into()]);
+            return Err(vec![
+                "qtest 索引为空: 扫描失效, 量子坍缩将静默回退全量".into()
+            ]);
         }
         Ok(())
     }
@@ -473,9 +486,18 @@ mod tests {
         let mut idx = QTestIndex::new(vec![src.clone()]);
         idx.build();
         let report = idx.collapse(&changed, None);
-        assert!(!report.fallback_full, "非公共设施不应回退: {}", report.reason);
+        assert!(
+            !report.fallback_full,
+            "非公共设施不应回退: {}",
+            report.reason
+        );
         assert!(report.selected_files.len() >= 2);
-        assert_eq!(report.cargo_filters.len(), 6, "3 函数 + 3 文件级, 实际 {}", report.cargo_filters.len());
+        assert_eq!(
+            report.cargo_filters.len(),
+            6,
+            "3 函数 + 3 文件级, 实际 {}",
+            report.cargo_filters.len()
+        );
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
@@ -501,7 +523,11 @@ mod tests {
         let (src, _) = scaffold(&tmp);
         let infra = src.join("kb/schema.rs");
         std::fs::create_dir_all(src.join("kb")).unwrap();
-        std::fs::write(&infra, "pub fn migrate() {}\n#[cfg(test)]\nmod t { #[test] fn m() {} }\n").unwrap();
+        std::fs::write(
+            &infra,
+            "pub fn migrate() {}\n#[cfg(test)]\nmod t { #[test] fn m() {} }\n",
+        )
+        .unwrap();
         let mut idx = QTestIndex::new(vec![src]);
         idx.build();
         let report = idx.collapse(&[infra], None);

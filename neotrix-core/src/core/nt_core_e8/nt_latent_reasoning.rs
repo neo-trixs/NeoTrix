@@ -218,7 +218,11 @@ impl LatentReasoningPipeline {
     /// Emit the retrieval as a direct GWT attention vector.
     ///
     /// Returns `(weights, bias)` ready for `GlobalWorkspace::set_e8_attention_weights`.
-    pub fn to_gwt_attention(&self, retrieval: &LatentRetrieval, base_bias: f64) -> ([f64; 64], f64) {
+    pub fn to_gwt_attention(
+        &self,
+        retrieval: &LatentRetrieval,
+        base_bias: f64,
+    ) -> ([f64; 64], f64) {
         let bias = base_bias + (1.0 - retrieval.similarities.first().copied().unwrap_or(0.0)) * 0.2;
         let mut arr = [0.0f64; 64];
         for (i, a) in retrieval.attention.iter().enumerate().take(64) {
@@ -269,7 +273,10 @@ mod tests {
         }
         let r = p.query_state(ReasoningHexagram::new(0));
         let sum: f64 = r.attention.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-9, "attention should sum to 1, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-9,
+            "attention should sum to 1, got {sum}"
+        );
         assert!(r.attention[0] > 0.0);
     }
 
@@ -369,13 +376,22 @@ mod tests {
             "attention must normalize to 1, got {sum}"
         );
         // 最近邻 mode 槽位应携带注意力质量
-        assert!(weights[40] > 0.0, "nearest-neighbor slot must carry attention");
+        assert!(
+            weights[40] > 0.0,
+            "nearest-neighbor slot must carry attention"
+        );
 
         // (d) 记忆填充度 > 0 且 <= 1.0
         let fill = p.fill_ratio();
-        assert!(fill > 0.0 && fill <= 1.0, "fill_ratio must be in (0,1], got {fill}");
+        assert!(
+            fill > 0.0 && fill <= 1.0,
+            "fill_ratio must be in (0,1], got {fill}"
+        );
         // 记录 8 条 / 默认容量 256 → 填充度约为 8/256
-        assert!((fill - 8.0 / LATENT_MEMORY_SIZE as f64).abs() < 1e-9, "fill_ratio mismatch: {fill}");
+        assert!(
+            (fill - 8.0 / LATENT_MEMORY_SIZE as f64).abs() < 1e-9,
+            "fill_ratio mismatch: {fill}"
+        );
 
         // 查询计数递增 (生产接线侧证据)
         assert_eq!(p.queries_served, 1);
@@ -388,13 +404,26 @@ mod tests {
         p.record(ReasoningHexagram::new(8), 0.5, "seal");
         p.record(ReasoningHexagram::new(9), 0.5, "seal");
 
-        let before = p.memory.iter().find(|e| e.mode == 8).map(|e| e.outcome).unwrap();
+        let before = p
+            .memory
+            .iter()
+            .find(|e| e.mode == 8)
+            .map(|e| e.outcome)
+            .unwrap();
         let r = p.query_state(ReasoningHexagram::new(8));
-        assert!(r.attention[8] > 0.0, "attended mode must carry attention mass");
+        assert!(
+            r.attention[8] > 0.0,
+            "attended mode must carry attention mass"
+        );
 
         let updated = p.apply_feedback(&r);
         assert!(updated >= 1, "feedback must update attended entries");
-        let after = p.memory.iter().find(|e| e.mode == 8).map(|e| e.outcome).unwrap();
+        let after = p
+            .memory
+            .iter()
+            .find(|e| e.mode == 8)
+            .map(|e| e.outcome)
+            .unwrap();
         assert!(
             after > before,
             "attended state outcome must strengthen: {before:.3} -> {after:.3}"
@@ -413,8 +442,18 @@ mod tests {
             "attended mode must carry more attention than distant mode"
         );
         let updated = p.apply_feedback(&r);
-        let m3 = p.memory.iter().find(|e| e.mode == 3).map(|e| e.outcome).unwrap();
-        let m40 = p.memory.iter().find(|e| e.mode == 40).map(|e| e.outcome).unwrap();
+        let m3 = p
+            .memory
+            .iter()
+            .find(|e| e.mode == 3)
+            .map(|e| e.outcome)
+            .unwrap();
+        let m40 = p
+            .memory
+            .iter()
+            .find(|e| e.mode == 40)
+            .map(|e| e.outcome)
+            .unwrap();
         assert!(
             m40 - 0.4 > m3 - 0.4,
             "attended state must strengthen more than unattended: 40={m40:.4} vs 3={m3:.4}"
@@ -429,7 +468,12 @@ mod tests {
         p.record(ReasoningHexagram::new(20), 0.6, "seal");
         let r = p.query_state(ReasoningHexagram::new(20));
         p.apply_feedback(&r);
-        let m = p.memory.iter().find(|e| e.mode == 20).map(|e| e.outcome).unwrap();
+        let m = p
+            .memory
+            .iter()
+            .find(|e| e.mode == 20)
+            .map(|e| e.outcome)
+            .unwrap();
         assert!((m - 0.6).abs() < 1e-9, "rate 0 must not change outcome");
         assert_eq!(p.feedback_applied, 0);
     }
@@ -443,7 +487,12 @@ mod tests {
             let r = p.query_state(ReasoningHexagram::new(50));
             p.apply_feedback(&r);
         }
-        let final_outcome = p.memory.iter().find(|e| e.mode == 50).map(|e| e.outcome).unwrap();
+        let final_outcome = p
+            .memory
+            .iter()
+            .find(|e| e.mode == 50)
+            .map(|e| e.outcome)
+            .unwrap();
         assert!(
             final_outcome > 0.5,
             "repeated attention must strengthen outcome well above 0.2, got {final_outcome:.3}"

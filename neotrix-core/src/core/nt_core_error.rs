@@ -2,9 +2,9 @@
 //!
 //! 定义在 core 层以防 L7/L5/L4 模块因依赖此类型而反向引用 neotrix 层。
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 
 /// NeoTrix 统一错误枚举
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,8 +16,15 @@ pub enum NeoTrixError {
     Mcp(String),
     Brain(String),
     Memory(String),
-    Command { cmd: String, exit_code: Option<i32>, stderr: String },
-    Path { path: PathBuf, detail: String },
+    Command {
+        cmd: String,
+        exit_code: Option<i32>,
+        stderr: String,
+    },
+    Path {
+        path: PathBuf,
+        detail: String,
+    },
     Unimplemented(String),
     Wasm(String),
     Crypto(String),
@@ -50,7 +57,11 @@ impl fmt::Display for NeoTrixError {
             NeoTrixError::Mcp(msg) => write!(f, "MCP 错误: {}", msg),
             NeoTrixError::Brain(msg) => write!(f, "Brain 错误: {}", msg),
             NeoTrixError::Memory(msg) => write!(f, "记忆错误: {}", msg),
-            NeoTrixError::Command { cmd, exit_code, stderr } => {
+            NeoTrixError::Command {
+                cmd,
+                exit_code,
+                stderr,
+            } => {
                 write!(f, "命令执行失败 [{}] exit={:?}: {}", cmd, exit_code, stderr)
             }
             NeoTrixError::Path { path, detail } => {
@@ -68,22 +79,28 @@ impl fmt::Display for NeoTrixError {
             NeoTrixError::NotImplemented(msg) => write!(f, "未实现: {}", msg),
             NeoTrixError::OperationFailed(msg) => write!(f, "操作失败: {}", msg),
             NeoTrixError::SafetyViolation(msg) => write!(f, "安全违规: {}", msg),
-}
+        }
     }
 }
 
 impl std::error::Error for NeoTrixError {}
 
 impl From<std::io::Error> for NeoTrixError {
-    fn from(err: std::io::Error) -> Self { NeoTrixError::Io(err.to_string()) }
+    fn from(err: std::io::Error) -> Self {
+        NeoTrixError::Io(err.to_string())
+    }
 }
 
 impl From<String> for NeoTrixError {
-    fn from(msg: String) -> Self { NeoTrixError::Brain(msg) }
+    fn from(msg: String) -> Self {
+        NeoTrixError::Brain(msg)
+    }
 }
 
 impl From<&str> for NeoTrixError {
-    fn from(msg: &str) -> Self { NeoTrixError::Brain(msg.to_string()) }
+    fn from(msg: &str) -> Self {
+        NeoTrixError::Brain(msg.to_string())
+    }
 }
 
 pub type NeoTrixResult<T> = Result<T, NeoTrixError>;
@@ -142,7 +159,7 @@ mod tests {
         let io = std::io::Error::new(std::io::ErrorKind::Other, "io error");
         let e: NeoTrixError = io.into();
         match e {
-            NeoTrixError::Io(_) => {},
+            NeoTrixError::Io(_) => {}
             _ => panic!("expected Io variant"),
         }
     }
@@ -172,7 +189,15 @@ mod tests {
         // pi-agent steer (缺陷②): Steer 变体是可显示的错误, 携带重定向建议。
         let e = NeoTrixError::Steer("保留进度, 请重定向任务目标".into());
         let s = e.to_string();
-        assert!(s.contains("steer 重定向"), "display 应含 steer 标记, got: {}", s);
-        assert!(s.contains("重定向任务目标"), "display 应含建议内容, got: {}", s);
+        assert!(
+            s.contains("steer 重定向"),
+            "display 应含 steer 标记, got: {}",
+            s
+        );
+        assert!(
+            s.contains("重定向任务目标"),
+            "display 应含建议内容, got: {}",
+            s
+        );
     }
 }

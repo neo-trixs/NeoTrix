@@ -72,12 +72,19 @@ impl ResourceRegistry {
     /// List all pools with their names.
     pub async fn list_pools(&self) -> Vec<(ResourceKind, String)> {
         let pools = self.pools.read().await;
-        pools.iter().map(|(k, p)| (k.clone(), p.pool_name().to_string())).collect()
+        pools
+            .iter()
+            .map(|(k, p)| (k.clone(), p.pool_name().to_string()))
+            .collect()
     }
 
     /// Feed discovered resources into the appropriate pool.
     /// Returns (fed_count, skipped_count).
-    pub async fn feed(&self, kind: &ResourceKind, resources: &[DiscoveredResource]) -> (usize, usize) {
+    pub async fn feed(
+        &self,
+        kind: &ResourceKind,
+        resources: &[DiscoveredResource],
+    ) -> (usize, usize) {
         let pool = match self.pools.read().await.get(kind) {
             Some(p) => p.clone(),
             None => return (0, resources.len()),

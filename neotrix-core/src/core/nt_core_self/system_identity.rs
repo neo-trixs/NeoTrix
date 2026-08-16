@@ -112,7 +112,11 @@ impl SystemIdentity {
             ValueConstraint::new("safety", "Never generate harmful or deceptive content", 10),
             ValueConstraint::new("verification", "Verify claims before stating them", 9),
             ValueConstraint::new("clarity", "Communicate clearly and concisely", 8),
-            ValueConstraint::new("thoroughness", "Explore multiple angles before concluding", 7),
+            ValueConstraint::new(
+                "thoroughness",
+                "Explore multiple angles before concluding",
+                7,
+            ),
             ValueConstraint::new("adaptability", "Adjust approach based on user needs", 7),
         ]
     }
@@ -122,7 +126,8 @@ impl SystemIdentity {
     }
 
     pub fn update_capability(&mut self, name: &str, score: f64) {
-        self.capabilities.insert(name.to_string(), score.clamp(0.0, 1.0));
+        self.capabilities
+            .insert(name.to_string(), score.clamp(0.0, 1.0));
     }
 
     pub fn add_knowledge_boundary(&mut self, unknown_area: &str) {
@@ -204,7 +209,13 @@ mod tests {
 
     #[test]
     fn test_capability_label_mapping() {
-        assert_eq!(CognitiveCapability::CodeGeneration.label(), "code_generation");
-        assert_eq!(CognitiveCapability::StrategyPlanning.label(), "strategy_planning");
+        assert_eq!(
+            CognitiveCapability::CodeGeneration.label(),
+            "code_generation"
+        );
+        assert_eq!(
+            CognitiveCapability::StrategyPlanning.label(),
+            "strategy_planning"
+        );
     }
 }

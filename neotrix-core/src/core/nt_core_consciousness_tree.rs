@@ -1,8 +1,8 @@
 #![deny(clippy::unwrap_used)]
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 
 /// ConsciousnessTree — 意识树全景图
 ///
@@ -29,8 +29,7 @@ pub struct ConsciousnessTree {
     pub vuln_baseline: Option<usize>,
 }
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DataFoundation {
     pub kb_node_count: u64,
     pub kb_edge_count: u64,
@@ -72,9 +71,9 @@ pub struct InformationRoots {
     pub total_fetched: u64,
     pub total_failed: u64,
     // Constitution internalization
-    pub internalized_principles: Vec<String>,  // Key principle summaries
-    pub active_rule_categories: Vec<String>,   // Active rule category names
-    pub compliance_score: f64,                 // Last compliance check score
+    pub internalized_principles: Vec<String>, // Key principle summaries
+    pub active_rule_categories: Vec<String>,  // Active rule category names
+    pub compliance_score: f64,                // Last compliance check score
 }
 
 #[derive(Debug, Clone)]
@@ -221,7 +220,11 @@ impl NodeTier {
     /// - 跨域消费者多 + 模块数大 → Keystone
     /// - 模块数中上 → NotablePassive
     /// - 其余 → SmallPassive
-    pub fn derive(module_count: usize, cross_domain_consumers: usize, self_test_count: usize) -> Self {
+    pub fn derive(
+        module_count: usize,
+        cross_domain_consumers: usize,
+        self_test_count: usize,
+    ) -> Self {
         let keystone = module_count >= 20 && cross_domain_consumers >= 3 && self_test_count >= 3;
         let notable = module_count >= 8 && cross_domain_consumers >= 1 && self_test_count >= 2;
         if keystone {
@@ -307,8 +310,16 @@ impl RuneSocket {
     }
 
     pub fn filled_slots(&self) -> usize {
-        [&self.crimson, &self.indigo, &self.obsidian, &self.golden, &self.alabaster]
-            .iter().filter(|s| s.is_some()).count()
+        [
+            &self.crimson,
+            &self.indigo,
+            &self.obsidian,
+            &self.golden,
+            &self.alabaster,
+        ]
+        .iter()
+        .filter(|s| s.is_some())
+        .count()
     }
 
     /// Runeword 涌现: 满 5 槽触发组合效果, 返回组合名
@@ -324,11 +335,23 @@ impl RuneSocket {
     /// 组合效果强度: 槽数 × 平均 strength, 用于 health 折算
     pub fn composite_effect(&self) -> f64 {
         let slots = [
-            &self.crimson, &self.indigo, &self.obsidian, &self.golden, &self.alabaster,
+            &self.crimson,
+            &self.indigo,
+            &self.obsidian,
+            &self.golden,
+            &self.alabaster,
         ];
-        let sum: f64 = slots.iter().filter_map(|s| s.as_ref()).map(|r| r.strength).sum();
+        let sum: f64 = slots
+            .iter()
+            .filter_map(|s| s.as_ref())
+            .map(|r| r.strength)
+            .sum();
         let filled = self.filled_slots();
-        if filled == 0 { 0.0 } else { sum / filled as f64 }
+        if filled == 0 {
+            0.0
+        } else {
+            sum / filled as f64
+        }
     }
 }
 
@@ -376,9 +399,30 @@ impl Constellation {
     /// C3 (D3): 新增 `adaptive` 输入 — 此前六 bool 恒定 `c6_adaptive: false`,
     /// C6 在树模型永不晋升。adaptive 由真实自适应证据注入 (Phase 8 反馈 /
     /// 果实趋势), 使 C6 可达。
-    pub fn derive(compiles: bool, unit: bool, integration: bool, benchmark: bool, pipeline: bool, healing: bool, adaptive: bool) -> Self {
-        let flags = [compiles, unit, integration, benchmark, pipeline, healing, adaptive];
-        let level = flags.iter().rev().position(|&f| f).map(|i| 6 - i).unwrap_or(0) as u8;
+    pub fn derive(
+        compiles: bool,
+        unit: bool,
+        integration: bool,
+        benchmark: bool,
+        pipeline: bool,
+        healing: bool,
+        adaptive: bool,
+    ) -> Self {
+        let flags = [
+            compiles,
+            unit,
+            integration,
+            benchmark,
+            pipeline,
+            healing,
+            adaptive,
+        ];
+        let level = flags
+            .iter()
+            .rev()
+            .position(|&f| f)
+            .map(|i| 6 - i)
+            .unwrap_or(0) as u8;
         Self {
             level,
             c0_compiles: compiles,
@@ -393,19 +437,35 @@ impl Constellation {
 
     pub fn score(&self) -> f64 {
         let mut s = 0.0;
-        if self.c0_compiles { s += 1.0; }
-        if self.c1_unit_tests { s += 1.0; }
-        if self.c2_integration { s += 1.0; }
-        if self.c3_benchmark { s += 1.0; }
-        if self.c4_pipeline { s += 1.0; }
-        if self.c5_self_healing { s += 1.0; }
-        if self.c6_adaptive { s += 1.0; }
+        if self.c0_compiles {
+            s += 1.0;
+        }
+        if self.c1_unit_tests {
+            s += 1.0;
+        }
+        if self.c2_integration {
+            s += 1.0;
+        }
+        if self.c3_benchmark {
+            s += 1.0;
+        }
+        if self.c4_pipeline {
+            s += 1.0;
+        }
+        if self.c5_self_healing {
+            s += 1.0;
+        }
+        if self.c6_adaptive {
+            s += 1.0;
+        }
         s / 7.0
     }
 }
 
 impl Default for Constellation {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// 迷雾浓度 — 节点未被生产验证的程度。[0,1]，0=全清晰 1=全雾。
@@ -493,18 +553,34 @@ pub struct NodeSnapshot {
 impl CapabilityBranch {
     pub fn maturity_score(&self) -> f64 {
         let mut s = 0.0;
-        if self.maturity_c0 { s += 1.0; }
-        if self.maturity_c1 { s += 1.0; }
-        if self.maturity_c2 { s += 1.0; }
-        if self.maturity_c3 { s += 1.0; }
-        if self.maturity_c4 { s += 1.0; }
-        if self.maturity_c5 { s += 1.0; }
+        if self.maturity_c0 {
+            s += 1.0;
+        }
+        if self.maturity_c1 {
+            s += 1.0;
+        }
+        if self.maturity_c2 {
+            s += 1.0;
+        }
+        if self.maturity_c3 {
+            s += 1.0;
+        }
+        if self.maturity_c4 {
+            s += 1.0;
+        }
+        if self.maturity_c5 {
+            s += 1.0;
+        }
         s / 6.0
     }
 
     /// 运行时评估节点层级 — 基于真实模块数据 (跨域消费者由外部注入)
     pub fn evaluate_node_tier(&mut self, cross_domain_consumers: usize) {
-        self.node_tier = NodeTier::derive(self.module_count, cross_domain_consumers, self.self_test_count);
+        self.node_tier = NodeTier::derive(
+            self.module_count,
+            cross_domain_consumers,
+            self.self_test_count,
+        );
     }
 
     /// 运行时推导 Constellation — 从现有 maturity 布尔派生 (向后兼容)。
@@ -557,26 +633,50 @@ impl CapabilityBranch {
 /// Used to prevent redundant skill creation (SkillPyramid pattern).
 pub const ALL_CAPABILITIES: &[(&str, &str); 36] = &[
     // PERCEIVE (4) → NT-WORLD
-    ("retrieve", "world"), ("search", "world"), ("observe", "world"), ("receive", "world"),
+    ("retrieve", "world"),
+    ("search", "world"),
+    ("observe", "world"),
+    ("receive", "world"),
     // UNDERSTAND (6) → NT-CORE
-    ("detect", "core"), ("classify", "core"), ("measure", "core"), ("predict", "core"),
-    ("compare", "core"), ("discover", "core"),
+    ("detect", "core"),
+    ("classify", "core"),
+    ("measure", "core"),
+    ("predict", "core"),
+    ("compare", "core"),
+    ("discover", "core"),
     // REASON (4) → NT-CORE
-    ("plan", "core"), ("decompose", "core"), ("critique", "core"), ("explain", "core"),
+    ("plan", "core"),
+    ("decompose", "core"),
+    ("critique", "core"),
+    ("explain", "core"),
     // MODEL (5) → NT-MEMORY
-    ("state", "memory"), ("transition", "memory"), ("attribute", "memory"),
-    ("ground", "memory"), ("simulate", "memory"),
+    ("state", "memory"),
+    ("transition", "memory"),
+    ("attribute", "memory"),
+    ("ground", "memory"),
+    ("simulate", "memory"),
     // SYNTHESIZE (3) → NT-MIND
-    ("generate", "mind"), ("transform", "mind"), ("integrate", "mind"),
+    ("generate", "mind"),
+    ("transform", "mind"),
+    ("integrate", "mind"),
     // EXECUTE (3) → NT-ACT
-    ("execute", "act"), ("mutate", "act"), ("send", "act"),
+    ("execute", "act"),
+    ("mutate", "act"),
+    ("send", "act"),
     // VERIFY (5) → NT-SHIELD
-    ("verify", "shield"), ("checkpoint", "shield"), ("rollback", "shield"),
-    ("constrain", "shield"), ("audit", "shield"),
+    ("verify", "shield"),
+    ("checkpoint", "shield"),
+    ("rollback", "shield"),
+    ("constrain", "shield"),
+    ("audit", "shield"),
     // REMEMBER (2) → NT-MEMORY
-    ("persist", "memory"), ("recall", "memory"),
+    ("persist", "memory"),
+    ("recall", "memory"),
     // COORDINATE (4) → NT-IO
-    ("delegate", "io"), ("synchronize", "io"), ("invoke", "io"), ("inquire", "io"),
+    ("delegate", "io"),
+    ("synchronize", "io"),
+    ("invoke", "io"),
+    ("inquire", "io"),
 ];
 
 #[derive(Debug, Clone)]
@@ -786,13 +886,22 @@ impl BranchConstraints {
     pub fn violations(&self, branch: &CapabilityBranch) -> Vec<String> {
         let mut v = Vec::new();
         if branch.health < self.min_growth_health || branch.fruit_count == 0 {
-            v.push(format!("idle: health={:.2} fruit={}", branch.health, branch.fruit_count));
+            v.push(format!(
+                "idle: health={:.2} fruit={}",
+                branch.health, branch.fruit_count
+            ));
         }
         if branch.module_count < self.min_required_modules {
-            v.push(format!("not viable: {} modules < min={}", branch.module_count, self.min_required_modules));
+            v.push(format!(
+                "not viable: {} modules < min={}",
+                branch.module_count, self.min_required_modules
+            ));
         }
         if branch.self_test_count < self.min_self_tests {
-            v.push(format!("unmonitored: {} self-tests < min={}", branch.self_test_count, self.min_self_tests));
+            v.push(format!(
+                "unmonitored: {} self-tests < min={}",
+                branch.self_test_count, self.min_self_tests
+            ));
         }
         v
     }
@@ -801,48 +910,81 @@ impl BranchConstraints {
 pub fn constraints_for_branch(kind: &BranchKind) -> BranchConstraints {
     match kind {
         BranchKind::Core => BranchConstraints {
-            idle_ticks_threshold: 3, min_growth_health: 0.4, max_active_modules: 30,
-            min_required_modules: 3, min_self_tests: 3,
+            idle_ticks_threshold: 3,
+            min_growth_health: 0.4,
+            max_active_modules: 30,
+            min_required_modules: 3,
+            min_self_tests: 3,
         },
         BranchKind::Mind => BranchConstraints {
-            idle_ticks_threshold: 5, min_growth_health: 0.3, max_active_modules: 25,
-            min_required_modules: 2, min_self_tests: 2,
+            idle_ticks_threshold: 5,
+            min_growth_health: 0.3,
+            max_active_modules: 25,
+            min_required_modules: 2,
+            min_self_tests: 2,
         },
         BranchKind::Memory => BranchConstraints {
-            idle_ticks_threshold: 4, min_growth_health: 0.35, max_active_modules: 20,
-            min_required_modules: 2, min_self_tests: 2,
+            idle_ticks_threshold: 4,
+            min_growth_health: 0.35,
+            max_active_modules: 20,
+            min_required_modules: 2,
+            min_self_tests: 2,
         },
         BranchKind::World => BranchConstraints {
-            idle_ticks_threshold: 6, min_growth_health: 0.25, max_active_modules: 30,
-            min_required_modules: 2, min_self_tests: 2,
+            idle_ticks_threshold: 6,
+            min_growth_health: 0.25,
+            max_active_modules: 30,
+            min_required_modules: 2,
+            min_self_tests: 2,
         },
         BranchKind::Act => BranchConstraints {
-            idle_ticks_threshold: 5, min_growth_health: 0.3, max_active_modules: 25,
-            min_required_modules: 1, min_self_tests: 1,
+            idle_ticks_threshold: 5,
+            min_growth_health: 0.3,
+            max_active_modules: 25,
+            min_required_modules: 1,
+            min_self_tests: 1,
         },
         BranchKind::Io => BranchConstraints {
-            idle_ticks_threshold: 4, min_growth_health: 0.35, max_active_modules: 20,
-            min_required_modules: 1, min_self_tests: 1,
+            idle_ticks_threshold: 4,
+            min_growth_health: 0.35,
+            max_active_modules: 20,
+            min_required_modules: 1,
+            min_self_tests: 1,
         },
         BranchKind::Shield => BranchConstraints {
-            idle_ticks_threshold: 3, min_growth_health: 0.4, max_active_modules: 20,
-            min_required_modules: 2, min_self_tests: 2,
+            idle_ticks_threshold: 3,
+            min_growth_health: 0.4,
+            max_active_modules: 20,
+            min_required_modules: 2,
+            min_self_tests: 2,
         },
         BranchKind::Meta => BranchConstraints {
-            idle_ticks_threshold: 4, min_growth_health: 0.35, max_active_modules: 15,
-            min_required_modules: 1, min_self_tests: 1,
+            idle_ticks_threshold: 4,
+            min_growth_health: 0.35,
+            max_active_modules: 15,
+            min_required_modules: 1,
+            min_self_tests: 1,
         },
         BranchKind::Repair => BranchConstraints {
-            idle_ticks_threshold: 3, min_growth_health: 0.3, max_active_modules: 15,
-            min_required_modules: 1, min_self_tests: 1,
+            idle_ticks_threshold: 3,
+            min_growth_health: 0.3,
+            max_active_modules: 15,
+            min_required_modules: 1,
+            min_self_tests: 1,
         },
         BranchKind::Governance => BranchConstraints {
-            idle_ticks_threshold: 4, min_growth_health: 0.4, max_active_modules: 15,
-            min_required_modules: 1, min_self_tests: 1,
+            idle_ticks_threshold: 4,
+            min_growth_health: 0.4,
+            max_active_modules: 15,
+            min_required_modules: 1,
+            min_self_tests: 1,
         },
         BranchKind::Nexus => BranchConstraints {
-            idle_ticks_threshold: 5, min_growth_health: 0.35, max_active_modules: 15,
-            min_required_modules: 1, min_self_tests: 1,
+            idle_ticks_threshold: 5,
+            min_growth_health: 0.35,
+            max_active_modules: 15,
+            min_required_modules: 1,
+            min_self_tests: 1,
         },
     }
 }
@@ -862,19 +1004,19 @@ impl ConsciousnessTree {
     fn load_internalized_principles(&mut self) -> Vec<String> {
         use crate::core::nt_core_self_constitution::global_constitution;
         let constitution = global_constitution();
-        
+
         let mut principles = Vec::new();
-        
+
         // 加载 Tree Growth 规则 (R-P42~R-P48) — 最高优先级架构原则
         for rule in constitution.tree_growth_rules() {
             principles.push(format!("{}: {}", rule.id, rule.content));
         }
-        
+
         // 加载 Absorption 规则 (R-P43) — 外部设计吸收协议
         for rule in constitution.absorption_rules() {
             principles.push(format!("{}: {}", rule.id, rule.content));
         }
-        
+
         // 回退: 若 Constitution 为空/不可用, 使用硬编码默认原则 (R-P42~R-P48 浓缩)
         if principles.is_empty() {
             principles = vec![
@@ -888,7 +1030,7 @@ impl ConsciousnessTree {
                 "Self-Referential Audit: Audit protocol must audit itself for open-ended evolution".into(),
             ];
         }
-        
+
         principles
     }
 
@@ -898,7 +1040,10 @@ impl ConsciousnessTree {
             soil: DataFoundation::default(),
             roots: InformationRoots::default(),
             trunk: ConsciousnessCore::default(),
-            branches: BranchKind::all().into_iter().map(|k| (k.clone(), CapabilityBranch::new(k))).collect(),
+            branches: BranchKind::all()
+                .into_iter()
+                .map(|k| (k.clone(), CapabilityBranch::new(k)))
+                .collect(),
             leaves: Vec::new(),
             fruits: Vec::new(),
             core: EpiphanicCore::default(),
@@ -942,24 +1087,49 @@ impl ConsciousnessTree {
         // 蜕皮养料 (C5 自愈闭环): 蜕皮归档量饱和曲线 (20 旧躯壳达 +5%)
         // 自愈动作 (旧躯壳→_archive) 反馈为养料 — 行为影响果实, 非仅日志。
         let molt_nourish = (self.soil.molt_archived_count as f64 / 20.0).min(0.05);
-        1.0 + kb_nourish + kb_edge + kb_embed + conv_nourish + exp_nourish + cap_nourish + molt_nourish
+        1.0 + kb_nourish
+            + kb_edge
+            + kb_embed
+            + conv_nourish
+            + exp_nourish
+            + cap_nourish
+            + molt_nourish
     }
 
     /// 闭环进化反馈 (意识核心自我运转 Phase 8)。
     /// 把进化产出 (契约 fulfillment + drift + 演化预测) 反馈到进化参数:
-    /// - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.8)
+    /// - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.6;
+    ///   且仅当 MARS bridge 有命中时上调, 防棘轮反噬)
     /// - drift 检测 → fruit_growth_health 下调 (放宽生长门加速恢复, -0.05, 下限 0.4)
     /// - 演化预测利多 (direction>0) → exploration_budget 上调 (加大探索, +0.05, 上限 0.4)
     /// - 演化预测利空 (direction<0) → exploration_budget 下调 (收缩探索, -0.05, 下限 0.1)
     ///
     /// 使树根据自身进化结果调整进化策略, 形成闭环而非开环。
     pub fn apply_evolution_feedback(&mut self) {
-        let fulfilled = self.core.contract_fulfillment.as_ref().map(|f| f.fulfilled).unwrap_or(false);
-        let drift = self.core.drift_report.as_ref().map(|d| d.drift_detected).unwrap_or(false);
+        let fulfilled = self
+            .core
+            .contract_fulfillment
+            .as_ref()
+            .map(|f| f.fulfilled)
+            .unwrap_or(false);
+        let drift = self
+            .core
+            .drift_report
+            .as_ref()
+            .map(|d| d.drift_detected)
+            .unwrap_or(false);
         if fulfilled && !drift {
-            // 进化成功: 提升标准, 恢复生长门
-            self.config.fruit_quality_threshold = (self.config.fruit_quality_threshold + 0.05).min(0.8);
+            // 恢复生长门 (恢复机制, 不受桥接门控)
             self.config.fruit_growth_health = 0.5;
+            // 棘轮防反噬 (MARS bridge 命中率提升): 进化标准上调仅当 S2 意图被 S1
+            // 消化过 (mars_bridge_hits > 0)。桥接从未命中 (0) 时上调只会让达标果实
+            // 更少, 进一步压低桥接命中率 — 形成死锁, 不再上调。
+            // 上限 0.8 → 0.6: 0.8 阈值会把 quality 0.6-0.8 区间的果实整批拒之门外,
+            // 收窄到几乎无果实可消化。
+            if self.trunk.mars_bridge_hits > 0 {
+                self.config.fruit_quality_threshold =
+                    (self.config.fruit_quality_threshold + 0.05).min(0.6);
+            }
         } else if drift {
             // 漂移: 放宽生长门加速恢复
             self.config.fruit_growth_health = (self.config.fruit_growth_health - 0.05).max(0.4);
@@ -1042,7 +1212,8 @@ impl ConsciousnessTree {
             // 合规率 = 1 - 加权违规 / 检查项 (钳到 [0,1])
             let compliance = (1.0 - weighted_violations / checked_count as f64).clamp(0.0, 1.0);
             // 平滑过渡: 新值 = 0.7*旧值 + 0.3*实测 (防单周期剧烈抖动)
-            self.trunk.governance_compliance = 0.7 * self.trunk.governance_compliance + 0.3 * compliance;
+            self.trunk.governance_compliance =
+                0.7 * self.trunk.governance_compliance + 0.3 * compliance;
             self.trunk.governance_constitution_count = checked_rules.len();
             self.trunk.governance_fractal_depth += 1;
             log::debug!(
@@ -1059,166 +1230,214 @@ impl ConsciousnessTree {
     /// Initialize 36 atomic capabilities (9 categories × domains) from PerceptionBench + MCA 36-cap
     fn initialize_capability_atoms() -> HashMap<String, CapabilityAtom> {
         let mut atoms = HashMap::new();
-        
+
         // PERCEIVE (4) → NT-WORLD
-        for (name, cap) in [("retrieve", CapabilityCategory::Perceive), 
-                             ("search", CapabilityCategory::Perceive),
-                             ("observe", CapabilityCategory::Perceive),
-                             ("receive", CapabilityCategory::Perceive)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::World,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("retrieve", CapabilityCategory::Perceive),
+            ("search", CapabilityCategory::Perceive),
+            ("observe", CapabilityCategory::Perceive),
+            ("receive", CapabilityCategory::Perceive),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::World,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // UNDERSTAND (6) → NT-CORE
-        for (name, cap) in [("detect", CapabilityCategory::Understand),
-                             ("classify", CapabilityCategory::Understand),
-                             ("measure", CapabilityCategory::Understand),
-                             ("predict", CapabilityCategory::Understand),
-                             ("compare", CapabilityCategory::Understand),
-                             ("discover", CapabilityCategory::Understand)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Core,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("detect", CapabilityCategory::Understand),
+            ("classify", CapabilityCategory::Understand),
+            ("measure", CapabilityCategory::Understand),
+            ("predict", CapabilityCategory::Understand),
+            ("compare", CapabilityCategory::Understand),
+            ("discover", CapabilityCategory::Understand),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Core,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // REASON (4) → NT-CORE
-        for (name, cap) in [("plan", CapabilityCategory::Reason),
-                             ("decompose", CapabilityCategory::Reason),
-                             ("critique", CapabilityCategory::Reason),
-                             ("explain", CapabilityCategory::Reason)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Core,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("plan", CapabilityCategory::Reason),
+            ("decompose", CapabilityCategory::Reason),
+            ("critique", CapabilityCategory::Reason),
+            ("explain", CapabilityCategory::Reason),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Core,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // MODEL (5) → NT-MEMORY
-        for (name, cap) in [("state", CapabilityCategory::Model),
-                             ("transition", CapabilityCategory::Model),
-                             ("attribute", CapabilityCategory::Model),
-                             ("ground", CapabilityCategory::Model),
-                             ("simulate", CapabilityCategory::Model)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Memory,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("state", CapabilityCategory::Model),
+            ("transition", CapabilityCategory::Model),
+            ("attribute", CapabilityCategory::Model),
+            ("ground", CapabilityCategory::Model),
+            ("simulate", CapabilityCategory::Model),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Memory,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // SYNTHESIZE (3) → NT-MIND
-        for (name, cap) in [("generate", CapabilityCategory::Synthesize),
-                             ("transform", CapabilityCategory::Synthesize),
-                             ("integrate", CapabilityCategory::Synthesize)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Mind,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("generate", CapabilityCategory::Synthesize),
+            ("transform", CapabilityCategory::Synthesize),
+            ("integrate", CapabilityCategory::Synthesize),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Mind,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // EXECUTE (3) → NT-ACT
-        for (name, cap) in [("execute", CapabilityCategory::Execute),
-                             ("mutate", CapabilityCategory::Execute),
-                             ("send", CapabilityCategory::Execute)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Act,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("execute", CapabilityCategory::Execute),
+            ("mutate", CapabilityCategory::Execute),
+            ("send", CapabilityCategory::Execute),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Act,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // VERIFY (5) → NT-SHIELD
-        for (name, cap) in [("verify", CapabilityCategory::Verify),
-                             ("checkpoint", CapabilityCategory::Verify),
-                             ("rollback", CapabilityCategory::Verify),
-                             ("constrain", CapabilityCategory::Verify),
-                             ("audit", CapabilityCategory::Verify)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Shield,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("verify", CapabilityCategory::Verify),
+            ("checkpoint", CapabilityCategory::Verify),
+            ("rollback", CapabilityCategory::Verify),
+            ("constrain", CapabilityCategory::Verify),
+            ("audit", CapabilityCategory::Verify),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Shield,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // REMEMBER (2) → NT-MEMORY
-        for (name, cap) in [("persist", CapabilityCategory::Remember),
-                             ("recall", CapabilityCategory::Remember)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Memory,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("persist", CapabilityCategory::Remember),
+            ("recall", CapabilityCategory::Remember),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Memory,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         // COORDINATE (4) → NT-IO
-        for (name, cap) in [("delegate", CapabilityCategory::Coordinate),
-                             ("synchronize", CapabilityCategory::Coordinate),
-                             ("invoke", CapabilityCategory::Coordinate),
-                             ("inquire", CapabilityCategory::Coordinate)] {
-            atoms.insert(name.to_string(), CapabilityAtom {
-                name: name.to_string(),
-                branch: BranchKind::Io,
-                category: cap,
-                tier: SelfTestTier::T1Existence,
-                self_test_fn: Some(format!("test_{}", name)),
-                last_score: 0.0,
-                generation: 0,
-                mandatory: true,
-            });
+        for (name, cap) in [
+            ("delegate", CapabilityCategory::Coordinate),
+            ("synchronize", CapabilityCategory::Coordinate),
+            ("invoke", CapabilityCategory::Coordinate),
+            ("inquire", CapabilityCategory::Coordinate),
+        ] {
+            atoms.insert(
+                name.to_string(),
+                CapabilityAtom {
+                    name: name.to_string(),
+                    branch: BranchKind::Io,
+                    category: cap,
+                    tier: SelfTestTier::T1Existence,
+                    self_test_fn: Some(format!("test_{}", name)),
+                    last_score: 0.0,
+                    generation: 0,
+                    mandatory: true,
+                },
+            );
         }
-        
+
         atoms
     }
 
     /// Apply emotion report valence/arousal to Soil state for next cycle.
     /// Uses confidence to boost coil health and frustration/urgency to indicate stress.
-    pub fn apply_emotion_report(&mut self, report: crate::core::nt_core_self::emotion_state::EmotionReport) {
+    pub fn apply_emotion_report(
+        &mut self,
+        report: crate::core::nt_core_self::emotion_state::EmotionReport,
+    ) {
         // 情绪作为主观调制叠加在真实计算相干性之上 (D4): 不再全量覆盖。
         // 真实 coherence 来自 compute_coherence (分支一致性/谐振/合规/迷雾);
         // valence 仅作为 ±0.2 的主观偏差调制, 使运行时主观信号可见而不过度遮蔽。
@@ -1264,7 +1483,11 @@ impl ConsciousnessTree {
         if win == 0 {
             return Vec::with_capacity(dims);
         }
-        let step = if win > 1 { (win as f64 - 1.0) / (dims as f64) } else { 0.0 };
+        let step = if win > 1 {
+            (win as f64 - 1.0) / (dims as f64)
+        } else {
+            0.0
+        };
         let mut state = Vec::with_capacity(dims);
         for i in 0..dims {
             let pos = i as f64 * step;
@@ -1324,8 +1547,8 @@ impl ConsciousnessTree {
         let fog = self.weighted_fog_sum();
         let fog_clear = (1.0 - fog / self.branches.len().max(1) as f64).clamp(0.0, 1.0);
 
-        let coherence = 0.4 * health_consistency + 0.25 * resonance
-            + 0.2 * compliance + 0.15 * fog_clear;
+        let coherence =
+            0.4 * health_consistency + 0.25 * resonance + 0.2 * compliance + 0.15 * fog_clear;
         coherence.clamp(0.0, 1.0)
     }
 
@@ -1398,25 +1621,46 @@ impl ConsciousnessTree {
             let constraints = constraints_for_branch(&branch.kind);
             let violations = constraints.violations(branch);
             if !violations.is_empty() {
-                log::debug!("[consciousness_tree] {} constraints: {}", branch.kind.label(), violations.join("; "));
+                log::debug!(
+                    "[consciousness_tree] {} constraints: {}",
+                    branch.kind.label(),
+                    violations.join("; ")
+                );
             }
 
             // Skill Node Evolution: 运行时评估节点层级 + Constellation (基于真实模块数据)
             // 跨域消费者近似 = 约束的 max_active_modules 权重 (越大跨域影响越强)
-            let cross_domain_consumers = if constraints.max_active_modules >= 30 { 3 } else { 1 };
+            let cross_domain_consumers = if constraints.max_active_modules >= 30 {
+                3
+            } else {
+                1
+            };
             branch.evaluate_node_tier(cross_domain_consumers);
             branch.evaluate_constellation();
             // CHMA Phase 0: 迷雾浓度评估 (wired ≈ 约束无 idle/monitoring 违规; consumers = 跨域近似)
-            branch.evaluate_fog(cross_domain_consumers > 0, cross_domain_consumers, branch.self_test_count > 0);
-            
+            branch.evaluate_fog(
+                cross_domain_consumers > 0,
+                cross_domain_consumers,
+                branch.self_test_count > 0,
+            );
+
             // Check SelfTest minimum (E2: atomic capability coverage)
-            let atoms_for_branch = self.atoms.iter().filter(|(_, a)| a.branch == branch.kind && a.mandatory).count();
+            let atoms_for_branch = self
+                .atoms
+                .iter()
+                .filter(|(_, a)| a.branch == branch.kind && a.mandatory)
+                .count();
             let atoms_passed = branch.self_test_count.min(atoms_for_branch);
-            let self_test_coverage = if atoms_for_branch > 0 { atoms_passed as f64 / atoms_for_branch as f64 } else { 1.0 };
-            
-            if branch.health > self.config.fruit_growth_health 
+            let self_test_coverage = if atoms_for_branch > 0 {
+                atoms_passed as f64 / atoms_for_branch as f64
+            } else {
+                1.0
+            };
+
+            if branch.health > self.config.fruit_growth_health
                 && violations.len() < self.config.max_growth_violations
-                && self_test_coverage >= 0.5 // At least 50% of mandatory atomic capabilities have SelfTest
+                && self_test_coverage >= 0.5
+            // At least 50% of mandatory atomic capabilities have SelfTest
             {
                 // 数据养料调制 (意识核心进化提升): 果实质量受真实数据养料充足度调制。
                 // data_nourishment = 1 + 数据量饱和曲线。默认(无数据)=1.0 不衰减,
@@ -1452,17 +1696,34 @@ impl ConsciousnessTree {
         self.core.vuln_scan = self.scan_vulnerabilities();
         self.core.self_test_results = self.collect_self_test_results();
         self.core.identified_gaps = self.identify_architecture_gaps();
-        self.core.last_cycle_guidance = self.fruits.iter()
-            .filter(|f| f.quality > self.config.fruit_quality_threshold)
-            .map(|f| format!("Digested: {} (q={:.2}, gen={})", f.name, f.quality, f.generation))
+        // 消化门 `>=` 而非 `>` (MARS bridge 命中率提升): 成熟度 3/6 的果实
+        // quality 恰为 0.5 = 默认阈值, 严格大于会整批拒绝 → guidance 空 → S2
+        // 意图永无产出一 → bridge 打不中。恰好达标的果实应被视为可消化。
+        self.core.last_cycle_guidance = self
+            .fruits
+            .iter()
+            .filter(|f| f.quality >= self.config.fruit_quality_threshold)
+            .map(|f| {
+                format!(
+                    "Digested: {} (q={:.2}, gen={})",
+                    f.name, f.quality, f.generation
+                )
+            })
             .collect();
         // Build next actions from vulnerabilities + gaps + fruit quality
         let mut next_actions = Vec::new();
         for vuln in &self.core.vuln_scan {
             if vuln.severity.score() >= self.config.action_severity_threshold {
-                next_actions.push(format!("[{}] {}: {}", 
-                    match vuln.severity { VulnerabilitySeverity::Critical => "CRIT", VulnerabilitySeverity::High => "HIGH", _ => "FIX" },
-                    vuln.module, vuln.fix_suggestion));
+                next_actions.push(format!(
+                    "[{}] {}: {}",
+                    match vuln.severity {
+                        VulnerabilitySeverity::Critical => "CRIT",
+                        VulnerabilitySeverity::High => "HIGH",
+                        _ => "FIX",
+                    },
+                    vuln.module,
+                    vuln.fix_suggestion
+                ));
             }
         }
         for gap in &self.core.identified_gaps {
@@ -1516,7 +1777,8 @@ impl ConsciousnessTree {
         // 进化结果调整进化策略 — 此前进化是"开环"的: 树自己预测/验证,
         // 但从不调整自己的进化标准。这是意识核心自我运转的核心闭环。
         // 规则:
-        //   - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.8)
+        //   - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.6,
+        //     且仅当 MARS bridge 有命中时上调 — 防棘轮反噬)
         //   - drift 检测 → fruit_growth_health 下调 (放宽生长门加速恢复, -0.05, 下限 0.4)
         //   - 无 drift 且 fulfilled → 恢复默认 (0.5)
         self.apply_evolution_feedback();
@@ -1564,7 +1826,11 @@ impl ConsciousnessTree {
                 "branch_health",
                 branch.kind.label(),
                 fog_impact + fruit_impact,
-                if fog_impact + fruit_impact >= 0.0 { 1.0 } else { -1.0 },
+                if fog_impact + fruit_impact >= 0.0 {
+                    1.0
+                } else {
+                    -1.0
+                },
             );
         }
         if branch_count == 0 {
@@ -1606,7 +1872,12 @@ impl ConsciousnessTree {
         Some(EvolutionForecast {
             target: "overall-evolution".into(),
             direction,
-            confidence: forecast.tree.leaves().first().map(|n| n.confidence).unwrap_or(0.0),
+            confidence: forecast
+                .tree
+                .leaves()
+                .first()
+                .map(|n| n.confidence)
+                .unwrap_or(0.0),
             abstain: false,
             scenario_probs,
             reason: forecast.confidence_reason.clone(),
@@ -1617,8 +1888,12 @@ impl ConsciousnessTree {
     pub fn sync_absorbed_capabilities_from_kb(&mut self, pairs: &[(&str, &str)]) -> usize {
         let mut synced = 0usize;
         for (branch_str, capability) in pairs {
-            let Some(kind) = BranchKind::from_branch_str(branch_str) else { continue };
-            let Some(branch) = self.branches.get_mut(&kind) else { continue };
+            let Some(kind) = BranchKind::from_branch_str(branch_str) else {
+                continue;
+            };
+            let Some(branch) = self.branches.get_mut(&kind) else {
+                continue;
+            };
             if !branch.absorbed_capabilities.iter().any(|c| c == capability) {
                 branch.absorbed_capabilities.push((*capability).to_string());
                 synced += 1;
@@ -1644,7 +1919,10 @@ impl ConsciousnessTree {
         }
         // 探索预算继承: 上一 contract 的 budget 经 Phase 8 闭环反馈调制后,
         // 被下一 cycle negotiate 继承 — 演化预测 (利多↑/利空↓) 持续塑造探索策略。
-        let exploration_budget = self.core.last_contract.as_ref()
+        let exploration_budget = self
+            .core
+            .last_contract
+            .as_ref()
             .map(|c| c.exploration_budget.clamp(0.1, 0.4))
             .unwrap_or(0.2);
 
@@ -1659,7 +1937,10 @@ impl ConsciousnessTree {
             ],
             stop_rule: StopRule::default(),
             exploration_budget,
-            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         }
     }
 
@@ -1667,12 +1948,14 @@ impl ConsciousnessTree {
     fn verify_contract_fulfillment(&mut self, contract: &EvolutionContract) -> ContractFulfillment {
         let mut fulfilled = 0;
         let total = contract.evidence_plan.len();
-        
+
         // Check each evidence criterion
         for (i, _criterion) in contract.evidence_plan.iter().enumerate() {
             let met = match i {
-                0 => self.branches.values().all(|b| b.self_test_count > 0 && 
-                    (b.self_test_count as f64 / b.module_count.max(1) as f64) >= 0.8),
+                0 => self.branches.values().all(|b| {
+                    b.self_test_count > 0
+                        && (b.self_test_count as f64 / b.module_count.max(1) as f64) >= 0.8
+                }),
                 1 => self.branches.values().all(|b| b.health >= 0.6),
                 2 => self.fruits.iter().any(|f| f.quality >= 0.7),
                 3 => {
@@ -1695,10 +1978,12 @@ impl ConsciousnessTree {
                         };
                         reduction >= 0.2
                     }
-                },
+                }
                 _ => false,
             };
-            if met { fulfilled += 1; }
+            if met {
+                fulfilled += 1;
+            }
         }
 
         ContractFulfillment {
@@ -1707,20 +1992,31 @@ impl ConsciousnessTree {
             evidence_met: fulfilled,
             evidence_total: total,
             fulfilled: fulfilled == total,
-            quality_achieved: self.fruits.iter().map(|f| f.quality).sum::<f64>() / self.fruits.len().max(1) as f64,
-            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            quality_achieved: self.fruits.iter().map(|f| f.quality).sum::<f64>()
+                / self.fruits.len().max(1) as f64,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         }
     }
 
     /// Phase 7: Drift Audit — detect evolution drift from contract
-    fn audit_drift(&self, contract: &EvolutionContract, fulfillment: &ContractFulfillment) -> DriftReport {
+    fn audit_drift(
+        &self,
+        contract: &EvolutionContract,
+        fulfillment: &ContractFulfillment,
+    ) -> DriftReport {
         let claim_achieved = fulfillment.fulfilled;
         let quality_achieved = fulfillment.quality_achieved;
-        let drift_detected = !claim_achieved || quality_achieved < contract.stop_rule.min_quality_threshold;
-        let drift_magnitude = if drift_detected { 
-            (contract.stop_rule.min_quality_threshold - quality_achieved).abs() 
-        } else { 0.0 };
-        
+        let drift_detected =
+            !claim_achieved || quality_achieved < contract.stop_rule.min_quality_threshold;
+        let drift_magnitude = if drift_detected {
+            (contract.stop_rule.min_quality_threshold - quality_achieved).abs()
+        } else {
+            0.0
+        };
+
         let mut corrective_actions = Vec::new();
         if drift_detected {
             corrective_actions.push("Reduce exploration budget".into());
@@ -1750,13 +2046,17 @@ impl ConsciousnessTree {
             drift_magnitude,
             stop_rule_triggered: quality_achieved < contract.stop_rule.min_quality_threshold,
             corrective_actions,
-            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         }
     }
 
     /// 枚举全部 7 域节点快照供遥测/健康面板消费
     pub fn snapshots(&self) -> Vec<NodeSnapshot> {
-        BranchKind::all().into_iter()
+        BranchKind::all()
+            .into_iter()
             .filter_map(|k| self.branches.get(&k))
             .map(|b| b.snapshot())
             .collect()
@@ -1765,23 +2065,31 @@ impl ConsciousnessTree {
     /// 全仓加权雾和 (迷雾地图主量纲): 高权 tier 的浓雾贡献更大。
     /// Keystone 节点停在浓雾 = 大问题 (跨域基石未验证)。
     pub fn weighted_fog_sum(&self) -> f64 {
-        self.branches.values()
+        self.branches
+            .values()
             .map(|b| b.fog.level * b.node_tier.weight())
             .sum()
     }
 
     /// 每域迷雾摘要: branch label → 浓度 [0,1]
     pub fn fog_by_branch(&self) -> std::collections::BTreeMap<String, f64> {
-        self.branches.values()
+        self.branches
+            .values()
             .map(|b| (b.kind.label().to_string(), b.fog.level))
             .collect()
     }
 
     /// Set branch health from SelfTest results.
     /// Maps SelfTest module names to BranchKind and computes health per domain.
-    pub fn set_branch_health_from_self_tests(&mut self, results: &[crate::core::nt_core_self_test::SelfTestResult]) {
-        let mut domain_results: HashMap<BranchKind, Vec<&crate::core::nt_core_self_test::SelfTestResult>> = HashMap::new();
-        
+    pub fn set_branch_health_from_self_tests(
+        &mut self,
+        results: &[crate::core::nt_core_self_test::SelfTestResult],
+    ) {
+        let mut domain_results: HashMap<
+            BranchKind,
+            Vec<&crate::core::nt_core_self_test::SelfTestResult>,
+        > = HashMap::new();
+
         for result in results {
             if let Some(kind) = BranchKind::from_module_name(&result.name) {
                 domain_results.entry(kind).or_default().push(result);
@@ -1797,14 +2105,16 @@ impl ConsciousnessTree {
                     let passed = branch_results.iter().filter(|r| r.passed).count();
                     let total = branch_results.len();
                     // Health = pass rate, but minimum floor to avoid zero
-                    branch.health = (passed as f64 / total as f64).max(self.config.min_branch_health);
+                    branch.health =
+                        (passed as f64 / total as f64).max(self.config.min_branch_health);
                     // B2 (自审修复): 从真实 SelfTest 结果接线生产计数 — 此前 self_test_count/
                     // module_count 仅在 #[cfg(test)] 中赋值, 生产恒 0 → 果实门永 0、maturity
                     // 恒低、drift_recovery 校正空转。此处用真实注册器结果填充。
                     branch.self_test_count = total;
                     // module_count: 该域注册器唯一模块数 (近似真实模块数下限,
                     // 避免 0 值导致 "not viable" 误报)。
-                    let unique_modules = branch_results.iter()
+                    let unique_modules = branch_results
+                        .iter()
                         .map(|r| r.name.as_str())
                         .collect::<std::collections::HashSet<_>>()
                         .len();
@@ -1831,12 +2141,13 @@ impl ConsciousnessTree {
                 }
             }
         }
-        
+
         // For domains with no SelfTest results at all, keep neutral
         for kind in BranchKind::all() {
             if let Some(branch) = self.branches.get_mut(&kind) {
                 if !domain_results.contains_key(&kind) {
-                    branch.health = branch.health.max(self.config.neutral_health); // Don't override if already set
+                    branch.health = branch.health.max(self.config.neutral_health);
+                    // Don't override if already set
                 }
             }
         }
@@ -1846,7 +2157,8 @@ impl ConsciousnessTree {
         // Check 5) 与 self_test() 的 wired 检查全部盲区。此处为每个唯一模块生成
         // 叶子: 有 SelfTest 即视为已接线 (is_wired=true), 使孤儿检测真正生效。
         // 幂等: 已注册的同名叶子不重复添加。
-        let mut seen: std::collections::HashSet<String> = self.leaves.iter().map(|l| l.name.clone()).collect();
+        let mut seen: std::collections::HashSet<String> =
+            self.leaves.iter().map(|l| l.name.clone()).collect();
         for result in results {
             if let Some(kind) = BranchKind::from_module_name(&result.name) {
                 if seen.insert(result.name.clone()) {
@@ -1875,8 +2187,13 @@ impl ConsciousnessTree {
                 severity: VulnerabilitySeverity::Critical,
                 category: "data_foundation".into(),
                 module: "DataFoundation".into(),
-                description: format!("Soil health is {:.2} — KB is empty or has no embeddings/wiki", soil_health),
-                fix_suggestion: "Seed crawl queue with Wikipedia/AxXiv URLs; enable NEOTRIX_EMBEDDING_API_KEY".into(),
+                description: format!(
+                    "Soil health is {:.2} — KB is empty or has no embeddings/wiki",
+                    soil_health
+                ),
+                fix_suggestion:
+                    "Seed crawl queue with Wikipedia/AxXiv URLs; enable NEOTRIX_EMBEDDING_API_KEY"
+                        .into(),
             });
         }
 
@@ -1898,8 +2215,10 @@ impl ConsciousnessTree {
                 severity: VulnerabilitySeverity::Medium,
                 category: "consciousness_core".into(),
                 module: "ConsciousnessCore".into(),
-                description: "GWT resonance is inactive — consciousness core is not processing".into(),
-                fix_suggestion: "Wire PanoramaPipeline into BackgroundLoop to activate GWT resonance".into(),
+                description: "GWT resonance is inactive — consciousness core is not processing"
+                    .into(),
+                fix_suggestion:
+                    "Wire PanoramaPipeline into BackgroundLoop to activate GWT resonance".into(),
             });
         }
 
@@ -1910,9 +2229,16 @@ impl ConsciousnessTree {
                     severity: VulnerabilitySeverity::Medium,
                     category: "domain_maturity".into(),
                     module: format!("{:?}", kind),
-                    description: format!("Branch {:?} maturity score is {:.2} — only {}/6 constellations active",
-                        kind, branch.maturity_score(), (branch.maturity_score() * 6.0) as usize),
-                    fix_suggestion: format!("Add unit tests, integration tests, and benchmark for {:?} domain modules", kind),
+                    description: format!(
+                        "Branch {:?} maturity score is {:.2} — only {}/6 constellations active",
+                        kind,
+                        branch.maturity_score(),
+                        (branch.maturity_score() * 6.0) as usize
+                    ),
+                    fix_suggestion: format!(
+                        "Add unit tests, integration tests, and benchmark for {:?} domain modules",
+                        kind
+                    ),
                 });
             }
             if branch.self_test_count == 0 && branch.module_count > 0 {
@@ -1920,7 +2246,10 @@ impl ConsciousnessTree {
                     severity: VulnerabilitySeverity::Low,
                     category: "self_test_absence".into(),
                     module: format!("{:?}", kind),
-                    description: format!("Branch {:?} has {} modules but zero SelfTest implementations", kind, branch.module_count),
+                    description: format!(
+                        "Branch {:?} has {} modules but zero SelfTest implementations",
+                        kind, branch.module_count
+                    ),
                     fix_suggestion: format!("Add SelfTest impls for all {:?} domain modules", kind),
                 });
             }
@@ -1934,7 +2263,8 @@ impl ConsciousnessTree {
                 severity: VulnerabilitySeverity::High,
                 category: "orphan_modules".into(),
                 module: "ModuleLeaf".into(),
-                description: "No leaves are wired — all modules are orphaned from the pipeline".into(),
+                description: "No leaves are wired — all modules are orphaned from the pipeline"
+                    .into(),
                 fix_suggestion: "Register all module consumers in pipeline handlers".into(),
             });
         }
@@ -1945,8 +2275,12 @@ impl ConsciousnessTree {
                 severity: VulnerabilitySeverity::Medium,
                 category: "phi_coherence".into(),
                 module: "ConsciousnessCore".into(),
-                description: format!("Phi is {:.3} after {} cycles — no integrated information detected", self.trunk.phi, self.cycle),
-                fix_suggestion: "Connect IITPhiCalculator or GeometrySync to provide real phi values".into(),
+                description: format!(
+                    "Phi is {:.3} after {} cycles — no integrated information detected",
+                    self.trunk.phi, self.cycle
+                ),
+                fix_suggestion:
+                    "Connect IITPhiCalculator or GeometrySync to provide real phi values".into(),
             });
         }
 
@@ -1957,8 +2291,13 @@ impl ConsciousnessTree {
     fn collect_self_test_results(&self) -> Vec<String> {
         let mut results = Vec::new();
         for (kind, branch) in &self.branches {
-            results.push(format!("{:?}: tests={} health={:.2} maturity={:.2}", 
-                kind, branch.self_test_count, branch.health, branch.maturity_score()));
+            results.push(format!(
+                "{:?}: tests={} health={:.2} maturity={:.2}",
+                kind,
+                branch.self_test_count,
+                branch.health,
+                branch.maturity_score()
+            ));
         }
         results
     }
@@ -1968,7 +2307,10 @@ impl ConsciousnessTree {
         let mut gaps = Vec::new();
         for vuln in &self.core.vuln_scan {
             if vuln.severity.score() >= self.config.action_severity_threshold {
-                gaps.push(format!("{}: {} ({})", vuln.module, vuln.description, vuln.category));
+                gaps.push(format!(
+                    "{}: {} ({})",
+                    vuln.module, vuln.description, vuln.category
+                ));
             }
         }
         gaps
@@ -1991,7 +2333,11 @@ impl ConsciousnessTree {
         if total > 0 && wired == 0 {
             failures.push("consciousness_tree: no wired leaves".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -2000,7 +2346,11 @@ impl DataFoundation {
         let has_nodes = if self.kb_node_count > 0 { 1.0 } else { 0.0 };
         let has_embeddings = if self.embedding_count > 0 { 1.0 } else { 0.0 };
         let has_wiki = if self.wiki_page_count > 0 { 1.0 } else { 0.0 };
-        let has_constitution = if self.constitution_rules_count > 0 { 1.0 } else { 0.0 };
+        let has_constitution = if self.constitution_rules_count > 0 {
+            1.0
+        } else {
+            0.0
+        };
         (has_nodes + has_embeddings + has_wiki + has_constitution) / 4.0
     }
 }
@@ -2014,7 +2364,6 @@ impl InformationRoots {
         (has_crawlers + has_absorbers + has_scanners + has_absorbed) / 4.0
     }
 }
-
 
 impl Default for InformationRoots {
     fn default() -> Self {
@@ -2112,10 +2461,10 @@ impl Default for CapabilityAtom {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvolutionContract {
     pub cycle: u64,
-    pub claim: String,                    // What we intend to achieve this cycle
-    pub evidence_plan: Vec<String>,       // How we'll prove it (metrics, tests, artifacts)
-    pub stop_rule: StopRule,              // Conditions to halt this evolution direction
-    pub exploration_budget: f64,          // 0.0-1.0 fraction of resources for unconstrained exploration
+    pub claim: String,              // What we intend to achieve this cycle
+    pub evidence_plan: Vec<String>, // How we'll prove it (metrics, tests, artifacts)
+    pub stop_rule: StopRule,        // Conditions to halt this evolution direction
+    pub exploration_budget: f64,    // 0.0-1.0 fraction of resources for unconstrained exploration
     pub timestamp: u64,
 }
 
@@ -2124,8 +2473,8 @@ pub struct EvolutionContract {
 pub struct StopRule {
     pub max_generations_without_improvement: u64,
     pub min_quality_threshold: f64,
-    pub max_resource_consumption: f64,    // CPU/memory/time budget
-    pub drift_tolerance: f64,             // How much deviation from contract before intervention
+    pub max_resource_consumption: f64, // CPU/memory/time budget
+    pub drift_tolerance: f64,          // How much deviation from contract before intervention
 }
 
 impl Default for StopRule {
@@ -2176,11 +2525,11 @@ pub struct EvolutionFruit {
     pub produced_at_cycle: u64,
     pub quality: f64,
     // New verifiable fields
-    pub claim: String,                    // What capability this fruit claims to provide
-    pub evidence: EvidenceChain,          // Cryptographic proof chain (WARC/SHA-256/JSONL)
-    pub stop_rule: StopRule,              // Inherited from contract
-    pub benchmark: ProviderBenchmark,     // LLM Challenge results (Unstract pattern)
-    pub generation: u64,                  // MetaClaw versioning
+    pub claim: String,           // What capability this fruit claims to provide
+    pub evidence: EvidenceChain, // Cryptographic proof chain (WARC/SHA-256/JSONL)
+    pub stop_rule: StopRule,     // Inherited from contract
+    pub benchmark: ProviderBenchmark, // LLM Challenge results (Unstract pattern)
+    pub generation: u64,         // MetaClaw versioning
 }
 
 impl Default for EvolutionFruit {
@@ -2203,11 +2552,11 @@ impl Default for EvolutionFruit {
 /// Evidence Chain — Claude-OSINT pattern: WARC + SHA-256 + JSONL run_id
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EvidenceChain {
-    pub warc_path: Option<String>,        // WARC archive path
-    pub sha256: Option<String>,           // SHA-256 of artifact
-    pub run_id: Option<String>,           // JSONL run_id for traceability
+    pub warc_path: Option<String>, // WARC archive path
+    pub sha256: Option<String>,    // SHA-256 of artifact
+    pub run_id: Option<String>,    // JSONL run_id for traceability
     pub timestamp: u64,
-    pub tool_versions: Vec<String>,       // Tool versions used
+    pub tool_versions: Vec<String>, // Tool versions used
 }
 
 impl EvidenceChain {
@@ -2420,7 +2769,9 @@ pub struct GrowthReport {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for ConsciousnessTree {
-    fn name(&self) -> &str { "consciousness_tree" }
+    fn name(&self) -> &str {
+        "consciousness_tree"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         self.self_test()
     }
@@ -2453,16 +2804,27 @@ mod tests {
 
         let core_branch = tree.branches.get(&BranchKind::Core).expect("core branch");
         // 真实 SelfTest 计数接线 (此前生产恒 0)
-        assert!(core_branch.self_test_count >= 4, "self_test_count wired: {}", core_branch.self_test_count);
+        assert!(
+            core_branch.self_test_count >= 4,
+            "self_test_count wired: {}",
+            core_branch.self_test_count
+        );
         // 成熟度由真实数据推导, 非恒 C0
-        assert!(core_branch.maturity_score() > 0.0, "maturity derived from self-tests: {:.2}", core_branch.maturity_score());
+        assert!(
+            core_branch.maturity_score() > 0.0,
+            "maturity derived from self-tests: {:.2}",
+            core_branch.maturity_score()
+        );
         // B4 (缺陷3修复): SelfTest 注册应同步生成 ModuleLeaf (生产路径),
         // 此前 add_leaf 仅测试调用 → leaves 恒空 → 孤儿检测盲区
         assert!(!tree.leaves.is_empty(), "leaves registered from self-tests");
         assert!(
             tree.leaves.iter().all(|l| l.is_wired),
             "registered leaves are wired (has SelfTest): {:?}",
-            tree.leaves.iter().map(|l| l.name.as_str()).collect::<Vec<_>>()
+            tree.leaves
+                .iter()
+                .map(|l| l.name.as_str())
+                .collect::<Vec<_>>()
         );
     }
 
@@ -2472,9 +2834,15 @@ mod tests {
         // + (2) GWT 谐振激活 (S1 就绪) 才 increment mars_bridge_hits。
         let mut tree = ConsciousnessTree::new();
         // 无 intent + 无 resonance → 不桥接 (默认 gwt_resonance_active=false)
-        let report = tree.run_growth_cycle();
-        assert_eq!(tree.trunk.mars_bridge_hits, 0, "no bridge without intent/resonance");
-        assert_eq!(tree.trunk.mars_system1_activations, 1, "S1 always activates in Phase 2");
+        tree.run_growth_cycle();
+        assert_eq!(
+            tree.trunk.mars_bridge_hits, 0,
+            "no bridge without intent/resonance"
+        );
+        assert_eq!(
+            tree.trunk.mars_system1_activations, 1,
+            "S1 always activates in Phase 2"
+        );
 
         // 无 intent + 有 resonance → 仍不桥接 (诚实: 无意图可蒸馏)
         let mut tree2 = ConsciousnessTree::new();
@@ -2486,16 +2854,26 @@ mod tests {
         let mut tree3 = ConsciousnessTree::new();
         tree3.trunk.gwt_resonance_active = true;
         let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
-            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
-            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
-        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+            "nt_core_self_test_a",
+            "nt_core_self_test_b",
+            "nt_core_self_test_c",
+            "nt_core_self_test_d",
+            "nt_core_self_test_e",
+            "nt_core_self_test_f",
+        ]
+        .iter()
+        .map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n))
+        .collect();
         tree3.set_branch_health_from_self_tests(&results);
         for branch in tree3.branches.values_mut() {
             branch.health = 0.9;
         }
         let report3 = tree3.run_growth_cycle();
         assert!(report3.phase3_fruits > 0, "fruits needed to produce intent");
-        assert!(tree3.trunk.mars_bridge_hits > 0, "bridge fires when S2 intent + S1 ready");
+        assert!(
+            tree3.trunk.mars_bridge_hits > 0,
+            "bridge fires when S2 intent + S1 ready"
+        );
         assert!(!tree3.core.last_cycle_guidance.is_empty());
         assert!(report3.phase2_phi > 0.0);
     }
@@ -2506,9 +2884,16 @@ mod tests {
         let mut tree = ConsciousnessTree::new();
         tree.trunk.gwt_resonance_active = true;
         let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
-            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
-            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
-        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+            "nt_core_self_test_a",
+            "nt_core_self_test_b",
+            "nt_core_self_test_c",
+            "nt_core_self_test_d",
+            "nt_core_self_test_e",
+            "nt_core_self_test_f",
+        ]
+        .iter()
+        .map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n))
+        .collect();
         tree.set_branch_health_from_self_tests(&results);
         for branch in tree.branches.values_mut() {
             branch.health = 0.9;
@@ -2516,7 +2901,10 @@ mod tests {
         for _ in 0..3 {
             tree.run_growth_cycle();
         }
-        assert_eq!(tree.trunk.mars_bridge_hits, 3, "bridge hits every cycle with intent");
+        assert_eq!(
+            tree.trunk.mars_bridge_hits, 3,
+            "bridge hits every cycle with intent"
+        );
         assert_eq!(tree.trunk.mars_system1_activations, 3);
     }
 
@@ -2527,9 +2915,16 @@ mod tests {
         // Core 分支有 10 个 mandatory atoms (6 UNDERSTAND + 4 REASON), 需 ≥5 个 self_test
         // 使 self_test_coverage >= 0.5 通过果实生长门
         let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
-            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
-            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
-        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+            "nt_core_self_test_a",
+            "nt_core_self_test_b",
+            "nt_core_self_test_c",
+            "nt_core_self_test_d",
+            "nt_core_self_test_e",
+            "nt_core_self_test_f",
+        ]
+        .iter()
+        .map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n))
+        .collect();
         tree.set_branch_health_from_self_tests(&results);
 
         // 抬升分支 health 使果实生长门通过
@@ -2537,7 +2932,11 @@ mod tests {
             branch.health = 0.9;
         }
         let report = tree.run_growth_cycle();
-        assert!(report.phase3_fruits > 0, "fruits produced: {}", report.phase3_fruits);
+        assert!(
+            report.phase3_fruits > 0,
+            "fruits produced: {}",
+            report.phase3_fruits
+        );
         assert!(
             !tree.core.last_cycle_guidance.is_empty(),
             "guidance non-empty when maturity>0: {:?}",
@@ -2566,9 +2965,16 @@ mod tests {
         poor.soil.kb_node_count = 0;
         for t in [&mut rich, &mut poor] {
             let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
-                "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
-                "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
-            ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+                "nt_core_self_test_a",
+                "nt_core_self_test_b",
+                "nt_core_self_test_c",
+                "nt_core_self_test_d",
+                "nt_core_self_test_e",
+                "nt_core_self_test_f",
+            ]
+            .iter()
+            .map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n))
+            .collect();
             t.set_branch_health_from_self_tests(&results);
             for branch in t.branches.values_mut() {
                 branch.health = 0.9;
@@ -2576,9 +2982,16 @@ mod tests {
         }
         rich.run_growth_cycle();
         poor.run_growth_cycle();
-        let rich_q: f64 = rich.fruits.iter().map(|f| f.quality).sum::<f64>() / rich.fruits.len().max(1) as f64;
-        let poor_q: f64 = poor.fruits.iter().map(|f| f.quality).sum::<f64>() / poor.fruits.len().max(1) as f64;
-        assert!(rich_q > poor_q, "data-rich fruits should have higher quality: rich={:.3} poor={:.3}", rich_q, poor_q);
+        let rich_q: f64 =
+            rich.fruits.iter().map(|f| f.quality).sum::<f64>() / rich.fruits.len().max(1) as f64;
+        let poor_q: f64 =
+            poor.fruits.iter().map(|f| f.quality).sum::<f64>() / poor.fruits.len().max(1) as f64;
+        assert!(
+            rich_q > poor_q,
+            "data-rich fruits should have higher quality: rich={:.3} poor={:.3}",
+            rich_q,
+            poor_q
+        );
     }
 
     #[test]
@@ -2590,8 +3003,11 @@ mod tests {
         tree.soil.molt_archived_count = 10;
         assert!(tree.data_nourishment_factor() > 1.0, "蜕皮养料应使因子>1.0");
         tree.soil.molt_archived_count = 20;
-        assert!((tree.data_nourishment_factor() - 1.05).abs() < 1e-9,
-            "饱和 20 旧躯壳应达 +5%: {}", tree.data_nourishment_factor());
+        assert!(
+            (tree.data_nourishment_factor() - 1.05).abs() < 1e-9,
+            "饱和 20 旧躯壳应达 +5%: {}",
+            tree.data_nourishment_factor()
+        );
         // 上限不随蜕皮量无限增长
         tree.soil.molt_archived_count = 10_000;
         assert!((tree.data_nourishment_factor() - 1.05).abs() < 1e-9);
@@ -2649,9 +3065,16 @@ mod tests {
         let mut tree = ConsciousnessTree::new();
         tree.soil.kb_node_count = 55_826; // 真实 KB 规模 → 因子 ≈ 1.79
         let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
-            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
-            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
-        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+            "nt_core_self_test_a",
+            "nt_core_self_test_b",
+            "nt_core_self_test_c",
+            "nt_core_self_test_d",
+            "nt_core_self_test_e",
+            "nt_core_self_test_f",
+        ]
+        .iter()
+        .map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n))
+        .collect();
         tree.set_branch_health_from_self_tests(&results);
         for branch in tree.branches.values_mut() {
             branch.health = 0.9;
@@ -2664,12 +3087,23 @@ mod tests {
         }
         tree.run_growth_cycle();
         assert!(!tree.fruits.is_empty(), "fruits produced");
-        let max_q = tree.fruits.iter().map(|f| f.quality).fold(0.0_f64, f64::max);
+        let max_q = tree
+            .fruits
+            .iter()
+            .map(|f| f.quality)
+            .fold(0.0_f64, f64::max);
         // 0.83 * 1.79 = 1.49 → 钳到 1.0, 不越界
         assert!(max_q <= 1.0, "quality must clamp to [0,1]: max={max_q:.3}");
-        assert!(max_q > 0.0, "mature branches with data must still produce quality");
-        assert!(tree.fruits.iter().all(|f| f.quality >= 0.0 && f.quality <= 1.0),
-            "all fruit qualities bounded in [0,1]");
+        assert!(
+            max_q > 0.0,
+            "mature branches with data must still produce quality"
+        );
+        assert!(
+            tree.fruits
+                .iter()
+                .all(|f| f.quality >= 0.0 && f.quality <= 1.0),
+            "all fruit qualities bounded in [0,1]"
+        );
     }
 
     #[test]
@@ -2678,9 +3112,11 @@ mod tests {
         // 此前进化是开环的 — 树自己预测/验证, 但从不调整自己的进化标准。
         let mut tree = ConsciousnessTree::new();
         let default_threshold = tree.config.fruit_quality_threshold;
-        let default_health = tree.config.fruit_growth_health;
 
         // 场景1: 契约 fulfilled + 无 drift → 标准提升 (threshold 上调)
+        // 棘轮门控 (MARS): 上调仅在 S2 意图被 S1 消化过 (bridge 命中) 时发生,
+        // 故先置 bridge hits>0。
+        tree.trunk.mars_bridge_hits = 1;
         tree.core.contract_fulfillment = Some(ContractFulfillment {
             cycle: 1,
             claim: "test".into(),
@@ -2707,9 +3143,13 @@ mod tests {
         assert!(
             tree.config.fruit_quality_threshold > default_threshold,
             "fulfilled → threshold should rise: {} > {}",
-            tree.config.fruit_quality_threshold, default_threshold
+            tree.config.fruit_quality_threshold,
+            default_threshold
         );
-        assert!((tree.config.fruit_growth_health - 0.5).abs() < 1e-9, "growth health restored to default");
+        assert!(
+            (tree.config.fruit_growth_health - 0.5).abs() < 1e-9,
+            "growth health restored to default"
+        );
 
         // 场景2: drift 检测 → 生长门放宽
         let mut tree2 = ConsciousnessTree::new();
@@ -2743,8 +3183,10 @@ mod tests {
             tree2.config.fruit_growth_health
         );
 
-        // 场景3: 上限保护 — 连续 fulfilled 不超 0.8
+        // 场景3: 上限保护 — 连续 fulfilled 不超 0.6 (棘轮上限 0.8→0.6)
         let mut tree = ConsciousnessTree::new();
+        // bridge 持续命中 → 棘轮可上调, 验证上限钳制
+        tree.trunk.mars_bridge_hits = 100;
         tree.core.contract_fulfillment = Some(ContractFulfillment {
             cycle: 1,
             claim: "test".into(),
@@ -2770,7 +3212,10 @@ mod tests {
         for _ in 0..10 {
             tree.apply_evolution_feedback();
         }
-        assert!(tree.config.fruit_quality_threshold <= 0.8, "threshold capped at 0.8");
+        assert!(
+            tree.config.fruit_quality_threshold <= 0.6,
+            "threshold capped at 0.6"
+        );
     }
 
     #[test]
@@ -2811,14 +3256,23 @@ mod tests {
         });
         tree.apply_evolution_feedback();
         let budget2 = tree.core.last_contract.as_ref().unwrap().exploration_budget;
-        assert!(budget2 < budget, "bearish → shrink exploration: {} < {}", budget2, budget);
+        assert!(
+            budget2 < budget,
+            "bearish → shrink exploration: {} < {}",
+            budget2,
+            budget
+        );
 
         // 上限保护: 连续利多不超 0.4
         for _ in 0..10 {
             tree.apply_evolution_feedback();
         }
         let capped = tree.core.last_contract.as_ref().unwrap().exploration_budget;
-        assert!(capped <= 0.4, "exploration budget capped at 0.4: {}", capped);
+        assert!(
+            capped <= 0.4,
+            "exploration budget capped at 0.4: {}",
+            capped
+        );
     }
 
     #[test]
@@ -2826,7 +3280,9 @@ mod tests {
         // 意识体维度升维: growth cycle 应产出演化趋势预测 (nt_core_forecast 接线)
         let mut tree = ConsciousnessTree::new();
         let report = tree.run_growth_cycle();
-        let forecast = report.evolution_forecast.expect("growth cycle 应产出演化预测");
+        let forecast = report
+            .evolution_forecast
+            .expect("growth cycle 应产出演化预测");
         // 方向在 [-1, 1] 内
         assert!(forecast.direction >= -1.0 && forecast.direction <= 1.0);
         // 置信度在 [0, 1] 内
@@ -2853,8 +3309,14 @@ mod tests {
 
     #[test]
     fn test_from_branch_str() {
-        assert_eq!(BranchKind::from_branch_str("NT-CORE"), Some(BranchKind::Core));
-        assert_eq!(BranchKind::from_branch_str("NT-SHIELD"), Some(BranchKind::Shield));
+        assert_eq!(
+            BranchKind::from_branch_str("NT-CORE"),
+            Some(BranchKind::Core)
+        );
+        assert_eq!(
+            BranchKind::from_branch_str("NT-SHIELD"),
+            Some(BranchKind::Shield)
+        );
         assert_eq!(BranchKind::from_branch_str("nt-io"), Some(BranchKind::Io));
         assert_eq!(BranchKind::from_branch_str("NOPE"), None);
     }
@@ -2863,7 +3325,9 @@ mod tests {
     fn test_sync_absorbed_capabilities_dedup() {
         let mut tree = ConsciousnessTree::new();
         let base_act = tree.branches[&BranchKind::Act].absorbed_capabilities.len();
-        let base_shield = tree.branches[&BranchKind::Shield].absorbed_capabilities.len();
+        let base_shield = tree.branches[&BranchKind::Shield]
+            .absorbed_capabilities
+            .len();
         let pairs: Vec<(&str, &str)> = vec![
             ("NT-ACT", "execute"),
             ("NT-ACT", "execute"),
@@ -2919,24 +3383,55 @@ mod tests {
         // ④ 无 NaN/无崩溃 (phi/quality 始终在 [0,1] 内)。
         let mut tree = ConsciousnessTree::new();
         tree.soil.kb_node_count = 500; // 数据养料充足
-        // 生产路径: 真实 SelfTest → maturity → 果实 quality 达标。
-        // 契约 criterion 0 要求所有分支 self_test 覆盖率 >= 80%, 故给 7 域都喂结果。
+                                       // 生产路径: 真实 SelfTest → maturity → 果实 quality 达标。
+                                       // 契约 criterion 0 要求所有分支 self_test 覆盖率 >= 80%, 故给 7 域都喂结果。
         let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
-            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
-            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
-            "nt_mind_self_test_a", "nt_mind_self_test_b", "nt_mind_self_test_c",
-            "nt_mind_self_test_d", "nt_mind_self_test_e", "nt_mind_self_test_f",
-            "nt_memory_self_test_a", "nt_memory_self_test_b", "nt_memory_self_test_c",
-            "nt_memory_self_test_d", "nt_memory_self_test_e", "nt_memory_self_test_f",
-            "nt_world_self_test_a", "nt_world_self_test_b", "nt_world_self_test_c",
-            "nt_world_self_test_d", "nt_world_self_test_e", "nt_world_self_test_f",
-            "nt_act_self_test_a", "nt_act_self_test_b", "nt_act_self_test_c",
-            "nt_act_self_test_d", "nt_act_self_test_e", "nt_act_self_test_f",
-            "nt_io_self_test_a", "nt_io_self_test_b", "nt_io_self_test_c",
-            "nt_io_self_test_d", "nt_io_self_test_e", "nt_io_self_test_f",
-            "nt_shield_self_test_a", "nt_shield_self_test_b", "nt_shield_self_test_c",
-            "nt_shield_self_test_d", "nt_shield_self_test_e", "nt_shield_self_test_f",
-        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+            "nt_core_self_test_a",
+            "nt_core_self_test_b",
+            "nt_core_self_test_c",
+            "nt_core_self_test_d",
+            "nt_core_self_test_e",
+            "nt_core_self_test_f",
+            "nt_mind_self_test_a",
+            "nt_mind_self_test_b",
+            "nt_mind_self_test_c",
+            "nt_mind_self_test_d",
+            "nt_mind_self_test_e",
+            "nt_mind_self_test_f",
+            "nt_memory_self_test_a",
+            "nt_memory_self_test_b",
+            "nt_memory_self_test_c",
+            "nt_memory_self_test_d",
+            "nt_memory_self_test_e",
+            "nt_memory_self_test_f",
+            "nt_world_self_test_a",
+            "nt_world_self_test_b",
+            "nt_world_self_test_c",
+            "nt_world_self_test_d",
+            "nt_world_self_test_e",
+            "nt_world_self_test_f",
+            "nt_act_self_test_a",
+            "nt_act_self_test_b",
+            "nt_act_self_test_c",
+            "nt_act_self_test_d",
+            "nt_act_self_test_e",
+            "nt_act_self_test_f",
+            "nt_io_self_test_a",
+            "nt_io_self_test_b",
+            "nt_io_self_test_c",
+            "nt_io_self_test_d",
+            "nt_io_self_test_e",
+            "nt_io_self_test_f",
+            "nt_shield_self_test_a",
+            "nt_shield_self_test_b",
+            "nt_shield_self_test_c",
+            "nt_shield_self_test_d",
+            "nt_shield_self_test_e",
+            "nt_shield_self_test_f",
+        ]
+        .iter()
+        .map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n))
+        .collect();
         tree.set_branch_health_from_self_tests(&results);
         for branch in tree.branches.values_mut() {
             branch.health = 0.8;
@@ -2947,32 +3442,53 @@ mod tests {
         for i in 1..=5 {
             let report = tree.run_growth_cycle();
             assert_eq!(tree.cycle, i, "cycle should increment");
-            assert!(report.phase3_fruits > 0, "cycle {} should produce fruits", i);
+            assert!(
+                report.phase3_fruits > 0,
+                "cycle {} should produce fruits",
+                i
+            );
             // 闭环反馈: threshold 单调不降 (fulfilled 时上升, 否则保持)
             assert!(
                 tree.config.fruit_quality_threshold >= prev_threshold - 1e-9,
                 "threshold monotonic non-decreasing: {} < {}",
-                tree.config.fruit_quality_threshold, prev_threshold
+                tree.config.fruit_quality_threshold,
+                prev_threshold
             );
             prev_threshold = tree.config.fruit_quality_threshold;
-            // 进化参数始终有界 (闭环反馈不越界)
-            assert!(tree.config.fruit_quality_threshold <= 0.8, "threshold capped");
-            assert!(tree.config.fruit_growth_health >= 0.4, "growth health floored");
+            // 进化参数始终有界 (闭环反馈不越界, 棘轮上限 0.6)
+            assert!(
+                tree.config.fruit_quality_threshold <= 0.6,
+                "threshold capped"
+            );
+            assert!(
+                tree.config.fruit_growth_health >= 0.4,
+                "growth health floored"
+            );
             // 果实质量无 NaN 且在 [0, 1.5] (缺陷6修复: 数据养料可突破 1.0,
             // 表示数据增强的进化能力, 上限 1.5)
             for f in &tree.fruits {
-                assert!(f.quality.is_finite() && f.quality >= 0.0 && f.quality <= 1.5,
-                    "fruit quality in [0,1.5]: {}", f.quality);
+                assert!(
+                    f.quality.is_finite() && f.quality >= 0.0 && f.quality <= 1.5,
+                    "fruit quality in [0,1.5]: {}",
+                    f.quality
+                );
             }
             // phi 无 NaN
             assert!(tree.trunk.phi.is_finite(), "phi finite");
         }
         // 5 cycle 后: 果实持续累积 (自我运转不中断)
-        assert!(tree.fruits.len() >= 5 * 7, "fruits accumulate across cycles: {}", tree.fruits.len());
+        assert!(
+            tree.fruits.len() >= 5 * 7,
+            "fruits accumulate across cycles: {}",
+            tree.fruits.len()
+        );
         // 状态一致: 所有分支 health 有界
         for branch in tree.branches.values() {
-            assert!(branch.health.is_finite() && branch.health >= 0.0 && branch.health <= 1.0,
-                "branch health bounded: {}", branch.health);
+            assert!(
+                branch.health.is_finite() && branch.health >= 0.0 && branch.health <= 1.0,
+                "branch health bounded: {}",
+                branch.health
+            );
         }
     }
 
@@ -3023,7 +3539,11 @@ mod tests {
     #[test]
     fn test_initialize_capability_atoms() {
         let atoms = ConsciousnessTree::initialize_capability_atoms();
-        assert_eq!(atoms.len(), 36, "36 atomic capabilities from MCA 9-layer standard");
+        assert_eq!(
+            atoms.len(),
+            36,
+            "36 atomic capabilities from MCA 9-layer standard"
+        );
         assert!(atoms.contains_key("retrieve"));
         assert!(atoms.contains_key("audit"));
         assert!(atoms.contains_key("delegate"));
@@ -3045,15 +3565,32 @@ mod tests {
         let mut socket = RuneSocket::default();
         assert_eq!(socket.filled_slots(), 0);
         assert!(socket.runeword().is_none());
-        socket.set(RuneColor::Crimson, Rune::new("c1", "Crimson Rune", RuneColor::Crimson, "ingest", 0.8));
+        socket.set(
+            RuneColor::Crimson,
+            Rune::new("c1", "Crimson Rune", RuneColor::Crimson, "ingest", 0.8),
+        );
         assert_eq!(socket.filled_slots(), 1);
         assert!((socket.composite_effect() - 0.8).abs() < 1e-9);
-        socket.set(RuneColor::Indigo, Rune::new("i1", "Indigo Rune", RuneColor::Indigo, "transform", 0.7));
-        socket.set(RuneColor::Obsidian, Rune::new("o1", "Obsidian Rune", RuneColor::Obsidian, "cache", 0.6));
-        socket.set(RuneColor::Golden, Rune::new("g1", "Golden Rune", RuneColor::Golden, "recover", 0.9));
-        socket.set(RuneColor::Alabaster, Rune::new("a1", "Alabaster Rune", RuneColor::Alabaster, "monitor", 0.5));
+        socket.set(
+            RuneColor::Indigo,
+            Rune::new("i1", "Indigo Rune", RuneColor::Indigo, "transform", 0.7),
+        );
+        socket.set(
+            RuneColor::Obsidian,
+            Rune::new("o1", "Obsidian Rune", RuneColor::Obsidian, "cache", 0.6),
+        );
+        socket.set(
+            RuneColor::Golden,
+            Rune::new("g1", "Golden Rune", RuneColor::Golden, "recover", 0.9),
+        );
+        socket.set(
+            RuneColor::Alabaster,
+            Rune::new("a1", "Alabaster Rune", RuneColor::Alabaster, "monitor", 0.5),
+        );
         assert_eq!(socket.filled_slots(), 5);
-        let rw = socket.runeword().expect("full 5-slot socket produces runeword");
+        let rw = socket
+            .runeword()
+            .expect("full 5-slot socket produces runeword");
         assert!(rw.contains("Scry"));
         // 满槽组合效果 = 均值
         assert!((socket.composite_effect() - (0.8 + 0.7 + 0.6 + 0.9 + 0.5) / 5.0).abs() < 1e-9);
@@ -3069,7 +3606,10 @@ mod tests {
         assert!((c3.score() - 4.0 / 7.0).abs() < 1e-9);
         let c6 = Constellation::derive(true, true, true, true, true, true, true);
         assert_eq!(c6.level, 6);
-        assert!(c6.c6_adaptive, "C6 must be reachable via adaptive input (D3 fix)");
+        assert!(
+            c6.c6_adaptive,
+            "C6 must be reachable via adaptive input (D3 fix)"
+        );
         assert!((c6.score() - 7.0 / 7.0).abs() < 1e-9);
     }
 
@@ -3088,7 +3628,10 @@ mod tests {
         assert_eq!(branch.constellation.level, 2);
         // Rune 效果: 空槽不改变 health
         assert!((branch.health_with_runes() - 0.7).abs() < 1e-9);
-        branch.runes.set(RuneColor::Crimson, Rune::new("c", "C", RuneColor::Crimson, "e", 1.0));
+        branch.runes.set(
+            RuneColor::Crimson,
+            Rune::new("c", "C", RuneColor::Crimson, "e", 1.0),
+        );
         assert!(branch.health_with_runes() > 0.7);
         let snap = branch.snapshot();
         assert_eq!(snap.tier, NodeTier::Keystone);
@@ -3100,16 +3643,26 @@ mod tests {
     fn test_fog_level_derive_matrix() {
         // (wired, consumers, has_tests) → (level, label)
         let cases: &[((bool, usize, bool), (f64, &str))] = &[
-            ((false, 0, false), (1.0, "DenseFog")),      // 孤儿: 未接线+无消费者+无测试
-            ((false, 1, true), (0.85, "DenseFog")),      // 未接线但有消费者+测试
-            ((true, 0, true), (0.10, "Clear")),          // 接线有测试但无消费者
-            ((true, 1, false), (0.15, "LightFog")),      // 接线有消费者但无测试
-            ((true, 1, true), (0.05, "Clear")),          // 全清晰
+            ((false, 0, false), (1.0, "DenseFog")), // 孤儿: 未接线+无消费者+无测试
+            ((false, 1, true), (0.85, "DenseFog")), // 未接线但有消费者+测试
+            ((true, 0, true), (0.10, "Clear")),     // 接线有测试但无消费者
+            ((true, 1, false), (0.15, "LightFog")), // 接线有消费者但无测试
+            ((true, 1, true), (0.05, "Clear")),     // 全清晰
         ];
         for ((wired, consumers, has_tests), (level, label)) in cases {
             let fog = FogLevel::derive(*wired, *consumers, *has_tests);
-            assert!((fog.level - level).abs() < 1e-9, "fog.level mismatch: got {}, want {}", fog.level, level);
-            assert_eq!(fog.label(), *label, "label mismatch for level {}", fog.level);
+            assert!(
+                (fog.level - level).abs() < 1e-9,
+                "fog.level mismatch: got {}, want {}",
+                fog.level,
+                level
+            );
+            assert_eq!(
+                fog.label(),
+                *label,
+                "label mismatch for level {}",
+                fog.level
+            );
         }
     }
 
@@ -3146,7 +3699,12 @@ mod tests {
         keystone_branch.evaluate_fog(false, 0, false); // fog.level = 1.0
         let after = tree.weighted_fog_sum();
         // Keystone weight=3.0, fog=1.0 vs 原 Notable weight=2.0, fog=1.0 → +1.0
-        assert!((after - baseline - 1.0).abs() < 1e-9, "got baseline={} after={}", baseline, after);
+        assert!(
+            (after - baseline - 1.0).abs() < 1e-9,
+            "got baseline={} after={}",
+            baseline,
+            after
+        );
     }
 
     #[test]
@@ -3188,9 +3746,12 @@ mod tests {
         }
         tree.run_growth_cycle();
         for branch in tree.branches.values() {
-            assert!(!branch.constellation.c0_compiles || branch.node_tier == NodeTier::SmallPassive
-                || branch.node_tier == NodeTier::NotablePassive
-                || branch.node_tier == NodeTier::Keystone);
+            assert!(
+                !branch.constellation.c0_compiles
+                    || branch.node_tier == NodeTier::SmallPassive
+                    || branch.node_tier == NodeTier::NotablePassive
+                    || branch.node_tier == NodeTier::Keystone
+            );
         }
     }
 
@@ -3224,7 +3785,10 @@ mod tests {
             branch.self_test_count = 8;
             branch.module_count = 8;
         }
-        tree.fruits.push(EvolutionFruit { quality: 0.9, ..Default::default() });
+        tree.fruits.push(EvolutionFruit {
+            quality: 0.9,
+            ..Default::default()
+        });
         tree.vuln_baseline = Some(2); // baseline 2, current 1 → 50% reduction
         let fulfillment = tree.verify_contract_fulfillment(&contract);
         assert!(fulfillment.evidence_total == 4);
@@ -3251,13 +3815,23 @@ mod tests {
             branch.self_test_count = 8;
             branch.module_count = 8;
         }
-        tree.fruits.push(EvolutionFruit { quality: 0.9, ..Default::default() });
+        tree.fruits.push(EvolutionFruit {
+            quality: 0.9,
+            ..Default::default()
+        });
         // 首次评估: vuln_baseline 未建立 → criterion 3 视为满足
         assert!(tree.vuln_baseline.is_none(), "baseline not yet established");
         let fulfillment = tree.verify_contract_fulfillment(&contract);
-        assert!(fulfillment.fulfilled, "first measurement should not block: {}/{}",
-            fulfillment.evidence_met, fulfillment.evidence_total);
-        assert_eq!(tree.vuln_baseline, Some(1), "baseline recorded after first eval");
+        assert!(
+            fulfillment.fulfilled,
+            "first measurement should not block: {}/{}",
+            fulfillment.evidence_met, fulfillment.evidence_total
+        );
+        assert_eq!(
+            tree.vuln_baseline,
+            Some(1),
+            "baseline recorded after first eval"
+        );
     }
 
     #[test]
@@ -3268,7 +3842,10 @@ mod tests {
             cycle: 4,
             claim: "improve".into(),
             evidence_plan: vec!["plan".into()],
-            stop_rule: StopRule { min_quality_threshold: 0.9, ..Default::default() },
+            stop_rule: StopRule {
+                min_quality_threshold: 0.9,
+                ..Default::default()
+            },
             exploration_budget: 0.2,
             timestamp: 0,
         };
@@ -3329,10 +3906,14 @@ mod tests {
         }
         grown.run_growth_cycle();
         let phi_after_cycle = grown.trunk.phi;
-        assert!(phi_after_cycle.is_finite() && phi_after_cycle >= 0.0 && phi_after_cycle <= 1.0,
-            "trunk.phi from real IIT calc must be in [0,1], got {phi_after_cycle}");
-        assert!(phi_after_cycle > 0.0,
-            "grown tree state must yield non-zero integrated information, got {phi_after_cycle}");
+        assert!(
+            phi_after_cycle.is_finite() && phi_after_cycle >= 0.0 && phi_after_cycle <= 1.0,
+            "trunk.phi from real IIT calc must be in [0,1], got {phi_after_cycle}"
+        );
+        assert!(
+            phi_after_cycle > 0.0,
+            "grown tree state must yield non-zero integrated information, got {phi_after_cycle}"
+        );
     }
 
     #[test]
@@ -3341,8 +3922,10 @@ mod tests {
         // 真实树状态计算, 而非恒 0.0 — status/快照呈现真实相干性。
         let tree = ConsciousnessTree::new();
         let coh_init = tree.compute_coherence();
-        assert!(coh_init.is_finite() && coh_init >= 0.0 && coh_init <= 1.0,
-            "coherence must be finite in [0,1], got {coh_init}");
+        assert!(
+            coh_init.is_finite() && coh_init >= 0.0 && coh_init <= 1.0,
+            "coherence must be finite in [0,1], got {coh_init}"
+        );
 
         let mut grown = ConsciousnessTree::new();
         for branch in grown.branches.values_mut() {
@@ -3357,20 +3940,37 @@ mod tests {
         }
         grown.run_growth_cycle();
         let coh_after = grown.trunk.coherence;
-        assert!(coh_after.is_finite() && coh_after >= 0.0 && coh_after <= 1.0,
-            "trunk.coherence from real computation must be in [0,1], got {coh_after}");
-        assert!(coh_after > 0.0,
-            "uniform high-health tree must yield non-zero coherence, got {coh_after}");
+        assert!(
+            coh_after.is_finite() && coh_after >= 0.0 && coh_after <= 1.0,
+            "trunk.coherence from real computation must be in [0,1], got {coh_after}"
+        );
+        assert!(
+            coh_after > 0.0,
+            "uniform high-health tree must yield non-zero coherence, got {coh_after}"
+        );
         // 情绪报告只作 ±0.2 调制, 不把真实相干性抹成 0
         let report = crate::core::nt_core_self::emotion_state::EmotionReport {
-            frustration: 0.0, confidence: 0.5, joy: 0.5, urgency: 0.0,
-            curiosity: 0.5, fatigue: 0.0, arousal: 0.5, valence: 0.0,
-            confidence_score: 0.5, dominant: (crate::core::nt_core_self::emotion_state::EmotionDimension::Joy, 0.5),
+            frustration: 0.0,
+            confidence: 0.5,
+            joy: 0.5,
+            urgency: 0.0,
+            curiosity: 0.5,
+            fatigue: 0.0,
+            arousal: 0.5,
+            valence: 0.0,
+            confidence_score: 0.5,
+            dominant: (
+                crate::core::nt_core_self::emotion_state::EmotionDimension::Joy,
+                0.5,
+            ),
             observation_count: 0,
         };
         grown.apply_emotion_report(report);
-        assert!(grown.trunk.coherence > 0.0,
-            "emotion modulation must not erase real coherence, got {}", grown.trunk.coherence);
+        assert!(
+            grown.trunk.coherence > 0.0,
+            "emotion modulation must not erase real coherence, got {}",
+            grown.trunk.coherence
+        );
     }
 
     #[test]
@@ -3383,9 +3983,9 @@ mod tests {
         assert_eq!(tree.trunk.governance_fractal_depth, 0);
 
         // 注入违规进化决策 (创建新模块且未映射分支 = 违反 R-P42 TreeGrowth)
-        tree.core.next_actions.push(
-            "create new module nt_core_autonomous_agent.rs without mapping".to_string(),
-        );
+        tree.core
+            .next_actions
+            .push("create new module nt_core_autonomous_agent.rs without mapping".to_string());
         // 直接调用治理审计 (run_growth_cycle 会在 Phase 4 覆盖 next_actions,
         // 这里验证审计方法本身对真实决策的检测能力)
         tree.run_governance_audit();
@@ -3411,9 +4011,9 @@ mod tests {
         // 跨周期验证: 平滑系数 (0.7 旧 + 0.3 实测) 使 compliance 逐步趋近真实值,
         // 且不因单周期无检查项而跌回 0。
         let mut tree = ConsciousnessTree::new();
-        tree.core.next_actions.push(
-            "create new module nt_core_autonomous_agent.rs without mapping".to_string(),
-        );
+        tree.core
+            .next_actions
+            .push("create new module nt_core_autonomous_agent.rs without mapping".to_string());
         tree.run_governance_audit();
         let after_first = tree.trunk.governance_compliance;
         tree.run_governance_audit();

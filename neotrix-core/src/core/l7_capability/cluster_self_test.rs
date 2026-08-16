@@ -23,7 +23,10 @@ impl SelfTest for CapabilityClusterSelfTest {
         // 注册表可构造且空表计数为 0 — 防未来 Default 实现破坏不变量
         let empty = crate::core::l7_capability::registry::CapabilityRegistry::new();
         if empty.count() != 0 {
-            failures.push(format!("empty registry count = {}, expected 0", empty.count()));
+            failures.push(format!(
+                "empty registry count = {}, expected 0",
+                empty.count()
+            ));
         }
 
         // 注册模型技能应幂等: 首次返回新注册数, 重复调用返回 0 (不重复注册)

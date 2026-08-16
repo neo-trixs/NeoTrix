@@ -1,14 +1,10 @@
-use crate::core::{CapabilityVector, nt_core_knowledge::KnowledgeSource};
+use crate::core::{nt_core_knowledge::KnowledgeSource, CapabilityVector};
 pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
     match s {
         KnowledgeSource::DeepSeekTui => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.4,
-                0.1, 0.2, 0.1, 0.2,
-                0.92, 0.6, 0.9, 0.85, 0.88,
-                0.5, 0.6, 0.4,
-                0.3, 0.4, 0.3,
-                0.6, 0.7, 0.92, 0.85,
+                0.3, 0.3, 0.2, 0.4, 0.1, 0.2, 0.1, 0.2, 0.92, 0.6, 0.9, 0.85, 0.88, 0.5, 0.6, 0.4,
+                0.3, 0.4, 0.3, 0.6, 0.7, 0.92, 0.85,
             );
             cv.extend_named(&[
                 ("sub_agent_concurrency".into(), 0.95),
@@ -24,12 +20,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Codebuff => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.3,
-                0.2, 0.2, 0.2, 0.2,
-                0.9, 0.7, 0.92, 0.88, 0.85,
-                0.4, 0.5, 0.3,
-                0.3, 0.3, 0.2,
-                0.6, 0.7, 0.9, 0.85,
+                0.3, 0.3, 0.2, 0.3, 0.2, 0.2, 0.2, 0.2, 0.9, 0.7, 0.92, 0.88, 0.85, 0.4, 0.5, 0.3,
+                0.3, 0.3, 0.2, 0.6, 0.7, 0.9, 0.85,
             );
             cv.extend_named(&[
                 ("file_picker_agent".into(), 0.93),
@@ -44,12 +36,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::OpenClaude => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.88, 0.65, 0.85, 0.82, 0.85,
-                0.3, 0.4, 0.3,
-                0.2, 0.2, 0.2,
-                0.5, 0.6, 0.85, 0.8,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.88, 0.65, 0.85, 0.82, 0.85, 0.3, 0.4,
+                0.3, 0.2, 0.2, 0.2, 0.5, 0.6, 0.85, 0.8,
             );
             cv.extend_named(&[
                 ("multi_provider_routing".into(), 0.95),
@@ -63,12 +51,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Cairn => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.3,
-                0.85, 0.5, 0.88, 0.8, 0.9,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.1,
-                0.5, 0.6, 0.85, 0.8,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.85, 0.5, 0.88, 0.8, 0.9, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.1, 0.5, 0.6, 0.85, 0.8,
             );
             cv.extend_named(&[
                 ("blackboard_architecture".into(), 0.95),
@@ -83,12 +67,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Orca => {
             let mut cv = CapabilityVector::from_values(
-                0.5, 0.4, 0.5, 0.4,
-                0.3, 0.3, 0.3, 0.3,
-                0.8, 0.6, 0.8, 0.75, 0.7,
-                0.4, 0.3, 0.3,
-                0.3, 0.3, 0.2,
-                0.5, 0.6, 0.7, 0.6,
+                0.5, 0.4, 0.5, 0.4, 0.3, 0.3, 0.3, 0.3, 0.8, 0.6, 0.8, 0.75, 0.7, 0.4, 0.3, 0.3,
+                0.3, 0.3, 0.2, 0.5, 0.6, 0.7, 0.6,
             );
             cv.extend_named(&[
                 ("worktree_isolation".into(), 0.93),
@@ -102,12 +82,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::RedRun => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.1, 0.2,
-                0.1, 0.2, 0.1, 0.2,
-                0.85, 0.5, 0.9, 0.78, 0.92,
-                0.2, 0.2, 0.1,
-                0.1, 0.2, 0.1,
-                0.4, 0.5, 0.85, 0.85,
+                0.2, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.85, 0.5, 0.9, 0.78, 0.92, 0.2, 0.2, 0.1,
+                0.1, 0.2, 0.1, 0.4, 0.5, 0.85, 0.85,
             );
             cv.extend_named(&[
                 ("agent_team_orchestration".into(), 0.93),
@@ -122,12 +98,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::AutonomousSpeedrunning => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.9, 0.7, 0.92, 0.9, 0.85,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.6, 0.7, 0.88, 0.85,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.9, 0.7, 0.92, 0.9, 0.85, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.6, 0.7, 0.88, 0.85,
             );
             cv.extend_named(&[
                 ("multi_wave_experiment".into(), 0.92),
@@ -140,12 +112,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Synesis => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.3,
-                0.2, 0.2, 0.2, 0.2,
-                0.88, 0.6, 0.85, 0.85, 0.9,
-                0.4, 0.3, 0.2,
-                0.3, 0.3, 0.2,
-                0.65, 0.7, 0.88, 0.85,
+                0.3, 0.3, 0.2, 0.3, 0.2, 0.2, 0.2, 0.2, 0.88, 0.6, 0.85, 0.85, 0.9, 0.4, 0.3, 0.2,
+                0.3, 0.3, 0.2, 0.65, 0.7, 0.88, 0.85,
             );
             cv.extend_named(&[
                 ("ucb1_bandit_scoring".into(), 0.95),
@@ -160,12 +128,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::MemOS => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.3,
-                0.2, 0.3, 0.2, 0.2,
-                0.9, 0.6, 0.88, 0.9, 0.85,
-                0.5, 0.4, 0.3,
-                0.3, 0.3, 0.2,
-                0.7, 0.8, 0.9, 0.88,
+                0.3, 0.3, 0.2, 0.3, 0.2, 0.3, 0.2, 0.2, 0.9, 0.6, 0.88, 0.9, 0.85, 0.5, 0.4, 0.3,
+                0.3, 0.3, 0.2, 0.7, 0.8, 0.9, 0.88,
             );
             cv.extend_named(&[
                 ("multi_agent_memory_sharing".into(), 0.93),
@@ -180,12 +144,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Reflexio => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.92, 0.7, 0.9, 0.88, 0.85,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.6, 0.7, 0.92, 0.85,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.92, 0.7, 0.9, 0.88, 0.85, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.6, 0.7, 0.92, 0.85,
             );
             cv.extend_named(&[
                 ("playbook_extraction".into(), 0.95),
@@ -199,12 +159,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Mem0 => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.3,
-                0.2, 0.2, 0.2, 0.2,
-                0.9, 0.65, 0.92, 0.9, 0.88,
-                0.4, 0.3, 0.2,
-                0.3, 0.3, 0.2,
-                0.7, 0.8, 0.9, 0.88,
+                0.3, 0.3, 0.2, 0.3, 0.2, 0.2, 0.2, 0.2, 0.9, 0.65, 0.92, 0.9, 0.88, 0.4, 0.3, 0.2,
+                0.3, 0.3, 0.2, 0.7, 0.8, 0.9, 0.88,
             );
             cv.extend_named(&[
                 ("single_pass_add_extraction".into(), 0.94),
@@ -217,12 +173,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::Mnemosyne => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.2, 0.3,
-                0.2, 0.3, 0.3, 0.3,
-                0.88, 0.6, 0.85, 0.88, 0.85,
-                0.4, 0.3, 0.2,
-                0.3, 0.3, 0.2,
-                0.65, 0.75, 0.88, 0.85,
+                0.3, 0.3, 0.2, 0.3, 0.2, 0.3, 0.3, 0.3, 0.88, 0.6, 0.85, 0.88, 0.85, 0.4, 0.3, 0.2,
+                0.3, 0.3, 0.2, 0.65, 0.75, 0.88, 0.85,
             );
             cv.extend_named(&[
                 ("five_layer_cognitive".into(), 0.93),
@@ -237,12 +189,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::OriMnemos => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.9, 0.6, 0.88, 0.85, 0.88,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.6, 0.7, 0.88, 0.85,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.9, 0.6, 0.88, 0.85, 0.88, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.6, 0.7, 0.88, 0.85,
             );
             cv.extend_named(&[
                 ("actr_decay".into(), 0.93),
@@ -257,12 +205,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::OPSD => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.95, 0.65, 0.92, 0.9, 0.88,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.55, 0.6, 0.85, 0.85,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.95, 0.65, 0.92, 0.9, 0.88, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.55, 0.6, 0.85, 0.85,
             );
             cv.extend_named(&[
                 ("on_policy_self_distillation".into(), 0.95),
@@ -275,12 +219,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::AttentionMechanism => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.6,
-                0.85, 0.6, 0.9, 0.8, 0.7,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.6, 0.7, 0.7, 0.5,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.6, 0.85, 0.6, 0.9, 0.8, 0.7, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.6, 0.7, 0.7, 0.5,
             );
             cv.extend_named(&[
                 ("global_workspace_attention".into(), 0.92),
@@ -292,12 +232,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::PatchFile => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.3,
-                0.5, 0.5, 0.6, 0.6, 0.4,
-                0.3, 0.7, 0.3,
-                0.3, 0.2, 0.2,
-                0.85, 0.4, 0.7, 0.5,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.5, 0.5, 0.6, 0.6, 0.4, 0.3, 0.7, 0.3,
+                0.3, 0.2, 0.2, 0.85, 0.4, 0.7, 0.5,
             );
             cv.extend_named(&[
                 ("surgical_edit".into(), 0.95),
@@ -309,12 +245,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::KeyVault => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.4, 0.3, 0.5, 0.4, 0.3,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.6, 0.5, 0.8, 0.95,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.4, 0.3, 0.5, 0.4, 0.3, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.6, 0.5, 0.8, 0.95,
             );
             cv.extend_named(&[
                 ("dual_layer_secret".into(), 0.95),
@@ -326,12 +258,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::SealLoop => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.2,
-                0.9, 0.65, 0.85, 0.75, 0.8,
-                0.3, 0.2, 0.2,
-                0.2, 0.2, 0.2,
-                0.8, 0.6, 0.8, 0.7,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.9, 0.65, 0.85, 0.75, 0.8, 0.3, 0.2, 0.2,
+                0.2, 0.2, 0.2, 0.8, 0.6, 0.8, 0.7,
             );
             cv.extend_named(&[
                 ("seal_iteration".into(), 0.95),
@@ -344,12 +272,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HashCortxAgents => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.3, 0.3,
-                0.85, 0.6, 0.88, 0.85, 0.8,
-                0.3, 0.5, 0.2,
-                0.2, 0.2, 0.2,
-                0.8, 0.6, 0.5, 0.4,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.3, 0.85, 0.6, 0.88, 0.85, 0.8, 0.3, 0.5, 0.2,
+                0.2, 0.2, 0.2, 0.8, 0.6, 0.5, 0.4,
             );
             cv.extend_named(&[
                 ("agent_template_system".into(), 0.95),
@@ -362,12 +286,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HashCortxSecurity => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.1, 0.1,
-                0.1, 0.1, 0.2, 0.2,
-                0.7, 0.3, 0.9, 0.7, 0.95,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.4, 0.5, 0.95, 0.9,
+                0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.7, 0.3, 0.9, 0.7, 0.95, 0.1, 0.2, 0.1,
+                0.1, 0.1, 0.1, 0.4, 0.5, 0.95, 0.9,
             );
             cv.extend_named(&[
                 ("interactive_guard".into(), 0.95),
@@ -380,12 +300,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HashCortxSwarm => {
             let mut cv = CapabilityVector::from_values(
-                0.2, 0.2, 0.2, 0.2,
-                0.2, 0.2, 0.2, 0.3,
-                0.88, 0.6, 0.88, 0.85, 0.8,
-                0.2, 0.7, 0.2,
-                0.2, 0.2, 0.2,
-                0.9, 0.7, 0.4, 0.4,
+                0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.88, 0.6, 0.88, 0.85, 0.8, 0.2, 0.7, 0.2,
+                0.2, 0.2, 0.2, 0.9, 0.7, 0.4, 0.4,
             );
             cv.extend_named(&[
                 ("swarm_execution".into(), 0.95),
@@ -398,12 +314,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HashCortxFailover => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.1, 0.1,
-                0.1, 0.1, 0.2, 0.2,
-                0.75, 0.3, 0.8, 0.7, 0.75,
-                0.1, 0.3, 0.1,
-                0.1, 0.1, 0.1,
-                0.85, 0.6, 0.7, 0.6,
+                0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2, 0.75, 0.3, 0.8, 0.7, 0.75, 0.1, 0.3, 0.1,
+                0.1, 0.1, 0.1, 0.85, 0.6, 0.7, 0.6,
             );
             cv.extend_named(&[
                 ("tier_aware_failover".into(), 0.95),
@@ -416,12 +328,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HetuLuoshu => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.2, 0.1,
-                0.3, 0.3, 0.1, 0.1,
-                0.9, 0.8, 0.85, 0.85, 0.9,
-                0.1, 0.3, 0.1,
-                0.1, 0.1, 0.1,
-                0.4, 0.5, 0.85, 0.6,
+                0.1, 0.1, 0.2, 0.1, 0.3, 0.3, 0.1, 0.1, 0.9, 0.8, 0.85, 0.85, 0.9, 0.1, 0.3, 0.1,
+                0.1, 0.1, 0.1, 0.4, 0.5, 0.85, 0.6,
             );
             cv.extend_named(&[
                 ("he_tu_luo_shu".into(), 0.98),
@@ -434,12 +342,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::YijingBinary => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.2, 0.1,
-                0.2, 0.3, 0.1, 0.15,
-                0.95, 0.85, 0.9, 0.85, 0.92,
-                0.1, 0.25, 0.1,
-                0.1, 0.1, 0.1,
-                0.3, 0.6, 0.8, 0.55,
+                0.1, 0.1, 0.2, 0.1, 0.2, 0.3, 0.1, 0.15, 0.95, 0.85, 0.9, 0.85, 0.92, 0.1, 0.25,
+                0.1, 0.1, 0.1, 0.1, 0.3, 0.6, 0.8, 0.55,
             );
             cv.extend_named(&[
                 ("binary_encoding".into(), 0.98),
@@ -452,12 +356,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::FivePhasesGauge => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.15, 0.1,
-                0.2, 0.25, 0.1, 0.1,
-                0.92, 0.85, 0.88, 0.95, 0.9,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.3, 0.85, 0.82, 0.7,
+                0.1, 0.1, 0.15, 0.1, 0.2, 0.25, 0.1, 0.1, 0.92, 0.85, 0.88, 0.95, 0.9, 0.1, 0.2,
+                0.1, 0.1, 0.1, 0.1, 0.3, 0.85, 0.82, 0.7,
             );
             cv.extend_named(&[
                 ("five_phases_gauge".into(), 0.95),
@@ -470,12 +370,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::ThreeCosmologies => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.2, 0.1,
-                0.3, 0.35, 0.1, 0.2,
-                0.88, 0.8, 0.85, 0.9, 0.88,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.4, 0.7, 0.8, 0.65,
+                0.1, 0.1, 0.2, 0.1, 0.3, 0.35, 0.1, 0.2, 0.88, 0.8, 0.85, 0.9, 0.88, 0.1, 0.2, 0.1,
+                0.1, 0.1, 0.1, 0.4, 0.7, 0.8, 0.65,
             );
             cv.extend_named(&[
                 ("gaitian_geometry".into(), 0.95),
@@ -488,12 +384,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::HuainanziCalendar => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.2, 0.1,
-                0.25, 0.3, 0.1, 0.15,
-                0.9, 0.8, 0.92, 0.93, 0.85,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.45, 0.65, 0.85, 0.6,
+                0.1, 0.1, 0.2, 0.1, 0.25, 0.3, 0.1, 0.15, 0.9, 0.8, 0.92, 0.93, 0.85, 0.1, 0.2,
+                0.1, 0.1, 0.1, 0.1, 0.45, 0.65, 0.85, 0.6,
             );
             cv.extend_named(&[
                 ("universal_embedding_matrix".into(), 0.95),
@@ -506,12 +398,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::ZhangHengSeismoscope => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.15, 0.1,
-                0.2, 0.3, 0.1, 0.2,
-                0.88, 0.75, 0.95, 0.85, 0.9,
-                0.1, 0.15, 0.1,
-                0.1, 0.1, 0.1,
-                0.3, 0.8, 0.82, 0.75,
+                0.1, 0.1, 0.15, 0.1, 0.2, 0.3, 0.1, 0.2, 0.88, 0.75, 0.95, 0.85, 0.9, 0.1, 0.15,
+                0.1, 0.1, 0.1, 0.1, 0.3, 0.8, 0.82, 0.75,
             );
             cv.extend_named(&[
                 ("resonance_detection".into(), 0.95),
@@ -524,12 +412,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::MawangduiAstronomy => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.2, 0.1,
-                0.3, 0.35, 0.15, 0.15,
-                0.85, 0.8, 0.92, 0.88, 0.9,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.4, 0.7, 0.8, 0.65,
+                0.1, 0.1, 0.2, 0.1, 0.3, 0.35, 0.15, 0.15, 0.85, 0.8, 0.92, 0.88, 0.9, 0.1, 0.2,
+                0.1, 0.1, 0.1, 0.1, 0.4, 0.7, 0.8, 0.65,
             );
             cv.extend_named(&[
                 ("comet_atlas".into(), 0.95),
@@ -542,12 +426,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::ShaoYongCosmology => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.15, 0.1,
-                0.25, 0.35, 0.1, 0.2,
-                0.92, 0.85, 0.88, 0.92, 0.9,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.35, 0.75, 0.82, 0.7,
+                0.1, 0.1, 0.15, 0.1, 0.25, 0.35, 0.1, 0.2, 0.92, 0.85, 0.88, 0.92, 0.9, 0.1, 0.2,
+                0.1, 0.1, 0.1, 0.1, 0.35, 0.75, 0.82, 0.7,
             );
             cv.extend_named(&[
                 ("cosmic_cycle_129600".into(), 0.95),
@@ -560,12 +440,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::DayanNumber => {
             let mut cv = CapabilityVector::from_values(
-                0.1, 0.1, 0.15, 0.1,
-                0.2, 0.3, 0.1, 0.1,
-                0.95, 0.85, 0.95, 0.9, 0.92,
-                0.1, 0.2, 0.1,
-                0.1, 0.1, 0.1,
-                0.3, 0.8, 0.85, 0.7,
+                0.1, 0.1, 0.15, 0.1, 0.2, 0.3, 0.1, 0.1, 0.95, 0.85, 0.95, 0.9, 0.92, 0.1, 0.2,
+                0.1, 0.1, 0.1, 0.1, 0.3, 0.8, 0.85, 0.7,
             );
             cv.extend_named(&[
                 ("dayan_number_50".into(), 0.95),
@@ -578,12 +454,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::AdamsLaw => {
             let mut cv = CapabilityVector::from_values(
-                0.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0,
-                0.0, 0.3, 0.5,
-                0.0, 0.7, 0.6, 0.4,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.3, 0.5, 0.0, 0.7, 0.6, 0.4,
             );
             cv.extend_named(&[
                 ("text_frequency".into(), 0.95),
@@ -597,12 +469,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::DialogueExperience => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.3, 0.3, 0.3,
-                0.3, 0.6, 0.3, 0.4,
-                0.85, 0.75, 0.85, 0.88, 0.86,
-                0.4, 0.5, 0.4,
-                0.3, 0.3, 0.3,
-                0.7, 0.75, 0.85, 0.82,
+                0.3, 0.3, 0.3, 0.3, 0.3, 0.6, 0.3, 0.4, 0.85, 0.75, 0.85, 0.88, 0.86, 0.4, 0.5,
+                0.4, 0.3, 0.3, 0.3, 0.7, 0.75, 0.85, 0.82,
             );
             cv.extend_named(&[
                 ("conversation_grounding".into(), 0.95),
@@ -616,12 +484,8 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         }
         KnowledgeSource::ResearchFindings => {
             let mut cv = CapabilityVector::from_values(
-                0.3, 0.4, 0.35, 0.3,
-                0.4, 0.7, 0.3, 0.5,
-                0.85, 0.78, 0.88, 0.9, 0.86,
-                0.5, 0.5, 0.4,
-                0.35, 0.35, 0.4,
-                0.75, 0.8, 0.9, 0.84,
+                0.3, 0.4, 0.35, 0.3, 0.4, 0.7, 0.3, 0.5, 0.85, 0.78, 0.88, 0.9, 0.86, 0.5, 0.5,
+                0.4, 0.35, 0.35, 0.4, 0.75, 0.8, 0.9, 0.84,
             );
             cv.extend_named(&[
                 ("search_aggregation".into(), 0.95),
@@ -635,7 +499,6 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
         _ => CapabilityVector::default(),
     }
 }
-
 
 #[cfg(test)]
 mod tests {

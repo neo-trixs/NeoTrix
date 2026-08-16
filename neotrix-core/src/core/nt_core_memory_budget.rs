@@ -208,7 +208,13 @@ mod tests {
 
     #[test]
     fn test_suggested_batch_size_decreases_with_pressure() {
-        assert!(MemoryPressure::Normal.suggested_batch_size() > MemoryPressure::Warning.suggested_batch_size());
-        assert!(MemoryPressure::Warning.suggested_batch_size() > MemoryPressure::Critical.suggested_batch_size());
+        assert!(
+            MemoryPressure::Normal.suggested_batch_size()
+                > MemoryPressure::Warning.suggested_batch_size()
+        );
+        assert!(
+            MemoryPressure::Warning.suggested_batch_size()
+                > MemoryPressure::Critical.suggested_batch_size()
+        );
     }
 }

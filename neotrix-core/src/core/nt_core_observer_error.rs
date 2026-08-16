@@ -92,7 +92,9 @@ impl RetryConfig {
     ///
     /// Formula: `min(max_delay_ms, base_delay_ms * 2^(attempt - 1))`
     pub fn delay(&self, attempt: u32) -> u64 {
-        let exp = self.base_delay_ms.saturating_mul(2u64.saturating_pow(attempt.saturating_sub(1)));
+        let exp = self
+            .base_delay_ms
+            .saturating_mul(2u64.saturating_pow(attempt.saturating_sub(1)));
         exp.min(self.max_delay_ms)
     }
 }
@@ -185,7 +187,9 @@ impl CircuitBreaker {
     pub fn record_failure(&mut self) {
         self.consecutive_failures += 1;
         if self.consecutive_failures >= self.failure_threshold {
-            self.state = CircuitState::Open { since: self.consecutive_failures as usize };
+            self.state = CircuitState::Open {
+                since: self.consecutive_failures as usize,
+            };
             self.last_tripped = Some(Instant::now());
         }
     }
@@ -263,11 +267,24 @@ impl std::fmt::Display for ErrorRecoveryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorRecoveryError::Internal(msg) => write!(f, "observer internal error: {}", msg),
-            ErrorRecoveryError::RetriesExhausted { attempts, last_error } => {
-                write!(f, "retries exhausted after {} attempts: {}", attempts, last_error)
+            ErrorRecoveryError::RetriesExhausted {
+                attempts,
+                last_error,
+            } => {
+                write!(
+                    f,
+                    "retries exhausted after {} attempts: {}",
+                    attempts, last_error
+                )
             }
-            ErrorRecoveryError::CircuitOpen { consecutive_failures } => {
-                write!(f, "circuit breaker open ({} consecutive failures)", consecutive_failures)
+            ErrorRecoveryError::CircuitOpen {
+                consecutive_failures,
+            } => {
+                write!(
+                    f,
+                    "circuit breaker open ({} consecutive failures)",
+                    consecutive_failures
+                )
             }
             ErrorRecoveryError::Timeout { duration_ms } => {
                 write!(f, "observer operation timed out after {}ms", duration_ms)
@@ -301,7 +318,11 @@ mod tests {
 
     #[test]
     fn test_retry_delay_capped_at_max() {
-        let cfg = RetryConfig { base_delay_ms: 2000, max_delay_ms: 5000, ..Default::default() };
+        let cfg = RetryConfig {
+            base_delay_ms: 2000,
+            max_delay_ms: 5000,
+            ..Default::default()
+        };
         // 2000 * 2^2 = 8000 → capped to 5000
         assert_eq!(cfg.delay(3), 5000);
     }
@@ -376,7 +397,10 @@ mod tests {
 
     #[test]
     fn test_fallback_with_custom_score() {
-        let fb = FallbackHandler { fallback_score: 0.3, degrade_gracefully: true };
+        let fb = FallbackHandler {
+            fallback_score: 0.3,
+            degrade_gracefully: true,
+        };
         let report = fb.fallback();
         assert_eq!(report.quality_score, 0.3);
     }
@@ -384,21 +408,23 @@ mod tests {
     #[test]
     fn test_execute_returns_ok_on_success() {
         let mut recovery = ObserverErrorRecovery::new();
-        let result = recovery.execute(|| Ok(ObserverReport {
-            trajectory_len: 5,
-            distinct_states: 3,
-            patterns: Vec::new(),
-            step_qualities: Vec::new(),
-            quality_score: 0.8,
-            recommended_meta: None,
-            capability_deltas: Vec::new(),
-            has_actionable_insight: false,
-            critical_patterns: Vec::new(),
-            trajectory_weighted_score: None,
-            convergence_score: None,
-            should_exit_early: None,
-            step_attention: None,
-        }));
+        let result = recovery.execute(|| {
+            Ok(ObserverReport {
+                trajectory_len: 5,
+                distinct_states: 3,
+                patterns: Vec::new(),
+                step_qualities: Vec::new(),
+                quality_score: 0.8,
+                recommended_meta: None,
+                capability_deltas: Vec::new(),
+                has_actionable_insight: false,
+                critical_patterns: Vec::new(),
+                trajectory_weighted_score: None,
+                convergence_score: None,
+                should_exit_early: None,
+                step_attention: None,
+            })
+        });
         assert!(result.is_ok());
         let report = result.unwrap();
         assert_eq!(report.trajectory_len, 5);
@@ -495,13 +521,27 @@ mod tests {
         let err = ErrorRecoveryError::Internal("oops".into());
         assert_eq!(format!("{}", err), "observer internal error: oops");
 
-        let err = ErrorRecoveryError::RetriesExhausted { attempts: 3, last_error: "fail".into() };
-        assert_eq!(format!("{}", err), "retries exhausted after 3 attempts: fail");
+        let err = ErrorRecoveryError::RetriesExhausted {
+            attempts: 3,
+            last_error: "fail".into(),
+        };
+        assert_eq!(
+            format!("{}", err),
+            "retries exhausted after 3 attempts: fail"
+        );
 
-        let err = ErrorRecoveryError::CircuitOpen { consecutive_failures: 5 };
-        assert_eq!(format!("{}", err), "circuit breaker open (5 consecutive failures)");
+        let err = ErrorRecoveryError::CircuitOpen {
+            consecutive_failures: 5,
+        };
+        assert_eq!(
+            format!("{}", err),
+            "circuit breaker open (5 consecutive failures)"
+        );
 
         let err = ErrorRecoveryError::Timeout { duration_ms: 1000 };
-        assert_eq!(format!("{}", err), "observer operation timed out after 1000ms");
+        assert_eq!(
+            format!("{}", err),
+            "observer operation timed out after 1000ms"
+        );
     }
 }

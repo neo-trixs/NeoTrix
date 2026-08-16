@@ -1,7 +1,7 @@
-use super::silicon_self::SiliconSelfModel;
-use super::thinking_trace::ReflectionGrade;
 use super::attention_head::AttentionDomain;
 use super::reasoning_strategy::StrategyKind;
+use super::silicon_self::SiliconSelfModel;
+use super::thinking_trace::ReflectionGrade;
 
 pub struct MotivationState {
     pub intrinsic_reward: f64,
@@ -70,16 +70,20 @@ impl IntrinsicMotivation {
             return state;
         }
 
-        let confidence: f64 = traces.iter().map(|t| t.grade.score()).sum::<f64>() / window_size as f64;
+        let confidence: f64 =
+            traces.iter().map(|t| t.grade.score()).sum::<f64>() / window_size as f64;
 
-        let error_count = traces.iter()
+        let error_count = traces
+            .iter()
             .filter(|t| matches!(t.grade, ReflectionGrade::Poor | ReflectionGrade::Failed))
             .count();
         let error_rate = error_count as f64 / window_size as f64;
 
         let all_traces = model.recent_traces(model.thinking_traces.len());
         let older_strategies: Vec<StrategyKind> = {
-            let mut s: Vec<StrategyKind> = all_traces.iter().skip(window_size)
+            let mut s: Vec<StrategyKind> = all_traces
+                .iter()
+                .skip(window_size)
                 .flat_map(|t| t.strategies_used())
                 .collect();
             s.sort_by_key(|k| *k as u8);
@@ -88,9 +92,8 @@ impl IntrinsicMotivation {
         };
 
         let window_strategies: Vec<StrategyKind> = {
-            let mut s: Vec<StrategyKind> = traces.iter()
-                .flat_map(|t| t.strategies_used())
-                .collect();
+            let mut s: Vec<StrategyKind> =
+                traces.iter().flat_map(|t| t.strategies_used()).collect();
             s.sort_by_key(|k| *k as u8);
             s.dedup();
             s
@@ -99,7 +102,8 @@ impl IntrinsicMotivation {
         let novelty = if window_strategies.is_empty() || older_strategies.is_empty() {
             0.0
         } else {
-            let new_count = window_strategies.iter()
+            let new_count = window_strategies
+                .iter()
                 .filter(|sk| !older_strategies.contains(sk))
                 .count();
             new_count as f64 / window_strategies.len() as f64
@@ -112,21 +116,32 @@ impl IntrinsicMotivation {
         let should_explore = r_int > self.exploration_threshold || novelty > 0.5;
 
         let low_threshold = model.attention_manager.global_threshold * 0.5;
-        let suggested_domains: Vec<AttentionDomain> = model.attention_manager.heads.iter()
+        let suggested_domains: Vec<AttentionDomain> = model
+            .attention_manager
+            .heads
+            .iter()
             .filter(|h| h.activation < low_threshold)
             .map(|h| h.domain)
             .collect();
 
-        let min_count = model.strategy_registry.strategies.values()
-            .map(|s| s.use_count).min().unwrap_or(0);
-        let suggested_strategies: Vec<StrategyKind> = model.strategy_registry.strategies.values()
+        let min_count = model
+            .strategy_registry
+            .strategies
+            .values()
+            .map(|s| s.use_count)
+            .min()
+            .unwrap_or(0);
+        let suggested_strategies: Vec<StrategyKind> = model
+            .strategy_registry
+            .strategies
+            .values()
             .filter(|s| s.use_count == min_count)
             .map(|s| s.kind)
             .collect();
 
-            self.last_reward = r_int;
-            self.reward_history.push(r_int);
-            self.cap_reward_history();
+        self.last_reward = r_int;
+        self.reward_history.push(r_int);
+        self.cap_reward_history();
 
         MotivationState {
             intrinsic_reward: r_int,
@@ -169,11 +184,11 @@ impl IntrinsicMotivation {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::super::silicon_self::SiliconSelfModel;
-    use super::super::thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
-    use super::super::reasoning_strategy::StrategyKind;
     use super::super::attention_head::AttentionDomain;
+    use super::super::reasoning_strategy::StrategyKind;
+    use super::super::silicon_self::SiliconSelfModel;
+    use super::super::thinking_trace::{ReflectionGrade, ThinkingStep, ThinkingTrace};
+    use super::*;
 
     fn make_model_with_grades(grades: &[(ReflectionGrade, StrategyKind)]) -> SiliconSelfModel {
         let mut model = SiliconSelfModel::new();
@@ -240,7 +255,9 @@ mod tests {
     #[test]
     fn test_suggested_domains() {
         let mut model = SiliconSelfModel::new();
-        model.attention_manager.stimulate_domain(AttentionDomain::Code, 0.9);
+        model
+            .attention_manager
+            .stimulate_domain(AttentionDomain::Code, 0.9);
         let mut im = IntrinsicMotivation::new();
         im.window_size = 1;
         let mut trace = ThinkingTrace::new(0, "test");
@@ -249,7 +266,10 @@ mod tests {
         model.add_thinking_trace(trace);
 
         let state = im.compute(&model);
-        assert!(state.suggested_domains.iter().any(|d| *d != AttentionDomain::Code));
+        assert!(state
+            .suggested_domains
+            .iter()
+            .any(|d| *d != AttentionDomain::Code));
     }
 
     #[test]

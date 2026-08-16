@@ -33,7 +33,10 @@ impl EffectSpec {
     pub fn commutative(id: impl Into<String>, keys: &[&str]) -> Self {
         Self {
             id: id.into(),
-            keys: keys.iter().map(|k| (k.to_string(), KeyCommutativity::Commutative)).collect(),
+            keys: keys
+                .iter()
+                .map(|k| (k.to_string(), KeyCommutativity::Commutative))
+                .collect(),
         }
     }
 
@@ -73,8 +76,12 @@ pub fn independent(a: &EffectSpec, b: &EffectSpec) -> IndependenceVerdict {
     let b_keys: HashSet<&str> = b.keys.iter().map(|(k, _)| k.as_str()).collect();
     let mut conflicts = Vec::new();
     for shared in a_keys.intersection(&b_keys) {
-        let a_c = a.commutativity_for(shared).unwrap_or(KeyCommutativity::Ordered);
-        let b_c = b.commutativity_for(shared).unwrap_or(KeyCommutativity::Ordered);
+        let a_c = a
+            .commutativity_for(shared)
+            .unwrap_or(KeyCommutativity::Ordered);
+        let b_c = b
+            .commutativity_for(shared)
+            .unwrap_or(KeyCommutativity::Ordered);
         if a_c == KeyCommutativity::Ordered || b_c == KeyCommutativity::Ordered {
             conflicts.push((a.id.clone(), b.id.clone()));
         }
@@ -113,10 +120,7 @@ impl IndependenceGate {
 
     /// 判定给定 id 集合是否两两独立 (任意序撤回合法)。
     pub fn assert_any_order(&self, ids: &[&str]) -> IndependenceVerdict {
-        let present: Vec<&EffectSpec> = ids
-            .iter()
-            .filter_map(|id| self.spec(id))
-            .collect();
+        let present: Vec<&EffectSpec> = ids.iter().filter_map(|id| self.spec(id)).collect();
         for i in 0..present.len() {
             for j in (i + 1)..present.len() {
                 if let IndependenceVerdict::OrderedRequired { conflicts } =
@@ -135,10 +139,7 @@ impl IndependenceGate {
     /// 语义: 可交换部分任意序 (Corollary 21), 顺序敏感部分由依赖强加
     /// (coeffect 承接次序)。
     pub fn order_for(&self, ids: &[&str]) -> Option<Vec<String>> {
-        let present: Vec<&EffectSpec> = ids
-            .iter()
-            .filter_map(|id| self.spec(id))
-            .collect();
+        let present: Vec<&EffectSpec> = ids.iter().filter_map(|id| self.spec(id)).collect();
         if present.is_empty() {
             return Some(Vec::new());
         }
@@ -159,11 +160,15 @@ impl IndependenceGate {
                     .map(|(k, _)| k.as_str())
                     .filter(|k| b.commutativity_for(k).is_some())
                     .collect();
-                if shared.iter().any(|k| {
-                    b.commutativity_for(k) == Some(KeyCommutativity::Ordered)
-                }) {
+                if shared
+                    .iter()
+                    .any(|k| b.commutativity_for(k) == Some(KeyCommutativity::Ordered))
+                {
                     // a 顺序敏感地依赖 b: b 先执行。
-                    dependents.entry(b.id.clone()).or_default().push(a.id.clone());
+                    dependents
+                        .entry(b.id.clone())
+                        .or_default()
+                        .push(a.id.clone());
                     *indegree.entry(a.id.clone()).or_insert(0) += 1;
                 }
             }
@@ -242,7 +247,10 @@ mod tests {
         gate.register(EffectSpec::commutative("r1", &["events"]));
         gate.register(EffectSpec::commutative("r2", &["events"]));
         // mw 与 r1 共享 events 但声明为 Ordered (middleware 链非交换)
-        gate.register(EffectSpec::with_ordered("mw", &[("events", KeyCommutativity::Ordered)]));
+        gate.register(EffectSpec::with_ordered(
+            "mw",
+            &[("events", KeyCommutativity::Ordered)],
+        ));
         // r1+r2 独立 (共享可交换 key)
         assert_eq!(
             gate.assert_any_order(&["r1", "r2"]),
@@ -268,7 +276,10 @@ mod tests {
     #[test]
     fn test_order_for_ordered_dependency() {
         let mut gate = IndependenceGate::new();
-        gate.register(EffectSpec::with_ordered("init", &[("accum", KeyCommutativity::Ordered)]));
+        gate.register(EffectSpec::with_ordered(
+            "init",
+            &[("accum", KeyCommutativity::Ordered)],
+        ));
         gate.register(EffectSpec::commutative("read", &["accum"]));
         // init 声明 accum 为 Ordered → read 依赖 init, 必须 init 先
         let order = gate.order_for(&["read", "init"]).unwrap();
@@ -279,8 +290,14 @@ mod tests {
     #[test]
     fn test_order_for_cycle_returns_none() {
         let mut gate = IndependenceGate::new();
-        gate.register(EffectSpec::with_ordered("a", &[("k", KeyCommutativity::Ordered)]));
-        gate.register(EffectSpec::with_ordered("b", &[("k", KeyCommutativity::Ordered)]));
+        gate.register(EffectSpec::with_ordered(
+            "a",
+            &[("k", KeyCommutativity::Ordered)],
+        ));
+        gate.register(EffectSpec::with_ordered(
+            "b",
+            &[("k", KeyCommutativity::Ordered)],
+        ));
         // 双方都声明 k 为 Ordered → 相互依赖环, 无法自动排序
         assert!(gate.order_for(&["a", "b"]).is_none());
     }

@@ -44,14 +44,19 @@ impl ReflectionHead {
             if clean.is_empty() {
                 continue;
             }
-            if self.perspective.to_lowercase().contains(&clean.to_lowercase()) {
+            if self
+                .perspective
+                .to_lowercase()
+                .contains(&clean.to_lowercase())
+            {
                 evidence.push(format!("word '{}' aligns with {}", clean, self.perspective));
             } else {
                 for bias in &self.biases {
                     if clean.to_lowercase().contains(&bias.to_lowercase()) {
                         evidence.push(format!("word '{}' matches bias '{}'", clean, bias));
                     } else {
-                        contradictions.push(format!("word '{}' does not match bias '{}'", clean, bias));
+                        contradictions
+                            .push(format!("word '{}' does not match bias '{}'", clean, bias));
                     }
                 }
             }
@@ -97,7 +102,11 @@ impl ReflectionHead {
             if clean.is_empty() {
                 continue;
             }
-            if self.perspective.to_lowercase().contains(&clean.to_lowercase()) {
+            if self
+                .perspective
+                .to_lowercase()
+                .contains(&clean.to_lowercase())
+            {
                 evidence.push(format!(
                     "hypothesis term '{}' aligns with {}",
                     clean, self.perspective

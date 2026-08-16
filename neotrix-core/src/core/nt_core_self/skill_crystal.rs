@@ -1,5 +1,5 @@
-use super::reasoning_strategy::StrategyKind;
 use super::attention_head::AttentionDomain;
+use super::reasoning_strategy::StrategyKind;
 use super::thinking_trace::ThinkingTrace;
 use std::path::Path;
 
@@ -104,11 +104,7 @@ impl CrystalRegistry {
         }
     }
 
-    pub fn extract_from_trace(
-        &mut self,
-        trace: &ThinkingTrace,
-        iteration: usize,
-    ) -> Option<usize> {
+    pub fn extract_from_trace(&mut self, trace: &ThinkingTrace, iteration: usize) -> Option<usize> {
         if trace.grade.score() < 0.75 {
             return None;
         }
@@ -148,10 +144,7 @@ impl CrystalRegistry {
         };
 
         let pattern = {
-            let mut descs: Vec<String> = strategies
-                .iter()
-                .map(|s| s.label().to_string())
-                .collect();
+            let mut descs: Vec<String> = strategies.iter().map(|s| s.label().to_string()).collect();
             descs.dedup();
             descs.join(", ")
         };
@@ -277,10 +270,8 @@ impl CrystalRegistry {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let remove_indices: std::collections::HashSet<usize> = candidates
-            .into_iter()
-            .take(to_remove)
-            .collect();
+        let remove_indices: std::collections::HashSet<usize> =
+            candidates.into_iter().take(to_remove).collect();
 
         let mut sorted: Vec<usize> = remove_indices.into_iter().collect();
         sorted.sort_unstable_by(|a, b| b.cmp(a));
@@ -371,13 +362,22 @@ impl CrystalRegistry {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::thinking_trace::ReflectionGrade;
+    use super::*;
 
-    fn make_trace(id: usize, task: &str, grade: ReflectionGrade, strategy: StrategyKind, domain: AttentionDomain) -> ThinkingTrace {
+    fn make_trace(
+        id: usize,
+        task: &str,
+        grade: ReflectionGrade,
+        strategy: StrategyKind,
+        domain: AttentionDomain,
+    ) -> ThinkingTrace {
         let mut trace = ThinkingTrace::new(id, task);
         trace.grade = grade;
-        trace.steps.push(super::super::thinking_trace::ThinkingStep::new(1, "step", strategy).with_domain(domain));
+        trace.steps.push(
+            super::super::thinking_trace::ThinkingStep::new(1, "step", strategy)
+                .with_domain(domain),
+        );
         trace
     }
 
@@ -392,7 +392,13 @@ mod tests {
     #[test]
     fn test_extract_from_good_trace() {
         let mut reg = CrystalRegistry::new();
-        let trace = make_trace(0, "fix rust borrow checker", ReflectionGrade::Good, StrategyKind::Reflection, AttentionDomain::Code);
+        let trace = make_trace(
+            0,
+            "fix rust borrow checker",
+            ReflectionGrade::Good,
+            StrategyKind::Reflection,
+            AttentionDomain::Code,
+        );
         let id = reg.extract_from_trace(&trace, 1);
         assert!(id.is_some());
         assert_eq!(reg.crystals.len(), 1);
@@ -405,7 +411,13 @@ mod tests {
     #[test]
     fn test_extract_from_poor_trace() {
         let mut reg = CrystalRegistry::new();
-        let trace = make_trace(0, "failed attempt", ReflectionGrade::Poor, StrategyKind::Direct, AttentionDomain::Code);
+        let trace = make_trace(
+            0,
+            "failed attempt",
+            ReflectionGrade::Poor,
+            StrategyKind::Direct,
+            AttentionDomain::Code,
+        );
         let id = reg.extract_from_trace(&trace, 1);
         assert!(id.is_none());
         assert_eq!(reg.crystals.len(), 0);
@@ -419,23 +431,52 @@ mod tests {
         let mut reg = CrystalRegistry::new();
         let long_task = "修复编译错误与类型系统缺陷".repeat(4);
         assert!(long_task.len() > 40);
-        let trace = make_trace(0, &long_task, ReflectionGrade::Good, StrategyKind::Reflection, AttentionDomain::Code);
+        let trace = make_trace(
+            0,
+            &long_task,
+            ReflectionGrade::Good,
+            StrategyKind::Reflection,
+            AttentionDomain::Code,
+        );
         let id = reg.extract_from_trace(&trace, 1);
         assert!(id.is_some());
         let crystal = &reg.crystals[0];
-        assert!(crystal.name.ends_with("..."), "long names must be ellipsized");
+        assert!(
+            crystal.name.ends_with("..."),
+            "long names must be ellipsized"
+        );
         let name_chars = crystal.name.chars().count();
-        assert!(name_chars <= 40, "truncated name must fit in 40 chars, got {}", name_chars);
-        assert!(crystal.name.is_char_boundary(crystal.name.len() - 1) || crystal.name.ends_with('.'));
+        assert!(
+            name_chars <= 40,
+            "truncated name must fit in 40 chars, got {}",
+            name_chars
+        );
+        assert!(
+            crystal.name.is_char_boundary(crystal.name.len() - 1) || crystal.name.ends_with('.')
+        );
     }
 
     #[test]
     fn test_merge_crystals() {
         let mut reg = CrystalRegistry::new();
-        reg.crystals.push(SkillCrystal::new(0, "debug CoT", "cot pattern", StrategyKind::ChainOfThought, AttentionDomain::Code, 1));
+        reg.crystals.push(SkillCrystal::new(
+            0,
+            "debug CoT",
+            "cot pattern",
+            StrategyKind::ChainOfThought,
+            AttentionDomain::Code,
+            1,
+        ));
         reg.crystals[0].source_trace_ids.push(0);
         reg.next_id = 1;
-        reg.crystals.push(SkillCrystal::new(1, "debug direct", "direct pattern", StrategyKind::Direct, AttentionDomain::Code, 2));
+        reg.crystals.push(SkillCrystal::new(
+            1,
+            "debug direct",
+            "direct pattern",
+            StrategyKind::Direct,
+            AttentionDomain::Code,
+            2,
+        ));
         reg.crystals[1].source_trace_ids.push(1);
         reg.next_id = 2;
 
@@ -449,9 +490,23 @@ mod tests {
     #[test]
     fn test_prune_weak() {
         let mut reg = CrystalRegistry::new();
-        reg.crystals.push(SkillCrystal::new(0, "weak", "pattern", StrategyKind::Direct, AttentionDomain::Code, 1));
+        reg.crystals.push(SkillCrystal::new(
+            0,
+            "weak",
+            "pattern",
+            StrategyKind::Direct,
+            AttentionDomain::Code,
+            1,
+        ));
         reg.crystals[0].effectiveness = 0.3;
-        reg.crystals.push(SkillCrystal::new(1, "strong", "pattern", StrategyKind::Reflection, AttentionDomain::Code, 1));
+        reg.crystals.push(SkillCrystal::new(
+            1,
+            "strong",
+            "pattern",
+            StrategyKind::Reflection,
+            AttentionDomain::Code,
+            1,
+        ));
         reg.crystals[1].effectiveness = 0.9;
         let removed = reg.prune_weak(0.5);
         assert_eq!(removed, 1);
@@ -462,7 +517,13 @@ mod tests {
     #[test]
     fn test_find_similar() {
         let mut reg = CrystalRegistry::new();
-        let trace = make_trace(0, "refactor module", ReflectionGrade::Good, StrategyKind::Reflection, AttentionDomain::Code);
+        let trace = make_trace(
+            0,
+            "refactor module",
+            ReflectionGrade::Good,
+            StrategyKind::Reflection,
+            AttentionDomain::Code,
+        );
         reg.extract_from_trace(&trace, 1);
         let found = reg.find_similar(StrategyKind::Reflection, AttentionDomain::Code);
         assert!(found.is_some());
@@ -477,7 +538,14 @@ mod tests {
         reg.max_crystals = 3;
         for i in 0..5 {
             let domain = AttentionDomain::all()[i % AttentionDomain::all().len()];
-            reg.crystals.push(SkillCrystal::new(i, &format!("crystal_{}", i), "test", StrategyKind::Direct, domain, 1));
+            reg.crystals.push(SkillCrystal::new(
+                i,
+                &format!("crystal_{}", i),
+                "test",
+                StrategyKind::Direct,
+                domain,
+                1,
+            ));
         }
         assert_eq!(reg.crystals.len(), 5);
         let removed = reg.auto_prune();
@@ -488,26 +556,63 @@ mod tests {
     #[test]
     fn test_best_by_domain_and_strategy() {
         let mut reg = CrystalRegistry::new();
-        reg.crystals.push(SkillCrystal::new(0, "a", "p1", StrategyKind::Direct, AttentionDomain::Code, 1));
-        reg.crystals.push(SkillCrystal::new(1, "b", "p2", StrategyKind::Reflection, AttentionDomain::Code, 1));
-        reg.crystals.push(SkillCrystal::new(2, "c", "p3", StrategyKind::Direct, AttentionDomain::Planning, 1));
+        reg.crystals.push(SkillCrystal::new(
+            0,
+            "a",
+            "p1",
+            StrategyKind::Direct,
+            AttentionDomain::Code,
+            1,
+        ));
+        reg.crystals.push(SkillCrystal::new(
+            1,
+            "b",
+            "p2",
+            StrategyKind::Reflection,
+            AttentionDomain::Code,
+            1,
+        ));
+        reg.crystals.push(SkillCrystal::new(
+            2,
+            "c",
+            "p3",
+            StrategyKind::Direct,
+            AttentionDomain::Planning,
+            1,
+        ));
         reg.crystals[0].effectiveness = 0.9;
         reg.crystals[1].effectiveness = 0.7;
         reg.crystals[2].effectiveness = 0.8;
 
         let by_domain = reg.best_by_domain(AttentionDomain::Code);
         assert!(by_domain.is_some());
-        assert_eq!(by_domain.expect("best_by_domain should return a crystal").id, 0);
+        assert_eq!(
+            by_domain
+                .expect("best_by_domain should return a crystal")
+                .id,
+            0
+        );
 
         let by_strategy = reg.best_by_strategy(StrategyKind::Direct);
         assert!(by_strategy.is_some());
-        assert_eq!(by_strategy.expect("best_by_strategy should return a crystal").id, 0);
+        assert_eq!(
+            by_strategy
+                .expect("best_by_strategy should return a crystal")
+                .id,
+            0
+        );
     }
 
     #[test]
     fn test_summary_format() {
         let mut reg = CrystalRegistry::new();
-        let trace = make_trace(0, "test task", ReflectionGrade::Excellent, StrategyKind::Direct, AttentionDomain::Code);
+        let trace = make_trace(
+            0,
+            "test task",
+            ReflectionGrade::Excellent,
+            StrategyKind::Direct,
+            AttentionDomain::Code,
+        );
         reg.extract_from_trace(&trace, 1);
         let s = reg.summary();
         assert!(s.contains("CrystalRegistry: 1 crystals"));
@@ -516,7 +621,14 @@ mod tests {
     #[test]
     fn test_merge_same_id_returns_unchanged() {
         let mut reg = CrystalRegistry::new();
-        reg.crystals.push(SkillCrystal::new(0, "only", "pattern", StrategyKind::Direct, AttentionDomain::Code, 1));
+        reg.crystals.push(SkillCrystal::new(
+            0,
+            "only",
+            "pattern",
+            StrategyKind::Direct,
+            AttentionDomain::Code,
+            1,
+        ));
         let merged = reg.merge_crystals(0, 0);
         assert!(merged.is_some());
         assert_eq!(merged.expect("merge should return merged id"), 0);
@@ -526,8 +638,16 @@ mod tests {
     #[test]
     fn test_record_use_updates_count_and_last_used() {
         let mut reg = CrystalRegistry::new();
-        let trace = make_trace(0, "used skill", ReflectionGrade::Good, StrategyKind::Reflection, AttentionDomain::Code);
-        let id = reg.extract_from_trace(&trace, 1).expect("extract_from_trace should return an id");
+        let trace = make_trace(
+            0,
+            "used skill",
+            ReflectionGrade::Good,
+            StrategyKind::Reflection,
+            AttentionDomain::Code,
+        );
+        let id = reg
+            .extract_from_trace(&trace, 1)
+            .expect("extract_from_trace should return an id");
         assert_eq!(reg.crystals[0].use_count, 1);
         reg.record_use(id, 10);
         assert_eq!(reg.crystals[0].use_count, 2);

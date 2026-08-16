@@ -27,7 +27,10 @@ pub struct MetricEntry {
 
 impl MetricEntry {
     pub fn new(max_len: usize) -> Self {
-        Self { values: Vec::with_capacity(max_len), max_len }
+        Self {
+            values: Vec::with_capacity(max_len),
+            max_len,
+        }
     }
 
     pub fn record(&mut self, value: f64) {
@@ -79,15 +82,26 @@ impl StateSubstrate {
     }
 
     pub fn record_metric(&mut self, name: &str, value: f64) {
-        let entry = self.metrics.entry(name.to_string()).or_insert_with(|| MetricEntry::new(100));
+        let entry = self
+            .metrics
+            .entry(name.to_string())
+            .or_insert_with(|| MetricEntry::new(100));
         entry.record(value);
     }
 
     pub fn tick(&mut self) {
         self.tick_count += 1;
-        let load = self.metrics.get("load").and_then(|m| m.latest()).unwrap_or(0.5);
+        let load = self
+            .metrics
+            .get("load")
+            .and_then(|m| m.latest())
+            .unwrap_or(0.5);
         self.free_energy = (self.free_energy * 0.9 + load * 0.1).max(0.0).min(1.0);
-        self.active_mode = if self.free_energy > 0.7 { ThinkingMode::Deep } else { ThinkingMode::Fast };
+        self.active_mode = if self.free_energy > 0.7 {
+            ThinkingMode::Deep
+        } else {
+            ThinkingMode::Fast
+        };
     }
 
     pub fn tick_count(&self) -> u64 {
@@ -111,6 +125,10 @@ impl SelfTest for StateSubstrate {
         if self.free_energy < 0.0 || self.free_energy > 1.0 {
             failures.push(format!("free_energy out of range: {}", self.free_energy));
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }

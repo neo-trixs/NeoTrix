@@ -121,12 +121,10 @@ impl PermissionMatrix {
     /// 生成可读工具串 (供 catalog 展示)。
     pub fn allowed_tools_string(&self) -> String {
         let mut out = Vec::new();
-        let mut push = |name: &str, p: &Option<ToolPermission>| {
-            match p {
-                Some(t) if t.allow => out.push(name.to_string()),
-                Some(_) => {}
-                None => out.push(format!("{name}?")),
-            }
+        let mut push = |name: &str, p: &Option<ToolPermission>| match p {
+            Some(t) if t.allow => out.push(name.to_string()),
+            Some(_) => {}
+            None => out.push(format!("{name}?")),
         };
         push("edit", &self.edit);
         push("write", &self.write);
@@ -156,7 +154,10 @@ impl SubAgentDef {
     }
 
     pub fn scope_label(&self) -> &str {
-        if self.source_path.starts_with(dirs::home_dir().unwrap_or_default()) {
+        if self
+            .source_path
+            .starts_with(dirs::home_dir().unwrap_or_default())
+        {
             "user"
         } else {
             "project"
@@ -346,7 +347,9 @@ impl SubAgentRegistry {
                 }
             }
             Err(e) => {
-                report.errors.push(format!("read_dir {}: {}", dir.display(), e));
+                report
+                    .errors
+                    .push(format!("read_dir {}: {}", dir.display(), e));
             }
         }
 
@@ -357,8 +360,7 @@ impl SubAgentRegistry {
         agents: &mut HashMap<String, SubAgentDef>,
         path: &Path,
     ) -> Result<IsNew, String> {
-        let content =
-            std::fs::read_to_string(path).map_err(|e| format!("read failed: {e}"))?;
+        let content = std::fs::read_to_string(path).map_err(|e| format!("read failed: {e}"))?;
 
         let def = SubAgentDefParser::parse(path, &content)
             .ok_or_else(|| "invalid frontmatter (missing name or description)".to_string())?;
@@ -396,8 +398,7 @@ impl SubAgentRegistry {
         self.agents
             .values()
             .filter(|a| {
-                a.name.to_lowercase().contains(&q)
-                    || a.description.to_lowercase().contains(&q)
+                a.name.to_lowercase().contains(&q) || a.description.to_lowercase().contains(&q)
             })
             .collect()
     }
@@ -411,15 +412,14 @@ impl SubAgentRegistry {
     }
 
     pub fn create_agent_file(&self, name: &str, def: &SubAgentDef) -> Result<PathBuf, String> {
-        let project_dir = self.source_dirs.iter()
+        let project_dir = self
+            .source_dirs
+            .iter()
             .find(|d| !d.starts_with(dirs::home_dir().unwrap_or_default()))
             .cloned()
-            .unwrap_or_else(|| {
-                PathBuf::from(".neotrix").join("agents")
-            });
+            .unwrap_or_else(|| PathBuf::from(".neotrix").join("agents"));
 
-        std::fs::create_dir_all(&project_dir)
-            .map_err(|e| format!("create agents dir: {e}"))?;
+        std::fs::create_dir_all(&project_dir).map_err(|e| format!("create agents dir: {e}"))?;
 
         let file_path = project_dir.join(format!("{}.md", name));
 
@@ -467,8 +467,7 @@ impl SubAgentRegistry {
         frontmatter.push_str("---\n\n");
         frontmatter.push_str(&def.body);
 
-        std::fs::write(&file_path, &frontmatter)
-            .map_err(|e| format!("write agent file: {e}"))?;
+        std::fs::write(&file_path, &frontmatter).map_err(|e| format!("write agent file: {e}"))?;
 
         Ok(file_path)
     }
@@ -544,7 +543,9 @@ impl AgentDefConfig {
 
     pub fn is_readonly(&self) -> bool {
         if let Some(tools) = self.tool_allowlist() {
-            !tools.iter().any(|t| t == "Write" || t == "Edit" || t == "Bash")
+            !tools
+                .iter()
+                .any(|t| t == "Write" || t == "Edit" || t == "Bash")
         } else {
             false
         }
@@ -638,8 +639,14 @@ specific, actionable feedback on quality, security, and best practices.
         let path = Path::new("/fake/path/code-reviewer.md");
         let def = SubAgentDefParser::parse(path, SAMPLE_AGENT_MD).unwrap();
         assert_eq!(def.name, "code-reviewer");
-        assert_eq!(def.description, "Reviews code for quality and best practices");
-        assert_eq!(def.tools, Some(vec!["Read".into(), "Glob".into(), "Grep".into()]));
+        assert_eq!(
+            def.description,
+            "Reviews code for quality and best practices"
+        );
+        assert_eq!(
+            def.tools,
+            Some(vec!["Read".into(), "Glob".into(), "Grep".into()])
+        );
         assert_eq!(def.model, Some("sonnet".into()));
         assert_eq!(def.max_turns, Some(30));
         assert_eq!(def.memory, Some("project".into()));
@@ -728,7 +735,10 @@ body"#;
         reg.add_project_dir(tmp_root.clone());
         let report = reg.scan_all();
         // 注册的文件必须被扫描到（用户目录 ~/.neotrix/agents/ 可能存在 NT 域文件，不设精确计数）
-        assert!(reg.get("code-reviewer").is_some(), "registered file should be found");
+        assert!(
+            reg.get("code-reviewer").is_some(),
+            "registered file should be found"
+        );
         assert!(report.new >= 1, "at least the test file must be new");
 
         let _ = std::fs::remove_dir_all(&tmp_root);
@@ -876,7 +886,10 @@ tools: [Bash, Read]
         let file_path = written.unwrap();
         assert!(file_path.exists());
         // 必须写入注册的 temp 项目目录，绝不落到仓库 cwd 相对路径
-        assert!(file_path.starts_with(&tmp_root), "agent file must be under temp project dir");
+        assert!(
+            file_path.starts_with(&tmp_root),
+            "agent file must be under temp project dir"
+        );
 
         let content = std::fs::read_to_string(&file_path).unwrap();
         let reparsed = SubAgentDefParser::parse(&file_path, &content).unwrap();

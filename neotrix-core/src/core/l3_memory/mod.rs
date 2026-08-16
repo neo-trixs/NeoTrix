@@ -8,18 +8,18 @@
 //! - L3 不验证数据真实性（那是 L2 的工作）
 //! - 四层记忆梯度不可逆
 
-pub use crate::core::nt_core_hcube as hcube;
 pub use crate::core::nt_core_bank as bank;
+pub use crate::core::nt_core_hcube as hcube;
 
 pub use crate::core::nt_core_bank::{
-    ReasoningBank, ReasoningMemory, TemporalContext,
-    MemoryTier, MemoryLifecycle, ReasoningBankStats,
+    MemoryLifecycle, MemoryTier, ReasoningBank, ReasoningBankStats, ReasoningMemory,
+    TemporalContext,
 };
 
 // VSA 标记体系（从 consciousness/移入中，所有记忆必须标记）
-pub use crate::core::l5_consciousness::conscious::vsa_tag::{
-    VsaOrigin, VsaSelfCategory, VsaWorldCategory, VsaTagged,
-};
 pub use crate::core::l5_consciousness::conscious::source_hierarchy::{
-    SourceHierarchy, KnowledgeLayer, ProvenanceChain,
+    KnowledgeLayer, ProvenanceChain, SourceHierarchy,
+};
+pub use crate::core::l5_consciousness::conscious::vsa_tag::{
+    VsaOrigin, VsaSelfCategory, VsaTagged, VsaWorldCategory,
 };

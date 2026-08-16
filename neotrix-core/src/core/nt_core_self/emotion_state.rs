@@ -61,8 +61,7 @@ impl EmotionState {
     pub fn update(&mut self, dim: EmotionDimension, observed: f64) {
         let idx = dim.index();
         let observed = observed.max(0.0).min(1.0);
-        self.values[idx] =
-            (0.3 * observed + 0.7 * self.values[idx]).max(0.0).min(1.0);
+        self.values[idx] = (0.3 * observed + 0.7 * self.values[idx]).max(0.0).min(1.0);
     }
 
     pub fn decay(&mut self) {
@@ -94,14 +93,11 @@ impl EmotionState {
     }
 
     pub fn arousal(&self) -> f64 {
-        (self.get(EmotionDimension::Frustration)
-            + self.get(EmotionDimension::Urgency))
-            / 2.0
+        (self.get(EmotionDimension::Frustration) + self.get(EmotionDimension::Urgency)) / 2.0
     }
 
     pub fn valence(&self) -> f64 {
-        (self.get(EmotionDimension::Joy)
-            + self.get(EmotionDimension::Confidence)
+        (self.get(EmotionDimension::Joy) + self.get(EmotionDimension::Confidence)
             - self.get(EmotionDimension::Frustration)
             - self.get(EmotionDimension::Fatigue))
             / 4.0
@@ -115,8 +111,8 @@ impl EmotionState {
             + 0.2 * self.get(EmotionDimension::Curiosity)
             + 0.1 * (1.0 - self.get(EmotionDimension::Fatigue))
             + 0.1 * self.get(EmotionDimension::Urgency))
-            .max(0.0)
-            .min(1.0)
+        .max(0.0)
+        .min(1.0)
     }
 }
 
@@ -204,7 +200,12 @@ impl EmotionEngine {
     }
 
     pub fn recent_triggers(&self, n: usize) -> Vec<String> {
-        self.history.iter().rev().take(n).map(|o| o.trigger.clone()).collect()
+        self.history
+            .iter()
+            .rev()
+            .take(n)
+            .map(|o| o.trigger.clone())
+            .collect()
     }
 
     pub fn to_json(&self) -> Result<String, serde_json::Error> {

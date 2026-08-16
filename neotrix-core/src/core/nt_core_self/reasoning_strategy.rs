@@ -168,7 +168,12 @@ impl ReasoningStrategyRegistry {
         Self { strategies }
     }
 
-    pub fn select(&self, task_complexity: u8, needs_tools: bool, needs_reflection: bool) -> StrategyKind {
+    pub fn select(
+        &self,
+        task_complexity: u8,
+        needs_tools: bool,
+        needs_reflection: bool,
+    ) -> StrategyKind {
         if needs_tools && task_complexity >= 3 {
             return StrategyKind::LifecycleAnalysis;
         }
@@ -188,8 +193,13 @@ impl ReasoningStrategyRegistry {
     }
 
     pub fn best_by_effectiveness(&self) -> Option<StrategyKind> {
-        self.strategies.values()
-            .max_by(|a, b| a.effectiveness.partial_cmp(&b.effectiveness).unwrap_or(std::cmp::Ordering::Equal))
+        self.strategies
+            .values()
+            .max_by(|a, b| {
+                a.effectiveness
+                    .partial_cmp(&b.effectiveness)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|s| s.kind)
     }
 
@@ -200,7 +210,8 @@ impl ReasoningStrategyRegistry {
     }
 
     pub fn most_used(&self) -> Option<StrategyKind> {
-        self.strategies.values()
+        self.strategies
+            .values()
             .max_by_key(|s| s.use_count)
             .map(|s| s.kind)
     }
@@ -232,7 +243,10 @@ mod tests {
     #[test]
     fn test_select_cot_for_complex() {
         let registry = ReasoningStrategyRegistry::new();
-        assert_eq!(registry.select(5, false, false), StrategyKind::ChainOfThought);
+        assert_eq!(
+            registry.select(5, false, false),
+            StrategyKind::ChainOfThought
+        );
     }
 
     #[test]
@@ -244,7 +258,10 @@ mod tests {
     #[test]
     fn test_select_recursive_for_reflection() {
         let registry = ReasoningStrategyRegistry::new();
-        assert_eq!(registry.select(6, false, true), StrategyKind::RecursiveDecomposition);
+        assert_eq!(
+            registry.select(6, false, true),
+            StrategyKind::RecursiveDecomposition
+        );
     }
 
     #[test]
@@ -276,20 +293,28 @@ mod tests {
 
     #[test]
     fn test_strategy_complexity_ordering() {
-        assert!(StrategyKind::RecursiveDecomposition.complexity() > StrategyKind::Direct.complexity());
+        assert!(
+            StrategyKind::RecursiveDecomposition.complexity() > StrategyKind::Direct.complexity()
+        );
         assert!(StrategyKind::ChainOfThought.complexity() > StrategyKind::Intuitive.complexity());
     }
 
     #[test]
     fn test_select_lifecycle_analysis() {
         let registry = ReasoningStrategyRegistry::new();
-        assert_eq!(registry.select(3, true, false), StrategyKind::LifecycleAnalysis);
+        assert_eq!(
+            registry.select(3, true, false),
+            StrategyKind::LifecycleAnalysis
+        );
     }
 
     #[test]
     fn test_select_structural_integrity() {
         let registry = ReasoningStrategyRegistry::new();
-        assert_eq!(registry.select(3, false, true), StrategyKind::StructuralIntegrity);
+        assert_eq!(
+            registry.select(3, false, true),
+            StrategyKind::StructuralIntegrity
+        );
     }
 
     #[test]

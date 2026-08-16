@@ -20,6 +20,7 @@ pub mod pipeline_autofixer;
 pub mod safe_applier;
 pub mod semantic_entropy;
 pub mod template_registry;
+pub mod yagni_ladder;
 
 pub use ast_searcher::{AstCodeSearcher, AstQuery, CodeMatch};
 pub use code_writer::{CodeGenRequest, CodeGenResult, CodeContentEntropy, SelfCodeWriter};

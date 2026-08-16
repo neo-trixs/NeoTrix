@@ -173,11 +173,7 @@ pub fn ghrr_random_vector_dim(dim: usize, seed: u64) -> Vec<f64> {
 ///
 /// Returns the index of the candidate with highest similarity.
 /// If the best similarity is below the threshold, returns `None`.
-pub fn ghrr_cleanup(
-    noisy: &[f64],
-    candidates: &[&[f64]],
-    threshold: f64,
-) -> Option<usize> {
+pub fn ghrr_cleanup(noisy: &[f64], candidates: &[&[f64]], threshold: f64) -> Option<usize> {
     let (best_idx, best_sim) = candidates
         .iter()
         .enumerate()
@@ -418,10 +414,7 @@ impl GhrrHyperCube {
     ///
     /// Returns an N×N matrix where entry [i][j] = similarity(symbols[i], symbols[j]).
     /// All symbols must exist in the codebook.
-    pub fn compute_similarity_matrix(
-        &self,
-        symbols: &[&str],
-    ) -> Result<Vec<Vec<f64>>, String> {
+    pub fn compute_similarity_matrix(&self, symbols: &[&str]) -> Result<Vec<Vec<f64>>, String> {
         let n = symbols.len();
         let vecs: Vec<&[f64]> = symbols
             .iter()
@@ -528,7 +521,10 @@ impl GhrrHyperCube {
         }
 
         let symbols: Vec<&str> = self.codebook.keys().map(|s| s.as_str()).collect();
-        let vecs: Vec<&[f64]> = symbols.iter().map(|&name| &self.codebook[name][..]).collect();
+        let vecs: Vec<&[f64]> = symbols
+            .iter()
+            .map(|&name| &self.codebook[name][..])
+            .collect();
 
         // Step 1: compute seed activations
         let mut seed_act: Vec<f64> = Vec::with_capacity(n);
@@ -871,7 +867,11 @@ mod tests {
 
         let rebound = bound.unbind_dir(&v1, GHRR_ETA);
         let sim = rebound.similarity(&v2);
-        assert!(sim > 0.95, "wrapper unbind should recover original, sim={}", sim);
+        assert!(
+            sim > 0.95,
+            "wrapper unbind should recover original, sim={}",
+            sim
+        );
     }
 
     #[test]
@@ -925,7 +925,11 @@ mod tests {
         let filler_v = hc.get_symbol("filler").unwrap();
         let sim_role = ghrr_similarity(&bound, role_v);
         let sim_filler = ghrr_similarity(&bound, filler_v);
-        assert!(sim_role.abs() < 0.3, "bound should be dissimilar to role, sim={}", sim_role);
+        assert!(
+            sim_role.abs() < 0.3,
+            "bound should be dissimilar to role, sim={}",
+            sim_role
+        );
         assert!(
             sim_filler.abs() < 0.3,
             "bound should be dissimilar to filler, sim={}",
@@ -1003,11 +1007,7 @@ mod tests {
 
         let rebound = hc.unbind_symbols_dir("bound", "a").unwrap();
         let sim = ghrr_similarity(&rebound, &vb);
-        assert!(
-            sim > 0.95,
-            "unbind should recover symbol b, sim={}",
-            sim
-        );
+        assert!(sim > 0.95, "unbind should recover symbol b, sim={}", sim);
     }
 
     #[test]
@@ -1121,7 +1121,10 @@ mod tests {
         let hc = GhrrHyperCube::new(128, GHRR_ETA);
         let query = ghrr_random_vector_dim(128, 0);
         let results = hc.diffusion_retrieve(&query, &GhrrDiffusionConfig::default());
-        assert!(results.is_empty(), "empty codebook should return empty results");
+        assert!(
+            results.is_empty(),
+            "empty codebook should return empty results"
+        );
     }
 
     #[test]
@@ -1139,7 +1142,10 @@ mod tests {
         let results = hc.diffusion_retrieve(&query, &config);
         assert_eq!(results.len(), 1, "should find the only symbol");
         assert_eq!(results[0].name, "only");
-        assert!(results[0].activation > 0.8, "activation should be high for exact match");
+        assert!(
+            results[0].activation > 0.8,
+            "activation should be high for exact match"
+        );
     }
 
     #[test]

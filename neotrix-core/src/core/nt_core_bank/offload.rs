@@ -1,4 +1,4 @@
-use crate::core::nt_core_bank::{PipelineConfig, ReasoningMemory, L1Memory, SceneBlock, Persona};
+use crate::core::nt_core_bank::{L1Memory, Persona, PipelineConfig, ReasoningMemory, SceneBlock};
 
 pub struct OffloadManager {
     pub base_path: std::path::PathBuf,
@@ -10,7 +10,11 @@ impl OffloadManager {
     pub fn new(base_path: &std::path::Path) -> Self {
         let refs_dir = base_path.join("refs");
         let _ = std::fs::create_dir_all(&refs_dir);
-        Self { base_path: base_path.to_path_buf(), config: PipelineConfig::default(), ref_files: Vec::new() }
+        Self {
+            base_path: base_path.to_path_buf(),
+            config: PipelineConfig::default(),
+            ref_files: Vec::new(),
+        }
     }
 
     pub fn offload_memory(&mut self, mem: &ReasoningMemory) -> Result<String, String> {
@@ -24,7 +28,11 @@ impl OffloadManager {
             mem.t3_views.semantic_view.as_deref().unwrap_or(""),
             mem.t3_views.reflect_view.as_deref().unwrap_or(""),
         );
-        let edits_str: Vec<String> = mem.micro_edits.iter().map(|e| format!("- {}", e.summary())).collect();
+        let edits_str: Vec<String> = mem
+            .micro_edits
+            .iter()
+            .map(|e| format!("- {}", e.summary()))
+            .collect();
         let full = format!("{}\n{}\n", content, edits_str.join("\n"));
         std::fs::write(&path, &full).map_err(|e| format!("Offload write: {}", e))?;
         self.ref_files.push(path);
@@ -38,7 +46,9 @@ impl OffloadManager {
     pub fn save_l1_extraction(&self, memories: &[L1Memory]) -> Result<String, String> {
         let path = self.base_path.join("l1_atomic.jsonl");
         let mut file = std::fs::OpenOptions::new()
-            .create(true).append(true).open(&path)
+            .create(true)
+            .append(true)
+            .open(&path)
             .map_err(|e| format!("L1 save: {}", e))?;
         for mem in memories {
             let line = serde_json::to_string(mem).map_err(|e| format!("L1 serialize: {}", e))?;
@@ -49,10 +59,13 @@ impl OffloadManager {
     }
 
     pub fn save_scene(&self, scene: &SceneBlock) -> Result<String, String> {
-        let path = self.base_path.join("scenes").join(format!("scene_{}.md", scene.id));
-        let parent = path.parent().ok_or_else(|| {
-            format!("[offload] scene path has no parent: {}", path.display())
-        })?;
+        let path = self
+            .base_path
+            .join("scenes")
+            .join(format!("scene_{}.md", scene.id));
+        let parent = path
+            .parent()
+            .ok_or_else(|| format!("[offload] scene path has no parent: {}", path.display()))?;
         let _ = std::fs::create_dir_all(parent);
         let content = format!(
             "# Scene: {}\n\n**summary**: {}\n**heat**: {}\n**created**: {}\n**updated**: {}\n\n{}\n",

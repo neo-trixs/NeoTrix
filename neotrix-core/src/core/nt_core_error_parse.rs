@@ -84,7 +84,8 @@ fn extract_code_and_message(rest: &str, _kind: &str) -> (Option<String>, String)
         if let Some(code_end) = rest.find(']') {
             let code = rest[code_start + 1..code_end].to_string();
             let after_bracket = rest[code_end + 1..].trim();
-            let msg = after_bracket.strip_prefix(':')
+            let msg = after_bracket
+                .strip_prefix(':')
                 .unwrap_or(after_bracket)
                 .trim()
                 .to_string();
@@ -116,7 +117,9 @@ fn parse_location_line(line: &str) -> (String, usize, usize, Option<String>) {
 }
 
 /// Group diagnostics by file for targeted repair.
-pub fn group_by_file(diagnostics: &[CompilerDiagnostic]) -> Vec<(String, Vec<&CompilerDiagnostic>)> {
+pub fn group_by_file(
+    diagnostics: &[CompilerDiagnostic],
+) -> Vec<(String, Vec<&CompilerDiagnostic>)> {
     let mut groups: std::collections::HashMap<String, Vec<&CompilerDiagnostic>> =
         std::collections::HashMap::new();
     for d in diagnostics {
@@ -147,7 +150,7 @@ pub fn is_fixable(diag: &CompilerDiagnostic) -> bool {
             | "dead_code"  // dead code warning
             | "unused_import"  // unused import
             | "unused_variable"  // unused variable
-            | "unused_mut"  // unused mut
+            | "unused_mut" // unused mut
         ),
         None => diag.severity == DiagnosticSeverity::Warning,
     }
@@ -254,7 +257,9 @@ pub fn suggest_fix(diag: &CompilerDiagnostic) -> Option<FixSuggestion> {
 }
 
 /// Group diagnostics by error code for batch fix strategy.
-pub fn group_by_code(diagnostics: &[CompilerDiagnostic]) -> Vec<(Option<String>, Vec<&CompilerDiagnostic>)> {
+pub fn group_by_code(
+    diagnostics: &[CompilerDiagnostic],
+) -> Vec<(Option<String>, Vec<&CompilerDiagnostic>)> {
     let mut groups: std::collections::BTreeMap<Option<String>, Vec<&CompilerDiagnostic>> =
         std::collections::BTreeMap::new();
     for d in diagnostics {
@@ -292,7 +297,8 @@ mod tests {
 
     #[test]
     fn test_parse_warning() {
-        let output = "warning[dead_code]: function `foo` is never used\n  --> src/core/mod.rs:50:12\n";
+        let output =
+            "warning[dead_code]: function `foo` is never used\n  --> src/core/mod.rs:50:12\n";
         let diags = parse_compiler_output(output);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].severity, DiagnosticSeverity::Warning);
@@ -334,9 +340,13 @@ mod tests {
     #[test]
     fn test_is_fixable_codes() {
         let mut d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: Some("E0425".into()), message: "".into(), span_text: None,
+            code: Some("E0425".into()),
+            message: "".into(),
+            span_text: None,
         };
         assert!(is_fixable(&d));
         d.code = Some("E0433".into());
@@ -348,9 +358,13 @@ mod tests {
     #[test]
     fn test_suggest_fix_missing_symbol_add() {
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: Some("E0433".into()), message: "".into(), span_text: None,
+            code: Some("E0433".into()),
+            message: "".into(),
+            span_text: None,
         };
         let fix = suggest_fix(&d).expect("E0433 should have a fix");
         assert_eq!(fix.action, "add");
@@ -361,9 +375,13 @@ mod tests {
     fn test_suggest_fix_officecli_suggestion_and_range() {
         // OfficeCLI 模式 (2026-08-15): 错误码携带 suggestion + valid_range
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: Some("E0425".into()), message: "".into(), span_text: None,
+            code: Some("E0425".into()),
+            message: "".into(),
+            span_text: None,
         };
         let fix = suggest_fix(&d).expect("E0425 should have a fix");
         let sug = fix.suggestion.as_deref().expect("suggestion present");
@@ -375,21 +393,32 @@ mod tests {
     #[test]
     fn test_suggest_fix_cleanup_cmd() {
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Warning,
-            code: Some("unused_import".into()), message: "".into(), span_text: None,
+            code: Some("unused_import".into()),
+            message: "".into(),
+            span_text: None,
         };
         let fix = suggest_fix(&d).expect("unused_import should have a fix");
         assert_eq!(fix.action, "cleanup");
-        assert_eq!(fix.suggestion.as_deref(), Some("cargo fix --lib --allow-dirty"));
+        assert_eq!(
+            fix.suggestion.as_deref(),
+            Some("cargo fix --lib --allow-dirty")
+        );
     }
 
     #[test]
     fn test_suggest_fix_unwrap_type_wrap() {
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: Some("E0308".into()), message: "".into(), span_text: None,
+            code: Some("E0308".into()),
+            message: "".into(),
+            span_text: None,
         };
         let fix = suggest_fix(&d).expect("E0308 should have a fix");
         assert_eq!(fix.action, "type_fix");
@@ -399,9 +428,13 @@ mod tests {
     #[test]
     fn test_suggest_fix_borrow_clone() {
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: Some("E0382".into()), message: "".into(), span_text: None,
+            code: Some("E0382".into()),
+            message: "".into(),
+            span_text: None,
         };
         let fix = suggest_fix(&d).expect("E0382 should have a fix");
         assert_eq!(fix.action, "clone");
@@ -411,9 +444,13 @@ mod tests {
     #[test]
     fn test_suggest_fix_unknown_none() {
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: Some("E9999".into()), message: "".into(), span_text: None,
+            code: Some("E9999".into()),
+            message: "".into(),
+            span_text: None,
         };
         assert!(suggest_fix(&d).is_none());
     }
@@ -421,9 +458,13 @@ mod tests {
     #[test]
     fn test_suggest_fix_no_code_none() {
         let d = CompilerDiagnostic {
-            file: "x.rs".into(), line: 1, column: 1,
+            file: "x.rs".into(),
+            line: 1,
+            column: 1,
             severity: DiagnosticSeverity::Error,
-            code: None, message: "".into(), span_text: None,
+            code: None,
+            message: "".into(),
+            span_text: None,
         };
         assert!(suggest_fix(&d).is_none());
     }

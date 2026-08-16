@@ -111,7 +111,11 @@ impl LoraAdapter {
         }
         let mut weights = Vec::with_capacity(expected);
         for chunk in bytes.chunks_exact(8) {
-            weights.push(f64::from_le_bytes(chunk.try_into().map_err(|_| "invalid f64 bytes".to_string())?));
+            weights.push(f64::from_le_bytes(
+                chunk
+                    .try_into()
+                    .map_err(|_| "invalid f64 bytes".to_string())?,
+            ));
         }
         self.weights = Some(weights);
         Ok(())
@@ -246,7 +250,13 @@ impl HardwareDetector {
         let os = OsType::Android;
         #[cfg(target_os = "windows")]
         let os = OsType::Windows;
-        #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "linux", target_os = "android", target_os = "windows")))]
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "linux",
+            target_os = "android",
+            target_os = "windows"
+        )))]
         let os = OsType::Linux;
         #[allow(unreachable_patterns)]
         let _os = os;
@@ -259,7 +269,9 @@ impl HardwareDetector {
             has_gpu: true,
             has_npu: cfg!(any(target_os = "android", target_os = "ios")),
             memory_mb,
-            cpu_cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4),
+            cpu_cores: std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4),
             os_type: os,
         }
     }
@@ -280,7 +292,8 @@ impl HardwareDetector {
         {
             let output = std::process::Command::new("sysctl")
                 .args(["-n", "hw.memsize"])
-                .output().ok()?;
+                .output()
+                .ok()?;
             let s = String::from_utf8(output.stdout).ok()?;
             let bytes: u64 = s.trim().parse().ok()?;
             Some(bytes / 1_048_576)
@@ -303,16 +316,13 @@ impl HardwareDetector {
         #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         None
     }
-
 }
 
 /// AotCompiler — ahead-of-time compilation for edge targets
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AotCompiler {
     pub tool_paths: HashMap<AotTarget, String>,
 }
-
 
 impl AotCompiler {
     pub fn new() -> Self {
@@ -399,19 +409,33 @@ impl AotCompiler {
 
         match target {
             AotTarget::CoreML => {
-                cmd.arg("coremlcompiler").arg("compile").arg(&model_path).arg("-o").arg(&output_path);
+                cmd.arg("coremlcompiler")
+                    .arg("compile")
+                    .arg(&model_path)
+                    .arg("-o")
+                    .arg(&output_path);
             }
             AotTarget::MLX => {
-                cmd.arg("compile").arg("--model").arg(&model_path).arg("--output").arg(&output_path);
+                cmd.arg("compile")
+                    .arg("--model")
+                    .arg(&model_path)
+                    .arg("--output")
+                    .arg(&output_path);
             }
             AotTarget::ONNX => {
                 cmd.arg(&model_path).arg(&output_path);
             }
             AotTarget::TFLite => {
-                cmd.arg("--input").arg(&model_path).arg("--output").arg(&output_path);
+                cmd.arg("--input")
+                    .arg(&model_path)
+                    .arg("--output")
+                    .arg(&output_path);
             }
             AotTarget::ExecuTorch => {
-                cmd.arg("--model").arg(&model_path).arg("--output").arg(&output_path);
+                cmd.arg("--model")
+                    .arg(&model_path)
+                    .arg("--output")
+                    .arg(&output_path);
             }
         };
 
@@ -450,7 +474,11 @@ impl AotCompiler {
                 error_message: String::new(),
             },
             Ok(_) => {
-                let stderr = child.wait_with_output().ok().and_then(|o| String::from_utf8(o.stderr).ok()).unwrap_or_default();
+                let stderr = child
+                    .wait_with_output()
+                    .ok()
+                    .and_then(|o| String::from_utf8(o.stderr).ok())
+                    .unwrap_or_default();
                 AotResult {
                     target,
                     output_path: String::new(),
@@ -485,7 +513,13 @@ impl EdgeDeployPipeline {
     }
 
     /// Create a LoRA adapter with given rank, alpha, and dimensions
-    pub fn create_lora(&self, rank: usize, alpha: f64, input_dim: usize, output_dim: usize) -> LoraAdapter {
+    pub fn create_lora(
+        &self,
+        rank: usize,
+        alpha: f64,
+        input_dim: usize,
+        output_dim: usize,
+    ) -> LoraAdapter {
         LoraAdapter::new(rank, alpha, input_dim, output_dim)
     }
 
@@ -571,7 +605,8 @@ impl AWQQuantization {
             if i % 2 == 0 {
                 self.quantized_weights[i / 2] = (self.quantized_weights[i / 2] & 0xF0) | clamped;
             } else {
-                self.quantized_weights[i / 2] = (self.quantized_weights[i / 2] & 0x0F) | (clamped << 4);
+                self.quantized_weights[i / 2] =
+                    (self.quantized_weights[i / 2] & 0x0F) | (clamped << 4);
             }
         }
     }
@@ -583,7 +618,11 @@ impl AWQQuantization {
         for i in 0..total {
             let c = i / self.shape.1;
             let byte = self.quantized_weights[i / 2];
-            let nibble = if i % 2 == 0 { byte & 0x0F } else { (byte >> 4) & 0x0F };
+            let nibble = if i % 2 == 0 {
+                byte & 0x0F
+            } else {
+                (byte >> 4) & 0x0F
+            };
             let val = (nibble as f64 - 8.0) / 7.0;
             out.push(val / self.scales[c].max(1e-12));
         }
@@ -686,8 +725,7 @@ impl GGUFQuantization {
 }
 
 /// Quantization pipeline supporting AWQ and GGUF methods.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct QuantizationPipeline {
     pub awq_config: AWQConfig,
     pub gguf_config: GGUFConfig,
@@ -701,7 +739,10 @@ pub struct AWQConfig {
 
 impl Default for AWQConfig {
     fn default() -> Self {
-        Self { group_size: 128, scale_alpha: 0.5 }
+        Self {
+            group_size: 128,
+            scale_alpha: 0.5,
+        }
     }
 }
 
@@ -712,14 +753,20 @@ pub struct GGUFConfig {
 
 impl Default for GGUFConfig {
     fn default() -> Self {
-        Self { default_level: GGUFLevel::Q4KMedium }
+        Self {
+            default_level: GGUFLevel::Q4KMedium,
+        }
     }
 }
 
-
 impl QuantizationPipeline {
     /// Quantize f64 weights using AWQ-style method, returning quantized bytes.
-    pub fn quantize_awq(&self, weights: &[f64], activations: &[f64], shape: (usize, usize)) -> Vec<u8> {
+    pub fn quantize_awq(
+        &self,
+        weights: &[f64],
+        activations: &[f64],
+        shape: (usize, usize),
+    ) -> Vec<u8> {
         let mut awq = AWQQuantization::new(shape, self.awq_config.group_size);
         awq.quantize_awq(weights, activations);
         let mut out = Vec::with_capacity(awq.quantized_weights.len() + awq.scales.len() * 8);
@@ -754,7 +801,11 @@ impl QuantizationPipeline {
         for (block_idx, chunk) in model_weights.chunks(block_size).enumerate() {
             let block: Vec<f64> = chunk.to_vec();
             let max_val = block.iter().map(|v| v.abs()).fold(0.0f64, |a, b| a.max(b));
-            let scale = if max_val > 1e-12 { max_val / max_q as f64 } else { 1.0 };
+            let scale = if max_val > 1e-12 {
+                max_val / max_q as f64
+            } else {
+                1.0
+            };
             gguf.scales[block_idx] = scale as f32;
             let zp = 0i32; // symmetric quantization
             gguf.zero_points[block_idx] = zp;
@@ -890,23 +941,108 @@ pub enum HardwarePowerProfile {
 impl HardwarePowerProfile {
     pub fn profile(&self) -> PowerProfile {
         match self {
-            HardwarePowerProfile::AppleM1 => PowerProfile { avg_watts: 3.5, peak_watts: 7.0, thermal_limit_c: 95.0, efficiency: 120.0 },
-            HardwarePowerProfile::AppleM2 => PowerProfile { avg_watts: 3.8, peak_watts: 7.5, thermal_limit_c: 98.0, efficiency: 135.0 },
-            HardwarePowerProfile::AppleM3 => PowerProfile { avg_watts: 3.2, peak_watts: 6.5, thermal_limit_c: 98.0, efficiency: 155.0 },
-            HardwarePowerProfile::AppleM4 => PowerProfile { avg_watts: 3.0, peak_watts: 6.0, thermal_limit_c: 100.0, efficiency: 170.0 },
-            HardwarePowerProfile::AppleM1Pro => PowerProfile { avg_watts: 6.0, peak_watts: 14.0, thermal_limit_c: 95.0, efficiency: 90.0 },
-            HardwarePowerProfile::AppleM2Pro => PowerProfile { avg_watts: 5.5, peak_watts: 13.0, thermal_limit_c: 98.0, efficiency: 100.0 },
-            HardwarePowerProfile::AppleM3Pro => PowerProfile { avg_watts: 5.0, peak_watts: 12.0, thermal_limit_c: 98.0, efficiency: 115.0 },
-            HardwarePowerProfile::AppleM4Pro => PowerProfile { avg_watts: 4.5, peak_watts: 11.0, thermal_limit_c: 100.0, efficiency: 130.0 },
-            HardwarePowerProfile::AppleM1Max => PowerProfile { avg_watts: 12.0, peak_watts: 28.0, thermal_limit_c: 95.0, efficiency: 60.0 },
-            HardwarePowerProfile::AppleM2Max => PowerProfile { avg_watts: 11.0, peak_watts: 26.0, thermal_limit_c: 98.0, efficiency: 68.0 },
-            HardwarePowerProfile::AppleM3Max => PowerProfile { avg_watts: 10.0, peak_watts: 24.0, thermal_limit_c: 98.0, efficiency: 78.0 },
-            HardwarePowerProfile::AppleM4Max => PowerProfile { avg_watts: 9.0, peak_watts: 22.0, thermal_limit_c: 100.0, efficiency: 88.0 },
-            HardwarePowerProfile::AppleA16 => PowerProfile { avg_watts: 0.8, peak_watts: 2.5, thermal_limit_c: 85.0, efficiency: 250.0 },
-            HardwarePowerProfile::AppleA17 => PowerProfile { avg_watts: 0.75, peak_watts: 2.3, thermal_limit_c: 88.0, efficiency: 280.0 },
-            HardwarePowerProfile::AppleA18 => PowerProfile { avg_watts: 0.7, peak_watts: 2.1, thermal_limit_c: 88.0, efficiency: 310.0 },
-            HardwarePowerProfile::GenericArm => PowerProfile { avg_watts: 2.0, peak_watts: 5.0, thermal_limit_c: 85.0, efficiency: 50.0 },
-            HardwarePowerProfile::GenericX86 => PowerProfile { avg_watts: 15.0, peak_watts: 45.0, thermal_limit_c: 95.0, efficiency: 20.0 },
+            HardwarePowerProfile::AppleM1 => PowerProfile {
+                avg_watts: 3.5,
+                peak_watts: 7.0,
+                thermal_limit_c: 95.0,
+                efficiency: 120.0,
+            },
+            HardwarePowerProfile::AppleM2 => PowerProfile {
+                avg_watts: 3.8,
+                peak_watts: 7.5,
+                thermal_limit_c: 98.0,
+                efficiency: 135.0,
+            },
+            HardwarePowerProfile::AppleM3 => PowerProfile {
+                avg_watts: 3.2,
+                peak_watts: 6.5,
+                thermal_limit_c: 98.0,
+                efficiency: 155.0,
+            },
+            HardwarePowerProfile::AppleM4 => PowerProfile {
+                avg_watts: 3.0,
+                peak_watts: 6.0,
+                thermal_limit_c: 100.0,
+                efficiency: 170.0,
+            },
+            HardwarePowerProfile::AppleM1Pro => PowerProfile {
+                avg_watts: 6.0,
+                peak_watts: 14.0,
+                thermal_limit_c: 95.0,
+                efficiency: 90.0,
+            },
+            HardwarePowerProfile::AppleM2Pro => PowerProfile {
+                avg_watts: 5.5,
+                peak_watts: 13.0,
+                thermal_limit_c: 98.0,
+                efficiency: 100.0,
+            },
+            HardwarePowerProfile::AppleM3Pro => PowerProfile {
+                avg_watts: 5.0,
+                peak_watts: 12.0,
+                thermal_limit_c: 98.0,
+                efficiency: 115.0,
+            },
+            HardwarePowerProfile::AppleM4Pro => PowerProfile {
+                avg_watts: 4.5,
+                peak_watts: 11.0,
+                thermal_limit_c: 100.0,
+                efficiency: 130.0,
+            },
+            HardwarePowerProfile::AppleM1Max => PowerProfile {
+                avg_watts: 12.0,
+                peak_watts: 28.0,
+                thermal_limit_c: 95.0,
+                efficiency: 60.0,
+            },
+            HardwarePowerProfile::AppleM2Max => PowerProfile {
+                avg_watts: 11.0,
+                peak_watts: 26.0,
+                thermal_limit_c: 98.0,
+                efficiency: 68.0,
+            },
+            HardwarePowerProfile::AppleM3Max => PowerProfile {
+                avg_watts: 10.0,
+                peak_watts: 24.0,
+                thermal_limit_c: 98.0,
+                efficiency: 78.0,
+            },
+            HardwarePowerProfile::AppleM4Max => PowerProfile {
+                avg_watts: 9.0,
+                peak_watts: 22.0,
+                thermal_limit_c: 100.0,
+                efficiency: 88.0,
+            },
+            HardwarePowerProfile::AppleA16 => PowerProfile {
+                avg_watts: 0.8,
+                peak_watts: 2.5,
+                thermal_limit_c: 85.0,
+                efficiency: 250.0,
+            },
+            HardwarePowerProfile::AppleA17 => PowerProfile {
+                avg_watts: 0.75,
+                peak_watts: 2.3,
+                thermal_limit_c: 88.0,
+                efficiency: 280.0,
+            },
+            HardwarePowerProfile::AppleA18 => PowerProfile {
+                avg_watts: 0.7,
+                peak_watts: 2.1,
+                thermal_limit_c: 88.0,
+                efficiency: 310.0,
+            },
+            HardwarePowerProfile::GenericArm => PowerProfile {
+                avg_watts: 2.0,
+                peak_watts: 5.0,
+                thermal_limit_c: 85.0,
+                efficiency: 50.0,
+            },
+            HardwarePowerProfile::GenericX86 => PowerProfile {
+                avg_watts: 15.0,
+                peak_watts: 45.0,
+                thermal_limit_c: 95.0,
+                efficiency: 20.0,
+            },
         }
     }
 }
@@ -1082,7 +1218,9 @@ impl EdgeDeployPipeline {
                 success: false,
                 target: AotTarget::CoreML,
                 output_path: String::new(),
-                error_message: "Core ML compiler not found in PATH; install Xcode 16+ for Core AI support".into(),
+                error_message:
+                    "Core ML compiler not found in PATH; install Xcode 16+ for Core AI support"
+                        .into(),
             },
         }
     }
@@ -1104,7 +1242,14 @@ impl EdgeDeployPipeline {
                     start + bytes_per_shard
                 };
                 let mut metadata = HashMap::new();
-                metadata.insert("layers".into(), format!("{}-{}", i * layers_per_shard, ((i + 1) * layers_per_shard - 1).min(total_layers - 1)));
+                metadata.insert(
+                    "layers".into(),
+                    format!(
+                        "{}-{}",
+                        i * layers_per_shard,
+                        ((i + 1) * layers_per_shard - 1).min(total_layers - 1)
+                    ),
+                );
                 ModelShard {
                     shard_id: i,
                     total_shards: shard_count,
@@ -1232,7 +1377,11 @@ impl AneDirectProgramV2 {
     }
 
     pub fn estimate_dispatch_us(&self) -> f64 {
-        if self.is_deferred { 100.0 } else { 5.0 }
+        if self.is_deferred {
+            100.0
+        } else {
+            5.0
+        }
     }
 }
 
@@ -1254,7 +1403,12 @@ impl CoreAiDeployPipeline {
     pub fn aot_compile(&mut self, model_name: &str, _model_bytes: &[u8]) -> CoreAiAotResult {
         let start = std::time::Instant::now();
         let program_id = format!("ane_{}", model_name.replace('.', "_"));
-        let ops = vec!["embed".into(), "transformer_block".into(), "layer_norm".into(), "rms_norm".into()];
+        let ops = vec![
+            "embed".into(),
+            "transformer_block".into(),
+            "layer_norm".into(),
+            "rms_norm".into(),
+        ];
         let mut program = AneDirectProgramV2::new(&program_id, ops);
         if !self.config.deferred_compilation {
             program.compile_deferred();
@@ -1265,7 +1419,11 @@ impl CoreAiDeployPipeline {
             output_path: format!("/tmp/neotrix_coreai/{}.ane", model_name),
             compilation_ms: start.elapsed().as_millis() as u64,
             estimated_latency_ms: if self.config.use_fp16 { 5.0 } else { 10.0 },
-            estimated_memory_mb: if self.config.quantize_activations { 128 } else { 256 },
+            estimated_memory_mb: if self.config.quantize_activations {
+                128
+            } else {
+                256
+            },
             ane_program_id: Some(program_id),
         }
     }
@@ -1274,13 +1432,18 @@ impl CoreAiDeployPipeline {
         let program_id = format!("ane_{}", model_name.replace('.', "_"));
         match self.compiled_programs.get_mut(&program_id) {
             Some(program) => {
-                if program.is_deferred { program.compile_deferred(); }
+                if program.is_deferred {
+                    program.compile_deferred();
+                }
                 Ok(program.dispatch(input))
             }
             None => {
                 let result = self.aot_compile(model_name, &[]);
-                if result.success { self.dispatch_model(model_name, input) }
-                else { Err(format!("failed to compile model: {}", model_name)) }
+                if result.success {
+                    self.dispatch_model(model_name, input)
+                } else {
+                    Err(format!("failed to compile model: {}", model_name))
+                }
             }
         }
     }
@@ -1308,7 +1471,11 @@ impl EdgeDeployPipeline {
         let mem_mb = hw.memory_mb;
         DeployReport {
             hardware: hw,
-            quantization: if has_ane { Quantization::FP16 } else { Quantization::INT8 },
+            quantization: if has_ane {
+                Quantization::FP16
+            } else {
+                Quantization::INT8
+            },
             estimated_ram_mb: if has_ane { 128 } else { 256 },
             estimated_inference_ms: if has_ane { 3.0 } else { 15.0 },
             supported: has_ane || mem_mb >= 2048,
@@ -1332,7 +1499,13 @@ mod tests {
         assert_eq!(recovered.len(), 64);
         for (orig, rec) in weights.iter().zip(recovered.iter()) {
             let err = (orig - rec).abs();
-            assert!(err < 0.3, "AWQ error too large: {} vs {} (err={})", orig, rec, err);
+            assert!(
+                err < 0.3,
+                "AWQ error too large: {} vs {} (err={})",
+                orig,
+                rec,
+                err
+            );
         }
     }
 
@@ -1361,7 +1534,9 @@ mod tests {
         let pipeline = QuantizationPipeline::default();
         let weights: Vec<f64> = (0..256).map(|i| (i as f64 - 128.0) / 128.0).collect();
         let quantized = pipeline.quantize_gguf(&weights, GGUFLevel::Q8_0);
-        let recovered = pipeline.dequantize_gguf(&quantized, GGUFLevel::Q8_0).unwrap();
+        let recovered = pipeline
+            .dequantize_gguf(&quantized, GGUFLevel::Q8_0)
+            .unwrap();
         assert_eq!(recovered.len(), weights.len());
         for (w, r) in weights.iter().zip(recovered.iter()) {
             let err = (w - r).abs();
@@ -1737,7 +1912,8 @@ mod tests {
 
     #[test]
     fn test_load_calibration_nonexistent_path() {
-        let samples = EdgeDeployPipeline::load_calibration_dataset("/nonexistent/path/for/calibration");
+        let samples =
+            EdgeDeployPipeline::load_calibration_dataset("/nonexistent/path/for/calibration");
         assert!(samples.is_empty());
     }
 

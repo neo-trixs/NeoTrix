@@ -9,21 +9,21 @@
 //! - L8 的输出通过 L7 的 Capability 机制提交
 
 pub use crate::core::nt_core_iter as iter;
-pub use crate::core::nt_core_iter::SelfIteration;
 pub use crate::core::nt_core_iter::self_ref_code::{
-    CodeMutation, MutationRequest, MutationResult, MutationRisk, MutationType,
-    RollbackPlan, SelfCodeMonitor, SelfRefStats,
+    CodeMutation, MutationRequest, MutationResult, MutationRisk, MutationType, RollbackPlan,
+    SelfCodeMonitor, SelfRefStats,
 };
+pub use crate::core::nt_core_iter::SelfIteration;
 
 // SEAL 管线（会从 neotrix/nt_mind 移入）
 pub use crate::core::nt_core_absorb as absorb;
-pub use crate::core::nt_core_absorb::AbsorbValidator;
 pub use crate::core::nt_core_absorb::spec_driven::{
-    EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecPipelineStats,
-    SpecStatus, SpecVerification, SpecVerifier,
+    EvolutionSpec, SpecDiff, SpecDrivenPipeline, SpecPipelineConfig, SpecPipelineStats, SpecStatus,
+    SpecVerification, SpecVerifier,
 };
+pub use crate::core::nt_core_absorb::AbsorbValidator;
 
 // 梦境巩固（HyperCube 子系统）
 pub use crate::core::nt_core_hcube::dream_consolidation::{
-    DreamConfig, DreamEvent, DreamReport, DreamPhase,
+    DreamConfig, DreamEvent, DreamPhase, DreamReport,
 };

@@ -175,12 +175,7 @@ impl InnerCritic {
         self.critiques_issued
     }
 
-    pub fn set_thresholds(
-        &mut self,
-        relevance: f64,
-        consistency: f64,
-        uncertainty: f64,
-    ) {
+    pub fn set_thresholds(&mut self, relevance: f64, consistency: f64, uncertainty: f64) {
         self.config.relevance_threshold = relevance.clamp(0.0, 1.0);
         self.config.consistency_threshold = consistency.clamp(0.0, 1.0);
         self.config.uncertainty_tolerance = uncertainty.clamp(0.0, 1.0);
@@ -207,22 +202,36 @@ impl InnerCritic {
 }
 
 impl crate::core::nt_core_self_test::SelfTest for InnerCritic {
-    fn name(&self) -> &str { "inner_critic" }
+    fn name(&self) -> &str {
+        "inner_critic"
+    }
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         // Test 1: thresholds within valid range
         if !(0.0..=1.0).contains(&self.config.relevance_threshold) {
-            failures.push(format!("relevance_threshold out of range: {}", self.config.relevance_threshold));
+            failures.push(format!(
+                "relevance_threshold out of range: {}",
+                self.config.relevance_threshold
+            ));
         }
         if !(0.0..=1.0).contains(&self.config.consistency_threshold) {
-            failures.push(format!("consistency_threshold out of range: {}", self.config.consistency_threshold));
+            failures.push(format!(
+                "consistency_threshold out of range: {}",
+                self.config.consistency_threshold
+            ));
         }
         if !(0.0..=1.0).contains(&self.config.uncertainty_tolerance) {
-            failures.push(format!("uncertainty_tolerance out of range: {}", self.config.uncertainty_tolerance));
+            failures.push(format!(
+                "uncertainty_tolerance out of range: {}",
+                self.config.uncertainty_tolerance
+            ));
         }
         // Test 2: pass_rate works with zero critiques
         if (self.pass_rate() - 1.0).abs() > 1e-9 {
-            failures.push(format!("pass_rate should be 1.0 with no critiques, got {}", self.pass_rate()));
+            failures.push(format!(
+                "pass_rate should be 1.0 with no critiques, got {}",
+                self.pass_rate()
+            ));
         }
         // Test 3: adjust_thresholds on default state produces valid thresholds
         let mut c = InnerCritic::new();
@@ -231,16 +240,22 @@ impl crate::core::nt_core_self_test::SelfTest for InnerCritic {
         if rate_before > 0.95 && c.config.relevance_threshold <= 0.4 {
             failures.push("adjust_thresholds should increase relevance_threshold above 0.4".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_consciousness::vsa_tag::{
+        VsaOrigin, VsaSelfCategory, VsaWorldCategory,
+    };
     use crate::core::nt_core_consciousness::SpeciousPresent;
-use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
-    use crate::core::nt_core_consciousness::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaWorldCategory};
+    use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
     #[test]
     fn test_new_critic_has_perfect_pass_rate() {
@@ -308,7 +323,10 @@ use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
         let output = VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought));
         let context = VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought));
         let mut sp = SpeciousPresent::new(3);
-        sp.push(VsaTagged::new(vec![0; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+        sp.push(VsaTagged::new(
+            vec![0; 100],
+            VsaOrigin::Self_(VsaSelfCategory::Thought),
+        ));
         let result = c.evaluate(&output, &context, Some(&sp));
         assert!(!result.passed || result.consistency_score >= 0.0);
     }

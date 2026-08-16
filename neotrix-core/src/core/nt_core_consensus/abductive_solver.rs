@@ -110,13 +110,11 @@ impl AbductiveSolver {
     }
 
     pub fn best_explanation(&self) -> Option<&AbductiveExplanation> {
-        self.explanations
-            .iter()
-            .max_by(|a, b| {
-                a.plausibility
-                    .partial_cmp(&b.plausibility)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+        self.explanations.iter().max_by(|a, b| {
+            a.plausibility
+                .partial_cmp(&b.plausibility)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     pub fn resolve_conflicts(

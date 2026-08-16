@@ -45,16 +45,35 @@ impl HarnessProfile {
     }
 
     pub fn add_specialist_adaptation(&mut self, specialist: SpecialistType, adaptation: &str) {
-        self.specialist_adaptations.entry(specialist).or_default().push(adaptation.to_string());
+        self.specialist_adaptations
+            .entry(specialist)
+            .or_default()
+            .push(adaptation.to_string());
     }
 
     pub fn summary(&self) -> String {
         let mut parts = Vec::new();
         parts.push(format!("Source model: {}", self.source_model));
-        parts.push(format!("Contracts ({}): {}", self.environment_contracts.len(), self.environment_contracts.join(", ")));
-        parts.push(format!("Skills ({}): {}", self.procedural_skills.len(), self.procedural_skills.join(", ")));
-        parts.push(format!("Realizations ({}): {}", self.action_realizations.len(), self.action_realizations.join(", ")));
-        parts.push(format!("Trajectory rules ({}): {}", self.trajectory_rules.len(), self.trajectory_rules.join(", ")));
+        parts.push(format!(
+            "Contracts ({}): {}",
+            self.environment_contracts.len(),
+            self.environment_contracts.join(", ")
+        ));
+        parts.push(format!(
+            "Skills ({}): {}",
+            self.procedural_skills.len(),
+            self.procedural_skills.join(", ")
+        ));
+        parts.push(format!(
+            "Realizations ({}): {}",
+            self.action_realizations.len(),
+            self.action_realizations.join(", ")
+        ));
+        parts.push(format!(
+            "Trajectory rules ({}): {}",
+            self.trajectory_rules.len(),
+            self.trajectory_rules.join(", ")
+        ));
         parts.push(format!("Performance delta: {}", self.performance_delta));
         parts.join("\n\n")
     }

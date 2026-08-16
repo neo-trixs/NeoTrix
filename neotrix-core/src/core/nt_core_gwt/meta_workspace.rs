@@ -132,7 +132,8 @@ impl MetaWorkspace {
                             "[meta] 专家 {name} ({expert}) 激活频率过高: {:.0}% 的窗口周期",
                             frac * 100.0
                         ),
-                        severity: ((frac - OVERACTIVATE_FRAC) / (1.0 - OVERACTIVATE_FRAC)).clamp(0.0, 1.0),
+                        severity: ((frac - OVERACTIVATE_FRAC) / (1.0 - OVERACTIVATE_FRAC))
+                            .clamp(0.0, 1.0),
                         cycle: self.cycle,
                     });
                 }
@@ -144,18 +145,17 @@ impl MetaWorkspace {
         }
 
         // 2) Entropy anomaly: mean window entropy far from healthy band.
-        let mean_entropy = self
-            .history
-            .iter()
-            .map(|h| h.entropy)
-            .sum::<f64>()
-            / n;
+        let mean_entropy = self.history.iter().map(|h| h.entropy).sum::<f64>() / n;
         if !(0.5..=2.5).contains(&mean_entropy) {
             let mo = MetaObservation {
                 tag: "entropy_anomaly".to_string(),
                 message: format!(
                     "[meta] 工作空间熵异常 (mean={mean_entropy:.2}) — 注意状态 {}",
-                    if mean_entropy < 0.5 { "趋固定 (fixation)" } else { "发散 (scattered)" }
+                    if mean_entropy < 0.5 {
+                        "趋固定 (fixation)"
+                    } else {
+                        "发散 (scattered)"
+                    }
                 ),
                 severity: ((mean_entropy - 0.5).max(2.5 - mean_entropy)).clamp(0.0, 1.0),
                 cycle: self.cycle,
@@ -193,7 +193,10 @@ impl MetaWorkspace {
 
     /// Number of specialists observed (from the most recent observation).
     fn specialist_count(&self) -> usize {
-        self.history.front().map(|h| h.specialist_count).unwrap_or(0)
+        self.history
+            .front()
+            .map(|h| h.specialist_count)
+            .unwrap_or(0)
     }
 
     /// Push an observation, keeping the ring bounded.

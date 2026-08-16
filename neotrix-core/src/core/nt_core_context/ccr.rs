@@ -1,7 +1,7 @@
+use super::context_budget::{CompactionIntent, CompactionPriority};
 use std::collections::VecDeque;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::time::{SystemTime, UNIX_EPOCH, Duration, Instant};
-use super::context_budget::{CompactionIntent, CompactionPriority};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompressionStrategy {
@@ -81,7 +81,9 @@ impl CompressionStore {
                 if s.len() > *max_chars {
                     let truncated: String = s.chars().take(*max_chars).collect();
                     format!("{}\n\n[--- truncated, summary: {} ---]", truncated, summary)
-                } else { s }
+                } else {
+                    s
+                }
             }
             CompressionStrategy::Passthrough => content.to_string(),
         };
@@ -89,7 +91,9 @@ impl CompressionStore {
         let compressed_len = compressed.len();
         let ratio = if original_len > 0 {
             compressed_len as f64 / original_len as f64
-        } else { 1.0 };
+        } else {
+            1.0
+        };
 
         self.evict_expired();
         if self.cache.len() >= self.capacity {
@@ -108,7 +112,9 @@ impl CompressionStore {
         }
 
         let now_ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
 
         CompressedBlock {
             fingerprint: fp,
@@ -125,7 +131,10 @@ impl CompressionStore {
 
     pub fn retrieve(&mut self, fingerprint: &[u8; 16]) -> Option<Vec<u8>> {
         self.evict_expired();
-        let pos = self.cache.iter().position(|e| e.fingerprint == *fingerprint)?;
+        let pos = self
+            .cache
+            .iter()
+            .position(|e| e.fingerprint == *fingerprint)?;
         let entry = &mut self.cache[pos];
         entry.access_count += 1;
         self.total_retrievals += 1;
@@ -133,13 +142,17 @@ impl CompressionStore {
     }
 
     pub fn is_cached(&self, fingerprint: &[u8; 16]) -> bool {
-        self.cache.iter().any(|e| e.fingerprint == *fingerprint && e.created.elapsed() < self.ttl)
+        self.cache
+            .iter()
+            .any(|e| e.fingerprint == *fingerprint && e.created.elapsed() < self.ttl)
     }
 
     pub fn stats(&self) -> CcrStats {
         let overall = if self.total_original_bytes > 0 {
             self.total_compressed_bytes as f64 / self.total_original_bytes as f64
-        } else { 1.0 };
+        } else {
+            1.0
+        };
 
         CcrStats {
             entries: self.cache.len(),
@@ -168,7 +181,10 @@ pub fn compute_fingerprint(content: &[u8]) -> [u8; 16] {
 }
 
 pub fn should_compress(intent: &CompactionIntent, _store: &CompressionStore) -> bool {
-    matches!(intent.priority, CompactionPriority::Normal | CompactionPriority::Low)
+    matches!(
+        intent.priority,
+        CompactionPriority::Normal | CompactionPriority::Low
+    )
 }
 
 fn compress_whitespace(content: &str) -> String {
@@ -216,8 +232,8 @@ fn find_repeated_lines(lines: &[&str]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::nt_core_context::SourceType;
     use super::*;
+    use crate::core::nt_core_context::SourceType;
 
     #[test]
     fn test_compress_passthrough() {
@@ -236,10 +252,7 @@ mod tests {
         let block = store.compress(content);
         let retrieved = store.retrieve(&block.fingerprint);
         assert!(retrieved.is_some());
-        assert_eq!(
-            String::from_utf8(retrieved.unwrap()).unwrap(),
-            content
-        );
+        assert_eq!(String::from_utf8(retrieved.unwrap()).unwrap(), content);
     }
 
     #[test]

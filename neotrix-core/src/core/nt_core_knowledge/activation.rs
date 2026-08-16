@@ -1,16 +1,25 @@
-use std::collections::HashMap;
-use super::{KnowledgeSource, TaskType, SourceAccessTracker};
+use super::{KnowledgeSource, SourceAccessTracker, TaskType};
 use crate::core::CapabilityVector;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ActivationPolicy {
     Threshold(f64),
-    FrequencyBoost { base_threshold: f64, boost: f64 },
-    Hybrid { threshold: f64, boost: f64, decay_half_life_secs: f64 },
+    FrequencyBoost {
+        base_threshold: f64,
+        boost: f64,
+    },
+    Hybrid {
+        threshold: f64,
+        boost: f64,
+        decay_half_life_secs: f64,
+    },
 }
 
 impl Default for ActivationPolicy {
-    fn default() -> Self { ActivationPolicy::Threshold(0.7) }
+    fn default() -> Self {
+        ActivationPolicy::Threshold(0.7)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -37,7 +46,10 @@ pub struct CascadeSelector {
 
 impl Default for CascadeSelector {
     fn default() -> Self {
-        Self { top_k: 3, fallback_sources: vec![KnowledgeSource::MemOS, KnowledgeSource::BaseUI] }
+        Self {
+            top_k: 3,
+            fallback_sources: vec![KnowledgeSource::MemOS, KnowledgeSource::BaseUI],
+        }
     }
 }
 
@@ -58,12 +70,15 @@ impl KSActivationEngine {
         let all_sources = KnowledgeSource::all();
         let mut registry = HashMap::new();
         for source in all_sources {
-            registry.insert(source, RegisteredSource {
+            registry.insert(
                 source,
-                lifecycle: KsLifecycle::Young,
-                policy: ActivationPolicy::default(),
-                hit_count: 0,
-            });
+                RegisteredSource {
+                    source,
+                    lifecycle: KsLifecycle::Young,
+                    policy: ActivationPolicy::default(),
+                    hit_count: 0,
+                },
+            );
         }
         Self {
             registry,
@@ -73,16 +88,20 @@ impl KSActivationEngine {
     }
 
     pub fn register(&mut self, source: KnowledgeSource, policy: ActivationPolicy) {
-        self.registry.insert(source, RegisteredSource {
+        self.registry.insert(
             source,
-            lifecycle: KsLifecycle::Young,
-            policy,
-            hit_count: 0,
-        });
+            RegisteredSource {
+                source,
+                lifecycle: KsLifecycle::Young,
+                policy,
+                hit_count: 0,
+            },
+        );
     }
 
     pub fn select(&self, _task_type: TaskType, query: &CapabilityVector) -> Vec<KnowledgeSource> {
-        let mut scored: Vec<(f64, KnowledgeSource)> = self.registry
+        let mut scored: Vec<(f64, KnowledgeSource)> = self
+            .registry
             .values()
             .filter(|r| r.lifecycle != KsLifecycle::Archived)
             .filter_map(|r| {
@@ -90,16 +109,33 @@ impl KSActivationEngine {
                 let sim = cv.similarity(query);
                 let (threshold, boost) = match r.policy {
                     ActivationPolicy::Threshold(t) => (t, 0.0),
-                    ActivationPolicy::FrequencyBoost { base_threshold, boost } => (base_threshold, boost),
-                    ActivationPolicy::Hybrid { threshold, boost, .. } => (threshold, boost),
+                    ActivationPolicy::FrequencyBoost {
+                        base_threshold,
+                        boost,
+                    } => (base_threshold, boost),
+                    ActivationPolicy::Hybrid {
+                        threshold, boost, ..
+                    } => (threshold, boost),
                 };
-                let freq_boost = if r.hit_count > 0 { boost * (r.hit_count as f64).ln() } else { 0.0 };
+                let freq_boost = if r.hit_count > 0 {
+                    boost * (r.hit_count as f64).ln()
+                } else {
+                    0.0
+                };
                 let effective = sim + freq_boost;
-                if effective >= threshold { Some((effective, r.source)) } else { None }
+                if effective >= threshold {
+                    Some((effective, r.source))
+                } else {
+                    None
+                }
             })
             .collect();
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        let top: Vec<KnowledgeSource> = scored.into_iter().take(self.selector.top_k).map(|(_, s)| s).collect();
+        let top: Vec<KnowledgeSource> = scored
+            .into_iter()
+            .take(self.selector.top_k)
+            .map(|(_, s)| s)
+            .collect();
         if top.is_empty() {
             self.selector.fallback_sources.clone()
         } else {
@@ -118,7 +154,8 @@ impl KSActivationEngine {
     }
 
     pub fn lifecycle_report(&self) -> Vec<(KnowledgeSource, KsLifecycle, u64)> {
-        let mut report: Vec<_> = self.registry
+        let mut report: Vec<_> = self
+            .registry
             .values()
             .map(|r| (r.source, r.lifecycle, r.hit_count))
             .collect();
@@ -164,7 +201,10 @@ mod tests {
         engine.record_hit(source);
         engine.record_hit(source);
         let report = engine.lifecycle_report();
-        let (_, lifecycle, count) = report.iter().find(|(s, _, _)| *s == source).expect("value should be ok in test");
+        let (_, lifecycle, count) = report
+            .iter()
+            .find(|(s, _, _)| *s == source)
+            .expect("value should be ok in test");
         assert_eq!(*lifecycle, KsLifecycle::Mature);
         assert_eq!(*count, 3);
     }

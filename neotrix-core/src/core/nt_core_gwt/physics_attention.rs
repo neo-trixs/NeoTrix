@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
 use super::resonance::MODULE_COUNT;
 use crate::core::nt_core_hex::ReasoningHexagram;
+use serde::{Deserialize, Serialize};
 
 /// Adaptive slice clustering inspired by Transolver's Physics-Attention.
 ///
@@ -82,8 +82,16 @@ impl AdaptiveSlicer {
             let seed = (0..MODULE_COUNT)
                 .filter(|&i| !assigned[i])
                 .max_by(|&a, &b| {
-                    let wa = if self.use_activation_weight { activations[a] } else { 1.0 };
-                    let wb = if self.use_activation_weight { activations[b] } else { 1.0 };
+                    let wa = if self.use_activation_weight {
+                        activations[a]
+                    } else {
+                        1.0
+                    };
+                    let wb = if self.use_activation_weight {
+                        activations[b]
+                    } else {
+                        1.0
+                    };
                     wa.total_cmp(&wb)
                 })
                 .unwrap_or(0);
@@ -116,7 +124,11 @@ impl AdaptiveSlicer {
                 1.0
             };
 
-            slices.push(Slice { members, centroid, cohesion });
+            slices.push(Slice {
+                members,
+                centroid,
+                cohesion,
+            });
         }
 
         // Assign remaining unassigned specialists as singleton slices
@@ -131,11 +143,14 @@ impl AdaptiveSlicer {
         }
 
         // Compute per-slice weights (average activation within each slice)
-        let slice_weights: Vec<f64> = slices.iter().map(|slice| {
-            let avg_act: f64 = slice.members.iter().map(|&m| activations[m]).sum::<f64>()
-                / slice.members.len() as f64;
-            avg_act
-        }).collect();
+        let slice_weights: Vec<f64> = slices
+            .iter()
+            .map(|slice| {
+                let avg_act: f64 = slice.members.iter().map(|&m| activations[m]).sum::<f64>()
+                    / slice.members.len() as f64;
+                avg_act
+            })
+            .collect();
 
         self.slices = slices;
         self.slice_weights = slice_weights;
@@ -174,8 +189,8 @@ impl AdaptiveSlicer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::resonance::default_specialist_states;
+    use super::*;
 
     #[test]
     fn test_default() {

@@ -8,8 +8,8 @@
 //! 4. Collapse — anchored iterative compaction into a ContextState document
 //! 5. Auto-compact — automatically trigger when window exceeds threshold
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 
 /// Minimum context entries to preserve after any compaction stage.
 pub const MIN_CONTEXT_ENTRIES: usize = 10;
@@ -32,7 +32,6 @@ pub struct ContextState {
     /// Last update tick
     pub last_updated: usize,
 }
-
 
 impl ContextState {
     pub fn update_goal(&mut self, goal: String, tick: usize) {
@@ -99,7 +98,10 @@ impl Default for CompactionPipeline {
 
 impl CompactionPipeline {
     pub fn new(budget: usize) -> Self {
-        Self { budget, ..Default::default() }
+        Self {
+            budget,
+            ..Default::default()
+        }
     }
 
     pub fn tick(&mut self) -> usize {
@@ -132,7 +134,9 @@ impl CompactionPipeline {
 
         // Layer 3: Microcompact — summarize oldest entries into context state
         if history.len() > self.snip_keep {
-            let oldest: Vec<String> = history.drain(..history.len().saturating_sub(self.snip_keep)).collect();
+            let oldest: Vec<String> = history
+                .drain(..history.len().saturating_sub(self.snip_keep))
+                .collect();
             let summary = self.summarize_for_state(&oldest);
             if let Some(s) = summary {
                 self.context_state.add_completed(s, self.tick);
@@ -165,11 +169,16 @@ impl CompactionPipeline {
             return None;
         }
         let total: usize = entries.len();
-        let key_events: Vec<&str> = entries.iter()
+        let key_events: Vec<&str> = entries
+            .iter()
             .filter(|e| e.contains("[resonant_broadcast]") || e.contains("[entropy_monitor]"))
             .map(|s| s.as_str())
             .collect();
-        Some(format!("[compact] {} entries ({} key events)", total, key_events.len()))
+        Some(format!(
+            "[compact] {} entries ({} key events)",
+            total,
+            key_events.len()
+        ))
     }
 
     fn update_state_from_entry(&mut self, entry: &str) {
@@ -184,7 +193,9 @@ impl CompactionPipeline {
         let marker = "winner=";
         entry.find(marker).map(|i| {
             let rest = &entry[i + marker.len()..];
-            let end = rest.find(|c: char| !c.is_numeric() && c != '.' && c != '-').unwrap_or(rest.len());
+            let end = rest
+                .find(|c: char| !c.is_numeric() && c != '.' && c != '-')
+                .unwrap_or(rest.len());
             format!("winner_idx_{}", &rest[..end])
         })
     }
@@ -210,7 +221,10 @@ mod tests {
 
         let report = pipeline.compact(&mut history);
         assert!(report.entries_before > report.entries_after);
-        assert!(report.stages_applied.iter().any(|s| s.starts_with("budget:")));
+        assert!(report
+            .stages_applied
+            .iter()
+            .any(|s| s.starts_with("budget:")));
     }
 
     #[test]
@@ -231,7 +245,10 @@ mod tests {
         let mut history = make_history(10);
 
         let report = pipeline.compact(&mut history);
-        assert!(report.context_state.completed_summary.len() > 0 || report.entries_after <= pipeline.snip_keep);
+        assert!(
+            report.context_state.completed_summary.len() > 0
+                || report.entries_after <= pipeline.snip_keep
+        );
     }
 
     #[test]

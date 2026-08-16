@@ -62,7 +62,12 @@ impl TemporalDifferenceFlows {
             .map(|_| (rand::random::<f32>() - 0.5) * 0.1)
             .collect();
 
-        Self { config, flow_field, value_function, state_dim }
+        Self {
+            config,
+            flow_field,
+            value_function,
+            state_dim,
+        }
     }
 
     pub fn flow(&self, _state: &[f32], time: f64) -> Vec<f32> {
@@ -166,7 +171,10 @@ mod tests {
         }
         let state = vec![1.0, 2.0, 3.0, 4.0];
         let result = tdf.integrate(&state, 0.0, 5.0);
-        assert!(approx_eq(&result, &state, 1e-6), "zero flow should keep state unchanged");
+        assert!(
+            approx_eq(&result, &state, 1e-6),
+            "zero flow should keep state unchanged"
+        );
     }
 
     #[test]
@@ -181,8 +189,16 @@ mod tests {
         tdf.flow_field[0][1][0] = 2.0;
         let state = vec![0.0, 0.0];
         let result = tdf.integrate(&state, 0.0, 1.0);
-        assert!((result[0] - 1.0).abs() < 0.1, "dim0 should increase to ~1.0, got {}", result[0]);
-        assert!((result[1] - 2.0).abs() < 0.2, "dim1 should increase to ~2.0, got {}", result[1]);
+        assert!(
+            (result[0] - 1.0).abs() < 0.1,
+            "dim0 should increase to ~1.0, got {}",
+            result[0]
+        );
+        assert!(
+            (result[1] - 2.0).abs() < 0.2,
+            "dim1 should increase to ~2.0, got {}",
+            result[1]
+        );
     }
 
     #[test]
@@ -200,7 +216,10 @@ mod tests {
         let state = vec![10.0, 20.0];
         let forward = tdf.integrate(&state, 0.0, 5.0);
         let back = tdf.integrate(&forward, 5.0, 0.0);
-        assert!(approx_eq(&state, &back, 0.5), "reverse integration should return to start");
+        assert!(
+            approx_eq(&state, &back, 0.5),
+            "reverse integration should return to start"
+        );
     }
 
     #[test]
@@ -224,8 +243,16 @@ mod tests {
             tdf.learn_transition(&before, &after, 1.0);
         }
         let predicted = tdf.predict_at_time(&before, 1.0);
-        assert!(predicted[0] > 0.0, "should learn positive flow for dim0, got {}", predicted[0]);
-        assert!(predicted[1] > 0.0, "should learn positive flow for dim1, got {}", predicted[1]);
+        assert!(
+            predicted[0] > 0.0,
+            "should learn positive flow for dim0, got {}",
+            predicted[0]
+        );
+        assert!(
+            predicted[1] > 0.0,
+            "should learn positive flow for dim1, got {}",
+            predicted[1]
+        );
     }
 
     #[test]
@@ -244,7 +271,10 @@ mod tests {
         let init = vec![0.0; 3];
         let t1 = tdf.predict_at_time(&init, 1.0);
         let t2 = tdf.predict_at_time(&init, 2.0);
-        assert!(t1[0] > 0.0 && t2[0] > 0.0, "both horizons should move in flow direction");
+        assert!(
+            t1[0] > 0.0 && t2[0] > 0.0,
+            "both horizons should move in flow direction"
+        );
         assert!(t2[0] > t1[0], "longer horizon should be further");
     }
 
@@ -253,7 +283,10 @@ mod tests {
         let config = TDFlowsConfig::default();
         let tdf = TemporalDifferenceFlows::new(config, 0);
         let result = tdf.integrate(&[], 0.0, 5.0);
-        assert!(result.is_empty(), "zero-dim state should produce empty result");
+        assert!(
+            result.is_empty(),
+            "zero-dim state should produce empty result"
+        );
         let flow_val = tdf.flow(&[], 0.5);
         assert!(flow_val.is_empty(), "zero-dim flow should be empty");
     }
@@ -268,7 +301,10 @@ mod tests {
         let tdf = TemporalDifferenceFlows::new(config, 3);
         let state = vec![1.0, 2.0, 3.0];
         let result = tdf.predict_at_time(&state, 5.0);
-        assert!(approx_eq(&result, &state, 1e-6), "zero horizon should keep state unchanged");
+        assert!(
+            approx_eq(&result, &state, 1e-6),
+            "zero horizon should keep state unchanged"
+        );
     }
 
     #[test]
@@ -277,7 +313,10 @@ mod tests {
         let tdf = TemporalDifferenceFlows::new(config, 3);
         let state = vec![5.0, 6.0, 7.0];
         let result = tdf.predict_at_time(&state, -1.0);
-        assert!(approx_eq(&result, &state, 1e-6), "negative time should return initial state");
+        assert!(
+            approx_eq(&result, &state, 1e-6),
+            "negative time should return initial state"
+        );
     }
 
     #[test]
@@ -294,8 +333,14 @@ mod tests {
         }
         let state = vec![10.0, 20.0];
         let rev = tdf.integrate(&state, 3.0, 1.0);
-        assert!(rev[0] < state[0], "reverse integration should go backward on dim0");
-        assert!(rev[1] < state[1], "reverse integration should go backward on dim1");
+        assert!(
+            rev[0] < state[0],
+            "reverse integration should go backward on dim0"
+        );
+        assert!(
+            rev[1] < state[1],
+            "reverse integration should go backward on dim1"
+        );
     }
 
     #[test]

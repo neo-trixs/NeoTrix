@@ -60,9 +60,9 @@ impl FreeEnergyEngine {
     pub fn update_belief(&mut self, belief: &mut [f64], observation: &[f64]) {
         if observation.len() == 1 {
             let obs_idx = observation[0] as usize;
-            let new_belief = self
-                .belief_updater
-                .update_belief(belief, obs_idx, &self.model.likelihood_matrix);
+            let new_belief =
+                self.belief_updater
+                    .update_belief(belief, obs_idx, &self.model.likelihood_matrix);
             for (b, nb) in belief.iter_mut().zip(new_belief.iter()) {
                 *b = *nb;
             }
@@ -91,9 +91,11 @@ impl FreeEnergyEngine {
 
         let (selected_policy, efe) = self.select_policy(belief, policies, horizon);
 
-        let new_belief = self
-            .belief_updater
-            .update_belief(belief, observation_idx, &self.model.likelihood_matrix);
+        let new_belief = self.belief_updater.update_belief(
+            belief,
+            observation_idx,
+            &self.model.likelihood_matrix,
+        );
         for (b, nb) in belief.iter_mut().zip(new_belief.iter()) {
             *b = *nb;
         }
@@ -127,11 +129,7 @@ mod tests {
             vec![0.3, 0.4, 0.3],
             vec![0.1, 0.2, 0.7],
         ];
-        model.likelihood_matrix = vec![
-            vec![0.9, 0.1],
-            vec![0.5, 0.5],
-            vec![0.1, 0.9],
-        ];
+        model.likelihood_matrix = vec![vec![0.9, 0.1], vec![0.5, 0.5], vec![0.1, 0.9]];
         model
     }
 
@@ -203,8 +201,7 @@ mod tests {
         let policies = vec![vec![0, 0, 0], vec![1, 1, 1], vec![2, 2, 2]];
 
         for step in 0..3 {
-            let report =
-                engine.run_active_inference_step(&mut belief, step % 2, &policies, 3);
+            let report = engine.run_active_inference_step(&mut belief, step % 2, &policies, 3);
             assert!(report.vfe.is_finite());
             let sum: f64 = belief.iter().sum();
             assert!((sum - 1.0).abs() < 1e-10);

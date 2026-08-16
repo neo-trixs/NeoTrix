@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 
 /// Inner Speech generator for the Global Workspace.
 ///
@@ -89,7 +89,11 @@ impl InnerSpeech {
 
     /// Compose a natural-language self-talk line from the resonance state.
     fn verbalize(&self, input: &SpeechInput) -> String {
-        let focus_desc = if input.focused { "focused" } else { "distributed" };
+        let focus_desc = if input.focused {
+            "focused"
+        } else {
+            "distributed"
+        };
         let entropy_desc = if input.entropy < 0.5 {
             "low (risk of fixation)"
         } else if input.entropy > 2.0 {
@@ -121,13 +125,22 @@ impl InnerSpeech {
         if self.utterances.is_empty() {
             return String::new();
         }
-        let lines: Vec<&str> = self.utterances.iter().take(limit).map(|s| s.as_str()).collect();
+        let lines: Vec<&str> = self
+            .utterances
+            .iter()
+            .take(limit)
+            .map(|s| s.as_str())
+            .collect();
         format!("[self_talk_context]\n{}", lines.join("\n"))
     }
 
     /// Recent utterances (most recent first).
     pub fn recent(&self, limit: usize) -> Vec<&str> {
-        self.utterances.iter().take(limit).map(|s| s.as_str()).collect()
+        self.utterances
+            .iter()
+            .take(limit)
+            .map(|s| s.as_str())
+            .collect()
     }
 
     /// Number of retained utterances.
@@ -155,7 +168,13 @@ impl InnerSpeech {
 mod tests {
     use super::*;
 
-    fn input(winner: usize, name: &str, entropy: f64, focused: bool, complement: bool) -> SpeechInput {
+    fn input(
+        winner: usize,
+        name: &str,
+        entropy: f64,
+        focused: bool,
+        complement: bool,
+    ) -> SpeechInput {
         SpeechInput {
             winner,
             winner_name: name.to_string(),

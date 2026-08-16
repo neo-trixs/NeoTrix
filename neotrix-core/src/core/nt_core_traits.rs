@@ -3,10 +3,10 @@
 //! 核心接口定义 + L0 共享类型，解耦各层之间的直接引用。
 //! 所有实现都在各自层中，traits 本身在 core 层。
 
-use serde::{Serialize, Deserialize};
+use crate::core::nt_core_bank::{ReasoningBankStats, ReasoningMemory};
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::nt_core_knowledge::{KnowledgeSource, AbsorptionRecord};
-use crate::core::nt_core_bank::{ReasoningMemory, ReasoningBankStats};
+use crate::core::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
+use serde::{Deserialize, Serialize};
 
 pub use neotrix_types::core::nt_core_traits::{NativeTool, ToolDef, ToolOutput, ToolProvider};
 
@@ -28,11 +28,17 @@ pub trait CapabilityNode: Send + Sync {
     /// 该节点运行所需的上游能力标识符列表
     fn requires(&self) -> Vec<String>;
     /// 符文槽位配置 (模块级 rune socketing)
-    fn rune_sockets(&self) -> Vec<RuneSocket> { Vec::new() }
+    fn rune_sockets(&self) -> Vec<RuneSocket> {
+        Vec::new()
+    }
     /// 星座成熟度 (C0-C6, 返回 0-6)
-    fn constellation_level(&self) -> u8 { 0 }
+    fn constellation_level(&self) -> u8 {
+        0
+    }
     /// 尝试晋升星座成熟度一级
-    fn promote_constellation(&mut self) -> bool { false }
+    fn promote_constellation(&mut self) -> bool {
+        false
+    }
 }
 
 /// L0 共享专型枚举：GWT 专家模块类型 / SEAL 阶段路由 / PRM 过程奖励评分。
@@ -106,10 +112,16 @@ pub trait BrainProvider: Send + Sync {
     fn capability_vector(&self) -> CapabilityVector;
     fn absorb_knowledge(&mut self, source: KnowledgeSource) -> AbsorptionRecord;
     fn run_seal_iteration(&mut self) -> SealResult;
-    fn total_absorb_count(&self) -> u64 { 0 }
-    fn absorb(&mut self, source: KnowledgeSource) { self.absorb_knowledge(source); }
+    fn total_absorb_count(&self) -> u64 {
+        0
+    }
+    fn absorb(&mut self, source: KnowledgeSource) {
+        self.absorb_knowledge(source);
+    }
     fn register_knowledge_source(&mut self, _name: &str, _vector: CapabilityVector) {}
-    fn absorb_from_custom(&mut self, _name: &str) -> bool { false }
+    fn absorb_from_custom(&mut self, _name: &str) -> bool {
+        false
+    }
 }
 
 /// SkillRunner — L8 SkillEngine 的 L1 抽象接口，避免 L1→L8 直接依赖
@@ -140,27 +152,43 @@ mod tests {
 
     #[test]
     fn test_tool_output_success() {
-        let o = ToolOutput { success: true, content: "done".into() };
+        let o = ToolOutput {
+            success: true,
+            content: "done".into(),
+        };
         assert!(o.success);
         assert_eq!(o.content, "done");
     }
 
     #[test]
     fn test_tool_output_failure() {
-        let o = ToolOutput { success: false, content: "error".into() };
+        let o = ToolOutput {
+            success: false,
+            content: "error".into(),
+        };
         assert!(!o.success);
     }
 
     #[test]
     fn test_seal_result() {
-        let r = SealResult { score_before: 0.5, score_after: 0.8, delta: 0.3, iterations: 5 };
+        let r = SealResult {
+            score_before: 0.5,
+            score_after: 0.8,
+            delta: 0.3,
+            iterations: 5,
+        };
         assert!((r.delta - 0.3).abs() < 1e-10);
         assert_eq!(r.iterations, 5);
     }
 
     #[test]
     fn test_seal_result_zero_delta() {
-        let r = SealResult { score_before: 1.0, score_after: 1.0, delta: 0.0, iterations: 0 };
+        let r = SealResult {
+            score_before: 1.0,
+            score_after: 1.0,
+            delta: 0.0,
+            iterations: 0,
+        };
         assert!((r.delta).abs() < 1e-10);
     }
 

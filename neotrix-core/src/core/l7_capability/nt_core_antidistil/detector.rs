@@ -151,7 +151,8 @@ impl DistillationDetector {
     }
 
     fn check_request_rate(&mut self, source: &str, now: u64) -> Option<DistillationAlert> {
-        let recent: Vec<&RequestRecord> = self.request_log
+        let recent: Vec<&RequestRecord> = self
+            .request_log
             .iter()
             .filter(|r| r.source == source && now - r.timestamp < 60)
             .collect();
@@ -167,7 +168,10 @@ impl DistillationDetector {
                 source: source.to_string(),
                 alert_type: AlertType::HighRequestRate,
                 confidence,
-                detail: format!("RPM={:.0}, threshold={}", rpm, self.threshold_requests_per_min),
+                detail: format!(
+                    "RPM={:.0}, threshold={}",
+                    rpm, self.threshold_requests_per_min
+                ),
             };
             self.alert_history.push(alert.clone());
             return Some(alert);
@@ -176,7 +180,8 @@ impl DistillationDetector {
     }
 
     fn check_template_extraction(&mut self, source: &str, now: u64) -> Option<DistillationAlert> {
-        let recent: Vec<&RequestRecord> = self.request_log
+        let recent: Vec<&RequestRecord> = self
+            .request_log
             .iter()
             .filter(|r| r.source == source && now - r.timestamp < self.window_seconds)
             .collect();
@@ -213,7 +218,10 @@ impl DistillationDetector {
                 source: source.to_string(),
                 alert_type: AlertType::PromptTemplateExtraction,
                 confidence: similarity_ratio,
-                detail: format!("similarity_ratio={:.2}, threshold={:.2}", similarity_ratio, self.threshold_similar_prompts),
+                detail: format!(
+                    "similarity_ratio={:.2}, threshold={:.2}",
+                    similarity_ratio, self.threshold_similar_prompts
+                ),
             };
             self.alert_history.push(alert.clone());
             return Some(alert);
@@ -222,7 +230,8 @@ impl DistillationDetector {
     }
 
     fn check_systematic_sampling(&mut self, source: &str, now: u64) -> Option<DistillationAlert> {
-        let recent: Vec<&RequestRecord> = self.request_log
+        let recent: Vec<&RequestRecord> = self
+            .request_log
             .iter()
             .filter(|r| r.source == source && now - r.timestamp < self.window_seconds)
             .collect();
@@ -237,7 +246,8 @@ impl DistillationDetector {
 
         // Systematic distillation: low temp + high tokens per request + high frequency
         if avg_temp < 0.3 && avg_tokens_per_req > 2000.0 && recent.len() > 20 {
-            let confidence = ((1.0 - avg_temp as f64) * 0.4 + (avg_tokens_per_req / 4096.0).min(1.0) * 0.3
+            let confidence = ((1.0 - avg_temp as f64) * 0.4
+                + (avg_tokens_per_req / 4096.0).min(1.0) * 0.3
                 + (recent.len() as f64 / 100.0).min(1.0) * 0.3)
                 .min(0.99);
             let alert = DistillationAlert {
@@ -247,7 +257,9 @@ impl DistillationDetector {
                 confidence,
                 detail: format!(
                     "avg_temp={:.2}, avg_tokens={:.0}, request_count={}",
-                    avg_temp, avg_tokens_per_req, recent.len()
+                    avg_temp,
+                    avg_tokens_per_req,
+                    recent.len()
                 ),
             };
             self.alert_history.push(alert.clone());
@@ -258,8 +270,15 @@ impl DistillationDetector {
 
     fn check_known_source(&self, source: &str) -> Option<DistillationAlert> {
         let suspicious_keywords = [
-            "deepseek", "moonshot", "minimax", "zhipu", "baichuan",
-            "stepfun", "dashscope", "volces", "01ai",
+            "deepseek",
+            "moonshot",
+            "minimax",
+            "zhipu",
+            "baichuan",
+            "stepfun",
+            "dashscope",
+            "volces",
+            "01ai",
         ];
         let source_lower = source.to_lowercase();
         for kw in &suspicious_keywords {
@@ -280,19 +299,26 @@ impl DistillationDetector {
     }
 
     fn update_source_stats(&mut self, source: &str, now: u64, prompt_hash: u64, temperature: f32) {
-        let stats = self.source_stats.entry(source.to_string()).or_insert_with(|| {
-            SourceStats { first_seen: now, ..Default::default() }
-        });
+        let stats = self
+            .source_stats
+            .entry(source.to_string())
+            .or_insert_with(|| SourceStats {
+                first_seen: now,
+                ..Default::default()
+            });
 
         stats.total_requests += 1;
         stats.last_seen = now;
-        stats.avg_temperature = (stats.avg_temperature * (stats.total_requests as f64 - 1.0) + temperature as f64)
+        stats.avg_temperature = (stats.avg_temperature * (stats.total_requests as f64 - 1.0)
+            + temperature as f64)
             / stats.total_requests as f64;
 
         // Track unique prompts
-        if !stats.similarity_scores.iter().any(|&s| {
-            ((prompt_hash as i64) - (s as i64)).unsigned_abs() < 100
-        }) {
+        if !stats
+            .similarity_scores
+            .iter()
+            .any(|&s| ((prompt_hash as i64) - (s as i64)).unsigned_abs() < 100)
+        {
             stats.unique_prompts += 1;
         }
     }
@@ -353,8 +379,12 @@ pub fn analyze_response_pattern(response: &str) -> ResponseAnalysis {
         avg_line_length: avg_line_len,
         repetition_ratio,
         score: ((if length > 10000 { 0.3f64 } else { 0.0f64 })
-            + (if repetition_ratio > 0.3 { 0.4f64 } else { 0.0f64 }))
-            .min(1.0f64),
+            + (if repetition_ratio > 0.3 {
+                0.4f64
+            } else {
+                0.0f64
+            }))
+        .min(1.0f64),
     }
 }
 
@@ -377,10 +407,7 @@ fn detect_repetition(text: &str) -> f64 {
         return 0.0;
     }
     let total = ngrams.len() as f64;
-    let unique: std::collections::HashSet<String> = ngrams
-        .iter()
-        .map(|ng| ng.join(" "))
-        .collect();
+    let unique: std::collections::HashSet<String> = ngrams.iter().map(|ng| ng.join(" ")).collect();
     1.0 - (unique.len() as f64 / total)
 }
 
@@ -404,11 +431,16 @@ impl crate::core::nt_core_self_test::SelfTest for DistillationDetector {
         if stats.total_alerts != 0 {
             failures.push("unexpected alerts after one request".into());
         }
-        let analysis = analyze_response_pattern("The answer is A. Therefore we choose A. Finally we use A.");
+        let analysis =
+            analyze_response_pattern("The answer is A. Therefore we choose A. Finally we use A.");
         if analysis.score < 0.0 || analysis.score > 1.0 {
             failures.push("analysis score out of [0,1] range".into());
         }
-        if failures.is_empty() { Ok(()) } else { Err(failures) }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -452,26 +484,48 @@ mod tests {
         let mut d = DistillationDetector::new();
         d.threshold_similar_prompts = 0.3;
         for _ in 0..10 {
-            d.record_request("extractor.com", "Translate the following to Chinese:", 0.7, 4096, 200);
+            d.record_request(
+                "extractor.com",
+                "Translate the following to Chinese:",
+                0.7,
+                4096,
+                200,
+            );
         }
         let alerts = d.recent_alerts(10);
-        let template_alerts: Vec<_> = alerts.iter().filter(|a| a.alert_type == AlertType::PromptTemplateExtraction).collect();
-        assert!(!template_alerts.is_empty(), "should detect template extraction");
+        let template_alerts: Vec<_> = alerts
+            .iter()
+            .filter(|a| a.alert_type == AlertType::PromptTemplateExtraction)
+            .collect();
+        assert!(
+            !template_alerts.is_empty(),
+            "should detect template extraction"
+        );
     }
 
     #[test]
     fn test_systematic_sampling() {
         let mut d = DistillationDetector::new();
         d.threshold_similar_prompts = 0.95; // high threshold to avoid template trigger
-        // Need >20 requests with low temp + high tokens to trigger
+                                            // Need >20 requests with low temp + high tokens to trigger
         for i in 0..35 {
             let prompt = format!("Q{}: {}", i, "a".repeat((i % 10 + 5) * 10));
             d.record_request("distiller.com", &prompt, 0.1, 4096, 500);
         }
         let alerts = d.recent_alerts(35);
-        let sys_alerts: Vec<_> = alerts.iter().filter(|a| a.alert_type == AlertType::SystematicSampling).collect();
-        assert!(!sys_alerts.is_empty(), "should detect systematic sampling among {} total alerts {:?}",
-            alerts.len(), alerts.iter().map(|a| format!("{:?}", a.alert_type)).collect::<Vec<_>>());
+        let sys_alerts: Vec<_> = alerts
+            .iter()
+            .filter(|a| a.alert_type == AlertType::SystematicSampling)
+            .collect();
+        assert!(
+            !sys_alerts.is_empty(),
+            "should detect systematic sampling among {} total alerts {:?}",
+            alerts.len(),
+            alerts
+                .iter()
+                .map(|a| format!("{:?}", a.alert_type))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -479,7 +533,10 @@ mod tests {
         let d = DistillationDetector::new();
         let alert = d.check_known_source("api.deepseek.com");
         assert!(alert.is_some());
-        assert_eq!(alert.unwrap().alert_type, AlertType::KnownDistillationSource);
+        assert_eq!(
+            alert.unwrap().alert_type,
+            AlertType::KnownDistillationSource
+        );
     }
 
     #[test]

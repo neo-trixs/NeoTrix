@@ -23,11 +23,21 @@ pub struct MCPToolResult {
 
 impl MCPToolResult {
     pub fn ok(tool: &str, summary: impl Into<String>, detail: serde_json::Value) -> Self {
-        Self { tool: tool.to_string(), ok: true, summary: summary.into(), detail }
+        Self {
+            tool: tool.to_string(),
+            ok: true,
+            summary: summary.into(),
+            detail,
+        }
     }
 
     pub fn err(tool: &str, message: impl Into<String>) -> Self {
-        Self { tool: tool.to_string(), ok: false, summary: message.into(), detail: serde_json::json!({}) }
+        Self {
+            tool: tool.to_string(),
+            ok: false,
+            summary: message.into(),
+            detail: serde_json::json!({}),
+        }
     }
 }
 
@@ -123,13 +133,17 @@ impl CodeGraphMCP {
             return MCPToolResult::err("get_node", "graph not built");
         };
         match graph.get_node(id) {
-            Some(n) => MCPToolResult::ok("get_node", format!("node {} found", id), serde_json::json!({
-                "id": n.id,
-                "name": n.name,
-                "kind": format!("{:?}", n.kind),
-                "file": n.file_path.as_ref().map(|p| p.to_string_lossy().to_string()),
-                "line": n.start_line,
-            })),
+            Some(n) => MCPToolResult::ok(
+                "get_node",
+                format!("node {} found", id),
+                serde_json::json!({
+                    "id": n.id,
+                    "name": n.name,
+                    "kind": format!("{:?}", n.kind),
+                    "file": n.file_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+                    "line": n.start_line,
+                }),
+            ),
             None => MCPToolResult::err("get_node", format!("no node {}", id)),
         }
     }
@@ -145,14 +159,19 @@ mod tests {
     use super::*;
 
     fn fixture() -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("nt-retrieval-fixture-{}", uuid::Uuid::new_v4()));
+        let dir =
+            std::env::temp_dir().join(format!("nt-retrieval-fixture-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(dir.join("src")).unwrap();
         std::fs::write(
             dir.join("src/math.rs"),
             "pub fn add(a: i32, b: i32) -> i32 { a + b }\npub struct Config { pub name: String }\n",
         )
         .unwrap();
-        std::fs::write(dir.join("src/main.rs"), "use crate::math;\npub fn main() { math::add(1, 2); }\n").unwrap();
+        std::fs::write(
+            dir.join("src/main.rs"),
+            "use crate::math;\npub fn main() { math::add(1, 2); }\n",
+        )
+        .unwrap();
         dir
     }
 
@@ -185,7 +204,10 @@ mod tests {
         assert!(stats.ok);
         let topo = mcp.tool_graph_topology();
         assert!(topo.ok);
-        assert!(topo.detail["nodes"].as_u64().unwrap() >= 3, "main+math 的符号节点");
+        assert!(
+            topo.detail["nodes"].as_u64().unwrap() >= 3,
+            "main+math 的符号节点"
+        );
     }
 
     #[test]

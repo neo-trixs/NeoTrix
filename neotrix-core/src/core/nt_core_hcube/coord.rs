@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use super::axis::DimensionAxis;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HyperCoord {
@@ -15,7 +15,9 @@ impl Default for HyperCoord {
 
 impl HyperCoord {
     pub fn new() -> Self {
-        Self { values: HashMap::new() }
+        Self {
+            values: HashMap::new(),
+        }
     }
 
     pub fn with(axis: DimensionAxis, value: f64) -> Self {
@@ -59,7 +61,11 @@ impl HyperCoord {
             mag_b += b * b;
         }
         let denom = mag_a.sqrt() * mag_b.sqrt();
-        if denom < 1e-12 { 0.0 } else { dot / denom }
+        if denom < 1e-12 {
+            0.0
+        } else {
+            dot / denom
+        }
     }
 
     pub fn to_dense(&self) -> [f64; 16] {

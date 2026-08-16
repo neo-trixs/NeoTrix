@@ -27,7 +27,8 @@ impl Default for ConsciousnessConfig {
 impl ConsciousnessConfig {
     pub fn consciousness_level(&self, phi: f64, coherence: f64, health: f64) -> f64 {
         (self.phi_weight * phi + self.coherence_weight * coherence + self.health_weight * health)
-            .max(self.min_level).min(self.max_level)
+            .max(self.min_level)
+            .min(self.max_level)
     }
 }
 
@@ -175,7 +176,12 @@ pub struct BlindSpotSummary {
 }
 
 impl BlindSpotSummary {
-    pub fn new(kind: impl Into<String>, severity: u8, description: impl Into<String>, repair: impl Into<String>) -> Self {
+    pub fn new(
+        kind: impl Into<String>,
+        severity: u8,
+        description: impl Into<String>,
+        repair: impl Into<String>,
+    ) -> Self {
         Self {
             kind: kind.into(),
             severity,
@@ -238,7 +244,12 @@ mod tests {
 
     #[test]
     fn test_blind_spot_summary_new() {
-        let bs = BlindSpotSummary::new("strategy_fixation", 2, "Over-reliance on one strategy", "Boost alternatives");
+        let bs = BlindSpotSummary::new(
+            "strategy_fixation",
+            2,
+            "Over-reliance on one strategy",
+            "Boost alternatives",
+        );
         assert_eq!(bs.kind, "strategy_fixation");
         assert_eq!(bs.severity, 2);
         assert_eq!(bs.description, "Over-reliance on one strategy");
@@ -255,7 +266,9 @@ mod tests {
                     ..ConsciousnessAwareness::default()
                 }
             }
-            fn name(&self) -> &'static str { "dummy" }
+            fn name(&self) -> &'static str {
+                "dummy"
+            }
         }
         let p = DummyProvider;
         let a = p.contribute_awareness();

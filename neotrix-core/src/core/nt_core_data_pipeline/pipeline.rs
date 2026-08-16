@@ -90,7 +90,11 @@ impl PipelineOrchestrator {
 
     /// Register a new stage (appended to execution order).
     pub fn register(&mut self, stage: Box<dyn PipelineStage>) {
-        log::info!("[pipeline:{}] registered stage: {}", self.name, stage.name());
+        log::info!(
+            "[pipeline:{}] registered stage: {}",
+            self.name,
+            stage.name()
+        );
         self.stages.push(stage);
     }
 

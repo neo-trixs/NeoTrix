@@ -9,9 +9,9 @@
 //!   - TRACE: Test-Time Scaling via Temporal Reasoning Aggregation (ACL 2026)
 //!   - SWE-TRACE: Trajectory Reduction and Agentic Criteria Evaluation
 
-use super::super::nt_core_prm::AgentTrajectory;
 #[cfg(test)]
 use super::super::nt_core_hex::ReasoningHexagram;
+use super::super::nt_core_prm::AgentTrajectory;
 
 /// Step-attention weights for trajectory-level PRM scoring.
 ///
@@ -49,7 +49,9 @@ impl StepAttention {
     /// Returns normalized attention weights summing to 1.0.
     pub fn compute_weights(&self, trajectory: &AgentTrajectory) -> Vec<f64> {
         let n = trajectory.steps.len();
-        if n == 0 { return Vec::new(); }
+        if n == 0 {
+            return Vec::new();
+        }
 
         let mut raw = Vec::with_capacity(n);
         for (i, step) in trajectory.steps.iter().enumerate() {
@@ -73,23 +75,35 @@ impl StepAttention {
 
         // Softmax normalization
         let max_raw = raw.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let exp_sum: f64 = raw.iter().map(|v| ((v - max_raw) / self.temperature).exp()).sum();
+        let exp_sum: f64 = raw
+            .iter()
+            .map(|v| ((v - max_raw) / self.temperature).exp())
+            .sum();
         if exp_sum < 1e-12 {
             return vec![1.0 / n as f64; n];
         }
-        raw.iter().map(|v| ((v - max_raw) / self.temperature).exp() / exp_sum).collect()
+        raw.iter()
+            .map(|v| ((v - max_raw) / self.temperature).exp() / exp_sum)
+            .collect()
     }
 
     /// Apply step-attention to produce a trajectory-level weighted score.
     pub fn weighted_score(&self, step_scores: &[f64], attention: &[f64]) -> f64 {
-        if step_scores.is_empty() || attention.is_empty() { return 0.0; }
+        if step_scores.is_empty() || attention.is_empty() {
+            return 0.0;
+        }
         let n = step_scores.len().min(attention.len());
-        let weighted: f64 = step_scores[..n].iter()
+        let weighted: f64 = step_scores[..n]
+            .iter()
             .zip(attention[..n].iter())
             .map(|(s, w)| s * w)
             .sum();
         let total_weight: f64 = attention[..n].iter().sum();
-        if total_weight > 0.0 { weighted / total_weight } else { 0.0 }
+        if total_weight > 0.0 {
+            weighted / total_weight
+        } else {
+            0.0
+        }
     }
 }
 
@@ -124,14 +138,18 @@ impl ConvergenceDetector {
     /// Detect whether reasoning has converged based on recent score trajectory.
     /// Returns a convergence score [0.0-1.0] and whether to early-exit.
     pub fn detect_convergence(&self, scores: &[f64]) -> (f64, bool) {
-        if scores.len() < self.min_steps { return (0.0, false); }
+        if scores.len() < self.min_steps {
+            return (0.0, false);
+        }
 
         let n = scores.len();
         let window_end = n;
         let window_start = n.saturating_sub(self.window_size);
         let recent: Vec<f64> = scores[window_start..window_end].to_vec();
 
-        if recent.is_empty() { return (0.0, false); }
+        if recent.is_empty() {
+            return (0.0, false);
+        }
 
         // Answer consistency: low variance in recent scores means stable
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
@@ -198,7 +216,9 @@ impl TrajectoryPrm {
 
         // Step-attention weighting
         let attention = self.step_attention.compute_weights(trajectory);
-        let weighted = self.step_attention.weighted_score(rubric_scores, &attention);
+        let weighted = self
+            .step_attention
+            .weighted_score(rubric_scores, &attention);
 
         // Convergence detection
         let mut score_history = self.step_scores.clone();
@@ -294,7 +314,11 @@ mod tests {
         let weights = sa.compute_weights(&traj);
         assert_eq!(weights.len(), 9);
         let sum: f64 = weights.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "weights sum to {}, expected 1.0", sum);
+        assert!(
+            (sum - 1.0).abs() < 1e-6,
+            "weights sum to {}, expected 1.0",
+            sum
+        );
     }
 
     #[test]
@@ -320,7 +344,11 @@ mod tests {
             ..Default::default()
         };
         let (conv, exit) = cd.detect_convergence(&[0.8, 0.8, 0.8, 0.8]);
-        assert!(conv >= 0.5, "consistent scores should yield convergence >= 0.5, got {}", conv);
+        assert!(
+            conv >= 0.5,
+            "consistent scores should yield convergence >= 0.5, got {}",
+            conv
+        );
         assert!(exit, "should exit when convergence >= 0.45, got {}", conv);
     }
 
@@ -331,7 +359,10 @@ mod tests {
             ..Default::default()
         };
         let (conv, exit) = cd.detect_convergence(&[0.1, 0.9, 0.2, 0.8, 0.1, 0.9]);
-        assert!(conv < 0.5, "inconsistent scores should yield low convergence");
+        assert!(
+            conv < 0.5,
+            "inconsistent scores should yield low convergence"
+        );
         assert!(!exit);
     }
 
@@ -376,7 +407,7 @@ mod tests {
         // Middle-range mode (0.5) should get higher entropy bonus than edge mode (0.0)
         let mut traj = make_test_trajectory(2);
         traj.steps[0].e8_mode = ReasoningHexagram(31); // mid-range, high entropy
-        traj.steps[1].e8_mode = ReasoningHexagram(0);   // edge, low entropy
+        traj.steps[1].e8_mode = ReasoningHexagram(0); // edge, low entropy
         let weights = sa.compute_weights(&traj);
         // Both weights should be positive
         assert!(weights[0] > 0.0);
@@ -403,7 +434,12 @@ mod tests {
     fn test_blended_advantage_lambda_range() {
         for lambda in [0.0, 0.3, 0.5, 0.7, 1.0] {
             let adv = blended_trajectory_advantage(0.7, 0.5, 0.6, lambda);
-            assert!((0.0..=1.0).contains(&adv), "lambda={} gives adv={}", lambda, adv);
+            assert!(
+                (0.0..=1.0).contains(&adv),
+                "lambda={} gives adv={}",
+                lambda,
+                adv
+            );
         }
     }
 }

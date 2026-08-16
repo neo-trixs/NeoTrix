@@ -72,7 +72,9 @@ impl SelfTest for LayerBoundaryFitness {
         let re = Regex::new(r"l(?:8|9|10)_").expect("valid regex");
         let mut violations = Vec::new();
         for file in rs_files(&l1) {
-            let Ok(content) = std::fs::read_to_string(&file) else { continue };
+            let Ok(content) = std::fs::read_to_string(&file) else {
+                continue;
+            };
             for (i, line) in content.lines().enumerate() {
                 if re.is_match(line) && line.contains("crate::neotrix") {
                     violations.push(format!(
@@ -87,7 +89,10 @@ impl SelfTest for LayerBoundaryFitness {
         if violations.is_empty() {
             Ok(())
         } else {
-            let mut msg = vec![format!("层边界违规 {} 处 (L1 不得依赖 L8+)", violations.len())];
+            let mut msg = vec![format!(
+                "层边界违规 {} 处 (L1 不得依赖 L8+)",
+                violations.len()
+            )];
             msg.extend(violations.iter().take(20).cloned());
             Err(msg)
         }
@@ -103,7 +108,9 @@ impl SelfTest for LayerBoundaryFitness {
 pub struct NoCycleFitness;
 
 fn load_registry_edges() -> Option<Vec<(String, String)>> {
-    let path = repo_root().join(".neotrix").join("capability_registry.json");
+    let path = repo_root()
+        .join(".neotrix")
+        .join("capability_registry.json");
     let content = std::fs::read_to_string(path).ok()?;
     let v: serde_json::Value = serde_json::from_str(&content).ok()?;
     let edges = v.get("edges")?.as_array()?;
@@ -210,10 +217,7 @@ impl SelfTest for CapabilityConsistencyFitness {
         if dup.is_empty() {
             Ok(())
         } else {
-            let mut msg = vec![format!(
-                "能力网重复边 {} 条 (应幂等合并为 0)",
-                dup.len()
-            )];
+            let mut msg = vec![format!("能力网重复边 {} 条 (应幂等合并为 0)", dup.len())];
             let mut uniq: Vec<String> = dup.clone();
             uniq.sort();
             uniq.dedup();
@@ -254,7 +258,9 @@ impl SelfTest for TreeSingletonFitness {
             if file.ends_with("nt_core_consciousness_core.rs") {
                 continue;
             }
-            let Ok(content) = std::fs::read_to_string(&file) else { continue };
+            let Ok(content) = std::fs::read_to_string(&file) else {
+                continue;
+            };
             let lines: Vec<&str> = content.lines().collect();
             for (i, line) in lines.iter().enumerate() {
                 let trimmed = line.trim_start();
@@ -346,7 +352,9 @@ impl SelfTest for DeadCodeFitness {
         let src = src_root();
         let re = Regex::new(r"#!\[allow\(dead_code\)\]").expect("valid regex");
         for file in rs_files(&src) {
-            let Ok(content) = std::fs::read_to_string(&file) else { continue };
+            let Ok(content) = std::fs::read_to_string(&file) else {
+                continue;
+            };
             if re.is_match(&content) {
                 // 跳过注释/doc 里的示例文本
                 let code_only: Vec<&str> = content
@@ -372,14 +380,23 @@ impl SelfTest for DeadCodeFitness {
                 let stderr = String::from_utf8_lossy(&o.stderr);
                 let dead_warnings: Vec<String> = stderr
                     .lines()
-                    .filter(|l| l.contains("dead_code") || l.contains("never used") || l.contains("never constructed"))
+                    .filter(|l| {
+                        l.contains("dead_code")
+                            || l.contains("never used")
+                            || l.contains("never constructed")
+                    })
                     .map(|l| l.to_string())
                     .collect();
                 if !dead_warnings.is_empty() {
                     failures.push(format!(
                         "cargo check dead_code warning {} 处: {}",
                         dead_warnings.len(),
-                        dead_warnings.iter().take(5).cloned().collect::<Vec<_>>().join("; ")
+                        dead_warnings
+                            .iter()
+                            .take(5)
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join("; ")
                     ));
                 }
             }
@@ -422,7 +439,9 @@ impl Default for PanicDensityFitness {
 }
 
 fn count_panics_in(file: &Path) -> (usize, usize) {
-    let Ok(content) = std::fs::read_to_string(file) else { return (0, 0) };
+    let Ok(content) = std::fs::read_to_string(file) else {
+        return (0, 0);
+    };
     let mut unwraps = 0usize;
     let mut expects = 0usize;
     for line in content.lines() {

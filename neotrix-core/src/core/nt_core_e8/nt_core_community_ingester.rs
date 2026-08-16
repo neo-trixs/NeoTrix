@@ -22,10 +22,10 @@
 //!   `scripts/absorb-fable-2m.py` can download and feed real data)
 //! - A `task_type` mapping for domain-specific injection
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
+use crate::core::nt_core_e8::domain_transition::{E8DomainTransitionModel, E8TaskType};
 use crate::core::nt_core_e8::E8TransitionMatrix;
-use crate::core::nt_core_e8::domain_transition::{E8TaskType, E8DomainTransitionModel};
 
 /// 20-hex md5 of a string, used to derive deterministic node/edge ids.
 /// Mirrors the retired prototype `scripts/deep-absorb-fable5.py:ndig`. md5 here is used only for
@@ -80,7 +80,9 @@ pub struct CommunityDataIngester {
 
 impl Default for CommunityDataIngester {
     fn default() -> Self {
-        Self { datasets: default_datasets() }
+        Self {
+            datasets: default_datasets(),
+        }
     }
 }
 
@@ -117,8 +119,12 @@ impl CommunityDataIngester {
                 // Also record into task-type-specific matrices (skip General:
                 // all transitions already go into general_matrix above)
                 for task_type in &E8TaskType::ALL {
-                    if *task_type == E8TaskType::General { continue; }
-                    if ds.name.contains(task_type.label()) || matches_task_type(ds.name.as_str(), *task_type) {
+                    if *task_type == E8TaskType::General {
+                        continue;
+                    }
+                    if ds.name.contains(task_type.label())
+                        || matches_task_type(ds.name.as_str(), *task_type)
+                    {
                         for _ in 0..(virtual_count / 2).max(1) {
                             dtm.record_transition(*task_type, from, to);
                         }
@@ -222,8 +228,14 @@ impl CommunityDataIngester {
 
         // related edges within themed groups (faithful group split)
         let ssm_papers = ["priming_hybrid_ssm_fable", "retrieval_aware_distill_ssm"];
-        let fable_traces = ["fable5_sft_traces_kelexine_4k", "fable5_swarm_traces_sft_4k"];
-        let swe_related = ["nvidia_open_swe_traces_207k", "open_swe_agent_thinking_dual"];
+        let fable_traces = [
+            "fable5_sft_traces_kelexine_4k",
+            "fable5_swarm_traces_sft_4k",
+        ];
+        let swe_related = [
+            "nvidia_open_swe_traces_207k",
+            "open_swe_agent_thinking_dual",
+        ];
         for group in [&ssm_papers[..], &fable_traces[..], &swe_related[..]] {
             for i in 0..group.len() {
                 for j in (i + 1)..group.len() {
@@ -242,12 +254,42 @@ impl CommunityDataIngester {
 
         // cross-theme edges with lower weight
         let cross: &[(&str, &str, f64, &str)] = &[
-            ("nvidia_open_swe_traces_207k", "fable5_sft_traces_kelexine_4k", 0.4, "SWE-bench ↔ Kelexine SFT"),
-            ("nvidia_open_swe_traces_207k", "fable5_swarm_traces_sft_4k", 0.35, "SWE-bench ↔ Swarm-AI SFT"),
-            ("open_swe_agent_thinking_dual", "fable5_sft_traces_kelexine_4k", 0.4, "Dual-mode ↔ Kelexine SFT"),
-            ("open_swe_agent_thinking_dual", "fable5_swarm_traces_sft_4k", 0.4, "Dual-mode ↔ Swarm-AI SFT"),
-            ("priming_hybrid_ssm_fable", "fable5_sft_traces_kelexine_4k", 0.3, "SSM ↔ Kelexine SFT"),
-            ("retrieval_aware_distill_ssm", "fable5_swarm_traces_sft_4k", 0.3, "Distilled SSM ↔ Swarm-AI SFT"),
+            (
+                "nvidia_open_swe_traces_207k",
+                "fable5_sft_traces_kelexine_4k",
+                0.4,
+                "SWE-bench ↔ Kelexine SFT",
+            ),
+            (
+                "nvidia_open_swe_traces_207k",
+                "fable5_swarm_traces_sft_4k",
+                0.35,
+                "SWE-bench ↔ Swarm-AI SFT",
+            ),
+            (
+                "open_swe_agent_thinking_dual",
+                "fable5_sft_traces_kelexine_4k",
+                0.4,
+                "Dual-mode ↔ Kelexine SFT",
+            ),
+            (
+                "open_swe_agent_thinking_dual",
+                "fable5_swarm_traces_sft_4k",
+                0.4,
+                "Dual-mode ↔ Swarm-AI SFT",
+            ),
+            (
+                "priming_hybrid_ssm_fable",
+                "fable5_sft_traces_kelexine_4k",
+                0.3,
+                "SSM ↔ Kelexine SFT",
+            ),
+            (
+                "retrieval_aware_distill_ssm",
+                "fable5_swarm_traces_sft_4k",
+                0.3,
+                "Distilled SSM ↔ Swarm-AI SFT",
+            ),
         ];
         for (s, t, w, desc) in cross {
             if let (Some(src), Some(tgt)) = (ids.get(*s), ids.get(*t)) {
@@ -400,7 +442,9 @@ impl CommunityDataIngester {
                 source_url: format!("{base_source_url}/{}", task_type.to_lowercase()),
                 weight: base_weight,
                 transitions,
-                description: format!("Runtime-loaded {task_type} transitions from {base_source_url}"),
+                description: format!(
+                    "Runtime-loaded {task_type} transitions from {base_source_url}"
+                ),
             });
         }
         Some(Self { datasets })
@@ -412,11 +456,35 @@ fn matches_task_type(name: &str, task_type: E8TaskType) -> bool {
     let key = name.to_lowercase();
     match task_type {
         E8TaskType::General => false,
-        E8TaskType::Reasoning => key.contains("reason") || key.contains("fable") || key.contains("distill") || key.contains("fuse") || key.contains("thought") || key.contains("scaler") || key.contains("god_seed") || key.contains("thinking") || key.contains("self_rewriting") || key.contains("chronos") || key.contains("nova") || key.contains("ouroboros") || key.contains("stratos") || key.contains("noesis"),
+        E8TaskType::Reasoning => {
+            key.contains("reason")
+                || key.contains("fable")
+                || key.contains("distill")
+                || key.contains("fuse")
+                || key.contains("thought")
+                || key.contains("scaler")
+                || key.contains("god_seed")
+                || key.contains("thinking")
+                || key.contains("self_rewriting")
+                || key.contains("chronos")
+                || key.contains("nova")
+                || key.contains("ouroboros")
+                || key.contains("stratos")
+                || key.contains("noesis")
+        }
         E8TaskType::Math => key.contains("math"),
-        E8TaskType::Coding => key.contains("code") || key.contains("coding") || key.contains("swe") || key.contains("algorithmic"),
-        E8TaskType::Agentic => key.contains("agent") || key.contains("edge_agent") || key.contains("tool_use"),
-        E8TaskType::Creative => key.contains("creative") || key.contains("story") || key.contains("character"),
+        E8TaskType::Coding => {
+            key.contains("code")
+                || key.contains("coding")
+                || key.contains("swe")
+                || key.contains("algorithmic")
+        }
+        E8TaskType::Agentic => {
+            key.contains("agent") || key.contains("edge_agent") || key.contains("tool_use")
+        }
+        E8TaskType::Creative => {
+            key.contains("creative") || key.contains("story") || key.contains("character")
+        }
     }
 }
 
@@ -1624,7 +1692,10 @@ pub fn seed_transition_matrix_with_community(tm: &mut E8TransitionMatrix) {
         0.15,
     ) {
         Some(ing) => {
-            log::info!("[E8-COMMUNITY] loaded runtime transitions from {}", runtime_path.display());
+            log::info!(
+                "[E8-COMMUNITY] loaded runtime transitions from {}",
+                runtime_path.display()
+            );
             ing
         }
         None => {
@@ -1664,49 +1735,155 @@ mod tests {
         let ingester = CommunityDataIngester::default();
         let fused = ingester.fuse_all();
         let total: u64 = fused.visit_counts.0.iter().sum();
-        assert!(total > 1000, "should fuse many virtual observations, got {}", total);
+        assert!(
+            total > 1000,
+            "should fuse many virtual observations, got {}",
+            total
+        );
     }
 
     #[test]
     fn test_matches_task_type() {
-        assert!(matches_task_type("Complete-FABLE.5-traces-2M", E8TaskType::Reasoning));
+        assert!(matches_task_type(
+            "Complete-FABLE.5-traces-2M",
+            E8TaskType::Reasoning
+        ));
         assert!(matches_task_type("agentic_coding_15k", E8TaskType::Coding));
-        assert!(matches_task_type("agentic_distill_10k", E8TaskType::Agentic));
-        assert!(matches_task_type("fable5_distillation_25k", E8TaskType::Reasoning));
-        assert!(matches_task_type("gemini_3_1_pro_reasoning_5_6m", E8TaskType::Reasoning));
+        assert!(matches_task_type(
+            "agentic_distill_10k",
+            E8TaskType::Agentic
+        ));
+        assert!(matches_task_type(
+            "fable5_distillation_25k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "gemini_3_1_pro_reasoning_5_6m",
+            E8TaskType::Reasoning
+        ));
         assert!(matches_task_type("deepseek_r1_math_12k", E8TaskType::Math));
-        assert!(matches_task_type("creative_story_writing_5k", E8TaskType::Creative));
-        assert!(matches_task_type("nvidia_open_swe_traces_207k", E8TaskType::Coding));
-        assert!(matches_task_type("fable5_sft_traces_kelexine_4k", E8TaskType::Reasoning));
-        assert!(matches_task_type("priming_hybrid_ssm_fable", E8TaskType::Reasoning));
-        assert!(matches_task_type("retrieval_aware_distill_ssm", E8TaskType::Reasoning));
-        assert!(matches_task_type("ansulev_fable_sft_combined_v2", E8TaskType::Reasoning));
-        assert!(matches_task_type("fable5_glm52_expanded_10k", E8TaskType::Reasoning));
-        assert!(matches_task_type("king3djbl_fable5_multisource_11k", E8TaskType::Reasoning));
-        assert!(matches_task_type("claude_mythos_distilled_25k", E8TaskType::Reasoning));
+        assert!(matches_task_type(
+            "creative_story_writing_5k",
+            E8TaskType::Creative
+        ));
+        assert!(matches_task_type(
+            "nvidia_open_swe_traces_207k",
+            E8TaskType::Coding
+        ));
+        assert!(matches_task_type(
+            "fable5_sft_traces_kelexine_4k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "priming_hybrid_ssm_fable",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "retrieval_aware_distill_ssm",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "ansulev_fable_sft_combined_v2",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "fable5_glm52_expanded_10k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "king3djbl_fable5_multisource_11k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "claude_mythos_distilled_25k",
+            E8TaskType::Reasoning
+        ));
         assert!(matches_task_type("openr1_math_220k", E8TaskType::Math));
-        assert!(matches_task_type("fuseo1_deepseek_qwq_sft", E8TaskType::Reasoning));
+        assert!(matches_task_type(
+            "fuseo1_deepseek_qwq_sft",
+            E8TaskType::Reasoning
+        ));
         assert!(matches_task_type("openmath_instruct_2", E8TaskType::Math));
-        assert!(matches_task_type("thoughts_v0_5_cot", E8TaskType::Reasoning));
-        assert!(matches_task_type("scaler_r1_data_17k", E8TaskType::Reasoning));
-        assert!(matches_task_type("magpie_deepseek_reasoning_1m", E8TaskType::Reasoning));
-        assert!(matches_task_type("helioai_deepreason_462x105m", E8TaskType::Reasoning));
-        assert!(matches_task_type("kelexine_fable5_sft_traces_4k", E8TaskType::Reasoning));
-        assert!(matches_task_type("snow_opus47_reasoning_8k", E8TaskType::Reasoning));
-        assert!(matches_task_type("shijunhao_fable5_pi_traces", E8TaskType::Reasoning));
-        assert!(matches_task_type("helioai_mythos_v2_full_distill", E8TaskType::Reasoning));
-        assert!(matches_task_type("opus47_god_seed_reasoning_25k", E8TaskType::Reasoning));
-        assert!(matches_task_type("self_rewriting_metalean_25k", E8TaskType::Reasoning));
-        assert!(matches_task_type("grok44_god_seed_truth_25k", E8TaskType::Reasoning));
-        assert!(matches_task_type("chronos_thinking_v1_mini", E8TaskType::Reasoning));
-        assert!(matches_task_type("nova_reasoning_correction_4k", E8TaskType::Reasoning));
-        assert!(matches_task_type("ouroboros_self_improving", E8TaskType::Reasoning));
-        assert!(matches_task_type("bespoke_stratos_17k", E8TaskType::Reasoning));
-        assert!(matches_task_type("noesis_50k_multilingual_moe", E8TaskType::Reasoning));
-        assert!(matches_task_type("algorithmic_sft_distill_24k", E8TaskType::Coding));
-        assert!(matches_task_type("edge_agent_websearch_260k", E8TaskType::Agentic));
-        assert!(matches_task_type("numinamath_cot_distill_100k", E8TaskType::Math));
-        assert!(matches_task_type("gemma4_fable5_distilled", E8TaskType::Reasoning));
+        assert!(matches_task_type(
+            "thoughts_v0_5_cot",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "scaler_r1_data_17k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "magpie_deepseek_reasoning_1m",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "helioai_deepreason_462x105m",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "kelexine_fable5_sft_traces_4k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "snow_opus47_reasoning_8k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "shijunhao_fable5_pi_traces",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "helioai_mythos_v2_full_distill",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "opus47_god_seed_reasoning_25k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "self_rewriting_metalean_25k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "grok44_god_seed_truth_25k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "chronos_thinking_v1_mini",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "nova_reasoning_correction_4k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "ouroboros_self_improving",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "bespoke_stratos_17k",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "noesis_50k_multilingual_moe",
+            E8TaskType::Reasoning
+        ));
+        assert!(matches_task_type(
+            "algorithmic_sft_distill_24k",
+            E8TaskType::Coding
+        ));
+        assert!(matches_task_type(
+            "edge_agent_websearch_260k",
+            E8TaskType::Agentic
+        ));
+        assert!(matches_task_type(
+            "numinamath_cot_distill_100k",
+            E8TaskType::Math
+        ));
+        assert!(matches_task_type(
+            "gemma4_fable5_distilled",
+            E8TaskType::Reasoning
+        ));
     }
 
     #[test]
@@ -1731,9 +1908,13 @@ mod tests {
         let written = ingester.persist_to_kb(&conn, 1700000000).unwrap();
         assert!(written >= 1);
 
-        let hub: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM nodes WHERE id='community_e8_datasets_hub'", [], |r| r.get(0),
-        ).unwrap();
+        let hub: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE id='community_e8_datasets_hub'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(hub, 1);
 
         // The 6 deep-absorb-fable5 datasets must be materialized
@@ -1745,18 +1926,26 @@ mod tests {
             "retrieval_aware_distill_ssm",
             "open_swe_agent_thinking_dual",
         ] {
-            let c: i64 = conn.query_row(
-                "SELECT COUNT(*) FROM nodes WHERE id=?1", rusqlite::params![format!("community_dataset_{name}")], |r| r.get(0),
-            ).unwrap();
+            let c: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes WHERE id=?1",
+                    rusqlite::params![format!("community_dataset_{name}")],
+                    |r| r.get(0),
+                )
+                .unwrap();
             assert_eq!(c, 1, "missing dataset node {name}");
         }
 
         // Idempotent second run
         let written2 = ingester.persist_to_kb(&conn, 1700000000).unwrap();
         assert_eq!(written2, written);
-        let contains: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM edges WHERE relation_type='contains'", [], |r| r.get(0),
-        ).unwrap();
+        let contains: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE relation_type='contains'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert!(contains >= 6);
     }
 
@@ -1774,13 +1963,24 @@ mod tests {
             let mut f = std::fs::File::create(&tmp).unwrap();
             f.write_all(json.as_bytes()).unwrap();
         }
-        let ingester = CommunityDataIngester::from_runtime_jsonl(&tmp, "https://huggingface.co/datasets/Complete-FABLE.5-traces-2M", 0.15);
+        let ingester = CommunityDataIngester::from_runtime_jsonl(
+            &tmp,
+            "https://huggingface.co/datasets/Complete-FABLE.5-traces-2M",
+            0.15,
+        );
         let _ = std::fs::remove_file(&tmp);
         let ingester = ingester.expect("runtime loader should parse");
         assert_eq!(ingester.datasets.len(), 2);
-        assert!(ingester.datasets.iter().any(|d| d.name == "runtime_Reasoning"));
+        assert!(ingester
+            .datasets
+            .iter()
+            .any(|d| d.name == "runtime_Reasoning"));
         assert!(ingester.datasets.iter().any(|d| d.name == "runtime_Coding"));
-        let reasoning = ingester.datasets.iter().find(|d| d.name == "runtime_Reasoning").unwrap();
+        let reasoning = ingester
+            .datasets
+            .iter()
+            .find(|d| d.name == "runtime_Reasoning")
+            .unwrap();
         assert_eq!(reasoning.transitions, vec![(56, 48, 100), (48, 40, 80)]);
         assert!((reasoning.weight - 0.15).abs() < 1e-9);
     }
@@ -1790,7 +1990,7 @@ mod tests {
         // 意识核心进化闭环 (数据→KB): persist_to_kb_store 应把社区数据集
         // 落盘为真实 KB 节点/边, 使 ConsciousnessTree soil 可观测。
         // 此前该方法无生产调用者, KB 全表 0 行。
-                let tmp = std::env::temp_dir().join(format!("nt_kb_test_{}.db", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("nt_kb_test_{}.db", std::process::id()));
         let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(tmp.clone()))
             .expect("open temp KB");
         let ingester = CommunityDataIngester::default();
@@ -1798,12 +1998,23 @@ mod tests {
         // hub + 每个数据集 = 1 + datasets.len()
         assert_eq!(n, 1 + ingester.datasets.len(), "hub + all datasets written");
         // hub 节点存在
-        let hub = kb.get_node("community_e8_datasets_hub").expect("get hub").expect("hub node");
-        assert_eq!(hub.node_type, crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Concept);
+        let hub = kb
+            .get_node("community_e8_datasets_hub")
+            .expect("get hub")
+            .expect("hub node");
+        assert_eq!(
+            hub.node_type,
+            crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Concept
+        );
         // 至少一个数据集节点存在且为 Dataset 类型
-        let ds = kb.get_node(&format!("community_dataset_{}", ingester.datasets[0].name))
-            .expect("get ds").expect("first dataset node");
-        assert_eq!(ds.node_type, crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Dataset);
+        let ds = kb
+            .get_node(&format!("community_dataset_{}", ingester.datasets[0].name))
+            .expect("get ds")
+            .expect("first dataset node");
+        assert_eq!(
+            ds.node_type,
+            crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Dataset
+        );
         // 幂等: 再次落盘不重复
         let n2 = ingester.persist_to_kb_store(&kb).expect("persist again");
         assert_eq!(n2, 1 + ingester.datasets.len(), "idempotent");

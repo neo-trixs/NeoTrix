@@ -1,8 +1,7 @@
+use crate::core::nt_core_plan::E8Plan;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::core::nt_core_plan::E8Plan;
-
 
 /// Async agent execution status
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,9 +51,16 @@ pub struct SubagentInstance {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SubagentStatus {
     Idle,
-    Running { task: String, started_at: u64 },
-    Completed { result: String },
-    Failed { error: String },
+    Running {
+        task: String,
+        started_at: u64,
+    },
+    Completed {
+        result: String,
+    },
+    Failed {
+        error: String,
+    },
     Paused,
     /// Heartbeat expired (port of sync_todos.py SubagentTracker::check_stale).
     Stale,
@@ -107,7 +113,9 @@ impl SubagentManager {
         let id = format!("agent-{:04}", self.next_id);
         self.next_id += 1;
         let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         let agent = SubagentInstance {
             id: id.clone(),
             config,
@@ -144,14 +152,22 @@ impl SubagentManager {
         self.agents.len()
     }
 
-    pub fn send_message(&mut self, from: &str, to: &str, content: &str, msg_type: MessageType) -> Result<(), String> {
+    pub fn send_message(
+        &mut self,
+        from: &str,
+        to: &str,
+        content: &str,
+        msg_type: MessageType,
+    ) -> Result<(), String> {
         let to_exists = self.agents.contains_key(to);
         if !to_exists {
             return Err(format!("Agent '{}' not found", to));
         }
         let id = format!("msg-{}", uuid::Uuid::new_v4());
         let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         let msg = AgentMessage {
             id,
             from: from.to_string(),
@@ -169,18 +185,26 @@ impl SubagentManager {
     }
 
     pub fn assign_plan(&mut self, agent_id: &str, plan: E8Plan) -> Result<(), String> {
-        let agent = self.agents.get_mut(agent_id).ok_or_else(|| format!("Agent '{}' not found", agent_id))?;
+        let agent = self
+            .agents
+            .get_mut(agent_id)
+            .ok_or_else(|| format!("Agent '{}' not found", agent_id))?;
         agent.current_plan = Some(plan);
         agent.status = SubagentStatus::Running {
             task: agent.config.goal.clone(),
             started_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         };
         Ok(())
     }
 
     pub fn agent_by_e8_mode(&self, mode: u8) -> Vec<&SubagentInstance> {
-        self.agents.values().filter(|a| a.config.e8_mode == mode).collect()
+        self.agents
+            .values()
+            .filter(|a| a.config.e8_mode == mode)
+            .collect()
     }
 
     pub fn broadcast(&mut self, sender: &str, content: &str) {
@@ -193,17 +217,36 @@ impl SubagentManager {
     }
 
     pub fn running_count(&self) -> usize {
-        self.agents.values().filter(|a| matches!(a.status, SubagentStatus::Running { .. })).count()
+        self.agents
+            .values()
+            .filter(|a| matches!(a.status, SubagentStatus::Running { .. }))
+            .count()
     }
 
     pub fn summary_stats(&self) -> AgentPoolStats {
         AgentPoolStats {
             total: self.agents.len(),
             running: self.running_count(),
-            idle: self.agents.values().filter(|a| matches!(a.status, SubagentStatus::Idle)).count(),
-            completed: self.agents.values().filter(|a| matches!(a.status, SubagentStatus::Completed { .. })).count(),
-            failed: self.agents.values().filter(|a| matches!(a.status, SubagentStatus::Failed { .. })).count(),
-            paused: self.agents.values().filter(|a| matches!(a.status, SubagentStatus::Paused)).count(),
+            idle: self
+                .agents
+                .values()
+                .filter(|a| matches!(a.status, SubagentStatus::Idle))
+                .count(),
+            completed: self
+                .agents
+                .values()
+                .filter(|a| matches!(a.status, SubagentStatus::Completed { .. }))
+                .count(),
+            failed: self
+                .agents
+                .values()
+                .filter(|a| matches!(a.status, SubagentStatus::Failed { .. }))
+                .count(),
+            paused: self
+                .agents
+                .values()
+                .filter(|a| matches!(a.status, SubagentStatus::Paused))
+                .count(),
             total_executions: self.agents.values().map(|a| a.execution_count).sum(),
         }
     }
@@ -235,7 +278,9 @@ impl SubagentManager {
 
     /// Execute all pending background tasks
     pub fn execute_pending_tasks(&mut self) -> Vec<String> {
-        let pending: Vec<String> = self.background_tasks.iter()
+        let pending: Vec<String> = self
+            .background_tasks
+            .iter()
             .filter(|(_, t)| matches!(t.status, TaskStatus::Pending))
             .map(|(id, _)| id.clone())
             .collect();
@@ -244,7 +289,8 @@ impl SubagentManager {
             if let Some(task) = self.background_tasks.get_mut(id) {
                 task.status = TaskStatus::Running;
                 task.status = TaskStatus::Completed(format!(
-                    "Task {} completed in E8 mode {}", task.name, task.e8_mode
+                    "Task {} completed in E8 mode {}",
+                    task.name, task.e8_mode
                 ));
             }
         }
@@ -274,7 +320,10 @@ impl SubagentManager {
         let agent = SubagentInstance {
             id: id.clone(),
             config,
-            status: SubagentStatus::Running { task: task_id.to_string(), started_at: now },
+            status: SubagentStatus::Running {
+                task: task_id.to_string(),
+                started_at: now,
+            },
             messages: Vec::new(),
             current_plan: None,
             context_window: Vec::new(),
@@ -289,7 +338,9 @@ impl SubagentManager {
 
     /// Touch a subagent's heartbeat (port of sync_todos.py heartbeat).
     pub fn heartbeat(&mut self, id: &str, result: Option<String>) -> bool {
-        let Some(agent) = self.agents.get_mut(id) else { return false };
+        let Some(agent) = self.agents.get_mut(id) else {
+            return false;
+        };
         agent.last_active = unix_secs();
         if let Some(r) = result {
             agent.status = SubagentStatus::Completed { result: r };
@@ -303,7 +354,12 @@ impl SubagentManager {
         let now = unix_secs();
         let mut stale = Vec::new();
         for agent in self.agents.values_mut() {
-            if matches!(agent.status, SubagentStatus::Completed { .. } | SubagentStatus::Failed { .. } | SubagentStatus::Stale) {
+            if matches!(
+                agent.status,
+                SubagentStatus::Completed { .. }
+                    | SubagentStatus::Failed { .. }
+                    | SubagentStatus::Stale
+            ) {
                 continue;
             }
             if now.saturating_sub(agent.last_active) > timeout_secs {
@@ -316,8 +372,12 @@ impl SubagentManager {
 
     /// Release a subagent (task finished) — port of sync_todos.py release.
     pub fn release(&mut self, id: &str, result: &str) -> bool {
-        let Some(agent) = self.agents.get_mut(id) else { return false };
-        agent.status = SubagentStatus::Completed { result: result.to_string() };
+        let Some(agent) = self.agents.get_mut(id) else {
+            return false;
+        };
+        agent.status = SubagentStatus::Completed {
+            result: result.to_string(),
+        };
         agent.last_active = unix_secs();
         true
     }
@@ -325,18 +385,24 @@ impl SubagentManager {
     // ── KB persistence (sync_todos.py sessions/subagents.yml) ──
 
     /// Persist subagent states to the KB `subagents` namespace.
-    pub fn save_to_kb(&self, kb: &crate::neotrix::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
+    pub fn save_to_kb(
+        &self,
+        kb: &crate::neotrix::nt_memory_kb::KnowledgeBase,
+    ) -> Result<(), String> {
         let json = serde_json::to_string_pretty(&self.agents)
             .map_err(|e| format!("SubagentManager serialize: {e}"))?;
         kb.kv_set("subagents", "registry", &json)
     }
 
     /// Load subagent states from the KB `subagents` namespace, merging into current state.
-    pub fn load_from_kb(&mut self, kb: &crate::neotrix::nt_memory_kb::KnowledgeBase) -> Result<usize, String> {
+    pub fn load_from_kb(
+        &mut self,
+        kb: &crate::neotrix::nt_memory_kb::KnowledgeBase,
+    ) -> Result<usize, String> {
         let json = kb.kv_get("subagents", "registry")?;
         let Some(json) = json else { return Ok(0) };
-        let loaded: HashMap<String, SubagentInstance> = serde_json::from_str(&json)
-            .map_err(|e| format!("SubagentManager deserialize: {e}"))?;
+        let loaded: HashMap<String, SubagentInstance> =
+            serde_json::from_str(&json).map_err(|e| format!("SubagentManager deserialize: {e}"))?;
         let count = loaded.len();
         self.agents.extend(loaded);
         Ok(count)
@@ -437,8 +503,12 @@ impl AgentProfile {
 
     /// 域归属：`nt-world` → `NT-WORLD`；非 NT → None。
     pub fn domain_label(&self) -> Option<String> {
-        self.is_nt_domain()
-            .then(|| self.name.trim_start_matches("nt-").to_uppercase().replace('-', "_"))
+        self.is_nt_domain().then(|| {
+            self.name
+                .trim_start_matches("nt-")
+                .to_uppercase()
+                .replace('-', "_")
+        })
     }
 }
 
@@ -502,7 +572,11 @@ impl AgentCatalog {
                 e8_mode: 9,
                 description: "先研究再出：产出实施计划，构建前锁定方案",
                 goal: "调研约束并输出可执行计划，写字面方案不动生产代码",
-                capabilities: vec![CapabilityOp::Plan, CapabilityOp::Reason, CapabilityOp::Search],
+                capabilities: vec![
+                    CapabilityOp::Plan,
+                    CapabilityOp::Reason,
+                    CapabilityOp::Search,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect],
                 max_context: 16384,
             },
@@ -512,7 +586,12 @@ impl AgentCatalog {
                 e8_mode: 12,
                 description: "搜索研究 agent：统一有序后端搜索，聚合多源为可吸收结论",
                 goal: "先用有序搜索后端 (DDG→Wikipedia) 检索，再聚合为证据接地的结论，结果可落 KB",
-                capabilities: vec![CapabilityOp::Research, CapabilityOp::Search, CapabilityOp::Plan, CapabilityOp::Reason],
+                capabilities: vec![
+                    CapabilityOp::Research,
+                    CapabilityOp::Search,
+                    CapabilityOp::Plan,
+                    CapabilityOp::Reason,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Communicate],
                 max_context: 16384,
             },
@@ -523,11 +602,18 @@ impl AgentCatalog {
                 description: "旗舰通用执行 agent，兜底所有未路由任务",
                 goal: "全权执行：读、写、构建、验证、沟通",
                 capabilities: vec![
-                    CapabilityOp::Reason, CapabilityOp::Search, CapabilityOp::Plan,
-                    CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Communicate,
+                    CapabilityOp::Reason,
+                    CapabilityOp::Search,
+                    CapabilityOp::Plan,
+                    CapabilityOp::Execute,
+                    CapabilityOp::Verify,
+                    CapabilityOp::Communicate,
                 ],
                 allowed_tools: vec![
-                    ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate,
+                    ToolPerm::Read,
+                    ToolPerm::Write,
+                    ToolPerm::Execute,
+                    ToolPerm::Communicate,
                 ],
                 max_context: 32768,
             },
@@ -564,8 +650,20 @@ impl AgentCatalog {
                 e8_mode: 63,
                 description: "NT-CORE E8引导者：编排架构大脑，路由委托 + 质量门 + 架构决策",
                 goal: "识别任务类型委托给最合适的域 agent；架构决策自己做；双 Ledger 编排",
-                capabilities: vec![CapabilityOp::Reason, CapabilityOp::Plan, CapabilityOp::Execute, CapabilityOp::Communicate, CapabilityOp::Verify],
-                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate, ToolPerm::Inspect],
+                capabilities: vec![
+                    CapabilityOp::Reason,
+                    CapabilityOp::Plan,
+                    CapabilityOp::Execute,
+                    CapabilityOp::Communicate,
+                    CapabilityOp::Verify,
+                ],
+                allowed_tools: vec![
+                    ToolPerm::Read,
+                    ToolPerm::Write,
+                    ToolPerm::Execute,
+                    ToolPerm::Communicate,
+                    ToolPerm::Inspect,
+                ],
                 max_context: 32768,
             },
             AgentProfile {
@@ -584,8 +682,18 @@ impl AgentCatalog {
                 e8_mode: 31,
                 description: "NT-ACT 行动执行者：多步任务执行与功能实现（可写）",
                 goal: "Spec 驱动实现、TDD 红绿重构、双验证（cargo check + test）、R-P16 持久化校验",
-                capabilities: vec![CapabilityOp::Execute, CapabilityOp::Reason, CapabilityOp::Plan, CapabilityOp::Verify],
-                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate],
+                capabilities: vec![
+                    CapabilityOp::Execute,
+                    CapabilityOp::Reason,
+                    CapabilityOp::Plan,
+                    CapabilityOp::Verify,
+                ],
+                allowed_tools: vec![
+                    ToolPerm::Read,
+                    ToolPerm::Write,
+                    ToolPerm::Execute,
+                    ToolPerm::Communicate,
+                ],
                 max_context: 32768,
             },
             AgentProfile {
@@ -594,7 +702,11 @@ impl AgentCatalog {
                 e8_mode: 14,
                 description: "NT-MIND 进化工匠：TDD 实施与技能结晶（可写）",
                 goal: "红绿重构、测试金字塔、回归保护优先、技能结晶走吸收协议",
-                capabilities: vec![CapabilityOp::Plan, CapabilityOp::Verify, CapabilityOp::Reason],
+                capabilities: vec![
+                    CapabilityOp::Plan,
+                    CapabilityOp::Verify,
+                    CapabilityOp::Reason,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute],
                 max_context: 16384,
             },
@@ -604,7 +716,11 @@ impl AgentCatalog {
                 e8_mode: 37,
                 description: "NT-SHIELD 影卫：安全审查与代码审计（只读）",
                 goal: "D1-D63 维度审查、OWASP 2026 增量、证据优先、T3 验证接线",
-                capabilities: vec![CapabilityOp::Verify, CapabilityOp::Search, CapabilityOp::Reason],
+                capabilities: vec![
+                    CapabilityOp::Verify,
+                    CapabilityOp::Search,
+                    CapabilityOp::Reason,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Execute],
                 max_context: 16384,
             },
@@ -614,7 +730,11 @@ impl AgentCatalog {
                 e8_mode: 21,
                 description: "NT-MEMORY 知识守护者：KB 经验吸收/检索/会话收尾",
                 goal: "experience-tree 五阶段吸收、指针守恒执行者、neotrix-experience 检索",
-                capabilities: vec![CapabilityOp::Reason, CapabilityOp::Search, CapabilityOp::Monitor],
+                capabilities: vec![
+                    CapabilityOp::Reason,
+                    CapabilityOp::Search,
+                    CapabilityOp::Monitor,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Execute],
                 max_context: 16384,
             },
@@ -624,8 +744,17 @@ impl AgentCatalog {
                 e8_mode: 40,
                 description: "NT-IO 界面使徒：前端/Tauri UI 与交互实现（可写）",
                 goal: "契约对齐、逐功能接线、vitest/playwright/build 三连、对标拉平",
-                capabilities: vec![CapabilityOp::Execute, CapabilityOp::Communicate, CapabilityOp::Reason],
-                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate],
+                capabilities: vec![
+                    CapabilityOp::Execute,
+                    CapabilityOp::Communicate,
+                    CapabilityOp::Reason,
+                ],
+                allowed_tools: vec![
+                    ToolPerm::Read,
+                    ToolPerm::Write,
+                    ToolPerm::Execute,
+                    ToolPerm::Communicate,
+                ],
                 max_context: 32768,
             },
             AgentProfile {
@@ -634,7 +763,11 @@ impl AgentCatalog {
                 e8_mode: 11,
                 description: "NT-SCOUT 虚空探查：外部研究与文献检索（只读）",
                 goal: "多源交叉验证、一手优先、query 变体矩阵、溯源纪律，结论带 URL",
-                capabilities: vec![CapabilityOp::Research, CapabilityOp::Search, CapabilityOp::Reason],
+                capabilities: vec![
+                    CapabilityOp::Research,
+                    CapabilityOp::Search,
+                    CapabilityOp::Reason,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Communicate, ToolPerm::Inspect],
                 max_context: 16384,
             },
@@ -644,7 +777,11 @@ impl AgentCatalog {
                 e8_mode: 50,
                 description: "NT-META 元吸收者：跨会话元认知与反思（只读）",
                 goal: "实证性反思、量化信号、自欺检测、跨会话模式挖掘",
-                capabilities: vec![CapabilityOp::Monitor, CapabilityOp::Reason, CapabilityOp::Research],
+                capabilities: vec![
+                    CapabilityOp::Monitor,
+                    CapabilityOp::Reason,
+                    CapabilityOp::Research,
+                ],
                 allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect],
                 max_context: 8192,
             },
@@ -654,8 +791,18 @@ impl AgentCatalog {
                 e8_mode: 55,
                 description: "NT-REPAIR 自愈工程师：问题诊断与恢复（可写）",
                 goal: "先复现再假设、二分定位、缓存头号嫌疑、regression 闭环守卫",
-                capabilities: vec![CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Reason, CapabilityOp::Monitor],
-                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Inspect],
+                capabilities: vec![
+                    CapabilityOp::Execute,
+                    CapabilityOp::Verify,
+                    CapabilityOp::Reason,
+                    CapabilityOp::Monitor,
+                ],
+                allowed_tools: vec![
+                    ToolPerm::Read,
+                    ToolPerm::Write,
+                    ToolPerm::Execute,
+                    ToolPerm::Inspect,
+                ],
                 max_context: 32768,
             },
         ]
@@ -697,16 +844,140 @@ impl AgentCatalog {
 
         // NT 域优先路由 — 触发词与 ~/.neotrix/agents 文件定义对齐（共享语言 CONTEXT.md）
         let nt_routes: &[(&str, &[&str])] = &[
-            ("nt-core", &["编排", "路由", "架构决策", "委托", "orchestrat", "dispatch", "architecture decision"]),
-            ("nt-world", &["探索", "定位", "梳理", "盘点", "explore code", "locate", "find file", "代码结构", "依赖图"]),
-            ("nt-act", &["实现", "修复 bug", "重构", "实施", "implement", "fix bug", "refactor", "接线", "落地"]),
-            ("nt-mind", &["tdd", "写测试", "测试驱动", "技能结晶", "test-driven", "regression test", "测试优先"]),
-            ("nt-shield", &["审查", "审计", "安全扫描", "盘点代码", "review", "audit", "security scan", "漏洞"]),
-            ("nt-memory", &["经验", "吸收", "检索", "收尾", "cycle", "知识库", "absorb", "experience", "memory"]),
-            ("nt-io", &["前端", "界面", "ui", "tauri", "对话界面", "交互", "frontend", "桌面端"]),
-            ("nt-scout", &["搜索", "调研", "对标", "文献", "查资料", "竞品", "research paper", "benchmark", "scout"]),
-            ("nt-meta", &["复盘", "反思", "元认知", "自省", "模式提炼", "进化评估", "retrospect", "meta-cognition"]),
-            ("nt-repair", &["报错", "失败", "崩溃", "诊断", "构建失败", "无法启动", "bug fix", "crash", "debug", "diagnos"]),
+            (
+                "nt-core",
+                &[
+                    "编排",
+                    "路由",
+                    "架构决策",
+                    "委托",
+                    "orchestrat",
+                    "dispatch",
+                    "architecture decision",
+                ],
+            ),
+            (
+                "nt-world",
+                &[
+                    "探索",
+                    "定位",
+                    "梳理",
+                    "盘点",
+                    "explore code",
+                    "locate",
+                    "find file",
+                    "代码结构",
+                    "依赖图",
+                ],
+            ),
+            (
+                "nt-act",
+                &[
+                    "实现",
+                    "修复 bug",
+                    "重构",
+                    "实施",
+                    "implement",
+                    "fix bug",
+                    "refactor",
+                    "接线",
+                    "落地",
+                ],
+            ),
+            (
+                "nt-mind",
+                &[
+                    "tdd",
+                    "写测试",
+                    "测试驱动",
+                    "技能结晶",
+                    "test-driven",
+                    "regression test",
+                    "测试优先",
+                ],
+            ),
+            (
+                "nt-shield",
+                &[
+                    "审查",
+                    "审计",
+                    "安全扫描",
+                    "盘点代码",
+                    "review",
+                    "audit",
+                    "security scan",
+                    "漏洞",
+                ],
+            ),
+            (
+                "nt-memory",
+                &[
+                    "经验",
+                    "吸收",
+                    "检索",
+                    "收尾",
+                    "cycle",
+                    "知识库",
+                    "absorb",
+                    "experience",
+                    "memory",
+                ],
+            ),
+            (
+                "nt-io",
+                &[
+                    "前端",
+                    "界面",
+                    "ui",
+                    "tauri",
+                    "对话界面",
+                    "交互",
+                    "frontend",
+                    "桌面端",
+                ],
+            ),
+            (
+                "nt-scout",
+                &[
+                    "搜索",
+                    "调研",
+                    "对标",
+                    "文献",
+                    "查资料",
+                    "竞品",
+                    "research paper",
+                    "benchmark",
+                    "scout",
+                ],
+            ),
+            (
+                "nt-meta",
+                &[
+                    "复盘",
+                    "反思",
+                    "元认知",
+                    "自省",
+                    "模式提炼",
+                    "进化评估",
+                    "retrospect",
+                    "meta-cognition",
+                ],
+            ),
+            (
+                "nt-repair",
+                &[
+                    "报错",
+                    "失败",
+                    "崩溃",
+                    "诊断",
+                    "构建失败",
+                    "无法启动",
+                    "bug fix",
+                    "crash",
+                    "debug",
+                    "diagnos",
+                ],
+            ),
         ];
 
         for (name, triggers) in nt_routes {
@@ -718,25 +989,46 @@ impl AgentCatalog {
         }
 
         // 回落旧 5 类（兼容既有调用方）
-        if hint.contains("research") || hint.contains("研究") || hint.contains("find")
-            || hint.contains("aggregate") || hint.contains("synthesize") {
+        if hint.contains("research")
+            || hint.contains("研究")
+            || hint.contains("find")
+            || hint.contains("aggregate")
+            || hint.contains("synthesize")
+        {
             return Self::by_name("researcher").unwrap_or_else(Self::fallback_profile);
         }
-        if hint.contains("explore") || hint.contains("search") || hint.contains("read")
-            || hint.contains("inspect") || hint.contains("audit") || hint.contains("分析")
-            || hint.contains("查找") {
+        if hint.contains("explore")
+            || hint.contains("search")
+            || hint.contains("read")
+            || hint.contains("inspect")
+            || hint.contains("audit")
+            || hint.contains("分析")
+            || hint.contains("查找")
+        {
             return Self::by_name("explorer").unwrap_or_else(Self::fallback_profile);
         }
-        if hint.contains("plan") || hint.contains("design") || hint.contains("方案")
-            || hint.contains("调研") || hint.contains("architecture") {
+        if hint.contains("plan")
+            || hint.contains("design")
+            || hint.contains("方案")
+            || hint.contains("调研")
+            || hint.contains("architecture")
+        {
             return Self::by_name("planner").unwrap_or_else(Self::fallback_profile);
         }
-        if hint.contains("verify") || hint.contains("test") || hint.contains("审查")
-            || hint.contains("review") || hint.contains("回滚") {
+        if hint.contains("verify")
+            || hint.contains("test")
+            || hint.contains("审查")
+            || hint.contains("review")
+            || hint.contains("回滚")
+        {
             return Self::by_name("verifier").unwrap_or_else(Self::fallback_profile);
         }
-        if hint.contains("monitor") || hint.contains("watch") || hint.contains("health")
-            || hint.contains("监控") || hint.contains("心跳") {
+        if hint.contains("monitor")
+            || hint.contains("watch")
+            || hint.contains("health")
+            || hint.contains("监控")
+            || hint.contains("心跳")
+        {
             return Self::by_name("watcher").unwrap_or_else(Self::fallback_profile);
         }
         Self::by_name("generalist").unwrap_or_else(Self::fallback_profile)
@@ -744,16 +1036,19 @@ impl AgentCatalog {
 
     /// 兜底 profile：目录意外缺名时保证 route() 恒有返回值（内部不变量防御）。
     fn fallback_profile() -> AgentProfile {
-        Self::builtin().into_iter().next().unwrap_or_else(|| AgentProfile {
-            name: "generalist",
-            tier: AgentTier::Trunk,
-            e8_mode: 1,
-            description: "内置兜底 agent：目录损坏时的最后防线",
-            goal: "在目录缺失时保持最小可用能力",
-            capabilities: vec![CapabilityOp::Reason],
-            allowed_tools: vec![ToolPerm::Read],
-            max_context: 2048,
-        })
+        Self::builtin()
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| AgentProfile {
+                name: "generalist",
+                tier: AgentTier::Trunk,
+                e8_mode: 1,
+                description: "内置兜底 agent：目录损坏时的最后防线",
+                goal: "在目录缺失时保持最小可用能力",
+                capabilities: vec![CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read],
+                max_context: 2048,
+            })
     }
 
     /// 展示目录（供 `/agent catalog` 用）。NT 域 agent 分组在前，旧 5 类兜底在后。
@@ -761,19 +1056,29 @@ impl AgentCatalog {
         let mut out = String::from("NeoTrix 内置 agent 目录:\n");
         out.push_str("── NT 域 agent（10）──\n");
         for p in Self::nt_domain_builtin() {
-            let perms = p.allowed_tools.iter()
+            let perms = p
+                .allowed_tools
+                .iter()
                 .map(|t| format!("{:?}", t))
-                .collect::<Vec<_>>().join(",");
-            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
-                p.name, p.tier, p.e8_mode, perms, p.description));
+                .collect::<Vec<_>>()
+                .join(",");
+            out.push_str(&format!(
+                "  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description
+            ));
         }
         out.push_str("── 通用兜底（6）──\n");
         for p in Self::legacy_builtin() {
-            let perms = p.allowed_tools.iter()
+            let perms = p
+                .allowed_tools
+                .iter()
                 .map(|t| format!("{:?}", t))
-                .collect::<Vec<_>>().join(",");
-            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
-                p.name, p.tier, p.e8_mode, perms, p.description));
+                .collect::<Vec<_>>()
+                .join(",");
+            out.push_str(&format!(
+                "  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description
+            ));
         }
         out
     }
@@ -786,35 +1091,57 @@ impl AgentCatalog {
 
         out.push_str("── 内置 NT 域 agent（10）──\n");
         for p in Self::nt_domain_builtin() {
-            let perms = p.allowed_tools.iter()
+            let perms = p
+                .allowed_tools
+                .iter()
                 .map(|t| format!("{:?}", t))
-                .collect::<Vec<_>>().join(",");
-            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
-                p.name, p.tier, p.e8_mode, perms, p.description));
+                .collect::<Vec<_>>()
+                .join(",");
+            out.push_str(&format!(
+                "  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description
+            ));
         }
         out.push_str("── 通用兜底（6）──\n");
         for p in Self::legacy_builtin() {
-            let perms = p.allowed_tools.iter()
+            let perms = p
+                .allowed_tools
+                .iter()
                 .map(|t| format!("{:?}", t))
-                .collect::<Vec<_>>().join(",");
-            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
-                p.name, p.tier, p.e8_mode, perms, p.description));
+                .collect::<Vec<_>>()
+                .join(",");
+            out.push_str(&format!(
+                "  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description
+            ));
         }
 
         // 文件驱动 NT 域 agent（source of truth；覆盖/扩展同名内置）
         let mut reg = SubAgentRegistry::new();
         let report = reg.scan_all();
-        out.push_str(&format!("\n── 文件定义 agent（{} 个, 错误 {} 个）──\n",
-            report.new + report.updated, report.errors.len()));
+        out.push_str(&format!(
+            "\n── 文件定义 agent（{} 个, 错误 {} 个）──\n",
+            report.new + report.updated,
+            report.errors.len()
+        ));
         let mut defs: Vec<_> = reg.nt_domain_agents();
         defs.sort_by(|a, b| a.name.cmp(&b.name));
         for def in &defs {
             let domain = def.domain.as_deref().unwrap_or("NT");
-            let tools = def.permission.as_ref()
+            let tools = def
+                .permission
+                .as_ref()
                 .map(|p| p.allowed_tools_string())
                 .unwrap_or_else(|| "default".into());
-            out.push_str(&format!("  {} | domain={} | E8:{} | temp={} | tools=[{}]\n   {}\n",
-                def.name, domain, def.e8_mode_for(), def.temperature.unwrap_or(0.2), tools, def.description));
+            out.push_str(&format!(
+                "  {} | domain={} | E8:{} | temp={} | tools=[{}]\n   {}\n",
+                def.name,
+                domain,
+                def.e8_mode_for(),
+                def.temperature.unwrap_or(0.2),
+                tools,
+                def.description
+            ));
         }
         for e in &report.errors {
             out.push_str(&format!("  [错误] {}\n", e));
@@ -834,7 +1161,11 @@ impl SubagentManager {
         let report = reg.scan_all();
         if let Some(def) = reg.get(name) {
             let profile = AgentCatalog::from_subagent_def(def);
-            log::debug!("spawn_from_profile: 文件驱动 {} (errors: {})", name, report.errors.len());
+            log::debug!(
+                "spawn_from_profile: 文件驱动 {} (errors: {})",
+                name,
+                report.errors.len()
+            );
             return self.spawn_from_runtime_profile(&profile);
         }
 
@@ -846,7 +1177,9 @@ impl SubagentManager {
             e8_mode: profile.e8_mode,
             description: profile.description.to_string(),
             goal: profile.goal.to_string(),
-            capabilities: profile.capabilities.iter()
+            capabilities: profile
+                .capabilities
+                .iter()
                 .map(|c| format!("{:?}", c))
                 .collect(),
             max_context: profile.max_context,
@@ -856,13 +1189,18 @@ impl SubagentManager {
     }
 
     /// 从文件驱动的 RuntimeAgentProfile 物化（NT 域 agent 文件加载路径）。
-    pub fn spawn_from_runtime_profile(&mut self, profile: &RuntimeAgentProfile) -> Result<String, String> {
+    pub fn spawn_from_runtime_profile(
+        &mut self,
+        profile: &RuntimeAgentProfile,
+    ) -> Result<String, String> {
         let config = SubagentConfig {
             name: profile.name.clone(),
             e8_mode: profile.e8_mode,
             description: profile.description.clone(),
             goal: profile.goal.clone(),
-            capabilities: profile.capabilities.iter()
+            capabilities: profile
+                .capabilities
+                .iter()
                 .map(|c| format!("{:?}", c))
                 .collect(),
             max_context: profile.max_context,
@@ -874,7 +1212,10 @@ impl SubagentManager {
 
 /// 从文件驱动 permission 矩阵推导 ToolPerm 集合 + tier。
 /// 无 permission 声明时按 NT 域默认（只读域 → Leaf，可写域 → Branch/Trunk）。
-fn runtime_tool_perms(perm: Option<&crate::core::nt_core_subagent::PermissionMatrix>, name: &str) -> (Vec<ToolPerm>, AgentTier) {
+fn runtime_tool_perms(
+    perm: Option<&crate::core::nt_core_subagent::PermissionMatrix>,
+    name: &str,
+) -> (Vec<ToolPerm>, AgentTier) {
     let matrix = perm.cloned().unwrap_or_default();
     let mut tools = vec![ToolPerm::Read, ToolPerm::Inspect];
     let mut writable = false;
@@ -935,25 +1276,48 @@ fn runtime_capabilities(name: &str, domain: &Option<String>) -> Vec<CapabilityOp
     let mut caps = vec![CapabilityOp::Reason];
     match name {
         "nt-world" => caps.extend([CapabilityOp::Search]),
-        "nt-act" => caps.extend([CapabilityOp::Execute, CapabilityOp::Plan, CapabilityOp::Verify]),
+        "nt-act" => caps.extend([
+            CapabilityOp::Execute,
+            CapabilityOp::Plan,
+            CapabilityOp::Verify,
+        ]),
         "nt-mind" => caps.extend([CapabilityOp::Plan, CapabilityOp::Verify]),
         "nt-shield" => caps.extend([CapabilityOp::Verify, CapabilityOp::Search]),
         "nt-memory" => caps.extend([CapabilityOp::Search, CapabilityOp::Monitor]),
         "nt-io" => caps.extend([CapabilityOp::Execute, CapabilityOp::Communicate]),
         "nt-scout" => caps.extend([CapabilityOp::Research, CapabilityOp::Search]),
         "nt-meta" => caps.extend([CapabilityOp::Monitor, CapabilityOp::Research]),
-        "nt-repair" => caps.extend([CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Monitor]),
-        "nt-core" => caps.extend([CapabilityOp::Plan, CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Communicate]),
+        "nt-repair" => caps.extend([
+            CapabilityOp::Execute,
+            CapabilityOp::Verify,
+            CapabilityOp::Monitor,
+        ]),
+        "nt-core" => caps.extend([
+            CapabilityOp::Plan,
+            CapabilityOp::Execute,
+            CapabilityOp::Verify,
+            CapabilityOp::Communicate,
+        ]),
         _ => {
-            if d.contains("WORLD") { caps.push(CapabilityOp::Search); }
-            else if d.contains("ACT") { caps.extend([CapabilityOp::Execute, CapabilityOp::Plan]); }
-            else if d.contains("SHIELD") { caps.extend([CapabilityOp::Verify, CapabilityOp::Search]); }
-            else if d.contains("SCOUT") { caps.extend([CapabilityOp::Research, CapabilityOp::Search]); }
-            else if d.contains("META") { caps.extend([CapabilityOp::Monitor, CapabilityOp::Research]); }
-            else if d.contains("REPAIR") { caps.extend([CapabilityOp::Execute, CapabilityOp::Verify]); }
-            else if d.contains("MIND") { caps.extend([CapabilityOp::Plan, CapabilityOp::Verify]); }
-            else if d.contains("MEMORY") { caps.extend([CapabilityOp::Search, CapabilityOp::Monitor]); }
-            else if d.contains("IO") { caps.extend([CapabilityOp::Execute, CapabilityOp::Communicate]); }
+            if d.contains("WORLD") {
+                caps.push(CapabilityOp::Search);
+            } else if d.contains("ACT") {
+                caps.extend([CapabilityOp::Execute, CapabilityOp::Plan]);
+            } else if d.contains("SHIELD") {
+                caps.extend([CapabilityOp::Verify, CapabilityOp::Search]);
+            } else if d.contains("SCOUT") {
+                caps.extend([CapabilityOp::Research, CapabilityOp::Search]);
+            } else if d.contains("META") {
+                caps.extend([CapabilityOp::Monitor, CapabilityOp::Research]);
+            } else if d.contains("REPAIR") {
+                caps.extend([CapabilityOp::Execute, CapabilityOp::Verify]);
+            } else if d.contains("MIND") {
+                caps.extend([CapabilityOp::Plan, CapabilityOp::Verify]);
+            } else if d.contains("MEMORY") {
+                caps.extend([CapabilityOp::Search, CapabilityOp::Monitor]);
+            } else if d.contains("IO") {
+                caps.extend([CapabilityOp::Execute, CapabilityOp::Communicate]);
+            }
         }
     }
     caps
@@ -984,13 +1348,31 @@ mod tests {
     #[test]
     fn test_send_message() {
         let mut mgr = SubagentManager::new();
-        let config_a = SubagentConfig { name: "alpha".into(), e8_mode: 1, description: "".into(), goal: "".into(), capabilities: vec![], max_context: 1000, autostart: false };
-        let config_b = SubagentConfig { name: "beta".into(), e8_mode: 2, description: "".into(), goal: "".into(), capabilities: vec![], max_context: 1000, autostart: false };
+        let config_a = SubagentConfig {
+            name: "alpha".into(),
+            e8_mode: 1,
+            description: "".into(),
+            goal: "".into(),
+            capabilities: vec![],
+            max_context: 1000,
+            autostart: false,
+        };
+        let config_b = SubagentConfig {
+            name: "beta".into(),
+            e8_mode: 2,
+            description: "".into(),
+            goal: "".into(),
+            capabilities: vec![],
+            max_context: 1000,
+            autostart: false,
+        };
         mgr.spawn(config_a);
         mgr.spawn(config_b);
 
         let id_b = mgr.list().last().unwrap().id.clone();
-        assert!(mgr.send_message("agent-0001", &id_b, "hello", MessageType::Query).is_ok());
+        assert!(mgr
+            .send_message("agent-0001", &id_b, "hello", MessageType::Query)
+            .is_ok());
         let agent_b = mgr.get(&id_b).unwrap();
         assert_eq!(agent_b.messages.len(), 1);
         assert_eq!(agent_b.messages[0].content, "hello");
@@ -999,7 +1381,15 @@ mod tests {
     #[test]
     fn test_assign_plan() {
         let mut mgr = SubagentManager::new();
-        let config = SubagentConfig { name: "planner".into(), e8_mode: 7, description: "".into(), goal: "Execute plan".into(), capabilities: vec![], max_context: 1000, autostart: false };
+        let config = SubagentConfig {
+            name: "planner".into(),
+            e8_mode: 7,
+            description: "".into(),
+            goal: "Execute plan".into(),
+            capabilities: vec![],
+            max_context: 1000,
+            autostart: false,
+        };
         mgr.spawn(config);
         let id = mgr.list().last().unwrap().id.clone();
 
@@ -1013,7 +1403,15 @@ mod tests {
     #[test]
     fn test_kill_agent() {
         let mut mgr = SubagentManager::new();
-        let config = SubagentConfig { name: "temp".into(), e8_mode: 0, description: "".into(), goal: "".into(), capabilities: vec![], max_context: 1000, autostart: false };
+        let config = SubagentConfig {
+            name: "temp".into(),
+            e8_mode: 0,
+            description: "".into(),
+            goal: "".into(),
+            capabilities: vec![],
+            max_context: 1000,
+            autostart: false,
+        };
         mgr.spawn(config);
         let id = mgr.list().last().unwrap().id.clone();
         assert_eq!(mgr.agent_count(), 1);
@@ -1027,7 +1425,10 @@ mod tests {
         let id = mgr.spawn_background("bg-worker", 12);
         assert!(id.starts_with("bg-"));
         assert_eq!(mgr.list_tasks().len(), 1);
-        assert!(matches!(mgr.get_task_status(&id), Some(TaskStatus::Pending)));
+        assert!(matches!(
+            mgr.get_task_status(&id),
+            Some(TaskStatus::Pending)
+        ));
     }
 
     #[test]
@@ -1065,9 +1466,33 @@ mod tests {
     fn test_broadcast() {
         let mut mgr = SubagentManager::new();
         let configs = vec![
-            SubagentConfig { name: "a".into(), e8_mode: 1, description: "".into(), goal: "".into(), capabilities: vec![], max_context: 1000, autostart: false },
-            SubagentConfig { name: "b".into(), e8_mode: 2, description: "".into(), goal: "".into(), capabilities: vec![], max_context: 1000, autostart: false },
-            SubagentConfig { name: "c".into(), e8_mode: 3, description: "".into(), goal: "".into(), capabilities: vec![], max_context: 1000, autostart: false },
+            SubagentConfig {
+                name: "a".into(),
+                e8_mode: 1,
+                description: "".into(),
+                goal: "".into(),
+                capabilities: vec![],
+                max_context: 1000,
+                autostart: false,
+            },
+            SubagentConfig {
+                name: "b".into(),
+                e8_mode: 2,
+                description: "".into(),
+                goal: "".into(),
+                capabilities: vec![],
+                max_context: 1000,
+                autostart: false,
+            },
+            SubagentConfig {
+                name: "c".into(),
+                e8_mode: 3,
+                description: "".into(),
+                goal: "".into(),
+                capabilities: vec![],
+                max_context: 1000,
+                autostart: false,
+            },
         ];
         for cfg in configs {
             mgr.spawn(cfg);
@@ -1109,7 +1534,10 @@ mod tests {
         let marked = mgr.check_stale(3600);
         assert!(!marked.contains(&fresh));
         assert!(marked.contains(&stale));
-        assert!(matches!(mgr.get(&stale).unwrap().status, SubagentStatus::Stale));
+        assert!(matches!(
+            mgr.get(&stale).unwrap().status,
+            SubagentStatus::Stale
+        ));
     }
 
     #[test]
@@ -1140,8 +1568,18 @@ mod tests {
         assert!(names.contains(&"verifier"));
         assert!(names.contains(&"watcher"));
         // NT 域 agent 全量存在
-        for nt in ["nt-core", "nt-world", "nt-act", "nt-mind", "nt-shield",
-                   "nt-memory", "nt-io", "nt-scout", "nt-meta", "nt-repair"] {
+        for nt in [
+            "nt-core",
+            "nt-world",
+            "nt-act",
+            "nt-mind",
+            "nt-shield",
+            "nt-memory",
+            "nt-io",
+            "nt-scout",
+            "nt-meta",
+            "nt-repair",
+        ] {
             assert!(names.contains(&nt), "missing {}", nt);
         }
     }
@@ -1178,9 +1616,15 @@ mod tests {
         assert_eq!(AgentCatalog::route("review the diff").name, "nt-shield");
         assert_eq!(AgentCatalog::route("监控系统健康").name, "watcher");
         // 研究/聚合任务 → researcher（统一有序搜索后端）
-        assert_eq!(AgentCatalog::route("research the latest papers").name, "researcher");
+        assert_eq!(
+            AgentCatalog::route("research the latest papers").name,
+            "researcher"
+        );
         assert_eq!(AgentCatalog::route("研究该主题").name, "researcher");
-        assert_eq!(AgentCatalog::route("synthesize findings").name, "researcher");
+        assert_eq!(
+            AgentCatalog::route("synthesize findings").name,
+            "researcher"
+        );
         // 未知任务兜底到 generalist（旗舰通用）
         assert_eq!(AgentCatalog::route("随便做点什么").name, "generalist");
         // 工具权限矩阵：explorer 只读，generalist 可写/执行
@@ -1283,7 +1727,9 @@ permission:
 "#;
         let def = SubAgentDefParser::parse(std::path::Path::new("nt-scout.md"), content).unwrap();
         let profile = AgentCatalog::from_subagent_def(&def);
-        let id2 = mgr.spawn_from_runtime_profile(&profile).expect("spawn nt-scout");
+        let id2 = mgr
+            .spawn_from_runtime_profile(&profile)
+            .expect("spawn nt-scout");
         let agent2 = mgr.get(&id2).unwrap();
         assert_eq!(agent2.config.name, "nt-scout");
         assert_eq!(agent2.config.e8_mode, 11);
@@ -1300,8 +1746,10 @@ permission:
         // E8 无论文件还是内置都是 11（文件也有 e8Mode/domain 回落）；关键是 goal 应来自文件定义
         assert_eq!(agent.config.e8_mode, 11);
         assert!(
-            agent.config.goal.contains("按域契约执行任务") || agent.config.goal.contains("多源交叉验证"),
-            "goal 应来自文件定义或内置兜底, got: {}", agent.config.goal
+            agent.config.goal.contains("按域契约执行任务")
+                || agent.config.goal.contains("多源交叉验证"),
+            "goal 应来自文件定义或内置兜底, got: {}",
+            agent.config.goal
         );
     }
 }

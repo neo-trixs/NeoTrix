@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::sync::Mutex;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkSpace {
@@ -25,10 +25,18 @@ pub struct WorkSpaceManager {
 
 impl WorkSpaceManager {
     pub fn new() -> Self {
-        Self { workspaces: Vec::new(), active_id: None }
+        Self {
+            workspaces: Vec::new(),
+            active_id: None,
+        }
     }
 
-    pub fn create(&mut self, name: &str, project_root: Option<PathBuf>, description: &str) -> WorkSpace {
+    pub fn create(
+        &mut self,
+        name: &str,
+        project_root: Option<PathBuf>,
+        description: &str,
+    ) -> WorkSpace {
         let id = format!("ws-{}", &uuid::Uuid::new_v4().to_string()[..8]);
         let now = chrono::Utc::now();
         let ws = WorkSpace {
@@ -48,7 +56,9 @@ impl WorkSpaceManager {
         ws
     }
 
-    pub fn list(&self) -> &[WorkSpace] { &self.workspaces }
+    pub fn list(&self) -> &[WorkSpace] {
+        &self.workspaces
+    }
 
     pub fn switch(&mut self, id: &str) -> Result<(), String> {
         if self.workspaces.iter().any(|w| w.id == id) {
@@ -63,7 +73,10 @@ impl WorkSpaceManager {
     }
 
     pub fn delete(&mut self, id: &str) -> Result<(), String> {
-        let pos = self.workspaces.iter().position(|w| w.id == id)
+        let pos = self
+            .workspaces
+            .iter()
+            .position(|w| w.id == id)
             .ok_or_else(|| format!("WorkSpace not found: {}", id))?;
         self.workspaces.remove(pos);
         if self.active_id.as_deref() == Some(id) {
@@ -73,7 +86,9 @@ impl WorkSpaceManager {
     }
 
     pub fn active(&self) -> Option<&WorkSpace> {
-        self.active_id.as_ref().and_then(|id| self.workspaces.iter().find(|w| w.id == *id))
+        self.active_id
+            .as_ref()
+            .and_then(|id| self.workspaces.iter().find(|w| w.id == *id))
     }
 
     pub fn get(&self, id: &str) -> Option<&WorkSpace> {
@@ -85,7 +100,9 @@ impl WorkSpaceManager {
     }
 
     pub fn rename(&mut self, id: &str, new_name: &str) -> Result<(), String> {
-        let ws = self.get_mut(id).ok_or_else(|| format!("WorkSpace not found: {}", id))?;
+        let ws = self
+            .get_mut(id)
+            .ok_or_else(|| format!("WorkSpace not found: {}", id))?;
         ws.name = new_name.to_string();
         Ok(())
     }
@@ -96,7 +113,8 @@ impl WorkSpaceManager {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| format!("Serialize error: {}", e))?;
+        let json =
+            serde_json::to_string_pretty(self).map_err(|e| format!("Serialize error: {}", e))?;
         std::fs::write(&path, json).map_err(|e| format!("Write error: {}", e))?;
         Ok(())
     }
@@ -119,7 +137,9 @@ impl WorkSpaceManager {
 }
 
 impl Default for WorkSpaceManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // TODO: inject via DI — pass &WorkSpaceManager through CLI command context

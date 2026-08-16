@@ -21,18 +21,20 @@
 //!   (and separately for DnsServer / RouteNode)
 //! - `GatewayV2` → implements `ResourcePool<Resource=LlmProviderState>`
 
-mod pooled_resource;
-mod pool_trait;
-mod selection_strategy;
-mod resource_types;
-mod resource_registry;
 mod discovery;
 mod normalizer;
+mod pool_trait;
+mod pooled_resource;
+mod resource_registry;
+mod resource_types;
+mod selection_strategy;
 
-pub use pooled_resource::PooledResource;
+pub use discovery::{
+    DiscovererInfo, DiscoveryCache, DiscoveryResult, ResourceDiscoverer, ResourceDiscoveryEngine,
+};
+pub use normalizer::{NormalizedEntry, ProxyUrlNormalizer, ResourceNormalizer};
 pub use pool_trait::{PoolHealthReport, PoolSnapshot, PoolSupervisor, ResourcePool};
-pub use selection_strategy::PoolSelectionStrategy;
-pub use resource_types::{ResourceKind, DiscoveredResource, ResourceMeta};
+pub use pooled_resource::PooledResource;
 pub use resource_registry::{AnyPool, ResourceRegistry};
-pub use discovery::{DiscovererInfo, DiscoveryResult, DiscoveryCache, ResourceDiscoverer, ResourceDiscoveryEngine};
-pub use normalizer::{ResourceNormalizer, NormalizedEntry, ProxyUrlNormalizer};
+pub use resource_types::{DiscoveredResource, ResourceKind, ResourceMeta};
+pub use selection_strategy::PoolSelectionStrategy;

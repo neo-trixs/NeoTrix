@@ -7,12 +7,12 @@
 //! - `AttentionTrigger` / `TriggerMapping` — attention routing primitives
 //! - `ConversationTurn` / `ConversationObserver` / `GodViewReport` — conversation awareness
 
-mod sensory_types;
-mod sensory_processing;
 pub mod sensor_trait;
+mod sensory_processing;
+mod sensory_types;
 
-pub use sensory_types::*;
 pub use sensor_trait::{Sensor, SensorSample};
+pub use sensory_types::*;
 
 #[cfg(test)]
 mod tests;

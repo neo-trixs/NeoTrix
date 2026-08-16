@@ -63,7 +63,12 @@ pub enum GroundedDecision {
 impl GroundedGate {
     /// 构造一个新接地门。
     pub fn new(name: &str, checks: Vec<GroundedCheck>, max_retries: u8, timeout_secs: u64) -> Self {
-        Self { name: name.to_string(), checks, max_retries, timeout_secs }
+        Self {
+            name: name.to_string(),
+            checks,
+            max_retries,
+            timeout_secs,
+        }
     }
 
     /// 执行所有检查（外部接地验证）。
@@ -86,7 +91,9 @@ impl GroundedGate {
         } else if self.max_retries > 0 {
             GroundedDecision::Revise { feedback }
         } else {
-            GroundedDecision::Fail { reason: format!("{}: checks exhausted", self.name) }
+            GroundedDecision::Fail {
+                reason: format!("{}: checks exhausted", self.name),
+            }
         }
     }
 
@@ -94,11 +101,7 @@ impl GroundedGate {
     ///
     /// `produce` 产出一份工件，`check_runner` 验证之；Revise 时把反馈传给
     /// `produce`（worker 修订），直至重试耗尽。
-    pub fn run_loop<F, P>(
-        &self,
-        mut produce: P,
-        mut check_runner: F,
-    ) -> GroundedDecision
+    pub fn run_loop<F, P>(&self, mut produce: P, mut check_runner: F) -> GroundedDecision
     where
         F: FnMut(&GroundedCheck, &str) -> Result<String, String>,
         P: FnMut(&[String]) -> String,
@@ -118,7 +121,9 @@ impl GroundedGate {
             }
             attempts += 1;
             if attempts > self.max_retries as u32 {
-                return GroundedDecision::Fail { reason: format!("{}: retries exhausted", self.name) };
+                return GroundedDecision::Fail {
+                    reason: format!("{}: retries exhausted", self.name),
+                };
             }
             feedback = errs;
         }
@@ -145,12 +150,20 @@ pub struct Field {
 impl Field {
     /// 构造一个必填字段。
     pub fn req(name: &str, ty: FieldType) -> Self {
-        Self { name: name.to_string(), ty, required: true }
+        Self {
+            name: name.to_string(),
+            ty,
+            required: true,
+        }
     }
 
     /// 构造一个可选字段。
     pub fn opt(name: &str, ty: FieldType) -> Self {
-        Self { name: name.to_string(), ty, required: false }
+        Self {
+            name: name.to_string(),
+            ty,
+            required: false,
+        }
     }
 }
 
@@ -205,7 +218,13 @@ impl AgentContract {
         output_schema: Vec<Field>,
         success_criteria: Vec<GroundedCheck>,
     ) -> Self {
-        Self { domain, input_schema, output_schema, success_criteria, upstream_watch: Vec::new() }
+        Self {
+            domain,
+            input_schema,
+            output_schema,
+            success_criteria,
+            upstream_watch: Vec::new(),
+        }
     }
 
     /// 校验一份产出工件（JSON 对象表示）是否满足输出 schema。
@@ -276,10 +295,19 @@ mod tests {
 
     #[test]
     fn test_gate_pass_when_all_checks_ok() {
-        let gate = GroundedGate::new("unit", vec![
-            GroundedCheck::Compile { crate_name: "neotrix".into() },
-            GroundedCheck::ToolOutput { expected: "ok".into() },
-        ], 2, 60);
+        let gate = GroundedGate::new(
+            "unit",
+            vec![
+                GroundedCheck::Compile {
+                    crate_name: "neotrix".into(),
+                },
+                GroundedCheck::ToolOutput {
+                    expected: "ok".into(),
+                },
+            ],
+            2,
+            60,
+        );
         let decision = gate.evaluate(|check| match check {
             GroundedCheck::Compile { .. } => Ok("compiled".into()),
             _ => Ok("matched".into()),
@@ -289,9 +317,14 @@ mod tests {
 
     #[test]
     fn test_gate_revise_with_feedback_when_retries_left() {
-        let gate = GroundedGate::new("unit", vec![
-            GroundedCheck::Compile { crate_name: "neotrix".into() },
-        ], 2, 60);
+        let gate = GroundedGate::new(
+            "unit",
+            vec![GroundedCheck::Compile {
+                crate_name: "neotrix".into(),
+            }],
+            2,
+            60,
+        );
         let decision = gate.evaluate(|_| Err("compile error E0308".into()));
         match decision {
             GroundedDecision::Revise { feedback } => {
@@ -304,9 +337,14 @@ mod tests {
 
     #[test]
     fn test_gate_fail_when_no_retries_left() {
-        let gate = GroundedGate::new("unit", vec![
-            GroundedCheck::Compile { crate_name: "neotrix".into() },
-        ], 0, 60);
+        let gate = GroundedGate::new(
+            "unit",
+            vec![GroundedCheck::Compile {
+                crate_name: "neotrix".into(),
+            }],
+            0,
+            60,
+        );
         let decision = gate.evaluate(|_| Err("boom".into()));
         match decision {
             GroundedDecision::Fail { reason } => assert!(reason.contains("unit")),
@@ -316,11 +354,23 @@ mod tests {
 
     #[test]
     fn test_gate_partial_fail_collects_all_feedback() {
-        let gate = GroundedGate::new("multi", vec![
-            GroundedCheck::Compile { crate_name: "a".into() },
-            GroundedCheck::Test { crate_name: "a".into(), filter: "x".into() },
-            GroundedCheck::ToolOutput { expected: "needle".into() },
-        ], 3, 60);
+        let gate = GroundedGate::new(
+            "multi",
+            vec![
+                GroundedCheck::Compile {
+                    crate_name: "a".into(),
+                },
+                GroundedCheck::Test {
+                    crate_name: "a".into(),
+                    filter: "x".into(),
+                },
+                GroundedCheck::ToolOutput {
+                    expected: "needle".into(),
+                },
+            ],
+            3,
+            60,
+        );
         // 第一个失败，后两个成功 → 只有 1 条反馈
         let decision = gate.evaluate(|check| match check {
             GroundedCheck::Compile { .. } => Err("E0308".into()),
@@ -335,20 +385,33 @@ mod tests {
     #[test]
     fn test_gate_run_loop_produce_revise_until_pass() {
         // produce 第一次产出坏工件，修订后产出好工件；检查通过 → Pass
-        let gate = GroundedGate::new("loop", vec![
-            GroundedCheck::ToolOutput { expected: "GOOD".into() },
-        ], 2, 60);
+        let gate = GroundedGate::new(
+            "loop",
+            vec![GroundedCheck::ToolOutput {
+                expected: "GOOD".into(),
+            }],
+            2,
+            60,
+        );
         let mut produced = 0;
         let decision = gate.run_loop(
             |feedback| {
                 produced += 1;
-                if feedback.is_empty() { "BAD".to_string() } else { "GOOD".to_string() }
+                if feedback.is_empty() {
+                    "BAD".to_string()
+                } else {
+                    "GOOD".to_string()
+                }
             },
             |check, artifact| {
                 let GroundedCheck::ToolOutput { expected } = check else {
                     return Err("unexpected".into());
                 };
-                if artifact.contains(expected.as_str()) { Ok("match".into()) } else { Err("no match".into()) }
+                if artifact.contains(expected.as_str()) {
+                    Ok("match".into())
+                } else {
+                    Err("no match".into())
+                }
             },
         );
         assert_eq!(decision, GroundedDecision::Pass);
@@ -357,16 +420,25 @@ mod tests {
 
     #[test]
     fn test_gate_run_loop_exhausts_retries_then_fail() {
-        let gate = GroundedGate::new("loop", vec![
-            GroundedCheck::ToolOutput { expected: "GOOD".into() },
-        ], 1, 60);
+        let gate = GroundedGate::new(
+            "loop",
+            vec![GroundedCheck::ToolOutput {
+                expected: "GOOD".into(),
+            }],
+            1,
+            60,
+        );
         let decision = gate.run_loop(
             |_| "BAD".to_string(),
             |check, artifact| {
                 let GroundedCheck::ToolOutput { expected } = check else {
                     return Err("unexpected".into());
                 };
-                if artifact.contains(expected.as_str()) { Ok("match".into()) } else { Err("no match".into()) }
+                if artifact.contains(expected.as_str()) {
+                    Ok("match".into())
+                } else {
+                    Err("no match".into())
+                }
             },
         );
         match decision {
@@ -391,15 +463,19 @@ mod tests {
             vec![],
         );
         // 完整合规
-        assert!(contract.validate_output(&json!({
-            "title": "hello",
-            "score": 0.88,
-            "meta": {"a": 1},
-            "ref_file": "/tmp/x.md"
-        })).is_empty());
+        assert!(contract
+            .validate_output(&json!({
+                "title": "hello",
+                "score": 0.88,
+                "meta": {"a": 1},
+                "ref_file": "/tmp/x.md"
+            }))
+            .is_empty());
         // 缺必填 + 类型错
         let errors = contract.validate_output(&json!({ "title": 42, "meta": [] }));
-        assert!(errors.iter().any(|e| e.contains("missing required field: score")));
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("missing required field: score")));
         assert!(errors.iter().any(|e| e.contains("expected String")));
     }
 
@@ -428,7 +504,9 @@ mod tests {
             Domain::Core,
             vec![],
             vec![],
-            vec![GroundedCheck::Compile { crate_name: "neotrix".into() }],
+            vec![GroundedCheck::Compile {
+                crate_name: "neotrix".into(),
+            }],
         );
         let decision = contract.evaluate_success(|_| Ok("compiled".into()));
         assert_eq!(decision, GroundedDecision::Pass);

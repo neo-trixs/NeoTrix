@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::core::nt_core_e8::hexagram_hadamard;
+use std::collections::HashMap;
 
 const WH_DIM: usize = 64;
 
@@ -28,7 +28,8 @@ impl Default for WalshMemoryIndex {
 impl WalshMemoryIndex {
     pub fn new() -> Self {
         let raw = hexagram_hadamard();
-        let hadamard: Vec<Vec<f64>> = raw.iter()
+        let hadamard: Vec<Vec<f64>> = raw
+            .iter()
             .map(|row| row.iter().map(|&x| x as f64).collect())
             .collect();
         Self {
@@ -43,15 +44,32 @@ impl WalshMemoryIndex {
     fn text_signature(&self, text: &str) -> Vec<f64> {
         let mut sig = vec![0.0; WH_DIM];
         for token in text.split(|c: char| !c.is_alphanumeric()) {
-            if token.is_empty() || token.len() < 2 { continue; }
-            let h1: usize = token.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64)) as usize % WH_DIM;
-            let sign: f64 = if (token.bytes().fold(0u64, |acc, b| acc.wrapping_mul(37).wrapping_add(b as u64)) as usize).is_multiple_of(2) { 1.0 } else { -1.0 };
+            if token.is_empty() || token.len() < 2 {
+                continue;
+            }
+            let h1: usize = token
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+                as usize
+                % WH_DIM;
+            let sign: f64 = if (token
+                .bytes()
+                .fold(0u64, |acc, b| acc.wrapping_mul(37).wrapping_add(b as u64))
+                as usize)
+                .is_multiple_of(2)
+            {
+                1.0
+            } else {
+                -1.0
+            };
             sig[h1] += sign;
         }
         // Normalize to unit vector in signature space
         let norm: f64 = sig.iter().map(|x| x * x).sum::<f64>().sqrt();
         if norm > 0.0 {
-            for x in sig.iter_mut() { *x /= norm; }
+            for x in sig.iter_mut() {
+                *x /= norm;
+            }
         }
         sig
     }
@@ -60,7 +78,11 @@ impl WalshMemoryIndex {
     fn wh_transform(&self, x: &[f64]) -> Vec<f64> {
         let mut y = vec![0.0; WH_DIM];
         for (i, item) in y.iter_mut().enumerate() {
-            *item = self.hadamard[i].iter().zip(x.iter()).map(|(h, xv)| h * xv).sum();
+            *item = self.hadamard[i]
+                .iter()
+                .zip(x.iter())
+                .map(|(h, xv)| h * xv)
+                .sum();
         }
         y
     }
@@ -69,7 +91,12 @@ impl WalshMemoryIndex {
     fn wh_inverse(&self, y: &[f64]) -> Vec<f64> {
         let mut x = vec![0.0; WH_DIM];
         for (i, item) in x.iter_mut().enumerate() {
-            *item = self.hadamard[i].iter().zip(y.iter()).map(|(h, yv)| h * yv).sum::<f64>() / WH_DIM as f64;
+            *item = self.hadamard[i]
+                .iter()
+                .zip(y.iter())
+                .map(|(h, yv)| h * yv)
+                .sum::<f64>()
+                / WH_DIM as f64;
         }
         x
     }
@@ -78,7 +105,7 @@ impl WalshMemoryIndex {
     /// Pipeline: signature → WH-transform → normalize
     pub fn encode(&self, text: &str) -> Vec<f64> {
         let sig = self.text_signature(text);
-        
+
         self.wh_transform(&sig)
     }
 
@@ -111,9 +138,13 @@ impl WalshMemoryIndex {
 
     /// Search for top-k most similar memories by WH-encoded dot product.
     pub fn search(&self, query: &str, k: usize) -> Vec<(f64, String)> {
-        if self.embeddings.is_empty() { return Vec::new(); }
+        if self.embeddings.is_empty() {
+            return Vec::new();
+        }
         let q_emb = self.encode(query);
-        let mut scored: Vec<(f64, &str)> = self.embeddings.iter()
+        let mut scored: Vec<(f64, &str)> = self
+            .embeddings
+            .iter()
             .map(|(id, emb)| {
                 let sim = Self::wh_dot(&q_emb, emb);
                 (sim, id.as_str())
@@ -121,7 +152,11 @@ impl WalshMemoryIndex {
             .collect();
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         let k = k.min(scored.len());
-        scored.into_iter().take(k).map(|(s, id)| (s, id.to_string())).collect()
+        scored
+            .into_iter()
+            .take(k)
+            .map(|(s, id)| (s, id.to_string()))
+            .collect()
     }
 
     /// Dot product in WH space (preserves L2 up to scale).
@@ -136,21 +171,34 @@ impl WalshMemoryIndex {
         // Threshold small values (below 1/64 of max signal) to zero
         let max_val: f64 = x_recovered.iter().copied().fold(0.0f64, f64::max);
         let threshold = max_val / 64.0;
-        let x_clean: Vec<f64> = x_recovered.iter().map(|&v| if v.abs() < threshold { 0.0 } else { v }).collect();
+        let x_clean: Vec<f64> = x_recovered
+            .iter()
+            .map(|&v| if v.abs() < threshold { 0.0 } else { v })
+            .collect();
         self.wh_transform(&x_clean)
     }
 
     /// Measure recovery quality: cosine similarity between original and recovered.
     pub fn recovery_ratio(original: &[f64], recovered: &[f64]) -> f64 {
-        let dot: f64 = original.iter().zip(recovered.iter()).map(|(a, b)| a * b).sum();
+        let dot: f64 = original
+            .iter()
+            .zip(recovered.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let norm_o: f64 = original.iter().map(|x| x * x).sum::<f64>().sqrt();
         let norm_r: f64 = recovered.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm_o == 0.0 || norm_r == 0.0 { return 0.0; }
+        if norm_o == 0.0 || norm_r == 0.0 {
+            return 0.0;
+        }
         dot / (norm_o * norm_r)
     }
 
-    pub fn len(&self) -> usize { self.embeddings.len() }
-    pub fn is_empty(&self) -> bool { self.embeddings.is_empty() }
+    pub fn len(&self) -> usize {
+        self.embeddings.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.embeddings.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -167,7 +215,11 @@ mod tests {
         let sim = WalshMemoryIndex::wh_dot(&emb, &re_encoded);
         let norm_emb: f64 = emb.iter().map(|x| x * x).sum::<f64>().sqrt();
         let normalized_sim = sim / (norm_emb * norm_emb);
-        assert!((normalized_sim - 1.0).abs() < 1e-10, "roundtrip failed: {}", normalized_sim);
+        assert!(
+            (normalized_sim - 1.0).abs() < 1e-10,
+            "roundtrip failed: {}",
+            normalized_sim
+        );
     }
 
     #[test]
@@ -220,7 +272,11 @@ mod tests {
         let results = index.search(text, 1);
         assert_eq!(results[0].1, "self");
         // Self-similarity should be very high (> 0.9)
-        assert!(results[0].0 > 0.9, "self-similarity too low: {}", results[0].0);
+        assert!(
+            results[0].0 > 0.9,
+            "self-similarity too low: {}",
+            results[0].0
+        );
     }
 
     #[test]
@@ -230,8 +286,15 @@ mod tests {
         let original = index.encode(text);
         // Add noise at 20% of signal amplitude
         let _signal_power: f64 = original.iter().map(|x| x * x).sum::<f64>().sqrt();
-        let noise: Vec<f64> = original.iter().map(|x| x * 0.2 * (if (x * 1e6) as i64 % 2 == 0 { 1.0 } else { -1.0 })).collect();
-        let noisy: Vec<f64> = original.iter().zip(noise.iter()).map(|(s, n)| s + n).collect();
+        let noise: Vec<f64> = original
+            .iter()
+            .map(|x| x * 0.2 * (if (x * 1e6) as i64 % 2 == 0 { 1.0 } else { -1.0 }))
+            .collect();
+        let noisy: Vec<f64> = original
+            .iter()
+            .zip(noise.iter())
+            .map(|(s, n)| s + n)
+            .collect();
         let denoised = index.denoise(&noisy);
         let ratio = WalshMemoryIndex::recovery_ratio(&original, &denoised);
         assert!(ratio > 0.85, "noise recovery too low: {}", ratio);
@@ -263,10 +326,15 @@ mod tests {
         let cn = index.encode("全局工作空间中的共振注意力");
         // Different languages about the same concept should still have some similarity
         let sim = WalshMemoryIndex::wh_dot(&en, &cn);
-        let norm = en.iter().map(|x| x * x).sum::<f64>().sqrt() * cn.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let norm = en.iter().map(|x| x * x).sum::<f64>().sqrt()
+            * cn.iter().map(|x| x * x).sum::<f64>().sqrt();
         let normalized = sim / norm;
         // Same concept → should be positive (not anti-correlated)
-        assert!(normalized > -0.1, "cross-language anti-correlated: {}", normalized);
+        assert!(
+            normalized > -0.1,
+            "cross-language anti-correlated: {}",
+            normalized
+        );
     }
 
     #[test]
@@ -285,12 +353,19 @@ mod tests {
         let emb3 = index.encode("pizza recipe tomato cheese dough");
         let sim12 = WalshMemoryIndex::wh_dot(&emb1, &emb2);
         let sim13 = WalshMemoryIndex::wh_dot(&emb1, &emb3);
-        let norm12 = emb1.iter().map(|x| x * x).sum::<f64>().sqrt() * emb2.iter().map(|x| x * x).sum::<f64>().sqrt();
-        let norm13 = emb1.iter().map(|x| x * x).sum::<f64>().sqrt() * emb3.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let norm12 = emb1.iter().map(|x| x * x).sum::<f64>().sqrt()
+            * emb2.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let norm13 = emb1.iter().map(|x| x * x).sum::<f64>().sqrt()
+            * emb3.iter().map(|x| x * x).sum::<f64>().sqrt();
         // Physics texts should be closer to each other than to pizza
         let n12 = sim12 / norm12;
         let n13 = sim13 / norm13;
-        assert!(n12 > n13, "physics-pizza similarity ({}) should be less than physics-physics ({})", n13, n12);
+        assert!(
+            n12 > n13,
+            "physics-pizza similarity ({}) should be less than physics-physics ({})",
+            n13,
+            n12
+        );
     }
 
     #[test]

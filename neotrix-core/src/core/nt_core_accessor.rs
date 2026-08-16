@@ -45,7 +45,9 @@ pub struct UrlAccessor {
 
 impl UrlAccessor {
     pub fn new(url: &str) -> Self {
-        Self { url: url.to_string() }
+        Self {
+            url: url.to_string(),
+        }
     }
 }
 
@@ -63,7 +65,8 @@ impl Accessor for UrlAccessor {
         {
             let resp = reqwest::blocking::get(&self.url)
                 .map_err(|e| format!("Failed to fetch URL: {}", e))?;
-            resp.text().map_err(|e| format!("Failed to read response: {}", e))
+            resp.text()
+                .map_err(|e| format!("Failed to read response: {}", e))
         }
         #[cfg(not(feature = "full"))]
         {
@@ -75,7 +78,12 @@ impl Accessor for UrlAccessor {
         let title = content
             .lines()
             .find(|l| l.starts_with("# ") || l.to_lowercase().contains("title"))
-            .map(|l| l.trim_start_matches("# ").trim_start_matches("title: ").trim().to_string())
+            .map(|l| {
+                l.trim_start_matches("# ")
+                    .trim_start_matches("title: ")
+                    .trim()
+                    .to_string()
+            })
             .unwrap_or_else(|| "Unknown Source".to_string());
 
         let has_code_blocks = content.contains("```");
@@ -93,7 +101,8 @@ impl Accessor for UrlAccessor {
             domains.push("minimal".to_string());
         }
 
-        let estimated_impact = if domains.contains(&"documentation".to_string()) && word_count > 200 {
+        let estimated_impact = if domains.contains(&"documentation".to_string()) && word_count > 200
+        {
             0.7
         } else if domains.contains(&"code".to_string()) {
             0.6
@@ -127,7 +136,10 @@ pub struct GitHubRepoAccessor {
 
 impl GitHubRepoAccessor {
     pub fn new(url: &str) -> Self {
-        Self { url: url.to_string(), local_path: None }
+        Self {
+            url: url.to_string(),
+            local_path: None,
+        }
     }
 }
 
@@ -147,7 +159,14 @@ impl Accessor for GitHubRepoAccessor {
             std::fs::remove_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
         }
         let status = std::process::Command::new("git")
-            .args(["clone", "--depth=1", &self.url, tmp_dir.to_str().ok_or_else(|| "temp dir path is not valid UTF-8".to_string())?])
+            .args([
+                "clone",
+                "--depth=1",
+                &self.url,
+                tmp_dir
+                    .to_str()
+                    .ok_or_else(|| "temp dir path is not valid UTF-8".to_string())?,
+            ])
             .status()
             .map_err(|e| format!("git clone failed: {}", e))?;
         if !status.success() {
@@ -167,12 +186,17 @@ impl Accessor for GitHubRepoAccessor {
     }
 
     fn analyze(&self, content: &str) -> Result<AccessionReport, String> {
-        let title = content.lines()
+        let title = content
+            .lines()
             .find(|l| l.starts_with('#'))
             .map(|l| l.trim_start_matches('#').trim().to_string())
             .unwrap_or_else(|| self.url.clone());
         let word_count = content.split_whitespace().count();
-        let domains = vec!["code".to_string(), "documentation".to_string(), "comparison".to_string()];
+        let domains = vec![
+            "code".to_string(),
+            "documentation".to_string(),
+            "comparison".to_string(),
+        ];
         let estimated_impact = (word_count as f64 / 500.0).min(1.0) * 0.8;
         Ok(AccessionReport {
             title,
@@ -180,7 +204,13 @@ impl Accessor for GitHubRepoAccessor {
             domains,
             estimated_impact,
             source_type: SourceType::GitHubRepo,
-            suggested_name: Some(self.url.split('/').next_back().unwrap_or("repo").to_string()),
+            suggested_name: Some(
+                self.url
+                    .split('/')
+                    .next_back()
+                    .unwrap_or("repo")
+                    .to_string(),
+            ),
         })
     }
 }
@@ -205,7 +235,8 @@ mod tests {
     #[test]
     fn test_analyze_markdown_content() {
         let a = UrlAccessor::new("https://example.com");
-        let content = "# My Project\n\n## Overview\nThis is a cool project.\n\n```rust\nfn main() {}\n```";
+        let content =
+            "# My Project\n\n## Overview\nThis is a cool project.\n\n```rust\nfn main() {}\n```";
         let report = a.analyze(content).expect("value should be ok in test");
         assert_eq!(report.title, "My Project");
         assert!(report.estimated_impact > 0.5);
@@ -215,7 +246,9 @@ mod tests {
     #[test]
     fn test_analyze_short_content_low_impact() {
         let a = UrlAccessor::new("https://example.com");
-        let report = a.analyze("hello world").expect("value should be ok in test");
+        let report = a
+            .analyze("hello world")
+            .expect("value should be ok in test");
         assert!(report.estimated_impact < 0.5);
         assert!(report.domains.contains(&"minimal".to_string()));
     }

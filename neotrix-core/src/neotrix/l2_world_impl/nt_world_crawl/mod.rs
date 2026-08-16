@@ -18,6 +18,7 @@ pub mod mapper;
 pub mod adaptive;
 pub mod spider;
 pub mod stealth;
+pub mod resilient;
 pub mod unified;
 
 pub use config::{CrawlerConfig, CrawlStrategy, CrawlTopic, CrawlFormat, SeedEntry, default_seed_urls};
@@ -27,3 +28,4 @@ pub use classifier::{ContentClassifier, ClassifiedContent, ClassifierSummary};
 pub use mapper::{KnowledgeMapper, MappedKnowledge, MapperSummary};
 pub use unified::{UnifiedCrawler, CrawlerSummary, CycleResult, HealAction};
 pub use stealth::{StealthCrawler, StealthConfig, CrawlResult, BypassMethod, SessionPool, CrawlSession};
+pub use resilient::{ResilientCrawler, ThrottlePolicy, PersistentQueue, AutoThrottle, CrawlReport};

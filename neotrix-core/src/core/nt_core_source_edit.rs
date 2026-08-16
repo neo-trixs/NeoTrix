@@ -19,7 +19,11 @@ pub enum SourceEdit {
     /// Delete line at `line` (1-indexed).
     DeleteLine { line: usize },
     /// Replace a range of lines [start, end) with `content`.
-    ReplaceRange { start: usize, end: usize, content: Vec<String> },
+    ReplaceRange {
+        start: usize,
+        end: usize,
+        content: Vec<String>,
+    },
     /// Add an import statement if not already present.
     AddImport { path: String, name: String },
 }
@@ -51,7 +55,11 @@ impl SourceEditor {
     }
 
     /// Apply a single edit to a file. Returns the backup path.
-    pub fn apply_edit(&mut self, file: &Path, edit: &SourceEdit) -> Result<SourceEditResult, String> {
+    pub fn apply_edit(
+        &mut self,
+        file: &Path,
+        edit: &SourceEdit,
+    ) -> Result<SourceEditResult, String> {
         // Create backup on first edit to this file
         if !self.active_backups.contains_key(file) {
             let backup = self.create_backup(file)?;
@@ -65,11 +73,17 @@ impl SourceEditor {
         match edit {
             SourceEdit::ReplaceLine { line, new_content } => {
                 if *line == 0 || *line > lines.len() {
-                    return Err(format!("line {line} out of range (file has {} lines)", lines.len()));
+                    return Err(format!(
+                        "line {line} out of range (file has {} lines)",
+                        lines.len()
+                    ));
                 }
                 lines[*line - 1] = new_content.clone();
             }
-            SourceEdit::InsertAfter { after_line, content } => {
+            SourceEdit::InsertAfter {
+                after_line,
+                content,
+            } => {
                 if *after_line > lines.len() {
                     return Err(format!("after_line {after_line} out of range"));
                 }
@@ -81,13 +95,25 @@ impl SourceEditor {
                 }
                 lines.remove(*line - 1);
             }
-            SourceEdit::ReplaceRange { start, end, content } => {
+            SourceEdit::ReplaceRange {
+                start,
+                end,
+                content,
+            } => {
                 if *start == 0 || *start > lines.len() || *end > lines.len() || *start >= *end {
-                    return Err(format!("range [{}, {}) invalid for {} lines", start, end, lines.len()));
+                    return Err(format!(
+                        "range [{}, {}) invalid for {} lines",
+                        start,
+                        end,
+                        lines.len()
+                    ));
                 }
                 lines.splice(*start - 1..*end - 1, content.clone());
             }
-            SourceEdit::AddImport { path: import_path, name } => {
+            SourceEdit::AddImport {
+                path: import_path,
+                name,
+            } => {
                 let import_stmt = if name.is_empty() {
                     format!("use {};", import_path)
                 } else {
@@ -97,7 +123,8 @@ impl SourceEditor {
                 let already = lines.iter().any(|l| l.trim() == import_stmt);
                 if !already {
                     // Insert after the last existing use statement, or at line 1
-                    let insert_pos = lines.iter()
+                    let insert_pos = lines
+                        .iter()
                         .rposition(|l| l.trim().starts_with("use "))
                         .map(|p| p + 1)
                         .unwrap_or(0);
@@ -122,7 +149,9 @@ impl SourceEditor {
 
     /// Rollback a single file to its backed-up state.
     pub fn rollback(&mut self, file: &Path) -> Result<(), String> {
-        let backup = self.active_backups.get(file)
+        let backup = self
+            .active_backups
+            .get(file)
             .ok_or_else(|| format!("no backup found for {}", file.display()))?;
         std::fs::copy(backup, file)
             .map_err(|e| format!("rollback failed for {}: {}", file.display(), e))?;
@@ -134,10 +163,13 @@ impl SourceEditor {
     /// Rollback ALL modified files.
     pub fn rollback_all(&mut self) -> Vec<(PathBuf, Result<(), String>)> {
         let files: Vec<PathBuf> = self.modified_files.clone();
-        files.iter().map(|f| {
-            let result = self.rollback(f);
-            (f.clone(), result)
-        }).collect()
+        files
+            .iter()
+            .map(|f| {
+                let result = self.rollback(f);
+                (f.clone(), result)
+            })
+            .collect()
     }
 
     fn create_backup(&self, file: &Path) -> Result<PathBuf, String> {
@@ -190,7 +222,8 @@ mod tests {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("source_edit_test_{}_{}", std::process::id(), id));
+        let dir =
+            std::env::temp_dir().join(format!("source_edit_test_{}_{}", std::process::id(), id));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -208,9 +241,15 @@ mod tests {
         let backup_dir = dir.join("backups");
         let mut editor = SourceEditor::new(backup_dir);
 
-        let result = editor.apply_edit(&file, &SourceEdit::ReplaceLine {
-            line: 2, new_content: "modified2".into(),
-        }).unwrap();
+        let result = editor
+            .apply_edit(
+                &file,
+                &SourceEdit::ReplaceLine {
+                    line: 2,
+                    new_content: "modified2".into(),
+                },
+            )
+            .unwrap();
 
         assert_eq!(result.file, file);
         let content = std::fs::read_to_string(&file).unwrap();
@@ -223,9 +262,15 @@ mod tests {
         let file = write_test_file(&dir, "test.rs", "line1\nline2\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&file, &SourceEdit::InsertAfter {
-            after_line: 1, content: "inserted".into(),
-        }).unwrap();
+        editor
+            .apply_edit(
+                &file,
+                &SourceEdit::InsertAfter {
+                    after_line: 1,
+                    content: "inserted".into(),
+                },
+            )
+            .unwrap();
 
         let content = std::fs::read_to_string(&file).unwrap();
         assert_eq!(content, "line1\ninserted\nline2\n");
@@ -237,7 +282,9 @@ mod tests {
         let file = write_test_file(&dir, "test.rs", "line1\nline2\nline3\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&file, &SourceEdit::DeleteLine { line: 2 }).unwrap();
+        editor
+            .apply_edit(&file, &SourceEdit::DeleteLine { line: 2 })
+            .unwrap();
 
         let content = std::fs::read_to_string(&file).unwrap();
         assert_eq!(content, "line1\nline3\n");
@@ -249,9 +296,16 @@ mod tests {
         let file = write_test_file(&dir, "test.rs", "a\nb\nc\nd\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&file, &SourceEdit::ReplaceRange {
-            start: 2, end: 4, content: vec!["x".into(), "y".into()],
-        }).unwrap();
+        editor
+            .apply_edit(
+                &file,
+                &SourceEdit::ReplaceRange {
+                    start: 2,
+                    end: 4,
+                    content: vec!["x".into(), "y".into()],
+                },
+            )
+            .unwrap();
 
         let content = std::fs::read_to_string(&file).unwrap();
         assert_eq!(content, "a\nx\ny\nd\n");
@@ -263,9 +317,15 @@ mod tests {
         let file = write_test_file(&dir, "lib.rs", "pub fn foo() {}\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&file, &SourceEdit::AddImport {
-            path: "std::collections".into(), name: "HashMap".into(),
-        }).unwrap();
+        editor
+            .apply_edit(
+                &file,
+                &SourceEdit::AddImport {
+                    path: "std::collections".into(),
+                    name: "HashMap".into(),
+                },
+            )
+            .unwrap();
 
         let content = std::fs::read_to_string(&file).unwrap();
         assert!(content.contains("use std::collections::HashMap;"));
@@ -274,12 +334,22 @@ mod tests {
     #[test]
     fn test_add_import_no_duplicate() {
         let dir = temp_dir();
-        let file = write_test_file(&dir, "lib.rs", "use std::collections::HashMap;\npub fn foo() {}\n");
+        let file = write_test_file(
+            &dir,
+            "lib.rs",
+            "use std::collections::HashMap;\npub fn foo() {}\n",
+        );
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&file, &SourceEdit::AddImport {
-            path: "std::collections".into(), name: "HashMap".into(),
-        }).unwrap();
+        editor
+            .apply_edit(
+                &file,
+                &SourceEdit::AddImport {
+                    path: "std::collections".into(),
+                    name: "HashMap".into(),
+                },
+            )
+            .unwrap();
 
         let content = std::fs::read_to_string(&file).unwrap();
         assert_eq!(content.lines().filter(|l| l.contains("HashMap")).count(), 1);
@@ -291,9 +361,15 @@ mod tests {
         let file = write_test_file(&dir, "test.rs", "original\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&file, &SourceEdit::ReplaceLine {
-            line: 1, new_content: "modified".into(),
-        }).unwrap();
+        editor
+            .apply_edit(
+                &file,
+                &SourceEdit::ReplaceLine {
+                    line: 1,
+                    new_content: "modified".into(),
+                },
+            )
+            .unwrap();
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "modified\n");
 
         editor.rollback(&file).unwrap();
@@ -307,8 +383,24 @@ mod tests {
         let f2 = write_test_file(&dir, "b.rs", "bbb\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        editor.apply_edit(&f1, &SourceEdit::ReplaceLine { line: 1, new_content: "AAA".into() }).unwrap();
-        editor.apply_edit(&f2, &SourceEdit::ReplaceLine { line: 1, new_content: "BBB".into() }).unwrap();
+        editor
+            .apply_edit(
+                &f1,
+                &SourceEdit::ReplaceLine {
+                    line: 1,
+                    new_content: "AAA".into(),
+                },
+            )
+            .unwrap();
+        editor
+            .apply_edit(
+                &f2,
+                &SourceEdit::ReplaceLine {
+                    line: 1,
+                    new_content: "BBB".into(),
+                },
+            )
+            .unwrap();
 
         let results = editor.rollback_all();
         assert_eq!(results.len(), 2);
@@ -324,9 +416,13 @@ mod tests {
         let file = write_test_file(&dir, "test.rs", "only one line\n");
         let mut editor = SourceEditor::new(dir.join("backups"));
 
-        let result = editor.apply_edit(&file, &SourceEdit::ReplaceLine {
-            line: 5, new_content: "x".into(),
-        });
+        let result = editor.apply_edit(
+            &file,
+            &SourceEdit::ReplaceLine {
+                line: 5,
+                new_content: "x".into(),
+            },
+        );
         assert!(result.is_err());
     }
 
@@ -337,9 +433,15 @@ mod tests {
         let backup_dir = dir.join("backups");
         let mut editor = SourceEditor::new(backup_dir.clone());
 
-        let result = editor.apply_edit(&file, &SourceEdit::ReplaceLine {
-            line: 1, new_content: "modified".into(),
-        }).unwrap();
+        let result = editor
+            .apply_edit(
+                &file,
+                &SourceEdit::ReplaceLine {
+                    line: 1,
+                    new_content: "modified".into(),
+                },
+            )
+            .unwrap();
 
         assert!(result.backup_path.is_some());
         assert!(result.backup_path.unwrap().exists());

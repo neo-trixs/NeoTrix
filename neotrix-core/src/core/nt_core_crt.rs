@@ -14,7 +14,9 @@
 use serde::{Deserialize, Serialize};
 
 /// The three CRT time scales, ordered from fastest to slowest.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum CrtTimeScale {
     /// 盖天 (Covering Heaven) — tactical: immediate actions, seconds-minutes
     Gaitian,
@@ -56,8 +58,8 @@ impl CrtTimeScale {
     /// Base cycle length in seconds.
     pub fn cycle_seconds(&self) -> f64 {
         match self {
-            Self::Gaitian => 86_400.0,        // 1 day
-            Self::Huntian => 31_557_600.0,    // 365.25 days
+            Self::Gaitian => 86_400.0,                     // 1 day
+            Self::Huntian => 31_557_600.0,                 // 365.25 days
             Self::Xuanye => 129_600.0 * 365.25 * 86_400.0, // Shao Yong cycle
         }
     }
@@ -65,17 +67,17 @@ impl CrtTimeScale {
     /// Recommended re-evaluation interval in seconds.
     pub fn re_eval_interval(&self) -> f64 {
         match self {
-            Self::Gaitian => 60.0,            // Every minute
-            Self::Huntian => 3_600.0,         // Every hour
-            Self::Xuanye => 86_400.0,         // Every day
+            Self::Gaitian => 60.0,    // Every minute
+            Self::Huntian => 3_600.0, // Every hour
+            Self::Xuanye => 86_400.0, // Every day
         }
     }
 
     /// Default max iterations per planning cycle.
     pub fn max_iterations(&self) -> u64 {
         match self {
-            Self::Gaitian => 100,  // Fast, many small iterations
-            Self::Huntian => 50,   // Moderate
+            Self::Gaitian => 100, // Fast, many small iterations
+            Self::Huntian => 50,  // Moderate
             Self::Xuanye => 10,   // Slow, deep iterations
         }
     }
@@ -92,9 +94,11 @@ impl CrtTimeScale {
 
     /// Determine the appropriate scale for a given duration in seconds.
     pub fn for_duration(seconds: f64) -> Self {
-        if seconds < 3_600.0 {                         // < 1 hour
+        if seconds < 3_600.0 {
+            // < 1 hour
             Self::Gaitian
-        } else if seconds < 604_800.0 {                // < 1 week
+        } else if seconds < 604_800.0 {
+            // < 1 week
             Self::Huntian
         } else {
             Self::Xuanye
@@ -166,7 +170,12 @@ impl CrtPlan {
 
     pub fn total_sub_plans(&self) -> usize {
         let direct = self.sub_plans.len();
-        direct + self.sub_plans.iter().map(|s| s.total_sub_plans()).sum::<usize>()
+        direct
+            + self
+                .sub_plans
+                .iter()
+                .map(|s| s.total_sub_plans())
+                .sum::<usize>()
     }
 
     pub fn depth(&self) -> usize {
@@ -205,11 +214,17 @@ impl CrtTimeline {
 
     /// Advance all three time scales by elapsed seconds.
     pub fn advance(&mut self, elapsed_seconds: f64) {
-        self.gaitian_ticks = (CrtTimeScale::Gaitian.to_ticks(elapsed_seconds + self.gaitian_cycle_start).floor() as u64)
+        self.gaitian_ticks = (CrtTimeScale::Gaitian
+            .to_ticks(elapsed_seconds + self.gaitian_cycle_start)
+            .floor() as u64)
             .max(self.gaitian_ticks);
-        self.huntian_ticks = (CrtTimeScale::Huntian.to_ticks(elapsed_seconds + self.huntian_cycle_start).floor() as u64)
+        self.huntian_ticks = (CrtTimeScale::Huntian
+            .to_ticks(elapsed_seconds + self.huntian_cycle_start)
+            .floor() as u64)
             .max(self.huntian_ticks);
-        self.xuanye_ticks = (CrtTimeScale::Xuanye.to_ticks(elapsed_seconds + self.xuanye_cycle_start).floor() as u64)
+        self.xuanye_ticks = (CrtTimeScale::Xuanye
+            .to_ticks(elapsed_seconds + self.xuanye_cycle_start)
+            .floor() as u64)
             .max(self.xuanye_ticks);
     }
 
@@ -286,9 +301,10 @@ mod tests {
 
     #[test]
     fn test_for_duration() {
-        assert_eq!(CrtTimeScale::for_duration(300.0), CrtTimeScale::Gaitian);    // 5 min
-        assert_eq!(CrtTimeScale::for_duration(7200.0), CrtTimeScale::Huntian);   // 2 hours
-        assert_eq!(CrtTimeScale::for_duration(864_000.0), CrtTimeScale::Xuanye); // 10 days
+        assert_eq!(CrtTimeScale::for_duration(300.0), CrtTimeScale::Gaitian); // 5 min
+        assert_eq!(CrtTimeScale::for_duration(7200.0), CrtTimeScale::Huntian); // 2 hours
+        assert_eq!(CrtTimeScale::for_duration(864_000.0), CrtTimeScale::Xuanye);
+        // 10 days
     }
 
     #[test]

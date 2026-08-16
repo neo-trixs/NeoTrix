@@ -44,7 +44,8 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
 
     // Helper: safe fetch single row
     fn count(conn: &Connection, sql: &str, params: &[&dyn rusqlite::types::ToSql]) -> i64 {
-        conn.query_row(sql, params, |r| r.get::<_, i64>(0)).unwrap_or(0)
+        conn.query_row(sql, params, |r| r.get::<_, i64>(0))
+            .unwrap_or(0)
     }
 
     // Helper: count by node type with optional empty content filter
@@ -52,7 +53,11 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
 
     // ── P0: Life-threatening ──
 
-    let empty = count(conn, "SELECT COUNT(*) FROM nodes WHERE content IS NULL OR content = ''", &[]);
+    let empty = count(
+        conn,
+        "SELECT COUNT(*) FROM nodes WHERE content IS NULL OR content = ''",
+        &[],
+    );
     if empty > 0 {
         let pct = if total > 0 { empty * 100 / total } else { 0 };
         let insight_empty = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Insight' AND (content IS NULL OR content = '')", &[]);
@@ -60,17 +65,31 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
         let concept_empty = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Concept' AND (content IS NULL OR content = '')", &[]);
         let repo_empty = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Repository' AND (content IS NULL OR content = '')", &[]);
         defects.push(KbDefect {
-            priority: "P0".into(), severity: 0.9,
-            title: format!("{}/{} nodes empty ({}%) — bulk content fill pipeline needed", empty, total, pct),
+            priority: "P0".into(),
+            severity: 0.9,
+            title: format!(
+                "{}/{} nodes empty ({}%) — bulk content fill pipeline needed",
+                empty, total, pct
+            ),
             area: "kb-content".into(),
-            detail: format!("Node types: Insight({}), Article({}), Concept({}), Repository({})",
-                insight_empty, article_empty, concept_empty, repo_empty),
+            detail: format!(
+                "Node types: Insight({}), Article({}), Concept({}), Repository({})",
+                insight_empty, article_empty, concept_empty, repo_empty
+            ),
         });
     }
 
     // Broken edges
-    let broken_src = count(conn, "SELECT COUNT(*) FROM edges e LEFT JOIN nodes n ON e.source_id = n.id WHERE n.id IS NULL", &[]);
-    let broken_tgt = count(conn, "SELECT COUNT(*) FROM edges e LEFT JOIN nodes n ON e.target_id = n.id WHERE n.id IS NULL", &[]);
+    let broken_src = count(
+        conn,
+        "SELECT COUNT(*) FROM edges e LEFT JOIN nodes n ON e.source_id = n.id WHERE n.id IS NULL",
+        &[],
+    );
+    let broken_tgt = count(
+        conn,
+        "SELECT COUNT(*) FROM edges e LEFT JOIN nodes n ON e.target_id = n.id WHERE n.id IS NULL",
+        &[],
+    );
     if broken_src + broken_tgt > 0 {
         defects.push(KbDefect {
             priority: "P0".into(), severity: 0.85,
@@ -94,9 +113,17 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
 
     // Repository metadata quality
     let repos_no_meta = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Repository' AND (metadata IS NULL OR metadata='{}' OR metadata='')", &[]);
-    let total_repos = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Repository'", &[]);
+    let total_repos = count(
+        conn,
+        "SELECT COUNT(*) FROM nodes WHERE node_type='Repository'",
+        &[],
+    );
     if repos_no_meta > 0 {
-        let repo_pct = if total_repos > 0 { repos_no_meta * 100 / total_repos } else { 0 };
+        let repo_pct = if total_repos > 0 {
+            repos_no_meta * 100 / total_repos
+        } else {
+            0
+        };
         defects.push(KbDefect {
             priority: "P0".into(), severity: 0.75,
             title: format!("{}/{} repos have no metadata ({}%) — useless stubs", repos_no_meta, total_repos, repo_pct),
@@ -108,7 +135,8 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
     // ── P1: Structural issues ──
 
     // Duplicate URLs
-    let dup_query = "SELECT url, COUNT(*) as cnt FROM nodes WHERE url != '' GROUP BY url HAVING cnt > 1";
+    let dup_query =
+        "SELECT url, COUNT(*) as cnt FROM nodes WHERE url != '' GROUP BY url HAVING cnt > 1";
     if let Ok(mut stmt) = conn.prepare(dup_query) {
         if let Ok(rows) = stmt.query_map([], |r| {
             let url: String = r.get(0)?;
@@ -120,11 +148,19 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
             if !dup_results.is_empty() {
                 let worst = dup_results.first().map(|(u, _)| u.as_str()).unwrap_or("");
                 defects.push(KbDefect {
-                    priority: "P1".into(), severity: 0.7,
-                    title: format!("{} duplicate URLs ({} extra copies) — waste and search noise",
-                        dup_results.len(), total_dups),
+                    priority: "P1".into(),
+                    severity: 0.7,
+                    title: format!(
+                        "{} duplicate URLs ({} extra copies) — waste and search noise",
+                        dup_results.len(),
+                        total_dups
+                    ),
                     area: "kb-dedup".into(),
-                    detail: format!("Worst: {} ({}x)", worst, dup_results.first().map(|(_, c)| c).unwrap_or(&0)),
+                    detail: format!(
+                        "Worst: {} ({}x)",
+                        worst,
+                        dup_results.first().map(|(_, c)| c).unwrap_or(&0)
+                    ),
                 });
             }
         }
@@ -140,13 +176,18 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
         }) {
             let case_results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
             if !case_results.is_empty() {
-                let detail: String = case_results.iter()
+                let detail: String = case_results
+                    .iter()
                     .map(|(t, c)| format!("{}({})", t, c))
                     .collect::<Vec<_>>()
                     .join(", ");
                 defects.push(KbDefect {
-                    priority: "P1".into(), severity: 0.65,
-                    title: format!("{} lowercase-starting node types — schema violation", case_results.len()),
+                    priority: "P1".into(),
+                    severity: 0.65,
+                    title: format!(
+                        "{} lowercase-starting node types — schema violation",
+                        case_results.len()
+                    ),
                     area: "kb-schema".into(),
                     detail,
                 });
@@ -158,32 +199,63 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
     let orphaned = count(conn, "SELECT COUNT(*) FROM nodes n WHERE NOT EXISTS (SELECT 1 FROM edges e WHERE e.source_id = n.id OR e.target_id = n.id)", &[]);
     if orphaned > 0 {
         defects.push(KbDefect {
-            priority: "P1".into(), severity: 0.6,
-            title: format!("{} nodes have zero edges — disconnected knowledge islands", orphaned),
+            priority: "P1".into(),
+            severity: 0.6,
+            title: format!(
+                "{} nodes have zero edges — disconnected knowledge islands",
+                orphaned
+            ),
             area: "kb-connectivity".into(),
-            detail: "Nodes exist in the DB but no relationship connects them to the rest of the graph".into(),
+            detail:
+                "Nodes exist in the DB but no relationship connects them to the rest of the graph"
+                    .into(),
         });
     }
 
     // Missing domain
-    let no_domain = count(conn, "SELECT COUNT(*) FROM nodes WHERE domain IS NULL OR domain = ''", &[]);
+    let no_domain = count(
+        conn,
+        "SELECT COUNT(*) FROM nodes WHERE domain IS NULL OR domain = ''",
+        &[],
+    );
     if no_domain > 0 {
         defects.push(KbDefect {
-            priority: "P1".into(), severity: 0.55,
-            title: format!("{} nodes missing domain field — search and filtering degraded", no_domain),
+            priority: "P1".into(),
+            severity: 0.55,
+            title: format!(
+                "{} nodes missing domain field — search and filtering degraded",
+                no_domain
+            ),
             area: "kb-metadata".into(),
-            detail: "Domain field is NULL or empty, causing domain-based queries to miss these nodes".into(),
+            detail:
+                "Domain field is NULL or empty, causing domain-based queries to miss these nodes"
+                    .into(),
         });
     }
 
     // Crawl queue status
-    let pending = count(conn, "SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", &[]);
-    let failed = count(conn, "SELECT COUNT(*) FROM crawl_queue WHERE status='failed'", &[]);
-    let completed = count(conn, "SELECT COUNT(*) FROM crawl_queue WHERE status='completed'", &[]);
+    let pending = count(
+        conn,
+        "SELECT COUNT(*) FROM crawl_queue WHERE status='pending'",
+        &[],
+    );
+    let failed = count(
+        conn,
+        "SELECT COUNT(*) FROM crawl_queue WHERE status='failed'",
+        &[],
+    );
+    let completed = count(
+        conn,
+        "SELECT COUNT(*) FROM crawl_queue WHERE status='completed'",
+        &[],
+    );
     defects.push(KbDefect {
-        priority: "P1".into(), severity: 0.65,
-        title: format!("Crawl queue: {} completed, {} failed, {} pending — need new seeds",
-            completed, failed, pending),
+        priority: "P1".into(),
+        severity: 0.65,
+        title: format!(
+            "Crawl queue: {} completed, {} failed, {} pending — need new seeds",
+            completed, failed, pending
+        ),
         area: "kb-crawl".into(),
         detail: "Need to inject new seed URLs to continue external absorption".into(),
     });
@@ -203,23 +275,45 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
     let legacy_edges = count(conn, "SELECT COUNT(*) FROM knowledge_edges", &[]);
     if legacy_edges > 0 {
         defects.push(KbDefect {
-            priority: "P2".into(), severity: 0.45,
-            title: format!("{} knowledge_edges in legacy table — duplicate edge storage", legacy_edges),
+            priority: "P2".into(),
+            severity: 0.45,
+            title: format!(
+                "{} knowledge_edges in legacy table — duplicate edge storage",
+                legacy_edges
+            ),
             area: "kb-legacy".into(),
             detail: "Same as knowledge_nodes — dual-write to clean up".into(),
         });
     }
 
     // ArXiv paper quality
-    let paper_empty = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Paper' AND (content IS NULL OR content = '')", &[]);
-    let paper_total = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Paper'", &[]);
+    let paper_empty = count(
+        conn,
+        "SELECT COUNT(*) FROM nodes WHERE node_type='Paper' AND (content IS NULL OR content = '')",
+        &[],
+    );
+    let paper_total = count(
+        conn,
+        "SELECT COUNT(*) FROM nodes WHERE node_type='Paper'",
+        &[],
+    );
     if paper_empty > 0 {
-        let pct = if paper_total > 0 { paper_empty * 100 / paper_total } else { 0 };
+        let pct = if paper_total > 0 {
+            paper_empty * 100 / paper_total
+        } else {
+            0
+        };
         defects.push(KbDefect {
-            priority: "P2".into(), severity: 0.5,
-            title: format!("{}/{} Paper nodes empty ({}%) — ArXiv fill pipeline", paper_empty, paper_total, pct),
+            priority: "P2".into(),
+            severity: 0.5,
+            title: format!(
+                "{}/{} Paper nodes empty ({}%) — ArXiv fill pipeline",
+                paper_empty, paper_total, pct
+            ),
             area: "kb-content-paper".into(),
-            detail: "arXiv abstract fetch failing for some papers; need better retry + HTML fallback".into(),
+            detail:
+                "arXiv abstract fetch failing for some papers; need better retry + HTML fallback"
+                    .into(),
         });
     }
 
@@ -227,19 +321,33 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
     let insight_empty = count(conn, "SELECT COUNT(*) FROM nodes WHERE node_type='Insight' AND (content IS NULL OR content = '')", &[]);
     if insight_empty > 0 {
         defects.push(KbDefect {
-            priority: "P2".into(), severity: 0.4,
+            priority: "P2".into(),
+            severity: 0.4,
             title: format!("{} empty Insight nodes — are these needed?", insight_empty),
             area: "kb-housekeeping".into(),
-            detail: "Insight nodes are auto-generated; may not need content, but should be documented".into(),
+            detail:
+                "Insight nodes are auto-generated; may not need content, but should be documented"
+                    .into(),
         });
     }
 
     // Sort by priority
-    let order = |p: &str| -> u8 { match p { "P0" => 0, "P1" => 1, "P2" => 2, _ => 99 } };
+    let order = |p: &str| -> u8 {
+        match p {
+            "P0" => 0,
+            "P1" => 1,
+            "P2" => 2,
+            _ => 99,
+        }
+    };
     defects.sort_by(|a, b| {
         let pa = order(&a.priority);
         let pb = order(&b.priority);
-        pa.cmp(&pb).then_with(|| b.severity.partial_cmp(&a.severity).unwrap_or(std::cmp::Ordering::Equal))
+        pa.cmp(&pb).then_with(|| {
+            b.severity
+                .partial_cmp(&a.severity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     });
 
     defects
@@ -265,7 +373,8 @@ pub fn store_report_to_kb(conn: &Connection, report: &KbHealthReport) -> rusqlit
             "area": d.area,
             "detail": d.detail,
             "ts": now,
-        }).to_string();
+        })
+        .to_string();
         conn.execute(
             "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params!["evolution_todo", key, value, now],
@@ -361,8 +470,13 @@ pub fn print_report(report: &KbHealthReport) {
     }
 
     println!("┌────────────────────────────────────────────────────────────────────────────────┐");
-    println!("│  Total: {} items  |  P0: {}  |  P1: {}  |  P2: {}  │",
-        report.defects.len(), report.p0_count(), report.p1_count(), report.p2_count());
+    println!(
+        "│  Total: {} items  |  P0: {}  |  P1: {}  |  P2: {}  │",
+        report.defects.len(),
+        report.p0_count(),
+        report.p1_count(),
+        report.p2_count()
+    );
     println!("└────────────────────────────────────────────────────────────────────────────────┘");
     println!();
 }
@@ -379,8 +493,9 @@ mod tests {
              CREATE TABLE edges (source_id INTEGER, target_id INTEGER);
              CREATE TABLE embeddings (id INTEGER PRIMARY KEY);
              CREATE TABLE crawl_queue (status TEXT);
-             PRAGMA busy_timeout=30000;"
-        ).unwrap();
+             PRAGMA busy_timeout=30000;",
+        )
+        .unwrap();
         conn
     }
 
@@ -390,55 +505,86 @@ mod tests {
         let defects = analyze_kb_health(&conn);
         assert!(!defects.is_empty(), "Should find defects even in empty DB");
         let p0: Vec<_> = defects.iter().filter(|d| d.priority == "P0").collect();
-        assert!(!p0.is_empty(), "Should find P0 defects (empty content, 0 embeddings, etc.)");
+        assert!(
+            !p0.is_empty(),
+            "Should find P0 defects (empty content, 0 embeddings, etc.)"
+        );
     }
 
     #[test]
     fn test_analyze_kb_health_with_data() {
         let conn = create_test_db();
-        conn.execute("INSERT INTO nodes (url, content, node_type, domain) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params!["http://example.com", "some content", "Article", "example.com"]).unwrap();
-        conn.execute("INSERT INTO nodes (url, content, node_type, domain) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params!["http://example.org", "more content", "Repository", "example.org"]).unwrap();
-        conn.execute("INSERT INTO edges (source_id, target_id) VALUES (1, 2)", []).unwrap();
+        conn.execute(
+            "INSERT INTO nodes (url, content, node_type, domain) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![
+                "http://example.com",
+                "some content",
+                "Article",
+                "example.com"
+            ],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO nodes (url, content, node_type, domain) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![
+                "http://example.org",
+                "more content",
+                "Repository",
+                "example.org"
+            ],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO edges (source_id, target_id) VALUES (1, 2)", [])
+            .unwrap();
 
         let defects = analyze_kb_health(&conn);
         let empty_nodes: Vec<_> = defects.iter().filter(|d| d.area == "kb-content").collect();
         // 0 empty nodes since both have content
-        assert!(empty_nodes.is_empty() || empty_nodes[0].title.starts_with("0/"),
-            "Should report 0 empty nodes when all have content");
+        assert!(
+            empty_nodes.is_empty() || empty_nodes[0].title.starts_with("0/"),
+            "Should report 0 empty nodes when all have content"
+        );
     }
 
     #[test]
     fn test_store_report_to_kb() {
         let conn = create_test_db();
-        let defects = vec![
-            KbDefect {
-                priority: "P0".into(), severity: 0.9,
-                title: "Test defect".into(), area: "kb-test".into(),
-                detail: "Testing storage".into(),
-            },
-        ];
-        let report = KbHealthReport { defects, generated_at: 1000 };
+        let defects = vec![KbDefect {
+            priority: "P0".into(),
+            severity: 0.9,
+            title: "Test defect".into(),
+            area: "kb-test".into(),
+            detail: "Testing storage".into(),
+        }];
+        let report = KbHealthReport {
+            defects,
+            generated_at: 1000,
+        };
         store_report_to_kb(&conn, &report).unwrap();
 
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM kv_store WHERE namespace='evolution_todo'",
-            [], |r| r.get(0)
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM kv_store WHERE namespace='evolution_todo'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 2, "Should store 1 defect + 1 aggregate");
     }
 
     #[test]
     fn test_print_report_does_not_crash() {
-        let defects = vec![
-            KbDefect {
-                priority: "P0".into(), severity: 0.9,
-                title: "Test P0".into(), area: "test".into(),
-                detail: "Detail".into(),
-            },
-        ];
-        let report = KbHealthReport { defects, generated_at: 1000 };
+        let defects = vec![KbDefect {
+            priority: "P0".into(),
+            severity: 0.9,
+            title: "Test P0".into(),
+            area: "test".into(),
+            detail: "Detail".into(),
+        }];
+        let report = KbHealthReport {
+            defects,
+            generated_at: 1000,
+        };
         print_report(&report);
         // Should not panic
     }

@@ -93,7 +93,11 @@ impl CognitiveHub {
         let mut probs = Vec::with_capacity(HUB_TOPK);
         for &t in order.iter().take(HUB_TOPK) {
             indices.push(t);
-            probs.push(if total > 0.0 { row[t] / total } else { 1.0 / HUB_TOPK as f64 });
+            probs.push(if total > 0.0 {
+                row[t] / total
+            } else {
+                1.0 / HUB_TOPK as f64
+            });
         }
         (indices, probs)
     }
@@ -252,7 +256,10 @@ mod tests {
             for b in 0..HUB_COUNT {
                 if a != b && hub.collab_counts[a][b] > 0 {
                     // At least one of the hubs is Linguistic (0).
-                    assert!(a == 0 || b == 0, "unexpected edge {a}→{b} from single-hub broadcast");
+                    assert!(
+                        a == 0 || b == 0,
+                        "unexpected edge {a}→{b} from single-hub broadcast"
+                    );
                 }
             }
         }
@@ -270,7 +277,9 @@ mod tests {
         for _ in 0..50 {
             hub.record_collaboration(CognitiveType::Social, CognitiveType::Linguistic);
         }
-        let sum: f64 = hub.weights[CognitiveHub::idx(CognitiveType::Social)].iter().sum();
+        let sum: f64 = hub.weights[CognitiveHub::idx(CognitiveType::Social)]
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-6);
     }
 }

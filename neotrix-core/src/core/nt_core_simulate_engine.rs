@@ -30,12 +30,15 @@ impl SimulateEngine {
     pub fn create_scenario(&mut self, name: &str, description: &str) -> String {
         let id = format!("sim-{}", self.next_id);
         self.next_id += 1;
-        self.scenarios.insert(id.clone(), Scenario {
-            name: name.to_string(),
-            description: description.to_string(),
-            mode: None,
-            result: None,
-        });
+        self.scenarios.insert(
+            id.clone(),
+            Scenario {
+                name: name.to_string(),
+                description: description.to_string(),
+                mode: None,
+                result: None,
+            },
+        );
         if self.scenarios.len() > 1024 {
             let oldest = self.scenarios.keys().next().cloned();
             if let Some(k) = oldest {

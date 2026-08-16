@@ -60,15 +60,24 @@ impl AbductiveReasoningEngine {
         if let Some(n) = self.graph.nodes.last_mut() {
             n.observed = true;
         }
-        self.state_machine.transition(AbductiveState::HypothesisGeneration);
+        self.state_machine
+            .transition(AbductiveState::HypothesisGeneration);
     }
 
     pub fn generate_hypotheses(&mut self, max_hypotheses: usize) -> Vec<AbductiveHypothesis> {
         let mut hypotheses = Vec::new();
-        let observed_ids: Vec<usize> = self.graph.nodes.iter().filter(|n| n.observed).map(|n| n.id).collect();
+        let observed_ids: Vec<usize> = self
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| n.observed)
+            .map(|n| n.id)
+            .collect();
 
         for &obs_id in &observed_ids {
-            let paths = self.graph.find_abductive_explanations(obs_id, self.search.max_depth);
+            let paths = self
+                .graph
+                .find_abductive_explanations(obs_id, self.search.max_depth);
             for path in &paths {
                 if hypotheses.len() >= max_hypotheses {
                     break;
@@ -79,7 +88,13 @@ impl AbductiveReasoningEngine {
                 let causes: Vec<usize> = path[..path.len() - 1].to_vec();
                 let confidence: f64 = causes
                     .iter()
-                    .filter_map(|cid| self.graph.nodes.iter().find(|n| n.id == *cid).map(|n| n.confidence))
+                    .filter_map(|cid| {
+                        self.graph
+                            .nodes
+                            .iter()
+                            .find(|n| n.id == *cid)
+                            .map(|n| n.confidence)
+                    })
                     .product();
                 let plausibility = self.compute_plausibility(&causes, obs_id);
 
@@ -133,7 +148,8 @@ impl AbductiveReasoningEngine {
         let mut state_transitions = vec![initial_state];
 
         if *self.state_machine.current() == AbductiveState::Observation {
-            self.state_machine.transition(AbductiveState::HypothesisGeneration);
+            self.state_machine
+                .transition(AbductiveState::HypothesisGeneration);
             state_transitions.push(AbductiveState::HypothesisGeneration);
         }
 
@@ -142,13 +158,19 @@ impl AbductiveReasoningEngine {
         self.state_machine.transition(AbductiveState::Evaluation);
         state_transitions.push(AbductiveState::Evaluation);
 
-        let best_hypothesis = hypotheses.iter().max_by(|a, b| {
-            self.evaluate_hypothesis(a)
-                .partial_cmp(&self.evaluate_hypothesis(b))
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }).cloned();
+        let best_hypothesis = hypotheses
+            .iter()
+            .max_by(|a, b| {
+                self.evaluate_hypothesis(a)
+                    .partial_cmp(&self.evaluate_hypothesis(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .cloned();
 
-        let convergence = best_hypothesis.as_ref().map(|h| self.evaluate_hypothesis(h)).unwrap_or(0.0);
+        let convergence = best_hypothesis
+            .as_ref()
+            .map(|h| self.evaluate_hypothesis(h))
+            .unwrap_or(0.0);
 
         if convergence >= self.convergence_threshold {
             self.state_machine.transition(AbductiveState::Revision);
@@ -162,12 +184,18 @@ impl AbductiveReasoningEngine {
             if !regenerated.is_empty() {
                 self.state_machine.transition(AbductiveState::Evaluation);
                 state_transitions.push(AbductiveState::Evaluation);
-                let re_best = regenerated.iter().max_by(|a, b| {
-                    self.evaluate_hypothesis(a)
-                        .partial_cmp(&self.evaluate_hypothesis(b))
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                }).cloned();
-                let new_conv = re_best.as_ref().map(|h| self.evaluate_hypothesis(h)).unwrap_or(0.0);
+                let re_best = regenerated
+                    .iter()
+                    .max_by(|a, b| {
+                        self.evaluate_hypothesis(a)
+                            .partial_cmp(&self.evaluate_hypothesis(b))
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .cloned();
+                let new_conv = re_best
+                    .as_ref()
+                    .map(|h| self.evaluate_hypothesis(h))
+                    .unwrap_or(0.0);
                 if new_conv >= self.convergence_threshold {
                     self.state_machine.transition(AbductiveState::Acceptance);
                     state_transitions.push(AbductiveState::Acceptance);
@@ -231,7 +259,9 @@ mod tests {
             }
         });
         engine.graph.add_edge(cause, effect, "triggers".into(), 0.9);
-        engine.state_machine.transition(AbductiveState::HypothesisGeneration);
+        engine
+            .state_machine
+            .transition(AbductiveState::HypothesisGeneration);
         let hypotheses = engine.generate_hypotheses(10);
         assert!(!hypotheses.is_empty());
         assert_eq!(hypotheses[0].effect, effect);
@@ -263,7 +293,9 @@ mod tests {
             }
         });
         engine.graph.add_edge(cause, effect, "causes".into(), 0.95);
-        engine.state_machine.transition(AbductiveState::HypothesisGeneration);
+        engine
+            .state_machine
+            .transition(AbductiveState::HypothesisGeneration);
 
         let report = engine.run_abduction_cycle(10);
         assert!(report.hypotheses_generated > 0);
@@ -283,7 +315,9 @@ mod tests {
         });
         engine.graph.add_edge(r1, obs, "causes".into(), 0.7);
         engine.graph.add_edge(r2, obs, "causes".into(), 0.6);
-        engine.state_machine.transition(AbductiveState::HypothesisGeneration);
+        engine
+            .state_machine
+            .transition(AbductiveState::HypothesisGeneration);
         let report = engine.run_abduction_cycle(10);
         assert!(report.hypotheses_generated > 0);
         assert!(!report.state_transitions.is_empty());
@@ -307,7 +341,9 @@ mod tests {
             }
         });
         engine.graph.add_edge(cause, obs, "c".into(), 0.8);
-        engine.state_machine.transition(AbductiveState::HypothesisGeneration);
+        engine
+            .state_machine
+            .transition(AbductiveState::HypothesisGeneration);
         let h1 = engine.generate_hypotheses(5);
         let h2 = engine.generate_hypotheses(5);
         assert_eq!(h2[0].id, h1.len() as usize);
@@ -331,7 +367,9 @@ mod tests {
             }
         });
         engine.graph.add_edge(c, o, "".into(), 0.7);
-        engine.state_machine.transition(AbductiveState::HypothesisGeneration);
+        engine
+            .state_machine
+            .transition(AbductiveState::HypothesisGeneration);
         let report = engine.run_abduction_cycle(5);
         assert!(report.cycles_used >= 1);
         assert!(report.hypotheses_generated <= 5);

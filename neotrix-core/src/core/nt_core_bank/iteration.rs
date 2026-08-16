@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::core::nt_core_bank::ReasoningBankStats;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct MemoryIterationResult {
@@ -39,18 +39,30 @@ pub(crate) struct Bm25Index {
 
 impl Bm25Index {
     pub(crate) fn empty() -> Self {
-        Self { df: HashMap::new(), docs: Vec::new(), avg_doc_len: 0.0, n_docs: 0 }
+        Self {
+            df: HashMap::new(),
+            docs: Vec::new(),
+            avg_doc_len: 0.0,
+            n_docs: 0,
+        }
     }
 
     pub(crate) fn build(docs: &[Bm25Document]) -> Self {
-        let entries: Vec<DocEntry> = docs.iter().map(|d| {
-            let tokens = tokenize(&d.text);
-            let mut tf: HashMap<String, f64> = HashMap::new();
-            for t in &tokens {
-                *tf.entry(t.clone()).or_insert(0.0) += 1.0;
-            }
-            DocEntry { doc_id: d.id.clone(), field_length: tokens.len(), term_freqs: tf }
-        }).collect();
+        let entries: Vec<DocEntry> = docs
+            .iter()
+            .map(|d| {
+                let tokens = tokenize(&d.text);
+                let mut tf: HashMap<String, f64> = HashMap::new();
+                for t in &tokens {
+                    *tf.entry(t.clone()).or_insert(0.0) += 1.0;
+                }
+                DocEntry {
+                    doc_id: d.id.clone(),
+                    field_length: tokens.len(),
+                    term_freqs: tf,
+                }
+            })
+            .collect();
 
         let n = entries.len();
         let mut df: HashMap<String, usize> = HashMap::new();
@@ -66,30 +78,54 @@ impl Bm25Index {
             0.0
         };
 
-        Self { df, docs: entries, avg_doc_len: avgdl, n_docs: n }
+        Self {
+            df,
+            docs: entries,
+            avg_doc_len: avgdl,
+            n_docs: n,
+        }
     }
 
     pub(crate) fn search(&self, query: &str, k: usize) -> Vec<(f64, String)> {
-        if self.n_docs == 0 { return Vec::new(); }
+        if self.n_docs == 0 {
+            return Vec::new();
+        }
         let query_terms = tokenize(query);
-        if query_terms.is_empty() { return Vec::new(); }
+        if query_terms.is_empty() {
+            return Vec::new();
+        }
 
-        let mut scores: Vec<(f64, usize)> = (0..self.docs.len()).map(|i| {
-            let entry = &self.docs[i];
-            let mut score = 0.0;
-            for qt in &query_terms {
-                let doc_freq = self.df.get(qt.as_str()).copied().unwrap_or(0);
-                if doc_freq == 0 { continue; }
-                let idf = ((self.n_docs as f64 - doc_freq as f64 + 0.5) / (doc_freq as f64 + 0.5) + 1.0).ln();
-                let tf = entry.term_freqs.get(qt.as_str()).copied().unwrap_or(0.0);
-                if tf <= 0.0 { continue; }
-                score += idf * (tf * (K1 + 1.0)) / (tf + K1 * (1.0 - B + B * entry.field_length as f64 / self.avg_doc_len));
-            }
-            (score, i)
-        }).collect();
+        let mut scores: Vec<(f64, usize)> = (0..self.docs.len())
+            .map(|i| {
+                let entry = &self.docs[i];
+                let mut score = 0.0;
+                for qt in &query_terms {
+                    let doc_freq = self.df.get(qt.as_str()).copied().unwrap_or(0);
+                    if doc_freq == 0 {
+                        continue;
+                    }
+                    let idf = ((self.n_docs as f64 - doc_freq as f64 + 0.5)
+                        / (doc_freq as f64 + 0.5)
+                        + 1.0)
+                        .ln();
+                    let tf = entry.term_freqs.get(qt.as_str()).copied().unwrap_or(0.0);
+                    if tf <= 0.0 {
+                        continue;
+                    }
+                    score += idf * (tf * (K1 + 1.0))
+                        / (tf + K1 * (1.0 - B + B * entry.field_length as f64 / self.avg_doc_len));
+                }
+                (score, i)
+            })
+            .collect();
 
         scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        scores.into_iter().filter(|(s, _)| *s > 0.0).take(k).map(|(s, i)| (s, self.docs[i].doc_id.clone())).collect()
+        scores
+            .into_iter()
+            .filter(|(s, _)| *s > 0.0)
+            .take(k)
+            .map(|(s, i)| (s, self.docs[i].doc_id.clone()))
+            .collect()
     }
 }
 
@@ -102,7 +138,9 @@ pub(crate) fn tokenize(text: &str) -> Vec<String> {
 }
 
 pub(crate) fn rrf_fuse(results: &[Vec<(f64, String)>]) -> Vec<(f64, String)> {
-    if results.is_empty() { return Vec::new(); }
+    if results.is_empty() {
+        return Vec::new();
+    }
     let mut agg: HashMap<String, f64> = HashMap::new();
     for ranklist in results {
         for (rank, (_score, id)) in ranklist.iter().enumerate() {
@@ -147,14 +185,23 @@ mod tests {
     #[test]
     fn test_tokenize_hyphenated() {
         let tokens = tokenize("state-of-the-art");
-        assert!(tokens.contains(&"state-of-the-art".to_string()) || tokens.contains(&"state".to_string()));
+        assert!(
+            tokens.contains(&"state-of-the-art".to_string())
+                || tokens.contains(&"state".to_string())
+        );
     }
 
     #[test]
     fn test_bm25_search_returns_results() {
         let docs = vec![
-            Bm25Document { id: "1".into(), text: "rust programming language".into() },
-            Bm25Document { id: "2".into(), text: "python programming language".into() },
+            Bm25Document {
+                id: "1".into(),
+                text: "rust programming language".into(),
+            },
+            Bm25Document {
+                id: "2".into(),
+                text: "python programming language".into(),
+            },
         ];
         let index = Bm25Index::build(&docs);
         let results = index.search("rust", 5);
@@ -171,9 +218,10 @@ mod tests {
 
     #[test]
     fn test_bm25_search_no_match() {
-        let docs = vec![
-            Bm25Document { id: "1".into(), text: "rust programming".into() },
-        ];
+        let docs = vec![Bm25Document {
+            id: "1".into(),
+            text: "rust programming".into(),
+        }];
         let index = Bm25Index::build(&docs);
         let results = index.search("golang", 5);
         assert!(results.is_empty());
@@ -181,7 +229,10 @@ mod tests {
 
     #[test]
     fn test_bm25_empty_query() {
-        let docs = vec![Bm25Document { id: "1".into(), text: "hello world".into() }];
+        let docs = vec![Bm25Document {
+            id: "1".into(),
+            text: "hello world".into(),
+        }];
         let index = Bm25Index::build(&docs);
         let results = index.search("", 5);
         assert!(results.is_empty());
@@ -211,8 +262,14 @@ mod tests {
     #[test]
     fn test_bm25_build_and_search_multiple_terms() {
         let docs = vec![
-            Bm25Document { id: "d1".into(), text: "the quick brown fox".into() },
-            Bm25Document { id: "d2".into(), text: "lazy dog sleeping".into() },
+            Bm25Document {
+                id: "d1".into(),
+                text: "the quick brown fox".into(),
+            },
+            Bm25Document {
+                id: "d2".into(),
+                text: "lazy dog sleeping".into(),
+            },
         ];
         let index = Bm25Index::build(&docs);
         let results = index.search("quick fox", 5);

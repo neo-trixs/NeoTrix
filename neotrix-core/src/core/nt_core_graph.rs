@@ -104,7 +104,10 @@ impl HyperGraph {
             relation: edge.relation.clone(),
             strength: edge.strength,
         };
-        self.adjacency.entry(from.to_string()).or_default().push(edge);
+        self.adjacency
+            .entry(from.to_string())
+            .or_default()
+            .push(edge);
         self.adjacency.entry(to.to_string()).or_default().push(rev);
     }
 
@@ -197,7 +200,10 @@ impl HyperGraph {
         for (from_id, edges) in other.adjacency {
             let entry = self.adjacency.entry(from_id).or_default();
             for edge in edges {
-                if !entry.iter().any(|e| e.to_id == edge.to_id && e.relation == edge.relation) {
+                if !entry
+                    .iter()
+                    .any(|e| e.to_id == edge.to_id && e.relation == edge.relation)
+                {
                     entry.push(edge);
                 }
             }
@@ -277,11 +283,31 @@ mod tests {
 
     fn create_test_graph() -> HyperGraph {
         let mut graph = HyperGraph::with_capacity(10);
-        graph.add_node(HyperNode::new("n1", HyperNodeType::Concept, "machine learning", 0.9));
-        graph.add_node(HyperNode::new("n2", HyperNodeType::Concept, "neural networks", 0.85));
-        graph.add_node(HyperNode::new("n3", HyperNodeType::Concept, "deep learning", 0.8));
+        graph.add_node(HyperNode::new(
+            "n1",
+            HyperNodeType::Concept,
+            "machine learning",
+            0.9,
+        ));
+        graph.add_node(HyperNode::new(
+            "n2",
+            HyperNodeType::Concept,
+            "neural networks",
+            0.85,
+        ));
+        graph.add_node(HyperNode::new(
+            "n3",
+            HyperNodeType::Concept,
+            "deep learning",
+            0.8,
+        ));
         graph.add_node(HyperNode::new("n4", HyperNodeType::Skill, "Python", 0.95));
-        graph.add_node(HyperNode::new("n5", HyperNodeType::Pattern, "attention mechanism", 0.75));
+        graph.add_node(HyperNode::new(
+            "n5",
+            HyperNodeType::Pattern,
+            "attention mechanism",
+            0.75,
+        ));
 
         graph.add_edge("n1", "n2", EdgeRelation::DerivesFrom, 0.9);
         graph.add_edge("n2", "n3", EdgeRelation::PartOf, 0.85);
@@ -341,15 +367,30 @@ mod tests {
         let mut graph1 = create_test_graph();
         let mut graph2 = HyperGraph::new();
         graph2.add_node(HyperNode::new("n6", HyperNodeType::Goal, "new goal", 0.7));
-        graph2.add_node(HyperNode::new("n1", HyperNodeType::Concept, "different content", 0.3));
+        graph2.add_node(HyperNode::new(
+            "n1",
+            HyperNodeType::Concept,
+            "different content",
+            0.3,
+        ));
         graph2.add_edge("n6", "n1", EdgeRelation::Enhances, 0.5);
 
         graph1.merge_from(graph2);
         assert_eq!(graph1.node_count(), 6);
-        assert_eq!(graph1.nodes.get("n1").expect("value should be ok in test").content, "machine learning");
+        assert_eq!(
+            graph1
+                .nodes
+                .get("n1")
+                .expect("value should be ok in test")
+                .content,
+            "machine learning"
+        );
         assert!(graph1.nodes.contains_key("n6"));
 
-        let n1_edges = graph1.adjacency.get("n1").expect("value should be ok in test");
+        let n1_edges = graph1
+            .adjacency
+            .get("n1")
+            .expect("value should be ok in test");
         let has_n6_edge = n1_edges.iter().any(|e| e.to_id == "n6");
         assert!(has_n6_edge);
     }

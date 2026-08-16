@@ -4,6 +4,7 @@ pub mod worker;
 pub mod critic;
 pub mod state_graph;
 pub mod pm_workflow;
+pub mod harness_scaffold;
 #[cfg(test)]
 pub mod group_integration_test;
 #[cfg(test)]

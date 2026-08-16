@@ -45,29 +45,32 @@ impl SelfEditGen {
         let target_lower = target.to_lowercase();
         let context_lower = code_context.to_lowercase();
 
-        let candidate_types: Vec<EditType> = if context_lower.contains("function")
-            || context_lower.contains("fn")
-        {
-            vec![EditType::Refactor, EditType::Fix]
-        } else if context_lower.contains("optimize") || context_lower.contains("perf") {
-            vec![EditType::Optimize]
-        } else if context_lower.contains("doc") || context_lower.contains("comment") {
-            vec![EditType::Document]
-        } else if target_lower.contains("feature") || target_lower.contains("new") {
-            vec![EditType::Feature]
-        } else {
-            vec![
-                EditType::Refactor,
-                EditType::Optimize,
-                EditType::Fix,
-                EditType::Document,
-                EditType::Feature,
-            ]
-        };
+        let candidate_types: Vec<EditType> =
+            if context_lower.contains("function") || context_lower.contains("fn") {
+                vec![EditType::Refactor, EditType::Fix]
+            } else if context_lower.contains("optimize") || context_lower.contains("perf") {
+                vec![EditType::Optimize]
+            } else if context_lower.contains("doc") || context_lower.contains("comment") {
+                vec![EditType::Document]
+            } else if target_lower.contains("feature") || target_lower.contains("new") {
+                vec![EditType::Feature]
+            } else {
+                vec![
+                    EditType::Refactor,
+                    EditType::Optimize,
+                    EditType::Fix,
+                    EditType::Document,
+                    EditType::Feature,
+                ]
+            };
 
         let noise_scale = self.temperature * 0.2;
         let mut edits = Vec::new();
-        for (i, et) in candidate_types.iter().enumerate().take(self.max_edits_per_step) {
+        for (i, et) in candidate_types
+            .iter()
+            .enumerate()
+            .take(self.max_edits_per_step)
+        {
             let noise: f64 = ((i as f64 + 1.0) * 1.13).sin() * noise_scale;
             let confidence = ((1.0 - self.temperature * 0.15) + noise).max(0.1).min(1.0);
             let improvement = (0.3 + (i as f64 * 0.27).cos() * 0.2).max(0.0).min(1.0);
@@ -99,7 +102,9 @@ impl SelfEditGen {
             EditType::Feature => 0.5,
             EditType::Document => 0.3,
         };
-        (type_base * 0.5 + edit.confidence * 0.3 + edit.expected_improvement * 0.2).max(0.0).min(1.0)
+        (type_base * 0.5 + edit.confidence * 0.3 + edit.expected_improvement * 0.2)
+            .max(0.0)
+            .min(1.0)
     }
 }
 

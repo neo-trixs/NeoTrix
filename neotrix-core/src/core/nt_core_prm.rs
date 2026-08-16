@@ -1,7 +1,7 @@
 use crate::core::nt_core_hex::ReasoningHexagram;
-use crate::core::nt_core_traits::SpecialistType;
 use crate::core::nt_core_policy::E8Policy;
-use serde::{Serialize, Deserialize};
+use crate::core::nt_core_traits::SpecialistType;
+use serde::{Deserialize, Serialize};
 
 /// One step in a multi-agent reasoning trajectory.
 ///
@@ -153,10 +153,13 @@ pub trait Coach: Send + Sync {
             .iter()
             .enumerate()
             .map(|(i, step)| {
-                self.score_step(step, &CoachContext {
-                    trajectory_so_far: trajectory.steps[..=i].to_vec(),
-                    ..terminal.clone()
-                })
+                self.score_step(
+                    step,
+                    &CoachContext {
+                        trajectory_so_far: trajectory.steps[..=i].to_vec(),
+                        ..terminal.clone()
+                    },
+                )
             })
             .collect()
     }
@@ -270,7 +273,11 @@ impl TrajectoryCollector {
         }
     }
 
-    pub fn finish(&mut self, outcome_reward: Option<f64>, completed: bool) -> Option<AgentTrajectory> {
+    pub fn finish(
+        &mut self,
+        outcome_reward: Option<f64>,
+        completed: bool,
+    ) -> Option<AgentTrajectory> {
         if let Some(mut traj) = self.active.take() {
             traj.outcome_reward = outcome_reward;
             traj.completed = completed;
@@ -370,14 +377,21 @@ impl Coach for HeuristicCoach {
             })
             .collect();
         // Apply LATA normalization to each score
-        base_scores.into_iter().map(|mut ps| {
-            ps.score = (ps.score / lata_factor).max(0.0).min(1.0);
-            ps
-        }).collect()
+        base_scores
+            .into_iter()
+            .map(|mut ps| {
+                ps.score = (ps.score / lata_factor).max(0.0).min(1.0);
+                ps
+            })
+            .collect()
     }
 
     fn score_step(&self, step: &TrajectoryStep, context: &CoachContext) -> ProcessScore {
-        let mut score = if step.success { self.success_base } else { self.failure_penalty };
+        let mut score = if step.success {
+            self.success_base
+        } else {
+            self.failure_penalty
+        };
 
         if let Some(ext_r) = step.external_reward {
             score += self.reward_bonus_weight * ext_r.max(0.0);
@@ -397,7 +411,14 @@ impl Coach for HeuristicCoach {
         criteria.push(ScoredCriterion {
             name: "completion".to_string(),
             score: if step.success { 1.0 } else { 0.0 },
-            rationale: Some(if step.success { "step completed" } else { "step failed" }.to_string()),
+            rationale: Some(
+                if step.success {
+                    "step completed"
+                } else {
+                    "step failed"
+                }
+                .to_string(),
+            ),
         });
 
         if let Some(ext_r) = step.external_reward {
@@ -441,7 +462,10 @@ impl Coach for HeuristicCoach {
             if let Some(reward) = trajectory.outcome_reward {
                 let normalized_reward = ((reward + 1.0) / 2.0).max(0.0).min(1.0);
                 if normalized_reward > 0.6 {
-                    self.success_base = (self.success_base + lr * (normalized_reward - self.success_base)).max(0.0).min(1.0);
+                    self.success_base = (self.success_base
+                        + lr * (normalized_reward - self.success_base))
+                        .max(0.0)
+                        .min(1.0);
                     let target_penalty = self.failure_penalty + lr * 0.1;
                     self.failure_penalty = target_penalty.max(0.0).min(1.0);
                 } else {
@@ -578,7 +602,8 @@ impl ProcessRewardLearner {
 
         for traj in &trajectories {
             let scores = self.coach.score_episode(traj);
-            let avg_score = scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
+            let avg_score =
+                scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
             self.score_history.push(avg_score);
 
             // Learn from trajectory and scores directly
@@ -587,7 +612,9 @@ impl ProcessRewardLearner {
             // Blend auxiliary rule-based reward if available
             let aux = Self::auxiliary_reward(traj);
             if aux != 0.0 {
-                let aux_scores: Vec<ProcessScore> = traj.steps.iter()
+                let aux_scores: Vec<ProcessScore> = traj
+                    .steps
+                    .iter()
                     .map(|s| {
                         let mut ps = ProcessScore::new(s.step_idx);
                         ps.score = aux.max(0.0).min(1.0);
@@ -679,10 +706,26 @@ mod tests {
         assert!(tc.is_active());
         assert_eq!(tc.active_task(), Some("test task"));
 
-        tc.record_step(SpecialistType::Planner, ReasoningHexagram(0),
-            "plan".into(), "input".into(), "output".into(), None, true, None);
-        tc.record_step(SpecialistType::CodeAnalyzer, ReasoningHexagram(1),
-            "code".into(), "input2".into(), "output2".into(), None, true, Some(0.8));
+        tc.record_step(
+            SpecialistType::Planner,
+            ReasoningHexagram(0),
+            "plan".into(),
+            "input".into(),
+            "output".into(),
+            None,
+            true,
+            None,
+        );
+        tc.record_step(
+            SpecialistType::CodeAnalyzer,
+            ReasoningHexagram(1),
+            "code".into(),
+            "input2".into(),
+            "output2".into(),
+            None,
+            true,
+            Some(0.8),
+        );
 
         let traj = tc.finish(Some(1.0), true);
         assert!(traj.is_some());
@@ -725,8 +768,16 @@ mod tests {
     fn test_collector_abort() {
         let mut tc = TrajectoryCollector::new();
         tc.begin("abortable".into());
-        tc.record_step(SpecialistType::Planner, ReasoningHexagram(0),
-            "action".into(), "in".into(), "out".into(), None, true, None);
+        tc.record_step(
+            SpecialistType::Planner,
+            ReasoningHexagram(0),
+            "action".into(),
+            "in".into(),
+            "out".into(),
+            None,
+            true,
+            None,
+        );
         tc.abort();
         assert!(!tc.is_active());
         assert!(tc.latest().is_none());
@@ -760,12 +811,36 @@ mod tests {
 
         learner.learn_step(|collector| {
             collector.begin("test task".into());
-            collector.record_step(SpecialistType::Planner, ReasoningHexagram(0),
-                "plan".into(), "".into(), "plan_output".into(), None, true, None);
-            collector.record_step(SpecialistType::CodeAnalyzer, ReasoningHexagram(1),
-                "code".into(), "plan_output".into(), "code_output".into(), None, true, None);
-            collector.record_step(SpecialistType::MetaCognitionAnalyst, ReasoningHexagram(2),
-                "verify".into(), "code_output".into(), "verified".into(), None, true, Some(1.0));
+            collector.record_step(
+                SpecialistType::Planner,
+                ReasoningHexagram(0),
+                "plan".into(),
+                "".into(),
+                "plan_output".into(),
+                None,
+                true,
+                None,
+            );
+            collector.record_step(
+                SpecialistType::CodeAnalyzer,
+                ReasoningHexagram(1),
+                "code".into(),
+                "plan_output".into(),
+                "code_output".into(),
+                None,
+                true,
+                None,
+            );
+            collector.record_step(
+                SpecialistType::MetaCognitionAnalyst,
+                ReasoningHexagram(2),
+                "verify".into(),
+                "code_output".into(),
+                "verified".into(),
+                None,
+                true,
+                Some(1.0),
+            );
             collector.finish(Some(1.0), true);
         });
 
@@ -774,20 +849,39 @@ mod tests {
         assert!(learner.avg_recent_score(1) > 0.0);
         // Policy values should have been updated by the learning step
         let total_value: f64 = learner.policy.mode_values.iter().sum();
-        assert!(total_value > 0.0, "policy should have learned positive values");
+        assert!(
+            total_value > 0.0,
+            "policy should have learned positive values"
+        );
     }
 
     #[test]
     fn test_trajectory_collector_multiple_collected() {
         let mut tc = TrajectoryCollector::new();
         tc.begin("task1".into());
-        tc.record_step(SpecialistType::Planner, ReasoningHexagram(0),
-            "plan".into(), "".into(), "out1".into(), None, true, None);
+        tc.record_step(
+            SpecialistType::Planner,
+            ReasoningHexagram(0),
+            "plan".into(),
+            "".into(),
+            "out1".into(),
+            None,
+            true,
+            None,
+        );
         tc.finish(Some(1.0), true);
 
         tc.begin("task2".into());
-        tc.record_step(SpecialistType::CodeAnalyzer, ReasoningHexagram(1),
-            "code".into(), "".into(), "out2".into(), None, true, None);
+        tc.record_step(
+            SpecialistType::CodeAnalyzer,
+            ReasoningHexagram(1),
+            "code".into(),
+            "".into(),
+            "out2".into(),
+            None,
+            true,
+            None,
+        );
         tc.finish(Some(0.0), false);
 
         assert_eq!(tc.count(), 2);
@@ -880,7 +974,10 @@ pub fn zscore_normalize(values: &[f64]) -> Vec<f64> {
     if n == 1 {
         return vec![0.0];
     }
-    let clean: Vec<f64> = values.iter().map(|v| if v.is_finite() { *v } else { 0.0 }).collect();
+    let clean: Vec<f64> = values
+        .iter()
+        .map(|v| if v.is_finite() { *v } else { 0.0 })
+        .collect();
     let mean = clean.iter().sum::<f64>() / n as f64;
     let variance = clean.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n as f64;
     let std = variance.sqrt();
@@ -891,11 +988,7 @@ pub fn zscore_normalize(values: &[f64]) -> Vec<f64> {
 }
 
 /// Blended advantage: λ · A_step + (1-λ) · A_outcome
-pub fn blended_advantage(
-    step_advantage: f64,
-    outcome_advantage: f64,
-    lambda: f64,
-) -> f64 {
+pub fn blended_advantage(step_advantage: f64, outcome_advantage: f64, lambda: f64) -> f64 {
     lambda * step_advantage + (1.0 - lambda) * outcome_advantage
 }
 
@@ -908,7 +1001,10 @@ pub fn trajectory_convergence(trajectory: &AgentTrajectory) -> f64 {
     let rewards: Vec<f64> = trajectory
         .steps
         .iter()
-        .map(|s| s.external_reward.unwrap_or(if s.success { 1.0 } else { 0.0 }))
+        .map(|s| {
+            s.external_reward
+                .unwrap_or(if s.success { 1.0 } else { 0.0 })
+        })
         .collect();
     let n = rewards.len();
     if n < 2 {
@@ -1336,14 +1432,23 @@ mod lambda_grpo_tests {
 
         // Good outcomes normalize to positive; bad to negative
         for sa in &results[0].step_advantages {
-            assert!(sa.advantage > -0.5, "good trajectory should not be heavily penalized");
+            assert!(
+                sa.advantage > -0.5,
+                "good trajectory should not be heavily penalized"
+            );
         }
         for sa in &results[1].step_advantages {
-            assert!(sa.advantage > -0.5, "good trajectory should not be heavily penalized");
+            assert!(
+                sa.advantage > -0.5,
+                "good trajectory should not be heavily penalized"
+            );
         }
         // The bad one should have negative or near-zero advantages
         for sa in &results[2].step_advantages {
-            assert!(sa.advantage <= 0.5, "bad trajectory should not have large positive advantage");
+            assert!(
+                sa.advantage <= 0.5,
+                "bad trajectory should not have large positive advantage"
+            );
         }
     }
 
@@ -1352,10 +1457,20 @@ mod lambda_grpo_tests {
         let cfg = LambdaGrpoConfig::default();
         // Trajectories with explicit external rewards on each step
         let high = make_trajectory_with_rewards(
-            1, "high", &[true, true], &[Some(0.9), Some(0.8)], Some(1.0), true,
+            1,
+            "high",
+            &[true, true],
+            &[Some(0.9), Some(0.8)],
+            Some(1.0),
+            true,
         );
         let low = make_trajectory_with_rewards(
-            2, "low", &[true, false], &[Some(0.1), Some(0.0)], Some(0.0), false,
+            2,
+            "low",
+            &[true, false],
+            &[Some(0.1), Some(0.0)],
+            Some(0.0),
+            false,
         );
         let results = lambda_grpo_loss(&[high, low], &cfg);
         assert_eq!(results.len(), 2);
@@ -1390,17 +1505,26 @@ mod lambda_grpo_tests {
         let bad = make_trajectory(2, "bad", 2, false, Some(0.0), false);
 
         // λ=0: pure outcome — both step rewards ignored, only outcome matters
-        let cfg0 = LambdaGrpoConfig { lambda: 0.0, ..Default::default() };
+        let cfg0 = LambdaGrpoConfig {
+            lambda: 0.0,
+            ..Default::default()
+        };
         let r0 = lambda_grpo_loss(&[good.clone(), bad.clone()], &cfg0);
         let loss_diff_0 = (r0[0].loss - r0[1].loss).abs();
 
         // λ=1: pure step — outcome ignored, only step rewards matter
-        let cfg1 = LambdaGrpoConfig { lambda: 1.0, ..Default::default() };
+        let cfg1 = LambdaGrpoConfig {
+            lambda: 1.0,
+            ..Default::default()
+        };
         let r1 = lambda_grpo_loss(&[good.clone(), bad.clone()], &cfg1);
         let loss_diff_1 = (r1[0].loss - r1[1].loss).abs();
 
         // λ=0.5: balanced
-        let cfg5 = LambdaGrpoConfig { lambda: 0.5, ..Default::default() };
+        let cfg5 = LambdaGrpoConfig {
+            lambda: 0.5,
+            ..Default::default()
+        };
         let r5 = lambda_grpo_loss(&[good, bad], &cfg5);
         let loss_diff_5 = (r5[0].loss - r5[1].loss).abs();
 
@@ -1421,16 +1545,34 @@ mod lambda_grpo_tests {
         let results = learner.learn_step_grpo(|collector| {
             collector.begin("grpo_test".into());
             collector.record_step(
-                SpecialistType::Planner, ReasoningHexagram(0),
-                "plan".into(), "".into(), "plan_out".into(), None, true, None,
+                SpecialistType::Planner,
+                ReasoningHexagram(0),
+                "plan".into(),
+                "".into(),
+                "plan_out".into(),
+                None,
+                true,
+                None,
             );
             collector.record_step(
-                SpecialistType::CodeAnalyzer, ReasoningHexagram(1),
-                "code".into(), "plan_out".into(), "code_out".into(), None, true, None,
+                SpecialistType::CodeAnalyzer,
+                ReasoningHexagram(1),
+                "code".into(),
+                "plan_out".into(),
+                "code_out".into(),
+                None,
+                true,
+                None,
             );
             collector.record_step(
-                SpecialistType::MetaCognitionAnalyst, ReasoningHexagram(2),
-                "verify".into(), "code_out".into(), "verified".into(), None, true, Some(1.0),
+                SpecialistType::MetaCognitionAnalyst,
+                ReasoningHexagram(2),
+                "verify".into(),
+                "code_out".into(),
+                "verified".into(),
+                None,
+                true,
+                Some(1.0),
             );
             collector.finish(Some(1.0), true);
         });
@@ -1455,8 +1597,14 @@ mod lambda_grpo_tests {
             |collector| {
                 collector.begin("multi_step".into());
                 collector.record_step(
-                    SpecialistType::Planner, ReasoningHexagram(0),
-                    "plan".into(), "".into(), "out".into(), None, true, None,
+                    SpecialistType::Planner,
+                    ReasoningHexagram(0),
+                    "plan".into(),
+                    "".into(),
+                    "out".into(),
+                    None,
+                    true,
+                    None,
                 );
                 collector.finish(Some(1.0), true);
             },
@@ -1507,26 +1655,44 @@ mod lambda_grpo_tests {
         let collect = |collector: &mut TrajectoryCollector| {
             collector.begin("step_bad_outcome_good".into());
             collector.record_step(
-                SpecialistType::Planner, ReasoningHexagram(0),
-                "step".into(), "".into(), "out".into(), None, false, Some(1.0),
+                SpecialistType::Planner,
+                ReasoningHexagram(0),
+                "step".into(),
+                "".into(),
+                "out".into(),
+                None,
+                false,
+                Some(1.0),
             );
             collector.finish(Some(0.0), true);
 
             collector.begin("step_good_outcome_bad".into());
             collector.record_step(
-                SpecialistType::Planner, ReasoningHexagram(1),
-                "step".into(), "".into(), "out".into(), None, true, Some(0.0),
+                SpecialistType::Planner,
+                ReasoningHexagram(1),
+                "step".into(),
+                "".into(),
+                "out".into(),
+                None,
+                true,
+                Some(0.0),
             );
             collector.finish(Some(1.0), true);
         };
 
-        let cfg0 = LambdaGrpoConfig { lambda: 0.0, ..Default::default() };
+        let cfg0 = LambdaGrpoConfig {
+            lambda: 0.0,
+            ..Default::default()
+        };
         let policy0 = E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
         let coach0: Box<dyn Coach> = Box::new(HeuristicCoach::default());
         let mut learner0 = LambdaGrpoLearner::new(policy0, coach0, cfg0);
         let r0 = learner0.learn_step_grpo(collect);
 
-        let cfg1 = LambdaGrpoConfig { lambda: 1.0, ..Default::default() };
+        let cfg1 = LambdaGrpoConfig {
+            lambda: 1.0,
+            ..Default::default()
+        };
         let policy1 = E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
         let coach1: Box<dyn Coach> = Box::new(HeuristicCoach::default());
         let mut learner1 = LambdaGrpoLearner::new(policy1, coach1, cfg1);
@@ -1554,14 +1720,23 @@ mod lambda_grpo_tests {
         let mut traj = AgentTrajectory::new(1, "test".into());
         for i in 0..4 {
             traj.push(TrajectoryStep {
-                step_idx: i, specialist: SpecialistType::Planner,
+                step_idx: i,
+                specialist: SpecialistType::Planner,
                 e8_mode: ReasoningHexagram(i as u8),
-                action: "".into(), input: "".into(), output: "".into(),
-                duration_ms: None, success: true, external_reward: Some(1.0),
+                action: "".into(),
+                input: "".into(),
+                output: "".into(),
+                duration_ms: None,
+                success: true,
+                external_reward: Some(1.0),
             });
         }
         let c = trajectory_convergence(&traj);
-        assert!(c > 0.9, "constant rewards should give high convergence: {:.4}", c);
+        assert!(
+            c > 0.9,
+            "constant rewards should give high convergence: {:.4}",
+            c
+        );
     }
 
     #[test]
@@ -1570,27 +1745,45 @@ mod lambda_grpo_tests {
         let rewards = [0.0, 1.0, 0.0, 1.0];
         for (i, &r) in rewards.iter().enumerate() {
             traj.push(TrajectoryStep {
-                step_idx: i, specialist: SpecialistType::Planner,
+                step_idx: i,
+                specialist: SpecialistType::Planner,
                 e8_mode: ReasoningHexagram(i as u8),
-                action: "".into(), input: "".into(), output: "".into(),
-                duration_ms: None, success: r > 0.5, external_reward: Some(r),
+                action: "".into(),
+                input: "".into(),
+                output: "".into(),
+                duration_ms: None,
+                success: r > 0.5,
+                external_reward: Some(r),
             });
         }
         let c = trajectory_convergence(&traj);
-        assert!(c < 0.5, "noisy rewards should give low convergence: {:.4}", c);
+        assert!(
+            c < 0.5,
+            "noisy rewards should give low convergence: {:.4}",
+            c
+        );
     }
 
     #[test]
     fn test_trajectory_convergence_short() {
         let mut traj = AgentTrajectory::new(3, "short".into());
         traj.push(TrajectoryStep {
-            step_idx: 0, specialist: SpecialistType::Planner,
+            step_idx: 0,
+            specialist: SpecialistType::Planner,
             e8_mode: ReasoningHexagram(0),
-            action: "".into(), input: "".into(), output: "".into(),
-            duration_ms: None, success: true, external_reward: None,
+            action: "".into(),
+            input: "".into(),
+            output: "".into(),
+            duration_ms: None,
+            success: true,
+            external_reward: None,
         });
         let c = trajectory_convergence(&traj);
-        assert!((c - 0.5).abs() < 1e-6, "short (<2) should give neutral 0.5: {:.4}", c);
+        assert!(
+            (c - 0.5).abs() < 1e-6,
+            "short (<2) should give neutral 0.5: {:.4}",
+            c
+        );
     }
 
     #[test]
@@ -1600,10 +1793,15 @@ mod lambda_grpo_tests {
         let mut high_cons = AgentTrajectory::new(1, "easy".into());
         for i in 0..4 {
             high_cons.push(TrajectoryStep {
-                step_idx: i, specialist: SpecialistType::Planner,
+                step_idx: i,
+                specialist: SpecialistType::Planner,
                 e8_mode: ReasoningHexagram(i as u8),
-                action: "".into(), input: "".into(), output: "".into(),
-                duration_ms: None, success: true, external_reward: Some(1.0),
+                action: "".into(),
+                input: "".into(),
+                output: "".into(),
+                duration_ms: None,
+                success: true,
+                external_reward: Some(1.0),
             });
         }
         high_cons.outcome_reward = Some(1.0);
@@ -1613,10 +1811,15 @@ mod lambda_grpo_tests {
         let noisy = [0.0, 1.0, 0.0, 1.0];
         for (i, &r) in noisy.iter().enumerate() {
             low_cons.push(TrajectoryStep {
-                step_idx: i, specialist: SpecialistType::Planner,
+                step_idx: i,
+                specialist: SpecialistType::Planner,
                 e8_mode: ReasoningHexagram(i as u8),
-                action: "".into(), input: "".into(), output: "".into(),
-                duration_ms: None, success: r > 0.5, external_reward: Some(r),
+                action: "".into(),
+                input: "".into(),
+                output: "".into(),
+                duration_ms: None,
+                success: r > 0.5,
+                external_reward: Some(r),
             });
         }
         low_cons.outcome_reward = Some(1.0);
@@ -1649,13 +1852,20 @@ mod lambda_grpo_tests {
         let results_uniform = lambda_grpo_loss(&[high_cons.clone(), low_cons.clone()], &cfg);
         let mut any_diff = false;
         for (adaptive, uniform) in results.iter().zip(results_uniform.iter()) {
-            for (sa_a, sa_u) in adaptive.step_advantages.iter().zip(uniform.step_advantages.iter()) {
+            for (sa_a, sa_u) in adaptive
+                .step_advantages
+                .iter()
+                .zip(uniform.step_advantages.iter())
+            {
                 if (sa_a.advantage - sa_u.advantage).abs() > 1e-8 {
                     any_diff = true;
                 }
             }
         }
-        assert!(any_diff, "adaptive and uniform λ should produce different advantages");
+        assert!(
+            any_diff,
+            "adaptive and uniform λ should produce different advantages"
+        );
     }
 
     #[test]
@@ -1664,10 +1874,15 @@ mod lambda_grpo_tests {
         let mixed = [0.0, 0.8, 0.2, 0.9, 0.1, 0.95];
         for (i, &r) in mixed.iter().enumerate() {
             traj.push(TrajectoryStep {
-                step_idx: i, specialist: SpecialistType::Planner,
+                step_idx: i,
+                specialist: SpecialistType::Planner,
                 e8_mode: ReasoningHexagram(i as u8),
-                action: "".into(), input: "".into(), output: "".into(),
-                duration_ms: None, success: r > 0.5, external_reward: Some(r),
+                action: "".into(),
+                input: "".into(),
+                output: "".into(),
+                duration_ms: None,
+                success: r > 0.5,
+                external_reward: Some(r),
             });
         }
         traj.outcome_reward = Some(0.8);
@@ -1691,12 +1906,19 @@ mod lambda_grpo_tests {
 
         // With same trajectory, different scales → different advantages
         let mut diff = false;
-        for (sa_l, sa_h) in r_low[0].step_advantages.iter().zip(r_high[0].step_advantages.iter()) {
+        for (sa_l, sa_h) in r_low[0]
+            .step_advantages
+            .iter()
+            .zip(r_high[0].step_advantages.iter())
+        {
             if (sa_l.advantage - sa_h.advantage).abs() > 1e-8 {
                 diff = true;
             }
         }
-        assert!(diff, "scale=0.1 and scale=3.0 should produce different advantages");
+        assert!(
+            diff,
+            "scale=0.1 and scale=3.0 should produce different advantages"
+        );
     }
 }
 
@@ -1779,7 +2001,11 @@ pub fn compute_step_rewards(
     let mut tokens_saved = 0usize;
 
     for (i, step) in trajectory.steps.iter().enumerate() {
-        let base = if step.success { config.step_reward } else { 0.0 };
+        let base = if step.success {
+            config.step_reward
+        } else {
+            0.0
+        };
         let mut reward = StepReward::new(i, base);
 
         if i >= config.optimal_steps {
@@ -1818,28 +2044,31 @@ pub fn compute_step_advantages(
     all_rewards: &[Vec<StepReward>],
     _config: &StepGrpoConfig,
 ) -> Vec<Vec<f64>> {
-    let all_final: Vec<f64> = all_rewards.iter()
+    let all_final: Vec<f64> = all_rewards
+        .iter()
         .flat_map(|rewards| rewards.iter().map(|r| r.final_reward))
         .collect();
 
     let mu = all_final.iter().sum::<f64>() / (all_final.len() as f64).max(1.0);
-    let variance = all_final.iter()
-        .map(|r| (r - mu).powi(2))
-        .sum::<f64>() / (all_final.len() as f64).max(1.0);
+    let variance =
+        all_final.iter().map(|r| (r - mu).powi(2)).sum::<f64>() / (all_final.len() as f64).max(1.0);
     let sigma = variance.sqrt().max(1e-8);
 
-    all_rewards.iter()
+    all_rewards
+        .iter()
         .map(|rewards| {
-            rewards.iter().map(|r| (r.final_reward - mu) / sigma).collect()
+            rewards
+                .iter()
+                .map(|r| (r.final_reward - mu) / sigma)
+                .collect()
         })
         .collect()
 }
 
 /// Estimate token savings from Step-GRPO compared to baseline
-pub fn estimate_token_savings(
-    all_rewards: &[Vec<StepReward>],
-) -> (usize, f64) {
-    let total_saved: usize = all_rewards.iter()
+pub fn estimate_token_savings(all_rewards: &[Vec<StepReward>]) -> (usize, f64) {
+    let total_saved: usize = all_rewards
+        .iter()
         .flat_map(|r| r.iter())
         .map(|r| if r.overthinking_penalty < 0.0 { 1 } else { 0 })
         .sum();
@@ -1881,7 +2110,10 @@ impl StepGrpoLearner {
     }
 
     /// Run Step-GRPO on collected trajectories and return (rewards, advantages, report)
-    pub fn evaluate<F>(&mut self, collect_fn: F) -> (Vec<Vec<StepReward>>, Vec<Vec<f64>>, StepGrpoReport)
+    pub fn evaluate<F>(
+        &mut self,
+        collect_fn: F,
+    ) -> (Vec<Vec<StepReward>>, Vec<Vec<f64>>, StepGrpoReport)
     where
         F: FnOnce(&mut TrajectoryCollector),
     {
@@ -1890,7 +2122,8 @@ impl StepGrpoLearner {
         let total_steps: usize = trajectories.iter().map(|t| t.steps.len()).sum();
         let count = trajectories.len();
 
-        let all_rewards: Vec<Vec<StepReward>> = trajectories.iter()
+        let all_rewards: Vec<Vec<StepReward>> = trajectories
+            .iter()
             .map(|t| compute_step_rewards(t, &self.config))
             .map(|(r, _)| r)
             .collect();
@@ -1904,7 +2137,11 @@ impl StepGrpoLearner {
             total_steps,
             total_tokens_saved: total_saved,
             savings_ratio,
-            avg_steps_per_task: if count > 0 { total_steps as f64 / count as f64 } else { 0.0 },
+            avg_steps_per_task: if count > 0 {
+                total_steps as f64 / count as f64
+            } else {
+                0.0
+            },
         };
         self.reports.push(report.clone());
 
@@ -2058,7 +2295,10 @@ mod step_grpo_tests {
         // All advantages should be normalized around 0
         let all: Vec<f64> = advantages.iter().flat_map(|v| v.iter().copied()).collect();
         let mean = all.iter().sum::<f64>() / all.len() as f64;
-        assert!(mean.abs() < 1e-6, "group-normalized advantages should have mean near 0");
+        assert!(
+            mean.abs() < 1e-6,
+            "group-normalized advantages should have mean near 0"
+        );
     }
 
     #[test]
@@ -2085,16 +2325,34 @@ mod step_grpo_tests {
         let (rewards, advantages, report) = learner.evaluate(|collector| {
             collector.begin("eval_test".into());
             collector.record_step(
-                SpecialistType::Planner, ReasoningHexagram(0),
-                "plan".into(), "".into(), "out1".into(), None, true, None,
+                SpecialistType::Planner,
+                ReasoningHexagram(0),
+                "plan".into(),
+                "".into(),
+                "out1".into(),
+                None,
+                true,
+                None,
             );
             collector.record_step(
-                SpecialistType::CodeAnalyzer, ReasoningHexagram(1),
-                "code".into(), "out1".into(), "out2".into(), None, true, None,
+                SpecialistType::CodeAnalyzer,
+                ReasoningHexagram(1),
+                "code".into(),
+                "out1".into(),
+                "out2".into(),
+                None,
+                true,
+                None,
             );
             collector.record_step(
-                SpecialistType::MetaCognitionAnalyst, ReasoningHexagram(2),
-                "verify".into(), "out2".into(), "verified".into(), None, true, Some(1.0),
+                SpecialistType::MetaCognitionAnalyst,
+                ReasoningHexagram(2),
+                "verify".into(),
+                "out2".into(),
+                "verified".into(),
+                None,
+                true,
+                Some(1.0),
             );
             collector.finish(Some(1.0), true);
         });
@@ -2115,8 +2373,14 @@ mod step_grpo_tests {
         learner.evaluate(|collector| {
             collector.begin("report_test1".into());
             collector.record_step(
-                SpecialistType::Planner, ReasoningHexagram(0),
-                "step1".into(), "".into(), "out".into(), None, true, None,
+                SpecialistType::Planner,
+                ReasoningHexagram(0),
+                "step1".into(),
+                "".into(),
+                "out".into(),
+                None,
+                true,
+                None,
             );
             collector.finish(Some(1.0), true);
         });
@@ -2124,12 +2388,24 @@ mod step_grpo_tests {
         learner.evaluate(|collector| {
             collector.begin("report_test2".into());
             collector.record_step(
-                SpecialistType::Planner, ReasoningHexagram(0),
-                "step1".into(), "".into(), "out".into(), None, true, None,
+                SpecialistType::Planner,
+                ReasoningHexagram(0),
+                "step1".into(),
+                "".into(),
+                "out".into(),
+                None,
+                true,
+                None,
             );
             collector.record_step(
-                SpecialistType::CodeAnalyzer, ReasoningHexagram(1),
-                "step2".into(), "out".into(), "out2".into(), None, true, None,
+                SpecialistType::CodeAnalyzer,
+                ReasoningHexagram(1),
+                "step2".into(),
+                "out".into(),
+                "out2".into(),
+                None,
+                true,
+                None,
             );
             collector.finish(Some(1.0), true);
         });
@@ -2185,28 +2461,44 @@ use std::collections::HashMap;
 /// Falls back to "unknown" when no keywords match.
 fn extract_task_type(task: &str) -> String {
     let lower = task.to_lowercase();
-    if lower.contains("code") || lower.contains("program") || lower.contains("implement")
-        || lower.contains("function") || lower.contains("algorithm") || lower.contains("debug")
+    if lower.contains("code")
+        || lower.contains("program")
+        || lower.contains("implement")
+        || lower.contains("function")
+        || lower.contains("algorithm")
+        || lower.contains("debug")
     {
         return "code".to_string();
     }
-    if lower.contains("math") || lower.contains("equation") || lower.contains("calculate")
-        || lower.contains("numerical") || lower.contains("arithmetic")
+    if lower.contains("math")
+        || lower.contains("equation")
+        || lower.contains("calculate")
+        || lower.contains("numerical")
+        || lower.contains("arithmetic")
     {
         return "math".to_string();
     }
-    if lower.contains("reason") || lower.contains("logic") || lower.contains("deduce")
-        || lower.contains("infer") || lower.contains("syllogism")
+    if lower.contains("reason")
+        || lower.contains("logic")
+        || lower.contains("deduce")
+        || lower.contains("infer")
+        || lower.contains("syllogism")
     {
         return "reasoning".to_string();
     }
-    if lower.contains("plan") || lower.contains("schedule") || lower.contains("organize")
-        || lower.contains("strategy") || lower.contains("arrange")
+    if lower.contains("plan")
+        || lower.contains("schedule")
+        || lower.contains("organize")
+        || lower.contains("strategy")
+        || lower.contains("arrange")
     {
         return "planning".to_string();
     }
-    if lower.contains("search") || lower.contains("find") || lower.contains("lookup")
-        || lower.contains("retrieve") || lower.contains("query")
+    if lower.contains("search")
+        || lower.contains("find")
+        || lower.contains("lookup")
+        || lower.contains("retrieve")
+        || lower.contains("query")
     {
         return "search".to_string();
     }
@@ -2270,7 +2562,10 @@ impl WsPreferenceModel {
     /// Returns 0.5 (neutral) for unknown task types.
     pub fn preference_score(&self, task: &str) -> f64 {
         let task_type = extract_task_type(task);
-        self.preference_scores.get(&task_type).copied().unwrap_or(0.5)
+        self.preference_scores
+            .get(&task_type)
+            .copied()
+            .unwrap_or(0.5)
     }
 }
 
@@ -2303,7 +2598,12 @@ pub struct WsGrpoLearner {
 }
 
 impl WsGrpoLearner {
-    pub fn new(policy: E8Policy, coach: Box<dyn Coach>, learning_rate: f64, max_history: usize) -> Self {
+    pub fn new(
+        policy: E8Policy,
+        coach: Box<dyn Coach>,
+        learning_rate: f64,
+        max_history: usize,
+    ) -> Self {
         Self {
             preference_model: WsPreferenceModel::new(learning_rate, max_history),
             inner: ProcessRewardLearner::new(policy, coach),
@@ -2379,7 +2679,9 @@ impl WsGrpoLearner {
 
         // Step 5: Update preference model with trajectory outcomes
         for traj in &trajectories {
-            let reward = traj.outcome_reward.unwrap_or(if traj.completed { 1.0 } else { 0.0 });
+            let reward = traj
+                .outcome_reward
+                .unwrap_or(if traj.completed { 1.0 } else { 0.0 });
             self.preference_model.record_outcome(&traj.task, reward);
         }
 
@@ -2455,18 +2757,30 @@ impl VerificationAction {
                     t if t.contains("code") => {
                         // Coding: prefer modes with MODE bit on (0x08) and DEPTH moderate
                         let bits = mode & 0x3F;
-                        if bits & 0x08 != 0 && (bits & 0x1C) < 0x1C { 0.8 } else { 0.4 }
+                        if bits & 0x08 != 0 && (bits & 0x1C) < 0x1C {
+                            0.8
+                        } else {
+                            0.4
+                        }
                     }
                     t if t.contains("math") => {
                         // Math: prefer structured high-ABST modes
-                        if mode & 0x20 != 0 && mode & 0x04 != 0 { 0.85 } else { 0.45 }
+                        if mode & 0x20 != 0 && mode & 0x04 != 0 {
+                            0.85
+                        } else {
+                            0.45
+                        }
                     }
                     t if t.contains("reason") => {
                         // Reasoning: prefer balanced STANCE+MODE
                         let bits = mode & 0x3F;
                         let stance = (bits & 0x20) >> 5;
                         let mode_bit = (bits & 0x08) >> 3;
-                        if stance == mode_bit { 0.75 } else { 0.5 }
+                        if stance == mode_bit {
+                            0.75
+                        } else {
+                            0.5
+                        }
                     }
                     _ => 0.6, // General: neutral
                 }
@@ -2479,11 +2793,11 @@ impl VerificationAction {
                     let diff = (step.e8_mode.0 ^ prev_mode) as u32;
                     let hamming = diff.count_ones();
                     match hamming {
-                        0 => 0.3,  // no change = stuck
-                        1 => 0.9,  // single bit = focused refinement
-                        2 => 0.8,  // two bits = exploration
+                        0 => 0.3,     // no change = stuck
+                        1 => 0.9,     // single bit = focused refinement
+                        2 => 0.8,     // two bits = exploration
                         3 | 4 => 0.5, // moderate jump
-                        _ => 0.2,  // large jump = unstable
+                        _ => 0.2,     // large jump = unstable
                     }
                 } else {
                     0.7 // first step: default trust
@@ -2522,7 +2836,10 @@ impl VerificationAction {
             VerificationAction::OscillationCheck => {
                 // Oscillation: repeating same mode wastes compute.
                 if trajectory.len() >= 2 {
-                    let same_as_prev = trajectory.last().map(|s| s.e8_mode.0 == step.e8_mode.0).unwrap_or(false);
+                    let same_as_prev = trajectory
+                        .last()
+                        .map(|s| s.e8_mode.0 == step.e8_mode.0)
+                        .unwrap_or(false);
                     let same_as_prev2 = trajectory.len() >= 2
                         && trajectory[trajectory.len() - 2].e8_mode.0 == step.e8_mode.0;
                     if same_as_prev && same_as_prev2 {
@@ -2752,7 +3069,13 @@ impl GroundedPrmVerifier {
     ) -> (f64, Vec<(VerificationAction, f64, u64)>) {
         self.total_steps_verified += 1;
         let mut tree = MctsTree::new();
-        tree.run(step, trajectory, &self.mode_rewards, task_type, self.num_iterations);
+        tree.run(
+            step,
+            trajectory,
+            &self.mode_rewards,
+            task_type,
+            self.num_iterations,
+        );
         let score = tree.grounded_score();
         let actions = tree.per_action_scores();
         (score, actions)
@@ -2771,8 +3094,12 @@ impl GroundedPrmVerifier {
 
         for (i, step) in trajectory.steps.iter().enumerate() {
             let (grounded, actions) = self.verify_step(step, &context, task_type);
-            let original = original_scores.get(i).cloned().unwrap_or_else(|| ProcessScore::new(i));
-            let blended_score = self.grounded_weight * grounded + (1.0 - self.grounded_weight) * original.score;
+            let original = original_scores
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| ProcessScore::new(i));
+            let blended_score =
+                self.grounded_weight * grounded + (1.0 - self.grounded_weight) * original.score;
             let grounded_criterion = ScoredCriterion {
                 name: "grounded_prm".to_string(),
                 score: grounded,
@@ -2872,7 +3199,11 @@ mod grounded_prm_tests {
         tree.run(&step, &trajectory, &mode_rewards, "general", 48);
         let score = tree.grounded_score();
         // With 48 iterations across 6 actions ≈ 8 per action
-        assert!(score > 0.0 && score <= 1.0, "score should be in (0,1], got {}", score);
+        assert!(
+            score > 0.0 && score <= 1.0,
+            "score should be in (0,1], got {}",
+            score
+        );
         assert!(tree.nodes[0].visits > 0, "root should have been visited");
     }
 
@@ -2884,20 +3215,44 @@ mod grounded_prm_tests {
         let mode_rewards = [(0.0, 0); 64];
 
         // Mode consistency for "code" task
-        let mc = VerificationAction::ModeConsistency.ground(&step, &trajectory, &mode_rewards, "code");
-        assert!(mc >= 0.0 && mc <= 1.0, "mode_consistency out of range: {}", mc);
+        let mc =
+            VerificationAction::ModeConsistency.ground(&step, &trajectory, &mode_rewards, "code");
+        assert!(
+            mc >= 0.0 && mc <= 1.0,
+            "mode_consistency out of range: {}",
+            mc
+        );
 
         // Transition pattern
-        let tp = VerificationAction::TransitionPattern.ground(&step, &trajectory, &mode_rewards, "general");
+        let tp = VerificationAction::TransitionPattern.ground(
+            &step,
+            &trajectory,
+            &mode_rewards,
+            "general",
+        );
         assert!(tp >= 0.0 && tp <= 1.0, "transition out of range: {}", tp);
 
         // Direction change within same ABST
-        let dc = VerificationAction::DirectionChange.ground(&step, &trajectory, &mode_rewards, "general");
+        let dc = VerificationAction::DirectionChange.ground(
+            &step,
+            &trajectory,
+            &mode_rewards,
+            "general",
+        );
         assert!(dc >= 0.0 && dc <= 1.0, "direction out of range: {}", dc);
 
         // Oscillation (first step after prev = different)
-        let osc = VerificationAction::OscillationCheck.ground(&step, &trajectory, &mode_rewards, "general");
-        assert!(osc >= 0.0 && osc <= 1.0, "oscillation out of range: {}", osc);
+        let osc = VerificationAction::OscillationCheck.ground(
+            &step,
+            &trajectory,
+            &mode_rewards,
+            "general",
+        );
+        assert!(
+            osc >= 0.0 && osc <= 1.0,
+            "oscillation out of range: {}",
+            osc
+        );
     }
 
     #[test]
@@ -2927,20 +3282,39 @@ mod grounded_prm_tests {
             completed: true,
             total_duration_ms: Some(500),
         };
-        let original: Vec<ProcessScore> = (0..5).map(|i| {
-            ProcessScore { step_idx: i, score: 0.5 + i as f64 * 0.1, confidence: 0.5, criteria: vec![], attribution_tags: vec![] }
-        }).collect();
+        let original: Vec<ProcessScore> = (0..5)
+            .map(|i| ProcessScore {
+                step_idx: i,
+                score: 0.5 + i as f64 * 0.1,
+                confidence: 0.5,
+                criteria: vec![],
+                attribution_tags: vec![],
+            })
+            .collect();
 
         let mut verifier = GroundedPrmVerifier::new(36, 0.3);
         let blended = verifier.verify_trajectory(&traj, &original, "code");
         assert_eq!(blended.len(), 5);
         for (i, ps) in blended.iter().enumerate() {
-            assert!(ps.score >= 0.0 && ps.score <= 1.0, "score out of range at {}: {}", i, ps.score);
+            assert!(
+                ps.score >= 0.0 && ps.score <= 1.0,
+                "score out of range at {}: {}",
+                i,
+                ps.score
+            );
             assert_eq!(ps.step_idx, i);
             // Should have grounded_prm criterion added
-            assert!(ps.criteria.iter().any(|c| c.name == "grounded_prm"), "missing grounded_prm criterion at {}", i);
+            assert!(
+                ps.criteria.iter().any(|c| c.name == "grounded_prm"),
+                "missing grounded_prm criterion at {}",
+                i
+            );
             // Should have grounded_prm tag
-            assert!(ps.attribution_tags.iter().any(|t| t == "grounded_prm"), "missing grounded_prm tag at {}", i);
+            assert!(
+                ps.attribution_tags.iter().any(|t| t == "grounded_prm"),
+                "missing grounded_prm tag at {}",
+                i
+            );
         }
         assert_eq!(verifier.total_steps_verified, 5);
     }
@@ -2949,7 +3323,11 @@ mod grounded_prm_tests {
     fn test_verifier_blend_weight_effect() {
         let step = make_step(0, 56, true);
         let original = ProcessScore {
-            step_idx: 0, score: 0.2, confidence: 0.5, criteria: vec![], attribution_tags: vec![],
+            step_idx: 0,
+            score: 0.2,
+            confidence: 0.5,
+            criteria: vec![],
+            attribution_tags: vec![],
         };
         let traj = AgentTrajectory {
             trajectory_id: 1,
@@ -2970,8 +3348,10 @@ mod grounded_prm_tests {
         let mut verifier_low = GroundedPrmVerifier::new(48, 0.1);
         let blended_low = verifier_low.verify_trajectory(&traj, &[original], "general");
         let blended_low_score = blended_low[0].score;
-        assert!((blended_low_score - 0.2).abs() < 0.3 || grounded_only > blended_low_score,
-            "high weight should pull further from original than low weight");
+        assert!(
+            (blended_low_score - 0.2).abs() < 0.3 || grounded_only > blended_low_score,
+            "high weight should pull further from original than low weight"
+        );
     }
 
     #[test]
@@ -2982,13 +3362,23 @@ mod grounded_prm_tests {
             make_step(2, 30, true),
         ];
         let traj = AgentTrajectory {
-            trajectory_id: 2, task: "test".into(), steps,
-            outcome_reward: Some(0.5), completed: true, total_duration_ms: None,
+            trajectory_id: 2,
+            task: "test".into(),
+            steps,
+            outcome_reward: Some(0.5),
+            completed: true,
+            total_duration_ms: None,
         };
 
-        let original: Vec<ProcessScore> = (0..3).map(|i| ProcessScore {
-            step_idx: i, score: 0.5, confidence: 0.5, criteria: vec![], attribution_tags: vec![],
-        }).collect();
+        let original: Vec<ProcessScore> = (0..3)
+            .map(|i| ProcessScore {
+                step_idx: i,
+                score: 0.5,
+                confidence: 0.5,
+                criteria: vec![],
+                attribution_tags: vec![],
+            })
+            .collect();
 
         let mut verifier = GroundedPrmVerifier::new(24, 0.3);
         let _ = verifier.verify_trajectory(&traj, &original, "general");
@@ -3006,8 +3396,12 @@ mod grounded_prm_tests {
     fn test_verify_and_blend_one_shot() {
         let steps = vec![make_step(0, 0, true), make_step(1, 1, true)];
         let traj = AgentTrajectory {
-            trajectory_id: 3, task: "math problem".into(), steps,
-            outcome_reward: Some(1.0), completed: true, total_duration_ms: None,
+            trajectory_id: 3,
+            task: "math problem".into(),
+            steps,
+            outcome_reward: Some(1.0),
+            completed: true,
+            total_duration_ms: None,
         };
         let coach = HeuristicCoach::default();
         let mut verifier = GroundedPrmVerifier::new(48, 0.3);
@@ -3020,12 +3414,18 @@ mod grounded_prm_tests {
     fn test_grounded_prm_oscillation_detection() {
         // Repeated modes should produce low oscillation score
         let step = make_step(2, 42, true);
-        let trajectory = vec![
-            make_step(0, 42, true),
-            make_step(1, 42, true),
-        ];
-        let osc = VerificationAction::OscillationCheck.ground(&step, &trajectory, &[(0.0, 0); 64], "general");
-        assert!(osc <= 0.5, "oscillation should be low for repeated mode, got {}", osc);
+        let trajectory = vec![make_step(0, 42, true), make_step(1, 42, true)];
+        let osc = VerificationAction::OscillationCheck.ground(
+            &step,
+            &trajectory,
+            &[(0.0, 0); 64],
+            "general",
+        );
+        assert!(
+            osc <= 0.5,
+            "oscillation should be low for repeated mode, got {}",
+            osc
+        );
     }
 
     #[test]
@@ -3034,7 +3434,12 @@ mod grounded_prm_tests {
         let step_late = make_step(8, 60, true);
         let mut traj_early = vec![make_step(0, 36, true)]; // 36 = no ABST
 
-        let dc_early = VerificationAction::DirectionChange.ground(&step_early, &traj_early, &[(0.0, 0); 64], "general");
+        let dc_early = VerificationAction::DirectionChange.ground(
+            &step_early,
+            &traj_early,
+            &[(0.0, 0); 64],
+            "general",
+        );
         traj_early.push(make_step(1, 36, true));
         traj_early.push(make_step(2, 36, true));
         traj_early.push(make_step(3, 36, true));
@@ -3042,9 +3447,19 @@ mod grounded_prm_tests {
         traj_early.push(make_step(5, 36, true));
         traj_early.push(make_step(6, 36, true));
         traj_early.push(make_step(7, 36, true));
-        let dc_late = VerificationAction::DirectionChange.ground(&step_late, &traj_early, &[(0.0, 0); 64], "general");
+        let dc_late = VerificationAction::DirectionChange.ground(
+            &step_late,
+            &traj_early,
+            &[(0.0, 0); 64],
+            "general",
+        );
         // Late direction change should score higher than early
-        assert!(dc_late >= dc_early, "late direction change {}, early {}", dc_late, dc_early);
+        assert!(
+            dc_late >= dc_early,
+            "late direction change {}, early {}",
+            dc_late,
+            dc_early
+        );
     }
 
     #[test]
@@ -3062,32 +3477,61 @@ mod grounded_prm_tests {
         // Hamming distance 1 (single bit flip) = 0.9
         let step_h1 = make_step(0, 0x21, true); // 33 in binary: 100001
         let prev_h1 = vec![make_step(0, 0x01, true)]; // 1 in binary: 000001 — Hamming=1
-        let tp_h1 = VerificationAction::TransitionPattern.ground(&step_h1, &prev_h1, &[(0.0, 0); 64], "general");
-        assert!((tp_h1 - 0.9).abs() < 1e-10, "expected 0.9 for Hamming=1, got {}", tp_h1);
+        let tp_h1 = VerificationAction::TransitionPattern.ground(
+            &step_h1,
+            &prev_h1,
+            &[(0.0, 0); 64],
+            "general",
+        );
+        assert!(
+            (tp_h1 - 0.9).abs() < 1e-10,
+            "expected 0.9 for Hamming=1, got {}",
+            tp_h1
+        );
 
         // Hamming distance 0 (same) = 0.3
         let step_h0 = make_step(1, 0x01, true);
         let prev_h0 = vec![make_step(0, 0x01, true)];
-        let tp_h0 = VerificationAction::TransitionPattern.ground(&step_h0, &prev_h0, &[(0.0, 0); 64], "general");
-        assert!((tp_h0 - 0.3).abs() < 1e-10, "expected 0.3 for Hamming=0, got {}", tp_h0);
+        let tp_h0 = VerificationAction::TransitionPattern.ground(
+            &step_h0,
+            &prev_h0,
+            &[(0.0, 0); 64],
+            "general",
+        );
+        assert!(
+            (tp_h0 - 0.3).abs() < 1e-10,
+            "expected 0.3 for Hamming=0, got {}",
+            tp_h0
+        );
     }
 
     #[test]
     fn test_grounded_prm_confidence_blend() {
         let step = make_step(0, 42, true);
         let original = ProcessScore {
-            step_idx: 0, score: 0.5, confidence: 0.3, criteria: vec![], attribution_tags: vec![],
+            step_idx: 0,
+            score: 0.5,
+            confidence: 0.3,
+            criteria: vec![],
+            attribution_tags: vec![],
         };
         let traj = AgentTrajectory {
-            trajectory_id: 4, task: "test".into(),
+            trajectory_id: 4,
+            task: "test".into(),
             steps: vec![step],
-            outcome_reward: None, completed: false, total_duration_ms: None,
+            outcome_reward: None,
+            completed: false,
+            total_duration_ms: None,
         };
 
         let mut verifier = GroundedPrmVerifier::new(48, 0.5);
         let blended = verifier.verify_trajectory(&traj, &[original], "general");
         // confidence = (0.3 + grounded) / 2, should be >= 0.15
-        assert!(blended[0].confidence >= 0.15, "confidence too low: {}", blended[0].confidence);
+        assert!(
+            blended[0].confidence >= 0.15,
+            "confidence too low: {}",
+            blended[0].confidence
+        );
     }
 
     #[test]
@@ -3095,12 +3539,22 @@ mod grounded_prm_tests {
         let mut verifier = GroundedPrmVerifier::new(48, 0.3);
         let steps = vec![make_step(0, 42, true), make_step(1, 42, true)];
         let traj = AgentTrajectory {
-            trajectory_id: 5, task: "test".into(), steps,
-            outcome_reward: None, completed: true, total_duration_ms: None,
+            trajectory_id: 5,
+            task: "test".into(),
+            steps,
+            outcome_reward: None,
+            completed: true,
+            total_duration_ms: None,
         };
-        let original: Vec<ProcessScore> = (0..2).map(|i| ProcessScore {
-            step_idx: i, score: 0.5, confidence: 0.5, criteria: vec![], attribution_tags: vec![],
-        }).collect();
+        let original: Vec<ProcessScore> = (0..2)
+            .map(|i| ProcessScore {
+                step_idx: i,
+                score: 0.5,
+                confidence: 0.5,
+                criteria: vec![],
+                attribution_tags: vec![],
+            })
+            .collect();
 
         let _ = verifier.verify_trajectory(&traj, &original, "general");
         assert_eq!(verifier.total_steps_verified, 2);
@@ -3115,9 +3569,11 @@ mod grounded_prm_tests {
         tree.run(&step, &[], &[(0.0, 0); 64], "general", 60);
         // With 60 iterations and 6 actions, each should be visited at least once
         for &child_idx in &tree.nodes[0].children {
-            assert!(tree.nodes[child_idx].visits > 0,
+            assert!(
+                tree.nodes[child_idx].visits > 0,
                 "action {:?} was never visited in 60 iterations",
-                tree.nodes[child_idx].action);
+                tree.nodes[child_idx].action
+            );
         }
     }
 }
@@ -3139,19 +3595,37 @@ mod ws_grpo_tests {
 
         // code avg = (0.8 + 0.9) / 2 = 0.85, ema: 0.5 + 0.1*(0.8-0.5) = 0.53,
         //   then 0.53 + 0.1*(0.85-0.53) = 0.562
-        assert!((code_score - 0.562).abs() < 1e-6, "code_score={}", code_score);
-        assert!(code_score > 0.5, "code score should reflect positive outcomes");
+        assert!(
+            (code_score - 0.562).abs() < 1e-6,
+            "code_score={}",
+            code_score
+        );
+        assert!(
+            code_score > 0.5,
+            "code score should reflect positive outcomes"
+        );
 
         // math avg = 0.3, ema: 0.5 + 0.1*(0.3-0.5) = 0.48
-        assert!((math_score - 0.48).abs() < 1e-6, "math_score={}", math_score);
-        assert!(math_score < 0.5, "math score should reflect negative outcome");
+        assert!(
+            (math_score - 0.48).abs() < 1e-6,
+            "math_score={}",
+            math_score
+        );
+        assert!(
+            math_score < 0.5,
+            "math score should reflect negative outcome"
+        );
     }
 
     #[test]
     fn test_ws_preference_model_unknown_task() {
         let model = WsPreferenceModel::new(0.1, 100);
         let score = model.preference_score("completely unknown gibberish task");
-        assert!((score - 0.5).abs() < 1e-10, "unknown tasks should score 0.5, got {}", score);
+        assert!(
+            (score - 0.5).abs() < 1e-10,
+            "unknown tasks should score 0.5, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3191,7 +3665,11 @@ mod ws_grpo_tests {
         // Preference model should have been updated for "code" type
         let code_score = learner.preference_model.preference_score("code debugging");
         // one outcome with reward 1.0 → 0.5 + 0.1*(1.0-0.5) = 0.55
-        assert!((code_score - 0.55).abs() < 1e-6, "code_score={}", code_score);
+        assert!(
+            (code_score - 0.55).abs() < 1e-6,
+            "code_score={}",
+            code_score
+        );
 
         // Policy should have been updated via learn_from_scores
         let total_value: f64 = learner.inner.policy.mode_values.iter().sum();
