@@ -815,7 +815,7 @@
       "id": "nt_mind_distiller::reversible_distill",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "可逆蒸馏",
         "error_first压缩",
@@ -842,11 +842,19 @@
           "to_node": "nt_mind_distiller::reversible_distill",
           "note": "第一梯队接线: CommandDistiller 接生产蒸馏路径 — run_distillation_with_paths 接 goal_loop, error_lines保留+expand_last_distillation还原; 66 passed",
           "timestamp": "2026-08-15T01:57:03.982344Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::reversible_distill",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:41:57.150656Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T07:25:01.569883Z",
-      "updated_at": "2026-08-15T01:57:03.982346Z",
+      "updated_at": "2026-08-16T07:41:57.150658Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1052,7 +1060,7 @@
       "id": "nt_mind_guard::mape_validation_gate",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "多指标验证门",
         "burn_in",
@@ -1080,11 +1088,19 @@
           "to_node": "nt_mind_guard::mape_validation_gate",
           "note": "cycle2026-08-14: G8落地 — MapeGate burn-in多指标裁决/提前回滚/幂等,4测试绿;wired experience feedback",
           "timestamp": "2026-08-14T08:25:02.071086Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_guard::mape_validation_gate",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:41:57.066333Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:43.288598Z",
-      "updated_at": "2026-08-15T01:57:07.494513Z",
+      "updated_at": "2026-08-16T07:41:57.066335Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1092,7 +1108,7 @@
       "id": "nt_mind_evolution_loop::independent_auditor_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "独立验证门",
         "Auditor三角色",
@@ -1115,11 +1131,19 @@
           "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
           "note": "P1-1 G8: LongHorizon-Harness 独立 ground-truth Auditor (Evidence/Consistency/Governance 三角色共识) + checkpoint→verify_change→recover; 4测试绿; wired进 autofix_cycle_in",
           "timestamp": "2026-08-14T11:46:32.523576Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:41:57.094172Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T11:46:32.523575Z",
-      "updated_at": "2026-08-14T11:46:45.752247Z",
+      "updated_at": "2026-08-16T07:41:57.094174Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1127,7 +1151,7 @@
       "id": "nt_mind_background_loop::loop_ready_scoring",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c0compile",
+      "constellation": "c1unittest",
       "provides": [
         "循环就绪评分",
         "LoopReadyScore",
@@ -1154,11 +1178,19 @@
           "to_node": "nt_mind_background_loop::loop_ready_scoring",
           "note": "P1-1 G9: loop-engineering Loop Ready 评分 (handlers40/kb25/no_stall20/cadence15, >=80 L3 >=50 L2) + AutonomyTier 梯度; 4测试绿; wired进 300s loop_readiness handler",
           "timestamp": "2026-08-14T11:46:33.420327Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_background_loop::loop_ready_scoring",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-16T07:41:57.124884Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T11:46:33.420325Z",
-      "updated_at": "2026-08-15T01:57:07.518494Z",
+      "updated_at": "2026-08-16T07:41:57.124886Z",
       "deprecated": false,
       "deprecated_reason": null
     },
