@@ -299,11 +299,13 @@ pub fn routines_stats() -> Result<RoutineStats, String> {
         .iter()
         .filter(|r| r.status == "completed" && r.duration_ms.is_some())
         .collect();
-    let avg_duration_ms = if !completed_with_duration.is_empty() {
-        let sum: u64 = completed_with_duration.iter().map(|r| r.duration_ms.unwrap()).sum();
-        sum as f64 / completed_with_duration.len() as f64
-    } else {
-        0.0
+    let avg_duration_ms = {
+        let sum: u64 = completed_with_duration.iter().filter_map(|r| r.duration_ms).sum();
+        if !completed_with_duration.is_empty() {
+            sum as f64 / completed_with_duration.len() as f64
+        } else {
+            0.0
+        }
     };
 
     Ok(RoutineStats {

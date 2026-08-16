@@ -391,7 +391,7 @@ pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Resul
     if let Ok(meta) = std::fs::metadata(&path) {
         let len = meta.len();
         let mtime = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-        let mut slot = geo_pack_cache().lock().unwrap();
+        let mut slot = geo_pack_cache().lock().map_err(|e| NeoTrixError::Memory(format!("geo cache lock: {}", e)))?;
         if let Some(c) = slot.as_ref() {
             if c.key_file == path && c.key_len == len && c.key_mtime == mtime
                 && c.born.elapsed() < GEO_PACK_TTL
@@ -415,11 +415,8 @@ pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Resul
         });
         let pts: Vec<nt_memory_pack::GeoPoint> = slot
             .as_ref()
-            .unwrap()
-            .points
-            .iter()
-            .cloned()
-            .collect();
+            .map(|c| c.points.iter().cloned().collect())
+            .unwrap_or_default();
         return Ok(filtered(pts, limit));
     }
 

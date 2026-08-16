@@ -347,17 +347,17 @@ pub fn workflow_run(workflow_id: String) -> Result<String, String> {
             .run_steps
             .iter()
             .rposition(|s| s.run_id == run_id && s.step_id == step.id)
-            .unwrap();
+            .ok_or_else(|| format!("step {} for run {} not found", step.id, run_id))?;
         state.run_steps[step_idx].status = "completed".into();
         state.run_steps[step_idx].duration_ms = duration;
         state.run_steps[step_idx].output = Some(simulated_output);
 
-        let run_idx = state.runs.iter().rposition(|r| r.id == run_id).unwrap();
+        let run_idx = state.runs.iter().rposition(|r| r.id == run_id).ok_or_else(|| format!("run {} not found", run_id))?;
         state.runs[run_idx].current_step = (i + 1) as u32;
         state.runs[run_idx].progress_pct = ((i + 1) as f64 / total * 100.0 * 100.0).round() / 100.0;
     }
 
-    let run_idx = state.runs.iter().rposition(|r| r.id == run_id).unwrap();
+    let run_idx = state.runs.iter().rposition(|r| r.id == run_id).ok_or_else(|| format!("run {} not found", run_id))?;
     state.runs[run_idx].status = "completed".into();
     state.runs[run_idx].completed_at = Some(now_ts());
     state.runs[run_idx].progress_pct = 100.0;

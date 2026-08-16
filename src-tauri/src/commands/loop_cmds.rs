@@ -547,16 +547,23 @@ pub fn loop_stats() -> Result<LoopStats, String> {
         1.0
     };
 
-    let with_duration: Vec<_> = state
-        .executions
-        .iter()
-        .filter(|e| e.status == "completed" && e.duration_ms.is_some())
-        .collect();
-    let avg_duration_ms = if !with_duration.is_empty() {
-        let sum: u64 = with_duration.iter().map(|e| e.duration_ms.unwrap()).sum();
-        sum as f64 / with_duration.len() as f64
-    } else {
-        0.0
+    let avg_duration_ms = {
+        let sum: u64 = state
+            .executions
+            .iter()
+            .filter(|e| e.status == "completed")
+            .filter_map(|e| e.duration_ms)
+            .sum();
+        let n = state
+            .executions
+            .iter()
+            .filter(|e| e.status == "completed" && e.duration_ms.is_some())
+            .count();
+        if n > 0 {
+            sum as f64 / n as f64
+        } else {
+            0.0
+        }
     };
 
     let next_scheduled_run = state

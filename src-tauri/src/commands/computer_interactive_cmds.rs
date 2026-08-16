@@ -623,9 +623,10 @@ pub fn computer_bg_submit(
             if let Ok(mut s) = BG_STATE.lock() {
                 if let Some(t) = s.tasks.iter_mut().find(|t| t.id == exec_id) {
                     if t.status == "cancelled" {
-                        t.completed_at = Some(timestamp_nanos());
+                        let now_ns = timestamp_nanos();
+                        t.completed_at = Some(now_ns);
                         if let Some(started) = t.started_at {
-                            t.duration_ms = Some(t.completed_at.unwrap().saturating_sub(started) / 1_000_000);
+                            t.duration_ms = Some(now_ns.saturating_sub(started) / 1_000_000);
                         }
                         s.stats.currently_running = s.stats.currently_running.saturating_sub(1);
                         s.stats.total_cancelled += 1;
@@ -642,9 +643,10 @@ pub fn computer_bg_submit(
             if let Some(t) = s.tasks.iter_mut().find(|t| t.id == exec_id) {
                 t.status = "completed".into();
                 t.progress_pct = 100;
-                t.completed_at = Some(timestamp_nanos());
+                let now_ns = timestamp_nanos();
+                t.completed_at = Some(now_ns);
                 if let Some(started) = t.started_at {
-                    t.duration_ms = Some(t.completed_at.unwrap().saturating_sub(started) / 1_000_000);
+                    t.duration_ms = Some(now_ns.saturating_sub(started) / 1_000_000);
                 }
 
                 t.result = match t.task_type.as_str() {
@@ -785,9 +787,10 @@ pub fn computer_bg_retry(task_id: String) -> Result<(), String> {
             if let Some(t) = s.tasks.iter_mut().find(|t| t.id == exec_id) {
                 t.status = "completed".into();
                 t.progress_pct = 100;
-                t.completed_at = Some(timestamp_nanos());
+                let now_ns = timestamp_nanos();
+                t.completed_at = Some(now_ns);
                 if let Some(started) = t.started_at {
-                    t.duration_ms = Some(t.completed_at.unwrap().saturating_sub(started) / 1_000_000);
+                    t.duration_ms = Some(now_ns.saturating_sub(started) / 1_000_000);
                 }
                 t.result = Some(format!("Retry of {} completed", exec_type));
                 s.stats.currently_running = s.stats.currently_running.saturating_sub(1);
@@ -906,9 +909,10 @@ pub fn computer_bg_run_script(
             if let Some(t) = s.tasks.iter_mut().find(|t| t.id == exec_id) {
                 t.status = "completed".into();
                 t.progress_pct = 100;
-                t.completed_at = Some(timestamp_nanos());
+                let now_ns = timestamp_nanos();
+                t.completed_at = Some(now_ns);
                 if let Some(started) = t.started_at {
-                    t.duration_ms = Some(t.completed_at.unwrap().saturating_sub(started) / 1_000_000);
+                    t.duration_ms = Some(now_ns.saturating_sub(started) / 1_000_000);
                 }
                 t.result = Some(format!("Script '{}' executed successfully", exec_name));
 

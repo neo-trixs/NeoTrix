@@ -1919,7 +1919,10 @@ pub async fn neocodex_clear_session(session_id: String) -> Result<String, String
             }
         }
     }
-    let events = keep.iter().map(|l| serde_json::from_str::<WireEvent>(l).unwrap()).collect::<Vec<_>>();
+    let events = keep
+        .iter()
+        .filter_map(|l| serde_json::from_str::<WireEvent>(l).ok())
+        .collect::<Vec<_>>();
     write_wire_events(&path, &events)?;
     // If active agent points here, rebuild
     let mut guard = NEOCODEX_AGENT.lock().await;
