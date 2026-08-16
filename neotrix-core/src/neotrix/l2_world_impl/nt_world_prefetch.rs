@@ -1,11 +1,11 @@
 //! NT-WORLD 两阶段抓取 + 统一端点 — 缺陷网 D11/D15 修复:
 //! - D11 单遍抓取无 prefetch: 引入两阶段 — 先 prefetch 只发现 URL 不抓正文
-//!    (快速展开站点地图), 再选择性抓正文。BM25 关键词过滤降噪, 断点续爬。
+//!   (快速展开站点地图), 再选择性抓正文。BM25 关键词过滤降噪, 断点续爬。
 //! - D15 无统一 Scrape/Interact+Map: 统一端点 scrape()/map()/search()/
-//!    interact(), 一致输入输出契约。
+//!   interact(), 一致输入输出契约。
 //!
 //! 参照: crawl4ai (prefetch 两阶段 + BM25 过滤 + resume_state),
-//!    firecrawl (Search/Scrape/Interact/Map 统一端点)。
+//!   firecrawl (Search/Scrape/Interact/Map 统一端点)。
 //! 纯内存实现 (无网络依赖), 便于离线单测; 生产路径见 nt_world_crawl 走真实网络。
 
 use serde::{Deserialize, Serialize};

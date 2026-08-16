@@ -674,13 +674,11 @@ fn truncate_str(s: &str, max_chars: usize) -> String {
         return s.to_string();
     }
     let mut end = s.len();
-    let mut count = 0usize;
-    for (idx, _) in s.char_indices() {
+    for (count, (idx, _)) in s.char_indices().enumerate() {
         if count == max_chars {
             end = idx;
             break;
         }
-        count += 1;
     }
     format!("{}…", &s[..end])
 }

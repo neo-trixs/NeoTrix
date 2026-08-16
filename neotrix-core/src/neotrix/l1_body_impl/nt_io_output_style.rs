@@ -74,7 +74,7 @@ impl OutputStyle for AnswerFirstStyle {
         }
         let mut lines: Vec<&str> = t.lines().collect();
         let head = lines.remove(0);
-        let head = head.trim_end_matches(|c| c == '.' || c == '。' || c == '!');
+        let head = head.trim_end_matches(['.', '。', '!']);
         let mut out = format!("**{head}**");
         if !lines.is_empty() {
             out.push_str("\n\n要点:");
@@ -148,7 +148,12 @@ impl OutputStyleRegistry {
         self.styles
             .get(&id)
             .map(|s| s.as_ref())
-            .unwrap_or_else(|| self.styles.get(&OutputStyleId::Plain).unwrap().as_ref())
+            .unwrap_or_else(|| {
+                self.styles
+                    .get(&OutputStyleId::Plain)
+                    .expect("Plain style registered in StyleRegistry")
+                    .as_ref()
+            })
     }
 
     /// 应用样式 (生产入口，被 AgentLoop 调用)。
@@ -521,8 +526,7 @@ fn r10_no_trailing_apology(text: &str) -> RuleResult {
     let last = text
         .lines()
         .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .last()
+        .rfind(|l| !l.is_empty())
         .map(|s| s.to_lowercase())
         .unwrap_or_default();
     if APOLOGY_MARKERS.iter().any(|m| last.contains(m)) {

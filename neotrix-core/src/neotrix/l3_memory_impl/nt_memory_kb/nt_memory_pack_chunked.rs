@@ -56,7 +56,7 @@ pub fn encode_chunked(points: &[GeoPoint], chunk_size: usize) -> Vec<u8> {
     // 两遍扫描: 第一遍收集全部唯一字符串 (写出字典区前必须稳定), 第二遍构造块数据。
     let mut dict: Vec<String> = Vec::new();
     let mut dict_map: HashMap<String, u32> = HashMap::new();
-    fn intern<'a>(s: &'a str, dict: &mut Vec<String>, dict_map: &mut HashMap<String, u32>) -> u32 {
+    fn intern(s: &str, dict: &mut Vec<String>, dict_map: &mut HashMap<String, u32>) -> u32 {
         if s.is_empty() {
             return 0;
         }

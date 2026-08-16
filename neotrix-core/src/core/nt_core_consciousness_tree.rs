@@ -1186,8 +1186,7 @@ impl ConsciousnessTree {
                 self.core
                     .last_contract
                     .as_ref()
-                    .map(|c| c.claim.clone())
-                    .into_iter(),
+                    .map(|c| c.claim.clone()),
             )
             .chain(fruit_claims)
             .collect();

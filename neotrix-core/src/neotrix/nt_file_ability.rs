@@ -1283,7 +1283,7 @@ fn to_cell_data(text: &str) -> office_oxide::xlsx::write::CellData {
             return CellData::Formula(f.to_string());
         }
     }
-    if let Ok(n) = t.replace(',', "").replace('￥', "").parse::<f64>() {
+    if let Ok(n) = t.replace([',', '￥'], "").parse::<f64>() {
         return CellData::Number(n);
     }
     CellData::String(t.to_string())
@@ -1360,7 +1360,7 @@ pub fn read_xlsx_sheets_all(path: impl AsRef<Path>) -> Result<Vec<TableData>> {
         // 按 (row, col) 填充
         let mut grid: Vec<Vec<String>> = Vec::new();
         for cell in range.cells() {
-            let (r, c, v) = (cell.0 as usize, cell.1 as usize, cell.2);
+            let (r, c, v) = (cell.0, cell.1, cell.2);
             while grid.len() <= r {
                 grid.push(vec![String::new(); max_col]);
             }
@@ -1998,7 +1998,7 @@ pub fn merge_tables_with(
     report.output = output.as_ref().display().to_string();
 
     // 输出数据校验 (阶段2): 数字列非数值 → validation_warnings
-    for (_, (col, ctype)) in schema.column_types.iter().enumerate() {
+    for (col, ctype) in schema.column_types.iter() {
         if *ctype != ColumnType::Numeric {
             continue;
         }
@@ -2029,10 +2029,7 @@ pub fn merge_tables_with(
 /// 返回 Some(数值) 若可解析, None 否则。
 fn parse_numeric(v: &str) -> Option<f64> {
     let t = v
-        .replace(',', "")
-        .replace('￥', "")
-        .replace('¥', "")
-        .replace('$', "");
+        .replace([',', '￥', '¥', '$'], "");
     // 单位后缀 (如 "2.5kg" / "300元") — 剥离尾部非数值字符
     let trimmed: String = t
         .chars()
@@ -2083,7 +2080,7 @@ fn strip_leading_num(s: &str) -> Option<&str> {
     }
     // 跳过后续分隔符 (、. 空格)
     let rest = &s[i..];
-    let rest = rest.trim_start_matches(|c: char| c == '、' || c == '.' || c == ' ' || c == '-' || c == '_');
+    let rest = rest.trim_start_matches(['、', '.', ' ', '-', '_']);
     if rest.is_empty() {
         None
     } else {

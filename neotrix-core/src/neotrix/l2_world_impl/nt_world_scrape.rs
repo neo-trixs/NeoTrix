@@ -89,7 +89,7 @@ impl StealthParams {
 
     /// 该请求序号是否应轮换代理 (命中 rotate 边界)。
     pub fn should_rotate_proxy(&self, request_seq: u32) -> bool {
-        self.enabled && self.rotate_proxy_every > 0 && request_seq > 0 && request_seq % self.rotate_proxy_every == 0
+        self.enabled && self.rotate_proxy_every > 0 && request_seq > 0 && request_seq.is_multiple_of(self.rotate_proxy_every)
     }
 }
 

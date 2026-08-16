@@ -434,7 +434,7 @@ impl ReasoningEngine {
                 };
                 
                 // 同步调用 CoT 生成器 (使用 block_on 在当前运行时中执行)
-                let cot_future = cot_gen.generate_cot(&task, &kernel_trace, None);
+                let cot_future = cot_gen.generate_cot(task, &kernel_trace, None);
                 if let Ok(cot_output) = tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(cot_future)) {
                     // 将 CoT 结果记录到 span 中
                     root_span.set_attribute("cot_generated", AttributeValue::Bool(true));

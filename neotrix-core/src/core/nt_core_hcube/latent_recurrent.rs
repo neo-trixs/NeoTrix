@@ -94,7 +94,7 @@ pub struct RecurrentLatent {
 impl RecurrentLatent {
     pub fn new(config: RecurrentLatentConfig) -> Self {
         assert!(
-            config.dim % config.block == 0,
+            config.dim.is_multiple_of(config.block),
             "dim must be divisible by block"
         );
         let n_blocks = config.dim / config.block;

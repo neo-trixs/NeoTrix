@@ -143,15 +143,15 @@ impl LlmProvider for OpenAiProvider {
                 let tool_calls = resp["choices"][0]["message"]["tool_calls"]
                     .as_array()
                     .map(|arr| {
-                        arr.iter().filter_map(|tc| {
-                            Some(ToolCallInfo {
+                        arr.iter().map(|tc| {
+                            ToolCallInfo {
                                 id: tc["id"].as_str().unwrap_or("").to_string(),
                                 call_type: tc["type"].as_str().unwrap_or("function").to_string(),
                                 function: super::types::ToolCallFunction {
                                     name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
                                     arguments: tc["function"]["arguments"].as_str().unwrap_or("{}").to_string(),
                                 },
-                            })
+                            }
                         }).collect()
                     });
                 Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: finish, tool_calls })

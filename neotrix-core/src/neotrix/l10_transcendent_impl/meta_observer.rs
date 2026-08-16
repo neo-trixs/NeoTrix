@@ -190,8 +190,10 @@ impl SelfTest for MetaObserverSelfTest {
         }
 
         // 低相干快照: 失真检测必须触发 (coherence < observation_threshold)
-        let mut distorted = CoreSnapshot::default();
-        distorted.coherence = 0.2;
+        let mut distorted = CoreSnapshot {
+            coherence: 0.2,
+            ..CoreSnapshot::default()
+        };
         distorted.branch_health.insert("NT-CORE".into(), 0.9);
         distorted.branch_health.insert("NT-META".into(), 0.1);
         let distorted_report = observer.observe(&distorted);

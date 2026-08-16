@@ -393,14 +393,12 @@ impl BackgroundLoopHandle {
                     .map(|d| d.drift_detected)
                     .unwrap_or(false) as u8;
                 // 状态句子: [soil→roots, trunk, branches, core, review, feedback]
-                let state_trace = vec![
-                    ReasoningHexagram::new(stage_code(1, (abs << 1) | phi_hi)),
+                let state_trace = [ReasoningHexagram::new(stage_code(1, (abs << 1) | phi_hi)),
                     ReasoningHexagram::new(stage_code(2, (phi_hi << 1) | fruit_hi)),
                     ReasoningHexagram::new(stage_code(3, (fruit_hi << 1) | guid_hi)),
                     ReasoningHexagram::new(stage_code(4, (guid_hi << 1) | fog_hi)),
                     ReasoningHexagram::new(stage_code(5, (fog_hi << 1) | fulfilled)),
-                    ReasoningHexagram::new(stage_code(6, (fulfilled << 1) | drift)),
-                ];
+                    ReasoningHexagram::new(stage_code(6, (fulfilled << 1) | drift))];
                 let state_bytes: Vec<u8> = state_trace.iter().map(|h| h.0).collect();
                 predictor.observe_trace(&state_bytes);
                 predictor_persist(&predictor);

@@ -251,7 +251,7 @@ impl KnowledgeSource {
         tracker: &super::SourceAccessTracker,
     ) -> Vec<&'a KnowledgeSource> {
         let mut sorted: Vec<&'a KnowledgeSource> = sources.iter().collect();
-        sorted.sort_by(|a, b| tracker.access_count(b).cmp(&tracker.access_count(a)));
+        sorted.sort_by_key(|a| std::cmp::Reverse(tracker.access_count(a)));
         sorted
     }
 }

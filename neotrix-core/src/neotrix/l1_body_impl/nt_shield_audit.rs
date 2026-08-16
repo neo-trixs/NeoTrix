@@ -513,21 +513,13 @@ pub enum TraceGuardMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct TraceLeakReport {
     pub blocks_found: usize,
     pub encrypted_blocks: usize,
     pub has_leak: bool,
 }
 
-impl Default for TraceLeakReport {
-    fn default() -> Self {
-        Self {
-            blocks_found: 0,
-            encrypted_blocks: 0,
-            has_leak: false,
-        }
-    }
-}
 
 /// 已知推理块信封 (开标记, 闭标记)。encrypted 标记表示该信封可承载加密块,
 /// 视为整体泄露 (可见层清洗无效 — Snyk 实证)。
@@ -567,7 +559,7 @@ impl ReasoningTraceGuard {
             let mut earliest: Option<(usize, &str, &str, bool)> = None;
             for &(open, close, _enc) in REASONING_ENVELOPES {
                 if let Some(pos) = rest.find(open) {
-                    if earliest.map_or(true, |(e, _, _, _)| pos < e) {
+                    if earliest.is_none_or(|(e, _, _, _)| pos < e) {
                         earliest = Some((pos, open, close, _enc));
                     }
                 }

@@ -635,8 +635,10 @@ impl Platform {
 
 /// 风险分级 — 驱动 CLI 交互 (MacBroom/DeepPurge Safe·Moderate·Advanced 参照)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum RiskLevel {
     #[serde(rename = "low")]
+    #[default]
     Low,
     #[serde(rename = "medium")]
     Medium,
@@ -654,11 +656,6 @@ impl RiskLevel {
     }
 }
 
-impl Default for RiskLevel {
-    fn default() -> Self {
-        RiskLevel::Low
-    }
-}
 
 /// 跨平台清理规则 — platform 门控 + risk 分级
 #[derive(Debug, Clone, Serialize, Deserialize)]

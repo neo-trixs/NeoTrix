@@ -1,6 +1,6 @@
 //! NT-WORLD 共享多格式文档模型 + 长文档滑窗 — 缺陷网 D12/D14 修复:
 //! - D12 无共享多格式文档模型: 统一 ParsedDoc schema, 任何格式 (text/md/html/
-//!    json) 解析后均产出同一结构, 共用一套序列化。
+//!   json) 解析后均产出同一结构, 共用一套序列化。
 //! - D14 无长文档滑窗: sliding_window 分块降低峰值内存, 保留阅读顺序 (去页眉页脚)。
 //!
 //! 参照: anydoc (14/14 格式统一输出), MinerU (sliding-window 峰值内存优化)。
@@ -138,7 +138,7 @@ pub fn strip_junk(text: &str) -> String {
     text.lines()
         .filter(|l| {
             let t = l.trim().to_lowercase();
-            !(t.contains("©") || t.contains("copyright") || t == "\u{2022}".to_string()
+            !(t.contains("©") || t.contains("copyright") || t == "\u{2022}"
                 || t.contains("all rights reserved"))
         })
         .collect::<Vec<_>>()

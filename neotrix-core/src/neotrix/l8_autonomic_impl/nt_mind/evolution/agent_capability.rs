@@ -186,6 +186,12 @@ pub struct RouteLearner {
     pub config: RouteLearnerConfig,
 }
 
+impl Default for RouteLearner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RouteLearner {
     pub fn new() -> Self {
         Self {

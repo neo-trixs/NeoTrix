@@ -903,7 +903,7 @@ impl SkillEngine {
         let mut categories: HashMap<String, usize> = HashMap::new();
         let mut roots = 0usize;
         let mut orphans = 0usize;
-        let max_depth;
+        
         let mut depth: HashMap<String, usize> = HashMap::new();
 
         for s in &self.skills {
@@ -932,7 +932,7 @@ impl SkillEngine {
                 break;
             }
         }
-        max_depth = depth.values().copied().max().unwrap_or(0);
+        let max_depth = depth.values().copied().max().unwrap_or(0);
         let known: std::collections::HashSet<&String> =
             self.skills.iter().map(|s| &s.name).collect();
         for s in &self.skills {

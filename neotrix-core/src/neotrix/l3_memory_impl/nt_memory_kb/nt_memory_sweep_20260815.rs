@@ -369,7 +369,7 @@ impl SingleFileMemory {
             created_at: now_secs(),
         };
         self.records.push(record);
-        self.records.last().unwrap()
+        self.records.last().expect("record just pushed")
     }
 
     pub fn recall(&self, query: &str) -> Vec<&MemoryRecord> {

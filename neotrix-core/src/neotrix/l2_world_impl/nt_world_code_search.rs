@@ -94,6 +94,12 @@ const CODE_EXTENSIONS: &[&str] = &[
     "swift", "toml",
 ];
 
+impl Default for SymbolIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SymbolIndex {
     pub fn new() -> Self {
         Self {
@@ -106,7 +112,7 @@ impl SymbolIndex {
     pub fn build(root: &Path) -> Self {
         let mut index = Self::new();
         if root.is_file() {
-            if let Some(content) = std::fs::read_to_string(root).ok() {
+            if let Ok(content) = std::fs::read_to_string(root) {
                 index.add_file(root, &content);
             }
             return index;
@@ -138,7 +144,7 @@ impl SymbolIndex {
                 if !CODE_EXTENSIONS.contains(&ext.as_str()) {
                     continue;
                 }
-                if let Some(content) = std::fs::read_to_string(&path).ok() {
+                if let Ok(content) = std::fs::read_to_string(&path) {
                     self.add_file(&path, &content);
                 }
             }
@@ -279,11 +285,11 @@ fn extract_symbols(file: &str, content: &str) -> Vec<SymbolRecord> {
     let fn_re = regex::Regex::new(
         r"^(?:pub(?:\s*\([^)]*\))?\s+)?(?:async\s+|unsafe\s+|extern\s+|const\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)",
     )
-    .unwrap();
+    .expect("valid fn regex");
     let item_re = regex::Regex::new(
         r"^(?:pub(?:\s*\([^)]*\))?\s+)?(struct|enum|trait|mod|type|const|static|impl|def)\s+([a-zA-Z_][a-zA-Z0-9_:<>]*)",
     )
-    .unwrap();
+    .expect("valid item regex");
     let mut records = Vec::new();
     for (i, raw) in content.lines().enumerate() {
         let line = raw.trim();

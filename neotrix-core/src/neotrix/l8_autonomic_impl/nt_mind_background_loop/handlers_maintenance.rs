@@ -213,8 +213,7 @@ impl BackgroundLoopHandle {
                 entry_type: "pattern".into(),
                 domain_name: parse_domain(&format!("{:?}", r.pattern_type))
                     .as_str()
-                    .to_uppercase()
-                    .into(),
+                    .to_uppercase(),
                 content: r.description.clone(),
                 not: None,
                 confidence: (0.6 + r.effectiveness_gain.clamp(0.0, 1.0) * 0.4).min(1.0),
@@ -369,7 +368,7 @@ impl BackgroundLoopHandle {
             report.iter().filter(|s| s.dimension == "todo").count(),
             report.iter().filter(|s| s.dimension == "unwraps").count()
         );
-        if report.len() > 0 {
+        if !report.is_empty() {
             self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
                 component: "healers".into(),
                 error: format!("{} code-health findings: {:?}", report.len(), dims),

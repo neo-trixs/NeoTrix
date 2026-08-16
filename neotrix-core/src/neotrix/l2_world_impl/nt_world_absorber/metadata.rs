@@ -260,9 +260,7 @@ impl ThreeWaySync {
     /// - 仅一侧在 last_sync 之后有新版本 → PushLocal / PullRemote。
     /// - 两侧都在 last_sync 之后有新版本 → Merge。
     pub fn resolve(&mut self, local_ver: u32, remote_ver: u32, last_sync_ver: u32) -> SyncAction {
-        let action = if last_sync_ver >= local_ver && last_sync_ver >= remote_ver {
-            SyncAction::NoOp
-        } else if local_ver == remote_ver {
+        let action = if local_ver == remote_ver || (last_sync_ver >= local_ver && last_sync_ver >= remote_ver) {
             SyncAction::NoOp
         } else if local_ver > remote_ver {
             if last_sync_ver >= remote_ver {
@@ -333,7 +331,7 @@ impl SelfTest for MetadataAggregator {
         if r.sources_used != 3 {
             failures.push("sources_used mismatch".into());
         }
-        if !((r.consensus - 2.0 / 3.0).abs() < 1e-9) {
+        if (r.consensus - 2.0 / 3.0).abs() >= 1e-9 {
             failures.push("consensus mismatch".into());
         }
 

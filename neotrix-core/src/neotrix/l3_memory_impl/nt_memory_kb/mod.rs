@@ -766,7 +766,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                     valid_until,
                     source,
                 )
-                .map_err(|e| format!("{e}"))
+                .map_err(|e| e.to_string())
             });
         if let Err(e) = res {
             log::debug!("[temporal] skip node fact {}: {}", node.id, e);
@@ -1055,7 +1055,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                                             lg.supersede_node_fact(
                                                 &e.older_id, &obj, None, "nt_memory_curation",
                                             )
-                                            .map_err(|x| format!("{x}"))
+                                            .map_err(|x| x.to_string())
                                         })
                                     {
                                         log::debug!(

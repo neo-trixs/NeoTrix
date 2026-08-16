@@ -1275,7 +1275,7 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
                 .and_then(|c| c.as_array())
                 .and_then(|arr| arr.first())
                 .and_then(|p| p.as_array())
-                .map(|p| (p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0), p.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0)))
+                .map(|p| (p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0), p.first().and_then(|v| v.as_f64()).unwrap_or(0.0)))
                 .unwrap_or((0.0, 0.0)),
             "Polygon" => coords
                 .and_then(|c| c.as_array())
@@ -1283,7 +1283,7 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
                 .and_then(|ring| ring.as_array())
                 .and_then(|ring| ring.first())
                 .and_then(|p| p.as_array())
-                .map(|p| (p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0), p.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0)))
+                .map(|p| (p.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0), p.first().and_then(|v| v.as_f64()).unwrap_or(0.0)))
                 .unwrap_or((0.0, 0.0)),
             _ => (0.0, 0.0),
         };

@@ -216,7 +216,7 @@ pub fn fold_tool_specs(specs: Vec<ToolSpec>) -> FoldedSpecs {
     } else {
         saved_chars as f64 / original_chars as f64
     };
-    let tokens = |chars: usize| (chars + 3) / 4;
+    let tokens = |chars: usize| chars.div_ceil(4);
 
     FoldedSpecs {
         categories,
@@ -749,7 +749,7 @@ impl ToolStub {
                     out.push('_');
                 }
                 out.push(c);
-            } else if out.chars().last() != Some('_') {
+            } else if !out.ends_with('_') {
                 out.push('_');
             }
             let _ = i;

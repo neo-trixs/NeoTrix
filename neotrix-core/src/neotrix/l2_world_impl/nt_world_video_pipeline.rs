@@ -1693,7 +1693,7 @@ impl HttpSniff {
     pub fn content_type(&self) -> String {
         self.headers
             .iter()
-            .find(|(k, _)| k.to_ascii_lowercase() == "content-type")
+            .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
             .map(|(_, v)| v.to_ascii_lowercase())
             .unwrap_or_default()
     }
@@ -1743,6 +1743,12 @@ pub struct PipelineStatus {
     cycles_completed: usize,
 }
 
+impl Default for PipelineStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PipelineStatus {
     pub fn new() -> Self {
         Self {
@@ -1786,6 +1792,12 @@ impl PipelineStatus {
 pub struct MediaSniffer {
     pub sniffed: Vec<SniffedMedia>,
     pub status: PipelineStatus,
+}
+
+impl Default for MediaSniffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MediaSniffer {
