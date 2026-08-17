@@ -35,6 +35,13 @@ use super::nt_shield::redaction::Redactor;
 use crate::cli::approval::{ActionType, PendingAction};
 use crate::core::nt_core_traits::{NativeTool, ToolOutput};
 
+/// P1-B2 双相 compaction 阈值: 超过预算 90% 触发 LLM 摘要压缩 (OpenCode 40K 双相模式, E10)。
+const COMPACTION_THRESHOLD_RATIO: f64 = 0.9;
+/// 至少这么多条可压缩消息才值得一次 LLM 摘要调用 (否则驱逐即可, 省一次调用)。
+const COMPACTION_MIN_MESSAGES: usize = 8;
+/// 摘要输出预算。
+const COMPACTION_SUMMARY_MAX_TOKENS: u32 = 1024;
+
 /// 一次工具执行的记录（供调用方观测/审计）。
 #[derive(Debug, Clone)]
 pub struct ToolInvocation {
@@ -248,6 +255,8 @@ impl AgentLoop {
             user_input.to_string()
         };
         self.messages.push(Message::new(Role::User, &user_input));
+        // P1-B2: 高水位先摘要压缩 (救语义), 再驱逐 (兜底)。
+        self.maybe_compact_context().await;
         self.trim_history();
 
         for _round in 0..self.max_tool_rounds {
@@ -296,6 +305,8 @@ impl AgentLoop {
         G: FnMut(&ToolCallInfo, &ToolOutput) + Send + Sync,
     {
         self.messages.push(Message::new(Role::User, user_input));
+        // P1-B2: 高水位先摘要压缩 (救语义), 再驱逐 (兜底)。
+        self.maybe_compact_context().await;
         self.trim_history();
 
         let mut cancelled = false;
@@ -425,6 +436,8 @@ impl AgentLoop {
         H: FnMut(&str, &str, &str, u64, bool) -> bool + Send + Sync,
     {
         self.messages.push(Message::new(Role::User, user_input));
+        // P1-B2: 高水位先摘要压缩 (救语义), 再驱逐 (兜底)。
+        self.maybe_compact_context().await;
         self.trim_history();
 
         let mut cancelled = false;
@@ -817,6 +830,88 @@ impl AgentLoop {
                 }
             }
         }
+    }
+
+    /// P1-B2 双相 compaction: 当估算上下文超过预算 90% 时, 把最旧的
+    /// `COMPACTION_MIN_MESSAGES+` 条消息用一次 LLM 调用折成摘要, 替换为单条
+    /// Assistant 摘要消息 — 比纯驱逐保留语义, 比全部保留省 token。
+    ///
+    /// 纯驱逐 (trim_history) 只丢弃, 会丢信息; 本方法在驱逐前抢救语义。
+    /// 压缩失败时静默回退驱逐 (不影响本轮)。
+    async fn maybe_compact_context(&mut self) {
+        if self.context_token_budget == 0 {
+            return;
+        }
+        let budget = self.context_token_budget;
+        if estimate_messages_tokens(&self.messages)
+            < (budget as f64 * COMPACTION_THRESHOLD_RATIO) as usize
+        {
+            return;
+        }
+        // 可压缩区: 跳过 System 头 (idx 0) 与末条 (当前请求)。
+        let compact_end = self.messages.len().saturating_sub(1);
+        let compactable = compact_end.saturating_sub(1);
+        if compactable < COMPACTION_MIN_MESSAGES {
+            return;
+        }
+        // 压缩最旧一半, 保留最近一半细节 + 末条请求。
+        let compact_count = compactable / 2;
+        let block: Vec<String> = self.messages[1..=compact_count]
+            .iter()
+            .map(|m| {
+                let role = match m.role {
+                    Role::System => "system",
+                    Role::User => "user",
+                    Role::Assistant => "assistant",
+                    Role::Tool => "tool",
+                };
+                format!("{role}: {}", m.content)
+            })
+            .collect();
+
+        let request = LlmRequest {
+            model: self.model.clone(),
+            messages: vec![
+                Message::new(
+                    Role::System,
+                    "You are a conversation summarizer for an autonomous coding agent. \
+                     Compress the given conversation turns into a concise but complete summary. \
+                     Preserve: the overall goal, key decisions, tool results that matter, \
+                     and any explicit constraints or user requirements. \
+                     Output ONLY the summary, in the same language as the source turns.",
+                ),
+                Message::new(Role::User, &block.join("\n---\n")),
+            ],
+            temperature: Some(0.2),
+            max_tokens: COMPACTION_SUMMARY_MAX_TOKENS,
+            tools: vec![],
+            image_data: None,
+            thinking_budget: None,
+            provider_params: HashMap::new(),
+            constraint_json: None,
+            structured_output: None,
+            cacheable_prefix_tokens: None,
+        };
+
+        let summary = match self.backend.complete(&request).await {
+            Ok(resp) => resp.content.trim().to_string(),
+            Err(_) => {
+                // 摘要失败 → 静默回退到纯驱逐。
+                return;
+            }
+        };
+        if summary.is_empty() {
+            return;
+        }
+
+        // 用单条摘要消息替换最旧 block。
+        self.messages.splice(
+            1..=compact_count,
+            std::iter::once(Message::new(
+                Role::Assistant,
+                &format!("【上下文摘要 (旧轮次压缩)】\n{summary}"),
+            )),
+        );
     }
 
     /// 返回当前会话的消息历史（供持久化/检索）。
@@ -1299,6 +1394,70 @@ mod tests {
         let report = loop_.last_governance().expect("governance attached");
         assert!(!report.violations.is_empty(), "violations surfaced: {:?}", report.violations);
         assert_eq!(out, "答案：42。\n抱歉，这只是一个占位。TODO 补充细节。");
+    }
+
+    // ── P1-B2 双相 compaction ────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_compaction_replaces_old_turns_at_high_water() {
+        // 摘要调用脚本: 第一个响应命中 compaction, 返回摘要文本。
+        let (backend, _seen) = backend_with(vec![(
+            "【压缩结果】goal: answer 1+1".to_string(),
+            FinishReason::Stop,
+            vec![],
+        )]);
+        let mut loop_ = AgentLoop::new(backend, "mock", "You are sys.");
+        // 灌入 12 条中等消息 (超过 COMPACTION_MIN_MESSAGES=8)。
+        for i in 0..12 {
+            loop_.messages.push(Message::new(
+                Role::User,
+                &format!("turn {i}: {}", "x".repeat(300)),
+            ));
+        }
+        let before = loop_.messages.len();
+        assert!(before >= COMPACTION_MIN_MESSAGES + 2, "must be compactable");
+        // 动态推导预算 (避免 tiktoken 离线/在线口径差异): 预算 = 当前 token,
+        // 阈值 (90%) = 0.9× 当前 token, 必命中。
+        let tokens_before = estimate_messages_tokens(&loop_.messages);
+        loop_ = loop_.with_context_token_budget(tokens_before);
+        assert!(
+            estimate_messages_tokens(&loop_.messages)
+                >= (loop_.context_token_budget as f64 * COMPACTION_THRESHOLD_RATIO) as usize,
+            "precondition: over 90% budget ({} vs {})",
+            tokens_before,
+            loop_.context_token_budget
+        );
+
+        loop_.maybe_compact_context().await;
+
+        assert!(loop_.messages.len() < before, "old turns collapsed");
+        let has_summary = loop_.messages.iter().any(|m| {
+            m.content.contains("【上下文摘要") && m.content.contains("【压缩结果】")
+        });
+        assert!(has_summary, "summary message present: {:?}", loop_.messages);
+        // System 头仍在原位。
+        assert_eq!(loop_.messages[0].role, Role::System);
+    }
+
+    #[tokio::test]
+    async fn test_compaction_skipped_below_threshold() {
+        let (backend, _seen) = backend_with(vec![(
+            "unused".to_string(),
+            FinishReason::Stop,
+            vec![],
+        )]);
+        let mut loop_ = AgentLoop::new(backend, "mock", "sys");
+        // 预算拉满, 消息少, 不该触发压缩。
+        loop_ = loop_.with_context_token_budget(10_000);
+        for i in 0..5 {
+            loop_.messages.push(Message::new(
+                Role::User,
+                &format!("turn {i}: {}", "x".repeat(50)),
+            ));
+        }
+        let before = loop_.messages.len();
+        loop_.maybe_compact_context().await;
+        assert_eq!(loop_.messages.len(), before, "no compaction below threshold");
     }
 
     // ── 真实 LLM 端到端（agent 循环层，本地手动跑，不进 CI）──────────

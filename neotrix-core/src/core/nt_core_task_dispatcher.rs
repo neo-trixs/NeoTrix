@@ -906,6 +906,13 @@ Output your result for this subtask only."#,
         let report = reduce_subtask_results(results);
         let field_signals = format_reducer_signals(&report);
 
+        // P1-D2 结果封顶: 子任务结果整体预算共享 — 结果多时均分, 单条封顶 1k token。
+        // 防止 N 个子任务全量输出把聚合 prompt 撑爆 (聚合请求 input 成本全付)。
+        const MAX_AGGREGATION_RESULTS_TOKENS: usize = 4096;
+        let result_count = results.len().max(1);
+        let per_result_budget = (MAX_AGGREGATION_RESULTS_TOKENS / result_count).max(256);
+        let field_signals = truncate_preserving(&field_signals, 1024, 0.6);
+
         // 使用 LLM 聚合结果（模型只做推理综合, 不再承担清洗/去重）
         let aggregation_prompt = format!(
             r#"You are aggregating results from multiple sub-tasks to produce a final answer.
@@ -932,7 +939,7 @@ Output ONLY the final synthesized answer."#,
                         "{}. {}: {}",
                         i + 1,
                         if r.success { "SUCCESS" } else { "FAILED" },
-                        truncate_preserving(&r.output, 2048, 0.6)
+                        truncate_preserving(&r.output, per_result_budget, 0.6)
                     )
                 })
                 .collect::<Vec<_>>()

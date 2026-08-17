@@ -64,7 +64,7 @@
 - **P0-A1 接线语义缓存**: 命中链路加 `get_semantic` 余弦相似度层 (用 VSA HyperCube 或本地 embedding), 阈值 ~0.92。命中即零推理 (对标 E9, -73% 成本场景)。
 - **P0-A2 Provider prefix caching**: ReAct 的 system+tools+稳定历史是前缀 → 按 provider 打 cache-control (Anthropic cache_control / OpenAI automatic prefix / DeepSeek context caching)。这使"每轮全历史重发"成本趋近于增量。需在 `LlmRequest` 加 `cacheable_prefix` 标记 + 消息排序保证稳定前缀在前。
 - **P1-A3 成本估算口径统一**: 改用 `context_budget::estimate_tokens`。
-- **P2-A4 重试上限**: 候选链 8→3, 重试仅限瞬时错误 (429/5xx), 4xx 不重试。
+- **P2-A4 重试上限**: 候选链 8→3, 重试仅限瞬时错误 (429/5xx), 4xx 不重试。**✅ 已落地**: `gateway.rs` complete/stream 双环候选链 8→3; `Authentication`/`InvalidRequest` (4xx) 熔断整链, 跳过 aggressive retry。
 
 ### 3.2 AgentLoop — `nt_io_agent_loop.rs`
 
@@ -79,9 +79,9 @@
 
 **优化**:
 - **P0-B1 stream 路径补截断**: 在 `turn_stream`/`turn_stream_with_approval` 回填 Tool 消息前调用 `truncate_preserving` (复用 L610 逻辑)。工具输出是 ~84% 的 token 源 (E10)。
-- **P1-B2 token 感知裁剪**: `trim_history` 改为 `estimate_messages_tokens` 驱动; 加双相: 先截断超大工具输出, 再逐轮驱逐, 最后 (90% 预算) 触发 LLM 摘要 compaction (OpenCode 40K 双相模式, E10)。
+- **P1-B2 token 感知裁剪**: `trim_history` 改为 `estimate_messages_tokens` 驱动; 加双相: 先截断超大工具输出, 再逐轮驱逐, 最后 (90% 预算) 触发 LLM 摘要 compaction (OpenCode 40K 双相模式, E10)。**✅ 已落地**: trim (estimate_messages_tokens 驱动, 已有) + `maybe_compact_context` — 预算 ≥90% 且可压缩 ≥8 条时, 一次 LLM 调用把最旧一半折成摘要单条 (1016 输出预算, 失败静默回退驱逐), 已接入 turn/turn_stream/turn_stream_with_approval 三入口。
 - **P1-B3 模型感知预算**: 入口按 active model 的 `context_window` × 0.8 派生 budget; 显式 `with_*` builder 参数透传。
-- **P2-B4 输出端约束**: 按任务类型设 `max_tokens`; reasoning 任务用 CoD 提示 (E7) 省输出 token。
+- **P2-B4 输出端约束**: 按任务类型设 `max_tokens`; reasoning 任务用 CoD 提示 (E7) 省输出 token。**✅ 已落地**: AgentLoop `output_budget_for()` 用 F6 GenerationClassifier 关键词检测 (零 LLM 成本) 派生 max_tokens (摘要/抽取/工具 2048, 编码 8192, 其余 4096)。CoD 已在 P0-5 forecast 侧落地。
 
 ### 3.3 NeoCodex — `nt_io_neocodex.rs` (最佳实践标杆)
 
@@ -97,7 +97,7 @@
 **优化**:
 - **P1-C1 口径统一**: Layer-3 与入队估算全部走 `count_tokens`。
 - **P2-C2 subagent 传压缩摘要**: subagent 返回时带回结构化摘要而非原始结果 (对标 sub-agent-as-context-management, E1 Pattern 5)。**✅ 已落地**: `SubagentDispatch::compress_context` + `build_request_with_context` + `run_with_context`/`run_parallel_with_context`, `dispatch_subagents` 自动注入父对话 2k 字符摘要 (nt_io_neocodex.rs)。
-- **P2-C3 稳定前缀前置**: 保证 system+工具定义始终在消息最前, 最大化 prefix cache 命中 (配合 P0-A2)。
+- **P2-C3 稳定前缀前置**: 保证 system+工具定义始终在消息最前, 最大化 prefix cache 命中 (配合 P0-A2)。**✅ 验证满足**: agent_loop/neocodex 的 system 恒为 messages[0], tools 经 LlmRequest.tools 由 provider 序列化在消息之前, prefix = 除末条外全历史——结构上已保证。
 
 ### 3.4 TaskDispatcher — `nt_core_task_dispatcher.rs`
 
@@ -111,8 +111,8 @@
 
 **优化**:
 - **P0-D1 子任务原文降量**: 分解后只向每个子任务传"任务摘要" (如任务标题 + 前 200 字意图 + 相关上下文切片), 或传共享引用; 完整原文仅存分解层。预期直接削减 (N-1)×task_len token/批。
-- **P1-D2 结果封顶**: 每个子任务结果进入综合 prompt 前按 `estimate_tokens` 截断 (保留 60/40), 或用 reducer 输出结构化压缩。
-- **P2-D3 usage 回填**: 从 Gateway `Usage` 真实聚合到 `tokens_used`。
+- **P1-D2 结果封顶**: 每个子任务结果进入综合 prompt 前按 `estimate_tokens` 截断 (保留 60/40), 或用 reducer 输出结构化压缩。**✅ 已落地**: aggregate_results 子任务结果整体共享 4096 token 预算 (均分+单条下限 256), reducer 信号 cap 1k, 单条仍走 token 感知 truncate_preserving (60/40) — 聚合输入成本与子任务数解耦。
+- **P2-D3 usage 回填**: 从 Gateway `Usage` 真实聚合到 `tokens_used`。**✅ 已落地**: `nt_core_task_dispatcher.rs` 加 `AtomicU32` usage 累积器, 三处 `.complete()` 记真实 `response.usage.total_tokens`, execute_sub_task 消费; kernel/reasoning/cot 路径无直接调用 → `estimate_tokens` 估算回填 (消除 `tokens_used:0` TODO)。
 
 ### 3.5 RAG / KB 注入
 
@@ -125,7 +125,7 @@
 
 **优化**:
 - **P0-E1 KB 上下文缓存 + 预算**: 会话内按 query 缓存检索结果; 注入前 `estimate_tokens` 封顶 (如 512 token), 超限按相关度截断。对标本项目已确立的预算引擎。
-- **P2-E2 去重**: 相邻轮次相同 KB 命中合并为增量差异。
+- **P2-E2 去重**: 相邻轮次相同 KB 命中合并为增量差异。**✅ 已落地**: engine_core `last_kb_injected` 记录上一轮注入的 node id, 新搜索命中相同 node 跳过 (只注入增量), 全重复时保留最高相关度一条防空注入。
 
 ### 3.6 多 Agent / 决策节点
 
@@ -180,14 +180,14 @@
 | P0-7 | 口径统一 | 单一 tiktoken 估算器贯通全链 | 消除低估/高估系统性偏差 | `context_budget.rs`/`context_strategy.rs` 等 |
 | P0-8 | 遥测真实化 | Usage 单一事实源, 删伪随机/len/4 | 数据可信 | `agent_view_cmds.rs`/`neocodex_cmds.rs` |
 
-P1: AgentLoop 入口模型感知预算 (✅ P1-B3) / token 感知 trim + 双相 compaction / gate 早停 (✅ P1-F2) / 子任务结果封顶 / gateway 成本口径统一。
-P2: subagent 压缩摘要 (✅ P2-C2) / 桌面 chat 恢复历史 (✅ P2-G2) / 桌面并入 Gateway (✅ P2-G3) / retry 上限 / 输出端 CoD。
+P1: AgentLoop 入口模型感知预算 (✅ P1-B3) / token 感知 trim + 双相 compaction (✅ P1-B2) / gate 早停 (✅ P1-F2) / 子任务结果封顶 (✅ P1-D2) / gateway 成本口径统一 (✅ P1-A3)。
+P2: subagent 压缩摘要 (✅ P2-C2) / 桌面 chat 恢复历史 (✅ P2-G2) / 桌面并入 Gateway (✅ P2-G3) / retry 上限 (✅ P2-A4) / 输出端 CoD (✅ P2-B4) / 稳定前缀 (✅ P2-C3) / usage 回填 (✅ P2-D3) / KB 去重 (✅ P2-E2)。
 
 ---
 
 ## 5. 落地纪律
 
-**落地状态 (2026-08-17)**: P0 全 8 项 + P1-B3 + P1-F2 + P2-C2/G2/G3 已闭环并验证 (cargo check -p neotrix / neotrix-tauri 0 error; 相关测试通过)。剩余未做: P1-B1/B2/D2 + P2-A4/B4/C3/D3/E2/G1。
+**落地状态 (2026-08-17)**: P0 全 8 项 + P1 全 5 项 + P2 全 8 项 已全部闭环并验证 (cargo check -p neotrix / neotrix-tauri 0 error; gateway/task_dispatcher/agent_loop/engine_core/neocodex 相关测试 109+396+17+13 passed)。无剩余审计项。
 
 - 复用既有基建: 预算引擎 (`context_budget.rs`)、tiktoken (`neocodex::count_tokens`)、语义缓存 (`nt_io_cache::SemanticCache::get_semantic`) — **不新建平行适配器 (R-P42)**。
 - 改动后可观测: `BudgetResult` (original/final/tool_outputs_truncated/messages_evicted) 已是观测杠杆, 各节点应用后记录削减量。
