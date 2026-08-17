@@ -84,9 +84,6 @@ jobs:
       - name: Install Windows deps
         if: matrix.os == 'windows-latest'
         run: choco install -y webview2-runtime
-      - name: Build frontend
-        run: npm ci && npm run build
-        working-directory: src-tauri/frontend
       - name: Build desktop app
         uses: tauri-apps/tauri-action@v2
         env:
