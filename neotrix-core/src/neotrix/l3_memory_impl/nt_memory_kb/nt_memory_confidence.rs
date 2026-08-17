@@ -1175,6 +1175,9 @@ mod tests {
                 )
                 .expect("in-memory temporal ledger"),
             ),
+            freshness: std::sync::RwLock::new(
+                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_sweep_20260815::FreshnessLedger::new(),
+            ),
         };
 
         let high_conf_id = Uuid::new_v4();

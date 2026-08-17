@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::nt_world_search::WebSearchEngine;
+use crate::neotrix::nt_world_search::UnifiedSearch;
 
 pub struct SearchCmd;
 
@@ -47,7 +47,7 @@ impl CliCommand for SearchCmd {
             return CommandOutput::err("Usage: /search <query> [-n <count>]");
         }
 
-        let engine = WebSearchEngine::default();
+        let engine = UnifiedSearch::new();
         match engine.search(&query, count) {
             Ok(results) => {
                 if results.is_empty() {
@@ -55,7 +55,10 @@ impl CliCommand for SearchCmd {
                 }
                 let mut msg = format!("Search results for \"{}\":\n\n", query);
                 for (i, r) in results.iter().enumerate() {
-                    msg.push_str(&format!("{}. {}\n   {}\n   {}\n\n", i + 1, r.title, r.url, r.snippet));
+                    let ev = r.evidence.as_ref()
+                        .map(|e| format!("  [可信度 {} · {} · 时效 {}]", e.label(), e.selection, e.freshness))
+                        .unwrap_or_default();
+                    msg.push_str(&format!("{}. {}{}\n   {}\n   {}\n\n", i + 1, r.title, ev, r.url, r.snippet));
                 }
                 CommandOutput::ok(msg.trim())
             }
