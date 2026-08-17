@@ -296,7 +296,7 @@ src/neotrix/
 - **2026-04-29**：S-06 外部信息自我进化（本次对话）
   - **代数视角转变**：从人类逻辑设计 → Agent 代数运算（向量空间、变换矩阵、相似度计算）
   - **MemOS 启发**：CapabilityVector 可扩展（extension + provenance）、ReasoningBank 记忆存储
-  - **gstack 启发**：generate_self_edit 分解为 Vec<MicroEdit>`（矩阵分解）、SEALAlgebra 谱半径验证
+  - **gstack 启发**：generate_self_edit 分解为 Vec&lt;MicroEdit&gt;（矩阵分解）、SEALAlgebra 谱半径验证
   - **dbskill 启发**：ReasoningMemory 添加 task_type（多维度检索）、ImpactMatrix 实现（22 维 → k 种任务类型）
   - **新模块**：`self_evolver.rs`（S-06）、`impact_matrix.rs`、`seal_algebra.rs`
   - **结果**：0 errors，编译通过，8 个 TODO 全部完成
