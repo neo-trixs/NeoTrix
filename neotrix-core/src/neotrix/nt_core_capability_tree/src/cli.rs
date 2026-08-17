@@ -189,6 +189,9 @@ pub enum Commands {
     /// 验证注册表 (检查循环依赖、层级跨度等)
     Validate,
 
+    /// 契约审计 (P1): 报告缺失 input/output_schema + fallback_chain 的节点
+    Contracts,
+
     /// 最短路径路由: 计算目标能力的最优依赖链 (LoopX 吸收: 流程节点最优解)
     Route {
         /// 目标能力标签 (如 websearch) 或节点 ID
@@ -265,6 +268,9 @@ impl CapabilityCli {
             }
             Commands::Validate => {
                 self.cmd_validate(&registry)?;
+            }
+            Commands::Contracts => {
+                self.cmd_contracts(&registry);
             }
             Commands::Route { target, from, to } => {
                 self.cmd_route(&registry, target, from.as_deref(), to.as_deref())?;
@@ -811,6 +817,30 @@ impl CapabilityCli {
             println!("Validation passed.");
         }
         Ok(())
+    }
+
+    /// 契约审计 (P1): 报告缺失 input/output_schema + fallback_chain 的节点。
+    /// 履约率 = 合规节点 / 总节点。只读审计, 不阻塞 (既有节点向后兼容)。
+    fn cmd_contracts(&self, registry: &CapabilityRegistry) {
+        let violations = registry.contract_violations();
+        let compliance = registry.contract_compliance();
+        println!(
+            "契约履约率: {:.1}% ({} / {} 节点)",
+            compliance * 100.0,
+            registry.nodes.len() - violations.len(),
+            registry.nodes.len()
+        );
+        if violations.is_empty() {
+            println!("OK: 全部节点已声明 input_schema / output_schema / fallback_chain 契约");
+            return;
+        }
+        println!("\n缺失契约节点 ({}):", violations.len());
+        for (id, missing) in violations.iter().take(40) {
+            println!("  - {}: {}", id, missing.join(", "));
+        }
+        if violations.len() > 40 {
+            println!("  ... 其余 {} 个省略 (共 {})", violations.len() - 40, violations.len());
+        }
     }
 
     /// 最短路径路由 (LoopX 吸收: 流程节点最优解)。

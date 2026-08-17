@@ -61,7 +61,40 @@ impl CliCommand for FileCmd {
                     Err(e) => CommandOutput::err(&format!("合并失败: {e}")),
                 }
             }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate", sub)),
+            "suggest" => {
+                if rest.is_empty() {
+                    return CommandOutput::err("用法: /file suggest <目录> — 生成 schema 初稿 (确定性表头匹配 + LLM 增强可选)");
+                }
+                let src = std::path::PathBuf::from(&rest[0]);
+                match crate::neotrix::suggest_schema(&src, None) {
+                    Ok(s) => {
+                        let mut out = format!(
+                            "Schema 初稿 (LLM 增强: {})\n观察表头 {} 个 / 命中 {} 标准列 / 未命中 {} 个:\n",
+                            s.llm_enhanced,
+                            s.observed_headers.len(),
+                            s.matched.len(),
+                            s.unmatched.len()
+                        );
+                        for (std, headers) in &s.matched {
+                            out.push_str(&format!("  ✓ {std} ← {}\n", headers.join(", ")));
+                        }
+                        if !s.unmatched.is_empty() {
+                            out.push_str("  ✗ 未命中 (需人工/LLM 归类): ");
+                            out.push_str(&s.unmatched.join(", "));
+                            out.push('\n');
+                        }
+                        if !s.suggested_variants.is_empty() {
+                            out.push_str("LLM 建议变体 (待确认):\n");
+                            for (std, variants) in &s.suggested_variants {
+                                out.push_str(&format!("  {std} += {}\n", variants.join(", ")));
+                            }
+                        }
+                        CommandOutput::ok(&out)
+                    }
+                    Err(e) => CommandOutput::err(&format!("schema 初稿生成失败: {e}")),
+                }
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest", sub)),
         }
     }
 }

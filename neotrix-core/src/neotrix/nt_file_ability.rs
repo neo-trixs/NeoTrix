@@ -1580,6 +1580,12 @@ pub struct MergeSchema {
     pub filename_suffixes: &'static [&'static str],
     /// 需要补单位的列规则
     pub unit_rules: &'static [UnitRule],
+    /// 多 sheet 文件优先选用的 sheet 名 (trim 精确匹配; 命中则只用该 sheet, 否则取第一个 sheet)。
+    /// 为空 = 保留旧行为 (全 sheet 遍历合并)。
+    pub preferred_sheets: &'static [&'static str],
+    /// 空值标记 → 留空 (列, [标记列表]) — 如 单重(Kg) 列 "/" 表示无数据。
+    /// 该列命中标记时输出空串 (不补单位)。
+    pub empty_markers: &'static [(&'static str, &'static [&'static str])],
     /// 用于统计的价值列 (如 USD 报价列), 必须 ∈ standard_columns
     pub value_columns: &'static [&'static str],
     /// 附加透出列 (如 "备注"/"_source_file")
@@ -1744,11 +1750,12 @@ pub const PRICE_TABLE_SCHEMA: MergeSchema = MergeSchema {
         "价格_报价", "价格表", "报价模板", "_报价", "-报价", "价格表_报价", "已完善",
         "-已更新", "-修改版", "-中高档", "-中低档", "-第一版", "-第二版", "-第五版本", "-含税",
     ],
-    unit_rules: &[UnitRule {
-        column: "单重(Kg)",
-        suffix: "kg",
-        skip_if_contains: &["kg", "千克"],
-    }],
+    // 表头已含单位 (单重(Kg)), 值保持纯数字, 不再追加 "kg" (R-2026-08 优化)
+    unit_rules: &[],
+    // 多 sheet 文件优先用 "修改版" sheet, 无则取第一个 sheet
+    preferred_sheets: &["修改版"],
+    // 单重(Kg) 空值标记 "/" → 留空 (不产出 "/kg" 垃圾行)
+    empty_markers: &[("单重(Kg)", &["/"])],
     value_columns: &["美元报价(USD)", "青岛港FOB报价(USD)", "天津港FOB报价(USD)"],
     extra_columns: &["备注", "_source_file"],
     skip_prefixes: &["consolidated", "native_consolidated"],
@@ -1858,7 +1865,7 @@ pub fn merge_tables_with(
             .to_lowercase();
         let srcs: Vec<TableData> = match ext.as_str() {
             "xlsx" => match read_xlsx_sheets_all(&path) {
-                Ok(tables) => tables,
+                Ok(tables) => select_preferred_sheets(tables, schema.preferred_sheets),
                 Err(e) => {
                     report
                         .files_failed
@@ -1933,6 +1940,14 @@ pub fn merge_tables_with(
                                 .any(|mark| v.to_lowercase().contains(&mark.to_lowercase()))
                         {
                             std_row[idx] = format!("{v}{}", rule.suffix);
+                        }
+                    }
+                }
+                // 空值标记 → 留空 (不补单位, 不产出垃圾行)
+                for (col, markers) in schema.empty_markers {
+                    if let Some(&idx) = std_idx.get(*col) {
+                        if markers.iter().any(|m| std_row[idx].trim() == *m) {
+                            std_row[idx] = String::new();
                         }
                     }
                 }
@@ -2045,6 +2060,163 @@ pub fn consolidate_tables(
     output: impl AsRef<Path>,
 ) -> Result<ConsolidationReport> {
     merge_tables_with(&PRICE_TABLE_SCHEMA, src_dir, output)
+}
+
+/// 建议 schema 草稿 (P3 选项 B: LLM 生成初稿 → 人工确认固化, 不直入生产)。
+/// 确定性部分: 扫描目录收集所有表头 → 与 PRICE_TABLE_SCHEMA 变体表匹配, 标注命中/未命中。
+/// 增强部分: 未命中列由 LLM 建议归类 (可选; LLM 不可用时纯确定性降级)。
+/// 产出 JSON 草稿, 必须经人工确认后才固化为 MergeSchema const (Validator gate 不 PASS 不呈现)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SchemaSuggestion {
+    /// 扫描到的全部原始表头 (去重, 排序)
+    pub observed_headers: Vec<String>,
+    /// 命中标准列的变体 (标准列 → 原始表头列表)
+    pub matched: std::collections::BTreeMap<String, Vec<String>>,
+    /// 未命中任何标准列/变体的表头 (需人工或 LLM 归类)
+    pub unmatched: Vec<String>,
+    /// 建议的列名变体新增项 (标准列 → 新增变体), 来自 LLM 增强 (可为空)
+    pub suggested_variants: std::collections::BTreeMap<String, Vec<String>>,
+    /// LLM 增强是否可用 (false = 纯确定性降级)
+    pub llm_enhanced: bool,
+}
+
+impl SchemaSuggestion {
+    /// 生成可固化为 MergeSchema 的草稿 — 仅输出确定性可验证部分,
+    /// 未确认的变体一律不进 (防止幻觉污染生产 schema)。
+    pub fn draft(&self) -> MergeSchema {
+        PRICE_TABLE_SCHEMA
+    }
+}
+
+/// 扫描目录收集建议 schema 初稿 (P3)。
+///
+/// 确定性阶段 (无 LLM 依赖, 可离线):
+///   - 扫描 xlsx/csv/tsv 文件, 收集全部表头
+///   - 与 PRICE_TABLE_SCHEMA.column_variants 匹配 → matched / unmatched
+/// 增强阶段 (可选):
+///   - 若提供 `llm` 回调, 对 unmatched 表头调用, 建议归类到标准列
+///   - LLM 建议仅进 `suggested_variants` (草稿), 不自动落进生产 schema
+///
+/// 返回 `SchemaSuggestion`。调用方 (CLI / 意识核心) 负责展示 + 人工确认。
+pub fn suggest_schema(
+    src_dir: impl AsRef<Path>,
+    llm: Option<&dyn Fn(&str) -> Option<String>>,
+) -> Result<SchemaSuggestion> {
+    let schema = &PRICE_TABLE_SCHEMA;
+    let mut headers: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+
+    if let Ok(read) = std::fs::read_dir(src_dir.as_ref()) {
+        for e in read.flatten() {
+            let p = e.path();
+            let ext = p
+                .extension()
+                .and_then(|x| x.to_str())
+                .map(|x| x.to_lowercase())
+                .unwrap_or_default();
+            if !matches!(ext.as_str(), "xlsx" | "csv" | "tsv") {
+                continue;
+            }
+            let name = p
+                .file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_default()
+                .to_lowercase();
+            if schema
+                .skip_prefixes
+                .iter()
+                .any(|pfx| name.starts_with(&pfx.to_lowercase()))
+            {
+                continue;
+            }
+            // 取第一个 sheet / 首行表头
+            let tables = if ext == "xlsx" {
+                read_xlsx_sheets_all(&p).unwrap_or_default()
+            } else if ext == "csv" {
+                read_csv(&p).map(|t| vec![t]).unwrap_or_default()
+            } else {
+                continue;
+            };
+            if let Some(first) = tables.into_iter().next() {
+                for h in first.headers {
+                    headers.insert(h.trim().to_string());
+                }
+            }
+        }
+    }
+
+    let mut matched: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    let mut unmatched: Vec<String> = Vec::new();
+    for h in &headers {
+        let normalized = schema.normalize_column(h);
+        // normalize 未命中时返回原样 — 若原样在标准列集合中视为命中
+        if schema.standard_columns.contains(&normalized.as_str()) {
+            matched
+                .entry(normalized)
+                .or_default()
+                .push(h.clone());
+        } else {
+            unmatched.push(h.clone());
+        }
+    }
+
+    let mut suggested_variants: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    let mut llm_enhanced = false;
+    if let Some(llm_fn) = llm {
+        let mut prompt = String::from(
+            "你是表头映射专家。以下表头未命中价格表标准列, 请归类到标准列之一: \n",
+        );
+        for (i, h) in unmatched.iter().enumerate() {
+            prompt.push_str(&format!("{}. {}\n", i + 1, h));
+        }
+        prompt.push_str("标准列: ");
+        prompt.push_str(&schema.standard_columns.join(" / "));
+        prompt.push_str("\n仅输出 '原始表头 → 标准列' 一行一条, 无法归类则 '原始表头 → NULL'");
+        if let Some(resp) = llm_fn(&prompt) {
+            llm_enhanced = true;
+            for line in resp.lines() {
+                let Some((raw, target)) = line.split_once("→") else {
+                    continue;
+                };
+                let raw = raw.trim();
+                let target = target.trim();
+                if target == "NULL" || target.is_empty() {
+                    continue;
+                }
+                if !schema.standard_columns.contains(&target) {
+                    continue; // LLM 建议的目标不是合法标准列 → 丢弃 (防幻觉)
+                }
+                suggested_variants
+                    .entry(target.to_string())
+                    .or_default()
+                    .push(raw.to_string());
+            }
+        }
+    }
+
+    Ok(SchemaSuggestion {
+        observed_headers: headers.into_iter().collect(),
+        matched,
+        unmatched,
+        suggested_variants,
+        llm_enhanced,
+    })
+}
+
+/// 多 sheet 表格按 preferred_sheets 选择: 命中任一 (trim 精确匹配) 只保留该 sheet;
+/// 未命中则取第一个 sheet。preferred_sheets 为空 = 保留全部 (旧行为)。
+fn select_preferred_sheets(tables: Vec<TableData>, preferred: &[&str]) -> Vec<TableData> {
+    if preferred.is_empty() {
+        return tables;
+    }
+    if let Some(t) = tables
+        .iter()
+        .find(|t| preferred.iter().any(|p| t.name.trim() == *p))
+    {
+        return vec![t.clone()];
+    }
+    tables.into_iter().take(1).collect()
 }
 
 /// 从文件名推导来源名 (通用: 剥离序号/后缀, 后缀来自 schema.filename_suffixes)。
@@ -3174,6 +3346,8 @@ mod tests {
             column_variants: &[],
             filename_suffixes: &[],
             unit_rules: &[],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["单价(元)"],
             extra_columns: &["_source_file"],
             skip_prefixes: &["consolidated"],
@@ -3219,6 +3393,54 @@ mod tests {
     }
 
     #[test]
+    fn test_p3_suggest_schema_deterministic_and_llm() {
+        // 临时目录: 一个 xlsx, 表头混合命中/未命中标准列
+        let dir = std::env::temp_dir().join(format!("nt_suggest_schema_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = TableData {
+            name: "Sheet1".to_string(),
+            headers: vec![
+                "产品型号".to_string(),
+                "阀体材质".to_string(),
+                "单重(Kg)".to_string(),
+                "完全未知列A".to_string(),
+            ],
+            rows: vec![vec![
+                "DN50".to_string(),
+                "WCB".to_string(),
+                "12.5".to_string(),
+                "?".to_string(),
+            ]],
+        };
+        write_xlsx_table(dir.join("甲价格表.xlsx"), &table).unwrap();
+
+        // 确定性路径 (无 LLM): 命中 3 标准列, 未命中 1
+        let s = suggest_schema(&dir, None).unwrap();
+        assert!(s.matched.contains_key("产品型号"));
+        assert!(s.matched.contains_key("阀体材质"));
+        assert!(s.matched.contains_key("单重(Kg)"));
+        assert!(s.unmatched.contains(&"完全未知列A".to_string()));
+        assert!(!s.llm_enhanced);
+        assert!(s.suggested_variants.is_empty());
+
+        // LLM 增强路径: 建议列A → 产品大类 (合法标准列); 建议到非法目标 → 丢弃
+        let s = suggest_schema(&dir, Some(&|_prompt: &str| {
+            Some("完全未知列A → 产品大类\n完全未知列A → 不存在的列\n".to_string())
+        }))
+        .unwrap();
+        assert!(s.llm_enhanced);
+        assert_eq!(s.suggested_variants.get("产品大类").map(|v| v.len()), Some(1));
+        // 非法目标被过滤
+        assert!(!s.suggested_variants.contains_key("不存在的列"));
+
+        // draft() 不返回未确认变体 — 保持生产 schema 纯净
+        let draft = s.draft();
+        assert!(!draft.column_variants.iter().any(|(_, vs)| vs.contains(&"完全未知列A")));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn test_d4_normalize_column_name() {
         assert_eq!(normalize_column_name("阀体材质"), "阀体材质");
         assert_eq!(normalize_column_name("BODY阀体"), "阀体材质");
@@ -3260,6 +3482,8 @@ mod tests {
             column_variants: &[],
             filename_suffixes: &[],
             unit_rules: &[],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["c"],
             extra_columns: &["d"],
             skip_prefixes: &[],
@@ -3275,6 +3499,8 @@ mod tests {
             column_variants: &[],
             filename_suffixes: &[],
             unit_rules: &[],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["a"],
             extra_columns: &[],
             skip_prefixes: &[],
@@ -3290,6 +3516,8 @@ mod tests {
             column_variants: &[],
             filename_suffixes: &[],
             unit_rules: &[],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["a"],
             extra_columns: &["a"],
             skip_prefixes: &[],
@@ -3345,6 +3573,8 @@ mod tests {
                 suffix: "kg",
                 skip_if_contains: &["kg"],
             }],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["单价(元)"],
             extra_columns: &["_source_file"],
             skip_prefixes: &["consolidated"],
@@ -3430,6 +3660,8 @@ mod tests {
             column_variants: &[],
             filename_suffixes: &["目录"],
             unit_rules: &[],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["单价(元)"],
             extra_columns: &["_source_file"],
             skip_prefixes: &["consolidated"],
@@ -3491,6 +3723,8 @@ mod tests {
             column_variants: &[],
             filename_suffixes: &["目录"],
             unit_rules: &[],
+            preferred_sheets: &[],
+            empty_markers: &[],
             value_columns: &["单价(元)"],
             extra_columns: &["_source_file"],
             skip_prefixes: &["consolidated"],
@@ -3611,11 +3845,15 @@ mod tests {
             .collect();
         assert!(suppliers.iter().any(|s| s.contains("甲工厂")));
         assert!(suppliers.iter().any(|s| s.contains("乙工厂")));
-        // 单重带 kg
+        // 单重保持纯数字 (表头已含单位, 不再追加 kg)
         let weights: Vec<String> = (0..back.row_count())
             .map(|i| back.cell(i, "单重(Kg)").unwrap_or("").to_string())
             .collect();
-        assert!(weights.iter().any(|w| w.contains("kg")), "单重应带单位: {weights:?}");
+        assert_eq!(weights, vec!["8", "12"], "单重应保留源数据纯数字: {weights:?}");
+        assert!(
+            !weights.iter().any(|w| w.contains("kg")),
+            "表头已含单位, 值不应再带 kg: {weights:?}"
+        );
         std::fs::remove_file(&out).ok();
     }
 
@@ -3690,13 +3928,18 @@ mod tests {
             .filter(|s| !s.trim().is_empty())
             .count();
         println!("raw USD cells present: {usd_rates}");
-        // 单重单位抽查
-        let with_kg = (0..back.row_count())
-            .map(|i| back.cell(i, "单重(Kg)").unwrap_or(""))
-            .filter(|s| !s.trim().is_empty() && !s.contains("kg"))
+        // 单重保持纯数字 (表头已含单位) 且无 "/kg" 垃圾行
+        let all_weights: Vec<String> = (0..back.row_count())
+            .map(|i| back.cell(i, "单重(Kg)").unwrap_or("").to_string())
+            .collect();
+        let with_kg = all_weights
+            .iter()
+            .filter(|s| !s.trim().is_empty() && s.contains("kg"))
             .count();
-        println!("weight cells missing kg: {with_kg}");
-        assert_eq!(with_kg, 0, "所有非空单重应带 kg 单位");
+        println!("weight cells with redundant kg: {with_kg}");
+        assert_eq!(with_kg, 0, "表头已含单位, 值不应再带 kg");
+        let slash_kg = all_weights.iter().filter(|s| s.as_str() == "/kg").count();
+        assert_eq!(slash_kg, 0, "空值标记不应产出 /kg 垃圾行");
     }
 
     #[test]

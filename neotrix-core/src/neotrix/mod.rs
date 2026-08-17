@@ -217,16 +217,16 @@ pub mod proxy_daemon_wrapper;
 // + image crate (图像元数据)。复用 ConstellationLevel 成熟度 + SelfTest T1-T3 接线。
 // Dark Forest 合规: 模块需有消费者方可存活，每次编辑后需 register_consumer
 pub use nt_file_ability::{
-    check_health, consolidate_tables, content_similarity, create_from_markdown, decode_bytes,
-    detect_encoding, edit_xlsx_table, embed_text, extract_text, load_snapshot, merge_tables_with,
-    normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
-    replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
-    to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport, ContentSnapshot,
-    FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation, ImageMetadata,
-    MergeSchema, OcrEngine, OcrResult, PRICE_STANDARD_COLUMNS, PRICE_TABLE_SCHEMA, RuleBasedOcr,
-    SheetCellData, SheetCellValueType, SheetData, SheetRowData, StructuredData, TableData,
-    TableEdit, TextEncoding, UnitRule,
-};
+     check_health, consolidate_tables, content_similarity, create_from_markdown, decode_bytes,
+     detect_encoding, edit_xlsx_table, embed_text, extract_text, load_snapshot, merge_tables_with,
+     normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
+     replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
+     suggest_schema, to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport,
+     ContentSnapshot, FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation,
+     ImageMetadata, MergeSchema, OcrEngine, OcrResult, PRICE_STANDARD_COLUMNS, PRICE_TABLE_SCHEMA,
+     RuleBasedOcr, SchemaSuggestion, SheetCellData, SheetCellValueType, SheetData, SheetRowData,
+     StructuredData, TableData, TableEdit, TextEncoding, UnitRule,
+ };
 
 // ─── L7 Capability Tree 採入 (经验 → 能力节点迭代目标) ─────────────────────
 // 能力树 crate 作为 workspace 成员, 此处接入主管线 (Dark Forest 合规: 有消费者)

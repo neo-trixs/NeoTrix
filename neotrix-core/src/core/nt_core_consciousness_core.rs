@@ -920,10 +920,19 @@ impl ConsciousnessCoreHandle {
 }
 
 /// 内置能力真实调度 — 能力网命中后把能力标签映射到实际 Rust 函数调用。
-/// 目前覆盖文件能力网 (nt_file_ability): xlsx_consolidation → consolidate_tables。
+/// 覆盖文件能力网 (nt_file_ability) 全分支: xlsx_consolidation → consolidate_tables、
+/// file_extract → extract_text/to_markdown/read_xlsx_sheets_all、file_structured → read/write。
 /// 未覆盖标签返回 (false, 描述) — 保持向后兼容 (原实现仅标记 executed)。
 /// 生产接地: 意识核心自主调用能力网, 不再只是"标记已执行"。
 fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
+    // 通用辅助: 从摘要提取路径 (含 '/' 或 '\' 的 token)
+    fn first_path(summary: &str) -> Option<std::path::PathBuf> {
+        summary
+            .split_whitespace()
+            .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+            .find(|w| w.contains('/') || w.contains('\\'))
+            .map(std::path::PathBuf::from)
+    }
     match task.capability_tag.as_str() {
         // 目录表格合并 (D4): 从子任务摘要提取目录路径 (含 / 或 \ 者首个路径 token)
         "xlsx_consolidation" | "data_merge" => {
@@ -959,6 +968,58 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 None => (
                     false,
                     format!("子任务 '{}' 未提供有效目录路径, 无法执行合并", task.summary),
+                ),
+            }
+        }
+        // 文件内容抽取 (FileKind 全分支: 文本/PDF/Office → 文本/Markdown/表格)
+        "file_extract" | "content_extraction" | "file_parsing" => {
+            let dir = first_path(&task.summary);
+            match dir {
+                Some(p) if p.is_dir() => {
+                    // 目录级抽取: 扫描目录内文件, 逐文件提取文本摘要
+                    let mut extracted = 0;
+                    let mut chars = 0usize;
+                    if let Ok(entries) = std::fs::read_dir(&p) {
+                        for e in entries.flatten() {
+                            let path = e.path();
+                            if path.is_file() {
+                                if let Ok(txt) = crate::neotrix::extract_text(&path) {
+                                    extracted += 1;
+                                    chars += txt.chars().count();
+                                }
+                            }
+                        }
+                    }
+                    (
+                        true,
+                        format!(
+                            "文件抽取完成: 扫描 {} 个文件 / 提取 {} 字符\n目录: {}",
+                            extracted,
+                            chars,
+                            p.display()
+                        ),
+                    )
+                }
+                Some(p) if p.is_file() => {
+                    let md = crate::neotrix::to_markdown(&p).unwrap_or_else(|_| {
+                        crate::neotrix::extract_text(&p).unwrap_or_else(|e| format!("<{e}>"))
+                    });
+                    (
+                        true,
+                        format!(
+                            "文件抽取完成 ({} 字符):\n{}",
+                            md.chars().count(),
+                            md.chars().take(400).collect::<String>()
+                        ),
+                    )
+                }
+                Some(p) => (
+                    false,
+                    format!("路径 '{}' 既非文件也非目录, 无法抽取", p.display()),
+                ),
+                None => (
+                    false,
+                    format!("子任务 '{}' 未提供有效路径, 无法抽取", task.summary),
                 ),
             }
         }

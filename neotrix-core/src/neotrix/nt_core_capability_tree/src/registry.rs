@@ -75,6 +75,43 @@ impl CapabilityRegistry {
     }
 
     /// 注册新节点
+    /// 生成节点契约审计报告 (P1 推广: 能力网节点强制 input/output_schema + fallback 链契约)。
+    /// 契约通过 metadata 承载: metadata["input_schema"], metadata["output_schema"],
+    /// metadata["fallback_chain"] (字符串数组)。缺失即违规 (true)。
+    /// 审计为只读, 不阻塞注册 — 保持对既有 100+ 节点的向后兼容 (R-P42 强化现有节点, 非强制改写)。
+    pub fn contract_violations(&self) -> Vec<(String, Vec<String>)> {
+        self.nodes
+            .iter()
+            .filter_map(|(id, node)| {
+                let mut missing = Vec::new();
+                for key in ["input_schema", "output_schema"] {
+                    if !node.metadata.contains_key(key) {
+                        missing.push(format!("missing {key}"));
+                    }
+                }
+                if !node.metadata.contains_key("fallback_chain") {
+                    missing.push("missing fallback_chain".to_string());
+                }
+                if missing.is_empty() {
+                    None
+                } else {
+                    Some((id.clone(), missing))
+                }
+            })
+            .collect()
+    }
+
+    /// 契约履约率 (0.0-1.0) — 供 consciousness_status / 审查报告引用
+    pub fn contract_compliance(&self) -> f64 {
+        let total = self.nodes.len();
+        if total == 0 {
+            return 1.0;
+        }
+        let compliant = total - self.contract_violations().len();
+        compliant as f64 / total as f64
+    }
+
+    /// 注册节点
     pub fn register(&mut self, node: CapabilityNode) -> Result<(), RegistryError> {
         if self.nodes.contains_key(&node.id) {
             return Err(RegistryError::AlreadyExists(node.id));
