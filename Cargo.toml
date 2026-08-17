@@ -16,7 +16,8 @@ edition = "2021"
 rust-version = "1.81"
 authors = ["NeoTrix Team"]
 license = "MIT"
-repository = "https://github.com/neotrix/neotrix"
+license-file = "LICENSE"
+repository = "https://github.com/neo-trixs/NeoTrix"
 description = "NeoTrix - Self-evolving reasoning kernel with 18 stages of neural architecture"
 
 [workspace.dependencies]

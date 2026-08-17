@@ -319,7 +319,18 @@ aider --openai-api-base http://localhost:3000/v1
 
 ## License
 
-MIT
+Dual-licensed:
+
+- **MIT License** — applies to the public portions of the codebase (CLI, GUI,
+  frontend, integration code, and documentation). See [LICENSE](LICENSE).
+- **Proprietary exceptions** — the NT-SHIELD security layer, ConsciousnessTree
+  meta-cognition core, and VSA HyperCube engine are proprietary. See
+  [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md). The corresponding source
+  files carry the `SPDX-License-Identifier: LicenseRef-NeoTrix-Proprietary`
+  marker (added at release time via `scripts/add-proprietary-spdx.sh`).
+
+For commercial licensing of proprietary modules, contact via the
+[GitHub repository](https://github.com/neo-trixs/NeoTrix).
 
 ---
 
