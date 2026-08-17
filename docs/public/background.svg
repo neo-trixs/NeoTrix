@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDFBF5"/>
+      <stop offset="55%" stop-color="#F8F2E1"/>
+      <stop offset="100%" stop-color="#FCFAF3"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#EBD7AC" stop-opacity="0.5"/>
+      <stop offset="40%" stop-color="#E7D2A0" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#E7D2A0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="nucleus" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD7AC"/>
+      <stop offset="55%" stop-color="#D6AC58"/>
+      <stop offset="100%" stop-color="#C2933F"/>
+    </linearGradient>
+    <!-- HyperCube honeycomb lattice -->
+    <pattern id="lattice" width="54" height="31.18" patternUnits="userSpaceOnUse" patternTransform="scale(1.35)">
+      <path d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
+            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.16"/>
+      <path transform="translate(27 15.59)"
+            d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
+            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.16"/>
+      <path transform="translate(27 -15.59)"
+            d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
+            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.16"/>
+    </pattern>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <rect width="1440" height="900" fill="url(#lattice)"/>
+  <rect width="1440" height="900" fill="url(#halo)"/>
+
+  <!-- Orbit rings: the mind's atmosphere -->
+  <circle cx="1150" cy="150" r="250" fill="none" stroke="#E3CB94" stroke-width="1" opacity="0.5"/>
+  <circle cx="1150" cy="150" r="180" fill="none" stroke="#EBD7AC" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="300" cy="790" r="300" fill="none" stroke="#E3CB94" stroke-width="1" opacity="0.4"/>
+  <circle cx="300" cy="790" r="220" fill="none" stroke="#EBD7AC" stroke-width="0.8" opacity="0.35"/>
+
+  <!-- Constellation nodes: diamond-nucleus echoes -->
+  <g stroke="#D6AC58" stroke-width="0.8" opacity="0.5">
+    <line x1="920" y1="560" x2="1040" y2="610"/>
+    <line x1="1040" y1="610" x2="1180" y2="575"/>
+    <line x1="1180" y1="575" x2="1230" y2="460"/>
+    <line x1="1180" y1="575" x2="1255" y2="650"/>
+    <line x1="350" y1="300" x2="470" y2="255"/>
+    <line x1="470" y1="255" x2="610" y2="290"/>
+    <line x1="470" y1="255" x2="505" y2="160"/>
+    <line x1="470" y1="255" x2="540" y2="360"/>
+    <line x1="120" y1="640" x2="240" y2="590"/>
+    <line x1="240" y1="590" x2="360" y2="620"/>
+    <line x1="240" y1="590" x2="200" y2="470"/>
+  </g>
+
+  <!-- Diamond nodes -->
+  <g fill="url(#nucleus)" opacity="0.85">
+    <polygon points="920,552 940,560 920,568 900,560"/>
+    <polygon points="1040,602 1060,610 1040,618 1020,610"/>
+    <polygon points="1180,567 1200,575 1180,583 1160,575"/>
+    <polygon points="1230,452 1250,460 1230,468 1210,460"/>
+    <polygon points="1255,642 1275,650 1255,658 1235,650"/>
+    <polygon points="350,292 370,300 350,308 330,300"/>
+    <polygon points="470,247 490,255 470,263 450,255"/>
+    <polygon points="610,282 630,290 610,298 590,290"/>
+    <polygon points="505,152 525,160 505,168 485,160"/>
+    <polygon points="540,352 560,360 540,368 520,360"/>
+    <polygon points="120,632 140,640 120,648 100,640"/>
+    <polygon points="240,582 260,590 240,598 220,590"/>
+    <polygon points="360,612 380,620 360,628 340,620"/>
+    <polygon points="200,462 220,470 200,478 180,470"/>
+  </g>
+
+  <!-- Scattered nucleus echoes -->
+  <g fill="#D6AC58" opacity="0.3">
+    <polygon points="1010,140 1024,160 1010,180 996,160"/>
+    <polygon points="680,80 692,96 680,112 668,96"/>
+    <polygon points="90,210 100,226 90,242 80,226"/>
+    <polygon points="1330,330 1342,346 1330,362 1318,346"/>
+    <polygon points="700,760 712,776 700,792 688,776"/>
+    <polygon points="560,470 572,486 560,502 548,486"/>
+    <polygon points="820,820 832,836 820,852 808,836"/>
+    <polygon points="1180,120 1190,132 1180,144 1170,132"/>
+  </g>
+
+  <!-- Polar axis thread, top-left -->
+  <line x1="130" y1="40" x2="130" y2="180" stroke="#DCC58F" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.4"/>
+  <polygon points="130,52 146,82 130,112 114,82" fill="url(#nucleus)" opacity="0.5"/>
+</svg>

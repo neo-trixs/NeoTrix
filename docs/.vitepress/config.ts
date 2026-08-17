@@ -35,8 +35,8 @@ export default defineConfig({
   ],
 
   head: [
-    ['link', { rel: 'icon', href: '/favicon.ico' }],
-    ['meta', { name: 'theme-color', content: '#1a0533' }],
+    ['link', { rel: 'icon', href: '/favicon.svg' }],
+    ['meta', { name: 'theme-color', content: '#FCFAF3' }],
   ],
 
   themeConfig: {

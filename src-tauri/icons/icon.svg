@@ -1,40 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FBBF24"/>
-      <stop offset="45%" stop-color="#F97316"/>
-      <stop offset="100%" stop-color="#C2410C"/>
-    </linearGradient>
-    <radialGradient id="centerGlow" cx="0.5" cy="0.45" r="0.55">
-      <stop offset="0%" stop-color="#FFF7ED" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#FFF7ED" stop-opacity="0"/>
+    <radialGradient id="bg" cx="50%" cy="44%" r="72%">
+      <stop offset="0%" stop-color="#FDFBF5"/>
+      <stop offset="100%" stop-color="#F2E7C8"/>
     </radialGradient>
-    <linearGradient id="glyph" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFFBEB"/>
-      <stop offset="100%" stop-color="#FFEDD5"/>
+    <linearGradient id="nucleus" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD7AC"/>
+      <stop offset="55%" stop-color="#D6AC58"/>
+      <stop offset="100%" stop-color="#C2933F"/>
     </linearGradient>
+    <linearGradient id="coreHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#FCFAF3" stop-opacity="0.75"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="16"/>
+    </filter>
   </defs>
 
-  <!-- Warm amber rounded-square background -->
-  <rect width="512" height="512" rx="115" ry="115" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
 
-  <!-- Soft inner luminosity -->
-  <rect width="512" height="512" rx="115" ry="115" fill="url(#centerGlow)"/>
+  <!-- Halo orbit ring + inner echo -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#E3CB94" stroke-width="3"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#EBD7AC" stroke-width="2.4" opacity="0.7"/>
 
-  <!-- VSA HyperCube — tesseract 2D projection (outer + inner square, corner links) -->
-  <g fill="none" stroke="url(#glyph)" stroke-linecap="round" stroke-linejoin="round">
-    <!-- inner square -->
-    <rect x="221" y="221" width="70" height="70" rx="6" stroke-width="12"/>
-    <!-- outer square -->
-    <rect x="151" y="151" width="210" height="210" rx="12" stroke-width="10" opacity="0.55"/>
-    <!-- corner connections: outer → inner -->
-    <line x1="151" y1="151" x2="221" y2="221" stroke-width="10"/>
-    <line x1="361" y1="151" x2="291" y2="221" stroke-width="10"/>
-    <line x1="361" y1="361" x2="291" y2="291" stroke-width="10"/>
-    <line x1="151" y1="361" x2="221" y2="291" stroke-width="10"/>
+  <!-- Polar axis: the infinite thread -->
+  <line x1="256" y1="34" x2="256" y2="478" stroke="#DCC58F" stroke-width="2" stroke-dasharray="6 10" opacity="0.6"/>
+
+  <!-- E8 diamond nucleus -->
+  <polygon points="256,130 376,256 256,382 136,256" fill="url(#nucleus)" filter="url(#glow)"/>
+  <polygon points="256,130 376,256 256,382 136,256" fill="url(#nucleus)"/>
+  <polygon points="256,160 346,256 256,352 166,256" fill="url(#coreHighlight)"/>
+
+  <!-- Hexagram ticks: six binary axes -->
+  <g stroke="#C9A85C" stroke-width="2.4" opacity="0.55" stroke-linecap="round">
+    <line x1="226" y1="390" x2="286" y2="390"/>
+    <line x1="232" y1="396" x2="280" y2="396"/>
+    <line x1="238" y1="402" x2="274" y2="402"/>
+    <line x1="244" y1="408" x2="268" y2="408"/>
   </g>
 
-  <!-- E8 consciousness core — luminous center dot -->
-  <circle cx="256" cy="256" r="17" fill="#FFFBEB" opacity="0.95"/>
-  <circle cx="256" cy="256" r="7.5" fill="#EA580C"/>
+  <!-- Orbit satellites -->
+  <circle cx="390" cy="122" r="6" fill="#D6AC58"/>
+  <circle cx="66" cy="256" r="5" fill="#C2933F" opacity="0.8"/>
+  <circle cx="390" cy="390" r="5" fill="#A0752E" opacity="0.7"/>
 </svg>

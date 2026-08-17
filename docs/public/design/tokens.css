@@ -1,0 +1,70 @@
+:root {
+  /* ── NeoTrix Superbody Minimal · Light Gold · single source of truth ── */
+  --background: #FCFAF3;
+  --foreground: #262419;
+  --card: #FFFFFF;
+  --card-foreground: #262419;
+  --popover: #FFFFFF;
+  --popover-foreground: #262419;
+  --primary: #D6AC58;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F7F0DE;
+  --secondary-foreground: #262419;
+  --muted: #F0E3C4;
+  --muted-foreground: #8F8666;
+  --accent: #E7D2A0;
+  --accent-foreground: #4E3813;
+  --destructive: #C2403F;
+  --destructive-foreground: #FFFFFF;
+  --border: #E3DCC9;
+  --input: #E3DCC9;
+  --ring: #D6AC58;
+
+  /* Gold scale primitives */
+  --gold-50: #FCFAF3;
+  --gold-100: #F7F0DE;
+  --gold-200: #F0E3C4;
+  --gold-300: #E7D2A0;
+  --gold-400: #DDC079;
+  --gold-500: #D6AC58;
+  --gold-600: #C2933F;
+  --gold-700: #A0752E;
+  --gold-800: #7C5822;
+  --gold-900: #4E3813;
+
+  /* Warm ink neutrals */
+  --ink-1: #262419;
+  --ink-2: #5C5545;
+  --ink-3: #8F8666;
+  --ink-line: #E3DCC9;
+
+  --radius: 0.625rem;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  --background: #1B1813;
+  --foreground: #F3EFE4;
+  --card: #242018;
+  --card-foreground: #F3EFE4;
+  --popover: #242018;
+  --popover-foreground: #F3EFE4;
+  --primary: #E7D2A0;
+  --primary-foreground: #1B1813;
+  --secondary: #242018;
+  --secondary-foreground: #F3EFE4;
+  --muted: #3A3324;
+  --muted-foreground: #B7AA8C;
+  --accent: #3A3324;
+  --accent-foreground: #E7D2A0;
+  --destructive: #E07B7A;
+  --destructive-foreground: #1B1813;
+  --border: #3A3324;
+  --input: #3A3324;
+  --ring: #E7D2A0;
+  --ink-1: #F3EFE4;
+  --ink-2: #C7BC9E;
+  --ink-3: #8F8666;
+  --ink-line: #3A3324;
+}
