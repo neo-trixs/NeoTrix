@@ -40,13 +40,13 @@ knowledge in a **4096-dim VSA HyperCube**, and improves its own reasoning via th
 
 | Icon | Domain | Chinese name | Role |
 |---|---|---|---|
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-core.svg" alt="NT-CORE" width="32"> | **NT-CORE** | E8引导者 | E8 engine · GWT attention · VSA HyperCube · Self |
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-mind.svg" alt="NT-MIND" width="32"> | **NT-MIND** | 进化工匠 | SEAL pipeline · distillation · skill crystallization |
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-memory.svg" alt="NT-MEMORY" width="32"> | **NT-MEMORY** | 知识守护者 | SQLite KB · FTS5 search · embeddings · versioning |
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-world.svg" alt="NT-WORLD" width="32"> | **NT-WORLD** | 虚空探索者 | crawlers · fetchers · parsers · classifiers |
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-act.svg" alt="NT-ACT" width="32"> | **NT-ACT** | 行动执行者 | MCP tools · code · social · orchestration |
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-io.svg" alt="NT-IO" width="32"> | **NT-IO** | 界面使徒 | LLM providers · CLI · web · ACP · LSP |
-| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/nt-shield.svg" alt="NT-SHIELD" width="32"> | **NT-SHIELD** | 影卫 | sandbox · proxy pool · Tor · fingerprint · audit |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-core-48.png" alt="NT-CORE" width="32"> | **NT-CORE** | E8引导者 | E8 engine · GWT attention · VSA HyperCube · Self |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-mind-48.png" alt="NT-MIND" width="32"> | **NT-MIND** | 进化工匠 | SEAL pipeline · distillation · skill crystallization |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-memory-48.png" alt="NT-MEMORY" width="32"> | **NT-MEMORY** | 知识守护者 | SQLite KB · FTS5 search · embeddings · versioning |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-world-48.png" alt="NT-WORLD" width="32"> | **NT-WORLD** | 虚空探索者 | crawlers · fetchers · parsers · classifiers |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-act-48.png" alt="NT-ACT" width="32"> | **NT-ACT** | 行动执行者 | MCP tools · code · social · orchestration |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-io-48.png" alt="NT-IO" width="32"> | **NT-IO** | 界面使徒 | LLM providers · CLI · web · ACP · LSP |
+| <img src="https://github.com/neo-trixs/NeoTrix/raw/main/docs/public/icons/png/thumb/nt-shield-48.png" alt="NT-SHIELD" width="32"> | **NT-SHIELD** | 影卫 | sandbox · proxy pool · Tor · fingerprint · audit |
 
 ## ⚙️ Featured Work
 

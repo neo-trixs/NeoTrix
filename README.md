@@ -101,13 +101,13 @@ NeoTrix is organized as **7 domains** (factions) across **10 implementation laye
 (L1 Body → L10 Transcendent):
 
 <p align="center">
-  <img src="docs/public/icons/nt-core.svg" alt="NT-CORE" width="56">
-  <img src="docs/public/icons/nt-mind.svg" alt="NT-MIND" width="56">
-  <img src="docs/public/icons/nt-memory.svg" alt="NT-MEMORY" width="56">
-  <img src="docs/public/icons/nt-world.svg" alt="NT-WORLD" width="56">
-  <img src="docs/public/icons/nt-act.svg" alt="NT-ACT" width="56">
-  <img src="docs/public/icons/nt-io.svg" alt="NT-IO" width="56">
-  <img src="docs/public/icons/nt-shield.svg" alt="NT-SHIELD" width="56">
+  <img src="docs/public/icons/png/thumb/nt-core-48.png" alt="NT-CORE" width="48">
+  <img src="docs/public/icons/png/thumb/nt-mind-48.png" alt="NT-MIND" width="48">
+  <img src="docs/public/icons/png/thumb/nt-memory-48.png" alt="NT-MEMORY" width="48">
+  <img src="docs/public/icons/png/thumb/nt-world-48.png" alt="NT-WORLD" width="48">
+  <img src="docs/public/icons/png/thumb/nt-act-48.png" alt="NT-ACT" width="48">
+  <img src="docs/public/icons/png/thumb/nt-io-48.png" alt="NT-IO" width="48">
+  <img src="docs/public/icons/png/thumb/nt-shield-48.png" alt="NT-SHIELD" width="48">
 </p>
 
 <p align="center">
@@ -156,12 +156,12 @@ awakening metrics. Each layer has observable outputs that feed back upward.
 | **NT-SHIELD** | Zero-unsafe security layer: sandboxing, credential vault, proxy pool, fingerprint management, reasoning trace protection (PII / injection / divergence scans). |
 
 <p align="center">
-  <img src="docs/public/icons/e8.svg" alt="E8" width="40">
-  <img src="docs/public/icons/seal.svg" alt="SEAL" width="40">
-  <img src="docs/public/icons/hcube.svg" alt="HyperCube" width="40">
-  <img src="docs/public/icons/gwt.svg" alt="GWT" width="40">
-  <img src="docs/public/icons/tree.svg" alt="ConsciousnessTree" width="40">
-  <img src="docs/public/icons/kb.svg" alt="KB" width="40">
+  <img src="docs/public/icons/png/thumb/e8-48.png" alt="E8" width="40">
+  <img src="docs/public/icons/png/thumb/seal-48.png" alt="SEAL" width="40">
+  <img src="docs/public/icons/png/thumb/hcube-48.png" alt="HyperCube" width="40">
+  <img src="docs/public/icons/png/thumb/gwt-48.png" alt="GWT" width="40">
+  <img src="docs/public/icons/png/thumb/tree-48.png" alt="ConsciousnessTree" width="40">
+  <img src="docs/public/icons/png/thumb/kb-48.png" alt="KB" width="40">
 </p>
 
 <p align="center">

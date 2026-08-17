@@ -1,10 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <defs>
-    <linearGradient id="gold" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F0E3C4"/>
-      <stop offset="0.45" stop-color="#D6AC58"/>
-      <stop offset="1" stop-color="#C2933F"/>
+    <linearGradient id="gold" x1="4" y1="3" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F4E6BF"/>
+      <stop offset="0.4" stop-color="#D6AC58"/>
+      <stop offset="1" stop-color="#B9852F"/>
     </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#F7EDCD"/>
+      <stop offset="0.45" stop-color="#D6AC58"/>
+      <stop offset="1" stop-color="#B9852F"/>
+    </radialGradient>
   </defs>
   <line x1="6" y1="5" x2="18" y2="5"/>
   <line x1="6.8" y1="8.6" x2="17.2" y2="8.6"/>
