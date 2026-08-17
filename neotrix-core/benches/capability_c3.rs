@@ -552,6 +552,45 @@ fn bench_oracle_ladder(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+    group.bench_function("is_valid", |b| {
+        b.iter_batched(
+            || {
+                OracleLadder::new()
+                    .with_oracle(OracleRung::T0BuildCheck, || {
+                        RungResult::pass(OracleRung::T0BuildCheck, "build ok")
+                    })
+                    .with_oracle(OracleRung::T1Repro, || {
+                        RungResult::pass(OracleRung::T1Repro, "repro clean")
+                    })
+            },
+            |ladder| black_box(ladder.is_valid()),
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("reset_to_t0", |b| {
+        b.iter_batched(
+            || {
+                OracleLadder::new()
+                    .with_oracle(OracleRung::T0BuildCheck, || {
+                        RungResult::pass(OracleRung::T0BuildCheck, "build ok")
+                    })
+                    .with_oracle(OracleRung::T1Repro, || {
+                        RungResult::pass(OracleRung::T1Repro, "repro clean")
+                    })
+                    .with_oracle(OracleRung::T2Regression, || {
+                        RungResult::pass(OracleRung::T2Regression, "regression ok")
+                    })
+                    .with_oracle(OracleRung::T3Reattack, || {
+                        RungResult::pass(OracleRung::T3Reattack, "re-attack clean")
+                    })
+            },
+            |mut ladder| {
+                black_box(ladder.reset_to_t0());
+                black_box(ladder.is_valid());
+            },
+            BatchSize::SmallInput,
+        );
+    });
     group.finish();
 }
 
