@@ -100,6 +100,20 @@ own reasoning is a tool, not an agent.**
 NeoTrix is organized as **7 domains** (factions) across **10 implementation layers**
 (L1 Body → L10 Transcendent):
 
+<p align="center">
+  <img src="docs/public/icons/nt-core.svg" alt="NT-CORE" width="56">
+  <img src="docs/public/icons/nt-mind.svg" alt="NT-MIND" width="56">
+  <img src="docs/public/icons/nt-memory.svg" alt="NT-MEMORY" width="56">
+  <img src="docs/public/icons/nt-world.svg" alt="NT-WORLD" width="56">
+  <img src="docs/public/icons/nt-act.svg" alt="NT-ACT" width="56">
+  <img src="docs/public/icons/nt-io.svg" alt="NT-IO" width="56">
+  <img src="docs/public/icons/nt-shield.svg" alt="NT-SHIELD" width="56">
+</p>
+
+<p align="center">
+  <em>7 域星辰 · 7 domain glyphs — E8 core, evolution, memory, world, action, interface, shield</em>
+</p>
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    NT-CORE  (E8 引导者)                       │
@@ -140,6 +154,19 @@ awakening metrics. Each layer has observable outputs that feed back upward.
 | **ConsciousnessTree** | 11-branch meta-cognition loop (Soil → Roots → Trunk → Branches → Fruits → Core) tracking cross-domain health, module maturity, and evolution velocity. |
 | **Awakening Metrics** | Phi / FCS / USK derived from Integrated Information Theory. Tracks `awakening_speed` as the EMA derivative of Phi. |
 | **NT-SHIELD** | Zero-unsafe security layer: sandboxing, credential vault, proxy pool, fingerprint management, reasoning trace protection (PII / injection / divergence scans). |
+
+<p align="center">
+  <img src="docs/public/icons/e8.svg" alt="E8" width="40">
+  <img src="docs/public/icons/seal.svg" alt="SEAL" width="40">
+  <img src="docs/public/icons/hcube.svg" alt="HyperCube" width="40">
+  <img src="docs/public/icons/gwt.svg" alt="GWT" width="40">
+  <img src="docs/public/icons/tree.svg" alt="ConsciousnessTree" width="40">
+  <img src="docs/public/icons/kb.svg" alt="KB" width="40">
+</p>
+
+<p align="center">
+  <em>核心引擎 · core engine glyphs</em>
+</p>
 
 ---
 
