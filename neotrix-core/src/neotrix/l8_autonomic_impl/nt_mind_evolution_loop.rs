@@ -354,6 +354,11 @@ pub struct RstFlywheel {
     pub rejected_count: u64,
     /// 已接受计数。
     pub accepted_count: u64,
+    /// A2 迭代预算 (autoresearch bounded-by-default): 单轮进化循环上限,
+    /// 超出即停, 防止无界自进化消耗 (R-P38 retry_cap 语义)。
+    pub iteration_budget: usize,
+    /// A2 已消耗迭代数。
+    pub iterations_used: usize,
 }
 
 impl Default for RstFlywheel {
@@ -372,6 +377,8 @@ impl RstFlywheel {
             complexity_cap: 100.0,
             rejected_count: 0,
             accepted_count: 0,
+            iteration_budget: 5,
+            iterations_used: 0,
         }
     }
 
@@ -525,6 +532,41 @@ impl RstFlywheel {
         }
         (self.verified_pool.len(), dist)
     }
+
+    // ── A2 (autoresearch, uditgoenka/autoresearch): 有界自进化循环 ──
+    // "bounded-by-default / one change per iteration / mechanical verification
+    // only / git is memory / commit before verify"。注入 RST 飞轮作为生产
+    // 纪律: ①迭代有上限 (R-P38 retry_cap) ②先 commit 再验证 (改进保留,
+    // 变差 revert) ③单次单改动。
+
+    /// A2 迭代预算是否耗尽 (bounded-by-default)。
+    pub fn budget_exhausted(&self) -> bool {
+        self.iterations_used >= self.iteration_budget
+    }
+
+    /// A2 有界飞轮循环: 每次消耗 1 迭代预算; 耗尽 → 停 (返回 None)。
+    /// 无界漂移的强制上限, 防止自进化循环吞噬资源。
+    pub fn bounded_run_generation(&mut self, parent: &RstTask) -> Option<usize> {
+        if self.budget_exhausted() {
+            return None;
+        }
+        self.iterations_used += 1;
+        Some(self.run_generation(parent))
+    }
+
+    /// A2 commit-then-verify 判定 (autoresearch "先 commit 再验证"):
+    /// 新分 > 旧分 × keep_threshold → keep (commit 保留); 否则 revert (回滚)。
+    /// 与 P0-8 keep_or_revert 同构, 但显式表达 "验证在 commit 之后" 的纪律,
+    /// 并返回 (keep, 是否触发回滚) 双元供上层事件分发 (R-P25 行为接地)。
+    pub fn commit_then_verify(
+        &self,
+        old_score: f64,
+        new_score: f64,
+        keep_threshold: f64,
+    ) -> (bool, bool) {
+        let keep = self.keep_or_revert(old_score, new_score, keep_threshold);
+        (keep, !keep)
+    }
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -588,6 +630,10 @@ fn normalize_code(code: &str) -> String {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MetaHarnessOptimizer {
     candidates: Vec<HarnessCandidate>,
+    /// A3 (DarwinX): 被拒谱系档案 — preserve-and-extend 淘汰的候选进档案,
+    /// 供后续重组 (recombination), 不直接丢弃 (single-lineage 局部更新会
+    /// 回归其他任务, 档案保留替代谱系)。
+    pub archive: Vec<HarnessCandidate>,
 }
 
 impl MetaHarnessOptimizer {
@@ -604,17 +650,67 @@ impl MetaHarnessOptimizer {
         Ok(())
     }
 
+    /// A3 preserve-and-extend 录取门 (DarwinX): 只接受"扩展覆盖且不回归"
+    /// 的变体。判定: 候选覆盖点必须 ⊇ 某现存候选的覆盖点 (扩展无回归),
+    /// 或带来全新覆盖点 (cap 内)。回归变体 → 拒绝并存入 archive 供重组。
+    /// 返回 (是否录取, 拒绝理由)。
+    pub fn admit_preserve_and_extend(
+        &mut self,
+        c: HarnessCandidate,
+        coverage_cap: usize,
+    ) -> Result<bool, String> {
+        if self.candidates.iter().any(|x| x.fingerprint == c.fingerprint) {
+            self.archive.push(c);
+            return Ok(false);
+        }
+        let extends_without_regress = self
+            .candidates
+            .iter()
+            .any(|x| x.covers.iter().all(|cv| c.covers.contains(cv)));
+        let new_coverage = c.covers.iter().any(|cv| {
+            !self
+                .candidates
+                .iter()
+                .any(|x| x.covers.contains(cv))
+        });
+        let within_cap = c.covers.len() <= coverage_cap;
+        if (extends_without_regress || new_coverage) && within_cap {
+            self.candidates.push(c);
+            Ok(true)
+        } else {
+            self.archive.push(c);
+            Ok(false)
+        }
+    }
+
+    /// A3 重组: 从档案取一条替代谱系 (被拒变体) 作为重组源, 供后续变异。
+    /// 破单一路径依赖 (DarwinX archive recombination)。
+    pub fn recombine(&self, offset: usize) -> Option<&HarnessCandidate> {
+        if self.archive.is_empty() {
+            return None;
+        }
+        self.archive.get(offset % self.archive.len())
+    }
+
+    pub fn archive_len(&self) -> usize {
+        self.archive.len()
+    }
+
     /// 功能覆盖剪枝: 保留覆盖点最多的 top_k (AutoDesign 覆盖率裁剪)。
     pub fn prune(&mut self, k: usize) -> usize {
         if k == 0 {
             let n = self.candidates.len();
-            self.candidates.clear();
+            let mut archived = std::mem::take(&mut self.candidates);
+            self.archive.append(&mut archived);
             return n;
         }
         let mut ranked = self.candidates.clone();
         ranked.sort_by(|a, b| b.covers.len().cmp(&a.covers.len()));
         ranked.truncate(k);
         let removed = self.candidates.len() - ranked.len();
+        for c in self.candidates.iter().skip(ranked.len()) {
+            self.archive.push(c.clone());
+        }
         self.candidates = ranked;
         removed
     }
@@ -2098,5 +2194,75 @@ mod tests {
     fn train_pipeline_selftest_passes() {
         let pipe = TrainPipeline::new(TrainConfig::default());
         assert!(pipe.self_test().is_ok());
+    }
+
+    // ── A2 (autoresearch): 有界循环 + commit-then-verify ──
+    #[test]
+    fn rst_budget_exhausts_after_budget_iters() {
+        let mut fw = RstFlywheel::new();
+        fw.iteration_budget = 2;
+        let seed = fw.seed("base task");
+        assert!(!fw.budget_exhausted());
+        assert!(fw.bounded_run_generation(&seed).is_some());
+        assert!(fw.bounded_run_generation(&seed).is_some());
+        assert!(fw.budget_exhausted(), "预算耗尽后停");
+        assert!(fw.bounded_run_generation(&seed).is_none(), "耗尽后不再运行");
+        assert_eq!(fw.iterations_used, 2);
+    }
+
+    #[test]
+    fn rst_commit_then_verify_reverts_on_regression() {
+        let fw = RstFlywheel::new();
+        // keep: 新分显著更高
+        let (keep, revert) = fw.commit_then_verify(10.0, 20.0, 1.1);
+        assert!(keep && !revert);
+        // revert: 新分低于旧分 × 阈值
+        let (keep, revert) = fw.commit_then_verify(10.0, 5.0, 1.1);
+        assert!(!keep && revert);
+        // 无基准 (old=0) → keep
+        assert!(fw.commit_then_verify(0.0, 1.0, 1.1).0);
+    }
+
+    // ── A3 (DarwinX): preserve-and-extend 种群档案 ──
+    #[test]
+    fn meta_harness_preserve_and_extend_admits_superset() {
+        let mut opt = MetaHarnessOptimizer::new();
+        opt.propose(HarnessCandidate::new(
+            HarnessTarget::UnitTest,
+            "fn a(){}",
+            vec!["tok_a".into()],
+        ))
+        .unwrap();
+        // 扩展覆盖且不回归 → 录取
+        let ext = HarnessCandidate::new(
+            HarnessTarget::UnitTest,
+            "fn ab(){}",
+            vec!["tok_a".into(), "tok_b".into()],
+        );
+        let admitted = opt.admit_preserve_and_extend(ext, 10).unwrap();
+        assert!(admitted);
+        assert_eq!(opt.count(), 2);
+    }
+
+    #[test]
+    fn meta_harness_preserve_and_extend_rejects_regress_to_archive() {
+        let mut opt = MetaHarnessOptimizer::new();
+        opt.propose(HarnessCandidate::new(
+            HarnessTarget::UnitTest,
+            "fn a(){}",
+            vec!["tok_a".into(), "tok_b".into()],
+        ))
+        .unwrap();
+        // 回归: 丢掉了 tok_b → 拒绝入档案 (供重组)
+        let regress = HarnessCandidate::new(
+            HarnessTarget::UnitTest,
+            "fn a_only(){}",
+            vec!["tok_a".into()],
+        );
+        let admitted = opt.admit_preserve_and_extend(regress, 10).unwrap();
+        assert!(!admitted);
+        assert_eq!(opt.count(), 1, "回归变体不录取");
+        assert_eq!(opt.archive_len(), 1, "回归变体入档案");
+        assert!(opt.recombine(0).is_some(), "档案可重组");
     }
 }

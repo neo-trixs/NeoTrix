@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vitepress dev",
-    "build": "vitepress build",
+    "build": "node scripts/design-audit.mjs && vitepress build",
+    "design-audit": "node scripts/design-audit.mjs",
     "preview": "vitepress preview"
   },
   "devDependencies": {

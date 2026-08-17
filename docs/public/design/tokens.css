@@ -32,6 +32,11 @@
   --gold-800: #7C5822;
   --gold-900: #4E3813;
 
+  /* Nucleus gradient (design-language sacred geometry) */
+  --nucleus-from: #EBD7AC;
+  --nucleus-mid: #D6AC58;
+  --nucleus-to: #C2933F;
+
   /* Warm ink neutrals */
   --ink-1: #262419;
   --ink-2: #5C5545;

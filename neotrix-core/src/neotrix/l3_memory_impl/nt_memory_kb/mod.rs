@@ -144,6 +144,9 @@ pub struct KnowledgeBase {
     /// 时序事实账本 (TemporalFactLedger 接线, R-P79): 节点写入/更正自动记
     /// temporal_facts, 知识变更获得 append-only + supersede + point-in-time 语义。
     pub temporal_ledger: Mutex<TemporalFactLedger>,
+    /// A1 时效账本 (recall absorb, R-P79): 追踪节点最后更新时刻 + 应遗忘标记,
+    /// 检索时过滤 "自信但过期" 的陈旧事实, 减少 agent 被误导决策。
+    pub freshness: RwLock<nt_memory_sweep_20260815::FreshnessLedger>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -205,14 +208,11 @@ impl KnowledgeBase {
              vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
              retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
              temporal_ledger: Mutex::new(temporal_ledger),
+             freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
          };
-        {
-            let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-            let mut cache = kb.graph_cache.write().map_err(|e| format!("Lock: {}", e))?;
-            *cache = nt_memory_graph_cache::GraphCache::new(&conn).unwrap_or_else(|_| nt_memory_graph_cache::GraphCache::empty());
-            log::info!("[KB] graph_cache built: {} edges, {} nodes", cache.edge_count, cache.node_count);
-        }
-        log::info!("[KB] opened at {db_path_str} — BM25/tech-reserve lazy (rebuild on first use)");
+        // 惰性 graph_cache: 启动不预构建 (28 万 edge 构建+析构拖慢启动/退出数秒,
+        // 且当前无生产查询方) — 由后台循环 rebuild_graph_cache 按需构建。
+        log::info!("[KB] opened at {db_path_str} — graph_cache lazy (rebuilt by background loop on demand); BM25/tech-reserve lazy");
 
         // Warn if embeddings are not configured (semantic search disabled)
         if std::env::var("NEOTRIX_EMBEDDING_API_KEY").is_err() {
@@ -238,7 +238,7 @@ impl KnowledgeBase {
         let confidence_store = ConfidenceStore::new(DecayConfig::default());
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
         let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
-        let cache = nt_memory_graph_cache::GraphCache::new(&conn).unwrap_or_else(|_| nt_memory_graph_cache::GraphCache::empty());
+        let cache = nt_memory_graph_cache::GraphCache::empty();
         let temporal_ledger = TemporalFactLedger::open(Some(&db_path)).unwrap_or_else(|e| {
             log::warn!(
                 "[KB] temporal ledger open failed ({}), using isolated in-memory ledger",
@@ -273,7 +273,8 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
              retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
              graph_cache: RwLock::new(cache),
              temporal_ledger: Mutex::new(temporal_ledger),
-        }
+             freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
+         }
     }
 
     pub fn rebuild_skills_library(&self) -> Result<usize, String> {
@@ -732,6 +733,11 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         drop(conn);
         if r.is_ok() {
             self.record_node_fact(node);
+            // A1 时效账本 (recall absorb, R-P79): 写入即刷新时刻, 避免新数据被误判陈旧。
+            if let Ok(mut f) = self.freshness.write() {
+                let now = f.tick();
+                f.note_updated(&node.id, now);
+            }
         }
         r
     }
@@ -796,6 +802,11 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         let r = nt_memory_store::delete_node(&conn, id).map_err(|e| format!("delete_node: {}", e));
         if r.as_ref().ok().copied().unwrap_or(false) {
             self.mark_bm25_dirty();
+            // A1 时效账本 (recall absorb, R-P79): 删除即标记应遗忘, 使仍残留在
+            // 内存索引/缓存里的该 id 不再被检索返回。
+            if let Ok(mut f) = self.freshness.write() {
+                f.mark_should_forget(id);
+            }
         }
         r
     }
@@ -862,6 +873,11 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
             .map_err(|e| format!("update_node: {}", e));
         if r.is_ok() {
             self.mark_bm25_dirty();
+            // A1 时效账本 (recall absorb, R-P79): 更新即刷新时刻 + 撤销遗忘标记。
+            if let Ok(mut f) = self.freshness.write() {
+                let now = f.tick();
+                f.note_updated(&node.id, now);
+            }
         }
         r
     }
@@ -1314,6 +1330,30 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
     ) -> Result<Vec<SearchResult>, String> {
         let results = self.recency_rerank(results);
         let results = self.graph_signal_augment(query, results, limit);
+        // A1 时效过滤 (recall absorb, R-P79): 剔除被显式标记为应遗忘
+        // (mark_should_forget) 的节点 — "存储系统忘了该忘的", 避免应遗忘的
+        // 记忆仍被自信返回。仅剔除显式标记 (保守语义, 不误伤正常陈旧知识)。
+        let freshness_results = {
+            let ledger = match self.freshness.read() {
+                Ok(l) => l,
+                Err(_) => return self._finalize_tail(cache_key, query, results),
+            };
+            let retained: Vec<SearchResult> = results
+                .into_iter()
+                .filter(|r| !ledger.should_forget(&r.node.id))
+                .collect();
+            retained
+        };
+        return self._finalize_tail(cache_key, query, freshness_results);
+    }
+
+    fn _finalize_tail(
+        &self,
+        cache_key: &str,
+        query: &str,
+        results: Vec<SearchResult>,
+    ) -> Result<Vec<SearchResult>, String> {
+        let results = results;
         // 检索自进化 (G4): 每次检索记录质量 (结果数 + 均值分), 窗口满时
         // Diagnose→Propose→Guard 自调参。
         let (rlen, mean) = if results.is_empty() {

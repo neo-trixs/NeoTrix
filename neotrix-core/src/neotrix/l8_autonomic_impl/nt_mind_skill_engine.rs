@@ -146,6 +146,131 @@ impl SkillEntry {
 }
 
 // ────────────────────────────────────────────────────────────────
+// A5 吸收 (SkillNet, zjunlp/SkillNet): 技能五维质量评估。
+// SkillNet 把技能当软件资产, 五维评估 = Safety / Completeness /
+// Executability / Maintainability / Cost-awareness。注入 SkillEntry
+// 作为生产质量门: 新技能入库前评分, 低于阈值的标记低质量 (R-P55 对接
+// 质量门禁语义)。纯确定性启发式, 无 LLM 依赖。
+// ────────────────────────────────────────────────────────────────
+
+/// A5 五维技能质量评分 (SkillNet 语义, 归一化到 [0,1])。
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+pub struct SkillQualityScores {
+    /// 安全性: 无危险命令/脚本 (0..1)。
+    pub safety: f64,
+    /// 完整性: frontmatter 字段齐 + 正文非空 (0..1)。
+    pub completeness: f64,
+    /// 可执行性: 带 selftest / scripts / 明确的验证步骤 (0..1)。
+    pub executability: f64,
+    /// 可维护性: 有版本/作者/references 引用 (0..1)。
+    pub maintainability: f64,
+    /// 成本意识: 触发描述简短, 渐进披露 (0..1)。
+    pub cost_awareness: f64,
+}
+
+impl SkillQualityScores {
+    /// 五维均值总评分 [0,1]。
+    pub fn overall(&self) -> f64 {
+        (self.safety
+            + self.completeness
+            + self.executability
+            + self.maintainability
+            + self.cost_awareness)
+            / 5.0
+    }
+
+    /// A5 质量门: 总分 ≥ min_overall 且安全分 ≥ min_safety 才通过。
+    pub fn passes_gate(&self, min_overall: f64, min_safety: f64) -> bool {
+        self.overall() >= min_overall && self.safety >= min_safety
+    }
+}
+
+/// A5 技能质量评估器 — 对 SkillEntry 做确定性五维评分。
+pub struct SkillQualityScorer;
+
+impl SkillQualityScorer {
+    /// 评估一个技能条目, 返回五维分。
+    pub fn evaluate(skill: &SkillEntry) -> SkillQualityScores {
+        let body = skill.body();
+        // 安全性: 正文含危险 shell 操作标记 → 降分。
+        let danger_marks = ["rm -rf", "curl.*|.*sh", "sudo ", "--force", "dangerously"];
+        let mut safety: f64 = 1.0;
+        let body_lower = body.to_lowercase();
+        for mark in danger_marks {
+            let m = mark.to_lowercase();
+            if body_lower.contains(&m) {
+                safety -= 0.25;
+            }
+        }
+        let safety = safety.max(0.0);
+
+        // 完整性: name/description/triggers/tools + 正文足够长。
+        let mut completeness = 0.0;
+        if !skill.name.is_empty() {
+            completeness += 0.3;
+        }
+        if !skill.description.is_empty() {
+            completeness += 0.3;
+        }
+        if !skill.triggers.is_empty() {
+            completeness += 0.2;
+        }
+        if !skill.tools.is_empty() {
+            completeness += 0.1;
+        }
+        if body.trim().chars().count() >= 120 {
+            completeness += 0.1;
+        }
+
+        // 可执行性: selftest / scripts / Verification 段。
+        let mut executability = 0.0;
+        if skill.verified {
+            executability += 0.5;
+        }
+        if body.to_lowercase().contains("verification")
+            || body.to_lowercase().contains("verify")
+            || body.to_lowercase().contains("selftest")
+        {
+            executability += 0.5;
+        }
+
+        // 可维护性: references / category / parent 结构化。
+        let mut maintainability = 0.0;
+        if !skill.references.is_empty() {
+            maintainability += 0.4;
+        }
+        if !skill.category.is_empty() && skill.category != "general" {
+            maintainability += 0.3;
+        }
+        if !skill.parent.is_empty() {
+            maintainability += 0.3;
+        }
+
+        // 成本意识: 触发描述短 (渐进披露省 token) + 无巨大正文。
+        let desc_len = skill.description.chars().count();
+        let cost = if desc_len > 0 && desc_len <= 180 {
+            0.6
+        } else {
+            0.3
+        };
+        let cost_awareness = cost
+            + if body.chars().count() < 4000 {
+                0.4
+            } else {
+                0.2
+            };
+
+        SkillQualityScores {
+            safety,
+            completeness,
+            executability,
+            maintainability,
+            cost_awareness,
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
 // P4: AnchorPromote (dsh-anchored-standard 吸收)
 // 渐进披露阶梯 (progressive disclosure ladder) 应用到工具预算: agent
 // session 首个模型请求锚定 Minimal 工具集 (真实 schema, 无自动注入上下文),
@@ -919,6 +1044,9 @@ pub struct SkillEngine {
     pub inverse_ledger: InverseLedger,
     /// 技能 fiber 生命周期注册表 (cordiverse F5 吸收): skill 名 → fiber 状态机。
     pub fiber_lifecycles: HashMap<String, FiberLifecycle>,
+    /// A5 五维质量门 (SkillNet absorb, R-P79): load_all 时对每个技能跑质量评分,
+    /// 记录 "拒绝低质量技能" 统计, 生产检索路径可按需查询。
+    pub quality_stats: std::collections::HashMap<String, SkillQualityScores>,
 }
 
 impl SkillEngine {
@@ -935,6 +1063,7 @@ impl SkillEngine {
             disclosure: AnchorPromote::default(),
             inverse_ledger: InverseLedger::new(),
             fiber_lifecycles: HashMap::new(),
+            quality_stats: std::collections::HashMap::new(),
         }
     }
 
@@ -970,6 +1099,7 @@ impl SkillEngine {
         }
 
         let mut loaded = Vec::new();
+        self.quality_stats.clear();
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -977,14 +1107,24 @@ impl SkillEngine {
                     let skill_md = path.join("SKILL.md");
                     if skill_md.exists() {
                         if let Some(skill) = SkillEntry::from_file(&skill_md) {
-                            loaded.push(skill);
+                            let scores = SkillQualityScorer::evaluate(&skill);
+                            // A5 安全门 (SkillNet absorb, R-P79): 含危险命令
+                            // (rm -rf 等) 的技能拒收, 不进入生产检索索引。
+                            if scores.safety >= 0.8 {
+                                self.quality_stats.insert(skill.name.clone(), scores);
+                                loaded.push(skill);
+                            }
                         }
                     }
                     continue;
                 }
                 if path.extension().is_some_and(|e| e == "md") {
                     if let Some(skill) = SkillEntry::from_file(&path) {
-                        loaded.push(skill);
+                        let scores = SkillQualityScorer::evaluate(&skill);
+                        if scores.safety >= 0.8 {
+                            self.quality_stats.insert(skill.name.clone(), scores);
+                            loaded.push(skill);
+                        }
                     }
                 }
             }
@@ -3236,5 +3376,38 @@ category: general
         assert_eq!(engine.fiber_state("healthy"), Some(FiberLifecycleState::Active));
         assert_eq!(engine.fiber_state("dangling"), Some(FiberLifecycleState::Retired));
         assert!(engine.release_dangling().is_empty(), "幂等: 无残留悬挂");
+    }
+
+    // ── A5 (SkillNet): 技能五维质量评估 ──
+    #[test]
+    fn test_quality_scorer_rewards_structured_skills() {
+        let content = "---\nname: test-skill\ndescription: A skill with a short focused description\n\
+            triggers: [test]\ntools: [rg]\nreferences: [ref.md]\ncategory: testing\npriority: 50\n---\n\
+            When to use: testing\nVerification: run selftest and check output\n\
+            Steps: do the thing carefully without dangerous operations\n";
+        let dir = std::env::temp_dir().join("neotrix_quality_test");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("SKILL.md"), content).unwrap();
+        let skill = SkillEntry::from_file(&dir.join("SKILL.md")).expect("parse skill");
+        let scores = SkillQualityScorer::evaluate(&skill);
+        assert!(scores.completeness > 0.8, "结构化 skill 完整性高, got {}", scores.completeness);
+        assert!(scores.executability > 0.0, "Verification 段 → 可执行性 >0");
+        assert!(scores.cost_awareness > 0.5, "短描述 → 成本意识高");
+        assert!(scores.passes_gate(0.5, 0.5), "结构化技能过质量门");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_quality_scorer_penalizes_dangerous_commands() {
+        let content = "---\nname: danger-skill\ndescription: rm -rf everything with sudo and --force\n\
+            triggers: [x]\n---\nRun: sudo rm -rf / --force\n";
+        let dir = std::env::temp_dir().join("neotrix_quality_danger_test");
+        let _ = std::fs::create_dir_all(&dir);
+        std::fs::write(dir.join("SKILL.md"), content).unwrap();
+        let skill = SkillEntry::from_file(&dir.join("SKILL.md")).expect("parse skill");
+        let scores = SkillQualityScorer::evaluate(&skill);
+        assert!(scores.safety < 0.5, "危险命令 → 安全分低, got {}", scores.safety);
+        assert!(!scores.passes_gate(0.5, 0.6), "安全分不足 → 拒绝");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

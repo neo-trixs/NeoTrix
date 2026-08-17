@@ -6,7 +6,7 @@
 //   P17 SingleFileMemory   (claude-brain 单文件记忆栈)
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ────────────────────────────────────────────────────────────────
 // P6: KvCacheMemory — KV 缓存即记忆 (KEEP)
@@ -408,6 +408,86 @@ impl QualityRanker {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// A1 吸收 (recall, roxx0x/recall, 2026-08-17): 记忆时效/遗忘评测。
+// "A document never stops being true. A memory does."
+// staleness@k = 返回结果中过期记忆的占比; forgetting = 该遗忘的没遗忘占比。
+// 高 recall + 高 staleness 比低 recall 更糟: "a confidently-returned
+// outdated fact is a wrong action" → 检索必须感知时效。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FreshnessLedger {
+    /// doc_id → 最后更新时间戳 (clock tick)。
+    updated_at: HashMap<String, u64>,
+    /// doc_id → 应遗忘但仍在索引中的记忆 (forgetting 评测集)。
+    should_forget: HashSet<String>,
+    /// 全局时钟, 单调递增。
+    clock: u64,
+}
+
+impl FreshnessLedger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 推进时钟并返回新 tick (标记记忆写入/更新时刻)。
+    pub fn tick(&mut self) -> u64 {
+        self.clock += 1;
+        self.clock
+    }
+
+    /// 记录 doc 在指定 tick 被更新。
+    pub fn note_updated(&mut self, doc_id: impl Into<String>, at: u64) {
+        self.updated_at.insert(doc_id.into(), at);
+    }
+
+    /// 标记记忆为应遗忘 (forgetting 金标, 来自 recall 任务标签)。
+    pub fn mark_should_forget(&mut self, doc_id: impl Into<String>) {
+        self.should_forget.insert(doc_id.into());
+    }
+
+    /// 该记忆是否被显式标记为应遗忘 (生产遗忘语义: 只有显式标记才从检索剔除)。
+    pub fn should_forget(&self, doc_id: &str) -> bool {
+        self.should_forget.contains(doc_id)
+    }
+
+    /// 该记忆是否过期: 距上次更新超过 staleness_after 个 tick。
+    pub fn is_stale(&self, doc_id: &str, staleness_after: u64) -> bool {
+        match self.updated_at.get(doc_id) {
+            Some(at) => self.clock.saturating_sub(*at) > staleness_after,
+            None => false,
+        }
+    }
+
+    /// recall staleness@k: 返回 hits 中过期记忆占比 [0,1]。
+    /// 度量 "检索系统返回了多少自信但过期的记忆"。
+    pub fn staleness_at_k(&self, hits: &[RetrievalHit], staleness_after: u64) -> f64 {
+        if hits.is_empty() {
+            return 0.0;
+        }
+        let stale = hits
+            .iter()
+            .filter(|h| self.is_stale(&h.doc_id, staleness_after))
+            .count();
+        stale as f64 / hits.len() as f64
+    }
+
+    /// recall forgetting: 应遗忘但仍在索引中的记忆占比 [0,1]。
+    /// 度量 "存储系统是否真的忘了该忘的" (0 = 完美遗忘)。
+    pub fn forgetting_gap(&self, matrix: &RetrievalMatrix) -> f64 {
+        if self.should_forget.is_empty() {
+            return 0.0;
+        }
+        let still_present = self
+            .should_forget
+            .iter()
+            .filter(|id| matrix.contains(id))
+            .count();
+        still_present as f64 / self.should_forget.len() as f64
+    }
+}
+
 impl RetrievalMatrix {
     pub fn new() -> Self {
         Self::default()
@@ -505,6 +585,27 @@ impl RetrievalMatrix {
 
     pub fn semantic_len(&self) -> usize {
         self.semantic_index.len()
+    }
+
+    /// 索引中是否包含该 doc (语义或关键词任一通道)。
+    pub fn contains(&self, doc_id: &str) -> bool {
+        self.semantic_index.contains_key(doc_id) || self.keyword_index.contains_key(doc_id)
+    }
+
+    /// A1 接线 (R-P79): 时效感知检索 — 基础混合检索后过滤过期记忆,
+    /// 避免 "自信但错误" 的过期事实被返回给 agent 决策。
+    pub fn hybrid_search_fresh(
+        &self,
+        query: &[f64],
+        query_terms: &[&str],
+        k: usize,
+        ledger: &FreshnessLedger,
+        staleness_after: u64,
+    ) -> Vec<RetrievalHit> {
+        let mut hits = self.hybrid_search(query, query_terms, usize::MAX);
+        hits.retain(|h| !ledger.is_stale(&h.doc_id, staleness_after));
+        hits.truncate(k);
+        hits
     }
 }
 
@@ -888,5 +989,65 @@ mod tests {
         r.set_citation_authority("a", 1.0);
         r.retract("a");
         assert_eq!(r.score("a"), 0.0, "撤回 → 0");
+    }
+
+    // ── A1 (recall): 记忆时效/遗忘评测 ──
+    #[test]
+    fn test_freshness_ledger_staleness_at_k() {
+        let mut matrix = RetrievalMatrix::new();
+        let mut ledger = FreshnessLedger::new();
+        let t0 = ledger.tick();
+        matrix.index_keywords("fresh", vec![("a".into(), 3)]);
+        matrix.index_keywords("stale", vec![("a".into(), 3)]);
+        ledger.note_updated("stale", t0);
+        // 推进时钟使 stale 过期, fresh 在最新时刻更新
+        for _ in 0..6 {
+            ledger.tick();
+        }
+        let t_now = ledger.tick();
+        ledger.note_updated("fresh", t_now);
+        let hits = matrix.hybrid_search(&[], &["a"], 10);
+        let staleness = ledger.staleness_at_k(&hits, 3);
+        assert!(staleness > 0.0 && staleness < 1.0, "staleness@k ∈ (0,1), got {staleness}");
+        assert!(ledger.is_stale("stale", 3), "stale 应过期");
+        assert!(!ledger.is_stale("fresh", 3), "fresh 不应过期");
+    }
+
+    #[test]
+    fn test_freshness_ledger_forgetting_gap() {
+        let mut matrix = RetrievalMatrix::new();
+        let mut ledger = FreshnessLedger::new();
+        let t0 = ledger.tick();
+        matrix.index_keywords("keep", vec![("a".into(), 1)]);
+        matrix.index_keywords("forget", vec![("a".into(), 1)]);
+        ledger.note_updated("keep", t0);
+        ledger.note_updated("forget", t0);
+        ledger.mark_should_forget("keep");
+        ledger.mark_should_forget("forget");
+        // 尚未遗忘 → gap 高 (2/2 仍在)
+        assert_eq!(ledger.forgetting_gap(&matrix), 1.0, "2/2 应遗忘记忆仍在 → 1.0");
+        // 模拟真正遗忘: 从索引移除 forget → gap 0.5 (1/2 仍在)
+        let mut mx = RetrievalMatrix::new();
+        mx.index_keywords("keep", vec![("a".into(), 1)]);
+        ledger.note_updated("keep", t0);
+        assert_eq!(ledger.forgetting_gap(&mx), 0.5, "forget 已被移除 → gap 0.5");
+    }
+
+    #[test]
+    fn test_hybrid_search_fresh_filters_stale() {
+        let mut matrix = RetrievalMatrix::new();
+        let mut ledger = FreshnessLedger::new();
+        let t0 = ledger.tick();
+        matrix.index_keywords("fresh", vec![("a".into(), 3)]);
+        matrix.index_keywords("stale", vec![("a".into(), 3)]);
+        ledger.note_updated("stale", t0);
+        for _ in 0..6 {
+            ledger.tick();
+        }
+        let t_now = ledger.tick();
+        ledger.note_updated("fresh", t_now);
+        let hits = matrix.hybrid_search_fresh(&[], &["a"], 10, &ledger, 3);
+        assert_eq!(hits.len(), 1, "过期记忆应过滤, 只剩 fresh");
+        assert_eq!(hits[0].doc_id, "fresh");
     }
 }

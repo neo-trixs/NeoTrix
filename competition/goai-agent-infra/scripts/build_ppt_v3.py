@@ -13,6 +13,7 @@ primary blue 执行 + positive green 价值 + negative red 痛点），并按专
 - support teal/cyan = 辅助 / 次级
 """
 import sys
+import os
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -28,7 +29,17 @@ PROJECT = "NeoTrix 研发闭环"
 BACKGROUND = ("AI-native 软件研发全流程多 Agent 协同系统：GWT 注意力调度编排 5 职能 Agent，"
               "E8 确定性推理定位根因，SelfTest T1-T3 质量门禁，experience-tree 复盘自动结晶 Skill，"
               "MIT 开源、8000+ 项测试背书")
-THEME = derive_theme(PROJECT, BACKGROUND)
+
+# 设计语言注入 (des/design-language C4): --tokens <path> 或 NEOTRIX_TOKENS_JSON 环境变量
+# 指向 tokens.json 时, StyleSpec 消费 semantic token (品牌一致), 否则现场推导主题。
+_TOKENS_ARG = None
+for _i, _a in enumerate(sys.argv):
+    if _a == "--tokens" and _i + 1 < len(sys.argv):
+        _TOKENS_ARG = sys.argv[_i + 1]
+_TOKENS_ARG = _TOKENS_ARG or os.environ.get("NEOTRIX_TOKENS_JSON")
+THEME = derive_theme(PROJECT, BACKGROUND, tokens_path=_TOKENS_ARG)
+if getattr(THEME, "signals", None) and "token-injected" in THEME.signals:
+    print(f"[ppt] StyleSpec token 注入: {THEME.name} (source={_TOKENS_ARG})")
 
 FONT = "微软雅黑"
 _ts = TypeScale()

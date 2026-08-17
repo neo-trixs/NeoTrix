@@ -2052,11 +2052,13 @@ mod tests {
                 title: "NeoTrix Search Backend Fallback".into(),
                 url: "https://example.com/search-fallback".into(),
                 snippet: "web search method with evidence source citation for verification and synthesis".into(),
+                evidence: None,
             },
             SearchResult {
                 title: "Ordered Backend Routing Research".into(),
                 url: "https://example.com/routing".into(),
                 snippet: "research paper arxiv study aggregating benchmark metrics and findings".into(),
+                evidence: None,
             },
         ]
     }

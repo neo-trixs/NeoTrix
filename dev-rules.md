@@ -183,6 +183,15 @@
 - **R-P106 (双路径检测审计 — Crucix OSINT terminal, 11.4k★)**: 任何检测/告警系统 (OSINT sweep/异常检测/自愈触发) 必须: ①≥2 独立判定路径 (LLM+规则) 或文档化单路径理由; ②severity 枚举方向一致 (Critical=0<High=1<...), 过滤方向必须匹配枚举序 (`severity > min_severity` 配降序, `<` 配升序) — **反例 bug 类**: 方向反转静默丢弃全部关键告警或保留全部 info 噪声; ③语义去重必须归一化实体 (数字占位 `CVE-2026-0001`→`cve`、变量 ID、时间戳), 否则同事件不同 ID 永不 dedup → 告警洪水; ④阈值可配置 (DeltaConfig 式: dedup_normalize/min_severity/correlation_window, R-P11), 硬编码阈值 = C1 smell; ⑤跨源相关性 (同一 token 跨 sweep 端点) 产生 CorrelatedSignal+confidence∈[0,1], 单源告警证据弱于多源相关; ⑥多级告警类 (FLASH/PRIORITY/ROUTINE ≈ Critical/High/Medium) 每类必须有消费者, 无消费者的类 = theater (D44); ⑦无 API key 时优雅降级 (限速/缓存) 不崩溃 (R-P48)。severity 过滤方向 = 必查项, 反转 = P0。
 - **R-P107 (契约完整性审计 — oi-language agent-native language)**: 任何被 agent 调用的能力/工具/MCP 必须声明显式契约, 7 项: ①意图 (做什么, 非名字推断); ②前置条件 (KB 开/网络可用/≥N 参数); ③失败语义 (重试?部分成功?回滚? — 含糊失败 = Critical, agent 无法决策恢复); ④停止条件 (循环/递归有界, max_iterations/retry_cap, R-P38; 无上限 loop = P0); ⑤作用域边界 (bounded freedom: allow/deny-wins/`default_allow` fallback, 借 oi.mod sandbox 语义); ⑥deliver-exactly-once (幂等键/外部写去重, R-P55 Egress Policy 幂等); ⑦版本化契约 (oi.mod 快照, R-P83 单一事实源)。审计清单: 每能力缺 ≥3/7 项 = Critical 能力缺口。
 
+## 技能格式与吸收评测纪律 (R-P108) — 2026-08-17 吸收 Anthropic-Cybersecurity-Skills / SkillNet
+
+- **R-P108 (技能四段式 + 五维质量门)**: 结构化技能/SKILL.md 必须遵循两个吸收标准 (本 session 吸收 Anthropic-Cybersecurity-Skills 817 技能库 + SkillNet 技能资产化):
+  1. **四段式正文**: 技能正文固定为 `When to Use → Prerequisites → Workflow → Verification` 四段, 是可执行 playbook 而非脚本/提示集合 (Anthropic-Cybersecurity-Skills 实证: 触发条件/前置/分步/验证, 无 Verification 段的技能标记低质量)。
+  2. **五维质量评估**: 新技能入库前用确定性五维评分 (Safety/Completeness/Executability/Maintainability/Cost-awareness, SkillNet 语义) 做质量门: 总分 <0.5 或安全分 <0.6 → 拒收/标记低质量 (代码: `SkillQualityScorer::evaluate` + `SkillQualityScores::passes_gate`, nt_mind_skill_engine)。安全分看危险命令标记 (rm -rf/sudo --force/dangerously); 完整性看 name/description/triggers/tools/正文长度; 可执行性看 selftest/Verification 段; 可维护性看 references/category/parent; 成本意识看描述长度与渐进披露。
+  3. **frontmatter 快速扫描**: 技能索引只需 frontmatter (≈30 token), 命中才按需加载全文 (渐进披露, 与 nt_mind_skill_engine::AnchorPromote 同构)。
+
+## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：

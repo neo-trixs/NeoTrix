@@ -305,6 +305,10 @@ impl EvolutionDaemon {
         self.autofix_attempt()
     }
 
+    /// A2 有界迭代预算 (autoresearch absorb, R-P79): 单周期修复迭代上限,
+    /// 防止进化循环在失败修复上无限重试 (autoresearch: 明确迭代预算)。
+    pub const A2_FIX_BUDGET: u32 = 20;
+
     /// FEP 目标选择: 用预期自由能对目标排序
     /// 低自由能 = 高认识价值 + 低预测能量 = 最优探索
     pub fn select_goal_by_fe(&mut self, goals: &[EvolutionGoal]) -> Vec<(usize, f64)> {
@@ -382,7 +386,13 @@ impl EvolutionDaemon {
         let ordered = self.select_goal_by_fe(&goals);
 
         // 按 FEP 排序处理目标 (低自由能优先)
+        let mut applied_fixes: u32 = 0;
         for (idx, _fe) in &ordered {
+            // A2 有界迭代预算 (autoresearch absorb, R-P79): 超预算立即终止
+            // 周期, 防止低质量目标耗尽修复预算 (autoresearch bounded-loop)。
+            if applied_fixes >= Self::A2_FIX_BUDGET {
+                break;
+            }
             if let Some(goal) = goals.get(*idx) {
                 // 记录 FE 作为基线自由能
                 let jepa_energy = self.compute_jepa_energy();
@@ -428,8 +438,15 @@ impl EvolutionDaemon {
 
                 if fix_result.is_ok() {
                     fixes += 1;
+                    applied_fixes += 1;
                     let result = BehavioralVerifier::verify(&file, "", "", VerificationLevel::CompileAndTest);
+                    // A2 commit-then-verify (autoresearch absorb, R-P79): 修复提交后
+                    // 必须过行为验证 (compile+test) 才算有效; 验证失败 → 该修复被视为
+                    // 回滚 (score 归零), 不积累进化奖励, 防止 "提交了但坏了" 的假进展。
+                    let verified = result.compile_ok && result.tests_ok;
+                    let commit_reward = if verified { 1.0 } else { 0.0 };
                     let reward = self.rl_feedback.process_result(&file, "evolution", &result);
+                    let reward = reward * (0.5 + 0.5 * commit_reward);
                     let phi_reward = self.compute_phi_reward();
                     self.phi_reward_history.push(phi_reward);
                     let causal_coherence = self.compute_causal_coherence();

@@ -21,6 +21,8 @@
 """
 from dataclasses import dataclass, field
 from typing import Optional
+import json
+import os
 
 
 # ---------------- 字体层级 ----------------
@@ -105,6 +107,17 @@ THEMES = {
         surface="FAFAFA", surface2="F4F4F5", muted="71717A",
         keywords=["极简", "简洁", "clean", "minimal", "mono", "黑白"],
     ),
+    "superbody": Theme(
+        name="Superbody Minimal · 超体极简",
+        base="C2933F", ink="262419", primary="D6AC58",
+        accent="E7D2A0", support1="F0E3C4", support2="E7D2A0",
+        positive="7C5822", negative="C2403F",
+        surface="FCFAF3", surface2="F7F0DE", muted="8F8666",
+        radii=0.12,
+        keywords=["超体", "superbody", "浅金", "light gold", "cream",
+                  "品牌", "设计语言", "design language", "极简", "minimal",
+                  "NeoTrix", "金", "gold", "hypercube"],
+    ),
 }
 
 
@@ -114,8 +127,61 @@ def _score(theme: Theme, text: str) -> int:
     return sum(1 for kw in theme.keywords if kw.lower() in low)
 
 
-def derive_theme(project: str, background: str, prefer: Optional[str] = None) -> Theme:
-    """根据项目名 + 背景描述推导主题。prefer 可显式指定（consciousness/hexagram/...）。"""
+def from_tokens(tokens_path: Optional[str] = None) -> Optional[Theme]:
+    """从设计语言 token 系统 (tokens.json) 构建 StyleSpec 主题 (des/design-language 消费)。
+
+    Primitive→Semantic 两层: tokens.json 为机器可读单一事实源。
+    消费 semantic token (primary/secondary/muted/destructive/border), 禁止现场重推色板。
+    返回 None 表示无 token 系统 (fallback 到现场推导)。
+    """
+    path = tokens_path or os.environ.get("NEOTRIX_TOKENS_JSON")
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path) as f:
+            tok = json.load(f)
+    except (OSError, ValueError):
+        return None
+    def g(*keys, default="#262419"):
+        for k in keys:
+            if tok.get(k):
+                return tok[k]
+        return default
+    return Theme(
+        name="Superbody Minimal · 超体极简 (token 驱动)",
+        base=g("base", "gold-600", "primary", default="C2933F"),
+        ink=g("ink", "ink-1", "foreground", default="262419"),
+        primary=g("primary", "gold-500", default="D6AC58"),
+        accent=g("accent", "gold-300", default="E7D2A0"),
+        support1=g("support1", "gold-200", default="F0E3C4"),
+        support2=g("support2", "gold-300", default="E7D2A0"),
+        positive=g("positive", "gold-800", default="7C5822"),
+        negative=g("negative", "destructive", default="C2403F"),
+        surface=g("surface", "background", default="FCFAF3"),
+        surface2=g("surface2", "secondary", default="F7F0DE"),
+        muted=g("muted", "ink-3", default="8F8666"),
+        radii=0.12,
+        signals=["design-language", "token-injected"],
+        keywords=["超体", "superbody", "浅金", "light gold", "design language"],
+    )
+
+
+def derive_theme(project: str, background: str, prefer: Optional[str] = None,
+                 tokens_path: Optional[str] = None) -> Theme:
+    """根据项目名 + 背景描述推导主题。prefer 可显式指定（consciousness/hexagram/...）。
+
+    设计语言注入 (C4): tokens_path 提供 tokens.json 时优先消费 token 系统
+    (品牌一致 + 防 AI 雷同), 否则现场推导。tokens_path 也接受 design-language 关键词
+    "superbody" 或 "design-language" 强制走 token 驱动。
+    """
+    if tokens_path in ("superbody", "design-language") or prefer in ("superbody", "design-language"):
+        th = from_tokens()
+        if th is not None:
+            return th
+    if tokens_path and tokens_path not in ("superbody", "design-language"):
+        th = from_tokens(tokens_path)
+        if th is not None:
+            return th
     if prefer and prefer in THEMES:
         th = THEMES[prefer]
     else:

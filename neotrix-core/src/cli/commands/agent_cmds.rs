@@ -216,7 +216,7 @@ pub struct DiscoverCmd;
 impl CliCommand for DiscoverCmd {
     fn name(&self) -> &str { "/discover" }
     fn aliases(&self) -> Vec<&str> { vec!["/scan", "/dsc"] }
-    fn description(&self) -> &str { "Scan for NeoTrix agents on the network: /discover [--json] [--port <port>] [--duration <ms>]" }
+    fn description(&self) -> &str { "Scan for NeoTrix agents on the network: /discover [--json] [--port <port>] [--duration <ms>] [--secret <secret>]" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -231,68 +231,84 @@ impl CliCommand for DiscoverCmd {
             .and_then(|i| args.get(i + 1))
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(3000);
+        let secret = args.iter()
+            .position(|a| a == "--secret" || a == "-s")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
 
-        let mut discovery = match crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery::new(port) {
+        let secure = secret.is_some();
+        let discovery = match secret {
+            Some(sec) => crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery::new_secure(port, sec.as_bytes()),
+            None => crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery::new(port),
+        };
+        let mut discovery = match discovery {
             Ok(d) => d,
             Err(e) => return CommandOutput::err(&format!("绑定 UDP :{} 失败: {}", port, e)),
         };
 
-        match discovery.discover(duration) {
-            Ok(agents) => {
-                if agents.is_empty() {
-                    let msg = format!("🔍 扫描完成 ({}ms)，未发现任何代理", duration);
-                    if want_json {
-                        return CommandOutput::ok(&msg).with_json(serde_json::json!({
-                            "scanned": true, "agent_count": 0, "duration_ms": duration, "port": port
-                        }));
-                    }
-                    return CommandOutput::ok(&msg);
-                }
-
-                let mut table = format!("🔍 发现 {} 个代理 (扫描 {}ms):\n", agents.len(), duration);
-                table.push_str("┌──────┬────────────────────────┬──────────────────────┬───────┬──────┐\n");
-                table.push_str("│ #    │ ID                     │ Host                 │ Port  │ Caps │\n");
-                table.push_str("├──────┼────────────────────────┼──────────────────────┼───────┼──────┤\n");
-                for (i, a) in agents.iter().enumerate() {
-                    let id_trunc = if a.id.len() > 22 { format!("{}…", &a.id[..21]) } else { a.id.clone() };
-                    let host_trunc = if a.host.len() > 20 { format!("{}…", &a.host[..19]) } else { a.host.clone() };
-                    let cap_count = a.capabilities.len();
-                    table.push_str(&format!("│ {:<4} │ {:<22} │ {:<20} │ {:<5} │ {:<4} │",
-                        i + 1, id_trunc, host_trunc, a.port, cap_count));
-                    table.push('\n');
-                }
-                table.push_str("└──────┴────────────────────────┴──────────────────────┴───────┴──────┘\n");
-
-                if agents.len() == 1 {
-                    let a = &agents[0];
-                    table.push_str("  详情:\n");
-                    table.push_str(&format!("    Name:    {}\n", a.name));
-                    table.push_str(&format!("    Service: {}\n", if a.service_type.is_empty() { "(none)" } else { &a.service_type }));
-                    table.push_str(&format!("    Instance:{}\n", if a.instance_name.is_empty() { "(none)" } else { &a.instance_name }));
-                    if !a.capabilities.is_empty() {
-                        table.push_str(&format!("    Caps:    {}\n", a.capabilities.join(", ")));
-                    }
-                    if a.hexagram != 0 {
-                        table.push_str(&format!("    Hexagram:{}", a.hexagram));
-                    }
-                }
-
-                if want_json {
-                    let json_agents: Vec<serde_json::Value> = agents.iter().map(|a| {
-                        serde_json::json!({
-                            "id": a.id, "name": a.name, "host": a.host, "port": a.port,
-                            "capabilities": a.capabilities, "hexagram": a.hexagram,
-                            "service_type": a.service_type, "instance_name": a.instance_name,
-                        })
-                    }).collect();
-                    return CommandOutput::ok(&table).with_json(serde_json::json!({
-                        "agent_count": agents.len(), "duration_ms": duration, "port": port, "agents": json_agents
-                    }));
-                }
-                CommandOutput::ok(&table)
+        let agents: Vec<crate::neotrix::nt_agent_protocol::discovery::AgentInfo> = if secure {
+            match discovery.scan_secure(duration) {
+                Ok(_) => discovery.known_agents.values().cloned().collect(),
+                Err(e) => return CommandOutput::err(&format!("扫描失败: {}", e)),
             }
-            Err(e) => CommandOutput::err(&format!("扫描失败: {}", e)),
+        } else {
+            match discovery.discover(duration) {
+                Ok(a) => a,
+                Err(e) => return CommandOutput::err(&format!("扫描失败: {}", e)),
+            }
+        };
+
+        if agents.is_empty() {
+            let msg = format!("🔍 扫描完成 ({}ms)，未发现任何代理", duration);
+            if want_json {
+                return CommandOutput::ok(&msg).with_json(serde_json::json!({
+                    "scanned": true, "agent_count": 0, "duration_ms": duration, "port": port
+                }));
+            }
+            return CommandOutput::ok(&msg);
         }
+
+        let mut table = format!("🔍 发现 {} 个代理 (扫描 {}ms):\n", agents.len(), duration);
+        table.push_str("┌──────┬────────────────────────┬──────────────────────┬───────┬──────┐\n");
+        table.push_str("│ #    │ ID                     │ Host                 │ Port  │ Caps │\n");
+        table.push_str("├──────┼────────────────────────┼──────────────────────┼───────┼──────┤\n");
+        for (i, a) in agents.iter().enumerate() {
+            let id_trunc = if a.id.len() > 22 { format!("{}…", &a.id[..21]) } else { a.id.clone() };
+            let host_trunc = if a.host.len() > 20 { format!("{}…", &a.host[..19]) } else { a.host.clone() };
+            let cap_count = a.capabilities.len();
+            table.push_str(&format!("│ {:<4} │ {:<22} │ {:<20} │ {:<5} │ {:<4} │",
+                i + 1, id_trunc, host_trunc, a.port, cap_count));
+            table.push('\n');
+        }
+        table.push_str("└──────┴────────────────────────┴──────────────────────┴───────┴──────┘\n");
+
+        if agents.len() == 1 {
+            let a = &agents[0];
+            table.push_str("  详情:\n");
+            table.push_str(&format!("    Name:    {}\n", a.name));
+            table.push_str(&format!("    Service: {}\n", if a.service_type.is_empty() { "(none)" } else { &a.service_type }));
+            table.push_str(&format!("    Instance:{}\n", if a.instance_name.is_empty() { "(none)" } else { &a.instance_name }));
+            if !a.capabilities.is_empty() {
+                table.push_str(&format!("    Caps:    {}\n", a.capabilities.join(", ")));
+            }
+            if a.hexagram != 0 {
+                table.push_str(&format!("    Hexagram:{}", a.hexagram));
+            }
+        }
+
+        if want_json {
+            let json_agents: Vec<serde_json::Value> = agents.iter().map(|a| {
+                serde_json::json!({
+                    "id": a.id, "name": a.name, "host": a.host, "port": a.port,
+                    "capabilities": a.capabilities, "hexagram": a.hexagram,
+                    "service_type": a.service_type, "instance_name": a.instance_name,
+                })
+            }).collect();
+            return CommandOutput::ok(&table).with_json(serde_json::json!({
+                "agent_count": agents.len(), "duration_ms": duration, "port": port, "agents": json_agents
+            }));
+        }
+        CommandOutput::ok(&table)
     }
 }
 
