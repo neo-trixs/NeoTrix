@@ -5,7 +5,8 @@
 //!   - 半维状态: hidden_dim 从 128 降至 64 (MIMO 提供更高每维表达力)
 //!   - 多输入: MimoSelectableOperator 同时处理 multi_stream 个输入
 use serde::{Deserialize, Serialize};
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
 use chrono::Utc;
 use super::core::{Vector, Matrix};
 
@@ -114,11 +115,32 @@ impl SelectableOperator {
     }
 
     fn random_matrix(rows: usize, cols: usize) -> Matrix {
-        let mut rng = rand::thread_rng();
+        Self::random_matrix_with_rng(rows, cols, &mut rand::thread_rng())
+    }
+
+    fn random_matrix_with_rng<R: Rng + ?Sized>(rows: usize, cols: usize, rng: &mut R) -> Matrix {
         let scale = (cols as f64).sqrt().recip();
         (0..rows)
             .map(|_| (0..cols).map(|_| rng.gen::<f64>() * 2.0 * scale - scale).collect())
             .collect()
+    }
+
+    /// 确定性构造器 (固定种子): 供测试与可复现实验使用, 消除
+    /// thread_rng 无种子导致的矩阵退化 (输出全零) 随机失败。
+    pub fn with_seed(dim: usize, hidden_dim: usize, seed: u64) -> Self {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let a = Self::init_a_matrix(dim, hidden_dim);
+        let b_proj = Self::random_matrix_with_rng(hidden_dim, dim, &mut rng);
+        let c_proj = Self::random_matrix_with_rng(dim, hidden_dim, &mut rng);
+        let delta_proj = Self::random_matrix_with_rng(hidden_dim, dim, &mut rng);
+        Self {
+            dim,
+            hidden_dim,
+            a,
+            b_proj,
+            c_proj,
+            delta_proj,
+        }
     }
 
     /// 真正的 Mamba 风格递推 SSM 步进:
@@ -391,6 +413,15 @@ impl SsdOperator {
         }
     }
 
+    /// 确定性构造器 (固定种子), 见 SelectableOperator::with_seed。
+    pub fn with_seed(dim: usize, hidden_dim: usize, seed: u64) -> Self {
+        let n = hidden_dim.max(super::core::SSM_STATE_SIZE);
+        Self {
+            base: SelectableOperator::with_seed(dim, n, seed),
+            ssd_state: super::core::SsdState::new(n),
+        }
+    }
+
     pub fn step_ssd(&mut self, input: &Vector, attention_context: &Vector) -> Vector {
         let mut temp_state = super::core::SelectiveState::new(input.len(), self.base.hidden_dim);
         let ssm_output = self.base.step(&mut temp_state, input);
@@ -530,7 +561,8 @@ mod tests {
 
     #[test]
     fn test_ssd_operator_step_base_backward_compat() {
-        let op = SsdOperator::new(8, 64);
+        // 固定种子消除 thread_rng 矩阵退化 (输出全零) 的随机失败
+        let op = SsdOperator::with_seed(8, 64, 42);
         let mut state = super::super::core::SelectiveState::new(8, 64);
         let input = vec![1.0; 8];
         let output = op.step_base(&mut state, &input);
@@ -546,5 +578,20 @@ mod tests {
         let out1 = op.step_ssd(&input, &ctx);
         let out2 = op.step_ssd(&input, &ctx);
         assert_ne!(out1, out2);
+    }
+
+    #[test]
+    fn test_ssd_operator_step_base_seed_stable() {
+        // 多种子稳定性: 任何固定种子都必须产生非零输出 (防退化矩阵回归)
+        for seed in [1u64, 42, 7, 2026, 12345, 999_999] {
+            let op = SsdOperator::with_seed(8, 64, seed);
+            let mut state = super::super::core::SelectiveState::new(8, 64);
+            let output = op.step_base(&mut state, &vec![1.0; 8]);
+            assert_eq!(output.len(), 8, "seed {seed} output length");
+            assert!(
+                output.iter().any(|&v| v.abs() > 0.0),
+                "seed {seed} produced all-zero output"
+            );
+        }
     }
 }
