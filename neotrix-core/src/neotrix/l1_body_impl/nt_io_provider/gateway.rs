@@ -2,8 +2,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, RwLock, Weak};
 use std::time::{Duration, Instant};
 
+use super::account_pool::{AccountPool, AccountPoolConfig, AccountPoolError};
 use super::agent_routing::AgentRoutingTable;
 use super::circuit_breaker::{BreakerState, CircuitBreaker};
+use super::context_budget::estimate_tokens;
 use super::factory::LlmProviderType;
 use super::free_pool::global_free_pool;
 use super::generation_classifier::{
@@ -18,7 +20,7 @@ use super::types::*;
 use crate::core::nt_core_error_recovery::{
     ErrorContext, ErrorType, RecoveryAction, RecoveryConfig, RecoveryOrchestrator,
 };
-use crate::core::nt_io_cache::{CacheConfig, SemanticCache};
+use crate::core::nt_io_cache::{text_to_embedding, CacheConfig, SemanticCache};
 use crate::core::nt_io_telemetry::{ConsoleTracer, CostTracker, SpanKind, Tracer};
 
 /// 识别配额耗尽错误 — 与瞬时限速 (429) 区分 (freellmapi/aimux 模式)。
@@ -384,6 +386,43 @@ impl ResponseCache {
         self.prefetch_hits
     }
 
+    /// P0-7 lookahead 预取 (OasisKV 吸收): 由 speculative 提示词流预测未来访问 key,
+    /// 提前把条目刷新到热层 (staging), 而非仅刷新已缓存项 (原 prefetch 是反应式)。
+    /// hints 是"未来可能访问的 key 列表" — 对已缓存者刷新 LRU 防驱逐, 对缺失者
+    /// 由调用方判定是否值得热加载 (返回缺失列表供 fetch)。
+    ///
+    /// 返回 (预取命中数, 缺失的 lookahead key 列表)。
+    pub fn prefetch_lookahead(&mut self, hints: &[String]) -> (usize, Vec<String>) {
+        let mut hits = 0;
+        let mut missing = Vec::new();
+        for hint in hints {
+            let hash = Self::hash_key(hint);
+            if self.entries.contains_key(&hash) {
+                self.tick += 1;
+                if let Some((_, t)) = self.entries.get_mut(&hash) {
+                    *t = self.tick;
+                }
+                self.prefetch_hits += 1;
+                hits += 1;
+            } else {
+                missing.push(hint.clone());
+            }
+        }
+        (hits, missing)
+    }
+
+    /// P0-7 辅助: 低开销 lookahead 提示 — 从当前 key 派生相邻 key 候选
+    /// (如同一 model_id 下的相邻温度/指纹变体)。纯字符串启发, 供调用方
+    /// 作为 prefetch_lookahead 的 hints 输入。
+    pub fn lookahead_hints(&self, key: &str) -> Vec<String> {
+        let mut hints = Vec::new();
+        if let Some((model, _)) = key.split_once('|') {
+            hints.push(format!("{}|fp=lookahead:1", model));
+            hints.push(format!("{}|fp=lookahead:2", model));
+        }
+        hints
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -738,6 +777,8 @@ pub struct GatewayV2 {
     /// G: Response Caching — LRU 响应缓存实例 (默认关闭)
     pub response_cache: Mutex<ResponseCache>,
     response_cache_enabled: bool,
+    /// P0-7 lookahead 预取命中累计 (OasisKV, telemetry 消费)。
+    response_cache_prefetches: std::sync::atomic::AtomicU64,
     /// G: Response Healing — 畸形 JSON 修复器实例 (默认关闭)
     pub response_healer: Mutex<ResponseHealer>,
     response_healer_enabled: bool,
@@ -747,6 +788,9 @@ pub struct GatewayV2 {
     pub generation_classifier: Mutex<GenerationClassifier>,
     pub generation_analytics: Mutex<GenerationAnalytics>,
     generation_classification_enabled: bool,
+    /// P7 账户池 (open-kritt 吸收) — 健康感知 round-robin 选择层:
+    /// 每账户并发租约 + 限流检疫 + 冷却自动恢复。
+    pub account_pool: Mutex<AccountPool>,
 }
 
 impl GatewayV2 {
@@ -765,12 +809,14 @@ impl GatewayV2 {
             sub_grids: RwLock::new(HashMap::new()),
             response_cache: Mutex::new(ResponseCache::new(ResponseCache::DEFAULT_CAPACITY)),
             response_cache_enabled: false,
+            response_cache_prefetches: std::sync::atomic::AtomicU64::new(0),
             response_healer: Mutex::new(ResponseHealer::new()),
             response_healer_enabled: false,
             market_router: Mutex::new(MarketRouter::new()),
             generation_classifier: Mutex::new(GenerationClassifier::new()),
             generation_analytics: Mutex::new(GenerationAnalytics::new()),
             generation_classification_enabled: false,
+            account_pool: Mutex::new(AccountPool::new(AccountPoolConfig::default())),
         }
     }
 
@@ -808,6 +854,12 @@ impl GatewayV2 {
 
     pub fn response_cache_len(&self) -> usize {
         self.response_cache.lock().map(|c| c.len()).unwrap_or(0)
+    }
+
+    /// P0-7 lookahead 预取命中计数 (OasisKV, 遥测可见)。
+    pub fn response_cache_prefetches(&self) -> u64 {
+        self.response_cache_prefetches
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// 开关畸形 JSON 修复 (G: Response Healing)
@@ -927,24 +979,34 @@ impl GatewayV2 {
                     Ok(serialized) => rc.insert(&rc_key, serialized),
                     Err(_) => rc.insert(&rc_key, response.content.clone()),
                 }
+                let hints = rc.lookahead_hints(&rc_key);
+                if !hints.is_empty() {
+                    let (_, _) = rc.prefetch_lookahead(&hints);
+                    self.response_cache_prefetches.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
             }
         }
         response
     }
 
+    /// 请求的纯文本提示 (消息内容拼接) — 用于 embedding 与 token 估算。
+    fn prompt_text(&self, request: &LlmRequest) -> String {
+        request
+            .messages
+            .iter()
+            .map(|m| m.content.clone())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     /// 缓存 key 硬化: 除消息内容外, 纳入会影响响应语义的请求指纹
-    /// (max_tokens / thinking_budget / tools / structured_output)。
+    /// (max_tokens / thinking_budget / tools / structured_output / prefix 标记)。
     ///
     /// 旧 key 仅拼 messages 内容: 同一提示词在不同 max_tokens 或不同工具集下的
     /// 请求会错误共享缓存 — 可能命中被截断输出 (Length) 或带 tool_calls 的响应,
     /// 属质量损失型 bug。改为指纹后, 缓存命中语义与请求完全一致。
     fn prompt_cache_key(&self, request: &LlmRequest) -> String {
-        let content = request
-            .messages
-            .iter()
-            .map(|m| m.content.clone())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let content = self.prompt_text(request);
         let mut tools: Vec<&str> = request
             .tools
             .iter()
@@ -957,8 +1019,13 @@ impl GatewayV2 {
             None => String::new(),
         };
         format!(
-            "{}|max={}|think={:?}|tools=[{}]|struct={}",
-            content, request.max_tokens, request.thinking_budget, tools_fp, structured_fp
+            "{}|max={}|think={:?}|tools=[{}]|struct={}|prefix={:?}",
+            content,
+            request.max_tokens,
+            request.thinking_budget,
+            tools_fp,
+            structured_fp,
+            request.cacheable_prefix_tokens
         )
     }
 
@@ -1100,6 +1167,17 @@ impl GatewayV2 {
                 }
             }
         }
+        // 语义回退 (与 complete_with_selection 同口径): exact miss 后按 embedding 余弦兜底
+        {
+            let embedding = text_to_embedding(&self.prompt_text(request));
+            if let Ok(mut cache) = self.cache.lock() {
+                if let Some(cached) = cache.get_semantic(&embedding) {
+                    if let Ok(response) = serde_json::from_str::<LlmResponse>(cached) {
+                        return Ok((response, required, request.model.clone()));
+                    }
+                }
+            }
+        }
         // 前缀锁定: request.model 形如 `{provider}/{model_id}` 时优先该 provider
         // (与 complete_with_selection 前缀路由一致), 避免 llm7/codestral-latest
         // 被 select_best_for_profile 路由到 composite_score 更高的 pollinations (402/404)。
@@ -1133,7 +1211,12 @@ impl GatewayV2 {
                     if let Ok(response) = &resp {
                         if let Ok(mut cache) = self.cache.lock() {
                             if let Ok(serialized) = serde_json::to_string(response) {
-                                cache.set_exact(&request.model, &cache_key, serialized);
+                                cache.set_with_embedding(
+                                    &request.model,
+                                    &cache_key,
+                                    serialized,
+                                    text_to_embedding(&self.prompt_text(request)),
+                                );
                             }
                         }
                     }
@@ -1574,6 +1657,83 @@ impl GatewayV2 {
         self.call_provider(provider_name, request).await
     }
 
+    /// P7 账户池选择层: 经 AccountPool 按健康状态 round-robin 选择账户并获取并发租约,
+    /// 再走既有 `call_provider` 调用路径。RateLimit 错误 → 检疫该账户 (冷却后自动恢复)。
+    ///
+    /// R-P42: 强化 GatewayV2 既有选择路径, 非平行 provider 系统 — 池只决定"用哪个账户"。
+    ///
+    /// `provider` 用于限定账户范围 (同 provider 多账户); 传空字符串则从请求 model 前缀推断。
+    pub async fn complete_with_account_pool(
+        &self,
+        provider: &str,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
+        // 推断 provider 范围: 显式参数优先, 否则取 model 前缀 (如 `openai/gpt-4o` → openai)
+        let scope = if provider.is_empty() {
+            request
+                .model
+                .split('/')
+                .next()
+                .map(|s| s.to_string())
+                .unwrap_or_default()
+        } else {
+            provider.to_string()
+        };
+        if scope.is_empty() {
+            return Err(LlmError::Unknown(
+                "account_pool: cannot infer provider scope from empty model".to_string(),
+            ));
+        }
+        let lease = {
+            let pool = self.account_pool.lock().unwrap_or_else(|e| {
+                log::warn!("[gateway] account_pool Mutex poisoned: {}", e);
+                e.into_inner()
+            });
+            match pool.select(&scope) {
+                Ok(lease) => lease,
+                Err(AccountPoolError::NoAccounts(_)) => {
+                    return Err(LlmError::Unknown(format!(
+                        "account_pool: no accounts registered for provider '{scope}'"
+                    )));
+                }
+                Err(AccountPoolError::NoHealthyAccount(_)) => {
+                    return Err(LlmError::RateLimit(format!(
+                        "account_pool: all accounts for '{scope}' are quarantined/unavailable"
+                    )));
+                }
+                Err(AccountPoolError::Saturated(_)) => {
+                    return Err(LlmError::RateLimit(format!(
+                        "account_pool: account concurrency cap reached for '{scope}'"
+                    )));
+                }
+            }
+        };
+        let account_name = lease.account_name().to_string();
+        let result = self.call_provider(&account_name, request).await;
+
+        let pool = self.account_pool.lock().unwrap_or_else(|e| {
+            log::warn!("[gateway] account_pool Mutex poisoned: {}", e);
+            e.into_inner()
+        });
+        match &result {
+            Ok(_) => {
+                pool.record_success(&account_name);
+            }
+            Err(LlmError::RateLimit(_)) => {
+                log::warn!(
+                    "[gateway] account '{account_name}' rate-limited → quarantine ({}s cooldown)",
+                    pool.config().quarantine_cooldown.as_secs()
+                );
+                pool.quarantine(&account_name);
+            }
+            Err(_) => {
+                pool.record_failure(&account_name);
+            }
+        }
+        let _ = lease; // 释放并发租约 (AccountLease::drop)
+        result
+    }
+
     pub async fn complete_with_selection(
         &self,
         request: &LlmRequest,
@@ -1586,6 +1746,19 @@ impl GatewayV2 {
             if let Some(cached) = cache.get_exact(&request.model, &prompt_key) {
                 if let Ok(response) = serde_json::from_str::<LlmResponse>(&cached) {
                     return Ok(response);
+                }
+            }
+        }
+
+        // Layer 1.25: semantic fallback — exact miss 后按 embedding 余弦相似兜底
+        // (语义阈值保守 0.98, 避免不同语义误命中; 命中即复用同模型的历史响应)。
+        {
+            let embedding = text_to_embedding(&self.prompt_text(request));
+            if let Ok(mut cache) = self.cache.lock() {
+                if let Some(cached) = cache.get_semantic(&embedding) {
+                    if let Ok(response) = serde_json::from_str::<LlmResponse>(cached) {
+                        return Ok(response);
+                    }
                 }
             }
         }
@@ -1624,7 +1797,7 @@ impl GatewayV2 {
         // providers, whose cost is 0.0, hard-blocked too).
         {
             if self.cost_budget_per_query > 0.0 {
-                let est_tokens = (prompt_key.len() / 4) as f64;
+                let est_tokens = estimate_tokens(&self.prompt_text(request)) as f64;
                 let estimated_cost = (est_tokens / 1000.0) * 0.002;
                 if estimated_cost > self.cost_budget_per_query {
                     log::warn!(
@@ -1726,7 +1899,12 @@ impl GatewayV2 {
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
-                            cache.set_exact(&request.model, &prompt_key, serialized);
+                            cache.set_with_embedding(
+                                &request.model,
+                                &prompt_key,
+                                serialized,
+                                text_to_embedding(&self.prompt_text(request)),
+                            );
                         }
                     }
                     return Ok(response);
@@ -1964,10 +2142,11 @@ impl GatewayV2 {
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
-                            cache.set_exact(
+                            cache.set_with_embedding(
                                 &request.model,
                                 &self.prompt_cache_key(request),
                                 serialized,
+                                text_to_embedding(&self.prompt_text(request)),
                             );
                         }
                     }
@@ -3678,6 +3857,7 @@ mod tests {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
         };
         let mut rx = gw
             .stream_complete_with_selection(&req)
@@ -3779,6 +3959,20 @@ mod provider_reliability_tests {
         assert_eq!(cache.prefetch_hit_count(), 1);
         assert_eq!(cache.prefetch("cold"), None, "未命中 prefetch 返回 None");
         assert_eq!(cache.prefetch_hit_count(), 1, "miss 不计 prefetch hit");
+    }
+
+    #[test]
+    fn test_response_cache_lookahead_prefetch() {
+        // P0-7 lookahead (OasisKV): 预取 hint 列表, 已缓存者刷新, 缺失者列出。
+        let mut cache = ResponseCache::new(8);
+        cache.insert("m|fp=lookahead:1", "v1".to_string());
+        let (hits, missing) = cache.prefetch_lookahead(&["m|fp=lookahead:1".to_string(), "m|fp=lookahead:2".to_string()]);
+        assert_eq!(hits, 1, "cached hint 刷新命中");
+        assert_eq!(missing, vec!["m|fp=lookahead:2".to_string()]);
+        assert_eq!(cache.prefetch_hit_count(), 1);
+        let hints = cache.lookahead_hints("model-a|fp=x");
+        assert_eq!(hints.len(), 2);
+        assert!(hints.iter().all(|h| h.starts_with("model-a|")));
     }
 
     #[test]

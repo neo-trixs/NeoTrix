@@ -38,8 +38,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-11T06:24:37.598213Z",
       "updated_at": "2026-08-16T07:33:55.836189Z",
@@ -133,10 +133,10 @@
         }
       ],
       "metadata": {
+        "evidence_gated": "unknown",
         "tests": "17 passed (nt_core_parallel::isolation)",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
         "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
-        "evidence_gated": "unknown"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-16T07:45:37.672467Z",
@@ -337,7 +337,15 @@
           "timestamp": "2026-08-16T07:33:56.054892Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "fallback_chain": [
+          "native (calamine/office_oxide/image)",
+          "extract_text -> to_markdown",
+          "check_health"
+        ],
+        "input_schema": "path: string; dir: string | null; kind: FileKind; options: { preferred_sheets: string[], empty_markers: [string, string[]][], unit_rules: [] }",
+        "output_schema": "ContentSnapshot { kind, text, markdown, table[], image, media, mime_type, size_bytes } | ConsolidationReport { files_processed, total_rows, usd_rows, validation_warnings[], output }"
+      },
       "created_at": "2026-08-13T13:02:47.046875Z",
       "updated_at": "2026-08-16T07:33:56.054893Z",
       "deprecated": false,
@@ -392,8 +400,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T03:07:54.119406Z",
       "updated_at": "2026-08-16T07:35:04.200467Z",
@@ -555,14 +563,22 @@
           "to_node": "nt_mind_skill_engine::progressive_disclosure",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:04:12.954238Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::progressive_disclosure",
+          "note": "probe预算分配+evolution-worthiness门 (SPOT/2608.02636)",
+          "timestamp": "2026-08-17T02:34:31.093410Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "skill_cmds.rs:175-186 record_call+step_disclosure"
+        "wiring_evidence": "skill_cmds.rs:175-186 record_call+step_disclosure",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T03:58:06.411029Z",
-      "updated_at": "2026-08-16T13:04:12.954239Z",
+      "updated_at": "2026-08-17T02:34:31.093412Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -604,6 +620,14 @@
           "to_node": "nt_memory_curation::fidelity_ledger",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.160374Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_memory_curation::fidelity_ledger",
+          "note": "Dreamer巩固+生命周期状态机+机检输出约束 (magic-context/hyperresearch)",
+          "timestamp": "2026-08-17T02:34:31.287179Z"
         }
       ],
       "metadata": {
@@ -611,7 +635,7 @@
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T03:58:06.420110Z",
-      "updated_at": "2026-08-16T07:33:56.160376Z",
+      "updated_at": "2026-08-17T02:34:31.287180Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -666,8 +690,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T03:58:06.428234Z",
       "updated_at": "2026-08-16T07:35:04.200464Z",
@@ -912,6 +936,14 @@
           "to_node": "nt_mind_distiller::reversible_distill",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:02.255810Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::reversible_distill",
+          "note": "outcome校准+rationale增强+recoverability判定 (SPOT/SFS-DPO/EML)",
+          "timestamp": "2026-08-17T02:34:31.156258Z"
         }
       ],
       "metadata": {
@@ -919,7 +951,7 @@
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T07:25:01.569883Z",
-      "updated_at": "2026-08-16T12:32:02.255810Z",
+      "updated_at": "2026-08-17T02:34:31.156261Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -967,8 +999,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T07:25:01.580480Z",
       "updated_at": "2026-08-16T12:34:35.302204Z",
@@ -1100,11 +1132,19 @@
           "to_node": "nt_memory_kb::retrieval_self_evolution",
           "note": "Promoted to C4",
           "timestamp": "2026-08-16T12:32:40.444005Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::retrieval_self_evolution",
+          "note": "多源一体检索+git索引+技能固化 (magic-context/2504.01990)",
+          "timestamp": "2026-08-17T02:34:31.256460Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:18.435537Z",
-      "updated_at": "2026-08-16T12:32:40.444005Z",
+      "updated_at": "2026-08-17T02:34:31.256462Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1183,11 +1223,19 @@
           "to_node": "nt_memory_historian::temporal_context_graph",
           "note": "Promoted to C4",
           "timestamp": "2026-08-16T12:32:42.039663Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_memory_historian::temporal_context_graph",
+          "note": "tiered-compartment+gap marker+importance score (magic-context)",
+          "timestamp": "2026-08-17T02:34:31.225013Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:43.277610Z",
-      "updated_at": "2026-08-16T12:32:42.039663Z",
+      "updated_at": "2026-08-17T02:34:31.225015Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1242,8 +1290,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T08:24:43.288598Z",
       "updated_at": "2026-08-16T12:32:02.769277Z",
@@ -1293,6 +1341,14 @@
           "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:03.277921Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
+          "note": "step-level偏好+re-ablate+negative-revisit (SFS-DPO/PI-blog)",
+          "timestamp": "2026-08-17T02:34:31.122710Z"
         }
       ],
       "metadata": {
@@ -1300,7 +1356,7 @@
         "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T11:46:32.523575Z",
-      "updated_at": "2026-08-16T12:32:03.277922Z",
+      "updated_at": "2026-08-17T02:34:31.122712Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1456,6 +1512,14 @@
           "to_node": "nt_io_provider::provider_reliability_suite",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T10:57:30.281918Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::provider_reliability_suite",
+          "note": "OasisKV分层缓存+lookahead预取+断点续传 (2608.08097/unsloth)",
+          "timestamp": "2026-08-17T02:34:31.033568Z"
         }
       ],
       "metadata": {
@@ -1463,7 +1527,7 @@
         "evidence_gated": "unknown"
       },
       "created_at": "2026-08-14T12:55:44.852663Z",
-      "updated_at": "2026-08-16T10:57:30.281919Z",
+      "updated_at": "2026-08-17T02:34:31.033570Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1563,14 +1627,22 @@
           "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:03:35.168047Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
+          "note": "seed梯度付费+早期剪枝+影子评测通道 (PI-blog/2607.27191)",
+          "timestamp": "2026-08-17T02:34:31.189406Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "bench_cmds.rs:113 record_withholding + compliance_report"
+        "wiring_evidence": "bench_cmds.rs:113 record_withholding + compliance_report",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T12:55:44.878189Z",
-      "updated_at": "2026-08-16T13:03:35.168048Z",
+      "updated_at": "2026-08-17T02:34:31.189408Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1618,8 +1690,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T01:56:52.494679Z",
       "updated_at": "2026-08-16T12:32:34.469581Z",
@@ -1666,6 +1738,14 @@
           "to_node": "nt_io_provider::market_re_evaluation_daemon",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T10:57:29.731485Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::market_re_evaluation_daemon",
+          "note": "后端运行时选择+厂商中立telemetry契约 (unsloth/pi)",
+          "timestamp": "2026-08-17T02:34:31.064334Z"
         }
       ],
       "metadata": {
@@ -1673,7 +1753,7 @@
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T01:56:57.858315Z",
-      "updated_at": "2026-08-16T10:57:29.731486Z",
+      "updated_at": "2026-08-17T02:34:31.064336Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1734,11 +1814,19 @@
           "to_node": "nt_shield_sandbox::credential_vault_injection",
           "note": "Promoted to C4",
           "timestamp": "2026-08-16T12:32:43.586269Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::credential_vault_injection",
+          "note": "命令审批allowlist+research-egress+隔离browser空间 (hermes/ego-lite/PI)",
+          "timestamp": "2026-08-17T02:34:31.376369Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-15T01:56:57.873400Z",
-      "updated_at": "2026-08-16T12:32:43.586271Z",
+      "updated_at": "2026-08-17T02:34:31.376370Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1965,6 +2053,14 @@
           "to_node": "nt_mind_evolution_loop::rst_flywheel",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.428013Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::rst_flywheel",
+          "note": "P0-8 auto-research keep_or_revert + PI seed_escalation anti-drift",
+          "timestamp": "2026-08-17T05:37:46.674332Z"
         }
       ],
       "metadata": {
@@ -1972,7 +2068,7 @@
         "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-16T07:33:56.428014Z",
+      "updated_at": "2026-08-17T05:37:46.674333Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2093,8 +2189,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-16T07:33:56.302392Z",
@@ -2135,8 +2231,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.107775Z",
@@ -2265,8 +2361,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.553093Z",
@@ -2309,8 +2405,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-16T07:33:56.249155Z",
@@ -2483,14 +2579,30 @@
           "to_node": "nt_shield_audit::reasoning_trace_guard",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:34.980756Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_shield_audit::reasoning_trace_guard",
+          "note": "加密CoT会话绑定+日志PII扫描+注入检测+分歧检测 (2608.09867 P0)",
+          "timestamp": "2026-08-17T02:34:36.981975Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_shield_audit::reasoning_trace_guard",
+          "note": "P0-2 DSAgentBench 2608.09867: scan_protected 4-layer (session binding/PII/injection/divergence) + T3 wire in handle_architecture_audit",
+          "timestamp": "2026-08-17T05:37:46.649051Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:34.980757Z",
+      "updated_at": "2026-08-17T05:37:46.649053Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2568,8 +2680,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:28.654927Z",
@@ -2606,6 +2718,14 @@
           "to_node": "nt_agent_orchestrator::arbiter_mediation",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:31.309498Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_agent_orchestrator::arbiter_mediation",
+          "note": "personality四件套+plan-hash审批+证据gate (agency-agents/autoresearch)",
+          "timestamp": "2026-08-17T02:34:31.348836Z"
         }
       ],
       "metadata": {
@@ -2613,7 +2733,7 @@
         "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:31.309498Z",
+      "updated_at": "2026-08-17T02:34:31.348838Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2649,8 +2769,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:29.213219Z",
@@ -2730,8 +2850,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:05.342850Z",
@@ -2770,8 +2890,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:29.731073Z",
@@ -2850,8 +2970,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:20.413819Z",
@@ -2970,8 +3090,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:35.503915Z",
@@ -3018,8 +3138,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:21.429566Z",
@@ -3220,8 +3340,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:32.894527Z",
@@ -3260,8 +3380,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:30.260679Z",
@@ -3300,8 +3420,8 @@
         }
       ],
       "metadata": {
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "evidence_gated": "degraded"
+        "evidence_gated": "degraded",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:22.444863Z",
@@ -3340,8 +3460,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "degraded"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:21.933843Z",
@@ -3380,8 +3500,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-16T12:32:05.852152Z",
@@ -3508,8 +3628,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs"
+        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T02:50:22.160537Z",
       "updated_at": "2026-08-16T13:04:55.118339Z",
@@ -3555,8 +3675,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T02:50:22.749743Z",
       "updated_at": "2026-08-16T12:32:36.553841Z",
@@ -3761,8 +3881,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "factory.rs:655 enable_response_cache + gateway.rs:1595/924 read-write"
+        "wiring_evidence": "factory.rs:655 enable_response_cache + gateway.rs:1595/924 read-write",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T07:45:07.725209Z",
       "updated_at": "2026-08-16T13:08:10.626517Z",
@@ -3811,8 +3931,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T07:45:11.146832Z",
       "updated_at": "2026-08-16T12:43:22.200933Z",
@@ -3860,8 +3980,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "unknown",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T07:45:11.165170Z",
       "updated_at": "2026-08-16T12:32:23.495703Z",
@@ -4125,8 +4245,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "unknown"
       },
       "created_at": "2026-08-16T07:45:34.006424Z",
       "updated_at": "2026-08-16T12:32:22.969831Z",
@@ -4173,11 +4293,789 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "unified_tauri_full_catalog L2 orchestrator",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "unified_tauri_full_catalog L2 orchestrator"
       },
       "created_at": "2026-08-16T10:26:23.580698Z",
       "updated_at": "2026-08-16T10:28:51.196256Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_shield_sentry::untrusted_data_fence",
+      "domain": "shield",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "untrusted_data_fence",
+        "nonce_delim"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shield_sentry::untrusted_data_fence",
+          "note": "defending-code-reference-harness F4: nonce 分隔 <untrusted_data id> 围栏 + closing-tag 净化。消费者: 所有 prompt builder (nt_io_provider/nt_agent_mcp_gateway)。",
+          "timestamp": "2026-08-17T01:38:53.370937Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sentry::untrusted_data_fence",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:45:02.331429Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:38:53.370935Z",
+      "updated_at": "2026-08-17T05:45:02.331429Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind_skill_engine::revertible_effects",
+      "domain": "mind",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
+      "provides": [
+        "revertible_effects",
+        "inverse_ledger"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::revertible_effects",
+          "note": "cordiverse/paper §3.1: 每次上下文变换携带追踪逆, LIFO teardown。消费者: 吸收回滚/experience-tree。R-P79 同 session 接线。",
+          "timestamp": "2026-08-17T01:38:53.394161Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::revertible_effects",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.839401Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:38:53.394159Z",
+      "updated_at": "2026-08-17T05:46:23.839402Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind_skill_engine::fiber_lifecycle",
+      "domain": "mind",
+      "layer": "l2orchestrator",
+      "constellation": "c1unittest",
+      "provides": [
+        "fiber_lifecycle",
+        "withdrawal_guard"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::fiber_lifecycle",
+          "note": "cordiverse/paper §4.1-4.3: 组件 (d,p,e) 5 态生命周期 + withdrawal guard (provider 先停再 inverse)。消费者: BackgroundLoop/SelfTest。",
+          "timestamp": "2026-08-17T01:39:04.277332Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::fiber_lifecycle",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.864637Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:39:04.277330Z",
+      "updated_at": "2026-08-17T05:46:23.864639Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_act_orchestrator::task_state_dag",
+      "domain": "act",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "task_state_dag",
+        "attempt_token"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act_orchestrator::task_state_dag",
+          "note": "dsh-agent-teams P2/P4: 依赖感知任务 DAG + attempt_id 能力令牌 + 迟到结果拒绝。消费者: PlannerNode。",
+          "timestamp": "2026-08-17T01:39:04.301385Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_act_orchestrator::task_state_dag",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.889421Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:39:04.301383Z",
+      "updated_at": "2026-08-17T05:46:23.889422Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_core_scheduler::event_driven_claim",
+      "domain": "core",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "event_driven_claim",
+        "idle_edge"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core_scheduler::event_driven_claim",
+          "note": "dsh-agent-teams P3: 事件驱动共享调度, idle 边+图变更→原子认领+唤醒, 零轮询, 冷恢复重试。消费者: OrchestratorAgent。",
+          "timestamp": "2026-08-17T01:39:04.323206Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_scheduler::event_driven_claim",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.914774Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:39:04.323204Z",
+      "updated_at": "2026-08-17T05:46:23.914775Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io_provider::account_pool",
+      "domain": "io",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "account_pool",
+        "rate_limit_quarantine"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::account_pool",
+          "note": "open-kritt P7: provider 账户池 health+round-robin+rate-limit 隔离+per-account 并发租约。消费者: MCP gateway PTC。",
+          "timestamp": "2026-08-17T01:39:04.345541Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::account_pool",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.940458Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:39:04.345539Z",
+      "updated_at": "2026-08-17T05:46:23.940459Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory_kb::spill_storage",
+      "domain": "memory",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "spill_storage",
+        "opaque_locator"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::spill_storage",
+          "note": "deepseek-harness #9: 超大结果→opaque locator 溢出存储。消费者: 大结果溢出路径。",
+          "timestamp": "2026-08-17T01:39:04.368120Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::spill_storage",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.965405Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:39:04.368118Z",
+      "updated_at": "2026-08-17T05:46:23.965407Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind_eval_harness::oracle_ladder",
+      "domain": "mind",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "oracle_ladder",
+        "t0_t3"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::oracle_ladder",
+          "note": "defending-code-reference-harness F5: T0-T3 executable-oracle 验证梯 (build→repro→regress→re-attack), 无模型判断门。消费者: 补丁验证。",
+          "timestamp": "2026-08-17T01:39:04.390459Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::oracle_ladder",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:46:23.990953Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T01:39:04.390458Z",
+      "updated_at": "2026-08-17T05:46:23.990954Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_shield::nt_shield_coh_guard",
+      "domain": "shield",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "coh_guard",
+        "reasoning_trace_guard",
+        "audit"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shield::nt_shield_coh_guard",
+          "note": "加密推理块生命周期管理 (2608.09867 P0)",
+          "timestamp": "2026-08-17T02:34:21.178977Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield::nt_shield_coh_guard",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:32:48.642286Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield::nt_shield_coh_guard",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T05:37:22.400580Z"
+        }
+      ],
+      "metadata": {
+        "wiring_evidence": "handlers_consciousness.rs:1395"
+      },
+      "created_at": "2026-08-17T02:34:21.178975Z",
+      "updated_at": "2026-08-17T05:37:22.400581Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory::nt_memory_untrusted_fence",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "untrusted_fence",
+        "ingest",
+        "shield"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_untrusted_fence",
+          "note": "外部摄取内容隔离 data-not-instructions (hyperresearch P0)",
+          "timestamp": "2026-08-17T02:34:21.205525Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_untrusted_fence",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:33:00.135029Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_untrusted_fence",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T05:37:27.499821Z"
+        }
+      ],
+      "metadata": {
+        "wiring_evidence": "nt_memory_sweep_20260815.rs:534 is_fenced_doc"
+      },
+      "created_at": "2026-08-17T02:34:21.205523Z",
+      "updated_at": "2026-08-17T05:37:27.499822Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory::nt_memory_quality_rank",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "quality_rank",
+        "retrieval",
+        "provenance"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_quality_rank",
+          "note": "复合来源质量评分+retraction归零 (hyperresearch P0)",
+          "timestamp": "2026-08-17T02:34:21.231241Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_quality_rank",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:33:00.158693Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_quality_rank",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T05:37:27.531850Z"
+        }
+      ],
+      "metadata": {
+        "wiring_evidence": "nt_memory_sweep_20260815.rs:515 hybrid_search_quality"
+      },
+      "created_at": "2026-08-17T02:34:21.231239Z",
+      "updated_at": "2026-08-17T05:37:27.531856Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_core_self::multi_signal_eval",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "multi_signal_eval",
+        "converge_check",
+        "verify"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core_self::multi_signal_eval",
+          "note": "确定性多信号产出物级验证 (DSAgentBench P0)",
+          "timestamp": "2026-08-17T02:34:21.259825Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_self::multi_signal_eval",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:37:27.564509Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_self::multi_signal_eval",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T05:37:41.868056Z"
+        }
+      ],
+      "metadata": {
+        "wiring_evidence": "handlers_consciousness.rs:1256 MultiSignalEval::new T3 wire"
+      },
+      "created_at": "2026-08-17T02:34:21.259823Z",
+      "updated_at": "2026-08-17T05:37:41.868057Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_absorber::constrained_selection",
+      "domain": "world",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "constrained_selection",
+        "self_curriculum",
+        "anti_hallucination"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::constrained_selection",
+          "note": "语法约束选择器防幻觉 (text-alb P1)",
+          "timestamp": "2026-08-17T02:34:21.288044Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::constrained_selection",
+          "note": "api目录+预筛门+引用验证 (geoai/text-alb/opendataloader)",
+          "timestamp": "2026-08-17T02:34:31.318083Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::constrained_selection",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:37:27.592802Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::constrained_selection",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T05:37:41.893109Z"
+        }
+      ],
+      "metadata": {
+        "wiring_evidence": "self_curriculum/mod.rs:261 suggest_next_source_constrained"
+      },
+      "created_at": "2026-08-17T02:34:21.288041Z",
+      "updated_at": "2026-08-17T05:37:41.893110Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory::nt_memory_sft_extract_templates",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "sft_extract_templates",
+        "distillation",
+        "triplet"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_sft_extract_templates",
+          "note": "结构化提取指令模板库 (300K P1)",
+          "timestamp": "2026-08-17T02:34:21.318927Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.318924Z",
+      "updated_at": "2026-08-17T02:34:21.318928Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory::nt_memory_run_manifest",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "run_manifest",
+        "resume",
+        "checkpoint"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_run_manifest",
+          "note": "断点续跑 manifest (hyperresearch P1)",
+          "timestamp": "2026-08-17T02:34:21.350062Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.350059Z",
+      "updated_at": "2026-08-17T02:34:21.350063Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory::nt_memory_embed_binding",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "embed_binding",
+        "drift_protection"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_embed_binding",
+          "note": "embedding 模型绑定防漂移 (memvid P1)",
+          "timestamp": "2026-08-17T02:34:21.381223Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.381222Z",
+      "updated_at": "2026-08-17T02:34:21.381224Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_core::nt_core_eml_primitive",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "eml_primitive",
+        "primitive_completeness",
+        "vsa"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::nt_core_eml_primitive",
+          "note": "单一原语完备性 (2603.21852 P1)",
+          "timestamp": "2026-08-17T02:34:21.416154Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.416151Z",
+      "updated_at": "2026-08-17T02:34:21.416155Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind::nt_mind_symbolic_regression",
+      "domain": "mind",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "symbolic_regression",
+        "reversible_distill"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_symbolic_regression",
+          "note": "梯度符号回归恢复闭式规律 (2603.21852 P1)",
+          "timestamp": "2026-08-17T02:34:21.449425Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.449423Z",
+      "updated_at": "2026-08-17T02:34:21.449425Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind::nt_mind_eval_shadow_review",
+      "domain": "mind",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "shadow_review",
+        "absorption_quality"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_eval_shadow_review",
+          "note": "原作者评审通道 (2607.27191 P1)",
+          "timestamp": "2026-08-17T02:34:21.481654Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.481652Z",
+      "updated_at": "2026-08-17T02:34:21.481654Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io_provider::lookahead_prefetch",
+      "domain": "io",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "lookahead_prefetch",
+        "predictive_cache",
+        "response_cache"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::lookahead_prefetch",
+          "note": "预测式分层缓存预取 (OasisKV P1)",
+          "timestamp": "2026-08-17T02:34:21.512447Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::lookahead_prefetch",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T05:37:27.624700Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::lookahead_prefetch",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T05:37:41.917798Z"
+        }
+      ],
+      "metadata": {
+        "wiring_evidence": "gateway.rs:966 heal_and_cache_response prefetch wire"
+      },
+      "created_at": "2026-08-17T02:34:21.512446Z",
+      "updated_at": "2026-08-17T05:37:41.917799Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io::host_cred_exec_split",
+      "domain": "io",
+      "layer": "l0primitive",
+      "constellation": "c0compile",
+      "provides": [
+        "cred_exec_split",
+        "sandbox",
+        "credential"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::host_cred_exec_split",
+          "note": "凭据留宿主+执行进沙箱 (pi P1)",
+          "timestamp": "2026-08-17T02:34:21.543592Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-17T02:34:21.543590Z",
+      "updated_at": "2026-08-17T02:34:21.543593Z",
       "deprecated": false,
       "deprecated_reason": null
     }

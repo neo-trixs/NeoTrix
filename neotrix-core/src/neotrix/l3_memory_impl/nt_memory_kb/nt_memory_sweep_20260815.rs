@@ -205,6 +205,209 @@ pub struct RetrievalMatrix {
     keyword_index: HashMap<String, Vec<(String, u32)>>,
 }
 
+// ────────────────────────────────────────────────────────────────
+// P0-3: UntrustedFence (nt_memory_untrusted_fence) — 未信任记忆隔离围栏。
+// 从外部/爬虫/非审核源吸收的记忆 (untrusted) 与内部可信记忆 (trusted) 物理隔离。
+// 检索时默认不混入 untrusted, 除非显式请求 (is_fenced_doc 谓词)。
+// 机制来源: wms data 清洗/隔离 (R-P79 生产接线: RetrievalMatrix 消费)。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FenceKind {
+    Trusted,
+    Untrusted,
+}
+
+#[derive(Debug, Clone)]
+pub struct FencedContent {
+    pub doc_id: String,
+    pub kind: FenceKind,
+    pub source_url: Option<String>,
+}
+
+impl FencedContent {
+    pub fn trusted(doc_id: impl Into<String>) -> Self {
+        Self {
+            doc_id: doc_id.into(),
+            kind: FenceKind::Trusted,
+            source_url: None,
+        }
+    }
+
+    pub fn untrusted(doc_id: impl Into<String>, source_url: impl Into<String>) -> Self {
+        Self {
+            doc_id: doc_id.into(),
+            kind: FenceKind::Untrusted,
+            source_url: Some(source_url.into()),
+        }
+    }
+
+    pub fn is_trusted(&self) -> bool {
+        self.kind == FenceKind::Trusted
+    }
+
+    pub fn is_untrusted(&self) -> bool {
+        self.kind == FenceKind::Untrusted
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct UntrustedFence {
+    /// doc_id → 围栏元数据 (trusted/untrusted + 来源)。
+    fences: HashMap<String, FencedContent>,
+    /// 围栏边界标记 — untrusted 内容写入时包上, 读取时校验剥离。
+    /// (文本围栏语义: 未闭合即拒绝消费, 防部分提取污染)。
+    pub marker_open: &'static str,
+    pub marker_close: &'static str,
+}
+
+pub const UNTRUSTED_OPEN: &str = "\u{FFFD}__NT_UNTRUSTED__\u{FFFD}";
+pub const UNTRUSTED_CLOSE: &str = "\u{FFFD}__NT_UNTRUSTED_END__\u{FFFD}";
+
+impl UntrustedFence {
+    pub fn new() -> Self {
+        Self {
+            fences: HashMap::new(),
+            marker_open: UNTRUSTED_OPEN,
+            marker_close: UNTRUSTED_CLOSE,
+        }
+    }
+
+    /// 围栏写入: 把 untrusted 内容包上边界标记。
+    pub fn fence(&mut self, doc_id: impl Into<String>, content: &str, source_url: impl Into<String>) -> String {
+        let id = doc_id.into();
+        self.fences.insert(
+            id.clone(),
+            FencedContent::untrusted(id, source_url),
+        );
+        format!("{}{}{}", self.marker_open, content, self.marker_close)
+    }
+
+    /// 围栏读取: 剥离边界标记。未闭合 → None (拒绝消费)。
+    pub fn unwrap(&self, content: &str) -> Option<String> {
+        if content.starts_with(self.marker_open) && content.ends_with(self.marker_close) {
+            Some(content[self.marker_open.len()..content.len() - self.marker_close.len()].to_string())
+        } else if content.contains(self.marker_open) || content.contains(self.marker_close) {
+            None
+        } else {
+            Some(content.to_string())
+        }
+    }
+
+    /// 是否为围栏文档 (fence 内登记过)。
+    pub fn is_fenced(&self, doc_id: &str) -> bool {
+        self.fences.contains_key(doc_id)
+    }
+
+    pub fn fence_kind(&self, doc_id: &str) -> Option<FenceKind> {
+        self.fences.get(doc_id).map(|f| f.kind)
+    }
+
+    pub fn source_url(&self, doc_id: &str) -> Option<&str> {
+        self.fences.get(doc_id).and_then(|f| f.source_url.as_deref())
+    }
+
+    pub fn fence_count(&self) -> usize {
+        self.fences.len()
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// P0-4: QualityRanker (nt_memory_quality_rank) — 检索质量排序器。
+// 按来源分级 (peer-reviewed > official docs > blog > social > crowdsourced),
+// 引用权威度 + 语义中心度加权, 撤回 (retracted) 文档强制降权到垫底。
+// 机制来源: content 质量分级 (R-P79 生产接线: hybrid_search_quality 消费)。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SourceTier {
+    PeerReviewed,
+    OfficialDocs,
+    Blog,
+    Social,
+    Crowdsourced,
+}
+
+impl SourceTier {
+    pub fn weight(&self) -> f64 {
+        match self {
+            SourceTier::PeerReviewed => 1.0,
+            SourceTier::OfficialDocs => 0.9,
+            SourceTier::Blog => 0.6,
+            SourceTier::Social => 0.4,
+            SourceTier::Crowdsourced => 0.3,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            SourceTier::PeerReviewed => "peer-reviewed",
+            SourceTier::OfficialDocs => "official",
+            SourceTier::Blog => "blog",
+            SourceTier::Social => "social",
+            SourceTier::Crowdsourced => "crowdsourced",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct QualityRanker {
+    /// doc_id → 来源分级。
+    tiers: HashMap<String, SourceTier>,
+    /// doc_id → 引用权威度 [0,1]。
+    citation_authority: HashMap<String, f64>,
+    /// doc_id → 语义中心度 [0,1]。
+    centrality: HashMap<String, f64>,
+    /// 已撤回 (retracted) 文档集。
+    retracted: std::collections::HashSet<String>,
+}
+
+impl QualityRanker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_tier(&mut self, doc_id: impl Into<String>, tier: SourceTier) {
+        self.tiers.insert(doc_id.into(), tier);
+    }
+
+    pub fn set_citation_authority(&mut self, doc_id: impl Into<String>, a: f64) {
+        self.citation_authority.insert(doc_id.into(), a.clamp(0.0, 1.0));
+    }
+
+    pub fn set_centrality(&mut self, doc_id: impl Into<String>, c: f64) {
+        self.centrality.insert(doc_id.into(), c.clamp(0.0, 1.0));
+    }
+
+    pub fn retract(&mut self, doc_id: impl Into<String>) {
+        self.retracted.insert(doc_id.into());
+    }
+
+    /// 质量分 = tier_weight × (0.5 + 0.3×authority + 0.2×centrality)。
+    /// 撤回文档 → 直接返回 0.0 (垫底, 永不出现在顶部)。
+    pub fn score(&self, doc_id: &str) -> f64 {
+        if self.retracted.contains(doc_id) {
+            return 0.0;
+        }
+        let tier_w = self.tiers.get(doc_id).map(|t| t.weight()).unwrap_or(0.5);
+        let authority = self.citation_authority.get(doc_id).copied().unwrap_or(0.5);
+        let centrality = self.centrality.get(doc_id).copied().unwrap_or(0.5);
+        tier_w * (0.5 + 0.3 * authority + 0.2 * centrality)
+    }
+
+    /// 质量感知重排: 在基础分数上乘质量系数 (撤回 → 0)。
+    pub fn rerank(&self, hits: &mut Vec<RetrievalHit>) {
+        for h in hits.iter_mut() {
+            h.score *= self.score(&h.doc_id);
+        }
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+}
+
 impl RetrievalMatrix {
     pub fn new() -> Self {
         Self::default()
@@ -302,6 +505,34 @@ impl RetrievalMatrix {
 
     pub fn semantic_len(&self) -> usize {
         self.semantic_index.len()
+    }
+}
+
+impl RetrievalMatrix {
+    /// P0-4 接线 (R-P79): 质量感知混合检索 — 基础 hybrid_search 结果经
+    /// QualityRanker 重排 (tier/authority/centrality 加权, 撤回垫底)。
+    /// UntrustedFence 登记过的 untrusted 文档默认过滤 (除非 include_untrusted)。
+    pub fn hybrid_search_quality(
+        &self,
+        query: &[f64],
+        query_terms: &[&str],
+        k: usize,
+        ranker: &QualityRanker,
+        fence: &UntrustedFence,
+        include_untrusted: bool,
+    ) -> Vec<RetrievalHit> {
+        let mut hits = self.hybrid_search(query, query_terms, usize::MAX);
+        if !include_untrusted {
+            hits.retain(|h| !fence.is_fenced(&h.doc_id));
+        }
+        ranker.rerank(&mut hits);
+        hits.truncate(k);
+        hits
+    }
+
+    /// P0-3 接线 (R-P79): 是否为围栏文档 (untrusted 隔离谓词, 供上层检索过滤)。
+    pub fn is_fenced_doc(&self, doc_id: &str, fence: &UntrustedFence) -> bool {
+        fence.is_fenced(doc_id)
     }
 }
 
@@ -604,5 +835,58 @@ mod tests {
     fn test_aggregate_selftest() {
         let t = SweepMemoryCapabilitiesSelfTest;
         assert!(t.self_test().is_ok());
+    }
+
+    // ── P0-3 UntrustedFence ──
+    #[test]
+    fn test_untrusted_fence_roundtrip() {
+        let mut fence = UntrustedFence::new();
+        let wrapped = fence.fence("d1", "external raw content", "https://example.com/x");
+        assert!(wrapped.starts_with(UNTRUSTED_OPEN));
+        assert!(fence.is_fenced("d1"));
+        assert_eq!(fence.fence_kind("d1"), Some(FenceKind::Untrusted));
+        assert_eq!(fence.source_url("d1"), Some("https://example.com/x"));
+        let inner = fence.unwrap(&wrapped);
+        assert_eq!(inner.as_deref(), Some("external raw content"));
+    }
+
+    #[test]
+    fn test_untrusted_fence_rejects_unclosed() {
+        let fence = UntrustedFence::new();
+        let broken = format!("{}{}", UNTRUSTED_OPEN, "no close marker");
+        assert!(fence.unwrap(&broken).is_none(), "未闭合 → 拒绝消费");
+        assert_eq!(fence.unwrap("plain"), Some("plain".to_string()));
+    }
+
+    #[test]
+    fn test_retrieval_matrix_fenced_filter() {
+        let mut matrix = RetrievalMatrix::new();
+        let mut fence = UntrustedFence::new();
+        matrix.index_keywords("trusted", vec![("a".into(), 3)]);
+        matrix.index_keywords("untrusted", vec![("a".into(), 3)]);
+        fence.fence("untrusted", "raw", "http://x");
+        let hits = matrix.hybrid_search_quality(&[], &["a"], 10, &QualityRanker::new(), &fence, false);
+        assert!(hits.iter().all(|h| h.doc_id != "untrusted"), "untrusted 默认过滤");
+        assert!(matrix.is_fenced_doc("untrusted", &fence));
+        let all = matrix.hybrid_search_quality(&[], &["a"], 10, &QualityRanker::new(), &fence, true);
+        assert_eq!(all.len(), 2, "include_untrusted 时全部返回");
+    }
+
+    // ── P0-4 QualityRanker ──
+    #[test]
+    fn test_quality_ranker_peer_reviewed_top() {
+        let mut r = QualityRanker::new();
+        r.set_tier("a", SourceTier::PeerReviewed);
+        r.set_tier("b", SourceTier::Crowdsourced);
+        assert!(r.score("a") > r.score("b"));
+    }
+
+    #[test]
+    fn test_quality_ranker_retracted_bottom() {
+        let mut r = QualityRanker::new();
+        r.set_tier("a", SourceTier::PeerReviewed);
+        r.set_citation_authority("a", 1.0);
+        r.retract("a");
+        assert_eq!(r.score("a"), 0.0, "撤回 → 0");
     }
 }

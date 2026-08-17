@@ -452,6 +452,114 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergeCheckFn {
 /// Helper struct to implement SelfTest for the module-level functions.
 pub struct ConvergeCheckFn;
 
+// ────────────────────────────────────────────────────────────────
+// P0-5: MultiSignalEval (DSAgentBench 2608.09867) — 多信号产出物级验证。
+// 对 Agent 的产出物做确定性多信号检查 (语法 / 证据 / 过程步), 综合判定
+// 是否通过。纯确定性 (R-P48): 不依赖 LLM 判断, 只做字符串/结构断言。
+// T3 接线: converge_check 输出作为信号喂入, 写入 KB (R-P36 行为接地)。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct SignalResult {
+    pub name: &'static str,
+    pub passed: bool,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct MultiSignalVerdict {
+    pub total: usize,
+    pub passed: usize,
+    pub pass_ratio: f64,
+    pub all_passed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct MultiSignalEval {
+    /// 通过阈值 (pass_ratio 需 ≥ 此值才算 all_passed)。
+    threshold: f64,
+}
+
+impl MultiSignalEval {
+    pub fn new(threshold: f64) -> Self {
+        Self { threshold }
+    }
+
+    /// 信号 1: 语法/结构完整 — 输出不含已知畸形标记 (如 UNPARSEABLE 残留)。
+    pub fn signal_syntax_ok(&self, output: &str, known_bad_markers: &[&str]) -> SignalResult {
+        let bad = known_bad_markers.iter().find(|m| output.contains(**m));
+        SignalResult {
+            name: "syntax_ok",
+            passed: bad.is_none(),
+            detail: bad.map(|m| format!("found bad marker: {}", m)).unwrap_or_default(),
+        }
+    }
+
+    /// 信号 2: 证据存在 — 输出包含声称存在的关键证据片段。
+    pub fn signal_evidence_present(&self, output: &str, required_evidence: &[&str]) -> SignalResult {
+        let missing: Vec<&str> = required_evidence
+            .iter()
+            .filter(|e| !output.contains(**e))
+            .copied()
+            .collect();
+        SignalResult {
+            name: "evidence_present",
+            passed: missing.is_empty(),
+            detail: if missing.is_empty() {
+                String::new()
+            } else {
+                format!("missing evidence: {:?}", missing)
+            },
+        }
+    }
+
+    /// 信号 3: 过程步完整 — 断言步骤状态向量全部成功。
+    pub fn signal_process_steps(&self, step_states: &[bool]) -> SignalResult {
+        let failed = step_states.iter().filter(|s| !**s).count();
+        SignalResult {
+            name: "process_steps",
+            passed: failed == 0,
+            detail: format!("{} of {} steps failed", failed, step_states.len()),
+        }
+    }
+
+    /// 综合判定: 聚合信号, 计算 pass_ratio, 按阈值判定 all_passed。
+    pub fn evaluate(&self, signals: Vec<SignalResult>) -> MultiSignalVerdict {
+        let total = signals.len();
+        let passed = signals.iter().filter(|s| s.passed).count();
+        let pass_ratio = if total == 0 { 0.0 } else { passed as f64 / total as f64 };
+        MultiSignalVerdict {
+            total,
+            passed,
+            pass_ratio,
+            all_passed: pass_ratio >= self.threshold,
+        }
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for MultiSignalEval {
+    fn name(&self) -> &str {
+        "nt_core_multi_signal_eval"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let eval = MultiSignalEval::new(1.0);
+        let v = eval.evaluate(vec![
+            eval.signal_syntax_ok("clean", &["UNPARSEABLE"]),
+            eval.signal_evidence_present("has table", &["table"]),
+            eval.signal_process_steps(&[true, true]),
+        ]);
+        if !v.all_passed || v.pass_ratio < 1.0 {
+            return Err(vec!["all-pass signal set failed".into()]);
+        }
+        let v2 = eval.evaluate(vec![eval.signal_process_steps(&[false])]);
+        if v2.all_passed {
+            return Err(vec!["failed step should not pass at threshold 1.0".into()]);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -572,5 +680,27 @@ mod tests {
         assert_eq!(deg.len(), 1);
         assert_eq!(deg[0].0, "write");
         assert!(!m.summary().is_empty());
+    }
+
+    #[test]
+    fn test_multi_signal_eval_all_pass() {
+        let eval = MultiSignalEval::new(1.0);
+        let verdict = eval.evaluate(vec![
+            eval.signal_syntax_ok("clean output", &["UNPARSEABLE"]),
+            eval.signal_evidence_present("result table", &["table"]),
+            eval.signal_process_steps(&[true, false]),
+        ]);
+        assert!(!verdict.all_passed);
+        assert!(verdict.pass_ratio < 1.0);
+    }
+
+    #[test]
+    fn test_multi_signal_eval_threshold() {
+        let eval = MultiSignalEval::new(0.5);
+        let verdict = eval.evaluate(vec![
+            eval.signal_syntax_ok("clean", &["UNPARSEABLE"]),
+            eval.signal_process_steps(&[false]),
+        ]);
+        assert!(verdict.all_passed, "0.5 threshold → 1/2 passes");
     }
 }

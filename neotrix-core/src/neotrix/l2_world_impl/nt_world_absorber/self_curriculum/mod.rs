@@ -255,6 +255,25 @@ impl SelfCurriculumPipeline {
         candidates.into_iter().find(|_| true)
     }
 
+    /// P0-6 接线: 语法约束的选择 — 仅从已知来源集选择候选。
+    /// 防选择器/课程幻觉 (text-alb: "cannot select something that doesn't exist")。
+    /// 已知来源由 source_discoverer 的 known_sources 提供 (约束域)。
+    pub fn suggest_next_source_constrained(&self, knowledge_gaps: &[String]) -> Option<String> {
+        let candidates = self.source_discoverer.discover(knowledge_gaps);
+        let mut sel = ConstrainedSelector::new();
+        for known in self.source_discoverer.known_sources() {
+            sel.allow(known);
+        }
+        match sel.select(&candidates) {
+            SelectionVerdict {
+                kind: SelectionVerdictKind::Selected,
+                selected: Some(s),
+                ..
+            } => Some(s),
+            _ => None,
+        }
+    }
+
     pub fn record_outcome(&mut self, entry: CurriculumEntry) {
         if self.task_history.len() >= self.max_history {
             self.task_history.pop_front();
@@ -322,6 +341,83 @@ impl SelfCurriculumPipeline {
             current_difficulty: self.difficulty_adjuster.current_difficulty,
             suggested_next_type,
         }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// P0-6: ConstrainedSelector — 语法约束选择器 (text-albumentations 吸收)
+// "grammar-constrained to the actual task names, so it cannot select something
+// that doesn't exist" — 防 LLM/选择器幻觉选择不存在之物。
+// 选择候选必须 ∈ 已知来源集 (known_set), 越界即拒绝, 而非返回虚构项。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SelectionVerdictKind {
+    Selected,
+    RejectedOutOfSet,
+    RejectedEmpty,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelectionVerdict {
+    pub kind: SelectionVerdictKind,
+    pub selected: Option<String>,
+    pub reason: String,
+}
+
+/// 语法约束选择器 (text-alb MetaAugmentation 机制)。
+#[derive(Debug, Clone, Default)]
+pub struct ConstrainedSelector {
+    /// 已知可用来源集合 (语法约束域)。
+    known: std::collections::HashSet<String>,
+}
+
+impl ConstrainedSelector {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 注册一个已知可用来源。
+    pub fn allow(&mut self, source: impl Into<String>) {
+        self.known.insert(source.into());
+    }
+
+    /// 从候选集选择: 候选必须是已知来源 (约束) 且非空。
+    /// 返回被选中的首个合法候选, 全部越界 → RejectedOutOfSet。
+    pub fn select(&self, candidates: &[String]) -> SelectionVerdict {
+        if candidates.is_empty() {
+            return SelectionVerdict {
+                kind: SelectionVerdictKind::RejectedEmpty,
+                selected: None,
+                reason: "candidate list is empty".into(),
+            };
+        }
+        for c in candidates {
+            if self.known.contains(c) {
+                return SelectionVerdict {
+                    kind: SelectionVerdictKind::Selected,
+                    selected: Some(c.clone()),
+                    reason: "candidate is a known source".into(),
+                };
+            }
+        }
+        SelectionVerdict {
+            kind: SelectionVerdictKind::RejectedOutOfSet,
+            selected: None,
+            reason: format!(
+                "no candidate is a known source ({} unknown candidates)",
+                candidates.len()
+            ),
+        }
+    }
+
+    /// 是否为已知来源 (约束谓词, 供外部调用)。
+    pub fn is_known(&self, source: &str) -> bool {
+        self.known.contains(source)
+    }
+
+    pub fn known_len(&self) -> usize {
+        self.known.len()
     }
 }
 
@@ -512,5 +608,42 @@ mod tests {
         let pipeline = SelfCurriculumPipeline::new();
         let ds = pipeline.diversity_score();
         assert!((ds - 0.0).abs() < 1e-6);
+    }
+
+    // ── P0-6 ConstrainedSelector (text-alb) ──
+    #[test]
+    fn test_constrained_select_known() {
+        let mut sel = ConstrainedSelector::new();
+        sel.allow("github.com/neo/awesome");
+        let v = sel.select(&["github.com/neo/awesome".to_string()]);
+        assert_eq!(v.kind, SelectionVerdictKind::Selected);
+        assert_eq!(v.selected.as_deref(), Some("github.com/neo/awesome"));
+        assert!(sel.is_known("github.com/neo/awesome"));
+        assert_eq!(sel.known_len(), 1);
+    }
+
+    #[test]
+    fn test_constrained_reject_out_of_set() {
+        let mut sel = ConstrainedSelector::new();
+        sel.allow("known-only");
+        let v = sel.select(&["hallucinated-repo".to_string()]);
+        assert_eq!(v.kind, SelectionVerdictKind::RejectedOutOfSet);
+        assert!(v.selected.is_none());
+        assert!(!v.reason.is_empty());
+    }
+
+    #[test]
+    fn test_constrained_reject_empty() {
+        let sel = ConstrainedSelector::new();
+        let v = sel.select(&[]);
+        assert_eq!(v.kind, SelectionVerdictKind::RejectedEmpty);
+    }
+
+    #[test]
+    fn test_constrained_prefers_known_among_unknown() {
+        let mut sel = ConstrainedSelector::new();
+        sel.allow("real");
+        let v = sel.select(&["ghost-a".to_string(), "real".to_string(), "ghost-b".to_string()]);
+        assert_eq!(v.selected.as_deref(), Some("real"));
     }
 }

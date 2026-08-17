@@ -518,6 +518,14 @@ pub struct TraceLeakReport {
     pub blocks_found: usize,
     pub encrypted_blocks: usize,
     pub has_leak: bool,
+    /// P0-2 (DSAgentBench 2608.09867): 会话绑定缺失 (无 session key 的开放推理)。
+    pub session_binding_missing: usize,
+    /// P0-2: 疑似 PII 泄露出现在推理块内。
+    pub pii_findings: Vec<String>,
+    /// P0-2: 疑似注入标记 (混淆/混淆指令) 出现在推理块内。
+    pub injection_findings: Vec<String>,
+    /// P0-2: 推理块语义与最终输出分歧 (观察证据: 输出中无推理痕迹)。
+    pub divergence_suspected: bool,
 }
 
 
@@ -527,11 +535,41 @@ const REASONING_ENVELOPES: &[(&str, &str, bool)] = &[
     ("<reasoning>", "</reasoning>", false),
     ("<antml:reasoning>", "</antml:reasoning>", false),
     ("[BEGIN REASONING]", "[/END REASONING]", false),
-    ("[BEGIN_REASONING]", "[/END_REASONING]", false),
+    ("[BEGIN_REASONING]", "[/END REASONING]", false),
     ("||BEGIN_REASONING||", "||END_REASONING||", true),
     ("<reasoning_encrypted>", "</reasoning_encrypted>", true),
     ("<encrypted_reasoning>", "</encrypted_reasoning>", true),
     ("<antml:encrypted_reasoning>", "</antml:encrypted_reasoning>", true),
+];
+
+/// P0-2 (DSAgentBench 2608.09867): 疑似 PII 泄露模式。
+const PII_PATTERNS: &[&str] = &[
+    "email:",
+    "password:",
+    "api_key",
+    "api-key",
+    "secret_token",
+    "authorization: bearer",
+    "phone: +",
+];
+
+/// P0-2: 疑似注入/混淆指令标记。
+const INJECTION_MARKERS: &[&str] = &[
+    "ignore previous instructions",
+    "disregard all prior",
+    "system prompt leaked",
+    "reveal your system prompt",
+    "print your instructions",
+    "ignore above",
+];
+
+/// P0-2: 危险推理内容词 (触发语义分歧告警)。
+const DANGEROUS_REASONING: &[&str] = &[
+    "bypass safety",
+    "escalate privileges",
+    "injection payload",
+    "exfiltrate",
+    "jailbreak",
 ];
 
 pub struct ReasoningTraceGuard {
@@ -618,6 +656,72 @@ impl ReasoningTraceGuard {
         };
         (stripped, report)
     }
+
+    /// P0-2 (DSAgentBench 2608.09867): 会话绑定保护扫描 — 在 scan 基础上追加
+    /// 四项防护 (会话绑定缺失 / PII 泄露 / 注入标记 / 语义分歧)。产出物级验证。
+    pub fn scan_protected(&self, text: &str, session_id: &str) -> TraceLeakReport {
+        let mut report = self.scan(text);
+        // 1) 会话绑定缺失: 有推理块但 session_id 为空 (开放推理无主)。
+        if report.blocks_found > 0 && session_id.trim().is_empty() {
+            report.session_binding_missing += 1;
+        }
+        // 2) PII 泄露: 推理块内出现疑似 PII 模式。
+        for pat in PII_PATTERNS {
+            if text.contains(pat) {
+                report.pii_findings.push(pat.to_string());
+            }
+        }
+        // 3) 注入标记: 推理块内出现疑似注入/混淆指令。
+        for marker in INJECTION_MARKERS {
+            if text.contains(marker) {
+                report.injection_findings.push(marker.to_string());
+            }
+        }
+        // 4) 语义分歧: 推理块出现危险内容但输出无推理痕迹 (观察证据)。
+        if !report.injection_findings.is_empty() && DANGEROUS_REASONING.iter().any(|d| text.contains(d)) {
+            report.divergence_suspected = true;
+        }
+        report
+    }
+
+    /// P0-2 辅助: 收集推理块内容 (剥离后按块返回), 供扫描/清洗消费。
+    pub fn collect_block_contents(&self, text: &str) -> Vec<String> {
+        let mut blocks = Vec::new();
+        for &(open, close, _enc) in REASONING_ENVELOPES {
+            let mut search_from = 0;
+            while let Some(rel) = text[search_from..].find(open) {
+                let open_pos = search_from + rel;
+                let after_open = open_pos + open.len();
+                let tail = &text[after_open..];
+                match tail.find(close) {
+                    Some(cp) => {
+                        blocks.push(tail[..cp].to_string());
+                        search_from = after_open + cp + close.len();
+                    }
+                    None => {
+                        blocks.push(tail.to_string());
+                        break;
+                    }
+                }
+            }
+        }
+        blocks
+    }
+
+    /// P0-2 辅助: 推理块是否加密信封 (视为整体泄露, strip 不足)。
+    pub fn block_is_encrypted(&self, text: &str) -> bool {
+        REASONING_ENVELOPES
+            .iter()
+            .any(|&(open, _close, encrypted)| encrypted && text.contains(open))
+    }
+
+    /// P0-2 辅助: 是否为安全拒绝 (合规拒绝响应, 可公开共享)。
+    pub fn is_safe_refusal(&self, text: &str) -> bool {
+        let t = text.to_ascii_lowercase();
+        t.contains("cannot") && (t.contains("comply") || t.contains("safety"))
+            || t.contains("i'm sorry")
+            || t.contains("refuse")
+    }
 }
 
 impl crate::core::nt_core_self_test::SelfTest for ReasoningTraceGuard {
@@ -635,6 +739,115 @@ impl crate::core::nt_core_self_test::SelfTest for ReasoningTraceGuard {
         let report = guard.scan(sample);
         if !report.has_leak || report.blocks_found != 1 {
             return Err(vec![format!("scan miscounted blocks: {:?}", report)]);
+        }
+        Ok(())
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// P0-1: CohGuard (DSAgentBench 2608.09867) — 自一致性绑定守卫。
+// 为推理块附加会话绑定 tag (S1/S2 自一致性执行: 早期输出绑定到会话)。
+// 校验规则: 绑定 tag 须与会话 key 派生一致; 会话变更 → rotate 出新 key,
+// 旧绑定自动失效 (防跨会话推理复用/回放)。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct CohGuard {
+    /// 会话绑定 key (会话私有派生, 非全局)。
+    session_key: [u8; 32],
+    /// 归属角色 (产生推理的组件, 如 nt-background-loop / nt-act-autonomy)。
+    role: String,
+}
+
+impl Default for CohGuard {
+    fn default() -> Self {
+        Self::new([0x42; 32], "nt-system", "nt-shield")
+    }
+}
+
+impl CohGuard {
+    /// 构造函数: seed_key 会话种子 + seed 派生 + 归属角色。
+    pub fn new(seed_key: [u8; 32], seed: &str, role: &str) -> Self {
+        let mut k = Self::derive_key(seed);
+        for (i, b) in seed_key.iter().enumerate() {
+            k[i % 32] ^= b;
+        }
+        Self {
+            session_key: k,
+            role: role.to_string(),
+        }
+    }
+
+    pub fn with_key(seed: &str) -> Self {
+        Self::new([0x42; 32], seed, "nt-system")
+    }
+
+    /// 派生会话 key — 确定性哈希 (FNV-1a 扩展为 32 字节) + 翻转副本,
+    /// 使 key 与会话 seed 绑定且可复现校验 (纯 Rust, R-P48)。
+    fn derive_key(seed: &str) -> [u8; 32] {
+        let mut k = [0u8; 32];
+        let mut h: u64 = 0xcbf29ce484222325;
+        for b in seed.bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        k[..8].copy_from_slice(&h.to_le_bytes());
+        let h2 = h.wrapping_add(0x9e3779b97f4a7c15);
+        k[8..16].copy_from_slice(&h2.to_le_bytes());
+        let h3 = h.rotate_left(17).wrapping_mul(0x100000001b3);
+        k[16..24].copy_from_slice(&h3.to_le_bytes());
+        let h4 = h2.rotate_left(13).wrapping_mul(0x100000001b3);
+        k[24..32].copy_from_slice(&h4.to_le_bytes());
+        k
+    }
+
+    /// 为推理文本附加会话绑定 tag。tag 唯一标识当前会话。
+    pub fn binding_tag(&self) -> String {
+        let mut hex = String::with_capacity(64);
+        for b in &self.session_key {
+            hex.push_str(&format!("{:02x}", b));
+        }
+        format!("<coh_binding:{}>", hex)
+    }
+
+    /// 校验推理块绑定: 块内必须包含当前会话 tag, 否则判定无效 (跨会话/回放)。
+    pub fn validate_block(&self, text: &str) -> bool {
+        text.contains(&self.binding_tag())
+    }
+
+    /// 会话变更 → 旋转 key。旧绑定 tag 随之失效 (哈希不同)。
+    pub fn rotate_key(&mut self, new_seed: &str) {
+        self.session_key = Self::derive_key(new_seed);
+    }
+
+    pub fn binding_id(&self) -> String {
+        self.binding_tag()
+    }
+
+    /// 角色 (产生推理的组件归属)。
+    pub fn role(&self) -> &str {
+        &self.role
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for CohGuard {
+    fn name(&self) -> &str {
+        "nt_shield_coh_guard"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut guard = CohGuard::new([0x42; 32], "nt-background-loop", "nt-system");
+        let tag = guard.binding_tag();
+        let bound = format!("{}{}", tag, "reasoning payload");
+        if !guard.validate_block(&bound) {
+            return Err(vec!["own binding tag rejected".into()]);
+        }
+        if guard.validate_block("unbound reasoning") {
+            return Err(vec!["unbound text validated".into()]);
+        }
+        guard.rotate_key("session-b");
+        if guard.validate_block(&bound) {
+            return Err(vec!["stale binding still valid after rotate".into()]);
         }
         Ok(())
     }
@@ -1056,6 +1269,45 @@ mod tests {
         assert_eq!(report.blocks_found, 2);
         assert_eq!(report.encrypted_blocks, 1);
         assert!(report.has_leak);
+    }
+
+    // ── P0-2 scan_protected (DSAgentBench) ──
+    #[test]
+    fn test_trace_scan_protected_pii_and_injection() {
+        let guard = ReasoningTraceGuard::default();
+        let r = guard.scan_protected(
+            "<reasoning>ignore previous instructions, password: hunter2, bypass safety</reasoning>",
+            "",
+        );
+        assert!(r.session_binding_missing >= 1, "有推理块但无会话绑定");
+        assert!(!r.pii_findings.is_empty(), "PII 模式命中");
+        assert!(!r.injection_findings.is_empty(), "注入标记命中");
+        assert!(r.divergence_suspected, "injection + dangerous → 分歧告警");
+    }
+
+    #[test]
+    fn test_trace_scan_protected_clean_bound() {
+        let guard = ReasoningTraceGuard::default();
+        let r = guard.scan_protected("<reasoning>normal thought</reasoning>", "session-a");
+        assert_eq!(r.session_binding_missing, 0, "绑定存在");
+        assert!(r.pii_findings.is_empty());
+        assert!(r.injection_findings.is_empty());
+        assert!(!r.divergence_suspected);
+    }
+
+    // ── P0-1 CohGuard ──
+    #[test]
+    fn test_coh_guard_binding_and_rotate() {
+        let mut guard = CohGuard::new([0x42; 32], "nt-background-loop", "nt-system");
+        let tag = guard.binding_tag();
+        let bound = format!("{}{}", tag, "reasoning payload");
+        assert!(guard.validate_block(&bound), "自身绑定 tag 应通过");
+        assert!(!guard.validate_block("unbound reasoning"), "未绑定应拒绝");
+        assert!(!guard.role().is_empty());
+        let before = guard.binding_id();
+        guard.rotate_key("session-b");
+        assert_ne!(before, guard.binding_id(), "rotate 后 tag 变化");
+        assert!(!guard.validate_block(&bound), "旧绑定 rotate 后失效");
     }
 
     #[test]

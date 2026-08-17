@@ -463,6 +463,31 @@ impl RstFlywheel {
         }
     }
 
+    /// P0-8 keep-or-revert (awesome-autoresearch): 单次单改动判定 —
+    /// 新方案得分 > 旧方案 × keep_threshold → keep; 否则 revert (回滚到旧方案)。
+    /// 防止连续改动导致的累计漂移。无基准 (old=0) → 视为 keep。
+    pub fn keep_or_revert(&self, old_score: f64, new_score: f64, keep_threshold: f64) -> bool {
+        if old_score <= 0.0 {
+            return true;
+        }
+        new_score > old_score * keep_threshold
+    }
+
+    /// P0-8 seed 梯度付费 (PI-blog): 按噪声估计选择验证 seed 数。
+    /// 低噪声 → 1 seed 足够; 中噪声 → 3; 高噪声 → 8 (付费上限)。
+    /// 返回 (seed 数, 是否升级到下一档)。
+    pub fn seed_escalation(&self, noise_estimate: f64, current_seeds: usize) -> (usize, bool) {
+        let target = if noise_estimate < 0.15 {
+            1
+        } else if noise_estimate < 0.4 {
+            3
+        } else {
+            8
+        };
+        let escalated = current_seeds < target;
+        (target, escalated)
+    }
+
     /// 阶段 5 reuse: 从已验证池采样可复用任务 (round-robin 策略, 确定性)。
     pub fn reuse(&self, offset: usize) -> Option<&RstTask> {
         if self.verified_pool.is_empty() {
@@ -1897,6 +1922,34 @@ mod tests {
         assert_eq!(total, 1 + dist.get(1).copied().unwrap_or(0));
         assert!(dist.len() >= 2, "seed(gen0) + children(gen1)");
         assert_eq!(dist[0], 1, "exactly one seed at gen0");
+    }
+
+    // ── P0-8 keep-or-revert + seed escalation ──
+    #[test]
+    fn rst_keep_or_revert_keeps_when_improves() {
+        let fw = RstFlywheel::new();
+        assert!(fw.keep_or_revert(10.0, 12.0, 1.05), "12 > 10*1.05 → keep");
+    }
+
+    #[test]
+    fn rst_keep_or_revert_reverts_when_regresses() {
+        let fw = RstFlywheel::new();
+        assert!(!fw.keep_or_revert(10.0, 9.0, 1.05), "9 < 10*1.05 → revert");
+    }
+
+    #[test]
+    fn rst_keep_or_revert_no_baseline_keeps() {
+        let fw = RstFlywheel::new();
+        assert!(fw.keep_or_revert(0.0, 5.0, 1.05), "无基准 → keep");
+    }
+
+    #[test]
+    fn rst_seed_escalation_tiers() {
+        let fw = RstFlywheel::new();
+        assert_eq!(fw.seed_escalation(0.05, 1), (1, false), "低噪声 1 seed");
+        assert_eq!(fw.seed_escalation(0.2, 1), (3, true), "中噪声升级到 3");
+        assert_eq!(fw.seed_escalation(0.6, 3), (8, true), "高噪声升级到 8");
+        assert_eq!(fw.seed_escalation(0.6, 8), (8, false), "已达付费上限");
     }
 
     // ── P7 MetaHarnessOptimizer ──

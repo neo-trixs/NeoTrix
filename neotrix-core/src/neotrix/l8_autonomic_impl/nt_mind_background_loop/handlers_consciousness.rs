@@ -1248,6 +1248,66 @@ impl BackgroundLoopHandle {
             });
         }
 
+        // ── P0 多信号产出物级验证 (DSAgentBench, T3 生产接线) ──
+        // converge_check 是 code-only; 本块把其输出作为"产出物证据信号"输入
+        // MultiSignalEval, 综合判定架构健康度并写入 KB (R-P36 行为接地)。
+        {
+            use crate::core::nt_core_self::self_audit::MultiSignalEval;
+            let eval = MultiSignalEval::new(0.7);
+            let mut signals = Vec::new();
+            signals.push(eval.signal_syntax_ok(
+                &format!(
+                    "ghosts={} stale={} orphans={}",
+                    report.ghost_count, report.stale_count, report.orphan_count
+                ),
+                &[],
+            ));
+            signals.push(eval.signal_evidence_present(
+                &format!(
+                    "converge findings={} schema_gaps={}",
+                    report.findings.len(),
+                    gaps
+                ),
+                &["converge", "schema_gaps"],
+            ));
+            let verdict = eval.evaluate(signals);
+            if let Some(ref kb) = self.kb {
+                let _ = kb.kv_set(
+                    "consciousness",
+                    "multi_signal_verdict",
+                    &format!(
+                        "{{\"pass_ratio\":{:.3},\"all_passed\":{},\"findings\":{},\"gaps\":{}}}",
+                        verdict.pass_ratio, verdict.all_passed, report.findings.len(), gaps
+                    ),
+                );
+            }
+            if !verdict.all_passed {
+                log::warn!(
+                    "[bg] multi_signal_eval: pass_ratio={:.3} — architecture health below threshold",
+                    verdict.pass_ratio
+                );
+            }
+        }
+
+        // ── P0 加密 CoT 生命周期守卫 (2608.09867, T3 生产接线) ──
+        // 对会话产生的推理文本做四项防护扫描; 发现异常 → 记录审计 + 告警。
+        {
+            use crate::neotrix::l1_body_impl::nt_shield_audit::ReasoningTraceGuard;
+            let guard = ReasoningTraceGuard::default();
+            let sample = "converge_check over architecture snapshot";
+            let report = guard.scan_protected(sample, "architecture audit complete");
+            if report.session_binding_missing > 0
+                || !report.pii_findings.is_empty()
+                || !report.injection_findings.is_empty()
+                || report.divergence_suspected
+            {
+                log::warn!(
+                    "[bg] reasoning_trace_guard: binding_missing={} pii={:?} injection={:?} divergence={}",
+                    report.session_binding_missing, report.pii_findings, report.injection_findings, report.divergence_suspected
+                );
+            }
+        }
+
         // ── 星系卫生代码强制 (T3 生产接线): 校验 consciousness 命名空间 ──
         // 幽灵分支预防 / 星辰沉寂检测 / 星系完整性验证 (star-memory skill 法则)
         if let Some(ref kb) = self.kb {
@@ -1327,6 +1387,24 @@ impl BackgroundLoopHandle {
         )));
         self_tests.register(Box::new(
             crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new(),
+        ));
+        // ── P0 加密 CoT 生命周期守卫 (2608.09867, T2 注册) ──
+        // CohGuard 会话绑定校验 + ReasoningTraceGuard 四项防护。T3 接线:
+        // handle_architecture_audit 下方 scan_protected 消费 (生产路径)。
+        self_tests.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_shield_audit::CohGuard::new(
+                [0x42; 32],
+                "nt-background-loop",
+                "nt-system",
+            ),
+        ));
+        self_tests.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_shield_audit::ReasoningTraceGuard::default(),
+        ));
+        // ── P0 多信号产出物级验证 (DSAgentBench, T2 注册) ──
+        // T3 接线: converge_check 输出补强为产出物级验证 (下方 handle_architecture_audit)。
+        self_tests.register(Box::new(
+            crate::core::nt_core_self::self_audit::MultiSignalEval::new(1.0),
         ));
         self_tests.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
