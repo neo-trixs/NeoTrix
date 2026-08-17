@@ -4,7 +4,7 @@
       "id": "exp::nt-repair::build_hygiene",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "build_hygiene"
       ],
@@ -35,14 +35,30 @@
           "to_node": "exp::nt-repair::build_hygiene",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:55.836188Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:36.847185Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:36.872904Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-11T06:24:37.598213Z",
-      "updated_at": "2026-08-16T07:33:55.836189Z",
+      "updated_at": "2026-08-17T06:26:36.872905Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -50,7 +66,7 @@
       "id": "exp::nt-repair::root_cause_method",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "root_cause_method"
       ],
@@ -89,14 +105,30 @@
           "to_node": "exp::nt-repair::root_cause_method",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:31.833772Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::root_cause_method",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:36.898470Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::root_cause_method",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:36.923569Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-11T06:24:37.598236Z",
-      "updated_at": "2026-08-16T12:32:31.833773Z",
+      "updated_at": "2026-08-17T06:26:36.923570Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -104,7 +136,7 @@
       "id": "nt_core_parallel::intent_isolation",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "intent_isolation",
         "need_to_know"
@@ -130,16 +162,32 @@
           "to_node": "nt_core_parallel::intent_isolation",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:55.982405Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::intent_isolation",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:36.949365Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::intent_isolation",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:36.974267Z"
         }
       ],
       "metadata": {
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
         "tests": "17 passed (nt_core_parallel::isolation)",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct"
       },
       "created_at": "2026-08-11T17:40:00Z",
-      "updated_at": "2026-08-16T07:45:37.672467Z",
+      "updated_at": "2026-08-17T06:26:36.974268Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -147,7 +195,7 @@
       "id": "nt_core_parallel::atomic_decomposition",
       "domain": "core",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "atomic_decomposition",
         "output_contract"
@@ -176,16 +224,32 @@
           "to_node": "nt_core_parallel::atomic_decomposition",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:55.945649Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::atomic_decomposition",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:36.999757Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::atomic_decomposition",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.025308Z"
         }
       ],
       "metadata": {
         "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
-        "evidence_gated": "unknown",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "tests": "17 passed (nt_core_parallel::isolation)"
+        "tests": "17 passed (nt_core_parallel::isolation)",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-11T17:40:00Z",
-      "updated_at": "2026-08-16T07:33:55.945651Z",
+      "updated_at": "2026-08-17T06:26:37.025309Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -338,13 +402,13 @@
         }
       ],
       "metadata": {
-        "input_schema": "path: string; dir: string | null; kind: FileKind; options: { preferred_sheets: string[], empty_markers: [string, string[]][], unit_rules: [] }",
-        "output_schema": "ContentSnapshot { kind, text, markdown, table[], image, media, mime_type, size_bytes } | ConsolidationReport { files_processed, total_rows, usd_rows, validation_warnings[], output }",
         "fallback_chain": [
           "native (calamine/office_oxide/image)",
           "extract_text -> to_markdown",
           "check_health"
-        ]
+        ],
+        "output_schema": "ContentSnapshot { kind, text, markdown, table[], image, media, mime_type, size_bytes } | ConsolidationReport { files_processed, total_rows, usd_rows, validation_warnings[], output }",
+        "input_schema": "path: string; dir: string | null; kind: FileKind; options: { preferred_sheets: string[], empty_markers: [string, string[]][], unit_rules: [] }"
       },
       "created_at": "2026-08-13T13:02:47.046875Z",
       "updated_at": "2026-08-16T07:33:56.054893Z",
@@ -355,7 +419,7 @@
       "id": "nt_core_parallel::dpp_diversity",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "parallel",
         "diversity",
@@ -397,14 +461,30 @@
           "to_node": "nt_core_parallel::dpp_diversity",
           "note": "Deprecated: Folded into nt_core_absorb::incremental_merge",
           "timestamp": "2026-08-16T07:35:04.200467Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::dpp_diversity",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.050486Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::dpp_diversity",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.075697Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T03:07:54.119406Z",
-      "updated_at": "2026-08-16T07:35:04.200467Z",
+      "updated_at": "2026-08-17T06:26:37.075698Z",
       "deprecated": true,
       "deprecated_reason": "Folded into nt_core_absorb::incremental_merge"
     },
@@ -476,7 +556,7 @@
       "id": "nt_io_multimodal_transform::intent_aware_vision",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "multimodal",
         "vision",
@@ -512,14 +592,30 @@
           "to_node": "nt_io_multimodal_transform::intent_aware_vision",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.090066Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::intent_aware_vision",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.101009Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::intent_aware_vision",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.126245Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T03:07:54.135702Z",
-      "updated_at": "2026-08-16T07:33:56.090067Z",
+      "updated_at": "2026-08-17T06:26:37.126247Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -527,7 +623,7 @@
       "id": "nt_mind_skill_engine::progressive_disclosure",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "skill",
         "progressive",
@@ -571,14 +667,30 @@
           "to_node": "nt_mind_skill_engine::progressive_disclosure",
           "note": "probe预算分配+evolution-worthiness门 (SPOT/2608.02636)",
           "timestamp": "2026-08-17T02:34:31.093410Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::progressive_disclosure",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.151566Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::progressive_disclosure",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.177275Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "skill_cmds.rs:175-186 record_call+step_disclosure",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "skill_cmds.rs:175-186 record_call+step_disclosure"
       },
       "created_at": "2026-08-14T03:58:06.411029Z",
-      "updated_at": "2026-08-17T02:34:31.093412Z",
+      "updated_at": "2026-08-17T06:26:37.177276Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -586,7 +698,7 @@
       "id": "nt_memory_curation::fidelity_ledger",
       "domain": "memory",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "curation",
         "conflict",
@@ -628,14 +740,30 @@
           "to_node": "nt_memory_curation::fidelity_ledger",
           "note": "Dreamer巩固+生命周期状态机+机检输出约束 (magic-context/hyperresearch)",
           "timestamp": "2026-08-17T02:34:31.287179Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_curation::fidelity_ledger",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.203242Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_curation::fidelity_ledger",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.228798Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T03:58:06.420110Z",
-      "updated_at": "2026-08-17T02:34:31.287180Z",
+      "updated_at": "2026-08-17T06:26:37.228799Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -643,7 +771,7 @@
       "id": "nt_core_absorb::incremental_merge",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "absorb",
         "incremental",
@@ -687,14 +815,30 @@
           "to_node": "nt_core_absorb::incremental_merge",
           "note": "Consolidate merge providers in NT-CORE/L1: dpp_diversity 折叠入 incremental_merge, 消除重复 merge provides",
           "timestamp": "2026-08-16T07:35:04.200462Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_absorb::incremental_merge",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.254890Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_absorb::incremental_merge",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.280111Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
+        "evidence_gated": "passed",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T03:58:06.428234Z",
-      "updated_at": "2026-08-16T07:35:04.200464Z",
+      "updated_at": "2026-08-17T06:26:37.280113Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -842,7 +986,7 @@
       "id": "nt_world_code_search::hybrid_symbol_search",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "代码语义搜索",
         "symbol索引",
@@ -878,14 +1022,30 @@
           "to_node": "nt_world_code_search::hybrid_symbol_search",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:39:38.480344Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::hybrid_symbol_search",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.307398Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::hybrid_symbol_search",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.333157Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T07:24:57.735635Z",
-      "updated_at": "2026-08-16T12:39:38.480346Z",
+      "updated_at": "2026-08-17T06:26:37.333159Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -893,7 +1053,7 @@
       "id": "nt_mind_distiller::reversible_distill",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "可逆蒸馏",
         "error_first压缩",
@@ -944,14 +1104,30 @@
           "to_node": "nt_mind_distiller::reversible_distill",
           "note": "outcome校准+rationale增强+recoverability判定 (SPOT/SFS-DPO/EML)",
           "timestamp": "2026-08-17T02:34:31.156258Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::reversible_distill",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.358881Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::reversible_distill",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.392875Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T07:25:01.569883Z",
-      "updated_at": "2026-08-17T02:34:31.156261Z",
+      "updated_at": "2026-08-17T06:26:37.392877Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -959,7 +1135,7 @@
       "id": "nt_mind_skill_engine::complementarity_attribution",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "技能树",
         "互补检索",
@@ -996,14 +1172,30 @@
           "to_node": "nt_mind_skill_engine::complementarity_attribution",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:34:35.302202Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::complementarity_attribution",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.425883Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::complementarity_attribution",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.455690Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T07:25:01.580480Z",
-      "updated_at": "2026-08-16T12:34:35.302204Z",
+      "updated_at": "2026-08-17T06:26:37.455692Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1011,7 +1203,7 @@
       "id": "nt_memory_kb::experience_triplet_pool",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "经验三元组",
         "质量过滤门",
@@ -1054,14 +1246,30 @@
           "to_node": "nt_memory_kb::experience_triplet_pool",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:43:34.910495Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::experience_triplet_pool",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.485663Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::experience_triplet_pool",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.515317Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T08:24:18.424618Z",
-      "updated_at": "2026-08-16T12:43:34.910496Z",
+      "updated_at": "2026-08-17T06:26:37.515319Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1243,7 +1451,7 @@
       "id": "nt_mind_guard::mape_validation_gate",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "多指标验证门",
         "burn_in",
@@ -1287,14 +1495,30 @@
           "to_node": "nt_mind_guard::mape_validation_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:02.769276Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_guard::mape_validation_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.544826Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_guard::mape_validation_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.574231Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
+        "evidence_gated": "passed",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T08:24:43.288598Z",
-      "updated_at": "2026-08-16T12:32:02.769277Z",
+      "updated_at": "2026-08-17T06:26:37.574232Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1302,7 +1526,7 @@
       "id": "nt_mind_evolution_loop::independent_auditor_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "独立验证门",
         "Auditor三角色",
@@ -1349,14 +1573,30 @@
           "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
           "note": "step-level偏好+re-ablate+negative-revisit (SFS-DPO/PI-blog)",
           "timestamp": "2026-08-17T02:34:31.122710Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.602389Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::independent_auditor_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.629088Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T11:46:32.523575Z",
-      "updated_at": "2026-08-17T02:34:31.122712Z",
+      "updated_at": "2026-08-17T06:26:37.629089Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1364,7 +1604,7 @@
       "id": "nt_mind_background_loop::loop_ready_scoring",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "循环就绪评分",
         "LoopReadyScore",
@@ -1407,14 +1647,30 @@
           "to_node": "nt_mind_background_loop::loop_ready_scoring",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:03.793075Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_background_loop::loop_ready_scoring",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.658785Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_background_loop::loop_ready_scoring",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.688310Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T11:46:33.420325Z",
-      "updated_at": "2026-08-16T12:32:03.793076Z",
+      "updated_at": "2026-08-17T06:26:37.688312Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1422,7 +1678,7 @@
       "id": "nt_mind_background_loop::path_denylist_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "路径denylist",
         "机械门",
@@ -1459,14 +1715,30 @@
           "to_node": "nt_mind_background_loop::path_denylist_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:04.315539Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_background_loop::path_denylist_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.718381Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_background_loop::path_denylist_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.748234Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T11:46:34.190535Z",
-      "updated_at": "2026-08-16T12:32:04.315539Z",
+      "updated_at": "2026-08-17T06:26:37.748236Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1474,7 +1746,7 @@
       "id": "nt_io_provider::provider_reliability_suite",
       "domain": "io",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "响应缓存",
         "ResponseCaching",
@@ -1520,14 +1792,30 @@
           "to_node": "nt_io_provider::provider_reliability_suite",
           "note": "OasisKV分层缓存+lookahead预取+断点续传 (2608.08097/unsloth)",
           "timestamp": "2026-08-17T02:34:31.033568Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::provider_reliability_suite",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.776014Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::provider_reliability_suite",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.807770Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T12:55:44.852663Z",
-      "updated_at": "2026-08-17T02:34:31.033570Z",
+      "updated_at": "2026-08-17T06:26:37.807771Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1535,7 +1823,7 @@
       "id": "nt_mind_distiller::verbalized_sampling",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "VerbalizedSampling",
         "多样性采样",
@@ -1572,14 +1860,30 @@
           "to_node": "nt_mind_distiller::verbalized_sampling",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:04.832412Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::verbalized_sampling",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.837086Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_distiller::verbalized_sampling",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.867742Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T12:55:44.865493Z",
-      "updated_at": "2026-08-16T12:32:04.832413Z",
+      "updated_at": "2026-08-17T06:26:37.867743Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1587,7 +1891,7 @@
       "id": "nt_mind_eval_harness::ap_acc_compliance_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "AP-Acc",
         "反巧合评估",
@@ -1635,6 +1939,22 @@
           "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
           "note": "seed梯度付费+早期剪枝+影子评测通道 (PI-blog/2607.27191)",
           "timestamp": "2026-08-17T02:34:31.189406Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.903588Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::ap_acc_compliance_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:37.938526Z"
         }
       ],
       "metadata": {
@@ -1642,7 +1962,7 @@
         "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T12:55:44.878189Z",
-      "updated_at": "2026-08-17T02:34:31.189408Z",
+      "updated_at": "2026-08-17T06:26:37.938528Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1650,7 +1970,7 @@
       "id": "nt_shield_agentic_scan::poc_verification_gate",
       "domain": "shield",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "poc验证",
         "真实HTTP验证",
@@ -1687,14 +2007,30 @@
           "to_node": "nt_shield_agentic_scan::poc_verification_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:34.469580Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_agentic_scan::poc_verification_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:37.971910Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_agentic_scan::poc_verification_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.004883Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T01:56:52.494679Z",
-      "updated_at": "2026-08-16T12:32:34.469581Z",
+      "updated_at": "2026-08-17T06:26:38.004886Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1702,7 +2038,7 @@
       "id": "nt_io_provider::market_re_evaluation_daemon",
       "domain": "io",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "市场重评",
         "周期驱动",
@@ -1746,14 +2082,30 @@
           "to_node": "nt_io_provider::market_re_evaluation_daemon",
           "note": "后端运行时选择+厂商中立telemetry契约 (unsloth/pi)",
           "timestamp": "2026-08-17T02:34:31.064334Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::market_re_evaluation_daemon",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.036826Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::market_re_evaluation_daemon",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.067896Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T01:56:57.858315Z",
-      "updated_at": "2026-08-17T02:34:31.064336Z",
+      "updated_at": "2026-08-17T06:26:38.067897Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1834,7 +2186,7 @@
       "id": "nt_io_output_style::output_governor",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "output_governance",
         "r01_r10_rules",
@@ -1853,14 +2205,30 @@
           "to_node": "nt_io_output_style::output_governor",
           "note": "tier-2 absorption wiring (output_governor/mcp_gateway/telemetry/diagram)",
           "timestamp": "2026-08-15T04:15:47.812468Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_output_style::output_governor",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.098105Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_output_style::output_governor",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.128160Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
+        "evidence_gated": "passed",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-16T00:25:21.783488Z",
+      "updated_at": "2026-08-17T06:26:38.128162Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1868,7 +2236,7 @@
       "id": "nt_agent_mcp_gateway::governed_mcp",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c3benchmark",
+      "constellation": "c4mainpipeline",
       "provides": [
         "mcp_gateway",
         "evidence_chain",
@@ -1898,11 +2266,21 @@
           "to_node": "nt_agent_mcp_gateway::governed_mcp",
           "note": "Promoted to C3",
           "timestamp": "2026-08-16T07:33:55.872733Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_mcp_gateway::governed_mcp",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.157007Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-16T07:33:55.872734Z",
+      "updated_at": "2026-08-17T06:26:38.157009Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1910,7 +2288,7 @@
       "id": "nt_core_telemetry::anomaly_detection",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c3benchmark",
+      "constellation": "c4mainpipeline",
       "provides": [
         "privacy_aggregation",
         "spike_drop_alerts",
@@ -1936,11 +2314,21 @@
           "to_node": "nt_core_telemetry::anomaly_detection",
           "note": "Promoted to C3",
           "timestamp": "2026-08-16T07:33:56.036942Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_telemetry::anomaly_detection",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.187243Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-16T07:33:56.036944Z",
+      "updated_at": "2026-08-17T06:26:38.187244Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1948,7 +2336,7 @@
       "id": "nt_io_multimodal_transform::diagram_rendering",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "mermaid",
         "ascii_render",
@@ -1974,14 +2362,30 @@
           "to_node": "nt_io_multimodal_transform::diagram_rendering",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.072577Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::diagram_rendering",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.216917Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::diagram_rendering",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.249932Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T04:15:47.812468Z",
-      "updated_at": "2026-08-16T07:33:56.072578Z",
+      "updated_at": "2026-08-17T06:26:38.249934Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1989,7 +2393,7 @@
       "id": "nt_memory_provenance::signed_provenance",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "hmac_signature",
         "teacher_second_pass",
@@ -2009,14 +2413,30 @@
           "to_node": "nt_memory_provenance::signed_provenance",
           "note": "tier-3 absorption wiring (signed-prov/RST/staged-context/checkpoint/gauntlet)",
           "timestamp": "2026-08-15T05:25:53.646647Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_provenance::signed_provenance",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.281469Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_provenance::signed_provenance",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.319945Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-16T00:25:21.783506Z",
+      "updated_at": "2026-08-17T06:26:38.319947Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2024,7 +2444,7 @@
       "id": "nt_mind_evolution_loop::rst_flywheel",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "recursive_task_synthesis",
         "seed_extend_realign",
@@ -2061,14 +2481,30 @@
           "to_node": "nt_mind_evolution_loop::rst_flywheel",
           "note": "P0-8 auto-research keep_or_revert + PI seed_escalation anti-drift",
           "timestamp": "2026-08-17T05:37:46.674332Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::rst_flywheel",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.353720Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::rst_flywheel",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.385386Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-17T05:37:46.674333Z",
+      "updated_at": "2026-08-17T06:26:38.385388Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2076,7 +2512,7 @@
       "id": "nt_core_parallel::staged_shared_context",
       "domain": "core",
       "layer": "l2orchestrator",
-      "constellation": "c3benchmark",
+      "constellation": "c4mainpipeline",
       "provides": [
         "staged_context",
         "context_budget_hard",
@@ -2103,11 +2539,21 @@
           "to_node": "nt_core_parallel::staged_shared_context",
           "note": "Promoted to C3",
           "timestamp": "2026-08-16T07:33:56.000921Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_parallel::staged_shared_context",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.417203Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-16T07:33:56.000922Z",
+      "updated_at": "2026-08-17T06:26:38.417204Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2115,7 +2561,7 @@
       "id": "nt_world_video_pipeline::checkpoint_resume",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "video_chain_checkpoint",
         "resume",
@@ -2142,14 +2588,39 @@
           "to_node": "nt_world_video_pipeline::checkpoint_resume",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.606745Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::checkpoint_resume",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:38.456248Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::checkpoint_resume",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.493949Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::checkpoint_resume",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.530329Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
+        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_error_recovery.rs:298",
+        "evidence_gated": "passed",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-16T07:33:56.606746Z",
+      "updated_at": "2026-08-17T06:26:38.530332Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2157,7 +2628,7 @@
       "id": "nt_mind_autofixer::gauntlet_gate",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "evidence_gated_delivery",
         "spec_red_green",
@@ -2186,14 +2657,30 @@
           "to_node": "nt_mind_autofixer::gauntlet_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.302391Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::gauntlet_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.563759Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::gauntlet_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.599062Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
-      "updated_at": "2026-08-16T07:33:56.302392Z",
+      "updated_at": "2026-08-17T06:26:38.599064Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2201,7 +2688,7 @@
       "id": "nt_io_provider::expert_cache_pin_prefetch",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "expert_cache_pin",
         "prefetch_refresh",
@@ -2228,14 +2715,30 @@
           "to_node": "nt_io_provider::expert_cache_pin_prefetch",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.107773Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::expert_cache_pin_prefetch",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.652844Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::expert_cache_pin_prefetch",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.687687Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-16T07:33:56.107775Z",
+      "updated_at": "2026-08-17T06:26:38.687689Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2243,7 +2746,7 @@
       "id": "nt_mind_autofixer::healer_registry",
       "domain": "mind",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "code_health_scan",
         "todo_scan",
@@ -2272,14 +2775,30 @@
           "to_node": "nt_mind_autofixer::healer_registry",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.320408Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::healer_registry",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.720600Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::healer_registry",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.753483Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-16T07:33:56.320410Z",
+      "updated_at": "2026-08-17T06:26:38.753485Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2287,7 +2806,7 @@
       "id": "nt_world_absorber::api_registry_meta",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "api_registry_schema",
         "discovery_seed",
@@ -2316,14 +2835,39 @@
           "to_node": "nt_world_absorber::api_registry_meta",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.516732Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::api_registry_meta",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:38.788980Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::api_registry_meta",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.829653Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::api_registry_meta",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.867577Z"
         }
       ],
       "metadata": {
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/mod.rs:6",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "evidence_gated": "degraded"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-16T07:33:56.516733Z",
+      "updated_at": "2026-08-17T06:26:38.867579Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2331,7 +2875,7 @@
       "id": "nt_world_scrape::design_token_extractor",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "design_token_extraction",
         "g21"
@@ -2358,14 +2902,30 @@
           "to_node": "nt_world_scrape::design_token_extractor",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.553092Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::design_token_extractor",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.906712Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::design_token_extractor",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:38.945067Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-16T07:33:56.553093Z",
+      "updated_at": "2026-08-17T06:26:38.945069Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2373,7 +2933,7 @@
       "id": "nt_memory_kb::temporal_audit_ledger",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "temporal_audit",
         "supersession_chain",
@@ -2402,14 +2962,30 @@
           "to_node": "nt_memory_kb::temporal_audit_ledger",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.249154Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::temporal_audit_ledger",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:38.979577Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::temporal_audit_ledger",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.015362Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
-      "updated_at": "2026-08-16T07:33:56.249155Z",
+      "updated_at": "2026-08-17T06:26:39.015364Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2417,7 +2993,7 @@
       "id": "nt_world_video_pipeline::video_production_chain",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "video_production_chain",
         "script_material_tts_compose_publish",
@@ -2448,14 +3024,39 @@
           "to_node": "nt_world_video_pipeline::video_production_chain",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:11:22.998036Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_production_chain",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:39.049365Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_production_chain",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.084438Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_production_chain",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.117846Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_video_pipeline.rs:957",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-16T13:11:22.998037Z",
+      "updated_at": "2026-08-17T06:26:39.117849Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2463,7 +3064,7 @@
       "id": "nt_world_video_pipeline::asset_enricher",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "asset_ml_enrichment",
         "dedup",
@@ -2493,14 +3094,39 @@
           "to_node": "nt_world_video_pipeline::asset_enricher",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.588815Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::asset_enricher",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:39.149346Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::asset_enricher",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.185843Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::asset_enricher",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.221197Z"
         }
       ],
       "metadata": {
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "evidence_gated": "degraded"
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_video_pipeline.rs:1135",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-16T07:33:56.588817Z",
+      "updated_at": "2026-08-17T06:26:39.221201Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2508,7 +3134,7 @@
       "id": "nt_core_retrieval::code_graph_mcp",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "code_graph_retrieval",
         "search_symbols",
@@ -2537,15 +3163,31 @@
           "to_node": "nt_core_retrieval::code_graph_mcp",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.019287Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_retrieval::code_graph_mcp",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.256550Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_retrieval::code_graph_mcp",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.287383Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "code_graph_cmds.rs:13,50 CodeGraphMCP tools (search_hybrid wired 3a010aca)",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "wiring_evidence": "code_graph_cmds.rs:13,50 CodeGraphMCP tools (search_hybrid wired 3a010aca)",
         "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:59:52Z",
-      "updated_at": "2026-08-16T14:59:38.572610Z",
+      "updated_at": "2026-08-17T06:26:39.287385Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2553,7 +3195,7 @@
       "id": "nt_shield_audit::reasoning_trace_guard",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "strip",
         "leak_scan"
@@ -2595,14 +3237,30 @@
           "to_node": "nt_shield_audit::reasoning_trace_guard",
           "note": "P0-2 DSAgentBench 2608.09867: scan_protected 4-layer (session binding/PII/injection/divergence) + T3 wire in handle_architecture_audit",
           "timestamp": "2026-08-17T05:37:46.649051Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_audit::reasoning_trace_guard",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.315924Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_audit::reasoning_trace_guard",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.344671Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-17T05:37:46.649053Z",
+      "updated_at": "2026-08-17T06:26:39.344672Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2610,7 +3268,7 @@
       "id": "nt_mind_eval_harness::hda_attribution",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "attribution",
         "heldout"
@@ -2636,6 +3294,22 @@
           "to_node": "nt_mind_eval_harness::hda_attribution",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:01:59.341862Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::hda_attribution",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.375572Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::hda_attribution",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.405668Z"
         }
       ],
       "metadata": {
@@ -2643,7 +3317,7 @@
         "wiring_evidence": "self_test_integration HdaAttributionSelfTest"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T13:01:59.341863Z",
+      "updated_at": "2026-08-17T06:26:39.405670Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2651,7 +3325,7 @@
       "id": "nt_core_gwt::mode_router",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "mode_routing",
         "task_routing"
@@ -2677,14 +3351,30 @@
           "to_node": "nt_core_gwt::mode_router",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:28.654926Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_gwt::mode_router",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.436639Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_gwt::mode_router",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.470246Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:28.654927Z",
+      "updated_at": "2026-08-17T06:26:39.470248Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2692,7 +3382,7 @@
       "id": "nt_agent_orchestrator::arbiter_mediation",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "mediation",
         "arbiter"
@@ -2726,14 +3416,30 @@
           "to_node": "nt_agent_orchestrator::arbiter_mediation",
           "note": "personality四件套+plan-hash审批+证据gate (agency-agents/autoresearch)",
           "timestamp": "2026-08-17T02:34:31.348836Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_orchestrator::arbiter_mediation",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.501111Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_orchestrator::arbiter_mediation",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.534421Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-17T02:34:31.348838Z",
+      "updated_at": "2026-08-17T06:26:39.534422Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2741,7 +3447,7 @@
       "id": "nt_core_hcube::latent_recurrent",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "latent_reason"
       ],
@@ -2766,14 +3472,30 @@
           "to_node": "nt_core_hcube::latent_recurrent",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:29.213218Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_hcube::latent_recurrent",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.562299Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_hcube::latent_recurrent",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.592759Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:29.213219Z",
+      "updated_at": "2026-08-17T06:26:39.592761Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2781,7 +3503,7 @@
       "id": "nt_memory_kb::kv_cache_memory",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "kv_cache",
         "mem_groups"
@@ -2807,14 +3529,30 @@
           "to_node": "nt_memory_kb::kv_cache_memory",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:33.407300Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::kv_cache_memory",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.621487Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::kv_cache_memory",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.648619Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:33.407300Z",
+      "updated_at": "2026-08-17T06:26:39.648621Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2822,7 +3560,7 @@
       "id": "nt_mind_evolution_loop::meta_harness_opt",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "harness_opt"
       ],
@@ -2847,14 +3585,30 @@
           "to_node": "nt_mind_evolution_loop::meta_harness_opt",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:05.342849Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::meta_harness_opt",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.677274Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::meta_harness_opt",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.707078Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:05.342850Z",
+      "updated_at": "2026-08-17T06:26:39.707080Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2862,7 +3616,7 @@
       "id": "nt_act_orchestrator::harness_scaffold",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "harness_scaffold"
       ],
@@ -2887,14 +3641,30 @@
           "to_node": "nt_act_orchestrator::harness_scaffold",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:29.731072Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_act_orchestrator::harness_scaffold",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.744103Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_act_orchestrator::harness_scaffold",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.777815Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:29.731073Z",
+      "updated_at": "2026-08-17T06:26:39.777816Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2902,7 +3672,7 @@
       "id": "nt_mind_eval_harness::self_verifiable_reward",
       "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "self_verify"
       ],
@@ -2927,14 +3697,30 @@
           "to_node": "nt_mind_eval_harness::self_verifiable_reward",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:01:59.805796Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::self_verifiable_reward",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.808811Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::self_verifiable_reward",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.839961Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "self_test_integration SelfVerifiableRewardSelfTest"
+        "wiring_evidence": "self_test_integration SelfVerifiableRewardSelfTest",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T13:01:59.805797Z",
+      "updated_at": "2026-08-17T06:26:39.839963Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2942,7 +3728,7 @@
       "id": "nt_world_scrape::fit_extraction",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "fit_markdown"
       ],
@@ -2967,14 +3753,30 @@
           "to_node": "nt_world_scrape::fit_extraction",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:20.413818Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::fit_extraction",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.870Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_scrape::fit_extraction",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.904168Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:20.413819Z",
+      "updated_at": "2026-08-17T06:26:39.904170Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -2982,7 +3784,7 @@
       "id": "nt_world_crawl::async_resilient",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "async_resilient"
       ],
@@ -3007,14 +3809,30 @@
           "to_node": "nt_world_crawl::async_resilient",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:42:42.867229Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_crawl::async_resilient",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.935301Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_crawl::async_resilient",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:39.967251Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:42:42.867230Z",
+      "updated_at": "2026-08-17T06:26:39.967253Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3022,7 +3840,7 @@
       "id": "nt_world_browse_auto::agentic_browse",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "agentic_browse"
       ],
@@ -3047,14 +3865,30 @@
           "to_node": "nt_world_browse_auto::agentic_browse",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:20.918977Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_browse_auto::agentic_browse",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:39.997064Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_browse_auto::agentic_browse",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.027705Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:20.918978Z",
+      "updated_at": "2026-08-17T06:26:40.027706Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3062,7 +3896,7 @@
       "id": "nt_shield_traffic::tls_fingerprint",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "tls_fingerprint"
       ],
@@ -3087,14 +3921,30 @@
           "to_node": "nt_shield_traffic::tls_fingerprint",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:35.503914Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_traffic::tls_fingerprint",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.058945Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_traffic::tls_fingerprint",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.090728Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:35.503915Z",
+      "updated_at": "2026-08-17T06:26:40.090729Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3102,7 +3952,7 @@
       "id": "nt_world_osint::sweep_delta",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "sweep_delta"
       ],
@@ -3135,14 +3985,30 @@
           "to_node": "nt_world_osint::sweep_delta",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:21.429565Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_osint::sweep_delta",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.120429Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_osint::sweep_delta",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.151176Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:21.429566Z",
+      "updated_at": "2026-08-17T06:26:40.151178Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3150,7 +4016,7 @@
       "id": "nt_memory_kb::guard_mutation",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "mutation_guard"
       ],
@@ -3177,14 +4043,30 @@
           "to_node": "nt_memory_kb::guard_mutation",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:34:35.917481Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::guard_mutation",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.182274Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::guard_mutation",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.214170Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:34:35.917482Z",
+      "updated_at": "2026-08-17T06:26:40.214172Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3192,7 +4074,7 @@
       "id": "nt_memory_kb::retrieval_matrix",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "retrieval_matrix"
       ],
@@ -3217,14 +4099,30 @@
           "to_node": "nt_memory_kb::retrieval_matrix",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T07:33:56.213442Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::retrieval_matrix",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.245333Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::retrieval_matrix",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.273144Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T07:33:56.213443Z",
+      "updated_at": "2026-08-17T06:26:40.273145Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3232,7 +4130,7 @@
       "id": "nt_memory_kb::single_file_memory",
       "domain": "memory",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "single_file"
       ],
@@ -3257,14 +4155,30 @@
           "to_node": "nt_memory_kb::single_file_memory",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:33.942052Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::single_file_memory",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.300925Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::single_file_memory",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.328760Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:33.942052Z",
+      "updated_at": "2026-08-17T06:26:40.328761Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3272,7 +4186,7 @@
       "id": "nt_io_multimodal_transform::vision_preprocess",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "vision_preprocess"
       ],
@@ -3297,14 +4211,30 @@
           "to_node": "nt_io_multimodal_transform::vision_preprocess",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:32.361256Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::vision_preprocess",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.356893Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::vision_preprocess",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.389102Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:32.361257Z",
+      "updated_at": "2026-08-17T06:26:40.389104Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3312,7 +4242,7 @@
       "id": "nt_io_multimodal_transform::cpu_tts",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "cpu_tts"
       ],
@@ -3337,14 +4267,30 @@
           "to_node": "nt_io_multimodal_transform::cpu_tts",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:32.894526Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::cpu_tts",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.425245Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_multimodal_transform::cpu_tts",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.462797Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
+        "evidence_gated": "passed",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:32.894527Z",
+      "updated_at": "2026-08-17T06:26:40.462798Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3352,7 +4298,7 @@
       "id": "nt_act_code::yagni_ladder",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "yagni_ladder"
       ],
@@ -3377,14 +4323,30 @@
           "to_node": "nt_act_code::yagni_ladder",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:30.260678Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_act_code::yagni_ladder",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.498277Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_act_code::yagni_ladder",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.539875Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:30.260679Z",
+      "updated_at": "2026-08-17T06:26:40.539878Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3392,7 +4354,7 @@
       "id": "nt_world_absorber::metadata_aggregate",
       "domain": "world",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "metadata_aggregate"
       ],
@@ -3417,14 +4379,39 @@
           "to_node": "nt_world_absorber::metadata_aggregate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:22.444862Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::metadata_aggregate",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:40.580543Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::metadata_aggregate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.616546Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::metadata_aggregate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.650977Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/metadata.rs:295"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:22.444863Z",
+      "updated_at": "2026-08-17T06:26:40.650980Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3432,7 +4419,7 @@
       "id": "nt_world_video_pipeline::media_sniff",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "media_sniff"
       ],
@@ -3457,14 +4444,39 @@
           "to_node": "nt_world_video_pipeline::media_sniff",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:21.933842Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::media_sniff",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:40.685101Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::media_sniff",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.719372Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::media_sniff",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.753137Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
+        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_self_test_integration.rs:126",
+        "evidence_gated": "passed",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:21.933843Z",
+      "updated_at": "2026-08-17T06:26:40.753139Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3472,7 +4484,7 @@
       "id": "nt_mind_skill_engine::prompt_assets",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "prompt_assets"
       ],
@@ -3497,14 +4509,30 @@
           "to_node": "nt_mind_skill_engine::prompt_assets",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:05.852151Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::prompt_assets",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.786896Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_skill_engine::prompt_assets",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.825998Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:05.852152Z",
+      "updated_at": "2026-08-17T06:26:40.825999Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3512,7 +4540,7 @@
       "id": "nt_shield_sandbox::device_sandbox",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "device_sandbox"
       ],
@@ -3537,14 +4565,30 @@
           "to_node": "nt_shield_sandbox::device_sandbox",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:36.025975Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::device_sandbox",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.860838Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::device_sandbox",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.896560Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:36.025976Z",
+      "updated_at": "2026-08-17T06:26:40.896562Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3552,7 +4596,7 @@
       "id": "nt_agent_orchestrator::expert_team_diff",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "expert_team_diff"
       ],
@@ -3577,14 +4621,30 @@
           "to_node": "nt_agent_orchestrator::expert_team_diff",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:30.782625Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_orchestrator::expert_team_diff",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:40.935733Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_orchestrator::expert_team_diff",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:40.972331Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
-      "updated_at": "2026-08-16T12:32:30.782626Z",
+      "updated_at": "2026-08-17T06:26:40.972332Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3592,7 +4652,7 @@
       "id": "nt_agent_mcp_gateway::programmatic_tool_calling",
       "domain": "act",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "tool_stub",
         "call_chain",
@@ -3625,14 +4685,30 @@
           "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:04:55.118338Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.006051Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_agent_mcp_gateway::programmatic_tool_calling",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.044564Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "agent_cmds.rs:363 /mcp stubs tool_stubs"
       },
       "created_at": "2026-08-16T02:50:22.160537Z",
-      "updated_at": "2026-08-16T13:04:55.118339Z",
+      "updated_at": "2026-08-17T06:26:41.044567Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3640,7 +4716,7 @@
       "id": "nt_shield_sandbox::egress_control",
       "domain": "shield",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "egress_policy",
         "trust_boundary"
@@ -3672,14 +4748,30 @@
           "to_node": "nt_shield_sandbox::egress_control",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:36.553840Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::egress_control",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.080906Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield_sandbox::egress_control",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.118105Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T02:50:22.749743Z",
-      "updated_at": "2026-08-16T12:32:36.553841Z",
+      "updated_at": "2026-08-17T06:26:41.118109Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3687,7 +4779,7 @@
       "id": "nt_core_hcube::bayesian_experiment_design",
       "domain": "core",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "voi",
         "m_open",
@@ -3720,6 +4812,22 @@
           "to_node": "nt_core_hcube::bayesian_experiment_design",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:01:58.868700Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_hcube::bayesian_experiment_design",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.152507Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_hcube::bayesian_experiment_design",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.185130Z"
         }
       ],
       "metadata": {
@@ -3727,7 +4835,7 @@
         "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T03:20:30.417692Z",
-      "updated_at": "2026-08-16T13:01:58.868701Z",
+      "updated_at": "2026-08-17T06:26:41.185132Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3735,7 +4843,7 @@
       "id": "nt_mind_eval_harness::small_scale_method",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "hyperparam_sensitivity",
         "scale_frontier"
@@ -3767,14 +4875,30 @@
           "to_node": "nt_mind_eval_harness::small_scale_method",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:40:48.842557Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::small_scale_method",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.217705Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_eval_harness::small_scale_method",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.248554Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T03:20:31.705506Z",
-      "updated_at": "2026-08-16T12:40:48.842558Z",
+      "updated_at": "2026-08-17T06:26:41.248555Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3843,7 +4967,7 @@
       "id": "nt_io_provider::response_cache",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "response_caching",
         "response_healing",
@@ -3878,6 +5002,22 @@
           "to_node": "nt_io_provider::response_cache",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:08:10.626516Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::response_cache",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.276734Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::response_cache",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.305801Z"
         }
       ],
       "metadata": {
@@ -3885,7 +5025,7 @@
         "wiring_evidence": "factory.rs:655 enable_response_cache + gateway.rs:1595/924 read-write"
       },
       "created_at": "2026-08-16T07:45:07.725209Z",
-      "updated_at": "2026-08-16T13:08:10.626517Z",
+      "updated_at": "2026-08-17T06:26:41.305802Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3893,7 +5033,7 @@
       "id": "nt_mind_autofixer::autofixer",
       "domain": "mind",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "auto_fix",
         "cargo_fix",
@@ -3928,14 +5068,30 @@
           "to_node": "nt_mind_autofixer::autofixer",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:43:22.200932Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::autofixer",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.333611Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_autofixer::autofixer",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.364520Z"
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T07:45:11.146832Z",
-      "updated_at": "2026-08-16T12:43:22.200933Z",
+      "updated_at": "2026-08-17T06:26:41.364523Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3943,7 +5099,7 @@
       "id": "nt_world_code_search::symbol_index",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "symbol_indexing",
         "ranked_hits"
@@ -3977,14 +5133,30 @@
           "to_node": "nt_world_code_search::symbol_index",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:23.495702Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::symbol_index",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.396892Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_code_search::symbol_index",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.435100Z"
         }
       ],
       "metadata": {
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "unknown"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T07:45:11.165170Z",
-      "updated_at": "2026-08-16T12:32:23.495703Z",
+      "updated_at": "2026-08-17T06:26:41.435102Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -3992,7 +5164,7 @@
       "id": "nt_world_absorber::unified_absorber",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "unified_absorption",
         "webpage_report"
@@ -4026,14 +5198,39 @@
           "to_node": "nt_world_absorber::unified_absorber",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:15:24.032791Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::unified_absorber",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:41.489492Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::unified_absorber",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.531073Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::unified_absorber",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.565361Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "degraded",
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/mod.rs:99",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-16T07:45:11.183785Z",
-      "updated_at": "2026-08-16T13:15:24.032792Z",
+      "updated_at": "2026-08-17T06:26:41.565362Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4041,7 +5238,7 @@
       "id": "nt_memory_kb::signed_provenance",
       "domain": "memory",
       "layer": "l1composite",
-      "constellation": "c3benchmark",
+      "constellation": "c4mainpipeline",
       "provides": [
         "signed_provenance",
         "provenance_sign",
@@ -4084,11 +5281,21 @@
           "to_node": "nt_memory_kb::signed_provenance",
           "note": "Promoted to C3",
           "timestamp": "2026-08-16T12:32:46.767831Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::signed_provenance",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.603771Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-16T07:45:26.666971Z",
-      "updated_at": "2026-08-16T12:32:46.767832Z",
+      "updated_at": "2026-08-17T06:26:41.603774Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4096,7 +5303,7 @@
       "id": "nt_world_video_pipeline::video_chain_runner",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "video_chain_runner",
         "chain_execution"
@@ -4130,14 +5337,39 @@
           "to_node": "nt_world_video_pipeline::video_chain_runner",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T13:11:23.448658Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_chain_runner",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:41.640306Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_chain_runner",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.674792Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_chain_runner",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.708569Z"
         }
       ],
       "metadata": {
+        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_self_test_integration.rs:445",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "evidence_gated": "degraded"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T07:45:26.688357Z",
-      "updated_at": "2026-08-16T13:11:23.448660Z",
+      "updated_at": "2026-08-17T06:26:41.708571Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4207,7 +5439,7 @@
       "id": "nt_world_video_pipeline::video_pipeline",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "video_pipeline",
         "pipeline_execution",
@@ -4242,14 +5474,30 @@
           "to_node": "nt_world_video_pipeline::video_pipeline",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T12:32:22.969831Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_pipeline",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.741904Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_video_pipeline::video_pipeline",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.774982Z"
         }
       ],
       "metadata": {
-        "evidence_gated": "unknown",
+        "evidence_gated": "passed",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T07:45:34.006424Z",
-      "updated_at": "2026-08-16T12:32:22.969831Z",
+      "updated_at": "2026-08-17T06:26:41.774985Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4257,7 +5505,7 @@
       "id": "nt_io_unified::command_bridge",
       "domain": "io",
       "layer": "l2orchestrator",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "unified_catalog",
         "cli_execute",
@@ -4290,6 +5538,22 @@
           "to_node": "nt_io_unified::command_bridge",
           "note": "Promoted to C2",
           "timestamp": "2026-08-16T10:28:51.196255Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_unified::command_bridge",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.804915Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_unified::command_bridge",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.837358Z"
         }
       ],
       "metadata": {
@@ -4297,7 +5561,7 @@
         "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T10:26:23.580698Z",
-      "updated_at": "2026-08-16T10:28:51.196256Z",
+      "updated_at": "2026-08-17T06:26:41.837360Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4648,8 +5912,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/core/nt_core_scheduler/event_driven_claim.rs:240 EventDrivenClaimPool cold recovery + reassign",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/core/nt_core_scheduler/event_driven_claim.rs:240 EventDrivenClaimPool cold recovery + reassign"
       },
       "created_at": "2026-08-17T01:39:04.323204Z",
       "updated_at": "2026-08-17T05:57:18.128158Z",
@@ -4861,8 +6125,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/neotrix/l9_transcendent_impl/nt_mind_eval_harness.rs:1135 OracleLadder T0-T3 ladder",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/neotrix/l9_transcendent_impl/nt_mind_eval_harness.rs:1135 OracleLadder T0-T3 ladder"
       },
       "created_at": "2026-08-17T01:39:04.390458Z",
       "updated_at": "2026-08-17T05:57:18.206220Z",
@@ -4873,7 +6137,7 @@
       "id": "nt_shield::nt_shield_coh_guard",
       "domain": "shield",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "coh_guard",
         "reasoning_trace_guard",
@@ -4906,13 +6170,30 @@
           "to_node": "nt_shield::nt_shield_coh_guard",
           "note": "Promoted to C2",
           "timestamp": "2026-08-17T05:37:22.400580Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield::nt_shield_coh_guard",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.868304Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_shield::nt_shield_coh_guard",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.901045Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "handlers_consciousness.rs:1395"
+        "wiring_evidence": "handlers_consciousness.rs:1395",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-17T02:34:21.178975Z",
-      "updated_at": "2026-08-17T05:37:22.400581Z",
+      "updated_at": "2026-08-17T06:26:41.901048Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4920,7 +6201,7 @@
       "id": "nt_memory::nt_memory_untrusted_fence",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "untrusted_fence",
         "ingest",
@@ -4953,13 +6234,30 @@
           "to_node": "nt_memory::nt_memory_untrusted_fence",
           "note": "Promoted to C2",
           "timestamp": "2026-08-17T05:37:27.499821Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_untrusted_fence",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.931568Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_untrusted_fence",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:41.964459Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "nt_memory_sweep_20260815.rs:534 is_fenced_doc"
+        "wiring_evidence": "nt_memory_sweep_20260815.rs:534 is_fenced_doc",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-17T02:34:21.205523Z",
-      "updated_at": "2026-08-17T05:37:27.499822Z",
+      "updated_at": "2026-08-17T06:26:41.964461Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -4967,7 +6265,7 @@
       "id": "nt_memory::nt_memory_quality_rank",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "quality_rank",
         "retrieval",
@@ -5000,13 +6298,30 @@
           "to_node": "nt_memory::nt_memory_quality_rank",
           "note": "Promoted to C2",
           "timestamp": "2026-08-17T05:37:27.531850Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_quality_rank",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:41.996914Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_quality_rank",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.026372Z"
         }
       ],
       "metadata": {
+        "evidence_gated": "passed",
         "wiring_evidence": "nt_memory_sweep_20260815.rs:515 hybrid_search_quality"
       },
       "created_at": "2026-08-17T02:34:21.231239Z",
-      "updated_at": "2026-08-17T05:37:27.531856Z",
+      "updated_at": "2026-08-17T06:26:42.026374Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5014,7 +6329,7 @@
       "id": "nt_core_self::multi_signal_eval",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "multi_signal_eval",
         "converge_check",
@@ -5047,13 +6362,30 @@
           "to_node": "nt_core_self::multi_signal_eval",
           "note": "Promoted to C2",
           "timestamp": "2026-08-17T05:37:41.868056Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_self::multi_signal_eval",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.059018Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core_self::multi_signal_eval",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.091607Z"
         }
       ],
       "metadata": {
+        "evidence_gated": "passed",
         "wiring_evidence": "handlers_consciousness.rs:1256 MultiSignalEval::new T3 wire"
       },
       "created_at": "2026-08-17T02:34:21.259823Z",
-      "updated_at": "2026-08-17T05:37:41.868057Z",
+      "updated_at": "2026-08-17T06:26:42.091609Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5061,7 +6393,7 @@
       "id": "nt_world_absorber::constrained_selection",
       "domain": "world",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "constrained_selection",
         "self_curriculum",
@@ -5102,13 +6434,30 @@
           "to_node": "nt_world_absorber::constrained_selection",
           "note": "Promoted to C2",
           "timestamp": "2026-08-17T05:37:41.893109Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::constrained_selection",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.121668Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_absorber::constrained_selection",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.154325Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "self_curriculum/mod.rs:261 suggest_next_source_constrained"
+        "wiring_evidence": "self_curriculum/mod.rs:261 suggest_next_source_constrained",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-17T02:34:21.288041Z",
-      "updated_at": "2026-08-17T05:37:41.893110Z",
+      "updated_at": "2026-08-17T06:26:42.154327Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5116,7 +6465,7 @@
       "id": "nt_memory::nt_memory_sft_extract_templates",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "sft_extract_templates",
         "distillation",
@@ -5133,11 +6482,46 @@
           "to_node": "nt_memory::nt_memory_sft_extract_templates",
           "note": "结构化提取指令模板库 (300K P1)",
           "timestamp": "2026-08-17T02:34:21.318927Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_sft_extract_templates",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:42.187198Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_sft_extract_templates",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:42.218881Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_sft_extract_templates",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.251152Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_sft_extract_templates",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.283042Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/entry/mod.rs:1"
+      },
       "created_at": "2026-08-17T02:34:21.318924Z",
-      "updated_at": "2026-08-17T02:34:21.318928Z",
+      "updated_at": "2026-08-17T06:26:42.283044Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5145,7 +6529,7 @@
       "id": "nt_memory::nt_memory_run_manifest",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "run_manifest",
         "resume",
@@ -5162,11 +6546,46 @@
           "to_node": "nt_memory::nt_memory_run_manifest",
           "note": "断点续跑 manifest (hyperresearch P1)",
           "timestamp": "2026-08-17T02:34:21.350062Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_run_manifest",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:42.320307Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_run_manifest",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:42.360726Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_run_manifest",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.399428Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_run_manifest",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.436544Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/mod.rs:11"
+      },
       "created_at": "2026-08-17T02:34:21.350059Z",
-      "updated_at": "2026-08-17T02:34:21.350063Z",
+      "updated_at": "2026-08-17T06:26:42.436547Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5174,7 +6593,7 @@
       "id": "nt_memory::nt_memory_embed_binding",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "embed_binding",
         "drift_protection"
@@ -5190,11 +6609,46 @@
           "to_node": "nt_memory::nt_memory_embed_binding",
           "note": "embedding 模型绑定防漂移 (memvid P1)",
           "timestamp": "2026-08-17T02:34:21.381223Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_embed_binding",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:42.473498Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_embed_binding",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:42.506792Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_embed_binding",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.541190Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory::nt_memory_embed_binding",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.581077Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "wiring_evidence": "capability wired at neotrix-core/src/entry/mod.rs:1",
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-17T02:34:21.381222Z",
-      "updated_at": "2026-08-17T02:34:21.381224Z",
+      "updated_at": "2026-08-17T06:26:42.581079Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5202,7 +6656,7 @@
       "id": "nt_core::nt_core_eml_primitive",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "eml_primitive",
         "primitive_completeness",
@@ -5219,11 +6673,46 @@
           "to_node": "nt_core::nt_core_eml_primitive",
           "note": "单一原语完备性 (2603.21852 P1)",
           "timestamp": "2026-08-17T02:34:21.416154Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core::nt_core_eml_primitive",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:42.616058Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core::nt_core_eml_primitive",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:42.651818Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core::nt_core_eml_primitive",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.687256Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_core::nt_core_eml_primitive",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.721652Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/agent.rs:4"
+      },
       "created_at": "2026-08-17T02:34:21.416151Z",
-      "updated_at": "2026-08-17T02:34:21.416155Z",
+      "updated_at": "2026-08-17T06:26:42.721654Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5231,7 +6720,7 @@
       "id": "nt_mind::nt_mind_symbolic_regression",
       "domain": "mind",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "symbolic_regression",
         "reversible_distill"
@@ -5247,11 +6736,46 @@
           "to_node": "nt_mind::nt_mind_symbolic_regression",
           "note": "梯度符号回归恢复闭式规律 (2603.21852 P1)",
           "timestamp": "2026-08-17T02:34:21.449425Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_symbolic_regression",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:42.762866Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_symbolic_regression",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:42.802525Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_symbolic_regression",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.837386Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_symbolic_regression",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:42.872422Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/mod.rs:11"
+      },
       "created_at": "2026-08-17T02:34:21.449423Z",
-      "updated_at": "2026-08-17T02:34:21.449425Z",
+      "updated_at": "2026-08-17T06:26:42.872424Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5259,7 +6783,7 @@
       "id": "nt_mind::nt_mind_eval_shadow_review",
       "domain": "mind",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "shadow_review",
         "absorption_quality"
@@ -5275,11 +6799,46 @@
           "to_node": "nt_mind::nt_mind_eval_shadow_review",
           "note": "原作者评审通道 (2607.27191 P1)",
           "timestamp": "2026-08-17T02:34:21.481654Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_eval_shadow_review",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:42.905782Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_eval_shadow_review",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:42.939233Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_eval_shadow_review",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:42.972686Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind::nt_mind_eval_shadow_review",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:43.005131Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/nt_core_event_bus.rs:1",
+        "evidence_gated": "passed"
+      },
       "created_at": "2026-08-17T02:34:21.481652Z",
-      "updated_at": "2026-08-17T02:34:21.481654Z",
+      "updated_at": "2026-08-17T06:26:43.005134Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5287,7 +6846,7 @@
       "id": "nt_io_provider::lookahead_prefetch",
       "domain": "io",
       "layer": "l0primitive",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "lookahead_prefetch",
         "predictive_cache",
@@ -5320,13 +6879,30 @@
           "to_node": "nt_io_provider::lookahead_prefetch",
           "note": "Promoted to C2",
           "timestamp": "2026-08-17T05:37:41.917798Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::lookahead_prefetch",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:43.039056Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_provider::lookahead_prefetch",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:43.072604Z"
         }
       ],
       "metadata": {
-        "wiring_evidence": "gateway.rs:966 heal_and_cache_response prefetch wire"
+        "wiring_evidence": "gateway.rs:966 heal_and_cache_response prefetch wire",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-17T02:34:21.512446Z",
-      "updated_at": "2026-08-17T05:37:41.917799Z",
+      "updated_at": "2026-08-17T06:26:43.072607Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -5334,7 +6910,7 @@
       "id": "nt_io::host_cred_exec_split",
       "domain": "io",
       "layer": "l0primitive",
-      "constellation": "c0compile",
+      "constellation": "c4mainpipeline",
       "provides": [
         "cred_exec_split",
         "sandbox",
@@ -5351,11 +6927,46 @@
           "to_node": "nt_io::host_cred_exec_split",
           "note": "凭据留宿主+执行进沙箱 (pi P1)",
           "timestamp": "2026-08-17T02:34:21.543592Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io::host_cred_exec_split",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-17T06:26:43.107178Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io::host_cred_exec_split",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-17T06:26:43.147583Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io::host_cred_exec_split",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-17T06:26:43.184549Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io::host_cred_exec_split",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-17T06:26:43.218351Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/main.rs:1"
+      },
       "created_at": "2026-08-17T02:34:21.543590Z",
-      "updated_at": "2026-08-17T02:34:21.543593Z",
+      "updated_at": "2026-08-17T06:26:43.218354Z",
       "deprecated": false,
       "deprecated_reason": null
     }
