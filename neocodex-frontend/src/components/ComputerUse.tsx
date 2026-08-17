@@ -262,13 +262,20 @@ export function ComputerUse(props: Props) {
                 重新捕获
               </button>
             </div>
-            <Show when={screenshotDataUrl()} fallback={
-              <div class="rounded-xl border border-dashed border-border-primary p-8 text-center text-xs text-text-muted">
-                点击「重新捕获」获取屏幕截图
-              </div>
+            <Show when={loading()} fallback={
+              <Show when={screenshotDataUrl()} fallback={
+                <div class="rounded-xl border border-dashed border-border-primary p-8 text-center text-xs text-text-muted">
+                  点击「重新捕获」获取屏幕截图
+                </div>
+              }>
+                <div class="rounded-xl overflow-hidden border border-border-primary bg-bg-primary/40">
+                  <img src={screenshotDataUrl()!} alt="屏幕截图" class="w-full h-auto max-h-64 object-contain" />
+                </div>
+              </Show>
             }>
-              <div class="rounded-xl overflow-hidden border border-border-primary bg-bg-primary/40">
-                <img src={screenshotDataUrl()!} alt="屏幕截图" class="w-full h-auto max-h-64 object-contain" />
+              <div class="rounded-xl border border-dashed border-border-primary p-8 text-center text-xs text-text-muted flex items-center justify-center gap-2">
+                <Loader2 class="w-4 h-4 animate-spin" />
+                正在捕获屏幕…
               </div>
             </Show>
           </div>

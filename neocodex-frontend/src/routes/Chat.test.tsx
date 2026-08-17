@@ -95,4 +95,28 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(document.querySelector('[role="dialog"][aria-label="Git 面板"]')).toBeNull()
   })
+
+  it('斜杠 / 菜单包含 model/status/cost/export 命令（对标 Claude Code 命令菜单）', () => {
+    render(() => <Chat />)
+    // 在输入区输入 / 激活命令菜单
+    const textarea = document.querySelector('textarea')!
+    fireEvent.input(textarea, { target: { value: '/' } })
+    const menu = document.querySelector('.slash-menu')
+    expect(menu).toBeTruthy()
+    const items = [...menu!.querySelectorAll('.slash-item')].map((el) => el.textContent ?? '')
+    expect(items.length).toBeGreaterThanOrEqual(8)
+    expect(items.some((t) => t.includes('切换模型'))).toBe(true)
+    expect(items.some((t) => t.includes('运行状态'))).toBe(true)
+    expect(items.some((t) => t.includes('成本统计'))).toBe(true)
+    expect(items.some((t) => t.includes('导出会话'))).toBe(true)
+  })
+
+  it('斜杠 /mo 过滤出模型命令（关键词匹配）', () => {
+    render(() => <Chat />)
+    const textarea = document.querySelector('textarea')!
+    fireEvent.input(textarea, { target: { value: '/mo' } })
+    const items = [...document.querySelectorAll('.slash-item')].map((el) => el.textContent ?? '')
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.some((t) => t.includes('切换模型'))).toBe(true)
+  })
 })

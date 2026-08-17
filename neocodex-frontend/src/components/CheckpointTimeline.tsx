@@ -201,7 +201,7 @@ export function CheckpointTimeline(props: Props) {
 
         {/* Body */}
         <div class="flex-1 overflow-y-auto p-3">
-          <Show when={loading}>
+          <Show when={loading()}>
             <div class="flex items-center justify-center gap-2 py-8 text-text-muted text-sm">
               <Loader2 class="w-4 h-4 animate-spin" />
               加载快照...
@@ -215,13 +215,13 @@ export function CheckpointTimeline(props: Props) {
               {restoreMsg()}
             </div>
           </Show>
-          <Show when={!loading && checkpoints().length === 0 && !error()}>
+          <Show when={!loading() && checkpoints().length === 0 && !error()}>
             <div class="py-10 text-center text-xs text-text-muted">
               暂无快照<br />
               <span class="text-text-muted/70">每轮对话结束会自动生成检查点</span>
             </div>
           </Show>
-          <Show when={!loading && checkpoints().length > 0}>
+          <Show when={!loading() && checkpoints().length > 0}>
             <div class="relative pl-5 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-border-primary">
               <For each={checkpoints()}>
                 {(cp, i) => (

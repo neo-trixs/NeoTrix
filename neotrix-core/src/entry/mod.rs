@@ -1,6 +1,6 @@
 #![deny(clippy::unwrap_used)]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use std::io::{self, Write};
 
@@ -2025,7 +2025,6 @@ pub fn run_agent_mode(profile: &str) {
     use neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop;
     use neotrix::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
     use std::io::{self, Write};
-    use std::sync::Arc;
 
     const NT_CORE_SYSTEM_PROMPT: &str = "\
 You are NT-CORE, the orchestrating brain of the NeoTrix system. \
@@ -2386,7 +2385,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             if input.is_empty() { continue; }
                             // 斜杠命令
                             if input.starts_with('/') {
-                                match handle_slash_tui(&mut app, &input) {
+                                match handle_slash_tui(&mut app, &input, Some(&agent)) {
                                     SlashResult::Quit => { exit = neotrix::cli::tui::app::TuiExit::Quit; break; }
                                     SlashResult::Handled => { app.input.clear(); app.cursor = 0; continue; }
                                     SlashResult::NotHandled => {
@@ -2692,7 +2691,12 @@ enum WorkerEvent {
 }
 
 /// TUI 模式斜杠命令分发（当前仅本地命令；其余透传给 AgentLoop 当消息）。
-fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashResult {
+/// `agent` 为可选的 AgentLoop 句柄（/model /compact /status /cost 需要读写模型/用量）。
+fn handle_slash_tui(
+    app: &mut neotrix::cli::tui::TuiApp,
+    input: &str,
+    agent: Option<&Arc<Mutex<neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop>>>,
+) -> SlashResult {
     let (cmd, rest) = match input.split_once(' ') {
         Some((c, r)) => (c, r),
         None => (input, ""),
@@ -2726,6 +2730,154 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             let filled = ((pct as usize * 20) / 100).min(20);
             let bar: String = format!("{}{}", "█".repeat(filled), "░".repeat(20 - filled));
             app.status_text = format!("ctx {}{} {:.1}k / {:.1}k tokens ({pct}%){warn}", bar, if pct >= 100 { "" } else { "" }, used_k, limit_k);
+            SlashResult::Handled
+        }
+        "/model" => {
+            // 运行时切换模型（对标 Claude Code /model）。无参 → 显示当前模型 + 候选。
+            let m = rest.trim().to_string();
+            if m.is_empty() {
+                let current = agent.as_ref()
+                    .and_then(|a| a.lock().ok())
+                    .map(|g| g.model().to_string())
+                    .unwrap_or_else(|| "unknown".into());
+                app.status_text = format!("当前模型: {} | 用法: /model <name> (如 /model llama3.1:8b)", current);
+            } else {
+                let applied = match agent.as_ref() {
+                    Some(a) => {
+                        let mut g = a.lock().unwrap_or_else(|e| e.into_inner());
+                        g.set_model(&m);
+                        g.model().to_string()
+                    }
+                    None => m.clone(),
+                };
+                app.status_text = format!("模型已切换: {}", applied);
+            }
+            SlashResult::Handled
+        }
+        "/models" => {
+            // 列出候选模型（env NEOTRIX_MODELS 或配置 default_model 的近似集）。
+            let mut list: Vec<String> = Vec::new();
+            if let Ok(v) = std::env::var("NEOTRIX_MODELS") {
+                list = v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            }
+            if list.is_empty() {
+                let cfg = neotrix::config::NeoTrixConfig::load();
+                if let Some(dm) = cfg.default_model {
+                    list.push(dm);
+                }
+            }
+            if list.is_empty() {
+                list.push("(未配置 NEOTRIX_MODELS / default_model)".into());
+            }
+            let cur = agent.as_ref().and_then(|a| a.lock().ok()).map(|g| g.model().to_string());
+            let shown = list.iter().map(|m| {
+                if Some(m) == cur.as_ref() { format!("{} ✓", m) } else { m.clone() }
+            }).collect::<Vec<_>>().join(" · ");
+            app.status_text = format!("可用模型: {}", shown);
+            SlashResult::Handled
+        }
+        "/compact" => {
+            // 压缩当前会话上下文（对标 opencode /compact）：保留 System + 最近 N 条，
+            // 把更早的对话折叠为一条 summary 消息（保持语义不断链）。
+            let keep = rest.trim().parse::<usize>().unwrap_or(6);
+            let n = app.compact_session(keep);
+            if n > 0 {
+                app.status_text = format!("已压缩会话: 保留最近 {} 条, 折叠 {} 条为摘要", keep, n);
+            } else {
+                app.status_text = "会话过短，无需压缩".into();
+            }
+            SlashResult::Handled
+        }
+        "/cost" => {
+            // 显示本会话 token 用量与估算成本（对标 Claude Code /cost）。
+            let (prompt, completion, total) = app.token_usage();
+            let approx_cost = total as f64 * 0.0000015; // 粗估 $/tok（约 $1.5/M 混合价）
+            app.status_text = format!(
+                "tokens: prompt {prompt} · completion {completion} · total {total} (≈ ${:.4})",
+                approx_cost
+            );
+            SlashResult::Handled
+        }
+        "/status" => {
+            // 会话状态诊断（对标 Claude Code /status）：model / 分支 / dirty / 消息数 / 上下文。
+            let model = agent.as_ref()
+                .and_then(|a| a.lock().ok())
+                .map(|g| g.model().to_string())
+                .unwrap_or_else(|| "unknown".into());
+            let msgs = app.active_session().messages.len();
+            let pct = app.context_pct();
+            let branch = neotrix::cli::tui::TuiApp::detect_git_branch_pub();
+            let dirty = neotrix::cli::tui::TuiApp::detect_git_dirty_pub();
+            let dirty_txt = if dirty { "dirty" } else { "clean" };
+            let theme = &app.theme_name;
+            app.status_text = format!(
+                "model: {} | messages: {} | ctx: {}% | git: {}{} | theme: {}",
+                model, msgs, pct,
+                branch.as_deref().unwrap_or("(no repo)"),
+                dirty_txt,
+                theme
+            );
+            SlashResult::Handled
+        }
+        "/copy" => {
+            // 复制最后一条 assistant 回复到系统剪贴板（对标 Claude Code /copy）。
+            let last = app.active_session().messages.iter().rev().find(|m| m.role == "assistant");
+            match last {
+                Some(m) => {
+                    match copy_to_clipboard(&m.content) {
+                        Ok(()) => app.status_text = format!("已复制 {} 字符到剪贴板", m.content.len()),
+                        Err(e) => app.status_text = format!("复制失败: {}", e),
+                    }
+                }
+                None => app.status_text = "没有可复制的回复".into(),
+            }
+            SlashResult::Handled
+        }
+        "/undo" => {
+            // 撤销最后轮次（assistant + 其前置 user），对标 opencode /undo。
+            let removed = app.undo_last_turn();
+            app.status_text = if removed > 0 {
+                format!("已撤销最后 {} 条消息", removed)
+            } else {
+                "没有可撤销的消息".into()
+            };
+            SlashResult::Handled
+        }
+        "/redo" => {
+            let restored = app.redo_last_turn();
+            app.status_text = if restored > 0 {
+                format!("已恢复 {} 条消息", restored)
+            } else {
+                "没有可恢复的撤销".into()
+            };
+            SlashResult::Handled
+        }
+        "/export" => {
+            // 导出当前会话为 Markdown（对标 opencode /export / Claude Code /export）。
+            let path = if rest.trim().is_empty() {
+                format!("session-{}.md", app.active_session().id)
+            } else {
+                rest.trim().to_string()
+            };
+            match export_session_markdown(app, &path) {
+                Ok(()) => app.status_text = format!("会话已导出: {}", path),
+                Err(e) => app.status_text = format!("导出失败: {}", e),
+            }
+            SlashResult::Handled
+        }
+        "/theme" => {
+            // 切换 / 列出主题（对标 opencode /themes）。
+            let t = rest.trim().to_string();
+            if t.is_empty() {
+                let cur = app.theme_name.clone();
+                let available: Vec<String> = neotrix::cli::tui::theme_list();
+                app.status_text = format!("主题: {} | 可用: {} | 用法: /theme <name>", cur, available.join(" · "));
+            } else if matches!(t.as_str(), "dark" | "light" | "gruvbox") {
+                app.theme_name = t;
+                app.status_text = format!("主题已切换: {}", app.theme_name);
+            } else {
+                app.status_text = format!("未知主题 '{}' (dark/light/gruvbox)", t);
+            }
             SlashResult::Handled
         }
         "/save" => {
@@ -2799,7 +2951,7 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             }
         }
         "/help" => {
-            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n引用: @路径 Tab 补全文件 | !<cmd> 直跑 shell\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n审批: 工具执行前提示 [a]允许 [d]拒绝 (Esc 取消)\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\nDiff: /diff [路径] 打开 diff 查看 (↑↓ 滚动 · q/Esc 退出)\n会话: /new /clear /save <名> /load <名> /sessions 恢复面板 /hist /context\n其他: /exit /quit /help".into());
+            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n引用: @路径 Tab 补全文件 | !<cmd> 直跑 shell\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n审批: 工具执行前提示 [a]允许 [d]拒绝 (Esc 取消)\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\nDiff: /diff [路径] 打开 diff 查看 (↑↓ 滚动 · q/Esc 退出)\n会话: /new /clear /save <名> /load <名> /sessions 恢复面板 /hist /context /undo /redo /export [路径]\n模型: /model <名> 切换 | /models 列出候选 | /cost 用量 | /compact [N] 压缩上下文\n诊断: /status 会话状态 | /copy 复制最后回复 | /theme [dark|light|gruvbox]\n其他: /exit /quit /help".into());
             SlashResult::Handled
         }
         _ => {
@@ -2904,6 +3056,85 @@ fn run_shell_direct(cmd: &str) -> Result<(i32, String, String), String> {
     Ok((code, stdout, stderr))
 }
 
+/// 复制文本到系统剪贴板（/copy）：优先 pbcopy (macOS) / pbpaste 对照，回退 xclip/xsel (Linux)。
+/// Windows 下无内置命令，回退错误提示。
+fn copy_to_clipboard(text: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut child = std::process::Command::new("pbcopy")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("pbcopy 启动失败: {}", e))?;
+        use std::io::Write;
+        child
+            .stdin
+            .take()
+            .ok_or("pbcopy stdin 不可用")?
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("写入剪贴板失败: {}", e))?;
+        let status = child.wait().map_err(|e| format!("pbcopy 等待失败: {}", e))?;
+        if !status.success() {
+            return Err(format!("pbcopy 退出码非零: {}", status));
+        }
+        return Ok(());
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let cmd = if std::process::Command::new("xclip").arg("-version").output().is_ok() {
+            "xclip"
+        } else {
+            "xsel"
+        };
+        let mut child = std::process::Command::new(cmd)
+            .arg("-b")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("{} 启动失败: {}", cmd, e))?;
+        use std::io::Write;
+        child
+            .stdin
+            .take()
+            .ok_or("剪贴板 stdin 不可用")?
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("写入剪贴板失败: {}", e))?;
+        let status = child.wait().map_err(|e| format!("{} 等待失败: {}", cmd, e))?;
+        if !status.success() {
+            return Err(format!("{} 退出码非零: {}", cmd, status));
+        }
+        return Ok(());
+    }
+    #[cfg(windows)]
+    {
+        let _ = text;
+        Err("Windows 暂不支持 /copy (无内置剪贴板命令)".into())
+    }
+}
+
+/// 导出当前会话为 Markdown（/export）：完整对话含角色/模型/时间戳。
+fn export_session_markdown(
+    app: &neotrix::cli::tui::TuiApp,
+    path: &str,
+) -> Result<(), String> {
+    let session = app.active_session();
+    let mut out = String::new();
+    out.push_str(&format!("# NeoTrix 会话: {}\n\n", session.name));
+    out.push_str(&format!("- id: `{}`\n", session.id));
+    out.push_str(&format!("- 消息数: {}\n\n", session.messages.len()));
+    for m in &session.messages {
+        let role = match m.role.as_str() {
+            "user" => "**User**",
+            "assistant" => "**Assistant**",
+            "system" => "**System**",
+            other => other,
+        };
+        let model = m.model.as_ref().map(|mm| format!(" · {}", mm)).unwrap_or_default();
+        out.push_str(&format!("## {}{} ({})\n\n", role, model, m.timestamp));
+        out.push_str(m.content.trim());
+        out.push_str("\n\n---\n\n");
+    }
+    std::fs::write(path, out).map_err(|e| format!("写入 {} 失败: {}", path, e))
+}
+
 /// 运行 `git diff --no-color [path]`，返回 stdout（best-effort，失败返回错误信息）。
 fn run_git_diff(path: Option<&str>) -> Result<String, String> {
     let mut cmd = std::process::Command::new("git");
@@ -2998,15 +3229,44 @@ mod tests {
         use super::SlashResult;
         // /clear
         app.push_message("user", "x".into());
-        assert!(matches!(super::handle_slash_tui(&mut app, "/clear"), SlashResult::Handled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/clear", None), SlashResult::Handled));
         assert!(app.sessions[0].messages.is_empty());
         // /new
-        assert!(matches!(super::handle_slash_tui(&mut app, "/new"), SlashResult::Handled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/new", None), SlashResult::Handled));
         assert_eq!(app.sessions.len(), 2);
         // /exit
-        assert!(matches!(super::handle_slash_tui(&mut app, "/exit"), SlashResult::Quit));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/exit", None), SlashResult::Quit));
         // 未知命令透传
-        assert!(matches!(super::handle_slash_tui(&mut app, "/bogus"), SlashResult::NotHandled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/bogus", None), SlashResult::NotHandled));
+    }
+
+    #[test]
+    fn test_slash_compact_undo_redo_handled() {
+        use super::SlashResult;
+        use neotrix::cli::tui::TuiApp;
+        let mut app = TuiApp::new(true);
+        // 无 agent 时 /model 无参仅显示提示（Handled）。
+        assert!(matches!(super::handle_slash_tui(&mut app, "/model", None), SlashResult::Handled));
+        assert!(app.status_text.contains("用法: /model"));
+        // /compact 无参（会话为空 → 提示过短）。
+        assert!(matches!(super::handle_slash_tui(&mut app, "/compact", None), SlashResult::Handled));
+        assert!(app.status_text.contains("无需压缩"));
+        // /undo /redo /cost /status /copy /theme /export 均 Handled 且不 panic。
+        assert!(matches!(super::handle_slash_tui(&mut app, "/undo", None), SlashResult::Handled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/redo", None), SlashResult::Handled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/cost", None), SlashResult::Handled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/status", None), SlashResult::Handled));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/copy", None), SlashResult::Handled));
+        assert!(app.status_text.contains("没有可复制"));
+        assert!(matches!(super::handle_slash_tui(&mut app, "/theme gruvbox", None), SlashResult::Handled));
+        assert_eq!(app.theme_name, "gruvbox");
+        assert!(matches!(super::handle_slash_tui(&mut app, "/models", None), SlashResult::Handled));
+        // /export 无参写入默认文件名。
+        app.push_message("user", "hello".into());
+        assert!(matches!(super::handle_slash_tui(&mut app, "/export", None), SlashResult::Handled));
+        let path = format!("session-{}.md", app.active_session().id);
+        assert!(std::path::Path::new(&path).exists(), "导出文件应存在");
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
@@ -3016,7 +3276,7 @@ mod tests {
         // 含换行的参数 → 视为命令行直接传入的 diff 文本（不触发 git 调用）。
         let diff_text = "diff --git a/x.rs b/x.rs\n@@ -1,2 +1,3 @@\n-old\n+new\n";
         assert!(matches!(
-            super::handle_slash_tui(&mut app, &format!("/diff {}", diff_text)),
+            super::handle_slash_tui(&mut app, &format!("/diff {}", diff_text), None),
             super::SlashResult::Handled
         ));
         assert!(app.diff_active(), "/diff 应打开 diff 查看模式");
@@ -3034,7 +3294,7 @@ mod tests {
         let mut app = TuiApp::new(true);
         // 空 diff 文本 → 不进入查看模式，状态栏提示无内容。
         assert!(matches!(
-            super::handle_slash_tui(&mut app, "/diff \n"),
+            super::handle_slash_tui(&mut app, "/diff \n", None),
             super::SlashResult::Handled
         ));
         assert!(!app.diff_active());

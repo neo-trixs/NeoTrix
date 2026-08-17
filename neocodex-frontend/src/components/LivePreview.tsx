@@ -112,6 +112,7 @@ export function LivePreview(props: Props) {
       aria-label="Live Preview"
       ref={(el) => (props.open ? el?.focus?.() : undefined)}
       tabIndex={-1}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose() }}
     >
       <div class="w-[min(1000px,92vw)] h-[min(720px,88vh)] glass-pop border border-white/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* 头部：URL 编辑 / 端口 / 刷新 / 外部打开 / 关闭 */}

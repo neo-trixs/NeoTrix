@@ -146,7 +146,13 @@ export function SideChat(props: Props) {
 
         {/* Messages */}
         <div ref={setBodyRef} class="flex-1 overflow-y-auto p-3 space-y-3" aria-live="polite">
-          <Show when={messages().length === 0 && !error()}>
+          <Show when={loading() && messages().length === 0 && !error()}>
+            <div class="py-10 text-center text-xs text-text-muted flex items-center justify-center gap-2">
+              <Loader2 class="w-4 h-4 animate-spin" />
+              加载中…
+            </div>
+          </Show>
+          <Show when={messages().length === 0 && !error() && !loading()}>
             <div class="py-10 text-center text-xs text-text-muted">
               侧向对话与主上下文隔离，适合提问、澄清、探索而不污染主线程
             </div>

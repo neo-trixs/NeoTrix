@@ -10,6 +10,9 @@ export default defineConfig({
   build: {
     target: 'esnext',
     outDir: 'dist',
+    // three 本体 (gzip ~352KB) 已隔离为懒加载 chunk (仅 /globe 访问时下载),
+    // 其 unminified 体积必然 >500KB — 按实际 gzip 影响设阈值, 消除误报警告。
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         // 代码分割：vendor 稳定分包（solid 生态 / tauri 桥 / UI 图标），

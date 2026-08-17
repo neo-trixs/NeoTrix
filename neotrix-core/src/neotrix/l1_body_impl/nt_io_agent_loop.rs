@@ -24,7 +24,7 @@ use serde_json::Value;
 use super::nt_io_multimodal_transform::MultimodalTransform;
 use super::nt_io_output_style::{GovernanceReport, OutputStyleId, OutputStyleRegistry};
 use super::nt_io_provider::context_budget::{
-    apply_context_budget, estimate_tokens, truncate_preserving,
+    apply_context_budget, estimate_messages_tokens, estimate_tokens, truncate_preserving,
 };
 use super::nt_io_provider::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
@@ -177,6 +177,13 @@ impl AgentLoop {
 
     pub fn model(&self) -> &str {
         &self.model
+    }
+
+    /// 运行时切换模型（TUI `/model <name>`）。空串忽略（保持当前）。
+    pub fn set_model(&mut self, model: &str) {
+        if !model.trim().is_empty() {
+            self.model = model.trim().to_string();
+        }
     }
 
     /// 注册单个工具。
@@ -359,7 +366,8 @@ impl AgentLoop {
                             success: result.is_ok(),
                             output: content.clone(),
                         });
-                        self.messages.push(Message::tool(&content, &call.id));
+                        let history_content = self.trim_tool_output(&content);
+                        self.messages.push(Message::tool(&history_content, &call.id));
                     }
                     self.trim_history();
                     continue;
@@ -484,7 +492,8 @@ impl AgentLoop {
                                 success: false,
                                 output: content.clone(),
                             });
-                            self.messages.push(Message::tool(&content, &call.id));
+                            let history_content = self.trim_tool_output(&content);
+                            self.messages.push(Message::tool(&history_content, &call.id));
                             continue;
                         }
 
@@ -516,7 +525,8 @@ impl AgentLoop {
                             success,
                             output: content.clone(),
                         });
-                        self.messages.push(Message::tool(&content, &call.id));
+                        let history_content = self.trim_tool_output(&content);
+                        self.messages.push(Message::tool(&history_content, &call.id));
                     }
                     self.trim_history();
                     if cancelled {
@@ -575,6 +585,7 @@ impl AgentLoop {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
         }
     }
 
@@ -598,15 +609,8 @@ impl AgentLoop {
                 }
                 Err(e) => format!("TOOL_ERROR: {}", e),
             };
-            // 工具输出截断 (Headroom/RTK 杠杆): 完整输出进 tool_log 供审计,
-            // 回填历史的仅保留头 60%/尾 40%, 中段折叠 — 防止巨大输出每轮重发。
-            let history_content = if self.max_tool_output_tokens > 0
-                && estimate_tokens(&content) > self.max_tool_output_tokens
-            {
-                truncate_preserving(&content, self.max_tool_output_tokens, 0.6)
-            } else {
-                content.clone()
-            };
+            // 完整输出进 tool_log 供审计, 回填历史经 trim_tool_output 截断。
+            let history_content = self.trim_tool_output(&content);
             self.tool_log.push(ToolInvocation {
                 name: call.function.name.clone(),
                 arguments: call.function.arguments.clone(),
@@ -684,6 +688,18 @@ impl AgentLoop {
         s.chars().take(max_chars).collect()
     }
 
+    /// 工具输出截断 (Headroom/RTK 杠杆): 完整输出进 tool_log 供审计,
+    /// 回填历史的仅保留头 60%/尾 40%, 中段折叠 — 防止巨大输出每轮重发。
+    fn trim_tool_output(&self, content: &str) -> String {
+        if self.max_tool_output_tokens > 0
+            && estimate_tokens(content) > self.max_tool_output_tokens
+        {
+            truncate_preserving(content, self.max_tool_output_tokens, 0.6)
+        } else {
+            content.to_string()
+        }
+    }
+
     /// 工具执行前审批门槛。
     /// - 无回调 (None)：需审批工具一律跳过，返回错误 "需审批"（默认安全）
     /// - 有回调：回调决策 approve (true) / deny (false)
@@ -725,23 +741,34 @@ impl AgentLoop {
         }
     }
 
-    /// 超过 max_history 时裁剪最旧的 user/assistant 消息，保留 System 首条。
+    /// 历史裁剪: 先按条数 (`max_history`), 再按 token 预算 (`context_token_budget`)。
+    /// 始终保留 System 首条与末条 (当前请求), 丢最旧非 System 消息。
     fn trim_history(&mut self) {
-        let limit = self.max_history;
-        if self.messages.len() <= limit {
-            return;
+        // 按条数裁剪 (硬上限)。
+        while self.messages.len() > self.max_history && self.messages.len() > 2 {
+            self.messages.remove(1);
         }
-        // 保留第 0 条（System），从第 1 条开始删，直到长度达标。
-        let mut drop = self.messages.len() - limit;
-        let mut i = 1;
-        while drop > 0 && i < self.messages.len() {
-            if i == 0 {
-                i += 1;
-                continue;
+        // 按 token 预算裁剪: 超预算丢最旧非 System 消息, 保留末条。
+        if self.context_token_budget > 0 {
+            while self.messages.len() > 2
+                && estimate_messages_tokens(&self.messages) > self.context_token_budget
+            {
+                let mut evict_at = None;
+                for (idx, m) in self.messages.iter().enumerate() {
+                    let is_system_head = idx == 0 && m.role == Role::System;
+                    let is_last = idx == self.messages.len() - 1;
+                    if !is_system_head && !is_last {
+                        evict_at = Some(idx);
+                        break;
+                    }
+                }
+                match evict_at {
+                    Some(idx) => {
+                        self.messages.remove(idx);
+                    }
+                    None => break,
+                }
             }
-            self.messages.remove(i);
-            drop -= 1;
-            // remove 后索引不变（后续元素前移），继续检查同位置。
         }
     }
 

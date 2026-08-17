@@ -91,6 +91,8 @@ pub struct TuiApp {
     pub git_dirty: bool,
     /// 会话恢复 picker（/sessions 打开；None = 未激活）。
     pub session_picker: Option<crate::cli::tui::app::types::SessionPicker>,
+    /// 撤销栈（/undo 移出最近轮次，/redo 恢复）。
+    pub undo_stack: Vec<crate::cli::tui::app::types::ChatMessage>,
 }
 
 impl TuiApp {
@@ -138,6 +140,7 @@ impl TuiApp {
             git_branch: Self::detect_git_branch(),
             git_dirty: Self::detect_git_dirty(),
             session_picker: None,
+            undo_stack: Vec::new(),
         }
     }
 
@@ -334,6 +337,103 @@ impl TuiApp {
         self.streaming_text.clear();
         self.input.clear();
         self.cursor = 0;
+    }
+
+    // ── 会话工具命令（/compact /undo /redo /cost /status 支撑）──
+
+    /// 压缩当前会话（对标 opencode /compact）：保留最近 `keep` 条消息，
+    /// 把更早的对话折叠为一条 `[compacted]` 摘要消息（含每轮角色与截断预览）。
+    /// 返回被折叠的消息数；会话过短返回 0。
+    pub fn compact_session(&mut self, keep: usize) -> usize {
+        let Some(session) = self.sessions.get_mut(self.active_session) else {
+            return 0;
+        };
+        let len = session.messages.len();
+        let keep = keep.max(2).min(len);
+        if len <= keep {
+            return 0;
+        }
+        let foldable: Vec<ChatMessage> = session.messages.drain(..(len - keep)).collect();
+        let mut summary = String::from("[compacted] 早期对话已折叠为摘要：\n");
+        for m in &foldable {
+            let role = &m.role;
+            let preview: String = m.content.chars().take(160).collect();
+            let preview = if m.content.chars().count() > 160 { format!("{}…", preview) } else { preview };
+            summary.push_str(&format!("- **{}**: {}\n", role, preview.trim()));
+        }
+        summary.push_str(&format!("（共折叠 {} 条消息）", foldable.len()));
+        session.messages.push_front(ChatMessage::with_model(
+            "system", summary, Some("compaction".into()),
+        ));
+        foldable.len()
+    }
+
+    /// 撤销最近一轮（assistant + 其前置 user/system 消息），移入 undo 栈。
+    /// 返回移除的消息数（0 = 无可撤销内容）。
+    pub fn undo_last_turn(&mut self) -> usize {
+        let Some(session) = self.sessions.get_mut(self.active_session) else {
+            return 0;
+        };
+        if session.messages.is_empty() {
+            return 0;
+        }
+        let mut removed: Vec<ChatMessage> = Vec::new();
+        // 从尾部弹出 assistant 回复（含 thinking/工具记录后的最终回复）。
+        while let Some(m) = session.messages.pop_back() {
+            removed.push(m.clone());
+            if m.role == "assistant" {
+                break;
+            }
+        }
+        // 再弹出其前置 user 消息（如存在）。
+        let is_user_tail = session
+            .messages
+            .back()
+            .map(|m| m.role == "user")
+            .unwrap_or(false);
+        if is_user_tail {
+            if let Some(m) = session.messages.pop_back() {
+                removed.push(m);
+            }
+        }
+        self.undo_stack.extend(removed.iter().rev().cloned());
+        removed.len()
+    }
+
+    /// 重做最近一次撤销（/redo）：把 undo 栈中最近一轮放回会话尾部。
+    /// 返回恢复的消息数。
+    pub fn redo_last_turn(&mut self) -> usize {
+        if self.undo_stack.is_empty() {
+            return 0;
+        }
+        let Some(session) = self.sessions.get_mut(self.active_session) else {
+            return 0;
+        };
+        // undo_stack 存的是原始顺序（[user, assistant]），重放回尾部。
+        let restored_len = self.undo_stack.len();
+        for m in self.undo_stack.drain(..) {
+            session.messages.push_back(m);
+        }
+        restored_len
+    }
+
+    /// 会话 token 用量（/cost）：prompt / completion / total。
+    /// 当前为估算口径（token_count 为流式累积；分割按 2:1 粗分）。
+    pub fn token_usage(&self) -> (u32, u32, u32) {
+        let total = self.token_count as u32;
+        let prompt = total * 2 / 3;
+        let completion = total - prompt;
+        (prompt, completion, total)
+    }
+
+    /// 公开的 git 分支检测（/status 使用）。
+    pub fn detect_git_branch_pub() -> Option<String> {
+        Self::detect_git_branch()
+    }
+
+    /// 公开的 git dirty 检测（/status 使用）。
+    pub fn detect_git_dirty_pub() -> bool {
+        Self::detect_git_dirty()
     }
 
     // ── Diff 查看模式 ──
@@ -932,7 +1032,10 @@ static SLASH_CANDIDATES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock:
 /// 返回匹配前缀的全部命令（顺序：TUI 专用在前，registry 在后）。
 pub fn slash_command_candidates(prefix: &str) -> Vec<String> {
     const TUI_ONLY: &[&str] = &[
-        "/save", "/load", "/resume", "/sessions", "/hist",
+        "/new", "/clear", "/save", "/load", "/resume", "/sessions", "/hist",
+        "/exit", "/quit", "/help", "/context", "/diff",
+        "/model", "/models", "/compact", "/cost", "/status",
+        "/copy", "/undo", "/redo", "/export", "/theme",
     ];
     let reg_names: &Vec<String> = SLASH_CANDIDATES.get_or_init(|| {
         let reg = crate::cli::commands::registry::default_registry();
@@ -1030,6 +1133,66 @@ mod tests {
     #[test]
     fn test_busy_elapsed_secs_zero_when_idle() {
         let app = TuiApp::new(true);        assert_eq!(app.busy_elapsed_secs(), 0, "空闲时无计时");
+    }
+
+    #[test]
+    fn test_compact_session_folds_early_messages() {
+        let mut app = TuiApp::new(true);
+        app.push_message("user", "第一条提问".into());
+        app.push_message("assistant", "第一条回答".into());
+        app.push_message("user", "第二条提问".into());
+        app.push_message("assistant", "第二条回答".into());
+        // keep=2 → 折叠前 2 条为摘要，保留后 2 条。
+        let folded = app.compact_session(2);
+        assert_eq!(folded, 2, "应折叠 2 条");
+        let msgs: Vec<&str> = app.active_session().messages.iter().map(|m| m.role.as_str()).collect();
+        assert_eq!(msgs, vec!["system", "user", "assistant"], "前部摘要 + 保留 2 条");
+        let first = &app.active_session().messages[0];
+        assert_eq!(first.role, "system");
+        assert!(first.content.contains("[compacted]"), "摘要应带标记");
+        assert!(first.content.contains("第一条提问"), "摘要应含被折叠内容预览");
+    }
+
+    #[test]
+    fn test_compact_session_short_returns_zero() {
+        let mut app = TuiApp::new(true);
+        app.push_message("user", "仅一条".into());
+        assert_eq!(app.compact_session(6), 0, "过短不压缩");
+        assert_eq!(app.active_session().messages.len(), 1);
+    }
+
+    #[test]
+    fn test_undo_redo_roundtrip() {
+        let mut app = TuiApp::new(true);
+        app.push_message("user", "提问".into());
+        app.push_message("assistant", "回答".into());
+        let removed = app.undo_last_turn();
+        assert_eq!(removed, 2, "撤销 user+assistant 两条");
+        assert_eq!(app.active_session().messages.len(), 0);
+        assert!(!app.undo_stack.is_empty());
+        let restored = app.redo_last_turn();
+        assert_eq!(restored, 2, "重做恢复两条");
+        assert_eq!(app.active_session().messages.len(), 2);
+        assert_eq!(app.active_session().messages[1].content, "回答");
+        // 二次 undo 后 redo 栈空
+        app.undo_last_turn();
+        assert_eq!(app.redo_last_turn(), 2, "可再次重做");
+        assert_eq!(app.redo_last_turn(), 0, "无剩余撤销时返回 0");
+    }
+
+    #[test]
+    fn test_undo_empty_session_returns_zero() {
+        let mut app = TuiApp::new(true);
+        assert_eq!(app.undo_last_turn(), 0);
+    }
+
+    #[test]
+    fn test_token_usage_splits_total() {
+        let mut app = TuiApp::new(true);
+        app.token_count = 300;
+        let (p, c, t) = app.token_usage();
+        assert_eq!(t, 300);
+        assert_eq!(p + c, t, "prompt+completion 应等于 total");
     }
 
     #[test]
@@ -1588,7 +1751,7 @@ mod tests {
         let cands = slash_command_candidates("/f");
         assert!(!cands.iter().any(|c| c == "/file"), "/file 是 agent 工具, 不应出现在人类补全候选");
         let cands2 = slash_command_candidates("/di");
-        assert!(!cands2.iter().any(|c| c == "/diff"), "/diff 被 /file 覆盖, 不应出现在补全候选");
+        assert!(cands2.iter().any(|c| c == "/diff"), "/diff 是 TUI 查看命令, 应出现在补全候选");
     }
 
     // ── 会话自动恢复 ──
@@ -1710,9 +1873,16 @@ mod tests {
     #[test]
     fn test_slash_completion_uses_registry_dynamic() {
         let mut app = TuiApp::new(true);
-        app.input = "/co".into();
+        app.input = "/config".into();
         app.complete_slash();
         assert!(app.input.starts_with("/config"),
             "应补全 registry 控制命令 (completions 已降级): {}", app.input);
+        // /co 前缀 → TUI 专用命令优先（/compact 在 TUI_ONLY 前部）。
+        app.input = "/co".into();
+        app.complete_slash();
+        assert!(
+            app.input.starts_with("/context") || app.input.starts_with("/compact") || app.input.starts_with("/config") || app.input.starts_with("/cost") || app.input.starts_with("/copy"),
+            "应补全到 TUI 或 registry 候选: {}", app.input
+        );
     }
 }

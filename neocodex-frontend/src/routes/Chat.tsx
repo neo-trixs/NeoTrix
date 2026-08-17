@@ -66,6 +66,10 @@ const SLASH_COMMANDS: SlashCommandDef[] = [
   { id: 'clear', label: '清除会话', desc: '清空当前会话全部消息', keywords: ['clear'] },
   { id: 'new', label: '新建会话', desc: '开启一段新对话', keywords: ['new'] },
   { id: 'compact', label: '压缩会话', desc: '精简上下文继续对话', keywords: ['compact'] },
+  { id: 'model', label: '切换模型', desc: '查看 / 切换当前模型', keywords: ['model', 'models'] },
+  { id: 'status', label: '运行状态', desc: '查看模型/上下文/成本与用量', keywords: ['status', 'health'] },
+  { id: 'cost', label: '成本统计', desc: '查看 token 用量与估算成本', keywords: ['cost', 'spend', 'usage'] },
+  { id: 'export', label: '导出会话', desc: '导出当前会话为 Markdown', keywords: ['export', 'share'] },
   { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '?'] },
 ]
 
@@ -248,8 +252,100 @@ export function Chat() {
       chatStore.addSession()
     } else if (cmd.id === 'compact') {
       runCompact()
+    } else if (cmd.id === 'model') {
+      runSlashModel()
+    } else if (cmd.id === 'status') {
+      runSlashStatus()
+    } else if (cmd.id === 'cost') {
+      runSlashCost()
+    } else if (cmd.id === 'export') {
+      runSlashExport()
     } else if (cmd.id === 'help') {
       showInfo('快捷键：Enter 发送 · Shift+Enter 换行 · ⌘K 命令面板 · ⌘1-6 功能面板 · ⌘7 电脑视图 · ⌘N 新建对话 · Esc 关闭', 5000)
+    }
+  }
+
+  /* /model：查看当前激活模型（只读命令，与状态栏同源 providerConfig） */
+  const runSlashModel = async () => {
+    try {
+      const cfg = await neocodex.providerConfig()
+      if (!cfg) {
+        showInfo('暂无提供商配置', 3000)
+        return
+      }
+      const model = cfg.active_model || '(未配置)'
+      const resolvable = cfg.resolvable
+      showInfo(`当前模型：${model}${resolvable ? '' : '（不可解析，请检查 API 配置）'} · 可用提供商 ${cfg.provider_count} 个`, 5000)
+    } catch (error) {
+      console.error('[Chat] /model failed:', error)
+      showInfo('读取模型失败，请检查提供商配置', 3000)
+    }
+  }
+
+  /* /status：运行状态诊断（模型 / 上下文 / 用量 / 成本，对标 Claude Code /status） */
+  const runSlashStatus = async () => {
+    try {
+      const s = await neocodex.agentStatus()
+      if (!s) {
+        showInfo('无运行状态', 3000)
+        return
+      }
+      const model = s.provider_model || '未知'
+      const ctx = Math.round((s.context_usage ?? 0) * 100)
+      const tokens = (s.tokens_used ?? 0).toLocaleString()
+      const cost = ((s.cost_spent ?? 0) / 1000).toFixed(3)
+      const budget = ((s.cost_budget ?? 0) / 1000).toFixed(3)
+      showInfo(`模型 ${model} · 上下文 ${ctx}% · tokens ${tokens} · 成本 $${cost} / $${budget}`, 6000)
+    } catch (error) {
+      console.error('[Chat] /status failed:', error)
+      showInfo('读取状态失败', 3000)
+    }
+  }
+
+  /* /cost：token 用量与成本估算（对标 Claude Code /cost） */
+  const runSlashCost = async () => {
+    try {
+      const s = await neocodex.agentStatus()
+      if (!s) {
+        showInfo('无用量数据', 3000)
+        return
+      }
+      const tokens = (s.tokens_used ?? 0).toLocaleString()
+      const cost = ((s.cost_spent ?? 0) / 1000).toFixed(3)
+      const budget = ((s.cost_budget ?? 0) / 1000).toFixed(3)
+      const pct = s.cost_budget ? `${Math.round(((s.cost_spent ?? 0) / s.cost_budget) * 100)}%` : '—'
+      showInfo(`已用 ${tokens} tokens · 花费 $${cost} / $${budget}（${pct}）`, 5000)
+    } catch (error) {
+      console.error('[Chat] /cost failed:', error)
+      showInfo('读取用量失败', 3000)
+    }
+  }
+
+  /* /export：导出当前会话为 Markdown（对标 Claude Code /export） */
+  const runSlashExport = async () => {
+    const sessionId = currentSession()?.id ?? ''
+    if (!sessionId) {
+      showInfo('当前没有激活会话，无法导出', 3000)
+      return
+    }
+    try {
+      const content = await neocodex.exportSession(sessionId, 'markdown')
+      if (content) {
+        const name = currentSession()?.title || 'session'
+        const blob = new Blob([content], { type: 'text/markdown' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${name.replace(/[^\w\u4e00-\u9fff-]+/g, '_')}.md`
+        a.click()
+        URL.revokeObjectURL(url)
+        showInfo('会话已导出为 Markdown', 3000)
+      } else {
+        showInfo('会话为空，无内容可导出', 3000)
+      }
+    } catch (error) {
+      console.error('[Chat] /export failed:', error)
+      showInfo('导出失败，请重试', 3000)
     }
   }
 
@@ -873,12 +969,14 @@ export function Chat() {
           }
         } catch (e) {
           console.error('[Chat] Transcription failed:', e)
+          showInfo('语音转写失败，请重试', 3000)
         }
       }
       mediaRecorder.start()
       setRecording(true)
     } catch (e) {
       console.error('[Chat] Mic access denied:', e)
+      showInfo('无法访问麦克风，请检查权限设置', 3000)
     }
   }
 
@@ -1600,6 +1698,12 @@ export function Chat() {
                 />
                 <div class="cic-actions">
                   <div class="cic-left">
+                    <button class="cic-attach" onClick={handlePickAttachment} aria-label="附加文件" title="附加文件">
+                      <svg viewBox="0 0 16 16">
+                        <line x1="8" y1="3" x2="8" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                        <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                      </svg>
+                    </button>
                     <PermissionModeSelector
                       value={permissionMode()}
                       onChange={setPermissionMode}
@@ -1609,6 +1713,19 @@ export function Chat() {
                   </div>
                   <div class="cic-right">
                     <ProviderSelector iconOnly />
+                    <button
+                      class={clsx('vc-btn vc-lang', recording() && 'recording')}
+                      onClick={handleVoiceToggle}
+                      aria-label={recording() ? '停止录音' : '语音输入'}
+                      title={recording() ? '停止录音并转写' : '语音输入'}
+                    >
+                      <svg viewBox="0 0 16 16">
+                        <rect x="5.5" y="2" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
+                        <path d="M3 7v.5a5 5 0 0010 0V7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
+                        <line x1="8" y1="12" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                        <line x1="5" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                      </svg>
+                    </button>
                     <Show when={inputValue().trim() || pendingAttachments().length > 0}>
                       <span class="text-[10px] text-text-muted/70 font-mono mr-2">
                         ≈{estimateTokens(inputValue())} tok

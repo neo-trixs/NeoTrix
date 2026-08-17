@@ -413,7 +413,7 @@ export function GitPanel(props: Props) {
 
         {/* Body */}
         <div class="flex-1 overflow-y-auto p-3">
-          <Show when={loading}>
+          <Show when={loading()}>
             <div class="flex items-center justify-center gap-2 py-8 text-text-muted text-sm">
               <Loader2 class="w-4 h-4 animate-spin" />
               加载变更...
@@ -435,10 +435,10 @@ export function GitPanel(props: Props) {
           <Show when={error()}>
             <div class="p-3 text-xs text-red-500 bg-red-500/10 rounded-lg mb-2">{error()}</div>
           </Show>
-          <Show when={!loading && diff() && diff()!.files.length === 0 && !error()}>
+          <Show when={!loading() && diff() && diff()!.files?.length === 0 && !error()}>
             <div class="py-10 text-center text-xs text-text-muted">工作区干净，没有未提交的变更</div>
           </Show>
-          <Show when={!loading && diff() && diff()!.files.length > 0}>
+          <Show when={!loading() && diff() && (diff()!.files?.length ?? 0) > 0}>
             <div class="space-y-2">
               <For each={diff()!.files}>
                 {(file) => {
