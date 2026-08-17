@@ -152,7 +152,7 @@
 
 **优化**:
 - **P0-G1 真实 usage 贯通**: 以 Gateway `record_success` 的 `Usage` 为唯一事实源, 桌面端/视图/统计统一订阅; 删除伪随机与 len/4 估算。
-- **P2-G2 桌面 chat 恢复历史**: 挂载 AgentLoop (带预算) 或传入最近 K 条消息。**✅ 已落地**: 每会话 `HISTORY` (HashMap<String, VecDeque<Message>>) + 24k token/40 条双控裁剪, 请求携带全历史并标注 prefix cache。
+- **P2-G2 桌面 chat 恢复历史**: 挂载 AgentLoop (带预算) 或传入最近 K 条消息。**✅ 已落地**: 每会话 `HISTORY` (HashMap&lt;String, VecDeque&lt;Message&gt;&gt;) + 24k token/40 条双控裁剪, 请求携带全历史并标注 prefix cache。
 - **P2-G3 桌面 Anthropic 直连并入 Gateway**: 消除双轨。**✅ 已落地**: 桌面聊天改走统一 `GatewayV2` (懒构建 + key 变更重建, Anthropic provider, 响应缓存), `anthropic::client::send_message_stream` 直连路径已删除 (client.rs 只留 key 存储)。
 
 ### 3.8 跨节点 — Token 计数口径分裂 (系统性)
@@ -163,7 +163,7 @@
 3. `neocodex.rs` L446 — tiktoken cl100k_base (精确)
 4. 多处 `len/4` — 低估 CJK 4x
 
-**后果**: 同一段历史在不同节点被估出不同 token 数 → 有的过早驱逐 (质量损), 有的溢出 (报错)。**P0-H1 统一估算器**: 进程级 `OnceLock<tiktoken>` 单例 (neocodex 已有模式), `context_budget.rs`/`context_strategy.rs`/gateway 成本预算/桌面端全部改走它, CJK 回退保留。
+**后果**: 同一段历史在不同节点被估出不同 token 数 → 有的过早驱逐 (质量损), 有的溢出 (报错)。**P0-H1 统一估算器**: 进程级 `OnceLock&lt;tiktoken&gt;` 单例 (neocodex 已有模式), `context_budget.rs`/`context_strategy.rs`/gateway 成本预算/桌面端全部改走它, CJK 回退保留。
 
 ---
 

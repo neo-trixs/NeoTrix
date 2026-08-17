@@ -14,7 +14,7 @@ See the OpenAPI specification at `6-REFERENCE/openapi.yaml` for the complete API
 
 ## Authentication
 
-API endpoints require authentication via API key. Set the `Authorization: Bearer <key>` header.
+API endpoints require authentication via API key. Set the `Authorization: Bearer &lt;key&gt;` header.
 
 ## Rate Limiting
 

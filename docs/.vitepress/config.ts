@@ -2,7 +2,7 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: 'NeoTrix',
-  description: 'AI-native developer toolkit — CLI + Desktop',
+  description: 'Open-source AI-native developer toolkit with self-evolving reasoning, VSA knowledge representation, and attention routing.',
   base: '/',
   lang: 'en-US',
   lastUpdated: true,
@@ -11,6 +11,28 @@ export default defineConfig({
     '4-GUIDES/:slug': 'guide/:slug',
     '3-API/:slug': 'api/:slug',
   },
+
+  srcExclude: [
+    '1-DESIGN/**',
+    '2-PLANS/**',
+    '3-AUDITS/**',
+    '5-LEARNING/**',
+    '6-REFERENCE/**',
+    'absorption-knowledge-base/**',
+    'NT-IO/**',
+    'NT-META/**',
+    'blueprints/**',
+    'architecture/**',
+    'legacy/**',
+    '0-ARCHITECTURE/**',
+    'cycle-120-mass-absorption-2026-07-22.md',
+    'experience-tree.md',
+    'first-principles-streaming-analysis.md',
+    'neotrix-data-flow.png',
+    'neotrix-data-flow.svg',
+    'neotrix-evolution.html',
+    'nt-pack-format.md',
+  ],
 
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }],
@@ -24,7 +46,7 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Guide', link: '/guide/what-is-neotrix' },
       { text: 'API', link: '/api/overview' },
-      { text: 'GitHub', link: 'https://github.com/neotrix/neotrix' },
+      { text: 'GitHub', link: 'https://github.com/neo-trixs/NeoTrix' },
     ],
 
     sidebar: {
@@ -54,11 +76,11 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/neotrix/neotrix' },
+      { icon: 'github', link: 'https://github.com/neo-trixs/NeoTrix' },
     ],
 
     footer: {
-      message: 'Released under the MIT License.',
+      message: 'Released under the MIT License (with proprietary exceptions for security modules).',
       copyright: 'Copyright 2026 NeoTrix',
     },
   },

@@ -55,7 +55,7 @@ ProjectLaws::check()         → VIOLATION→ 记录/警告/阻断
 | L009 | AGENTS.md | WARN | 浮点数用 .max(0.0).min(1.0) 代替 .clamp() |
 | L010 | AGENTS.md | WARN | VecDeque::windows() 禁用，用 .as_slices() |
 
-`ProjectLaws::check(path: &str, content: &str) -> Vec<LawViolation>`
+`ProjectLaws::check(path: &str, content: &str) -> Vec&lt;LawViolation&gt;`
 
 ### 3. 接入执行点
 

@@ -13,7 +13,7 @@ curl -fsSL https://neotrix.ai/install | bash
 Raw mirror, with options (`--version`, `--no-modify-path`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash -s -- --version 0.18.0
+curl -fsSL https://raw.githubusercontent.com/neo-trixs/NeoTrix/main/install.sh | bash -s -- --version 0.18.0
 ```
 
 `install.sh` auto-detects OS (macOS/Linux) and architecture (x86_64 / aarch64),
@@ -25,17 +25,17 @@ PATH is updated for `bash`/`zsh`/`fish`.
   `brew install neotrix-desktop` for the Desktop app (see below).
 - **Linux** (`x86_64`, `aarch64`): supported.
 - **Windows**: `install.sh` requires bash — use the MSI/NSIS installer from
-  the [releases page](https://github.com/neotrix/neotrix/releases) instead.
+  the [releases page](https://github.com/neo-trixs/NeoTrix/releases) instead.
 
 ### Windows
 
 Download and run the `neotrix-...-x64.msi` (or `.exe` NSIS) from the
-[releases page](https://github.com/neotrix/neotrix/releases).
+[releases page](https://github.com/neo-trixs/NeoTrix/releases).
 
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap neotrix/neotrix
+brew tap neo-trixs/neotrix
 brew install neotrix            # CLI
 brew install --cask neotrix-desktop   # Desktop app (once cask is published)
 ```
@@ -48,7 +48,7 @@ cargo install neotrix
 
 ### Pre-built Binaries
 
-Download the latest release for your platform from the [releases page](https://github.com/neotrix/neotrix/releases).
+Download the latest release for your platform from the [releases page](https://github.com/neo-trixs/NeoTrix/releases).
 
 Supported platforms:
 - **macOS**: Apple Silicon (arm64) and Intel (x86_64)
@@ -58,7 +58,7 @@ Supported platforms:
 ### Build from Source
 
 ```bash
-git clone https://github.com/neotrix/neotrix.git
+git clone https://github.com/neo-trixs/NeoTrix.git
 cd neotrix
 cargo build --release
 ./target/release/neotrix --version
