@@ -26,6 +26,7 @@ use super::nt_io_output_style::{GovernanceReport, OutputStyleId, OutputStyleRegi
 use super::nt_io_provider::context_budget::{
     apply_context_budget, estimate_messages_tokens, estimate_tokens, truncate_preserving,
 };
+use super::nt_io_provider::generation_classifier::{GenerationClassifier, TaskType};
 use super::nt_io_provider::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
 };
@@ -598,7 +599,8 @@ impl AgentLoop {
             model: self.model.clone(),
             messages,
             temperature: Some(0.7),
-            max_tokens: 4096,
+            // P2-B4: 输出端约束 — 按任务类型派生 max_tokens。
+            max_tokens: self.output_budget_for(),
             tools,
             image_data: None,
             thinking_budget: None,
@@ -606,6 +608,31 @@ impl AgentLoop {
             constraint_json: None,
             structured_output: None,
             cacheable_prefix_tokens,
+        }
+    }
+
+    /// P2-B4: 输出端约束 — 按任务类型派生输出 token 预算。
+    ///
+    /// 用 F6 GenerationClassifier 的关键词检测 (确定性, 零 LLM 成本) 对末条用户
+    /// 消息分类: 短任务 (摘要/抽取/工具) 不必预留满额预算, 编码任务给足——省输出 token
+    /// 同时避免小任务超时。默认仍保持 4096。
+    fn output_budget_for(&self) -> u32 {
+        let last_user = self
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+        if last_user.is_empty() {
+            return 4096;
+        }
+        let cls = GenerationClassifier::new().classify(&last_user, "");
+        match cls.task_type {
+            TaskType::Summarization | TaskType::Extraction | TaskType::ToolUse => 2048,
+            TaskType::Code => 8192,
+            TaskType::Reasoning | TaskType::Knowledge => 4096,
+            _ => 4096,
         }
     }
 

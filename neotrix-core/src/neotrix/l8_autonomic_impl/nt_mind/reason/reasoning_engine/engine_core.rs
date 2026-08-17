@@ -35,6 +35,7 @@ use crate::neotrix::nt_mind::model_router::ModelRouter;
 use crate::neotrix::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
 use crate::neotrix::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep, ControlTrainer, SftReport, CsppoReport};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::neotrix::nt_memory_kb::nt_memory_types::SearchResult;
 use crate::neotrix::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use crate::neotrix::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
@@ -106,6 +107,9 @@ pub struct ReasoningEngine {
     /// `b:{task 前缀}` (ContextBuilder/回退路径), value 为已拼好的注入上下文,
     /// 避免同一 session 内相同/近似 query 每轮重搜重注入。容量上限 MAX_KB_CACHE_ENTRIES。
     pub kb_cache: Mutex<HashMap<String, String>>,
+    /// P2-E2 相邻轮次注入去重: 上一轮已注入 KB 的 node id 集合。
+    /// 新搜索若命中相同 node, 只注入增量差异 (新 node), 避免相邻轮次重复注入。
+    pub last_kb_injected: Mutex<Vec<String>>,
     pub artifact_indexer: Option<ArtifactIndexer>,
     pub cognitive_eye: CognitiveEye,
     pub ttc_engine: Option<TtcEngine>,
@@ -218,6 +222,7 @@ impl ReasoningEngine {
             bank_retrieval_count: 0,
             kb: None,
             kb_cache: Mutex::new(HashMap::new()),
+            last_kb_injected: Mutex::new(Vec::new()),
             artifact_indexer: None,
             cognitive_eye: CognitiveEye::new(),
             ttc_engine: None,
@@ -1415,10 +1420,23 @@ impl ReasoningEngine {
         if let Some(ref kb) = self.kb {
             if let Ok(results) = kb.search(query, 3) {
                 if !results.is_empty() {
+                    // P2-E2: 相邻轮次去重 — 跳过上一轮已注入的 node (只注入增量)。
+                    let mut injected: Vec<String> = Vec::new();
+                    let last: std::collections::HashSet<String> = self
+                        .last_kb_injected
+                        .lock()
+                        .map(|g| g.iter().cloned().collect())
+                        .unwrap_or_default();
+                    let mut filtered: Vec<&SearchResult> =
+                        results.iter().filter(|r| !last.contains(&r.node.id)).collect();
+                    // 全部重复 → 至少保留最高相关度一条, 避免空注入
+                    if filtered.is_empty() && !results.is_empty() {
+                        filtered.push(&results[0]);
+                    }
                     let mut ctx = format!("Past experiences relevant to \"{}\":\n", query);
                     let mut used = estimate_tokens(&ctx);
                     // results 已按相关度排序: 优先保留前面的高相关条目
-                    for r in &results {
+                    for r in filtered {
                         let mut line = format!(
                             "- {}: {}\n",
                             r.node.title,
@@ -1441,7 +1459,9 @@ impl ReasoningEngine {
                         }
                         ctx.push_str(&line);
                         used += estimate_tokens(&line);
+                        injected.push(r.node.id.clone());
                     }
+                    *self.last_kb_injected.lock().unwrap_or_else(|e| e.into_inner()) = injected;
                     return ctx;
                 }
             }

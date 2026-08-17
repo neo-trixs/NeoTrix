@@ -14,7 +14,9 @@ use crate::core::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGene
 use crate::core::nt_core_crt::{CrtPlan, CrtTimeScale};
 use crate::core::nt_core_policy::E8Policy;
 use crate::core::nt_core_reasoning::{ReasoningMethod, TraceSource};
-use crate::neotrix::l1_body_impl::nt_io_provider::context_budget::truncate_preserving;
+use crate::neotrix::l1_body_impl::nt_io_provider::context_budget::{
+    estimate_tokens, truncate_preserving,
+};
 use crate::neotrix::l8_autonomic_impl::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
 use crate::neotrix::{LlmProvider, LlmRequest, Message, ReasoningKernel, Role, Vector, KERNEL_DIM};
 use serde::{Deserialize, Serialize};
@@ -86,6 +88,9 @@ pub struct TaskDecomposerDispatcher {
     e8_policy: Option<E8Policy>,
     /// 配置
     config: DispatcherConfig,
+    /// P2-D3: 本调度器直接 LLM 调用的真实 usage 累积器 (execute_sub_task 消费后清零)。
+    /// kernel/reasoning/cot 路径内部调用不进此计数, 走 estimate 回退。
+    usage_accumulator: std::sync::atomic::AtomicU32,
 }
 
 /// 调度器配置
@@ -180,6 +185,7 @@ impl TaskDecomposerDispatcher {
             kernel: None,
             e8_policy: None,
             config,
+            usage_accumulator: std::sync::atomic::AtomicU32::new(0),
         }
     }
 
@@ -403,6 +409,8 @@ Output ONLY the JSON array, no extra text."#,
             .complete(&request)
             .await
             .map_err(|e| TaskDispatchError::LlmError(e.to_string()))?;
+        self.usage_accumulator
+            .fetch_add(response.usage.total_tokens, std::sync::atomic::Ordering::Relaxed);
 
         let text = response.content;
         let sub_tasks: Vec<SubTask> = serde_json::from_str(&text)
@@ -693,24 +701,37 @@ Output your result for this subtask only."#,
             .as_millis() as u64;
 
         match result {
-            Ok(output) => Ok(SubTaskResult {
-                sub_task_id: sub_task.id.clone(),
-                success: true,
-                output,
-                error: None,
-                tokens_used: 0, // TODO: 从响应中提取
-                duration_ms: duration,
-                cot_output: None,
-            }),
-            Err(e) => Ok(SubTaskResult {
-                sub_task_id: sub_task.id.clone(),
-                success: false,
-                output: String::new(),
-                error: Some(e.to_string()),
-                tokens_used: 0,
-                duration_ms: duration,
-                cot_output: None,
-            }),
+            Ok(output) => {
+                // P2-D3: 优先取本子任务期间调度器直连 LLM 的真实 usage (已累积),
+                // 否则 (kernel/reasoning/cot 路径) 用统一估算口径回填。
+                let real_usage = self.usage_accumulator.swap(0, std::sync::atomic::Ordering::Relaxed);
+                let tokens_used = if real_usage > 0 {
+                    real_usage
+                } else {
+                    estimate_tokens(&format!("{}\n{}", sub_task.prompt, output)) as u32
+                };
+                Ok(SubTaskResult {
+                    sub_task_id: sub_task.id.clone(),
+                    success: true,
+                    output,
+                    error: None,
+                    tokens_used,
+                    duration_ms: duration,
+                    cot_output: None,
+                })
+            }
+            Err(e) => {
+                let real_usage = self.usage_accumulator.swap(0, std::sync::atomic::Ordering::Relaxed);
+                Ok(SubTaskResult {
+                    sub_task_id: sub_task.id.clone(),
+                    success: false,
+                    output: String::new(),
+                    error: Some(e.to_string()),
+                    tokens_used: real_usage,
+                    duration_ms: duration,
+                    cot_output: None,
+                })
+            }
         }
     }
 
@@ -836,6 +857,8 @@ Output your result for this subtask only."#,
             .complete(&request)
             .await
             .map_err(|e| TaskDispatchError::LlmError(e.to_string()))?;
+        self.usage_accumulator
+            .fetch_add(response.usage.total_tokens, std::sync::atomic::Ordering::Relaxed);
 
         Ok(response.content)
     }
@@ -938,6 +961,8 @@ Output ONLY the final synthesized answer."#,
             .complete(&request)
             .await
             .map_err(|e| TaskDispatchError::LlmError(e.to_string()))?;
+        self.usage_accumulator
+            .fetch_add(response.usage.total_tokens, std::sync::atomic::Ordering::Relaxed);
 
         Ok(response.content)
     }

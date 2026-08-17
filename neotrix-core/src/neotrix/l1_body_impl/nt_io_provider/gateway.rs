@@ -1815,7 +1815,10 @@ impl GatewayV2 {
         let mut used_names: Vec<String> = Vec::new();
 
         // 候选链: 从池子实际注册名动态构建 (前缀优先 + free/available/score 排序)
-        let chain = self.build_candidate_chain(&request.model, 8);
+        // P2-A4: 8→3 — 失败放大收敛 (每次重试同量输入 token 全付, 3 次封顶)。
+        let chain = self.build_candidate_chain(&request.model, 3);
+        // P2-A4: 4xx (认证/非法请求) 非瞬时错误 — 同凭据换 provider 亦失败, 直接熔断整链。
+        let mut fatal_error: Option<LlmError> = None;
 
         for name in chain {
             if used_names.contains(&name) {
@@ -1941,6 +1944,13 @@ impl GatewayV2 {
                         AttemptPhase::Normal,
                     );
 
+                    // P2-A4: 4xx 非瞬时错误 (认证失败/非法请求) — 同凭据换 provider
+                    // 亦失败, 跳过 recovery 重试与 Phase-2 aggressive retry, 熔断整链。
+                    if matches!(err, LlmError::Authentication(_) | LlmError::InvalidRequest(_)) {
+                        fatal_error = Some(err);
+                        break;
+                    }
+
                     // Consult recovery orchestrator
                     let error_type = if is_quota_exhausted {
                         ErrorType::Unknown(
@@ -1996,7 +2006,12 @@ impl GatewayV2 {
         // Phase 2: Aggressive retry — all normal providers exhausted.
         // Temporarily override breaker states to HalfOpen for all Open-circuit providers,
         // reset failure thresholds, and retry every provider once more.
-        let result = self.attempt_aggressive_retry(request).await;
+        // P2-A4: 若链上出现 4xx 致命错误 (认证/非法请求), 跳过 aggressive retry —
+        // 该重试只会再次全付输入 token。
+        let result = match fatal_error {
+            Some(f) => Err(f),
+            None => self.attempt_aggressive_retry(request).await,
+        };
         // End telemetry span
         if let Ok(guard) = self.tracer.read() {
             if let Some(tracer) = guard.as_ref() {
@@ -2222,7 +2237,8 @@ impl GatewayV2 {
         let mut used_names: Vec<String> = Vec::new();
 
         // 候选链: 从池子实际注册名动态构建 (前缀优先 + free/available/score 排序)
-        let chain = self.build_candidate_chain(&request.model, 8);
+        // P2-A4: 8→3 — 失败放大收敛。
+        let chain = self.build_candidate_chain(&request.model, 3);
 
         for name in chain {
             if used_names.contains(&name) {
@@ -2262,6 +2278,20 @@ impl GatewayV2 {
                     }
                     self.fire_event(&name, false, 0.0, 0, &request.model, AttemptPhase::Normal);
                     continue;
+                }
+                // P2-A4: 4xx 非瞬时错误 — 同凭据换 provider 亦失败, 立即终止整链。
+                Err(err @ (LlmError::Authentication(_) | LlmError::InvalidRequest(_))) => {
+                    {
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
+                        if let Some(state) = states.get_mut(&name) {
+                            state.record_failure(0.0);
+                        }
+                    }
+                    self.fire_event(&name, false, 0.0, 0, &request.model, AttemptPhase::Normal);
+                    return Err(err);
                 }
                 Err(_) => {
                     {
@@ -2621,7 +2651,7 @@ impl GatewayV2 {
     /// 从池子真实状态出发, 而非写死某个 provider。
     /// 同步版 (async 版见 `resolve_default_model`, 优先 llm7/codestral-latest)。
     pub fn resolve_default_model_sync(&self) -> String {
-        let chain = self.build_candidate_chain("", 8);
+        let chain = self.build_candidate_chain("", 3);
         chain
             .first()
             .cloned()
