@@ -293,6 +293,123 @@ impl TaskStateDag {
     pub fn done_count(&self) -> usize {
         self.nodes.values().filter(|n| n.state == ArtifactState::Done).count()
     }
+
+    /// Kahn 拓扑排序: 无悬挂依赖边且无环时返回完整顺序, 否则 None。
+    fn topological_order(&self) -> Option<Vec<String>> {
+        use std::collections::VecDeque;
+        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        for id in self.nodes.keys() {
+            in_degree.entry(id.as_str()).or_insert(0);
+        }
+        for e in &self.edges {
+            if !self.nodes.contains_key(&e.from) || !self.nodes.contains_key(&e.to) {
+                return None;
+            }
+            *in_degree.entry(e.to.as_str()).or_insert(0) += 1;
+        }
+        let mut queue: VecDeque<&str> = in_degree.iter()
+            .filter(|(_, &deg)| deg == 0)
+            .map(|(&id, _)| id)
+            .collect();
+        let mut sorted = Vec::new();
+        while let Some(node) = queue.pop_front() {
+            sorted.push(node.to_string());
+            for e in &self.edges {
+                if e.from == node {
+                    if let Some(deg) = in_degree.get_mut(e.to.as_str()) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push_back(&e.to);
+                        }
+                    }
+                }
+            }
+        }
+        if sorted.len() == self.nodes.len() {
+            Some(sorted)
+        } else {
+            None
+        }
+    }
+
+    /// 一致性: 无悬挂依赖边 (依赖的 task 均存在) + 拓扑顺序完整 (无环)。
+    pub fn is_consistent(&self) -> bool {
+        self.topological_order().is_some()
+    }
+
+    /// C5 自愈: 移除指向不存在 task 的悬挂依赖边, 返回移除列表。
+    /// 环无法自动修复 — 修复后 is_consistent 仍为 false 即信号 (由 healer 报告)。
+    pub fn repair_consistency(&mut self) -> Vec<String> {
+        let mut removed = Vec::new();
+        let kept: Vec<DagEdge> = self.edges.iter()
+            .filter(|e| {
+                if self.nodes.contains_key(&e.from) && self.nodes.contains_key(&e.to) {
+                    true
+                } else {
+                    removed.push(format!("dangling edge {} -> {}", e.from, e.to));
+                    false
+                }
+            })
+            .cloned()
+            .collect();
+        self.edges = kept;
+        removed
+    }
+}
+
+/// C5 自愈检测件 (ACT, task_state_dag): 构造含悬挂依赖的 DAG,
+/// repair_consistency 修复后断言 is_consistent。
+pub struct TaskStateDagHealer;
+
+impl crate::core::nt_core_self_test::SelfTest for TaskStateDagHealer {
+    fn name(&self) -> &str {
+        "nt_act_orchestrator::task_state_dag"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let mut healthy = TaskStateDag::new();
+        healthy.add_task("a", "task a");
+        healthy.add_task("b", "task b");
+        healthy.add_task("c", "task c");
+        healthy.add_dependency("b", "a");
+        healthy.add_dependency("c", "b");
+        if !healthy.is_consistent() {
+            failures.push("healthy DAG reported inconsistent".into());
+        }
+
+        let mut cyclic = TaskStateDag::new();
+        cyclic.add_task("a", "a");
+        cyclic.add_task("b", "b");
+        cyclic.add_dependency("a", "b");
+        cyclic.add_dependency("b", "a");
+        if cyclic.is_consistent() {
+            failures.push("cyclic DAG reported consistent".into());
+        }
+
+        let mut dag = TaskStateDag::new();
+        dag.add_task("a", "task a");
+        dag.add_task("b", "task b");
+        dag.add_dependency("b", "a");
+        dag.edges.push(DagEdge { from: "ghost".into(), to: "b".into() });
+        if dag.is_consistent() {
+            failures.push("dangling edge not detected".into());
+        }
+        let removed = dag.repair_consistency();
+        if removed.is_empty() {
+            failures.push("repair_consistency removed nothing".into());
+        }
+        if !dag.is_consistent() {
+            failures.push("DAG still inconsistent after repair".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -423,5 +540,31 @@ mod tests {
         assert_eq!(dag.eligible_for_claim(), vec!["b".to_string()]);
         let _ = dag.claim("b", "m1").unwrap();
         assert!(dag.eligible_for_claim().is_empty());
+    }
+
+    /// C5: 正常 DAG 拓扑一致 (无环 + 无悬挂依赖)。
+    #[test]
+    fn consistent_dag_detected() {
+        let mut dag = TaskStateDag::new();
+        dag.add_task("a", "task a");
+        dag.add_task("b", "task b");
+        dag.add_task("c", "task c");
+        dag.add_dependency("b", "a");
+        dag.add_dependency("c", "b");
+        assert!(dag.is_consistent(), "linear DAG must be consistent");
+    }
+
+    /// C5: 悬挂依赖边被 repair_consistency 移除, 恢复一致性。
+    #[test]
+    fn dangling_edge_removed_by_repair() {
+        let mut dag = TaskStateDag::new();
+        dag.add_task("a", "task a");
+        dag.add_task("b", "task b");
+        dag.add_dependency("b", "a");
+        dag.edges.push(DagEdge { from: "ghost".into(), to: "b".into() });
+        assert!(!dag.is_consistent(), "dangling edge must be detected");
+        let removed = dag.repair_consistency();
+        assert_eq!(removed.len(), 1, "exactly one dangling edge removed");
+        assert!(dag.is_consistent(), "repair must restore consistency");
     }
 }

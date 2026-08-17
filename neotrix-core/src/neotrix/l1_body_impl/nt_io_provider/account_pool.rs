@@ -270,6 +270,34 @@ impl AccountPool {
         restored
     }
 
+    /// 池健康检测 (C5 自愈):
+    /// (a) 池内不应存在已失效/不健康账户的 active lease (health != Healthy 时 in_flight 必须为 0);
+    /// (b) 所有账户 in_flight 不超并发上限 (租约计数与内部状态一致)。
+    pub fn is_healthy(&self) -> bool {
+        let acc = match self.accounts.read() {
+            Ok(a) => a,
+            Err(_) => return false,
+        };
+        acc.values().all(|s| {
+            (s.health == AccountHealth::Healthy || s.in_flight == 0)
+                && s.in_flight <= s.max_concurrent
+        })
+    }
+
+    /// 驱逐不健康账户 (health == Unhealthy): 移除账户并随之释放其 lease
+    /// (in_flight 槽随账户消失)。返回被驱逐账户名列表; 调用后 is_healthy() 为 true。
+    pub fn evict_unhealthy(&mut self) -> Vec<String> {
+        let mut acc = self.accounts.write().unwrap_or_else(|e| e.into_inner());
+        let evicted: Vec<String> = acc.iter()
+            .filter(|(_, s)| s.health == AccountHealth::Unhealthy)
+            .map(|(name, _)| name.clone())
+            .collect();
+        for name in &evicted {
+            acc.remove(name);
+        }
+        evicted
+    }
+
     /// 健康感知 round-robin 选择并获取并发租约。
     ///
     /// 跳过: 检疫中且冷却未到 / Unhealthy / 并发已达上限 (in_flight >= max_concurrent)。
@@ -348,6 +376,69 @@ impl AccountPool {
 impl Default for AccountPool {
     fn default() -> Self {
         Self::new(AccountPoolConfig::default())
+    }
+}
+
+/// C5 自愈检测件 (IO, account_pool): 构造含不健康账户的池,
+/// evict_unhealthy 驱逐后断言 is_healthy。
+pub struct AccountPoolHealer;
+
+impl crate::core::nt_core_self_test::SelfTest for AccountPoolHealer {
+    fn name(&self) -> &str {
+        "nt_io_provider::account_pool_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let healthy = AccountPool::new(AccountPoolConfig::default());
+        healthy.register_default("openai", "acc-a");
+        healthy.register_default("openai", "acc-b");
+        if !healthy.is_healthy() {
+            failures.push("healthy pool reported unhealthy".into());
+        }
+
+        let mut pool = AccountPool::new(AccountPoolConfig::default());
+        pool.register_default("openai", "acc-a");
+        pool.register_default("openai", "acc-b");
+        let l1 = match pool.acquire("acc-a") {
+            Ok(l) => l,
+            Err(e) => {
+                failures.push(format!("acquire acc-a failed: {}", e));
+                return Err(failures);
+            }
+        };
+        let l2 = match pool.acquire("acc-b") {
+            Ok(l) => l,
+            Err(e) => {
+                failures.push(format!("acquire acc-b failed: {}", e));
+                return Err(failures);
+            }
+        };
+        for _ in 0..3 {
+            pool.record_failure("acc-b");
+        }
+        if pool.health_of("acc-b") != Some(AccountHealth::Unhealthy) {
+            failures.push("acc-b should be Unhealthy after 3 failures".into());
+        }
+        if pool.is_healthy() {
+            failures.push("unhealthy account with active lease not detected".into());
+        }
+        let evicted = pool.evict_unhealthy();
+        if evicted.is_empty() {
+            failures.push("evict_unhealthy removed nothing".into());
+        }
+        if !pool.is_healthy() {
+            failures.push("pool still unhealthy after eviction".into());
+        }
+        drop(l1);
+        drop(l2);
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -456,5 +547,43 @@ mod tests {
         assert_eq!(pool.healthy_count("openai"), 0);
         let err = pool.select("openai").expect_err("unhealthy excluded");
         assert!(matches!(err, AccountPoolError::NoHealthyAccount(_)));
+    }
+
+    // (e) C5 不变量: 健康池 (含活跃租约) 始终健康
+    #[test]
+    fn healthy_pool_reports_healthy() {
+        let pool = AccountPool::new(test_config());
+        pool.register_default("openai", "acc-a");
+        pool.register_default("openai", "acc-b");
+        assert!(pool.is_healthy(), "fresh pool must be healthy");
+
+        let _l1 = pool.select("openai").expect("lease 1");
+        let _l2 = pool.select("openai").expect("lease 2");
+        assert!(pool.is_healthy(), "healthy accounts with leases stay healthy");
+    }
+
+    // (f) C5 自愈: 不健康账户 (持有 lease) 被驱逐并恢复健康
+    #[test]
+    fn unhealthy_account_is_evicted() {
+        let mut pool = AccountPool::new(test_config());
+        pool.register_default("openai", "acc-a");
+        pool.register_default("openai", "acc-b");
+        let l1 = pool.acquire("acc-a").expect("lease acc-a");
+        let l2 = pool.acquire("acc-b").expect("lease acc-b");
+
+        for _ in 0..3 {
+            pool.record_failure("acc-b");
+        }
+        assert_eq!(pool.health_of("acc-b"), Some(AccountHealth::Unhealthy));
+        assert_eq!(pool.in_flight_of("acc-b"), Some(1), "lease still held");
+        assert!(!pool.is_healthy(), "unhealthy account with active lease detected");
+
+        let evicted = pool.evict_unhealthy();
+        assert_eq!(evicted, vec!["acc-b".to_string()]);
+        assert!(!pool.contains("acc-b"), "evicted account must be removed");
+        assert!(pool.is_healthy(), "pool healthy after eviction");
+
+        drop(l1);
+        drop(l2);
     }
 }

@@ -173,6 +173,88 @@ impl SpillStorage {
     pub fn blob_count(&self) -> usize {
         self.blobs.read().map(|b| b.len()).unwrap_or(0)
     }
+
+    /// 溢出层完整性 (C5 自愈): 索引映射 (key → 位置) 与数据层一致, 无悬挂索引。
+    /// 悬挂索引 = 索引条目指向已丢失/空的数据 (无法 restore 的条目)。
+    pub fn is_consistent(&self) -> bool {
+        self.blobs
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .all(|data| !data.is_empty())
+    }
+
+    /// 重建索引 (C5 自愈): 扫描数据层, 移除指向缺失数据的悬挂索引条目,
+    /// 返回修复动作列表 (无悬挂时返回空列表)。
+    pub fn rebuild_index(&mut self) -> Vec<String> {
+        let dangling: Vec<String> = self
+            .blobs
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter(|(_, data)| data.is_empty())
+            .map(|(key, _)| key.clone())
+            .collect();
+        if dangling.is_empty() {
+            return Vec::new();
+        }
+        let mut actions = Vec::new();
+        let mut blobs = self.blobs.write().unwrap_or_else(|e| e.into_inner());
+        for key in dangling {
+            blobs.remove(&key);
+            actions.push(format!("removed dangling index entry '{}' (data missing)", key));
+        }
+        actions
+    }
+}
+
+/// C5 自愈检测件 (MEMORY, spill_storage): 构造含悬挂索引的存储,
+/// rebuild_index 修复后断言 is_consistent。
+pub struct SpillStorageHealer;
+
+impl crate::core::nt_core_self_test::SelfTest for SpillStorageHealer {
+    fn name(&self) -> &str {
+        "nt_memory_kb::spill_storage_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let store = SpillStorage::new(SpillConfig {
+            threshold_bytes: 8,
+            backend: "memory",
+        });
+        if !store.is_consistent() {
+            failures.push("empty store must be consistent".into());
+        }
+
+        let mut store = SpillStorage::new(SpillConfig {
+            threshold_bytes: 8,
+            backend: "memory",
+        });
+        store.store_with_key("healthy", &vec![b'x'; 16]);
+        store
+            .blobs
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert("dangling".to_string(), Vec::new());
+        if store.is_consistent() {
+            failures.push("dangling index not detected".into());
+        }
+        let actions = store.rebuild_index();
+        if actions.is_empty() {
+            failures.push("rebuild_index removed nothing".into());
+        }
+        if !store.is_consistent() {
+            failures.push("store still inconsistent after rebuild".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
 }
 
 impl Default for SpillStorage {
@@ -244,5 +326,33 @@ mod tests {
         let store = SpillStorage::new(small_config()); // threshold = 8
         assert!(!store.store(b"1234567").is_spilled()); // 7 < 8 inline
         assert!(store.store(b"12345678").is_spilled()); // 8 == 8 spill
+    }
+
+    // (e) C5 自愈: 正常一致的溢出层 (无悬挂索引)
+    #[test]
+    fn spill_index_consistent_when_healthy() {
+        let mut store = SpillStorage::new(small_config());
+        store.store_with_key("k1", &vec![b'a'; 16]);
+        store.store_with_key("k2", &vec![b'b'; 16]);
+        assert!(store.is_consistent());
+        assert!(store.rebuild_index().is_empty());
+        assert_eq!(store.blob_count(), 2);
+    }
+
+    // (f) C5 自愈: 悬挂索引被 rebuild_index 移除后恢复一致
+    #[test]
+    fn spill_dangling_index_rebuilt() {
+        let mut store = SpillStorage::new(small_config());
+        store.store_with_key("k1", &vec![b'a'; 16]);
+        store
+            .blobs
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert("dangling".to_string(), Vec::new());
+        assert!(!store.is_consistent());
+        let actions = store.rebuild_index();
+        assert!(!actions.is_empty());
+        assert!(store.is_consistent());
+        assert_eq!(store.blob_count(), 1);
     }
 }

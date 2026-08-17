@@ -111,6 +111,38 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::core::nt_core_quantum_fusion::QuantumFusionSelfTest,
     ));
+    register_c5_healers(registry);
+}
+
+/// C5 自愈回路检测件 (检测异常 → 自动恢复)。纯内存, 无网络/磁盘/env IO。
+pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_shield_sentry::SentryHealer,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_act_orchestrator::task_state_dag::TaskStateDagHealer,
+    ));
+    // 2026-08-17 C5 自愈回路扩展: nt_mind_skill_engine 可逆效应 (F1) + fiber 生命周期 (F5)
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::RevertibleEffectsHealer,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::FiberLifecycleHealer,
+    ));
+    // 2026-08-17 C5 自愈回路扩展: MEMORY 溢出层完整性 + MIND-eval 阶梯单调性
+    registry.register(Box::new(
+        crate::neotrix::l3_memory_impl::nt_memory_kb::spill_storage::SpillStorageHealer,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::OracleLadderHealer,
+    ));
+    // 2026-08-17 C5 自愈回路扩展: CORE scheduler 认领池一致性 + IO 账户池健康度
+    registry.register(Box::new(
+        crate::core::nt_core_scheduler::event_driven_claim::ClaimPoolHealer,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_io_provider::account_pool::AccountPoolHealer,
+    ));
 }
 
 /// 轻量 SelfTest 注册表 (纯内存检测件, 无网络/无 cargo check/无全仓扫描) —
@@ -527,6 +559,39 @@ mod tests {
                 "lightweight registry missing {} selftest",
                 prefix
             );
+        }
+    }
+
+    #[test]
+    fn test_c5_healers_registered_and_pass() {
+        // C5 自愈回路: SentryHealer + TaskStateDagHealer + skill_engine 双 healer
+        // 必须注册且 self_test 通过。
+        let mut registry = SelfTestRegistry::new();
+        register_c5_healers(&mut registry);
+        let results = registry.run_all();
+        let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+        assert!(
+            names.contains(&"nt_shield_sentry::sentry_healer"),
+            "SentryHealer not registered, got {:?}",
+            names
+        );
+        assert!(
+            names.contains(&"nt_act_orchestrator::task_state_dag"),
+            "TaskStateDagHealer not registered, got {:?}",
+            names
+        );
+        assert!(
+            names.contains(&"nt_mind_skill_engine::revertible_effects_healer"),
+            "RevertibleEffectsHealer not registered, got {:?}",
+            names
+        );
+        assert!(
+            names.contains(&"nt_mind_skill_engine::fiber_lifecycle_healer"),
+            "FiberLifecycleHealer not registered, got {:?}",
+            names
+        );
+        for r in &results {
+            assert!(r.passed, "C5 healer {} failed: {:?}", r.name, r.failures);
         }
     }
 }

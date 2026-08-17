@@ -261,6 +261,143 @@ impl EventDrivenClaimPool {
         self.wake_idle_workers()
     }
 
+    /// 池一致性检测 (C5 自愈):
+    /// (a) 每个 active claim 的 worker 必须存在且为 Running;
+    /// (b) 每个 Running worker 必须恰好持有一个 claim, worker_of 映射一致
+    ///     (worker → 其 claim 的 task, 且 claim.worker == worker);
+    /// (c) 任务 claimed 标志与 claims 集合一致。
+    pub fn is_consistent(&self) -> bool {
+        for (task_id, claim) in &self.claims {
+            if !matches!(self.workers.get(&claim.worker), Some(WorkerState::Running)) {
+                return false;
+            }
+            if self.worker_of.get(&claim.worker) != Some(task_id) {
+                return false;
+            }
+            if !self.tasks.get(task_id).map(|t| t.claimed).unwrap_or(false) {
+                return false;
+            }
+        }
+        for (worker, state) in &self.workers {
+            match state {
+                WorkerState::Running => {
+                    let held = self.claims.values().filter(|c| &c.worker == worker).count();
+                    if held != 1 {
+                        return false;
+                    }
+                    if self.worker_of.get(worker).is_none() {
+                        return false;
+                    }
+                }
+                WorkerState::Idle | WorkerState::Ready => {
+                    if self.worker_of.contains_key(worker) {
+                        return false;
+                    }
+                }
+            }
+        }
+        for (worker, task_id) in &self.worker_of {
+            if !matches!(self.workers.get(worker), Some(WorkerState::Running)) {
+                return false;
+            }
+            match self.claims.get(task_id) {
+                Some(c) if &c.worker == worker => {}
+                _ => return false,
+            }
+        }
+        for (task_id, task) in &self.tasks {
+            if task.claimed != self.claims.contains_key(task_id) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// 自愈: 冷恢复清除无主 claim, 随后修复残余不一致 (悬挂/重复 claim、
+    /// 无 claim 的 Running worker、worker_of 漂移、claimed 标志错位)。
+    /// 返回修复动作描述列表; 调用后 is_consistent() 为 true。
+    pub fn heal(&mut self) -> Vec<String> {
+        let mut actions = Vec::new();
+
+        let orphaned_before = self.claim_count();
+        let reclaimed = self.cold_recovery();
+        if orphaned_before != self.claim_count() || !reclaimed.is_empty() {
+            actions.push(format!(
+                "cold_recovery: cleared {} orphaned claim(s), reclaimed {} task(s)",
+                orphaned_before.saturating_sub(self.claim_count()),
+                reclaimed.len()
+            ));
+        }
+
+        // 悬挂 claim: task 不存在 → 移除并释放其 worker_of 项
+        let dangling: Vec<String> = self.claims.keys()
+            .filter(|tid| !self.tasks.contains_key(*tid))
+            .cloned()
+            .collect();
+        for tid in dangling {
+            let claim = self.claims.remove(&tid).expect("dangling claim exists");
+            let _ = self.worker_of.remove(&claim.worker);
+            actions.push(format!("dropped dangling claim for missing task '{}'", tid));
+        }
+
+        // 同 worker 重复 claim: 确定性保留任务 ID 最小者, 其余释放
+        let mut sorted_tasks: Vec<&String> = self.claims.keys().collect();
+        sorted_tasks.sort();
+        let mut dup = Vec::new();
+        {
+            let mut seen = HashSet::new();
+            for tid in sorted_tasks {
+                if !seen.insert(self.claims[tid].worker.clone()) {
+                    dup.push(tid.clone());
+                }
+            }
+        }
+        for tid in dup {
+            let claim = self.claims.remove(&tid).expect("duplicate claim exists");
+            let _ = self.worker_of.remove(&claim.worker);
+            if let Some(t) = self.tasks.get_mut(&tid) {
+                t.claimed = false;
+            }
+            actions.push(format!(
+                "dropped duplicate claim '{}' (worker already holds one)",
+                tid
+            ));
+        }
+
+        // Running worker 无 claim → 复位 Idle (可重新认领)
+        for worker in self.workers.iter()
+            .filter(|(_, s)| matches!(s, WorkerState::Running))
+            .map(|(w, _)| w.clone())
+            .collect::<Vec<_>>()
+        {
+            if !self.claims.values().any(|c| &c.worker == &worker) {
+                self.workers.insert(worker.clone(), WorkerState::Idle);
+                actions.push(format!("reset claim-less Running worker '{}' to Idle", worker));
+            }
+        }
+
+        // 重建 worker_of: 从 claims 推导, 丢弃陈旧/缺失项
+        let mut rebuilt = HashMap::new();
+        for (task_id, claim) in &self.claims {
+            rebuilt.insert(claim.worker.clone(), task_id.clone());
+        }
+        if rebuilt != self.worker_of {
+            self.worker_of = rebuilt;
+            actions.push("rebuilt worker_of from active claims".to_string());
+        }
+
+        // claimed 标志对齐 claims 集合
+        for (task_id, task) in &mut self.tasks {
+            let expected = self.claims.contains_key(task_id);
+            if task.claimed != expected {
+                task.claimed = expected;
+                actions.push(format!("realigned claimed flag for '{}'", task_id));
+            }
+        }
+
+        actions
+    }
+
     /// 转派: 撤销旧 worker 认领 → 该 worker 转 idle → 尝试认领 (如需)。
     /// 与 Feature 1 的静默交接不同: 这是调度池侧的撤销 + 重新分派。
     pub fn reassign(&mut self, task_id: &str, worker: &str) -> Result<Claim, String> {
@@ -296,6 +433,68 @@ impl EventDrivenClaimPool {
 
     pub fn task_ids(&self) -> HashSet<String> {
         self.tasks.keys().cloned().collect()
+    }
+}
+
+/// C5 自愈检测件 (CORE, event_driven_claim): 构造不一致池 (孤儿 claim),
+/// heal 修复后断言 is_consistent。
+pub struct ClaimPoolHealer;
+
+impl crate::core::nt_core_self_test::SelfTest for ClaimPoolHealer {
+    fn name(&self) -> &str {
+        "nt_core_scheduler::event_driven_claim_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let mut healthy = EventDrivenClaimPool::new();
+        healthy.register_worker("w1");
+        healthy.register_task("t1", vec![]);
+        let claim = match healthy.notify_worker_idle("w1") {
+            Some(c) => c,
+            None => {
+                failures.push("healthy pool failed to claim t1".into());
+                return Err(failures);
+            }
+        };
+        if !healthy.is_consistent() {
+            failures.push("healthy pool reported inconsistent".into());
+        }
+        if let Err(e) = healthy.complete(&claim) {
+            failures.push(format!("complete failed: {}", e));
+        }
+        if !healthy.is_consistent() {
+            failures.push("pool inconsistent after complete".into());
+        }
+
+        let mut broken = EventDrivenClaimPool::new();
+        broken.register_worker("w1");
+        broken.register_task("t1", vec![]);
+        if broken.notify_worker_idle("w1").is_none() {
+            failures.push("broken pool failed to claim t1".into());
+        }
+        // 手工破坏: worker 消失但 claim 保留 (孤儿 claim) + claimed 标志错位
+        broken.workers.remove("w1");
+        if let Some(t) = broken.tasks.get_mut("t1") {
+            t.claimed = false;
+        }
+        if broken.is_consistent() {
+            failures.push("orphaned claim not detected".into());
+        }
+        let actions = broken.heal();
+        if actions.is_empty() {
+            failures.push("heal reported no action for inconsistent pool".into());
+        }
+        if !broken.is_consistent() {
+            failures.push("pool still inconsistent after heal".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -424,5 +623,41 @@ mod tests {
         assert_eq!(pool.worker_state("w1"), Some(WorkerState::Idle));
         assert!(pool.complete(&c1).is_err(), "old claim invalid after reassign");
         pool.complete(&c2).unwrap();
+    }
+
+    /// (e) C5 不变量: 正常池 (注册/认领/完成) 始终一致。
+    #[test]
+    fn pool_consistent_when_normal() {
+        let mut pool = EventDrivenClaimPool::new();
+        pool.register_worker("w1");
+        pool.register_worker("w2");
+        pool.register_task("t1", vec![]);
+        pool.register_task("t2", vec!["t1".to_string()]);
+        assert!(pool.is_consistent(), "fresh pool must be consistent");
+
+        let c1 = pool.notify_worker_idle("w1").expect("t1 claimable");
+        assert!(pool.is_consistent(), "pool with active claim must be consistent");
+
+        pool.complete(&c1).unwrap();
+        assert!(pool.is_consistent(), "pool after complete must be consistent");
+    }
+
+    /// (f) C5 自愈: 不一致池 (孤儿 claim + claimed 标志错位) 被 heal 修复。
+    #[test]
+    fn heal_restores_inconsistent_pool() {
+        let mut pool = EventDrivenClaimPool::new();
+        pool.register_worker("w1");
+        pool.register_task("t1", vec![]);
+        pool.notify_worker_idle("w1").expect("t1 claimable");
+        assert!(pool.is_consistent());
+
+        // 手工破坏: worker 消失 (孤儿 claim) + claimed 标志错位
+        pool.workers.remove("w1");
+        pool.tasks.get_mut("t1").expect("t1 exists").claimed = false;
+        assert!(!pool.is_consistent(), "inconsistency must be detected");
+
+        let actions = pool.heal();
+        assert!(!actions.is_empty(), "heal must report actions");
+        assert!(pool.is_consistent(), "heal must restore consistency");
     }
 }

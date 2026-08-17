@@ -1264,6 +1264,76 @@ impl OracleLadder {
         let promoted = highest_passed == Some(OracleRung::T3Reattack);
         LadderReport { results, highest_passed, promoted }
     }
+
+    /// 阶梯有效性 (C5 自愈): 已注册 rung 集合必须是 T0 起的连续前缀 (无空洞),
+    /// 且不超出阶梯总级数 (T3)。空洞阶梯 (如 T2 注册而 T1 缺失) 无法单调执行。
+    pub fn is_valid(&self) -> bool {
+        let mut expect_next = true;
+        for rung in OracleRung::LADDER {
+            if self.oracles.contains_key(&rung) {
+                if !expect_next {
+                    return false;
+                }
+            } else {
+                expect_next = false;
+            }
+        }
+        true
+    }
+
+    /// 重置阶梯到 T0 (C5 自愈): 清空全部 oracle 回到基准状态 (构建检查基态,
+    /// 无空洞), 返回重置动作描述。
+    pub fn reset_to_t0(&mut self) -> Vec<String> {
+        let mut actions = Vec::new();
+        for rung in OracleRung::LADDER {
+            if self.oracles.remove(&rung).is_some() {
+                actions.push(format!("dropped oracle at rung {}", rung.label()));
+            }
+        }
+        actions.push("ladder reset to T0 (build-check base)".to_string());
+        actions
+    }
+}
+
+/// C5 自愈检测件 (MIND-eval, oracle_ladder): 构造含空洞 rung 的阶梯,
+/// reset_to_t0 重置后断言 is_valid。
+pub struct OracleLadderHealer;
+
+impl crate::core::nt_core_self_test::SelfTest for OracleLadderHealer {
+    fn name(&self) -> &str {
+        "nt_mind_eval_harness::oracle_ladder_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let healthy = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"));
+        if !healthy.is_valid() {
+            failures.push("healthy contiguous ladder reported invalid".into());
+        }
+
+        let mut holed = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+        if holed.is_valid() {
+            failures.push("ladder with hole (T2 without T1) reported valid".into());
+        }
+        let actions = holed.reset_to_t0();
+        if actions.is_empty() {
+            failures.push("reset_to_t0 returned no actions".into());
+        }
+        if !holed.is_valid() {
+            failures.push("ladder still invalid after reset".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1705,5 +1775,27 @@ mod tests {
         let report = ladder.run();
         assert!(!report.promoted);
         assert_eq!(report.highest_passed, Some(OracleRung::T1Repro));
+    }
+
+    // ── C5 OracleLadder 自愈 ──
+    #[test]
+    fn test_ladder_valid_when_contiguous() {
+        let ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "repro clean"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+        assert!(ladder.is_valid(), "T0→T2 连续前缀必须有效");
+    }
+
+    #[test]
+    fn test_ladder_hole_reset_to_t0() {
+        let mut ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+        assert!(!ladder.is_valid(), "T2 注册而 T1 缺失 → 空洞阶梯");
+        let actions = ladder.reset_to_t0();
+        assert!(!actions.is_empty());
+        assert!(ladder.is_valid(), "重置后必须回到有效基态");
+        assert!(!ladder.has(OracleRung::T0BuildCheck), "重置后不应残留任何 oracle");
     }
 }

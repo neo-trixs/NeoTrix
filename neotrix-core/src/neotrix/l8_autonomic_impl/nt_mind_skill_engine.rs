@@ -576,6 +576,12 @@ impl InverseLedger {
         self.entries.len()
     }
 
+    /// 事务是否仍存在 (install 逆账本条目的活标志; 供悬挂所有权检测: 事务
+    /// 消失但 fiber 仍标记 held 即悬挂所有权)。
+    pub fn has_transaction(&self, install_id: u64) -> bool {
+        self.entries.contains_key(&install_id)
+    }
+
     /// 以 LIFO (逆加载序) 执行该事务的全部逆操作; 单级失败被记录但不
     /// 中止其余逆操作 (L-Raise: failure per-fiber, siblings keep running)。
     pub fn teardown(&mut self, install_id: u64) -> Vec<Result<(), String>> {
@@ -701,6 +707,189 @@ impl FiberLifecycle {
             message: message.into(),
         });
         self.state = FiberLifecycleState::Failed;
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// C5 自愈检测件: revertible_effects (F1) + fiber_lifecycle (F5)
+// 纯内存模拟, 无网络/磁盘/env IO (SelfTest 约束)。不变量破坏即 Err。
+// ────────────────────────────────────────────────────────────────
+
+/// C5 自愈检测件: 逆账本往返不变量 (φ(γ) ≃ γ0) — LIFO 逆应用必须完全还原状态,
+/// 错序/逆丢失必须被检出。纯内存栈式模拟 (无 IO)。
+pub struct RevertibleEffectsHealer;
+
+impl RevertibleEffectsHealer {
+    /// 构造栈式 install 场景: 每次 install 推入值并登记逆操作 (弹回该值)。
+    fn push_scenario(installs: &[i32]) -> (Arc<std::sync::Mutex<Vec<i32>>>, Vec<RevertibleEffect>) {
+        let state = Arc::new(std::sync::Mutex::new(Vec::<i32>::new()));
+        let mut effects = Vec::new();
+        for &v in installs {
+            let s = state.clone();
+            state.lock().unwrap().push(v);
+            effects.push(RevertibleEffect::new(format!("pop_{}", v), move || {
+                let mut s = s.lock().map_err(|e| e.to_string())?;
+                match s.pop() {
+                    Some(top) if top == v => Ok(()),
+                    Some(top) => Err(format!("inverse mismatch: expected {}, got {}", v, top)),
+                    None => Err(format!("empty stack during inverse {}", v)),
+                }
+            }));
+        }
+        (state, effects)
+    }
+
+    /// 按给定顺序应用逆操作并判断状态是否完全还原 (往返不变量)。
+    fn roundtrip_restores(
+        state: &Arc<std::sync::Mutex<Vec<i32>>>,
+        effects: &[RevertibleEffect],
+        order: &[usize],
+    ) -> bool {
+        for &idx in order {
+            let ok = effects
+                .get(idx)
+                .map(|e| e.run())
+                .unwrap_or(Err("bad inverse index".into()))
+                .is_ok();
+            if !ok {
+                return false;
+            }
+        }
+        state.lock().unwrap().is_empty()
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for RevertibleEffectsHealer {
+    fn name(&self) -> &str {
+        "nt_mind_skill_engine::revertible_effects_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        // 1) 合法往返: LIFO 逆序应用 → 状态完全还原
+        let (state, effects) = Self::push_scenario(&[1, 2, 3]);
+        if !Self::roundtrip_restores(&state, &effects, &[2, 1, 0]) {
+            failures.push("roundtrip: LIFO 逆应用未还原状态 (φ(γ) ≇ γ0)".into());
+        }
+
+        // 2) 顺序错乱: 破坏不变量必须被检出
+        let (state_w, effects_w) = Self::push_scenario(&[1, 2, 3]);
+        if Self::roundtrip_restores(&state_w, &effects_w, &[0, 1, 2]) {
+            failures.push("roundtrip: 错序逆应用被误判为还原 (检测盲区)".into());
+        }
+
+        // 3) 逆丢失: 状态滞留必须被检出
+        let (state_m, effects_m) = Self::push_scenario(&[1, 2, 3]);
+        if Self::roundtrip_restores(&state_m, &effects_m, &[2, 1]) {
+            failures.push("roundtrip: 逆丢失未被检出 (状态滞留)".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// C5 自愈检测件: fiber 所有权生命周期 — 合法转移 + 悬挂所有权自动释放。
+/// 持有中不可被重新认领, 释放后可重装; holder 消失但 fiber 仍 held 即悬挂,
+/// 经 release_dangling 自动转入 Retired。
+pub struct FiberLifecycleHealer;
+
+impl FiberLifecycleHealer {
+    /// 安装一个带逆账本事务的 fiber 并激活 (合法持有)。
+    fn install_held_fiber(engine: &mut SkillEngine, name: &str) -> Result<u64, String> {
+        let id = engine.inverse_ledger.begin_install();
+        engine
+            .inverse_ledger
+            .push_inverse(id, RevertibleEffect::new(format!("inverse_{}", name), || Ok(())))?;
+        engine
+            .fiber_lifecycles
+            .insert(name.to_string(), FiberLifecycle::new(name.to_string(), id));
+        let _ = engine
+            .fiber_lifecycles
+            .get_mut(name)
+            .ok_or_else(|| format!("fiber '{}' not inserted", name))?
+            .transition(FiberLifecycleState::Active);
+        Ok(id)
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for FiberLifecycleHealer {
+    fn name(&self) -> &str {
+        "nt_mind_skill_engine::fiber_lifecycle_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        use FiberLifecycleState::*;
+
+        let mut failures = Vec::new();
+        let mut engine = SkillEngine::new(PathBuf::new());
+
+        // 1) 所有权转移合法: 持有中不可被重新认领 (惯性状态机拒绝自环)。
+        let id = match Self::install_held_fiber(&mut engine, "f1") {
+            Ok(id) => id,
+            Err(e) => return Err(vec![format!("install held fiber failed: {}", e)]),
+        };
+        if engine.fiber_lifecycles.get("f1").map(|f| f.state) != Some(Active) {
+            failures.push("合法持有 fiber 未处于 Active".into());
+        }
+        if !engine.inverse_ledger.has_transaction(id) {
+            failures.push("持有中 fiber 的逆账本事务必须存在".into());
+        }
+        let mut probe = FiberLifecycle::new("f1", id);
+        let _ = probe.transition(Active);
+        if probe.transition(Active).is_ok() {
+            failures.push("持有中 fiber 被非法重新认领 (自环)".into());
+        }
+
+        // 2) 释放后重新认领合法: 卸载 (Retired) 后重装派生新 install 事务。
+        match engine.uninstall_skill("f1") {
+            Ok(_) => {}
+            Err(e) => failures.push(format!("uninstall_skill failed: {}", e)),
+        }
+        let id2 = match Self::install_held_fiber(&mut engine, "f1") {
+            Ok(id2) => id2,
+            Err(e) => {
+                failures.push(format!("re-claim after release failed: {}", e));
+                u64::MAX
+            }
+        };
+        if engine.fiber_lifecycles.get("f1").map(|f| f.state) != Some(Active) {
+            failures.push("释放后重新认领未处于 Active".into());
+        }
+        if id2 != id + 1 {
+            failures.push("重装必须派生新的 install 事务".into());
+        }
+
+        // 3) 悬挂所有权: holder 消失 (事务被消耗) 但 fiber 仍 held → 自动释放。
+        let dangling_id = match Self::install_held_fiber(&mut engine, "dangling") {
+            Ok(id3) => id3,
+            Err(e) => {
+                failures.push(format!("install dangling fiber failed: {}", e));
+                u64::MAX
+            }
+        };
+        engine.inverse_ledger.teardown(dangling_id);
+        let released = engine.release_dangling();
+        if !released.iter().any(|n| n == "dangling") {
+            failures.push(format!("悬挂 fiber 未被自动释放, released={:?}", released));
+        }
+        if engine.fiber_lifecycles.get("dangling").map(|f| f.state) != Some(Retired) {
+            failures.push("悬挂 fiber 释放后应处于 Retired".into());
+        }
+        let extra = engine.release_dangling();
+        if !extra.is_empty() {
+            failures.push(format!("合法持有被误判为悬挂: {:?}", extra));
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
     }
 }
 
@@ -1397,6 +1586,27 @@ impl SkillEngine {
         } else {
             false
         }
+    }
+
+    /// 释放悬挂所有权: fiber 仍标记 held (Loaded/Active/Suspended) 但其 install
+    /// 逆账本事务已消失 (holder 失效) → 自动转入 Retired 终态。返回释放列表。
+    pub fn release_dangling(&mut self) -> Vec<String> {
+        use FiberLifecycleState::*;
+        let dangling: Vec<String> = self
+            .fiber_lifecycles
+            .iter()
+            .filter(|(_, f)| matches!(f.state, Loaded | Active | Suspended))
+            .filter(|(_, f)| !self.inverse_ledger.has_transaction(f.install_id))
+            .map(|(name, _)| name.clone())
+            .collect();
+        let mut released = Vec::new();
+        for name in dangling {
+            if let Some(fiber) = self.fiber_lifecycles.get_mut(&name) {
+                let _ = fiber.transition(FiberLifecycleState::Retired);
+                released.push(name);
+            }
+        }
+        released
     }
 
     /// Find all skill files in the workspace and agent directories.
@@ -2992,5 +3202,39 @@ category: general
         assert_eq!(engine.fiber_state("rust-analyzer"), Some(FiberLifecycleState::Retired));
         assert!(engine.find_matching("rust", None).is_empty(), "技能从路由移除");
         assert!(engine.uninstall_skill("rust-analyzer").is_err(), "重复卸载被拒");
+    }
+
+    // ── C5 自愈检测件: revertible_effects (F1) + fiber_lifecycle (F5) ──
+
+    #[test]
+    fn test_revertible_effects_healer() {
+        use crate::core::nt_core_self_test::SelfTest;
+        let healer = RevertibleEffectsHealer;
+        assert_eq!(healer.name(), "nt_mind_skill_engine::revertible_effects_healer");
+        assert!(healer.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_fiber_lifecycle_healer() {
+        use crate::core::nt_core_self_test::SelfTest;
+        let healer = FiberLifecycleHealer;
+        assert_eq!(healer.name(), "nt_mind_skill_engine::fiber_lifecycle_healer");
+        assert!(healer.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_release_dangling_recovers_dangling_ownership() {
+        // 合法持有的 fiber 不被误释放; 事务消失的 held fiber 被自动释放。
+        let mut engine = SkillEngine::new(PathBuf::new());
+        let id = FiberLifecycleHealer::install_held_fiber(&mut engine, "healthy").unwrap();
+        let dangling_id = FiberLifecycleHealer::install_held_fiber(&mut engine, "dangling").unwrap();
+        engine.inverse_ledger.teardown(dangling_id);
+
+        let released = engine.release_dangling();
+        assert_eq!(released, vec!["dangling"], "仅悬挂 fiber 被释放");
+        assert!(engine.inverse_ledger.has_transaction(id), "健康 fiber 事务保留");
+        assert_eq!(engine.fiber_state("healthy"), Some(FiberLifecycleState::Active));
+        assert_eq!(engine.fiber_state("dangling"), Some(FiberLifecycleState::Retired));
+        assert!(engine.release_dangling().is_empty(), "幂等: 无残留悬挂");
     }
 }

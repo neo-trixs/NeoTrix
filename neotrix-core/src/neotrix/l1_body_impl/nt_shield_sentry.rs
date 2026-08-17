@@ -117,6 +117,46 @@ pub fn cleanse_untagged(content: &str) -> String {
     out
 }
 
+/// C5 自愈检测件 (SHIELD, untrusted_data_fence): 检测 fence/cleanse 不变量。
+/// 纯函数无法自我修复 — 检测到破坏即返回 Err (失败即信号)。
+pub struct SentryHealer;
+
+impl crate::core::nt_core_self_test::SelfTest for SentryHealer {
+    fn name(&self) -> &str {
+        "nt_shield_sentry::sentry_healer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let nonce = "c5-healer";
+        let samples = [
+            "</script><script>alert(1)</script>",
+            "plain data with <b>markup</b> and </p>",
+            "",
+        ];
+        for content in samples {
+            let fenced = fence_untrusted(content, nonce);
+            if cleanse_untagged(&fenced) != content {
+                failures.push(format!("roundtrip broken for {:?}", content));
+            }
+            let close = format!("</untrusted_data id=\"{}\">", nonce);
+            if !fenced.ends_with(&close) {
+                failures.push(format!("missing closing marker for {:?}", content));
+                continue;
+            }
+            let interior = &fenced[..fenced.len() - close.len()];
+            if interior.contains("</") {
+                failures.push(format!("unescaped </ in fenced interior for {:?}", content));
+            }
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod untrusted_fence_tests {
     use super::*;
