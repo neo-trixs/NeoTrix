@@ -74,12 +74,12 @@ impl SemanticCache {
             embedding_entries: HashMap::with_capacity(config.capacity / 2),
             capacity: config.capacity,
             ttl_secs: config.ttl_secs,
-            semantic_threshold: 0.92,
+            semantic_threshold: 0.98,
             eviction_policy: config.eviction_policy,
         }
     }
 
-    /// Set a custom similarity threshold for semantic matching (default 0.92).
+    /// Set a custom similarity threshold for semantic matching (default 0.98).
     pub fn set_semantic_threshold(&mut self, threshold: f64) {
         self.semantic_threshold = threshold.clamp(0.80, 0.99);
     }
@@ -240,6 +240,28 @@ impl SemanticCache {
     }
 }
 
+/// 语义缓存用的确定性文本 → 定长 embedding (零外部依赖)。
+///
+/// 基于 unicode 码点哈希分桶累加 (64 维, 元素为 ±1 累加和): 同文本恒产生
+/// 同向量; 近义文本 (个别字符/句差异) 只影响少数分桶, 余弦相似度随差异
+/// 占比收敛 (追加 Δ/N 内容时约 √(N/(N+Δ)))。阈值 0.98 只放行近乎一致的提示。
+/// 每个字符独立分桶 (与前后文无关), 追加式增长的历史前缀保持桶对齐。
+pub fn text_to_embedding(text: &str) -> Vec<f64> {
+    const DIM: usize = 64;
+    let mut buckets = vec![0.0f64; DIM];
+    for (i, c) in text.chars().enumerate() {
+        let cp = c as u64;
+        let mut h = cp.wrapping_mul(0x9e37_79b9_7f4a_7c15) ^ 0x5bd1_e995;
+        h ^= h >> 33;
+        h = h.wrapping_mul(0xc2b2_ae3d);
+        h ^= h >> 29;
+        let bucket = (h as usize + i * 131) % DIM;
+        let sign = if h & 1 == 0 { 1.0 } else { -1.0 };
+        buckets[bucket] += sign;
+    }
+    buckets
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,6 +409,28 @@ mod tests {
     fn test_eviction_policy_default() {
         let config = CacheConfig::default();
         assert_eq!(config.eviction_policy, EvictionPolicy::Lfu);
+    }
+
+    #[test]
+    fn test_text_to_embedding_deterministic() {
+        let text = "你是一个 helpful assistant。summarize the request";
+        assert_eq!(text_to_embedding(text), text_to_embedding(text));
+    }
+
+    #[test]
+    fn test_text_to_embedding_similar_high_cosine() {
+        let a = text_to_embedding("analyze the codebase and summarize findings");
+        let b = text_to_embedding("analyze the codebase and summarize findings now");
+        let sim = SemanticCache::cosine_sim(&a, &b);
+        assert!(sim >= 0.9, "similar texts should be near-identical, got {sim}");
+    }
+
+    #[test]
+    fn test_text_to_embedding_different_low_cosine() {
+        let a = text_to_embedding("write a poem about the ocean");
+        let b = text_to_embedding("fetch stock prices for AAPL");
+        let sim = SemanticCache::cosine_sim(&a, &b);
+        assert!(sim < 0.5, "unrelated texts should differ, got {sim}");
     }
 
     #[test]

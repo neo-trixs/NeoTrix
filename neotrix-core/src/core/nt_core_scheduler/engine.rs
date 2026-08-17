@@ -1,4 +1,5 @@
 use super::history::{JobRunHistory, JobRunRecord, SchedulerStats};
+use super::event_driven_claim::{Claim, EventDrivenClaimPool};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +49,10 @@ pub struct SchedulerEngine {
     jobs: Vec<ScheduledJob>,
     history: JobRunHistory,
     tick_count: u64,
+    /// Event-driven claim pool: idle-edge + graph-change wakes with atomic
+    /// claims and cold-recovery re-claim (dsh-agent-teams P3/P4 absorption,
+    /// evidence: notes/absorption-20260817-dsh-agent-teams.md L40-46, L48-54).
+    claim_pool: EventDrivenClaimPool,
 }
 
 impl SchedulerEngine {
@@ -56,6 +61,7 @@ impl SchedulerEngine {
             jobs: Vec::new(),
             history: JobRunHistory::new(1000),
             tick_count: 0,
+            claim_pool: EventDrivenClaimPool::new(),
         }
     }
 
@@ -230,6 +236,55 @@ impl SchedulerEngine {
 
     pub fn tick_count(&self) -> u64 {
         self.tick_count
+    }
+
+    // ---- Event-driven claim pool (dsh-agent-teams P3/P4) ----
+
+    pub fn claim_pool(&self) -> &EventDrivenClaimPool {
+        &self.claim_pool
+    }
+
+    pub fn claim_pool_mut(&mut self) -> &mut EventDrivenClaimPool {
+        &mut self.claim_pool
+    }
+
+    /// Register a worker (member) into the claim pool.
+    pub fn register_claim_worker(&mut self, worker: &str) {
+        self.claim_pool.register_worker(worker);
+    }
+
+    /// Register a task with declared dependencies into the claim pool.
+    pub fn register_claim_task(&mut self, id: &str, deps: Vec<String>) {
+        self.claim_pool.register_task(id, deps);
+    }
+
+    /// Idle-edge wake: worker transitions to idle -> atomically claim+awaken the
+    /// next eligible task. Zero polling. Returns the claim if one was minted.
+    pub fn wake_idle_worker(&mut self, worker: &str) -> Option<Claim> {
+        self.claim_pool.notify_worker_idle(worker)
+    }
+
+    /// Graph-change wake: a task completed (or a dependency edge changed) ->
+    /// atomically claim+awaken eligible idle workers.
+    pub fn wake_graph_change(&mut self, completed: &str) -> Vec<Claim> {
+        self.claim_pool.notify_graph_change(completed)
+    }
+
+    /// Complete a claim: validates attempt-token identity, marks the task done,
+    /// returns the wake claims for newly-idle workers. Stale claims rejected.
+    pub fn complete_claim(&mut self, claim: &Claim) -> Result<Vec<Claim>, String> {
+        self.claim_pool.complete(claim)
+    }
+
+    /// Cold recovery after restart: recompute eligible tasks, clear orphaned
+    /// claims, and re-claim with new attempt generations.
+    pub fn cold_recovery_claims(&mut self) -> Vec<Claim> {
+        self.claim_pool.cold_recovery()
+    }
+
+    /// Reassign a claimed task to another worker (revoke + re-claim).
+    pub fn reassign_claim(&mut self, task_id: &str, worker: &str) -> Result<Claim, String> {
+        self.claim_pool.reassign(task_id, worker)
     }
 }
 

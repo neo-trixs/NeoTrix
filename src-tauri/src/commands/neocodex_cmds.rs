@@ -195,9 +195,13 @@ pub async fn neocodex_send_message_stream(
             timestamp: ts,
             attachments: core_atts,
         });
-        let est = send_content.len() / 4;
+        // 输入 token 估算 (CJK 感知, 来自 neotrix-core context_budget:
+        // CJK≈1 token/字符, 其余≈1/4 token/字符)。仅用于 context 预算跟踪 —
+        // 输入侧真实 token 需等 provider 返回。tokens_used 的真实用量由
+        // react_loop_stream 内部累加 LlmResponse.usage.total_tokens (含
+        // prompt+completion), 此处不重复累加估算值, 避免虚构/双重计数。
+        let est = neotrix::neotrix::l1_body_impl::nt_io_provider::context_budget::estimate_tokens(&send_content);
         agent.context.push("user", send_content.clone(), est);
-        agent.state.tokens_used += est;
         agent.state.turn_count += 1;
     }
 

@@ -41,6 +41,10 @@ pub struct LlmRequest {
     /// When set, providers use their native JSON mode (OpenAI response_format,
     /// Anthropic output_config, Gemini response_mime_type) instead of constrained decoding.
     pub structured_output: Option<StructuredOutputConfig>,
+    /// Provider prefix caching hint: 稳定前缀 (system + 工具定义 + 早期历史) 的
+    /// token 数。标记后 gateway 将其纳入缓存指纹, 避免不同前缀标记共享缓存;
+    /// provider 层可据此对齐其 prefix cache。None = 未标注。
+    pub cacheable_prefix_tokens: Option<usize>,
 }
 
 /// Provider-native structured output configuration.
@@ -80,6 +84,7 @@ impl LlmRequest {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
         }
     }
 

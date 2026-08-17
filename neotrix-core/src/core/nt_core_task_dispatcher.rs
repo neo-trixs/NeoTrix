@@ -14,6 +14,7 @@ use crate::core::nt_core_cot_generator::{CoTConfig, CoTGenerator, DefaultCoTGene
 use crate::core::nt_core_crt::{CrtPlan, CrtTimeScale};
 use crate::core::nt_core_policy::E8Policy;
 use crate::core::nt_core_reasoning::{ReasoningMethod, TraceSource};
+use crate::neotrix::l1_body_impl::nt_io_provider::context_budget::truncate_preserving;
 use crate::neotrix::l8_autonomic_impl::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
 use crate::neotrix::{LlmProvider, LlmRequest, Message, ReasoningKernel, Role, Vector, KERNEL_DIM};
 use serde::{Deserialize, Serialize};
@@ -395,6 +396,7 @@ Output ONLY the JSON array, no extra text."#,
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
         };
 
         let response = provider
@@ -432,7 +434,7 @@ Instructions:
 5. Be concise but complete
 
 Output your result for this subtask only."#,
-            original_task,
+            task_summary(original_task),
             index + 1,
             suggestion.subtask,
             suggestion.reasoning
@@ -826,6 +828,7 @@ Output your result for this subtask only."#,
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
         };
 
         let response = self
@@ -896,7 +899,7 @@ Please synthesize these into a coherent, complete answer for the original task.
 If some sub-tasks failed, note what's missing but provide the best answer possible from successful results.
 
 Output ONLY the final synthesized answer."#,
-            decomposition.original_task,
+            task_summary(&decomposition.original_task),
             field_signals,
             results
                 .iter()
@@ -906,7 +909,7 @@ Output ONLY the final synthesized answer."#,
                         "{}. {}: {}",
                         i + 1,
                         if r.success { "SUCCESS" } else { "FAILED" },
-                        r.output
+                        truncate_preserving(&r.output, 2048, 0.6)
                     )
                 })
                 .collect::<Vec<_>>()
@@ -927,6 +930,7 @@ Output ONLY the final synthesized answer."#,
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
         };
 
         let response = self
@@ -959,6 +963,19 @@ Output ONLY the final synthesized answer."#,
         v.iter_mut().for_each(|x| *x /= norm);
         v
     }
+}
+
+/// 生成任务意图摘要: 截取前 ~200 字符, 超限以 "…" 折叠。
+/// 子任务 prompt 只注入摘要而非全文, 消除 N 个子任务 × 全量原文的 token 放大。
+fn task_summary(original_task: &str) -> String {
+    const MAX_CHARS: usize = 200;
+    if original_task.chars().count() <= MAX_CHARS {
+        return original_task.to_string();
+    }
+    format!(
+        "{}…",
+        original_task.chars().take(MAX_CHARS).collect::<String>()
+    )
 }
 
 // ── 确定性 Reducer (H2-H6): 过滤 → 规范化 → 聚类 → 保留最高 → 标注一致性 ──

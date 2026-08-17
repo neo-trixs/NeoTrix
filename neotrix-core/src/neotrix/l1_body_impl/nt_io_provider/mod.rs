@@ -7,6 +7,7 @@
 
 pub mod agent_routing;
 pub mod anthropic;
+pub mod account_pool;
 pub mod circuit_breaker;
 pub mod compaction;
 pub mod context_budget;
@@ -79,6 +80,11 @@ pub use gateway::{
 pub use circuit_breaker::CircuitBreaker;
 pub use rate_limiter::RateLimiter;
 pub use rate_limiter::TokenBucket;
+
+// Re-export 账户池 (P7 吸收)
+pub use account_pool::{
+    AccountHealth, AccountLease, AccountPool, AccountPoolConfig, AccountPoolError,
+};
 
 // Re-export ProviderCatalog
 pub use provider_catalog::{

@@ -170,6 +170,16 @@ impl AgentLoop {
         self
     }
 
+    /// 按模型 context window 派生预算 (P1-B3, 入口模型感知):
+    /// 上下文预算 = window × 0.8 (安全余量); 单条工具输出上限 ≥ 3k 且 ≤ window/8。
+    /// 避免一律走默认 24k, 导致大窗口模型被过早驱逐 / 小窗口模型溢出。
+    pub fn with_context_window(mut self, window: usize) -> Self {
+        let budget = ((window as f64) * 0.8).floor().max(1024.0) as usize;
+        self.context_token_budget = budget;
+        self.max_tool_output_tokens = self.max_tool_output_tokens.max(3_000).min(window / 8);
+        self
+    }
+
     /// 最近一次 LLM 调用的实际 token 用量 (prompt/completion/total)。
     pub fn last_usage(&self) -> Option<&Usage> {
         self.last_usage.as_ref()
@@ -574,6 +584,16 @@ impl AgentLoop {
         let mut messages = self.messages.clone();
         apply_context_budget(&mut messages, self.context_token_budget, self.max_tool_output_tokens);
 
+        // P0-4 prefix caching: 稳定前缀 = 除末条 (当前请求) 外的全部历史。
+        // ReAct 每轮重发时该前缀命中 provider 缓存, 成本趋近增量。
+        let cacheable_prefix_tokens = if messages.len() > 1 {
+            Some(estimate_messages_tokens(&messages[..messages.len() - 1]))
+        } else {
+            messages
+                .first()
+                .map(|m| estimate_tokens(&m.content))
+        };
+
         LlmRequest {
             model: self.model.clone(),
             messages,
@@ -585,7 +605,7 @@ impl AgentLoop {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
-            cacheable_prefix_tokens: None,
+            cacheable_prefix_tokens,
         }
     }
 

@@ -473,6 +473,237 @@ fn parse_array_field(val: &str) -> Vec<String> {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P-F1: RevertibleEffect + InverseLedger (吸收 cordiverse §3.1, F1)
+// 每个 skill-install 上下文变换携带追踪的逆 (Γ → Γ×(Γ→Γ))。Runtime 把逆
+// 按加载序累积到 accumulator φ (twisted composition monoid 𝔗Γ); teardown
+// 以 LIFO 逆序应用 φ — 结构性保证, 非手写清理 (paper §3.3.3 p.27)。
+// ────────────────────────────────────────────────────────────────
+
+/// 逆操作闭包: 返回 Result 以便按 fiber 捕获失败而不中断其余逆操作 (L-Raise)。
+pub type InverseOp = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
+
+/// 可逆效应: 一次安装变换的前向标签 + 显式单侧逆。
+#[derive(Clone)]
+pub struct RevertibleEffect {
+    pub label: String,
+    inverse: InverseOp,
+}
+
+impl RevertibleEffect {
+    pub fn new(
+        label: impl Into<String>,
+        inverse: impl Fn() -> Result<(), String> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            label: label.into(),
+            inverse: Arc::new(inverse),
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn run(&self) -> Result<(), String> {
+        (self.inverse)()
+    }
+}
+
+impl std::fmt::Debug for RevertibleEffect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RevertibleEffect").field("label", &self.label).finish()
+    }
+}
+
+/// 逆账本: `install_id` → 按加载序记录的逆操作列表。
+/// 卸载以 LIFO (逆加载序) 派生 teardown, 结构上保证 φ(γ) ≃ γ0。
+#[derive(Clone)]
+pub struct InverseLedger {
+    entries: HashMap<u64, Vec<RevertibleEffect>>,
+    next_id: u64,
+}
+
+impl std::fmt::Debug for InverseLedger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InverseLedger")
+            .field("next_id", &self.next_id)
+            .field("active_transactions", &self.entries.len())
+            .finish()
+    }
+}
+
+impl Default for InverseLedger {
+    fn default() -> Self {
+        Self { entries: HashMap::new(), next_id: 0 }
+    }
+}
+
+impl InverseLedger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 开启一个新的安装事务, 返回 install_id (accumulator φ 的标识)。
+    pub fn begin_install(&mut self) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.entries.insert(id, Vec::new());
+        id
+    }
+
+    /// 把逆操作按加载顺序推入账本。
+    pub fn push_inverse(&mut self, install_id: u64, effect: RevertibleEffect) -> Result<(), String> {
+        let entry = self.entries.get_mut(&install_id)
+            .ok_or_else(|| format!("unknown install transaction: {}", install_id))?;
+        entry.push(effect);
+        Ok(())
+    }
+
+    /// 加载序下的逆操作标签 (诊断/测试: 记录顺序即加载顺序)。
+    pub fn inverse_labels(&self, install_id: u64) -> Vec<String> {
+        self.entries
+            .get(&install_id)
+            .map(|e| e.iter().map(|x| x.label.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn inverse_count(&self, install_id: u64) -> usize {
+        self.entries.get(&install_id).map_or(0, |e| e.len())
+    }
+
+    pub fn active_transactions(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// 以 LIFO (逆加载序) 执行该事务的全部逆操作; 单级失败被记录但不
+    /// 中止其余逆操作 (L-Raise: failure per-fiber, siblings keep running)。
+    pub fn teardown(&mut self, install_id: u64) -> Vec<Result<(), String>> {
+        let entry = match self.entries.remove(&install_id) {
+            Some(e) => e,
+            None => return Vec::new(),
+        };
+        entry.into_iter().rev().map(|effect| effect.run()).collect()
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// P-F5: FiberLifecycle 惯性生命周期状态机 (吸收 cordiverse §4.1-4.3, F5)
+// 组件 = (d: spec, p: provision, e: witnessed effect); fiber = 单次实例化,
+// 拥有自己的生命周期状态。非原子转移有惯性; 失败按 fiber 记录 (L-Raise),
+// 不传播到 parent — sibling 继续运行。效应总经 Retired/Unloading 恢复, 不滞留。
+// ────────────────────────────────────────────────────────────────
+
+/// Fiber 生命周期状态 (F5): Loaded → Active → Suspended → Retired + Failed。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FiberLifecycleState {
+    /// 已加载 (install 完成, 尚未激活)
+    Loaded,
+    /// 激活 (依赖满足, 正常服务)
+    Active,
+    /// 挂起 (依赖丢失, 等待重新满足)
+    Suspended,
+    /// 退休 (teardown 完成, 终态)
+    Retired,
+    /// 失败 (按 fiber 捕获, 不传播到 sibling)
+    Failed,
+}
+
+impl FiberLifecycleState {
+    pub fn label(&self) -> &'static str {
+        use FiberLifecycleState::*;
+        match self {
+            Loaded => "loaded",
+            Active => "active",
+            Suspended => "suspended",
+            Retired => "retired",
+            Failed => "failed",
+        }
+    }
+}
+
+/// 单次 fiber 失败记录: 失败时的状态 + 消息。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FiberFailure {
+    pub at_state: FiberLifecycleState,
+    pub message: String,
+}
+
+/// Fiber 生命周期状态机 (F5): 惯性转移 (仅合法下一状态) + 按 fiber 失败捕获。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FiberLifecycle {
+    pub fiber_id: String,
+    pub state: FiberLifecycleState,
+    pub install_id: u64,
+    pub failures: Vec<FiberFailure>,
+}
+
+impl FiberLifecycle {
+    pub fn new(fiber_id: impl Into<String>, install_id: u64) -> Self {
+        Self {
+            fiber_id: fiber_id.into(),
+            state: FiberLifecycleState::Loaded,
+            install_id,
+            failures: Vec::new(),
+        }
+    }
+
+    /// 惯性转移表 (paper §4.3.3): 仅允许的下一状态。
+    /// Retired 是终态 (无后继); Failed 仅可回 Loaded (重装/重试) 或 Retired。
+    fn is_allowed(from: FiberLifecycleState, to: FiberLifecycleState) -> bool {
+        use FiberLifecycleState::*;
+        matches!(
+            (from, to),
+            (Loaded, Active)
+                | (Loaded, Suspended)
+                | (Loaded, Retired)
+                | (Loaded, Failed)
+                | (Active, Suspended)
+                | (Active, Retired)
+                | (Active, Failed)
+                | (Suspended, Active)
+                | (Suspended, Retired)
+                | (Suspended, Failed)
+                | (Failed, Loaded)
+                | (Failed, Retired)
+        )
+    }
+
+    pub fn state(&self) -> FiberLifecycleState {
+        self.state
+    }
+
+    /// 惯性转移: 非法转移返回 Err 且状态不变 (inertia: in-flight 转移先落地)。
+    pub fn transition(&mut self, to: FiberLifecycleState) -> Result<(), String> {
+        if self.state == to {
+            return Err(format!(
+                "fiber '{}' is already {}",
+                self.fiber_id,
+                self.state.label()
+            ));
+        }
+        if !Self::is_allowed(self.state, to) {
+            return Err(format!(
+                "illegal transition for fiber '{}': {} → {}",
+                self.fiber_id,
+                self.state.label(),
+                to.label()
+            ));
+        }
+        self.state = to;
+        Ok(())
+    }
+
+    /// 按 fiber 捕获失败: 记录失败并转入 Failed; 不传播到 sibling。
+    pub fn record_failure(&mut self, message: impl Into<String>) {
+        self.failures.push(FiberFailure {
+            at_state: self.state,
+            message: message.into(),
+        });
+        self.state = FiberLifecycleState::Failed;
+    }
+}
+
 /// Core skill engine: scan, index, match, activate/deactivate.
 pub struct SkillEngine {
     skills_dir: PathBuf,
@@ -494,6 +725,11 @@ pub struct SkillEngine {
     /// 锚定-然后-promote (dsh-anchored-standard 吸收): session 首个请求锚定
     /// Minimal 工具集, durable 后提升到 Standard 工具集。
     pub disclosure: AnchorPromote,
+    /// 可逆效应逆账本 (cordiverse F1 吸收): `install_id` → 加载序逆操作。
+    /// uninstall 以 LIFO 派生 teardown, 非手写清理。
+    pub inverse_ledger: InverseLedger,
+    /// 技能 fiber 生命周期注册表 (cordiverse F5 吸收): skill 名 → fiber 状态机。
+    pub fiber_lifecycles: HashMap<String, FiberLifecycle>,
 }
 
 impl SkillEngine {
@@ -508,6 +744,8 @@ impl SkillEngine {
             kb: None,
             attribution: HashMap::new(),
             disclosure: AnchorPromote::default(),
+            inverse_ledger: InverseLedger::new(),
+            fiber_lifecycles: HashMap::new(),
         }
     }
 
@@ -1029,6 +1267,7 @@ impl SkillEngine {
             }
 
             self.load_all();
+            self.register_install_effects(&entry.name, &target_dir)?;
             Ok(())
         } else if source_path.extension().is_some_and(|e| e == "md") {
             let content = std::fs::read_to_string(source_path).map_err(|e| e.to_string())?;
@@ -1041,6 +1280,7 @@ impl SkillEngine {
             std::fs::copy(source_path, &dest).map_err(|e| e.to_string())?;
 
             self.load_all();
+            self.register_install_effects(&entry.name, &target_dir)?;
             Ok(())
         } else {
             Err("Source must be a .md file or a directory containing SKILL.md".to_string())
@@ -1094,6 +1334,69 @@ impl SkillEngine {
         log::info!("[procedural→skill] installed '{}' from E8 pattern ({} states, reward={:.3})",
             skill.name, record.e8_sequence.len(), record.avg_reward);
         Ok(skill.name)
+    }
+
+    /// 把 install 的逆操作推入逆账本并派生 skill fiber (cordiverse F1+F5)。
+    /// teardown 从加载序派生, 非手写清理 (paper §3.3.3 p.27)。
+    fn register_install_effects(&mut self, name: &str, target_dir: &Path) -> Result<(), String> {
+        let install_id = self.inverse_ledger.begin_install();
+        let inv_target = target_dir.to_path_buf();
+        let inv_label = format!("remove installed skill dir: {}", inv_target.display());
+        self.inverse_ledger.push_inverse(
+            install_id,
+            RevertibleEffect::new(inv_label, move || {
+                if inv_target.exists() {
+                    std::fs::remove_dir_all(&inv_target)
+                        .map_err(|e| format!("remove {}: {}", inv_target.display(), e))
+                } else {
+                    Ok(())
+                }
+            }),
+        )?;
+        self.fiber_lifecycles.insert(
+            name.to_string(),
+            FiberLifecycle::new(name.to_string(), install_id),
+        );
+        if let Some(fiber) = self.fiber_lifecycles.get_mut(name) {
+            let _ = fiber.transition(FiberLifecycleState::Active);
+        }
+        Ok(())
+    }
+
+    /// 卸载技能 (cordiverse F1+F5): 按加载序的 LIFO 逆序执行该 install 的
+    /// 全部逆操作, 完成后把 fiber 转入 Retired 终态。逆操作中的失败按 fiber
+    /// 捕获, 不中断其余逆操作, 也不影响其他 fiber。
+    pub fn uninstall_skill(&mut self, name: &str) -> Result<Vec<Result<(), String>>, String> {
+        if self.fiber_lifecycles.get(name).map(|f| f.state) == Some(FiberLifecycleState::Retired) {
+            return Err(format!("skill '{}' fiber already retired", name));
+        }
+        let install_id = self.fiber_lifecycles.get(name)
+            .map(|f| f.install_id)
+            .ok_or_else(|| format!("no installed fiber for skill '{}'", name))?;
+        let results = self.inverse_ledger.teardown(install_id);
+        if let Some(fiber) = self.fiber_lifecycles.get_mut(name) {
+            let _ = fiber.transition(FiberLifecycleState::Retired);
+        }
+        if let Some(idx) = self.skills.iter().position(|s| s.name == name) {
+            self.skills.remove(idx);
+            self.build_index();
+        }
+        Ok(results)
+    }
+
+    /// 从 skill 名查 fiber 当前生命周期状态。
+    pub fn fiber_state(&self, name: &str) -> Option<FiberLifecycleState> {
+        self.fiber_lifecycles.get(name).map(|f| f.state)
+    }
+
+    /// 按 fiber 捕获失败并转入 Failed (不传播到 sibling)。
+    pub fn record_fiber_failure(&mut self, name: &str, message: impl Into<String>) -> bool {
+        if let Some(fiber) = self.fiber_lifecycles.get_mut(name) {
+            fiber.record_failure(message);
+            true
+        } else {
+            false
+        }
     }
 
     /// Find all skill files in the workspace and agent directories.
@@ -2571,5 +2874,123 @@ category: general
         let bts = BookToSkill::default();
         assert_eq!(bts.name(), "nt_mind_book_to_skill");
         assert!(bts.self_test().is_ok());
+    }
+
+    // ── cordiverse F1: RevertibleEffect + InverseLedger ──
+
+    #[test]
+    fn test_ledger_records_inverse_in_load_order() {
+        let mut ledger = InverseLedger::new();
+        let id = ledger.begin_install();
+        ledger.push_inverse(id, RevertibleEffect::new("first", || Ok(()))).unwrap();
+        ledger.push_inverse(id, RevertibleEffect::new("second", || Ok(()))).unwrap();
+        ledger.push_inverse(id, RevertibleEffect::new("third", || Ok(()))).unwrap();
+        assert_eq!(ledger.inverse_count(id), 3);
+        // 账本按加载序记录 (不是逆序)
+        assert_eq!(ledger.inverse_labels(id), vec!["first", "second", "third"]);
+    }
+
+    #[test]
+    fn test_ledger_lifo_teardown_runs_reverse_order() {
+        let mut ledger = InverseLedger::new();
+        let id = ledger.begin_install();
+        let log = Arc::new(std::sync::Mutex::new(Vec::new()));
+        for label in ["first", "second", "third"] {
+            let l = log.clone();
+            ledger.push_inverse(id, RevertibleEffect::new(label, move || {
+                l.lock().unwrap().push(label.to_string());
+                Ok(())
+            })).unwrap();
+        }
+        let results = ledger.teardown(id);
+        assert!(results.iter().all(|r| r.is_ok()));
+        let got = log.lock().unwrap().clone();
+        assert_eq!(got, vec!["third", "second", "first"], "LIFO: 逆加载序");
+        assert_eq!(ledger.inverse_count(id), 0, "teardown 消耗事务");
+    }
+
+    #[test]
+    fn test_ledger_teardown_unknown_id_is_empty() {
+        let mut ledger = InverseLedger::new();
+        assert!(ledger.teardown(99).is_empty());
+    }
+
+    // ── cordiverse F5: FiberLifecycle ──
+
+    #[test]
+    fn test_fiber_lifecycle_rejects_illegal_transitions() {
+        let mut fiber = FiberLifecycle::new("f1", 0);
+        assert_eq!(fiber.state(), FiberLifecycleState::Loaded);
+        assert!(fiber.transition(FiberLifecycleState::Active).is_ok());
+        assert!(fiber.transition(FiberLifecycleState::Active).is_err(), "自环非法");
+        assert!(fiber.transition(FiberLifecycleState::Loaded).is_err(), "Active→Loaded 非法");
+        assert!(fiber.transition(FiberLifecycleState::Retired).is_ok());
+        assert!(fiber.transition(FiberLifecycleState::Failed).is_err(), "Retired 是终态");
+        assert!(fiber.transition(FiberLifecycleState::Active).is_err(), "Retired→Active 非法");
+    }
+
+    #[test]
+    fn test_fiber_lifecycle_suspend_and_resume() {
+        let mut fiber = FiberLifecycle::new("f2", 0);
+        fiber.transition(FiberLifecycleState::Active).unwrap();
+        fiber.transition(FiberLifecycleState::Suspended).unwrap();
+        assert_eq!(fiber.state(), FiberLifecycleState::Suspended);
+        fiber.transition(FiberLifecycleState::Active).unwrap();
+        assert_eq!(fiber.state(), FiberLifecycleState::Active);
+    }
+
+    #[test]
+    fn test_fiber_failure_captured_per_fiber_without_aborting_others() {
+        // 两个独立 fiber: A 的逆失败被捕获, B 完全不受影响 (L-Raise)
+        let mut ledger = InverseLedger::new();
+        let id_a = ledger.begin_install();
+        ledger.push_inverse(id_a, RevertibleEffect::new("a1", || Err("a1 boom".into()))).unwrap();
+        let id_b = ledger.begin_install();
+        ledger.push_inverse(id_b, RevertibleEffect::new("b1", || Ok(()))).unwrap();
+
+        let mut fiber_a = FiberLifecycle::new("a", id_a);
+        let mut fiber_b = FiberLifecycle::new("b", id_b);
+        fiber_a.transition(FiberLifecycleState::Active).unwrap();
+        fiber_b.transition(FiberLifecycleState::Active).unwrap();
+
+        let res_a = ledger.teardown(id_a);
+        assert!(res_a[0].is_err(), "fiber A 逆失败必须被捕获");
+        fiber_a.record_failure("a1 boom");
+
+        let res_b = ledger.teardown(id_b);
+        assert!(res_b[0].is_ok(), "fiber B teardown 不受 A 影响");
+        assert_eq!(fiber_b.state(), FiberLifecycleState::Active);
+        assert_eq!(fiber_a.state(), FiberLifecycleState::Failed);
+        assert_eq!(fiber_a.failures.len(), 1);
+        assert_eq!(fiber_a.failures[0].message, "a1 boom");
+    }
+
+    // ── wiring: install → ledger → LIFO teardown ──
+
+    #[test]
+    fn test_install_wires_inverse_ledger_and_lifo_teardown() {
+        let tmp = setup_temp_dir();
+        let src = tmp.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("SKILL.md"), sample_skill_content()).unwrap();
+
+        let engine_dir = tmp.path().join("engine");
+        std::fs::create_dir_all(&engine_dir).unwrap();
+        let mut engine = SkillEngine::new(engine_dir.clone());
+        engine.install_skill(&src).unwrap();
+
+        let target = engine_dir.join("rust-analyzer");
+        assert!(target.exists(), "installed skill dir must exist");
+        let fiber = engine.fiber_lifecycles.get("rust-analyzer").unwrap();
+        assert_eq!(fiber.state(), FiberLifecycleState::Active);
+        let install_id = fiber.install_id;
+        assert!(engine.inverse_ledger.inverse_count(install_id) >= 1);
+
+        let results = engine.uninstall_skill("rust-analyzer").unwrap();
+        assert!(results.iter().all(|r| r.is_ok()), "teardown inverses must succeed");
+        assert!(!target.exists(), "uninstall 经 LIFO teardown 删除技能目录");
+        assert_eq!(engine.fiber_state("rust-analyzer"), Some(FiberLifecycleState::Retired));
+        assert!(engine.find_matching("rust", None).is_empty(), "技能从路由移除");
+        assert!(engine.uninstall_skill("rust-analyzer").is_err(), "重复卸载被拒");
     }
 }

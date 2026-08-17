@@ -39,6 +39,9 @@ impl ArtifactType {
 pub enum ArtifactState {
     Pending,
     Ready,
+    /// Claimed with a minted attempt token but not yet started (strict lifecycle
+    /// state introduced by the task_state_dag absorption, dsh-agent-teams P2/P4).
+    Claimed,
     InProgress,
     Done,
     Blocked(String),

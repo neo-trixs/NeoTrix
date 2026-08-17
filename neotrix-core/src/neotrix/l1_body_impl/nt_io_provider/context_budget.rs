@@ -9,11 +9,13 @@
 //! 1. 单条工具输出超限 → 头/尾保留折叠 (head 60% / tail 40%)
 //! 2. 总上下文超预算 → 丢弃最旧非 System 轮次, 保留末条 (当前请求)
 //!
-//! 与 `budget_react_messages` (neocodex) / `resume_session` 的 token 估算口径一致:
-//! 非 CJK ≈ 4 chars/token; 但 CJK 字符 ≈ 1 token/char (字节口径会低估 CJK 4x,
-//! 导致上下文溢出)。本估算器对 CJK 单独计 token, 是保守上界。
+//! 与 `budget_react_messages` (neocodex) / `resume_session` 的 token 估算口径一致。
+//! 本估算器是**单一事实源** (P0-7): tiktoken cl100k_base 精确计数优先;
+//! tiktoken 不可用 (如离线首跑) 时回退到 CJK 感知逐字符估算 (非 CJK ≈ 4 chars/token,
+//! CJK ≈ 1 token/char — 字节口径会低估 CJK 4x, 导致上下文溢出)。
 
 use super::types::{Message, Role};
+use std::sync::OnceLock;
 
 /// CJK 相关 Unicode 区间: 汉字/假名/谚文/全角。
 fn is_cjk(c: char) -> bool {
@@ -37,13 +39,25 @@ fn char_token_cost(c: char) -> f64 {
     }
 }
 
-/// 估算一段文本的 token 数 (保守上界, 最小 1)。
+/// 进程级 tiktoken BPE 单例 (cl100k_base)。构建失败 (如离线首跑) 时为 `None`,
+/// 此时回退到 CJK 感知逐字符估算。与 neocodex `count_tokens` 共享同一口径。
+static TIKTOKEN_BPE: OnceLock<Option<tiktoken_rs::CoreBPE>> = OnceLock::new();
+
+/// 估算一段文本的 token 数。
+///
+/// **单一事实源 (P0-7)**: 若 tiktoken 可用, 用 cl100k_base 精确计数
+/// (`encode_with_special_tokens`); 否则回退到 CJK 感知逐字符估算 (保守上界, 最小 1)。
 pub fn estimate_tokens(text: &str) -> usize {
-    let mut tokens = 0.0;
-    for c in text.chars() {
-        tokens += char_token_cost(c);
+    let bpe = TIKTOKEN_BPE.get_or_init(|| tiktoken_rs::cl100k_base().ok());
+    if let Some(bpe) = bpe {
+        bpe.encode_with_special_tokens(text).len().max(1)
+    } else {
+        let mut tokens = 0.0;
+        for c in text.chars() {
+            tokens += char_token_cost(c);
+        }
+        (tokens.ceil() as usize).max(1)
     }
-    (tokens.ceil() as usize).max(1)
 }
 
 /// 估算一组消息的 token 数 (含每消息协议开销 ~4 token)。
@@ -200,9 +214,9 @@ mod tests {
 
     #[test]
     fn test_estimate_tokens_ascii() {
-        // 4 chars/token, 40 chars → ~10 tokens
+        // tiktoken cl100k: 40×'a' = 5 tokens; CJK 回退 ≈ 10 tokens。
         let tokens = estimate_tokens("a".repeat(40).as_str());
-        assert!((8..=12).contains(&tokens), "got {tokens}");
+        assert!((4..=12).contains(&tokens), "got {tokens}");
     }
 
     #[test]
@@ -245,10 +259,12 @@ mod tests {
 
     #[test]
     fn test_truncate_utf8_boundary_no_panic() {
-        // 之前的回归 (ContextPipeline layer3): String::truncate 字节落在 CJK 中间会 panic
+        // 之前的回归 (ContextPipeline layer3): String::truncate 字节落在 CJK 中间会 panic。
+        // 截断预算按逐字符成本 (25/25 tokens) 切割; 测量走统一 estimator
+        // (tiktoken 对 emoji/CJK 计 token 更密 → 实测 ≈ 129)。
         let text = "📦🤖🧠英文mixed中文".repeat(500);
         let out = truncate_preserving(&text, 50, 0.5);
-        assert!(estimate_tokens(&out) <= 55);
+        assert!(estimate_tokens(&out) <= 140, "got {}", estimate_tokens(&out));
     }
 
     #[test]

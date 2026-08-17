@@ -44,13 +44,34 @@ impl ContextStrategy {
         }
     }
 
+    /// CJK 相关 Unicode 区间: 汉字/假名/谚文/全角。
+    /// 与 `neotrix-core` 的 `context_budget::is_cjk` 口径一致。
+    fn is_cjk(c: char) -> bool {
+        matches!(
+            c,
+            '\u{3000}'..='\u{303F}'   // CJK 标点
+            | '\u{3040}'..='\u{30FF}' // 假名
+            | '\u{3400}'..='\u{4DBF}' // CJK Ext A
+            | '\u{4E00}'..='\u{9FFF}' // CJK 统一表意
+            | '\u{AC00}'..='\u{D7AF}' // 谚文
+            | '\u{FF00}'..='\u{FFEF}' // 全角/半角
+        )
+    }
+
+    /// 估算一段文本的 token 数。
+    ///
+    /// **口径对齐 (P0-7)**: 与 `neotrix-core` 的单一事实源
+    /// `context_budget::estimate_tokens` 的 CJK 感知回退算法完全一致
+    /// (CJK ≈ 1 token/char, 其余 ≈ 1/4 token/char, 保守上界最小 1)。
+    ///
+    /// 注意: `neotrix-types` 不能依赖 `neotrix-core` (依赖方向相反, 引入会成环),
+    /// 故此处复制该算法而非委托; 语义与 context_budget 保持一致, 不做本地发散。
     pub fn estimate_tokens(text: &str) -> usize {
-        // 英文估算: 1 token ≈ 4 chars
-        // 中文估算: 1 token ≈ 2 chars
-        let char_count = text.chars().count();
-        let ascii_count = text.chars().filter(|c| c.is_ascii()).count();
-        let non_ascii = char_count.saturating_sub(ascii_count);
-        ascii_count / 4 + non_ascii / 2 + 1
+        let mut tokens: f64 = 0.0;
+        for c in text.chars() {
+            tokens += if Self::is_cjk(c) { 1.0 } else { 0.25 };
+        }
+        (tokens.ceil() as usize).max(1)
     }
 
     pub fn extract_sections(text: &str) -> Vec<String> {

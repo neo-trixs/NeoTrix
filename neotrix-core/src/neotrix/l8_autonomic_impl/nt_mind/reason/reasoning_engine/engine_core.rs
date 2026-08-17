@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::core::l7_capability::nt_core_antidistil::AntiDistillationSystem;
 use crate::core::nt_core_bank::ReasoningBank;
@@ -36,7 +36,7 @@ use crate::neotrix::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
 use crate::neotrix::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep, ControlTrainer, SftReport, CsppoReport};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_mind::context_artifacts::indexer::ArtifactIndexer;
-use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest};
+use crate::neotrix::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use super::CognitiveEye;
@@ -45,6 +45,10 @@ pub const MAX_COST_LOG: usize = 1000;
 pub const MAX_TRACES: usize = 1000;
 /// F6 训练节流: 累积多少条交替序列后触发一次 SFT + CSPO 训练。
 pub const CONTROL_TRAIN_BATCH: usize = 8;
+/// P0-6 会话内 KB 检索缓存容量上限: 超限时整体清空 (防膨胀, 保最旧语义)。
+pub const MAX_KB_CACHE_ENTRIES: usize = 32;
+/// P0-6 注入预算封顶: build_context 检索上下文拼进 prompt 前的 token 估算上限。
+pub const MAX_KB_INJECTION_TOKENS: usize = 512;
 
 pub struct CostRecord {
     pub tier: String,
@@ -98,6 +102,10 @@ pub struct ReasoningEngine {
     pub llm_last_duration_ms: u64,
     pub bank_retrieval_count: u64,
     pub kb: Option<KnowledgeBase>,
+    /// P0-6 会话内 KB 检索缓存: key 为 `s:{query 前缀}|{rtype}` (search 路径) 或
+    /// `b:{task 前缀}` (ContextBuilder/回退路径), value 为已拼好的注入上下文,
+    /// 避免同一 session 内相同/近似 query 每轮重搜重注入。容量上限 MAX_KB_CACHE_ENTRIES。
+    pub kb_cache: Mutex<HashMap<String, String>>,
     pub artifact_indexer: Option<ArtifactIndexer>,
     pub cognitive_eye: CognitiveEye,
     pub ttc_engine: Option<TtcEngine>,
@@ -209,6 +217,7 @@ impl ReasoningEngine {
             llm_last_duration_ms: 0,
             bank_retrieval_count: 0,
             kb: None,
+            kb_cache: Mutex::new(HashMap::new()),
             artifact_indexer: None,
             cognitive_eye: CognitiveEye::new(),
             ttc_engine: None,
@@ -559,31 +568,7 @@ impl ReasoningEngine {
         };
 
         // Phase 1.3: ContextBuilder 集成 — 从 KB/经验构建 Kernel context
-        let kb_context = if let (Some(ref kb), Some(ref builder)) = (&self.kb, &self.context_builder) {
-            // 使用 ContextBuilder 从 KB 检索相关经验并构建 context HashMap
-            let ctx_map = builder.build_context(kb, task, self.current_state.mode);
-            // 将 context HashMap 转为字符串注入 prompt
-            let mut ctx_str = String::new();
-            for (key, vec) in ctx_map {
-                let vec_str = vec.iter().map(|x| format!("{:.3}", x)).collect::<Vec<_>>().join(",");
-                ctx_str.push_str(&format!("{}: [{}]\n", key, vec_str));
-            }
-            if !ctx_str.is_empty() {
-                root_span.set_attribute("context_builder_used", AttributeValue::Bool(true));
-                format!("KB Context:\n{}\n", ctx_str)
-            } else {
-                String::new()
-            }
-        } else if let Some(ref kb) = self.kb {
-            // 回退到原有 E8 状态检索
-            if let Ok(results) = kb.query_by_e8_state(self.current_state.mode, 5) {
-                if !results.is_empty() {
-                    let mut s = String::from("KB knowledge:\n");
-                    for r in &results { s.push_str(&format!("- {} (score: {:.2})\n", r.node.title, r.score)); }
-                    s
-                } else { String::new() }
-            } else { String::new() }
-        } else { String::new() };
+        let kb_context = self.build_kb_context(task, root_span);
 
         let prompt = format!(
             "You are NeoTrix — mode: {mode_name}\n\
@@ -1399,17 +1384,63 @@ impl ReasoningEngine {
         Ok(())
     }
 
-    pub fn build_context(&self, query: &str, _rtype: ReasoningType) -> String {
+    /// 检索上下文 → 会话内缓存读写 (容量超限整体清空, 防膨胀)。
+    fn kb_cache_get(&self, key: &str) -> Option<String> {
+        self.kb_cache.lock().ok().and_then(|c| c.get(key).cloned())
+    }
+    fn kb_cache_put(&self, key: String, val: String) {
+        if let Ok(mut cache) = self.kb_cache.lock() {
+            if cache.len() >= MAX_KB_CACHE_ENTRIES {
+                cache.clear();
+            }
+            cache.insert(key, val);
+        }
+    }
+
+    /// P0-6: 会话内缓存 + 注入预算封顶的 KB 检索上下文。
+    /// 命中 (query 前缀, 推理类型) 即直接复用, 避免同一 session 重复 kb.search;
+    /// 未命中则检索并按相关度顺序截断到 ~MAX_KB_INJECTION_TOKENS。
+    pub fn build_context(&self, query: &str, rtype: ReasoningType) -> String {
+        let prefix: String = query.chars().take(64).collect();
+        let key = format!("s:{}|{:?}", prefix, rtype);
+        if let Some(cached) = self.kb_cache_get(&key) {
+            return cached;
+        }
+        let ctx = self.build_context_uncached(query);
+        self.kb_cache_put(key, ctx.clone());
+        ctx
+    }
+
+    fn build_context_uncached(&self, query: &str) -> String {
         if let Some(ref kb) = self.kb {
             if let Ok(results) = kb.search(query, 3) {
                 if !results.is_empty() {
                     let mut ctx = format!("Past experiences relevant to \"{}\":\n", query);
+                    let mut used = estimate_tokens(&ctx);
+                    // results 已按相关度排序: 优先保留前面的高相关条目
                     for r in &results {
-                        ctx.push_str(&format!(
+                        let mut line = format!(
                             "- {}: {}\n",
                             r.node.title,
                             r.node.summary.as_deref().unwrap_or("(no summary)")
-                        ));
+                        );
+                        let line_tokens = estimate_tokens(&line);
+                        if used + line_tokens > MAX_KB_INJECTION_TOKENS {
+                            // 全行超限 → title/summary 各取头部再试; 仍超限则丢弃该行
+                            let head_title = r.node.title.chars().take(64).collect::<String>();
+                            let head_summary = r
+                                .node
+                                .summary
+                                .as_deref()
+                                .map(|s| s.chars().take(160).collect::<String>())
+                                .unwrap_or_else(|| "(no summary)".to_string());
+                            line = format!("- {}: {}\n", head_title, head_summary);
+                            if used + estimate_tokens(&line) > MAX_KB_INJECTION_TOKENS {
+                                break;
+                            }
+                        }
+                        ctx.push_str(&line);
+                        used += estimate_tokens(&line);
                     }
                     return ctx;
                 }
@@ -1429,6 +1460,46 @@ impl ReasoningEngine {
             }
         }
         String::new()
+    }
+
+    /// P0-6: ContextBuilder/回退 E8 检索路径的会话内缓存 — 同一 task 前缀不重复检索。
+    fn build_kb_context(&self, task: &str, root_span: &Span) -> String {
+        let prefix: String = task.chars().take(64).collect();
+        let key = format!("b:{}", prefix);
+        if let Some(cached) = self.kb_cache_get(&key) {
+            return cached;
+        }
+        let ctx = self.build_kb_context_uncached(task, root_span);
+        self.kb_cache_put(key, ctx.clone());
+        ctx
+    }
+
+    fn build_kb_context_uncached(&self, task: &str, root_span: &Span) -> String {
+        if let (Some(ref kb), Some(ref builder)) = (&self.kb, &self.context_builder) {
+            // 使用 ContextBuilder 从 KB 检索相关经验并构建 context HashMap
+            let ctx_map = builder.build_context(kb, task, self.current_state.mode);
+            // 将 context HashMap 转为字符串注入 prompt
+            let mut ctx_str = String::new();
+            for (key, vec) in ctx_map {
+                let vec_str = vec.iter().map(|x| format!("{:.3}", x)).collect::<Vec<_>>().join(",");
+                ctx_str.push_str(&format!("{}: [{}]\n", key, vec_str));
+            }
+            if !ctx_str.is_empty() {
+                root_span.set_attribute("context_builder_used", AttributeValue::Bool(true));
+                format!("KB Context:\n{}\n", ctx_str)
+            } else {
+                String::new()
+            }
+        } else if let Some(ref kb) = self.kb {
+            // 回退到原有 E8 状态检索
+            if let Ok(results) = kb.query_by_e8_state(self.current_state.mode, 5) {
+                if !results.is_empty() {
+                    let mut s = String::from("KB knowledge:\n");
+                    for r in &results { s.push_str(&format!("- {} (score: {:.2})\n", r.node.title, r.score)); }
+                    s
+                } else { String::new() }
+            } else { String::new() }
+        } else { String::new() }
     }
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {

@@ -402,6 +402,9 @@ pub fn agent_view_tick() -> Result<AgentViewSummary, String> {
                 session.progress_pct = (session.progress_pct + pseudo_rand(&mut seed, 5.0)).min(100.0);
                 session.cpu_pct = (session.cpu_pct + pseudo_rand(&mut seed, 16.0) - 8.0).clamp(0.0, 100.0);
                 session.memory_mb = (session.memory_mb + pseudo_rand(&mut seed, 32.0) - 16.0).max(0.0);
+                // 演示模拟器: 本视图为种子/伪随机数据 (progress/cpu/memory 均为漂移),
+                // token 统计同样是演示值, 不代表真实用量; 真实 token 统计以 Gateway
+                // Usage (LlmResponse.usage.total_tokens) 为准。
                 session.tokens_used += pseudo_rand_int(&mut seed, 500);
                 session.last_active_at = now;
 

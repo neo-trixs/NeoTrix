@@ -3,6 +3,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tokio::sync::Mutex;
 
+use crate::neotrix::nt_io_provider::context_budget::{estimate_messages_tokens, estimate_tokens};
 use crate::neotrix::nt_io_provider::factory::create_gateway;
 use crate::neotrix::nt_io_provider::types::{LlmProvider, LlmRequest, Message, Role, Tool};
 use base64::Engine as _;
@@ -440,16 +441,34 @@ impl StreamingMarkdown {
 
 // ── Context Pipeline (from Claude Code: 5-layer compaction) ──
 
-/// Precise token counter backed by a lazily-initialized tiktoken BPE.
-/// Falls back to the classic chars/4 estimate if the BPE cannot be built
-/// (e.g. offline first-run). The BPE is built once per process.
+/// Precise token counter. **单一事实源 (P0-7)**: 委托 `context_budget::estimate_tokens`,
+/// 即 tiktoken cl100k_base 精确计数优先, tiktoken 不可用 (如离线首跑) 时回退
+/// CJK 感知逐字符估算。BPE 由 estimate_tokens 内部进程级 `OnceLock` 构建一次。
 pub fn count_tokens(text: &str) -> usize {
-    static BPE: std::sync::OnceLock<Option<tiktoken_rs::CoreBPE>> = std::sync::OnceLock::new();
-    let bpe = BPE.get_or_init(|| tiktoken_rs::cl100k_base().ok());
-    match bpe {
-        Some(bpe) => bpe.encode_with_special_tokens(text).len(),
-        None => text.len() / 4,
+    estimate_tokens(text)
+}
+
+/// 按 token 预算截断字符串 (Layer-3 microcompact 口径)。
+/// 用统一 estimator 二分查找最大字符前缀: 预算按 `estimate_tokens` 计, 与
+/// `count_tokens`/`estimate_tokens` 同口径, 不再用 `chars().take(200)` 字符口径。
+/// 字符边界安全 (按 char 迭代, 不会切坏 UTF-8 / CJK)。
+fn truncate_to_token_budget(text: &str, budget: usize) -> String {
+    if estimate_tokens(text) <= budget {
+        return text.to_string();
     }
+    // 二分找最大前缀使 estimate_tokens(prefix) <= budget。
+    let mut lo = 0usize;
+    let mut hi = text.chars().count();
+    while lo < hi {
+        let mid = (lo + hi + 1) / 2;
+        let prefix: String = text.chars().take(mid).collect();
+        if estimate_tokens(&prefix) <= budget {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    text.chars().take(lo).collect()
 }
 
 #[derive(Debug, Clone)]
@@ -554,12 +573,12 @@ impl ContextPipeline {
             && self.total_tokens() > (self.max_tokens as f64 * self.budget_low) as usize
         {
             if self.turns[i].priority < 2 {
-                let kept = self.turns[i].content.chars().take(200).collect::<String>();
+                let kept = truncate_to_token_budget(&self.turns[i].content, 50);
                 self.turns[i].content = format!("{}...", kept);
                 self.turns[i].token_count = if self.use_tiktoken {
                     count_tokens(&self.turns[i].content)
                 } else {
-                    kept.len() / 4
+                    estimate_tokens(&self.turns[i].content)
                 };
             }
             i += 1;
@@ -943,18 +962,38 @@ impl SubagentDispatch {
     /// 模型读 `NEOTRIX_SUBAGENT_MODEL`，缺省 `gpt-4o-mini`；Coder 用低温采样，
     /// Explorer/Planner 交给模型默认采样 (None)。
     pub fn build_request(kind: &SubagentKind, task: &str) -> LlmRequest {
+        Self::build_request_with_context(kind, task, None)
+    }
+
+    /// P2-C2: 同 `build_request`，但允许注入父代理的压缩上下文摘要
+    /// (subagent-as-context-management)。摘要以独立 System 消息下发，标记为
+    /// "仅参考、勿复述"——子代理获得父对话的定向信息，又不会被任务语义污染。
+    pub fn build_request_with_context(
+        kind: &SubagentKind,
+        task: &str,
+        context_hint: Option<&str>,
+    ) -> LlmRequest {
         let model = std::env::var(SUBAGENT_MODEL_ENV)
             .unwrap_or_else(|_| DEFAULT_SUBAGENT_MODEL.to_string());
         let temperature = match kind {
             SubagentKind::Coder => Some(0.2),
             SubagentKind::Explorer | SubagentKind::Planner => None,
         };
+        let mut messages = vec![Message::new(Role::System, subagent_system_prompt(*kind))];
+        if let Some(ctx) = context_hint {
+            let ctx = ctx.trim();
+            if !ctx.is_empty() {
+                let digest = format!(
+                    "Parent conversation digest (reference only, do not restate it):\n{}",
+                    ctx
+                );
+                messages.push(Message::new(Role::System, &digest));
+            }
+        }
+        messages.push(Message::new(Role::User, task));
         LlmRequest {
             model,
-            messages: vec![
-                Message::new(Role::System, subagent_system_prompt(*kind)),
-                Message::new(Role::User, task),
-            ],
+            messages,
             temperature,
             max_tokens: SUBAGENT_MAX_TOKENS,
             tools: vec![],
@@ -963,6 +1002,34 @@ impl SubagentDispatch {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens: None,
+        }
+    }
+
+    /// P2-C2: 将父代理最近的对话 turns 压缩为有界摘要。
+    /// 只取最近 N 条 turn，每条按预算截断，总量封顶 `max_total_chars`——
+    /// 子代理只看到压缩后的父上下文，不复制全量历史 (token 节省核心)。
+    pub fn compress_context(turns: &VecDeque<ContextTurn>, max_total_chars: usize) -> String {
+        const MAX_TURNS: usize = 8;
+        let tail: Vec<&ContextTurn> = turns.iter().rev().take(MAX_TURNS).collect();
+        let mut budget = max_total_chars;
+        let mut parts: Vec<String> = Vec::new();
+        for t in tail.iter().rev() {
+            let text = t.content.trim();
+            if text.is_empty() {
+                continue;
+            }
+            let take: String = text.chars().take(budget).collect();
+            if take.is_empty() {
+                break;
+            }
+            budget = budget.saturating_sub(take.chars().count());
+            parts.push(format!("[{}] {}", t.role, take));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("(recent conversation digest)\n{}", parts.join("\n"))
         }
     }
 
@@ -1000,8 +1067,19 @@ impl SubagentDispatch {
         _cwd: &str,
         provider: Arc<dyn LlmProvider>,
     ) -> SubagentResult {
+        Self::run_with_provider_ctx(kind, task, None, _cwd, provider).await
+    }
+
+    /// P2-C2: 带压缩上下文摘要的派发核心 (供 `run_with_context` 与并行派发复用)。
+    async fn run_with_provider_ctx(
+        kind: SubagentKind,
+        task: &str,
+        context_hint: Option<&str>,
+        _cwd: &str,
+        provider: Arc<dyn LlmProvider>,
+    ) -> SubagentResult {
         let start = Instant::now();
-        let request = Self::build_request(&kind, task);
+        let request = Self::build_request_with_context(&kind, task, context_hint);
         match provider.complete(&request).await {
             Ok(resp) => SubagentResult {
                 kind,
@@ -1024,15 +1102,45 @@ impl SubagentDispatch {
         }
     }
 
+    /// P2-C2: 派发单个 subagent 并注入压缩的父上下文摘要。
+    pub async fn run_with_context(
+        kind: SubagentKind,
+        task: &str,
+        context_hint: &str,
+        cwd: &str,
+    ) -> SubagentResult {
+        Self::run_with_provider_ctx(kind, task, Some(context_hint), cwd, Self::shared_gateway().await)
+            .await
+    }
+
     pub async fn run_parallel(
         tasks: Vec<(SubagentKind, String)>,
+        cwd: &str,
+    ) -> Vec<SubagentResult> {
+        Self::run_parallel_with_context(tasks, None, cwd).await
+    }
+
+    /// P2-C2: 并行派发多个 subagent，共享同一份父上下文摘要。
+    pub async fn run_parallel_with_context(
+        tasks: Vec<(SubagentKind, String)>,
+        context_hint: Option<&str>,
         cwd: &str,
     ) -> Vec<SubagentResult> {
         let handles: Vec<_> = tasks
             .into_iter()
             .map(|(kind, task)| {
                 let cwd = cwd.to_string();
-                tokio::spawn(async move { Self::run(kind, &task, &cwd).await })
+                let ctx = context_hint.map(|s| s.to_string());
+                tokio::spawn(async move {
+                    Self::run_with_provider_ctx(
+                        kind,
+                        &task,
+                        ctx.as_deref(),
+                        &cwd,
+                        Self::shared_gateway().await,
+                    )
+                    .await
+                })
             })
             .collect();
         let mut results = Vec::new();
@@ -1653,11 +1761,16 @@ impl NeoCodexAgent {
     }
 
     /// Dispatch parallel subagents (from Claude Code fork/async/sync)
+    ///
+    /// P2-C2: 把父代理最近的对话 turns 压缩成有界摘要随任务一起派发——
+    /// subagent 获得定向父上下文 (信息不丢失), 又不复制全量历史 (token 受控)。
     pub async fn dispatch_subagents(&mut self, tasks: Vec<(SubagentKind, String)>) {
         let cwd = std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
-        self.subagent_results = SubagentDispatch::run_parallel(tasks, &cwd).await;
+        let context_hint = SubagentDispatch::compress_context(&self.context.turns, 2000);
+        let hint = if context_hint.is_empty() { None } else { Some(context_hint.as_str()) };
+        self.subagent_results = SubagentDispatch::run_parallel_with_context(tasks, hint, &cwd).await;
     }
 
     /// Get all tool call context for permission checking
@@ -2505,6 +2618,14 @@ impl NeoCodexAgent {
             }
         }
 
+        // P0-4 prefix caching: 稳定前缀 = 除末条 (当前请求) 外的全部历史。
+        // ReAct 每轮重发时该前缀命中 provider 缓存, 成本趋近增量。
+        let cacheable_prefix_tokens = if messages.len() > 1 {
+            Some(estimate_messages_tokens(&messages[..messages.len() - 1]))
+        } else {
+            None
+        };
+
         let mut req = LlmRequest {
             model: self.provider.active_model(),
             messages,
@@ -2554,6 +2675,7 @@ impl NeoCodexAgent {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
+            cacheable_prefix_tokens,
         };
         if req.image_data.is_some() && active_has_vision {
             if let Some(raw) = req.image_data.clone() {
@@ -4001,6 +4123,7 @@ mod tests {
                     provider_params: Default::default(),
                     constraint_json: None,
                     structured_output: None,
+                    cacheable_prefix_tokens: None,
                 };
                 let _ = provider.stream_complete(&request).await;
             }
@@ -4221,5 +4344,56 @@ mod tests {
             "planner system prompt: {}",
             planner.messages[0].content
         );
+    }
+
+    #[test]
+    fn test_build_request_with_context_injects_digest() {
+        let req = SubagentDispatch::build_request_with_context(
+            &SubagentKind::Coder,
+            "write x",
+            Some("  [user] recent turn  "),
+        );
+        assert_eq!(req.messages.len(), 3, "system + digest + user");
+        assert_eq!(req.messages[0].role, Role::System);
+        assert_eq!(req.messages[1].role, Role::System, "digest as separate system msg");
+        assert!(
+            req.messages[1].content.contains("Parent conversation digest"),
+            "digest marker: {}",
+            req.messages[1].content
+        );
+        assert!(
+            req.messages[1].content.contains("recent turn"),
+            "digest body: {}",
+            req.messages[1].content
+        );
+        assert_eq!(req.messages[2].role, Role::User);
+        assert_eq!(req.messages[2].content, "write x", "task message unpolluted");
+
+        let no_ctx = SubagentDispatch::build_request_with_context(&SubagentKind::Coder, "t", None);
+        assert_eq!(no_ctx.messages.len(), 2, "None hint adds nothing");
+    }
+
+    #[test]
+    fn test_compress_context_bounded_digest() {
+        let mut pipeline = ContextPipeline::new(64_000);
+        pipeline.push("user", "hello world".into(), 0);
+        pipeline.push("assistant", "hi there".into(), 0);
+        pipeline.push("user", "long line ".repeat(50).into(), 0);
+        pipeline.push("tool", "".into(), 0);
+
+        let digest = SubagentDispatch::compress_context(&pipeline.turns, 64);
+        assert!(
+            digest.chars().count() <= 64 + 64,
+            "digest bounded (header/tag slack): {digest}"
+        );
+        assert!(digest.contains("hello world"), "newest tail includes early turns: {digest}");
+        assert!(digest.contains("[user]") && digest.contains("[assistant]"), "role tags: {digest}");
+        assert!(
+            !digest.contains(&"long line ".repeat(5)),
+            "over-budget content truncated, not copied whole: {digest}"
+        );
+
+        let empty = SubagentDispatch::compress_context(&VecDeque::new(), 64);
+        assert!(empty.is_empty(), "no turns -> empty digest");
     }
 }

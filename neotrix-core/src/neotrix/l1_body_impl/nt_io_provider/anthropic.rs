@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
-use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, Usage, Role};
+use super::context_budget::estimate_tokens;
+use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, StructuredOutputConfig, Usage, Role};
 
 pub struct AnthropicProvider {
     api_key: String,
@@ -18,6 +19,54 @@ impl AnthropicProvider {
     }
 }
 
+/// 计算稳定前缀边界消息索引 (在非 System 消息序列上): 从头累积
+/// `estimate_tokens` (含每消息 ~4 token 协议开销), 累计越过 `prefix_tokens`
+/// 时返回该消息索引 — 在此消息上打 Anthropic `cache_control` 断点, 使
+/// ReAct 每轮重发时该稳定前缀命中 provider 缓存 (对标 E1/E10 prefix caching)。
+fn prefix_boundary_index(messages: &[&Message], prefix_tokens: usize) -> Option<usize> {
+    let mut acc = 0usize;
+    for (i, m) in messages.iter().enumerate() {
+        acc += estimate_tokens(&m.content) + 4;
+        if acc >= prefix_tokens {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// 序列化单条非 System 消息; `cache` 为 true 时把 content 转为带
+/// `cache_control` 断点的文本块数组 (Anthropic 语义要求)。
+fn serialize_message(m: &Message, cache: bool) -> serde_json::Value {
+    let content = if cache {
+        serde_json::json!([
+            {"type": "text", "text": m.content, "cache_control": {"type": "ephemeral"}}
+        ])
+    } else {
+        serde_json::json!(m.content)
+    };
+    serde_json::json!({
+        "role": match m.role {
+            Role::User => "user",
+            Role::Assistant => "assistant",
+            Role::Tool => "tool",
+            _ => "user",
+        },
+        "content": content,
+    })
+}
+
+/// 序列化 system 提示: `cache` 为 true 时转文本块数组并打 `cache_control`
+/// (system 在会话内恒定, 是最高价值的缓存前缀)。
+fn serialize_system(s: &str, cache: bool) -> serde_json::Value {
+    if cache {
+        serde_json::json!([
+            {"type": "text", "text": s, "cache_control": {"type": "ephemeral"}}
+        ])
+    } else {
+        serde_json::json!(s)
+    }
+}
+
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
     fn set_proxy(&mut self, proxy_url: &str) {
@@ -27,21 +76,21 @@ impl LlmProvider for AnthropicProvider {
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/v1/messages", self.base_url);
 
-        let system = request.messages.iter()
-            .find(|m| m.role == Role::System)
-            .map(|m| m.content.clone());
+        let system_msg = request.messages.iter().find(|m| m.role == Role::System);
+        let system = system_msg.map(|m| m.content.clone());
+        let cache_prefix = request.cacheable_prefix_tokens;
 
-        let messages: Vec<serde_json::Value> = request.messages.iter()
+        let non_system: Vec<&Message> = request
+            .messages
+            .iter()
             .filter(|m| m.role != Role::System)
-            .map(|m| serde_json::json!({
-                "role": match m.role {
-                    Role::User => "user",
-                    Role::Assistant => "assistant",
-                    Role::Tool => "tool",
-                    _ => "user",
-                },
-                "content": m.content,
-            }))
+            .collect();
+        // P0-4 prefix caching: 在稳定前缀边界消息上打 cache_control 断点。
+        let boundary = cache_prefix.and_then(|n| prefix_boundary_index(&non_system, n));
+        let messages: Vec<serde_json::Value> = non_system
+            .iter()
+            .enumerate()
+            .map(|(i, m)| serialize_message(m, Some(i) == boundary))
             .collect();
 
         let mut body = serde_json::json!({
@@ -66,7 +115,7 @@ impl LlmProvider for AnthropicProvider {
         }
 
         if let Some(s) = system {
-            body["system"] = serde_json::json!(s);
+            body["system"] = serialize_system(&s, cache_prefix.is_some());
         }
 
         if let Some(so) = &request.structured_output {
@@ -138,21 +187,21 @@ impl LlmProvider for AnthropicProvider {
         let temperature = request.temperature_clean();
         let provider_params = request.provider_params.clone();
 
-        let system = request.messages.iter()
-            .find(|m| m.role == Role::System)
-            .map(|m| m.content.clone());
+        let system_msg = request.messages.iter().find(|m| m.role == Role::System);
+        let system = system_msg.map(|m| m.content.clone());
+        let cache_prefix = request.cacheable_prefix_tokens;
 
-        let messages: Vec<serde_json::Value> = request.messages.iter()
+        let non_system: Vec<&Message> = request
+            .messages
+            .iter()
             .filter(|m| m.role != Role::System)
-            .map(|m| serde_json::json!({
-                "role": match m.role {
-                    Role::User => "user",
-                    Role::Assistant => "assistant",
-                    Role::Tool => "tool",
-                    _ => "user",
-                },
-                "content": m.content,
-            }))
+            .collect();
+        // P0-4 prefix caching: 在稳定前缀边界消息上打 cache_control 断点。
+        let boundary = cache_prefix.and_then(|n| prefix_boundary_index(&non_system, n));
+        let messages: Vec<serde_json::Value> = non_system
+            .iter()
+            .enumerate()
+            .map(|(i, m)| serialize_message(m, Some(i) == boundary))
             .collect();
 
         let mut body = serde_json::json!({
@@ -181,7 +230,7 @@ impl LlmProvider for AnthropicProvider {
             body[key] = val.clone();
         }
 
-        if let Some(s) = system { body["system"] = serde_json::json!(s); }
+        if let Some(s) = system { body["system"] = serialize_system(&s, cache_prefix.is_some()); }
 
         let (tx, rx) = tokio::sync::mpsc::channel(64);
 

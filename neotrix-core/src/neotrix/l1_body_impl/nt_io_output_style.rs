@@ -222,7 +222,7 @@ impl RuleResult {
     }
 }
 
-/// 一次 `govern()` 的完整治理报告。
+/// 单条规则检查的完整治理报告。
 #[derive(Debug, Clone)]
 pub struct GovernanceReport {
     /// 每条规则的独立结果 (按 rule_id 顺序)。
@@ -235,6 +235,119 @@ pub struct GovernanceReport {
     pub fixes_applied: Vec<String>,
     /// auto-fix 后的文本 (仅 auto-fix 模式且发生修复时存在)。
     pub fixed_text: Option<String>,
+    /// AI-smell 检测结果 (natural-japanese #14 吸收) — 机械式 AI 写作痕迹清单。
+    pub smells: Vec<AiSmell>,
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AiSmellDetector — 机械式 AI 写作痕迹检测 (natural-japanese #14 吸收)
+// ────────────────────────────────────────────────────────────────────────────
+
+/// 单条 AI-smell 命中的结构化描述。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiSmell {
+    /// 模式标识 (如 `meta-speech` / `conclusion-signpost`)。
+    pub pattern_id: &'static str,
+    /// 命中行号 (1-based)。
+    pub line: usize,
+    /// 命中的原文片段 (截断显示)。
+    pub matched: String,
+    /// 建议改写 (消除机械感)。
+    pub suggestion: &'static str,
+}
+
+/// AI-smell 检测模式 — 正则 + 建议。
+pub struct SmellPattern {
+    pub id: &'static str,
+    pub regex: Regex,
+    pub suggestion: &'static str,
+}
+
+/// 机械式 AI 写作痕迹检测器 — 规则化 regex 检测 (非 LLM 打分)。
+pub struct AiSmellDetector {
+    patterns: Vec<SmellPattern>,
+    /// 每模式最多上报的命中数 (防止噪声淹没报告)。
+    max_per_pattern: usize,
+}
+
+impl Default for AiSmellDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AiSmellDetector {
+    pub fn new() -> Self {
+        Self {
+            patterns: Self::default_patterns(),
+            max_per_pattern: 3,
+        }
+    }
+
+    /// 内置模式集 — 高频机械 AI 标记。
+    fn default_patterns() -> Vec<SmellPattern> {
+        vec![
+            SmellPattern {
+                id: "meta-speech",
+                regex: Regex::new(
+                    r"(?i)值得注意的是|需要注意的是|it's worth noting|it is worth noting|please note that|as an ai,|i am an ai",
+                )
+                .expect("meta-speech 正则有效"),
+                suggestion: "直接给结论/事实, 不要声明性前言",
+            },
+            SmellPattern {
+                id: "conclusion-signpost",
+                regex: Regex::new(r"综上所述|总而言之|总的说来|in conclusion|to summarize|to sum up|overall, i think|in summary").expect("conclusion-signpost 正则有效"),
+                suggestion: "删掉总结开场白, 直接给要点或删除冗余段",
+            },
+            SmellPattern {
+                id: "transition-cliche",
+                regex: Regex::new(r"首先，|其次，|最后，|最后,|firstly,|secondly,|furthermore,|moreover,|additionally,").expect("transition-cliche 正则有效"),
+                suggestion: "用清单/编号结构替代口语化过渡词",
+            },
+            SmellPattern {
+                id: "over-polished",
+                regex: Regex::new(r"如下所示|如下：|以下是对|以下为|below is|here is the|as you can see|如您所见|正如您所知|as we all know|as you know").expect("over-polished 正则有效"),
+                suggestion: "去掉恭维性引导, 直入主题",
+            },
+            SmellPattern {
+                id: "hedge-stack",
+                regex: Regex::new(r"(?i)very very|extremely extremely|absolutely|undoubtedly|无疑|诚然|毋庸置疑|显然,").expect("hedge-stack 正则有效"),
+                suggestion: "删减程度副词, 让论证自己说话",
+            },
+        ]
+    }
+
+    /// 对一段文本运行全部模式, 返回命中的 AI-smell (按行序去重排序)。
+    pub fn detect(&self, text: &str) -> Vec<AiSmell> {
+        let mut out: Vec<AiSmell> = Vec::new();
+        for p in &self.patterns {
+            let mut hits: Vec<AiSmell> = Vec::new();
+            for cap in p.regex.captures_iter(text) {
+                if hits.len() >= self.max_per_pattern {
+                    break;
+                }
+                if let Some(m) = cap.get(0) {
+                    let line = text[..m.start()].matches('\n').count() + 1;
+                    let matched = truncate(m.as_str().trim(), 60);
+                    hits.push(AiSmell {
+                        pattern_id: p.id,
+                        line,
+                        matched,
+                        suggestion: p.suggestion,
+                    });
+                }
+            }
+            out.extend(hits);
+        }
+        // 按行号稳定排序 (同模式内保持正则顺序)。
+        out.sort_by_key(|s| s.line);
+        out
+    }
+
+    pub fn pattern_count(&self) -> usize {
+        self.patterns.len()
+    }
 }
 
 /// 单条治理规则 — 独立可测、可审计。
@@ -609,6 +722,8 @@ pub struct OutputGovernor {
     workspace_root: PathBuf,
     max_message_chars: usize,
     placeholder_pure: Regex,
+    /// AI-smell 检测器 (natural-japanese #14 吸收)。
+    smell_detector: AiSmellDetector,
 }
 
 /// 默认单消息长度上限 (字符)。
@@ -698,6 +813,7 @@ impl OutputGovernor {
             workspace_root: root,
             max_message_chars: DEFAULT_MAX_MESSAGE_CHARS,
             placeholder_pure: Regex::new(PLACEHOLDER_PURE_RE).expect("placeholder_pure 正则有效"),
+            smell_detector: AiSmellDetector::new(),
         }
     }
 
@@ -774,6 +890,7 @@ impl OutputGovernor {
             violations,
             fixes_applied,
             fixed_text,
+            smells: self.smell_detector.detect(text),
         }
     }
 }
@@ -807,5 +924,55 @@ mod tests {
     fn registry_unknown_id_falls_back_to_plain() {
         let reg = OutputStyleRegistry::new();
         assert_eq!(reg.apply(OutputStyleId::Plain, "abc"), "abc");
+    }
+
+    // ── AiSmellDetector (natural-japanese #14 吸收) ─────────────────────────
+
+    #[test]
+    fn detector_finds_mechanical_markers() {
+        let det = AiSmellDetector::new();
+        let text = "值得注意的是，本模块已接入。\n综上所述，一切正常。";
+        let smells = det.detect(text);
+        assert!(smells.len() >= 2, "got {smells:?}");
+        assert!(smells.iter().any(|s| s.pattern_id == "meta-speech" && s.line == 1));
+        assert!(smells.iter().any(|s| s.pattern_id == "conclusion-signpost" && s.line == 2));
+        // 每条命中都带可执行建议
+        for s in &smells {
+            assert!(!s.suggestion.is_empty());
+        }
+    }
+
+    #[test]
+    fn detector_clean_text_zero_smells() {
+        let det = AiSmellDetector::new();
+        let text = "网关已升级。\n账户池支持 round-robin 与限流检疫。\ncargo check 通过。";
+        assert_eq!(det.detect(text).len(), 0);
+    }
+
+    #[test]
+    fn detector_reports_line_and_snippet() {
+        let det = AiSmellDetector::new();
+        let text = "第一行。\n第二行如下所示。\n第三行。";
+        let smells = det.detect(text);
+        let hit = smells
+            .iter()
+            .find(|s| s.pattern_id == "over-polished")
+            .expect("over-polished marker present");
+        assert_eq!(hit.line, 2);
+        assert_eq!(hit.matched, "如下所示");
+    }
+
+    #[test]
+    fn governed_report_includes_smells() {
+        let reg = OutputStyleRegistry::new();
+        let report = reg.govern(
+            "综上所述，这是对账户池的总结。\n其余内容正常。",
+            OutputStyleId::Plain,
+        );
+        assert!(!report.smells.is_empty(), "smells should be detected in govern()");
+        assert!(report
+            .smells
+            .iter()
+            .any(|s| s.pattern_id == "conclusion-signpost"));
     }
 }

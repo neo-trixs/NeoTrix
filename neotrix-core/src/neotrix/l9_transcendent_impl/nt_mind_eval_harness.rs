@@ -1131,6 +1131,141 @@ impl crate::core::nt_core_self_test::SelfTest for SelfVerifiableRewardSelfTest {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P11: OracleLadder — T0-T3 执行式 oracle 验证阶梯 (defending-harness F5)
+// T0 构建检查 → T1 复现 → T2 回归 → T3 重攻击。每级都是可执行 oracle;
+// 变更仅在每级通过后提升。无模型判断门 — 只有可执行验证
+// ("No patch fails based on model judgment")。证据回传, 非 prose。
+// ────────────────────────────────────────────────────────────────
+
+/// 阶梯的 4 个 rung: T0 build-check → T1 repro → T2 regression → T3 re-attack。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum OracleRung {
+    /// T0: apply + rebuild 构建退出码 (cheapest, 第一层)
+    T0BuildCheck,
+    /// T1: 原始 PoC 不再触发 (exit 0 且无崩溃信号)
+    T1Repro,
+    /// T2: 项目测试套件通过 (回归)
+    T2Regression,
+    /// T3: 重新攻击 (fresh find-agent 二次攻击; ASAN 判定)
+    T3Reattack,
+}
+
+impl OracleRung {
+    pub const LADDER: [OracleRung; 4] = [
+        OracleRung::T0BuildCheck,
+        OracleRung::T1Repro,
+        OracleRung::T2Regression,
+        OracleRung::T3Reattack,
+    ];
+
+    pub fn label(&self) -> &'static str {
+        use OracleRung::*;
+        match self {
+            T0BuildCheck => "build-check",
+            T1Repro => "repro",
+            T2Regression => "regression",
+            T3Reattack => "re-attack",
+        }
+    }
+
+    pub fn next(self) -> Option<OracleRung> {
+        use OracleRung::*;
+        match self {
+            T0BuildCheck => Some(T1Repro),
+            T1Repro => Some(T2Regression),
+            T2Regression => Some(T3Reattack),
+            T3Reattack => None,
+        }
+    }
+}
+
+/// 单级可执行 oracle 的结果: passed + 证据 (evidence), 非 prose。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RungResult {
+    pub rung: OracleRung,
+    pub passed: bool,
+    pub evidence: String,
+}
+
+impl RungResult {
+    pub fn pass(rung: OracleRung, evidence: impl Into<String>) -> Self {
+        Self { rung, passed: true, evidence: evidence.into() }
+    }
+
+    pub fn fail(rung: OracleRung, evidence: impl Into<String>) -> Self {
+        Self { rung, passed: false, evidence: evidence.into() }
+    }
+}
+
+/// 阶梯运行报告: 达到的最高级 + 每级结果 + 是否整体提升。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LadderReport {
+    pub results: Vec<RungResult>,
+    pub highest_passed: Option<OracleRung>,
+    pub promoted: bool,
+}
+
+impl LadderReport {
+    pub fn rung_result(&self, rung: OracleRung) -> Option<&RungResult> {
+        self.results.iter().find(|r| r.rung == rung)
+    }
+}
+
+/// 可执行 oracle: 确定性执行的闭包, 返回 (passed, evidence)。
+pub type RungOracle = Box<dyn Fn() -> RungResult + Send + Sync>;
+
+/// 执行式 oracle 验证阶梯 (defending-harness F5): 按 T0→T3 单调顺序执行,
+/// 停在第一个失败级; 只有全部通过才提升到 T3。无模型判断门。
+#[derive(Default)]
+pub struct OracleLadder {
+    oracles: HashMap<OracleRung, RungOracle>,
+}
+
+impl OracleLadder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 为某个 rung 注册可执行 oracle。
+    pub fn with_oracle(
+        mut self,
+        rung: OracleRung,
+        oracle: impl Fn() -> RungResult + Send + Sync + 'static,
+    ) -> Self {
+        self.oracles.insert(rung, Box::new(oracle));
+        self
+    }
+
+    pub fn has(&self, rung: OracleRung) -> bool {
+        self.oracles.contains_key(&rung)
+    }
+
+    /// 按单调阶梯执行: T0→T1→T2→T3, 停在第一个失败级。
+    /// 未注册的级视为未达到 (不提升), 但不产生失败证据。
+    pub fn run(&self) -> LadderReport {
+        let mut results = Vec::new();
+        let mut highest_passed: Option<OracleRung> = None;
+        for rung in OracleRung::LADDER {
+            match self.oracles.get(&rung) {
+                Some(oracle) => {
+                    let res = oracle();
+                    let passed = res.passed;
+                    results.push(res);
+                    if passed {
+                        highest_passed = Some(rung);
+                    } else {
+                        break;
+                    }
+                }
+                None => break,
+            }
+        }
+        let promoted = highest_passed == Some(OracleRung::T3Reattack);
+        LadderReport { results, highest_passed, promoted }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1501,5 +1636,74 @@ mod tests {
         assert!(!d.full_tuning_frontier);
         let method = SmallScaleMethod::new(1.0, 0.5, 32);
         assert!(method.self_test().is_ok());
+    }
+
+    // ── P11 OracleLadder (defending-harness F5) ──
+
+    #[test]
+    fn test_ladder_stops_at_first_failing_rung() {
+        let ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc still crashes"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "regression ok"));
+        let report = ladder.run();
+        assert!(!report.promoted);
+        assert_eq!(report.highest_passed, Some(OracleRung::T0BuildCheck));
+        assert_eq!(report.results.len(), 2, "停在第一个失败级");
+    }
+
+    #[test]
+    fn test_all_oracles_pass_promotes_to_t3() {
+        let ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc no longer crashes"))
+            .with_oracle(OracleRung::T2Regression, || RungResult::pass(OracleRung::T2Regression, "suite passes"))
+            .with_oracle(OracleRung::T3Reattack, || RungResult::pass(OracleRung::T3Reattack, "survives re-attack"));
+        let report = ladder.run();
+        assert!(report.promoted, "全部 oracle 通过 → 提升到 T3");
+        assert_eq!(report.highest_passed, Some(OracleRung::T3Reattack));
+        assert_eq!(report.results.len(), 4);
+    }
+
+    #[test]
+    fn test_per_rung_result_recorded() {
+        let ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "exit 0"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "AddressSanitizer: heap-buffer-overflow"));
+        let report = ladder.run();
+        let t0 = report.rung_result(OracleRung::T0BuildCheck).unwrap();
+        assert!(t0.passed && t0.evidence == "exit 0");
+        let t1 = report.rung_result(OracleRung::T1Repro).unwrap();
+        assert!(!t1.passed && t1.evidence.contains("AddressSanitizer"));
+        assert_eq!(report.results.len(), 2);
+    }
+
+    #[test]
+    fn test_t1_failure_does_not_run_t2() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let t2_ran = Arc::new(AtomicBool::new(false));
+        let t2_flag = t2_ran.clone();
+        let ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::fail(OracleRung::T1Repro, "poc crashes"))
+            .with_oracle(OracleRung::T2Regression, move || {
+                t2_flag.store(true, Ordering::SeqCst);
+                RungResult::pass(OracleRung::T2Regression, "should not run")
+            });
+        let report = ladder.run();
+        assert!(!t2_ran.load(Ordering::SeqCst), "T1 失败时 T2 oracle 不得执行");
+        assert_eq!(report.results.len(), 2);
+        assert_eq!(report.highest_passed, Some(OracleRung::T0BuildCheck));
+    }
+
+    #[test]
+    fn test_ladder_missing_rung_does_not_promote() {
+        let ladder = OracleLadder::new()
+            .with_oracle(OracleRung::T0BuildCheck, || RungResult::pass(OracleRung::T0BuildCheck, "build ok"))
+            .with_oracle(OracleRung::T1Repro, || RungResult::pass(OracleRung::T1Repro, "poc clean"));
+        // T2/T3 未注册 → 不提升
+        let report = ladder.run();
+        assert!(!report.promoted);
+        assert_eq!(report.highest_passed, Some(OracleRung::T1Repro));
     }
 }

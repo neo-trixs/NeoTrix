@@ -261,6 +261,7 @@ impl CoTGenerator for DefaultCoTGenerator {
             } else {
                 None
             },
+            cacheable_prefix_tokens: None,
         };
 
         let response = self.provider.complete(&request).await?;

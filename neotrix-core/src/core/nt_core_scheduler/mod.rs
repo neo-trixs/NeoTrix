@@ -1,8 +1,10 @@
 pub mod engine;
 pub mod history;
+pub mod event_driven_claim;
 
 pub use engine::{ContextGate, ScheduleType, ScheduledJob, SchedulerEngine};
 pub use history::{JobRunHistory, JobRunRecord, SchedulerStats};
+pub use event_driven_claim::{Claim, EventDrivenClaimPool, WorkerState};
 
 /// Convenience function: create a scheduler with the default cleanup job pre-registered.
 ///

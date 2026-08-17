@@ -254,6 +254,7 @@ fn to_anthropic_request(req: AnthropicRequest) -> LlmRequest {
         provider_params: HashMap::new(),
         constraint_json: None,
         structured_output: None,
+        cacheable_prefix_tokens: None,
     }
 }
 

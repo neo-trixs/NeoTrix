@@ -1,6 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod bm25;
+pub mod spill_storage;
 pub mod nt_memory_blocks;
 pub mod nt_discovery_github_topics;
 pub mod nt_discovery_orchestrator;

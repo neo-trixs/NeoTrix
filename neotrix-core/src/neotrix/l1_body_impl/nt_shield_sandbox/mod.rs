@@ -389,6 +389,190 @@ impl CloudSandbox {
     }
 }
 
+/// Per-call enforcement level (deepseek-harness pattern #5). Describes how a
+/// single tool call should be confined. Also doubles as the *reported
+/// enforcement fact* from the sandbox backend (`full`/`partial` honesty):
+/// older backends (e.g. Landlock ABI) may only guarantee `Partial`, which must
+/// be surfaced, never assumed to be `Full`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnforcementLevel {
+    /// Fully confined — file effects and egress fully governed by policy.
+    Full,
+    /// Partially confined — backend cannot guarantee the full boundary.
+    Partial,
+    /// Informational — call proceeds, observed effects reported to the agent.
+    Notify,
+}
+
+impl EnforcementLevel {
+    pub fn is_full(&self) -> bool {
+        matches!(self, EnforcementLevel::Full)
+    }
+}
+
+/// Per-call policy contract (deepseek-harness pattern #5). Strengthens — never
+/// replaces — the existing session egress policy (R-P42): it carries the
+/// demanded enforcement level, an optional per-call egress overlay evaluated
+/// against the session snapshot, and an approval gate. Resolved *per call*;
+/// never mutates the session or global policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallPolicy {
+    /// Demanded enforcement level for this call.
+    pub level: EnforcementLevel,
+    /// Per-call egress overlay. `None` = evaluate against the session's
+    /// immutable egress snapshot. Deny-wins inside the overlay.
+    pub egress_override: Option<EgressPolicy>,
+    /// When true, the call requires human approval granted *before* execution;
+    /// an unanswered approval seam is a hard deny (fail-closed).
+    pub requires_approval: bool,
+}
+
+impl CallPolicy {
+    pub fn full() -> Self {
+        Self {
+            level: EnforcementLevel::Full,
+            egress_override: None,
+            requires_approval: false,
+        }
+    }
+
+    pub fn with_egress_override(self, egress: EgressPolicy) -> Self {
+        Self {
+            egress_override: Some(egress),
+            ..self
+        }
+    }
+
+    pub fn with_approval(self, requires_approval: bool) -> Self {
+        Self {
+            requires_approval,
+            ..self
+        }
+    }
+
+    /// Deny-wins per-call resolution against the session egress policy and the
+    /// backend-reported enforcement fact. Any denying dimension wins:
+    ///   1. unanswered approval gate → `Approval` denial (fail-closed);
+    ///   2. demanded `Full` but backend reports less than `Full` → `Sandbox`
+    ///      denial (enforcement honesty — a `Partial` ABI cannot honor `Full`);
+    ///   3. egress allow/deny verdict → `Egress` denial.
+    pub fn evaluate(
+        &self,
+        enforcement: EnforcementLevel,
+        session_egress: &EgressPolicy,
+        host: &str,
+        port: u16,
+    ) -> CallVerdict {
+        if self.requires_approval {
+            return CallVerdict::Denied(CallDenial::approval(
+                "approval seam unanswered or not granted",
+            ));
+        }
+        if self.level == EnforcementLevel::Full && enforcement != EnforcementLevel::Full {
+            return CallVerdict::Denied(CallDenial::sandbox(&format!(
+                "demanded {:?} confinement but backend reports {:?}",
+                self.level, enforcement
+            )));
+        }
+        let egress = self.egress_override.as_ref().unwrap_or(session_egress);
+        if !egress.check(host, port) {
+            return CallVerdict::Denied(CallDenial::egress(host, port));
+        }
+        CallVerdict::Allowed(self.level)
+    }
+}
+
+/// Machine-readable denial classification (deepseek-harness pattern #5:
+/// "denial dialect signatures"). Lets a calling agent branch on the *kind*
+/// instead of parsing prose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DenialKind {
+    Egress,
+    Resource,
+    Approval,
+    Sandbox,
+}
+
+/// Structured denial reason — never a bare error string. An agent can act on
+/// `code` (stable machine-readable tag) and `kind`, and show `message` to a
+/// human.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallDenial {
+    pub kind: DenialKind,
+    /// Stable machine-readable code, e.g. `egress_denied:fetch.api.example.com:443`.
+    pub code: String,
+    /// Human-readable explanation.
+    pub message: String,
+}
+
+impl CallDenial {
+    pub fn egress(host: &str, port: u16) -> Self {
+        Self {
+            kind: DenialKind::Egress,
+            code: format!("egress_denied:{}:{}", host, port),
+            message: format!("egress denied for {}:{} — outside the sandbox trust boundary", host, port),
+        }
+    }
+
+    pub fn resource(reason: &str) -> Self {
+        Self {
+            kind: DenialKind::Resource,
+            code: "resource_denied".to_string(),
+            message: format!("resource limit exceeded: {}", reason),
+        }
+    }
+
+    pub fn approval(reason: &str) -> Self {
+        Self {
+            kind: DenialKind::Approval,
+            code: "approval_required".to_string(),
+            message: format!("human approval required: {}", reason),
+        }
+    }
+
+    pub fn sandbox(reason: &str) -> Self {
+        Self {
+            kind: DenialKind::Sandbox,
+            code: "sandbox_denied".to_string(),
+            message: format!("sandbox confinement not enforceable: {}", reason),
+        }
+    }
+
+    /// Agent-actionable directive for the caller of a denied tool call.
+    pub fn agent_action(&self) -> &'static str {
+        match self.kind {
+            DenialKind::Egress => {
+                "rewrite the call to use an allowed host/port from the sandbox egress policy"
+            }
+            DenialKind::Resource => "reduce the call's resource footprint (output size / concurrency)",
+            DenialKind::Approval => "request human approval for the call, then retry",
+            DenialKind::Sandbox => {
+                "use a backend that can enforce the demanded level, or lower the call's level"
+            }
+        }
+    }
+}
+
+/// Per-call resolution outcome.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CallVerdict {
+    Allowed(EnforcementLevel),
+    Denied(CallDenial),
+}
+
+impl CallVerdict {
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, CallVerdict::Allowed(_))
+    }
+
+    pub fn denial(&self) -> Option<&CallDenial> {
+        match self {
+            CallVerdict::Denied(d) => Some(d),
+            CallVerdict::Allowed(_) => None,
+        }
+    }
+}
+
 #[cfg(all(test, feature = "sandbox"))]
 mod sandbox_vault_tests {
     use super::*;
@@ -563,5 +747,81 @@ mod egress_tests {
         let session = cloud.get_session(&sid).expect("session exists");
         assert!(session.egress.check("api.openai.com", 443));
         assert!(!session.egress.check("fetch.other.com", 443));
+    }
+}
+
+#[cfg(test)]
+mod call_policy_tests {
+    use super::*;
+
+    #[test]
+    fn test_deny_wins_full_vs_partial() {
+        // Demanded Full but the backend only guarantees Partial → fail-closed denial,
+        // even though the egress policy would allow the host (permissive).
+        let policy = CallPolicy::full();
+        let verdict =
+            policy.evaluate(EnforcementLevel::Partial, &EgressPolicy::permissive(), "api.example.com", 443);
+        assert!(!verdict.is_allowed());
+        assert_eq!(verdict.denial().map(|d| d.kind), Some(DenialKind::Sandbox));
+
+        // When the backend reports Full, the same call is allowed.
+        let ok = policy.evaluate(EnforcementLevel::Full, &EgressPolicy::permissive(), "api.example.com", 443);
+        assert!(ok.is_allowed());
+    }
+
+    #[test]
+    fn test_denial_dialect_maps_to_agent_action() {
+        let denials = [
+            CallDenial::egress("fetch.evil.net", 443),
+            CallDenial::resource(">10MB output"),
+            CallDenial::approval("write to ~/.ssh"),
+            CallDenial::sandbox("provider refused"),
+        ];
+        for d in &denials {
+            assert!(!d.code.is_empty(), "machine-readable code required");
+            assert!(!d.message.is_empty(), "human message required");
+            assert!(
+                !d.agent_action().is_empty(),
+                "agent-actionable directive required for {:?}",
+                d.kind
+            );
+        }
+        assert!(CallDenial::egress("h", 1).code.starts_with("egress_denied:"));
+        assert_eq!(CallDenial::approval("x").kind, DenialKind::Approval);
+        assert_eq!(CallDenial::resource("y").kind, DenialKind::Resource);
+        assert_eq!(CallDenial::sandbox("z").kind, DenialKind::Sandbox);
+        assert_eq!(CallDenial::egress("h", 1).kind, DenialKind::Egress);
+    }
+
+    #[test]
+    fn test_per_call_override_does_not_mutate_global_policy() {
+        let provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync> =
+            Arc::new(provider::NoopProvider);
+        let mut cloud = CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            provider,
+        );
+        cloud.set_egress(EgressPolicy::deny_all());
+        let sid = cloud.create_session(CloudRuntime::Python3);
+        let session = cloud.get_session(&sid).expect("session exists");
+
+        // Per-call override allows an API host while the session stays deny-all.
+        let policy = CallPolicy::full().with_egress_override(EgressPolicy::new(
+            vec![EgressRule::allow("api.openai.com", "443")],
+            false,
+        ));
+        let verdict = policy.evaluate(EnforcementLevel::Full, &session.egress, "api.openai.com", 443);
+        assert!(verdict.is_allowed(), "per-call override grants the API host");
+
+        // Global/session policy must be untouched by the per-call override.
+        assert!(!cloud.egress.check("api.openai.com", 443), "global policy unchanged");
+        assert!(!session.egress.check("api.openai.com", 443), "session policy unchanged");
+
+        // Without the override, the same host is denied by the session policy.
+        let denied = CallPolicy::full()
+            .evaluate(EnforcementLevel::Full, &session.egress, "api.openai.com", 443);
+        assert_eq!(denied.denial().map(|d| d.kind), Some(DenialKind::Egress));
     }
 }

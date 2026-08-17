@@ -3,6 +3,7 @@ pub mod planner;
 pub mod worker;
 pub mod critic;
 pub mod state_graph;
+pub mod task_state_dag;
 pub mod pm_workflow;
 pub mod harness_scaffold;
 #[cfg(test)]

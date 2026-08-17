@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
 use crate::core::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
 use crate::core::nt_core_self_test::SelfTest;
-use crate::neotrix::l1_body_impl::nt_io_provider::types::LlmRequest;
+use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmError, LlmRequest};
 
 // ─────────────────────────────────────────────────────────────
 // ① 结构化事件（Ding 2015: Actor-Action-Object + 时效衰减）
@@ -344,7 +344,7 @@ pub struct LlmNarrator {
 mod gateway_handle {
     use crate::neotrix::l1_body_impl::nt_io_provider::factory;
     use crate::neotrix::l1_body_impl::nt_io_provider::gateway::GatewayV2;
-    use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmRequest, LlmResponse};
+    use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmError, LlmRequest, LlmResponse};
     /// 持有 GatewayV2 并封装同步调用（池子内部自动选择 provider）。
     pub struct GatewayHandle(GatewayV2);
 
@@ -363,18 +363,18 @@ mod gateway_handle {
             &self,
             provider_name: &str,
             request: &LlmRequest,
-        ) -> Result<LlmResponse, String> {
+        ) -> Result<LlmResponse, LlmError> {
             let rt = match tokio::runtime::Handle::try_current() {
                 Ok(handle) => handle.block_on(self.0.complete_single(provider_name, request)),
                 Err(_) => {
                     let rt = match tokio::runtime::Runtime::new() {
                         Ok(rt) => rt,
-                        Err(e) => return Err(format!("runtime: {e}")),
+                        Err(e) => return Err(LlmError::Network(format!("runtime: {e}"))),
                     };
                     rt.block_on(self.0.complete_single(provider_name, request))
                 }
             };
-            rt.map_err(|e| e.to_string())
+            rt
         }
     }
 }
@@ -404,7 +404,7 @@ impl LlmNarrator {
         let handle = self.gateway.get_or_init(gateway_handle::GatewayHandle::new);
 
         // ── 构建候选链 (provider注册名, model)：按可用性优先级排序 ──
-        let candidates = if let Some(m) = &self.model {
+        let mut candidates = if let Some(m) = &self.model {
             vec![(
                 self.default_provider(handle.providers())
                     .unwrap_or_default(),
@@ -413,12 +413,14 @@ impl LlmNarrator {
         } else {
             Self::build_candidates(handle.providers())
         };
+        // Token 优化 (2026-08): 候选收敛 — 主候选 1 + 备用 1, 上限 2。
+        candidates.truncate(2);
         if candidates.is_empty() {
             return None; // 池子为空 → 降级
         }
 
         // Token 优化 (2026-08): ① 输入压缩 — context 按预算截断, 控制每调用成本;
-        // ② 调用预算门 — 全候选+全重试总调用 ≤ MAX_NARRATION_CALLS, 防 9 次全量重发。
+        // ② 调用预算门 — 全候选+全重试总调用 ≤ MAX_NARRATION_CALLS。
         let context = Self::truncate_context(context, Self::DEFAULT_CONTEXT_TOKEN_BUDGET);
         let mut budget = CallBudgetImpl::new(Self::MAX_NARRATION_CALLS);
 
@@ -427,7 +429,8 @@ impl LlmNarrator {
             request.max_tokens = self.max_tokens;
             request.temperature = Some(0.8);
 
-            // 每候选：节流重试（429/并发限制 → 尊重 retry_after；非限流 → 切下一候选）
+            // 每候选：仅瞬时/可重试错误（429/5xx/网络）节流重试;
+            // 4xx/认证/解析等不可重试 → 切下一候选
             let mut attempt = 0;
             let mut last_err: Option<String> = None;
             while attempt < 3 && budget.try_spend() {
@@ -448,18 +451,12 @@ impl LlmNarrator {
                         break;
                     }
                     Err(e) => {
-                        let msg = e.to_string();
-                        let is_429 = msg.contains("429")
-                            || msg.contains("rate limit")
-                            || msg.contains("RateLimit")
-                            || msg.contains("Queue full")
-                            || msg.contains("concurrent_request_limit")
-                            || msg.contains("retry_after");
+                        let retryable = Self::is_retryable(&e);
                         log::warn!(
                             "[nt_core_forecast] LLM narrate attempt {}/3 via {provider}/{model} failed: {e}",
                             attempt + 1
                         );
-                        last_err = Some(msg.clone());
+                        last_err = Some(e.to_string());
                         if budget.exhausted() {
                             log::warn!(
                                 "[nt_core_forecast] LLM narrate call budget exhausted ({}/{}) — 停止重试, 降级确定性模板",
@@ -467,10 +464,11 @@ impl LlmNarrator {
                             );
                             return None;
                         }
-                        if !is_429 {
-                            break; // 非限流错误 → 切下一候选
+                        if !retryable {
+                            break; // 4xx/解析/认证等不可重试错误 → 切下一候选
                         }
                         // 解析服务端 retry_after（秒），无则指数退避；至少等 3s
+                        let msg = e.to_string();
                         let retry_after = msg
                             .split("\"retry_after\":")
                             .nth(1)
@@ -480,7 +478,7 @@ impl LlmNarrator {
                             .and_then(|s| s.parse::<u64>().ok())
                             .unwrap_or(2u64.pow(attempt as u32) * 3);
                         log::info!(
-                            "[nt_core_forecast] LLM narrate via {provider}/{model} rate-limited, waiting {retry_after}s before retry"
+                            "[nt_core_forecast] LLM narrate via {provider}/{model} retryable error, waiting {retry_after}s before retry"
                         );
                         std::thread::sleep(std::time::Duration::from_secs(retry_after));
                         attempt += 1;
@@ -494,6 +492,15 @@ impl LlmNarrator {
             }
         }
         None
+    }
+
+    /// 是否可重试 — 仅瞬时/可重试错误 (RateLimit 429 / Server 5xx / Network)。
+    /// 4xx (除 429)、Authentication、Unknown 及解析/空 content 不重试。
+    fn is_retryable(e: &LlmError) -> bool {
+        matches!(
+            e,
+            LlmError::RateLimit(_) | LlmError::Server(_) | LlmError::Network(_)
+        )
     }
 
     /// 从池子挑一个默认 provider（仅用于显式指定模型时的宿主选择）。
@@ -549,24 +556,17 @@ impl LlmNarrator {
     // ── Token 消耗优化 (2026-08) ──────────────────────────────────────────
     // 依据外部文献 (SitePoint 2026 / Redis 2026 / tokenoptimize 2026) + 本地盘点:
     // ① 输入压缩: 上下文全量传入无截断 → 每调用全额重付
-    // ② 调用预算: 3候选×3重试=9次全量调用 → 超预算即停 (对齐 aggressive-retry 放大成本)
-    // ③ CJK 感知估算: 中文按字 1 token, 英文按 4 字符 1 token (对齐 nt_memory_skill_cost.rs:107)
+    // ② 候选收敛: 3候选×3重试=9次全量调用 → 主候选1+备用1(上限2), 仅瞬时错误重试
+    // ③ 调用预算: 总调用 ≤ MAX_NARRATION_CALLS (对齐 aggressive-retry 放大成本)
+    // ④ CJK 感知估算: 委托 nt_io_provider::context_budget (中文按字 1 token, 英文 4 字符 1 token)
 
     /// 默认输入上下文 token 预算（对齐 max_tokens=512 的输出预算, 输入控制在输出 2 倍内）。
     pub const DEFAULT_CONTEXT_TOKEN_BUDGET: usize = 800;
 
-    /// CJK 感知 token 估算: 中文(含全角标点)按字符计 1 token, 其余按 4 字符计 1 token。
+    /// CJK 感知 token 估算 — 委托 `nt_io_provider::context_budget::estimate_tokens`
+    /// (中文含全角标点按字符 1 token, 其余按 4 字符 1 token, 保守上界最小 1)。
     pub fn estimate_tokens(text: &str) -> usize {
-        let mut cjk = 0usize;
-        let mut rest = 0usize;
-        for ch in text.chars() {
-            if is_cjk(ch) {
-                cjk += 1;
-            } else {
-                rest += 1;
-            }
-        }
-        cjk + rest.div_ceil(4)
+        crate::neotrix::l1_body_impl::nt_io_provider::context_budget::estimate_tokens(text)
     }
 
     /// 按预算截断上下文: 保留开头, 超预算部分截断并附标记。
@@ -597,8 +597,8 @@ impl LlmNarrator {
         out
     }
 
-    /// 调用预算门: 限制单次叙事总 LLM 调用次数 (默认 5, 对应 1候选×3重试 的合理上限,
-    /// 防止 3候选×3重试=9 次全量调用放大成本, 对齐本地盘点#5 aggressive-retry)。
+    /// 调用预算门: 限制单次叙事总 LLM 调用次数 (默认 5, 作为候选上限 2 × 重试上限 3 的
+    /// 总调用封顶, 防止全量重发放大成本, 对齐本地盘点#5 aggressive-retry)。
     ///
     /// 注: 结构定义在 impl 外 (Rust 不允许 impl 内定义 struct), 见 `CallBudgetImpl`。
     pub const MAX_NARRATION_CALLS: u32 = 5;
@@ -846,7 +846,8 @@ impl ForecastEngine {
             "write exactly three short scenario narratives, one per line, in this order:\n",
         );
         ctx.push_str("1. Bullish scenario (positive driver)\n2. Bearish scenario (negative driver)\n3. Sideways scenario (consensus/confusion)\n");
-        ctx.push_str("Each line: max 60 words, concrete and specific to the events. No labels, no bullets, no numbering.\n\n");
+        ctx.push_str("Each line: max 60 words, concrete and specific to the events. No labels, no bullets, no numbering.\n");
+        ctx.push_str("Reason in short drafts: each reasoning step at most 5 words, then give the final conclusion. Do not write long chains of thought.\n\n");
         ctx.push_str(&format!("TARGET: {target}\nBASE_STATE: {base_state}\n"));
         ctx.push_str(&format!(
             "SIGNAL: strength={strength:.2} direction={direction:.2} consensus={consensus:.2}\n\n"
@@ -988,15 +989,6 @@ impl ForecastEngine {
         }
         out
     }
-}
-
-/// CJK 字符判断（中文/日文/韩文 + 全角标点）— 用于 CJK 感知 token 估算。
-fn is_cjk(ch: char) -> bool {
-    let c = ch as u32;
-    (0x4E00..=0x9FFF).contains(&c)   // CJK 统一表意文字
-        || (0x3400..=0x4DBF).contains(&c) // CJK 扩展 A
-        || (0x3000..=0x303F).contains(&c) // CJK 符号/标点
-        || (0xFF00..=0xFFEF).contains(&c) // 全角形式
 }
 
 /// 调用预算门 — 限制单次叙事总 LLM 调用次数。
@@ -1343,11 +1335,11 @@ mod tests {
         let cn = LlmNarrator::estimate_tokens("这是中文测试句子");
         assert_eq!(cn, 8); // 8 个中文字符
         let en = LlmNarrator::estimate_tokens("hello world");
-        assert_eq!(en, 3); // 11 字符 / 4 = 2.75 → 3
+        assert_eq!(en, 2); // tiktoken cl100k: "hello" + " world" = 2 (单一事实源, P0-7)
         let mixed = LlmNarrator::estimate_tokens("中文 mixed 测试");
         assert!(mixed > 0);
         let empty = LlmNarrator::estimate_tokens("");
-        assert_eq!(empty, 0);
+        assert_eq!(empty, 1); // 委托 context_budget: 保守上界最小 1
     }
 
     #[test]
@@ -1370,7 +1362,7 @@ mod tests {
 
     #[test]
     fn test_budget_gate_blocks_excessive_calls() {
-        // 总预算门: 超过 max_calls 时停止重试 (防止 3候选×3重试=9次全量调用)
+        // 总预算门: 超过 max_calls 时停止重试 (候选上限 2 × 重试上限 3 的总调用封顶)
         let mut gate = super::CallBudgetImpl::new(5);
         assert!(gate.try_spend());
         for _ in 0..4 {
