@@ -1,7 +1,7 @@
 //! Tauri commands for consciousness tool primitives
 
 use neotrix::neotrix::nt_core_error::NeoTrixError;
-use neotrix::neotrix::nt_world_search::WebSearchEngine;
+use neotrix::neotrix::nt_world_search::UnifiedSearch;
 use reqwest::blocking;
 use std::fs;
 use std::process::Command;
@@ -41,7 +41,7 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         "websearch" => {
             let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
             let count = args.get("count").and_then(|v| v.as_u64()).unwrap_or(8) as usize;
-            let engine = WebSearchEngine::default();
+            let engine = UnifiedSearch::new();
             match engine.search(query, count) {
                 Ok(results) => {
                     let items: Vec<String> = results.into_iter().map(|r| format!("{}: {}", r.title, r.url)).collect();
@@ -266,7 +266,7 @@ pub fn tool_execute(tool: String, args: serde_json::Value) -> ToolResponse {
 
 #[tauri::command]
 pub fn tool_search(query: String, count: Option<usize>) -> Result<Vec<SearchResultItem>, NeoTrixError> {
-    let engine = WebSearchEngine::default();
+    let engine = UnifiedSearch::new();
     let results = engine.search(&query, count.unwrap_or(8)).map_err(|e| NeoTrixError::Network(e.to_string()))?;
     let items: Vec<SearchResultItem> = results.into_iter().map(|r| SearchResultItem {
         title: r.title,
