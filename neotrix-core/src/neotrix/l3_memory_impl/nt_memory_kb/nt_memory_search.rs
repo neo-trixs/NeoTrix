@@ -354,6 +354,33 @@ pub fn hybrid_search(
         ia.cmp(&ib)
     });
 
+    // agentmemory 吸收接线 (cycle 1188): confidence × 时间衰减重排。
+    // 对标 agentmemory 的 confidence scoring + decay/auto-forget:
+    //   - confidence 权重: 高置信节点 (知识经验证/确认) 应优先于低置信 (模糊抓取/占位)。
+    //   - 时间衰减: 距离更新越久 (7 天半衰期), 排名越低 — 过期知识自动沉底 (auto-forget)。
+    // 仅作同权重内二级排序键, 不覆盖 FTS/RRF/Walsh 的相关性主排序。
+    if results.len() >= 2 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let half_life: i64 = 7 * 24 * 3600; // 7 天半衰期
+        results.sort_by(|a, b| {
+            // 主: fused 原排名
+            let ia = fused_ids.iter().position(|x| *x == a.node.id).unwrap_or(usize::MAX);
+            let ib = fused_ids.iter().position(|x| *x == b.node.id).unwrap_or(usize::MAX);
+            // 仅当两结果处于相邻近排名 (差距 ≤ 1) 时, 才用置信×衰减做二级修正,
+            // 避免颠覆强相关性 (标题精确命中/高分 BM25) 的既有排序。
+            if ia.abs_diff(ib) <= 1 {
+                let ra = a.node.confidence.max(0.1) * decay_factor(now - a.node.updated_at, half_life);
+                let rb = b.node.confidence.max(0.1) * decay_factor(now - b.node.updated_at, half_life);
+                rb.partial_cmp(&ra).unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                ia.cmp(&ib)
+            }
+        });
+    }
+
     if results.len() >= limit {
         results.truncate(limit);
         return Ok(results);
@@ -425,6 +452,15 @@ pub fn hybrid_search(
     }
 
     Ok(results)
+}
+
+/// 时间衰减因子 (agentmemory decay/auto-forget 接线, cycle 1188)。
+/// age ≥ 0; 半衰期 half_life 秒后衰减到 0.5, 之后指数递减 → 永远沉底但不消失。
+fn decay_factor(age: i64, half_life: i64) -> f64 {
+    if age <= 0 || half_life <= 0 {
+        return 1.0;
+    }
+    0.5_f64.powf(age as f64 / half_life as f64)
 }
 
 /// 构建 Walsh 正交 ranklist (nt_core_walsh 接线 — 能力网维度升维)。
@@ -1195,5 +1231,30 @@ mod precision_gate_tests {
         let gated = precision_gate(results, 10);
         let ids: Vec<&str> = gated.iter().map(|r| r.node.id.as_str()).collect();
         assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    // ========== agentmemory 接线测试 (cycle 1188: confidence × 时间衰减) ==========
+
+    #[test]
+    fn test_decay_factor_half_life() {
+        let half_life = 7 * 24 * 3600; // 7 天
+        // age=0 → 1.0 (全新)
+        assert!((decay_factor(0, half_life) - 1.0).abs() < 1e-9);
+        // age=half_life → 0.5 (一个半衰期)
+        assert!((decay_factor(half_life, half_life) - 0.5).abs() < 1e-9);
+        // age=2*half_life → 0.25 (两个半衰期)
+        assert!((decay_factor(2 * half_life, half_life) - 0.25).abs() < 1e-9);
+        // 负 age (时钟回拨) → 1.0
+        assert_eq!(decay_factor(-5, half_life), 1.0);
+        // half_life=0 → 1.0
+        assert_eq!(decay_factor(100, 0), 1.0);
+    }
+
+    #[test]
+    fn test_decay_factor_monotonic_decreasing() {
+        let half_life = 3600;
+        let older = decay_factor(7200, half_life);
+        let newer = decay_factor(3600, half_life);
+        assert!(older < newer, "越旧衰减越强, 分数越低");
     }
 }

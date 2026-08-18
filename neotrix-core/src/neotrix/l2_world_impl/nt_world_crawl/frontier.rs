@@ -179,6 +179,102 @@ pub fn extract_links(html: &str, base_url: &str) -> Vec<String> {
     links
 }
 
+/// deepcrawl 吸收接线 (cycle 1188): 分层链接树 (hierarchical links tree)。
+/// 对标 deepcrawl 的 agent-favoured hierarchical links tree — 链接按所在 HTML
+/// 结构分类 (main 正文 / nav 导航 / footer 页脚 / other), 供爬虫优先正文链接、
+/// 抑制导航/页脚噪音, 降低 agent 上下文切换 (deepcrawl README 核心主张)。
+/// 返回 (url, link_class); class 可直接映射 frontier priority。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkClass {
+    Main,   // <main>/<article>/<section> 正文区 → 高优先级
+    Nav,    // <nav>/<header> 导航 → 低优先级
+    Footer, // <footer> 页脚 → 最低优先级
+    Other,
+}
+
+impl LinkClass {
+    /// 映射 frontier priority (0-4, 5 层): Main=4 最优先, Nav=2, Footer=1, Other=3。
+    /// deepcrawl 分层树主张: 正文链接先于噪音链接。
+    pub fn priority(self) -> u32 {
+        match self {
+            LinkClass::Main => 4,
+            LinkClass::Other => 3,
+            LinkClass::Nav => 2,
+            LinkClass::Footer => 1,
+        }
+    }
+}
+
+/// 按 HTML 结构提取链接并分类 (分层链接树)。
+/// 滑动窗口判断每个 <a> 所在最近的上层结构标签, 无结构标签 → Other。
+pub fn extract_links_classified(html: &str, base_url: &str) -> Vec<(String, LinkClass)> {
+    let base_domain = extract_domain(base_url);
+    let mut links: Vec<(String, LinkClass)> = Vec::new();
+    let mut section_stack: Vec<&str> = Vec::new();
+
+    // 简化标记化: 逐标签扫描, 维护 open/close 栈判断当前上下文
+    let lower = html.to_lowercase();
+    let mut pos = 0usize;
+    let bytes = lower.as_bytes();
+    while pos < bytes.len() {
+        if bytes[pos] != b'<' {
+            pos += 1;
+            continue;
+        }
+        // 提取标签名
+        let is_closing = bytes.get(pos + 1) == Some(&b'/');
+        let name_start = if is_closing { pos + 2 } else { pos + 1 };
+        let tag_end = match lower[name_start..].find([' ', '>', '/']) {
+            Some(i) => name_start + i,
+            None => break,
+        };
+        let tag = &lower[name_start..tag_end];
+        let is_self_close = lower[pos..].starts_with("<img") || lower[pos..].starts_with("<br")
+            || lower[pos..].starts_with("<hr") || lower[pos..].starts_with("<input")
+            || lower[pos..].starts_with("<link") || lower[pos..].starts_with("<meta");
+        let structural = matches!(tag, "main" | "article" | "section" | "nav" | "header" | "footer");
+        let tag_len = match lower[pos..].find('>') {
+            Some(i) => i + 1,
+            None => break,
+        };
+
+        // <a href="..."> 链接提取
+        if tag == "a" && !is_closing {
+            if let Some(href_start) = lower[pos..].find("href=\"") {
+                let hs = pos + href_start + 6;
+                if let Some(end) = lower[hs..].find('"') {
+                    let href = &lower[hs..hs + end];
+                    if href.starts_with("http") && extract_domain(href) != base_domain {
+                        let class = section_stack.last()
+                            .map(|s| match *s {
+                                "main" | "article" | "section" => LinkClass::Main,
+                                "nav" | "header" => LinkClass::Nav,
+                                "footer" => LinkClass::Footer,
+                                _ => LinkClass::Other,
+                            })
+                            .unwrap_or(LinkClass::Other);
+                        links.push((href.to_string(), class));
+                    }
+                }
+            }
+        }
+
+        // 结构标签入栈/出栈
+        if structural && !is_self_close {
+            if is_closing {
+                section_stack.pop();
+            } else {
+                section_stack.push(tag);
+            }
+        }
+        pos += tag_len;
+    }
+
+    links.dedup();
+    links.truncate(50);
+    links
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289,5 +385,49 @@ mod tests {
         frontier.push(entry);
         let stats_str = format!("{}", frontier.stats());
         assert!(stats_str.contains("pushed=1"));
+    }
+
+    // ========== deepcrawl 接线测试 (cycle 1188: 分层链接树) ==========
+
+    #[test]
+    fn test_extract_links_classified_main_nav_footer() {
+        let html = r#"
+        <html>
+          <nav><a href="https://other.com/nav">Nav Link</a></nav>
+          <main>
+            <article><a href="https://other.com/post1">Post 1</a></article>
+            <section><a href="https://other.com/post2">Post 2</a></section>
+          </main>
+          <footer><a href="https://other.com/about">Footer Link</a></footer>
+          <a href="https://other.com/loose">Loose</a>
+        </html>"#;
+        let links = extract_links_classified(html, "https://example.com/page");
+        let main: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Main).map(|(u, _)| u.as_str()).collect();
+        let nav: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Nav).map(|(u, _)| u.as_str()).collect();
+        let footer: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Footer).map(|(u, _)| u.as_str()).collect();
+        let other: Vec<&str> = links.iter().filter(|(_, c)| *c == LinkClass::Other).map(|(u, _)| u.as_str()).collect();
+        assert!(main.contains(&"https://other.com/post1"));
+        assert!(main.contains(&"https://other.com/post2"));
+        assert!(nav.contains(&"https://other.com/nav"));
+        assert!(footer.contains(&"https://other.com/about"));
+        assert!(other.contains(&"https://other.com/loose"));
+        assert_eq!(links.len(), 5);
+    }
+
+    #[test]
+    fn test_link_class_priority_mapping() {
+        assert_eq!(LinkClass::Main.priority(), 4);
+        assert_eq!(LinkClass::Other.priority(), 3);
+        assert_eq!(LinkClass::Nav.priority(), 2);
+        assert_eq!(LinkClass::Footer.priority(), 1);
+    }
+
+    #[test]
+    fn test_extract_links_classified_excludes_same_domain() {
+        let html = r#"<main><a href="https://example.com/self">Self</a><a href="https://other.com/ext">Ext</a></main>"#;
+        let links = extract_links_classified(html, "https://example.com/page");
+        let urls: Vec<&str> = links.iter().map(|(u, _)| u.as_str()).collect();
+        assert!(urls.contains(&"https://other.com/ext"));
+        assert!(!urls.contains(&"https://example.com/self"));
     }
 }

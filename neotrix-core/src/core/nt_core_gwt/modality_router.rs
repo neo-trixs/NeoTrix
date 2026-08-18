@@ -183,6 +183,29 @@ impl ModalityRouter {
         })
     }
 
+    /// NIE 吸收接线 (cycle 1188): 从 agent 执行痕迹派生奖励 (NIE-Stop / NIE-Path)。
+    /// 对标 arXiv:2608.15956 Navigation-Informed Embeddings — 无需外部相关性标注,
+    /// 从检索工作流副产品 (query/retrieval/stopping traces) 派生训练信号:
+    ///   - NIE-Stop: 停止采用的文档 = 软正例 (soft positive) → 该步奖励升高。
+    ///   - NIE-Path: 路径上连续采用的文档 = 硬对比 (hard comparisons), 序约束 → 路径越长奖励累积。
+    /// 映射: path_steps = 该 modality 被连续采用次数 (retrieval path 长度);
+    ///         stopped = 是否因采纳该结果而停止 (stopping doc)。
+    /// 奖励: 连续采用递增 (路径累积) + 停止采用加成 (软正例), 封顶 1.0。
+    /// 返回值直接可喂给 reinforce() — trace 派生奖励, 零外部标注。
+    pub fn trace_reward(path_steps: u32, stopped: bool) -> f64 {
+        // NIE-Path: 路径累积 — 连续采用 >1 步 → 有序硬对比带来更高奖励
+        let path_term = if path_steps >= 2 {
+            (0.5 * (1.0 - 0.8_f64.powi(path_steps as i32))).min(0.5)
+        } else if path_steps == 1 {
+            0.1
+        } else {
+            0.0
+        };
+        // NIE-Stop: 停止采用 = 软正例 → 该结果被视为"解决了问题"
+        let stop_term = if stopped { 0.4 } else { 0.0 };
+        (path_term + stop_term).clamp(0.0, 1.0)
+    }
+
     fn dot(&self, a: &[f64], b: &[f64]) -> f64 {
         let n = a.len().min(b.len());
         (0..n).map(|i| a[i] * b[i]).sum()
@@ -337,5 +360,39 @@ mod tests {
         // There is at least one modality with decent weight; assert winner is deterministic
         let _ = text_w;
         assert!(weights[0].1 > 0.0);
+    }
+
+    // ========== NIE 接线测试 (cycle 1188: trace 派生奖励) ==========
+
+    #[test]
+    fn test_trace_reward_stop_is_soft_positive() {
+        // NIE-Stop: 停止采用 = 软正例 → 单步停止奖励 > 单步未停止
+        let stopped = ModalityRouter::trace_reward(1, true);
+        let not_stopped = ModalityRouter::trace_reward(1, false);
+        assert!(stopped > not_stopped, "停止采用应获更高奖励: {} vs {}", stopped, not_stopped);
+        assert!((not_stopped - 0.1).abs() < 1e-9, "单步未停止 = 0.1");
+        assert!((stopped - 0.5).abs() < 1e-9, "单步停止 = 0.1+0.4 = 0.5");
+    }
+
+    #[test]
+    fn test_trace_reward_path_accumulates() {
+        // NIE-Path: 路径越长 (连续采用越多) 奖励越高
+        let one = ModalityRouter::trace_reward(1, false);
+        let two = ModalityRouter::trace_reward(2, false);
+        let three = ModalityRouter::trace_reward(3, false);
+        assert!(three > two && two > one, "路径应累积奖励: {} < {} < {}", one, two, three);
+    }
+
+    #[test]
+    fn test_trace_reward_clamped() {
+        let r = ModalityRouter::trace_reward(u32::MAX, true);
+        assert!(r <= 1.0, "奖励封顶 1.0: {}", r);
+        assert!(r >= 0.0);
+    }
+
+    #[test]
+    fn test_trace_reward_zero_path() {
+        let r = ModalityRouter::trace_reward(0, false);
+        assert_eq!(r, 0.0);
     }
 }

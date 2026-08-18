@@ -5,6 +5,25 @@ use super::capability::CapabilityVector;
 
 pub struct PerformanceEvaluator;
 
+// CUDA Agent 吸收接线 (cycle 1188): 外部执行反馈奖励信号。
+// 对标 CUDA Agent 的 skill-augmented env + 自动验证/profiling 提供可靠奖励信号:
+// 静态能力评估 (evaluate) 无经验反馈, RL 需要「执行后验证」信号。
+// combine_reward: 外部执行反馈 (verification/profiling, RewardSource::External)
+// 与内部能力自评 (RewardSource::Internal) 加权融合 — external_weight 越高,
+// 奖励越接地于真实执行结果 (CUDA Agent 核心主张: 自动验证 → 稳定 RL 训练)。
+#[derive(Debug, Clone, Copy)]
+pub struct ExecutionFeedback {
+    pub verified: bool,        // 产物通过自动验证 (编译/测试/profiling gate)
+    pub latency_ratio: f64,    // 相对基线延迟比 (0.5=快 2x, 1.0=持平, >1=更慢)
+    pub quality: f64,          // 质量分 0..1 (如 benchmark 命中率)
+}
+
+impl ExecutionFeedback {
+    pub fn new(verified: bool, latency_ratio: f64, quality: f64) -> Self {
+        Self { verified, latency_ratio, quality }
+    }
+}
+
 impl PerformanceEvaluator {
     pub fn evaluate(task_type: &crate::neotrix::nt_world_model::TaskType, capability: &CapabilityVector) -> f64 {
         let raw_score = match task_type {
@@ -45,6 +64,30 @@ impl PerformanceEvaluator {
 
     pub fn has_meaningful_change(before: f64, after: f64, threshold: f64) -> bool {
         (after - before).abs() > threshold
+    }
+
+    /// 融合外部执行反馈与内部能力评估 (CUDA Agent 奖励信号接线)。
+    /// - external_weight: 0..1, 奖励中有多少比例来自外部验证/执行反馈。
+    ///   为 0 → 纯内部自评 (无验证工具时的退化); 为 1 → 纯外部执行信号。
+    /// - 外部信号: 验证通过 + 延迟比 + 质量分 合成的可执行奖励。
+    /// - 内部信号: capability 静态评估 (evaluate)。
+    pub fn combine_reward(
+        capability_score: f64,
+        feedback: ExecutionFeedback,
+        external_weight: f64,
+    ) -> f64 {
+        let w = external_weight.clamp(0.0, 1.0);
+        let latency_bonus = (1.0 / feedback.latency_ratio.max(0.05)).clamp(0.5, 2.0);
+        // 外部执行奖励: 未验证通过 → 惩罚 (cap 0.3, 防止未验证产物获得高奖励);
+        // 验证通过 → 质量分 × 延迟奖励。
+        let external_score = if !feedback.verified {
+            feedback.quality * 0.3
+        } else {
+            (feedback.quality * latency_bonus).min(1.0)
+        };
+        let internal_score = capability_score.clamp(0.0, 1.0);
+        let combined = external_score * w + internal_score * (1.0 - w);
+        combined.clamp(0.0, 1.0)
     }
 }
 
@@ -180,5 +223,54 @@ mod tests {
     #[test]
     fn test_has_meaningful_change_exact_threshold() {
         assert!(!PerformanceEvaluator::has_meaningful_change(0.5, 0.6, 0.1));
+    }
+
+    // ========== CUDA Agent 接线测试 (cycle 1188: 外部执行反馈奖励) ==========
+
+    #[test]
+    fn test_combine_reward_verified_high_quality() {
+        // 验证通过 + 高质量 → 外部权重越高奖励越高
+        let feedback = ExecutionFeedback::new(true, 1.0, 0.9);
+        let pure_internal = PerformanceEvaluator::combine_reward(0.5, feedback, 0.0);
+        let grounded = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        assert!(grounded > pure_internal, "验证通过的高质量产物应获更高奖励");
+        assert!((pure_internal - 0.5).abs() < 1e-9, "external_weight=0 应退化为内部自评");
+    }
+
+    #[test]
+    fn test_combine_reward_unverified_penalized() {
+        // 未验证通过 → 外部奖励被惩罚 (cap 0.3), 不应超过内部自评
+        let feedback = ExecutionFeedback::new(false, 1.0, 0.9);
+        let grounded = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        assert!(grounded < 0.5, "未验证产物应受惩罚: {}", grounded);
+        assert!(grounded <= 0.3, "未验证奖励 cap 0.3: {}", grounded);
+    }
+
+    #[test]
+    fn test_combine_reward_latency_bonus() {
+        // 快 2x (latency_ratio=0.5) 应比持平 (1.0) 奖励高
+        let fast = ExecutionFeedback::new(true, 0.5, 0.8);
+        let equal = ExecutionFeedback::new(true, 1.0, 0.8);
+        let fast_r = PerformanceEvaluator::combine_reward(0.5, fast, 1.0);
+        let equal_r = PerformanceEvaluator::combine_reward(0.5, equal, 1.0);
+        assert!(fast_r > equal_r, "更快应获更高奖励: fast={} equal={}", fast_r, equal_r);
+    }
+
+    #[test]
+    fn test_combine_reward_clamped() {
+        let feedback = ExecutionFeedback::new(true, 0.05, 1.0); // latency_bonus 封顶 2.0
+        let r = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        assert!(r <= 1.0);
+        assert!(r >= 0.0);
+    }
+
+    #[test]
+    fn test_combine_reward_external_weight_blend() {
+        // 外部权重 0.5 → 结果落在内部与外部之间
+        let feedback = ExecutionFeedback::new(true, 1.0, 0.6);
+        let internal_only = PerformanceEvaluator::combine_reward(0.5, feedback, 0.0);
+        let external_only = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
+        let blended = PerformanceEvaluator::combine_reward(0.5, feedback, 0.5);
+        assert!((blended - (internal_only + external_only) / 2.0).abs() < 1e-9);
     }
 }
