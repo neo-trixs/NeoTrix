@@ -163,6 +163,7 @@ impl WebSearchEngine {
     fn client(&self) -> &reqwest::blocking::Client {
         self.client.get_or_init(|| {
             reqwest::blocking::Client::builder()
+                .user_agent("NeoTrix/0.18 (research tool; https://github.com/neotrix)")
                 .build()
                 .unwrap_or_else(|_| reqwest::blocking::Client::new())
         })
@@ -592,6 +593,7 @@ impl WikipediaBackend {
     fn client(&self) -> &reqwest::blocking::Client {
         self.client.get_or_init(|| {
             reqwest::blocking::Client::builder()
+                .user_agent("NeoTrix/0.18 (research tool; https://github.com/neotrix)")
                 .build()
                 .unwrap_or_else(|_| reqwest::blocking::Client::new())
         })
@@ -924,6 +926,15 @@ mod tests {
                 })
                 .collect())
         }
+    }
+
+    #[test]
+    #[ignore] // 网络探测: 真实后端可达性 (Wikipedia 需 UA, 403 曾阻断 fallback)
+    fn probe_real_backends() {
+        let mut router = WebSearchRouter::default_ordered();
+        let results = router.search("Rust async runtime", 5).unwrap_or_default();
+        assert!(!results.is_empty(), "ordered router 应经 fallback 返回结果");
+        assert_eq!(router.current_backend(), "wikipedia", "DDG 空 → 应切 Wikipedia");
     }
 
     #[test]
