@@ -417,7 +417,20 @@ fn main() {
                 eprintln!("error: no prompt provided. Usage: neotrix exec <prompt>");
                 std::process::exit(2);
             }
-            run_exec(&resolved, *json, *stream, *timeout);
+            if cli.standalone {
+                // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络
+                use neotrix::neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
+                let mut engine = StandaloneEngine::new(cli.stage.min(18));
+                let response = engine.reason(&resolved);
+                if *json {
+                    println!("{{\"standalone\":true,\"output\":{}}}",
+                        serde_json::to_string(&response).unwrap_or_default());
+                } else {
+                    println!("{}", response);
+                }
+            } else {
+                run_exec(&resolved, *json, *stream, *timeout);
+            }
         }
         Some(Commands::Run { headless, prompt, file, pipe, format, suggest: _, auto_edit, full_auto, yolo, sandbox, max_budget_usd, ephemeral, stream }) => {
             if let Some(limit) = max_budget_usd {
