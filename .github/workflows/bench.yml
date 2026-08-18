@@ -43,13 +43,14 @@ jobs:
 
       - name: Build benches (sanity)
         working-directory: neotrix-core
-        run: cargo bench --no-run --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks --bench capability_c3
+        run: cargo bench --no-run --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks --bench capability_c3 --bench shield_c3 --bench repair_c3 --bench memory_c3 --bench act_c3
 
       - name: Run benches (quick, 1 sample, short measurement)
         working-directory: neotrix-core
         run: |
           cargo bench \
             --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks --bench capability_c3 \
+            --bench shield_c3 --bench repair_c3 --bench memory_c3 --bench act_c3 \
             -- --warm-up-time 2 --measurement-time 5 --sample-size 5
 
       - name: Upload bench results

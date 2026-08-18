@@ -83,3 +83,73 @@ impl NativeTool for McpToolAdapter {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+use crate::agent::tool::mcp::{McpToolDef, McpTransport};
+    use neotrix_types::traits::NativeTool;
+
+    fn def(name: &str) -> McpToolDef {
+        McpToolDef {
+            name: name.into(),
+            description: format!("desc {name}"),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["mcp".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {"query": {"type": "string"}}}),
+            schema_version: None,
+        }
+    }
+
+    fn local_mode() -> TransportMode {
+        TransportMode::Local {
+            command: "neotrix".into(),
+            args: vec!["mcp".into()],
+        }
+    }
+
+    #[test]
+    fn single_tool_surface_uses_tool_identity() {
+        let adapter = McpToolAdapter::new("server-a", local_mode(), vec![def("tool_x")]);
+        assert_eq!(adapter.id(), "tool_x", "single-tool server uses tool name as id");
+        assert_eq!(adapter.description(), "desc tool_x");
+        assert_eq!(
+            adapter.input_schema()["type"],
+            "object",
+            "single-tool server passes through its own schema"
+        );
+        assert!(adapter.capability_tags().contains(&"mcp_absorbed"));
+    }
+
+    #[test]
+    fn multi_tool_surface_uses_server_identity() {
+        let adapter = McpToolAdapter::new(
+            "server-a",
+            local_mode(),
+            vec![def("tool_x"), def("tool_y")],
+        );
+        assert_eq!(adapter.id(), "server-a", "multi-tool server uses server name as id");
+        assert_eq!(adapter.description(), "Absorbed MCP server");
+        let schema = adapter.input_schema();
+        let tool_name = schema.pointer("/properties/tool_name").unwrap();
+        assert!(tool_name.get("enum").is_some(), "multi-tool schema must enumerate tools");
+        assert_eq!(tool_name["enum"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn multi_tool_execute_requires_tool_name() {
+        let adapter = McpToolAdapter::new(
+            "server-a",
+            local_mode(),
+            vec![def("tool_x"), def("tool_y")],
+        );
+        let err = match adapter.execute(&serde_json::json!({})) {
+            Err(e) => e,
+            Ok(_) => panic!("missing tool_name must fail"),
+        };
+        assert!(err.contains("tool_name"), "missing tool_name must error with guidance");
+    }
+}

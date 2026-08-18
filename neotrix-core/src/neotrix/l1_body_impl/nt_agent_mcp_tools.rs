@@ -70,3 +70,46 @@ pub fn register_neotrix_tools(
     registry.register_stdio("built-in", "neotrix", &["mcp"], tools);
     fold_tool_specs_from_defs(registry.list_tools())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builtin_tools_are_valid_mcp_defs() {
+        let tools = neotrix_mcp_tools();
+        assert_eq!(tools.len(), 4, "built-in tool registry must expose 4 tools");
+        for t in &tools {
+            assert!(!t.name.is_empty(), "tool name must be non-empty");
+            assert!(!t.description.is_empty(), "tool description must be non-empty");
+            assert_eq!(t.server_name, "built-in");
+            assert!(t.input_schema.is_object(), "input schema must be an object");
+            assert!(t.schema_version.is_none(), "built-ins carry no schema version");
+        }
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"neotrix_search"));
+        assert!(names.contains(&"neotrix_reason"));
+        assert!(names.contains(&"neotrix_code_graph"));
+        assert!(names.contains(&"neotrix_judge"));
+    }
+
+    #[test]
+    fn registration_folds_n_to_4() {
+        let mut registry = McpRegistry::new();
+        let folded = register_neotrix_tools(&mut registry);
+        assert_eq!(folded.categories.len(), 4, "N→4 fold must produce exactly 4 categories");
+        assert!(folded.saved_tokens > 0, "folding must reduce token budget vs raw specs");
+        assert!(folded.savings_percent > 0.0);
+        let registered = registry.list_tools();
+        assert_eq!(registered.len(), 4, "all built-in tools must register");
+    }
+
+    #[test]
+    fn registration_is_idempotent() {
+        let mut registry = McpRegistry::new();
+        let first = register_neotrix_tools(&mut registry);
+        let second = register_neotrix_tools(&mut registry);
+        assert_eq!(registry.list_tools().len(), 4, "re-registration must not duplicate");
+        assert_eq!(first.folded_chars, second.folded_chars, "fold result must be stable");
+    }
+}
