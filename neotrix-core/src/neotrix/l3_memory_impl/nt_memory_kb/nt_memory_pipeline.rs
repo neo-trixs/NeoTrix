@@ -252,10 +252,7 @@ impl KnowledgeBase {
                 nt_memory_store::find_node_by_title_and_type(&conn, ttitle, &ttype)
                     .map_err(|e| e.to_string())?
                     .map(|n| n.id)
-                    .unwrap_or_else(|| {
-                        let _ = spec.target_title;
-                        return String::new();
-                    })
+                    .unwrap_or_default()
             } else {
                 String::new()
             };

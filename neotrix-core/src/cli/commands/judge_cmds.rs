@@ -39,7 +39,7 @@ impl CliCommand for JudgeCmd {
         // 过滤掉 --json / --input 及其值。
         let mut clean: Vec<String> = Vec::new();
         let mut skip = 0usize;
-        for (_i, a) in args.iter().enumerate() {
+        for a in args.iter() {
             if skip > 0 {
                 skip -= 1;
                 continue;

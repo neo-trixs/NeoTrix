@@ -328,16 +328,9 @@ impl DurationDriftMonitor {
 
 /// Duration-drift SelfTest — 若窗口内漂移样本占比超 1/3, 报告为自我欺骗信号
 /// (D15 self-deception / 可监控性维度)。生产接线点: growth-cycle 时长自省。
+#[derive(Default)]
 pub struct DurationDriftTest {
     pub monitor: DurationDriftMonitor,
-}
-
-impl Default for DurationDriftTest {
-    fn default() -> Self {
-        Self {
-            monitor: DurationDriftMonitor::default(),
-        }
-    }
 }
 
 impl DurationDriftTest {

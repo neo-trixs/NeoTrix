@@ -110,9 +110,10 @@ pub struct Classification {
 /// 业务用途归因 (Cumora llm_calls ledger 吸收, llm-ledger.ts) — 每次生成
 /// 必须可归因到一个 purpose, 使「哪个业务目的烧钱最多」可回答。
 /// 新增调用点 REQUIRED 补枚举 — 这是让账本完整的纪律旋钮。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum LlmPurpose {
     /// 真实主任务 (agent turn / 用户指令)
+    #[default]
     AgentTurn,
     /// 小脑过滤门 (triage / 前置判断)
     Triage,
@@ -139,12 +140,6 @@ impl LlmPurpose {
             Self::ImageGen => "image_gen",
             Self::Utility => "utility",
         }
-    }
-}
-
-impl Default for LlmPurpose {
-    fn default() -> Self {
-        Self::AgentTurn
     }
 }
 

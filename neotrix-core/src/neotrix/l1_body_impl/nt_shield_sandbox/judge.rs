@@ -127,6 +127,7 @@ impl JudgeSummary {
 ///   - 去除每行首尾空白
 ///   - 去除首尾空行 (末尾换行容忍)
 ///   - 保留行间顺序
+///
 /// 经典 OJ 判空惯例 (输出尾随换行/空格不计分差)。
 pub fn normalize_output(s: &str) -> String {
     let mut lines: Vec<&str> = s

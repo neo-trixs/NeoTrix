@@ -8252,6 +8252,14 @@
       "rationale": "经验 '[蒸馏-NT-IO] 聚合 6 条经验的模式: LLM 候选链应从池子实际注册名动态构建, 而非硬编码 provider。build_candidate_chain(model, limit) 规则: 前缀 provider 优先(完整注册名匹配>裸 provider 名) → available → free → 有调用记录(total_calls>0) → composite_score 降序。关键坑 [关键词: provider, model, api, key, llm, codestral, default, free]' 命中能力标签 'build_hygiene' 于域 Io, 应强化对应能力节点",
       "signal": 0.76,
       "promoted_at": 1787058851
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1787059930
     }
   ]
 }
