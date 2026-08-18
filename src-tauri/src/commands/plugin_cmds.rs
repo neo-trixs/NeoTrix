@@ -111,8 +111,8 @@ impl PluginState {
                     id: m.id.clone(),
                     name: m.name.clone(),
                     version: m.version.clone(),
-                    enabled: existing.map_or(true, |s| s.enabled),
-                    loaded: existing.map_or(true, |s| s.loaded),
+                    enabled: existing.is_none_or(|s| s.enabled),
+                    loaded: existing.is_none_or(|s| s.loaded),
                     load_time_ms: existing.map_or(0, |s| s.load_time_ms),
                     error: None,
                 }
@@ -130,7 +130,7 @@ pub fn plugin_list() -> Vec<PluginStatus> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "json") {
+            if path.extension().is_some_and(|e| e == "json") {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
                         if !state.manifests.iter().any(|m| m.id == manifest.id) {

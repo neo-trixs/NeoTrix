@@ -206,7 +206,7 @@ match module {
                 let name = gstr(args.get("name"));
                 let prompt = gstr(args.get("prompt"));
                 let schedule = gstr(args.get("schedule"));
-                Ok(serde_json::to_value(&super::create_background_task(name, prompt, schedule)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::create_background_task(name, prompt, schedule)).map_err(|e| e.to_string())?)
             }
             "delete_background_task" => {
                 let id = gstr(args.get("id"));
@@ -223,7 +223,7 @@ match module {
                 }
             }
             "list_background_tasks" => {
-                Ok(serde_json::to_value(&super::list_background_tasks()).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::list_background_tasks()).map_err(|e| e.to_string())?)
             }
             "pause_background_task" => {
                 let id = gstr(args.get("id"));
@@ -358,7 +358,7 @@ match module {
     "chat" => {
         match action {
             "list_conversations" => {
-                Ok(serde_json::to_value(&super::list_conversations()).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::list_conversations()).map_err(|e| e.to_string())?)
             }
             "stop_generation" => {
                 match super::stop_generation() {
@@ -616,7 +616,7 @@ match module {
             }
             "daemon_log" => {
                 let count = gus(args.get("count"));
-                Ok(serde_json::to_value(&super::daemon_log(count)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::daemon_log(count)).map_err(|e| e.to_string())?)
             }
             "daemon_start" => {
                 let config = serde_json::from_value::<DaemonConfig>(gjson(args.get("config"))).map_err(|e| e.to_string())?;
@@ -674,7 +674,7 @@ match module {
                 }
             }
             "dream_entries" => {
-                Ok(serde_json::to_value(&super::dream_entries()).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::dream_entries()).map_err(|e| e.to_string())?)
             }
             "dream_start" => {
                 let config = serde_json::from_value::<DreamConfig>(gjson(args.get("config"))).map_err(|e| e.to_string())?;
@@ -814,7 +814,7 @@ match module {
             }
             "gate_audit_log" => {
                 let count = gus(args.get("count"));
-                Ok(serde_json::to_value(&super::gate_audit_log(count)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::gate_audit_log(count)).map_err(|e| e.to_string())?)
             }
             "gate_get_config" => {
                 match super::gate_get_config() {
@@ -1127,14 +1127,12 @@ match module {
         }
     }
     "neocodex" => {
-        match action {
-            _ => Err(format!("unified_invoke: neocodex: 未知 action: {}", action))
-        }
+        Err(format!("unified_invoke: neocodex: 未知 action: {}", action))
     }
     "pet" => {
         match action {
             "get_pet_state" => {
-                Ok(serde_json::to_value(&super::get_pet_state()).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::get_pet_state()).map_err(|e| e.to_string())?)
             }
             _ => Err(format!("unified_invoke: pet: 未知 action: {}", action))
         }
@@ -1300,7 +1298,7 @@ match module {
                 let user = gstr(args.get("user"));
                 let auth_method = gstr(args.get("auth_method"));
                 let key_path = goptstr(args.get("key_path"));
-                Ok(serde_json::to_value(&super::add_remote_host(name, host, port, user, auth_method, key_path)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::add_remote_host(name, host, port, user, auth_method, key_path)).map_err(|e| e.to_string())?)
             }
             "execute_remote" => {
                 let id = gstr(args.get("id"));
@@ -1311,7 +1309,7 @@ match module {
                 }
             }
             "list_remote_hosts" => {
-                Ok(serde_json::to_value(&super::list_remote_hosts()).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::list_remote_hosts()).map_err(|e| e.to_string())?)
             }
             "remove_remote_host" => {
                 let id = gstr(args.get("id"));
@@ -1350,7 +1348,7 @@ match module {
                 }
             }
             "remote_bridge_devices" => {
-                Ok(serde_json::to_value(&super::remote_bridge_devices()).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::remote_bridge_devices()).map_err(|e| e.to_string())?)
             }
             "remote_bridge_disconnect" => {
                 let device_id = gstr(args.get("device_id"));
@@ -1361,7 +1359,7 @@ match module {
             }
             "remote_bridge_history" => {
                 let count = gus(args.get("count"));
-                Ok(serde_json::to_value(&super::remote_bridge_history(count)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::remote_bridge_history(count)).map_err(|e| e.to_string())?)
             }
             "remote_bridge_pair" => {
                 match super::remote_bridge_pair() {
@@ -1371,7 +1369,7 @@ match module {
             }
             "remote_bridge_poll" => {
                 let device_id = gstr(args.get("device_id"));
-                Ok(serde_json::to_value(&super::remote_bridge_poll(device_id)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::remote_bridge_poll(device_id)).map_err(|e| e.to_string())?)
             }
             "remote_bridge_send" => {
                 let device_id = gstr(args.get("device_id"));
@@ -1795,7 +1793,7 @@ match module {
             "tool_execute" => {
                 let tool = gstr(args.get("tool"));
                 let args = gjson(args.get("args"));
-                Ok(serde_json::to_value(&super::tool_execute(tool, args)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::tool_execute(tool, args)).map_err(|e| e.to_string())?)
             }
             "tool_search" => {
                 let query = gstr(args.get("query"));
@@ -1819,7 +1817,7 @@ match module {
             }
             "undercover_commit_log" => {
                 let count = gus(args.get("count"));
-                Ok(serde_json::to_value(&super::undercover_commit_log(count)).map_err(|e| e.to_string())?)
+                Ok(serde_json::to_value(super::undercover_commit_log(count)).map_err(|e| e.to_string())?)
             }
             "undercover_get_profiles" => {
                 match super::undercover_get_profiles() {
@@ -1942,7 +1940,7 @@ match module {
             "unified_session_list" => {
                 let filter = {
                 let v = args.get("filter");
-                if v.map_or(true, |x| x.is_null()) { None }
+                if v.is_none_or(|x| x.is_null()) { None }
                 else { Some(serde_json::from_value::<UnifiedSessionFilter>(v.cloned().unwrap_or(Value::Null)).map_err(|e| e.to_string())?) }
             };
                 match super::unified_session_list(filter) {

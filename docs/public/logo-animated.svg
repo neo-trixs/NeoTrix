@@ -5,11 +5,16 @@
       <stop offset="50%" stop-color="#F7F0DE"/>
       <stop offset="100%" stop-color="#FCFAF3"/>
     </linearGradient>
-    <linearGradient id="nucleus" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#EBD7AC"/>
-      <stop offset="55%" stop-color="#D6AC58"/>
-      <stop offset="100%" stop-color="#C2933F"/>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
       <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#EBE4D2" stroke-width="0.5"/>
     </pattern>
@@ -20,22 +25,28 @@
   <rect width="720" height="200" fill="url(#bg)"/>
   <rect width="720" height="200" fill="url(#grid)"/>
 
-  <!-- Superbody mark: halo ring + E8 diamond nucleus + polar axis -->
-  <circle cx="130" cy="100" r="44" fill="none" stroke="#E3CB94" stroke-width="1.1"/>
-  <line x1="130" y1="48" x2="130" y2="152" stroke="#DCC58F" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.55"/>
-  <polygon points="130,74 158,100 130,126 102,100" fill="url(#nucleus)" filter="url(#drop)"/>
-  <polygon points="130,81.5 152,100 130,118.5 108,100" fill="#FCFAF3" opacity="0.85"/>
+  <!-- Stellar mark: orbit rings + Qian-hexagram core -->
+  <circle cx="130" cy="100" r="44" fill="none" stroke="#C99B3F" stroke-width="0.9" opacity="0.6"/>
+  <circle cx="130" cy="100" r="36" fill="none" stroke="#EBD9A8" stroke-width="0.7" opacity="0.45"/>
+  <ellipse cx="130" cy="100" rx="42" ry="12" fill="none" stroke="#C99B3F" stroke-width="0.6" opacity="0.4"/>
+  <g stroke="url(#gold)" stroke-width="1.2" stroke-linecap="round">
+    <line x1="106" y1="90" x2="154" y2="90"/>
+    <line x1="106" y1="100" x2="154" y2="100"/>
+    <line x1="106" y1="110" x2="154" y2="110"/>
+  </g>
+  <circle cx="130" cy="100" r="8" fill="url(#goldFill)" filter="url(#drop)"/>
+  <circle cx="130" cy="100" r="4" fill="#F7E9C8"/>
 
   <!-- Wordmark: warm ink -->
-  <text x="200" y="95" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" letter-spacing="4" fill="#262419">Neo—<tspan fill="#A0752E">TRIX</tspan></text>
+  <text x="200" y="95" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" letter-spacing="4" fill="#262419">Neo—<tspan fill="#96701F">TRIX</tspan></text>
   <text x="200" y="125" font-family="Georgia, serif" font-size="14" font-style="italic" fill="#8F8666">The Agent That Learns to Think</text>
 
   <!-- Stats: muted -->
   <text x="200" y="155" font-family="monospace" font-size="9" fill="#A39A78" letter-spacing="1">474K+ LOC · 8,771 tests · 0 unsafe · 7 domains</text>
 
-  <!-- Signal dots: light gold crescendo -->
-  <circle cx="620" cy="60" r="2" fill="#E3CB94"/>
-  <circle cx="635" cy="60" r="2.5" fill="#E7D2A0"/>
-  <circle cx="652" cy="60" r="3" fill="#D6AC58"/>
-  <circle cx="671" cy="60" r="2" fill="#F0E3C4"/>
+  <!-- Constellation dots: ochre-gold crescendo -->
+  <circle cx="620" cy="60" r="2" fill="#EBD9A8"/>
+  <circle cx="635" cy="60" r="2.5" fill="#D9B878"/>
+  <circle cx="652" cy="60" r="3" fill="#C99B3F"/>
+  <circle cx="671" cy="60" r="2" fill="#96701F"/>
 </svg>

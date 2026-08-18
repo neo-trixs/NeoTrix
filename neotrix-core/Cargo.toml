@@ -176,6 +176,22 @@ name = "capability_c3"
 harness = false
 
 [[bench]]
+name = "shield_c3"
+harness = false
+
+[[bench]]
+name = "repair_c3"
+harness = false
+
+[[bench]]
+name = "memory_c3"
+harness = false
+
+[[bench]]
+name = "act_c3"
+harness = false
+
+[[bench]]
 name = "real_tasks"
 harness = false
 

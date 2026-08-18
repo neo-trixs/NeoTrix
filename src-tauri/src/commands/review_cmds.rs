@@ -36,8 +36,8 @@ fn check_line_issues(line: &str, line_num: usize) -> Vec<ReviewIssue> {
     let trimmed = line.trim();
 
     // Hardcoded credentials
-    if trimmed.contains("password") || trimmed.contains("api_key") || trimmed.contains("secret") {
-        if trimmed.contains('=') || trimmed.contains(':') {
+    if (trimmed.contains("password") || trimmed.contains("api_key") || trimmed.contains("secret"))
+        && (trimmed.contains('=') || trimmed.contains(':')) {
             issues.push(ReviewIssue {
                 line: line_num,
                 severity: "critical".into(),
@@ -46,7 +46,6 @@ fn check_line_issues(line: &str, line_num: usize) -> Vec<ReviewIssue> {
                 suggestion: Some("Use environment variables or a secrets manager".into()),
             });
         }
-    }
 
     // TODO/FIXME markers
     if trimmed.starts_with("// TODO") || trimmed.starts_with("// FIXME") || trimmed.starts_with("/* TODO") {

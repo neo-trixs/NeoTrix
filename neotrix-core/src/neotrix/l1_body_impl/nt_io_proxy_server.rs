@@ -1,6 +1,5 @@
 use crate::core::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningBank;
-use std::path::PathBuf;
 
 /// Local benchmark types (replaces L8 BenchmarkSuite dependency)
 #[derive(Debug, Clone)]
@@ -21,15 +20,32 @@ pub struct ServerProxy;
 impl ServerProxy {
     pub fn status() -> serde_json::Value {
         let cap = Self::load_brain();
-        let path = Self::snap_path();
-        let knowledge_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        let (kb_bytes, kb_nodes, kb_edges) = Self::kb_stats();
         serde_json::json!({
             "brain_dims": cap.arr.iter().filter(|&&v| v > 0.0).count(),
             "brain_extension": cap.extension.len(),
             "total_dims": cap.arr.len(),
-            "knowledge_store_bytes": knowledge_size,
-            "knowledge_store_mb": format!("{:.2}", knowledge_size as f64 / 1024.0 / 1024.0),
+            "knowledge_store_bytes": kb_bytes,
+            "knowledge_store_mb": format!("{:.2}", kb_bytes as f64 / 1024.0 / 1024.0),
+            "knowledge_nodes": kb_nodes,
+            "knowledge_edges": kb_edges,
         })
+    }
+
+    /// 真实 KB 统计: knowledge.db 文件大小 + nodes/edges 计数。
+    /// 替代原 knowledge_v2.snap (不存在 → 恒 0 bytes 谎言)。
+    fn kb_stats() -> (u64, i64, i64) {
+        let db_path = dirs::home_dir().unwrap_or_default().join(".neotrix/knowledge.db");
+        let bytes = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+        let (nodes, edges) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None)
+            .ok()
+            .and_then(|kb| {
+                kb.stats().ok().map(|s| {
+                    (s.total_nodes, s.total_edges)
+                })
+            })
+            .unwrap_or((0, 0));
+        (bytes, nodes, edges)
     }
 
     pub fn benchmark() -> String {
@@ -100,10 +116,6 @@ impl ServerProxy {
         } else {
             CapabilityVector::default()
         }
-    }
-
-    fn snap_path() -> PathBuf {
-        dirs::home_dir().unwrap_or_default().join(".neotrix/knowledge_v2.snap")
     }
 
     fn format_report(report: &BenchmarkReport) -> String {

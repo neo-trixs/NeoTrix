@@ -1308,12 +1308,26 @@ impl BackgroundLoopHandle {
             }
         }
 
-        // ── 星系卫生代码强制 (T3 生产接线): 校验 consciousness 命名空间 ──
+        // ── 星系卫生代码强制 (T3 生产接线): 跨 namespace 校验真实 hub ──
         // 幽灵分支预防 / 星辰沉寂检测 / 星系完整性验证 (star-memory skill 法则)
         if let Some(ref kb) = self.kb {
             let hygiene = kb.galaxy_hygiene_check(
                 &crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_galaxy_hygiene::GalaxyHygieneConfig::default(),
             );
+            // 沉寂星辰巡检: 未加载 / 超阈值 星辰列表 (生产可观测)
+            let dormant = kb.galaxy_wake_scan(90);
+            if !dormant.is_empty() {
+                log::warn!(
+                    "[bg] galaxy_hygiene: {} 颗沉寂星辰 (>90 天未激活): {:?}",
+                    dormant.len(),
+                    dormant.iter().map(|(ns, last, runs)| format!(
+                        "{}(last={}, runs={})",
+                        ns,
+                        last.map(|t| t.to_string()).unwrap_or_else(|| "never".into()),
+                        runs
+                    )).take(8).collect::<Vec<_>>()
+                );
+            }
             if hygiene.is_clean() {
                 log::info!("[bg] galaxy_hygiene: {} hubs clean", hygiene.hub_count);
             } else {

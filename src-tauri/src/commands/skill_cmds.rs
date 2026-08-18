@@ -85,7 +85,7 @@ fn count_lines_in_dir(dir: &std::path::Path) -> usize {
             let path = entry.path();
             if path.is_dir() {
                 total += count_lines_in_dir(&path);
-            } else if path.extension().map_or(false, |e| e == "rs" || e == "md" || e == "ts" || e == "js" || e == "py" || e == "sh" || e == "toml" || e == "json") {
+            } else if path.extension().is_some_and(|e| e == "rs" || e == "md" || e == "ts" || e == "js" || e == "py" || e == "sh" || e == "toml" || e == "json") {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     total += content.lines().count();
                 }

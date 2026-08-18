@@ -466,7 +466,7 @@ pub fn insights_insights(period: Option<String>) -> Result<Vec<ActivityInsight>,
             0
         } else {
             let total_dur: u64 = sessions.iter().filter_map(|e| e.duration_ms).map(|d| d as u64).sum();
-            (total_dur / sessions.len() as u64 / 60000) as u64
+            total_dur / sessions.len() as u64 / 60000 
         }
     };
 
@@ -608,7 +608,7 @@ pub fn insights_trend(days: Option<u32>) -> Result<serde_json::Value, String> {
     for ev in &state.events {
         let ev_date = &ev.timestamp[..10];
         let d = NaiveDate::parse_from_str(ev_date, "%Y-%m-%d").ok();
-        if d.map_or(true, |d| d < start) {
+        if d.is_none_or(|d| d < start) {
             continue;
         }
         let entry = date_map.entry(ev_date.to_string()).or_insert((0, 0, 0));

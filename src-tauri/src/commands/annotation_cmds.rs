@@ -279,8 +279,8 @@ pub fn annotation_list(
     let state = ANNOTATION_STATE.lock().map_err(|e| e.to_string())?;
     let mut results: Vec<PageAnnotation> = state.annotations.iter()
         .filter(|a| {
-            let url_match = url.as_ref().map_or(true, |u| a.url == *u);
-            let resolved_match = resolved.map_or(true, |r| a.resolved == r);
+            let url_match = url.as_ref().is_none_or(|u| a.url == *u);
+            let resolved_match = resolved.is_none_or(|r| a.resolved == r);
             url_match && resolved_match
         })
         .cloned()
@@ -420,7 +420,7 @@ pub fn annotation_stats() -> Result<AnnotationStats, String> {
     let unresolved = state.annotations.iter().filter(|a| !a.resolved).count() as u32;
     let today = today_str();
     let resolved_today = state.annotations.iter()
-        .filter(|a| a.resolved_at.as_deref().map_or(false, |d| d.starts_with(&today)))
+        .filter(|a| a.resolved_at.as_deref().is_some_and(|d| d.starts_with(&today)))
         .count() as u32;
     let mut unique_urls: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for a in &state.annotations {

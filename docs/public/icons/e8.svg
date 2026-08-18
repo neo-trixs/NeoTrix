@@ -1,7 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <line x1="6" y1="5" x2="18" y2="5"/>
-  <line x1="6.8" y1="8.6" x2="17.2" y2="8.6"/>
-  <line x1="7.6" y1="12.2" x2="16.4" y2="12.2"/>
-  <line x1="8.4" y1="15.8" x2="15.6" y2="15.8"/>
-  <line x1="9.2" y1="19.4" x2="14.8" y2="19.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <linearGradient id="gold" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
+  </defs>
+  <circle cx="12" cy="12" r="5.5" fill="url(#goldFill)" fill-opacity="0.25"/>
+  <line x1="5" y1="7.5" x2="19" y2="7.5"/>
+  <line x1="5" y1="12" x2="19" y2="12"/>
+  <line x1="5" y1="16.5" x2="19" y2="16.5"/>
+  <circle cx="12" cy="12" r="0.9" fill="#F7E9C8" stroke="none"/>
+  <circle cx="4.5" cy="5.5" r="0.5" fill="#F7E9C8" stroke="none"/>
+  <circle cx="19.5" cy="19" r="0.5" fill="#F7E9C8" stroke="none"/>
+  <circle cx="4.5" cy="18" r="0.35" fill="#C99B3F" stroke="none"/>
+  <circle cx="19.5" cy="6" r="0.35" fill="#C99B3F" stroke="none"/>
 </svg>

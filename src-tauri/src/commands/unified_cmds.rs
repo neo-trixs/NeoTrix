@@ -231,8 +231,8 @@ fn category_of(name: &str) -> &'static str {
 
 /// 动作名 → 人类可读描述 (自动生成目录无描述, 由动作名推导)
 fn action_description(action: &str) -> String {
-    let de = action.replace('_', " ");
-    de
+    
+    action.replace('_', " ")
 }
 
 /// 统一命令目录 (CLI + Tauri 全量)

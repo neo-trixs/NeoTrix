@@ -159,9 +159,9 @@ pub fn summary_add_artifact(name: String, kind: String, path: String) -> Result<
         return Err("No active session".into());
     }
     let id = format!("art-{}", Utc::now().timestamp_nanos_opt().unwrap_or(0));
-    let size = std::path::Path::new(&path).is_file().then(|| {
+    let size = if std::path::Path::new(&path).is_file() { {
         std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
-    }).unwrap_or(0);
+    } } else { 0 };
     lock.session.artifact_count += 1;
     push_bounded(&mut lock.artifacts, SessionArtifact { id, name, kind, path, size }, MAX_ARTIFACTS);
     Ok(())

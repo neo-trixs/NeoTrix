@@ -102,11 +102,10 @@ fn scan_file_issues(path: &str) -> Vec<String> {
     for (i, line) in content.lines().enumerate() {
         let ln = i + 1;
         let trimmed = line.trim();
-        if trimmed.contains("api_key") || trimmed.contains("password") || trimmed.contains("secret") {
-            if !trimmed.starts_with("//") && !trimmed.starts_with("#") && !trimmed.starts_with("/*") {
+        if (trimmed.contains("api_key") || trimmed.contains("password") || trimmed.contains("secret"))
+            && !trimmed.starts_with("//") && !trimmed.starts_with("#") && !trimmed.starts_with("/*") {
                 issues.push(format!("L{}: Possible hardcoded secret", ln));
             }
-        }
         if trimmed.to_uppercase().contains("TODO") || trimmed.to_uppercase().contains("FIXME") {
             issues.push(format!("L{}: {} marker", ln, trimmed.trim()));
         }

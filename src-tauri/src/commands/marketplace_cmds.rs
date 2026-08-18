@@ -118,7 +118,7 @@ fn build_catalog() -> HashMap<String, MarketplacePlugin> {
         MarketplacePlugin { id:"perf-benchmark".into(), name:"Perf Benchmark".into(), version:"2.0.0".into(), author:"NeoTrix QA".into(), description:"Benchmark your code with customizable scenarios and historical trend charts.".into(), category:"testing".into(), tags:vec!["performance".into(),"benchmark".into(),"profiling".into()], downloads:18900, rating:4.3, rating_count:145, is_installed:false, has_update:false, installed_version:None, homepage:None, repository:None, license:None, size_kb:1678, created_at:base-86400*70, updated_at:base-86400*18 },
         MarketplacePlugin { id:"e2e-automation".into(), name:"E2E Automation".into(), version:"1.9.4".into(), author:"NeoTrix QA".into(), description:"Record, edit, and run end-to-end browser tests with visual diffing.".into(), category:"testing".into(), tags:vec!["e2e".into(),"browser".into(),"visual".into()], downloads:31200, rating:4.6, rating_count:278, is_installed:false, has_update:false, installed_version:None, homepage:None, repository:Some("https://github.com/neotrix/e2e-automation".into()), license:Some("MIT".into()), size_kb:3450, created_at:base-86400*130, updated_at:base-86400*8 },
         // Frontend
-        MarketplacePlugin { id:"react-inspector".into(), name:"React Inspector".into(), version:"2.3.1".into(), author:"NeoTrix Frontend".into(), description:"Inspect React component tree, props, state, and hooks in real-time.".into(), category:"frontend".into(), tags:vec!["react".into(),"debug".into(),"components".into()], downloads:47100, rating:4.8, rating_count:423, is_installed:false, has_update:false, installed_version:None, homepage:Some("https://neotrix.ai/plugins/react-inspector".into()), repository:Some("https://github.com/neotrix/react-inspector".into()), license:Some("MIT".into()), size_kb:1890, created_at:base-86400*300, updated_at:base-86400*1 },
+        MarketplacePlugin { id:"react-inspector".into(), name:"React Inspector".into(), version:"2.3.1".into(), author:"NeoTrix Frontend".into(), description:"Inspect React component tree, props, state, and hooks in real-time.".into(), category:"frontend".into(), tags:vec!["react".into(),"debug".into(),"components".into()], downloads:47100, rating:4.8, rating_count:423, is_installed:false, has_update:false, installed_version:None, homepage:Some("https://neotrix.ai/plugins/react-inspector".into()), repository:Some("https://github.com/neotrix/react-inspector".into()), license:Some("MIT".into()), size_kb:1890, created_at:base-86400*300, updated_at:base-86400 },
         MarketplacePlugin { id:"tailwind-helper".into(), name:"Tailwind Helper".into(), version:"1.4.2".into(), author:"NeoTrix Frontend".into(), description:"Visual Tailwind CSS class explorer, color picker, and responsive preview.".into(), category:"frontend".into(), tags:vec!["tailwind".into(),"css".into(),"design".into()], downloads:38200, rating:4.7, rating_count:312, is_installed:false, has_update:false, installed_version:None, homepage:None, repository:Some("https://github.com/neotrix/tailwind-helper".into()), license:None, size_kb:1234, created_at:base-86400*160, updated_at:base-86400*14 },
         MarketplacePlugin { id:"component-gen".into(), name:"Component Gen".into(), version:"1.1.0".into(), author:"NeoTrix Frontend".into(), description:"AI-powered component generation from screenshots, prompts, or existing code.".into(), category:"frontend".into(), tags:vec!["generation".into(),"ai".into(),"components".into()], downloads:21400, rating:4.4, rating_count:167, is_installed:false, has_update:false, installed_version:None, homepage:None, repository:None, license:Some("Apache-2.0".into()), size_kb:2890, created_at:base-86400*50, updated_at:base-86400*22 },
         MarketplacePlugin { id:"a11y-checker".into(), name:"A11y Checker".into(), version:"1.0.0".into(), author:"NeoTrix Frontend".into(), description:"Automated accessibility audit with WCAG 2.2 AA compliance suggestions.".into(), category:"frontend".into(), tags:vec!["accessibility".into(),"a11y".into(),"wcag".into()], downloads:12780, rating:4.6, rating_count:94, is_installed:false, has_update:false, installed_version:None, homepage:None, repository:None, license:None, size_kb:890, created_at:base-86400*30, updated_at:base-86400*6 },
@@ -150,7 +150,7 @@ fn build_reviews(plugin_ids: &[String]) -> HashMap<String, Vec<MarketplaceReview
         "Decent tool but there are better alternatives. The UI could use some modernizing.",
     ];
     for pid in plugin_ids {
-        let n = 3 + (pid.len() % 3) as usize;
+        let n = 3 + (pid.len() % 3);
         let mut reviews: Vec<MarketplaceReview> = Vec::new();
         for i in 0..n {
             let ts = base - 86400 * (i as u64 * 7 + 5);
@@ -321,7 +321,7 @@ pub fn marketplace_check_updates() -> Result<Vec<MarketplacePlugin>, String> {
     let mut updated: Vec<MarketplacePlugin> = Vec::new();
     for pid in state.installed.clone() {
         if let Some(plugin) = state.plugins.get_mut(&pid) {
-            let has_update = (plugin.downloads.wrapping_mul(7) as u64 % 5) == 0;
+            let has_update = (plugin.downloads.wrapping_mul(7) % 5) == 0;
             plugin.has_update = has_update;
             if has_update {
                 let mut p = plugin.clone();
@@ -365,7 +365,7 @@ pub fn marketplace_submit_review(plugin_id: String, rating: u8, title: String, b
     if !state.plugins.contains_key(&plugin_id) {
         return Err(format!("Plugin '{}' not found", plugin_id));
     }
-    if rating < 1 || rating > 5 {
+    if !(1..=5).contains(&rating) {
         return Err("Rating must be between 1 and 5".into());
     }
     let review = MarketplaceReview {

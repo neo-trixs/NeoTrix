@@ -163,7 +163,7 @@ fn handle_line(line: &str) -> Option<String> {
         Ok(r) => r,
         Err(_) => return Some(parse_error_response().to_string()),
     };
-    if req.id.as_ref().map_or(true, serde_json::Value::is_null) {
+    if req.id.as_ref().is_none_or(serde_json::Value::is_null) {
         return None;
     }
     dispatch(&req).map(|resp| serde_json::to_string(&resp).unwrap_or_default())

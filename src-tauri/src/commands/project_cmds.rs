@@ -328,7 +328,7 @@ pub fn read_dir_recursive(path: String, max_depth: Option<u32>) -> Result<Vec<Fl
                 let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
                 out.push(FlatFileNode { name, path: file_path, is_dir, depth });
                 if is_dir {
-                    let _ = read_dir(&entry.path(), depth + 1, max_depth, out);
+                    read_dir(&entry.path(), depth + 1, max_depth, out);
                 }
             }
         }

@@ -1,30 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FDFBF5"/>
-      <stop offset="55%" stop-color="#F8F2E1"/>
-      <stop offset="100%" stop-color="#FCFAF3"/>
+      <stop offset="0%" stop-color="#FCFAF3"/>
+      <stop offset="50%" stop-color="#F7F0DE"/>
+      <stop offset="100%" stop-color="#FBF7EA"/>
     </linearGradient>
     <radialGradient id="halo" cx="50%" cy="42%" r="60%">
-      <stop offset="0%" stop-color="#EBD7AC" stop-opacity="0.5"/>
-      <stop offset="40%" stop-color="#E7D2A0" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#E7D2A0" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#EBD9A8" stop-opacity="0.5"/>
+      <stop offset="40%" stop-color="#D9B878" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#D9B878" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="nucleus" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#EBD7AC"/>
-      <stop offset="55%" stop-color="#D6AC58"/>
-      <stop offset="100%" stop-color="#C2933F"/>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </linearGradient>
-    <!-- HyperCube honeycomb lattice -->
+    <!-- Galaxy stardust lattice -->
     <pattern id="lattice" width="54" height="31.18" patternUnits="userSpaceOnUse" patternTransform="scale(1.35)">
       <path d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
-            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.16"/>
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.14"/>
       <path transform="translate(27 15.59)"
             d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
-            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.16"/>
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.14"/>
       <path transform="translate(27 -15.59)"
             d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
-            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.16"/>
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.14"/>
     </pattern>
   </defs>
 
@@ -32,14 +32,14 @@
   <rect width="1440" height="900" fill="url(#lattice)"/>
   <rect width="1440" height="900" fill="url(#halo)"/>
 
-  <!-- Orbit rings: the mind's atmosphere -->
-  <circle cx="1150" cy="150" r="250" fill="none" stroke="#E3CB94" stroke-width="1" opacity="0.5"/>
-  <circle cx="1150" cy="150" r="180" fill="none" stroke="#EBD7AC" stroke-width="0.8" opacity="0.4"/>
-  <circle cx="300" cy="790" r="300" fill="none" stroke="#E3CB94" stroke-width="1" opacity="0.4"/>
-  <circle cx="300" cy="790" r="220" fill="none" stroke="#EBD7AC" stroke-width="0.8" opacity="0.35"/>
+  <!-- Galaxy orbit rings -->
+  <circle cx="1150" cy="150" r="250" fill="none" stroke="#C99B3F" stroke-width="0.9" opacity="0.5"/>
+  <circle cx="1150" cy="150" r="180" fill="none" stroke="#EBD9A8" stroke-width="0.7" opacity="0.4"/>
+  <circle cx="300" cy="790" r="300" fill="none" stroke="#C99B3F" stroke-width="0.9" opacity="0.4"/>
+  <circle cx="300" cy="790" r="220" fill="none" stroke="#EBD9A8" stroke-width="0.7" opacity="0.35"/>
 
-  <!-- Constellation nodes: diamond-nucleus echoes -->
-  <g stroke="#D6AC58" stroke-width="0.8" opacity="0.5">
+  <!-- Constellation trails -->
+  <g stroke="#C99B3F" stroke-width="0.8" opacity="0.5">
     <line x1="920" y1="560" x2="1040" y2="610"/>
     <line x1="1040" y1="610" x2="1180" y2="575"/>
     <line x1="1180" y1="575" x2="1230" y2="460"/>
@@ -53,8 +53,8 @@
     <line x1="240" y1="590" x2="200" y2="470"/>
   </g>
 
-  <!-- Diamond nodes -->
-  <g fill="url(#nucleus)" opacity="0.85">
+  <!-- Star nodes -->
+  <g fill="url(#gold)" opacity="0.85">
     <polygon points="920,552 940,560 920,568 900,560"/>
     <polygon points="1040,602 1060,610 1040,618 1020,610"/>
     <polygon points="1180,567 1200,575 1180,583 1160,575"/>
@@ -71,8 +71,8 @@
     <polygon points="200,462 220,470 200,478 180,470"/>
   </g>
 
-  <!-- Scattered nucleus echoes -->
-  <g fill="#D6AC58" opacity="0.3">
+  <!-- Stardust scatter -->
+  <g fill="#C99B3F" opacity="0.3">
     <polygon points="1010,140 1024,160 1010,180 996,160"/>
     <polygon points="680,80 692,96 680,112 668,96"/>
     <polygon points="90,210 100,226 90,242 80,226"/>
@@ -83,7 +83,12 @@
     <polygon points="1180,120 1190,132 1180,144 1170,132"/>
   </g>
 
-  <!-- Polar axis thread, top-left -->
-  <line x1="130" y1="40" x2="130" y2="180" stroke="#DCC58F" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.4"/>
-  <polygon points="130,52 146,82 130,112 114,82" fill="url(#nucleus)" opacity="0.5"/>
+  <!-- Qian-hexagram stellar marker, top-left -->
+  <circle cx="130" cy="82" r="12" fill="none" stroke="#C99B3F" stroke-width="0.9" opacity="0.7"/>
+  <g stroke="#96701F" stroke-width="0.9" opacity="0.7" stroke-linecap="round">
+    <line x1="116" y1="74" x2="144" y2="74"/>
+    <line x1="116" y1="82" x2="144" y2="82"/>
+    <line x1="116" y1="90" x2="144" y2="90"/>
+  </g>
+  <circle cx="130" cy="82" r="2.5" fill="#EBD9A8"/>
 </svg>

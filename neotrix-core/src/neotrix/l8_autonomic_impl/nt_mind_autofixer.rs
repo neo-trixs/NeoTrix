@@ -391,6 +391,35 @@ pub struct GauntletVerdict {
     pub pass: bool,
     /// 未通过时的原因 (pass=true 时空)。
     pub reason: String,
+    /// J-Space 诊断 (j-space: self-monitoring.md CONTROL LOOP) — 未通过时
+    /// 必须携带的紧凑失败诊断, 重试必须带上它 (blank retry 拒绝)。
+    pub diagnosis: String,
+}
+
+impl GauntletVerdict {
+    /// 携带诊断的重试条款 — 返回诊断, 空则调用方不得重试。
+    /// J-Space: "Retrying; I think the failure was <diagnosis>."
+    pub fn diagnosis(&self) -> &str {
+        &self.diagnosis
+    }
+
+    fn pass(stage: GauntletStage) -> GauntletVerdict {
+        GauntletVerdict {
+            stage,
+            pass: true,
+            reason: String::new(),
+            diagnosis: String::new(),
+        }
+    }
+
+    fn fail(stage: GauntletStage, reason: &str, diagnosis: &str) -> GauntletVerdict {
+        GauntletVerdict {
+            stage,
+            pass: false,
+            reason: reason.to_string(),
+            diagnosis: diagnosis.to_string(),
+        }
+    }
 }
 
 /// GAUNTLET 证据门控状态机。
@@ -433,11 +462,11 @@ impl GauntletMachine {
         let stage = match self.current {
             Some(s) => s,
             None => {
-                return GauntletVerdict {
-                    stage: GauntletStage::Spec,
-                    pass: false,
-                    reason: "machine not started".into(),
-                };
+                return GauntletVerdict::fail(
+                    GauntletStage::Spec,
+                    "machine not started",
+                    "gauntlet: call start() before advancing",
+                );
             }
         };
         let verdict = Self::evaluate_stage(stage, spec, failed_tests, tests_pass, lint_ok, todos, unwraps, evidence);
@@ -455,23 +484,23 @@ impl GauntletMachine {
         match stage {
             GauntletStage::Spec => {
                 if spec.trim().is_empty() {
-                    GauntletVerdict { stage, pass: false, reason: "spec-before: no spec provided".into() }
+                    GauntletVerdict::fail(stage, "spec-before: no spec provided", "spec: provide a non-empty spec first")
                 } else {
-                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                    GauntletVerdict::pass(stage)
                 }
             }
             GauntletStage::Red => {
                 if failed_tests == 0 {
-                    GauntletVerdict { stage, pass: false, reason: "RED: need at least 1 failing test first".into() }
+                    GauntletVerdict::fail(stage, "RED: need at least 1 failing test first", "red: write a failing test before implementing")
                 } else {
-                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                    GauntletVerdict::pass(stage)
                 }
             }
             GauntletStage::Green => {
                 if !tests_pass {
-                    GauntletVerdict { stage, pass: false, reason: "GREEN: tests must pass".into() }
+                    GauntletVerdict::fail(stage, "GREEN: tests must pass", "green: fix implementation until tests pass")
                 } else {
-                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                    GauntletVerdict::pass(stage)
                 }
             }
             GauntletStage::Gauntlet => {
@@ -486,16 +515,20 @@ impl GauntletMachine {
                     problems.push(format!("{unwraps} unwrap abuses"));
                 }
                 if problems.is_empty() {
-                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                    GauntletVerdict::pass(stage)
                 } else {
-                    GauntletVerdict { stage, pass: false, reason: format!("GAUNTLET blocked: {}", problems.join(", ")) }
+                    GauntletVerdict::fail(
+                        stage,
+                        &format!("GAUNTLET blocked: {}", problems.join(", ")),
+                        &format!("gauntlet: resolve {}", problems.join(", ")),
+                    )
                 }
             }
             GauntletStage::Evidence => {
                 if evidence.is_empty() {
-                    GauntletVerdict { stage, pass: false, reason: "evidence-after: no evidence attached".into() }
+                    GauntletVerdict::fail(stage, "evidence-after: no evidence attached", "evidence: attach a real evidence pack before delivery")
                 } else {
-                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                    GauntletVerdict::pass(stage)
                 }
             }
         }
@@ -504,6 +537,58 @@ impl GauntletMachine {
     /// 是否被某阶段阻挡 (供调用方区分"卡住" vs "完成")。
     pub fn blocked(&self) -> Option<&GauntletVerdict> {
         self.failures.last()
+    }
+
+    /// J-Space 监控→控制绑定: 取出最近失败诊断供重试携带。
+    /// 返回 None 表示无失败/未开始, 此时调用方不得空白重试 (self-monitoring.md
+    /// "A retry that does not carry the diagnosis is the same attempt again")。
+    pub fn retry_diagnosis(&self) -> Option<String> {
+        self.failures
+            .last()
+            .filter(|v| !v.pass)
+            .map(|v| v.diagnosis.clone())
+    }
+
+    /// 携带诊断的重试: 调用方必须声明失败诊断, 空白诊断被拒绝。
+    /// 返回 false = 重试无效 (没有可携带的诊断)。
+    pub fn retry_with_diagnosis(&mut self, diagnosis: &str) -> bool {
+        if diagnosis.trim().is_empty() {
+            return false;
+        }
+        if self.retry_diagnosis().is_none_or(|d| d != diagnosis) {
+            return false;
+        }
+        true
+    }
+}
+
+/// T17 闭环监控强制出口 (jspace induction-playbook Technique 17) — 监控到
+/// 失败后必须三选一, 禁止空白重试 ("a retry that does not carry the diagnosis
+/// is the same attempt again")。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResolveExit {
+    /// 接受失败为已知事实, 不再重试 (范围重新界定)。
+    Trust,
+    /// 携带失败诊断重试 — 这是默认出口, 空白诊断被拒绝。
+    RetryWithDiagnosis,
+    /// 失败揭示了账本/规格本身的问题 — 先修正前提再继续。
+    Reconcile,
+}
+
+impl ResolveExit {
+    /// T17: 监控闭环的强制出口列表 — 卡住时不存在第 4 个选择。
+    pub const ALL: [ResolveExit; 3] = [
+        ResolveExit::Trust,
+        ResolveExit::RetryWithDiagnosis,
+        ResolveExit::Reconcile,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ResolveExit::Trust => "trust",
+            ResolveExit::RetryWithDiagnosis => "retry-with-diagnosis",
+            ResolveExit::Reconcile => "reconcile",
+        }
     }
 }
 
@@ -822,6 +907,61 @@ mod tests {
         let v = m.advance("spec", 1, true, true, 0, 0, &[]);
         assert!(!v.pass);
         assert!(v.reason.contains("not started"));
+    }
+
+    #[test]
+    fn gauntlet_verdict_carries_diagnosis() {
+        // SPEC 空规格失败 → 必须携带诊断 (J-Space: retry-with-diagnosis)
+        let v = GauntletMachine::evaluate_stage(GauntletStage::Spec, "", 0, false, false, 0, 0, &[]);
+        assert!(!v.pass);
+        assert!(!v.diagnosis.is_empty(), "failed verdict must carry diagnosis");
+        assert!(v.diagnosis().contains("spec"));
+        // 通过时诊断为空 (无重试需求)
+        let ok = GauntletMachine::evaluate_stage(GauntletStage::Spec, "do X", 0, false, false, 0, 0, &[]);
+        assert!(ok.pass);
+        assert!(ok.diagnosis.is_empty());
+    }
+
+    #[test]
+    fn gauntlet_retry_diagnosis_binds_gate_to_retry() {
+        let mut m = GauntletMachine::new();
+        m.start();
+        // SPEC 通过, RED 失败 (无失败测试)
+        assert!(m.advance("spec ok", 0, false, false, 0, 0, &[]).pass); // SPEC
+        let v = m.advance("spec ok", 0, false, false, 0, 0, &[]); // RED fails
+        assert!(!v.pass);
+        let diag = m.retry_diagnosis().expect("failure must yield diagnosis");
+        assert!(diag.contains("red"));
+        // 空白重试被拒绝 (J-Space: blank retry = same attempt again)
+        assert!(!m.retry_with_diagnosis(""), "blank diagnosis rejected");
+        assert!(!m.retry_with_diagnosis("wrong diagnosis"), "mismatched diagnosis rejected");
+        assert!(m.retry_with_diagnosis(&diag), "carrying real diagnosis accepted");
+    }
+
+    #[test]
+    fn resolve_exit_forces_three_choice_closure() {
+        // T17: 监控闭环只有三个出口 — trust / retry-with-diagnosis / reconcile
+        assert_eq!(ResolveExit::ALL.len(), 3);
+        assert_eq!(ResolveExit::ALL[0], ResolveExit::Trust);
+        assert_eq!(ResolveExit::ALL[1], ResolveExit::RetryWithDiagnosis);
+        assert_eq!(ResolveExit::ALL[2], ResolveExit::Reconcile);
+        assert_eq!(ResolveExit::RetryWithDiagnosis.label(), "retry-with-diagnosis");
+        assert_eq!(ResolveExit::Reconcile.label(), "reconcile");
+        // retry 出口必须携带诊断, 否则就不是有效出口
+        let mut m = GauntletMachine::new();
+        m.start();
+        m.advance("spec ok", 0, false, false, 0, 0, &[]);
+        let v = m.advance("spec ok", 0, false, false, 0, 0, &[]);
+        assert!(!v.pass);
+        let diag = m.retry_diagnosis().expect("diagnosis present");
+        assert!(m.retry_with_diagnosis(&diag));
+        // reconcile: 失败揭示了前提问题 — 修正规格后再走
+        let mut m2 = GauntletMachine::new();
+        m2.start();
+        let v = m2.advance("", 0, false, false, 0, 0, &[]);
+        assert!(!v.pass);
+        let diag = m2.retry_diagnosis().expect("spec failure yields diagnosis");
+        assert!(m2.retry_with_diagnosis(&diag), "reconcile then retry");
     }
 
     #[test]

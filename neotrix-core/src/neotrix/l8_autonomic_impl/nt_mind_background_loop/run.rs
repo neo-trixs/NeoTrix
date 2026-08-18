@@ -564,6 +564,13 @@ impl BackgroundLoop {
                 let mut hooks = MindHookRegistry::default();
                 hooks.register(HookEvent::SkillLoaded, Box::new(LogHook::new("bg-loop")));
                 hooks.register(HookEvent::SkillUnloaded, Box::new(LogHook::new("bg-loop")));
+                // CSGN 星辰唤醒 (T3 生产接线): 技能激活 → galaxy_wake_star 落盘
+                hooks.register(
+                    HookEvent::SkillLoaded,
+                    Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::skill_hooks::CsgnWakeHook {
+                        kb: kb.clone(),
+                    }),
+                );
                 SkillEngine::new(PathBuf::from(
                     &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
                 )).with_hooks(hooks)

@@ -642,7 +642,7 @@ fn snippet_around(haystack: &str, needle: &str, radius: usize) -> String {
         let end = (pos + needle.len() + radius).min(haystack.len());
         let mut s = haystack[start..end].to_string();
         if start > 0 {
-            s.insert_str(0, "…");
+            s.insert(0, '…');
         }
         if end < haystack.len() {
             s.push('…');
@@ -1144,7 +1144,7 @@ pub async fn neocodex_rename_session(session_id: String, name: String) -> Result
         message_count: 0,
         wire_path: path.to_string_lossy().to_string(),
         updated_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         tags: read_session_tags_from_path(&path)?,
     })
 }
@@ -1232,7 +1232,7 @@ pub async fn neocodex_tag_session(session_id: String, tag: String) -> Result<Neo
         message_count: 0,
         wire_path: path.to_string_lossy().to_string(),
         updated_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         tags,
     })
 }
@@ -1280,7 +1280,7 @@ pub async fn neocodex_untag_session(session_id: String, tag: String) -> Result<N
         message_count: 0,
         wire_path: path.to_string_lossy().to_string(),
         updated_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         tags,
     })
 }

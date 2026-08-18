@@ -247,6 +247,55 @@ pub struct TelemetryAlert {
     pub current: f64,
     pub baseline: f64,
     pub threshold: f64,
+    /// J-Space 能力实现损失层分类 (j-space 报告 §2): 告警对应哪一层失配。
+    /// None = 常规指标告警, 未归类。
+    pub loss_layer: Option<LossLayer>,
+}
+
+/// J-Space 能力实现损失 (capability-realization loss) 六层分类 —
+/// 推理模式 / 首轮接口 / 工具 schema / 活动表征 / 长程状态 / 验证机制。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LossLayer {
+    /// 推理模式失配 (短链跳过桥接 / 长链不行动)
+    ReasoningMode,
+    /// 首轮接口失配 (persona / 首轮条件 / 轨迹锚定)
+    FirstTurnInterface,
+    /// 工具 schema 失配 (工具目录 / schema 指纹)
+    ToolSchema,
+    /// 活动表征失配 (工作集过载 / 表征漂移)
+    ActiveRepresentation,
+    /// 长程状态失配 (目标淡出 / 跨分支重建 / 空白重试)
+    LongHorizonState,
+    /// 验证机制失配 (过早完成 / 验证覆盖不足)
+    Verification,
+}
+
+impl LossLayer {
+    pub const ALL: [LossLayer; 6] = [
+        LossLayer::ReasoningMode,
+        LossLayer::FirstTurnInterface,
+        LossLayer::ToolSchema,
+        LossLayer::ActiveRepresentation,
+        LossLayer::LongHorizonState,
+        LossLayer::Verification,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            LossLayer::ReasoningMode => "reasoning-mode",
+            LossLayer::FirstTurnInterface => "first-turn-interface",
+            LossLayer::ToolSchema => "tool-schema",
+            LossLayer::ActiveRepresentation => "active-representation",
+            LossLayer::LongHorizonState => "long-horizon-state",
+            LossLayer::Verification => "verification",
+        }
+    }
+}
+
+impl std::fmt::Display for LossLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
 }
 
 /// Rolling z-score anomaly detector over a metric time series.
@@ -364,7 +413,16 @@ impl AnomalyDetector {
             current: value,
             baseline: mean,
             threshold: self.z_threshold,
+            loss_layer: None,
         })
+    }
+
+    /// 带能力实现损失层分类的观察入口。J-Space: 告警不仅报告"偏离",
+    /// 还标注它落在六层失配中的哪一层, 供控制回路定向修复。
+    pub fn observe_loss(&self, metric: &str, value: f64, layer: LossLayer) -> Option<TelemetryAlert> {
+        let mut alert = self.observe(metric, value)?;
+        alert.loss_layer = Some(layer);
+        Some(alert)
     }
 
     pub fn series_len(&self, metric: &str) -> usize {
@@ -378,6 +436,97 @@ impl AnomalyDetector {
         if let Ok(mut s) = self.series.lock() {
             s.remove(metric);
         }
+    }
+}
+
+/// J-Space seam 停滞观察器 (jspace.py observations / STALL_RUN=3) — 在
+/// 相邻 seam 之间对比账本状态, 产出事实观察; 判断交给控制回路 (T17 三选一)。
+/// 忠实复现 jspace.py 四条观察, 不携带任何判断词 (judgement is not the
+/// script's)。
+#[derive(Debug)]
+pub struct SeamMonitor {
+    /// 连续观察窗口内的 seam 状态快照 (最新在前)。
+    runs: Mutex<VecDeque<SeamSnapshot>>,
+    /// 连续几轮算停滞 (jspace STALL_RUN = 3)。
+    run: usize,
+}
+
+/// 单个 seam 时刻的账本状态快照。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeamSnapshot {
+    pub next: String,
+    pub verified: usize,
+    pub open: usize,
+}
+
+impl Default for SeamMonitor {
+    fn default() -> Self {
+        Self::new(3)
+    }
+}
+
+impl SeamMonitor {
+    pub fn new(run: usize) -> Self {
+        Self {
+            runs: Mutex::new(VecDeque::with_capacity(run.max(3))),
+            run: run.max(3),
+        }
+    }
+
+    /// 记录一次 seam 快照, 返回窗口内的事实观察 (无则 None)。
+    pub fn observe(&self, snap: SeamSnapshot) -> Option<String> {
+        let mut runs = match self.runs.lock() {
+            Ok(r) => r,
+            Err(_) => return None,
+        };
+        runs.push_front(snap);
+        while runs.len() > self.run {
+            runs.pop_back();
+        }
+        if runs.len() < self.run {
+            return None;
+        }
+        let window: Vec<&SeamSnapshot> = runs.iter().collect();
+        if window[0].next.is_empty() {
+            return Some("seam: no next action recorded — the ledger stops being state".to_string());
+        }
+        let next_unchanged = window.iter().all(|s| s.next == window[0].next);
+        let verified_grew = window[0].verified != window[window.len() - 1].verified;
+        // 最新在前 (index 0), 单调增 = 每对相邻 (i, i+1) 满足 s[i].open > s[i+1].open
+        let open_monotonic = window
+            .windows(2)
+            .all(|w| w[0].open > w[1].open);
+
+        if next_unchanged && !verified_grew {
+            Some(format!(
+                "seam: next action unchanged for {} seams and nothing new verified — stalled",
+                self.run
+            ))
+        } else if next_unchanged && verified_grew {
+            Some(format!(
+                "seam: verified is growing but the next action has not changed for {} seams",
+                self.run
+            ))
+        } else if open_monotonic {
+            Some(format!(
+                "seam: open-question count increased at every seam over the last {} seams",
+                self.run
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// 当前窗口内的快照数。
+    pub fn len(&self) -> usize {
+        match self.runs.lock() {
+            Ok(r) => r.len(),
+            Err(_) => 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -456,6 +605,7 @@ impl PolicyDriftMonitor {
                 current: ratio,
                 baseline,
                 threshold: self.magnitude_jump,
+                loss_layer: Some(LossLayer::ReasoningMode),
             })
         } else {
             None
@@ -911,6 +1061,47 @@ mod tests {
     }
 
     #[test]
+    fn test_anomaly_detector_loss_layer_classification() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        // 基线
+        for _ in 0..5 {
+            assert!(d.observe_loss("goal_drift", 1.0, LossLayer::LongHorizonState).is_none());
+        }
+        // 长程状态层 spike → 告警必须携带 loss_layer 分类
+        let alert = d
+            .observe_loss("goal_drift", 10.0, LossLayer::LongHorizonState)
+            .expect("loss-layer spike should alert");
+        assert_eq!(alert.kind, AlertKind::Spike);
+        assert_eq!(alert.loss_layer, Some(LossLayer::LongHorizonState));
+        assert_eq!(alert.loss_layer.unwrap().label(), "long-horizon-state");
+    }
+
+    #[test]
+    fn test_loss_layer_enum_is_six_fold() {
+        assert_eq!(LossLayer::ALL.len(), 6, "J-Space 六层失配分类");
+        let labels: Vec<&str> = LossLayer::ALL.iter().map(|l| l.label()).collect();
+        assert!(labels.contains(&"reasoning-mode"));
+        assert!(labels.contains(&"first-turn-interface"));
+        assert!(labels.contains(&"tool-schema"));
+        assert!(labels.contains(&"active-representation"));
+        assert!(labels.contains(&"verification"));
+        // 每层 display == label
+        for l in LossLayer::ALL {
+            assert_eq!(l.to_string(), l.label());
+        }
+    }
+
+    #[test]
+    fn test_plain_observe_has_no_loss_layer() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        for _ in 0..5 {
+            d.observe("m", 1.0);
+        }
+        let alert = d.observe("m", 10.0).expect("spike should alert");
+        assert_eq!(alert.loss_layer, None, "plain observe stays unclassified");
+    }
+
+    #[test]
     fn test_anomaly_detector_metric_isolation() {
         let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
         for _ in 0..5 {
@@ -1044,5 +1235,117 @@ mod tests {
         // 未建立基线前散度跳变不应误报 (无历史可比)
         assert!(m.observe(100.0, false).is_none(), "无基线不应告警");
         assert!(!m.has_baseline());
+    }
+
+    // ── SeamMonitor (J-Space seam 停滞观察) ────────────────────────────
+
+    #[test]
+    fn test_seam_monitor_needs_full_window() {
+        let m = SeamMonitor::new(3);
+        for _ in 0..2 {
+            assert!(
+                m.observe(SeamSnapshot {
+                    next: "next".into(),
+                    verified: 1,
+                    open: 0,
+                })
+                .is_none(),
+                "窗口未满不产观察"
+            );
+        }
+        assert_eq!(m.len(), 2);
+        assert!(!m.is_empty());
+    }
+
+    #[test]
+    fn test_seam_monitor_flags_stall_when_next_unchanged_and_no_new_verified() {
+        let m = SeamMonitor::new(3);
+        for _ in 0..3 {
+            let obs = m.observe(SeamSnapshot {
+                next: "same action".into(),
+                verified: 2,
+                open: 1,
+            });
+            if obs.is_some() {
+                let text = obs.unwrap();
+                assert!(text.contains("stalled"), "{text}");
+                assert!(text.contains("unchanged"), "{text}");
+            }
+        }
+        // 第三次快照后窗口满 → 必须产出停滞观察
+        assert!(m.len() == 3);
+    }
+
+    #[test]
+    fn test_seam_monitor_reports_growth_with_frozen_next() {
+        let m = SeamMonitor::new(3);
+        for _ in 0..2 {
+            assert!(m
+                .observe(SeamSnapshot {
+                    next: "same".into(),
+                    verified: 1,
+                    open: 0,
+                })
+                .is_none());
+        }
+        let obs = m
+            .observe(SeamSnapshot {
+                next: "same".into(),
+                verified: 3,
+                open: 0,
+            })
+            .expect("verified grew but next frozen → observation");
+        assert!(obs.contains("growing"), "{obs}");
+    }
+
+    #[test]
+    fn test_seam_monitor_flags_monotonic_open_growth() {
+        let m = SeamMonitor::new(3);
+        // 窗口内 open 持续增加 (新→旧: 3,2,1) — 注意 observe 最新在前
+        for open in [1usize, 2, 3] {
+            m.observe(SeamSnapshot {
+                next: "n".into(),
+                verified: 1,
+                open,
+            });
+        }
+        let obs = m
+            .observe(SeamSnapshot {
+                next: "n".into(),
+                verified: 1,
+                open: 4,
+            })
+            .expect("open monotonically increasing → observation");
+        assert!(obs.contains("open-question count increased"), "{obs}");
+    }
+
+    #[test]
+    fn test_seam_monitor_silent_when_healthy() {
+        let m = SeamMonitor::new(3);
+        let mut last = 1usize;
+        for _ in 0..3 {
+            let obs = m.observe(SeamSnapshot {
+                next: format!("n{last}"),
+                verified: last,
+                open: 0,
+            });
+            assert!(obs.is_none(), "healthy progress must not stall: {obs:?}");
+            last += 1;
+        }
+    }
+
+    #[test]
+    fn test_seam_monitor_flags_missing_next() {
+        let m = SeamMonitor::new(3);
+        for _ in 0..3 {
+            let obs = m.observe(SeamSnapshot {
+                next: String::new(),
+                verified: 1,
+                open: 0,
+            });
+            if let Some(text) = obs {
+                assert!(text.contains("no next action"), "{text}");
+            }
+        }
     }
 }

@@ -30,7 +30,7 @@ fn search_duckduckgo(query: &str, max_results: usize) -> Vec<WebSearchResult> {
     match client {
         Ok(client) => {
             let url = format!("https://api.duckduckgo.com/?q={}&format=json&no_html=1&skip_disambig=1",
-                urlencoding(&query));
+                urlencoding(query));
             match client.get(&url).send() {
                 Ok(resp) if resp.status().is_success() => {
                     match resp.json::<serde_json::Value>() {

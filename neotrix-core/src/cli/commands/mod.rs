@@ -2,6 +2,7 @@
 
 pub mod types;
 pub mod sandbox_cmds;
+pub mod judge_cmds;
 pub mod bench_cmds;
 pub mod doctor_cmds;
 pub mod core_cmds;
@@ -54,6 +55,7 @@ pub mod code_graph_cmds;
 
 pub use types::*;
 pub use sandbox_cmds::*;
+pub use judge_cmds::*;
 pub use bench_cmds::*;
 pub use core_cmds::*;
 pub use brain_cmds::*;

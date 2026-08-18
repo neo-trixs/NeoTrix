@@ -10,6 +10,7 @@ use crate::neotrix::l1_body_impl::nt_shield::vault::Vault;
 pub mod cli;
 pub mod device;
 pub mod docker;
+pub mod judge;
 pub mod provider;
 pub mod remote;
 

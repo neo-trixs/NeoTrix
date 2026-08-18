@@ -1,4 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="12" cy="12" r="9"/>
-  <polygon points="12,6.5 17.5,12 12,17.5 6.5,12"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <linearGradient id="gold" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
+  </defs>
+  <circle cx="12" cy="12" r="6" fill="url(#goldFill)" fill-opacity="0.3"/>
+  <ellipse cx="12" cy="12" rx="9" ry="3.2" opacity="0.6"/>
+  <path d="M12 3 V5.5" opacity="0.5"/>
+  <path d="M12 18.5 V21" opacity="0.5"/>
+  <circle cx="12" cy="12" r="1.4" fill="#F7E9C8" stroke="none"/>
+  <circle cx="4" cy="5.5" r="0.6" fill="#F7E9C8" stroke="none"/>
+  <circle cx="20.5" cy="17" r="0.6" fill="#F7E9C8" stroke="none"/>
+  <circle cx="4.5" cy="16.5" r="0.45" fill="#C99B3F" stroke="none"/>
+  <circle cx="19.5" cy="6" r="0.45" fill="#C99B3F" stroke="none"/>
 </svg>

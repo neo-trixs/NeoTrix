@@ -23,18 +23,15 @@ pub struct TaskRun {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Default)]
 pub enum TaskStatus {
+    #[default]
     Idle,
     Running,
     Paused,
     Error,
 }
 
-impl Default for TaskStatus {
-    fn default() -> Self {
-        TaskStatus::Idle
-    }
-}
 
 impl std::fmt::Display for TaskStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

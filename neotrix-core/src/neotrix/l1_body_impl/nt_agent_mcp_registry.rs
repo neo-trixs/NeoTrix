@@ -217,6 +217,81 @@ impl McpRegistry {
             .collect()
     }
 
+    // -- RAG Tool Optimizer (pentestagent, absorbed 2026-08-18) -------------
+    //
+    // 机制: MCP 服务器 >128 工具时, 用 embedding 检索 meta-tool 把相关工具
+    // 注入上下文, 避免全量工具 schema 撑爆 prompt。此处为 embedding-lite
+    // (字符 bigram 相似度, 纯 std 零依赖): 当工具目录规模超阈值时,
+    // recommend_tools 退化为语义排序而非精确子串 — 语义近义工具 (如
+    // "judge" vs "evaluate_program") 也能召回, 抵御长工具目录下的召回失败。
+
+    /// 工具目录规模阈值 — 超过则启用 embedding-lite 语义检索。
+    pub const RAG_POOL_THRESHOLD: usize = 128;
+
+    /// embedding-lite: 查询与工具 (name + description) 的字符 bigram Jaccard
+    /// 相似度 ∈ [0,1]。纯 std, 无外部 embedding 依赖 (R-P48 合规)。
+    pub fn embedding_lite_score(query: &str, def: &McpToolDef) -> f64 {
+        let text = format!("{} {}", def.name, def.description);
+        Self::bigram_jaccard(query, &text)
+    }
+
+    fn bigram_jaccard(a: &str, b: &str) -> f64 {
+        let grams = |s: &str| -> std::collections::HashSet<String> {
+            let lower: Vec<char> = s.to_lowercase().chars().collect();
+            if lower.len() < 2 {
+                return std::collections::HashSet::new();
+            }
+            lower
+                .windows(2)
+                .map(|w| w.iter().collect::<String>())
+                .collect()
+        };
+        let (ga, gb) = (grams(a), grams(b));
+        if ga.is_empty() || gb.is_empty() {
+            return 0.0;
+        }
+        let inter = ga.intersection(&gb).count();
+        let union = ga.union(&gb).count();
+        if union == 0 {
+            0.0
+        } else {
+            inter as f64 / union as f64
+        }
+    }
+
+    /// pool 规模感知的工具检索: 目录 ≤ RAG_POOL_THRESHOLD 用精确打分
+    /// (现状); 目录更大则叠加 embedding-lite 语义分 (50% 权重), 使近义
+    /// 工具在超大门下仍可召回 — 直接复用现有 recommend_tools 生产路径。
+    pub fn recommend_tools_rag(&self, query: &str, top_k: usize) -> Vec<McpToolDef> {
+        let pool = self.tool_count();
+        if pool <= Self::RAG_POOL_THRESHOLD {
+            return self.recommend_tools(query, top_k);
+        }
+        let q = query.to_lowercase();
+        let mut scored: Vec<(f64, &McpToolDef)> = self
+            .servers
+            .iter()
+            .flat_map(|s| s.tools.iter())
+            .filter_map(|t| {
+                let name_match = if t.name.to_lowercase().contains(&q) { 2.0 } else { 0.0 };
+                let desc_match = if t.description.to_lowercase().contains(&q) { 1.0 } else { 0.0 };
+                let semantic = Self::embedding_lite_score(query, t) * 1.5;
+                let score = name_match + desc_match + semantic;
+                if score > 0.0 {
+                    Some((score, t))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored
+            .into_iter()
+            .take(top_k)
+            .map(|(_, t)| t.clone())
+            .collect()
+    }
+
     // -- Publish (legacy) ---------------------------------------------------
 
     pub fn publish(
@@ -544,5 +619,88 @@ mod tests {
     fn test_as_native_tools_empty_registry() {
         let reg = McpRegistry::new();
         assert!(reg.as_native_tools().is_empty());
+    }
+
+    fn sample_def(name: &str, desc: &str) -> McpToolDef {
+        McpToolDef {
+            name: name.into(),
+            description: desc.into(),
+            input_schema: serde_json::json!({"type": "object", "properties": {}}),
+            server_name: "test".into(),
+            transport: McpTransport::Stdio,
+            schema_version: None,
+        }
+    }
+
+    #[test]
+    fn test_embedding_lite_bigram_score() {
+        let def = sample_def("neotrix_judge", "run a program and produce a verdict");
+        let exact = McpRegistry::embedding_lite_score("judge", &def);
+        let unrelated = McpRegistry::embedding_lite_score("email", &def);
+        assert!(exact > unrelated, "semantic score must prefer related terms");
+        assert!(exact > 0.0);
+    }
+
+    #[test]
+    fn test_embedding_lite_identical_string_scores_high() {
+        let def = sample_def("neotrix_search", "search the knowledge base");
+        let score = McpRegistry::embedding_lite_score("search knowledge base", &def);
+        assert!(score > 0.1, "overlapping bigrams must score, got {}", score);
+    }
+
+    #[test]
+    fn test_embedding_lite_empty_grams_zero() {
+        let def = sample_def("a", "b");
+        assert_eq!(McpRegistry::embedding_lite_score("", &def), 0.0);
+        assert_eq!(McpRegistry::embedding_lite_score("xy", &sample_def("", "")), 0.0);
+    }
+
+    #[test]
+    fn test_recommend_tools_rag_small_pool_uses_exact() {
+        let mut reg = McpRegistry::new();
+        reg.register_stdio("test", "cmd", &[], vec![
+            sample_def("neotrix_judge", "run a program and produce a verdict"),
+            sample_def("neotrix_search", "search the knowledge base"),
+        ]);
+        // pool ≤ 128 → 精确路径
+        let rec = reg.recommend_tools_rag("search", 1);
+        assert_eq!(rec.len(), 1);
+        assert_eq!(rec[0].name, "neotrix_search");
+    }
+
+    #[test]
+    fn test_recommend_tools_rag_large_pool_semantic_recall() {
+        let mut reg = McpRegistry::new();
+        // 构造 > 128 工具目录: 近义工具 "evaluate_program" 无精确子串匹配
+        let mut tools: Vec<McpToolDef> = (0..130)
+            .map(|i| sample_def(
+                &format!("tool_{}", i),
+                "unrelated generic description number {i}",
+            ))
+            .collect();
+        tools.push(sample_def("evaluate_program", "judge code and emit verdict"));
+        reg.register_stdio("test", "cmd", &[], tools);
+        assert!(reg.tool_count() > McpRegistry::RAG_POOL_THRESHOLD);
+        // "judge" 查询: 精确子串在 130 无关工具中无命中, 语义检索须召回 evaluate_program
+        let rec = reg.recommend_tools_rag("judge", 3);
+        assert!(
+            rec.iter().any(|t| t.name == "evaluate_program"),
+            "semantic retrieval must recall near-synonym tool in large pool, got {:?}",
+            rec.iter().map(|t| t.name.as_str()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_recommend_tools_rag_pool_boundary() {
+        let mut reg = McpRegistry::new();
+        let tools: Vec<McpToolDef> = (0..128)
+            .map(|i| sample_def(&format!("tool_{}", i), "desc {i}"))
+            .collect();
+        reg.register_stdio("test", "cmd", &[], tools);
+        assert_eq!(reg.tool_count(), 128);
+        // = 阈值 → 仍走精确路径
+        let rec = reg.recommend_tools_rag("tool_5", 2);
+        assert!(!rec.is_empty());
+        assert_eq!(rec[0].name, "tool_5");
     }
 }

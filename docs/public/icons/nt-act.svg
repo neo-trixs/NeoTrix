@@ -1,3 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M13.5 4 L8 13.5 L11.5 13.5 L10.5 20 L16 10.5 L12.5 10.5 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <linearGradient id="gold" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
+  </defs>
+  <path d="M13.5 4 L8 13.5 L11.5 13.5 L10.5 20 L16 10.5 L12.5 10.5 Z" fill="url(#goldFill)"/>
+  <path d="M4.5 6 a2.5 3 0 0 1 4.5 1.2" opacity="0.5"/>
+  <path d="M16 18 a2 2.5 0 0 1 4 0" opacity="0.5"/>
+  <circle cx="5.5" cy="10" r="0.5" fill="#F7E9C8" stroke="none"/>
+  <circle cx="18.5" cy="14.5" r="0.5" fill="#F7E9C8" stroke="none"/>
+  <circle cx="4" cy="17" r="0.35" fill="#C99B3F" stroke="none"/>
 </svg>

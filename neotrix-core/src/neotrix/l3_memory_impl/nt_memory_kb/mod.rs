@@ -1329,6 +1329,18 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         limit: usize,
     ) -> Result<Vec<SearchResult>, String> {
         let results = self.recency_rerank(results);
+        // [T3] 检索精度门控 (2608.14036 absorbed 2026-08-18, R-P79):
+        // 候选池规模越大检索精度崩塌越严重 (5→100 条: 29.6%→3.3%)。
+        // 按 KB 节点计数做池规模信号, 丢弃明显低质候选 — 生产检索路径直接生效。
+        let results = {
+            let pool_size = self
+                .conn
+                .lock()
+                .ok()
+                .and_then(|conn| nt_memory_store::count_nodes(&conn).ok())
+                .unwrap_or(0);
+            nt_memory_search::precision_gate(results, pool_size)
+        };
         let results = self.graph_signal_augment(query, results, limit);
         // A1 时效过滤 (recall absorb, R-P79): 剔除被显式标记为应遗忘
         // (mark_should_forget) 的节点 — "存储系统忘了该忘的", 避免应遗忘的
@@ -2327,8 +2339,8 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         self.kv_list("experience")
     }
 
-    /// 星系卫生代码强制 (T3 生产接线): 校验 consciousness 命名空间的
-    /// 幽灵分支 / 沉寂星辰 / 缺失 hub。由 BackgroundLoop arch_audit 周期调用。
+    /// 星系卫生代码强制 (T3 生产接线): 跨 namespace 校验真实 hub 的
+    /// 幽灵分支 / 沉寂星辰 / 缺失 hub。由 BackgroundLoop 周期调用。
     pub fn galaxy_hygiene_check(&self, config: &nt_memory_galaxy_hygiene::GalaxyHygieneConfig) -> nt_memory_galaxy_hygiene::GalaxyHygieneReport {
         match self.conn.lock() {
             Ok(conn) => nt_memory_galaxy_hygiene::galaxy_hygiene_check(&conn, config),
@@ -2337,6 +2349,28 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                 report.findings.push(format!("[error] KB lock failed: {}", e));
                 report
             }
+        }
+    }
+
+    /// 原生星辰唤醒 (T3 生产接线): 技能激活事件落盘星辰活跃度。
+    pub fn galaxy_wake_star(&self, ns: &str) -> Result<String, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_galaxy_hygiene::galaxy_wake_star(&conn, ns)
+    }
+
+    /// 沉寂星辰扫描: 返回 `(ns, 上次活跃 epoch, invocations)`。
+    pub fn galaxy_wake_scan(&self, staleness_days: u64) -> Vec<(String, Option<u64>, u64)> {
+        match self.conn.lock() {
+            Ok(conn) => nt_memory_galaxy_hygiene::galaxy_wake_scan(&conn, staleness_days),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// 发现真实星系 hub (各技能 namespace 的 key='hub')。
+    pub fn galaxy_list_hubs(&self) -> Vec<(String, serde_json::Value)> {
+        match self.conn.lock() {
+            Ok(conn) => nt_memory_galaxy_hygiene::galaxy_list_hubs(&conn),
+            Err(_) => Vec::new(),
         }
     }
 

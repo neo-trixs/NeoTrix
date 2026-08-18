@@ -363,7 +363,7 @@ pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Resul
         .filter(|p| p.exists())
         .unwrap_or(default_path);
 
-    let limit = (limit.unwrap_or(5000) as usize).clamp(1, 20_000);
+    let limit = limit.unwrap_or(5000).clamp(1, 20_000);
     let filtered = |points: Vec<nt_memory_pack::GeoPoint>, limit: usize| {
         points
             .into_iter()

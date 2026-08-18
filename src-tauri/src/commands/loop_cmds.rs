@@ -137,11 +137,11 @@ impl CronField {
     }
 
     fn matches(&self, dt: &chrono::NaiveDateTime) -> bool {
-        self.minute.contains(&(dt.minute() as u32))
-            && self.hour.contains(&(dt.hour() as u32))
-            && self.day_of_month.contains(&(dt.day() as u32))
-            && self.month.contains(&(dt.month() as u32))
-            && self.day_of_week.contains(&(dt.weekday().num_days_from_sunday() as u32))
+        self.minute.contains(&{ dt.minute() })
+            && self.hour.contains(&{ dt.hour() })
+            && self.day_of_month.contains(&{ dt.day() })
+            && self.month.contains(&{ dt.month() })
+            && self.day_of_week.contains(&{ dt.weekday().num_days_from_sunday() })
     }
 }
 
@@ -675,7 +675,7 @@ pub fn loop_tick() -> Result<Vec<String>, String> {
             }
             if let Some(s) = state.schedules.iter_mut().find(|s| s.id == *id) {
                 s.last_run_at = Some(now_ts());
-                s.next_run_at = calculate_next_run(&cron_expr, now_ts()).ok();
+                s.next_run_at = calculate_next_run(cron_expr, now_ts()).ok();
                 s.run_count += 1;
                 if error.is_some() {
                     s.fail_count += 1;

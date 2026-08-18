@@ -61,21 +61,13 @@ impl Default for CloudRoutineConfig {
 
 // ===== State =====
 
+#[derive(Default)]
 struct RoutinesState {
     routines: Vec<RoutineConfig>,
     runs: Vec<RoutineRun>,
     cloud_config: CloudRoutineConfig,
 }
 
-impl Default for RoutinesState {
-    fn default() -> Self {
-        Self {
-            routines: Vec::new(),
-            runs: Vec::new(),
-            cloud_config: CloudRoutineConfig::default(),
-        }
-    }
-}
 
 static STATE: std::sync::LazyLock<Mutex<RoutinesState>> =
     std::sync::LazyLock::new(|| Mutex::new(RoutinesState::default()));

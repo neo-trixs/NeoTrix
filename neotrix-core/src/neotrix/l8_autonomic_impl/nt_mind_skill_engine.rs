@@ -440,7 +440,87 @@ impl AnchorPromote {
             }
         }
     }
+
+    /// J-Space ship 出站寄存器检查 (jspace.py mode_ship): 出站文本不得泄漏
+    /// 内部寄存器记号 — 内稠密外清洁 (register switch 是总数: 扩写为干净语言
+    /// 才能放出)。返回发现的泄漏, 空 = clean。
+    pub fn register_check(&self, text: &str) -> Vec<String> {
+        let mut findings = Vec::new();
+        if text.is_empty() {
+            return findings;
+        }
+        // 1. inner-register 记号泄漏
+        let leaked: Vec<&str> = INNER_ONLY
+            .iter()
+            .filter(|s| text.contains(**s))
+            .copied()
+            .collect();
+        if !leaked.is_empty() {
+            findings.push(format!(
+                "inner-register notation in outgoing text: {}",
+                leaked.join(" ")
+            ));
+        }
+        // 2. 状态标记泄漏
+        let hot: Vec<&str> = MARKERS
+            .iter()
+            .filter(|m| text.to_lowercase().contains(&m.to_lowercase()))
+            .copied()
+            .collect();
+        if !hot.is_empty() {
+            findings.push(format!("state markers in outgoing text: {}", hot.join(", ")));
+        }
+        // 3. "verified" 未声明 coverage ("verified without stated coverage is
+        //    a mood, not a result")
+        for (n, line) in text.lines().enumerate() {
+            if CLAIM_RE.is_match(line) && !COVERAGE_RE.is_match(line) {
+                findings.push(format!(
+                    "line {}: \"verified\" with no stated coverage",
+                    n + 1
+                ));
+                break;
+            }
+        }
+        // 4. 重复行 / 长字符 run (回环)
+        let lines: Vec<&str> = text.lines().collect();
+        let mut run = 1usize;
+        for pair in lines.windows(2) {
+            let a = pair[0].trim();
+            let b = pair[1].trim();
+            if !a.is_empty() && a == b {
+                run += 1;
+                if run >= 3 {
+                    findings.push("repetition loop: a line repeats three times or more".to_string());
+                    break;
+                }
+            } else {
+                run = 1;
+            }
+        }
+        if REPEAT_RE.is_match(text) {
+            findings.push("repetition loop: a character run of 20 or more".to_string());
+        }
+        findings
+    }
 }
+
+/// J-Space ship 检查常量 (jspace.py mode_ship) — 内部寄存器记号与状态标记。
+/// 出站文本若出现它们, 说明切换 (register switch) 未完成。
+const INNER_ONLY: [&str; 11] = [
+    "⇒", "⟹", "⟸", "∴", "∵", "⊆", "⊇", "∋", "??", "?!", "💀",
+];
+const MARKERS: [&str; 6] = [
+    "GRRR", "GAAAH", "PHEW", "I see meltdown", "DATA DATA", "I'M DROWNING",
+];
+static CLAIM_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"(?i)\b(verified|confirmed|validated|tested|proven)\b").expect("claim regex")
+});
+static COVERAGE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"(?i)(n\s*≤|n\s*<=|coverage|brute force|differential|exhaustive|including empty)").expect("coverage regex")
+});
+static REPEAT_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"([.…\-'\s])\1{20,}").expect("repeat regex")
+});
 
 // ────────────────────────────────────────────────────────────────
 // P6: BookToSkill (book-to-skill 机制输入侧)
@@ -2033,6 +2113,46 @@ pub mod skill_hooks {
             HookResult::ok("skill activation hook processed")
         }
     }
+
+    /// 星辰唤醒钩子 (CSGN Galaxy wake, T3 生产接线): `SkillLoaded` 事件 →
+    /// `galaxy_wake_star` 落盘星辰活跃度。技能名 `-`→`_` 映射 namespace,
+    /// 无星辰身份的技能静默跳过 (如 experience-tree 加密 hub)。
+    pub struct CsgnWakeHook {
+        pub kb: Option<Arc<KnowledgeBase>>,
+    }
+
+    impl crate::neotrix::l8_autonomic_impl::nt_mind_hook::HookAction for CsgnWakeHook {
+        fn name(&self) -> &str {
+            "csgn_wake_hook"
+        }
+
+        fn execute(&self, ctx: &HookContext) -> HookResult {
+            let msg = &ctx.message;
+            let name = msg.strip_prefix("skill:").unwrap_or(msg);
+            if name.is_empty() {
+                return HookResult::ok("csgn_wake: empty skill name");
+            }
+            let ns = if name == "experience-tree" {
+                "experience".to_string()
+            } else {
+                name.replace('-', "_")
+            };
+            match &self.kb {
+                Some(kb) => match kb.galaxy_wake_star(&ns) {
+                    Ok(msg) => HookResult::ok(&msg).with_effect("galaxy_wake"),
+                    Err(e) => {
+                        // 非星辰技能无 hub → 静默跳过, 不报错不阻塞
+                        if e.contains("不存在 hub") || e.contains("非星辰") {
+                            HookResult::ok("csgn_wake: skip (no star hub)")
+                        } else {
+                            HookResult::err(&e)
+                        }
+                    }
+                },
+                None => HookResult::ok("csgn_wake: no KB attached"),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3205,6 +3325,55 @@ category: general
         assert!(ap.maybe_promote(), "Both signal satisfied on first durable call");
         assert_eq!(ap.active_tool_count(), 12);
         assert_eq!(ap.disclosure_savings(), 0.75, "(1 - 3/12)");
+    }
+
+    #[test]
+    fn test_register_check_flags_inner_notation() {
+        let ap = AnchorPromote::default();
+        let findings = ap.register_check("Result: A ⇒ B. Verified by the run.");
+        assert!(
+            findings.iter().any(|f| f.contains("inner-register")),
+            "inner-register notation must leak: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_register_check_flags_state_markers() {
+        let ap = AnchorPromote::default();
+        let findings = ap.register_check("PHEW done. GRRR retry.");
+        assert!(
+            findings.iter().any(|f| f.contains("state markers")),
+            "state markers must leak: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_register_check_flags_verified_without_coverage() {
+        let ap = AnchorPromote::default();
+        let findings = ap.register_check("This is now verified.");
+        assert!(
+            findings.iter().any(|f| f.contains("no stated coverage")),
+            "verified without coverage is a mood: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_register_check_flags_repetition_loop() {
+        let ap = AnchorPromote::default();
+        let findings = ap.register_check("repeat\nrepeat\nrepeat");
+        assert!(
+            findings.iter().any(|f| f.contains("repetition loop")),
+            "repeated line must leak: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn test_register_check_clean_outgoing_holds() {
+        let ap = AnchorPromote::default();
+        let findings = ap.register_check(
+            "The invariant held. Verified by brute force, n <= 6, including empty input.",
+        );
+        assert!(findings.is_empty(), "clean outgoing must hold: {findings:?}");
     }
 
     // ── P6: BookToSkill (book-to-skill 输入侧) ──

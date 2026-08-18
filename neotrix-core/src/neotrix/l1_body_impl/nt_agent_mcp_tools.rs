@@ -41,6 +41,22 @@ pub fn neotrix_mcp_tools() -> Vec<McpToolDef> {
             }, "required": ["action"]}),
             schema_version: None,
         },
+        McpToolDef {
+            name: "neotrix_judge".into(),
+            description: "C2 judge: run a program against test cases and produce verdict (passed/wrong_answer/timeout/runtime_error/compile_error) via the sandbox. Verdict is machine-readable JSON".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["judge".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "runtime": {"type": "string", "enum": ["python3", "node18", "rust", "go", "linux"]},
+                "code": {"type": "string"},
+                "expected": {"type": "string"},
+                "input": {"type": "string"}
+            }, "required": ["runtime", "code", "expected"]}),
+            schema_version: None,
+        },
     ]
 }
 

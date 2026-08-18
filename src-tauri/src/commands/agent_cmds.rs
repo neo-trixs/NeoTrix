@@ -68,7 +68,7 @@ pub async fn agent_reason(app: tauri::AppHandle, req: ReasonRequest) -> ReasonRe
                         "error": "stream timed out",
                         "full": full_output,
                     }));
-                    return ReasonResponse { output: format!("LLM 流超时"), success: false };
+                    return ReasonResponse { output: "LLM 流超时".to_string(), success: false };
                 }
             };
             match next {

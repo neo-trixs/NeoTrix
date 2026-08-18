@@ -1,32 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="520" viewBox="0 0 720 520">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FDFBF5"/>
-      <stop offset="100%" stop-color="#F6EFDD"/>
+      <stop offset="0%" stop-color="#FCFAF3"/>
+      <stop offset="100%" stop-color="#F7F0DE"/>
     </linearGradient>
     <radialGradient id="halo" cx="32%" cy="46%" r="55%">
-      <stop offset="0%" stop-color="#EBD7AC" stop-opacity="0.5"/>
-      <stop offset="42%" stop-color="#E7D2A0" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#E7D2A0" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#EBD9A8" stop-opacity="0.5"/>
+      <stop offset="42%" stop-color="#D9B878" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#D9B878" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="nucleus" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#EBD7AC"/>
-      <stop offset="55%" stop-color="#D6AC58"/>
-      <stop offset="100%" stop-color="#C2933F"/>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
     <linearGradient id="path" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#D6AC58"/>
-      <stop offset="100%" stop-color="#C2933F"/>
+      <stop offset="0%" stop-color="#C99B3F"/>
+      <stop offset="100%" stop-color="#96701F"/>
     </linearGradient>
     <pattern id="lattice" width="54" height="31.18" patternUnits="userSpaceOnUse" patternTransform="scale(1.15)">
       <path d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
-            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.14"/>
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.12"/>
       <path transform="translate(27 15.59)"
             d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
-            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.14"/>
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.12"/>
       <path transform="translate(27 -15.59)"
             d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
-            fill="none" stroke="#D6AC58" stroke-width="0.55" opacity="0.14"/>
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.12"/>
     </pattern>
     <filter id="soft" x="-80%" y="-80%" width="260%" height="260%">
       <feGaussianBlur in="SourceGraphic" stdDeviation="30"/>
@@ -39,41 +44,36 @@
   <rect width="720" height="520" rx="24" fill="url(#bg)"/>
   <rect width="720" height="520" rx="24" fill="url(#halo)"/>
 
-  <!-- HyperCube lattice: lower canvas -->
+  <!-- Galaxy lattice: lower canvas -->
   <rect y="220" width="720" height="300" fill="url(#lattice)" opacity="0.8"/>
 
-  <!-- Outer orbit ring (atmosphere) -->
-  <circle cx="190" cy="235" r="132" fill="none" stroke="#E3CB94" stroke-width="0.9" opacity="0.55"/>
-  <circle cx="190" cy="235" r="100" fill="none" stroke="#EBD7AC" stroke-width="0.7" opacity="0.45"/>
-  <!-- Orbit satellites -->
-  <circle cx="58" cy="235" r="2.5" fill="#D6AC58" opacity="0.8"/>
-  <circle cx="190" cy="367" r="2" fill="#C2933F" opacity="0.7"/>
-  <circle cx="190" cy="103" r="2" fill="#C2933F" opacity="0.7"/>
+  <!-- Stellar system: orbit rings + Qian-hexagram core -->
+  <circle cx="190" cy="235" r="132" fill="none" stroke="#C99B3F" stroke-width="0.8" opacity="0.55"/>
+  <circle cx="190" cy="235" r="100" fill="none" stroke="#EBD9A8" stroke-width="0.6" opacity="0.45"/>
+  <ellipse cx="190" cy="235" rx="118" ry="34" fill="none" stroke="#C99B3F" stroke-width="0.6" opacity="0.4"/>
+  <circle cx="62" cy="235" r="2.5" fill="#C99B3F" opacity="0.8"/>
+  <circle cx="190" cy="365" r="2" fill="#96701F" opacity="0.7"/>
+  <circle cx="190" cy="105" r="2" fill="#96701F" opacity="0.7"/>
 
-  <!-- Polar axis thread -->
-  <line x1="190" y1="70" x2="190" y2="400" stroke="#DCC58F" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.5"/>
-
-  <!-- E8 diamond nucleus (superbody seal) -->
-  <polygon points="190,150 264,235 190,320 116,235" fill="url(#nucleus)" filter="url(#soft)"/>
-  <polygon points="190,150 264,235 190,320 116,235" fill="url(#nucleus)"/>
-  <polygon points="190,166 252,235 190,304 128,235" fill="#FCFAF3" opacity="0.85"/>
-
-  <!-- Hexagram ticks beneath the seal -->
-  <g stroke="#C9A85C" stroke-width="1" opacity="0.55" stroke-linecap="round">
-    <line x1="168" y1="338" x2="212" y2="338"/>
-    <line x1="173" y1="344" x2="207" y2="344"/>
-    <line x1="178" y1="350" x2="202" y2="350"/>
-    <line x1="182" y1="356" x2="198" y2="356"/>
+  <!-- Qian-hexagram stellar seal (three yang lines + glowing core) -->
+  <g stroke="url(#gold)" stroke-width="1.6" stroke-linecap="round">
+    <line x1="150" y1="205" x2="230" y2="205"/>
+    <line x1="150" y1="235" x2="230" y2="235"/>
+    <line x1="150" y1="265" x2="230" y2="265"/>
   </g>
+  <polygon points="190,172 260,235 190,298 120,235" fill="url(#goldFill)" filter="url(#soft)"/>
+  <polygon points="190,172 260,235 190,298 120,235" fill="url(#goldFill)" opacity="0.25"/>
+  <circle cx="190" cy="235" r="18" fill="url(#goldFill)"/>
+  <circle cx="190" cy="235" r="8" fill="#F7E9C8"/>
 
-  <!-- Active reasoning path: emerges from the nucleus -->
+  <!-- Active reasoning path: emerges from the stellar core -->
   <g fill="none" stroke="url(#path)" stroke-width="2.2" opacity="0.9">
     <path d="M264 235 L318 208"/>
     <path d="M318 208 L372 246"/>
     <path d="M372 246 L428 216"/>
     <path d="M428 216 L470 250" stroke-dasharray="4 4" opacity="0.5"/>
   </g>
-  <g fill="url(#nucleus)">
+  <g fill="url(#gold)">
     <polygon points="318,200 334,208 318,216 302,208"/>
     <polygon points="372,238 388,246 372,254 356,246"/>
     <polygon points="428,208 444,216 428,224 412,216"/>
@@ -86,14 +86,14 @@
     <rect x="548" y="82" width="70" height="6" rx="3" fill="#262419" opacity="0.85"/>
     <rect x="548" y="96" width="58" height="5" rx="2.5" fill="#C9C4B4"/>
     <rect x="548" y="108" width="66" height="5" rx="2.5" fill="#E3DCC9"/>
-    <rect x="548" y="120" width="46" height="5" rx="2.5" fill="#F0E3C4"/>
-    <rect x="548" y="132" width="30" height="5" rx="2.5" fill="#D6AC58" opacity="0.6"/>
+    <rect x="548" y="120" width="46" height="5" rx="2.5" fill="#EBD9A8"/>
+    <rect x="548" y="132" width="30" height="5" rx="2.5" fill="#C99B3F" opacity="0.6"/>
   </g>
 
   <g filter="url(#drop)">
     <rect x="546" y="172" width="124" height="72" rx="12" fill="#FDFBF5" stroke="#E3DCC9"/>
-    <polygon points="566,188 578,198 566,208 554,198" fill="#D6AC58" opacity="0.85"/>
-    <polygon points="584,188 596,198 584,208 572,198" fill="#C2933F" opacity="0.7"/>
+    <polygon points="566,188 578,198 566,208 554,198" fill="#C99B3F" opacity="0.85"/>
+    <polygon points="584,188 596,198 584,208 572,198" fill="#96701F" opacity="0.7"/>
     <polygon points="602,188 614,198 602,208 590,198" fill="#A0752E" opacity="0.55"/>
     <rect x="566" y="218" width="80" height="5" rx="2.5" fill="#D8D3C5"/>
     <rect x="566" y="230" width="60" height="5" rx="2.5" fill="#EBE4D2"/>
@@ -101,16 +101,16 @@
 
   <g filter="url(#drop)">
     <rect x="522" y="268" width="150" height="76" rx="12" fill="#FDFBF5" stroke="#E3DCC9"/>
-    <rect x="540" y="284" width="96" height="9" rx="4" fill="url(#nucleus)" opacity="0.75"/>
+    <rect x="540" y="284" width="96" height="9" rx="4" fill="url(#gold)" opacity="0.75"/>
     <rect x="540" y="302" width="70" height="6" rx="3" fill="#C9C4B4"/>
     <rect x="540" y="316" width="84" height="6" rx="3" fill="#D8D3C5"/>
     <rect x="540" y="330" width="56" height="6" rx="3" fill="#EBE4D2"/>
   </g>
 
-  <!-- Bottom status chip: warm ink pill, light gold signal -->
+  <!-- Bottom status chip: warm ink pill, ochre-gold signal -->
   <g filter="url(#drop)">
     <rect x="228" y="452" width="240" height="30" rx="15" fill="#262419"/>
-    <circle cx="250" cy="467" r="4" fill="#D6AC58"/>
+    <circle cx="250" cy="467" r="4" fill="#C99B3F"/>
     <text x="266" y="471" font-family="monospace" font-size="12" fill="#FCFAF3" letter-spacing="1">SUPERBODY · EVOLVING</text>
   </g>
 </svg>

@@ -208,6 +208,38 @@ impl BayesianExperimentDesign {
             .map(|(idx, _)| idx)
     }
 
+    /// RPM candidate ranking (arXiv:2608.13940 "AI Research Preference Models"
+    /// absorbed 2026-08-18): 偏好模型在花执行预算 (GPU 时间) 前, 用廉价评分
+    /// 对候选排序 — 不执行全部候选, 只选"值得"的。inference-only 变体:
+    /// 评分 = IG + 0.5×VoI (候选的判别价值 + 预期信息增益加权)。
+    /// 返回按 RPM 分数降序的候选索引, 长度 ≤ budget。
+    pub fn rpm_rank_candidates(&self, budget: usize) -> Vec<usize> {
+        if budget == 0 || self.experiments.is_empty() {
+            return Vec::new();
+        }
+        let mut ranked: Vec<(f64, usize)> = self
+            .experiments
+            .iter()
+            .enumerate()
+            .map(|(idx, e)| {
+                let ig = e.information_gain.max(0.0);
+                let voi = self.value_of_information(idx).max(0.0);
+                (ig + 0.5 * voi, idx)
+            })
+            .collect();
+        ranked.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        ranked.into_iter().take(budget).map(|(_, idx)| idx).collect()
+    }
+
+    /// rank-then-commit: 预算内先按 RPM 分数排序候选, 只 commit 排序最前的
+    /// 可执行项 — 语义 = "评估候选需花费执行预算, 因此先排序再决定, 而非全执行"。
+    /// budget = 剩余可执行实验数; 返回被选中的实验索引 (None = 预算耗尽/空池)。
+    pub fn rank_then_commit(&self, budget: usize) -> Option<usize> {
+        self.rpm_rank_candidates(budget).into_iter().next()
+    }
+
     /// M-open predictive check: adequacy = posterior > 1/n 的假设占比
     pub fn m_open_predictive_check(&self) -> MOpenCheck {
         let n = self.hypotheses.len();
@@ -390,6 +422,58 @@ mod tests {
             experiments: Vec::new(),
         };
         assert!(empty_pool.select_next_experiment().is_none());
+    }
+
+    #[test]
+    fn test_rpm_rank_candidates_budget_capped_and_ordered() {
+        let mut bed = sample_design(8);
+        // idx3 最高 IG, idx7 次之 — RPM 排序应把 idx3 放最前
+        for (i, e) in bed.experiments.iter_mut().enumerate() {
+            e.information_gain = if i == 3 { 2.0 } else if i == 7 { 1.5 } else { 0.1 + (i as f64) * 0.01 };
+        }
+        let ranked = bed.rpm_rank_candidates(2);
+        assert_eq!(ranked.len(), 2, "budget caps candidate count");
+        assert_eq!(ranked[0], 3, "highest-RPM candidate must rank first");
+        assert_eq!(ranked[1], 7, "second-highest-RPM candidate must rank second");
+        // budget=0 / 空池 → 空
+        assert!(bed.rpm_rank_candidates(0).is_empty());
+        let empty = BayesianExperimentDesign {
+            config: VoIConfig::default(),
+            hypotheses: Vec::new(),
+            experiments: Vec::new(),
+        };
+        assert!(empty.rpm_rank_candidates(5).is_empty());
+    }
+
+    #[test]
+    fn test_rank_then_commit_budget_aware() {
+        let mut bed = sample_design(8);
+        for (i, e) in bed.experiments.iter_mut().enumerate() {
+            e.information_gain = if i == 5 { 3.0 } else { 0.1 };
+        }
+        // 预算 1 → 只 commit 最高 RPM 候选 (idx5)
+        assert_eq!(bed.rank_then_commit(1).unwrap(), 5);
+        // 预算不足 → None
+        let empty = BayesianExperimentDesign {
+            config: VoIConfig::default(),
+            hypotheses: Vec::new(),
+            experiments: Vec::new(),
+        };
+        assert!(empty.rank_then_commit(3).is_none());
+        assert!(bed.rank_then_commit(0).is_none());
+    }
+
+    #[test]
+    fn test_rank_then_commit_saves_budget_versus_select_all() {
+        let mut bed = sample_design(8);
+        for (i, e) in bed.experiments.iter_mut().enumerate() {
+            e.information_gain = if i == 2 { 4.0 } else { 0.01 };
+        }
+        // RPM 在预算 1 内只评估 top-1, 不评估全部 16 候选
+        let committed = bed.rank_then_commit(1).unwrap();
+        assert_eq!(committed, 2);
+        // 与 select_next_experiment (全池评估后取 max) 结果一致, 但成本仅 1 个候选
+        assert_eq!(bed.select_next_experiment().unwrap(), committed);
     }
 
     #[test]

@@ -750,6 +750,12 @@ pub fn show_status() {
         info("Knowledge store:"),
         status["knowledge_store_bytes"].as_i64().unwrap_or(0),
         info("bytes"));
+    let nodes = status["knowledge_nodes"].as_i64().unwrap_or(0);
+    let edges = status["knowledge_edges"].as_i64().unwrap_or(0);
+    println!("│ {}  {:<6} {} / {:<6} {} │",
+        info("KB graph:"),
+        nodes, info("nodes"),
+        edges, info("edges"));
     println!("{}", info("╰─────────────────────────────────────────╯"));
 }
 

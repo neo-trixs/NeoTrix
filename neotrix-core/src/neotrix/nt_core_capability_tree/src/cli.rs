@@ -286,9 +286,14 @@ impl CapabilityCli {
             let content = fs::read_to_string(&self.registry)?;
             let export: crate::registry::RegistryExport = serde_json::from_str(&content)?;
             let mut reg = CapabilityRegistry::new();
+            // 两阶段加载: 先全量注册 (延迟依赖警告, 允许前向声明),
+            // 再统一 validate_dependencies — 消除 JSON 数组顺序导致的误报。
+            reg.set_defer_dep_warnings(true);
             for node in export.nodes {
                 reg.register(node).map_err(|e| format!("Failed to register node: {}", e))?;
             }
+            reg.set_defer_dep_warnings(false);
+            reg.validate_dependencies();
             for (from, to) in export.edges {
                 // 外部消费者容错: 边的端点可能不在注册表中 (如 nt_io_neocodex::build_request 等外部模块)
                 // 这些是外部消费者引用, 非树内依赖, 跳过并警告而非阻塞加载

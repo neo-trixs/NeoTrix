@@ -30,6 +30,7 @@ use crate::cli::commands::perm_cmds::PermCmd;
 use crate::cli::commands::redact_cmds::RedactCmd;
 use crate::cli::commands::profile_cmds::ProfileCmd;
 use crate::cli::commands::sandbox_cmds::SandboxCmd;
+use crate::cli::commands::judge_cmds::JudgeCmd;
 use crate::cli::commands::hypothesis_cmds::HypothesisCmd;
 use crate::cli::commands::evidence_cmds::EvidenceCmd;
 use crate::cli::commands::kanban_cmds::BoardCmd;
@@ -152,6 +153,7 @@ pub fn default_registry() -> CommandRegistry {
 
     // Sandbox
     reg.register(Box::new(SandboxCmd));
+    reg.register(Box::new(JudgeCmd));
 
     // Other
     reg.register(Box::new(ConnectorCmd));

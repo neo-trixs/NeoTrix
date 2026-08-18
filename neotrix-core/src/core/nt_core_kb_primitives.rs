@@ -25,6 +25,19 @@ pub fn is_compressed_value(raw: &str) -> bool {
     raw.as_bytes().starts_with(VALUE_COMPRESSED_MAGIC)
 }
 
+/// 将 kv_store value 列统一为字符串: 兼容 TEXT 与 BLOB (UTF-8) 存储。
+/// BLOB 写入方 (如脚本用 bytes 绑定) 与 TEXT 写入方混存时, 读取必须一致。
+/// 非 UTF-8 / 压缩二进制 → None (上层按无明文处理)。
+fn value_to_str(v: rusqlite::types::Value) -> Option<String> {
+    match v {
+        rusqlite::types::Value::Text(s) => Some(s),
+        rusqlite::types::Value::Blob(b) => String::from_utf8(b).ok(),
+        rusqlite::types::Value::Integer(i) => Some(i.to_string()),
+        rusqlite::types::Value::Real(r) => Some(r.to_string()),
+        rusqlite::types::Value::Null => None,
+    }
+}
+
 pub fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -40,12 +53,17 @@ pub fn kv_get(conn: &Connection, namespace: &str, key: &str) -> Result<Option<St
         .map_err(|e| format!("kv_get prepare: {}", e))?;
     // 区分真实 SQL 错误与"无行"：无行是正常未命中，错误必须向上传播
     // （否则 schema 漂移/DB 损坏会被静默当成"没有保存过状态"）
-    match stmt.query_row(rusqlite::params![namespace, key], |row| row.get::<_, String>(0)) {
+    match stmt.query_row(rusqlite::params![namespace, key], |row| {
+        row.get::<_, rusqlite::types::Value>(0)
+    }) {
         Ok(v) => {
-            if is_compressed_value(&v) {
+            let Some(s) = value_to_str(v) else {
+                return Ok(None); // 非 UTF-8 BLOB: 视为无明文
+            };
+            if is_compressed_value(&s) {
                 Ok(None) // 压缩值: Rust 侧不解码, 视为无明文
             } else {
-                Ok(Some(v))
+                Ok(Some(s))
             }
         }
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -74,22 +92,37 @@ pub fn kv_delete(conn: &Connection, namespace: &str, key: &str) -> Result<bool, 
     Ok(rows > 0)
 }
 
+/// 判断 kv 条目是否存在 (不读 value, 压缩值同样算存在)。
+/// `kv_get` 对压缩值返回 None (无明文), 与"不存在"语义混淆; 星系完整性等
+/// 场景需要区分"行存在但压缩"与"行缺失"。
+pub fn kv_exists(conn: &Connection, namespace: &str, key: &str) -> Result<bool, String> {
+    let mut stmt = conn
+        .prepare("SELECT 1 FROM kv_store WHERE namespace=?1 AND key=?2")
+        .map_err(|e| format!("kv_exists prepare: {}", e))?;
+    match stmt.query_row(rusqlite::params![namespace, key], |_| Ok(())) {
+        Ok(()) => Ok(true),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+        Err(e) => Err(format!("kv_exists query: {}", e)),
+    }
+}
+
 pub fn kv_list(conn: &Connection, namespace: &str) -> Result<Vec<(String, String)>, String> {
     let mut stmt = conn
         .prepare("SELECT key, value FROM kv_store WHERE namespace=?1 ORDER BY key")
         .map_err(|e| format!("kv_list prepare: {}", e))?;
     let rows = stmt
         .query_map(rusqlite::params![namespace], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            Ok((row.get::<_, String>(0)?, row.get::<_, rusqlite::types::Value>(1)?))
         })
         .map_err(|e| format!("kv_list query: {}", e))?;
     let mut results = Vec::new();
     for row in rows {
         let (k, v) = row.map_err(|e| format!("kv_list row: {}", e))?;
-        if is_compressed_value(&v) {
+        let Some(s) = value_to_str(v) else { continue };
+        if is_compressed_value(&s) {
             continue; // 压缩值: Rust 侧不解码, 跳过 (Python 侧负责解压读取)
         }
-        results.push((k, v));
+        results.push((k, s));
     }
     Ok(results)
 }
@@ -509,6 +542,38 @@ mod tests {
         kv_set(&conn, "ns", "k", "v1").unwrap();
         assert_eq!(kv_get(&conn, "ns", "k").unwrap(), Some("v1".to_string()));
         assert_eq!(kv_get(&conn, "ns", "missing").unwrap(), None);
+    }
+
+    #[test]
+    fn test_kv_get_handles_blob_column() {
+        // 回归: 脚本以 bytes 绑定写入 → sqlite 存 BLOB, kv_get 原先报
+        // InvalidColumnType (只读 String), 导致 BLOB 行对 Rust 生产路径不可见。
+        let conn = mem_conn();
+        conn.execute(
+            "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES ('ns','hub',?1,1)",
+            rusqlite::params![b"{\"star_name\": \"T\"}"],
+        )
+        .unwrap();
+        let got = kv_get(&conn, "ns", "hub").unwrap();
+        assert_eq!(got, Some("{\"star_name\": \"T\"}".to_string()));
+        // kv_list 同样兼容
+        let list = kv_list(&conn, "ns").unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].1, "{\"star_name\": \"T\"}");
+    }
+
+    #[test]
+    fn test_kv_exists_sees_compressed_and_blob() {
+        // kv_exists 只查行存在性, 压缩值/NTZ1 同样算存在 (区别于 kv_get 无明文)。
+        let conn = mem_conn();
+        conn.execute(
+            "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES ('exp','hub',?1,1)",
+            rusqlite::params![b"NTZ1\x78\x9c"],
+        )
+        .unwrap();
+        assert!(kv_exists(&conn, "exp", "hub").unwrap(), "压缩值应判存在");
+        assert_eq!(kv_get(&conn, "exp", "hub").unwrap(), None, "压缩值无明文");
+        assert!(!kv_exists(&conn, "exp", "nope").unwrap());
     }
 
     #[test]

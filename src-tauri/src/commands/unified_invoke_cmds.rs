@@ -94,7 +94,7 @@ fn gvec(v: Option<&Value>) -> Vec<String> {
 #[inline]
 #[allow(dead_code)]
 fn gopt_vec(v: Option<&Value>) -> Option<Vec<String>> {
-    if v.map_or(true, |x| x.is_null()) {
+    if v.is_none_or(|x| x.is_null()) {
         None
     } else {
         Some(gvec(v))

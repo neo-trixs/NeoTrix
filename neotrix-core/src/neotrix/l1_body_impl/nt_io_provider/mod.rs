@@ -80,6 +80,7 @@ pub use gateway::{
 pub use circuit_breaker::CircuitBreaker;
 pub use rate_limiter::RateLimiter;
 pub use rate_limiter::TokenBucket;
+pub use rate_limiter::{AdaptivePacer, BrainTier, TieredSemaphore};
 
 // Re-export 账户池 (P7 吸收)
 pub use account_pool::{

@@ -119,7 +119,7 @@ fn collect_rs_files(path: &str) -> Result<Vec<String>, String> {
         if p.extension().and_then(|e| e.to_str()) == Some("rs") {
             files.push(p.to_string_lossy().to_string());
         } else if p.is_dir() {
-            if let Ok(sub) = collect_rs_files(&p.to_string_lossy().to_string()) {
+            if let Ok(sub) = collect_rs_files(p.to_string_lossy().as_ref()) {
                 files.extend(sub);
             }
         }

@@ -6,7 +6,7 @@ use super::SessionInfo;
 
 // 测试时可覆盖数据库路径 (thread-local: 仅影响当前测试线程, 避免并行测试互相干扰)
 thread_local! {
-    static DB_OVERRIDE: std::cell::Cell<Option<PathBuf>> = std::cell::Cell::new(None);
+    static DB_OVERRIDE: std::cell::Cell<Option<PathBuf>> = const { std::cell::Cell::new(None) };
 }
 
 /// 统一数据库路径: ~/.neotrix/desktop.db

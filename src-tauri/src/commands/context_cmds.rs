@@ -8,16 +8,15 @@ use chrono::Utc;
 // ── Enums ──
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CompactionStrategy {
     SlidingWindow,
     SummaryBased,
+    #[default]
     Hybrid,
     Semantic,
 }
 
-impl Default for CompactionStrategy {
-    fn default() -> Self { Self::Hybrid }
-}
 
 impl ToString for CompactionStrategy {
     fn to_string(&self) -> String {
@@ -31,16 +30,15 @@ impl ToString for CompactionStrategy {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CompactionLevel {
     Light,
+    #[default]
     Medium,
     Aggressive,
     Maximum,
 }
 
-impl Default for CompactionLevel {
-    fn default() -> Self { Self::Medium }
-}
 
 impl ToString for CompactionLevel {
     fn to_string(&self) -> String {
@@ -379,7 +377,7 @@ pub fn context_summarize(text: String, max_chars: Option<u32>) -> Result<String,
     if text.len() <= limit {
         return Ok(text);
     }
-    let first_sentence: String = text.split(|c: char| c == '.' || c == '!' || c == '?')
+    let first_sentence: String = text.split(['.', '!', '?'])
         .next()
         .map(|s| s.to_string())
         .unwrap_or_else(|| {
@@ -413,7 +411,7 @@ pub fn context_extract_decisions(text: String) -> Result<Vec<String>, String> {
         "decided", "chose", "selected", "will use", "改用", "决定",
         "opted", "elected", "settled on", "concluded",
     ];
-    let sentences: Vec<&str> = text.split(|c: char| c == '.' || c == '!' || c == '?').collect();
+    let sentences: Vec<&str> = text.split(['.', '!', '?']).collect();
     let mut decisions = Vec::new();
 
     for sentence in &sentences {

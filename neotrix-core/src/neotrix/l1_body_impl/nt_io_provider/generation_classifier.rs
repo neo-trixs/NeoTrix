@@ -107,6 +107,47 @@ pub struct Classification {
     pub confidence: f64,
 }
 
+/// 业务用途归因 (Cumora llm_calls ledger 吸收, llm-ledger.ts) — 每次生成
+/// 必须可归因到一个 purpose, 使「哪个业务目的烧钱最多」可回答。
+/// 新增调用点 REQUIRED 补枚举 — 这是让账本完整的纪律旋钮。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum LlmPurpose {
+    /// 真实主任务 (agent turn / 用户指令)
+    AgentTurn,
+    /// 小脑过滤门 (triage / 前置判断)
+    Triage,
+    /// 摘要 / 压缩
+    Summarization,
+    /// 工具调用 / 结构化输出
+    ToolUse,
+    /// 嵌入 / 检索
+    Embedding,
+    /// 图片生成
+    ImageGen,
+    /// 杂项
+    Utility,
+}
+
+impl LlmPurpose {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::AgentTurn => "agent_turn",
+            Self::Triage => "triage",
+            Self::Summarization => "summarization",
+            Self::ToolUse => "tool_use",
+            Self::Embedding => "embedding",
+            Self::ImageGen => "image_gen",
+            Self::Utility => "utility",
+        }
+    }
+}
+
+impl Default for LlmPurpose {
+    fn default() -> Self {
+        Self::AgentTurn
+    }
+}
+
 /// 一次已打标签的生成记录 — 供 analytics 聚合
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerationRecord {
@@ -117,6 +158,8 @@ pub struct GenerationRecord {
     pub latency_ms: u64,
     pub tokens: u32,
     pub success: bool,
+    /// 业务用途归因 (ledger 维度)
+    pub purpose: LlmPurpose,
 }
 
 impl GenerationRecord {
@@ -128,6 +171,9 @@ impl GenerationRecord {
     }
     pub fn domain_label(&self) -> &'static str {
         self.classification.domain.label()
+    }
+    pub fn purpose_label(&self) -> &'static str {
+        self.purpose.label()
     }
 }
 
@@ -352,6 +398,8 @@ pub struct GenerationAnalytics {
     pub by_complexity: HashMap<String, u64>,
     pub by_domain: HashMap<String, u64>,
     pub by_model: HashMap<String, u64>,
+    /// llm_calls ledger 归因: purpose → 计数 (供「哪个业务目的烧钱最多」)
+    pub by_purpose: HashMap<String, u64>,
 }
 
 impl GenerationAnalytics {
@@ -366,6 +414,7 @@ impl GenerationAnalytics {
         *self.by_complexity.entry(record.complexity_label().to_string()).or_insert(0) += 1;
         *self.by_domain.entry(record.domain_label().to_string()).or_insert(0) += 1;
         *self.by_model.entry(record.model.clone()).or_insert(0) += 1;
+        *self.by_purpose.entry(record.purpose_label().to_string()).or_insert(0) += 1;
     }
 
     /// 指定维度的分布 (label → count), 空样本返回空 map
@@ -375,6 +424,7 @@ impl GenerationAnalytics {
             "complexity" => self.by_complexity.clone(),
             "domain" => self.by_domain.clone(),
             "model" => self.by_model.clone(),
+            "purpose" => self.by_purpose.clone(),
             _ => HashMap::new(),
         }
     }
@@ -458,6 +508,7 @@ mod tests {
             latency_ms: 10,
             tokens: 100,
             success: true,
+            purpose: LlmPurpose::AgentTurn,
         };
         analytics.record(&rec("write a rust function", "fn main() {}"));
         analytics.record(&rec("write a python function", "def main(): pass"));
@@ -467,6 +518,7 @@ mod tests {
         assert_eq!(analytics.distribution("task_type")["extraction"], 1);
         assert_eq!(analytics.dominant_task_type().as_deref(), Some("code"));
         assert_eq!(analytics.distribution("domain")["code"], 2);
+        assert_eq!(analytics.distribution("purpose")["agent_turn"], 3);
     }
 
     #[test]
@@ -483,8 +535,34 @@ mod tests {
             latency_ms: 1,
             tokens: 5,
             success: true,
+            purpose: LlmPurpose::Utility,
         });
         assert_eq!(analytics.by_model["llm7"], 1);
+        assert_eq!(analytics.by_purpose["utility"], 1);
+    }
+
+    #[test]
+    fn test_purpose_attribution() {
+        let mut analytics = GenerationAnalytics::new();
+        let c = GenerationClassifier::new();
+        let rec = |purpose: LlmPurpose| GenerationRecord {
+            model: "m2".into(),
+            classification: c.classify("hi", "ok"),
+            prompt_len: 2,
+            response_len: 2,
+            latency_ms: 1,
+            tokens: 3,
+            success: true,
+            purpose,
+        };
+        analytics.record(&rec(LlmPurpose::AgentTurn));
+        analytics.record(&rec(LlmPurpose::AgentTurn));
+        analytics.record(&rec(LlmPurpose::Triage));
+        analytics.record(&rec(LlmPurpose::Summarization));
+        assert_eq!(analytics.by_purpose["agent_turn"], 2);
+        assert_eq!(analytics.by_purpose["triage"], 1);
+        assert_eq!(analytics.by_purpose["summarization"], 1);
+        assert_eq!(LlmPurpose::Triage.label(), "triage");
     }
 
     #[test]

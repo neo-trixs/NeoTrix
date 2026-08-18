@@ -1085,3 +1085,114 @@ mod tests {
         assert_eq!(ev.recall_boost(), -2.0);
     }
 }
+
+/// 检索精度门控 (arXiv:2608.14036 "Demystifying Agent Skills" absorbed 2026-08-18):
+/// 技能/记忆候选池从 5 条增长到 100 条时, actual-use precision 从 29.6% 崩到 3.3% —
+/// 检索是独立于技能质量的瓶颈。池规模越大, 低分结果被实际使用的概率越低,
+/// 因此按池规模收紧分数阈值, 丢弃明显低质候选, 抑制 precision 崩塌。
+pub fn precision_gate(
+    results: Vec<SearchResult>,
+    pool_size: usize,
+) -> Vec<SearchResult> {
+    if results.is_empty() {
+        return results;
+    }
+    // 池规模阈值: 池越大门槛越高 (对数标度)。pool 5→100 → precision 29.6%→3.3%。
+    // 使用 sqrt(log2(pool+1)) 使阈值在常见池规模 (10-500) 内单调收紧且不会全杀。
+    let log2_pool = (pool_size as f64 + 1.0).log2();
+    let threshold_ratio = (0.25 + 0.10 * log2_pool).min(0.9);
+    let top = results
+        .iter()
+        .map(|r| r.score)
+        .fold(f64::MIN, f64::max);
+    if top <= 0.0 {
+        return results;
+    }
+    let cutoff = top * threshold_ratio;
+    let retained: Vec<SearchResult> = results
+        .into_iter()
+        .filter(|r| r.score >= cutoff)
+        .collect();
+    // 保底: 小池/无低分时不得清空 (precision gate 是软化, 不是硬截断)
+    if retained.is_empty() {
+        vec![]
+    } else {
+        retained
+    }
+}
+
+#[cfg(test)]
+mod precision_gate_tests {
+    use super::*;
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::KnowledgeNode;
+
+    fn node(id: &str) -> KnowledgeNode {
+        KnowledgeNode {
+            id: id.into(),
+            node_type: crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::Concept,
+            title: id.into(),
+            summary: None,
+            content: None,
+            url: None,
+            domain: None,
+            language: "zh".into(),
+            confidence: 0.0,
+            importance: 0.0,
+            created_at: 0,
+            updated_at: 0,
+            access_count: 0,
+            metadata: None,
+            temporal: None,
+            supersedes: None,
+            source_episode: None,
+        }
+    }
+
+    fn hit(id: &str, score: f64) -> SearchResult {
+        SearchResult {
+            node: node(id),
+            score,
+            matched_on: vec![SearchMatchType::Bm25],
+            signals: None,
+        }
+    }
+
+    #[test]
+    fn test_gate_empty_returns_empty() {
+        assert!(precision_gate(vec![], 100).is_empty());
+    }
+
+    #[test]
+    fn test_small_pool_keeps_all() {
+        let results = vec![hit("a", 0.9), hit("b", 0.5)];
+        let gated = precision_gate(results.clone(), 5);
+        assert_eq!(gated.len(), 2);
+    }
+
+    #[test]
+    fn test_large_pool_drops_low_scores() {
+        // pool=200 → log2(201)≈7.65 → ratio≈0.25+0.765=1.01→min(0.9)=0.9
+        // top=1.0 → cutoff=0.9 → 0.5 被丢弃
+        let results = vec![hit("a", 1.0), hit("b", 0.5)];
+        let gated = precision_gate(results, 200);
+        assert_eq!(gated.len(), 1);
+        assert_eq!(gated[0].node.id, "a");
+    }
+
+    #[test]
+    fn test_pool_size_monotonicity() {
+        // 池越大保留的越少
+        let results = vec![hit("a", 1.0), hit("b", 0.8), hit("c", 0.7), hit("d", 0.6)];
+        let small = precision_gate(results.clone(), 10).len();
+        let large = precision_gate(results.clone(), 500).len();
+        assert!(large <= small, "池越大门槛越高");
+    }
+
+    #[test]
+    fn test_gate_preserves_order() {
+        let results = vec![hit("a", 1.0), hit("b", 0.7), hit("c", 0.3)];
+        let gated = precision_gate(results, 100);
+        let ids: Vec<&str> = gated.iter().map(|r| r.node.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b"]);
+    }
+}

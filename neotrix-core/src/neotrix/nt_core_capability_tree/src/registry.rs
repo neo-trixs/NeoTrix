@@ -52,6 +52,10 @@ pub struct CapabilityRegistry {
     /// 经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
     /// 值结构: {domain, capability, action, rationale, signal, promoted_at}
     pub experience_targets: Vec<serde_json::Value>,
+    /// 两阶段加载: 加载期间延迟依赖警告, 全部注册后统一校验 —
+    /// 消除 JSON 数组加载顺序造成的前向声明误报 (requires 可引用后注册节点)。
+    defer_dep_warnings: bool,
+    pending_dep_warnings: Vec<(String, String)>,  // (dependency, consumer)
 }
 
 impl Default for CapabilityRegistry {
@@ -71,7 +75,35 @@ impl CapabilityRegistry {
             dag: petgraph::Graph::new(),
             node_indices: HashMap::new(),
             experience_targets: Vec::new(),
+            defer_dep_warnings: false,
+            pending_dep_warnings: Vec::new(),
         }
+    }
+
+    /// 两阶段加载模式开关 (cli.rs load_registry 调用)。
+    pub fn set_defer_dep_warnings(&mut self, defer: bool) {
+        self.defer_dep_warnings = defer;
+    }
+
+    /// 全部节点注册后统一校验依赖 — 仅报告真实无法解析的 requires。
+    /// 前向声明 (后续节点已注册) 自动消解, 不产生警告。
+    pub fn validate_dependencies(&self) -> Vec<(String, String)> {
+        let mut unresolved = Vec::new();
+        for node in self.nodes.values() {
+            for req in &node.requires {
+                let resolved = self.nodes.contains_key(req) || self.provides_index.contains_key(req);
+                if !resolved {
+                    unresolved.push((req.clone(), node.id.clone()));
+                }
+            }
+        }
+        for (dep, node) in &unresolved {
+            eprintln!(
+                "[capability_tree] WARNING: dependency '{}' not yet registered for node '{}'",
+                dep, node
+            );
+        }
+        unresolved
     }
 
     /// 注册新节点
@@ -122,8 +154,12 @@ impl CapabilityRegistry {
         for req in &node.requires {
             let resolved = self.nodes.contains_key(req) || self.provides_index.contains_key(req);
             if !resolved {
-                // 允许前向声明，但发出警告
-                eprintln!("[capability_tree] WARNING: dependency '{}' not yet registered for node '{}'", req, node.id);
+                // 允许前向声明，但发出警告 (两阶段加载模式: 延迟到 validate_dependencies)
+                if self.defer_dep_warnings {
+                    self.pending_dep_warnings.push((req.clone(), node.id.clone()));
+                } else {
+                    eprintln!("[capability_tree] WARNING: dependency '{}' not yet registered for node '{}'", req, node.id);
+                }
             }
         }
 
@@ -806,6 +842,42 @@ mod tests {
         assert!(reg.dag.find_edge(*from, *to).is_some(), "ID 引用应建 DAG 边");
         // 依赖节点可被 ID 解析 (not yet registered 误报根源)
         assert!(reg.get("nt_core_gwt::mode_router").is_some());
+    }
+
+    /// 两阶段加载 (cli.rs load_registry): defer 模式下前向声明不误报,
+    /// 全部注册后 validate_dependencies 仅报告真实缺失。
+    #[test]
+    fn test_two_phase_load_forward_declaration_no_false_warning() {
+        let mut reg = CapabilityRegistry::new();
+        reg.set_defer_dep_warnings(true);
+        // 消费者先注册 (前向声明依赖后注册节点)
+        let mut consumer = CapabilityNode::new_primitive(
+            "consumer_a".into(), Domain::Core, vec!["a".into()],
+        );
+        consumer.requires = vec!["dep_b".into()];
+        reg.register(consumer).unwrap();
+        // 后注册依赖
+        let dep = CapabilityNode::new_primitive(
+            "dep_b".into(), Domain::Core, vec!["b".into()],
+        );
+        reg.register(dep).unwrap();
+        reg.set_defer_dep_warnings(false);
+        // 前向声明已消解 → 无真实缺失
+        let unresolved = reg.validate_dependencies();
+        assert!(unresolved.is_empty(), "forward-declared dep must resolve: {:?}", unresolved);
+
+        // 真实缺失仍报告
+        let mut reg2 = CapabilityRegistry::new();
+        reg2.set_defer_dep_warnings(true);
+        let mut c2 = CapabilityNode::new_primitive(
+            "consumer_x".into(), Domain::Core, vec!["x".into()],
+        );
+        c2.requires = vec!["never_exists".into()];
+        reg2.register(c2).unwrap();
+        reg2.set_defer_dep_warnings(false);
+        let unresolved2 = reg2.validate_dependencies();
+        assert_eq!(unresolved2.len(), 1, "genuinely missing dep must be reported");
+        assert_eq!(unresolved2[0].0, "never_exists");
     }
 
     /// 多维最优解: deprecated 节点 (gates) 应被避开 — Dijkstra 加权路由。

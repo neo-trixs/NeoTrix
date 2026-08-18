@@ -9,12 +9,13 @@ use super::context_budget::estimate_tokens;
 use super::factory::LlmProviderType;
 use super::free_pool::global_free_pool;
 use super::generation_classifier::{
-    GenerationAnalytics, GenerationClassifier, GenerationRecord,
+    GenerationAnalytics, GenerationClassifier, GenerationRecord, LlmPurpose, TaskType,
 };
 use crate::neotrix::l8_autonomic_impl::nt_mind_benchmark::{OriEvalCase, OriEvalReport, OriEvalSuite};
 use super::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::provider_swap::ProviderSwapManager;
 use super::rate_limiter::RateLimiter;
+use super::rate_limiter::{AdaptivePacer, BrainTier, TieredSemaphore};
 use super::rate_profiles::get_rate_profile;
 use super::types::*;
 use crate::core::nt_core_error_recovery::{
@@ -791,6 +792,12 @@ pub struct GatewayV2 {
     /// P7 账户池 (open-kritt 吸收) — 健康感知 round-robin 选择层:
     /// 每账户并发租约 + 限流检疫 + 冷却自动恢复。
     pub account_pool: Mutex<AccountPool>,
+    /// Cumora 吸收 (COORDINATION.md §3b): 自适应最小调用间隔 —
+    /// 命中 429 翻倍, 连续 5 次成功回落。防 thundering-herd。
+    pub adaptive_pacer: Mutex<AdaptivePacer>,
+    /// Cumora 吸收 (COORDINATION.md §2/§3a): 双脑并发门 —
+    /// big (Frontier/Strong) 与 triage (support) 独立 cap, 防雪崩。
+    pub tiered_semaphore: Mutex<TieredSemaphore>,
 }
 
 impl GatewayV2 {
@@ -817,6 +824,8 @@ impl GatewayV2 {
             generation_analytics: Mutex::new(GenerationAnalytics::new()),
             generation_classification_enabled: false,
             account_pool: Mutex::new(AccountPool::new(AccountPoolConfig::default())),
+            adaptive_pacer: Mutex::new(AdaptivePacer::new(50)),
+            tiered_semaphore: Mutex::new(TieredSemaphore::default()),
         }
     }
 
@@ -917,6 +926,13 @@ impl GatewayV2 {
                 return;
             }
         };
+        // llm_calls ledger 归因: 从分类任务类型推断业务用途 (AgentTurn 兜底)。
+        let purpose = match classification.task_type {
+            TaskType::ToolUse => LlmPurpose::ToolUse,
+            TaskType::Summarization => LlmPurpose::Summarization,
+            TaskType::Extraction => LlmPurpose::ToolUse,
+            _ => LlmPurpose::AgentTurn,
+        };
         let record = GenerationRecord {
             model: format!("{}/{}", provider_name, request.model),
             classification,
@@ -925,6 +941,7 @@ impl GatewayV2 {
             latency_ms: latency_ms as u64,
             tokens,
             success,
+            purpose,
         };
         if let Ok(mut analytics) = self.generation_analytics.lock() {
             analytics.record(&record);
@@ -1640,7 +1657,55 @@ impl GatewayV2 {
         if let Some(m) = stripped {
             req.model = m;
         }
-        provider.complete(&req).await
+        // Cumora 吸收: 双脑并发门 — 按模型 tier 选 big/triage 槽位, 防雪崩。
+        let tier = if crate::neotrix::l1_body_impl::nt_io_provider::agent_routing::ModelTier::parse(&req.model) >= crate::neotrix::l1_body_impl::nt_io_provider::agent_routing::ModelTier::Capable {
+            BrainTier::Big
+        } else {
+            BrainTier::Triage
+        };
+        let gate_wait = {
+            // 自旋等待槽位: guard 在 .await 前即释放, 避免 std MutexGuard 跨 await (future 非 Send)。
+            loop {
+                let acquired = self
+                    .tiered_semaphore
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .try_acquire(tier);
+                if acquired {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+            self.adaptive_pacer
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .gate()
+        };
+        // 自适应间隔: 等待 pacer 允许的下一次调用 (429 后全局放慢)。
+        if gate_wait > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(gate_wait)).await;
+        }
+        let result = provider.complete(&req).await;
+        {
+            self.tiered_semaphore
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .release(tier);
+            let mut pacer = self.adaptive_pacer.lock().unwrap_or_else(|e| e.into_inner());
+            match &result {
+                Ok(_) => pacer.on_ok(),
+                Err(e) => {
+                    let msg = e.to_string();
+                    if is_quota_exhaustion(&msg) || msg.contains("rate limit") || msg.contains("429") {
+                        pacer.on_rate_limited();
+                    } else {
+                        pacer.on_ok();
+                    }
+                }
+            }
+        }
+        let _ = gate_wait;
+        result
     }
 
     /// 单次调用指定 provider — 无 select_best/无重试连打。

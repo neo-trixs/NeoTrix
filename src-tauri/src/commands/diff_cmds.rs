@@ -106,7 +106,7 @@ pub(crate) fn parse_porcelain_changed(out: &str) -> serde_json::Value {
         let path = l[3..].trim().to_string();
         if path.is_empty() { continue; }
         let entry = serde_json::json!({ "status": status.trim(), "path": path });
-        let is_staged = status.chars().next() == Some('M') || status.starts_with("A ") || status.starts_with("D ") || status.starts_with("R ") || status.starts_with("C ");
+        let is_staged = status.starts_with('M') || status.starts_with("A ") || status.starts_with("D ") || status.starts_with("R ") || status.starts_with("C ");
         if status == "??" {
             untracked.push(entry);
         } else if is_staged {
@@ -224,7 +224,7 @@ pub fn cmd_diff_review(pr_title: Option<String>) -> Result<super::review_cmds::R
         diff_text.push_str(&s);
     }
     let title = pr_title.unwrap_or_else(|| "工作区变更".to_string());
-    super::review_cmds::review_diff(diff_text, title).map_err(|e| NeoTrixError::Memory(e))
+    super::review_cmds::review_diff(diff_text, title).map_err(NeoTrixError::Memory)
 }
 
 #[cfg(test)]

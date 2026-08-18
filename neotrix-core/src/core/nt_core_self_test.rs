@@ -243,3 +243,190 @@ impl SelfTest for ConstitutionComplianceTest {
         Ok(())
     }
 }
+
+/// J-Space 时间自省缺口强化 (LessWrong: "Your Agents Are Not Time-Aware",
+/// absorbed 2026-08-18) — 智能体对自身时长无校准: Fable 过度预测 3×/Sol 6×,
+/// 校准依赖带时间戳的 transcript, 去掉时钟文本精度减半。时长自省 =
+/// 自控/可监控性维度。此处为 harness 层提供可观测的 预测 vs 实际 时长漂移。
+#[derive(Debug, Clone)]
+pub struct DurationDriftMonitor {
+    /// 记录 (预测分钟, 实际分钟) 对的容量。
+    capacity: usize,
+    /// 判定漂移的倍数阈值 (实际/预测 > threshold → 漂移)。
+    threshold: f64,
+    samples: std::collections::VecDeque<(f64, f64)>,
+}
+
+impl Default for DurationDriftMonitor {
+    fn default() -> Self {
+        Self {
+            capacity: 32,
+            threshold: 2.0,
+            samples: std::collections::VecDeque::new(),
+        }
+    }
+}
+
+impl DurationDriftMonitor {
+    pub fn new(capacity: usize, threshold: f64) -> Self {
+        Self {
+            capacity: capacity.max(4),
+            threshold,
+            samples: std::collections::VecDeque::with_capacity(capacity.max(4)),
+        }
+    }
+
+    /// 记录一次任务: (预测分钟, 实际分钟)。
+    pub fn record(&mut self, predicted_min: f64, actual_min: f64) {
+        if predicted_min <= 0.0 || actual_min < 0.0 {
+            return;
+        }
+        if self.samples.len() >= self.capacity {
+            self.samples.pop_front();
+        }
+        self.samples.push_back((predicted_min, actual_min));
+    }
+
+    /// 单次样本是否漂移 (实际 > threshold × 预测)。
+    pub fn is_drifted(predicted_min: f64, actual_min: f64, threshold: f64) -> bool {
+        predicted_min > 0.0 && actual_min > predicted_min * threshold
+    }
+
+    /// 窗口内漂移样本数。
+    pub fn drift_count(&self) -> usize {
+        self.samples
+            .iter()
+            .filter(|(p, a)| Self::is_drifted(*p, *a, self.threshold))
+            .count()
+    }
+
+    /// 平均漂移比 (实际/预测), 窗口内实际 > 预测的样本; 无样本返回 None。
+    pub fn mean_drift_ratio(&self) -> Option<f64> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        let ratios: Vec<f64> = self
+            .samples
+            .iter()
+            .map(|(p, a)| a / p)
+            .collect();
+        Some(ratios.iter().sum::<f64>() / ratios.len() as f64)
+    }
+
+    pub fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.samples.is_empty()
+    }
+
+    pub fn threshold(&self) -> f64 {
+        self.threshold
+    }
+}
+
+/// Duration-drift SelfTest — 若窗口内漂移样本占比超 1/3, 报告为自我欺骗信号
+/// (D15 self-deception / 可监控性维度)。生产接线点: growth-cycle 时长自省。
+pub struct DurationDriftTest {
+    pub monitor: DurationDriftMonitor,
+}
+
+impl Default for DurationDriftTest {
+    fn default() -> Self {
+        Self {
+            monitor: DurationDriftMonitor::default(),
+        }
+    }
+}
+
+impl DurationDriftTest {
+    pub fn new(monitor: DurationDriftMonitor) -> Self {
+        Self { monitor }
+    }
+}
+
+impl SelfTest for DurationDriftTest {
+    fn name(&self) -> &str {
+        "duration_drift"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if self.monitor.is_empty() {
+            return Err(vec![
+                "duration_drift: no duration samples recorded — time self-awareness unexercised".into()
+            ]);
+        }
+        let total = self.monitor.len();
+        let drifted = self.monitor.drift_count();
+        if drifted > total / 3 {
+            Err(vec![format!(
+                "duration_drift: {drifted}/{total} samples drifted (actual > {}× predicted) — temporal self-deception",
+                self.monitor.threshold()
+            )])
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod duration_drift_tests {
+    use super::*;
+
+    #[test]
+    fn test_monitor_records_and_counts_drift() {
+        let mut m = DurationDriftMonitor::new(16, 2.0);
+        m.record(10.0, 11.0); // within threshold
+        m.record(10.0, 30.0); // 3× → drifted
+        m.record(5.0, 20.0); // 4× → drifted
+        assert_eq!(m.drift_count(), 2);
+        assert_eq!(m.len(), 3);
+        let ratio = m.mean_drift_ratio().unwrap();
+        assert!(ratio > 2.0);
+    }
+
+    #[test]
+    fn test_monitor_rejects_invalid_samples() {
+        let mut m = DurationDriftMonitor::default();
+        m.record(0.0, 5.0);
+        m.record(-1.0, 5.0);
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn test_is_drifted_boundary() {
+        assert!(!DurationDriftMonitor::is_drifted(10.0, 20.0, 2.0));
+        assert!(DurationDriftMonitor::is_drifted(10.0, 20.1, 2.0));
+        assert!(!DurationDriftMonitor::is_drifted(0.0, 5.0, 2.0));
+    }
+
+    #[test]
+    fn test_selftest_passes_when_calibrated() {
+        let mut m = DurationDriftMonitor::new(16, 2.0);
+        for i in 1..=6 {
+            m.record(i as f64, i as f64 * 1.2);
+        }
+        let t = DurationDriftTest::new(m);
+        assert!(t.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_selftest_fails_when_many_drifted() {
+        let mut m = DurationDriftMonitor::new(16, 2.0);
+        m.record(10.0, 10.0);
+        m.record(10.0, 40.0);
+        m.record(10.0, 45.0);
+        let t = DurationDriftTest::new(m);
+        let result = t.self_test();
+        assert!(result.is_err(), "majority drift must be flagged");
+        let err = result.unwrap_err();
+        assert!(err.iter().any(|f| f.contains("drifted")));
+    }
+
+    #[test]
+    fn test_selftest_fails_when_no_samples() {
+        let t = DurationDriftTest::default();
+        assert!(t.self_test().is_err());
+    }
+}
