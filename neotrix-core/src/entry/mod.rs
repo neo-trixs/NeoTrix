@@ -1121,9 +1121,9 @@ pub fn run_browse(url: &str) {
 }
 
 pub fn run_search(query: &str, count: usize) {
-    use neotrix::neotrix::nt_world_search::WebSearchEngine;
+    use neotrix::neotrix::nt_world_search::UnifiedSearch;
 
-    let engine = WebSearchEngine::default();
+    let engine = UnifiedSearch::new();
     println!("{} Searching for: {}", info("🔍"), query);
     println!();
 
