@@ -178,9 +178,11 @@ fn cmd_backup() {
 
 /// 子命令: status — KB 健康 + 备份 + daemon 状态总览
 fn cmd_status() {
-    use neotrix::neotrix::l8_autonomic_impl::nt_mind_guard::db_healthy;
+    use neotrix::neotrix::l8_autonomic_impl::nt_mind_guard::db_healthy_fast;
     let kb = home_dir().join(".neotrix/knowledge.db");
-    let healthy = db_healthy(&kb);
+    // 用 fast 健康检查 (schema 校验, 毫秒级); db_healthy 的 PRAGMA integrity_check
+    // 对大型库 (28 万边) 全表校验耗时数秒~数十秒, 不适合 status 查询路径。
+    let healthy = db_healthy_fast(&kb);
     println!("╭─ NeoTrix SysOps ─────────────────────────╮");
     println!(
         "│ KB   {}  {}",
