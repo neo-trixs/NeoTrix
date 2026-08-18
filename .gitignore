@@ -72,3 +72,6 @@ src-tauri/frontend/node_modules
 # Test worktrees and nested test artifacts
 neotrix-core/test-worktree-branch/
 neotrix-core/.neotrix/
+
+# Runtime cleanup logs (auto-maintenance dir)
+.cleanup/

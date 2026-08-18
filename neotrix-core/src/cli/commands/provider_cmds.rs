@@ -39,12 +39,13 @@ impl CliCommand for ProviderCmd {
                 let name = args.get(1).map(|s| s.as_str()).unwrap_or("");
                 self.cmd_info(name)
             }
+            "pool" => self.cmd_pool(&args[1..]),
             "challenge" => {
                 let name = args.get(1).map(|s| s.as_str()).unwrap_or("");
                 let task_type = args.get(2).map(|s| s.as_str()).unwrap_or("arithmetic");
                 self.cmd_challenge(name, task_type)
             }
-            _ => CommandOutput::err("Usage:\n  /provider list                  列出所有支持的 provider\n  /provider info <name>           查看 provider 详情\n  /provider challenge <name> [task]  运行 LLM Challenge 基准 (arithmetic|extract|boolean)"),
+            _ => CommandOutput::err("Usage:\n  /provider list                  列出所有支持的 provider\n  /provider info <name>           查看 provider 详情\n  /provider pool <sub>             管理 LLM 代理池 (add|list|remove|reload)\n  /provider challenge <name> [task]  运行 LLM Challenge 基准 (arithmetic|extract|boolean)"),
         }
     }
 }
@@ -144,6 +145,124 @@ impl ProviderCmd {
                 ))
             }
             Err(e) => CommandOutput::err(&format!("LLM Challenge 失败: {}", e)),
+        }
+    }
+
+    // ── LLM 代理池 ──────────────────────────────────────────────
+    // 统一管理第三方 API key 及其模型, 带标签持久化于
+    // ~/.config/neotrix/provider_pool.toml; 启动时经 register_into_gateway
+    // 注册进 GatewayV2 + AccountPool 统一路由/健康/配额。
+    fn cmd_pool(&self, args: &[String]) -> CommandOutput {
+        let sub = args.first().map(|s| s.as_str()).unwrap_or("list");
+        match sub {
+            "list" | "ls" => {
+                let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+                let guard = pool.lock().unwrap_or_else(|e| e.into_inner());
+                CommandOutput::ok(&format!(
+                    "{}\n\n保存于: {}",
+                    guard.describe(),
+                    crate::neotrix::nt_io_provider::provider_pool::ProviderPool::path().display()
+                ))
+            }
+            "add" => self.cmd_pool_add(&args[1..]),
+            "remove" | "rm" => {
+                let label = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if label.is_empty() {
+                    return CommandOutput::err("Usage: /provider pool remove <label>");
+                }
+                let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+                let mut guard = pool.lock().unwrap_or_else(|e| e.into_inner());
+                if guard.remove(label) {
+                    CommandOutput::ok(&format!("已移除池条目: {}", label))
+                } else {
+                    CommandOutput::err(&format!("未找到池条目: {}", label))
+                }
+            }
+            "reload" => {
+                let mut gateway = crate::neotrix::nt_io_provider::create_gateway();
+                let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+                let guard = pool.lock().unwrap_or_else(|e| e.into_inner());
+                let n = guard.register_into_gateway(&mut gateway);
+                CommandOutput::ok(&format!(
+                    "已重新注册 {} 个池条目到 gateway (新进程生效)\n当前池:\n{}",
+                    n, guard.describe()
+                ))
+            }
+            _ => CommandOutput::err(
+                "Usage:\n  /provider pool list                   列出代理池条目\n  /provider pool add <label> --provider <p> --key <k> [--model <m>] [--tag <t>]...\n  /provider pool remove <label>\n  /provider pool reload",
+            ),
+        }
+    }
+
+    /// 解析 --key VALUE / --tag VALUE 形式的参数对。
+    fn parse_kv(args: &[String], key: &str) -> Option<String> {
+        args.iter()
+            .position(|a| a == key)
+            .and_then(|i| args.get(i + 1))
+            .map(|s| s.to_string())
+    }
+
+    fn parse_multi(args: &[String], key: &str) -> Vec<String> {
+        args.iter()
+            .enumerate()
+            .filter(|(_, a)| a.as_str() == key)
+            .filter_map(|(i, _)| args.get(i + 1))
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    fn cmd_pool_add(&self, args: &[String]) -> CommandOutput {
+        let label = args.first().map(|s| s.as_str()).unwrap_or("");
+        if label.is_empty() {
+            return CommandOutput::err(
+                "Usage: /provider pool add <label> --provider <p> --key <k> [--model <m>] [--tag <t>]...",
+            );
+        }
+        let provider = ProviderCmd::parse_kv(args, "--provider").unwrap_or_default();
+        if provider.is_empty() {
+            return CommandOutput::err("缺少 --provider (如 openai / opencode-zen / anthropic)");
+        }
+        if crate::neotrix::nt_io_provider::LlmProviderType::from_name(&provider).is_none() {
+            let known = [
+                "openai", "anthropic", "gemini", "ollama", "groq", "openrouter",
+                "cerebras", "sambanova", "opencode-zen", "deepseek-free",
+                "together-free", "siliconflow", "zai", "llm7", "freetheai",
+            ];
+            return CommandOutput::err(&format!(
+                "未知 provider '{}'。可用: {}",
+                provider,
+                known.join(", ")
+            ));
+        }
+        let key = ProviderCmd::parse_kv(args, "--key").unwrap_or_default();
+        if key.is_empty() {
+            return CommandOutput::err("缺少 --key (明文或 env:NAME 引用)");
+        }
+        let model = ProviderCmd::parse_kv(args, "--model")
+            .unwrap_or_else(|| "auto".to_string());
+        let base_url = ProviderCmd::parse_kv(args, "--base-url");
+        let tags = ProviderCmd::parse_multi(args, "--tag");
+
+        let entry = crate::neotrix::nt_io_provider::PoolEntry {
+            label: label.to_string(),
+            provider: provider.clone(),
+            api_key: key,
+            model: model.clone(),
+            tags,
+            base_url,
+            created_ts: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        };
+        let pool = crate::neotrix::nt_io_provider::global_provider_pool();
+        let mut guard = pool.lock().unwrap_or_else(|e| e.into_inner());
+        match guard.upsert(entry) {
+            Ok(()) => CommandOutput::ok(&format!(
+                "已注册池条目 [{}] ({}/{})\n\n当前池:\n{}",
+                label, provider, model, guard.describe()
+            )),
+            Err(e) => CommandOutput::err(&format!("注册失败: {}", e)),
         }
     }
 }

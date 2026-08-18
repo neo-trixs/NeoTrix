@@ -136,13 +136,26 @@ impl BackgroundLoopHandle {
         for (i, item) in parsed.iter().enumerate() {
             // 提取该 session 对应的 JSON 子片段 (object 时即为全文; list 时取对应元素)
             let sub = extract_session(&content, i).unwrap_or_else(|| content.clone());
+            // CLI `absorb` 参数是**文件路径** (cmd_absorb 内部 read_to_string),
+            // 子 JSON 字符串须先落临时文件 (R-P9/R-P29: 修复直接传 JSON 字符串
+            // 导致 CLI 把 JSON 当路径读 → "No such file" 吸收失败)。
+            let tmp = std::env::temp_dir().join(format!(
+                "neotrix-pending-{}-{}.json",
+                item.session_id.replace(['/', ' '], "_"),
+                i
+            ));
+            if let Err(e) = std::fs::write(&tmp, &sub) {
+                log::warn!("[bg-absorb] write temp session file failed: {e}");
+                all_ok = false;
+                continue;
+            }
 
             log::info!("[bg-absorb] absorbing pending item {} (session {}, cycle {})", i + 1, item.session_id, item.cycle);
             let absorb = tokio::time::timeout(
                 std::time::Duration::from_secs(600),
                 tokio::process::Command::new(&cli)
                     .arg("absorb")
-                    .arg(&sub)
+                    .arg(&tmp)
                     .output(),
             )
             .await;
@@ -169,6 +182,7 @@ impl BackgroundLoopHandle {
                         Ok(Err(e)) => log::warn!("[bg-absorb] close spawn failed: {e}"),
                         Err(_) => log::warn!("[bg-absorb] close timed out"),
                     }
+                    let _ = std::fs::remove_file(&tmp);
                 }
                 Ok(Ok(out)) => {
                     // 吸收失败: 保留 pending 下轮重试 (CLI 内部幂等)

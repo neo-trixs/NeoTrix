@@ -71,6 +71,13 @@ pub fn check_provider_config() -> bool {
             return true;
         }
     }
+    // LLM 代理池模式: provider_pool.toml 已注册第三方 key 时视为已配置。
+    let pool = neotrix::neotrix::nt_io_provider::global_provider_pool();
+    if let Ok(guard) = pool.lock() {
+        if !guard.entries.is_empty() {
+            return true;
+        }
+    }
     false
 }
 
@@ -434,6 +441,29 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
             eprintln!("error: empty prompt");
         }
         return;
+    }
+    // 管理类 slash 命令 (provider pool / provider list / free 等) 直接走命令注册表,
+    // 不经 LLM 推理 — 它们不依赖 provider 且不应被网络/LLM 错误阻塞。
+    let trimmed = prompt.trim_start();
+    if trimmed.starts_with('/') {
+        let reg = neotrix::cli::commands::registry::default_registry();
+        let cmd_name = trimmed.split(' ').next().unwrap_or(trimmed);
+        if reg.find(cmd_name).is_some() {
+            let out = reg.execute(trimmed, None);
+            if json_output {
+                use neotrix::cli::jsonl_stream::JsonlWriter;
+                let mut writer = JsonlWriter::new();
+                if out.success {
+                    writer.emit_message("command", &out.message, None);
+                } else {
+                    writer.emit_error(&out.message, Some("COMMAND_ERROR"), false);
+                }
+                writer.emit_finish(&out.message, 0, 0, if out.success { 0 } else { 1 });
+            } else {
+                println!("{}", out.message);
+            }
+            return;
+        }
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
     let (prompt, mentions) = resolve_mentions(prompt, &cwd);

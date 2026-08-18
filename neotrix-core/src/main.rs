@@ -389,7 +389,19 @@ fn main() {
         || cli.standalone
         || cli.headless;
     if !is_ops_cmd && !entry::check_provider_config() {
-        entry::run_provider_wizard();
+        // 管理类 slash 命令 (provider pool 等) 在未配置 provider 时也须可用 —
+        // 它们本身就是配置 provider 的入口, 不应被 wizard 阻塞。
+        let is_mgmt_prompt = match &cli.command {
+            Some(Commands::Exec { prompt: Some(p), .. })
+            | Some(Commands::Run { prompt: Some(p), .. }) => {
+                let t = p.trim_start();
+                t.starts_with("/provider") || t.starts_with("/free") || t.starts_with("/model")
+            }
+            _ => false,
+        };
+        if !is_mgmt_prompt {
+            entry::run_provider_wizard();
+        }
     }
 
     let cfg = neotrix::config::NeoTrixConfig::load();

@@ -564,7 +564,8 @@ mod judge_core_tests {
         let mut cloud = CloudSandbox::default_local();
         let cases = vec![TestCase::new("t1", "", "ok")];
         let config = JudgeConfig { refine_rounds: 3, ..Default::default() };
-        let mut repair = |_s: &JudgeSummary, _d: &[String]| -> Option<String> { Some("fn main(){}".into()) };
+        // repair 无法修复 → None 提前终止: 不走到 cap, rounds_used=1, 未 solved。
+        let mut repair = |_s: &JudgeSummary, _d: &[String]| -> Option<String> { None };
         let rt = tokio::runtime::Runtime::new().expect("rt");
         let outcome = rt.block_on(refine_loop(
             &mut cloud,
@@ -575,7 +576,7 @@ mod judge_core_tests {
             None,
             &mut repair,
         ));
-        assert_eq!(outcome.rounds_used, 1, "solved on first try must not refine further");
+        assert_eq!(outcome.rounds_used, 1, "repair= None 必须提前终止, 不再 refine");
         assert!(!outcome.solved());
     }
 

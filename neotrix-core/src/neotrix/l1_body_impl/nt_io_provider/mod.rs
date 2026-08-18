@@ -23,6 +23,7 @@ pub mod gemini;
 pub mod ollama;
 pub mod openai;
 pub mod provider_catalog;
+pub mod provider_pool;
 pub mod provider_swap;
 pub mod rate_limiter;
 pub mod rate_profiles;
@@ -66,6 +67,9 @@ pub use free_providers::{
 pub use factory::{
     create_gateway, create_provider, create_provider_from_type, LlmProviderType, ProviderConfig,
 };
+
+// Re-export LLM 代理池
+pub use provider_pool::{global_provider_pool, PoolEntry, ProviderPool};
 
 // Re-export 路由和配置管理
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};

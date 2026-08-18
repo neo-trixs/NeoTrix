@@ -1190,8 +1190,9 @@ mod precision_gate_tests {
 
     #[test]
     fn test_gate_preserves_order() {
+        // pool=10 → log2(11)≈3.46 → ratio≈0.596 → cutoff≈0.596: a/b 保留, c 丢弃, 顺序不变
         let results = vec![hit("a", 1.0), hit("b", 0.7), hit("c", 0.3)];
-        let gated = precision_gate(results, 100);
+        let gated = precision_gate(results, 10);
         let ids: Vec<&str> = gated.iter().map(|r| r.node.id.as_str()).collect();
         assert_eq!(ids, vec!["a", "b"]);
     }

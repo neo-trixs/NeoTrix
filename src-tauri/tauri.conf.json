@@ -45,10 +45,22 @@
       "nsis"
     ],
     "icon": [
-      "icons/icon.png"
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.svg",
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/256x256.png"
     ],
     "macOS": {
       "minimumSystemVersion": "12.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
     },
     "linux": {
       "deb": {
@@ -65,7 +77,7 @@
       "endpoints": [
         "https://releases.neotrix.ai/update/{{target}}/{{current_version}}"
       ],
-      "pubkey": "Z6H2pSM2XdraNQHZwul9ygc9EdWnFmV0DASod02i/R0"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc0Q0IwQURGMDM3MzI4MUUKUldRZUtITUQzd3JMZFArL0xCM1BQZlpsdHlvUXFWaXc2cEk0WElsL21Sc05oaEgzK2x0RGwvQXQK"
     }
   }
 }

@@ -118,4 +118,24 @@ shanhai-all: build-shanhai shanhai-pipeline
 build-shanhai:
 	cargo check -p neotrix --bin neotrix-shanhai-ingest --bin neotrix-shanhai-geo --bin neotrix-shanhai-evidence --bin neotrix-shanhai-all --bin neotrix-shanhai-query
 
-.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai
+# ═══════════════════════════════════════════════════════════
+# 桌面端构建阶梯 (iPolloWork 式: check → build → package:dir → package)
+# ═══════════════════════════════════════════════════════════
+
+# 最快验证门: 前端 tsc+tests + cargo check
+desktop-check:
+	@scripts/build-desktop.sh check
+
+# 前端构建 + cargo build 桌面二进制 (--release 传 RELEASE=1)
+desktop-build:
+	@scripts/build-desktop.sh build $(if $(RELEASE),--release)
+
+# 完整 tauri build --no-bundle → 未打包 .app 本地验证
+desktop-package-dir:
+	@scripts/build-desktop.sh package:dir
+
+# 完整 tauri build → 原生安装包 (dmg/appimage/msi) + updater 签名
+desktop-package:
+	@scripts/build-desktop.sh package
+
+.PHONY: sync-todo watch-todo daemon-todo install-hook install-launchd uninstall-launchd check-conflicts todo-stats shanhai-pipeline shanhai-stats shanhai-mappings shanhai-evidence shanhai-export shanhai-visualize shanhai-all build-shanhai desktop-check desktop-build desktop-package-dir desktop-package

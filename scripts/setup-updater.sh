@@ -17,16 +17,21 @@ if [ -f "$PRIVATE_KEY" ]; then
 else
   echo "[1/4] Generating signing key pair..."
   mkdir -p "$NEOTRIX_DIR"
-  npx @tauri-apps/cli signer generate -w "$PRIVATE_KEY"
+  # tauri signer generate 会同时产出 <key>.pub (真实 minisign 公钥文件)
+  CI=true npx --yes @tauri-apps/cli signer generate -w "$PRIVATE_KEY" --ci
 fi
 
-if [ ! -f "$PUBLIC_KEY" ]; then
-  echo "[2/4] Public key not found at $PUBLIC_KEY"
-  echo "  Copy it from the output above or extract from private key."
-  echo "  Temporary: writing placeholder -- replace with actual public key!"
-  echo "replace-with-your-ed25519-public-key" > "$PUBLIC_KEY"
+# Step 2: Extract the real public key from the signer-generated .pub file
+if [ -f "${PRIVATE_KEY}.pub" ]; then
+  # signer generate 的 .pub 内容即为 tauri.conf.json 需要的 base64 minisign 公钥
+  cp "${PRIVATE_KEY}.pub" "$PUBLIC_KEY"
+  echo "[2/4] Public key extracted from ${PRIVATE_KEY}.pub → $PUBLIC_KEY"
+elif [ -f "$PUBLIC_KEY" ]; then
+  echo "[2/4] Using existing public key: $PUBLIC_KEY"
 else
-  echo "[2/4] Public key exists: $PUBLIC_KEY"
+  echo "[2/4] ERROR: neither ${PRIVATE_KEY}.pub nor $PUBLIC_KEY exists."
+  echo "  Run 'tauri signer generate -w $PRIVATE_KEY' first."
+  exit 1
 fi
 
 PUBKEY=$(cat "$PUBLIC_KEY")
@@ -35,7 +40,7 @@ echo "  Public key: $PUBKEY"
 # Step 3: Update tauri.conf.json
 echo "[3/4] Updating $TAURI_CONF ..."
 if grep -q '"pubkey"' "$TAURI_CONF"; then
-  # Replace existing pubkey value
+  # Replace existing pubkey value (minisign base64 含 '/' '+' '='，用 | 作 sed 定界符)
   if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' "s|\"pubkey\":[[:space:]]*\".*\"|\"pubkey\": \"$PUBKEY\"|" "$TAURI_CONF"
   else

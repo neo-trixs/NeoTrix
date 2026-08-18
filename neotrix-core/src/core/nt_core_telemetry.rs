@@ -1301,17 +1301,18 @@ mod tests {
     #[test]
     fn test_seam_monitor_flags_monotonic_open_growth() {
         let m = SeamMonitor::new(3);
-        // 窗口内 open 持续增加 (新→旧: 3,2,1) — 注意 observe 最新在前
+        // 窗口内 open 持续增加 (新→旧: 3,2,1) — 注意 observe 最新在前。
+        // next 每次变化, 避免命中 stalled 分支 (next 冻结 + verified 未增)。
         for open in [1usize, 2, 3] {
             m.observe(SeamSnapshot {
-                next: "n".into(),
+                next: format!("n{open}"),
                 verified: 1,
                 open,
             });
         }
         let obs = m
             .observe(SeamSnapshot {
-                next: "n".into(),
+                next: "n4".into(),
                 verified: 1,
                 open: 4,
             })

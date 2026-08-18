@@ -1649,10 +1649,23 @@ impl GatewayV2 {
             .get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
+        // 兼容两种注册名: 裸 provider 名 (`llm7`) 与完整目录名 (`llm7/codestral-latest`)。
+        // 完整目录名场景下请求 model 恰等于注册名, `{name}/` strip 会失败,
+        // 需按首段前缀剥离, 否则上游收到 `llm7/codestral-latest` → model_unavailable。
         let stripped = request
             .model
             .strip_prefix(&format!("{}/", name))
-            .map(|m| m.to_string());
+            .map(|m| m.to_string())
+            .or_else(|| {
+                if name.contains('/') {
+                    request
+                        .model
+                        .split_once('/')
+                        .map(|(_, rest)| rest.to_string())
+                } else {
+                    None
+                }
+            });
         let mut req = request.clone();
         if let Some(m) = stripped {
             req.model = m;
@@ -2391,10 +2404,21 @@ impl GatewayV2 {
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀: 请求模型 `llm7/codestral-latest` 传给 provider 时
         // 只传 `codestral-latest` (上游不认识 `llm7/` 前缀, 返回 model_unavailable)。
+        // 兼容裸 provider 名与完整目录注册名 (见 call_provider 注释)。
         let stripped = request
             .model
             .strip_prefix(&format!("{}/", name))
-            .map(|m| m.to_string());
+            .map(|m| m.to_string())
+            .or_else(|| {
+                if name.contains('/') {
+                    request
+                        .model
+                        .split_once('/')
+                        .map(|(_, rest)| rest.to_string())
+                } else {
+                    None
+                }
+            });
         let mut req = request.clone();
         if let Some(m) = stripped {
             req.model = m;
@@ -4278,5 +4302,46 @@ mod provider_reliability_tests {
             0,
             "已释放网关不应被周期 tick 计入"
         );
+    }
+
+    #[test]
+    fn test_call_provider_strips_full_registered_name_prefix() {
+        // 完整目录注册名 (`llm7/codestral-latest`) 被选为候选链第一名时,
+        // `{name}/` strip 会失败 (model 无尾斜杠), 必须按首段剥离,
+        // 否则上游收到 `llm7/codestral-latest` → model_unavailable。
+        let gw = GatewayV2::new();
+        let cases = [
+            // (注册名, 请求 model, 期望传给 provider 的 model)
+            ("llm7", "llm7/codestral-latest", Some("codestral-latest")),
+            (
+                "llm7/codestral-latest",
+                "llm7/codestral-latest",
+                Some("codestral-latest"),
+            ),
+            (
+                "api-airforce/grok-4.1-mini:free",
+                "api-airforce/grok-4.1-mini:free",
+                Some("grok-4.1-mini:free"),
+            ),
+            ("openai", "openai/gpt-4o", Some("gpt-4o")),
+            ("llm7", "gpt-4o", None),
+        ];
+        for (name, model, expected) in cases {
+            let stripped = model
+                .strip_prefix(&format!("{}/", name))
+                .map(|m| m.to_string())
+                .or_else(|| {
+                    if name.contains('/') {
+                        model.split_once('/').map(|(_, rest)| rest.to_string())
+                    } else {
+                        None
+                    }
+                });
+            assert_eq!(
+                stripped.as_deref(),
+                expected,
+                "name={name} model={model} 应正确剥离前缀"
+            );
+        }
     }
 }

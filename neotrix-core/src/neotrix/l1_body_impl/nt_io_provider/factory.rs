@@ -783,6 +783,17 @@ pub async fn create_gateway_async() -> GatewayV2 {
     gateway.compose_sub_grid("open", CommunicationProfile::Open, false);
     log::info!("[gateway] SubGrid auto-composed: anonymous-local / proxied / open");
 
+    // ── 6. LLM 代理池: 注册持久化第三方 key 条目 (provider_pool.toml) ──
+    // 每个条目按 label 注册进 gateway (统一路由/健康/配额) + AccountPool
+    // (并发租约/检疫/自动恢复)。池为空时零开销跳过。
+    let pool = super::provider_pool::global_provider_pool();
+    if let Ok(guard) = pool.lock() {
+        if !guard.entries.is_empty() {
+            let n = guard.register_into_gateway(&mut gateway);
+            log::info!("[gateway] LLM provider pool: {} entries registered", n);
+        }
+    }
+
     gateway
 }
 
@@ -909,5 +920,29 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().expect("tokio");
         let err = rt.block_on(provider.complete(&LlmRequest::new("m", "hi"))).expect_err("must error");
         assert!(err.to_string().contains("blocked"), "got: {err}");
+    }
+
+    #[test]
+    fn test_pool_entry_registers_into_gateway() {
+        // 直接验证 ProviderPool::register_into_gateway 接线:
+        // 池条目按 label 注册为 gateway provider (可被 providers() 发现)。
+        let mut pool = crate::neotrix::nt_io_provider::provider_pool::ProviderPool::default();
+        pool.entries.push(crate::neotrix::nt_io_provider::provider_pool::PoolEntry {
+            label: "t-pool-gw".into(),
+            provider: "openai".into(),
+            api_key: "sk-test-pool".into(),
+            model: "gpt-4o-mini".into(),
+            tags: vec!["test".into()],
+            base_url: None,
+            created_ts: 0,
+        });
+        let mut gateway = GatewayV2::new();
+        let n = pool.register_into_gateway(&mut gateway);
+        assert_eq!(n, 1);
+        let names = gateway.providers();
+        assert!(names.iter().any(|p| p == "t-pool-gw"), "label 应注册为 provider, got {names:?}");
+        // AccountPool 也应登记
+        let acc_pool = gateway.account_pool.lock().expect("lock");
+        assert!(acc_pool.contains("t-pool-gw"));
     }
 }

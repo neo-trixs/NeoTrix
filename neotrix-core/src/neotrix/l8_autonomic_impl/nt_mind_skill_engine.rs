@@ -519,7 +519,7 @@ static COVERAGE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new
     regex::Regex::new(r"(?i)(n\s*≤|n\s*<=|coverage|brute force|differential|exhaustive|including empty)").expect("coverage regex")
 });
 static REPEAT_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-    regex::Regex::new(r"([.…\-'\s])\1{20,}").expect("repeat regex")
+    regex::Regex::new(r"[.…\-'\s]{20,}").expect("repeat regex")
 });
 
 // ────────────────────────────────────────────────────────────────
