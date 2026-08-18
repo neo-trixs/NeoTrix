@@ -27,6 +27,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 
+/// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+
 /// 意识核心快照 — 可序列化的跨会话状态 (标量集合 + 果实记录, 不序列化整树)。
 /// 加载时以快照重建树计数器与已消化果实, 使生长周期跨会话连续。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -900,17 +904,35 @@ impl ConsciousnessCoreHandle {
         report.internal_results = internal_results;
 
         // 外部缺口执行: 每个 External 子任务 → 自动外部求解闭环
-        let conn = open_kb().ok();
+        // 最短路径: 读端 serve_core 接地 (GWT 路由), 写端 absorb_core 吸收经验
+        let kb = KnowledgeBase::open(None).ok();
         let mut closures = Vec::new();
         for alloc in &report.allocations {
             if let AllocationProvider::External { .. } = &alloc.provider {
-                let result = match &conn {
-                    Some(conn) => close_external_gap(conn, &alloc.task, executor, config),
+                let result = match &kb {
+                    Some(kb) => close_external_gap(kb, &alloc.task, executor, config),
                     None => {
                         // 无 KB: 仍走试错循环 (接地为空), 不 panic
                         run_external_closure(&alloc.task, executor, config, &[])
                     }
                 };
+                // 写端吸收: solved 子任务的解决方案 → 经验节点落 KB (最短路径, 幂等按 title+type)
+                if result.solved && !result.solution.is_empty() {
+                    if let Some(kb) = &kb {
+                        let entry = AbsorbEntry {
+                            title: alloc.task.summary.clone(),
+                            summary: Some("意识核心任务解决经验".to_string()),
+                            content: Some(result.solution.clone()),
+                            node_type: "insight".to_string(),
+                            domain: Some("NT-MIND".to_string()),
+                            url: None,
+                            language: Some("zh".to_string()),
+                            importance: Some(0.7),
+                            relations: vec![],
+                        };
+                        let _ = kb.absorb_core(&entry);
+                    }
+                }
                 closures.push(result);
             }
         }
@@ -1219,19 +1241,40 @@ pub fn run_external_closure(
     report
 }
 
-/// 外部缺口全闭环: 获取外部知识 → 摄入 KB → 接地检索 → 试错求解。
+/// 外部缺口全闭环: 获取外部知识 → 摄入 KB → **管道接地 (serve_core)** → 试错求解。
+/// 读端走最短路径管道 (GWT 路由), 不再是裸 search_fts — 意识体与检索统一入口。
 pub fn close_external_gap(
-    conn: &rusqlite::Connection,
+    kb: &KnowledgeBase,
     task: &ConsciousTask,
     executor: &dyn SolutionExecutor,
     config: &ExternalClosureConfig,
 ) -> ExternalClosureReport {
+    // 外部知识摄入 (复用管道 KB 连接)
     let knowledge_acquired = if config.acquire_knowledge {
-        acquire_external_knowledge(conn, task)
+        if let Ok(conn) = kb.conn.lock() {
+            acquire_external_knowledge(&conn, task)
+        } else {
+            0
+        }
     } else {
         0
     };
-    let grounding = retrieve_grounding(conn, task);
+    // 接地: 最短路径管道 serve_core (GWT 意图路由 + 混合检索 + 图溯源)
+    let grounding: Vec<String> = kb
+        .serve_core(&task.summary, 10)
+        .map(|sr| {
+            sr.results
+                .iter()
+                .map(|r| {
+                    format!(
+                        "[{}] {}",
+                        r.node.title,
+                        r.node.summary.as_deref().unwrap_or("")
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let mut report = run_external_closure(task, executor, config, &grounding);
     report.knowledge_acquired = knowledge_acquired;
     report
@@ -1849,6 +1892,18 @@ mod tests {
             // 外部缺口执行报告携带任务摘要
             if let Some(closure) = report.external_closures.first() {
                 assert!(!closure.task_id.is_empty());
+            }
+            // 写端吸收: solved 外部任务经验已落 KB (最短路径 absorb_core → NT-MIND insight)
+            if let Some(closure) = report.external_closures.iter().find(|c| c.solved) {
+                let conn = open_kb().expect("open kb for assert");
+                let n: i64 = conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM nodes WHERE node_type='insight' AND domain='NT-MIND' AND title=?1",
+                        rusqlite::params![closure.summary],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                assert!(n >= 1, "solved 经验应已吸收, title={}", closure.summary);
             }
         });
     }

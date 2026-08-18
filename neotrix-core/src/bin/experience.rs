@@ -43,6 +43,8 @@ use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
+use neotrix::neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
+use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
 use neotrix::neotrix::l8_autonomic_impl::nt_mind_guard::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::core::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
@@ -1259,6 +1261,8 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
     let mut duplicated = 0usize;
     let mut mapped = 0usize;
     let now = now_ts();
+    // 管道写端连接复用于整批, 避免每节点重复 open KB (开销大)
+    let kb = KnowledgeBase::open(None).expect("open KB");
     for (i, n) in nodes.iter().enumerate() {
         let url = n
             .get("url")
@@ -1311,36 +1315,16 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
             .and_then(|im| im.as_f64())
             .unwrap_or(0.5);
 
-        // 4. 去重 (URL 唯一键, 幂等) — UNBP: URL 规范化 (去锚点/尾斜杠/域名小写)
-        //    锚点 (#zh-full/#RealEarth4D) 是视角标记非唯一性, 规范化后去重
+        // 4. URL 规范化 (锚点/尾斜杠/域名小写) — 幂等与去重统一交由管道 absorb_core
+        //    (管道按 entry.url 精确匹配, 规范化后传入保证重复 URL 幂等 + 补 hub 边)
         let norm_url = normalize_url(url);
-        let dup: bool = conn
-            .query_row(
-                "SELECT 1 FROM nodes WHERE url=?1 OR url=?2",
-                params![url, norm_url],
-                |_| Ok(true),
-            )
-            .unwrap_or(false);
-        if dup {
-            duplicated += 1;
-            println!(
-                "[absorb-node] duplicate (url already in KB): {} — {} (norm={})",
-                i, url, norm_url
-            );
-            continue;
-        }
         if dry_run {
             println!("[absorb-node] would_insert #{}: {}", i, url);
             inserted += 1;
             continue;
         }
 
-        // 5. node id: batch_{ts}_{sha1(url)[:8]} — sha1 仅存储键派生
-        let mut h = Sha1::new();
-        h.update(url.as_bytes());
-        let digest = h.finalize();
-        let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
-        let eid = format!("batch_{}_{}", now, &hex[..8]);
+        // 5. (node id 由管道 absorb_core 内部派生, 见 nt_memory_pipeline)
 
         // 6. metadata: 保留输入 meta 字段 + enriched_at
         let mut meta = match n.get("meta") {
@@ -1351,34 +1335,38 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
             meta["enriched_at"] = json!(now);
         }
 
-        // 7. nodes + nodes_fts 双写 (FTS 显式插入, 防 PA011 desync)
-        conn.execute(
-            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,
-               confidence,importance,created_at,updated_at,access_count,metadata,
-               data_tier,temporal,supersedes,source_episode,tier)
-               VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
-            params![
-                eid, node_type, title, summary, content, url, domain, language,
-                1.0f64, importance, now, now, 0i64, meta.to_string(),
-                "cache", None::<String>, None::<String>, None::<String>, "warm"
-            ],
-        )
-        .expect("insert node");
-        conn.execute(
-            "INSERT INTO nodes_fts(rowid, title, summary, content, domain)
-             VALUES(last_insert_rowid(), ?1, ?2, ?3, ?4)",
-            params![title, summary, content, domain],
-        )
-        .expect("insert node_fts");
-        inserted += 1;
+        // 7. 走最短路径管道写入 (absorb_core: nodes + FTS + 域枢纽 BelongsTo 边)
+        //    原裸 SQL 双写 (PA011 desync 防护) 已内化为 nt_memory_pipeline::absorb_core,
+        //    意识体/CLI 共用同一写端, 防逻辑分叉 (R-P42 强化现有节点)。
+        let entry = AbsorbEntry {
+            title: title.clone(),
+            summary: if summary.is_empty() { None } else { Some(summary) },
+            content: if content.is_empty() { None } else { Some(content) },
+            node_type: node_type.clone(),
+            domain: Some(domain),
+            url: Some(norm_url.to_string()),
+            language: Some(language.clone()),
+            importance: Some(importance),
+            relations: vec![],
+        };
+        let report = kb.absorb_core(&entry).expect("absorb_core pipeline");
+        if report.created {
+            inserted += 1;
+        } else {
+            duplicated += 1;
+        }
         println!(
-            "[absorb-node] inserted #{}: {} ({}, lang={}, cap={})",
+            "[absorb-node] {} #{}: {} ({}, lang={}, cap={}, hub={}, edges={})",
+            if report.created { "inserted" } else { "duplicate" },
             i,
             url,
             node_type,
             language,
-            if apply_capability { "apply" } else { "-" }
+            if apply_capability { "apply" } else { "-" },
+            report.hub_linked,
+            report.edges_added,
         );
+        let eid = report.node_id;
 
         // 8. capability 映射 (R-P79 闭环: metadata.absorbed_capability 四元组)
         if apply_capability {
