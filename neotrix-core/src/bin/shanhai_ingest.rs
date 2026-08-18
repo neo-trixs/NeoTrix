@@ -166,7 +166,7 @@ fn absorb_geography_concepts(ingester: &mut ResourceIngester) {
             .with_importance(0.88)
             .with_confidence(0.85)
             .with_tags(vec!["geography", "shanhaijing", "research", "absorbed-2026-07-03"])
-            .with_key_insights(insights.iter().map(|s| *s).collect());
+            .with_key_insights(insights.to_vec());
         let r = ingester.ingest(&desc).expect("Failed to ingest concept");
         println!("  ✅ {} — {}", title, r.node_id);
     }
@@ -213,7 +213,7 @@ fn absorb_global_mappings(ingester: &mut ResourceIngester) {
             .with_importance(0.85)
             .with_confidence(0.75)
             .with_tags(vec!["mapping", "global-geography", "world-circling", "absorbed-2026-07-03"])
-            .with_key_insights(insights.iter().map(|s| *s).collect());
+            .with_key_insights(insights.to_vec());
         let r = ingester.ingest(&desc).expect("Failed to ingest mapping");
         println!("  ✅ {} — {}", title, r.node_id);
     }
@@ -239,7 +239,7 @@ fn absorb_schools_of_thought(ingester: &mut ResourceIngester) {
             .with_importance(0.85)
             .with_confidence(0.85)
             .with_tags(vec!["school-of-thought", "research-methodology", "absorbed-2026-07-03"])
-            .with_key_insights(insights.iter().map(|s| *s).collect());
+            .with_key_insights(insights.to_vec());
         let r = ingester.ingest(&desc).expect("Failed to ingest school");
         println!("  ✅ {} — {}", title, r.node_id);
     }
@@ -298,7 +298,7 @@ fn absorb_mythical_kingdoms(ingester: &mut ResourceIngester) {
             .with_importance(0.78)
             .with_confidence(0.70)
             .with_tags(vec!["mythical-kingdom", "global-mapping", "phonetic", "absorbed-2026-07-03"])
-            .with_key_insights(insights.iter().map(|s| *s).collect());
+            .with_key_insights(insights.to_vec());
         let r = ingester.ingest(&desc).expect("Failed to ingest kingdom");
         println!("  ✅ {} — {}", title, r.node_id);
     }

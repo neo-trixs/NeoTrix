@@ -460,7 +460,7 @@ fn truncate_to_token_budget(text: &str, budget: usize) -> String {
     let mut lo = 0usize;
     let mut hi = text.chars().count();
     while lo < hi {
-        let mid = (lo + hi + 1) / 2;
+        let mid = (lo + hi).div_ceil(2);
         let prefix: String = text.chars().take(mid).collect();
         if estimate_tokens(&prefix) <= budget {
             lo = mid;

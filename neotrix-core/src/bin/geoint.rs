@@ -1,4 +1,5 @@
 //! mil_officer GEOINT Perception Pipeline — Rust 参考实现 (neotrix-geoint)
+#![allow(clippy::unwrap_used)] // CLI bin 自持 JSON 结构, 结构非法即 panic 报错优于静默降级
 //!
 //! 六层架构 (geoint-system.md):
 //!   ①Ingest → ②Detect → ③Fuse → ④Analyze → ⑤Warn → ⑥Decide

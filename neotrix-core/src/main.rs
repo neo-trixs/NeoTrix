@@ -569,7 +569,7 @@ fn main() {
         Some(Commands::Wiki { args }) => {
             use neotrix::cli::commands::types::CliCommand;
             let cmd = neotrix::cli::commands::wiki_cmds::WikiCmd;
-            let out = cmd.execute(&args, None);
+            let out = cmd.execute(args, None);
             if out.success {
                 println!("{}", out.message);
             } else {
@@ -580,7 +580,7 @@ fn main() {
         Some(Commands::Todo { args }) => {
             use neotrix::cli::commands::types::CliCommand;
             let cmd = neotrix::cli::commands::kanban_cmds::BoardCmd;
-            let out = cmd.execute(&args, None);
+            let out = cmd.execute(args, None);
             if out.success {
                 println!("{}", out.message);
             } else {

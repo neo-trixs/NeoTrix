@@ -1425,7 +1425,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         {
             use neotrix::neotrix::nt_io_agents_md::AgentsMdReader;
             let agents_reader = AgentsMdReader::new();
-            if let Ok(rules) = agents_reader.load_project_rules(&std::path::Path::new(".")) {
+            if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
                     println!("{}: {} ({} sections)",
                         info("AGENTS.md"), success("loaded"), rules.sections.len());
@@ -1615,7 +1615,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         {
             use neotrix::neotrix::nt_io_agents_md::AgentsMdReader;
             let agents_reader = AgentsMdReader::new();
-            if let Ok(rules) = agents_reader.load_project_rules(&std::path::Path::new(".")) {
+            if let Ok(rules) = agents_reader.load_project_rules(std::path::Path::new(".")) {
                 if !rules.is_empty() {
                     let sections: Vec<&str> = rules.sections.keys().map(|k| k.as_str()).collect();
                     println!("{}: {} ({}) — {} sections: {}",
@@ -2416,7 +2416,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                         }
                                         out.push_str(&format!("\n[exit {}]", code));
                                         app.push_message_with_model("assistant", out, Some("shell".into()));
-                                        app.status_text = if code == 0 { format!("shell: exit 0") } else { format!("shell: exit {} (非零)", code) };
+                                        app.status_text = if code == 0 { "shell: exit 0".to_string() } else { format!("shell: exit {} (非零)", code) };
                                     }
                                     Err(e) => {
                                         app.push_message("system", format!("[shell 失败] {}", e));
@@ -2547,7 +2547,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                 // 每 3 圈（≈90ms）推进一次 spinner 帧，贴近参考 100ms/帧；
                                 // 无 chunk 时也重绘（借鉴 claude-code-local：沉默≠卡死）。
                                 frame_counter += 1;
-                                if frame_counter % 3 == 0 {
+                                if frame_counter.is_multiple_of(3) {
                                     app.tick_spinner();
                                 }
                                 draw(&mut terminal, &app);
@@ -2729,7 +2729,7 @@ fn handle_slash_tui(
             // 20 格进度条（█ 满格 / ░ 空格）
             let filled = ((pct as usize * 20) / 100).min(20);
             let bar: String = format!("{}{}", "█".repeat(filled), "░".repeat(20 - filled));
-            app.status_text = format!("ctx {}{} {:.1}k / {:.1}k tokens ({pct}%){warn}", bar, if pct >= 100 { "" } else { "" }, used_k, limit_k);
+            app.status_text = format!("ctx {} {:.1}k / {:.1}k tokens ({pct}%){warn}", bar, used_k, limit_k);
             SlashResult::Handled
         }
         "/model" => {
@@ -3076,7 +3076,7 @@ fn copy_to_clipboard(text: &str) -> Result<(), String> {
         if !status.success() {
             return Err(format!("pbcopy 退出码非零: {}", status));
         }
-        return Ok(());
+        Ok(())
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {

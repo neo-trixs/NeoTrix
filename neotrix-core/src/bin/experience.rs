@@ -1,5 +1,6 @@
 //! neotrix-experience — Unified End-of-Conversation Absorption Engine (Rust native,
 //! 生产路径; 历史原型为 Python 版 `absorb_session.py`, 已退役).
+#![allow(clippy::unwrap_used)] // CLI bin 自持 JSON/DB 结构, 结构非法即 panic 报错优于静默降级
 //! 单入口: 每次会话结束时运行 `neotrix-experience absorb <session.json>`
 //!   统一数据层: ~/.neotrix/knowledge.db 的 kv_store, namespace='experience'.
 //!   统一 schema: 每条经验含 {schema_version, type, session_id, cycle, ts, domain,
@@ -1230,6 +1231,7 @@ fn auto_distill_if_over_threshold(conn: &mut Connection, hub: &mut Value) {
 ///   - 去重: SELECT 1 FROM nodes WHERE url=? (URL 为唯一键, 幂等)
 ///   - FTS: 显式 INSERT INTO nodes_fts (非 external-content 表, rebuild 不会拉新数据)
 ///   - capability: --apply-capability 写 metadata.absorbed_capability 四元组 (R-P79 闭环)
+///
 /// node id 派生: batch_{ts}_{sha1(url)[:8]} (sha1 仅作存储键派生, 非安全用途)。
 fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capability: bool) {
     // 1. 读取输入 (文件或 stdin)
@@ -1395,10 +1397,10 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
                     .unwrap_or("");
                 let mapped_at = {
                     // 本地时间 YYYY-MM-DDTHH:MM:SS
-                    let secs = now as i64;
+                    let secs = now;
                     let dt = chrono::DateTime::from_timestamp(secs, 0)
                         .unwrap_or_else(|| {
-                            chrono::DateTime::from_timestamp(0, 0).unwrap()
+                            chrono::DateTime::from_timestamp(0, 0).expect("epoch timestamp 必合法")
                         });
                     let local = dt.with_timezone(&chrono::Local);
                     local.format("%Y-%m-%dT%H:%M:%S").to_string()
@@ -1676,6 +1678,7 @@ struct QueryResult {
     semantic: f64,
 }
 
+#[allow(clippy::too_many_arguments)] // CLI 子命令参数面, 直白优于 struct
 fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>, limit: usize, no_hebb: bool, json: bool, semantic: bool, include_distilled: bool) -> usize {
     ensure_hub(conn);
     // 蒸馏降权: 默认过滤已蒸馏原始条目 (模式已升维), --include-distilled 保留溯源
@@ -1793,7 +1796,7 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
         let (qvec, _) = text_doc_vector(&kw.to_lowercase(), dim, &mut memo);
         if !results.is_empty() {
             // 阶段A: FTS 命中 → 只 refine top-K
-            let k = (limit * 4).min(64).max(8);
+            let k = (limit * 4).clamp(8, 64);
             let mut ranked: Vec<QueryResult> = results.clone();
             ranked.sort_by(|a, b| {
                 b.score
@@ -1838,7 +1841,7 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
             });
         } else {
             // 阶段B: FTS 0 命中 → 全库语义召回, 预算截断 (取 k 条最高 sim), 输出 fused=sim。
-            let k = (limit * 4).min(64).max(8);
+            let k = (limit * 4).clamp(8, 64);
             let mut scored: Vec<(f64, f64, String)> = Vec::new();
             for (key, v) in &cache {
                 let Some(v) = v else { continue };
@@ -2299,7 +2302,7 @@ fn cmd_dedup(conn: &Connection, dry_run: bool) {
 
     let mut to_delete: Vec<String> = Vec::new();
     let mut groups = 0;
-    for (_n, group) in &norm {
+    for group in norm.values() {
         if group.len() < 2 {
             continue;
         }
@@ -2456,7 +2459,7 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
             let r = find(&mut parent, k);
             clusters.entry(r).or_default().push(k.clone());
         }
-        for (_root, cluster) in &clusters {
+        for cluster in clusters.values() {
             if cluster.len() < min_group {
                 continue;
             }
@@ -2903,7 +2906,7 @@ fn cmd_compress(conn: &mut Connection, all: bool) {
 fn cycle_sort_key(c: &str) -> (i64, String) {
     let mut num = String::new();
     let mut suf = c.to_string();
-    for (i, ch) in c.chars().enumerate() {
+    for (i, ch) in c.char_indices() {
         if ch.is_ascii_digit() {
             num.push(ch);
         } else {
@@ -2982,7 +2985,7 @@ fn cmd_gen_index(conn: &Connection, out: &str, limit: usize) {
         .cloned()
         .unwrap_or_default();
     let mut ordered: Vec<String> = cycles.keys().cloned().collect();
-    ordered.sort_by(|a, b| cycle_sort_key(b).cmp(&cycle_sort_key(a)));
+    ordered.sort_by_key(|b| std::cmp::Reverse(cycle_sort_key(b)));
     ordered.truncate(limit);
     let header = format!(
         "# Experience Index (自动生成 — 勿手工编辑)\n\n\
@@ -3240,8 +3243,10 @@ fn cmd_sim(a: &str, b: &str, dim: usize) {
 /// 记忆星系拓扑报告: 全量分支 → VSA 文档向量 (归一化) → 持续同调点云。
 /// 输出 Betti 曲线 (β₀=记忆簇/组件, β₁=环路=反复出现的模式链, β₂=填充四面体≈高密度凸起)
 /// + 积分估计 (Φ 代理) + 持久熵 + 选定尺度下的记忆簇成员 (凸起映射回真实分支)。
+///
 /// 归一化向量欧氏距离: 语义相关 ≈0.4-0.6, 无关 ≈1.0-1.4 → scale_max=0.8 已覆盖相关区。
 /// O(n³) 三角形计数 → max_points 分层采样 (按 domain 均摊) 防爆炸。
+#[allow(clippy::needless_range_loop)] // 矩阵双索引 (dists[i][j]) 迭代器改写不可读
 fn cmd_topology(conn: &Connection, dim: usize, steps: usize, max_points: usize, json: bool) {
     ensure_hub(conn);
     let mut memo: HashMap<String, Vec<f64>> = HashMap::new();
@@ -3400,6 +3405,7 @@ fn l2_norm(v: &[f64]) -> f64 {
     v.iter().map(|x| x * x).sum::<f64>().sqrt()
 }
 
+#[allow(clippy::needless_range_loop)] // 矩阵双索引 (dists[i][j]) 迭代器改写不可读
 fn cloud_distance_matrix(cloud: &PointCloud) -> Vec<Vec<f64>> {
     let n = cloud.n();
     let mut dists = vec![vec![0.0f64; n]; n];

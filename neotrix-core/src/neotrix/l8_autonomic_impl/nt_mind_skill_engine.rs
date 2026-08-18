@@ -306,6 +306,41 @@ pub enum PromoteSignal {
     Both,
 }
 
+/// J-Space 三级门控 pass (j-space: SKILL.md §gate) — 任务分类决定加载多少机制。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TaskPass {
+    /// 一眼可核验的单步任务 — 不加载额外机制, 不暴露工具。
+    Fast,
+    /// 有限多步任务, 一个可交付物 — Minimal 工具集, 只加载相关模块。
+    Full,
+    /// 多阶段/多文件/多轮或需持久状态 — 提升到 Standard 工具集,
+    /// 启用账本 + checkpoint + 恢复。
+    Loop,
+}
+
+impl TaskPass {
+    pub const ALL: [TaskPass; 3] = [TaskPass::Fast, TaskPass::Full, TaskPass::Loop];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            TaskPass::Fast => "fast",
+            TaskPass::Full => "full",
+            TaskPass::Loop => "loop",
+        }
+    }
+
+    /// J-Space: pass 决定披露强度 — fast 零工具, full 保持 Minimal,
+    /// loop 需要 Standard (长程状态必须能带 checkpoint/恢复机制)。
+    pub fn needs_standard(self) -> bool {
+        matches!(self, TaskPass::Loop)
+    }
+
+    /// J-Space 地板: 无法一眼核验的答案就不是 fast。
+    pub fn is_verifiable_in_glance(self) -> bool {
+        matches!(self, TaskPass::Fast)
+    }
+}
+
 /// 锚定-然后-promote 状态机: 先以 Minimal 工具集锚定会话, session 一旦
 /// durable (首个 durable 工具/调用 或 assistant 消息) 即提升到 Standard
 /// 工具集。minimal/standard 预算可配, 披露节省量 = 1 - minimal/standard。
@@ -316,6 +351,8 @@ pub struct AnchorPromote {
     pub promote_on: PromoteSignal,
     pub stage: u8,
     pub durable_calls: usize,
+    /// J-Space pass 分层: 当前任务的推理深度门 (fast/full/loop)。
+    pub pass: TaskPass,
 }
 
 impl Default for AnchorPromote {
@@ -326,6 +363,7 @@ impl Default for AnchorPromote {
             promote_on: PromoteSignal::FirstDurableCall,
             stage: 0,
             durable_calls: 0,
+            pass: TaskPass::Full,
         }
     }
 }
@@ -338,7 +376,15 @@ impl AnchorPromote {
             promote_on,
             stage: 0,
             durable_calls: 0,
+            pass: TaskPass::Full,
         }
+    }
+
+    /// 设置 J-Space pass (fast/full/loop)。切换 pass 是显式交换 — J-Space
+    /// "THE SWAP": 说清换了什么, 而不是悄悄丢。
+    pub fn with_pass(mut self, pass: TaskPass) -> Self {
+        self.pass = pass;
+        self
     }
 
     /// 记录一次 durable 调用/assistant 消息。
@@ -346,18 +392,31 @@ impl AnchorPromote {
         self.durable_calls += 1;
     }
 
-    /// 当前生效的工具预算: stage 0 → minimal, stage >= 1 → standard。
+    /// 当前生效的工具预算。
+    /// J-Space pass 分层: fast 不暴露工具; full 保持 Minimal 锚定;
+    /// loop 直接需要 Standard (长程必须带完整工具 + checkpoint/恢复)。
     pub fn active_tool_count(&self) -> usize {
-        if self.stage == 0 {
-            self.minimal_tools
-        } else {
-            self.standard_tools
+        match self.pass {
+            TaskPass::Fast => 0,
+            TaskPass::Full => {
+                if self.stage == 0 {
+                    self.minimal_tools
+                } else {
+                    self.standard_tools
+                }
+            }
+            TaskPass::Loop => self.standard_tools,
         }
     }
 
     /// 尝试提升: 仅在 stage 0 且 durable 信号满足 (durable_calls >= 1) 时
-    /// 提升到 stage 1。返回阶段是否发生变化。
+    /// 提升到 stage 1。返回阶段是否发生变化。J-Space: loop pass 无需等待
+    /// durable — 长程任务从一开始就是完整披露。
     pub fn maybe_promote(&mut self) -> bool {
+        if self.pass == TaskPass::Loop {
+            self.stage = 1;
+            return true;
+        }
         if self.stage != 0 {
             return false;
         }
@@ -371,9 +430,15 @@ impl AnchorPromote {
 
     /// 披露节省量: Minimal 相对 Standard 省下的工具预算比例, 归一到 [0,1]。
     pub fn disclosure_savings(&self) -> f64 {
-        (1.0 - self.minimal_tools as f64 / self.standard_tools.max(1) as f64)
-            .max(0.0)
-            .min(1.0)
+        match self.pass {
+            TaskPass::Fast => 1.0,
+            TaskPass::Loop => 0.0,
+            TaskPass::Full => {
+                (1.0 - self.minimal_tools as f64 / self.standard_tools.max(1) as f64)
+                    .max(0.0)
+                    .min(1.0)
+            }
+        }
     }
 }
 
@@ -643,7 +708,7 @@ impl std::fmt::Debug for RevertibleEffect {
 
 /// 逆账本: `install_id` → 按加载序记录的逆操作列表。
 /// 卸载以 LIFO (逆加载序) 派生 teardown, 结构上保证 φ(γ) ≃ γ0。
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct InverseLedger {
     entries: HashMap<u64, Vec<RevertibleEffect>>,
     next_id: u64,
@@ -655,12 +720,6 @@ impl std::fmt::Debug for InverseLedger {
             .field("next_id", &self.next_id)
             .field("active_transactions", &self.entries.len())
             .finish()
-    }
-}
-
-impl Default for InverseLedger {
-    fn default() -> Self {
-        Self { entries: HashMap::new(), next_id: 0 }
     }
 }
 
@@ -851,7 +910,7 @@ impl RevertibleEffectsHealer {
         let mut effects = Vec::new();
         for &v in installs {
             let s = state.clone();
-            state.lock().unwrap().push(v);
+            state.lock().map(|mut s| s.push(v)).expect("state lock poisoned");
             effects.push(RevertibleEffect::new(format!("pop_{}", v), move || {
                 let mut s = s.lock().map_err(|e| e.to_string())?;
                 match s.pop() {
@@ -880,7 +939,7 @@ impl RevertibleEffectsHealer {
                 return false;
             }
         }
-        state.lock().unwrap().is_empty()
+        state.lock().map(|s| s.is_empty()).unwrap_or(false)
     }
 }
 
@@ -3041,6 +3100,47 @@ category: general
     fn test_disclosure_savings_is_80_percent() {
         let ap = AnchorPromote::default();
         assert_eq!(ap.disclosure_savings(), 0.8, "(1 - 2/10) = 0.8");
+    }
+
+    // ── J-Space pass 分层 (fast/full/loop 门控) ──
+    #[test]
+    fn test_jspace_pass_default_is_full() {
+        let ap = AnchorPromote::default();
+        assert_eq!(ap.pass, TaskPass::Full);
+        assert_eq!(ap.pass.label(), "full");
+        assert!(!ap.pass.needs_standard());
+        assert!(!ap.pass.is_verifiable_in_glance());
+    }
+
+    #[test]
+    fn test_jspace_fast_pass_keeps_zero_tools() {
+        let mut ap = AnchorPromote::new(2, 10, PromoteSignal::FirstDurableCall).with_pass(TaskPass::Fast);
+        ap.record_call();
+        assert_eq!(ap.active_tool_count(), 0, "fast pass exposes no tools");
+        assert_eq!(ap.disclosure_savings(), 1.0, "fast saves everything");
+        assert!(ap.pass.is_verifiable_in_glance());
+    }
+
+    #[test]
+    fn test_jspace_loop_pass_promotes_immediately() {
+        let mut ap = AnchorPromote::new(2, 10, PromoteSignal::FirstDurableCall)
+            .with_pass(TaskPass::Loop);
+        assert_eq!(ap.active_tool_count(), 10, "loop pass needs full toolset from start");
+        assert!(ap.maybe_promote(), "loop promotes without waiting for durable");
+        assert_eq!(ap.stage, 1);
+        assert_eq!(ap.disclosure_savings(), 0.0, "loop keeps no disclosure savings");
+        assert!(ap.pass.needs_standard());
+    }
+
+    #[test]
+    fn test_jspace_three_pass_labels() {
+        assert_eq!(TaskPass::ALL.len(), 3);
+        assert_eq!(TaskPass::Fast.label(), "fast");
+        assert_eq!(TaskPass::Full.label(), "full");
+        assert_eq!(TaskPass::Loop.label(), "loop");
+        assert!(!TaskPass::Fast.needs_standard());
+        assert!(TaskPass::Loop.needs_standard());
+        assert!(!TaskPass::Full.needs_standard());
     }
 
     #[test]

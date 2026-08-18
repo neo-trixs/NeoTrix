@@ -1,4 +1,5 @@
 //! NT-Pack 性能基准 (手写 std::time::Instant, C3 成熟度)
+#![allow(clippy::unwrap_used)] // 基准工具, 编码失败即 panic 显式报错
 //!
 //! 覆盖: 编码/解码吞吐 + 压缩率 (E5 无压缩 vs E5+zstd)。
 //! 用法: cargo run --release -p neotrix --bin nt_pack_bench [N=10000]

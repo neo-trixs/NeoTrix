@@ -2093,6 +2093,7 @@ impl SchemaSuggestion {
 /// 确定性阶段 (无 LLM 依赖, 可离线):
 ///   - 扫描 xlsx/csv/tsv 文件, 收集全部表头
 ///   - 与 PRICE_TABLE_SCHEMA.column_variants 匹配 → matched / unmatched
+///
 /// 增强阶段 (可选):
 ///   - 若提供 `llm` 回调, 对 unmatched 表头调用, 建议归类到标准列
 ///   - LLM 建议仅进 `suggested_variants` (草稿), 不自动落进生产 schema

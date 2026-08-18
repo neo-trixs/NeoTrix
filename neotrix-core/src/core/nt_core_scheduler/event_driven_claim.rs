@@ -164,7 +164,7 @@ impl EventDrivenClaimPool {
             return None;
         }
         let eligible = self.eligible_tasks();
-        for task_id in eligible {
+        if let Some(task_id) = eligible.into_iter().next() {
             self.seq += 1;
             let claim = Claim::new(
                 &task_id,
@@ -285,7 +285,7 @@ impl EventDrivenClaimPool {
                     if held != 1 {
                         return false;
                     }
-                    if self.worker_of.get(worker).is_none() {
+                    if !self.worker_of.contains_key(worker) {
                         return false;
                     }
                 }
@@ -370,7 +370,7 @@ impl EventDrivenClaimPool {
             .map(|(w, _)| w.clone())
             .collect::<Vec<_>>()
         {
-            if !self.claims.values().any(|c| &c.worker == &worker) {
+            if !self.claims.values().any(|c| c.worker == *worker) {
                 self.workers.insert(worker.clone(), WorkerState::Idle);
                 actions.push(format!("reset claim-less Running worker '{}' to Idle", worker));
             }

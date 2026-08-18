@@ -1344,7 +1344,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                 .collect();
             retained
         };
-        return self._finalize_tail(cache_key, query, freshness_results);
+        self._finalize_tail(cache_key, query, freshness_results)
     }
 
     fn _finalize_tail(

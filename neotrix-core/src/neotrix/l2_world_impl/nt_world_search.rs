@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /// absorption(证据密度) + freshness(时效) + 共识. 强化 nt_world_search 现有节点
 /// (R-P42), 非平行适配器. 算法移植自 taxueseek/argo (MIT), 精简为 Rust 单文件。
 /// 综合 = 0.40·selection + 0.35·absorption + 0.15·freshness + 0.10·引擎分
-
+///
 /// A reusable web search tool wrapping the unified ordered-backend router.
 /// Provides structured-text results suitable for LLM context injection.
 /// R-P79 接线: 作为统一搜索表面被 agent / CLI / tool 消费 (非死代码)。
@@ -426,7 +426,7 @@ fn score_freshness(title: &str, snippet: &str, url: &str) -> f64 {
     use chrono::Datelike;
     let now = chrono::Utc::now().year() as f64;
     let combined = format!("{} {} {}", title, snippet, url);
-    let year_re = regex::Regex::new(r"(20\d{2})").unwrap();
+    let year_re = regex::Regex::new(r"(20\d{2})").expect("静态年份正则必合法");
     let years: Vec<f64> = year_re
         .captures_iter(&combined)
         .map(|c| c[1].parse::<f64>().unwrap_or(0.0))
@@ -437,9 +437,9 @@ fn score_freshness(title: &str, snippet: &str, url: &str) -> f64 {
     }
     let recent: Vec<f64> = years.iter().filter(|y| **y >= now - 1.0).cloned().collect();
     let year = if recent.is_empty() {
-        *years.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(&now)
+        *years.iter().max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(&now)
     } else {
-        *recent.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(&now)
+        *recent.iter().max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(&now)
     };
     let age = now - year;
     if age <= 1.0 { 0.9 }
@@ -887,7 +887,7 @@ pub fn validate_site_learning(l: &SiteLearning) -> bool {
         return false;
     }
     let d = raw.trim_end_matches('.');
-    if d.contains('*') && !(d.starts_with("*.") && !d[2..].contains('*')) {
+    if d.contains('*') && (!d.starts_with("*.") || d[2..].contains('*')) {
         return false;
     }
     !l.name.trim().is_empty() && !l.category.trim().is_empty()

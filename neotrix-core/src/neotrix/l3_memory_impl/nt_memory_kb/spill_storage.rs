@@ -232,7 +232,7 @@ impl crate::core::nt_core_self_test::SelfTest for SpillStorageHealer {
             threshold_bytes: 8,
             backend: "memory",
         });
-        store.store_with_key("healthy", &vec![b'x'; 16]);
+        store.store_with_key("healthy", &[b'x'; 16]);
         store
             .blobs
             .write()
