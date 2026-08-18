@@ -30,7 +30,7 @@ impl FetchMethod for DumpDomFetcher {
     fn fetch(&self, url: &str, budget_ms: u32) -> Result<String, String> {
         let budget = format!("--virtual-time-budget={}", budget_ms);
         let dir = format!("--user-data-dir={}", profile_dir().display());
-        let out = std::process::Command::new(chrome_path())
+        let mut child = std::process::Command::new(chrome_path())
             .arg("--headless=new").arg("--disable-gpu").arg("--no-sandbox")
             .arg("--disable-dev-shm-usage").arg("--disable-blink-features=AutomationControlled")
             .arg("--no-first-run").arg("--disable-background-networking")
@@ -39,10 +39,32 @@ impl FetchMethod for DumpDomFetcher {
             .arg("--disable-component-update")
             .arg("--disable-client-side-phishing-detection")
             .arg(&budget).arg("--dump-dom").arg(url).arg(&dir)
-            .output().map_err(|e| format!("Chrome: {}", e))?;
-        let html = String::from_utf8_lossy(&out.stdout).to_string();
-        if html.len() < 80 { return Err("Empty page".into()); }
-        Ok(Self::clean(&html))
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn().map_err(|e| format!("Chrome: {}", e))?;
+        // 带 deadline 轮询, 避免 Chrome hang 时 browse 命令无限卡死 (R-P38 超时纪律)
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(budget_ms as u64 + 3000);
+        loop {
+            match child.try_wait().map_err(|e| format!("Chrome wait: {}", e))? {
+                Some(status) => {
+                    let mut stdout = String::new();
+                    use std::io::Read;
+                    let _ = child.stdout.take().and_then(|mut o| o.read_to_string(&mut stdout).ok());
+                    if !status.success() { return Err(format!("Chrome exit {}", status.code().unwrap_or(-1))); }
+                    let html = stdout;
+                    if html.len() < 80 { return Err("Empty page".into()); }
+                    return Ok(Self::clean(&html));
+                }
+                None => {
+                    if std::time::Instant::now() >= deadline {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(format!("Chrome timed out after {}ms", budget_ms));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                }
+            }
+        }
     }
 }
 
@@ -92,7 +114,9 @@ impl BrowserSession {
     pub fn fetch(&self, url: &str) -> Result<String, String> {
         std::thread::sleep(Duration::from_millis(200));
         let http = self.fetch_http(url);
-        match http { Ok(ref t) if t.len() > 500 => return Ok(t.clone()), _ => {} }
+        // HTTP 成功即返回 (页面短也可能是有效内容, 如 example.com <500 chars);
+        // 仅 HTTP 失败时才降级到 fetchers (Chrome headless)。
+        match http { Ok(ref t) if !t.is_empty() => return Ok(t.clone()), _ => {} }
         for fetcher in &self.fetchers {
             match fetcher.fetch(url, 15000) {
                 Ok(t) if t.len() > 100 => return Ok(t),
