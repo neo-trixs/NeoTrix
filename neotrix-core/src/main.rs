@@ -450,7 +450,14 @@ fn main() {
         Some(Commands::Serve { addr }) => run_background_daemon(addr, &cli.profile),
         Some(Commands::Reason { prompt, file, pipe, format, stream }) => {
             let resolved = resolve_prompt(prompt.as_deref(), file.as_deref(), *pipe);
-            run_one_shot(&resolved, format.as_deref(), &cli.profile, *stream);
+            if cli.standalone {
+                // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络 (无 LLM 环境可用)
+                use neotrix::neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
+                let mut engine = StandaloneEngine::new(cli.stage.min(18));
+                println!("{}", engine.reason(&resolved));
+            } else {
+                run_one_shot(&resolved, format.as_deref(), &cli.profile, *stream);
+            }
         }
         Some(Commands::Bench { category }) => run_benchmark(category.as_deref()),
         Some(Commands::Status) => show_status(),
