@@ -1,22 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round">
   <defs>
     <linearGradient id="gold" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F7E9C8"/>
-      <stop offset="0.5" stop-color="#E7C77A"/>
-      <stop offset="1" stop-color="#C2933F"/>
+      <stop offset="0" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </linearGradient>
     <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
-      <stop offset="0" stop-color="#FBF3DC"/>
-      <stop offset="0.5" stop-color="#E7D2A0"/>
-      <stop offset="1" stop-color="#C2933F"/>
+      <stop offset="0" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </radialGradient>
   </defs>
-  <polygon points="4,16 12,20 20,16 12,12" fill="url(#goldFill)" fill-opacity="0.4"/>
+  <polygon points="4,16 12,20 20,16 12,12" fill="url(#goldFill)" fill-opacity="0.35"/>
   <polygon points="12,12 20,16 20,8 12,4"/>
   <polygon points="4,16 12,12 12,4 4,8"/>
-  <line x1="4" y1="8" x2="12" y2="12" opacity="0.5"/>
-  <line x1="20" y1="8" x2="12" y2="12" opacity="0.5"/>
-  <circle cx="12" cy="12" r="0.7" fill="#F4E6BF" stroke="none"/>
-  <circle cx="4" cy="6" r="0.5" fill="#E7D2A0" stroke="none"/>
-  <circle cx="20" cy="18" r="0.5" fill="#E7D2A0" stroke="none"/>
+  <line x1="4" y1="8" x2="12" y2="12" opacity="0.45"/>
+  <line x1="20" y1="8" x2="12" y2="12" opacity="0.45"/>
+  <circle cx="12" cy="12" r="0.8" fill="#F7E9C8" stroke="none"/>
+  <circle cx="4" cy="6" r="0.45" fill="#F7E9C8" stroke="none"/>
+  <circle cx="20" cy="18" r="0.45" fill="#F7E9C8" stroke="none"/>
+  <circle cx="5.5" cy="18.5" r="0.35" fill="#C99B3F" stroke="none"/>
 </svg>

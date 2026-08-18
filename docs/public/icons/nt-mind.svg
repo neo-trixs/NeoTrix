@@ -1,17 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="url(#gold)" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round">
   <defs>
     <linearGradient id="gold" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#F7E9C8"/>
-      <stop offset="0.5" stop-color="#E7C77A"/>
-      <stop offset="1" stop-color="#C2933F"/>
+      <stop offset="0" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </linearGradient>
     <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
-      <stop offset="0" stop-color="#FBF3DC"/>
-      <stop offset="0.5" stop-color="#E7D2A0"/>
-      <stop offset="1" stop-color="#C2933F"/>
+      <stop offset="0" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </radialGradient>
   </defs>
-  <path d="M12 12 a1.2 1.2 0 0 1 -1.2 1.2 a2.2 2.2 0 0 1 -2.2 -2.2 a3.2 3.2 0 0 1 3.2 -3.2 a4.2 4.2 0 0 1 4.2 4.2"/>
+  <path d="M12 12 a1.2 1.2 0 0 1 -1.2 1.2 a2.2 2.2 0 0 1 -2.2 -2.2 a3.2 3.2 0 0 1 3.2 -3.2 a4.2 4.2 0 0 1 4.2 4.2" fill="url(#goldFill)" fill-opacity="0.25"/>
   <path d="M10.5 20 L13.5 20" opacity="0.6"/>
-  <circle cx="12" cy="12" r="0.6" fill="#F4E6BF" stroke="none"/>
+  <circle cx="12" cy="12" r="0.7" fill="#F7E9C8" stroke="none"/>
+  <circle cx="5" cy="7.5" r="0.5" fill="#F7E9C8" stroke="none"/>
+  <circle cx="19.5" cy="15" r="0.5" fill="#F7E9C8" stroke="none"/>
+  <circle cx="5.5" cy="18" r="0.35" fill="#C99B3F" stroke="none"/>
 </svg>

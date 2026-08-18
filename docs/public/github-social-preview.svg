@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCFAF3"/>
+      <stop offset="55%" stop-color="#F7F0DE"/>
+      <stop offset="100%" stop-color="#FBF7EA"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="30%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#EBD9A8" stop-opacity="0.5"/>
+      <stop offset="45%" stop-color="#D9B878" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#D9B878" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
+    <pattern id="lattice" width="54" height="31.18" patternUnits="userSpaceOnUse" patternTransform="scale(2)">
+      <path d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.1"/>
+      <path transform="translate(27 15.59)"
+            d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.1"/>
+      <path transform="translate(27 -15.59)"
+            d="M 18 0 L 9 15.59 L -9 15.59 L -18 0 L -9 -15.59 L 9 -15.59 Z"
+            fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.1"/>
+    </pattern>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#halo)"/>
+  <rect y="400" width="1200" height="230" fill="url(#lattice)" opacity="0.7"/>
+
+  <!-- Galaxy orbit rings -->
+  <circle cx="340" cy="315" r="210" fill="none" stroke="#C99B3F" stroke-width="1.2" opacity="0.55"/>
+  <circle cx="340" cy="315" r="160" fill="none" stroke="#EBD9A8" stroke-width="0.9" opacity="0.45"/>
+  <ellipse cx="340" cy="315" rx="190" ry="55" fill="none" stroke="#C99B3F" stroke-width="0.8" opacity="0.4"/>
+  <circle cx="135" cy="315" r="4" fill="#C99B3F"/>
+  <circle cx="340" cy="525" r="3.5" fill="#96701F"/>
+  <circle cx="340" cy="105" r="3.5" fill="#96701F"/>
+
+  <!-- Qian-hexagram stellar core -->
+  <g stroke="url(#gold)" stroke-width="3" stroke-linecap="round">
+    <line x1="268" y1="285" x2="412" y2="285"/>
+    <line x1="268" y1="315" x2="412" y2="315"/>
+    <line x1="268" y1="345" x2="412" y2="345"/>
+  </g>
+  <polygon points="340,215 460,315 340,415 220,315" fill="url(#goldFill)" filter="url(#glow)" opacity="0.4"/>
+  <circle cx="340" cy="315" r="30" fill="url(#goldFill)"/>
+  <circle cx="340" cy="315" r="13" fill="#F7E9C8"/>
+
+  <!-- Title block -->
+  <text x="520" y="270" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="700" letter-spacing="4" fill="#262419">Neo—<tspan fill="#96701F">TRIX</tspan></text>
+  <text x="522" y="326" font-family="Georgia, serif" font-size="24" font-style="italic" fill="#8F8666">AI-Native Developer Toolkit · VSA HyperCube · GWT Attention</text>
+
+  <!-- Stats -->
+  <text x="522" y="380" font-family="monospace" font-size="16" fill="#A39A78" letter-spacing="1.5">474K+ LOC · 8,771 tests · 0 unsafe · 7 domains · C5 self-evolving</text>
+
+  <!-- Stardust -->
+  <circle cx="880" cy="150" r="2.5" fill="#EBD9A8"/>
+  <circle cx="940" cy="200" r="2" fill="#D9B878"/>
+  <circle cx="1000" cy="170" r="2.5" fill="#C99B3F"/>
+  <circle cx="1060" cy="230" r="2" fill="#96701F"/>
+  <circle cx="920" cy="430" r="2" fill="#C99B3F"/>
+  <circle cx="1040" cy="480" r="2.5" fill="#96701F"/>
+</svg>

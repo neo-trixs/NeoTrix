@@ -1,12 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#b45309"/>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EBD9A8"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
     </linearGradient>
+    <radialGradient id="goldFill" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#F7EDCD"/>
+      <stop offset="0.5" stop-color="#C99B3F"/>
+      <stop offset="1" stop-color="#96701F"/>
+    </radialGradient>
   </defs>
-  <rect width="32" height="32" rx="7" fill="#fdfcf9"/>
-  <rect x="6" y="6" width="20" height="20" rx="4" fill="none" stroke="#c9c4b4" stroke-width="1"/>
-  <polygon points="16,5 25,16 16,27 7,16" fill="url(#pg)"/>
-  <polygon points="16,9 22,16 16,23 10,16" fill="#ffffff" opacity="0.3"/>
+  <rect width="32" height="32" rx="7" fill="#FCFAF3"/>
+  <circle cx="16" cy="16" r="14" fill="none" stroke="#EBD9A8" stroke-width="0.7" opacity="0.7"/>
+  <ellipse cx="16" cy="16" rx="12" ry="3.6" fill="none" stroke="#C99B3F" stroke-width="0.5" opacity="0.6"/>
+  <g stroke="url(#gold)" stroke-width="1.1" stroke-linecap="round">
+    <line x1="7" y1="11" x2="25" y2="11"/>
+    <line x1="7" y1="16" x2="25" y2="16"/>
+    <line x1="7" y1="21" x2="25" y2="21"/>
+  </g>
+  <circle cx="16" cy="16" r="3" fill="url(#goldFill)" stroke="none"/>
+  <circle cx="16" cy="16" r="1.4" fill="#F7E9C8" stroke="none"/>
+  <circle cx="5" cy="8" r="0.9" fill="#C99B3F"/>
+  <circle cx="27" cy="25" r="0.9" fill="#96701F"/>
 </svg>
