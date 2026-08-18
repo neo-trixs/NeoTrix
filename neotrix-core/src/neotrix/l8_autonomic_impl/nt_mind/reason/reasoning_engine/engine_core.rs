@@ -35,6 +35,7 @@ use crate::neotrix::nt_mind::model_router::ModelRouter;
 use crate::neotrix::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
 use crate::neotrix::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep, ControlTrainer, SftReport, CsppoReport};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::neotrix::nt_world_jepa::JepaWorldModel;
 use crate::neotrix::nt_memory_kb::nt_memory_types::SearchResult;
 use crate::neotrix::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use crate::neotrix::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
@@ -190,6 +191,9 @@ pub struct ReasoningEngine {
     /// Phase 10.3 — multimodal unified reasoning: text+image+audio encoders →
     /// unified latent space → cross-modal fusion driving the E8 loop.
     pub multimodal: MultimodalEncoder,
+    /// JEPA world model — predict upcoming latent state from reasoning context,
+    /// injected into the prompt as prior signal. Option: absent unless wired.
+    pub jepa: Option<JepaWorldModel>,
 }
 
 impl ReasoningEngine {
@@ -255,6 +259,7 @@ impl ReasoningEngine {
             latent_transformer: LatentReasoningTransformer::new(),
             sparse_moe: SparseMoERouter::default(),
             multimodal: MultimodalEncoder::new(),
+            jepa: None,
             context_builder: None,
             cot_generator: None,
             e8_policy: None,
@@ -575,11 +580,25 @@ impl ReasoningEngine {
         // Phase 1.3: ContextBuilder 集成 — 从 KB/经验构建 Kernel context
         let kb_context = self.build_kb_context(task, root_span);
 
+        // JEPA world-model prior: encode task text, predict next latent, and
+        // surface predicted trajectory as a soft prior (absent if unwired).
+        let jepa_prior = if let Some(ref jepa) = self.jepa {
+            let feats = jepa.encode(&task.as_bytes().iter().map(|&b| b as f64 / 255.0).collect::<Vec<f64>>());
+            let (_pred, confidence) = jepa.predict(&feats);
+            root_span.set_attribute("jepa_prior_confidence", AttributeValue::Float(confidence));
+            format!(
+                "\nWorld-model prior (confidence {:.3}): next latent predicted — use as soft direction, not ground truth.\n",
+                confidence
+            )
+        } else {
+            String::new()
+        };
+
         let prompt = format!(
             "You are NeoTrix — mode: {mode_name}\n\
              Strategy: {mode_desc}\n\n\
              Past experiences:\n{context}\n\n\
-              {kb_context}{artifact_ctx}{date_line}\
+             {kb_context}{artifact_ctx}{jepa_prior}{date_line}\
              Query: {query}"
         );
         (e8_machine, prompt)
@@ -1299,7 +1318,10 @@ impl ReasoningEngine {
 
     pub fn reason_task(&mut self, task: &str) -> NeoTrixResult<String> { self.reason(task) }
     pub fn plan_reasoning(&self, _task: &str, _mode: u8) -> String { String::new() }
-    pub fn with_jepa<T>(self, _jepa: T) -> Self { self }
+    pub fn with_jepa(mut self, jepa: JepaWorldModel) -> Self {
+        self.jepa = Some(jepa);
+        self
+    }
     pub fn self_iterate(&mut self) {
         // Run observer analysis to monitor reasoning state health
         self.observer_analyze("self-iteration");

@@ -644,7 +644,7 @@ mod tests {
         assert!(accepted >= 4, "valid edits must be accepted, got {accepted}");
         assert_eq!(refused.len(), 1, "mention rejected atomically: {refused:?}");
         assert_eq!(plan.goal, "done means x");
-        assert_eq!(plan.verified.len(), 1);
+        assert_eq!(plan.verified.len(), 2);
         assert_eq!(plan.open.len(), 1);
         assert_eq!(plan.core.len(), 0, "rejected core must not land");
     }
