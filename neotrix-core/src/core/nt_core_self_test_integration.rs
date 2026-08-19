@@ -7,6 +7,7 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AgentTeamSelfTest));
     registry.register(Box::new(AgenticScanSelfTest));
     registry.register(Box::new(DigitalHumanSelfTest));
+    registry.register(Box::new(AffectiveInterfaceSelfTest));
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(VideoPipelineSelfTest));
     registry.register(Box::new(QTestEngineSelfTest));
@@ -111,6 +112,10 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::core::nt_core_quantum_fusion::QuantumFusionSelfTest,
     ));
+    // 2026-08-19 write_guard 证据审计闭环 (dbx G4): T1→T2 注册 (run.rs 架构审计侧)
+    registry.register(Box::new(
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+    ));
     register_c5_healers(registry);
 }
 
@@ -168,6 +173,7 @@ pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
 pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     // NT-CORE (5)
     registry.register(Box::new(AnswerEngineSelfTest));
+    registry.register(Box::new(AffectiveInterfaceSelfTest));
     registry.register(Box::new(
         crate::core::nt_core_gwt::mode_router::ModeRouter::new(),
     ));
@@ -202,6 +208,10 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
         crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
     ));
     registry.register(Box::new(Bm25IndexSelfTest));
+    // 2026-08-19 write_guard 证据审计闭环 (dbx G4): 纯内存检测件 → 轻量注册表
+    registry.register(Box::new(
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+    ));
     // NT-MIND (5)
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
@@ -400,6 +410,34 @@ impl SelfTest for DigitalHumanSelfTest {
         let pipeline = DigitalHumanPipeline::new(PersonaConfig::default());
         if !pipeline.generate_reply("hello").contains("Hello") {
             return Err(vec!["reply should handle hello".into()]);
+        }
+        Ok(())
+    }
+}
+
+/// NT-CORE affective interface 自测 — 情感交互层 (C1→C5 晋升: 注册即产果门覆盖)。
+/// 纯内存构造即测, 适配 lightweight 表。
+struct AffectiveInterfaceSelfTest;
+
+impl SelfTest for AffectiveInterfaceSelfTest {
+    fn name(&self) -> &str {
+        "nt_core_affective_interface"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        use crate::core::nt_core_self::affective_interface::*;
+        let mut iface = AffectiveInterface::new();
+        let readout = iface.process_user_input("我很难过，真的很难受", None, GuideMode::Auto);
+        if readout.user.emotion != UserEmotion::Sadness {
+            return Err(vec!["sad text should map to Sadness".into()]);
+        }
+        if readout.expression != "frown" {
+            return Err(vec!["sadness expression should be frown".into()]);
+        }
+        let json = iface.to_json().map_err(|e| vec![format!("serialize: {e}")])?;
+        let restored = AffectiveInterface::from_json(&json).map_err(|e| vec![format!("deserialize: {e}")])?;
+        if restored.relationship.interactions != 1 {
+            return Err(vec!["restored interactions should carry over".into()]);
         }
         Ok(())
     }

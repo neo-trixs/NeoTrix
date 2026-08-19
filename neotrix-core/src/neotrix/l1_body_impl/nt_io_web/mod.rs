@@ -126,4 +126,6 @@ pub struct AppState {
     pub agent_start_time: Arc<Mutex<Option<std::time::Instant>>>,
     pub api_token: Option<String>,
     pub rate_limiter: Arc<Mutex<RateWindow>>,
+    /// 数字人管线 — /ws 文本消息经其情感化回复 (affective interface 生产消费者, R-P36)。
+    pub digital_human: Arc<Mutex<crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline>>,
 }

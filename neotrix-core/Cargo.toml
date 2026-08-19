@@ -193,6 +193,10 @@ name = "act_c3"
 harness = false
 
 [[bench]]
+name = "affective_c3"
+harness = false
+
+[[bench]]
 name = "real_tasks"
 harness = false
 

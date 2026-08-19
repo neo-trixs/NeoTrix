@@ -700,7 +700,7 @@ fn expression_for(user: UserEmotion) -> &'static str {
 }
 
 /// 自我披露启发式: 第一人称自述模式 + 长度 → (是否披露, 披露深度)。
-fn estimate_disclosure(text: &str) -> (bool, f64) {
+pub fn estimate_disclosure(text: &str) -> (bool, f64) {
     let lower = text.to_lowercase();
     let personal = [
         "我觉得",
@@ -719,7 +719,10 @@ fn estimate_disclosure(text: &str) -> (bool, f64) {
         "i have",
     ];
     let has_personal = personal.iter().any(|p| lower.contains(p));
-    let words = text.split_whitespace().count();
+    // CJK 无空格: 空白词数恒为 1, 需按字符折算字数 (≈2 字/词) 否则披露深度被严重低估。
+    let whitespace_words = text.split_whitespace().count();
+    let cjk_units = (text.chars().filter(|c| !c.is_whitespace()).count() + 1) / 2;
+    let words = whitespace_words.max(cjk_units);
     let length_depth = (words as f64 / 40.0).min(0.4);
     let depth = (0.2 + length_depth) * if has_personal { 1.0 } else { 0.4 };
     (has_personal, depth.max(0.0).min(1.0))
@@ -866,6 +869,17 @@ mod tests {
         assert_eq!(au_to_emotion(&[4, 5]), None);
     }
 
+    /// CJK 无空格句子不得被空白词数低估披露深度 (回归: 8 字中文句子 ≈ 4 词)。
+    #[test]
+    fn test_disclosure_cjk_word_units() {
+        let (personal, depth) = estimate_disclosure("我遇到一件难过的事");
+        assert!(personal);
+        // 9 字 → 5 词单位 → depth=0.325; 旧实现按空白词数=1 → 仅 0.225。
+        assert!(depth > 0.3, "CJK 深度不得被空白词数低估, got {depth}");
+        let (_p, d2) = estimate_disclosure("普通一句话");
+        assert!(d2 < 0.3, "非个人陈述深度应更低, got {d2}");
+    }
+
     #[test]
     fn test_serde_roundtrip() {
         let mut iface = AffectiveInterface::new();
@@ -874,5 +888,62 @@ mod tests {
         let restored = AffectiveInterface::from_json(&json).unwrap();
         assert_eq!(restored.relationship.interactions, 1);
         assert_eq!(restored.user.emotion, iface.user.emotion);
+    }
+
+    // ── C2 集成测试: 生产链路 持久化 → 恢复 → 数字人消费 ──
+    #[test]
+    fn test_end_to_end_persist_restore_consume() {
+        // 1) 真实 KB (临时文件) + SecondBrain — 生产持久化路径 (bg loop 每 tick 调 save_affective)。
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_aff_e2e_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(tmp))
+            .expect("open temp KB");
+        let kb = std::sync::Arc::new(kb);
+        let mut sb = crate::core::nt_core_second_brain::SecondBrain::new();
+        sb.attach_kb(kb.clone());
+
+        // 2) 8 轮悲伤披露交互 → 关系推进出 Stranger。
+        let mut iface = AffectiveInterface::new();
+        for _ in 0..8 {
+            iface.process_user_input("我遇到一件难过的事", None, GuideMode::Auto);
+        }
+        assert_eq!(iface.relationship.interactions, 8);
+        assert_ne!(iface.relationship.stage, RelationshipStage::Stranger);
+
+        // 3) 生产持久化。
+        sb.save_affective(&iface);
+
+        // 4) 启动恢复路径: 从 KB 读回 → from_json。
+        let raw = kb
+            .kv_get("emotion", "affective_interface")
+            .expect("kv_get")
+            .expect("affective interface persisted to KB");
+        let restored = AffectiveInterface::from_json(&raw).expect("restore from KB");
+
+        // 5) 连续性: 关系阶段/交互数/用户情绪跨 session 保持。
+        assert_eq!(restored.relationship.stage, iface.relationship.stage);
+        assert_eq!(restored.relationship.interactions, 8);
+        assert_eq!(restored.relationship.disclosures, iface.relationship.disclosures);
+        assert_eq!(restored.user.emotion, iface.user.emotion);
+
+        // 6) 数字人生产消费: 恢复的 interface 驱动情感化回复/表情/韵律。
+        let mut pipe = crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline::new(
+            crate::neotrix::l1_body_impl::nt_io_digital_human::PersonaConfig::default(),
+        );
+        pipe.affective = restored;
+        pipe.start_session();
+        let resp = pipe.process_audio_input("我很难过，真的很难受");
+        assert_eq!(pipe.affective.relationship.interactions, 9); // 恢复后继续计数
+        assert!(resp.animation.contains("frown") || resp.animation.contains("tilt"));
+        assert!(
+            resp.tts_text.contains("理解") || resp.tts_text.contains("陪") || resp.tts_text.contains("谢谢")
+        );
+        assert!(resp.tts_text.contains("我"));
     }
 }

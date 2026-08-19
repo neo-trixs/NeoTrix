@@ -190,25 +190,57 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// WebSocket echo — 从 server/http.rs 拆解融合
+/// WebSocket echo + 数字人情感化文本 (从 server/http.rs 拆解融合; affective R-P36 生产消费)。
+/// 客户端发送 `{type:'text', content: ...}` → 经 DigitalHumanPipeline::process_audio_input
+/// 产出情感化回复 + 微表情 + 韵律, 返回 `{type:'text', content, emotion, animation}`;
+/// 其他消息保持原 echo 语义。
 pub async fn ws_echo_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
+    axum::extract::State(state): axum::extract::State<AppState>,
 ) -> impl axum::response::IntoResponse {
-    ws.on_upgrade(ws_echo_loop)
+    ws.on_upgrade(move |socket| ws_echo_loop(socket, state))
 }
 
-async fn ws_echo_loop(socket: axum::extract::ws::WebSocket) {
+async fn ws_echo_loop(
+    socket: axum::extract::ws::WebSocket,
+    state: AppState,
+) {
     use axum::extract::ws::{Message};
     use futures::{SinkExt, StreamExt};
     let (mut sender, mut receiver) = socket.split();
     while let Some(msg) = receiver.next().await {
         if let Ok(Message::Text(text)) = msg {
-            let echo = format!("echo: {}", text);
-            if sender.send(Message::Text(echo.into())).await.is_err() {
+            let reply = handle_ws_text(&state.digital_human, &text);
+            if sender.send(Message::Text(reply.into())).await.is_err() {
                 break;
             }
         }
     }
+}
+
+/// 文本消息 → 数字人情感化回复; 非 `{type:'text'}` JSON 回落 echo。
+fn handle_ws_text(
+    digital_human: &std::sync::Mutex<crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline>,
+    text: &str,
+) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(text) {
+        if v.get("type").and_then(|t| t.as_str()) == Some("text") {
+            if let Some(content) = v.get("content").and_then(|c| c.as_str()) {
+                let mut pipe = digital_human.lock().unwrap_or_else(|e| e.into_inner());
+                let resp = pipe.process_audio_input(content);
+                let trust = pipe.affective.relationship.trust;
+                return serde_json::json!({
+                    "type": "text",
+                    "content": resp.reply,
+                    "emotion": format!("{:?}", resp.emotion),
+                    "animation": resp.animation,
+                    "trust": trust,
+                })
+                .to_string();
+            }
+        }
+    }
+    format!("echo: {}", text)
 }
 
 /// Inner server start — accepts pre-constructed brain and bank
@@ -267,6 +299,11 @@ pub async fn start_server_with(
         agent_start_time: Arc::new(Mutex::new(None)),
         api_token,
         rate_limiter: Arc::new(Mutex::new(super::RateWindow::new(300))),
+        digital_human: Arc::new(Mutex::new(
+            crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline::new(
+                crate::neotrix::l1_body_impl::nt_io_digital_human::PersonaConfig::default(),
+            ),
+        )),
     };
 
     let mut app = build_router(state.clone());
@@ -311,3 +348,44 @@ pub async fn start_server_with(
 }
 
 use super::{AgentStatus, SessionInfo};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_pipe() -> std::sync::Mutex<crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline> {
+        std::sync::Mutex::new(
+            crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline::new(
+                crate::neotrix::l1_body_impl::nt_io_digital_human::PersonaConfig::default(),
+            ),
+        )
+    }
+
+    /// C2: 生产消费者 handle_ws_text — 情感化回复 + 关系推进 + 跨消息连续。
+    #[test]
+    fn test_ws_text_routes_to_digital_human() {
+        let pipe = test_pipe();
+        let reply = handle_ws_text(&pipe, r#"{"type":"text","content":"我很难过，真的很难受"}"#);
+        let v: serde_json::Value = serde_json::from_str(&reply).expect("valid json reply");
+        assert_eq!(v["type"], "text");
+        assert!(v["content"].as_str().unwrap().contains("我"));
+        assert!(v["emotion"].as_str().unwrap().len() > 0);
+        assert!(v["animation"].as_str().unwrap().len() > 0);
+        assert!(v["trust"].as_f64().unwrap() > 0.0);
+        // 关系推进: 悲伤披露 → 信任上升。
+        let trust2 = handle_ws_text(&pipe, r#"{"type":"text","content":"我很难过，真的很难受"}"#);
+        let v2: serde_json::Value = serde_json::from_str(&trust2).expect("valid json reply");
+        assert!(v2["trust"].as_f64().unwrap() > v["trust"].as_f64().unwrap());
+    }
+
+    /// 非 text 消息保持原 echo 语义 (向后兼容)。
+    #[test]
+    fn test_ws_echo_fallback() {
+        let pipe = test_pipe();
+        assert_eq!(handle_ws_text(&pipe, "plain message"), "echo: plain message");
+        assert_eq!(
+            handle_ws_text(&pipe, r#"{"type":"other","content":"x"}"#),
+            r#"echo: {"type":"other","content":"x"}"#
+        );
+    }
+}
