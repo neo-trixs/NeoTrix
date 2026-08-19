@@ -35,7 +35,6 @@ pub mod tools;
 pub mod fs_util;
 pub mod wal;
 pub mod persist_envelope;
-pub mod epoch;
 pub mod file_parser;
 pub mod layered_memory;
 #[cfg(feature = "rkyv-storage")]
@@ -103,13 +102,6 @@ pub use nt_core_observer::{OneObserver, ObserverReport, TrajectoryPattern, StepQ
 
 // Re-export Walsh memory index
 pub use nt_core_walsh::WalshMemoryIndex;
-
-// Re-export Epoch types
-pub use epoch::{
-    EarthEpoch, DimensionDef, CognitiveFramework, FrameworkRoute, ActivationRecord,
-    ontology_for, initial_state_for, default_router_bias,
-    create_framework, all_frameworks, evaluate_in_epoch,
-};
 
 // Re-export thinking_model types
 pub use nt_core_self::{
