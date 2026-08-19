@@ -1,6 +1,7 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_memory_kb::{
-    kb_write_guard, record_write_evidence, KnowledgeBase, NodeType, RelationType, WriteGuardVerdict,
+    diff_snapshots, kb_write_guard, record_write_evidence, snapshot_from_file, snapshot_kb,
+    snapshot_to_file, KnowledgeBase, NodeType, RelationType, WriteGuardVerdict,
 };
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -75,7 +76,7 @@ impl CliCommand for KbCmd {
         vec!["/knowledge", "/knowledge-base"]
     }
     fn description(&self) -> &str {
-        "Knowledge base operations: /kb stats | /kb search <query> | /kb get <node_id> | /kb query <text> | /kb write <json> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map"
+        "Knowledge base operations: /kb stats | /kb search <query> | /kb get <node_id> | /kb query <text> | /kb write <json> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map | /kb snapshot [--out <path>] | /kb diff <snapA> [snapB]"
     }
     fn is_primary(&self) -> bool { false }
 
@@ -104,7 +105,9 @@ impl CliCommand for KbCmd {
                   /kb import-review [path]      导入 review-findings.json 缺陷记录到 KB\n\
                   /kb absorb-map [--dry-run] [--limit N] [--types a,b] 全库本源溯源+能力映射 (R-P79)\n\
                   /kb consistency               设定一致性检查 (对标网文每卷设定检查)\n\
-                  /kb axioms                    架构公理推演树 (公理→定律→模块约束)",
+                  /kb axioms                    架构公理推演树 (公理→定律→模块约束)\n\
+                  /kb snapshot [--out <path>]   捕获 KB 全量快照 (节点/边/统计, 默认 ~/.neotrix/snapshots/)\n\
+                  /kb diff <snapA> [snapB]      比较两个快照 (缺 snapB 则对当前库); --detail <N> 列出明细",
             );
         }
 
@@ -129,8 +132,10 @@ impl CliCommand for KbCmd {
             "embed" => cmd_embed(rest),
             "consistency" => cmd_consistency(rest),
             "axioms" => cmd_axioms(rest),
+            "snapshot" => cmd_snapshot(rest),
+            "diff" => cmd_diff(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, consistency, axioms",
+                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, consistency, axioms, snapshot, diff",
                 sub
             )),
         }
@@ -152,6 +157,153 @@ fn cmd_consistency(_args: &[String]) -> CommandOutput {
 fn cmd_axioms(_args: &[String]) -> CommandOutput {
     let tree = crate::core::nt_core_axiom_tree::AxiomTree::build();
     CommandOutput::ok(&tree.render())
+}
+
+/// /kb snapshot [--out <path>] — 捕获 KB 全量快照 (G5, dbx snapshot 对齐)。
+fn cmd_snapshot(args: &[String]) -> CommandOutput {
+    let kb = match open_kb() {
+        Some(kb) => kb,
+        None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
+    };
+    let snap = match snapshot_kb(&kb) {
+        Ok(s) => s,
+        Err(e) => return CommandOutput::err(&format!("快照捕获失败: {}", e)),
+    };
+
+    let out = if let Some(path) = args
+        .iter()
+        .position(|a| a == "--out")
+        .and_then(|i| args.get(i + 1))
+    {
+        std::path::PathBuf::from(path)
+    } else {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let dir = std::path::PathBuf::from(home).join(".neotrix").join("snapshots");
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        dir.join(format!("kb-{}.json", ts))
+    };
+
+    if let Err(e) = snapshot_to_file(&snap, &out) {
+        return CommandOutput::err(&format!("快照落盘失败: {}", e));
+    }
+
+    let msg = format!(
+        "KB 快照已捕获\n  文件:   {}\n  节点:   {}\n  边:     {}\n  指纹:   {}\n  DB:     {} bytes",
+        out.display(),
+        snap.nodes.len(),
+        snap.edges.len(),
+        snap.checksum(),
+        snap.stats.db_size_bytes,
+    );
+    CommandOutput::ok(&msg).with_json(serde_json::json!({
+        "path": out.to_string_lossy(),
+        "nodes": snap.nodes.len(),
+        "edges": snap.edges.len(),
+        "checksum": snap.checksum(),
+        "captured_at_ms": snap.captured_at_ms,
+    }))
+}
+
+/// /kb diff <snapA> [snapB] [--detail N] — 比较两个快照; 缺 snapB 时对当前库 (G5)。
+fn cmd_diff(args: &[String]) -> CommandOutput {
+    let detail = parse_usize(args, "--detail", 10);
+    // 位置参数过滤: 跳过取值 flag (--detail N) 及其值, 保留纯路径。
+    let mut positional: Vec<&str> = Vec::new();
+    let mut skip_next = false;
+    for a in args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if a == "--detail" {
+            skip_next = true;
+            continue;
+        }
+        if !a.starts_with("--") {
+            positional.push(a.as_str());
+        }
+    }
+    if positional.is_empty() {
+        return CommandOutput::err("用法: /kb diff <snapA.json> [snapB.json] [--detail N]");
+    }
+
+    let base = match snapshot_from_file(std::path::Path::new(positional[0])) {
+        Ok(s) => s,
+        Err(e) => return CommandOutput::err(&format!("读取 snapA 失败: {}", e)),
+    };
+
+    let other = if let Some(p) = positional.get(1) {
+        match snapshot_from_file(std::path::Path::new(p)) {
+            Ok(s) => s,
+            Err(e) => return CommandOutput::err(&format!("读取 snapB 失败: {}", e)),
+        }
+    } else {
+        let kb = match open_kb() {
+            Some(kb) => kb,
+            None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
+        };
+        match snapshot_kb(&kb) {
+            Ok(s) => s,
+            Err(e) => return CommandOutput::err(&format!("当前库快照失败: {}", e)),
+        }
+    };
+
+    let diff = diff_snapshots(&base, &other);
+    let mut out = format!(
+        "KB diff (base {} nodes/{} edges → other {} nodes/{} edges)\n",
+        base.nodes.len(), base.edges.len(), other.nodes.len(), other.edges.len()
+    );
+    out.push_str(&format!(
+        "  nodes: +{} / -{} / changed {} | edges: +{} / -{}\n",
+        diff.nodes_added.len(),
+        diff.nodes_removed.len(),
+        diff.nodes_changed.len(),
+        diff.edges_added.len(),
+        diff.edges_removed.len(),
+    ));
+    if diff.is_empty() {
+        out.push_str("  无差异\n");
+        return CommandOutput::ok(&out).with_json(serde_json::json!(diff));
+    }
+
+    let render_nodes = |items: &[crate::neotrix::nt_memory_kb::DiffNode], tag: &str| {
+        let mut s = String::new();
+        for item in items.iter().take(detail) {
+            s.push_str(&format!(
+                "    {} [{}] {} ({})\n",
+                tag, item.node_type, item.title, item.id
+            ));
+            if !item.fields_changed.is_empty() {
+                s.push_str(&format!("        changed: {}\n", item.fields_changed.join(", ")));
+            }
+        }
+        if items.len() > detail {
+            s.push_str(&format!("    … 还有 {} 条\n", items.len() - detail));
+        }
+        s
+    };
+    out.push_str("  新增节点:\n");
+    out.push_str(&render_nodes(&diff.nodes_added, "+"));
+    out.push_str("  删除节点:\n");
+    out.push_str(&render_nodes(&diff.nodes_removed, "-"));
+    out.push_str("  变更节点:\n");
+    out.push_str(&render_nodes(&diff.nodes_changed, "~"));
+    if !diff.edges_added.is_empty() {
+        out.push_str("  新增边:\n");
+        for e in diff.edges_added.iter().take(detail) {
+            out.push_str(&format!("    + {} → {} ({})\n", e.source_id, e.target_id, e.relation_type));
+        }
+    }
+    if !diff.edges_removed.is_empty() {
+        out.push_str("  删除边:\n");
+        for e in diff.edges_removed.iter().take(detail) {
+            out.push_str(&format!("    - {} → {} ({})\n", e.source_id, e.target_id, e.relation_type));
+        }
+    }
+    CommandOutput::ok(&out).with_json(serde_json::json!(diff))
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
@@ -1183,6 +1335,58 @@ mod tests {
             let v: serde_json::Value = serde_json::from_str(&meta.unwrap()).unwrap();
             assert_eq!(v["absorbed_capability"]["capability"], "execute");
             assert_eq!(v["knowledge_source"]["source_core"], "Reality");
+        });
+    }
+
+    #[test]
+    fn test_snapshot_then_diff_reports_added_node() {
+        with_temp_home(|| {
+            let conn = Connection::open(kb_path()).unwrap();
+            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
+            drop(conn);
+
+            let dir = std::env::temp_dir().join(format!("nt_kb_cmds_snap_{}", std::process::id()));
+            std::fs::create_dir_all(dir.join(".neotrix")).unwrap();
+            let snap_path = dir.join("snap.json");
+            let out = cmd_snapshot(&["--out".to_string(), snap_path.to_string_lossy().into_owned()]);
+            assert!(out.success, "{}", out.message);
+            assert!(snap_path.exists(), "快照文件应落盘");
+
+            // 再写入一个节点 → 与快照对比应报告新增。
+            let conn = open_raw_conn().unwrap();
+            seed_node(&conn, "u_2", "paper", "Attention Is All You Need", "https://arxiv.org/abs/1706.03762");
+            drop(conn);
+
+            let diff = cmd_diff(&[
+                snap_path.to_string_lossy().into_owned(),
+                "--detail".to_string(),
+                "5".to_string(),
+            ]);
+            assert!(diff.success, "{}", diff.message);
+            assert!(diff.message.contains("+1"), "应报告新增 1 节点: {}", diff.message);
+            let json = diff.json.unwrap();
+            assert_eq!(json["nodes_added"].as_array().unwrap().len(), 1);
+        });
+    }
+
+    #[test]
+    fn test_snapshot_roundtrip_via_diff_same_db() {
+        with_temp_home(|| {
+            let conn = Connection::open(kb_path()).unwrap();
+            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
+            drop(conn);
+
+            let dir = std::env::temp_dir().join(format!("nt_kb_cmds_snap2_{}", std::process::id()));
+            std::fs::create_dir_all(dir.join(".neotrix")).unwrap();
+            let snap_path = dir.join("snap.json");
+            let out = cmd_snapshot(&["--out".to_string(), snap_path.to_string_lossy().into_owned()]);
+            assert!(out.success);
+
+            let diff = cmd_diff(&[snap_path.to_string_lossy().into_owned()]);
+            assert!(diff.success, "{}", diff.message);
+            assert!(diff.message.contains("无差异"), "同库快照应无差异: {}", diff.message);
         });
     }
 }

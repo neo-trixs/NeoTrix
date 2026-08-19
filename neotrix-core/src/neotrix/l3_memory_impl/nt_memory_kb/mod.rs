@@ -63,6 +63,7 @@ pub mod nt_normalizer;
 pub mod knowledge_storage;
 pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
+pub mod nt_memory_snapshot;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
@@ -101,6 +102,10 @@ pub use nt_normalizer::{normalize_text, strip_markdown, normalize_lang, content_
 pub use knowledge_storage::{KnowledgeStorage, migrate_from_json};
 pub use nt_absorb_mapper::{map_all_nodes, map_batch_nodes, map_nodes, apply_mappings, map_node, map_source_core, CapabilityMapping, MappingReport};
 pub use nt_memory_write_guard::{kb_write_guard, record_write_evidence, WriteGuardVerdict, WRITE_GUARD_NS};
+pub use nt_memory_snapshot::{
+    diff_snapshots, snapshot_from_file, snapshot_kb, snapshot_to_file, DiffEdge, DiffNode, KbDiff,
+    KbSnapshot, SNAPSHOT_FORMAT, SNAPSHOT_VERSION,
+};
 
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
@@ -1248,6 +1253,12 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         nt_memory_store::get_all_nodes(&conn).map_err(|e| format!("all_nodes: {}", e))
     }
 
+    /// 枚举全部知识边 — 供快照/图结构批量灌入。
+    pub fn all_edges(&self) -> Result<Vec<KnowledgeEdge>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_store::get_all_edges(&conn).map_err(|e| format!("all_edges: {}", e))
+    }
+
     // ── dedup ──
 
     pub fn dedup_nodes(&self) -> Result<usize, String> {
@@ -1313,10 +1324,12 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         }
 
         // Fallback: hybrid BM25+FTS
-        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
-        let results = nt_memory_search::hybrid_search(&conn, &effective_query, limit, bm25.as_ref())
-            .map_err(|e| format!("search: {}", e))?;
+        let results = {
+            let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+            nt_memory_search::hybrid_search(&conn, &effective_query, limit, bm25.as_ref())
+                .map_err(|e| format!("search: {}", e))?
+        };
         self.finalize_search(&effective_query, &cache_key, results, limit)
     }
 

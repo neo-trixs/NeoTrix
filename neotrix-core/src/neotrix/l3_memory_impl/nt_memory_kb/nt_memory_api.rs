@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    kb_write_guard, nt_memory_embed, record_write_evidence, WriteGuardVerdict, KnowledgeBase,
-    SearchResult, SearchMatchType,
+    diff_snapshots, kb_write_guard, nt_memory_embed, record_write_evidence, snapshot_from_file,
+    snapshot_kb, WriteGuardVerdict, KnowledgeBase, SearchResult, SearchMatchType,
 };
 
 /// Shared state for KB API handlers
@@ -47,6 +47,8 @@ pub fn build_kb_router(state: KbApiState) -> Router {
         .route("/api/kb/edge", post(create_edge_handler))
         .route("/api/kb/embeddings/status", get(embeddings_status_handler))
         .route("/api/kb/embeddings/backfill", post(embeddings_backfill_handler))
+        .route("/api/kb/snapshot", get(snapshot_handler))
+        .route("/api/kb/diff", post(diff_handler))
         .with_state(state)
 }
 
@@ -144,6 +146,14 @@ pub struct CreateEdgeBody {
     pub relation_type: String,
     pub weight: Option<f64>,
     pub description: Option<String>,
+}
+
+/// POST /api/kb/diff 请求体 — base_path/other_path 至少提供一个文件路径;
+/// 缺省的一方使用当前实时库快照。
+#[derive(Deserialize)]
+pub struct DiffBody {
+    pub base_path: Option<String>,
+    pub other_path: Option<String>,
 }
 
 // ─── Handlers ───
@@ -399,6 +409,54 @@ pub async fn embeddings_backfill_handler(
     Ok(json_ok(serde_json::json!({"processed": processed})))
 }
 
+/// GET /api/kb/snapshot — 返回当前 KB 全量快照 (只读, G5)。
+pub async fn snapshot_handler(
+    State(state): State<KbApiState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+    let snap = snapshot_kb(&kb).map_err(|e| internal_err(&e))?;
+    Ok(json_ok(snap))
+}
+
+/// POST /api/kb/diff — 比较快照文件与/或当前库 (只读, G5)。
+/// body: {"base_path": "snapA.json"?, "other_path": "snapB.json"?}
+/// 双方皆缺省 → base=other=当前库, 恒空; 至少一个路径才有意义。
+pub async fn diff_handler(
+    State(state): State<KbApiState>,
+    Json(body): Json<DiffBody>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let load = |path: &Option<String>| -> Result<Option<super::KbSnapshot>, (StatusCode, Json<serde_json::Value>)> {
+        match path {
+            Some(p) => snapshot_from_file(std::path::Path::new(p))
+                .map(Some)
+                .map_err(|e| internal_err(&e)),
+            None => Ok(None),
+        }
+    };
+    let base = match load(&body.base_path)? {
+        Some(s) => s,
+        None => {
+            let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            snapshot_kb(&kb).map_err(|e| internal_err(&e))?
+        }
+    };
+    let other = match load(&body.other_path)? {
+        Some(s) => s,
+        None => {
+            let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            snapshot_kb(&kb).map_err(|e| internal_err(&e))?
+        }
+    };
+    let diff = diff_snapshots(&base, &other);
+    Ok(json_ok(serde_json::json!({
+        "base_nodes": base.nodes.len(),
+        "base_edges": base.edges.len(),
+        "other_nodes": other.nodes.len(),
+        "other_edges": other.edges.len(),
+        "diff": diff,
+    })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,6 +540,60 @@ mod tests {
         };
         let err = futures_block_on(create_edge_handler(State(state), Json(body))).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_snapshot_handler_reports_current_kb() {
+        let (state, _) = temp_kb();
+        // 写入一个节点后, 快照应包含该节点。
+        {
+            let kb = state.kb.lock().unwrap();
+            kb.insert_or_get_node("G5 snap", crate::neotrix::nt_memory_kb::NodeType::Concept, None, None, None).unwrap();
+        }
+        let body = futures_block_on(snapshot_handler(State(state))).expect("snapshot ok");
+        let v = body.0;
+        assert_eq!(v["format"], crate::neotrix::nt_memory_kb::SNAPSHOT_FORMAT);
+        assert_eq!(v["nodes"].as_array().map(|a| a.len()).unwrap_or(0), 1);
+        assert_eq!(v["edges"].as_array().map(|a| a.len()).unwrap_or(0), 0);
+    }
+
+    #[test]
+    fn test_diff_handler_against_self_is_empty() {
+        let (state, _) = temp_kb();
+        let body = futures_block_on(diff_handler(State(state), Json(DiffBody { base_path: None, other_path: None })))
+            .expect("diff ok");
+        assert_eq!(body.0["diff"]["nodes_added"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_diff_handler_file_vs_current() {
+        let (state, _) = temp_kb();
+        // 空库 → 快照文件 (含 1 节点) → 删除后 diff 应报告 removed 1。
+        let node_id = {
+            let kb = state.kb.lock().unwrap();
+            kb.insert_or_get_node("G5 file", crate::neotrix::nt_memory_kb::NodeType::Concept, None, None, None)
+                .unwrap()
+        };
+        let snap = {
+            let kb = state.kb.lock().unwrap();
+            snapshot_kb(&kb).unwrap()
+        };
+        let dir = std::env::temp_dir().join(format!("nt_kb_api_snap_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let path = dir.join("snap.json");
+        crate::neotrix::nt_memory_kb::snapshot_to_file(&snap, &path).unwrap();
+        // 删除节点 → 库变空, 与文件快照对比应报告 removed 1。
+        {
+            let kb = state.kb.lock().unwrap();
+            let deleted = kb.delete_node(&node_id).unwrap();
+            assert!(deleted, "删除应生效");
+        }
+        let body = futures_block_on(diff_handler(
+            State(state),
+            Json(DiffBody { base_path: Some(path.to_string_lossy().into_owned()), other_path: None }),
+        ))
+        .expect("diff ok");
+        assert_eq!(body.0["diff"]["nodes_removed"].as_array().unwrap().len(), 1);
     }
 
     fn futures_block_on<F: std::future::Future>(fut: F) -> F::Output {
