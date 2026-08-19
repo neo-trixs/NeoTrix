@@ -337,10 +337,17 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
         // 修复: 此前 serve 命令只跑 BackgroundLoop, HTTP server 从未启动（契约断裂）
         let http_port = parse_http_port(_addr);
         let http_handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_multi_thread()
+            // D5: runtime 创建失败不 panic — HTTP 服务降级为日志告警, 主进程继续运行
+            let rt = match tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .expect("HTTP server runtime");
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    eprintln!("[server] HTTP runtime 创建失败, 服务不可用: {}", e);
+                    return;
+                }
+            };
             rt.block_on(async {
                 // L1 层禁止直接依赖 L8 (层边界守卫 arch_fitness_layer_boundary):
                 // 在 entry (bin 层) 构造 ReasoningBrain 后经 start_server_with 注入。

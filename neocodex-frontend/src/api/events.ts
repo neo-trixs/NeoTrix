@@ -81,3 +81,35 @@ export async function subscribeStream(handlers: StreamEventHandlers): Promise<Un
     for (const un of unlisteners) un()
   }
 }
+
+/** 桌面菜单/全局事件桥（Rust 菜单 emit → 前端动作）
+ *  Rust 侧 SubmenuBuilder（src-tauri/src/lib.rs）emit 以下事件，
+ *  此前零前端订阅 → 菜单项 UI 全部无效。此层统一桥接。
+ *  组件禁止直接 import '@tauri-apps/api/event'，统一经此层。 */
+export interface MenuEventHandlers {
+  onNewSession?: () => void
+  onOpenSettings?: () => void
+  onOpenPalette?: () => void
+  onCheckUpdates?: () => void
+}
+
+export async function subscribeMenuEvents(handlers: MenuEventHandlers): Promise<UnlistenFn> {
+  const unlisteners: UnlistenFn[] = []
+  const entries: Array<[string, (() => void) | undefined]> = [
+    ['neotrix:new-session', handlers.onNewSession],
+    ['open-settings', handlers.onOpenSettings],
+    ['neocodex-open-palette', handlers.onOpenPalette],
+    ['neocodex-check-updates', handlers.onCheckUpdates],
+  ]
+  for (const [event, cb] of entries) {
+    if (!cb) continue
+    try {
+      unlisteners.push(await listen<void>(event, () => cb()))
+    } catch {
+      // 菜单事件订阅失败不阻塞主流程（非核心能力）
+    }
+  }
+  return () => {
+    for (const un of unlisteners) un()
+  }
+}

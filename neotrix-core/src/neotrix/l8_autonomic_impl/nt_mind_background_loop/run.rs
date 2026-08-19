@@ -725,7 +725,8 @@ cognitive_load: self.cognitive_load.take(),
         // ── 守卫层 (Rust 化自 sh 守护脚本, cycle 207) ──
         spawn_handler!(cfg.kb_guard_interval_secs, "kb_guard", |h| h.handle_kb_guard().await);
         spawn_handler!(cfg.kb_backup_interval_secs, "kb_backup", |h| h.handle_kb_backup().await);
-        spawn_handler!(cfg.workspace_guard_interval_secs, "workspace_guard", |h| h.handle_workspace_guard().await);        spawn_handler!(60, |h| h.handle_agent_discovery().await);
+        spawn_handler!(cfg.workspace_guard_interval_secs, "workspace_guard", |h| h.handle_workspace_guard().await);
+        spawn_handler!(60, |h| h.handle_agent_discovery().await);
         // ── 意识能力网内化吸收 (cycle 1053): 60s 检查 pending-absorb.json,
         //    替代原 .opencode/plugins/experience-tree-absorption.js idle 插件。
         spawn_handler!(60, |h| h.handle_pending_absorption().await);

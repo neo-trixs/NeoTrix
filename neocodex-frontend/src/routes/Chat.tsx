@@ -31,7 +31,7 @@ import { clsx } from 'clsx'
 import { neocodex, system, unified, errText } from '../api'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
-import { subscribeStream, type UnlistenFn } from '../api/events'
+import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
 import type { AgentStatus } from '../api/types'
 
 const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
@@ -356,6 +356,7 @@ export function Chat() {
 
   // Event listener cleanup functions
   const [unlistenStream, setUnlistenStream] = createSignal<UnlistenFn | null>(null)
+  const [unlistenMenu, setUnlistenMenu] = createSignal<UnlistenFn | null>(null)
   // 提供商切换事件 handler（普通变量，避免 signal setter 函数式更新歧义）
   let providerChangedHandler: (() => void) | null = null
   // 全局 Esc handler（面板/菜单/设置关闭层级统一在此）
@@ -525,11 +526,24 @@ export function Chat() {
     }
     window.addEventListener('keydown', onGlobalKeyDown)
     globalKeydownHandler = onGlobalKeyDown
+
+    // 桌面菜单事件桥（Rust 菜单 emit → 前端动作；此前零订阅，菜单项全部无效）
+    // new-session → chatStore.addSession()；open-settings / palette → 打开对应 UI
+    const unlistenMenu = await subscribeMenuEvents({
+      onNewSession: () => {
+        chatStore.addSession()
+      },
+      onOpenSettings: () => setSettingsOpen(true),
+      onOpenPalette: () => setPaletteOpen(true),
+      onCheckUpdates: () => setSettingsOpen(true),
+    })
+    setUnlistenMenu(() => unlistenMenu)
   })
 
   // Clean up event listeners
   onCleanup(() => {
     unlistenStream()?.()
+    unlistenMenu()?.()
     if (providerChangedHandler) {
       window.removeEventListener('neotrix:provider-changed', providerChangedHandler)
     }
