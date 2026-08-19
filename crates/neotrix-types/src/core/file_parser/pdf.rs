@@ -1,5 +1,7 @@
 use super::{FileParser, SpatialBlock, BlockType};
 use lopdf::dictionary;
+#[cfg(test)]
+use lopdf::Stream;
 
 /// 判断字符串是否为可读 PDF 文本 (而非 FlateDecode 压缩数据的伪匹配)。
 /// 压缩流乱码特征: 高控制字符密度 / 低可打印比例 / 无词边界。
@@ -241,15 +243,33 @@ impl FileParser {
             let mut positions: Vec<(f32, f32, f32)> = Vec::new();
             let mut matched = false;
 
-            for op in &mut content.operations {
+            // 多字符 span 跨相邻 op 匹配: CAD 类导出 PDF 常逐字符 Tj 绘制,
+            // 单 op 解码串==find 无法命中「闸阀」等多字符目标。此处按 BT..ET 段
+            // 累积连续文本操作 (跨 Tf/Td/Tm 等排版操作), 在累积串上做子串查找,
+            // 命中后清空覆盖的全部操作数 (保守整 op 清空, 兼容部分命中)。
+            let mut runs: Vec<Vec<(usize, String)>> = Vec::new();
+            let mut run_starts: Vec<Option<(f32, f32, f32)>> = Vec::new();
+            let mut cur_run: Vec<(usize, String)> = Vec::new();
+            let mut cur_start: Option<(f32, f32, f32)> = None;
+            let mut in_text = false;
+
+            for (idx, op) in content.operations.iter().enumerate() {
                 match op.operator.as_str() {
                     "BT" => {
+                        in_text = true;
+                        st = TextState::default();
                         st.in_text = true;
-                        st.tx = 0.0;
-                        st.ty = 0.0;
-                        st.leading = 0.0;
+                        cur_run.clear();
+                        cur_start = None;
                     }
-                    "ET" => st.in_text = false,
+                    "ET" => {
+                        in_text = false;
+                        if !cur_run.is_empty() {
+                            runs.push(std::mem::take(&mut cur_run));
+                            run_starts.push(cur_start);
+                        }
+                        cur_start = None;
+                    }
                     "Tf" => {
                         if let Some(name) = op.operands.first().and_then(|o| o.as_name().ok()) {
                             st.font = Some(name.to_vec());
@@ -280,21 +300,78 @@ impl FileParser {
                             st.ty = f;
                         }
                     }
-                    "Tj" | "TJ" | "'" if st.in_text => {
+                    "Tj" | "TJ" | "'" if in_text => {
                         let enc = st.font.as_ref().and_then(|f| encodings.get(f));
                         let decoded = decode_text_operand(op, enc)?;
-                        if decoded == edit.find {
-                            matched = true;
-                            positions.push((st.tx, st.ty, st.size));
-                            clear_text_operands(op);
+                        if decoded.is_empty() {
+                            continue;
+                        }
+                        if cur_start.is_none() {
+                            cur_start = Some((st.tx, st.ty, st.size));
+                        }
+                        cur_run.push((idx, decoded));
+                        if op.operator == "'" {
+                            runs.push(std::mem::take(&mut cur_run));
+                            run_starts.push(cur_start);
+                            cur_start = None;
                         }
                     }
-                    _ => {}
+                    _ => {
+                        if !cur_run.is_empty() {
+                            runs.push(std::mem::take(&mut cur_run));
+                            run_starts.push(cur_start);
+                            cur_start = None;
+                        }
+                    }
+                }
+            }
+            if !cur_run.is_empty() {
+                runs.push(std::mem::take(&mut cur_run));
+                run_starts.push(cur_start);
+            }
+
+            let mut to_clear: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+            for (run, start) in runs.iter().zip(run_starts.iter()) {
+                if run.is_empty() {
+                    continue;
+                }
+                let mut concat = String::new();
+                let mut starts: Vec<usize> = Vec::with_capacity(run.len() + 1);
+                for (_, decoded) in run {
+                    starts.push(concat.len());
+                    concat.push_str(decoded);
+                }
+                starts.push(concat.len());
+                let find_len = edit.find.len();
+                let mut offset = 0;
+                while let Some(rel) = concat[offset..].find(edit.find.as_str()) {
+                    let mstart = offset + rel;
+                    let mend = mstart + find_len;
+                    let op_start = starts.partition_point(|&s| s <= mstart).saturating_sub(1);
+                    let op_end = starts.partition_point(|&s| s <= mend - 1).saturating_sub(1);
+                    if op_start <= op_end && op_end < run.len() && starts[op_end + 1] >= mend {
+                        for i in op_start..=op_end {
+                            to_clear.insert(run[i].0);
+                        }
+                        if let Some((x, y, size)) = start {
+                            positions.push((*x, *y, *size));
+                        }
+                        matched = true;
+                        offset = mend;
+                    } else {
+                        offset = mstart + 1;
+                    }
                 }
             }
 
             if !matched {
                 return Err(PdfEditError::NotFound { find: edit.find.clone() });
+            }
+
+            for (idx, op) in content.operations.iter_mut().enumerate() {
+                if to_clear.contains(&idx) {
+                    clear_text_operands(op);
+                }
             }
 
             // redact 写回 (只读借用已在循环结束释放)
@@ -1083,5 +1160,69 @@ mod tests {
             "嵌入 TTF/ToUnicode 未解码出西里尔文本: {text:?}"
         );
         assert!(!text.contains("Hello"), "原文本仍存在: {text:?}");
+    }
+
+    /// 单页未压缩内容流 PDF: 文本逐字符拆成独立 Tj op (CAD 导出形态),
+    /// 每个字符前带 Tf + Td (位置推进), 验证跨 op 累积匹配。
+    fn per_char_pdf_bytes(text: &str) -> Vec<u8> {
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Courier",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let mut ops: Vec<Operation> = vec![Operation::new("BT", vec![])];
+        for (i, ch) in text.chars().enumerate() {
+            ops.push(Operation::new("Tf", vec!["F1".into(), 12.into()]));
+            ops.push(Operation::new("Td", vec![(10.0 + i as f32 * 6.0).into(), 600.into()]));
+            ops.push(Operation::new("Tj", vec![lopdf::Object::string_literal(ch.to_string())]));
+        }
+        ops.push(Operation::new("ET", vec![]));
+        let content = Content { operations: ops };
+        let content_id = doc.add_object(Stream::new(
+            lopdf::Dictionary::new(),
+            content.encode().expect("encode PDF content stream"),
+        ));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+        doc.objects.insert(
+            pages_id,
+            lopdf::Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog_id);
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save test PDF");
+        buf
+    }
+
+    #[test]
+    fn edit_pdf_matches_across_adjacent_ops() {
+        // 逐字符 Tj 绘制: "Gate Valve" 拆成独立单字符 op, 跨 op 累积后
+        // "Gate" 应被子串匹配整体清除并原位替换。
+        let buf = per_char_pdf_bytes("Gate Valve");
+        let out = FileParser::edit_pdf_text(
+            &buf,
+            &[PdfTextEdit { page: 1, find: "Gate".into(), replace: Some("Xyz".into()) }],
+            None,
+        )
+        .expect("edit pdf cross-op match");
+        let text = FileParser::extract_pdf_text(&out);
+        assert!(!text.contains("Gate"), "跨 op 匹配未清除原文本: {text:?}");
+        assert!(text.contains("Xyz"), "替换文本缺失: {text:?}");
+        assert!(text.contains("Valve"), "未匹配的相邻文本被误清: {text:?}");
     }
 }
