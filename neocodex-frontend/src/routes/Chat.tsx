@@ -446,6 +446,22 @@ export function Chat() {
           chatStore.appendToolCall(msgId, toolCall)
         }
       },
+      onError: (payload) => {
+        // F1: provider 阶段错误——保留已累积 partial，标记消息完成并提示
+        if (activeGen !== generation) return
+        const msgId = currentAssistantMsgId()
+        if (msgId) {
+          const text = payload.partial || `⚠️ ${payload.message}`
+          chatStore.updateMessage(msgId, text, false)
+        }
+        chatStore.setGenerating(false)
+        setCurrentAssistantMsgId(null)
+        setStreamError(payload.message || '生成失败')
+        setTimeout(() => setStreamError(null), 5000)
+        // 作废旧代次：错误后迟到的 token/done 一律丢弃
+        generation++
+        if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
+      },
       onSubscribeError: (event) => {
         setStreamError(`流式事件 ${event} 订阅失败，回复可能不完整`)
         setTimeout(() => setStreamError(null), 5000)

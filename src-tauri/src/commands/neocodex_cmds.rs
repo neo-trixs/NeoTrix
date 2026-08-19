@@ -133,6 +133,11 @@ pub async fn neocodex_send_message_stream(
     temperature: Option<f64>,
     max_tokens: Option<u32>,
 ) -> Result<String, String> {
+    // F6: 复位取消标志移到命令最开头（任何 await/lock 之前）——否则首条消息
+    // agent 懒初始化窗口内连点"发送→停止"会被吞，取消失效且后端跑完全程落盘。
+    // stop_stream 在异步等待期间置 true 不会被本行误清（命令是串行的，本命令
+    // 在 stop 之前已进入 agent 互斥锁或已在流式中，stop 无法插队到此 store）。
+    STREAM_CANCELLED.store(false, std::sync::atomic::Ordering::Relaxed);
     let mut agent_guard = NEOCODEX_AGENT.lock().await;
     let agent = match agent_guard.as_mut() {
         Some(a) => a,
@@ -208,7 +213,6 @@ pub async fn neocodex_send_message_stream(
     // Emit start event
     let _ = app.emit("neocodex_stream_start", content.clone());
 
-    STREAM_CANCELLED.store(false, std::sync::atomic::Ordering::Relaxed);
     let started = std::time::Instant::now();
     let result = agent.react_loop_stream(&send_content, 4, |token| {
         let _ = app.emit("neocodex_stream_token", token);
@@ -224,7 +228,30 @@ pub async fn neocodex_send_message_stream(
         !STREAM_CANCELLED.load(std::sync::atomic::Ordering::Relaxed)
     }).await;
 
-    let answer = result.unwrap_or_else(|| "[no response]".to_string());
+    // F1: provider 阶段错误不再降级为合法回答。emit 独立错误事件（携带已
+    // 累积的 partial token），且不落盘 wire/context——错误消息不能污染会话
+    // 历史（重载后不应出现 "[provider error] …" 作为助手回复）。
+    if let Some(err) = result.error {
+        let partial = result.content.clone().unwrap_or_default();
+        let _ = app.emit("neocodex_stream_error", serde_json::json!({
+            "message": err,
+            "partial": partial,
+        }));
+        // 通知中心提示（与正常完成路径一致，让用户知晓失败而非静默）
+        let focused = app.get_webview_window("main")
+            .map(|w| w.is_focused().unwrap_or(false))
+            .unwrap_or(false);
+        if !focused {
+            let _ = app.notification()
+                .builder()
+                .title("NeoCodex 生成失败")
+                .body(&err)
+                .show();
+        }
+        return Ok(partial);
+    }
+
+    let answer = result.content.unwrap_or_else(|| "[no response]".to_string());
     // Persist the assistant response so streamed conversations survive reload.
     let ats = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;

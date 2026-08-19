@@ -17,12 +17,20 @@ export interface StreamToolPayload {
   success: boolean
 }
 
+/** neocodex_stream_error 事件负载：provider 阶段错误（F1） */
+export interface StreamErrorPayload {
+  message: string
+  partial: string
+}
+
 export interface StreamEventHandlers {
   onStart?: (sessionId?: string) => void
   onToken?: (delta: string) => void
   onEnd?: (content: string) => void
   onDone?: (payload: { cancelled: boolean; elapsed_ms: number; content: string }) => void
   onTool?: (payload: StreamToolPayload) => void
+  /** F1: provider 阶段错误（不落盘，保留 partial） */
+  onError?: (payload: StreamErrorPayload) => void
   /** 单个事件订阅失败时回调（用于向用户暴露流式降级提示） */
   onSubscribeError?: (event: string, error: unknown) => void
 }
@@ -62,6 +70,11 @@ export async function subscribeStream(handlers: StreamEventHandlers): Promise<Un
   if (handlers.onTool) {
     await subscribe('neocodex_stream_tool', () =>
       listen<StreamToolPayload>('neocodex_stream_tool', (e) => handlers.onTool?.(e.payload)),
+    )
+  }
+  if (handlers.onError) {
+    await subscribe('neocodex_stream_error', () =>
+      listen<StreamErrorPayload>('neocodex_stream_error', (e) => handlers.onError?.(e.payload)),
     )
   }
   return () => {

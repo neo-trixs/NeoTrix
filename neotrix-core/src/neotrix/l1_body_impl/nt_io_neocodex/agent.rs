@@ -86,6 +86,16 @@ impl AgentState {
     }
 }
 
+/// 流式生成的最终结果。`error` 有值时表示 provider 阶段发生错误：
+/// 调用方应保留 `content`（已累积的 partial token）但**不**将其落盘为
+/// 合法助手消息（F1 修复：避免 `[provider error]` 污染 wire/context）。
+pub struct StreamOutcome {
+    /// 完整或部分生成内容
+    pub content: Option<String>,
+    /// provider 错误信息（None = 正常完成）
+    pub error: Option<String>,
+}
+
 pub struct NeoCodexAgent {
     pub config: NeoCodexConfig,
     pub state: AgentState,
@@ -790,12 +800,20 @@ impl NeoCodexAgent {
         max_steps: usize,
         mut on_token: F,
         mut on_tool: G,
-    ) -> Option<String>
+    ) -> StreamOutcome
     where
         F: FnMut(&str) -> bool + Send + Sync,
         G: FnMut(&str, &str, &str, u64, bool) -> bool + Send + Sync,
     {
-        let provider = self.provider.to_llm_provider()?;
+        let provider = match self.provider.to_llm_provider() {
+            Some(p) => p,
+            None => {
+                return StreamOutcome {
+                    content: None,
+                    error: Some("provider 未配置，无法开始生成".to_string()),
+                }
+            }
+        };
 
         let mut messages = self.build_messages(input);
         let mut step = 0;
@@ -805,7 +823,15 @@ impl NeoCodexAgent {
 
         while step < max_steps && !cancelled {
             Self::budget_react_messages(&mut messages, self.context.max_tokens);
-            let request = self.build_request(messages.clone())?;
+            let request = match self.build_request(messages.clone()) {
+                Some(r) => r,
+                None => {
+                    return StreamOutcome {
+                        content: if accumulated.is_empty() { None } else { Some(accumulated) },
+                        error: Some("请求构建失败（provider 参数无效）".to_string()),
+                    }
+                }
+            };
 
             let mut rx = match provider.stream_complete(&request).await {
                 Ok(rx) => rx,
@@ -818,7 +844,12 @@ impl NeoCodexAgent {
                             .unwrap_or_default()
                             .as_secs() as i64,
                     });
-                    return Some(format!("[provider error] {}", e));
+                    // F1: 保留已累积的 partial token，错误由调用方经事件呈现，
+                    // 不再把 "[provider error] …" 当作正常回答返回
+                    return StreamOutcome {
+                        content: if accumulated.is_empty() { None } else { Some(accumulated) },
+                        error: Some(e.to_string()),
+                    };
                 }
             };
 
@@ -849,7 +880,10 @@ impl NeoCodexAgent {
                                 .unwrap_or_default()
                                 .as_secs() as i64,
                         });
-                        return Some(format!("[provider error] {}", e));
+                        return StreamOutcome {
+                            content: if accumulated.is_empty() { None } else { Some(accumulated) },
+                            error: Some(e.to_string()),
+                        };
                     }
                 }
             }
@@ -872,7 +906,10 @@ impl NeoCodexAgent {
             // arbitrary commands despite the read-only contract. Skip tool
             // execution and return the drafted plan/response as the answer.
             if self.state.mode != NeoCodexMode::Agent {
-                return Some(response_content);
+                return StreamOutcome {
+                    content: Some(response_content),
+                    error: None,
+                };
             }
 
             match tool_call {
@@ -943,9 +980,15 @@ impl NeoCodexAgent {
         }
 
         if cancelled {
-            Some(accumulated)
+            StreamOutcome {
+                content: Some(accumulated),
+                error: None,
+            }
         } else {
-            final_answer
+            StreamOutcome {
+                content: final_answer,
+                error: None,
+            }
         }
     }
 
@@ -1722,7 +1765,8 @@ mod tests {
     #[test]
     fn test_react_loop_stream_no_provider_is_noop() {
         // D-streaming closure: without a resolvable provider the streaming
-        // loop must not panic and must return None (caller falls back).
+        // loop must not panic and must return an error outcome (F1: caller
+        // surfaces it via event, never persists it as a valid answer).
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let mut agent = NeoCodexAgent::new("react-stream-empty");
@@ -1745,7 +1789,8 @@ mod tests {
                     },
                 )
                 .await;
-            assert!(result.is_none());
+            assert!(result.content.is_none());
+            assert!(result.error.is_some(), "provider-less stream must error");
             assert!(seen.is_empty());
             assert!(tools.is_empty());
         });
