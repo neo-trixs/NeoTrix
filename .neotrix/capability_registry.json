@@ -8276,6 +8276,30 @@
       "rationale": "[蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
       "signal": 0.76,
       "promoted_at": 1787100585
+    },
+    {
+      "domain": "NT-MEMORY",
+      "capability": "architecture_decision",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '有界交接 (bounded handoff): 会话结束时把高信号上下文收敛为 ≤600 字符交接串供下一会话恢复, 而非重新解释架构/失败方法/未决问题。ai-memory 吸收接线到 SessionRecoveryManager.build_handoff — 跨会话连续性的通用模式。' 命中能力标签 'architecture_decision' 于域 Memory, 应强化对应能力节点",
+      "signal": 0.74,
+      "promoted_at": 1787104392
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "能力分类扫描窗口 (R-P109): 批量节点→能力映射时关键词分类只扫描 summary[:600]+title, 禁止扫全量 content — 全文扫描导致通用词过匹配 (batch2: 103/180 误归 NT-MEMORY/re",
+      "signal": 0.7,
+      "promoted_at": 1787104392
+    },
+    {
+      "domain": "NT-MIND",
+      "capability": "security_governance",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '可复用 agent skill 生产/评估/打包/治理四步 (yao-meta-skill + laoyao jqmciw): skill 作为可复用 AI 资产应四段式 (when-to-use/prereq/workflow/verification) + 质量门, 与 R-P108/五维质量门一致 — 外部 skill 治理方法论与 NeoTrix 收敛。' 命中能力标签 'security_governance' 于域 Mind, 应强化对应能力节点",
+      "signal": 0.7,
+      "promoted_at": 1787104392
     }
   ]
 }
