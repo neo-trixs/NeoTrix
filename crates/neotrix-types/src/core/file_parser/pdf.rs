@@ -82,6 +82,68 @@ pub struct PdfTextEdit {
     pub replace: Option<String>,
 }
 
+/// 查找覆盖 `text` 全部字形 (且非 .notdef 空字形) 的系统字体字节。
+///
+/// 非 Latin-1 替换文本 (西里尔/中文等) 需真实 TTF/OTF 嵌入; base14 Helvetica 仅支持
+/// Latin-1。返回首个完整覆盖的字体文件内容, 找不到返回 `None`。
+///
+/// 关键点:
+/// - **TTC 集合多 face 探测**: PingFang.ttc 等集合常把 CJK 字形放在后置 face
+///   (实测 face 0/1 无 CJK, face 2/3 才有), 必须遍历全部 face。
+/// - **跳过 .notdef**: `glyph_index` 对映射到空字形 (glyph 0) 的字符返回 `Some(0)`,
+///   须过滤, 否则选中的字体渲染为空白。
+/// - **优先顺序**: 先探测覆盖最广的单文件字体 (Arial Unicode.ttf 同时含 CJK+西里尔),
+///   再回退扫描常见系统字体目录。
+pub fn find_system_font_for_text(text: &str) -> Option<Vec<u8>> {
+    if text.is_empty() {
+        return None;
+    }
+    let mut candidates: Vec<std::path::PathBuf> = vec![
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf".into(),
+        "/System/Library/Fonts/PingFang.ttc".into(),
+        "/System/Library/Fonts/Supplemental/Songti.ttc".into(),
+        "/System/Library/Fonts/Supplemental/Arial.ttf".into(),
+        "/System/Library/Fonts/Supplemental/Georgia.ttf".into(),
+        "/System/Library/Fonts/Supplemental/Verdana.ttf".into(),
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf".into(),
+        "/usr/share/fonts/TTF/DejaVuSans.ttf".into(),
+        "C:\\Windows\\Fonts\\arial.ttf".into(),
+    ];
+    for dir in [
+        "/System/Library/Fonts",
+        "/System/Library/Fonts/Supplemental",
+        "/Library/Fonts",
+        "/usr/share/fonts/truetype",
+        "/usr/share/fonts",
+        "C:\\Windows\\Fonts",
+    ] {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for ent in rd.flatten() {
+                let p = ent.path();
+                let Some(ext) = p.extension().and_then(|e| e.to_str()) else { continue };
+                if matches!(ext, "ttf" | "otf" | "ttc" | "otc") {
+                    candidates.push(p);
+                }
+            }
+        }
+    }
+    for path in candidates {
+        let Ok(data) = std::fs::read(&path) else { continue };
+        let nfaces = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
+        for face_index in 0..nfaces {
+            let Ok(face) = ttf_parser::Face::parse(&data, face_index.into()) else {
+                continue;
+            };
+            if text.chars().all(|c| {
+                face.glyph_index(c).is_some_and(|g| g.0 != 0)
+            }) {
+                return Some(data);
+            }
+        }
+    }
+    None
+}
+
 /// 从文本操作 (Tj/TJ/') 中解码字符串 (按当前字体编码)。
 fn decode_text_operand(
     op: &lopdf::content::Operation,
@@ -742,6 +804,25 @@ impl FileParser {
 mod tests {
     use super::*;
     use lopdf::content::{Content, Operation};
+
+    #[test]
+    fn find_system_font_covers_cyrillic_and_cjk() {
+        // 西里尔: 候选列表首位 (Arial Unicode.ttf) 须完整覆盖。
+        let cyr = find_system_font_for_text("ЗАДВИЖКА");
+        assert!(
+            cyr.is_some(),
+            "西里尔替换应自动选中系统字体 (Arial Unicode/DejaVu)"
+        );
+        // 中文: 依赖 TTC 多 face 探测 (PingFang/Songti 后置 face 才有 CJK)。
+        let cjk = find_system_font_for_text("闸阀门");
+        assert!(
+            cjk.is_some(),
+            "CJK 替换应自动选中含 CJK 字形的系统字体 (多 face 探测)"
+        );
+        // 混合: 单字体同时覆盖中西文。
+        let mixed = find_system_font_for_text("阀З");
+        assert!(mixed.is_some(), "混合中西文应可找到单字体覆盖");
+    }
 
     /// 生成 FlateDecode 压缩内容流的最小 PDF (lopdf), 验证完整解析路径
     /// 而非正则回退 — 正则无法读取压缩流, 若回退则断言失败。
