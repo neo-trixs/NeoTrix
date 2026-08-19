@@ -123,14 +123,14 @@ impl WorkSpaceManager {
     pub fn load() -> Self {
         crate::core::nt_core_state::load("workspaces")
             .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_else(Self::new)
+            .unwrap_or_default()
     }
 
     /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
     pub fn load_with(conn: &rusqlite::Connection) -> Self {
         crate::core::nt_core_state::load_with(conn, "workspaces")
             .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_else(Self::new)
+            .unwrap_or_default()
     }
 
     pub fn scope_root(&self, id: &str) -> Option<PathBuf> {

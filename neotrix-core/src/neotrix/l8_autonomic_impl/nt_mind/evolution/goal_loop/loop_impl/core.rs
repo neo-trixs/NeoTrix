@@ -395,7 +395,7 @@ impl GoalLoop {
         let json = serde_json::to_string_pretty(&data)
             .map_err(|e| NeoTrixError::Serde(e.to_string()))?;
         crate::core::nt_core_state::save("goals", &json)
-            .map_err(|e| NeoTrixError::Io(e))
+            .map_err(NeoTrixError::Io)
     }
 
     pub fn load(&mut self) {

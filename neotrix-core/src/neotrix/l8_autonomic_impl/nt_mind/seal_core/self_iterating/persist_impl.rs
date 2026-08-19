@@ -43,9 +43,9 @@ impl ReasoningBrain {
             }
             None => {
                 crate::core::nt_core_state::save("brain", &brain_data)
-                    .map_err(|e| NeoTrixError::Io(e))?;
+                    .map_err(NeoTrixError::Io)?;
                 crate::core::nt_core_state::save("brain_metadata", &metadata_json)
-                    .map_err(|e| NeoTrixError::Io(e))?;
+                    .map_err(NeoTrixError::Io)?;
                 Ok(())
             }
         }

@@ -675,7 +675,7 @@ impl SelfIteratingBrain {
         let json = self.cortex.export_json();
         let data = serde_json::to_string_pretty(&json)
             .map_err(|e| NeoTrixError::Serde(format!("cortex序列化失败: {}", e)))?;
-        crate::core::nt_core_state::save("cortex", &data).map_err(|e| NeoTrixError::Io(e))
+        crate::core::nt_core_state::save("cortex", &data).map_err(NeoTrixError::Io)
     }
 
     /// 缺陷④: 证据持久化 (每 5 轮跨阶段证据 → KB kv_store state.seal_evidence)。
@@ -692,7 +692,7 @@ impl SelfIteratingBrain {
         });
         let data = serde_json::to_string_pretty(&evidence)
             .map_err(|e| NeoTrixError::Serde(format!("证据序列化失败: {}", e)))?;
-        crate::core::nt_core_state::save("seal_evidence", &data).map_err(|e| NeoTrixError::Io(e))
+        crate::core::nt_core_state::save("seal_evidence", &data).map_err(NeoTrixError::Io)
     }
 
     /// 缺陷④: 读取证据 — 重规划/steer 时慢进程可见此前各轮留下的证据历史。
