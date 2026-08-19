@@ -136,7 +136,6 @@ pub mod nt_core_observer_error;
 // ═══════════════════════════════════════════════════════════════════
 pub mod nt_core_accessor;
 pub mod nt_core_axiom_tree;
-pub mod nt_core_cache;
 pub mod nt_core_cap;
 pub mod nt_core_conn;
 pub mod nt_core_edit;
@@ -342,7 +341,6 @@ pub use nt_core_bank::{
     MemoryLifecycle, MemoryTier, ReasoningBank, ReasoningBankStats, ReasoningMemory,
     TemporalContext,
 };
-pub use nt_core_cache::{CacheStats, SemanticCache};
 pub use nt_core_cap::CapabilityVector;
 pub use nt_core_edit::{MicroEdit, ToolCall};
 pub use nt_core_graph::{EdgeRelation, HyperEdge, HyperGraph, HyperNode, HyperNodeType};
