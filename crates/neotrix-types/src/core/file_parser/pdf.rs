@@ -59,30 +59,33 @@ impl FileParser {
     /// 分页 PDF 文本提取 (公开生产路径, 供 CLI/example/消费方按页处理)。
     /// 走 lopdf 完整解析 (压缩流/ToUnicode/TJ), 逐页提取, 失败页跳过不 panic。
     /// 返回 (页号 1-based, 该页文本), 保持文档页序。
+    ///
+    /// 注意: lopdf `get_pages()` 的 key 是页序号 (1-based), `extract_text_chunks`
+    /// 同样接收页序号而非对象引用号; 且一页可能产生多个 chunk (按字体编码切分),
+    /// 必须逐页调用并拼接该页全部 chunk, 不能把扁平 chunk 列表与页号 zip 配对。
     pub fn extract_pdf_pages(data: &[u8]) -> Vec<(u32, String)> {
         let Ok(doc) = lopdf::Document::load_mem(data) else {
             return Vec::new();
         };
-        let page_nums: Vec<u32> = doc.get_pages().keys().copied().collect();
-        if page_nums.is_empty() {
+        let page_indices: Vec<u32> = doc.get_pages().keys().copied().collect();
+        if page_indices.is_empty() {
             return Vec::new();
         }
-        let chunks = doc.extract_text_chunks(&page_nums);
-        page_nums
-            .into_iter()
-            .zip(chunks)
-            .filter_map(|(page, chunk)| match chunk {
-                Ok(text) => {
-                    let trimmed = text.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        Some((page, trimmed.to_string()))
-                    }
+        let mut result = Vec::new();
+        for page_index in page_indices {
+            let chunks = doc.extract_text_chunks(&[page_index]);
+            let mut page_text = String::new();
+            for chunk in chunks {
+                match chunk {
+                    Ok(text) => page_text.push_str(text.trim()),
+                    Err(_) => continue,
                 }
-                Err(_) => None,
-            })
-            .collect()
+            }
+            if !page_text.is_empty() {
+                result.push((page_index, page_text));
+            }
+        }
+        result
     }
 
     pub(super) fn extract_pdf_spatial(data: &[u8]) -> Vec<SpatialBlock> {
@@ -296,6 +299,75 @@ mod tests {
         // 垃圾字节: 返回空 Vec, 不 panic
         let pages = FileParser::extract_pdf_pages(b"%PDF-1.7 not a real pdf");
         assert!(pages.is_empty());
+    }
+
+    #[test]
+    fn extract_pdf_pages_concatenates_multi_chunk_single_page() {
+        // reportlab 生成的 PDF 单页每个文本块独立 BT/ET, lopdf 按块/编码切多个 chunk。
+        // 修复前把扁平 chunk 列表与页号 zip 配对, 只取首个 chunk 导致整页文本丢失。
+        let mut doc = lopdf::Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Courier",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let content = Content {
+            operations: vec![
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                Operation::new("Td", vec![72.into(), 700.into()]),
+                Operation::new("Tj", vec![lopdf::Object::string_literal("Alpha line one")]),
+                Operation::new("ET", vec![]),
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                Operation::new("Td", vec![72.into(), 680.into()]),
+                Operation::new("Tj", vec![lopdf::Object::string_literal("Beta line two")]),
+                Operation::new("ET", vec![]),
+            ],
+        };
+        let content_id = doc.add_object(lopdf::Stream::new(
+            lopdf::Dictionary::new(),
+            content.encode().expect("encode content stream"),
+        ));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page.into()],
+            "Count" => 1,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        };
+        doc.objects.insert(pages_id, lopdf::Object::Dictionary(pages));
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        doc.compress();
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save test PDF");
+
+        let pages = FileParser::extract_pdf_pages(&buf);
+        assert_eq!(pages.len(), 1, "单页应聚合为一个条目, 得到 {pages:?}");
+        assert_eq!(pages[0].0, 1);
+        assert!(
+            pages[0].1.contains("Alpha line one"),
+            "应包含第一个 chunk, 得到 {:?}",
+            pages[0].1
+        );
+        assert!(
+            pages[0].1.contains("Beta line two"),
+            "应包含第二个 chunk, 得到 {:?}",
+            pages[0].1
+        );
     }
 
     #[test]
