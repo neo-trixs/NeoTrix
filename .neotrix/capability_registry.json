@@ -8510,6 +8510,14 @@
       "rationale": "[蒸馏-NT-GOVERNANCE] 聚合 3 条经验的模式: 并行会话环境的 git 提交纪律: commit 前必须先查暂存区 (git diff --cached --name-only) — 并行会话可能已 stage 文件, 精确",
       "signal": 0.76,
       "promoted_at": 1787121934
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1787122538
     }
   ]
 }

@@ -1,5 +1,37 @@
 use super::{FileParser, SpatialBlock, BlockType};
 
+/// 判断字符串是否为可读 PDF 文本 (而非 FlateDecode 压缩数据的伪匹配)。
+/// 压缩流乱码特征: 高控制字符密度 / 低可打印比例 / 无词边界。
+fn is_readable_pdf_text(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let total = s.chars().count();
+    if total < 2 {
+        return false;
+    }
+    let (readable, control, spaces) = s.chars().fold((0usize, 0usize, 0usize), |(r, c, sp), ch| {
+        if ch.is_alphabetic() || ch.is_ascii_digit() || ch.is_whitespace() || ch.is_ascii_punctuation() {
+            (r + 1, c, sp + usize::from(ch.is_whitespace()))
+        } else {
+            (r, c + 1, sp)
+        }
+    });
+    let readable_ratio = readable as f64 / total as f64;
+    let control_ratio = control as f64 / total as f64;
+    let space_ratio = spaces as f64 / total as f64;
+    // 可读字符占比 ≥ 80% 且控制字符 ≤ 10%: 判为真实文本
+    if readable_ratio < 0.8 || control_ratio > 0.1 {
+        return false;
+    }
+    // 长文本 (≥16 字符) 需存在词边界 (空白 ≥ 2%) 排除压缩乱码的无空格长串;
+    // 短文本 (单字/短词) 是可接受布局块, 不做词边界检查
+    if total >= 16 && space_ratio < 0.02 {
+        return false;
+    }
+    true
+}
+
 impl FileParser {
     /// PDF 文本提取 — 首选 lopdf 完整解析 (支持 FlateDecode 压缩流 / TJ 数组 / 字体映射),
     /// 失败或空结果时回退到朴素正则提取 (未压缩内容流)。
@@ -22,6 +54,35 @@ impl FileParser {
             return Ok(String::new());
         }
         doc.extract_text(&page_nums)
+    }
+
+    /// 分页 PDF 文本提取 (公开生产路径, 供 CLI/example/消费方按页处理)。
+    /// 走 lopdf 完整解析 (压缩流/ToUnicode/TJ), 逐页提取, 失败页跳过不 panic。
+    /// 返回 (页号 1-based, 该页文本), 保持文档页序。
+    pub fn extract_pdf_pages(data: &[u8]) -> Vec<(u32, String)> {
+        let Ok(doc) = lopdf::Document::load_mem(data) else {
+            return Vec::new();
+        };
+        let page_nums: Vec<u32> = doc.get_pages().keys().copied().collect();
+        if page_nums.is_empty() {
+            return Vec::new();
+        }
+        let chunks = doc.extract_text_chunks(&page_nums);
+        page_nums
+            .into_iter()
+            .zip(chunks)
+            .filter_map(|(page, chunk)| match chunk {
+                Ok(text) => {
+                    let trimmed = text.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some((page, trimmed.to_string()))
+                    }
+                }
+                Err(_) => None,
+            })
+            .collect()
     }
 
     pub(super) fn extract_pdf_spatial(data: &[u8]) -> Vec<SpatialBlock> {
@@ -77,7 +138,7 @@ impl FileParser {
                 if let Some(end) = line.rfind(')') {
                     if start < end && line[end..].contains("Tj") {
                         let text = &line[start + 1..end];
-                        if !text.is_empty() && text.chars().any(|c| c.is_alphabetic()) {
+                        if is_readable_pdf_text(text) {
                             blocks.push(SpatialBlock {
                                 x: cur_x,
                                 y: cur_y,
@@ -99,7 +160,7 @@ impl FileParser {
                     if let Some(end) = line.rfind(')') {
                         if start < end && (start == 0 || !line[..start].contains('\\')) {
                             let text = &line[start + 1..end];
-                            if text.len() > 3 && text.chars().filter(|&c| c.is_alphabetic()).count() > 3 {
+                            if is_readable_pdf_text(text) {
                                 blocks.push(SpatialBlock {
                                     x: 0.0,
                                     y: 0.0,
@@ -136,7 +197,13 @@ mod tests {
 
     /// 生成 FlateDecode 压缩内容流的最小 PDF (lopdf), 验证完整解析路径
     /// 而非正则回退 — 正则无法读取压缩流, 若回退则断言失败。
+    /// 每页一行文本: "NeoTrix PDF Extract Page N"
     fn compressed_pdf_bytes() -> Vec<u8> {
+        multi_page_pdf_bytes(&["NeoTrix PDF Extract"])
+    }
+
+    /// 多页压缩内容流 PDF: texts[i] 落第 i 页 (1-based)。
+    fn multi_page_pdf_bytes(texts: &[&str]) -> Vec<u8> {
         let mut doc = lopdf::Document::with_version("1.5");
         let pages_id = doc.new_object_id();
         let font_id = doc.add_object(dictionary! {
@@ -147,29 +214,37 @@ mod tests {
         let resources_id = doc.add_object(dictionary! {
             "Font" => dictionary! { "F1" => font_id },
         });
-        let content = Content {
-            operations: vec![
-                Operation::new("BT", vec![]),
-                Operation::new("Tf", vec!["F1".into(), 48.into()]),
-                Operation::new("Td", vec![100.into(), 600.into()]),
-                Operation::new(
-                    "Tj",
-                    vec![lopdf::Object::string_literal("NeoTrix PDF Extract")],
-                ),
-                Operation::new("ET", vec![]),
-            ],
-        };
-        let content_id =
-            doc.add_object(lopdf::Stream::new(lopdf::Dictionary::new(), content.encode().unwrap()));
-        let page = doc.add_object(dictionary! {
-            "Type" => "Page",
-            "Parent" => pages_id,
-            "Contents" => content_id,
-        });
+        let mut kids: Vec<lopdf::Object> = Vec::new();
+        for (i, text) in texts.iter().enumerate() {
+            let content = Content {
+                operations: vec![
+                    Operation::new("BT", vec![]),
+                    Operation::new("Tf", vec!["F1".into(), 48.into()]),
+                    Operation::new("Td", vec![100.into(), 600.into()]),
+                    Operation::new(
+                        "Tj",
+                        vec![lopdf::Object::string_literal(format!("{text} Page {}", i + 1))],
+                    ),
+                    Operation::new("ET", vec![]),
+                ],
+            };
+            let content_id = doc.add_object(lopdf::Stream::new(
+                lopdf::Dictionary::new(),
+                content
+                    .encode()
+                    .expect("encode PDF content stream for test"),
+            ));
+            let page = doc.add_object(dictionary! {
+                "Type" => "Page",
+                "Parent" => pages_id,
+                "Contents" => content_id,
+            });
+            kids.push(page.into());
+        }
         let pages = dictionary! {
             "Type" => "Pages",
-            "Kids" => vec![page.into()],
-            "Count" => 1,
+            "Kids" => kids,
+            "Count" => texts.len() as u32,
             "Resources" => resources_id,
             "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
         };
@@ -181,7 +256,7 @@ mod tests {
         doc.trailer.set("Root", catalog_id);
         doc.compress();
         let mut buf = Vec::new();
-        doc.save_to(&mut buf).unwrap();
+        doc.save_to(&mut buf).expect("save test PDF to buffer");
         buf
     }
 
@@ -201,5 +276,55 @@ mod tests {
         // 非 PDF 字节: lopdf 失败 → 正则回退为空 (不 panic, 不泄漏)
         let text = FileParser::extract_pdf_text(b"%PDF-1.7 junk not a real pdf");
         let _ = text;
+    }
+
+    #[test]
+    fn extract_pdf_pages_returns_ordered_page_text() {
+        let buf = multi_page_pdf_bytes(&["Alpha", "Beta", "Gamma"]);
+        let pages = FileParser::extract_pdf_pages(&buf);
+        assert_eq!(pages.len(), 3, "应返回 3 页, 得到 {pages:?}");
+        assert_eq!(pages[0].0, 1);
+        assert_eq!(pages[0].1, "Alpha Page 1");
+        assert_eq!(pages[1].0, 2);
+        assert_eq!(pages[1].1, "Beta Page 2");
+        assert_eq!(pages[2].0, 3);
+        assert_eq!(pages[2].1, "Gamma Page 3");
+    }
+
+    #[test]
+    fn extract_pdf_pages_handles_garbage_safely() {
+        // 垃圾字节: 返回空 Vec, 不 panic
+        let pages = FileParser::extract_pdf_pages(b"%PDF-1.7 not a real pdf");
+        assert!(pages.is_empty());
+    }
+
+    #[test]
+    fn spatial_filters_compressed_stream_garbage() {
+        // 模拟压缩流内字节: 高控制字符密度 (随机二进制经 UTF-8 lossy) 应被过滤
+        let garbage = "BT\n(\x00\x01\x02\x03\x7f\x01\x02 garbled \x00\x01) Tj\nET";
+        let blocks = FileParser::extract_pdf_spatial(garbage.as_bytes());
+        assert!(
+            blocks.is_empty(),
+            "压缩流乱码不应产生 spatial 块, 得到 {blocks:?}"
+        );
+    }
+
+    #[test]
+    fn spatial_keeps_readable_text() {
+        let pdf = b"%PDF-1.4\nBT\n1 0 0 1 100 700 Tm\n(Readable Hello World) Tj\nET";
+        let blocks = FileParser::extract_pdf_spatial(pdf);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].text, "Readable Hello World");
+    }
+
+    #[test]
+    fn spatial_filters_nonsense_alphabetic_burst() {
+        // 长二进制无空格 (压缩数据伪匹配): 即使含字母也应过滤
+        let nonsense = "BT\n(AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB) Tj\nET";
+        let blocks = FileParser::extract_pdf_spatial(nonsense.as_bytes());
+        assert!(
+            blocks.is_empty(),
+            "无词边界长串不应产生 spatial 块, 得到 {blocks:?}"
+        );
     }
 }
