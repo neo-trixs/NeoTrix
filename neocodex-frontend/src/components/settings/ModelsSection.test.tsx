@@ -21,9 +21,8 @@ const mount = (cfg: ProviderConfig) => {
   const [loading] = createSignal(false)
   const [switching] = createSignal(false)
   const onSwitch = vi.fn()
-  const onNotice = vi.fn()
   const utils = render(() => (
-    <ModelsSection config={config} loading={loading} switching={switching} onSwitchProvider={onSwitch} showNotice={onNotice} />
+    <ModelsSection config={config} loading={loading} switching={switching} onSwitchProvider={onSwitch} />
   ))
   return { ...utils, onSwitch }
 }

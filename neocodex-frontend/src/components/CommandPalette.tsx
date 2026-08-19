@@ -30,7 +30,7 @@ export function CommandPalette(props: Props) {
     const q = query().trim().toLowerCase()
     if (!q) return props.commands
     return props.commands.filter(
-      (c) => c.keywords.some((k) => k.includes(q)) || c.label.toLowerCase().includes(q),
+      (c) => c.keywords.some((k) => k.toLowerCase().includes(q)) || c.label.toLowerCase().includes(q),
     )
   }
 

@@ -8,7 +8,7 @@ import { neocodex, errText } from '../../api'
 import { listenUpdateEvents } from '../../api/system'
 import type { ProviderConfig } from '../../api/types'
 import { clsx } from 'clsx'
-import { InfoIcon, ExpandIcon, DataIcon } from './settingsIcons'
+import { InfoIcon, ExpandIcon } from './settingsIcons'
 
 interface Props {
   /** 应用版本访问器（父组件加载，只读展示） */
@@ -164,7 +164,7 @@ export function AboutSection(props: Props) {
       </div>
       <div class="ss-card">
         <div class="ss-card-header">
-          <DataIcon />
+          <InfoIcon />
           诊断信息
         </div>
         <div class="ss-card-body">

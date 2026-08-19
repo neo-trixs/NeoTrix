@@ -44,7 +44,6 @@ export interface ChatState {
   sessions: Session[]
   currentSessionId: string | null
   isGenerating: boolean
-  abortController: AbortController | null
   isLoadingSessions: boolean
   isLoadingMessages: boolean
 }
@@ -96,7 +95,6 @@ function createChatStore() {
     sessions: [],
     currentSessionId: null,
     isGenerating: false,
-    abortController: null,
     isLoadingSessions: false,
     isLoadingMessages: false,
   })
@@ -431,19 +429,13 @@ function createChatStore() {
     }))
   }
 
-  const setGenerating = (generating: boolean, controller?: AbortController): void => {
+  const setGenerating = (generating: boolean): void => {
     setState('isGenerating', generating)
-    if (controller) {
-      setState('abortController', controller)
-    } else if (!generating) {
-      setState('abortController', null)
-    }
   }
 
   const abortGeneration = (): void => {
-    state.abortController?.abort()
+    // 真实停止由 neocodex.stopStream 完成；此处仅复位 UI 状态
     setState('isGenerating', false)
-    setState('abortController', null)
   }
 
   /** 按目标消息定位重生成轮：截断被点 assistant 消息及之后全部消息，返回其所在轮的 user 内容 */

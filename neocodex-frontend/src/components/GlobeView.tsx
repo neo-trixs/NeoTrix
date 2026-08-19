@@ -1,4 +1,4 @@
-import { onMount, onCleanup, createSignal, createEffect, Show } from 'solid-js'
+import { onMount, onCleanup, createSignal, createEffect, Show, For } from 'solid-js'
 import Globe from 'globe.gl'
 import {
   geoPoints,
@@ -355,10 +355,12 @@ export function GlobeView(props: GlobeViewProps) {
       .catch((e: Error) => console.error('导出离线包失败:', e))
   }
 
-  // 列出离线包（简化：查询 trajectory 表中 kind='offline_pack' 的记录）
+  // 列出离线包：仅展示 kind='offline_pack' 的轨迹记录（修复混入普通轨迹）
   function listOfflinePacks() {
     trajectoryQuery()
-      .then((list: TrajectoryRecord[]) => setOfflinePacks(list))
+      .then((list: TrajectoryRecord[]) =>
+        setOfflinePacks(list.filter((p) => p.kind === 'offline_pack'))
+      )
       .catch((e: Error) => console.error('列出离线包失败:', e))
   }
 
@@ -422,8 +424,8 @@ export function GlobeView(props: GlobeViewProps) {
           </span>
         </div>
       </Show>
-      {/* C1/C2 usePack 扩展面板：轨迹记录 + 离线地图包 */}
-      {props.usePack && !loading() && !error() && (
+      {/* 轨迹记录 + 离线地图包面板：独立于 usePack 数据源，生产路径始终可达（审计 S3） */}
+      {!loading() && !error() && (
         <div class="absolute top-3 right-3 flex flex-col items-end gap-2">
           {/* 轨迹记录 */}
           <div class="flex items-center gap-2 rounded bg-slate-900/70 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
@@ -477,7 +479,26 @@ export function GlobeView(props: GlobeViewProps) {
             >
               📋 列表
             </button>
+            <Show when={offlinePacks().length > 0}>
+              <span class="text-[11px] text-slate-400 font-mono flex-shrink-0">
+                {offlinePacks().length} 包
+              </span>
+            </Show>
           </div>
+          <Show when={offlinePacks().length > 0}>
+            <div class="mt-2 rounded bg-slate-900/80 px-3 py-2 text-[11px] text-slate-300 backdrop-blur max-h-32 overflow-y-auto space-y-1">
+              <For each={offlinePacks()}>
+                {(p) => (
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-mono truncate">{p.name}</span>
+                    <span class="text-slate-500 flex-shrink-0">
+                      {p.distance_km.toFixed(0)} km
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
       )}
       <Show when={hovered()}>

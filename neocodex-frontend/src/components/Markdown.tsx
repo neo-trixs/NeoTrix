@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type JSX } from 'solid-js'
+import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Copy, Check } from 'lucide-solid'
 import { clsx } from 'clsx'
 
@@ -318,9 +318,11 @@ function renderBlock(block: Block): JSX.Element {
 /* ---------- 入口 ---------- */
 
 export function Markdown(props: { content: string; class?: string }) {
+  // memo：流式每 token 更新 content 时避免全量重解析（审计 F4 轻量版）
+  const blocks = createMemo(() => parseBlocks(props.content))
   return (
     <div class={clsx('markdown-body min-w-0', props.class)}>
-      <For each={parseBlocks(props.content)}>
+      <For each={blocks()}>
         {(block) => renderBlock(block)}
       </For>
     </div>

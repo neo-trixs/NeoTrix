@@ -1,7 +1,7 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { Monitor, X, RefreshCw, Loader2, MousePointerClick, Keyboard, AppWindow, Cpu } from 'lucide-solid'
 import { computer as computerApi, errText } from '../api'
-import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInfo } from '../api/types'
+import type { DisplayInfo, FrontmostApp, MousePosition, WindowInfo } from '../api/types'
 import { clsx } from 'clsx'
 
 // 截图+窗口枚举节流：时间戳提升到模块级，跨组件重挂载（切视图重挂载触发 onMount）仍生效，
@@ -82,6 +82,8 @@ export function ComputerUse(props: Props) {
       setFrontmost(front)
       await capture()
     } catch (e) {
+      // 回滚节流戳：失败后下次进入（onMount load）可自动重试，而非被节流挡住
+      lastSnapshotAt = 0
       setError(errText(e))
     } finally {
       setLoading(false)

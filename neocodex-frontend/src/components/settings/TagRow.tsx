@@ -51,7 +51,7 @@ export function TagRow(props: Props) {
           <For each={TAG_PALETTE}>
             {(c) => (
               <button
-                class="w-4 h-4 rounded-full border border-white/70 transition-transform hover:scale-115"
+                class="w-4 h-4 rounded-full border border-white/70 transition-transform hover:scale-110"
                 style={{ background: c, 'box-shadow': c === props.color ? '0 0 0 2px #fff, 0 0 0 4px rgba(240,145,58,0.6)' : undefined }}
                 onClick={() => { props.onColorChange(c); setPickerOpen(false) }}
                 aria-label={`设为 ${c}`}

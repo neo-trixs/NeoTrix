@@ -8,6 +8,7 @@ import { DataIcon, ExpandIcon } from './settingsIcons'
 
 interface Props {
   memStats: () => MemoryStats | null
+  memStatsLoaded: () => boolean
   dataBusy: () => boolean
   onExport: () => void
   onRequestClear: () => void
@@ -22,7 +23,13 @@ export function DataSection(props: Props) {
           记忆统计
         </div>
         <div class="ss-card-body">
-          <Show when={props.memStats()} fallback={<div class="text-xs text-text-muted py-2">加载记忆统计…</div>}>
+          <Show when={props.memStats()} fallback={
+            <div class="text-xs py-2">
+              <Show when={props.memStatsLoaded()} fallback={<span class="text-text-muted">加载记忆统计…</span>}>
+                <span class="text-text-muted">记忆统计不可用（非关键，其余功能正常）</span>
+              </Show>
+            </div>
+          }>
             {(ms) => (
               <div class="grid grid-cols-2 gap-2">
                 <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">

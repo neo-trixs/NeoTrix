@@ -27,7 +27,7 @@
   }
 
   ::-webkit-scrollbar {
-    @apply w-2 h-2;
+    @apply w-2.5 h-2.5;
   }
 
   ::-webkit-scrollbar-track {
@@ -35,15 +35,25 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full hover:bg-gray-400/60 transition-colors;
+    @apply bg-gray-300 rounded-full transition-colors;
+    border: 1px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #d8d8da;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background-color: #c7c7ca;
   }
 
   ::-webkit-scrollbar-thumb:vertical {
-    min-height: 40px;
+    min-height: 56px;
   }
 
   ::-webkit-scrollbar-thumb:horizontal {
-    min-width: 40px;
+    min-width: 56px;
   }
 }
 
@@ -339,6 +349,24 @@
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   }
   .ss-card-header svg { width: 15px; height: 15px; color: #f0913a; flex-shrink: 0; }
+
+  /* —— 浅橙电流细线图标（light-current 主题）：细线发光 + 流动 —— */
+  .nt-ic {
+    filter: drop-shadow(0 0 2.5px rgba(245, 168, 98, 0.45));
+    transition: filter 0.2s ease;
+  }
+  .nt-ic [fill='url(#nt-current-grad)'] {
+    filter: drop-shadow(0 0 3px rgba(245, 168, 98, 0.9));
+    animation: nt-ic-breathe 2.8s ease-in-out infinite;
+  }
+  .nt-ic:hover {
+    filter: drop-shadow(0 0 4px rgba(245, 168, 98, 0.65));
+  }
+  /* 电流节点呼吸：浅金→浅橙脉动（轻盈灵动） */
+  @keyframes nt-ic-breathe {
+    0%, 100% { opacity: 0.65; }
+    50% { opacity: 1; }
+  }
   .ss-card-body { padding: 12px 16px; }
   .ss-row {
     display: flex;
@@ -524,7 +552,7 @@
       inset 0 -10px 24px rgba(240, 145, 58, 0.04),
       0 1px 3px rgba(0, 0, 0, 0.04);
     backdrop-filter: blur(22px) saturate(1.6);
-    transition: border-color 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s cubic-bezier(0.22,1,0.36,1), background 0.25s ease;
+    transition: border-color 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s cubic-bezier(0.22,1,0.36,1), background 0.2s ease;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -550,7 +578,7 @@
     font-size: 14px;
     line-height: 1.5;
     color: #1a1a20;
-    min-height: 64px;
+    min-height: 52px;
     padding: 2px 2px;
   }
 
@@ -580,7 +608,7 @@
     justify-content: center;
     border-radius: 50%;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     color: #909098;
     border: none;
     background: transparent;
@@ -615,7 +643,7 @@
     justify-content: center;
     border-radius: 50%;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     border: none;
     background: transparent;
     color: #909098;
@@ -709,7 +737,7 @@
     border: 1px solid rgba(0, 0, 0, 0.06);
     cursor: pointer;
     color: #909098;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     font-family: inherit;
   }
   .qa-btn:focus-visible {
@@ -796,7 +824,7 @@
     flex: 1;
     text-align: center;
     outline: none;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     border-radius: 7px;
     padding: 6px 0;
     font-size: 10px;
@@ -1028,7 +1056,7 @@
     height: 14px;
     flex-shrink: 0;
     color: #909098;
-    transition: color 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: color 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .sf:hover .su-gear { color: #1a1a20; }
 
@@ -1132,7 +1160,7 @@
     backdrop-filter: blur(12px);
     color: #909098;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     opacity: 0;
     pointer-events: none;
   }
@@ -1218,7 +1246,7 @@
     cursor: pointer;
     font-size: 11px;
     color: #5a5a62;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     white-space: nowrap;
   }
   .ft-item:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
@@ -1321,7 +1349,7 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     background: transparent;
     color: #909098;
   }
@@ -1354,7 +1382,7 @@
     border-radius: 0;
     border: none;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     background: transparent;
     color: #909098;
     font-family: inherit;
@@ -1392,7 +1420,7 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .ap-footer .ap-action:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
   .ap-footer .ap-action svg {
@@ -1499,7 +1527,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-add:hover { background: rgba(240, 145, 58, 0.08); color: #f0913a; }
   .cw-add:focus-visible { outline: 2px solid #f0913a; outline-offset: 1px; }
@@ -1511,7 +1539,7 @@
     cursor: pointer;
     font-size: 11px;
     color: #5a5a62;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
     margin-bottom: 2px;
     border: none;
     background: transparent;
@@ -1595,7 +1623,7 @@
     width: 22px; height: 22px; border: none; background: rgba(0, 0, 0, 0.03);
     border-radius: 6px; cursor: pointer; color: #5a5a62;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-refresh-btn:hover { background: rgba(240, 145, 58, 0.08); color: #f0913a; }
   .cw-refresh-btn:focus-visible { outline: 2px solid #f0913a; outline-offset: 2px; }
@@ -1610,7 +1638,7 @@
   .cw-new-go {
     padding: 5px 10px; font-size: 11px; font-weight: 500; border: none; border-radius: 6px;
     background: #f0913a; color: #fff; cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-new-go:hover { background: #d43f3f; }
   .cw-new-go:focus-visible { outline: 2px solid #f0913a; outline-offset: 2px; }
@@ -1622,7 +1650,7 @@
     width: 24px; height: 24px; border: 1px solid rgba(0, 0, 0, 0.1); background: rgba(0, 0, 0, 0.02);
     border-radius: 6px; cursor: pointer; color: #5a5a62; font-size: 11px;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-ctl:hover { background: rgba(240, 145, 58, 0.08); color: #f0913a; }
   .cw-ctl:focus-visible { outline: 2px solid #f0913a; outline-offset: 2px; }

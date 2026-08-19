@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, fireEvent } from '@solidjs/testing-library'
 import { Chat } from '../routes/Chat'
-import { chatStore } from '../stores/chat'
 
 // Mock Tauri APIs
 vi.mock('@tauri-apps/api/core', () => ({

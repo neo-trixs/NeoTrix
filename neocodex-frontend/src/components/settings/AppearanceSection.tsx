@@ -4,7 +4,7 @@
    ════════════════════════════════════════════ */
 import { Show } from 'solid-js'
 import { clsx } from 'clsx'
-import { PaletteIcon, ExpandIcon, DataIcon, InfoIcon } from './settingsIcons'
+import { PaletteIcon, ExpandIcon, BoltIcon, InfoIcon } from './settingsIcons'
 
 export type FontSize = 'sm' | 'md' | 'lg'
 export type MotionPref = 'full' | 'reduced'
@@ -43,7 +43,7 @@ export function AppearanceSection(props: Props) {
           <ExpandIcon />
           界面字号
         </div>
-        <div class="ss-card-body space-y-2">
+        <div class="ss-card-body space-y-2" role="radiogroup" aria-label="界面字号">
           {(['sm', 'md', 'lg'] as FontSize[]).map((size) => (
             <button
               class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', props.fontSizePref() === size ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
@@ -60,10 +60,10 @@ export function AppearanceSection(props: Props) {
 
       <div class="ss-card">
         <div class="ss-card-header">
-          <DataIcon />
+          <BoltIcon />
           动效强度
         </div>
-        <div class="ss-card-body space-y-2">
+        <div class="ss-card-body space-y-2" role="radiogroup" aria-label="动效强度">
           <button
             class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', props.motionPref() === 'full' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
             onClick={() => props.setMotion('full')}
@@ -93,7 +93,7 @@ export function AppearanceSection(props: Props) {
           <InfoIcon />
           界面密度
         </div>
-        <div class="ss-card-body space-y-2">
+        <div class="ss-card-body space-y-2" role="radiogroup" aria-label="界面密度">
           <button
             class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', props.densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
             onClick={() => props.setDensity('comfortable')}

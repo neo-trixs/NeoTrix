@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@solidjs/testing-library'
+import { render, waitFor } from '@solidjs/testing-library'
 import { invoke } from '@tauri-apps/api/core'
 import { GlobeView } from './GlobeView'
 

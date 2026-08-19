@@ -261,6 +261,5 @@ export function PluginMarketplace(props: Props) {
 
 // Label helper for the default plugins dir (kept simple — matches backend default).
 function pluginsDirLabel(): string {
-  const home = typeof window !== 'undefined' ? '' : ''
-  return `${home}.config/neotrix/plugins`
+  return '~/.config/neotrix/plugins'
 }

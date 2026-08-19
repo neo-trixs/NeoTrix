@@ -7,25 +7,22 @@ import { createSignal, createEffect, Show, For } from 'solid-js'
 import { neocodex, errText } from '../../api'
 import type { McpServerInfo, McpToolInfo } from '../../api/types'
 import { clsx } from 'clsx'
+import { DataIcon } from './settingsIcons'
 
 interface Props {
   /** 通知回调（由父级注入，非关键） */
   showNotice: (msg: string) => void
 }
 
-function DataIcon() {
-  return (
-    <svg viewBox="0 0 14 14" class="w-3.5 h-3.5 text-nt-io-600" fill="none">
-      <ellipse cx="7" cy="3.5" rx="4.5" ry="1.8" stroke="currentColor" stroke-width="1.2" />
-      <path d="M2.5 3.5v3.5c0 1 2 1.8 4.5 1.8s4.5-.8 4.5-1.8V3.5" stroke="currentColor" stroke-width="1.2" />
-      <path d="M2.5 7v3.5c0 1 2 1.8 4.5 1.8s4.5-.8 4.5-1.8V7" stroke="currentColor" stroke-width="1.2" />
-    </svg>
-  )
-}
+/* 模块级缓存：MCP 数据跨挂载保留（R-P42 单次接线）。
+   设置页每次进入都会重建 McpSection，若无缓存则每次重拉 IPC——
+   此处首次加载后复用，注册成功时失效 tools 缓存以反映新服务器工具。 */
+let mcpCacheServers: McpServerInfo[] | null = null
+let mcpCacheTools: McpToolInfo[] | null = null
 
 export function McpSection(props: Props) {
-  const [mcpServers, setMcpServers] = createSignal<McpServerInfo[]>([])
-  const [mcpToolList, setMcpToolList] = createSignal<McpToolInfo[]>([])
+  const [mcpServers, setMcpServers] = createSignal<McpServerInfo[]>(mcpCacheServers ?? [])
+  const [mcpToolList, setMcpToolList] = createSignal<McpToolInfo[]>(mcpCacheTools ?? [])
   const [mcpLoading, setMcpLoading] = createSignal(false)
   const [mcpBusy, setMcpBusy] = createSignal(false)
   const [showMcpTools, setShowMcpTools] = createSignal(false)
@@ -34,9 +31,17 @@ export function McpSection(props: Props) {
   const [mcpArgs, setMcpArgs] = createSignal('')
 
   const loadMcp = async () => {
+    // 缓存命中：直接复用，避免每次进入设置页重拉（审计 S4：无谓 IPC）
+    if (mcpCacheServers !== null && mcpCacheTools !== null) {
+      setMcpServers(mcpCacheServers)
+      setMcpToolList(mcpCacheTools)
+      return
+    }
     setMcpLoading(true)
     try {
       const [servers, tools] = await Promise.all([neocodex.mcpList(), neocodex.mcpTools()])
+      mcpCacheServers = servers
+      mcpCacheTools = tools
       setMcpServers(servers)
       setMcpToolList(tools)
     } catch (e) {
@@ -57,6 +62,8 @@ export function McpSection(props: Props) {
     setMcpBusy(true)
     try {
       const servers = await neocodex.mcpRegister(name, command, args)
+      mcpCacheServers = servers
+      mcpCacheTools = null // 新服务器带工具，失效缓存重拉工具列表
       setMcpServers(servers)
       setMcpName('')
       setMcpCommand('')
@@ -119,11 +126,12 @@ export function McpSection(props: Props) {
             class="flex items-center gap-1 text-[11px] text-nt-io-600 hover:text-nt-io-700"
             onClick={() => setShowMcpTools(!showMcpTools())}
             aria-expanded={showMcpTools()}
+            aria-controls="mcp-tool-list"
           >
             {showMcpTools() ? '▾' : '▸'} 查看工具（{mcpToolList().length}）
           </button>
           <Show when={showMcpTools()}>
-            <div class="space-y-1 max-h-40 overflow-y-auto">
+            <div id="mcp-tool-list" class="space-y-1 max-h-40 overflow-y-auto">
               <For each={mcpToolList()}>
                 {(tool) => (
                   <div class="px-2 py-1 rounded bg-bg-primary/40 text-[11px] font-mono break-all">

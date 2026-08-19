@@ -1,6 +1,6 @@
 import { createSignal, onMount, For, Show } from 'solid-js'
 import { neocodex, system, errText } from '../api'
-import type { ProjectTreeItem, ProjectView } from '../api/types'
+import type { ProjectTreeItem } from '../api/types'
 import { clsx } from 'clsx'
 import { GlobeView } from './GlobeView'
 import { ProjectView as ProjectViewPanel } from './ProjectView'
@@ -32,7 +32,9 @@ function toFileNode(item: ProjectTreeItem): FileNode {
     name: item.name,
     type: item.is_dir ? 'dir' : 'file',
     path: item.path,
-    open: item.is_dir && item.children != null && item.children.length > 0,
+    // 默认折叠：大项目首帧全展开会渲染数万 DOM 节点（审计 S3）。
+    // 用户展开的路径经 collectOpenPaths/applyOpen 在刷新时保留。
+    open: false,
     children: item.children?.map(toFileNode),
   }
 }

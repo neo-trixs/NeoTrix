@@ -82,7 +82,6 @@ export function Sidebar(props: SidebarProps) {
   const [searchQuery, setSearchQuery] = createSignal('')
   // 搜索按钮引用：关闭搜索后焦点还原（Bug 3）
   let searchButtonRef: HTMLButtonElement | undefined
-  let searchInputRef: HTMLInputElement | undefined
   let viewTabsRef: HTMLDivElement | undefined
   // 会话列表容器引用：删除/归档当前会话后焦点回移最近邻条目
   let sessionListRef: HTMLDivElement | undefined
@@ -546,6 +545,22 @@ export function Sidebar(props: SidebarProps) {
 
           {/* 会话列表（按时间/项目分组）；showArchived 时切换为归档箱视图 */}
           <div ref={sessionListRef} class="flex-1 overflow-y-auto px-3 pb-4">
+            {/* 会话操作错误内联提示（对标 GitPanel toast；6s 自动消失） */}
+            <Show when={sidebarError()}>
+              {(err) => (
+                <div
+                  class="mx-1 mt-2 px-2.5 py-1.5 rounded-lg text-[11px] leading-snug bg-nt-shield-500/10 text-nt-shield-600 border border-nt-shield-500/20 flex items-start gap-1.5"
+                  role="alert"
+                >
+                  <svg viewBox="0 0 12 12" class="w-3.5 h-3.5 mt-px flex-shrink-0" fill="none">
+                    <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.1" />
+                    <line x1="6" y1="3.5" x2="6" y2="6.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+                    <circle cx="6" cy="8.2" r="0.6" fill="currentColor" />
+                  </svg>
+                  <span class="min-w-0 flex-1">{err()}</span>
+                </div>
+              )}
+            </Show>
             <Show
               when={!showArchived()}
               fallback={

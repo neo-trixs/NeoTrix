@@ -11,7 +11,7 @@ import type { ProviderConfig, ProviderMeta } from '../../api/types'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
 import { ModelIcon, CheckIcon, ActiveDotIcon } from './settingsIcons'
 
-/** 提供商分类分组（对齐 GeneralSection CATEGORY_ORDER，随迁独立） */
+/** 提供商分类分组（对齐 ProviderIcon 分类徽章：本地绿/代理琥珀/云端蓝） */
 const CATEGORY_ORDER = ['local', 'proxy', 'cloud', 'unknown'] as const
 const CATEGORY_TITLE: Record<string, string> = {
   local: '本地推理',
@@ -31,7 +31,6 @@ interface Props {
   loading: () => boolean
   switching: () => boolean
   onSwitchProvider: (name: string) => void
-  showNotice: (msg: string) => void
 }
 
 /** 只保留"可用"提供商（resolvable=true：name 映射到真实 LlmProviderType） */
@@ -98,7 +97,7 @@ export function ModelsSection(props: Props) {
                       </div>
                     </div>
                     <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium flex-shrink-0', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
-                      {cfg().resolvable ? '网关就绪' : '网关不可达'}
+                      {cfg().resolvable ? 'API 可达' : 'API 不可达'}
                     </span>
                   </div>
                 </div>
@@ -150,7 +149,7 @@ export function ModelsSection(props: Props) {
                                   </div>
                                 </div>
                                 {/* 模型列表：代理池行 */}
-                                <div class="px-2 pb-2 flex flex-col gap-1">
+                                <div class="px-2 pb-2 flex flex-col gap-1" role="radiogroup" aria-label={`${p.display_name} 模型池`}>
                                   <For each={p.models}>
                                     {(modelId) => {
                                       const isActive = modelId === cfg().active_model

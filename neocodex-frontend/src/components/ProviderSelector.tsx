@@ -2,7 +2,7 @@ import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid
 import { ChevronDown, Loader2, Check, AlertCircle } from 'lucide-solid'
 import { clsx } from 'clsx'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
-import { neocodex } from '../api'
+import { neocodex, errText } from '../api'
 import type { ProviderConfig } from '../api/types'
 
 /* ════════════════════════════════════════════
@@ -47,7 +47,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
       const result = await neocodex.providerConfig()
       setConfig(result)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '获取提供商配置失败'
+      const msg = errText(err) || '获取提供商配置失败'
       setError(msg)
       console.error('[ProviderSelector] Failed to load config:', err)
     } finally {
@@ -65,7 +65,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
       // 广播提供商变更，Chat 状态栏 / 其他监听方即时刷新
       window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name: providerName } }))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '切换提供商失败'
+      const msg = errText(err) || '切换提供商失败'
       setError(msg)
       console.error('[ProviderSelector] Failed to switch provider:', err)
     } finally {

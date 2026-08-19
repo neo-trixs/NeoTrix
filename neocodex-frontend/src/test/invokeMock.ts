@@ -7,7 +7,6 @@
    - 未注册命令默认抛「未 mock」错误，防遗漏（Dark Forest 纪律）。
    - 支持按命令注册 handler、once、断言调用次数。
    ════════════════════════════════════════════ */
-import { vi } from 'vitest'
 
 type InvokeHandler = (args?: Record<string, unknown>) => unknown | Promise<unknown>
 

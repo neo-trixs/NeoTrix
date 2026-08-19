@@ -143,6 +143,7 @@ export function TagsSection(props: Props) {
                 <span
                   class="w-6 h-6 rounded-full border border-white/70 shadow-sm"
                   style={{ background: c }}
+                  role="img"
                   aria-label={`色板 ${c}`}
                 />
               )}

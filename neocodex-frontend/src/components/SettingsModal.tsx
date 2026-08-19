@@ -58,6 +58,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [densityPref, setDensityPref] = createSignal<'comfortable' | 'compact'>('comfortable')
   const [fontSizePref, setFontSizePref] = createSignal<'sm' | 'md' | 'lg'>('md')
   const [memStats, setMemStats] = createSignal<MemoryStats | null>(null)
+  const [memStatsLoaded, setMemStatsLoaded] = createSignal(false)
   const [dataBusy, setDataBusy] = createSignal(false)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
   // 热更新状态（对标 Cursor/Claude 更新流：检查 → 下载进度 → 重启安装）
@@ -156,7 +157,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const loadMemStats = async () => {
     try {
       setMemStats(await memory.memoryStats())
-    } catch { /* 记忆统计非关键 */ }
+    } catch { /* 记忆统计非关键 */ } finally {
+      setMemStatsLoaded(true)
+    }
   }
 
   const loadAppVersion = async () => {
@@ -494,10 +497,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 <Show when={loading() && !config()}>
                   <div class="text-xs text-text-muted py-6 text-center">加载配置…</div>
                 </Show>
-                <Show when={config()}>
+                <Show when={config()} fallback={<Show when={!loading()}><div class="text-xs text-text-muted py-6 text-center">配置加载失败，请关闭后重试</div></Show>}>
                   <GeneralSection
                     config={config}
-                    loading={loading}
                     activeProvider={activeProvider}
                     apiKey={apiKey}
                     setApiKey={setApiKey}
@@ -515,7 +517,6 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   loading={loading}
                   switching={switching}
                   onSwitchProvider={switchProvider}
-                  showNotice={showNotice}
                 />
               </Show>
               <Show when={section() === 'appearance'}>
@@ -534,6 +535,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
               <Show when={section() === 'data'}>
                 <DataSection
                   memStats={memStats}
+                  memStatsLoaded={memStatsLoaded}
                   dataBusy={dataBusy}
                   onExport={exportMemory}
                   onRequestClear={requestClearMemory}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, waitFor } from '@solidjs/testing-library'
 import { CheckpointTimeline } from './CheckpointTimeline'
-import { mockInvokeImpl, mockCommand, resetInvokeMock } from '../test/invokeMock'
+import { mockCommand, resetInvokeMock } from '../test/invokeMock'
 
 vi.mock('@tauri-apps/api/core', async () => {
   const { mockInvokeImpl } = await import('../test/invokeMock')

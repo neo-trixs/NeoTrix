@@ -1,6 +1,5 @@
 import { clsx } from 'clsx'
 import { Show } from 'solid-js'
-import type { ProviderMeta } from '../api/types'
 
 /* ════════════════════════════════════════════
    ProviderIcon — LLM 第三方统一品牌标识（对标 Slack/Linear brand avatar）

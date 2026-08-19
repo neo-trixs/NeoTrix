@@ -1,6 +1,6 @@
 import { createSignal, createEffect, Show } from 'solid-js'
 import { RefreshCw, ExternalLink, MonitorPlay, Loader2, X } from 'lucide-solid'
-import { neocodex } from '../api'
+import { neocodex, errText } from '../api'
 import { clsx } from 'clsx'
 
 /* 批次5：Live Preview 面板 —— 内嵌本地 dev server 预览（对标 Spedy/UI-Inspector/Nimbalyst live preview）。
@@ -36,14 +36,19 @@ export function LivePreview(props: Props) {
     setProbing(true)
     setError(null)
     setDetected(null)
+    let workspace = ''
     try {
       const proj = await neocodex.getProject()
-      const workspace = proj || ''
+      workspace = proj || ''
+    } catch (e) {
+      console.error('[LivePreview] getProject failed:', e)
+    }
+    try {
       for (const port of COMMON_PORTS) {
         try {
           const ctrl = new AbortController()
           const t = setTimeout(() => ctrl.abort(), 1200)
-          const resp = await fetch(`http://localhost:${port}`, {
+          await fetch(`http://localhost:${port}`, {
             method: 'HEAD',
             signal: ctrl.signal,
             cache: 'no-store',
@@ -77,7 +82,7 @@ export function LivePreview(props: Props) {
     try {
       await neocodex.openExternal(url())
     } catch (e) {
-      setError(e instanceof Error ? e.message : '打开外部浏览器失败')
+      setError(errText(e) || '打开外部浏览器失败')
     } finally {
       setBusy(false)
     }
@@ -87,8 +92,16 @@ export function LivePreview(props: Props) {
   const frameSrc = () => {
     const base = url()
     if (!base) return ''
-    const sep = base.includes('?') ? '&' : '?'
-    return `${base}${sep}preview_t=${frameKey()}`
+    // URL 对象构造：避免含 # 片段的地址把参数拼进 fragment 导致刷新失效（审计 S4）
+    try {
+      const u = new URL(base)
+      u.searchParams.set('preview_t', String(frameKey()))
+      return u.toString()
+    } catch {
+      // 非完整 URL（如相对路径）：退回字符串拼接
+      const sep = base.includes('?') ? '&' : '?'
+      return `${base}${sep}preview_t=${frameKey()}`
+    }
   }
 
   const pickPort = (port: number) => setUrl(`http://localhost:${port}`)

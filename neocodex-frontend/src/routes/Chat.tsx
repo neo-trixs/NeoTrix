@@ -114,6 +114,9 @@ export function Chat() {
   const [infoNotice, setInfoNotice] = createSignal<string | null>(null)
   // 信息通知计时器：新通知接管旧计时器，避免快速触发（如连按 Shift+Tab）时旧计时器误清新通知
   let infoNoticeTimer: ReturnType<typeof setTimeout> | undefined
+  // F10: 流式看门狗——onDone 永不到达（传输丢失/后端异常退出）时强制复位，
+  // 防止 isGenerating 永久卡死输入。启动于 sendMessage，清除于 onDone/stop/失败。
+  let streamWatchdogTimer: ReturnType<typeof setTimeout> | undefined
   const showInfo = (msg: string, ms = 3000) => {
     if (infoNoticeTimer) clearTimeout(infoNoticeTimer)
     setInfoNotice(msg)
@@ -177,6 +180,9 @@ export function Chat() {
   const [compacting, setCompacting] = createSignal(false)
   const runCompact = async () => {
     if (compacting()) return
+    // F9: 流式进行中禁压缩——后端 compact 阻塞在 agent 互斥锁上直至流结束，
+    // 期间正流式的消息可能被 keep=8 裁掉，onDone 随后 no-op 造成三方不一致
+    if (isGenerating()) return
     const sessionId = currentSession()?.id ?? ''
     if (!sessionId) {
       setStreamError('当前没有激活会话，无法压缩')
@@ -193,7 +199,7 @@ export function Chat() {
       showInfo('上下文已压缩，更早的对话被截断', 3000)
     } catch (error) {
       console.error('[Chat] Compact session failed:', error)
-      const errorMsg = error instanceof Error ? error.message : '压缩会话失败，请重试'
+      const errorMsg = errText(error) || '压缩会话失败，请重试'
       setStreamError(errorMsg)
       setTimeout(() => setStreamError(null), 3000)
     } finally {
@@ -423,6 +429,7 @@ export function Chat() {
 
         chatStore.setGenerating(false)
         setCurrentAssistantMsgId(null)
+        if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
       },
       onTool: (payload) => {
         if (activeGen !== generation) return
@@ -519,6 +526,13 @@ export function Chat() {
     }
     audioStream?.getTracks().forEach((t) => t.stop())
     audioStream = null
+    // F5: 流式进行中卸载（路由切换 / → /chat 或 /globe）时复位 store——
+    // 否则重挂后 isGenerating 恒 true 锁死发送守卫，且流式消息红色光标永久残留
+    if (isGenerating()) {
+      chatStore.abortGeneration()
+      const msgId = currentAssistantMsgId()
+      if (msgId) chatStore.finishMessage(msgId)
+    }
   })
 
   // 消息区自动滚动：新消息/会话切换强制到底，流式期间若在底部则跟随
@@ -684,7 +698,10 @@ export function Chat() {
 
   // 核心发送：addMessage(user) → addMessage(assistant placeholder) → invoke
   // opts.userMessageAdded = true 表示用户消息已由编辑/重生成逻辑写入，跳过重复添加
-  const sendMessage = async (content: string, opts?: { userMessageAdded?: boolean }) => {
+  // opts.regenerate = true 表示 re-发被截断后保留的用户消息（wire 已含该轮，
+  //   后端跳过重复 record/context.push，修复 wire 双写）；编辑路径保持 false
+  //   （被编辑的用户消息已随 truncate 移除，需重新落盘）
+  const sendMessage = async (content: string, opts?: { userMessageAdded?: boolean; regenerate?: boolean }) => {
     if (!content || isGenerating()) return
 
     if (!currentSession()) {
@@ -694,8 +711,9 @@ export function Chat() {
     // 新消息开始即清除旧批准条（含批准后同轮延续的二次发送，避免残留）
     setPlanPending(null)
 
+    let userMsgId: string | null = null
     if (!opts?.userMessageAdded) {
-      chatStore.addMessage({ role: 'user', content })
+      userMsgId = chatStore.addMessage({ role: 'user', content })
     }
     const atts = pendingAttachments()
     setInputValue('')
@@ -714,12 +732,26 @@ export function Chat() {
     setCurrentAssistantMsgId(assistantMsgId)
     chatStore.setGenerating(true)
 
+    // F10: 启动看门狗。上限 600s（超长任务仍保活）；onDone/stop/失败路径清除
+    if (streamWatchdogTimer) clearTimeout(streamWatchdogTimer)
+    streamWatchdogTimer = setTimeout(() => {
+      if (!isGenerating()) return
+      console.error('[Chat] Stream watchdog fired: no done event, force resetting')
+      setStreamError('回复超时，请重试')
+      setTimeout(() => setStreamError(null), 3000)
+      const msgId = currentAssistantMsgId()
+      if (msgId) chatStore.finishMessage(msgId)
+      chatStore.setGenerating(false)
+      setCurrentAssistantMsgId(null)
+      generation++
+    }, 600_000)
+
     try {
       // 流式生成经统一 IPC 层；实际 token 由 neocodex_stream_* 事件推送
       await neocodex.sendMessageStream({
         content,
         attachments: atts.length > 0 ? atts : undefined,
-        regenerate: false,
+        regenerate: opts?.regenerate ?? false,
         permission_mode: permissionMode(),
         temperature: 0.7,
         max_tokens: 4096,
@@ -727,19 +759,21 @@ export function Chat() {
       // The actual streaming happens via events (neocodex_stream_token, etc.)
     } catch (error) {
       console.error('[Chat] Send message failed:', error)
-      const errorMsg = error instanceof Error ? error.message : '发送失败，请重试'
+      const errorMsg = errText(error) || '发送失败，请重试'
       setStreamError(errorMsg)
       // 3s 自动清除（对标 runCompact 自清模式，避免错误 toast 永不消失）
       setTimeout(() => setStreamError(null), 3000)
 
-      // Update the assistant message with error
-      if (assistantMsgId) {
-        chatStore.updateMessage(assistantMsgId, `❌ ${errorMsg}`, false)
-      }
+      // F8: 失败时移除本地占位消息（user + error 两者 wire 中均不存在）——
+      // 残留会让后续 regenerate/edit 的可见索引与 wire 错位，截断到错误位置。
+      // 错误反馈由上方 streamError toast（3s 自动清）承担，不需持久化占位。
+      if (userMsgId) chatStore.deleteMessage(userMsgId)
+      if (assistantMsgId) chatStore.deleteMessage(assistantMsgId)
       chatStore.setGenerating(false)
       // 作废旧代次：丢弃本次失败发送可能触发的迟到事件
       generation++
       setCurrentAssistantMsgId(null)
+      if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
     }
   }
 
@@ -882,9 +916,13 @@ export function Chat() {
       chatStore.finishMessage(msgId)
     }
     setCurrentAssistantMsgId(null)
+    if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
   }
 
   const handleRegenerate = (message: Message) => {
+    // 流式进行中禁止 regenerate：本地截断 + 重发若被 isGenerating 守卫吞掉，
+    // 会出现"会话已截断但无新回复"的三方不一致（审计 F2）
+    if (isGenerating()) return
     // 持久化对齐：先计算可见索引再截断——regenerateFrom 会先移除该 assistant 消息，
     // 若在其后读 currentMessages 已找不到 message.id。可见索引 = 前端数组中
     // user/assistant 消息计数（tool/system 不计数，与后端 visible_message_indices 对齐）。
@@ -907,12 +945,14 @@ export function Chat() {
       if (sid && visibleIdx >= 0) {
         neocodex.regenerate(sid, visibleIdx).catch((e: Error) => {
           console.error('[Chat] 持久化重新生成失败（本地已截断，重载后可能回退）:', e)
-          setStreamError(e.message ?? '重新生成失败')
+          setStreamError(errText(e) || '重新生成失败')
           setTimeout(() => setStreamError(null), 3000)
         })
       }
       // regenerateFrom 已截断被点消息所在轮（及之后），用户消息保留，跳过重复添加
-      sendMessage(userContent, { userMessageAdded: true })
+      // regenerate: true — wire 已含该用户轮（neocodex_regenerate 的 truncate 保留之），
+      // 后端跳过重复 record/context.push，修复双写（审计 F3）
+      sendMessage(userContent, { userMessageAdded: true, regenerate: true })
     }
   }
 
@@ -922,6 +962,8 @@ export function Chat() {
   }
 
   const handleSaveEdit = () => {
+    // 流式进行中禁止编辑重发（审计 F2：本地截断 + 重发被守卫吞 → 会话截断无响应）
+    if (isGenerating()) return
     const content = editContent().trim()
     const msgId = editingMessageId()
     if (msgId && content) {
@@ -1320,7 +1362,7 @@ export function Chat() {
                           isEditing && 'opacity-0'
                         )}>
                           <div class="flex items-center gap-1">
-                            {message.role === 'assistant' && !message.isStreaming && (
+                            {message.role === 'assistant' && !message.isStreaming && !isGenerating() && (
                               <>
                                 <button
                                   class={actionBtnClass}
@@ -1340,7 +1382,7 @@ export function Chat() {
                                 </button>
                               </>
                             )}
-                            {message.role === 'user' && !message.isStreaming && (
+                            {message.role === 'user' && !message.isStreaming && !isGenerating() && (
                               <button
                                 class={actionBtnClass}
                                 onClick={() => handleEditMessage(message)}
@@ -1571,7 +1613,7 @@ export function Chat() {
               <div class="cic">
                 <textarea
                   ref={setTextareaRef}
-                  class="flex-1 bg-transparent border-none resize-none min-h-[26px] max-h-[160px] py-2 text-[13.5px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
+                  class="flex-1 bg-transparent border-none resize-none min-h-[52px] max-h-[240px] py-2 text-[14px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
                   placeholder={isGenerating() ? '生成中仍可输入，下一条稍后发送…' : '输入消息… (Enter 发送, Shift+Enter 换行)'}
                   value={inputValue()}
                   onInput={handleInput}

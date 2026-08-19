@@ -11,7 +11,6 @@ import { ExpandIcon, InfoIcon } from './settingsIcons'
 
 interface Props {
   config: () => ProviderConfig | null
-  loading: () => boolean
   activeProvider: () => ProviderMeta | null
   apiKey: () => string
   setApiKey: (v: string) => void
@@ -35,19 +34,24 @@ export function GeneralSection(props: Props) {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <Show when={props.activeProvider()} fallback={<span class="w-8 h-8 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[14px] font-semibold flex-shrink-0">?</span>}>
-                {(ap) => (
-                  <>
-                    <ProviderIcon name={ap().name} />
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-[13px] font-medium text-text-primary truncate">{ap().display_name}</span>
-                        <CategoryBadge category={ap().category} />
-                        <Show when={ap().is_free}><FreeBadge free /></Show>
+                {(ap) => {
+                  const matched = props.config()?.providers.some((p) => p.model === props.config()?.active_model)
+                  return (
+                    <>
+                      <ProviderIcon name={ap().name} />
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-[13px] font-medium text-text-primary truncate">{ap().display_name}</span>
+                          <CategoryBadge category={ap().category} />
+                          <Show when={ap().is_free}><FreeBadge free /></Show>
+                        </div>
+                        <div class={clsx('text-[11px] font-mono truncate mt-0.5', matched ? 'text-text-muted' : 'text-nt-shield-600')}>
+                          {matched ? props.config()?.active_model : '模型未匹配，请前往「模型」标签选择'}
+                        </div>
                       </div>
-                      <div class="text-[11px] text-text-muted font-mono truncate mt-0.5">{props.config()?.active_model}</div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )
+                }}
               </Show>
             </div>
             <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium flex-shrink-0', props.config()?.resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
