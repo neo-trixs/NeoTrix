@@ -8486,6 +8486,30 @@
       "promoted_at": 1787104392,
       "rationale": "经验 '可复用 agent skill 生产/评估/打包/治理四步 (yao-meta-skill + laoyao jqmciw): skill 作为可复用 AI 资产应四段式 (when-to-use/prereq/workflow/verification) + 质量门, 与 R-P108/五维质量门一致 — 外部 skill 治理方法论与 NeoTrix 收敛。' 命中能力标签 'security_governance' 于域 Mind, 应强化对应能力节点",
       "signal": 0.7
+    },
+    {
+      "domain": "NT-MEMORY",
+      "capability": "hybrid_retrieval",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-MEMORY] 聚合 4 条经验的模式: neotrix-experience absorb 支持 stdin 直写 KB (跳过本地中转文件): cmd_absorb 原只读文件路径, 现支持 '-' 读 stdin (与 absorb-node 对称, experience.rs cmd_absorb 模式匹配)。agent 可 `cat session.json | neotrix-exper [关键词: absorb, experience, 蒸馏, cmd, cycle, fts, json, memory]' 命中能力标签 'hybrid_retrieval' 于域 Memory, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1787121934
+    },
+    {
+      "domain": "NT-META",
+      "capability": "performance_concurrency",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-META] 聚合 3 条经验的模式: 运行时数据文件 (如 capability_registry.json) 被并发会话格式重排 (json.dump indent=1) 时, 整个文件合并为单个 diff hunk, git add -p 无法精确分离自己的追加。权衡: 若内容自洽有效 JSON 且需落盘, 整体提交并在 commit message 如实注明含格式重排与并发内容; 否则留工 [关键词: capability, json, registry]' 命中能力标签 'performance_concurrency' 于域 Meta, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1787121934
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-GOVERNANCE] 聚合 3 条经验的模式: 并行会话环境的 git 提交纪律: commit 前必须先查暂存区 (git diff --cached --name-only) — 并行会话可能已 stage 文件, 精确",
+      "signal": 0.76,
+      "promoted_at": 1787121934
     }
   ]
 }
