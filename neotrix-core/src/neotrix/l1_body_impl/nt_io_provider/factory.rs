@@ -17,7 +17,7 @@ use super::free_catalog::FreeModelCatalog;
 use super::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
 use super::gateway::GatewayV2;
 use super::provider_catalog::{ProviderCategory, CommunicationProfile};
-use crate::core::nt_io_telemetry::CostTracker;
+use crate::core::nt_core_span::CostTracker;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]

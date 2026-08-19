@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType};
 use crate::core::nt_core_e8::e8_abduction_bridge::E8AbductionBridge;
 use crate::core::nt_core_self_test::SelfTest;
-use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmError, LlmRequest};
+use crate::core::nt_core_llm::{LlmError, LlmRequest};
 
 // ─────────────────────────────────────────────────────────────
 // ① 结构化事件（Ding 2015: Actor-Action-Object + 时效衰减）

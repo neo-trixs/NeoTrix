@@ -27,7 +27,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_prm::{AgentTrajectory, ScoredCriterion};
-use crate::neotrix::l1_body_impl::nt_io_provider::{LlmProvider, LlmRequest};
+use crate::core::nt_core_llm::{LlmProvider, LlmRequest};
 
 // ───────────────────────────── 基础类型 ─────────────────────────────
 
@@ -857,7 +857,7 @@ impl LLMJudgeAdapter {
         let request = LlmRequest::new(&self.model, &self.prompt(input))
             .with_temperature(Some(0.2))
             .with_max_tokens(max_tokens)
-            .with_structured_output(crate::neotrix::l1_body_impl::nt_io_provider::types::StructuredOutputConfig::JsonObject);
+            .with_structured_output(crate::core::nt_core_llm::StructuredOutputConfig::JsonObject);
         let response = self.provider.complete(&request).await;
         match response {
             Ok(resp) => {

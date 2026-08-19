@@ -17,7 +17,7 @@
 
 // 公开 re-exports of telemetry types from core layer
 #[cfg(feature = "telemetry")]
-pub use crate::core::nt_io_telemetry::{
+pub use crate::core::nt_core_span::{
     AttributeValue, ConsoleTracer, CostTracker, NoopTracer, SpanKind, Tracer,
 };
 

@@ -882,7 +882,7 @@ impl SelfIteratingBrain {
         use crate::core::nt_core_ttc::{TtcEngine, TtcConfig};
         use crate::core::nt_core_trajectory_compress::CompressionLevel;
         use crate::core::l7_capability::nt_core_antidistil::AntiDistillationSystem;
-        use crate::core::nt_io_telemetry::{ConsoleTracer, CostTracker};
+        use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
         use crate::core::nt_core_prm::{ProcessRewardLearner, HeuristicCoach};
         use crate::core::nt_core_policy::E8Policy;
         use crate::core::nt_core_e8::nt_core_fable_pattern::FablePatternMatcher;

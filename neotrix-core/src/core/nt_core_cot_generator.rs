@@ -5,9 +5,7 @@
 //! 这是 Kernel 与 LLM 解耦的关键桥梁：Kernel 做"推理骨架"，CoTGenerator 做"语言肉"。
 
 use crate::core::nt_core_reasoning::ReasoningTrace;
-use crate::neotrix::l1_body_impl::nt_io_provider::types::{
-    LlmError, LlmProvider, LlmRequest, Message, Role,
-};
+use crate::core::nt_core_llm::{LlmError, LlmProvider, LlmRequest, Message, Role};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -257,7 +255,7 @@ impl CoTGenerator for DefaultCoTGenerator {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: if self.config.structured_output {
-                Some(crate::neotrix::l1_body_impl::nt_io_provider::types::StructuredOutputConfig::JsonObject)
+                Some(crate::core::nt_core_llm::StructuredOutputConfig::JsonObject)
             } else {
                 None
             },

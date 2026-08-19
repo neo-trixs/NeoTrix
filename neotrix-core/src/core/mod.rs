@@ -152,7 +152,8 @@ pub mod nt_core_traits;
 pub mod nt_core_wbmem;
 pub mod nt_core_ws;
 pub mod nt_io_cache;
-pub mod nt_io_telemetry;
+pub mod nt_core_span;
+pub mod nt_core_llm;
 
 pub mod nt_core_answer_engine;
 pub mod nt_core_arch_fitness;

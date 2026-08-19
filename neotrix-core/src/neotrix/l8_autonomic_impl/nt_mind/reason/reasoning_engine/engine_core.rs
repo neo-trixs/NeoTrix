@@ -22,7 +22,7 @@ use crate::core::nt_core_prm::ProcessRewardLearner;
 use crate::core::nt_core_aura::IntentEngine;
 use crate::core::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
 
-use crate::core::nt_io_telemetry::{AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer};
+use crate::core::nt_core_span::{AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer};
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
 use crate::core::nt_core_observer::OneObserver;
