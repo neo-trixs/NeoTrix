@@ -8,11 +8,12 @@ import { memory, neocodex, errText, fs as fsApi } from '../api'
 import { storageGet, storageSet } from '../lib/env'
 import type { MemoryStats, ProviderConfig } from '../api/types'
 import { GeneralSection } from './settings/GeneralSection'
+import { ModelsSection } from './settings/ModelsSection'
 import { AppearanceSection } from './settings/AppearanceSection'
 import { DataSection } from './settings/DataSection'
 import { TagsSection } from './settings/TagsSection'
 import { AboutSection } from './settings/AboutSection'
-import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon } from './settings/settingsIcons'
+import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon, ModelIcon } from './settings/settingsIcons'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v3）
@@ -24,10 +25,11 @@ import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIco
    ════════════════════════════════════════════ */
 
 /** 提供商分类分组（对标 Claude Desktop 分类设置） */
-type SectionId = 'general' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
+type SectionId = 'general' | 'models' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
 
 const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'general', label: '通用', icon: ExpandIcon },
+  { id: 'models', label: '模型', icon: ModelIcon },
   { id: 'appearance', label: '外观', icon: PaletteIcon },
   { id: 'plugins', label: '插件', icon: PluginsIcon },
   { id: 'data', label: '数据', icon: DataIcon },
@@ -38,7 +40,7 @@ const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
 /* 分组侧栏导航（对标 osaurus ManagementView 分组结构）：
    常规 General / 扩展 Extensions / 数据 Data / 系统 System */
 const NAV_GROUPS: { title: string; ids: SectionId[] }[] = [
-  { title: '常规', ids: ['general', 'appearance'] },
+  { title: '常规', ids: ['general', 'models', 'appearance'] },
   { title: '扩展', ids: ['plugins'] },
   { title: '数据', ids: ['data', 'tags'] },
   { title: '系统', ids: ['about'] },
@@ -410,7 +412,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       return (
                         <button
                           class={clsx(
-                            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[12.5px] transition-colors',
+                            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[12.5px] transition-colors relative',
                             isActive
                               ? 'bg-nt-io-500/12 text-nt-io-700 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
                               : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
@@ -445,7 +447,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                             <s.icon />
                           </span>
                           <span class="flex-1 text-left truncate">{s.label}</span>
-                          {isActive && <span class="w-2 h-2 rounded-full bg-nt-io-500 flex-shrink-0" />}
+                          {isActive && <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500 flex-shrink-0" />}
                         </button>
                       )
                     }}
@@ -467,7 +469,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     {sectionById(section()).label}
                   </div>
                   <div class="text-[11px] text-text-muted">
-                    {section() === 'general' && '模型提供商与运行参数'}
+                    {section() === 'general' && '提供商与 API 密钥'}
+                    {section() === 'models' && '可用模型代理池'}
                     {section() === 'appearance' && '界面视觉与动效'}
                     {section() === 'plugins' && '技能插件与扩展'}
                     {section() === 'data' && '记忆与数据管理'}
@@ -496,17 +499,24 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     config={config}
                     loading={loading}
                     activeProvider={activeProvider}
-                    switching={switching}
                     apiKey={apiKey}
                     setApiKey={setApiKey}
                     hasKey={hasKey}
                     keyBusy={keyBusy}
-                    onSwitchProvider={switchProvider}
                     onSaveApiKey={saveApiKey}
                     onRequestDeleteKey={requestDeleteKey}
                     showNotice={showNotice}
                   />
                 </Show>
+              </Show>
+              <Show when={section() === 'models'}>
+                <ModelsSection
+                  config={config}
+                  loading={loading}
+                  switching={switching}
+                  onSwitchProvider={switchProvider}
+                  showNotice={showNotice}
+                />
               </Show>
               <Show when={section() === 'appearance'}>
                 <AppearanceSection

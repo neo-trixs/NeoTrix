@@ -1,49 +1,25 @@
 /* ════════════════════════════════════════════
-   components/settings/GeneralSection.tsx — 通用：提供商 + API 密钥 + MCP
-   provider 分组逻辑自包含（CATEGORY_ORDER 随迁）；API 密钥操作经父组件回调。
+   components/settings/GeneralSection.tsx — 通用：当前提供商 + API 密钥 + MCP
+   提供商列表/模型池已迁至 ModelsSection（模型标签，只展示可用模型）。
    ════════════════════════════════════════════ */
-import { For, Show } from 'solid-js'
+import { Show } from 'solid-js'
 import { clsx } from 'clsx'
 import type { ProviderConfig, ProviderMeta } from '../../api/types'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
 import { McpSection } from './McpSection'
-import { ExpandIcon, DataIcon, InfoIcon } from './settingsIcons'
-
-/** 提供商分类分组（对标 Claude Desktop 分类设置） */
-const CATEGORY_ORDER = ['local', 'proxy', 'cloud', 'unknown'] as const
-const CATEGORY_TITLE: Record<string, string> = {
-  local: '本地推理 · 数据不出设备',
-  proxy: '自定义代理 · OpenAI 兼容中转',
-  cloud: '云端 API · 需密钥',
-  unknown: '其他',
-}
+import { ExpandIcon, InfoIcon } from './settingsIcons'
 
 interface Props {
   config: () => ProviderConfig | null
   loading: () => boolean
   activeProvider: () => ProviderMeta | null
-  switching: () => boolean
   apiKey: () => string
   setApiKey: (v: string) => void
   hasKey: () => boolean | null
   keyBusy: () => boolean
-  onSwitchProvider: (name: string) => void
   onSaveApiKey: () => void
   onRequestDeleteKey: () => void
   showNotice: (msg: string) => void
-}
-
-const providerGroups = (cfg: ProviderConfig) => {
-  const groups: { category: string; title: string; providers: ProviderMeta[] }[] = []
-  for (const cat of CATEGORY_ORDER) {
-    const list = cfg.providers.filter((p) => (p.category ?? 'unknown') === cat)
-    if (list.length > 0) {
-      groups.push({ category: cat, title: CATEGORY_TITLE[cat] ?? cat, providers: list })
-    }
-  }
-  const rest = cfg.providers.filter((p) => !CATEGORY_ORDER.includes((p.category ?? 'unknown') as (typeof CATEGORY_ORDER)[number]))
-  if (rest.length > 0) groups.push({ category: 'unknown', title: '其他', providers: rest })
-  return groups
 }
 
 export function GeneralSection(props: Props) {
@@ -78,64 +54,6 @@ export function GeneralSection(props: Props) {
               {props.config()?.resolvable ? 'API 可达' : 'API 不可达'}
             </span>
           </div>
-        </div>
-      </div>
-
-      {/* 提供商列表 — 按分类分组 */}
-      <div class="ss-card">
-        <div class="ss-card-header">
-          <DataIcon />
-          {props.config()?.provider_count} 个提供商
-        </div>
-        <div class="ss-card-body space-y-4">
-          <For each={props.config() ? providerGroups(props.config()!) : []}>
-            {(group) => (
-              <div>
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-[10px] uppercase tracking-[0.1em] text-text-muted/80 font-medium">{group.title}</span>
-                  <span class="text-[9px] text-text-muted/60 font-mono">{group.providers.length}</span>
-                </div>
-                <div class="space-y-2">
-                  <For each={group.providers}>
-                    {(p) => {
-                      const isActive = p.model === props.config()?.active_model
-                      return (
-                        <button
-                          class={clsx(
-                            'w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl border transition-colors',
-                            isActive
-                              ? 'border-nt-io-500/40 bg-nt-io-500/6'
-                              : 'border-border-primary/50 bg-white/40 hover:bg-white/70'
-                          )}
-                          onClick={() => !isActive && props.onSwitchProvider(p.name)}
-                          disabled={props.switching()}
-                          role="radio"
-                          aria-checked={isActive}
-                        >
-                          <div class="flex items-center gap-3 min-w-0">
-                            <ProviderIcon name={p.name} size="sm" />
-                            <div class="min-w-0">
-                              <div class="flex items-center gap-1.5">
-                                <span class="text-[12.5px] text-text-primary font-medium truncate">{p.display_name}</span>
-                                <Show when={p.is_free}><FreeBadge free /></Show>
-                              </div>
-                              <div class="text-[10.5px] text-text-muted font-mono truncate">{p.model}</div>
-                            </div>
-                          </div>
-                          <div class="flex items-center gap-2 flex-shrink-0">
-                            <CategoryBadge category={p.category} className="hidden sm:inline-flex" />
-                            <Show when={isActive}>
-                              <span class="text-[10px] text-nt-io-600 font-medium">✓ 当前</span>
-                            </Show>
-                          </div>
-                        </button>
-                      )
-                    }}
-                  </For>
-                </div>
-              </div>
-            )}
-          </For>
         </div>
       </div>
 

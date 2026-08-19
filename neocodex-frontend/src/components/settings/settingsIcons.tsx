@@ -87,3 +87,34 @@ export function TagIcon() {
     </svg>
   )
 }
+
+/* ── 模型：代理池语义（层叠立方体 + 外扩节点） ── */
+export function ModelIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none">
+      {/* 层叠模型层 + 顶部外扩节点（模型池/代理池语义） */}
+      <rect x="3.5" y="4" width="9" height="3" rx="1" stroke="currentColor" stroke-width="1.2" />
+      <rect x="5" y="8" width="6" height="3" rx="1" stroke="currentColor" stroke-width="1.2" />
+      <circle cx="8" cy="1.8" r="1" stroke="currentColor" stroke-width="1.1" />
+      <line x1="8" y1="2.8" x2="8" y2="4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+      <line x1="3.5" y1="11" x2="2" y2="11" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.4" />
+      <line x1="12.5" y1="11" x2="14" y2="11" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.4" />
+    </svg>
+  )
+}
+
+export function CheckIcon(props: { class?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" fill="none" class={props.class}>
+      <path d="M2.5 6.2l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  )
+}
+
+export function ActiveDotIcon(props: { class?: string }) {
+  return (
+    <svg viewBox="0 0 8 8" fill="currentColor" class={props.class}>
+      <circle cx="4" cy="4" r="3.2" />
+    </svg>
+  )
+}
