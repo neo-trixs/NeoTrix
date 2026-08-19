@@ -42,6 +42,9 @@ use sha2::{Digest, Sha256};
 use crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict;
 use crate::neotrix::l1_body_impl::nt_agent_mcp_registry::{McpRegistry, McpToolDef};
 use crate::neotrix::l1_body_impl::nt_shield_audit::{AuditMode, AuditReport, CheckResult, CheckStatus};
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::{
+    kb_write_guard, WriteGuardVerdict,
+};
 
 // ---------------------------------------------------------------------------
 // N → 4 Tool Folding
@@ -387,6 +390,40 @@ pub fn glob_match(pattern: &str, text: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// KB action-aware governance (dbx absorb, G2 agent 侧)
+// ---------------------------------------------------------------------------
+
+/// KB 写工具名 — 命中这些工具时走动作分级裁决 (kb_write_guard)。
+pub const KB_WRITE_TOOLS: &[&str] = &["neotrix_kb_write", "kb_write"];
+
+/// 对 KB 写工具做动作分级裁决, 复用确定性的 `kb_write_guard` (纯函数, 无 I/O)。
+/// 与独立 McpServer 守卫 (`run_mcp_server` 的 `kb_tier`) 同源, 保证两条 MCP 面
+/// 的裁决一致 (R-P42: 不建平行裁决器)。
+///
+/// 返回:
+///   - `Some(SandboxVerdict::Approved)` — Tier2 可逆写 (node:create/update、
+///     edge:upsert、kv:set), 守卫校验通过。
+///   - `Some(SandboxVerdict::RequiresApproval)` — Tier3/4 (删除无 force、
+///     embedding:backfill)。
+///   - `Some(SandboxVerdict::Denied)` — 校验失败 (空字段/受保护命名空间/
+///     未知 action)。
+///   - `None` — 非 KB 写工具, 由策略规则裁决。
+pub fn kb_action_verdict(name: &str, args: &Value) -> Option<SandboxVerdict> {
+    if !KB_WRITE_TOOLS.iter().any(|t| *t == name) {
+        return None;
+    }
+    let action = args
+        .get("action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("node:create");
+    match kb_write_guard(action, args) {
+        WriteGuardVerdict::Allow => Some(SandboxVerdict::Approved),
+        WriteGuardVerdict::RequiresApproval => Some(SandboxVerdict::RequiresApproval),
+        WriteGuardVerdict::Reject(_) => Some(SandboxVerdict::Denied),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Hash-chain evidence
 // ---------------------------------------------------------------------------
 
@@ -597,10 +634,14 @@ impl<'a> McpGateway<'a> {
         fold_tool_specs_from_defs(self.registry.list_tools())
     }
 
-    /// Governed call: policy check → HITL gate → existing `call_tool`.
-    /// Every outcome (allow / deny / blocked-on-approval / executed / failed)
-    /// is appended to the registry hash chain.
+    /// Governed call: KB 动作分级 → policy check → HITL gate → existing
+    /// `call_tool`. Every outcome (allow / deny / blocked-on-approval /
+    /// executed / failed) is appended to the registry hash chain.
     pub fn call(&self, name: &str, args: &Value) -> Result<GatewayCall, String> {
+        // KB 写工具先走动作分级 (确定性覆写策略, 策略仅按工具名裁决)。
+        if let Some(verdict) = kb_action_verdict(name, args) {
+            return self.govern_kb_call(name, args, verdict);
+        }
         let verdict = self.policy.borrow().check(name);
         match verdict {
             SandboxVerdict::Denied => {
@@ -618,6 +659,39 @@ impl<'a> McpGateway<'a> {
                         .record_evidence(name, args, verdict, false, None);
                     return Err(format!(
                         "MCP governance: tool '{}' requires human approval (not granted)",
+                        name
+                    ));
+                }
+                self.execute(name, args, true)
+            }
+            SandboxVerdict::Approved => self.execute(name, args, false),
+        }
+    }
+
+    /// 依据 KB 动作分级裁决执行: 拒绝直接阻断, 需审批走 HITL gate, 放行执行。
+    /// 与 `call` 主路径共享 `execute` + 证据记录, 保证 hash-chain 全覆盖。
+    fn govern_kb_call(
+        &self,
+        name: &str,
+        args: &Value,
+        verdict: SandboxVerdict,
+    ) -> Result<GatewayCall, String> {
+        match verdict {
+            SandboxVerdict::Denied => {
+                self.registry
+                    .record_evidence(name, args, verdict, false, None);
+                Err(format!(
+                    "MCP governance: KB write '{}' rejected by kb_write_guard",
+                    name
+                ))
+            }
+            SandboxVerdict::RequiresApproval => {
+                let approved = self.gate_approval(name, args);
+                if !approved {
+                    self.registry
+                        .record_evidence(name, args, verdict, false, None);
+                    return Err(format!(
+                        "MCP governance: KB write '{}' requires human approval (not granted)",
                         name
                     ));
                 }
@@ -1183,6 +1257,134 @@ mod tests {
         assert!(search.member_tools.iter().any(|n| n == "neotrix_search"));
         assert!(reg.gateway().folding().savings_percent >= 0.0);
         let _ = TransportMode::Local { command: "sh".into(), args: vec![] };
+    }
+
+    // -- KB action-aware governance (dbx absorb, G2 agent 侧) ----------------
+
+    #[test]
+    fn test_kb_action_verdict_tier_mapping() {
+        // Tier2 可逆写 → Approved
+        let ok = serde_json::json!({
+            "action": "node:create",
+            "title": "hello world",
+            "url": "https://example.com",
+        });
+        assert_eq!(
+            kb_action_verdict("neotrix_kb_write", &ok),
+            Some(SandboxVerdict::Approved)
+        );
+        // 校验失败 → Denied
+        let bad = serde_json::json!({"action": "node:create", "title": ""});
+        assert_eq!(
+            kb_action_verdict("neotrix_kb_write", &bad),
+            Some(SandboxVerdict::Denied)
+        );
+        // Tier3 删除无 force → RequiresApproval
+        let del = serde_json::json!({"action": "node:delete", "id": "abc"});
+        assert_eq!(
+            kb_action_verdict("neotrix_kb_write", &del),
+            Some(SandboxVerdict::RequiresApproval)
+        );
+        // force 置位 → Approved
+        let del_f = serde_json::json!({"action": "node:delete", "id": "abc", "force": true});
+        assert_eq!(
+            kb_action_verdict("neotrix_kb_write", &del_f),
+            Some(SandboxVerdict::Approved)
+        );
+        // Tier4 embedding 重建 → RequiresApproval
+        assert_eq!(
+            kb_action_verdict("neotrix_kb_write", &serde_json::json!({"action": "embedding:backfill"})),
+            Some(SandboxVerdict::RequiresApproval)
+        );
+        // 受保护命名空间 → Denied
+        assert_eq!(
+            kb_action_verdict("kb_write", &serde_json::json!({"action": "kv:set", "namespace": "secrets", "key": "k", "value": "v"})),
+            Some(SandboxVerdict::Denied)
+        );
+        // 未知 action → Denied
+        assert_eq!(
+            kb_action_verdict("neotrix_kb_write", &serde_json::json!({"action": "rm:everything"})),
+            Some(SandboxVerdict::Denied)
+        );
+        // 非 KB 写工具 → None (策略裁决)
+        assert_eq!(kb_action_verdict("neotrix_kb_get", &ok), None);
+        assert_eq!(kb_action_verdict("shell:curl", &ok), None);
+    }
+
+    #[test]
+    fn test_gateway_kb_write_rejected_by_guard() {
+        let mut reg = McpRegistry::new();
+        reg.publish("neotrix_kb_write", "nonexistent-cmd-xyz", &[], "KB write");
+        let gw = reg.gateway(); // 默认 permissive 策略
+        let err = gw
+            .call(
+                "neotrix_kb_write",
+                &serde_json::json!({"action": "node:create", "title": ""}),
+            )
+            .unwrap_err();
+        assert!(err.contains("rejected by kb_write_guard"), "got: {}", err);
+        assert!(reg.chain_valid(), "denial must be evidenced on the hash chain");
+        let chain = reg.evidence_chain();
+        let ev = chain.entries.last().expect("evidence appended");
+        assert_eq!(ev.verdict, SandboxVerdict::Denied);
+    }
+
+    #[test]
+    fn test_gateway_kb_write_requires_approval_hitl() {
+        let mut reg = McpRegistry::new();
+        reg.publish("neotrix_kb_write", "nonexistent-cmd-xyz", &[], "KB write");
+        // 无 HITL gate → 删除类写被拦在审批门外。
+        let gw = reg.gateway();
+        let err = gw
+            .call(
+                "neotrix_kb_write",
+                &serde_json::json!({"action": "node:delete", "id": "abc"}),
+            )
+            .unwrap_err();
+        assert!(err.contains("requires human approval"), "got: {}", err);
+        let chain = reg.evidence_chain();
+        let ev = chain.entries.last().expect("evidence appended");
+        assert_eq!(ev.verdict, SandboxVerdict::RequiresApproval);
+        // HITL gate 拒绝 → 仍阻断。
+        let gw = reg.gateway();
+        gw.set_approval_gate(|_, _| false);
+        let err = gw
+            .call(
+                "neotrix_kb_write",
+                &serde_json::json!({"action": "node:delete", "id": "abc"}),
+            )
+            .unwrap_err();
+        assert!(err.contains("requires human approval"));
+        // HITL gate 放行 → 到达执行层 (spawn 失败, 但不再是审批错误)。
+        let gw = reg.gateway();
+        gw.set_approval_gate(|_, _| true);
+        let err = gw
+            .call(
+                "neotrix_kb_write",
+                &serde_json::json!({"action": "node:delete", "id": "abc"}),
+            )
+            .unwrap_err();
+        assert!(!err.contains("requires human approval"), "must reach execution: {}", err);
+        assert!(err.contains("failed"), "execution attempt recorded: {}", err);
+    }
+
+    #[test]
+    fn test_gateway_kb_write_approved_executes() {
+        let mut reg = McpRegistry::new();
+        reg.publish("neotrix_kb_write", "nonexistent-cmd-xyz", &[], "KB write");
+        let gw = reg.gateway();
+        let err = gw
+            .call(
+                "neotrix_kb_write",
+                &serde_json::json!({"action": "node:create", "title": "ok", "url": "https://example.com"}),
+            )
+            .unwrap_err();
+        assert!(!err.contains("rejected"), "must pass the guard: {}", err);
+        assert!(!err.contains("requires human approval"));
+        assert!(err.contains("failed"), "execution attempt recorded: {}", err);
+        let chain = reg.evidence_chain();
+        let ev = chain.entries.last().expect("evidence appended");
+        assert_eq!(ev.verdict, SandboxVerdict::Approved);
     }
 
     // -- PTC (arXiv 2608.06370) tests --------------------------------------

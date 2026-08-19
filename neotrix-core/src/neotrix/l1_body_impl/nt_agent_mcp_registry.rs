@@ -415,6 +415,51 @@ impl McpRegistry {
         args: &Value,
         policy: &crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::GovernancePolicy,
     ) -> Result<String, String> {
+        // KB 写工具先走动作分级 (确定性覆写策略) — 与 McpGateway::call 同源。
+        if let Some(verdict) =
+            crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::kb_action_verdict(name, args)
+        {
+            return match verdict {
+                crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Denied => {
+                    self.record_evidence(name, args, verdict, false, None);
+                    Err(format!(
+                        "MCP governance: KB write '{}' rejected by kb_write_guard",
+                        name
+                    ))
+                }
+                crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::RequiresApproval => {
+                    self.record_evidence(name, args, verdict, false, None);
+                    Err(format!(
+                        "MCP governance: KB write '{}' requires human approval (not granted)",
+                        name
+                    ))
+                }
+                crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Approved => {
+                    match self.call_tool(name, args) {
+                        Ok(content) => {
+                            self.record_evidence(
+                                name,
+                                args,
+                                verdict,
+                                false,
+                                Some(truncate_for_evidence(&content, 256)),
+                            );
+                            Ok(content)
+                        }
+                        Err(e) => {
+                            self.record_evidence(
+                                name,
+                                args,
+                                verdict,
+                                false,
+                                Some(format!("ERROR: {}", e)),
+                            );
+                            Err(e)
+                        }
+                    }
+                }
+            };
+        }
         let verdict = policy.check(name);
         match verdict {
             crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Denied => {
