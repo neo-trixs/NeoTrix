@@ -5,7 +5,7 @@
 
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
-pub use crate::neotrix::{ReasoningMethod, Vector, EVOLUTION, KERNEL_DIM};
+pub use crate::core::nt_core_kernel_types::{EVOLUTION, KERNEL_DIM, ReasoningMethod, Vector};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

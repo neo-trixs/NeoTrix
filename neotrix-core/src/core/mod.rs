@@ -70,6 +70,7 @@ pub mod nt_core_e8_vsa;
 pub mod nt_core_forecast;
 pub mod nt_core_gate;
 pub mod nt_core_hex;
+pub mod nt_core_kernel_types;
 pub mod nt_core_plan;
 pub mod nt_core_policy;
 pub mod nt_core_prm;
