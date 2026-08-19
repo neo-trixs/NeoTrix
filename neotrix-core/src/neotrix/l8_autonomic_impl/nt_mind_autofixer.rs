@@ -618,6 +618,8 @@ pub struct HealerRegistry {
     pub last_report: Vec<HealSuggestion>,
     /// 已执行自动修复数 (遥测)。
     pub auto_fixes_applied: u32,
+    /// 最近一轮成功落地的修复明细 (供上层写入经验分支, 单一事实源闭环)。
+    pub last_landed: Vec<HealSuggestion>,
 }
 
 impl HealerRegistry {
@@ -694,6 +696,7 @@ impl HealerRegistry {
     pub fn apply_auto_fixable(&mut self) -> usize {
         let mut applied = 0usize;
         let mut remaining = Vec::with_capacity(self.last_report.len());
+        self.last_landed.clear();
         for s in &self.last_report {
             if !s.auto_fixable {
                 remaining.push(s.clone());
@@ -709,6 +712,7 @@ impl HealerRegistry {
             };
             if landed {
                 applied += 1;
+                self.last_landed.push(s.clone());
                 log::info!("[healers] auto-fix landed: {} {}", s.dimension, s.file.as_deref().unwrap_or(""));
             } else {
                 remaining.push(s.clone());
@@ -1005,5 +1009,29 @@ mod tests {
         assert!(report.iter().any(|s| s.dimension == "todo"));
         assert!(report.iter().any(|s| s.dimension == "unwraps"));
         assert_eq!(reg.last_report.len(), report.len());
+    }
+
+    #[test]
+    fn test_apply_auto_fixable_records_last_landed() {
+        // 纯占位 TODO 行可落地 (cleanup_todos_tx 只删无正文行); 落地者进 last_landed,
+        // 未落地者留 last_report — 供上层写经验分支 (单一事实源闭环)。
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("placeholder.rs");
+        std::fs::write(&f, "pub fn f() {\n    // TODO\n    // FIXME\n    let x = 1;\n}\n").unwrap();
+        let other = dir.path().join("pending.rs");
+        std::fs::write(&other, "pub fn g() {\n    // TODO: real task\n}\n").unwrap();
+
+        let mut reg = HealerRegistry::new();
+        reg.run_full_scan(dir.path());
+        let applied = reg.apply_auto_fixable();
+        assert_eq!(applied, 1, "placeholder file lands one auto-fix");
+        assert_eq!(reg.last_landed.len(), 1, "landed fix recorded for experience report");
+        assert_eq!(reg.last_landed[0].dimension, "todo");
+        assert_eq!(reg.last_landed[0].file.as_deref(), Some(f.to_str().unwrap()));
+        assert!(reg.last_report.iter().any(|s| s.file.as_deref() == Some(other.to_str().unwrap())),
+            "pending TODO stays in last_report");
+        // 再跑一轮无落地 → last_landed 清空 (防陈旧上报)
+        reg.apply_auto_fixable();
+        assert!(reg.last_landed.is_empty(), "no new landings clears last_landed");
     }
 }

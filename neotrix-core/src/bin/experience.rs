@@ -918,6 +918,8 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
     // D20 (aihot-skill/workflow_templates 参照): 吸收审计轨迹 — 记录每条 entry 的
     // 决策 (written / redundant / invalid) 与内容哈希, 供事后核对吸收质量。
     let mut audit_log: Vec<Value> = Vec::new();
+    // 已实际落盘的高信号条目 (供即时 promote, 拒绝冗余/质量门过滤噪声)
+    let mut written_high_signal: Vec<Value> = Vec::new();
     for (i, raw_entry) in entries.iter().enumerate() {
         let mut e = json!({
             "schema_version": SCHEMA_VERSION,
@@ -950,6 +952,9 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
             "feedback": json!({"success": 0, "failure": 0, "reuse": 0}),
             // P0-2 G3 质量门 confidence: verified_by + evidence + source 综合置信度
             "confidence": confidence_of(raw_entry),
+            // 即时 promote 依赖的信号字段 (importance ≥ 0.6 → 立即升维)
+            "importance": raw_entry.get("importance").and_then(|x| x.as_f64())
+                .unwrap_or(0.5),
         });
         // D20: manifest — 内容 SHA-256, 落盘后可按哈希核对吸收内容未被篡改/漂移
         let raw_content = e.get("content").and_then(|c| c.as_str()).unwrap_or("");
@@ -1082,6 +1087,9 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
             domains.as_array_mut().unwrap().push(dom);
         }
         written += 1;
+        if e.get("importance").and_then(|x| x.as_f64()).unwrap_or(0.0) >= 0.6 {
+            written_high_signal.push(e.clone());
+        }
         audit_log.push(json!({
             "idx": i, "decision": "written", "key": key,
             "content_hash": content_hash, "ts": ts,
@@ -1107,6 +1115,17 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
     println!("[absorb] {} entries from {} (cycle={})", written, sid, cycle);
+    // 即时 promote (蒸馏延迟消除): 对已实际写入且 importance ≥ 0.6 的高信号经验立即
+    // 路由并写入 experience_targets, 不等 distill 批处理 — 高信号发现当天生效,
+    // 而不是等未蒸馏分支累积超阈值才被批量升维 (cycle 1191 教训: 接线完整性
+    // 门禁当时靠用户提问才被强化, 说明即时生效比批处理更可靠)。
+    // 只取 written_high_signal (已落盘 + 高信号), 冗余/质量门拒绝的条目不提升。
+    if !written_high_signal.is_empty() {
+        let n = immediate_promote_entries(&written_high_signal);
+        if n > 0 {
+            println!("[absorb] 即时 promote {} 条高信号经验 → experience_targets (不等 distill)", n);
+        }
+    }
     // 自动消退蒸馏: 吸收后若未蒸馏分支累积超阈值, 自动触发 distill
     // (经验无限追加 → 维度膨胀 → 自动收敛为能力模式, "始终处于最优解状态")
     auto_distill_if_over_threshold(conn, &mut hub);
@@ -2602,7 +2621,74 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
     );
 }
 
-/// 把蒸馏出的能力模式提升为能力树迭代目标 (经验升维: 细枝末节 → 能力网节点)。
+// ────────────────────────────────────────────────────────────────
+// 即时 promote (蒸馏延迟消除): 吸收后立即对高信号经验升维写入 experience_targets,
+// 不等 distill 批处理。与 distill_promote_to_capability 共享 ExperienceRouter,
+// 但只吃单条高信号 (importance ≥ 0.6) 而非聚类模式 — 保证高信号发现当天生效。
+// ────────────────────────────────────────────────────────────────
+fn immediate_promote_entries(entries: &[Value]) -> usize {
+    use neotrix::neotrix::nt_capability_bridge::{
+        ExperienceDimension, ExperienceEntry, ExperienceRouter, promote_to_file,
+    };
+    let mut dims: Vec<ExperienceDimension> = Vec::new();
+    for e in entries {
+        let content = e.get("content").and_then(|c| c.as_str()).unwrap_or("").to_string();
+        if content.trim().is_empty() {
+            continue;
+        }
+        let domain_name = e.get("domain").and_then(|d| d.as_str()).unwrap_or("NT-CORE").to_string();
+        let etype = e.get("type").and_then(|t| t.as_str()).unwrap_or("insight").to_string();
+        let importance = e.get("importance").and_then(|x| x.as_f64()).unwrap_or(0.5);
+        let entry = ExperienceEntry {
+            id: format!("immediate_{}", e.get("session_id").and_then(|s| s.as_str()).unwrap_or("sess")),
+            entry_type: etype,
+            domain_name: domain_name.clone(),
+            content: content.clone(),
+            not: None,
+            confidence: 0.7,
+            importance,
+            verified_by: None,
+            verification_status: None,
+        };
+        let dim = ExperienceRouter::route_experience(&entry);
+        match &dim {
+            ExperienceDimension::CapabilityNetwork { domain, capability_tag, signal, .. } => {
+                log::info!(
+                    "[immediate-promote] {} → {} (signal={:.2})",
+                    domain.as_str(), capability_tag, signal
+                );
+            }
+            ExperienceDimension::ConsciousnessAwakening { layer, signal, .. } => {
+                log::info!(
+                    "[immediate-promote] 意识体觉醒 → {} (signal={:.2})",
+                    layer, signal
+                );
+            }
+        }
+        dims.push(dim);
+    }
+    if dims.is_empty() {
+        return 0;
+    }
+    let cwd_registry = std::path::PathBuf::from(".neotrix/capability_registry.json");
+    let home_registry = dirs::home_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(".neotrix/capability_registry.json");
+    let mut written = 0usize;
+    for path in [&cwd_registry, &home_registry] {
+        if path.exists() {
+            written += promote_to_file(path, &dims);
+        }
+    }
+    if written == 0 && !cwd_registry.exists() {
+        if let Some(parent) = cwd_registry.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        written += promote_to_file(&cwd_registry, &dims);
+    }
+    written
+}
+
 /// 返回提升建议的行描述 (实际写入 capability_registry.json 的 experience_targets 区)。
 ///
 /// 接入点: 蒸馏模式 (domain, pattern, src_keys) → ExperienceRouter.route_experience

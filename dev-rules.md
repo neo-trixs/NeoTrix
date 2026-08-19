@@ -190,7 +190,11 @@
   2. **五维质量评估**: 新技能入库前用确定性五维评分 (Safety/Completeness/Executability/Maintainability/Cost-awareness, SkillNet 语义) 做质量门: 总分 <0.5 或安全分 <0.6 → 拒收/标记低质量 (代码: `SkillQualityScorer::evaluate` + `SkillQualityScores::passes_gate`, nt_mind_skill_engine)。安全分看危险命令标记 (rm -rf/sudo --force/dangerously); 完整性看 name/description/triggers/tools/正文长度; 可执行性看 selftest/Verification 段; 可维护性看 references/category/parent; 成本意识看描述长度与渐进披露。
   3. **frontmatter 快速扫描**: 技能索引只需 frontmatter (≈30 token), 命中才按需加载全文 (渐进披露, 与 nt_mind_skill_engine::AnchorPromote 同构)。
 
-## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
+## 批量吸收分类纪律 (R-P109) — 2026-08-19 批量吸收第二波 181 源教训
+
+- **R-P109 (能力分类扫描窗口)**: 批量节点→能力映射时，关键词分类只扫描 `summary[:600] + title`，禁止扫全量 content。教训: 首版扫全文导致通用词过匹配 (103/180 映射到 NT-MEMORY/recall)；缩窗口后分布收敛到合理域分布。summary 为空时 fallback `content[:1500]`。配套: title 取 repo 名而非 README 首行。
+- **吸收幂等验证**: `absorb-node --apply-capability` 重跑 = 0 insert / N dup / N mapped，是幂等门禁验证的基准流程。吸收后必须重跑一次确认 0 insert。
+- **raw.githubusercontent.com 拉取**: GitHub API 未授权 60/hr 不够 → 用 `raw.githubusercontent.com/{owner}/{repo}/{branch}/README.md` (branch 依次 main/master/HEAD，文件依次 README.md/readme.md/README.rst/readme.rst) 逃逸限流。repo 不存在返回 404 → 记录为 invalid slug 从批中剔除 (本批 6 个)。
 
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 

@@ -355,6 +355,9 @@ impl BackgroundLoopHandle {
         let applied = self.healer_registry.apply_auto_fixable();
         if applied > 0 {
             log::info!("[bg] healers: {} auto-fixes landed (total {})", applied, self.healer_registry.auto_fixes_applied);
+            // 自愈落地回流经验命名空间 (单一事实源闭环): 落地的自愈动作也是经验 —
+            // 写 experience 分支供 hub 索引/query 检索/后续蒸馏, 而非只留日志。
+            self.report_auto_fix_experience().await;
         }
         let report = self.healer_registry.last_report.clone();
         if report.is_empty() {
@@ -375,6 +378,68 @@ impl BackgroundLoopHandle {
                 severity: "info".into(),
             });
         }
+    }
+
+    /// 自愈落地 → 经验分支 (单一事实源闭环)。
+    ///
+    /// AutoFixer 每次成功落地不再只写日志, 而是把修复事件沉淀为一条 NT-REPAIR
+    /// defect 经验写入 KB experience 命名空间 — 与 session 吸收同 schema,
+    /// 供 hub 索引 / `neotrix-experience query` 检索 / 蒸馏升维复用。
+    /// 幂等: 同 session_id 拒绝重复 (与 cmd_absorb 语义一致)。
+    async fn report_auto_fix_experience(&mut self) {
+        use crate::neotrix::nt_memory_kb::nt_memory_unify::kv_set;
+        let kb = match self.kb.as_ref() {
+            Some(kb) => kb,
+            None => {
+                log::warn!("[bg] auto-fix experience: kb not attached");
+                return;
+            }
+        };
+        let landed: Vec<_> = self.healer_registry.last_landed.iter().collect();
+        if landed.is_empty() {
+            return;
+        }
+        let detail = landed
+            .iter()
+            .map(|s| format!("{} {}", s.dimension, s.file.as_deref().unwrap_or("")))
+            .collect::<Vec<_>>()
+            .join("; ");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let sid = format!("autofixer_{}_{}", now, landed.len());
+        let entry = serde_json::json!({
+            "schema_version": 1,
+            "type": "defect",
+            "session_id": sid,
+            "cycle": "autofixer",
+            "ts": now,
+            "domain": "NT-REPAIR",
+            "content": format!("自愈落地: {} 项自动修复 ({})", landed.len(), detail),
+            "evidence": detail,
+            "source": "code",
+            "not": null,
+            "verified_by": "autofixer",
+            "verification_status": "verified",
+            "confidence": 0.8,
+            "importance": 0.6,
+            "context": "handle_healer_scan / apply_auto_fixable",
+        });
+        let key = format!("branch_autofixer_{}_{}", now, landed.len());
+        let conn = match kb.conn.lock() {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("[bg] auto-fix experience lock failed: {}", e);
+                return;
+            }
+        };
+        if let Err(e) = kv_set(&conn, "experience", &key, &entry.to_string()) {
+            log::warn!("[bg] auto-fix experience write failed: {}", e);
+            return;
+        }
+        drop(conn);
+        log::info!("[bg] auto-fix experience recorded: {} ({} fixes)", key, landed.len());
     }
 
     pub(crate) async fn handle_avatar_auto_distill(&mut self) {
