@@ -57,6 +57,75 @@ pub fn neotrix_mcp_tools() -> Vec<McpToolDef> {
             }, "required": ["runtime", "code", "expected"]}),
             schema_version: None,
         },
+        McpToolDef {
+            name: "neotrix_kb_get".into(),
+            description: "Read a single KB node by id (read-only). Returns id/type/title/summary/url/domain/confidence/importance".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["kb".into(), "get".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "id": {"type": "string", "description": "KB node id"}
+            }, "required": ["id"]}),
+            schema_version: None,
+        },
+        McpToolDef {
+            name: "neotrix_kb_stats".into(),
+            description: "Read KB statistics (node/edge counts, type distribution). Read-only".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["kb".into(), "stats".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {}, "required": []}),
+            schema_version: None,
+        },
+        McpToolDef {
+            name: "neotrix_kb_query".into(),
+            description: "Advanced hybrid-rerank query over the KB (read-only). Returns ranked nodes by text".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["kb".into(), "query".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "text": {"type": "string", "description": "query text"},
+                "limit": {"type": "integer", "description": "max results (default 10)"}
+            }, "required": ["text"]}),
+            schema_version: None,
+        },
+        McpToolDef {
+            name: "neotrix_kb_write".into(),
+            description: "Guarded KB write (node:create/update, edge:upsert, kv:set, node:delete, edge:delete). \
+                         All writes pass the deterministic kb_write_guard (title/url/weight/protected-namespace checks); \
+                         deletes and bulk ops require explicit force (operator approval). Evidence is recorded to kv_store write_guard".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["kb".into(), "write".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "action": {"type": "string", "enum": ["node:create", "node:update", "edge:upsert", "node:delete", "edge:delete", "kv:set"], "description": "write operation"},
+                "id": {"type": "string"},
+                "title": {"type": "string"},
+                "node_type": {"type": "string"},
+                "summary": {"type": "string"},
+                "content": {"type": "string"},
+                "url": {"type": "string"},
+                "domain": {"type": "string"},
+                "source_id": {"type": "string"},
+                "target_id": {"type": "string"},
+                "relation_type": {"type": "string"},
+                "weight": {"type": "number"},
+                "description": {"type": "string"},
+                "namespace": {"type": "string"},
+                "key": {"type": "string"},
+                "value": {"type": "string"},
+                "force": {"type": "boolean", "description": "explicit approval for delete/backfill (Tier3/4)"}
+            }, "required": ["action"]}),
+            schema_version: None,
+        },
     ]
 }
 
@@ -78,7 +147,7 @@ mod tests {
     #[test]
     fn builtin_tools_are_valid_mcp_defs() {
         let tools = neotrix_mcp_tools();
-        assert_eq!(tools.len(), 4, "built-in tool registry must expose 4 tools");
+        assert_eq!(tools.len(), 8, "built-in tool registry must expose 8 tools");
         for t in &tools {
             assert!(!t.name.is_empty(), "tool name must be non-empty");
             assert!(!t.description.is_empty(), "tool description must be non-empty");
@@ -91,17 +160,25 @@ mod tests {
         assert!(names.contains(&"neotrix_reason"));
         assert!(names.contains(&"neotrix_code_graph"));
         assert!(names.contains(&"neotrix_judge"));
+        assert!(names.contains(&"neotrix_kb_get"));
+        assert!(names.contains(&"neotrix_kb_stats"));
+        assert!(names.contains(&"neotrix_kb_query"));
+        assert!(names.contains(&"neotrix_kb_write"));
     }
 
     #[test]
-    fn registration_folds_n_to_4() {
+    fn registration_folds_n_to_8() {
         let mut registry = McpRegistry::new();
         let folded = register_neotrix_tools(&mut registry);
         assert_eq!(folded.categories.len(), 4, "N→4 fold must produce exactly 4 categories");
         assert!(folded.saved_tokens > 0, "folding must reduce token budget vs raw specs");
         assert!(folded.savings_percent > 0.0);
         let registered = registry.list_tools();
-        assert_eq!(registered.len(), 4, "all built-in tools must register");
+        assert_eq!(registered.len(), 8, "all 8 built-in tools must register");
+        assert!(
+            registered.iter().any(|t| t.name == "neotrix_kb_write"),
+            "kb write tool must be registered"
+        );
     }
 
     #[test]
@@ -109,7 +186,7 @@ mod tests {
         let mut registry = McpRegistry::new();
         let first = register_neotrix_tools(&mut registry);
         let second = register_neotrix_tools(&mut registry);
-        assert_eq!(registry.list_tools().len(), 4, "re-registration must not duplicate");
+        assert_eq!(registry.list_tools().len(), 8, "re-registration must not duplicate");
         assert_eq!(first.folded_chars, second.folded_chars, "fold result must be stable");
     }
 }

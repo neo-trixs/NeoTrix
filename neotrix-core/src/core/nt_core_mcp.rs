@@ -279,6 +279,68 @@ impl McpServer {
             }),
             schema_version: None,
         });
+        // ── KB 访问工具 (dbx absorb, G1/G2) ──
+        // 读工具 Tier1 自动放行; 写工具过 kb_write_guard (确定性检查) + 守卫裁决。
+        self.register_tool(McpTool {
+            name: "kb_get".into(),
+            description: "Read a KB node by id (read-only, Tier1)".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "KB node id"}
+                },
+                "required": ["id"]
+            }),
+            schema_version: None,
+        });
+        self.register_tool(McpTool {
+            name: "kb_stats".into(),
+            description: "Read KB statistics (read-only, Tier1)".into(),
+            input_schema: serde_json::json!({"type": "object", "properties": {}, "required": []}),
+            schema_version: None,
+        });
+        self.register_tool(McpTool {
+            name: "kb_query".into(),
+            description: "Advanced hybrid-rerank query over KB (read-only, Tier1)".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "limit": {"type": "integer"}
+                },
+                "required": ["text"]
+            }),
+            schema_version: None,
+        });
+        self.register_tool(McpTool {
+            name: "kb_write".into(),
+            description: "Guarded KB write (node:create/update, edge:upsert, kv:set, delete). \
+                          Passes kb_write_guard deterministic checks; deletes require force. Tier2/3/4.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["node:create", "node:update", "edge:upsert", "node:delete", "edge:delete", "kv:set"]},
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "node_type": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "content": {"type": "string"},
+                    "url": {"type": "string"},
+                    "domain": {"type": "string"},
+                    "source_id": {"type": "string"},
+                    "target_id": {"type": "string"},
+                    "relation_type": {"type": "string"},
+                    "weight": {"type": "number"},
+                    "description": {"type": "string"},
+                    "namespace": {"type": "string"},
+                    "key": {"type": "string"},
+                    "value": {"type": "string"},
+                    "force": {"type": "boolean"}
+                },
+                "required": ["action"]
+            }),
+            schema_version: None,
+        });
     }
 
     pub fn register_tool(&mut self, tool: McpTool) {
@@ -528,8 +590,87 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> Result<String, String> 
         "consciousness_status" => call_consciousness_status(),
         "consciousness_tick" => call_consciousness_tick(args),
         "consciousness_task" => call_consciousness_task(args),
+        "kb_get" => call_kb_tool("kb_get", args),
+        "kb_stats" => call_kb_tool("kb_stats", args),
+        "kb_query" => call_kb_tool("kb_query", args),
+        "kb_write" => call_kb_tool("kb_write", args),
         other => Err(format!("Unknown tool: {}", other)),
     }
+}
+
+/// KB 工具执行 — 构建 `/kb <sub>` CLI 命令并进程内执行。
+/// 写路径经 kb_cmds::cmd_write 内部的 kb_write_guard 再次确定性把关
+/// (防御纵深: 守卫在 run_mcp_server 裁决一次, 执行层再校验一次)。
+fn call_kb_tool(name: &str, args: &serde_json::Value) -> Result<String, String> {
+    let command = match name {
+        "kb_get" => {
+            let id = args
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Missing required field: id".to_string())?;
+            format!("/kb get {}", id)
+        }
+        "kb_stats" => "/kb stats".to_string(),
+        "kb_query" => {
+            let text = args
+                .get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Missing required field: text".to_string())?;
+            let limit = args
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(10)
+                .min(50);
+            format!("/kb query {} --limit {}", text, limit)
+        }
+        "kb_write" => {
+            let action = args
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Missing required field: action".to_string())?;
+            // 组装结构化 payload 传给 cmd_write (JSON 命令文本)。
+            let mut payload = serde_json::Map::new();
+            payload.insert("action".into(), serde_json::Value::String(action.into()));
+            for field in [
+                "id", "title", "node_type", "summary", "content", "url", "domain",
+                "source_id", "target_id", "relation_type", "description", "namespace",
+                "key", "value",
+            ] {
+                if let Some(v) = args.get(field) {
+                    payload.insert(field.into(), v.clone());
+                }
+            }
+            if let Some(w) = args.get("weight").and_then(|v| v.as_f64()) {
+                payload.insert("weight".into(), serde_json::json!(w));
+            }
+            let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+            if force {
+                payload.insert("force".into(), serde_json::json!(true));
+            }
+            let json = serde_json::to_string(&serde_json::Value::Object(payload))
+                .map_err(|e| format!("Serialize payload: {}", e))?;
+            format!("/kb write {}", json)
+        }
+        _ => return Err(format!("Unknown KB tool: {}", name)),
+    };
+
+    let reg = crate::cli::commands::registry::default_registry();
+    let out = reg.execute(&command, None);
+    let mut result = String::new();
+    if out.success {
+        result.push_str(&out.message);
+    } else {
+        result.push_str(&format!("Error: {}", out.message));
+    }
+    if let Some(json) = &out.json {
+        if let Ok(s) = serde_json::to_string(json) {
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(&s);
+        }
+    }
+    Ok(result)
 }
 
 fn call_read_file(args: &serde_json::Value) -> Result<String, String> {
@@ -1194,7 +1335,7 @@ mod tests {
     fn test_register_all_tools() {
         let mut server = McpServer::new();
         server.register_all_tools();
-        assert_eq!(server.tools.len(), 10);
+        assert_eq!(server.tools.len(), 14);
         let names: Vec<&str> = server.tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -1207,6 +1348,10 @@ mod tests {
             names.contains(&"consciousness_task"),
             "consciousness_task 应注册"
         );
+        assert!(names.contains(&"kb_get"));
+        assert!(names.contains(&"kb_stats"));
+        assert!(names.contains(&"kb_query"));
+        assert!(names.contains(&"kb_write"));
     }
 
     #[test]
@@ -1217,7 +1362,7 @@ mod tests {
         assert!(resp.error.is_none());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 10);
+        assert_eq!(tools.len(), 14);
     }
 
     #[test]

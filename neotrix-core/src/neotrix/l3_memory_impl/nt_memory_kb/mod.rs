@@ -62,6 +62,7 @@ pub mod vector_adapter;
 pub mod nt_normalizer;
 pub mod knowledge_storage;
 pub mod nt_absorb_mapper;
+pub mod nt_memory_write_guard;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
@@ -99,6 +100,7 @@ pub use nt_memory_tech_reserve::{
 pub use nt_normalizer::{normalize_text, strip_markdown, normalize_lang, content_fingerprint, extract_key_sections, detect_language, compute_quality_score, validate_node_type, validate_relation_type};
 pub use knowledge_storage::{KnowledgeStorage, migrate_from_json};
 pub use nt_absorb_mapper::{map_all_nodes, map_batch_nodes, map_nodes, apply_mappings, map_node, map_source_core, CapabilityMapping, MappingReport};
+pub use nt_memory_write_guard::{kb_write_guard, record_write_evidence, WriteGuardVerdict, WRITE_GUARD_NS};
 
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
@@ -1342,6 +1344,10 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                 .unwrap_or(0);
             nt_memory_search::precision_gate(results, pool_size)
         };
+        // [T3] 陈旧信号标注 (codegraph absorbed 2026-08-19, R-P79):
+        // 填充 SearchResult.signals 预留槽 — 结果信封携带每节点 age/decay/stale 横幅,
+        // 检索路径直接生效, 消费方 (agent/UI) 可据 trust 级别决定是否直接采信。
+        let results = nt_memory_search::staleness_signal(results);
         let results = self.graph_signal_augment(query, results, limit);
         // A1 时效过滤 (recall absorb, R-P79): 剔除被显式标记为应遗忘
         // (mark_should_forget) 的节点 — "存储系统忘了该忘的", 避免应遗忘的

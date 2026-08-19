@@ -1,5 +1,7 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::neotrix::nt_memory_kb::{
+    kb_write_guard, record_write_evidence, KnowledgeBase, NodeType, RelationType, WriteGuardVerdict,
+};
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -73,7 +75,7 @@ impl CliCommand for KbCmd {
         vec!["/knowledge", "/knowledge-base"]
     }
     fn description(&self) -> &str {
-        "Knowledge base operations: /kb stats | /kb search <query> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map"
+        "Knowledge base operations: /kb stats | /kb search <query> | /kb get <node_id> | /kb query <text> | /kb write <json> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map"
     }
     fn is_primary(&self) -> bool { false }
 
@@ -89,6 +91,9 @@ impl CliCommand for KbCmd {
                 "Knowledge Base (KB) commands:\n\
                   /kb stats                      显示 KB 统计\n\
                   /kb search <query>             搜索知识库\n\
+                  /kb get <node_id>              按 ID 取节点 (MCP read)\n\
+                  /kb query <text> [--limit N]   高级查询 (混合重排, MCP read)\n\
+                  /kb write <json> [--force]     受守卫的 KB 写操作 (node:create/update, edge:upsert, kv:set, node:delete, edge:delete)\n\
                   /kb explore <node_id>          查看节点详情及关联\n\
                   /kb find <src> <tgt>           查找两个节点间最短路径\n\
                   /kb cluster [--min-size 3]     社区发现分析\n\
@@ -109,6 +114,9 @@ impl CliCommand for KbCmd {
         match sub {
             "stats" => cmd_stats(rest),
             "search" => cmd_search(rest),
+            "get" => cmd_get(rest),
+            "query" => cmd_query(rest),
+            "write" => cmd_write(rest),
             "explore" => cmd_explore(rest),
             "find" => cmd_find(rest),
             "cluster" => cmd_cluster(rest),
@@ -122,7 +130,7 @@ impl CliCommand for KbCmd {
             "consistency" => cmd_consistency(rest),
             "axioms" => cmd_axioms(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, consistency, axioms",
+                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, consistency, axioms",
                 sub
             )),
         }
@@ -425,6 +433,209 @@ fn cmd_explore(args: &[String]) -> CommandOutput {
         }
         Ok(None) => CommandOutput::not_found(&format!("未找到节点: {}", node_id)),
         Err(e) => CommandOutput::err(&format!("查询节点失败: {}", e)),
+    }
+}
+
+/// /kb get <node_id> — 按 ID 取节点 (MCP read 通道, JSON 友好)
+fn cmd_get(args: &[String]) -> CommandOutput {
+    if args.is_empty() {
+        return CommandOutput::err("用法: /kb get <node_id>");
+    }
+    let kb = match open_kb() {
+        Some(kb) => kb,
+        None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
+    };
+    let node_id = &args[0];
+    match kb.get_node(node_id) {
+        Ok(Some(node)) => {
+            let payload = serde_json::json!({
+                "id": node.id,
+                "type": node.node_type.as_str(),
+                "title": node.title,
+                "summary": node.summary,
+                "url": node.url,
+                "domain": node.domain,
+                "confidence": node.confidence,
+                "importance": node.importance,
+                "content": node.content.as_deref().map(|c| {
+                    if c.len() > 2000 { &c[..c.floor_char_boundary(2000)] } else { c }
+                }),
+            });
+            match serde_json::to_string_pretty(&payload) {
+                Ok(s) => CommandOutput::ok(&s).with_json(payload),
+                Err(_) => CommandOutput::err("序列化失败"),
+            }
+        }
+        Ok(None) => CommandOutput::not_found(&format!("未找到节点: {}", node_id)),
+        Err(e) => CommandOutput::err(&format!("查询节点失败: {}", e)),
+    }
+}
+
+/// /kb query <text> [--limit N] — 高级混合重排查询 (MCP read 通道)
+fn cmd_query(args: &[String]) -> CommandOutput {
+    if args.is_empty() {
+        return CommandOutput::err("用法: /kb query <text> [--limit N]");
+    }
+    let limit = parse_usize(args, "--limit", 10).min(50);
+    let text: Vec<&str> = args
+        .iter()
+        .filter(|a| !a.starts_with("--"))
+        .map(|a| a.as_str())
+        .collect();
+    if text.is_empty() {
+        return CommandOutput::err("用法: /kb query <text> [--limit N]");
+    }
+    let query = text.join(" ");
+    let kb = match open_kb() {
+        Some(kb) => kb,
+        None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
+    };
+    match kb.hybrid_rerank_search(&query, limit) {
+        Ok(results) => {
+            if results.is_empty() {
+                return CommandOutput::ok(&format!("未找到匹配 \"{}\" 的结果", query));
+            }
+            let mut out = format!("查询 \"{}\" ({} 条):\n", query, results.len());
+            for (i, r) in results.iter().enumerate() {
+                let node = &r.node;
+                out.push_str(&format!(
+                    "  {}. [{}] {} (score: {:.3})\n",
+                    i + 1,
+                    node.node_type.as_str(),
+                    node.title,
+                    r.score
+                ));
+            }
+            CommandOutput::ok(&out)
+        }
+        Err(e) => CommandOutput::err(&format!("查询失败: {}", e)),
+    }
+}
+
+/// /kb write <json> [--force] — 受守卫的 KB 写操作。
+/// action ∈ node:create | node:update | edge:upsert | node:delete | edge:delete | kv:set
+fn cmd_write(args: &[String]) -> CommandOutput {
+    let force = args.contains(&"--force".to_string());
+    let json_text = args
+        .iter()
+        .filter(|a| !a.starts_with("--"))
+        .map(|a| a.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if json_text.trim().is_empty() {
+        return CommandOutput::err(
+            "用法: /kb write <json> [--force]\n\
+             例: /kb write '{\"action\":\"node:create\",\"title\":\"Rust\",\"url\":\"https://rust-lang.org\"}'",
+        );
+    }
+    let payload: serde_json::Value = match serde_json::from_str(&json_text) {
+        Ok(v) => v,
+        Err(e) => return CommandOutput::err(&format!("JSON 解析失败: {}", e)),
+    };
+    let action = match payload.get("action").and_then(|v| v.as_str()) {
+        Some(a) => a.to_string(),
+        None => return CommandOutput::err("payload 缺少 action 字段"),
+    };
+
+    let kb = match open_kb() {
+        Some(kb) => kb,
+        None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
+    };
+
+    let mut verdict = kb_write_guard(&action, &payload);
+    if verdict == WriteGuardVerdict::RequiresApproval && force {
+        // force 视为人工审批 (operator 显式放行 Tier3/Tier4)
+        verdict = WriteGuardVerdict::Allow;
+    }
+
+    match &verdict {
+        WriteGuardVerdict::Allow => {}
+        WriteGuardVerdict::RequiresApproval => {
+            record_write_evidence(&kb, &action, &payload, &verdict, false);
+            return CommandOutput::err(&format!(
+                "KB 写操作需要审批 (force 未置位): {}",
+                verdict.reasons().join("; ")
+            ));
+        }
+        WriteGuardVerdict::Reject(reasons) => {
+            record_write_evidence(&kb, &action, &payload, &verdict, false);
+            return CommandOutput::err(&format!(
+                "KB 写操作被守卫拒绝: {}",
+                reasons.join("; ")
+            ));
+        }
+    }
+
+    let result: Result<String, String> = (|| {
+        match action.as_str() {
+            "node:create" => {
+                let title = payload.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                let ntype = payload
+                    .get("node_type")
+                    .and_then(|v| v.as_str())
+                    .map(NodeType::from_str)
+                    .unwrap_or(NodeType::Concept);
+                let summary = payload.get("summary").and_then(|v| v.as_str());
+                let url = payload.get("url").and_then(|v| v.as_str());
+                let domain = payload.get("domain").and_then(|v| v.as_str());
+                let id = kb.insert_or_get_node(title, ntype, summary, url, domain)?;
+                Ok(format!("节点已写入: {}", id))
+            }
+            "node:update" => {
+                let id = payload.get("id").and_then(|v| v.as_str()).ok_or("缺少 id")?;
+                let content = payload
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .ok_or("缺少 content")?;
+                kb.update_node_content(id, content)?;
+                Ok(format!("节点已更新: {}", id))
+            }
+            "edge:upsert" => {
+                let src = payload.get("source_id").and_then(|v| v.as_str()).ok_or("缺少 source_id")?;
+                let tgt = payload.get("target_id").and_then(|v| v.as_str()).ok_or("缺少 target_id")?;
+                let rt = payload
+                    .get("relation_type")
+                    .and_then(|v| v.as_str())
+                    .map(RelationType::from_str)
+                    .unwrap_or(RelationType::Related);
+                let weight = payload.get("weight").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                let desc = payload.get("description").and_then(|v| v.as_str());
+                kb.upsert_edge(src, tgt, rt, weight, desc)?;
+                Ok(format!("边已写入: {} -> {}", src, tgt))
+            }
+            "node:delete" | "edge:delete" => {
+                let id = payload.get("id").and_then(|v| v.as_str()).ok_or("缺少 id")?;
+                let deleted = if action == "node:delete" {
+                    kb.delete_node(id)?
+                } else {
+                    kb.delete_edge(id)?
+                };
+                if deleted {
+                    Ok(format!("已删除: {}", id))
+                } else {
+                    Err(format!("未找到待删除对象: {}", id))
+                }
+            }
+            "kv:set" => {
+                let ns = payload.get("namespace").and_then(|v| v.as_str()).ok_or("缺少 namespace")?;
+                let key = payload.get("key").and_then(|v| v.as_str()).ok_or("缺少 key")?;
+                let value = payload.get("value").map(|v| v.to_string()).ok_or("缺少 value")?;
+                kb.kv_set(ns, key, &value)?;
+                Ok(format!("kv 已写入: {}/{}", ns, key))
+            }
+            other => Err(format!("未知写操作: {}", other)),
+        }
+    })();
+
+    match result {
+        Ok(msg) => {
+            record_write_evidence(&kb, &action, &payload, &verdict, true);
+            CommandOutput::ok(&msg)
+        }
+        Err(e) => {
+            record_write_evidence(&kb, &action, &payload, &WriteGuardVerdict::Reject(vec![e.clone()]), false);
+            CommandOutput::err(&e)
+        }
     }
 }
 

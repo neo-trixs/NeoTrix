@@ -14,7 +14,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-use super::{nt_memory_embed, KnowledgeBase, SearchResult, SearchMatchType};
+use super::{
+    kb_write_guard, nt_memory_embed, record_write_evidence, WriteGuardVerdict, KnowledgeBase,
+    SearchResult, SearchMatchType,
+};
 
 /// Shared state for KB API handlers
 #[derive(Clone)]
@@ -59,6 +62,38 @@ fn json_err(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
 
 fn internal_err(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": msg})))
+}
+
+/// 写前门 (G3): 运行确定性 kb_write_guard。Reject → 400 (含拒绝原因);
+/// RequiresApproval → 403 (人工审批); Allow → Ok(verdict)。裁决落证据到 kv_store。
+async fn gate_write(
+    state: &KbApiState,
+    action: &str,
+    payload: &serde_json::Value,
+) -> Result<WriteGuardVerdict, (StatusCode, Json<serde_json::Value>)> {
+    let verdict = kb_write_guard(action, payload);
+    match &verdict {
+        WriteGuardVerdict::Allow => {}
+        WriteGuardVerdict::RequiresApproval => {
+            if let Ok(kb) = state.kb.lock() {
+                record_write_evidence(&kb, action, payload, &verdict, false);
+            }
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({"error": format!(
+                    "{} 需要人工审批 (RequiresApproval)",
+                    action
+                )})),
+            ));
+        }
+        WriteGuardVerdict::Reject(reasons) => {
+            if let Ok(kb) = state.kb.lock() {
+                record_write_evidence(&kb, action, payload, &verdict, false);
+            }
+            return Err(json_err(&format!("{} 拒绝: {}", action, reasons.join("; "))));
+        }
+    }
+    Ok(verdict)
 }
 
 // ─── Query Parameter Types ───
@@ -236,7 +271,17 @@ pub async fn create_node_handler(
     State(state): State<KbApiState>,
     Json(body): Json<CreateNodeBody>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let nt = super::NodeType::from_str(&body.node_type);
+    let payload = serde_json::json!({
+        "title": body.title,
+        "node_type": body.node_type,
+        "summary": body.summary,
+        "url": body.url,
+        "domain": body.domain,
+    });
+    let verdict = gate_write(&state, "node:create", &payload).await?;
+    let nt = super::NodeType::from_str(
+        payload.get("node_type").and_then(|v| v.as_str()).unwrap_or(""),
+    );
     let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let id = kb.insert_or_get_node(
         &body.title,
@@ -244,7 +289,11 @@ pub async fn create_node_handler(
         body.summary.as_deref(),
         body.url.as_deref(),
         body.domain.as_deref(),
-    ).map_err(|e| internal_err(&e))?;
+    ).map_err(|e| {
+        record_write_evidence(&kb, "node:create", &payload, &WriteGuardVerdict::Reject(vec![e.clone()]), false);
+        internal_err(&e)
+    })?;
+    record_write_evidence(&kb, "node:create", &payload, &verdict, true);
     Ok(json_ok(serde_json::json!({"id": id})))
 }
 
@@ -253,7 +302,17 @@ pub async fn create_edge_handler(
     State(state): State<KbApiState>,
     Json(body): Json<CreateEdgeBody>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let rt = super::RelationType::from_str(&body.relation_type);
+    let payload = serde_json::json!({
+        "source_id": body.source_id,
+        "target_id": body.target_id,
+        "relation_type": body.relation_type,
+        "weight": body.weight,
+        "description": body.description,
+    });
+    let verdict = gate_write(&state, "edge:upsert", &payload).await?;
+    let rt = super::RelationType::from_str(
+        payload.get("relation_type").and_then(|v| v.as_str()).unwrap_or(""),
+    );
     let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     kb.upsert_edge(
         &body.source_id,
@@ -261,7 +320,11 @@ pub async fn create_edge_handler(
         rt,
         body.weight.unwrap_or(1.0),
         body.description.as_deref(),
-    ).map_err(|e| internal_err(&e))?;
+    ).map_err(|e| {
+        record_write_evidence(&kb, "edge:upsert", &payload, &WriteGuardVerdict::Reject(vec![e.clone()]), false);
+        internal_err(&e)
+    })?;
+    record_write_evidence(&kb, "edge:upsert", &payload, &verdict, true);
     Ok(json_ok(serde_json::json!({"created": true})))
 }
 
@@ -323,6 +386,9 @@ pub async fn embeddings_status_handler(
 pub async fn embeddings_backfill_handler(
     State(state): State<KbApiState>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    // G3: 全量嵌入重建 = 批量重写, 一律 RequiresApproval (dbx high_risk_write 类)。
+    let payload = serde_json::json!({"action": "embedding:backfill"});
+    gate_write(&state, "embedding:backfill", &payload).await?;
     let kb = state.kb.clone();
     let processed = tokio::task::spawn_blocking(move || {
         kb.lock().map_err(|e| format!("Lock: {}", e))?.ensure_embeddings()
@@ -380,9 +446,42 @@ mod tests {
     #[test]
     fn test_embeddings_backfill_without_provider_is_noop() {
         let (state, _) = temp_kb();
-        // No provider configured → ensure_embeddings returns Ok(0); handler must not error.
-        let body = futures_block_on(embeddings_backfill_handler(State(state))).expect("backfill ok");
-        assert_eq!(body.0["processed"], 0);
+        // G3 gate: embedding:backfill 一律 RequiresApproval → 403, 不执行。
+        let err = futures_block_on(embeddings_backfill_handler(State(state))).unwrap_err();
+        assert_eq!(err.0, StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_create_node_gate_rejects_bad_payload() {
+        let (state, _) = temp_kb();
+        // 空 title → guard Reject → 400, 不写库。
+        let body = CreateNodeBody {
+            title: "  ".into(),
+            node_type: "concept".into(),
+            summary: None,
+            url: Some("ftp://x".into()),
+            domain: None,
+        };
+        let err = futures_block_on(create_node_handler(State(state.clone()), Json(body))).unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        // 库应保持空 (无节点写入)。
+        let kb = state.kb.lock().unwrap();
+        let stats = kb.stats().unwrap();
+        assert_eq!(stats.total_nodes, 0);
+    }
+
+    #[test]
+    fn test_create_edge_gate_rejects_self_loop() {
+        let (state, _) = temp_kb();
+        let body = CreateEdgeBody {
+            source_id: "a".into(),
+            target_id: "a".into(),
+            relation_type: "related".into(),
+            weight: Some(1.0),
+            description: None,
+        };
+        let err = futures_block_on(create_edge_handler(State(state), Json(body))).unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
 
     fn futures_block_on<F: std::future::Future>(fut: F) -> F::Output {

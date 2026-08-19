@@ -1077,6 +1077,45 @@ pub fn run_mcp_server() {
             }
         });
     }
+    // KB 分级守卫 (dbx absorb, G2): 写工具过确定性 kb_write_guard
+    // Allow → 放行; RequiresApproval → Ask (人工审批); Reject → Deny。
+    // 读工具 (kb_get/kb_stats/kb_query) 恒 Allow。
+    {
+        use neotrix::neotrix::l1_body_impl::nt_shield::guard_chain::GuardVerdict;
+        use neotrix::neotrix::l3_memory_impl::nt_memory_kb::{
+            kb_write_guard, WriteGuardVerdict,
+        };
+        server.add_guard("kb_tier", |tool, args| {
+            if tool != "kb_write" {
+                return GuardVerdict::Allow;
+            }
+            let mut payload = serde_json::Map::new();
+            for field in [
+                "id", "title", "node_type", "summary", "content", "url", "domain",
+                "source_id", "target_id", "relation_type", "description", "namespace",
+                "key", "value", "force",
+            ] {
+                if let Some(v) = args.get(field) {
+                    payload.insert(field.into(), v.clone());
+                }
+            }
+            if let Some(w) = args.get("weight") {
+                payload.insert("weight".into(), w.clone());
+            }
+            let action = args
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("node:create");
+            match kb_write_guard(action, &serde_json::Value::Object(payload)) {
+                WriteGuardVerdict::Allow => GuardVerdict::Allow,
+                WriteGuardVerdict::RequiresApproval => GuardVerdict::Ask,
+                WriteGuardVerdict::Reject(reasons) => {
+                    eprintln!("kb_tier guard: DENY ({})", reasons.join("; "));
+                    GuardVerdict::Deny
+                }
+            }
+        });
+    }
     // 横幅必须走 stderr: MCP stdio 协议要求 stdout 只承载 JSON-RPC 帧。
     eprintln!("neotrix-mcp {} starting (stdio JSON-RPC 2.0)", env!("CARGO_PKG_VERSION"));
     if let Err(e) = server.run() {
