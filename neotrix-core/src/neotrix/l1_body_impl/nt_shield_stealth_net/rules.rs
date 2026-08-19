@@ -313,10 +313,12 @@ impl RuleEngine {
         if self.use_kb {
             crate::core::nt_core_state::save("rules", &json).map_err(|e| format!("write rules kb: {}", e))?;
         }
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+        if !self.use_kb {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            std::fs::write(path, &json).map_err(|e| format!("write rules: {}", e))?;
         }
-        std::fs::write(path, &json).map_err(|e| format!("write rules: {}", e))?;
         Ok(())
     }
 

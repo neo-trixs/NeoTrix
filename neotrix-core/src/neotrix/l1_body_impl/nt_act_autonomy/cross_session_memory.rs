@@ -105,7 +105,10 @@ impl CrossSessionMemory {
             crate::core::nt_core_state::save("cross_session_memory", &json)
                 .map_err(|e| format!("kb write error: {}", e))?;
         }
-        std::fs::write(&self.storage_path, json).map_err(|e| format!("write error: {}", e))
+        if !self.use_kb {
+            std::fs::write(&self.storage_path, json).map_err(|e| format!("write error: {}", e))?;
+        }
+        Ok(())
     }
 
     pub fn load(&mut self) -> Result<(), String> {

@@ -193,10 +193,13 @@ impl EditHistoryTracker {
             crate::core::nt_core_state::save("edit_history", &json)
                 .map_err(|e| format!("KB写入失败: {}", e))?;
         }
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+        if !self.use_kb {
+            if let Some(parent) = self.path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+            }
+            std::fs::write(&self.path, &json).map_err(|e| format!("写入失败: {}", e))?;
         }
-        std::fs::write(&self.path, &json).map_err(|e| format!("写入失败: {}", e))
+        Ok(())
     }
 
     fn sha256(content: &str) -> String {

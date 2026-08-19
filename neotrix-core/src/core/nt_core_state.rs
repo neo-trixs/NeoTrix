@@ -22,7 +22,7 @@ pub const NS: &str = "state";
 
 /// 过渡开关: true = 写 KB 同时写 legacy 文件; 翻 false 后停止写文件。
 /// 注意: 该值是编译期常量, 翻转需重新编译并测试 (R-P35)。
-pub const DUAL_WRITE_FILE: bool = true;
+pub const DUAL_WRITE_FILE: bool = false;
 
 /// 全局懒加载连接 (生产路径): ~/.neotrix/knowledge.db, WAL + schema 初始化一次。
 static CONN: OnceLock<Mutex<Connection>> = OnceLock::new();

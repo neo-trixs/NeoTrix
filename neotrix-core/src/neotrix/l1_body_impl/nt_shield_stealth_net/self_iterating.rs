@@ -144,10 +144,12 @@ impl FingerprintManager {
                     log::warn!("[fingerprint] kb write: {}", e);
                 }
             }
-            if let Some(parent) = self.store_path.parent() {
-                if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[fingerprint] create dir: {}", e); }
+            if !self.use_kb {
+                if let Some(parent) = self.store_path.parent() {
+                    if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[fingerprint] create dir: {}", e); }
+                }
+                if let Err(e) = std::fs::write(&self.store_path, json) { log::warn!("[fingerprint] write: {}", e); }
             }
-            if let Err(e) = std::fs::write(&self.store_path, json) { log::warn!("[fingerprint] write: {}", e); }
         }
     }
 
@@ -527,6 +529,7 @@ mod tests {
         let path = PathBuf::from("/tmp/test_fp_persist.json");
         {
             let mut mgr = FingerprintManager::new();
+            mgr.use_kb = false;
             mgr.store_path = path.clone();
             mgr.report_result(true);
             mgr.report_result(false);

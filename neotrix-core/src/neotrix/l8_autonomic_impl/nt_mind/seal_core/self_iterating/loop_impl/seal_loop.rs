@@ -1228,8 +1228,8 @@ mod tests {
             brain.cortex.store(trace);
             brain.save_cortex()?;
 
-            let path = tmp.join(".neotrix").join("cortex.json");
-            assert!(path.exists(), "cortex.json 应已落盘");
+            let persisted = crate::core::nt_core_state::load("cortex");
+            assert!(persisted.is_some(), "cortex 应已写入 KB");
 
             // 全新 brain 从已持久化文件读回同一条 trace。
             let mut reloaded = SelfIteratingBrain::new();
