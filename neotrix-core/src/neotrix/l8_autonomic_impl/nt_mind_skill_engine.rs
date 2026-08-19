@@ -271,6 +271,71 @@ impl SkillQualityScorer {
 }
 
 // ────────────────────────────────────────────────────────────────
+// A5b (SkillNet): 技能组合推断 (composition)
+// SkillNet: "Composition: infer relationships and scenario handoffs
+// between local skills." 同一技能库内, 技能间存在场景交接关系:
+//   - 互补 (Complement): 类别相同且工具/触发器有交集 → 可串联执行。
+//   - 交接 (Handoff): 工具或触发器覆盖彼此输出侧 (启发式: 名称/触发器
+//     一方包含另一方产出领域) → 场景切换时移交控制。
+//   - 替代 (Substitute): 类别+工具高度重叠 → 同一场景互替。
+//   - 无关 (Unrelated): 默认。
+// 确定性判定, 无 LLM 打分 (对齐 deterministic-picker 纪律)。
+// ────────────────────────────────────────────────────────────────
+
+/// 技能间关系 (SkillNet composition 判定结果)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkillRelationship {
+    Complement,
+    Handoff,
+    Substitute,
+    Unrelated,
+}
+
+impl SkillRelationship {
+    pub fn label(self) -> &'static str {
+        match self {
+            SkillRelationship::Complement => "complement",
+            SkillRelationship::Handoff => "handoff",
+            SkillRelationship::Substitute => "substitute",
+            SkillRelationship::Unrelated => "unrelated",
+        }
+    }
+}
+
+/// 技能组合推断器 — 从类别/工具/触发器重叠推导两技能间关系。
+pub struct SkillComposer;
+
+impl SkillComposer {
+    /// 交集系数: 两集合的交集大小 / 较小集合大小 (Jaccard-ish, 0..1)。
+    fn overlap(a: &[String], b: &[String]) -> f64 {
+        if a.is_empty() || b.is_empty() {
+            return 0.0;
+        }
+        let sa: std::collections::HashSet<&str> = a.iter().map(|s| s.as_str()).collect();
+        let inter = b.iter().filter(|x| sa.contains(x.as_str())).count();
+        inter as f64 / a.len().min(b.len()).max(1) as f64
+    }
+
+    /// 判定两技能关系。
+    pub fn compose(a: &SkillEntry, b: &SkillEntry) -> SkillRelationship {
+        let tool_overlap = Self::overlap(&a.tools, &b.tools);
+        let trig_overlap = Self::overlap(&a.triggers, &b.triggers);
+        let same_category = !a.category.is_empty() && a.category == b.category;
+
+        if same_category && tool_overlap >= 0.75 && trig_overlap < 0.5 {
+            return SkillRelationship::Substitute;
+        }
+        if same_category && (trig_overlap >= 0.5 || tool_overlap >= 0.5) {
+            return SkillRelationship::Complement;
+        }
+        if tool_overlap >= 0.5 || (tool_overlap > 0.0 && trig_overlap > 0.0) {
+            return SkillRelationship::Handoff;
+        }
+        SkillRelationship::Unrelated
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
 // P4: AnchorPromote (dsh-anchored-standard 吸收)
 // 渐进披露阶梯 (progressive disclosure ladder) 应用到工具预算: agent
 // session 首个模型请求锚定 Minimal 工具集 (真实 schema, 无自动注入上下文),
@@ -3678,5 +3743,61 @@ category: general
         assert!(scores.safety < 0.5, "危险命令 → 安全分低, got {}", scores.safety);
         assert!(!scores.passes_gate(0.5, 0.6), "安全分不足 → 拒绝");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── A5b (SkillNet): 技能组合推断 ──
+    fn skill_entry(name: &str, category: &str, tools: &[&str], triggers: &[&str]) -> SkillEntry {
+        SkillEntry {
+            name: name.to_string(),
+            description: String::new(),
+            triggers: triggers.iter().map(|s| s.to_string()).collect(),
+            e8_modes: vec![],
+            tools: tools.iter().map(|s| s.to_string()).collect(),
+            hooks: vec![],
+            priority: 0,
+            path: std::env::temp_dir().join(name),
+            content: String::new(),
+            active: true,
+            references: vec![],
+            category: category.to_string(),
+            parent: String::new(),
+            verified: false,
+        }
+    }
+
+    #[test]
+    fn test_composer_substitute_same_category_overlapping_tools() {
+        let a = skill_entry("a", "testing", &["rg", "cargo"], &["test"]);
+        let b = skill_entry("b", "testing", &["rg", "cargo", "rustc"], &["check"]);
+        assert_eq!(SkillComposer::compose(&a, &b), SkillRelationship::Substitute);
+    }
+
+    #[test]
+    fn test_composer_complement_shared_triggers_partial_tools() {
+        let a = skill_entry("extract", "data", &["rg"], &["parse", "scrape"]);
+        let b = skill_entry("store", "data", &["sqlite", "rg"], &["parse"]);
+        assert_eq!(SkillComposer::compose(&a, &b), SkillRelationship::Complement);
+    }
+
+    #[test]
+    fn test_composer_handoff_cross_category_shared_signal() {
+        let a = skill_entry("gen", "writing", &["claude"], &["draft", "outline"]);
+        let b = skill_entry("polish", "editing", &["claude"], &["draft"]);
+        assert_eq!(SkillComposer::compose(&a, &b), SkillRelationship::Handoff);
+    }
+
+    #[test]
+    fn test_composer_unrelated_no_signal() {
+        let a = skill_entry("crawl", "world", &["curl"], &["fetch"]);
+        let b = skill_entry("meme", "fun", &["ffmpeg"], &["gif"]);
+        assert_eq!(SkillComposer::compose(&a, &b), SkillRelationship::Unrelated);
+    }
+
+    #[test]
+    fn test_composer_label_roundtrip() {
+        assert_eq!(SkillRelationship::Complement.label(), "complement");
+        assert_eq!(SkillRelationship::Handoff.label(), "handoff");
+        assert_eq!(SkillRelationship::Substitute.label(), "substitute");
+        assert_eq!(SkillRelationship::Unrelated.label(), "unrelated");
     }
 }

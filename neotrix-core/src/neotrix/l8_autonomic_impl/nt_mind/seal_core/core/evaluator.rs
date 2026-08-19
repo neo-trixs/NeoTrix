@@ -66,6 +66,38 @@ impl PerformanceEvaluator {
         (after - before).abs() > threshold
     }
 
+    /// 确定性选择器 (all-agentic-architectures 吸收): 逃逸 LLM-as-Scorer flat-band 病。
+    /// 纪律: 任何 LLM 打分面必须让 LLM 提交分类特征 (bool/enum), 而非连续浮点分 —
+    /// 连续分总是坍缩到 ~0.7 中带 (flat-band), 无法区分信号; 分类承诺 + 代码组合
+    /// 决定性信号, 信号不再饱和。
+    /// - `commits`: LLM 对一组分类特征提交的 bool 承诺 (每特征一票)。
+    /// - `weights`: 与 commits 对齐的票权, 长度需一致。
+    /// - `threshold`: 加权支持率门限, ≥ 则采纳 (决定输出, 非概率)。
+    /// 返回 (采纳, 支持率, 反对率): 决定性 bool + 可解释的边际。
+    pub fn deterministic_pick(
+        commits: &[bool],
+        weights: &[f64],
+        threshold: f64,
+    ) -> (bool, f64, f64) {
+        debug_assert_eq!(commits.len(), weights.len(), "commits/weights 长度必须一致");
+        if commits.is_empty() {
+            return (false, 0.0, 0.0);
+        }
+        let total: f64 = weights.iter().map(|w| w.max(0.0)).sum();
+        if total <= 0.0 {
+            return (false, 0.0, 0.0);
+        }
+        let mut support = 0.0;
+        for (c, w) in commits.iter().zip(weights.iter()) {
+            if *c {
+                support += w.max(0.0);
+            }
+        }
+        let support_ratio = support / total;
+        let oppose_ratio = 1.0 - support_ratio;
+        (support_ratio >= threshold, support_ratio, oppose_ratio)
+    }
+
     /// 融合外部执行反馈与内部能力评估 (CUDA Agent 奖励信号接线)。
     /// - external_weight: 0..1, 奖励中有多少比例来自外部验证/执行反馈。
     ///   为 0 → 纯内部自评 (无验证工具时的退化); 为 1 → 纯外部执行信号。
@@ -272,5 +304,84 @@ mod tests {
         let external_only = PerformanceEvaluator::combine_reward(0.5, feedback, 1.0);
         let blended = PerformanceEvaluator::combine_reward(0.5, feedback, 0.5);
         assert!((blended - (internal_only + external_only) / 2.0).abs() < 1e-9);
+    }
+
+    // ========== deterministic-picker 接线测试 (cycle 1191: all-agentic-architectures) ==========
+
+    #[test]
+    fn test_deterministic_pick_adopts_above_threshold() {
+        // 2/3 分类承诺 → 支持率 0.667 ≥ 0.6 → 采纳
+        let (adopt, support, oppose) = PerformanceEvaluator::deterministic_pick(
+            &[true, true, false],
+            &[1.0, 1.0, 1.0],
+            0.6,
+        );
+        assert!(adopt);
+        assert!((support - 2.0 / 3.0).abs() < 1e-9);
+        assert!((oppose - 1.0 / 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_deterministic_pick_rejects_below_threshold() {
+        let (adopt, support, _) = PerformanceEvaluator::deterministic_pick(
+            &[true, false, false],
+            &[1.0, 1.0, 1.0],
+            0.6,
+        );
+        assert!(!adopt);
+        assert!((support - 1.0 / 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_deterministic_pick_weighted_commit() {
+        // 强票权 (3x) 的单票否决 2 票弱票: 3/(3+1+1)=0.6 ≥ 0.6 → 采纳
+        let (adopt, support, _) = PerformanceEvaluator::deterministic_pick(
+            &[true, false, false],
+            &[3.0, 1.0, 1.0],
+            0.6,
+        );
+        assert!(adopt);
+        assert!((support - 3.0 / 5.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_deterministic_pick_empty_is_reject() {
+        let (adopt, support, oppose) = PerformanceEvaluator::deterministic_pick(&[], &[], 0.5);
+        assert!(!adopt);
+        assert_eq!(support, 0.0);
+        assert_eq!(oppose, 0.0);
+    }
+
+    #[test]
+    fn test_deterministic_pick_zero_weight_is_reject() {
+        let (adopt, _, _) = PerformanceEvaluator::deterministic_pick(
+            &[true, true],
+            &[0.0, 0.0],
+            0.0,
+        );
+        assert!(!adopt);
+    }
+
+    #[test]
+    fn test_deterministic_pick_negative_weights_ignored() {
+        // 负票权被忽略 (不拉低支持率), 符合 max(0) 语义
+        let (adopt, support, _) = PerformanceEvaluator::deterministic_pick(
+            &[true, false],
+            &[1.0, -5.0],
+            0.5,
+        );
+        assert!(adopt);
+        assert_eq!(support, 1.0);
+    }
+
+    #[test]
+    fn test_deterministic_pick_threshold_boundary() {
+        // 支持率恰等于阈值 → 采纳 (≥ 语义)
+        let (adopt, _, _) = PerformanceEvaluator::deterministic_pick(
+            &[true, false],
+            &[1.0, 1.0],
+            0.5,
+        );
+        assert!(adopt);
     }
 }

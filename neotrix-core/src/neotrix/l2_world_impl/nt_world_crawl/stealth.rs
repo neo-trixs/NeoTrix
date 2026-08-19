@@ -39,6 +39,7 @@ pub enum BypassMethod {
     FingerprintSpoof,
     ProxyRotation,
     CaptchaSolver,
+    TorRoute,
 }
 
 impl BypassMethod {
@@ -49,6 +50,7 @@ impl BypassMethod {
             BypassMethod::FingerprintSpoof => "fingerprint_spoof",
             BypassMethod::ProxyRotation => "proxy_rotation",
             BypassMethod::CaptchaSolver => "captcha_solver",
+            BypassMethod::TorRoute => "tor_route",
         }
     }
 }
@@ -82,6 +84,7 @@ impl Default for StealthConfig {
                 BypassMethod::FingerprintSpoof,
                 BypassMethod::ProxyRotation,
                 BypassMethod::CaptchaSolver,
+                BypassMethod::TorRoute,
             ],
             cookie_file: None,
         }
@@ -419,6 +422,20 @@ impl StealthCrawler {
                     duration_ms: elapsed + 500,
                 })
             }
+            BypassMethod::TorRoute => {
+                let mut headers = HashMap::new();
+                headers.insert("X-Tor-Route".into(), "simulated-tor-circuit".into());
+                Ok(CrawlResult {
+                    status: 200,
+                    body: format!(
+                        "<html><body>Tor route result for {}</body></html>",
+                        url
+                    ),
+                    headers,
+                    bypass_method: BypassMethod::TorRoute,
+                    duration_ms: elapsed + 700,
+                })
+            }
         }
     }
 
@@ -617,6 +634,31 @@ mod tests {
     }
 
     #[test]
+    fn test_tor_route_bypass_method() {
+        // CyberScraper-2077 吸收: Tor 网络路由作为独立绕过手段 (如 .onion 站点),
+        // 不依赖 cookies/指纹, 标记 X-Tor-Route 头。
+        let config = StealthConfig {
+            bypass_methods: vec![BypassMethod::TorRoute],
+            max_retries: 1,
+            ..StealthConfig::default()
+        };
+        let mut c = StealthCrawler::new(config);
+        let result = c.fetch("https://example.onion").expect("tor route fetch");
+        assert_eq!(result.status, 200);
+        assert!(result.headers.contains_key("X-Tor-Route"));
+        assert!(result.body.contains("Tor route"));
+        assert_eq!(result.bypass_method, BypassMethod::TorRoute);
+    }
+
+    #[test]
+    fn test_tor_route_default_in_bypass_set() {
+        // 默认绕过集合含 TorRoute, 域名可达时可直接走 tor 路径。
+        let cfg = StealthConfig::default();
+        assert!(cfg.bypass_methods.contains(&BypassMethod::TorRoute));
+        assert_eq!(BypassMethod::TorRoute.name(), "tor_route");
+    }
+
+    #[test]
     fn test_fetch_empty_bypass_methods_returns_error_not_panic() {
         // Regression: attempt % bypass_methods.len() panicked on modulo 0 when a
         // consumer constructed StealthConfig with an empty bypass_methods vec.
@@ -661,7 +703,7 @@ mod tests {
         let config = StealthConfig::default();
         assert_eq!(config.max_retries, 3);
         assert_eq!(config.retry_delay_ms, 1000);
-        assert_eq!(config.bypass_methods.len(), 5);
+        assert_eq!(config.bypass_methods.len(), 6);
         assert!(config.cookie_file.is_none());
     }
 
