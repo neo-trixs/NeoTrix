@@ -1,7 +1,8 @@
 //! neotrix-experience — Unified End-of-Conversation Absorption Engine (Rust native,
 //! 生产路径; 历史原型为 Python 版 `absorb_session.py`, 已退役).
 #![allow(clippy::unwrap_used)] // CLI bin 自持 JSON/DB 结构, 结构非法即 panic 报错优于静默降级
-//! 单入口: 每次会话结束时运行 `neotrix-experience absorb <session.json>`
+//! 单入口: 每次会话结束时运行 `neotrix-experience absorb <session.json>` (或 `-` 读 stdin,
+//!   stdin 直写 KB 跳过本地中转文件)
 //!   统一数据层: ~/.neotrix/knowledge.db 的 kv_store, namespace='experience'.
 //!   统一 schema: 每条经验含 {schema_version, type, session_id, cycle, ts, domain,
 //!                content, evidence, source, verify_by}.
@@ -22,6 +23,7 @@
 //! Usage:
 //!   cargo run -p neotrix --bin neotrix-experience snapshot --cycle NNN --task "..." [--domain X]
 //!   cargo run -p neotrix --bin neotrix-experience absorb <session.json>
+//!   cat session.json | cargo run -p neotrix --bin neotrix-experience absorb -
 //!   cargo run -p neotrix --bin neotrix-experience close --cycle NNN
 //!   cargo run -p neotrix --bin neotrix-experience query --kw "关键词" [--type T] [--domain D] [--limit N] [--no-hebb] [--include-distilled]
 //!   cargo run -p neotrix --bin neotrix-experience list [--type T] [--domain D]
@@ -873,9 +875,17 @@ fn confidence_of(entry: &Value) -> f64 {
     c.min(1.0)
 }
 
-fn cmd_absorb(conn: &mut Connection, session_path: &str) {
+fn cmd_absorb(conn: &mut Connection, input: &str) {
     let mut hub = ensure_hub(conn);
-    let raw = std::fs::read_to_string(session_path).expect("read session.json");
+    // 输入直通: "-" 读 stdin (与 absorb-node 对称, 支持直写 KB 跳过本地文件),
+    // 否则按文件路径读取。
+    let raw = if input == "-" {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf).expect("read stdin");
+        buf
+    } else {
+        std::fs::read_to_string(input).expect("read session.json")
+    };
     let session: Value = serde_json::from_str(&raw).expect("session.json is valid JSON");
 
     let sid = session
@@ -1096,21 +1106,21 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
         }));
     }
 
-    // D20: audit jsonl 落盘 — 与 KB 同一目录, 供审计核对每次吸收的决策轨迹
-    let kb_dir = kb_dir();
-    let audit_path = format!(
-        "{}/audit_{}_{}.jsonl",
-        kb_dir,
-        cycle.replace(['/', '\\', ' '], "_"),
-        sid.replace(['/', '\\', ' ', ':'], "_")
-    );
-    if std::fs::create_dir_all(&kb_dir).is_ok() {
-        let mut blob = String::new();
-        for rec in &audit_log {
-            blob.push_str(&serde_json::to_string(rec).unwrap_or_default());
-            blob.push('\n');
-        }
-        let _ = std::fs::write(&audit_path, blob);
+    // D20: 吸收审计轨迹 → kv_store `audit` 命名空间 (Phase 1 KB 直写迁移)。
+    // 替代本地 audit_*.jsonl 文件写入 — 每条 decision 一条记录, 附 session_id/cycle,
+    // 可经 `query`/`list` 检索; 历史 audit_*.jsonl 文件保留只读 (遗产), 不再新写。
+    for rec in &audit_log {
+        let mut r = rec.clone();
+        r["session_id"] = json!(sid);
+        r["cycle"] = json!(cycle);
+        let idx = r.get("idx").and_then(|x| x.as_u64()).unwrap_or(0);
+        let key = format!(
+            "audit_{}_{}_{}",
+            cycle.replace(['/', '\\', ' '], "_"),
+            sid.replace(['/', '\\', ' ', ':'], "_"),
+            idx
+        );
+        kv_set(conn, "audit", &key, &r.to_string());
     }
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
@@ -3108,7 +3118,11 @@ enum Cmd {
         cycle: String,
     },
     /// 会话结束吸收
+    /// 输入: session JSON (含 session_id/cycle/ts/entries), 文件路径或 "-" 读 stdin
+    /// (stdin 直写 KB experience 命名空间, 跳过 pending-absorb.json 本地中转)。
     Absorb {
+        /// session JSON 文件路径, 或 "-" 读 stdin
+        #[arg(default_value = "-")]
         session: String,
     },
     /// P0-2 G3+G8: 记录经验复用反馈 → MapeGate burn-in 门 (晋升/回滚)

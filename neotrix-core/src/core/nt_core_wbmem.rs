@@ -382,36 +382,40 @@ impl WhiteBoxMemory {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let dir = std::path::Path::new(&home).join(".neotrix");
-        let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("whitebox_memory.json");
+        crate::core::nt_core_state::save("whitebox_memory", &self.to_json()?)
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn save_with(&self, conn: &rusqlite::Connection) -> Result<(), String> {
+        crate::core::nt_core_state::save_with(conn, "whitebox_memory", &self.to_json()?)
+    }
+
+    fn to_json(&self) -> Result<String, String> {
         let data = serde_json::json!({
             "entries": self.entries,
             "checkpoints": self.checkpoints,
             "auto_consolidate": self.auto_consolidate,
             "last_dream_time": self.last_dream_time,
         });
-        let json = serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize: {}", e))?;
-        // 原子写：crash 中途不截断原文件，checkpoints/entries 不丢失
-        neotrix_types::fs_util::atomic_write(&path, json.as_bytes())
-            .map_err(|e| format!("Write: {}", e))?;
-        Ok(())
+        serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize: {}", e))
     }
 
     pub fn load() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let path = std::path::Path::new(&home)
-            .join(".neotrix")
-            .join("whitebox_memory.json");
-        if !path.exists() {
+        Self::from_json(crate::core::nt_core_state::load("whitebox_memory").as_deref())
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn load_with(conn: &rusqlite::Connection) -> Self {
+        Self::from_json(
+            crate::core::nt_core_state::load_with(conn, "whitebox_memory").as_deref(),
+        )
+    }
+
+    fn from_json(content: Option<&str>) -> Self {
+        let Some(content) = content else {
             return Self::new();
-        }
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => return Self::new(),
         };
-        let data: serde_json::Value = match serde_json::from_str(&content) {
+        let data: serde_json::Value = match serde_json::from_str(content) {
             Ok(v) => v,
             Err(_) => return Self::new(),
         };
@@ -726,27 +730,25 @@ mod tests {
 
     #[test]
     fn test_save_load_roundtrip() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
         let mut wbm = WhiteBoxMemory::new();
         wbm.entries.push(MemoryEntry::new("a", "content", "test"));
         wbm.auto_consolidate = true;
-        wbm.save().unwrap();
+        wbm.save_with(&conn).unwrap();
 
-        let loaded = WhiteBoxMemory::load();
+        let loaded = WhiteBoxMemory::load_with(&conn);
         assert_eq!(loaded.entries.len(), 1);
         assert_eq!(loaded.entries[0].content, "content");
         assert!(loaded.auto_consolidate);
         assert!(loaded.last_dream_time.is_none());
-
-        let _ = std::fs::remove_file(
-            std::path::Path::new(&std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-                .join(".neotrix")
-                .join("whitebox_memory.json"),
-        );
     }
 
     #[test]
     fn test_load_nonexistent() {
-        let loaded = WhiteBoxMemory::load();
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        let loaded = WhiteBoxMemory::load_with(&conn);
         assert!(loaded.entries.is_empty());
     }
 

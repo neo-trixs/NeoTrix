@@ -129,34 +129,45 @@ impl BackgroundLoopHandle {
             return;
         };
 
-        // 逐个 session 吸收 (list 双格式兼容): 每个 session 写独立临时文件交给 CLI,
+        // 逐个 session 吸收 (list 双格式兼容): 每个 session 子 JSON 经 stdin 直送 CLI,
         // 全部成功才删除 pending (all-or-nothing)。避免 CLI 只消费 list 首个元素
         // 导致后续 session 滞留 (格式缺陷修复)。
+        // 淘汰本地临时文件: CLI `absorb -` 支持 stdin (Phase 1 KB 直写迁移),
+        // 不再落 ~/tmp/neotrix-pending-*.json 中间载体。
         let mut all_ok = true;
         for (i, item) in parsed.iter().enumerate() {
             // 提取该 session 对应的 JSON 子片段 (object 时即为全文; list 时取对应元素)
             let sub = extract_session(&content, i).unwrap_or_else(|| content.clone());
-            // CLI `absorb` 参数是**文件路径** (cmd_absorb 内部 read_to_string),
-            // 子 JSON 字符串须先落临时文件 (R-P9/R-P29: 修复直接传 JSON 字符串
-            // 导致 CLI 把 JSON 当路径读 → "No such file" 吸收失败)。
-            let tmp = std::env::temp_dir().join(format!(
-                "neotrix-pending-{}-{}.json",
-                item.session_id.replace(['/', ' '], "_"),
-                i
-            ));
-            if let Err(e) = std::fs::write(&tmp, &sub) {
-                log::warn!("[bg-absorb] write temp session file failed: {e}");
-                all_ok = false;
-                continue;
-            }
 
             log::info!("[bg-absorb] absorbing pending item {} (session {}, cycle {})", i + 1, item.session_id, item.cycle);
+            // spawn 同步返回; wait_with_output 才是异步等待 (timeout 包它)。
+            let mut child = match tokio::process::Command::new(&cli)
+                .arg("absorb")
+                .arg("-")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!("[bg-absorb] absorb spawn failed: {e}");
+                    all_ok = false;
+                    continue;
+                }
+            };
+            // stdin 直送 session JSON (写端 tokio 任务, 不阻塞主循环)
+            if let Some(mut stdin) = child.stdin.take() {
+                let payload = sub.clone();
+                tokio::spawn(async move {
+                    use tokio::io::AsyncWriteExt;
+                    let _ = stdin.write_all(payload.as_bytes()).await;
+                    let _ = stdin.shutdown().await;
+                });
+            }
             let absorb = tokio::time::timeout(
                 std::time::Duration::from_secs(600),
-                tokio::process::Command::new(&cli)
-                    .arg("absorb")
-                    .arg(&tmp)
-                    .output(),
+                child.wait_with_output(),
             )
             .await;
 
@@ -182,7 +193,6 @@ impl BackgroundLoopHandle {
                         Ok(Err(e)) => log::warn!("[bg-absorb] close spawn failed: {e}"),
                         Err(_) => log::warn!("[bg-absorb] close timed out"),
                     }
-                    let _ = std::fs::remove_file(&tmp);
                 }
                 Ok(Ok(out)) => {
                     // 吸收失败: 保留 pending 下轮重试 (CLI 内部幂等)

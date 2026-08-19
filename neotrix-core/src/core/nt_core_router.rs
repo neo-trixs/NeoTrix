@@ -431,27 +431,27 @@ impl SmartRouter {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let home = std::env::var("HOME").map_err(|e| format!("HOME not set: {}", e))?;
-        let dir = std::path::Path::new(&home).join(".neotrix");
-        let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("smart_router.json");
         let json = serde_json::to_string_pretty(self).map_err(|e| format!("Serialize: {}", e))?;
-        std::fs::write(&path, &json).map_err(|e| format!("Write: {}", e))?;
-        Ok(())
+        crate::core::nt_core_state::save("smart_router", &json)
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn save_with(&self, conn: &rusqlite::Connection) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(self).map_err(|e| format!("Serialize: {}", e))?;
+        crate::core::nt_core_state::save_with(conn, "smart_router", &json)
     }
 
     pub fn load() -> Self {
-        let home = match std::env::var("HOME") {
-            Ok(h) => h,
-            Err(_) => return Self::new(),
-        };
-        let path = std::path::Path::new(&home)
-            .join(".neotrix")
-            .join("smart_router.json");
-        match std::fs::read_to_string(&path) {
-            Ok(json) => serde_json::from_str(&json).unwrap_or_else(|_| Self::new()),
-            Err(_) => Self::new(),
-        }
+        crate::core::nt_core_state::load("smart_router")
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_else(Self::new)
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn load_with(conn: &rusqlite::Connection) -> Self {
+        crate::core::nt_core_state::load_with(conn, "smart_router")
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_else(Self::new)
     }
 }
 
@@ -615,6 +615,8 @@ mod tests {
 
     #[test]
     fn test_persistence() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
         let mut router = SmartRouter::new();
         router.set_rule(
             TaskComplexity::Simple,
@@ -623,8 +625,8 @@ mod tests {
             0.01,
             0.02,
         );
-        assert!(router.save().is_ok());
-        let loaded = SmartRouter::load();
+        assert!(router.save_with(&conn).is_ok());
+        let loaded = SmartRouter::load_with(&conn);
         let rule = loaded.get_provider_config(TaskComplexity::Simple).unwrap();
         assert_eq!(rule.provider, "test-provider");
     }
@@ -647,7 +649,9 @@ mod tests {
 
     #[test]
     fn test_load_from_missing_file() {
-        let router = SmartRouter::load();
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        let router = SmartRouter::load_with(&conn);
         assert_eq!(router.rules.len(), 5);
     }
 

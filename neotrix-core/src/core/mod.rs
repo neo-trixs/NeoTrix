@@ -105,6 +105,7 @@ pub mod nt_core_self_constitution;
 pub mod nt_core_guard_chain;
 pub mod nt_core_kb_primitives;
 pub mod nt_core_kb_types;
+pub mod nt_core_state;
 
 // ═══════════════════════════════════════════════════════════════════
 // L7 — 能力层 (Capability) — *** 核心新增 ***

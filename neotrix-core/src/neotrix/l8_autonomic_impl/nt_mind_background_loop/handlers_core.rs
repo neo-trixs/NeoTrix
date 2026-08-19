@@ -226,14 +226,43 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_exploration(&mut self) {
-        let p = dirs::home_dir().unwrap_or_default().join(".neotrix").join("exploration_sources.txt");
-        let urls: Vec<String> = std::fs::read_to_string(&p).unwrap_or_default()
-            .lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
+        // Phase 1 KB 直写迁移: 探索队列 → kv_store state.exploration_queue (JSON 数组)。
+        // 旧文件 exploration_sources.txt 仅为外部投放兼容入口 — 读到即并入队列并删除,
+        // 存储载体移交 KB, 不再保留本地文件写入。
+        let mut urls: Vec<String> = Vec::new();
+        if let Some(ref kb) = self.kb {
+            if let Ok(Some(raw)) = kb.kv_get("state", "exploration_queue") {
+                if let Ok(arr) = serde_json::from_str::<Vec<String>>(&raw) {
+                    urls = arr;
+                }
+            }
+        }
+        let p = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".neotrix")
+            .join("exploration_sources.txt");
+        if let Ok(content) = std::fs::read_to_string(&p) {
+            let file_urls: Vec<String> = content
+                .lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                .collect();
+            if !file_urls.is_empty() {
+                urls.extend(file_urls);
+            }
+            // 迁移即删 — 文件不再作为存储载体
+            let _ = std::fs::remove_file(&p);
+        }
         if !urls.is_empty() {
             if let Some(ref mut ev) = self.self_evolver {
-                for url in &urls { let _ = ev.evolve_from_url(url); }
+                for url in &urls {
+                    let _ = ev.evolve_from_url(url);
+                }
             }
-            let _ = std::fs::write(&p, "");
+            // 消费后清空 KB 队列
+            if let Some(ref kb) = self.kb {
+                let _ = kb.kv_set("state", "exploration_queue", "[]");
+            }
         }
         if let Some(ref mut gd) = self.gap_detector {
             use crate::core::nt_core_meta::scanner::CodeScanner;

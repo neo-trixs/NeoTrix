@@ -108,27 +108,29 @@ impl WorkSpaceManager {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let home = dirs::home_dir().ok_or("Cannot find home directory")?;
-        let path = home.join(".neotrix").join("workspaces.json");
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
-        }
-        let json =
-            serde_json::to_string_pretty(self).map_err(|e| format!("Serialize error: {}", e))?;
-        std::fs::write(&path, json).map_err(|e| format!("Write error: {}", e))?;
-        Ok(())
+        crate::core::nt_core_state::save("workspaces", &self.to_json()?)
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn save_with(&self, conn: &rusqlite::Connection) -> Result<(), String> {
+        crate::core::nt_core_state::save_with(conn, "workspaces", &self.to_json()?)
+    }
+
+    fn to_json(&self) -> Result<String, String> {
+        serde_json::to_string_pretty(self).map_err(|e| format!("Serialize error: {}", e))
     }
 
     pub fn load() -> Self {
-        let home = match dirs::home_dir() {
-            Some(h) => h,
-            None => return Self::new(),
-        };
-        let path = home.join(".neotrix").join("workspaces.json");
-        match std::fs::read_to_string(&path) {
-            Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| Self::new()),
-            Err(_) => Self::new(),
-        }
+        crate::core::nt_core_state::load("workspaces")
+            .and_then(|content| serde_json::from_str(&content).ok())
+            .unwrap_or_else(Self::new)
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn load_with(conn: &rusqlite::Connection) -> Self {
+        crate::core::nt_core_state::load_with(conn, "workspaces")
+            .and_then(|content| serde_json::from_str(&content).ok())
+            .unwrap_or_else(Self::new)
     }
 
     pub fn scope_root(&self, id: &str) -> Option<PathBuf> {

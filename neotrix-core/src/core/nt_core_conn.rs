@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
 /// A connector to an external service
@@ -46,11 +44,6 @@ pub struct ConnectorManager {
     pub connectors: Vec<Connector>,
     server_running: bool,
     server_port: u16,
-}
-
-fn connectors_path() -> PathBuf {
-    let base = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    base.join(".neotrix").join("connectors.json")
 }
 
 impl ConnectorManager {
@@ -169,38 +162,41 @@ impl ConnectorManager {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let path = connectors_path();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
-        }
         let json = serde_json::to_string_pretty(&self.connectors)
             .map_err(|e| format!("Serialize error: {}", e))?;
-        fs::write(&path, json).map_err(|e| format!("Write error: {}", e))?;
-        Ok(())
+        crate::core::nt_core_state::save("connectors", &json)
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn save_with(&self, conn: &rusqlite::Connection) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(&self.connectors)
+            .map_err(|e| format!("Serialize error: {}", e))?;
+        crate::core::nt_core_state::save_with(conn, "connectors", &json)
     }
 
     pub fn load() -> Self {
-        let path = connectors_path();
-        if path.exists() {
-            match fs::read_to_string(&path) {
-                Ok(content) => match serde_json::from_str::<Vec<Connector>>(&content) {
-                    Ok(connectors) => Self {
-                        connectors,
-                        server_running: false,
-                        server_port: 9090,
-                    },
-                    Err(e) => {
-                        log::warn!("Failed to parse connectors.json: {}", e);
-                        Self::new()
-                    }
+        Self::from_json(crate::core::nt_core_state::load("connectors").as_deref())
+    }
+
+    /// Phase 2 KB 直写: 可注入连接变体 (测试用内存连接)。
+    pub fn load_with(conn: &rusqlite::Connection) -> Self {
+        Self::from_json(crate::core::nt_core_state::load_with(conn, "connectors").as_deref())
+    }
+
+    fn from_json(content: Option<&str>) -> Self {
+        match content {
+            Some(content) => match serde_json::from_str::<Vec<Connector>>(content) {
+                Ok(connectors) => Self {
+                    connectors,
+                    server_running: false,
+                    server_port: 9090,
                 },
                 Err(e) => {
-                    log::warn!("Failed to read connectors.json: {}", e);
+                    log::warn!("Failed to parse connectors.json: {}", e);
                     Self::new()
                 }
-            }
-        } else {
-            Self::new()
+            },
+            None => Self::new(),
         }
     }
 }
