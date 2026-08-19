@@ -1,15 +1,15 @@
 import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js'
-import { save } from '@tauri-apps/plugin-dialog'
-import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
 import { PluginMarketplace } from './PluginMarketplace'
+import { McpSection } from './settings/McpSection'
 import { TrafficLights } from './TrafficLights'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import { tagsStore, normalizeTagName, TAG_PALETTE, RECOMMENDED_TAGS, tagDepth } from '../stores/tags'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
-import { memory, neocodex } from '../api'
+import { memory, neocodex, errText, fs as fsApi } from '../api'
+import { storageGet, storageSet } from '../lib/env'
 import { listenUpdateEvents } from '../api/system'
-import type { MemoryStats, ProviderConfig, ProviderMeta, McpServerInfo, McpToolInfo } from '../api/types'
+import type { MemoryStats, ProviderConfig, ProviderMeta } from '../api/types'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v3）
@@ -159,15 +159,6 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [keyBusy, setKeyBusy] = createSignal(false)
   // 标签快速新建
   const [newTagInput, setNewTagInput] = createSignal('')
-  // MCP 服务器管理（stdio 注册，会话内生效；对标 Claude Desktop MCP 配置）
-  const [mcpServers, setMcpServers] = createSignal<McpServerInfo[]>([])
-  const [mcpToolList, setMcpToolList] = createSignal<McpToolInfo[]>([])
-  const [mcpLoading, setMcpLoading] = createSignal(false)
-  const [mcpBusy, setMcpBusy] = createSignal(false)
-  const [showMcpTools, setShowMcpTools] = createSignal(false)
-  const [mcpName, setMcpName] = createSignal('')
-  const [mcpCommand, setMcpCommand] = createSignal('')
-  const [mcpArgs, setMcpArgs] = createSignal('')
   // 统一确认模态：破坏性操作（清空记忆 / 删除密钥 / 删除标签）
   const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
   const [pendingDeleteTag, setPendingDeleteTag] = createSignal<string | null>(null)
@@ -198,7 +189,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     root.dataset.fontSize = fontSize
     root.dataset.theme = 'light'
     try {
-      localStorage.setItem('neotrix:prefs', JSON.stringify({ density, motion, theme: 'light', fontSize }))
+      storageSet('neotrix:prefs', JSON.stringify({ density, motion, theme: 'light', fontSize }))
     } catch { /* 持久化失败静默 */ }
   }
 
@@ -221,7 +212,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   createEffect(() => {
     if (props.open) {
       try {
-        const raw = localStorage.getItem('neotrix:prefs')
+        const raw = storageGet('neotrix:prefs')
         if (raw) {
           const p = JSON.parse(raw)
           if (p.density) setDensityPref(p.density)
@@ -248,7 +239,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       setConfig(cfg)
     } catch (e) {
       if (seq !== cfgReqSeq) return
-      showNotice(String(e))
+      showNotice(errText(e))
     } finally {
       if (seq === cfgReqSeq) setLoading(false)
     }
@@ -308,7 +299,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       await neocodex.downloadUpdate()
       // 下载完成后由 onDownloaded 事件驱动状态；若事件未到达，轮询确认
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
       setUpdateState('error')
     }
   }
@@ -317,7 +308,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     try {
       await neocodex.restartApp()
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
     }
   }
 
@@ -326,16 +317,16 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setNotice(null)
     try {
       const json = await memory.memoryExport('json')
-      const path = await save({
+      const path = await fsApi.saveFileDialog({
         defaultPath: `neotrix-memory-${new Date().toISOString().slice(0, 10)}.json`,
         filters: [{ name: 'JSON', extensions: ['json'] }],
       })
       if (path) {
-        await writeTextFile(path, json)
+        await fsApi.writeTextFileAt(path, json)
         showNotice(`已导出记忆到 ${path}`)
       }
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
     } finally {
       setDataBusy(false)
     }
@@ -361,7 +352,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       showNotice(`已清空 ${n} 条记忆`)
       await loadMemStats()
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
     } finally {
       setDataBusy(false)
     }
@@ -372,44 +363,6 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     try {
       setHasKey(await memory.hasApiKey())
     } catch { /* 非关键 */ }
-  }
-
-  const loadMcp = async () => {
-    setMcpLoading(true)
-    try {
-      const [servers, tools] = await Promise.all([neocodex.mcpList(), neocodex.mcpTools()])
-      setMcpServers(servers)
-      setMcpToolList(tools)
-    } catch (e) {
-      showNotice(String(e))
-    } finally {
-      setMcpLoading(false)
-    }
-  }
-
-  const registerMcp = async () => {
-    const name = mcpName().trim()
-    const command = mcpCommand().trim()
-    if (!name || !command) {
-      showNotice('服务器名称与启动命令不能为空')
-      return
-    }
-    const args = mcpArgs().split(',').map(s => s.trim()).filter(Boolean)
-    setMcpBusy(true)
-    setNotice(null)
-    try {
-      const servers = await neocodex.mcpRegister(name, command, args)
-      setMcpServers(servers)
-      setMcpName('')
-      setMcpCommand('')
-      setMcpArgs('')
-      showNotice(`已注册 MCP 服务器 ${name}`)
-      void loadMcp()
-    } catch (e) {
-      showNotice(String(e))
-    } finally {
-      setMcpBusy(false)
-    }
   }
 
   const saveApiKey = async () => {
@@ -423,7 +376,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       await loadApiKeyStatus()
       showNotice('API 密钥已保存')
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
     } finally {
       setKeyBusy(false)
     }
@@ -449,7 +402,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       await loadApiKeyStatus()
       showNotice('API 密钥已删除')
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
     } finally {
       setKeyBusy(false)
     }
@@ -467,7 +420,6 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       loadMemStats()
       loadAppVersion()
       loadApiKeyStatus()
-      loadMcp()
     } else {
       // 关闭时释放更新事件订阅（避免重复监听）
       if (unlistenUpdate) {
@@ -487,7 +439,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       // 广播提供商变更，输入区 ProviderSelector 即时刷新
       window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name } }))
     } catch (e) {
-      showNotice(String(e))
+      showNotice(errText(e))
     } finally {
       setSwitching(false)
     }
@@ -844,108 +796,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         </div>
                       </div>
 
-                      {/* MCP 服务器（stdio 注册；对标 Claude Desktop MCP 配置） */}
-                      <div class="ss-card">
-                        <div class="ss-card-header">
-                          <DataIcon />
-                          MCP 服务器
-                          <span class="ml-auto text-[10px] text-text-muted font-mono">{mcpServers().length} 个</span>
-                        </div>
-                        <div class="ss-card-body space-y-3">
-                          <p class="text-[11px] text-text-muted leading-relaxed -mt-1">
-                            注册本地 stdio MCP 服务器，为代理附加外部工具（如文件系统 / 数据库 / 浏览器）。
-                            当前会话内生效，重启后重新注册。
-                          </p>
-
-                          {/* 服务器列表 */}
-                          <Show when={mcpLoading() && mcpServers().length === 0}>
-                            <div class="text-xs text-text-muted py-2 text-center">加载 MCP 服务器…</div>
-                          </Show>
-                          <Show when={!mcpLoading() && mcpServers().length === 0}>
-                            <div class="text-[11px] text-text-muted py-3 text-center border border-dashed border-border-primary/60 rounded-lg">
-                              暂无 MCP 服务器，填写下方表单注册
-                            </div>
-                          </Show>
-                          <div class="space-y-1.5">
-                            <For each={mcpServers()}>
-                              {(srv) => (
-                                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-primary/40 bg-white/40">
-                                  <span class={clsx('w-2 h-2 rounded-full flex-shrink-0', srv.healthy ? 'bg-emerald-500' : 'bg-red-500')} />
-                                  <span class="text-[12px] text-text-primary font-medium truncate flex-1">{srv.name}</span>
-                                  <span class="text-[10px] text-text-muted font-mono flex-shrink-0">{srv.transport}</span>
-                                  <span class="text-[10px] text-text-muted font-mono flex-shrink-0">{srv.tool_count} 工具</span>
-                                  <span class={clsx('text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0', srv.healthy ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500')}>
-                                    {srv.healthy ? '健康' : '异常'}
-                                  </span>
-                                </div>
-                              )}
-                            </For>
-                          </div>
-
-                          {/* 工具一览（可折叠） */}
-                          <Show when={mcpToolList().length > 0}>
-                            <button
-                              class="flex items-center gap-1 text-[11px] text-nt-io-600 hover:text-nt-io-700"
-                              onClick={() => setShowMcpTools(!showMcpTools())}
-                              aria-expanded={showMcpTools()}
-                            >
-                              {showMcpTools() ? '▾' : '▸'} 查看工具（{mcpToolList().length}）
-                            </button>
-                            <Show when={showMcpTools()}>
-                              <div class="space-y-1 max-h-40 overflow-y-auto">
-                                <For each={mcpToolList()}>
-                                  {(tool) => (
-                                    <div class="px-2 py-1 rounded bg-bg-primary/40 text-[11px] font-mono break-all">
-                                      <span class="text-nt-io-600">{tool.server}.</span>
-                                      <span class="text-text-primary">{tool.name}</span>
-                                      <span class="text-text-muted"> — {tool.description}</span>
-                                    </div>
-                                  )}
-                                </For>
-                              </div>
-                            </Show>
-                          </Show>
-
-                          {/* 添加表单 */}
-                          <div class="border-t border-border-primary/40 pt-3 space-y-2">
-                            <div class="grid grid-cols-[1fr_1fr] gap-2">
-                              <input
-                                class="px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
-                                placeholder="服务器名称（如 filesystem）"
-                                value={mcpName()}
-                                onInput={(e) => setMcpName(e.currentTarget.value)}
-                                aria-label="MCP 服务器名称"
-                              />
-                              <input
-                                class="px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
-                                placeholder="启动命令（如 npx）"
-                                value={mcpCommand()}
-                                onInput={(e) => setMcpCommand(e.currentTarget.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') registerMcp() }}
-                                aria-label="MCP 启动命令"
-                              />
-                            </div>
-                            <div class="flex items-center gap-2">
-                              <input
-                                class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500 font-mono"
-                                placeholder="参数（逗号分隔，如 @modelcontextprotocol/server-filesystem, /tmp）"
-                                value={mcpArgs()}
-                                onInput={(e) => setMcpArgs(e.currentTarget.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') registerMcp() }}
-                                aria-label="MCP 启动参数"
-                              />
-                              <button
-                                class="px-3 py-2 rounded-lg bg-nt-io-500 text-text-primary text-[12px] font-medium hover:bg-nt-io-600 disabled:opacity-50 transition-colors flex-shrink-0"
-                                onClick={registerMcp}
-                                disabled={mcpBusy()}
-                                aria-label="注册 MCP 服务器"
-                              >
-                                {mcpBusy() ? '注册中…' : '注册'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <McpSection showNotice={showNotice} />
                     </div>
                   )}
                 </Show>

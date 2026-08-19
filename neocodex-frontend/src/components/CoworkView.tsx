@@ -1,6 +1,6 @@
 import { createSignal, createEffect, For, Show } from 'solid-js'
 import { Loader2 } from 'lucide-solid'
-import { cowork as coworkApi } from '../api'
+import { cowork as coworkApi, errText } from '../api'
 import type { CoworkAction, CoworkDeliverable, CoworkSession } from '../api/types'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
@@ -55,7 +55,7 @@ export function CoworkView() {
         setActiveId(list[0].id)
       }
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -81,7 +81,7 @@ export function CoworkView() {
       setDeliverables(dels)
     } catch (e) {
       if (seq !== detailSeq) return
-      setError(String(e))
+      setError(errText(e))
     } finally {
       if (seq === detailSeq) setDetailLoading(false)
     }
@@ -114,7 +114,7 @@ export function CoworkView() {
       await loadSessions()
       setActiveId(id)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -144,7 +144,7 @@ export function CoworkView() {
       else await coworkApi.coworkStop(id)
       await loadSessions()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     }
   }
 
@@ -168,7 +168,7 @@ export function CoworkView() {
       }
       await loadSessions()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     }
   }
 

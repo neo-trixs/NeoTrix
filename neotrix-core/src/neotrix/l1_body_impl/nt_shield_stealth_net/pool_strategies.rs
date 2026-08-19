@@ -143,16 +143,17 @@ impl StrategyLearner {
 
     pub fn save(&self) {
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            let parent = self.persist_path.parent().unwrap_or(std::path::Path::new(""));
-            if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[strategy] create dir: {}", e); }
-            if let Err(e) = std::fs::write(&self.persist_path, &json) { log::warn!("[strategy] write: {}", e); }
+            if let Err(e) = crate::core::nt_core_state::save("strategy_q", &json) {
+                log::warn!("[strategy] save to KB: {}", e);
+            }
         } else {
             log::warn!("[strategy-learner] failed to serialize");
         }
     }
 
+    /// Phase 2b KB 直写迁移: 读取 KB kv_store state.strategy_q (legacy 文件作 fallback)。
     pub fn load(path: &std::path::Path) -> Self {
-        if let Ok(content) = std::fs::read_to_string(path) {
+        if let Some(content) = crate::core::nt_core_state::load("strategy_q") {
             if let Ok(mut learner) = serde_json::from_str::<StrategyLearner>(&content) {
                 learner.persist_path = path.to_path_buf();
                 return learner;
@@ -247,20 +248,21 @@ mod tests {
 
     #[test]
     fn test_learner_save_load_roundtrip() {
-        let dir = std::env::temp_dir().join("neotrix_test_q");
-        let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("test_q.json");
+        let path = std::env::home_dir()
+            .unwrap_or_default()
+            .join(".neotrix")
+            .join("strategy_q.json");
         let _ = std::fs::remove_file(&path);
 
         {
             let mut learner = StrategyLearner::new();
             learner.record_reward("test.com", &NodeSelectionStrategy::Fastest, true);
-            learner.persist_path = path.clone();
             learner.save();
         }
 
         let loaded = StrategyLearner::load(&path);
         assert!(loaded.total_entries() > 0);
         let _ = std::fs::remove_file(&path);
+        let _ = crate::core::nt_core_state::delete("strategy_q");
     }
 }

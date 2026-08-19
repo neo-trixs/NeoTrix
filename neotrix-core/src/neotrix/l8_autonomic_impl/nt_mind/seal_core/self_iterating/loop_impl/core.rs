@@ -241,8 +241,12 @@ impl SelfIteratingBrain {
             )),
             _oracle_gate: Some(crate::neotrix::nt_act_autonomy::OracleGate::new()),
             _cross_session_memory: Some(crate::neotrix::nt_act_autonomy::CrossSessionMemory::new(
-                std::path::PathBuf::from("~/.neotrix/cross_session_memory.json"),
-            )),
+                dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(".neotrix")
+                    .join("cross_session_memory.json"),
+            )
+            .with_kb()),
             _last_consciousness_quality: 0.0,
             _consciousness_fruits: Vec::new(),
             _consciousness_critique_count: 0,

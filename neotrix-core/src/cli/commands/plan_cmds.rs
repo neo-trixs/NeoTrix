@@ -16,8 +16,7 @@ struct PlanManager {
 
 impl PlanManager {
     fn load() -> Self {
-        let path = Self::path();
-        if let Ok(data) = std::fs::read_to_string(&path) {
+        if let Some(data) = crate::core::nt_core_state::load("plans") {
             if let Ok(plans) = serde_json::from_str::<Vec<E8Plan>>(&data) {
                 let active_id = plans.last().map(|p| p.id.clone());
                 return Self { plans, active_id };
@@ -27,18 +26,9 @@ impl PlanManager {
     }
 
     fn save(&self) {
-        let path = Self::path();
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
         if let Ok(data) = serde_json::to_string_pretty(&self.plans) {
-            let _ = std::fs::write(&path, &data);
+            let _ = crate::core::nt_core_state::save("plans", &data);
         }
-    }
-
-    fn path() -> std::path::PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        std::path::PathBuf::from(home).join(".neotrix").join("plans.json")
     }
 
     fn active_plan(&self) -> Option<&E8Plan> {

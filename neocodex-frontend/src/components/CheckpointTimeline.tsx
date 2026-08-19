@@ -1,6 +1,6 @@
 import { createSignal, createEffect, onCleanup, Show, For } from 'solid-js'
 import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
-import { neocodex } from '../api'
+import { neocodex, errText } from '../api'
 import type { Checkpoint, NeoCodexMessageItem } from '../api/types'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
@@ -86,7 +86,7 @@ export function CheckpointTimeline(props: Props) {
       const list = await neocodex.checkpointList(props.sessionId)
       setCheckpoints(list)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -137,7 +137,7 @@ export function CheckpointTimeline(props: Props) {
         setHighlightedId(null)
       }, 3000)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setRestoring(null)
     }

@@ -1,6 +1,6 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { CalendarClock, X, RefreshCw, Loader2, Play, Plus, Trash2, Pause, CirclePlay, History } from 'lucide-solid'
-import { tasks as tasksApi } from '../api'
+import { tasks as tasksApi, errText } from '../api'
 import type { BackgroundTask } from '../api/types'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
@@ -75,7 +75,7 @@ export function ScheduledTasks(props: Props) {
       const list = await tasksApi.listBackgroundTasks()
       setTasks(list)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -119,7 +119,7 @@ export function ScheduledTasks(props: Props) {
       setShowCreate(false)
       await load()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -145,7 +145,7 @@ export function ScheduledTasks(props: Props) {
       else if (kind === 'resume') await tasksApi.resumeBackgroundTask(id)
       await load()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -161,7 +161,7 @@ export function ScheduledTasks(props: Props) {
       await tasksApi.deleteBackgroundTask(id)
       await load()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }

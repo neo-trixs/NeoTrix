@@ -75,3 +75,6 @@ neotrix-core/.neotrix/
 
 # Runtime cleanup logs (auto-maintenance dir)
 .cleanup/
+
+# Frontend test coverage output
+neocodex-frontend/coverage/

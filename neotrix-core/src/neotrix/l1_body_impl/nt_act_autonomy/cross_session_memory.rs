@@ -28,6 +28,8 @@ pub struct CrossSessionMemory {
     store: HashMap<String, MemoryEntry>,
     storage_path: PathBuf,
     max_entries: usize,
+    #[serde(skip)]
+    use_kb: bool,
 }
 
 impl CrossSessionMemory {
@@ -36,7 +38,14 @@ impl CrossSessionMemory {
             store: HashMap::new(),
             storage_path,
             max_entries: 1000,
+            use_kb: false,
         }
+    }
+
+    /// 生产接线: 记忆主存 KB kv_store `state.cross_session_memory`, 文件仅作 legacy dual-write。
+    pub fn with_kb(mut self) -> Self {
+        self.use_kb = true;
+        self
     }
 
     pub fn remember(&mut self, key: &str, value: &str, category: MemoryCategory) {
@@ -92,15 +101,31 @@ impl CrossSessionMemory {
 
     pub fn save(&self) -> Result<(), String> {
         let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize error: {}", e))?;
+        if self.use_kb {
+            crate::core::nt_core_state::save("cross_session_memory", &json)
+                .map_err(|e| format!("kb write error: {}", e))?;
+        }
         std::fs::write(&self.storage_path, json).map_err(|e| format!("write error: {}", e))
     }
 
     pub fn load(&mut self) -> Result<(), String> {
-        if !self.storage_path.exists() {
+        let data = if self.use_kb {
+            match crate::core::nt_core_state::load("cross_session_memory") {
+                Some(d) => Some(d),
+                None => self.storage_path
+                    .exists()
+                    .then(|| std::fs::read_to_string(&self.storage_path).ok())
+                    .flatten(),
+            }
+        } else {
+            if !self.storage_path.exists() {
+                return Ok(());
+            }
+            std::fs::read_to_string(&self.storage_path).ok()
+        };
+        let Some(data) = data else {
             return Ok(());
-        }
-        let data = std::fs::read_to_string(&self.storage_path)
-            .map_err(|e| format!("read error: {}", e))?;
+        };
         let loaded: Self =
             serde_json::from_str(&data).map_err(|e| format!("deserialize error: {}", e))?;
         self.store.clone_from(&loaded.store);

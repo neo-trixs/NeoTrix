@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 const MAX_ENTRIES: usize = 500;
 
@@ -120,31 +119,21 @@ impl CommandHistory {
         self.search_selection = 0;
     }
 
-    fn path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(home).join(".neotrix").join("history.json")
-    }
-
     pub fn save(&self) {
-        let path = Self::path();
-        if let Some(parent) = path.parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[history] create dir: {}", e); }
-        }
         if let Ok(json) = serde_json::to_string(&self.entries) {
-            if let Err(e) = std::fs::write(&path, &json) { log::warn!("[history] write: {}", e); }
+            if let Err(e) = crate::core::nt_core_state::save("history", &json) {
+                log::warn!("[history] write to KB: {}", e);
+            }
         }
     }
 
     fn load(&mut self) {
-        let path = Self::path();
-        if path.exists() {
-            if let Ok(json) = std::fs::read_to_string(&path) {
-                if let Ok(entries) = serde_json::from_str::<Vec<String>>(&json) {
-                    self.entries = entries;
-                    if self.entries.len() > self.max_entries {
-                        let excess = self.entries.len() - self.max_entries;
-                        self.entries.drain(..excess);
-                    }
+        if let Some(json) = crate::core::nt_core_state::load("history") {
+            if let Ok(entries) = serde_json::from_str::<Vec<String>>(&json) {
+                self.entries = entries;
+                if self.entries.len() > self.max_entries {
+                    let excess = self.entries.len() - self.max_entries;
+                    self.entries.drain(..excess);
                 }
             }
         }

@@ -33,7 +33,6 @@ pub(crate) fn truncate(s: &str, max: usize) -> String {
 pub struct GoalLoop {
     pub active_goal: Option<GoalTracker>,
     pub completed_goals: Vec<GoalTracker>,
-    persistence_path: PathBuf,
     pub rate_limiter: RateLimiter,
     pub circuit_breaker: CircuitBreaker,
     pub orchestrator: Option<Orchestrator>,
@@ -59,14 +58,9 @@ impl Default for GoalLoop {
 
 impl GoalLoop {
     pub fn new() -> Self {
-        let path = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".neotrix")
-            .join("goals.json");
         Self {
             active_goal: None,
             completed_goals: Vec::new(),
-            persistence_path: path,
             rate_limiter: RateLimiter::new(100),
             circuit_breaker: CircuitBreaker::new(3, 3, 1800),
             orchestrator: None,
@@ -82,11 +76,10 @@ impl GoalLoop {
         }
     }
 
-    pub fn with_path(path: PathBuf) -> Self {
+    pub fn with_path(_path: PathBuf) -> Self {
         Self {
             active_goal: None,
             completed_goals: Vec::new(),
-            persistence_path: path,
             rate_limiter: RateLimiter::new(100),
             circuit_breaker: CircuitBreaker::new(3, 3, 1800),
             orchestrator: None,
@@ -394,9 +387,6 @@ impl GoalLoop {
     }
 
     pub fn save(&self) -> NeoTrixResult<()> {
-        if let Some(parent) = self.persistence_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| NeoTrixError::Io(e.to_string()))?;
-        }
         let data = serde_json::json!({
             "active_goal": self.active_goal,
             "completed_goals": self.completed_goals,
@@ -404,38 +394,35 @@ impl GoalLoop {
         });
         let json = serde_json::to_string_pretty(&data)
             .map_err(|e| NeoTrixError::Serde(e.to_string()))?;
-        std::fs::write(&self.persistence_path, json)
-            .map_err(|e| NeoTrixError::Io(e.to_string()))?;
-        Ok(())
+        crate::core::nt_core_state::save("goals", &json)
+            .map_err(|e| NeoTrixError::Io(e))
     }
 
     pub fn load(&mut self) {
-        if self.persistence_path.exists() {
-            if let Ok(json) = std::fs::read_to_string(&self.persistence_path) {
-                if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json) {
-                    self.active_goal = data["active_goal"]
-                        .as_object()
-                        .and_then(|_| serde_json::from_value(data["active_goal"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse active_goal: {}", e)).ok());
-                    self.completed_goals = data["completed_goals"]
-                        .as_array()
-                        .and_then(|_| serde_json::from_value(data["completed_goals"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse completed_goals: {}", e)).ok())
-                        .unwrap_or_default();
-                    self.goal_queue = data["goal_queue"]
-                        .as_array()
-                        .and_then(|_| serde_json::from_value(data["goal_queue"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse goal_queue: {}", e)).ok())
-                        .unwrap_or_default();
-                    let restored = self.completed_goals.len();
-                    let queued = self.goal_queue.len();
-                    if restored > 0 {
-                        println!("[bg-goal] restored {} completed goals from persistence", restored);
-                    }
-                    if queued > 0 {
-                        println!("[bg-goal] restored {} queued goals", queued);
-                    }
-                    if let Some(ref g) = self.active_goal {
-                        if g.state == GoalState::Pursuing {
-                            println!("[bg-goal] restored pursuing goal: {}", truncate(&g.description, 40));
-                        }
+        if let Some(json) = crate::core::nt_core_state::load("goals") {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&json) {
+                self.active_goal = data["active_goal"]
+                    .as_object()
+                    .and_then(|_| serde_json::from_value(data["active_goal"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse active_goal: {}", e)).ok());
+                self.completed_goals = data["completed_goals"]
+                    .as_array()
+                    .and_then(|_| serde_json::from_value(data["completed_goals"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse completed_goals: {}", e)).ok())
+                    .unwrap_or_default();
+                self.goal_queue = data["goal_queue"]
+                    .as_array()
+                    .and_then(|_| serde_json::from_value(data["goal_queue"].clone()).inspect_err(|e| log::warn!("[goal-loop] parse goal_queue: {}", e)).ok())
+                    .unwrap_or_default();
+                let restored = self.completed_goals.len();
+                let queued = self.goal_queue.len();
+                if restored > 0 {
+                    println!("[bg-goal] restored {} completed goals from persistence", restored);
+                }
+                if queued > 0 {
+                    println!("[bg-goal] restored {} queued goals", queued);
+                }
+                if let Some(ref g) = self.active_goal {
+                    if g.state == GoalState::Pursuing {
+                        println!("[bg-goal] restored pursuing goal: {}", truncate(&g.description, 40));
                     }
                 }
             }

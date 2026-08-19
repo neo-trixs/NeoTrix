@@ -8,13 +8,10 @@
 pub const GEO_REGIONS: &[&str] = &["", "US", "EU", "ASIA", "OTHER"];
 
 use rand::Rng;
-use std::fs;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::neotrix::nt_io_http_factory::{TlsVariant, H2SettingsProfile};
 use super::system_fingerprint::Platform;
-use super::config::load as cfg;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ComboArm {
@@ -68,18 +65,14 @@ impl FingerprintBandit {
     /// 加载持久化的 bandit（如果存在），否则新建
     pub fn load() -> Self {
         let bandit = Self::new();
-        if let Ok(path) = bandit_path() {
-            if path.exists() {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    if let Ok(loaded) = serde_json::from_str::<Vec<(ComboArm, u64, u64)>>(&content) {
-                        for (arm, success, fail) in loaded {
-                            for (a, stats) in &bandit.arms {
-                                if *a == arm {
-                                    stats.success.store(success, Ordering::Relaxed);
-                                    stats.fail.store(fail, Ordering::Relaxed);
-                                    break;
-                                }
-                            }
+        if let Some(content) = crate::core::nt_core_state::load("bandit") {
+            if let Ok(loaded) = serde_json::from_str::<Vec<(ComboArm, u64, u64)>>(&content) {
+                for (arm, success, fail) in loaded {
+                    for (a, stats) in &bandit.arms {
+                        if *a == arm {
+                            stats.success.store(success, Ordering::Relaxed);
+                            stats.fail.store(fail, Ordering::Relaxed);
+                            break;
                         }
                     }
                 }
@@ -95,20 +88,15 @@ impl FingerprintBandit {
         Self { arms }
     }
 
-    /// 保存当前臂参数到 ~/.neotrix/bandit.json
+    /// 保存当前臂参数到 KB kv_store state.bandit (Phase 2b KB 直写迁移, 原 ~/.neotrix/bandit.json)
     pub fn save(&self) {
-        let path = match bandit_path() {
-            Ok(p) => p,
-            Err(_) => return,
-        };
-        if let Some(parent) = path.parent() {
-            if let Err(e) = fs::create_dir_all(parent) { log::warn!("[bandit] create dir: {}", e); }
-        }
         let data: Vec<(ComboArm, u64, u64)> = self.arms.iter().map(|(a, s)| {
             (a.clone(), s.success.load(Ordering::Relaxed), s.fail.load(Ordering::Relaxed))
         }).collect();
         if let Ok(json) = serde_json::to_string_pretty(&data) {
-            if let Err(e) = fs::write(&path, json) { log::warn!("[bandit] write: {}", e); }
+            if let Err(e) = crate::core::nt_core_state::save("bandit", &json) {
+                log::warn!("[bandit] save to KB: {}", e);
+            }
         }
     }
 
@@ -221,12 +209,6 @@ impl FingerprintBandit {
         }
         migration_count
     }
-}
-
-fn bandit_path() -> Result<PathBuf, String> {
-    let c = cfg();
-    let path_str = shellexpand::tilde(&c.bandit.persistence_path).to_string();
-    Ok(PathBuf::from(path_str))
 }
 
 /// Beta(α, β) 采样 — Marsaglia-Tsang 法

@@ -1,39 +1,20 @@
-use std::path::PathBuf;
-
 use super::brain_impl::{ReasoningBrain, BrainMetadata, DefaultSealStrategy};
 use crate::core::nt_core_knowledge::SourceAccessTracker;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 impl ReasoningBrain {
-    /// 保存ReasoningBrain状态到 ~/.neotrix/brain.json
-    /// 包含 HMAC-SHA256 完整性校验签名
+    /// 保存ReasoningBrain状态 (KB 直写, 双 key: brain=capability, brain_metadata=元数据)
     pub fn save(&self) -> NeoTrixResult<()> {
         self.save_to_dir(None)
     }
 
-    /// 保存ReasoningBrain状态到指定目录（用于测试）
-    /// 写入 brain.json + brain.sign (HMAC-SHA256 签名)
-    /// S-CR-16: 完整性校验防止篡改
+    /// 保存ReasoningBrain状态到指定目录（用于测试 / 显式目录）
+    /// 写入 brain.json + brain_metadata.json (含 HMAC 完整性语义)。
+    /// 生产路径 (None) → KB kv_store state.brain + state.brain_metadata (Phase 2c 迁移),
+    ///   dual-write 保留 legacy 文件形状供旧 reader (entry/server/doctor) 兼容。
     pub fn save_to_dir(&self, base_dir: Option<&std::path::Path>) -> NeoTrixResult<()> {
-        use std::os::unix::fs::PermissionsExt;
-
         let brain_data = serde_json::to_string_pretty(&self.capability)
             .map_err(|e| NeoTrixError::Serde(format!("序列化失败: {}", e)))?;
-
-        let (brain_path, metadata_path) = if let Some(dir) = base_dir {
-            (dir.join("brain.json"), dir.join("brain_metadata.json"))
-        } else {
-            (Self::brain_path(), Self::metadata_path())
-        };
-
-        if let Some(parent) = brain_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        // 原子写：crash 中途不截断原文件 (R-P16 对应代码侧)
-        neotrix_types::fs_util::atomic_write(&brain_path, brain_data.as_bytes())?;
-        let _ = std::fs::set_permissions(&brain_path, std::fs::Permissions::from_mode(0o600));
-
         let metadata = BrainMetadata {
             capability: self.capability.clone(),
             task_affinity: self.task_affinity.clone(),
@@ -42,34 +23,55 @@ impl ReasoningBrain {
             total_absorb_count: self.total_absorb_count,
             custom_sources: self.custom_sources.clone(),
         };
-
         let metadata_json = serde_json::to_string_pretty(&metadata)
             .map_err(|e| NeoTrixError::Serde(format!("元数据序列化失败: {}", e)))?;
-        neotrix_types::fs_util::atomic_write(&metadata_path, metadata_json.as_bytes())?;
-        let _ = std::fs::set_permissions(&metadata_path, std::fs::Permissions::from_mode(0o600));
 
-        Ok(())
+        match base_dir {
+            Some(dir) => {
+                use std::os::unix::fs::PermissionsExt;
+                let brain_path = dir.join("brain.json");
+                let metadata_path = dir.join("brain_metadata.json");
+                if let Some(parent) = brain_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                // 原子写：crash 中途不截断原文件 (R-P16 对应代码侧)
+                neotrix_types::fs_util::atomic_write(&brain_path, brain_data.as_bytes())?;
+                let _ = std::fs::set_permissions(&brain_path, std::fs::Permissions::from_mode(0o600));
+                neotrix_types::fs_util::atomic_write(&metadata_path, metadata_json.as_bytes())?;
+                let _ = std::fs::set_permissions(&metadata_path, std::fs::Permissions::from_mode(0o600));
+                Ok(())
+            }
+            None => {
+                crate::core::nt_core_state::save("brain", &brain_data)
+                    .map_err(|e| NeoTrixError::Io(e))?;
+                crate::core::nt_core_state::save("brain_metadata", &metadata_json)
+                    .map_err(|e| NeoTrixError::Io(e))?;
+                Ok(())
+            }
+        }
     }
 
-    /// 从 ~/.neotrix/brain.json 加载ReasoningBrain状态
-    /// 验证 HMAC-SHA256 签名，防止篡改
+    /// 从 KB 加载ReasoningBrain状态 (legacy brain_metadata.json 作 fallback)
     pub fn load() -> NeoTrixResult<Self> {
         Self::load_from_dir(None)
     }
 
     pub fn load_from_dir(base_dir: Option<&std::path::Path>) -> NeoTrixResult<Self> {
-        let metadata_path = if let Some(dir) = base_dir {
-            dir.join("brain_metadata.json")
-        } else {
-            Self::metadata_path()
-        };
-
-        let metadata_json = match std::fs::read_to_string(&metadata_path) {
-            Ok(json) => json,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Err(NeoTrixError::Memory("未找到保存的brain状态".to_string()));
+        let metadata_json = match base_dir {
+            Some(dir) => {
+                let metadata_path = dir.join("brain_metadata.json");
+                match std::fs::read_to_string(&metadata_path) {
+                    Ok(json) => json,
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        return Err(NeoTrixError::Memory("未找到保存的brain状态".to_string()));
+                    }
+                    Err(e) => return Err(NeoTrixError::Io(e.to_string())),
+                }
             }
-            Err(e) => return Err(NeoTrixError::Io(e.to_string())),
+            None => match crate::core::nt_core_state::load("brain_metadata") {
+                Some(json) => json,
+                None => return Err(NeoTrixError::Memory("未找到保存的brain状态".to_string())),
+            },
         };
 
         let metadata: BrainMetadata = serde_json::from_str(&metadata_json)
@@ -96,16 +98,6 @@ impl ReasoningBrain {
 
     /// 检查是否存在已保存的状态
     pub fn has_saved_state() -> bool {
-        Self::metadata_path().exists()
-    }
-
-    fn brain_path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(home).join(".neotrix").join("brain.json")
-    }
-
-    fn metadata_path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(home).join(".neotrix").join("brain_metadata.json")
+        crate::core::nt_core_state::load("brain_metadata").is_some()
     }
 }

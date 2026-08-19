@@ -97,25 +97,12 @@ impl ServerProxy {
     }
 
     fn load_brain() -> CapabilityVector {
-        let path = dirs::home_dir().unwrap_or_default().join(".neotrix/brain.json");
-        if path.exists() {
-            let content = match std::fs::read_to_string(&path) {
-                Ok(c) => c,
-                Err(e) => {
-                    log::warn!("[server-proxy] read brain.json: {}", e);
-                    return CapabilityVector::default();
-                }
-            };
-            match serde_json::from_str::<CapabilityVector>(&content) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::warn!("[server-proxy] parse brain.json: {}", e);
-                    CapabilityVector::default()
-                }
-            }
-        } else {
-            CapabilityVector::default()
-        }
+        crate::core::nt_core_state::load("brain")
+            .and_then(|content| serde_json::from_str::<CapabilityVector>(&content).ok())
+            .unwrap_or_else(|| {
+                log::warn!("[server-proxy] brain state missing or unparseable");
+                CapabilityVector::default()
+            })
     }
 
     fn format_report(report: &BenchmarkReport) -> String {

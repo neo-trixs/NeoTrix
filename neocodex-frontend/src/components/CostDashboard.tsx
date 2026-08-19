@@ -1,7 +1,8 @@
 import { createSignal, onMount, createEffect, Show } from 'solid-js'
 import { Coins, X, RefreshCw, Loader2, Cpu, Activity, Wallet, Repeat } from 'lucide-solid'
-import { neocodex } from '../api'
+import { neocodex, errText } from '../api'
 import type { AgentStatus } from '../api/types'
+import { query } from '../api/query'
 import { clsx } from 'clsx'
 
 interface Props {
@@ -53,10 +54,15 @@ export function CostDashboard(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const s = await neocodex.agentStatus()
+      // 同源 agentStatus（Chat.tsx 上下文占用 / CostDashboard 轮询）共享 3s TTL 缓存
+      const s = await query<AgentStatus>(
+        'agent_status',
+        () => neocodex.agentStatus(),
+        { ttlMs: 3000 },
+      )
       setStatus(s)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -69,8 +75,11 @@ export function CostDashboard(props: Props) {
   createEffect(() => {
     if (!props.open) return
     const timer = setInterval(() => {
-      neocodex
-        .agentStatus()
+      query<AgentStatus>(
+        'agent_status',
+        () => neocodex.agentStatus(),
+        { ttlMs: 3000, force: true },
+      )
         .then((s) => {
           pollFailures = 0
           setPollError(null)

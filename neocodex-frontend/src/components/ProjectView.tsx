@@ -1,6 +1,6 @@
 import { createSignal, onMount, createEffect, For, Show } from 'solid-js'
 import { Folder, FolderOpen, File, FileText, ChevronRight, ChevronDown, BookOpen, Loader2, X, RefreshCw } from 'lucide-solid'
-import { neocodex } from '../api'
+import { neocodex, errText } from '../api'
 import type { ProjectTreeItem, ProjectView as ProjectViewData } from '../api/types'
 import { clsx } from 'clsx'
 
@@ -38,7 +38,7 @@ export function ProjectView(props: Props) {
         firstLoad = false
       }
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }

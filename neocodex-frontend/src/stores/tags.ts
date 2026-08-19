@@ -1,4 +1,5 @@
 import { createStore, produce } from 'solid-js/store'
+import { safeLocalStorage } from '../lib/env'
 
 /* ════════════════════════════════════════════
    tags store — 会话标签系统（对标 Obsidian 标签体系）
@@ -44,17 +45,9 @@ export interface TagsState {
 
 const STORAGE_KEY = 'neotrix:tags'
 
-/** 安全 localStorage 访问（jsdom 等环境可能无 Storage 实现；异常回退空态） */
-const storage = (): Storage | null => {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage
-  } catch { /* 无 window */ }
-  return null
-}
-
 function loadPersisted(): TagsState {
   try {
-    const ls = storage()
+    const ls = safeLocalStorage()
     if (!ls) return { tags: {}, sessionTags: {} }
     const raw = ls.getItem(STORAGE_KEY)
     if (raw) {
@@ -72,7 +65,7 @@ function loadPersisted(): TagsState {
 
 function persist(state: TagsState) {
   try {
-    const ls = storage()
+    const ls = safeLocalStorage()
     if (!ls) return
     ls.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch { /* 持久化失败静默（隐私模式等） */ }

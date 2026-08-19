@@ -2,6 +2,7 @@ import { createSignal, onCleanup, onMount } from 'solid-js'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { system } from '../api'
 import { clsx } from 'clsx'
+import { isTauriRuntime } from '../lib/env'
 
 /**
  * 自绘 macOS 交通灯（红/黄/绿窗口控制点）。
@@ -15,6 +16,8 @@ export function TrafficLights() {
   const [focused, setFocused] = createSignal(true)
 
   onMount(async () => {
+    // 非 Tauri 宿主（测试/浏览器）不接窗口监听，保持 focused 默认态
+    if (!isTauriRuntime()) return
     try {
       const win = getCurrentWindow()
       setFocused(await win.isFocused())
@@ -23,7 +26,7 @@ export function TrafficLights() {
       })
       onCleanup(un)
     } catch {
-      /* 非 Tauri 环境（测试/浏览器）静默 */
+      /* 窗口 API 异常静默 */
     }
   })
 

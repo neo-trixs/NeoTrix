@@ -13,6 +13,7 @@ import {
   type GeoLayerSummary,
   type TrajectoryRecord,
 } from '../api/geo'
+import { errText } from '../api/client'
 
 /* ════════════════════════════════════════════
    GlobeView.tsx — 地球知识世界仿真 (3D 地图)
@@ -193,7 +194,7 @@ export function GlobeView(props: GlobeViewProps) {
       setShanhaiPts(shanhaiPts)
       setPoints([...cityPts, ...geoTagPts, ...naturalPts, ...shanhaiPts])
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(errText(e))
     } finally {
       if (!disposed) setLoading(false)
     }

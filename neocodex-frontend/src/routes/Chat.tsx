@@ -24,10 +24,14 @@ import { ComputerUse } from '../components/ComputerUse'
 import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
+import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
+import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
-import { neocodex, system, unified } from '../api'
+import { neocodex, system, unified, errText } from '../api'
+import { query } from '../api/query'
 import { subscribeStream, type UnlistenFn } from '../api/events'
+import type { AgentStatus } from '../api/types'
 
 const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
   { text: '解释当前项目结构', icon: FolderTree },
@@ -44,14 +48,6 @@ const actionBtnClass =
 /* 长消息内容折叠阈值（任务4：超长 assistant 消息折叠；末条/流式消息始终全量渲染，保证流式安全） */
 const LONG_MSG_FOLD_CHARS = 6000
 const LONG_MSG_SNIPPET_CHARS = 4000
-
-/* 折叠预览：前 N 字符 + 若截断点处未闭合的 ``` 围栏则自动补闭合，保证预览 markdown 完整 */
-function foldPreview(content: string, limit: number): string {
-  const snippet = content.slice(0, limit)
-  const fenceCount = (snippet.match(/```/g) || []).length
-  const closed = fenceCount % 2 === 0
-  return closed ? `${snippet}\n\n…` : `${snippet}\n\`\`\`\n\n…`
-}
 
 /* 权限模式徽章短标签（对标 Claude 顶栏 mode 徽章） */
 const MODE_SHORT_LABEL: Record<PermissionMode, string> = {
@@ -73,33 +69,6 @@ const SLASH_COMMANDS: SlashCommandDef[] = [
   { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '?'] },
 ]
 
-/* 根据扩展名猜测 MIME（附件预览用） */
-function guessMime(name: string): string {
-  const ext = name.split('.').pop()?.toLowerCase() || ''
-  const map: Record<string, string> = {
-    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-    rs: 'text/rust', ts: 'text/typescript', tsx: 'text/typescript', js: 'text/javascript', jsx: 'text/javascript',
-    py: 'text/python', go: 'text/plain', java: 'text/plain', c: 'text/plain', cpp: 'text/plain', h: 'text/plain',
-    rb: 'text/plain', sh: 'text/plain', json: 'application/json', yaml: 'text/yaml', yml: 'text/yaml',
-    toml: 'text/plain', md: 'text/markdown', sql: 'text/plain', html: 'text/html', css: 'text/css',
-    csv: 'text/csv', txt: 'text/plain', pdf: 'application/pdf',
-  }
-  return map[ext] ?? 'application/octet-stream'
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-/* 估算 token 数：CJK 每字符约 1 token，拉丁按 4 字符/token（对标 Claude 输入计数） */
-function estimateTokens(text: string): number {
-  if (!text) return 0
-  const cjk = text.match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g)?.length ?? 0
-  const latin = text.length - cjk
-  return Math.ceil(cjk + latin / 4)
-}
 /* —— 设计 v2 图标：E8 六芒星（hero） —— */
 function HeroMark() {
   return (
@@ -111,16 +80,6 @@ function HeroMark() {
       <path d="M4 20q4-4 8 0t8-8 8 4" stroke="#D04040" stroke-width="0.8" stroke-linecap="round" opacity="0.4" fill="none" />
     </svg>
   )
-}
-
-/* 时间自适应问候语 */
-function greeting(): string {
-  const h = new Date().getHours()
-  if (h < 6) return '夜深了'
-  if (h < 12) return '上午好'
-  if (h < 14) return '中午好'
-  if (h < 18) return '下午好'
-  return '晚上好'
 }
 
 /* —— 设计 v2 头像图标：用户（人形）/ 助手（方框·意识） —— */
@@ -175,7 +134,7 @@ export function Chat() {
       const r = await unified.execCli(input)
       showInfo(r.message.length > 200 ? `${r.message.slice(0, 200)}…` : r.message, r.success ? 4000 : 5000)
     } catch (e) {
-      showInfo(`CLI 命令执行失败：${e instanceof Error ? e.message : String(e)}`, 5000)
+      showInfo(`CLI 命令执行失败：${errText(e)}`, 5000)
     }
   }
   // 长消息展开状态（任务4：内容折叠；message.id → 是否展开）
@@ -241,6 +200,17 @@ export function Chat() {
       setCompacting(false)
     }
   }
+  // 斜杠命令执行上下文（依赖注入到独立逻辑模块 routes/chat/slashCommands）
+  const slashCtx: SlashContext = {
+    store: chatStore,
+    currentSessionId: () => currentSession()?.id ?? '',
+    clearInput: () => { setInputValue(''); adjustTextarea() },
+    showInfo,
+    showError: (msg: string) => {
+      setStreamError(msg)
+      setTimeout(() => setStreamError(null), 3000)
+    },
+  }
   const runSlash = (cmd: SlashCommandDef) => {
     setInputValue('')
     setSlashDismissed(false)
@@ -248,104 +218,12 @@ export function Chat() {
     if (cmd.id === 'clear') {
       chatStore.clearMessages()
       setMentionRefs([])
-    } else if (cmd.id === 'new') {
-      chatStore.addSession()
     } else if (cmd.id === 'compact') {
       runCompact()
-    } else if (cmd.id === 'model') {
-      runSlashModel()
-    } else if (cmd.id === 'status') {
-      runSlashStatus()
-    } else if (cmd.id === 'cost') {
-      runSlashCost()
-    } else if (cmd.id === 'export') {
-      runSlashExport()
-    } else if (cmd.id === 'help') {
-      showInfo('快捷键：Enter 发送 · Shift+Enter 换行 · ⌘K 命令面板 · ⌘1-6 功能面板 · ⌘7 电脑视图 · ⌘N 新建对话 · Esc 关闭', 5000)
-    }
-  }
-
-  /* /model：查看当前激活模型（只读命令，与状态栏同源 providerConfig） */
-  const runSlashModel = async () => {
-    try {
-      const cfg = await neocodex.providerConfig()
-      if (!cfg) {
-        showInfo('暂无提供商配置', 3000)
-        return
-      }
-      const model = cfg.active_model || '(未配置)'
-      const resolvable = cfg.resolvable
-      showInfo(`当前模型：${model}${resolvable ? '' : '（不可解析，请检查 API 配置）'} · 可用提供商 ${cfg.provider_count} 个`, 5000)
-    } catch (error) {
-      console.error('[Chat] /model failed:', error)
-      showInfo('读取模型失败，请检查提供商配置', 3000)
-    }
-  }
-
-  /* /status：运行状态诊断（模型 / 上下文 / 用量 / 成本，对标 Claude Code /status） */
-  const runSlashStatus = async () => {
-    try {
-      const s = await neocodex.agentStatus()
-      if (!s) {
-        showInfo('无运行状态', 3000)
-        return
-      }
-      const model = s.provider_model || '未知'
-      const ctx = Math.round((s.context_usage ?? 0) * 100)
-      const tokens = (s.tokens_used ?? 0).toLocaleString()
-      const cost = ((s.cost_spent ?? 0) / 1000).toFixed(3)
-      const budget = ((s.cost_budget ?? 0) / 1000).toFixed(3)
-      showInfo(`模型 ${model} · 上下文 ${ctx}% · tokens ${tokens} · 成本 $${cost} / $${budget}`, 6000)
-    } catch (error) {
-      console.error('[Chat] /status failed:', error)
-      showInfo('读取状态失败', 3000)
-    }
-  }
-
-  /* /cost：token 用量与成本估算（对标 Claude Code /cost） */
-  const runSlashCost = async () => {
-    try {
-      const s = await neocodex.agentStatus()
-      if (!s) {
-        showInfo('无用量数据', 3000)
-        return
-      }
-      const tokens = (s.tokens_used ?? 0).toLocaleString()
-      const cost = ((s.cost_spent ?? 0) / 1000).toFixed(3)
-      const budget = ((s.cost_budget ?? 0) / 1000).toFixed(3)
-      const pct = s.cost_budget ? `${Math.round(((s.cost_spent ?? 0) / s.cost_budget) * 100)}%` : '—'
-      showInfo(`已用 ${tokens} tokens · 花费 $${cost} / $${budget}（${pct}）`, 5000)
-    } catch (error) {
-      console.error('[Chat] /cost failed:', error)
-      showInfo('读取用量失败', 3000)
-    }
-  }
-
-  /* /export：导出当前会话为 Markdown（对标 Claude Code /export） */
-  const runSlashExport = async () => {
-    const sessionId = currentSession()?.id ?? ''
-    if (!sessionId) {
-      showInfo('当前没有激活会话，无法导出', 3000)
-      return
-    }
-    try {
-      const content = await neocodex.exportSession(sessionId, 'markdown')
-      if (content) {
-        const name = currentSession()?.title || 'session'
-        const blob = new Blob([content], { type: 'text/markdown' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${name.replace(/[^\w\u4e00-\u9fff-]+/g, '_')}.md`
-        a.click()
-        URL.revokeObjectURL(url)
-        showInfo('会话已导出为 Markdown', 3000)
-      } else {
-        showInfo('会话为空，无内容可导出', 3000)
-      }
-    } catch (error) {
-      console.error('[Chat] /export failed:', error)
-      showInfo('导出失败，请重试', 3000)
+    } else if (cmd.id === 'new') {
+      chatStore.addSession()
+    } else {
+      runSlashDispatch(slashCtx, cmd)
     }
   }
 
@@ -422,10 +300,11 @@ export function Chat() {
     showInfo(`权限模式：${next.label}`, 2500)
   }
 
-  /* 任务3：上下文占用只读轮询（与 CostDashboard 同源 agentStatus，只读不污染） */
+  /* 任务3：上下文占用只读轮询（与 CostDashboard 同源 agentStatus，只读不污染）
+     经 api/query 共享 3s TTL 缓存，避免两个轮询各自发 IPC */
   const refreshContextUsage = async () => {
     try {
-      const s = await neocodex.agentStatus()
+      const s = await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000 })
       if (s && typeof s.context_usage === 'number') {
         setContextPct(s.context_usage * 100)
       }

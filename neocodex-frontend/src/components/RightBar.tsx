@@ -1,5 +1,5 @@
 import { createSignal, onMount, For, Show } from 'solid-js'
-import { neocodex, system } from '../api'
+import { neocodex, system, errText } from '../api'
 import type { ProjectTreeItem, ProjectView } from '../api/types'
 import { clsx } from 'clsx'
 import { GlobeView } from './GlobeView'
@@ -218,7 +218,7 @@ export function RightBar() {
       if (!activePath()) setActivePath(nodes[0]?.path ?? null)
     } catch (e) {
       if (seq !== treeReqSeq) return
-      setTreeError(String(e))
+      setTreeError(errText(e))
     } finally {
       if (seq === treeReqSeq) setTreeLoading(false)
     }

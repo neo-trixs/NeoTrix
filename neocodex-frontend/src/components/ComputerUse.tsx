@@ -1,6 +1,6 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { Monitor, X, RefreshCw, Loader2, MousePointerClick, Keyboard, AppWindow, Cpu } from 'lucide-solid'
-import { computer as computerApi } from '../api'
+import { computer as computerApi, errText } from '../api'
 import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInfo } from '../api/types'
 import { clsx } from 'clsx'
 
@@ -82,7 +82,7 @@ export function ComputerUse(props: Props) {
       setFrontmost(front)
       await capture()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -105,7 +105,7 @@ export function ComputerUse(props: Props) {
       setWindows(wl)
       setMousePos(mp)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -119,7 +119,7 @@ export function ComputerUse(props: Props) {
       const mp = await computerApi.mousePosition()
       setMousePos(mp)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -131,7 +131,7 @@ export function ComputerUse(props: Props) {
     try {
       await computerApi.mouseClick(null)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -145,7 +145,7 @@ export function ComputerUse(props: Props) {
       await computerApi.keyboardType(keyText())
       setKeyText('')
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -158,7 +158,7 @@ export function ComputerUse(props: Props) {
     try {
       await computerApi.keyboardPress(keyCode(), mods())
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }

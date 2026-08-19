@@ -38,16 +38,30 @@ pub struct EditHistoryTracker {
     path: PathBuf,
     entries: Vec<EditEntry>,
     session_id: String,
+    use_kb: bool,
 }
 
 impl EditHistoryTracker {
-    /// 创建追踪器, 加载已有历史
+    /// 创建追踪器, 加载已有历史 (生产: KB kv_store `state.edit_history` 优先, 文件 legacy fallback)
     pub fn new() -> Self {
         let path = dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".neotrix")
             .join("edit_history.json");
-        Self::load_from_path(path)
+        let session_id = Self::generate_session_id();
+        let entries = crate::core::nt_core_state::load("edit_history")
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .or_else(|| {
+                path.exists()
+                    .then(|| {
+                        std::fs::read_to_string(&path)
+                            .ok()
+                            .and_then(|s| serde_json::from_str(&s).ok())
+                    })
+                    .flatten()
+            })
+            .unwrap_or_default();
+        Self { path, entries, session_id, use_kb: true }
     }
 
     pub fn load_from_path(path: PathBuf) -> Self {
@@ -60,7 +74,7 @@ impl EditHistoryTracker {
         } else {
             Vec::new()
         };
-        Self { path, entries, session_id }
+        Self { path, entries, session_id, use_kb: false }
     }
 
     /// 记录一次代码变更
@@ -173,11 +187,15 @@ impl EditHistoryTracker {
     // ─── 内部 ───
 
     fn persist(&self) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(&self.entries)
+            .map_err(|e| format!("序列化失败: {}", e))?;
+        if self.use_kb {
+            crate::core::nt_core_state::save("edit_history", &json)
+                .map_err(|e| format!("KB写入失败: {}", e))?;
+        }
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
         }
-        let json = serde_json::to_string_pretty(&self.entries)
-            .map_err(|e| format!("序列化失败: {}", e))?;
         std::fs::write(&self.path, &json).map_err(|e| format!("写入失败: {}", e))
     }
 

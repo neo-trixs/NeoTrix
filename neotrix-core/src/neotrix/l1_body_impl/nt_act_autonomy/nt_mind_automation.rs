@@ -135,27 +135,17 @@ impl AutomationEngine {
     }
 
     pub fn save_to_file(&self) {
-        let path = Self::store_path();
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
         if let Ok(data) = serde_json::to_string_pretty(&self.rules) {
-            let _ = std::fs::write(&path, &data);
+            let _ = crate::core::nt_core_state::save("automation", &data);
         }
     }
 
     pub fn load_from_file(&mut self) {
-        let path = Self::store_path();
-        if let Ok(data) = std::fs::read_to_string(&path) {
+        if let Some(data) = crate::core::nt_core_state::load("automation") {
             if let Ok(rules) = serde_json::from_str::<Vec<AutomationRule>>(&data) {
                 self.rules = rules;
             }
         }
-    }
-
-    fn store_path() -> std::path::PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        std::path::PathBuf::from(home).join(".neotrix").join("automation.json")
     }
 
     pub fn add_rule(&mut self, rule: AutomationRule) -> Result<(), String> {

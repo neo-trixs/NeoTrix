@@ -351,17 +351,12 @@ impl CliCommand for HistoryCmd {
         let cmd = args.iter().find(|a| *a != "--json").map(|s| s.as_str());
         match cmd {
             Some("clear") | Some("cls") => {
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                let path = std::path::Path::new(&home).join(".neotrix").join("history.json");
-                let _ = std::fs::write(&path, "[]");
+                let _ = crate::core::nt_core_state::save("history", "[]");
                 let out = CommandOutput::ok("🗑️ 命令历史已清空");
                 if want_json { out.with_json(serde_json::json!({"cleared": true})) } else { out }
             }
             _ => {
-                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                let path = std::path::Path::new(&home).join(".neotrix").join("history.json");
-                let count = std::fs::read_to_string(&path)
-                    .ok()
+                let count = crate::core::nt_core_state::load("history")
                     .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
                     .map(|v| v.len())
                     .unwrap_or(0);

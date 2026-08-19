@@ -1088,16 +1088,12 @@ pub fn run_benchmark(category: Option<&str>) {
     use neotrix::neotrix::nt_mind_benchmark::{BenchmarkSuite, BenchmarkReport};
     use neotrix::CapabilityVector;
 
-    let path = dirs::home_dir().unwrap_or_default().join(".neotrix/brain.json");
-    let cap: CapabilityVector = if path.exists() {
-        let json = std::fs::read_to_string(&path).unwrap_or_default();
-        serde_json::from_str(&json).unwrap_or_else(|e| {
-            eprintln!("{}", warn(format!("failed to parse brain.json ({}), using default", e)));
+    let cap: CapabilityVector = neotrix::core::nt_core_state::load("brain")
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_else(|| {
+            eprintln!("{}", warn("failed to parse brain state, using default"));
             CapabilityVector::default()
-        })
-    } else {
-        CapabilityVector::default()
-    };
+        });
 
     let mut bank = ReasoningBank::new(100);
     let report = match category {

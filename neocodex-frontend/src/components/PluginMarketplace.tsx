@@ -1,6 +1,6 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { Puzzle, X, RefreshCw, Loader2, Download, Trash2, Power, PowerOff, ListTree, Box } from 'lucide-solid'
-import { plugins as pluginsApi } from '../api'
+import { plugins as pluginsApi, errText, fs as fsApi } from '../api'
 import type { PluginEvent, PluginStatus } from '../api/types'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
@@ -39,7 +39,7 @@ export function PluginMarketplace(props: Props) {
       setPlugins(pl)
       setEvents(ev)
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -50,15 +50,14 @@ export function PluginMarketplace(props: Props) {
   const install = async () => {
     // Pick a plugin manifest .json via dialog
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog')
-      const path = await open({ filters: [{ name: 'Plugin Manifest', extensions: ['json'] }] })
+      const path = await fsApi.openFileDialog({ filters: [{ name: 'Plugin Manifest', extensions: ['json'] }] })
       if (typeof path === 'string') {
         setBusy('install')
         await pluginsApi.pluginInstall(path)
         await load()
       }
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -84,7 +83,7 @@ export function PluginMarketplace(props: Props) {
       await pluginsApi.pluginUninstall(id)
       await load()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }
@@ -98,7 +97,7 @@ export function PluginMarketplace(props: Props) {
       else await pluginsApi.pluginEnable(p.id)
       await load()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setBusy(null)
     }

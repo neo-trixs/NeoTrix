@@ -1,6 +1,6 @@
 import { createSignal, createEffect, Show, For } from 'solid-js'
 import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
-import { neocodex } from '../api'
+import { neocodex, errText } from '../api'
 import type { NeoCodexMessageItem } from '../api/types'
 import { clsx } from 'clsx'
 import { Markdown } from './Markdown'
@@ -47,7 +47,7 @@ export function SideChat(props: Props) {
       setMessages(msgs)
       scrollToBottom()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setLoading(false)
     }
@@ -78,7 +78,7 @@ export function SideChat(props: Props) {
       setInput('')
       scrollToBottom()
     } catch (e) {
-      setError(String(e))
+      setError(errText(e))
     } finally {
       setSending(false)
     }

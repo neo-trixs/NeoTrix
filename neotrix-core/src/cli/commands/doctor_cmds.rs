@@ -89,15 +89,10 @@ pub fn run_doctor() -> CommandOutput {
     }
 
     // 5. Brain state
-    let brain_path = dirs::home_dir().map(|p| p.join(".neotrix").join("brain.json"));
-    if let Some(ref path) = brain_path {
-        if path.exists() {
-            report.push_str(&format!("**Brain**: ✅ {} ({} bytes)\n\n",
-                path.display(),
-                std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)));
-        } else {
-            report.push_str(&format!("**Brain**: ⚠️ not found at {}\n\n", path.display()));
-        }
+    if crate::core::nt_core_state::load("brain_metadata").is_some() {
+        report.push_str("**Brain**: ✅ saved in KB kv_store (state.brain)\n\n");
+    } else {
+        report.push_str("**Brain**: ⚠️ not found in KB\n\n");
     }
 
     // 6. Knowledge DB

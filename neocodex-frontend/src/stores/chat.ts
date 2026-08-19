@@ -594,4 +594,7 @@ function createChatStore() {
   }
 }
 
+/** store 类型契约：对外模块（routes/chat/slashCommands 等）依赖此类型而非具体实现 */
+export type ChatStore = ReturnType<typeof createChatStore>
+
 export const chatStore = createChatStore()

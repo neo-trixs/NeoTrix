@@ -42,6 +42,7 @@ pub struct FingerprintManager {
     store_path: PathBuf,
     pub current_timing_jitter: Range<u64>,
     rotation_profiles: Vec<RotationProfile>,
+    use_kb: bool,
 }
 
 impl Default for FingerprintManager {
@@ -57,7 +58,11 @@ impl FingerprintManager {
             .unwrap_or_else(|| PathBuf::from("fingerprints.json"));
 
         let gen = SystemFingerprintGenerator::new();
-        let fingerprints = Self::load_or_init(&gen, &store_path);
+        let fingerprints = crate::core::nt_core_state::load("fingerprints")
+            .and_then(|json| serde_json::from_str::<FingerprintStore>(&json).ok())
+            .filter(|store| !store.fingerprints.is_empty())
+            .map(|store| store.fingerprints)
+            .unwrap_or_else(|| Self::load_or_init(&gen, &store_path));
 
         Self {
             fingerprints,
@@ -67,6 +72,7 @@ impl FingerprintManager {
             store_path,
             current_timing_jitter: 50..300,
             rotation_profiles: RotationProfile::default_pool(),
+            use_kb: true,
         }
     }
 
@@ -132,10 +138,15 @@ impl FingerprintManager {
             fingerprints: self.fingerprints.clone(),
             best_index: self.current_index,
         };
-        if let Some(parent) = self.store_path.parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[fingerprint] create dir: {}", e); }
-        }
         if let Ok(json) = serde_json::to_string_pretty(&store) {
+            if self.use_kb {
+                if let Err(e) = crate::core::nt_core_state::save("fingerprints", &json) {
+                    log::warn!("[fingerprint] kb write: {}", e);
+                }
+            }
+            if let Some(parent) = self.store_path.parent() {
+                if let Err(e) = std::fs::create_dir_all(parent) { log::warn!("[fingerprint] create dir: {}", e); }
+            }
             if let Err(e) = std::fs::write(&self.store_path, json) { log::warn!("[fingerprint] write: {}", e); }
         }
     }

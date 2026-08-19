@@ -258,6 +258,7 @@ pub struct RuleEngine {
     rules: Vec<OutboundRule>,
     default_action: OutboundAction,
     persistence_path: Option<PathBuf>,
+    use_kb: bool,
 }
 
 impl RuleEngine {
@@ -267,9 +268,10 @@ impl RuleEngine {
             rules: china_bypass_rules(),
             default_action: OutboundAction::Direct,
             persistence_path: Some(Self::default_path()),
+            use_kb: true,
         };
         engine.rules.sort_by_key(|r| r.priority);
-        // 合并来自 ~/.neotrix/rules.json 的用户自定义规则
+        // 合并来自 KB kv_store `state.rules` 的用户自定义规则 (文件 legacy fallback)
         let _ = engine.load();
         engine
     }
@@ -280,6 +282,7 @@ impl RuleEngine {
             rules: Vec::new(),
             default_action: OutboundAction::Direct,
             persistence_path: None,
+            use_kb: false,
         }
     }
 
@@ -307,6 +310,9 @@ impl RuleEngine {
             .map(RuleSnapshot::from_rule)
             .collect();
         let json = serde_json::to_string_pretty(&snapshots).map_err(|e| format!("serialize: {}", e))?;
+        if self.use_kb {
+            crate::core::nt_core_state::save("rules", &json).map_err(|e| format!("write rules kb: {}", e))?;
+        }
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -316,8 +322,16 @@ impl RuleEngine {
 
     pub fn load(&mut self) -> Result<(), String> {
         let path = match self.persistence_path { Some(ref p) => p, None => return Ok(()) };
-        if !path.exists() { return Ok(()); }
-        let json = std::fs::read_to_string(path).map_err(|e| format!("read rules: {}", e))?;
+        let json = if self.use_kb {
+            match crate::core::nt_core_state::load("rules") {
+                Some(j) => Some(j),
+                None => path.exists().then(|| std::fs::read_to_string(path).ok()).flatten(),
+            }
+        } else {
+            if !path.exists() { return Ok(()); }
+            std::fs::read_to_string(path).ok()
+        };
+        let Some(json) = json else { return Ok(()); };
         let snapshots: Vec<RuleSnapshot> = serde_json::from_str(&json).map_err(|e| format!("deserialize: {}", e))?;
         let persisted: Vec<OutboundRule> = snapshots.iter().filter_map(|s| s.to_rule()).collect();
         self.merge_persisted(persisted)

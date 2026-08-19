@@ -301,21 +301,18 @@ impl AlwaysOnEngine {
         }
 
         // Check for incomplete work
-        let goals_path = neotrix_dir.join("goals.json");
-        if goals_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&goals_path) {
-                if let Ok(goals) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(items) = goals.get("items").and_then(|v| v.as_array()) {
-                        for item in items {
-                            let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                            if status == "pending" || status == "in_progress" {
-                                if let Some(desc) = item.get("description").and_then(|v| v.as_str()) {
-                                    discovered.push(ScannedTask {
-                                        description: desc.to_string(),
-                                        priority: 1,
-                                        source: "goal_queue".into(),
-                                    });
-                                }
+        if let Some(content) = crate::core::nt_core_state::load("goals") {
+            if let Ok(goals) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(items) = goals.get("items").and_then(|v| v.as_array()) {
+                    for item in items {
+                        let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                        if status == "pending" || status == "in_progress" {
+                            if let Some(desc) = item.get("description").and_then(|v| v.as_str()) {
+                                discovered.push(ScannedTask {
+                                    description: desc.to_string(),
+                                    priority: 1,
+                                    source: "goal_queue".into(),
+                                });
                             }
                         }
                     }
@@ -585,11 +582,6 @@ impl AlwaysOnEngine {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let neotrix_dir = dirs::home_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join(".neotrix");
-        std::fs::create_dir_all(&neotrix_dir).map_err(|e| e.to_string())?;
-
         let data = serde_json::json!({
             "enabled": self.enabled,
             "state": self.state.to_string(),
@@ -598,52 +590,45 @@ impl AlwaysOnEngine {
             "scan_interval_secs": self.scan_interval_secs,
             "idle_cooldown_secs": self.idle_cooldown_secs,
         });
-        let path = neotrix_dir.join("always_on.json");
-        std::fs::write(&path, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-        Ok(())
+        let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+        crate::core::nt_core_state::save("always_on", &json)
     }
 
     pub fn load() -> Self {
-        let neotrix_dir = dirs::home_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join(".neotrix");
-        let path = neotrix_dir.join("always_on.json");
-        if path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {
-                    let enabled = data.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
-                    let state_str = data.get("state").and_then(|v| v.as_str()).unwrap_or("idle");
-                    let state = match state_str {
-                        "scanning" => AlwaysOnState::Scanning,
-                        "working" => AlwaysOnState::Working,
-                        "reporting" => AlwaysOnState::Reporting,
-                        "sleeping" => AlwaysOnState::Sleeping,
-                        _ => AlwaysOnState::Idle,
-                    };
-                    let scan_interval = data.get("scan_interval_secs").and_then(|v| v.as_u64()).unwrap_or(60);
-                    let idle_cooldown = data.get("idle_cooldown_secs").and_then(|v| v.as_u64()).unwrap_or(300);
-                    let tasks: Vec<AlwaysOnTask> = data.get("tasks")
-                        .and_then(|v| serde_json::from_value(v.clone()).ok())
-                        .unwrap_or_default();
-                    let completed: Vec<String> = data.get("completed_task_ids")
-                        .and_then(|v| serde_json::from_value(v.clone()).ok())
-                        .unwrap_or_default();
-                    let started = if enabled { Some(Instant::now()) } else { None };
-                    return Self {
-                        enabled,
-                        state,
-                        tasks,
-                        scan_interval_secs: scan_interval,
-                        idle_cooldown_secs: idle_cooldown,
-                        max_concurrent: 1,
-                        auto_queue: true,
-                        completed_task_ids: completed,
-                        started_at: started,
-                        last_cycle: None,
-                    };
-                }
-            }
+        let Some(content) = crate::core::nt_core_state::load("always_on") else {
+            return Self::new();
+        };
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {
+            let enabled = data.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+            let state_str = data.get("state").and_then(|v| v.as_str()).unwrap_or("idle");
+            let state = match state_str {
+                "scanning" => AlwaysOnState::Scanning,
+                "working" => AlwaysOnState::Working,
+                "reporting" => AlwaysOnState::Reporting,
+                "sleeping" => AlwaysOnState::Sleeping,
+                _ => AlwaysOnState::Idle,
+            };
+            let scan_interval = data.get("scan_interval_secs").and_then(|v| v.as_u64()).unwrap_or(60);
+            let idle_cooldown = data.get("idle_cooldown_secs").and_then(|v| v.as_u64()).unwrap_or(300);
+            let tasks: Vec<AlwaysOnTask> = data.get("tasks")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            let completed: Vec<String> = data.get("completed_task_ids")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            let started = if enabled { Some(Instant::now()) } else { None };
+            return Self {
+                enabled,
+                state,
+                tasks,
+                scan_interval_secs: scan_interval,
+                idle_cooldown_secs: idle_cooldown,
+                max_concurrent: 1,
+                auto_queue: true,
+                completed_task_ids: completed,
+                started_at: started,
+                last_cycle: None,
+            };
         }
         Self::new()
     }
