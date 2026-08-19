@@ -60,7 +60,7 @@
 
 1. ✅ **W-2 错误接线**（已完成）：12 组件 `String(e)` → `errText(e)`，生产路径 String(e) 清零
 2. ✅ **W-1 API 下沉**（已完成）：建 `api/fs.ts`（saveFileDialog/openFileDialog/writeTextFileAt），SettingsModal + PluginMarketplace 移除 tauri 插件直连，localStorage 改 storageGet/Set
-3. **W-3 SettingsModal 拆分**（MCP 已拆）：抽 `components/settings/McpSection.tsx`（自包含域，-149 行，1574→1425）；其余区块 state 纠缠度高（provider/apiKey/update 状态机），本次未继续，标记 next
+3. ✅ **W-3 SettingsModal 拆分**（已完成）：抽 8 文件——GeneralSection/AppearanceSection/DataSection/TagsSection/AboutSection/McpSection/TagRow/settingsIcons；update 状态机下沉 AboutSection 自管理；破坏性确认统一父组件回调。**1574 → 591 行**（-983）；清理死信号 themePref
 4. ✅ **I-1 usePolling hook**（已完成）：`lib/usePolling.ts` 统一 4 处轮询，生产 setInterval 清零，6 测试
 
 ## 五、结论
@@ -68,4 +68,4 @@
 C1→C2 的架构基础已夯实（信封/契约/缓存/收敛层/CI 门禁）。
 本轮重审证明：**约定建立了，但消费端接线不彻底**（W-1/W-2 皆是"建而不用"）。
 按 R-P79 纪律已同 session 接线闭环：**错误信封 + fs 收敛 + env 收敛全部接入生产路径**。
-基线 120 测试全绿 + tsc clean + 零依赖环 + 组件零 tauri 直连（唯一例外 TrafficLights 窗口 API）。
+基线 124 测试全绿 + tsc clean + 零依赖环 + 组件零 tauri 直连（唯一例外 TrafficLights 窗口 API）。

@@ -56,12 +56,12 @@
 |---|---|---|---|
 | C0 编译 | ✅ tsc clean | ✅ | 无 |
 | C1 单测 | ✅ 71 测试 | ✅ 全量 | 补 api 层契约测试 |
-| C2 集成测试 | ⚠️ 无 Tauri 集成 mock | ✅ invoke mock + e2e | F4/F6 |
+| C2 集成测试 | ✅ 契约 mock 已建 | ✅ invoke mock + e2e | test/invokeMock.ts 已落地（4 基建 + 2 消费方测试改造） |
 | C3 benchmark | ❌ | ⚠️ 组件渲染/包体积基线 | manualChunks 已有 |
 | C4 主流水线 | ⚠️ 无 CI 前端门禁 | ✅ lint+test+build 门禁 | 需接 CI |
 | C5 自愈 | ❌ | ⚠️ errorMonitor 已有雏形 | lib/errorMonitor.ts |
 
-结论: **前端处于 C1 稳态，距 C2 差契约 mock 与错误信封，距 C4 差 CI 门禁。**
+结论: **前端已从 C1 稳态进入 C2（契约 mock + 错误信封 + CI 门禁全部补齐）。剩余 C3 benchmark 与 C5 自愈为远期。**
 
 ## 五、落地优先级（R-P42 强化现有节点，禁止平行模块）
 

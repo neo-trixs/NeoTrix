@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { mockInvokeImpl, mockCommand, resetInvokeMock } from '../test/invokeMock'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mockCommand, resetInvokeMock } from '../test/invokeMock'
 
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: mockInvokeImpl,
-}))
+vi.mock('@tauri-apps/api/core', async () => {
+  const { mockInvokeImpl } = await import('../test/invokeMock')
+  return { invoke: mockInvokeImpl }
+})
 
 import { fullCatalog, cliList, tauriList, unifiedCatalog, execCli, cliLookup } from './unified'
 

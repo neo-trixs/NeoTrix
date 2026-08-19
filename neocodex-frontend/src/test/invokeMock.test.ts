@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mockInvokeImpl, mockCommand, mockCommandOnce, resetInvokeMock } from './invokeMock'
+import { mockCommand, mockCommandOnce, resetInvokeMock } from './invokeMock'
 
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: mockInvokeImpl,
-}))
+vi.mock('@tauri-apps/api/core', async () => {
+  const { mockInvokeImpl } = await import('./invokeMock')
+  return { invoke: mockInvokeImpl }
+})
 
 import { call } from '../api/client'
 
