@@ -63,7 +63,32 @@ impl CliCommand for PermCmd {
                 }
                 CommandOutput::ok(&format!("✅ 轴2 权限链模式已设为 {}", mode.label()))
             }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: status, check, set-approval, set-chain", args[0])),
+            "set-rule" => {
+                if args.len() < 3 {
+                    return CommandOutput::err("用法: /perm set-rule <action> <allow|ask|deny>\n单调收紧: 只允许把规则收紧 (Deny/Ask), 禁止放宽已保存策略 (DBX 单调性不变量)");
+                }
+                use crate::neotrix::l1_body_impl::nt_shield::policy::PolicyDecision;
+                let action = args[1].clone();
+                let decision = match args[2].as_str() {
+                    "allow" => PolicyDecision::Allow,
+                    "ask" | "confirm" | "require" => PolicyDecision::RequireConfirmation,
+                    "deny" => PolicyDecision::Deny,
+                    other => {
+                        return CommandOutput::err(&format!("无效决策: {}. 可用: allow|ask|deny", other));
+                    }
+                };
+                let effective = match crate::cli::shield_enforcer::global_shield().lock() {
+                    Ok(mut shield) => shield.set_rule_monotonic(&action, decision),
+                    Err(_) => {
+                        return CommandOutput::err("ShieldEnforcer 锁中毒");
+                    }
+                };
+                CommandOutput::ok(&format!(
+                    "✅ 单调规则已应用: {} → {:?} (若提案更宽松则保留已保存策略)",
+                    action, effective
+                ))
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: status, check, set-approval, set-chain, set-rule", args[0])),
         }
     }
 }

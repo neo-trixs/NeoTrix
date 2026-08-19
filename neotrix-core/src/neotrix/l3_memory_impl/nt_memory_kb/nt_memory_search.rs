@@ -1157,6 +1157,31 @@ pub fn precision_gate(
     }
 }
 
+/// 陈旧信号标注 (codegraph staleness-signaling absorbed 2026-08-19):
+/// 填充 SearchResult.signals 预留槽 `[f64;4]` — 该槽此前从未被写入。
+/// 语义 (对齐 codegraph "索引永不过期" + agentmemory 7 天半衰期):
+///   signals[0] = stale_ratio   1.0=全新, →0.0=陈旧 (decay_factor 语义)
+///   signals[1] = age_days      节点距上次更新天数
+///   signals[2] = decay         <0.5 表示超过 1 个半衰期
+///   signals[3] = stale_banner  age > 30 天 → 1.0 (消费方据此显示 ⚠️ stale 横幅)
+/// 检索结果信封从此携带 trust 级别 — agent 知道每个结果是新鲜的还是陈旧的。
+pub fn staleness_signal(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    const HALF_LIFE_SECS: i64 = 7 * 24 * 3600; // 7 天
+    const STALE_DAYS: i64 = 30;
+    let now = chrono::Utc::now().timestamp();
+    results
+        .into_iter()
+        .map(|mut r| {
+            let age = now.saturating_sub(r.node.updated_at).max(0);
+            let age_days = age / 86400;
+            let decay = decay_factor(age, HALF_LIFE_SECS);
+            let stale_banner = if age_days > STALE_DAYS { 1.0 } else { 0.0 };
+            r.signals = Some([decay, age_days as f64, decay, stale_banner]);
+            r
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod precision_gate_tests {
     use super::*;
@@ -1231,6 +1256,58 @@ mod precision_gate_tests {
         let gated = precision_gate(results, 10);
         let ids: Vec<&str> = gated.iter().map(|r| r.node.id.as_str()).collect();
         assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    // ========== codegraph 陈旧信号标注接线测试 (2026-08-19) ==========
+
+    #[test]
+    fn test_staleness_signal_fills_reserved_slot() {
+        let mut n = node("old");
+        n.updated_at = chrono::Utc::now().timestamp() - 90 * 86400; // 90 天前
+        let results = vec![SearchResult {
+            node: n,
+            score: 1.0,
+            matched_on: vec![SearchMatchType::Bm25],
+            signals: None,
+        }];
+        let annotated = staleness_signal(results);
+        assert!(annotated[0].signals.is_some(), "signals 槽必须被填充");
+        let sig = annotated[0].signals.unwrap();
+        assert_eq!(sig[3], 1.0, ">30 天应打 stale 横幅");
+        assert!(sig[0] < 0.5, "90 天 ≈ 12.8 半衰期, decay 应接近 0");
+        assert!(sig[1] >= 89.0, "age_days 约 90");
+    }
+
+    #[test]
+    fn test_staleness_fresh_node_no_banner() {
+        let mut n = node("fresh");
+        n.updated_at = chrono::Utc::now().timestamp(); // 刚刚更新
+        let results = vec![SearchResult {
+            node: n,
+            score: 1.0,
+            matched_on: vec![SearchMatchType::Bm25],
+            signals: None,
+        }];
+        let annotated = staleness_signal(results);
+        let sig = annotated[0].signals.unwrap();
+        assert_eq!(sig[3], 0.0, "新节点不打横幅");
+        assert!((sig[0] - 1.0).abs() < 1e-9, "age=0 → decay=1.0");
+    }
+
+    #[test]
+    fn test_staleness_signal_uses_existing_updated_at() {
+        let mut n = node("half");
+        n.updated_at = chrono::Utc::now().timestamp() - 7 * 24 * 3600; // 恰 1 个半衰期
+        let results = vec![SearchResult {
+            node: n,
+            score: 0.5,
+            matched_on: vec![SearchMatchType::FtsTitle],
+            signals: None,
+        }];
+        let annotated = staleness_signal(results);
+        let sig = annotated[0].signals.unwrap();
+        assert!((sig[0] - 0.5).abs() < 1e-6, "1 半衰期 → decay=0.5");
+        assert_eq!(sig[3], 0.0, "7 天 < 30 天, 不打横幅");
     }
 
     // ========== agentmemory 接线测试 (cycle 1188: confidence × 时间衰减) ==========

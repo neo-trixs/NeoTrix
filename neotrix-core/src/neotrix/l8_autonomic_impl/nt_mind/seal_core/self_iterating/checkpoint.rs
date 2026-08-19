@@ -1,10 +1,29 @@
 use std::collections::VecDeque;
 use std::time::Instant;
 
+use serde::{Deserialize, Serialize};
+
 use super::pipeline::{AutonomyLevel, BrainSnapshot, BrainStage, PermissionLevel, StageDecision};
 use super::SelfIteratingBrain;
+use crate::core::CapabilityVector;
 use crate::make_stage;
 use crate::neotrix::nt_core_error::NeoTrixError;
+
+/// ScienceFlow 持久化 re-anchor 桥接 (absorbed 2026-08-19, P3):
+/// 内存环形 checkpoint (CheckpointManager) 之外, 把最高奖励锚点序列化写入
+/// KB nt_core_state (`seal_checkpoint`)。进程重启后 build_full re-anchor:
+/// 从上次锚点恢复 iteration/reward/brain capability, 而非零冷启动。
+/// `BrainCheckpoint` 含 `Instant` 不可序列化, 故用此轻量 DTO 落盘。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistedCheckpoint {
+    pub iteration: u64,
+    pub reward: f64,
+    pub learning_rate: f64,
+    pub score: f64,
+    pub capability: CapabilityVector,
+    pub permission: String,
+    pub autonomy: String,
+}
 
 #[derive(Debug, Clone)]
 pub struct BrainCheckpoint {
@@ -155,6 +174,106 @@ impl CheckpointManager {
     }
 }
 
+/// ScienceFlow 持久化 re-anchor 桥接 (absorbed 2026-08-19, P3):
+/// 内存环形 checkpoint 之外, 最新 checkpoint 序列化落盘 KB nt_core_state
+/// (`seal_checkpoint`), 进程重启后可 re-anchor 恢复迭代/奖励/能力向量。
+/// R-P79: 生产接线 → CheckpointStage::process 写, SelfIteratingBrain::re_anchor 读。
+impl CheckpointManager {
+    /// 把当前最高奖励 checkpoint 持久化到 KB (R-P79 生产路径直写)。
+    pub fn persist_latest_to_kb(&self) -> Result<(), NeoTrixError> {
+        self.persist_to_conn(None)
+    }
+
+    /// 注入连接变体 (测试用内存 conn, 避免污染生产 KB 全局连接)。
+    pub fn persist_to_conn(&self, conn: Option<&rusqlite::Connection>) -> Result<(), NeoTrixError> {
+        let cp = self
+            .best_checkpoint()
+            .ok_or_else(|| NeoTrixError::Brain("no checkpoint to persist".to_string()))?;
+        let persisted = PersistedCheckpoint {
+            iteration: cp.iteration,
+            reward: cp.reward,
+            learning_rate: cp.brain_snapshot.learning_rate,
+            score: cp.brain_snapshot.score,
+            capability: cp.brain_snapshot.capability.clone(),
+            permission: format!("{:?}", cp.permission_level),
+            autonomy: format!("{:?}", cp.autonomy_level),
+        };
+        let json = serde_json::to_string_pretty(&persisted)
+            .map_err(|e| NeoTrixError::Serde(format!("checkpoint 序列化失败: {e}")))?;
+        match conn {
+            Some(c) => crate::core::nt_core_state::save_with(c, "seal_checkpoint", &json),
+            None => crate::core::nt_core_state::save("seal_checkpoint", &json),
+        }
+        .map_err(NeoTrixError::Io)
+    }
+
+    /// 从 KB 加载持久化 checkpoint (re-anchor 锚点)。无则 None (首次运行)。
+    pub fn load_from_kb() -> Option<PersistedCheckpoint> {
+        Self::load_from_conn(None)
+    }
+
+    /// 注入连接变体。
+    pub fn load_from_conn(conn: Option<&rusqlite::Connection>) -> Option<PersistedCheckpoint> {
+        let json = match conn {
+            Some(c) => crate::core::nt_core_state::load_with(c, "seal_checkpoint"),
+            None => crate::core::nt_core_state::load("seal_checkpoint"),
+        }?;
+        serde_json::from_str(&json).ok()
+    }
+
+    /// 清除持久化 checkpoint (翻转期/测试清理)。
+    pub fn clear_kb_persisted() -> Result<bool, String> {
+        Self::clear_conn(None)
+    }
+
+    /// 注入连接变体。
+    pub fn clear_conn(conn: Option<&rusqlite::Connection>) -> Result<bool, String> {
+        match conn {
+            Some(c) => crate::core::nt_core_state::delete_with(c, "seal_checkpoint"),
+            None => crate::core::nt_core_state::delete("seal_checkpoint"),
+        }
+    }
+}
+
+impl SelfIteratingBrain {
+    /// ScienceFlow re-anchor (absorbed 2026-08-19, P3): 进程重启后从 KB
+    /// 恢复持久化 checkpoint — iteration/reward/brain capability/learning_rate。
+    /// 与 ESTRA 的 "continue vs redirect" 对应: 恢复到最高奖励锚点继续进化,
+    /// 而非每次零冷启动。skip_kb_io (单元测试) 时跳过, 避免污染生产 KB。
+    pub fn re_anchor_from_kb(&mut self) {
+        self.re_anchor_from_conn(None);
+    }
+
+    /// 注入连接变体 (测试用内存 conn)。
+    pub fn re_anchor_from_conn(&mut self, conn: Option<&rusqlite::Connection>) {
+        if self.skip_kb_io {
+            return;
+        }
+        let Some(cp) = CheckpointManager::load_from_conn(conn) else {
+            return;
+        };
+        self.iteration = cp.iteration;
+        self._reward = cp.reward;
+        self.brain.capability = cp.capability.clone();
+        self.brain.learning_rate = cp.learning_rate;
+        self.permission = match cp.permission.as_str() {
+            "Full" => PermissionLevel::Full,
+            _ => PermissionLevel::Suggest,
+        };
+        self.autonomy = match cp.autonomy.as_str() {
+            "Full" => AutonomyLevel::Full,
+            "Bounded" => AutonomyLevel::Bounded,
+            _ => AutonomyLevel::Proposal,
+        };
+        log::info!(
+            "[re-anchor] restored checkpoint iter={} reward={:.4} lr={:.3}",
+            cp.iteration,
+            cp.reward,
+            cp.learning_rate
+        );
+    }
+}
+
 make_stage!(CheckpointStage);
 impl BrainStage for CheckpointStage {
     fn name(&self) -> &str {
@@ -171,6 +290,14 @@ impl BrainStage for CheckpointStage {
         brain
             ._checkpoint_manager
             .push(iteration, &snap, permission, autonomy, reward, "checkpoint");
+        // ScienceFlow 持久化 re-anchor 接线 (absorbed 2026-08-19, P3, R-P79):
+        // 每轮 checkpoint 落盘 KB, 进程重启后 build_full re-anchor 恢复。
+        // 仅在非 skip_kb_io (生产路径) 时写, 单元测试不污染 ~/.neotrix。
+        if !brain.skip_kb_io {
+            if let Err(e) = brain._checkpoint_manager.persist_latest_to_kb() {
+                log::warn!("[checkpoint] KB persist failed: {e}");
+            }
+        }
         Ok(StageDecision::Continue)
     }
 }
@@ -342,5 +469,78 @@ mod tests {
         let best = mgr.best_checkpoint().unwrap();
         assert_eq!(best.reward, 1.5);
         assert_eq!(best.iteration, 3);
+    }
+
+    fn mem_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_persist_roundtrip_snapshot_fields() {
+        let mut mgr = CheckpointManager::with_max(4);
+        let snap = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.42,
+            score: 0.95,
+        };
+        mgr.push(
+            7,
+            &snap,
+            PermissionLevel::Suggest,
+            AutonomyLevel::Bounded,
+            0.8,
+            "persist_test",
+        );
+        let conn = mem_conn();
+        mgr.persist_to_conn(Some(&conn)).ok();
+        let loaded = CheckpointManager::load_from_conn(Some(&conn)).expect("roundtrip should load");
+        assert_eq!(loaded.iteration, 7);
+        assert!((loaded.reward - 0.8).abs() < 1e-9);
+        assert!((loaded.learning_rate - 0.42).abs() < 1e-9);
+        assert_eq!(loaded.permission, "Suggest");
+        assert_eq!(loaded.autonomy, "Bounded");
+    }
+
+    #[test]
+    fn test_re_anchor_restores_state() {
+        let mut mgr = CheckpointManager::new();
+        let snap = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.33,
+            score: 0.5,
+        };
+        mgr.push(
+            11,
+            &snap,
+            PermissionLevel::Full,
+            AutonomyLevel::Full,
+            0.6,
+            "anchor_test",
+        );
+        let conn = mem_conn();
+        mgr.persist_to_conn(Some(&conn)).ok();
+
+        // 全新 brain, skip_kb_io=false 模拟生产重启 → re-anchor 应恢复
+        let mut fresh = SelfIteratingBrain::new_lightweight();
+        assert_eq!(fresh.skip_kb_io, true, "lightweight 默认跳过 re-anchor");
+        fresh.re_anchor_from_conn(Some(&conn)); // skip_kb_io=true → 无副作用
+        assert_eq!(fresh.iteration, 0);
+
+        // 强制以生产语义 re-anchor (仅测试: 直接翻转 skip_kb_io 走恢复路径)
+        fresh.skip_kb_io = false;
+        fresh.re_anchor_from_conn(Some(&conn));
+        assert_eq!(fresh.iteration, 11);
+        assert!((fresh._reward - 0.6).abs() < 1e-9);
+        assert!((fresh.brain.learning_rate - 0.33).abs() < 1e-9);
+        assert_eq!(fresh.permission, PermissionLevel::Full);
+        assert_eq!(fresh.autonomy, AutonomyLevel::Full);
+    }
+
+    #[test]
+    fn test_load_absent_returns_none() {
+        let conn = mem_conn();
+        assert!(CheckpointManager::load_from_conn(Some(&conn)).is_none(), "无持久化时应 None");
     }
 }

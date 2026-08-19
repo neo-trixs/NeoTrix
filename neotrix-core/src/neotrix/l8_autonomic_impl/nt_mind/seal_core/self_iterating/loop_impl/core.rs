@@ -158,7 +158,7 @@ impl SelfIteratingBrain {
     }
 
     fn build_full(init_kb: Option<KnowledgeBase>, init_adapter: HarnessAdapter, skip_kb_io: bool) -> Self {
-        Self {
+        let mut brain = Self {
             brain: ReasoningBrain::new(),
             iteration: 0,
             quality_threshold: 0.85,
@@ -252,7 +252,12 @@ impl SelfIteratingBrain {
             _consciousness_critique_count: 0,
             self_model: crate::core::nt_core_self::SelfModel::new(),
             element_registry: Self::build_element_registry(),
-        }
+        };
+        // ScienceFlow re-anchor 接线 (absorbed 2026-08-19, P3, R-P79):
+        // 从 KB 持久化 checkpoint 恢复迭代/奖励/能力, 而非零冷启动。
+        // skip_kb_io (轻量构造/单元测试) 时跳过。
+        brain.re_anchor_from_kb();
+        brain
     }
 
     /// Build the plugin Element registry seeded with the brain's core elements.

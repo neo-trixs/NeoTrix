@@ -8,6 +8,28 @@ pub enum PolicyDecision {
     Deny,
 }
 
+impl PolicyDecision {
+    /// 严格度排序 (DBX 权限单调性, 吸收 2026-08-19): Allow=0 < RequireConfirmation=1 < Deny=2。
+    /// 值越大越严格。runtime/env 覆盖层只能收紧、绝不能放宽已保存策略。
+    pub fn strictness(&self) -> u8 {
+        match self {
+            PolicyDecision::Allow => 0,
+            PolicyDecision::RequireConfirmation => 1,
+            PolicyDecision::Deny => 2,
+        }
+    }
+
+    /// 单调合并: 返回两者中更严格者。保证低信任源 (env/config 覆盖) 永远无法
+    /// 提升权限 — 已保存策略若为 Deny 则保持 Deny。
+    pub fn tightened_with(&self, other: &PolicyDecision) -> PolicyDecision {
+        if other.strictness() > self.strictness() {
+            other.clone()
+        } else {
+            self.clone()
+        }
+    }
+}
+
 /// 安全配置文件
 #[derive(Debug, Clone)]
 pub struct ActionPolicy {
@@ -91,6 +113,23 @@ impl ActionPolicy {
     /// 动态添加自定义规则
     pub fn add_rule(&mut self, action: &str, decision: PolicyDecision) {
         self.rules.insert(action.to_string(), decision);
+    }
+
+    /// 单调收紧规则 (DBX 权限单调性不变量, 吸收 2026-08-19):
+    /// 低信任源 (env/config 覆盖层) 只能把规则收紧到更严格 (Allow→Ask/Deny, Ask→Deny),
+    /// 永远无法放宽已保存策略 (Deny 不可被覆盖为 Ask/Allow)。返回生效后的决策。
+    /// 消费者: `ShieldEnforcer::set_rule_monotonic` → `/perm set-rule` (perm_cmds.rs)。
+    pub fn set_rule_monotonic(&mut self, action: &str, decision: PolicyDecision) -> PolicyDecision {
+        let effective = self
+            .rules
+            .get(action)
+            .cloned()
+            .unwrap_or(PolicyDecision::Deny)
+            .tightened_with(&decision);
+        if self.rules.insert(action.to_string(), effective.clone()).is_none() {
+            // 新 action 首次引入 — 单调语义下以更严格者为准已满足
+        }
+        effective
     }
 
     /// 将域名加入网络白名单
@@ -279,5 +318,68 @@ mod tests {
         let before = p.action_count();
         p.add_rule("extra_op", PolicyDecision::Allow);
         assert_eq!(p.action_count(), before + 1);
+    }
+
+    #[test]
+    fn test_policy_decision_strictness_ordering() {
+        assert!(PolicyDecision::Allow.strictness() < PolicyDecision::RequireConfirmation.strictness());
+        assert!(PolicyDecision::RequireConfirmation.strictness() < PolicyDecision::Deny.strictness());
+    }
+
+    #[test]
+    fn test_tightened_with_keeps_stricter() {
+        assert_eq!(
+            PolicyDecision::Allow.tightened_with(&PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyDecision::Deny.tightened_with(&PolicyDecision::Allow),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyDecision::RequireConfirmation.tightened_with(&PolicyDecision::Deny),
+            PolicyDecision::Deny
+        );
+        assert_eq!(
+            PolicyDecision::Allow.tightened_with(&PolicyDecision::RequireConfirmation),
+            PolicyDecision::RequireConfirmation
+        );
+    }
+
+    #[test]
+    fn test_set_rule_monotonic_cannot_elevate_saved_policy() {
+        let mut p = ActionPolicy::new();
+        // 已保存策略: write_file = RequireConfirmation
+        assert_eq!(p.decide("write_file"), PolicyDecision::RequireConfirmation);
+        // 低信任源尝试放宽 → 被拒绝, 保留 RequireConfirmation
+        let effective = p.set_rule_monotonic("write_file", PolicyDecision::Allow);
+        assert_eq!(effective, PolicyDecision::RequireConfirmation);
+        assert_eq!(p.decide("write_file"), PolicyDecision::RequireConfirmation);
+        // 低信任源尝试收紧 → 生效
+        let effective = p.set_rule_monotonic("write_file", PolicyDecision::Deny);
+        assert_eq!(effective, PolicyDecision::Deny);
+        assert_eq!(p.decide("write_file"), PolicyDecision::Deny);
+    }
+
+    #[test]
+    fn test_set_rule_monotonic_deny_never_unlocked() {
+        let mut p = ActionPolicy::new();
+        // 已保存策略: read_secrets = Deny
+        assert_eq!(p.decide("read_secrets"), PolicyDecision::Deny);
+        // env/覆盖层无论如何都不能解锁 Deny
+        let effective = p.set_rule_monotonic("read_secrets", PolicyDecision::Allow);
+        assert_eq!(effective, PolicyDecision::Deny);
+        let effective = p.set_rule_monotonic("read_secrets", PolicyDecision::RequireConfirmation);
+        assert_eq!(effective, PolicyDecision::Deny);
+        assert_eq!(p.decide("read_secrets"), PolicyDecision::Deny);
+    }
+
+    #[test]
+    fn test_set_rule_monotonic_unknown_action_defaults_deny() {
+        let mut p = ActionPolicy::new();
+        // 未注册 action 的决策基线是 Deny (decide 默认), 任何放宽提案都被卡在 Deny
+        let effective = p.set_rule_monotonic("brand_new_action", PolicyDecision::Allow);
+        assert_eq!(effective, PolicyDecision::Deny);
+        assert_eq!(p.decide("brand_new_action"), PolicyDecision::Deny);
     }
 }

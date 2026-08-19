@@ -212,6 +212,15 @@ impl ShieldEnforcer {
         self.perm_chain.set_mode(mode);
     }
 
+    /// 单调收紧单条策略 (DBX 权限单调性不变量, 吸收 2026-08-19):
+    /// 低信任源 (env/config 覆盖) 只能收紧, 绝不能提升或放宽已保存策略。
+    /// 与 `set_policy_profile` (保存态切换, 允许放宽) 区分: 此路径用于
+    /// runtime/env 覆盖层, 经 `PolicyDecision::tightened_with` 保证单调。
+    /// 消费者: `/perm set-rule` (perm_cmds.rs)。
+    pub fn set_rule_monotonic(&mut self, action: &str, decision: PolicyDecision) -> PolicyDecision {
+        self.policy.set_rule_monotonic(action, decision)
+    }
+
     /// Set project root on SecurityGuard (auto-allows reads within project).
     pub fn set_project_root(&self, root: &str) {
         self.guard.set_project_root(root);

@@ -114,6 +114,10 @@ extract → dedup → categorize → capability map → insert + 显式 FTS → 
 | **SPA 站点内容在 TS 字符串字面量** | Vite/React 站点 (index.html 仅 647B 壳) 正文在 `src/content/*.ts`/`*.tsx` 的字符串字面量 → 正则 `"([^"\\]*(?:\\.[^"\\]*)*)"` 提取 + len>30 过滤，即可组装 article 节点 | vibe-designing-playbook chapter1.ts → 2577B |
 | **静态站内容直接是 markdown** | 静态 GitHub Pages (index.html 是入口壳) 正文在 `article.md`/`README.md` → markdown strip 格式符 (`#>*_\`~|-`、图片/链接语法) 后取行 >30 字符拼接 | morpho article.md 55KB → 4000B 节点 |
 | **R-P97 吸收写入 Rust 化 (Cycle 232)** | 知识写入单一事实源: Python 脚本 (kb_batch_absorb/bridge_pages_absorb/absorb_to_capability) 全部只做数据 prep + 映射算法, 写入委托 Rust CLI `neotrix-experience absorb-node` (URL 去重 + nodes/FTS 双写) 与 `update-node-metadata` (读原 metadata → merge patch → 写回)。本地 insert_node/UPDATE 已退役 | 3 个写入方 → 12 tests + 1262 节点 E2E |
+| **TITLE_HIT 误伤 → 人工校正门 (Cycle 1192/1201)** | 仓库 README 含 audit/verify 等安全词会被 keyword 规则误映射 (如 chinese-poetry→SHIELD/audit)。接线前必须按 artifact 实际机制人工复核映射: 语料→retrieve, 打包→invoke, 指纹伪装→proxy, OCR→invoke, 上下文图→search, agent 协调→orchestrate。校正走 `update-node-metadata` 同路径 (merge 语义) | 37 源中 6 条误映射校正 |
+| **接线裁决 = 落地/路线图/拒绝三选一 (Cycle 1201)** | 每个 New 机制必须明确: ✅ 本 session 接线落地 (同 session 消费者) / 📋 路线图降级 (现有能力已覆盖, 给出覆盖依据) / ❌ R-P79 拒 (实体依据: 已有消费者或已有实现)。拒绝不能因"不方便", 要有代码引用。P2(蒸馏)/P4(驻留审计) 降级均因 SkillQualityScorer.cost_awareness + ToolOutput 截断已覆盖 | 6 New → 3 落地 + 2 降级 + 1 评估中 |
+| **能力树 bud/strengthen 随接线同步 (Cycle 1201)** | 接线落地后立即: 新能力节点 bud (如 `nt_shield::policy_monotonic_invariant`, `nt_mind_evolution_loop::checkpoint_reanchor`), 既有节点 strengthen (如 `nt_memory_kb::retrieval_self_evolution` ← staleness_signal)。能力树是 R-P79 闭环的审计面 | 3 接线 → 2 bud + 1 strengthen |
+| **session-batch cycle 冲突检查 (Cycle 1201)** | `absorb-session-batch.sh` 按 `branch_<cycle>_%` 前缀判幂等; 若 cycle 号已被当日其他会话占用 → 静默 SKIP, 新会话经验不落盘。写 pending JSON 前查 `SELECT DISTINCT substr(key,8,4) FROM kv_store WHERE key LIKE 'branch_%' ORDER BY CAST(...) DESC LIMIT 1` 取未占用 cycle | 首次吸收误 SKIP (cycle 1193 已占用) → 改 1201 成功 |
 
 #### absorbed_capability 数据层追踪 (R-P79 闭环)
 

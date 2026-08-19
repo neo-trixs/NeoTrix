@@ -124,8 +124,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-11T06:24:37.598236Z",
       "updated_at": "2026-08-17T06:26:36.923570Z",
@@ -189,8 +189,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
         "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "tests": "17 passed (nt_core_parallel::isolation)",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
         "evidence_gated": "passed"
       },
@@ -251,8 +251,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
         "tests": "17 passed (nt_core_parallel::isolation)",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
         "evidence_gated": "passed",
         "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
       },
@@ -410,13 +410,13 @@
         }
       ],
       "metadata": {
+        "input_schema": "path: string; dir: string | null; kind: FileKind; options: { preferred_sheets: string[], empty_markers: [string, string[]][], unit_rules: [] }",
         "output_schema": "ContentSnapshot { kind, text, markdown, table[], image, media, mime_type, size_bytes } | ConsolidationReport { files_processed, total_rows, usd_rows, validation_warnings[], output }",
         "fallback_chain": [
           "native (calamine/office_oxide/image)",
           "extract_text -> to_markdown",
           "check_health"
-        ],
-        "input_schema": "path: string; dir: string | null; kind: FileKind; options: { preferred_sheets: string[], empty_markers: [string, string[]][], unit_rules: [] }"
+        ]
       },
       "created_at": "2026-08-13T13:02:47.046875Z",
       "updated_at": "2026-08-16T07:33:56.054893Z",
@@ -784,8 +784,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T03:58:06.420110Z",
       "updated_at": "2026-08-17T06:26:37.228799Z",
@@ -1090,8 +1090,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T07:24:57.735635Z",
       "updated_at": "2026-08-19T01:58:01.201865Z",
@@ -1180,8 +1180,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T07:25:01.569883Z",
       "updated_at": "2026-08-18T04:11:10.380581Z",
@@ -1250,8 +1250,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-14T07:25:01.580480Z",
       "updated_at": "2026-08-17T12:47:45.434147Z",
@@ -1415,11 +1415,19 @@
           "to_node": "nt_memory_kb::retrieval_self_evolution",
           "note": "2608.14036 absorb: precision_gate 池规模感知门控接入 finalize_search (pool 5→100 时 precision 29.6%→3.3%), 检索精度崩溃防御",
           "timestamp": "2026-08-18T07:07:34.229060Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_memory_kb::retrieval_self_evolution",
+          "note": "codegraph吸收(2026-08-19 P5): staleness_signal() 填充 SearchResult.signals 槽 [decay,age_days,decay,stale_banner] (30天横幅/7天半衰期); 接入 finalize_search 生产检索路径; 测试10过",
+          "timestamp": "2026-08-19T12:59:19.096602Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T08:24:18.435537Z",
-      "updated_at": "2026-08-18T07:07:34.229060Z",
+      "updated_at": "2026-08-19T12:59:19.096603Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1589,8 +1597,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T08:24:43.288598Z",
       "updated_at": "2026-08-17T06:26:37.574232Z",
@@ -1894,8 +1902,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-14T12:55:44.852663Z",
       "updated_at": "2026-08-18T04:11:10.534902Z",
@@ -2117,8 +2125,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T01:56:52.494679Z",
       "updated_at": "2026-08-18T04:11:10.472835Z",
@@ -2200,8 +2208,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T01:56:57.858315Z",
       "updated_at": "2026-08-19T01:57:55.684508Z",
@@ -2496,8 +2504,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T04:15:47.812468Z",
       "updated_at": "2026-08-17T06:26:38.249934Z",
@@ -2555,8 +2563,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-19T01:57:45.314138Z",
@@ -2746,9 +2754,9 @@
         }
       ],
       "metadata": {
+        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_error_recovery.rs:298",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "evidence_gated": "passed",
-        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_error_recovery.rs:298"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-17T06:26:38.530332Z",
@@ -2807,8 +2815,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T05:25:53.646647Z",
       "updated_at": "2026-08-17T06:26:38.599064Z",
@@ -2865,8 +2873,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-17T06:26:38.687689Z",
@@ -3001,8 +3009,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "evidence_gated": "passed",
         "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/mod.rs:6"
       },
       "created_at": "2026-08-15T14:34:28Z",
@@ -3060,8 +3068,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:34:28Z",
       "updated_at": "2026-08-17T06:26:38.945069Z",
@@ -3191,8 +3199,8 @@
       ],
       "metadata": {
         "evidence_gated": "passed",
-        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_video_pipeline.rs:957",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_video_pipeline.rs:957"
       },
       "created_at": "2026-08-15T14:59:52Z",
       "updated_at": "2026-08-17T06:26:39.117849Z",
@@ -3260,9 +3268,9 @@
         }
       ],
       "metadata": {
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
         "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_video_pipeline.rs:1135",
-        "evidence_gated": "passed",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T14:59:52Z",
       "updated_at": "2026-08-17T06:26:39.221201Z",
@@ -3321,8 +3329,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
         "wiring_evidence": "code_graph_cmds.rs:13,50 CodeGraphMCP tools (search_hybrid wired 3a010aca)",
+        "evidence_gated": "passed",
         "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T14:59:52Z",
@@ -3403,8 +3411,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-18T04:11:10.504381Z",
@@ -3460,8 +3468,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "self_test_integration HdaAttributionSelfTest"
+        "wiring_evidence": "self_test_integration HdaAttributionSelfTest",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:39.405670Z",
@@ -3695,8 +3703,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:39.648621Z",
@@ -3767,8 +3775,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-18T04:11:10.350149Z",
@@ -4063,8 +4071,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:40.027706Z",
@@ -4305,8 +4313,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T12:47:10.796999Z",
@@ -4361,8 +4369,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:40.328761Z",
@@ -4417,8 +4425,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:40.389104Z",
@@ -4537,8 +4545,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-19T01:57:55.750408Z",
@@ -4601,9 +4609,9 @@
         }
       ],
       "metadata": {
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/metadata.rs:295",
         "evidence_gated": "passed",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/metadata.rs:295"
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:40.650980Z",
@@ -4666,9 +4674,9 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_self_test_integration.rs:126",
         "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
-        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_self_test_integration.rs:126"
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-17T06:26:40.753139Z",
@@ -4795,8 +4803,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-15T23:00:00Z",
       "updated_at": "2026-08-19T01:58:01.103446Z",
@@ -4978,8 +4986,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T02:50:22.749743Z",
       "updated_at": "2026-08-17T06:26:41.118109Z",
@@ -5332,8 +5340,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-16T07:45:11.146832Z",
       "updated_at": "2026-08-17T06:26:41.364523Z",
@@ -5478,9 +5486,9 @@
         }
       ],
       "metadata": {
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
         "evidence_gated": "passed",
-        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/mod.rs:99"
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/l2_world_impl/nt_world_absorber/mod.rs:99",
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
       },
       "created_at": "2026-08-16T07:45:11.183785Z",
       "updated_at": "2026-08-19T01:57:55.717707Z",
@@ -5617,9 +5625,9 @@
         }
       ],
       "metadata": {
+        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)",
         "evidence_gated": "passed",
-        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_self_test_integration.rs:445",
-        "degrade_reason": "D2 audit: zero production consumers (Dark Forest)"
+        "wiring_evidence": "capability wired at neotrix-core/src/core/nt_core_self_test_integration.rs:445"
       },
       "created_at": "2026-08-16T07:45:26.688357Z",
       "updated_at": "2026-08-17T06:26:41.708571Z",
@@ -5746,8 +5754,8 @@
         }
       ],
       "metadata": {
-        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "gate_note": "D16 gate: wiring evidence not yet audited; future C3+ promotion requires evidence_gated=passed"
       },
       "created_at": "2026-08-16T07:45:34.006424Z",
       "updated_at": "2026-08-17T06:26:41.774985Z",
@@ -5881,8 +5889,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/neotrix/l1_body_impl/nt_shield_sentry.rs:243 cleanse_untagged/apply_trust_contract called by prompt builders",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/neotrix/l1_body_impl/nt_shield_sentry.rs:243 cleanse_untagged/apply_trust_contract called by prompt builders"
       },
       "created_at": "2026-08-17T01:38:53.370935Z",
       "updated_at": "2026-08-17T05:57:18.024017Z",
@@ -6023,8 +6031,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind_skill_engine.rs:634 FiberLifecycleState ownership lifecycle",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind_skill_engine.rs:634 FiberLifecycleState ownership lifecycle"
       },
       "created_at": "2026-08-17T01:39:04.277330Z",
       "updated_at": "2026-08-17T05:57:18.075751Z",
@@ -6165,8 +6173,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/core/nt_core_scheduler/event_driven_claim.rs:240 EventDrivenClaimPool cold recovery + reassign",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/core/nt_core_scheduler/event_driven_claim.rs:240 EventDrivenClaimPool cold recovery + reassign"
       },
       "created_at": "2026-08-17T01:39:04.323204Z",
       "updated_at": "2026-08-17T05:57:18.128158Z",
@@ -6244,8 +6252,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/neotrix/l1_body_impl/nt_io_provider/account_pool.rs:10 AccountPool provider rotation",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/neotrix/l1_body_impl/nt_io_provider/account_pool.rs:10 AccountPool provider rotation"
       },
       "created_at": "2026-08-17T01:39:04.345539Z",
       "updated_at": "2026-08-19T01:57:45.347294Z",
@@ -6315,8 +6323,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/neotrix/l3_memory_impl/nt_memory_kb/spill_storage.rs:5 SpillStorage spill/restore",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/neotrix/l3_memory_impl/nt_memory_kb/spill_storage.rs:5 SpillStorage spill/restore"
       },
       "created_at": "2026-08-17T01:39:04.368118Z",
       "updated_at": "2026-08-17T05:57:18.180459Z",
@@ -6394,8 +6402,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "neotrix-core/src/neotrix/l9_transcendent_impl/nt_mind_eval_harness.rs:1135 OracleLadder T0-T3 ladder",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "neotrix-core/src/neotrix/l9_transcendent_impl/nt_mind_eval_harness.rs:1135 OracleLadder T0-T3 ladder"
       },
       "created_at": "2026-08-17T01:39:04.390458Z",
       "updated_at": "2026-08-19T01:57:55.651277Z",
@@ -6722,8 +6730,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "self_curriculum/mod.rs:261 suggest_next_source_constrained"
+        "wiring_evidence": "self_curriculum/mod.rs:261 suggest_next_source_constrained",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-17T02:34:21.288041Z",
       "updated_at": "2026-08-17T06:26:42.154327Z",
@@ -6913,8 +6921,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "capability wired at neotrix-core/src/entry/mod.rs:1",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/entry/mod.rs:1"
       },
       "created_at": "2026-08-17T02:34:21.381222Z",
       "updated_at": "2026-08-17T06:26:42.581079Z",
@@ -7103,8 +7111,8 @@
         }
       ],
       "metadata": {
-        "evidence_gated": "passed",
-        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/nt_core_event_bus.rs:1"
+        "wiring_evidence": "capability wired at neotrix-core/src/neotrix/nt_core_event_bus.rs:1",
+        "evidence_gated": "passed"
       },
       "created_at": "2026-08-17T02:34:21.481652Z",
       "updated_at": "2026-08-17T06:26:43.005134Z",
@@ -7231,8 +7239,8 @@
         }
       ],
       "metadata": {
-        "wiring_evidence": "capability wired at neotrix-core/src/main.rs:1",
-        "evidence_gated": "passed"
+        "evidence_gated": "passed",
+        "wiring_evidence": "capability wired at neotrix-core/src/main.rs:1"
       },
       "created_at": "2026-08-17T02:34:21.543590Z",
       "updated_at": "2026-08-17T06:26:43.218354Z",
@@ -7644,6 +7652,64 @@
       "metadata": {},
       "created_at": "2026-08-19T01:58:11.011174Z",
       "updated_at": "2026-08-19T01:58:11.011176Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_shield::policy_monotonic_invariant",
+      "domain": "shield",
+      "layer": "l1composite",
+      "constellation": "c0compile",
+      "provides": [
+        "权限单调性不变量",
+        "DBX单调收紧",
+        "PolicyDecision strictness"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shield::policy_monotonic_invariant",
+          "note": "DBX吸收(2026-08-19 P1): PolicyDecision::strictness/tightened_with + ActionPolicy::set_rule_monotonic — env/config 覆盖层只能收紧绝不提升已保存策略 (Deny不可放宽); 消费者 /perm set-rule (perm_cmds.rs); 测试53过",
+          "timestamp": "2026-08-19T12:58:58.134557Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-19T12:58:58.134556Z",
+      "updated_at": "2026-08-19T12:58:58.134557Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_mind_evolution_loop::checkpoint_reanchor",
+      "domain": "mind",
+      "layer": "l2orchestrator",
+      "constellation": "c0compile",
+      "provides": [
+        "checkpoint持久化",
+        "ScienceFlow re-anchor",
+        "resumable state"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind_evolution_loop::checkpoint_reanchor",
+          "note": "ScienceFlow吸收(2026-08-19 P3): PersistedCheckpoint DTO→KB nt_core_state; CheckpointStage::process 每轮落盘; build_full 启动 re_anchor_from_kb 恢复 iteration/reward/capability (skip_kb_io跳过); 测试9过",
+          "timestamp": "2026-08-19T12:59:07.614165Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-19T12:59:07.614165Z",
+      "updated_at": "2026-08-19T12:59:07.614165Z",
       "deprecated": false,
       "deprecated_reason": null
     }
@@ -8488,36 +8554,76 @@
       "signal": 0.7
     },
     {
-      "domain": "NT-MEMORY",
+      "action": "strengthen_or_bud",
       "capability": "hybrid_retrieval",
-      "action": "strengthen_or_bud",
+      "domain": "NT-MEMORY",
+      "promoted_at": 1787121934,
       "rationale": "经验 '[蒸馏-NT-MEMORY] 聚合 4 条经验的模式: neotrix-experience absorb 支持 stdin 直写 KB (跳过本地中转文件): cmd_absorb 原只读文件路径, 现支持 '-' 读 stdin (与 absorb-node 对称, experience.rs cmd_absorb 模式匹配)。agent 可 `cat session.json | neotrix-exper [关键词: absorb, experience, 蒸馏, cmd, cycle, fts, json, memory]' 命中能力标签 'hybrid_retrieval' 于域 Memory, 应强化对应能力节点",
-      "signal": 0.76,
-      "promoted_at": 1787121934
+      "signal": 0.76
     },
     {
-      "domain": "NT-META",
-      "capability": "performance_concurrency",
       "action": "strengthen_or_bud",
+      "capability": "performance_concurrency",
+      "domain": "NT-META",
+      "promoted_at": 1787121934,
       "rationale": "经验 '[蒸馏-NT-META] 聚合 3 条经验的模式: 运行时数据文件 (如 capability_registry.json) 被并发会话格式重排 (json.dump indent=1) 时, 整个文件合并为单个 diff hunk, git add -p 无法精确分离自己的追加。权衡: 若内容自洽有效 JSON 且需落盘, 整体提交并在 commit message 如实注明含格式重排与并发内容; 否则留工 [关键词: capability, json, registry]' 命中能力标签 'performance_concurrency' 于域 Meta, 应强化对应能力节点",
-      "signal": 0.76,
-      "promoted_at": 1787121934
+      "signal": 0.76
     },
     {
-      "domain": "NT-META",
-      "capability": "consciousness::meta_cognition",
       "action": "awakening_note",
+      "capability": "consciousness::meta_cognition",
+      "domain": "NT-META",
+      "promoted_at": 1787121934,
       "rationale": "[蒸馏-NT-GOVERNANCE] 聚合 3 条经验的模式: 并行会话环境的 git 提交纪律: commit 前必须先查暂存区 (git diff --cached --name-only) — 并行会话可能已 stage 文件, 精确",
-      "signal": 0.76,
-      "promoted_at": 1787121934
+      "signal": 0.76
+    },
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::consciousness_tree",
+      "domain": "NT-META",
+      "promoted_at": 1787122538,
+      "rationale": "[蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76
+    },
+    {
+      "action": "strengthen_or_bud",
+      "capability": "architecture_decision",
+      "domain": "NT-CORE",
+      "promoted_at": 1787138163,
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 4 条经验的模式: 架构审计规模基线: 项目 39.5 万行 Rust (core 125K + neotrix 269K, L1-L10), 791 测试文件, crate 依赖树 77 节点。9 个 god-file (>2500行) 待拆: bin/experience.rs(3979)/nt_mind_skill_engine.rs(3803)/nt_memory_kb [关键词: core, crate, neotrix, capability, cargo, clean, experience, rust]' 命中能力标签 'architecture_decision' 于域 Core, 应强化对应能力节点",
+      "signal": 0.76
+    },
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::consciousness_tree",
+      "domain": "NT-META",
+      "promoted_at": 1787140658,
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76
+    },
+    {
+      "action": "strengthen_or_bud",
+      "capability": "frontend_ui",
+      "domain": "NT-CORE",
+      "promoted_at": 1787140658,
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: [蒸馏-NT-CORE] 聚合 3 条经验的模式: [蒸馏-NT-CORE] 聚合 4 条经验的模式: [蒸馏-NT-CORE] 聚合 5 条经验的模式: main 工作区守卫实践：工作区 14 个修改文件中仅 4 个属本次会话（TUI 光标），其余 10 个为之前会话遗留（NT-WORLD/NT-MIND/NT-CORE 域）。提交时只提交本次会话文件，避 [关键词: core, 关键词, 条经验的模式, 聚合, 蒸馏, mind]' 命中能力标签 'frontend_ui' 于域 Core, 应强化对应能力节点",
+      "signal": 0.76
+    },
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::e8",
+      "domain": "NT-META",
+      "promoted_at": 1787142116,
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: Rust std::sync::Mutex 在并发测试中被其他测试 panic 污染 (poisoned) 后，`.lock().ok().flatten()` 会静默降级到错误路径：TE",
+      "signal": 0.76
     },
     {
       "domain": "NT-META",
       "capability": "consciousness::consciousness_tree",
       "action": "awakening_note",
-      "rationale": "[蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
       "signal": 0.76,
-      "promoted_at": 1787122538
+      "promoted_at": 1787144720
     }
   ]
 }
