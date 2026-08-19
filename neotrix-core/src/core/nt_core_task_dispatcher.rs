@@ -7,6 +7,9 @@
 /// 4. 智能选择合适的 LLM 模型/策略执行子任务
 /// 5. 自动聚合子任务结果，生成最终答案
 /// 6. 对用户完全隐藏意识核心内部实现细节（E8、CRT、GWT 等）
+///
+/// 受控边界: 反向引用 `crate::neotrix::...::engine_core::ReasoningEngine`
+/// 属架构允许的 ReasoningEngine 注入边界, 禁止扩展此边界。
 use crate::core::l7_capability::nt_core_antidistil::decompose::{
     DecomposeSuggestion, TaskDecomposer,
 };

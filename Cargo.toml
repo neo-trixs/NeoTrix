@@ -6,6 +6,7 @@ members = [
     "crates/neotrix-sysctl",
     "guard_core",
     "neotrix-core/src/neotrix/nt_core_capability_tree",
+    "crates/nt-lang",
 ]
 
 resolver = "2"

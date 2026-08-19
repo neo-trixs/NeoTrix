@@ -3,6 +3,9 @@
 //! Bud `code_graph_mcp`: 把 NT-WORLD 的 `CodeGraph` (符号图) 与 `CodeSearchEngine`
 //! (语义检索) 包装为确定性 MCP 风格工具函数, 供 `nt_agent_mcp_registry` 登记为
 //! 代码图检索工具面。纯 Rust, 零 LLM 依赖, 结果可复现。
+//!
+//! 受控边界: 反向引用 `crate::neotrix::...::code_graph::CodeGraph`
+//! 属架构允许的 CodeGraph 注入边界, 禁止扩展此边界。
 
 use std::collections::HashMap;
 use std::path::Path;

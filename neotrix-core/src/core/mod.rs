@@ -51,10 +51,9 @@ pub mod nt_core_bank;
 pub mod nt_core_consensus;
 pub mod nt_core_graph;
 pub mod nt_core_hcube;
-pub mod nt_core_knowledge;
-pub mod nt_core_kron;
-pub mod nt_core_negentropy;
-pub mod nt_core_walsh;
+ pub mod nt_core_knowledge;
+ pub mod nt_core_kron;
+ pub mod nt_core_walsh;
 
 // ═══════════════════════════════════════════════════════════════════
 // L4 — 认知层 (Cognition)
@@ -152,9 +151,8 @@ pub mod nt_core_retrieval;
 pub mod nt_core_router;
 pub mod nt_core_self_review;
 pub mod nt_core_traits;
-pub mod nt_core_wbmem;
-pub mod nt_core_ws;
-pub mod nt_io_cache;
+ pub mod nt_core_ws;
+ pub mod nt_io_cache;
 pub mod nt_core_span;
 pub mod nt_core_llm;
 

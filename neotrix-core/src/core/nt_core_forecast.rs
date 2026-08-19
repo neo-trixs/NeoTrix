@@ -11,6 +11,9 @@
 //!
 //! 复用 NeoTrix 现有组件：E8AbductionBridge（因果推演）、SimulateEngine（情景模拟）、
 //! SelfTest（T1 自测注册）。
+//!
+//! 受控边界: 反向引用 `nt_io_provider` (factory/GatewayV2)
+//! 属架构允许的 LLM provider 注入边界, 禁止扩展此边界。
 
 #![forbid(unsafe_code)]
 

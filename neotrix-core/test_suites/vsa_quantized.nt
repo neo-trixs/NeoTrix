@@ -12,25 +12,41 @@ tests:
       assert_eq!(v.len(), VSA_DIM);
 
   - name: vsa_binary_vector_is_binary
-    description: "Random binary vector elements are 0 or 1"
+    description: "Random binary vector elements are 0 or 255 (binary-quantized encoding)"
     imports:
       - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
       - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
     code: |
       let v = QuantizedVSA::random_binary();
       for &x in &v {
-          assert!(x == 0 || x == 1);
+          assert!(x == 0 || x == 255);
       }
 
   - name: vsa_bind_self_returns_zero
-    description: "a XOR a is all zeros"
+    description: "HRR bind is not XOR — a⊗a produces noise-like output (density ~0.5), not zeros"
     imports:
       - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
       - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
     code: |
       let a = QuantizedVSA::random_binary();
       let bound = QuantizedVSA::bind(&a, &a);
-      assert!(bound.iter().all(|&x| x == 0));
+      // HRR self-bind yields roughly half the elements nonzero (binary thresholding
+      // of circular autocorrelation), unlike XOR where a XOR a == 0.
+      let nonzero = bound.iter().filter(|&&x| x != 0).count();
+      assert!(nonzero > VSA_DIM / 4, "HRR self-bind should be noise-like, got {} nonzero", nonzero);
+
+  - name: vsa_unbind_recovers_component
+    description: "HRR unbind(bind(a, b), a) recovers b approximately"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let a = QuantizedVSA::random_binary();
+      let b = QuantizedVSA::random_binary();
+      let c = QuantizedVSA::bind(&a, &b);
+      let rec = QuantizedVSA::unbind(&c, &a);
+      let sim = QuantizedVSA::similarity(&rec, &b);
+      assert!(sim > 0.5, "expected unbind(bind(a,b),a) ≈ b, got sim {}", sim);
 
   - name: vsa_permute_reversible
     description: "Permute is reversible"

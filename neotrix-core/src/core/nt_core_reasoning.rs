@@ -2,6 +2,9 @@
 //!
 //! 消除 4 处 ReasoningTrace 重复定义，建立 Method↔Stage↔Hexagram 显式映射，
 //! 提供 KB/经验 → Kernel context 自动注入的 ContextBuilder。
+//!
+//! 受控边界: 反向引用 `crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase`
+//! 属架构允许的 KB 注入边界 (core 逻辑核心消费 neotrix 层基础设施), 禁止扩展此边界。
 
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
