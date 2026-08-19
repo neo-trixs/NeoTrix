@@ -1055,7 +1055,7 @@ impl RevertibleEffectsHealer {
         let mut effects = Vec::new();
         for &v in installs {
             let s = state.clone();
-            state.lock().map(|mut s| s.push(v)).expect("state lock poisoned");
+            state.lock().map(|mut s| s.push(v)).unwrap_or_else(|e| e.into_inner().push(v));
             effects.push(RevertibleEffect::new(format!("pop_{}", v), move || {
                 let mut s = s.lock().map_err(|e| e.to_string())?;
                 match s.pop() {

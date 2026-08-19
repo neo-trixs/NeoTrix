@@ -584,12 +584,22 @@ impl ReasoningEngine {
         // surface predicted trajectory as a soft prior (absent if unwired).
         let jepa_prior = if let Some(ref jepa) = self.jepa {
             let feats = jepa.encode(&task.as_bytes().iter().map(|&b| b as f64 / 255.0).collect::<Vec<f64>>());
-            let (_pred, confidence) = jepa.predict(&feats);
+            let (pred, confidence, uncertainty) = jepa.predict_with_confidence(&feats);
             root_span.set_attribute("jepa_prior_confidence", AttributeValue::Float(confidence));
-            format!(
-                "\nWorld-model prior (confidence {:.3}): next latent predicted — use as soft direction, not ground truth.\n",
-                confidence
-            )
+            root_span.set_attribute("jepa_prior_uncertainty", AttributeValue::Float(uncertainty));
+            // Quantize the predicted latent into a directional signal. High-magnitude
+            // coordinates carry the strongest next-state trend; low-magnitude ones are noise.
+            let direction: Vec<f64> = pred.iter().cloned().filter(|&x| x.abs() > 0.1).collect();
+            if direction.is_empty() {
+                String::new()
+            } else {
+                let top = direction[0];
+                let signal = if top > 0.0 { "positive" } else { "negative" };
+                format!(
+                    "\nWorld-model prior (confidence {:.3}, uncertainty {:.3}): latent trend {signal}, {n} active features — use as soft direction, not ground truth.\n",
+                    confidence, uncertainty, n = direction.len()
+                )
+            }
         } else {
             String::new()
         };

@@ -141,7 +141,7 @@ notify = "7"
 sentry = { version = "0.34", default-features = false, features = ["anyhow", "backtrace", "contexts", "panic"] }
 rusqlite = { version = "0.31", features = ["bundled", "backup"] }
 lopdf = "0.42"
-serde_yml = "0.0.13"
+noyalib = { version = "0.0.24", features = ["compat-serde-yaml"] }
 zip = { version = "2", optional = true }
 quick-xml = { version = "0.41", optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
