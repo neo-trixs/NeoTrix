@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show } from 'solid-js'
+import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
@@ -25,6 +25,8 @@ export function CommandPalette(props: Props) {
   const [query, setQuery] = createSignal('')
   const [selectedIdx, setSelectedIdx] = createSignal(0)
   let inputRef: HTMLInputElement | undefined
+  let cardRef: HTMLDivElement | undefined
+  let restoreFocusEl: HTMLElement | null = null
 
   const filtered = () => {
     const q = query().trim().toLowerCase()
@@ -34,13 +36,42 @@ export function CommandPalette(props: Props) {
     )
   }
 
-  // 每次打开重置查询并聚焦输入
+  // 每次打开重置查询并聚焦输入，记录还原焦点（Raycast 对标：关闭后焦点归还触发元素）
   createEffect(() => {
     if (props.open) {
+      restoreFocusEl = document.activeElement as HTMLElement | null
       setQuery('')
       setSelectedIdx(0)
       requestAnimationFrame(() => inputRef?.focus())
     }
+  })
+
+  // 关闭时还原焦点到唤起元素
+  createEffect(() => {
+    if (props.open) return
+    if (restoreFocusEl?.isConnected) restoreFocusEl.focus()
+  })
+
+  // Tab 焦点循环限定面板内（aria-modal dialog 防逃逸，与 SettingsModal/ConfirmModal 一致）
+  const onDialogKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Tab' || !cardRef) return
+    const focusables = cardRef.querySelectorAll<HTMLElement>(
+      'button, input, [href], [tabindex]:not([tabindex="-1"])',
+    )
+    if (focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
+  onCleanup(() => {
+    if (restoreFocusEl?.isConnected) restoreFocusEl.focus()
   })
 
   const run = (cmd: PaletteCommand) => {
@@ -67,7 +98,7 @@ export function CommandPalette(props: Props) {
     <Show when={props.open}>
       <div class="cmd-palette" role="dialog" aria-modal="true" aria-label="命令面板">
         <div class="cmd-palette-backdrop" onClick={props.onClose} aria-hidden="true" />
-        <div class="cmd-palette-card">
+        <div class="cmd-palette-card" ref={cardRef} onKeyDown={onDialogKeyDown}>
           <input
             ref={inputRef}
             class="cmd-palette-input"
