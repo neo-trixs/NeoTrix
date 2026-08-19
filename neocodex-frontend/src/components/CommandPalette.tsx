@@ -100,6 +100,12 @@ export function CommandPalette(props: Props) {
               <div class="cmd-palette-empty">无匹配命令</div>
             </Show>
           </div>
+          {/* 底部快捷键提示（Raycast 对标：面板 footer 告知可用操作） */}
+          <div class="cmd-palette-footer">
+            <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+            <span><kbd>↵</kbd> 执行</span>
+            <span><kbd>esc</kbd> 关闭</span>
+          </div>
         </div>
       </div>
     </Show>

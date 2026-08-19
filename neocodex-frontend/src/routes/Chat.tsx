@@ -1706,16 +1706,6 @@ export function Chat() {
                   <span>NeoTrix v{appVersion() ?? '0.18.0'}</span>
                   <span class="hidden md:inline">Enter 发送 · Shift+Enter 换行</span>
                 </div>
-                <div class="flex items-center gap-2 text-[10px] text-text-muted/80">
-                  <Show when={inputValue().trim() || pendingAttachments().length > 0}>
-                    <span class="font-mono">
-                      ≈{estimateTokens(inputValue())} tok
-                      <Show when={pendingAttachments().length > 0}>
-                        <span class="ml-1">· {pendingAttachments().length} 附件</span>
-                      </Show>
-                    </span>
-                  </Show>
-                </div>
               </div>
             </div>
           </div>

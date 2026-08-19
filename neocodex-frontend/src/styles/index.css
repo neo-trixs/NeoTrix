@@ -1165,6 +1165,7 @@
     pointer-events: none;
   }
   .rb-float:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
+  .rb-float:focus-visible { outline: 2px solid #f0913a; outline-offset: -2px; }
   .rb-float svg {
     width: 8px;
     height: 8px;
@@ -1211,6 +1212,7 @@
     transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .rb-tab:hover { color: #1a1a20; background: rgba(255, 255, 255, 0.5); }
+  .rb-tab:focus-visible { outline: 2px solid #f0913a; outline-offset: -2px; }
   .rb-tab.on {
     background: rgba(255, 255, 255, 0.85);
     color: #1a1a20;
@@ -1354,6 +1356,7 @@
     color: #909098;
   }
   .ap-view-btn:hover { background: rgba(0, 0, 0, 0.03); color: #5a5a62; }
+  .ap-view-btn:focus-visible { outline: 2px solid #f0913a; outline-offset: -2px; }
   .ap-view-btn.on { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
   .ap-view-btn svg {
     width: 14px;
@@ -1423,6 +1426,7 @@
     transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
   }
   .ap-footer .ap-action:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
+  .ap-footer .ap-action:focus-visible { outline: 2px solid #f0913a; outline-offset: -2px; }
   .ap-footer .ap-action svg {
     width: 11px;
     height: 11px;
@@ -1766,10 +1770,15 @@
   cursor: pointer;
 }
 .slash-item:hover,
-.slash-item.on {
-  background: rgba(240, 145, 58, 0.12);
-  color: #b45309;
-}
+  .slash-item.on {
+    background: rgba(240, 145, 58, 0.12);
+    color: #b45309;
+  }
+  .slash-item:focus-visible {
+    outline: 2px solid rgba(240, 145, 58, 0.7);
+    outline-offset: -2px;
+    background: rgba(240, 145, 58, 0.12);
+  }
 .slash-kbd {
   width: 1.25rem;
   height: 1.25rem;
@@ -1847,4 +1856,29 @@
   text-align: center;
   font-size: 12px;
   color: #6b7280;
+}
+.cmd-palette-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0.5rem 0.875rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.02);
+  font-size: 10px;
+  color: #6b7280;
+}
+.cmd-palette-footer kbd {
+  display: inline-block;
+  min-width: 1.1rem;
+  padding: 0.1rem 0.3rem;
+  margin-right: 0.2rem;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: #4b5563;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
