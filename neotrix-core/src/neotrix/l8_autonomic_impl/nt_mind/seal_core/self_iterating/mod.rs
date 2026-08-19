@@ -97,7 +97,7 @@ mod tests {
     fn test_seal_rl_loop_single_task() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         brain.brain.learning_rate = 0.05;
 
         // 测试单个任务的 SEAL 循环（不使用基准测试）
@@ -108,7 +108,7 @@ mod tests {
         let reward = result.expect("result should be ok in test");
         println!("单个任务奖励: {}", reward);
 
-        // 验证 ReasoningBank 有记录
+        // 验证 ReasoningBank 有记录 — 单次迭代 freq=2 不落 bank
         let stats = brain.reasoning_bank.stats();
         assert_eq!(stats.total_memories, 0);
         println!("ReasoningBank 统计: {:?}", stats);
@@ -123,7 +123,7 @@ mod tests {
     fn test_seal_rl_loop_batch() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         brain.brain.learning_rate = 0.05;
 
         let tasks = vec![
@@ -261,7 +261,7 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
         // 完整 SEAL Algorithm 2 测试
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         brain.brain.learning_rate = 0.05;
         brain.quality_threshold = 0.5;
 

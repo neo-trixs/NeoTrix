@@ -1097,7 +1097,7 @@ mod tests {
     // 3. 预算边界：高奖励推高学习率但有上限；低奖励压低学习率有下限。
     #[test]
     fn seal_loop_update_policy_budget_boundaries() {
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         assert_eq!(brain.brain.learning_rate, 0.05);
 
         // 高奖励 → 学习率上升。
@@ -1111,7 +1111,7 @@ mod tests {
         assert!(brain.brain.learning_rate <= 0.3, "lr capped at 0.3, got {}", brain.brain.learning_rate);
 
         // 负奖励 → 学习率回落，且不跌破 0.01。
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         for _ in 0..300 {
             brain.update_policy(-1.0);
         }
