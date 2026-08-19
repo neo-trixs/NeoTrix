@@ -342,9 +342,9 @@ pub struct LlmNarrator {
 
 /// Gateway 句柄 — 持有池子实例，`complete` 时自动 block_on。
 mod gateway_handle {
+    use crate::core::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
     use crate::neotrix::l1_body_impl::nt_io_provider::factory;
     use crate::neotrix::l1_body_impl::nt_io_provider::gateway::GatewayV2;
-    use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmError, LlmRequest, LlmResponse};
     /// 持有 GatewayV2 并封装同步调用（池子内部自动选择 provider）。
     pub struct GatewayHandle(GatewayV2);
 
@@ -563,10 +563,10 @@ impl LlmNarrator {
     /// 默认输入上下文 token 预算（对齐 max_tokens=512 的输出预算, 输入控制在输出 2 倍内）。
     pub const DEFAULT_CONTEXT_TOKEN_BUDGET: usize = 800;
 
-    /// CJK 感知 token 估算 — 委托 `nt_io_provider::context_budget::estimate_tokens`
+    /// CJK 感知 token 估算 — 委托 `nt_core_llm::estimate_tokens`
     /// (中文含全角标点按字符 1 token, 其余按 4 字符 1 token, 保守上界最小 1)。
     pub fn estimate_tokens(text: &str) -> usize {
-        crate::neotrix::l1_body_impl::nt_io_provider::context_budget::estimate_tokens(text)
+        crate::core::nt_core_llm::estimate_tokens(text)
     }
 
     /// 按预算截断上下文: 保留开头, 超预算部分截断并附标记。

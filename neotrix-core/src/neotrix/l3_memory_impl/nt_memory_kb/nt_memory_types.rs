@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-// D3 架构倒置: NodeType / RelationType 下沉至 core (nt_core_kb_types), 此处
-// re-export 保持 `nt_memory_types::NodeType/RelationType` 调用方路径不变。
-// 单一事实源在 core; 其余 KB 领域类型 (KnowledgeNode/Edge/...) 保留本模块。
+// D3 架构倒置: NodeType / RelationType / KnowledgeNode / KnowledgeEdge /
+// TemporalValidity 下沉至 core (nt_core_kb_types), 此处 re-export 保持
+// `nt_memory_types::*` 调用方路径不变。单一事实源在 core。
 pub use crate::core::nt_core_kb_types::{NodeType, RelationType};
 
 /// Permission-aware retrieval level (P0-2, Cycle 159). Maps to the caller's
@@ -53,52 +53,9 @@ pub fn node_sensitivity(node_type: &NodeType) -> PermissionLevel {
     }
 }
 
-/// Temporal validity window for fact accuracy
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemporalValidity {
-    /// When this fact became valid (Unix timestamp)
-    pub valid_from: i64,
-    /// When this fact expires (None = no expiry)
-    pub valid_until: Option<i64>,
-    /// Confidence in temporal bounds (0.0-1.0)
-    pub confidence: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnowledgeNode {
-    pub id: String,
-    pub node_type: NodeType,
-    pub title: String,
-    pub summary: Option<String>,
-    pub content: Option<String>,
-    pub url: Option<String>,
-    pub domain: Option<String>,
-    pub language: String,
-    pub confidence: f64,
-    pub importance: f64,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub access_count: i64,
-    pub metadata: Option<serde_json::Value>,
-    /// Temporal validity window for fact accuracy
-    pub temporal: Option<TemporalValidity>,
-    /// UUID of the node this node supersedes (for fact versioning)
-    pub supersedes: Option<String>,
-    /// Episode provenance tracking
-    pub source_episode: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnowledgeEdge {
-    pub id: String,
-    pub source_id: String,
-    pub target_id: String,
-    pub relation_type: RelationType,
-    pub weight: f64,
-    pub description: Option<String>,
-    pub created_at: i64,
-    pub metadata: Option<serde_json::Value>,
-}
+/// D3 下沉: 节点/边/时间窗口类型迁至 core `nt_core_kb_types`, 此处 re-export
+/// 保持 `nt_memory_types::KnowledgeNode/KnowledgeEdge/TemporalValidity` 调用方路径不变。
+pub use crate::core::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, TemporalValidity};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchQuery {

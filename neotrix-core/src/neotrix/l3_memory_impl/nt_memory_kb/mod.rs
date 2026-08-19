@@ -2313,6 +2313,27 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         }
     }
 
+    /// 外部知识自动获取 — 按任务摘要调度 discover_* 源 (Semantic Scholar / ArXiv /
+    /// 技术文档) 摄入 KB。全部源失败不 panic, 返回成功摄入数。D3: 该编排原驻留
+    /// NT-CORE consciousness_core, 下沉至 NT-MEMORY (KB 持 conn 的域能力)。
+    pub fn acquire_external_sources(&self, query: &str) -> usize {
+        let conn = match self.conn.lock() {
+            Ok(conn) => conn,
+            Err(_) => return 0,
+        };
+        let mut ingested = 0usize;
+        if let Ok(s) = nt_discovery_sources::discover_semantic_scholar(&conn, query, 5) {
+            ingested += s.resources_ingested;
+        }
+        if let Ok(s) = nt_discovery_sources::discover_arxiv_papers(&conn, query, 5) {
+            ingested += s.resources_ingested;
+        }
+        if let Ok(s) = nt_discovery_sources::discover_technical_docs(&conn, query) {
+            ingested += s.resources_ingested;
+        }
+        ingested
+    }
+
     // ── Unified Store (KV / Config / Secrets / etc.) ──
 
     pub fn kv_get(&self, namespace: &str, key: &str) -> Result<Option<String>, String> {

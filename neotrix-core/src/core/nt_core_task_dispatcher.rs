@@ -15,11 +15,10 @@ use crate::core::nt_core_crt::{CrtPlan, CrtTimeScale};
 use crate::core::nt_core_policy::E8Policy;
 use crate::core::nt_core_reasoning::{ReasoningMethod, TraceSource};
 use crate::core::nt_core_kernel_types::{KERNEL_DIM, ReasoningKernel, Vector};
-use crate::neotrix::l1_body_impl::nt_io_provider::context_budget::{
-    estimate_tokens, truncate_preserving,
+use crate::core::nt_core_llm::{
+    estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
 use crate::neotrix::l8_autonomic_impl::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
-use crate::neotrix::{LlmProvider, LlmRequest, Message, Role};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

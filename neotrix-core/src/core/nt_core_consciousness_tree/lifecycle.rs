@@ -514,7 +514,7 @@ impl ConsciousnessTree {
     /// 独立 CLI/MCP 路径经 run_growth_cycle Phase 2 调用后, trunk.phi 反映真实
     /// 树状态集成度, 快照/CoreSnapshot.phi 不再是恒 0.0。
     pub fn compute_iit_phi(&self) -> f64 {
-        use crate::neotrix::nt_core_iit_phi::IITPhiCalculator;
+        use crate::core::nt_core_iit_phi::IITPhiCalculator;
         let state = self.build_phi_state();
         IITPhiCalculator::new().compute_phi(&state).phi
     }

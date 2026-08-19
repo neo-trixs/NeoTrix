@@ -1155,41 +1155,6 @@ pub struct ExternalClosureReport {
     pub last_error: String,
 }
 
-/// 外部知识自动获取 — 按能力标签分派 discover_* 源。
-/// 全部源失败不 panic (单源错误记录, 其余源继续), 返回成功摄入数。
-pub fn acquire_external_knowledge(conn: &rusqlite::Connection, task: &ConsciousTask) -> usize {
-    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_discovery_sources as src;
-    let query = &task.summary;
-    let mut ingested = 0usize;
-    // 论文类 (学术): Semantic Scholar + ArXiv
-    if let Ok(s) = src::discover_semantic_scholar(conn, query, 5) {
-        ingested += s.resources_ingested;
-    }
-    if let Ok(s) = src::discover_arxiv_papers(conn, query, 5) {
-        ingested += s.resources_ingested;
-    }
-    // 技术文档/百科: Wikipedia (技术文档词条)
-    if let Ok(s) = src::discover_technical_docs(conn, query) {
-        ingested += s.resources_ingested;
-    }
-    ingested
-}
-
-/// 接地检索 — 从 KB 检索与任务相关的已摄入知识作为求解上下文。
-pub fn retrieve_grounding(conn: &rusqlite::Connection, task: &ConsciousTask) -> Vec<String> {
-    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_search;
-    match nt_memory_search::search_fts(conn, &task.summary, 10) {
-        Ok(results) => results
-            .iter()
-            .map(|r| {
-                let n = &r.node;
-                format!("[{}] {}", n.title, n.summary.as_deref().unwrap_or(""))
-            })
-            .collect(),
-        Err(_) => Vec::new(),
-    }
-}
-
 /// 试错循环 — 在 token 预算内反复 attempt, 直到解决或预算耗尽。
 /// 每次失败将错误反馈进上下文 (下一轮修正), 精准控制 token 消耗。
 pub fn run_external_closure(
@@ -1251,11 +1216,7 @@ pub fn close_external_gap(
 ) -> ExternalClosureReport {
     // 外部知识摄入 (复用管道 KB 连接)
     let knowledge_acquired = if config.acquire_knowledge {
-        if let Ok(conn) = kb.conn.lock() {
-            acquire_external_knowledge(&conn, task)
-        } else {
-            0
-        }
+        kb.acquire_external_sources(&task.summary)
     } else {
         0
     };
@@ -1834,14 +1795,6 @@ mod tests {
         assert!(report.solved);
         // grounding_hits 记录初始接地数
         assert_eq!(report.grounding_hits, 1);
-    }
-
-    #[test]
-    fn retrieve_grounding_degrades_gracefully_on_empty_kb() {
-        // 空内存 KB → 接地检索返回空 (不 panic), 闭环不依赖 KB 预存
-        let conn = rusqlite::Connection::open_in_memory().expect("in-memory sqlite");
-        let hits = retrieve_grounding(&conn, &fake_task());
-        assert!(hits.is_empty(), "空库应无命中, got {}", hits.len());
     }
 
     #[test]
