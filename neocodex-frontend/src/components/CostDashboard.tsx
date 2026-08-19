@@ -3,6 +3,7 @@ import { Coins, X, RefreshCw, Loader2, Cpu, Activity, Wallet, Repeat } from 'luc
 import { neocodex, errText } from '../api'
 import type { AgentStatus } from '../api/types'
 import { query } from '../api/query'
+import { usePolling } from '../lib/usePolling'
 import { clsx } from 'clsx'
 
 interface Props {
@@ -72,9 +73,10 @@ export function CostDashboard(props: Props) {
 
   // 成本看板自动刷新：面板打开期间每 5s 轮询（对标 Claude usage 实时面板）。
   // 连续失败不再静默：达 2 次时显示轻量提示；单次失败不影响已有数据。
-  createEffect(() => {
-    if (!props.open) return
-    const timer = setInterval(() => {
+  usePolling({
+    enabled: () => props.open,
+    intervalMs: 5000,
+    run: () =>
       query<AgentStatus>(
         'agent_status',
         () => neocodex.agentStatus(),
@@ -88,9 +90,7 @@ export function CostDashboard(props: Props) {
         .catch(() => {
           pollFailures += 1
           if (pollFailures >= 2) setPollError('自动刷新失败，数据可能已过期')
-        })
-    }, 5000)
-    return () => clearInterval(timer)
+        }),
   })
 
   const formatTokens = (n: number) => {

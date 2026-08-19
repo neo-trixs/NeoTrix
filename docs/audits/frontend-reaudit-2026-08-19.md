@@ -46,11 +46,10 @@
 - 对照 iPolloWork domains 拆分思路：按 section 拆子组件，props 传 store
 - 这是继 Chat.tsx 后第二大拆分点
 
-### ℹ️ Info-1: 轮询循环未完全单 Driver
-- 4 处 setInterval（Chat 15s/CostDashboard 5s/CoworkView 10s/ScheduledTasks 10s）独立实现
-- agent_status 已共享缓存；其余为独立命令，去重逻辑各自实现
-- osaurus 单 Loop Driver 理想态：抽 `lib/usePolling.ts` hook 统一（周期/visibility/in-flight）
-- 价值中等：当前实现已正确，仅 DRY 优化
+### ✅ Info-1: 轮询循环已单 Driver（已修复）
+- 抽 `lib/usePolling.ts` hook：统一 enabled 守卫 / in-flight 去重 / visibility 守卫 / cleanup / immediate 首刷
+- 4 处接线完毕：Chat(15s,immediate)/CostDashboard(5s,enabled)/CoworkView(10s)/ScheduledTasks(10s,enabled)
+- 生产代码 setInterval 清零（仅 hook 内一份）；6 测试
 
 ### ℹ️ Info-2: 路由无 URL 身份
 - `/ /chat /globe` 静态路由，会话身份在全局 store
@@ -62,11 +61,11 @@
 1. ✅ **W-2 错误接线**（已完成）：12 组件 `String(e)` → `errText(e)`，生产路径 String(e) 清零
 2. ✅ **W-1 API 下沉**（已完成）：建 `api/fs.ts`（saveFileDialog/openFileDialog/writeTextFileAt），SettingsModal + PluginMarketplace 移除 tauri 插件直连，localStorage 改 storageGet/Set
 3. **W-3 SettingsModal 拆分**（MCP 已拆）：抽 `components/settings/McpSection.tsx`（自包含域，-149 行，1574→1425）；其余区块 state 纠缠度高（provider/apiKey/update 状态机），本次未继续，标记 next
-4. **I-1 usePolling hook**（纯重构）：4 轮询统一（可选，当前正确）
+4. ✅ **I-1 usePolling hook**（已完成）：`lib/usePolling.ts` 统一 4 处轮询，生产 setInterval 清零，6 测试
 
 ## 五、结论
 
 C1→C2 的架构基础已夯实（信封/契约/缓存/收敛层/CI 门禁）。
 本轮重审证明：**约定建立了，但消费端接线不彻底**（W-1/W-2 皆是"建而不用"）。
 按 R-P79 纪律已同 session 接线闭环：**错误信封 + fs 收敛 + env 收敛全部接入生产路径**。
-基线 114 测试全绿 + tsc clean + 零依赖环 + 组件零 tauri 直连（唯一例外 TrafficLights 窗口 API）。
+基线 120 测试全绿 + tsc clean + 零依赖环 + 组件零 tauri 直连（唯一例外 TrafficLights 窗口 API）。

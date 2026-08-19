@@ -30,6 +30,7 @@ import { CommandPalette, type PaletteCommand } from '../components/CommandPalett
 import { clsx } from 'clsx'
 import { neocodex, system, unified, errText } from '../api'
 import { query } from '../api/query'
+import { usePolling } from '../lib/usePolling'
 import { subscribeStream, type UnlistenFn } from '../api/events'
 import type { AgentStatus } from '../api/types'
 
@@ -142,7 +143,6 @@ export function Chat() {
   // 上下文占用（任务3：/compact 自动提示数据源，只读轮询 agentStatus，不写入任何 store）
   const [contextPct, setContextPct] = createSignal<number | null>(null)
   const [compactHintDismissed, setCompactHintDismissed] = createSignal(false)
-  let contextPollTimer: ReturnType<typeof setInterval> | undefined
   // 待发送附件（dialog 选择后暂存，随下一条消息发送）
   const [pendingAttachments, setPendingAttachments] = createSignal<NeoCodexAttachmentDto[]>([])
 
@@ -302,16 +302,20 @@ export function Chat() {
 
   /* 任务3：上下文占用只读轮询（与 CostDashboard 同源 agentStatus，只读不污染）
      经 api/query 共享 3s TTL 缓存，避免两个轮询各自发 IPC */
-  const refreshContextUsage = async () => {
-    try {
-      const s = await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000 })
-      if (s && typeof s.context_usage === 'number') {
-        setContextPct(s.context_usage * 100)
+  usePolling({
+    intervalMs: 15000,
+    immediate: true,
+    run: async () => {
+      try {
+        const s = await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000 })
+        if (s && typeof s.context_usage === 'number') {
+          setContextPct(s.context_usage * 100)
+        }
+      } catch {
+        /* 只读轮询，失败静默 */
       }
-    } catch {
-      /* 只读轮询，失败静默 */
-    }
-  }
+    },
+  })
   // 上下文回落到阈值以下后，重新允许 /compact 提示再次出现
   createEffect(() => {
     const p = contextPct()
@@ -454,9 +458,7 @@ export function Chat() {
       /* 版本非关键 */
     }
 
-    // 上下文占用只读轮询（驱动 /compact 自动提示；与 CostDashboard 同源 agentStatus）
-    refreshContextUsage()
-    contextPollTimer = setInterval(refreshContextUsage, 15000)
+    // 上下文占用只读轮询由 usePolling 管理（15s；同源 agentStatus 共享缓存）
 
     // 监听提供商切换事件（SettingsModal / ProviderSelector 广播），同步状态栏模型
     const onProviderChanged = () => {
@@ -508,8 +510,6 @@ export function Chat() {
     if (globalKeydownHandler) {
       window.removeEventListener('keydown', globalKeydownHandler)
     }
-    // 停止上下文占用轮询
-    if (contextPollTimer) clearInterval(contextPollTimer)
     // 释放麦克风资源：卸载时若仍在录音，停止 recorder 并关闭所有 tracks
     if (recording()) {
       mediaRecorder?.stop()

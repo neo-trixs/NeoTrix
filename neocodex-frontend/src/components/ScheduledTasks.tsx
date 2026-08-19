@@ -3,6 +3,7 @@ import { CalendarClock, X, RefreshCw, Loader2, Play, Plus, Trash2, Pause, Circle
 import { tasks as tasksApi, errText } from '../api'
 import type { BackgroundTask } from '../api/types'
 import { clsx } from 'clsx'
+import { usePolling } from '../lib/usePolling'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 // 预置调度模板（RRULE 风格速选）
@@ -85,19 +86,12 @@ export function ScheduledTasks(props: Props) {
 
   // 任务状态实时刷新：面板打开期间每 10s 轮询。
   // 守卫：in-flight 去重 + 页面不可见时不轮询。
-  let polling = false
-  createEffect(() => {
-    if (!props.open) return
-    const timer = setInterval(async () => {
-      if (polling || document.visibilityState === 'hidden') return
-      polling = true
-      try {
-        await load()
-      } finally {
-        polling = false
-      }
-    }, 10000)
-    return () => clearInterval(timer)
+  // 任务状态实时刷新：面板打开期间每 10s 轮询。
+  // 守卫（usePolling 内置）：in-flight 去重 + 页面不可见时不轮询。
+  usePolling({
+    enabled: () => props.open,
+    intervalMs: 10000,
+    run: () => load(),
   })
 
   const create = async () => {

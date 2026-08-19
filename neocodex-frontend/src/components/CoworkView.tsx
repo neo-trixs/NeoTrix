@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-solid'
 import { cowork as coworkApi, errText } from '../api'
 import type { CoworkAction, CoworkDeliverable, CoworkSession } from '../api/types'
 import { clsx } from 'clsx'
+import { usePolling } from '../lib/usePolling'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 /* ════════════════════════════════════════════
@@ -180,21 +181,16 @@ export function CoworkView() {
   }
 
   // 会话/任务状态自动刷新：视图挂载期间每 10s 轮询（对标 Codex 任务实时状态）。
-  // 守卫：in-flight 去重（轮询重叠时跳过）+ 页面不可见时不轮询（document.visibilityState）。
-  let polling = false
-  createEffect(() => {
-    const timer = setInterval(() => {
-      if (polling || document.visibilityState === 'hidden') return
-      polling = true
+  // 守卫（usePolling 内置）：in-flight 去重 + 页面不可见时不轮询。
+  usePolling({
+    intervalMs: 10000,
+    run: async () => {
       const id = active()?.id
-      Promise.all([
+      await Promise.all([
         loadSessions(),
         id ? loadDetail(id) : Promise.resolve(),
-      ]).finally(() => {
-        polling = false
-      })
-    }, 10000)
-    return () => clearInterval(timer)
+      ])
+    },
   })
 
   return (
