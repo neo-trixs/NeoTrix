@@ -2402,4 +2402,26 @@ mod tests {
             panic!("PRM must be configured");
         }
     }
+
+    #[test]
+    fn test_e8_state_json_roundtrip() {
+        let mut engine = ReasoningEngine::from_env();
+        engine.current_state = FullReasoningState::new(
+            ReasoningHexagram::new(42),
+            crate::core::nt_core_hex::MetaState::new(2),
+        );
+        engine.state_trajectory.push(FullReasoningState::new(
+            ReasoningHexagram::new(9),
+            crate::core::nt_core_hex::MetaState::new(1),
+        ));
+        let json = engine.e8_state_json().expect("serialize ok");
+        assert!(!json.is_empty());
+
+        let mut reloaded = ReasoningEngine::from_env();
+        reloaded.load_e8_state_json(&json).expect("deserialize ok");
+        assert_eq!(reloaded.current_state.mode.0, 42);
+        assert_eq!(reloaded.current_state.meta.0, 2);
+        assert_eq!(reloaded.state_trajectory.len(), 1);
+        assert_eq!(reloaded.state_trajectory[0].mode.0, 9);
+    }
 }
