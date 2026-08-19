@@ -1371,6 +1371,16 @@ impl ReasoningEngine {
     }
 
     pub fn save_e8_state(&self, path: &std::path::Path) -> Result<(), String> {
+        let json = self.e8_state_json()?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
+        }
+        std::fs::write(path, &json).map_err(|e| format!("write: {}", e))?;
+        Ok(())
+    }
+
+    /// Serialize E8 persisted state to JSON string (KB TEXT 列存储)。
+    pub fn e8_state_json(&self) -> Result<String, String> {
         let (e8_policy, prm_learning_count, prm_score_history) = self.prm.as_ref().map_or(
             (None, 0u64, Vec::new()),
             |prm| {
@@ -1388,19 +1398,20 @@ impl ReasoningEngine {
             prm_learning_count,
             prm_score_history,
         };
-        let json = serde_json::to_string_pretty(&state).map_err(|e| format!("serialize: {}", e))?;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
-        }
-        std::fs::write(path, &json).map_err(|e| format!("write: {}", e))?;
-        Ok(())
+        serde_json::to_string_pretty(&state).map_err(|e| format!("serialize: {}", e))
     }
+
     pub fn load_e8_state(&mut self, path: &std::path::Path) -> Result<(), String> {
         if !path.exists() {
             return Ok(());
         }
         let json = std::fs::read_to_string(path).map_err(|e| format!("read: {}", e))?;
-        let state: E8PersistedState = serde_json::from_str(&json).map_err(|e| format!("deserialize: {}", e))?;
+        self.load_e8_state_json(&json)
+    }
+
+    /// Deserialize E8 persisted state from JSON string (KB TEXT 列存储)。
+    pub fn load_e8_state_json(&mut self, json: &str) -> Result<(), String> {
+        let state: E8PersistedState = serde_json::from_str(json).map_err(|e| format!("deserialize: {}", e))?;
         self.current_state = FullReasoningState::new(
             ReasoningHexagram::new(state.current_mode.min(63)),
             crate::core::nt_core_hex::MetaState::new(state.current_meta),

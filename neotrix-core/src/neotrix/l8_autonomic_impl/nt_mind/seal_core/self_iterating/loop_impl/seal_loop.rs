@@ -922,10 +922,10 @@ impl SelfIteratingBrain {
 
     pub fn save_e8(&self) {
         if let Some(ref engine) = self.reasoning_engine {
-            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-            let path = std::path::PathBuf::from(&home).join(".neotrix").join("e8_state.json");
-            if let Err(e) = engine.save_e8_state(&path) {
-                eprintln!("[warn] 保存 E8 状态失败: {}", e);
+            if let Ok(json) = engine.e8_state_json() {
+                if let Err(e) = crate::core::nt_core_state::save("e8_state", &json) {
+                    eprintln!("[warn] 保存 E8 状态到 KB 失败: {}", e);
+                }
             }
             // Persist E8 transition matrix to KB for cross-session learning
             if let Some(ref kb) = engine.kb {
@@ -956,10 +956,8 @@ impl SelfIteratingBrain {
 
     pub fn load_e8(&mut self) {
         if let Some(ref mut engine) = self.reasoning_engine {
-            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-            let path = std::path::PathBuf::from(&home).join(".neotrix").join("e8_state.json");
-            if path.exists() {
-                if let Err(e) = engine.load_e8_state(&path) {
+            if let Some(json) = crate::core::nt_core_state::load("e8_state") {
+                if let Err(e) = engine.load_e8_state_json(&json) {
                     eprintln!("[warn] 加载 E8 状态失败: {}", e);
                 }
             }

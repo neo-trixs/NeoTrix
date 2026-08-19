@@ -165,14 +165,16 @@ fn walk_rs_files(dir: &Path) -> Vec<PathBuf> {
 
 fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
     let mut declared = HashSet::new();
-    let all_mods: Vec<PathBuf> = walk_rs_files(src)
-        .into_iter()
-        .filter(|p| p.file_name().and_then(|n| n.to_str()) == Some("mod.rs"))
-        .collect();
+    let all_rs = walk_rs_files(src);
 
-    for mod_rs in &all_mods {
-        let dir = mod_rs.parent().unwrap_or_else(|| Path::new("."));
-        if let Ok(content) = fs::read_to_string(mod_rs) {
+    for rs_file in &all_rs {
+        let rel = rs_file.to_string_lossy();
+        if rel.contains("target/") || rel.contains("/_archived/") {
+            continue;
+        }
+        let dir = rs_file.parent().unwrap_or_else(|| Path::new("."));
+        let is_mod_rs = rs_file.file_name().and_then(|n| n.to_str()) == Some("mod.rs");
+        if let Ok(content) = fs::read_to_string(rs_file) {
             for line in content.lines() {
                 let trimmed = line.trim();
                 if let Some(name) = trimmed
@@ -182,8 +184,15 @@ fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
                     .and_then(|s| s.strip_suffix(';'))
                 {
                     let name = name.trim();
-                    let rs = dir.join(format!("{}.rs", name));
-                    let sub = dir.join(name).join("mod.rs");
+                    // god-file 模式: 非 mod.rs 文件 (如 nt_core_prm.rs) 内部
+                    // `mod types;` 解析为 dir/nt_core_prm/types.rs (同辈目录)。
+                    let sub_dir = if is_mod_rs {
+                        dir.join(name)
+                    } else {
+                        dir.join(rs_file.file_stem().unwrap_or_default()).join(name)
+                    };
+                    let rs = sub_dir.with_extension("rs");
+                    let sub = sub_dir.join("mod.rs");
                     if rs.exists() {
                         declared.insert(rs);
                     }
