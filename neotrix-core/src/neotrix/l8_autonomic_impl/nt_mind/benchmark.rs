@@ -101,7 +101,7 @@ pub fn bench_plan_reasoning(iterations: usize) -> Vec<BenchPhase> {
         }
 
         {
-            let engine = build_full_engine();
+            let mut engine = build_full_engine();
             let start = Instant::now();
             let _plan = engine.plan_reasoning(prompt, 0);
             total_phase.record(start.elapsed());
@@ -165,7 +165,7 @@ mod tests {
 
         let mut phase = BenchPhase::new("plan_reasoning (compound)");
         for prompt in &compound_prompts {
-            let engine = build_full_engine();
+            let mut engine = build_full_engine();
             let start = Instant::now();
             let _plan = engine.plan_reasoning(prompt, 0);
             phase.record(start.elapsed());

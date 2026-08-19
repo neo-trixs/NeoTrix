@@ -188,8 +188,9 @@ impl ModalityRouter {
     /// 从检索工作流副产品 (query/retrieval/stopping traces) 派生训练信号:
     ///   - NIE-Stop: 停止采用的文档 = 软正例 (soft positive) → 该步奖励升高。
     ///   - NIE-Path: 路径上连续采用的文档 = 硬对比 (hard comparisons), 序约束 → 路径越长奖励累积。
-    /// 映射: path_steps = 该 modality 被连续采用次数 (retrieval path 长度);
-    ///         stopped = 是否因采纳该结果而停止 (stopping doc)。
+    ///
+    /// 映射: path_steps = 该 modality 被连续采用次数 (retrieval path 长度),
+    /// stopped = 是否因采纳该结果而停止 (stopping doc)。
     /// 奖励: 连续采用递增 (路径累积) + 停止采用加成 (软正例), 封顶 1.0。
     /// 返回值直接可喂给 reinforce() — trace 派生奖励, 零外部标注。
     pub fn trace_reward(path_steps: u32, stopped: bool) -> f64 {

@@ -1317,7 +1317,9 @@ impl ReasoningEngine {
     }
 
     pub fn reason_task(&mut self, task: &str) -> NeoTrixResult<String> { self.reason(task) }
-    pub fn plan_reasoning(&self, _task: &str, _mode: u8) -> String { String::new() }
+    pub fn plan_reasoning(&mut self, task: &str, _mode: u8) -> String {
+        self.reason_task(task).unwrap_or_default()
+    }
     pub fn with_jepa(mut self, jepa: JepaWorldModel) -> Self {
         self.jepa = Some(jepa);
         self
