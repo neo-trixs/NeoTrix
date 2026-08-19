@@ -1,4 +1,4 @@
-use crate::core::nt_io_cache::text_to_embedding;
+use crate::core::nt_core_cache::text_to_embedding;
 
 use super::super::provider_catalog::lookup_provider;
 use super::*;

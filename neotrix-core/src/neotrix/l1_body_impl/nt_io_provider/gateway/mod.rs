@@ -8,7 +8,7 @@ use super::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::rate_limiter::{AdaptivePacer, TieredSemaphore};
 use super::types::*;
 use crate::core::nt_core_error_recovery::{RecoveryConfig, RecoveryOrchestrator};
-use crate::core::nt_io_cache::{CacheConfig, SemanticCache};
+use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 
 #[cfg(test)]

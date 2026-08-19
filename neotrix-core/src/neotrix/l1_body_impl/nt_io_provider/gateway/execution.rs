@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::core::nt_core_error_recovery::{ErrorContext, ErrorType, RecoveryAction};
-use crate::core::nt_io_cache::text_to_embedding;
+use crate::core::nt_core_cache::text_to_embedding;
 use crate::core::nt_core_span::{SpanKind, Tracer};
 
 use super::super::account_pool::AccountPoolError;
