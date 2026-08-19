@@ -180,6 +180,46 @@ impl SessionRecoveryManager {
             .and_then(|s| serde_json::from_str::<SessionSnapshot>(&s).ok())
     }
 
+    /// 从最新快照构建有界交接摘要 (ai-memory 吸收, R-P79 接线)。
+    ///
+    /// ai-memory 核心概念: 会话结束时相关观察收敛为连贯摘要, 下一个 agent 接收
+    /// **有界 (bounded) 交接** — 而非重新解释架构/已失败方法/未决问题。
+    /// 这里把同样概念落地到 SessionRecoveryManager: 从最新快照提取高信号上下文,
+    /// 生成一条 ≤ HANDOFF_MAX_CHARS 的交接串, 供恢复/日志/后台循环注入下一会话。
+    pub fn build_handoff(&self) -> Option<String> {
+        const HANDOFF_MAX_CHARS: usize = 600;
+        let snap = self.load_latest_snapshot()?;
+        if snap.message_count == 0 && snap.active_topics.is_empty() && snap.plan_ids.is_empty() {
+            return None;
+        }
+        let mut parts: Vec<String> = Vec::new();
+        if !snap.active_topics.is_empty() {
+            let topics = snap.active_topics.join(", ");
+            parts.push(format!("topics: {}", topics));
+        }
+        if !snap.plan_ids.is_empty() {
+            parts.push(format!("open plans: {}", snap.plan_ids.len()));
+        }
+        if snap.bank_snapshot.trim().len() > 3 {
+            parts.push("state: has bank snapshot".to_string());
+        }
+        let body = parts.join(" | ");
+        if body.is_empty() {
+            return None;
+        }
+        let prefix = format!("[session-handoff {}] ", self.session_id);
+        if prefix.len() + body.len() <= HANDOFF_MAX_CHARS {
+            return Some(format!("{}{}", prefix, body));
+        }
+        // 超界截断到最近的 token 边界 (避免切断 UTF-8 序列)
+        let budget = HANDOFF_MAX_CHARS - prefix.len();
+        let mut idx = budget;
+        while idx > 0 && !body.is_char_boundary(idx) {
+            idx -= 1;
+        }
+        Some(format!("{}{}…", prefix, &body[..idx]))
+    }
+
     pub fn get_recovery_info(&self) -> RecoveryInfo {
         let path = self.snapshot_path("latest");
         let has_snapshot = path.exists();
@@ -252,5 +292,32 @@ mod tests {
         let mgr = SessionRecoveryManager::new("nonexistent")
             .with_auto_recover(false);
         assert!(mgr.load_latest_snapshot().is_none());
+    }
+
+    #[test]
+    fn test_build_handoff_from_snapshot() {
+        let mut mgr = SessionRecoveryManager::new("handoff-test")
+            .with_interval(1);
+        let snap = mgr.create_snapshot(
+            &[1, 2, 3],
+            &["rust".to_string(), "memory".to_string(), "absorption".to_string()],
+            "bank_ctx_xyz",
+        ).expect("create snapshot");
+        let handoff = mgr.build_handoff().expect("handoff built");
+        assert!(handoff.contains("handoff-test"), "session id in handoff");
+        assert!(handoff.contains("rust"), "active topic surfaced");
+        assert!(handoff.contains("absorption"));
+        assert!(handoff.contains("bank snapshot"), "bank state surfaced");
+        assert!(handoff.len() <= 700, "handoff is bounded, got {}", handoff.len());
+        // 快照轮数 > 0 → 交接非空
+        assert!(snap.created_at > 0);
+    }
+
+    #[test]
+    fn test_build_handoff_none_when_empty() {
+        // 无快照 → None (不产生空交接)
+        let mgr = SessionRecoveryManager::new("empty-handoff")
+            .with_auto_recover(false);
+        assert!(mgr.build_handoff().is_none());
     }
 }

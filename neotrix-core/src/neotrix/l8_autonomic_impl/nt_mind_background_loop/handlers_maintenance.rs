@@ -476,6 +476,11 @@ impl BackgroundLoopHandle {
             if let Ok(s) = snap {
                 log::info!("[bg] session_recovery: snapshot {} created", s.session_id);
             }
+            // ai-memory 吸收接线 (R-P79): 快照后构建有界交接摘要, 注入后续日志 —
+            // 跨会话连续性靠"有界交接"而非重新解释上下文 (bounded handoff)。
+            if let Some(handoff) = sr.build_handoff() {
+                log::info!("[bg] session_recovery handoff: {}", handoff);
+            }
         }
     }
 
