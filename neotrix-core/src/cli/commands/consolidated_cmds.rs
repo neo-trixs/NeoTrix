@@ -108,26 +108,41 @@ impl CliCommand for FileCmd {
                 let find = &rest[3];
                 let replace = rest.get(4).cloned();
                 let has_replace = replace.is_some();
-                let ttf = rest.get(5).map(|p| std::fs::read(p)).transpose();
-                match ttf {
-                    Err(e) => CommandOutput::err(&format!("读取字体失败: {e}")),
-                    Ok(ttf_bytes) => {
-                        let edit = crate::neotrix::PdfEdit {
-                            page,
-                            find: find.clone(),
-                            replace,
-                        };
-                        match crate::neotrix::edit_pdf(&src, &out, &[edit], ttf_bytes.as_deref()) {
-                            Ok(_) => {
-                                let mode = if has_replace { "替换" } else { "删除" };
-                                CommandOutput::ok(&format!(
-                                    "PDF {mode}完成: 页 {page} 文本 {find:?}\n输出: {}",
-                                    out.display()
-                                ))
-                            }
-                            Err(e) => CommandOutput::err(&format!("PDF 编辑失败: {e}")),
-                        }
+                // 非 Latin-1 替换需真实字体: 显式 font.ttf 优先, 否则自动探测系统字体。
+                let auto_needed = replace
+                    .as_deref()
+                    .is_some_and(|r| r.chars().any(|c| (c as u32) > 0xFF));
+                let ttf_bytes = if let Some(p) = rest.get(5) {
+                    match std::fs::read(p) {
+                        Ok(b) => Some(b),
+                        Err(e) => return CommandOutput::err(&format!("读取字体失败: {e}")),
                     }
+                } else if auto_needed {
+                    neotrix_types::core::file_parser::pdf::find_system_font_for_text(
+                        replace.as_deref().unwrap_or_default(),
+                    )
+                } else {
+                    None
+                };
+                if auto_needed && ttf_bytes.is_none() {
+                    return CommandOutput::err(&format!(
+                        "替换文本含非 Latin-1 字符但未找到支持的系统字体: {replace:?}。请显式提供 font.ttf"
+                    ));
+                }
+                let edit = crate::neotrix::PdfEdit {
+                    page,
+                    find: find.clone(),
+                    replace,
+                };
+                match crate::neotrix::edit_pdf(&src, &out, &[edit], ttf_bytes.as_deref()) {
+                    Ok(_) => {
+                        let mode = if has_replace { "替换" } else { "删除" };
+                        CommandOutput::ok(&format!(
+                            "PDF {mode}完成: 页 {page} 文本 {find:?}\n输出: {}",
+                            out.display()
+                        ))
+                    }
+                    Err(e) => CommandOutput::err(&format!("PDF 编辑失败: {e}")),
                 }
             }
             _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest, editpdf", sub)),

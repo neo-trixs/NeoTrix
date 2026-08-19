@@ -1153,28 +1153,11 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
     }
 }
 
-/// 查找覆盖给定文本全部字形的系统 TTF (西里尔等非 Latin-1 替换用)。
+/// 查找覆盖给定文本全部字形的系统 TTF (西里尔/中文等非 Latin-1 替换用)。
 /// 找不到返回 None — 调用方应提示用户, 而非静默降级。
+/// 实现下沉到 neotrix-types `find_system_font_for_text` (TTC 多 face + .notdef 过滤)。
 fn find_system_font_for(text: &str) -> Option<Vec<u8>> {
-    let candidates = [
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/System/Library/Fonts/Supplemental/Georgia.ttf",
-        "/System/Library/Fonts/Supplemental/Verdana.ttf",
-        "/System/Library/Fonts/Supplemental/Helvetica.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/TTF/DejaVuSans.ttf",
-        "C:\\Windows\\Fonts\\arial.ttf",
-    ];
-    for path in candidates {
-        let Ok(data) = std::fs::read(path) else { continue };
-        let Ok(face) = ttf_parser::Face::parse(&data, 0) else {
-            continue;
-        };
-        if text.chars().all(|c| face.glyph_index(c).is_some()) {
-            return Some(data);
-        }
-    }
-    None
+    neotrix_types::core::file_parser::pdf::find_system_font_for_text(text)
 }
 
 /// 进程内单例入口: 意识核心直接处理人类语言 (不依赖 CLI/MCP 子命令)。
