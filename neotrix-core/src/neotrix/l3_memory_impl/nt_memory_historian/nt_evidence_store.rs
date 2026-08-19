@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use super::nt_evidence_types::{
     era_center, haversine_km, BayesianLink, CalibrationResult, ConfidenceTier, ConflictResolution,
     ContradictionCategory, EvidenceCluster, EvidenceContradiction, EvidenceRecord, EvidenceStats,
-    EvidenceTableSnapshot,
+    EvidenceSufficiency, EvidenceTableSnapshot,
 };
 use super::nt_evidence_hypothesis::HypothesisNetwork;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::{KnowledgeBase, KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
@@ -130,6 +130,20 @@ impl EvidenceStore {
             })
             .collect();
         Ok(ev)
+    }
+
+    /// scansci-pi 证据优先: 列出所有证据不足的记录及充分性判定。
+    /// 生产路径 = 断言落地前先过此门, 不足则显式声明, 不静默产出。
+    pub fn list_insufficient_evidence(&self) -> Result<Vec<(EvidenceRecord, EvidenceSufficiency)>, String> {
+        let records = self.list_evidence()?;
+        let mut insufficient = Vec::new();
+        for r in &records {
+            let suff = r.sufficiency();
+            if !suff.is_sufficient() {
+                insufficient.push((r.clone(), suff));
+            }
+        }
+        Ok(insufficient)
     }
 
     pub fn delete_evidence(&self, id: &str) -> Result<(), String> {
@@ -547,6 +561,8 @@ impl EvidenceStore {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     fn new_store() -> super::EvidenceStore {
         let tmp = std::env::temp_dir().join(format!(
             "neotrix_evstore_{}_{}",
@@ -585,5 +601,80 @@ mod tests {
         assert_eq!(rec.category, "chain");
         assert!(rec.description.contains("run-42"), "run_id 应入 description");
         assert_eq!(rec.dating_methods.len(), 2, "tool_versions 桥接为 dating_methods");
+    }
+
+    #[test]
+    fn test_sufficiency_gate_explicit_declaration() {
+        // scansci-pi: 证据不足必须显式声明, 不静默产出置信度
+        let store = new_store();
+        // 完整证据 → Sufficient
+        let complete = super::EvidenceRecord {
+            id: "full".into(),
+            name: "Full".into(),
+            latitude: 0.0,
+            longitude: 0.0,
+            era: "3000".into(),
+            category: "cat".into(),
+            description: "desc".into(),
+            dating_methods: vec!["c14".into()],
+            context_clarity: 0.9,
+            publication_level: 0.9,
+            independent_replications: 2,
+            provenance_gap: 0.1,
+            anachronism_index: 0.0,
+            motivation_score: 0.0,
+            verification_gap: 0.1,
+            references: "src".into(),
+            connections: vec![],
+            created_at: "1".into(),
+            updated_at: "1".into(),
+        };
+        assert_eq!(complete.sufficiency(), EvidenceSufficiency::Sufficient);
+        store.store_evidence(&complete).expect("store complete");
+
+        // 缺口证据 → Insufficient with reasons
+        let gappy = super::EvidenceRecord {
+            id: "gappy".into(),
+            name: "Gappy".into(),
+            latitude: 0.0,
+            longitude: 0.0,
+            era: "3000".into(),
+            category: "cat".into(),
+            description: "desc".into(),
+            dating_methods: vec![],
+            context_clarity: 0.1,
+            publication_level: 0.1,
+            independent_replications: 0,
+            provenance_gap: 0.9,
+            anachronism_index: 0.0,
+            motivation_score: 0.0,
+            verification_gap: 0.9,
+            references: "".into(),
+            connections: vec![],
+            created_at: "2".into(),
+            updated_at: "2".into(),
+        };
+        let suff = gappy.sufficiency();
+        match &suff {
+            EvidenceSufficiency::Insufficient { reasons } => {
+                assert!(!reasons.is_empty(), "必须列出缺口原因");
+                assert!(reasons.iter().any(|r| r.contains("定年方法")));
+                assert!(reasons.iter().any(|r| r.contains("溯源缺口")));
+                assert!(reasons.iter().any(|r| r.contains("核验缺口")));
+                assert!(reasons.iter().any(|r| r.contains("独立复现")));
+                assert!(reasons.iter().any(|r| r.contains("置信度")));
+            }
+            EvidenceSufficiency::Sufficient => panic!("缺口证据不应判定 Sufficient"),
+        }
+        store.store_evidence(&gappy).expect("store gappy");
+
+        // 生产路径: list_insufficient_evidence 必须捞出 gappy 而排除 complete
+        let insufficient = store.list_insufficient_evidence().expect("list insufficient");
+        let ids: Vec<&str> = insufficient.iter().map(|(r, _)| r.id.as_str()).collect();
+        assert!(ids.contains(&"gappy"), "gappy 应被声明为证据不足");
+        assert!(!ids.contains(&"full"), "full 应判定证据充分");
+        for (r, suff) in &insufficient {
+            assert!(!suff.reasons().is_empty(), "{} 的缺口原因不能为空", r.id);
+        }
     }
 }

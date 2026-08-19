@@ -17,6 +17,7 @@ pub mod code_writer;
 pub mod edit_history;
 pub mod pattern_extractor;
 pub mod pipeline_autofixer;
+pub mod recipe_refactor;
 pub mod safe_applier;
 pub mod semantic_entropy;
 pub mod template_registry;
@@ -27,6 +28,7 @@ pub use code_writer::{CodeGenRequest, CodeGenResult, CodeContentEntropy, SelfCod
 pub use edit_history::EditHistoryTracker;
 pub use pattern_extractor::PatternExtractor;
 pub use pipeline_autofixer::PipelineAutoFixer;
+pub use recipe_refactor::{Recipe, RecipeError, RecipeRefactor, RecipeResult, RecipeStep, StepResult};
 pub use safe_applier::SafeCodeApplier;
 pub use semantic_entropy::{SemanticEntropy, SemanticEntropyGate, EntropyAction, EntropyRecord, EditContext, TrendDirection};
 pub use template_registry::{CodeTemplate, CodeTemplateRegistry, TemplateCategory};

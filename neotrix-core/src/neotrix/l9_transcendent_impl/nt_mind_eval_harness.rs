@@ -883,8 +883,9 @@ pub fn hda_attribution(tuned: f64, open: f64, guard: f64, delta: f64) -> HdaAttr
 //              约束满足(拒绝策略)。
 // ────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum VerificationChannel {
+    #[default]
     Deterministic,
     Extractable,
     Constraint,
@@ -946,6 +947,102 @@ pub fn verify_constraint(policy: &str, actual: &str, forbidden: &[&str]) -> Self
         verifiable: !actual.is_empty(),
         detail: format!("policy {} violated={}", policy, violated),
     }
+}
+
+// ────────────────────────────────────────────────────────────────
+// llm-as-a-verifier 吸收 (R-P79 代码级接线): 统一验证框架
+// "Any modality, Many Applications, One Unified Verification Framework"。
+// 提供模态无关的分派入口: 任意产出 (代码/JSON/策略约束/确定性答案) 经
+// 对应通道验证, 聚合为单一判定。与既有 verify_* 通道一致, 不建平行系统。
+// ────────────────────────────────────────────────────────────────
+
+/// 统一验证请求 — 模态无关的任意产出描述。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnifiedVerifyRequest {
+    /// 产出类型: "code" | "json" | "deterministic" | "policy"。
+    pub modality: String,
+    /// 模型产出 (待验证内容)。
+    pub actual: String,
+    /// 预期 (deterministic/code 通道用)。
+    pub expected: Option<String>,
+    /// 需从产出中可提取的锚点 (json/code 通道用)。
+    pub extractable: Option<String>,
+    /// 约束策略 + 禁止串 (policy 通道用)。
+    pub policy: Option<String>,
+    pub forbidden: Vec<String>,
+}
+
+/// 统一验证结果 — 单入口多通道聚合判定。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UnifiedVerifyResult {
+    pub channel: VerificationChannel,
+    pub score: f64,
+    pub verifiable: bool,
+    pub detail: String,
+}
+
+impl UnifiedVerifyResult {
+    /// 判定为通过: 可验证且满分。
+    pub fn passed(&self) -> bool {
+        self.verifiable && self.score >= 1.0
+    }
+}
+
+/// 统一验证入口: 按模态路由到对应验证通道, 聚合为单一判定。
+pub fn verify_unified(req: &UnifiedVerifyRequest) -> UnifiedVerifyResult {
+    match req.modality.as_str() {
+        "deterministic" => {
+            let r = verify_deterministic(
+                req.expected.as_deref().unwrap_or(""),
+                &req.actual,
+            );
+            UnifiedVerifyResult {
+                channel: r.channel,
+                score: r.score,
+                verifiable: r.verifiable,
+                detail: r.detail,
+            }
+        }
+        "json" | "code" => {
+            let r = verify_extractable(
+                req.extractable.as_deref().unwrap_or(""),
+                &req.actual,
+            );
+            UnifiedVerifyResult {
+                channel: r.channel,
+                score: r.score,
+                verifiable: r.verifiable && !req.actual.trim().is_empty(),
+                detail: r.detail,
+            }
+        }
+        "policy" => {
+            let r = verify_constraint(
+                req.policy.as_deref().unwrap_or("default"),
+                &req.actual,
+                &req.forbidden.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+            );
+            UnifiedVerifyResult {
+                channel: r.channel,
+                score: r.score,
+                verifiable: r.verifiable,
+                detail: r.detail,
+            }
+        }
+        other => UnifiedVerifyResult {
+            channel: VerificationChannel::Constraint,
+            score: 0.0,
+            verifiable: false,
+            detail: format!("unknown modality: {other}"),
+        },
+    }
+}
+
+/// 批量统一验证: 逐条分派并汇总 (全通过才算整体通过)。
+pub fn verify_unified_batch(requests: &[UnifiedVerifyRequest]) -> (Vec<UnifiedVerifyResult>, bool) {
+    let results: Vec<UnifiedVerifyResult> =
+        requests.iter().map(verify_unified).collect();
+    let all_passed = !results.is_empty() && results.iter().all(|r| r.passed());
+    (results, all_passed)
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -1077,6 +1174,29 @@ impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
         let c = verify_constraint("no-pii", "user@example.com", &["@example.com"]);
         if c.score != 0.0 {
             return Err(vec!["constraint channel should reject PII".into()]);
+        }
+        // 统一验证框架 (llm-as-a-verifier 吸收): 多模态分派入口行为健康
+        let d = verify_unified(&UnifiedVerifyRequest {
+            modality: "deterministic".into(),
+            actual: "42".into(),
+            expected: Some("42".into()),
+            extractable: None,
+            policy: None,
+            forbidden: vec![],
+        });
+        if !d.passed() {
+            return Err(vec!["unified deterministic channel failed".into()]);
+        }
+        let p = verify_unified(&UnifiedVerifyRequest {
+            modality: "policy".into(),
+            actual: "user@example.com".into(),
+            expected: None,
+            extractable: None,
+            policy: Some("no-pii".into()),
+            forbidden: vec!["@example.com".into()],
+        });
+        if p.score != 0.0 {
+            return Err(vec!["unified policy channel should reject PII".into()]);
         }
         Ok(())
     }
@@ -1632,6 +1752,94 @@ mod tests {
             rewards: vec![verify_constraint("c", "", &[])],
         };
         assert_eq!(empty.gated_total(), None);
+    }
+
+    // ── llm-as-a-verifier 统一验证框架 ──
+    #[test]
+    fn test_unified_verify_dispatches_by_modality() {
+        let d = verify_unified(&UnifiedVerifyRequest {
+            modality: "deterministic".into(),
+            actual: "42".into(),
+            expected: Some("42".into()),
+            extractable: None,
+            policy: None,
+            forbidden: vec![],
+        });
+        assert_eq!(d.channel, VerificationChannel::Deterministic);
+        assert!(d.passed());
+
+        let j = verify_unified(&UnifiedVerifyRequest {
+            modality: "json".into(),
+            actual: r#"{"answer": 42}"#.into(),
+            expected: None,
+            extractable: Some("answer".into()),
+            policy: None,
+            forbidden: vec![],
+        });
+        assert_eq!(j.channel, VerificationChannel::Extractable);
+        assert!(j.passed());
+
+        let p = verify_unified(&UnifiedVerifyRequest {
+            modality: "policy".into(),
+            actual: "user@example.com".into(),
+            expected: None,
+            extractable: None,
+            policy: Some("no-pii".into()),
+            forbidden: vec!["@example.com".into()],
+        });
+        assert_eq!(p.channel, VerificationChannel::Constraint);
+        assert_eq!(p.score, 0.0);
+        assert!(!p.passed());
+    }
+
+    #[test]
+    fn test_unified_verify_unknown_modality_and_batch() {
+        let bad = verify_unified(&UnifiedVerifyRequest {
+            modality: "audio".into(),
+            actual: "x".into(),
+            expected: None,
+            extractable: None,
+            policy: None,
+            forbidden: vec![],
+        });
+        assert!(!bad.verifiable);
+        assert_eq!(bad.score, 0.0);
+
+        let reqs = vec![
+            UnifiedVerifyRequest {
+                modality: "deterministic".into(),
+                actual: "ok".into(),
+                expected: Some("ok".into()),
+                extractable: None,
+                policy: None,
+                forbidden: vec![],
+            },
+            UnifiedVerifyRequest {
+                modality: "policy".into(),
+                actual: "clean".into(),
+                expected: None,
+                extractable: None,
+                policy: Some("p".into()),
+                forbidden: vec!["bad".into()],
+            },
+        ];
+        let (results, all) = verify_unified_batch(&reqs);
+        assert!(all, "所有通道通过 → 整体通过");
+        assert_eq!(results.len(), 2);
+
+        let failing = vec![
+            reqs[0].clone(),
+            UnifiedVerifyRequest {
+                modality: "policy".into(),
+                actual: "contains bad".into(),
+                expected: None,
+                extractable: None,
+                policy: Some("p".into()),
+                forbidden: vec!["bad".into()],
+            },
+        ];
+        let (_, all2) = verify_unified_batch(&failing);
+        assert!(!all2, "任一通道失败 → 整体失败");
     }
 
     #[test]

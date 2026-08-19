@@ -14,6 +14,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
+use serde::{Deserialize, Serialize};
+
 /// 账户健康状态。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AccountHealth {
@@ -373,6 +375,109 @@ impl AccountPool {
     }
 }
 
+/// BYOK 订阅条目 (dsh-plugin-subscriptions 吸收, R-P79 代码级接线)。
+///
+/// 用户已有 ChatGPT (Codex)/Claude/Grok (X Premium) 等订阅可直接作为 LLM provider 复用,
+/// 无需新建账户。每条订阅映射为一个可选择的账户, 汇入 AccountPool 健康/检疫/并发语义。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ByokSubscription {
+    /// 订阅名称, 如 "codex" / "claude-pro" / "grok-premium"。
+    pub name: String,
+    /// 订阅所属服务 (映射到 provider), 如 "openai" / "anthropic" / "xai"。
+    pub provider: String,
+    /// 复用的接入方式: "harness_subscription" (dsh 式: 借既有 CLI 订阅) 等。
+    pub kind: ByokKind,
+    /// 订阅配额上限 (并发)。
+    pub max_concurrent: usize,
+}
+
+/// BYOK 订阅接入方式。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ByokKind {
+    /// 借既有 harness/CLI 订阅 (Codex/Claude Code/Grok), 走本地凭证直连。
+    HarnessSubscription,
+    /// 自带 API 密钥, 但走订阅计费档位 (复用订阅配额而非独立计费)。
+    KeyOnSubscriptionPlan,
+}
+
+impl ByokSubscription {
+    /// 在给定 AccountPool 注册该订阅为可用账户 (R-P42: 汇入既有池, 不建平行系统)。
+    pub fn register_into(&self, pool: &AccountPool) {
+        pool.register(&self.provider, &self.name, self.max_concurrent);
+    }
+}
+
+/// BYOK 订阅池 — 管理用户已有订阅的注册/查询/健康聚合。
+#[derive(Debug, Default)]
+pub struct ByokPool {
+    subs: Arc<RwLock<HashMap<String, ByokSubscription>>>,
+}
+
+impl ByokPool {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 注册一条订阅 (覆盖同名)。
+    pub fn register(&self, sub: ByokSubscription) {
+        if let Ok(mut m) = self.subs.write() {
+            m.insert(sub.name.clone(), sub);
+        }
+    }
+
+    /// 移除订阅。
+    pub fn unregister(&self, name: &str) -> bool {
+        self.subs
+            .write()
+            .map(|mut m| m.remove(name).is_some())
+            .unwrap_or(false)
+    }
+
+    pub fn get(&self, name: &str) -> Option<ByokSubscription> {
+        self.subs
+            .read()
+            .ok()
+            .and_then(|m| m.get(name).cloned())
+    }
+
+    pub fn all(&self) -> Vec<ByokSubscription> {
+        self.subs
+            .read()
+            .map(|m| m.values().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn len(&self) -> usize {
+        self.subs
+            .read()
+            .map(|m| m.len())
+            .unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// 全部订阅灌入 AccountPool 作为可用账户。
+    pub fn register_all_into(&self, pool: &AccountPool) -> usize {
+        let subs = self.all();
+        let mut n = 0;
+        for sub in &subs {
+            sub.register_into(pool);
+            n += 1;
+        }
+        n
+    }
+
+    /// 按 provider 过滤订阅。
+    pub fn for_provider(&self, provider: &str) -> Vec<ByokSubscription> {
+        self.all()
+            .into_iter()
+            .filter(|s| s.provider == provider)
+            .collect()
+    }
+}
+
 impl Default for AccountPool {
     fn default() -> Self {
         Self::new(AccountPoolConfig::default())
@@ -585,5 +690,51 @@ mod tests {
 
         drop(l1);
         drop(l2);
+    }
+
+    // BYOK 订阅池 (dsh-plugin-subscriptions 吸收): 注册 → 汇入 AccountPool → 可选租约
+    #[test]
+    fn byok_subscription_registers_into_account_pool() {
+        let pool = AccountPool::new(test_config());
+        let byok = ByokPool::new();
+
+        byok.register(ByokSubscription {
+            name: "codex".to_string(),
+            provider: "openai".to_string(),
+            kind: ByokKind::HarnessSubscription,
+            max_concurrent: 2,
+        });
+        byok.register(ByokSubscription {
+            name: "grok-premium".to_string(),
+            provider: "xai".to_string(),
+            kind: ByokKind::KeyOnSubscriptionPlan,
+            max_concurrent: 3,
+        });
+
+        assert_eq!(byok.len(), 2);
+        assert_eq!(byok.for_provider("xai").len(), 1);
+
+        let registered = byok.register_all_into(&pool);
+        assert_eq!(registered, 2);
+        assert_eq!(pool.total_accounts(), 2);
+
+        let lease = pool.select("openai").expect("codex subscription usable");
+        assert_eq!(lease.account_name(), "codex");
+        assert_eq!(pool.healthy_count("xai"), 1);
+    }
+
+    #[test]
+    fn byok_subscription_unregister_and_query() {
+        let byok = ByokPool::new();
+        byok.register(ByokSubscription {
+            name: "claude-pro".to_string(),
+            provider: "anthropic".to_string(),
+            kind: ByokKind::HarnessSubscription,
+            max_concurrent: 1,
+        });
+        assert!(byok.get("claude-pro").is_some());
+        assert!(byok.unregister("claude-pro"));
+        assert!(byok.get("claude-pro").is_none());
+        assert!(byok.is_empty());
     }
 }

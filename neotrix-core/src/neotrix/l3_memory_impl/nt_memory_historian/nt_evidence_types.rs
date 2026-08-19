@@ -9,6 +9,29 @@ pub enum ConfidenceTier {
     T5,
 }
 
+/// scansci-pi 证据优先门 — 证据不足时显式声明, 而非静默产出置信度。
+/// 每个声明必须能追溯其依据 (reasons), 无依据即不通过 (不编造)。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum EvidenceSufficiency {
+    /// 证据充分, 可作断言依据
+    Sufficient,
+    /// 证据不足, 显式声明并列出缺口
+    Insufficient { reasons: Vec<String> },
+}
+
+impl EvidenceSufficiency {
+    pub fn is_sufficient(&self) -> bool {
+        matches!(self, EvidenceSufficiency::Sufficient)
+    }
+
+    pub fn reasons(&self) -> &[String] {
+        match self {
+            EvidenceSufficiency::Sufficient => &[],
+            EvidenceSufficiency::Insufficient { reasons } => reasons,
+        }
+    }
+}
+
 impl ConfidenceTier {
     pub fn label(&self) -> &str {
         match self {
@@ -153,6 +176,32 @@ impl EvidenceRecord {
 
     pub fn tier(&self) -> ConfidenceTier {
         ConfidenceTier::from_score(self.effective_confidence(), self.forgery_risk().total())
+    }
+
+    /// scansci-pi 证据优先门: 显式判断证据是否足以支撑断言。
+    /// 证据不足时必须返回 Insufficient 并列出缺口 (不编造、不静默通过)。
+    pub fn sufficiency(&self) -> EvidenceSufficiency {
+        let mut reasons: Vec<String> = Vec::new();
+        if self.dating_methods.is_empty() {
+            reasons.push("无任何定年方法 (dating_methods empty)".into());
+        }
+        if self.provenance_gap > 0.7 {
+            reasons.push(format!("溯源缺口过大 (provenance_gap={:.2})", self.provenance_gap));
+        }
+        if self.verification_gap > 0.7 {
+            reasons.push(format!("核验缺口过大 (verification_gap={:.2})", self.verification_gap));
+        }
+        if self.independent_replications == 0 {
+            reasons.push("无独立复现 (independent_replications=0)".into());
+        }
+        if self.effective_confidence() < 0.35 {
+            reasons.push(format!("有效置信度过低 (effective_confidence={:.2})", self.effective_confidence()));
+        }
+        if reasons.is_empty() {
+            EvidenceSufficiency::Sufficient
+        } else {
+            EvidenceSufficiency::Insufficient { reasons }
+        }
     }
 }
 

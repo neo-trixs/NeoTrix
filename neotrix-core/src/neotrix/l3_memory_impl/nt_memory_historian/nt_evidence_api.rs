@@ -188,7 +188,16 @@ async fn get_handler(
         Ok(store) => match store.get_evidence(&id) {
             Ok(Some(record)) => {
                 let tier = record.tier();
-                json_ok(json!({"found": true, "record": record, "tier": tier.label(), "tier_color": tier.color()}))
+                let suff = record.sufficiency();
+                json_ok(json!({
+                    "found": true,
+                    "record": record,
+                    "tier": tier.label(),
+                    "tier_color": tier.color(),
+                    // scansci-pi 证据优先门: 显式声明证据充分性, 不静默置信度
+                    "sufficient_evidence": suff.is_sufficient(),
+                    "insufficient_reasons": suff.reasons(),
+                }))
             }
             Ok(None) => json_ok(json!({"found": false})),
             Err(e) => json_ok(json!({"error": e})),
