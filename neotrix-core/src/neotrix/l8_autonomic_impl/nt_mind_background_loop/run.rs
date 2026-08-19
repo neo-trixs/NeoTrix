@@ -761,13 +761,28 @@ cognitive_load: self.cognitive_load.take(),
         // Startup: restore emotion state from KB (deferred 5s, then skips)
         spawn_handler!(5, |h| {
             if !h.emotion_restored.load(std::sync::atomic::Ordering::Relaxed) {
-                if let Some(kb) = &h.kb {
-                    if let Ok(Some(json)) = kb.kv_get("emotion", "engine_state") {
-                        if let Ok(engine) = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json) {
-                            if let Some(ref mut cr) = h.consciousness_runtime {
-                                cr.set_emotion_engine(engine);
-                                log::info!("[bg] emotion state restored from KB");
-                            }
+                // 先把两个持久化 JSON 读成 owned 值, 释放对 kb 的借用, 再改 runtime。
+                let engine_json = h.kb.as_ref()
+                    .and_then(|kb| kb.kv_get("emotion", "engine_state").ok().flatten());
+                let affective_json = h.kb.as_ref()
+                    .and_then(|kb| kb.kv_get("emotion", "affective_interface").ok().flatten());
+                if let Some(json) = engine_json {
+                    if let Ok(engine) = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json) {
+                        if let Some(ref mut cr) = h.consciousness_runtime {
+                            cr.set_emotion_engine(engine);
+                            log::info!("[bg] emotion state restored from KB");
+                        }
+                    }
+                }
+                if let Some(json) = affective_json {
+                    if let Ok(iface) = crate::core::nt_core_self::affective_interface::AffectiveInterface::from_json(&json) {
+                        if let Some(ref mut cr) = h.consciousness_runtime {
+                            // 恢复人类情感交互界面 (关系阶段 + 用户情感历史)。
+                            // 恢复后把持久化的用户情感吸收进意识 (意识影响闭环)。
+                            *cr.affective_mut() = iface;
+                            let snap = cr.affective().user.snapshot();
+                            cr.observe_user_affect(&snap);
+                            log::info!("[bg] affective interface restored from KB");
                         }
                     }
                 }

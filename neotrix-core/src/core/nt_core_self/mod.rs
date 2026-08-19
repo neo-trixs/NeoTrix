@@ -1,3 +1,4 @@
+pub mod affective_interface;
 pub mod archive;
 pub mod attention_head;
 pub mod context_window;
@@ -16,11 +17,18 @@ pub mod skill_crystal;
 pub mod system_identity;
 pub mod thinking_trace;
 
+pub use affective_interface::{
+    au_to_emotion, AffectiveInterface, AffectiveReadout, EmpathyConfig, EmpathyStrategy, GuideMode,
+    RelationshipConfig, RelationshipStage, RelationshipState, ResponseIntent, RhythmProfile,
+    UserAffectConfig, UserAffectModel, UserAffectSnapshot, UserEmotion, VisualAffect,
+    VisualAffectSource,
+};
 pub use archive::{AttentionSnapshot, SiliconArchive, SiliconSnapshot};
 pub use attention_head::{AttentionDomain, AttentionHead, AttentionManager, AttentionProfile};
 pub use context_window::{CognitiveUnit, CognitiveUnitKind, ContextWindow};
 pub use emotion_state::{
-    EmotionConfig, EmotionDimension, EmotionEngine, EmotionObservation, EmotionReport, EmotionState,
+    EmotionConfig, EmotionDimension, EmotionEngine, EmotionLabel, EmotionObservation, EmotionReport,
+    EmotionState,
 };
 pub use evolution_analysis::{
     analyze_kb_health, print_report, record_meta_cognition_defect, store_report_to_kb, KbDefect,

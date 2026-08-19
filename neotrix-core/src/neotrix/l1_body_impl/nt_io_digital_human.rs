@@ -1,6 +1,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
+use crate::core::nt_core_self::affective_interface::{
+    AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Emotion {
     Neutral,
@@ -23,6 +27,19 @@ impl Emotion {
             Emotion::Confused => "tilt",
             Emotion::Thinking => "look_up",
         }
+    }
+}
+
+/// 情绪微表情键 → 数字人 Emotion 枚举 (桥接 affective 表情键与动画枚举)。
+fn emotion_from_expression(expression: &str) -> Emotion {
+    match expression {
+        "smile" => Emotion::Happy,
+        "frown" => Emotion::Sad,
+        "fury" => Emotion::Angry,
+        "shock" => Emotion::Surprised,
+        "tilt" => Emotion::Confused,
+        "look_up" => Emotion::Thinking,
+        _ => Emotion::Neutral,
     }
 }
 
@@ -62,6 +79,7 @@ pub struct TtsConfig {
     pub voice: String,
     pub speed: f64,
     pub pitch: f64,
+    pub energy: f64,
     pub emotion: Emotion,
 }
 
@@ -72,6 +90,7 @@ impl Default for TtsConfig {
             voice: "zh-CN-XiaoxiaoNeural".into(),
             speed: 1.0,
             pitch: 1.0,
+            energy: 0.5,
             emotion: Emotion::Neutral,
         }
     }
@@ -234,6 +253,8 @@ pub struct DigitalHumanPipeline {
     pub tts_config: TtsConfig,
     pub emotion: EmotionEngine,
     pub avatar: AvatarController,
+    /// 人类情感交互界面 — 感知用户情绪/关系阶段/共情策略, 驱动表情/韵律/回复意图。
+    pub affective: AffectiveInterface,
     session_active: bool,
     session_start: Option<Instant>,
     utterance_count: u64,
@@ -247,6 +268,7 @@ impl DigitalHumanPipeline {
             tts_config: TtsConfig::default(),
             emotion: EmotionEngine::new(),
             avatar: AvatarController::new(),
+            affective: AffectiveInterface::new(),
             session_active: false,
             session_start: None,
             utterance_count: 0,
@@ -269,14 +291,23 @@ impl DigitalHumanPipeline {
 
     pub fn process_audio_input(&mut self, text: &str) -> PipelineResponse {
         self.utterance_count += 1;
-        let emotion = self.emotion.detect_from_text(text);
+        // Legacy keyword engine kept for session_stats backward compat.
+        self.emotion.detect_from_text(text);
+        // Affective interface drives expression/rhythm/reply intent (mirror-then-guide).
+        let readout = self
+            .affective
+            .process_user_input(text, None, GuideMode::Auto);
+        let emotion = emotion_from_expression(&readout.expression);
         self.avatar.set_emotion(emotion);
-        let reply = self.generate_reply(text);
         self.tts_config.emotion = emotion;
+        self.tts_config.speed = readout.rhythm.voice_rate;
+        self.tts_config.pitch = readout.rhythm.voice_pitch;
+        self.tts_config.energy = readout.rhythm.voice_energy;
+        let reply = self.reply_affective(text, &readout);
         PipelineResponse {
             reply: reply.clone(),
             emotion,
-            animation: emotion.animation_key().to_string(),
+            animation: readout.expression.clone(),
             asr_confidence: 0.92,
             tts_text: reply,
             session_duration: self.session_start.map(|s| s.elapsed()).unwrap_or(Duration::ZERO),
@@ -294,6 +325,33 @@ impl DigitalHumanPipeline {
             }
         }
         format!("I heard: '{}'. Let me think about that...", input)
+    }
+
+    /// 情感化回复: backchannel + 意图模板 + 开放式追问 (共情对话实证)。
+    fn reply_affective(&self, input: &str, readout: &AffectiveReadout) -> String {
+        let mut out = String::new();
+        if let Some(bc) = &readout.backchannel {
+            out.push_str(bc);
+            out.push(' ');
+        }
+        out.push_str(&self.intent_template(input, readout));
+        if let Some(fq) = &readout.followup_question {
+            out.push(' ');
+            out.push_str(fq);
+        }
+        out
+    }
+
+    fn intent_template(&self, input: &str, readout: &AffectiveReadout) -> String {
+        match readout.intent {
+            ResponseIntent::Sympathizing => "我理解这让你很难受。谢谢你和我说这些。".to_string(),
+            ResponseIntent::Consoling => "别担心，我会在这里陪着你。".to_string(),
+            ResponseIntent::Acknowledging => "我听到了，这确实不容易。".to_string(),
+            ResponseIntent::Encouraging => "这真的很棒，为你开心！".to_string(),
+            ResponseIntent::Questioning => format!("嗯，我听到了：'{}'。", input),
+            ResponseIntent::Agreeing => "没错，我也这么觉得。".to_string(),
+            _ => self.generate_reply(input),
+        }
     }
 
     pub fn process_asr_result(&self, result: &AsrResult) -> String {
@@ -416,5 +474,40 @@ mod tests {
         let stats = pipeline.session_stats();
         assert!(stats.active);
         assert_eq!(stats.utterance_count, 1);
+    }
+
+    #[test]
+    fn test_affective_drives_expression_rhythm() {
+        let mut pipeline = DigitalHumanPipeline::new(PersonaConfig::default());
+        pipeline.start_session();
+        let resp = pipeline.process_audio_input("我很难过，真的很难受");
+        assert_eq!(resp.emotion, Emotion::Sad);
+        assert_eq!(resp.animation, "frown");
+        assert!(pipeline.tts_config.speed < 1.0, "sad → slower rate");
+        assert!(resp.reply.contains("我在听"));
+        assert_eq!(pipeline.affective.relationship.interactions, 1);
+    }
+
+    #[test]
+    fn test_affective_encouragement_reply() {
+        let mut pipeline = DigitalHumanPipeline::new(PersonaConfig::default());
+        let resp = pipeline.process_audio_input("太开心了，终于成功了");
+        assert_eq!(resp.emotion, Emotion::Happy);
+        assert_eq!(resp.animation, "smile");
+        assert!(resp.reply.contains("开心"));
+        assert!(pipeline.tts_config.energy >= 0.5);
+    }
+
+    #[test]
+    fn test_emotion_from_expression() {
+        assert_eq!(emotion_from_expression("fury"), Emotion::Angry);
+        assert_eq!(emotion_from_expression("idle"), Emotion::Neutral);
+        assert_eq!(emotion_from_expression("look_up"), Emotion::Thinking);
+    }
+
+    #[test]
+    fn test_tts_energy_field() {
+        let cfg = TtsConfig::default();
+        assert!((cfg.energy - 0.5).abs() < 1e-9);
     }
 }

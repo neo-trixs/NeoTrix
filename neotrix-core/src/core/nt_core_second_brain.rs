@@ -115,6 +115,16 @@ impl SecondBrain {
         }
     }
 
+    /// 持久化人类情感交互界面 (用户情感模型 + 关系阶段 + 共情策略),
+    /// 供后台循环恢复跨 session 连续性 (R-P36: KB 持久化 → handler 消费)。
+    pub fn save_affective(&self, interface: &crate::core::nt_core_self::affective_interface::AffectiveInterface) {
+        if let Some(kb) = self.kb.as_ref() {
+            if let Ok(json) = interface.to_json() {
+                let _ = kb.kv_set("emotion", "affective_interface", &json);
+            }
+        }
+    }
+
     fn save_emotion(&self, kb: &KnowledgeBase, engine: &EmotionEngine) {
         if let Ok(json) = engine.to_json() {
             let _ = kb.kv_set("emotion", "engine_state", &json);

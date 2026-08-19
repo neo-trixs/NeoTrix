@@ -10,6 +10,12 @@
 
 pub use crate::core::nt_core_self as self_model;
 
+pub use crate::core::nt_core_self::affective_interface::{
+    au_to_emotion, AffectiveInterface, AffectiveReadout, EmpathyConfig, EmpathyStrategy, GuideMode,
+    RelationshipConfig, RelationshipStage, RelationshipState, ResponseIntent, RhythmProfile,
+    UserAffectConfig, UserAffectModel, UserAffectSnapshot, UserEmotion, VisualAffect,
+    VisualAffectSource,
+};
 pub use crate::core::nt_core_self::archive::{AttentionSnapshot, SiliconArchive, SiliconSnapshot};
 pub use crate::core::nt_core_self::attention_head::{
     AttentionDomain, AttentionHead, AttentionManager, AttentionProfile,
@@ -18,7 +24,8 @@ pub use crate::core::nt_core_self::context_window::{
     CognitiveUnit, CognitiveUnitKind, ContextWindow,
 };
 pub use crate::core::nt_core_self::emotion_state::{
-    EmotionConfig, EmotionDimension, EmotionEngine, EmotionObservation, EmotionReport, EmotionState,
+    EmotionConfig, EmotionDimension, EmotionEngine, EmotionLabel, EmotionObservation, EmotionReport,
+    EmotionState,
 };
 pub use crate::core::nt_core_self::intrinsic_motivation::{IntrinsicMotivation, MotivationState};
 pub use crate::core::nt_core_self::metacognitive_evaluator::{

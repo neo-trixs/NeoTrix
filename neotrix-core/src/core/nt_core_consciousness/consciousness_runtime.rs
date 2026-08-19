@@ -9,6 +9,9 @@ use super::specious_present::SpeciousPresent;
 use super::stream_buffer::ConsciousnessStream;
 use super::volition::{ActionCandidate, VolitionEngine};
 use super::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
+use crate::core::nt_core_self::affective_interface::{
+    AffectiveInterface, UserAffectSnapshot, UserEmotion,
+};
 use crate::core::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
@@ -51,6 +54,9 @@ pub struct ConsciousnessRuntime {
     pub volition: VolitionEngine,
     pub critic: InnerCritic,
     pub emotion_engine: EmotionEngine,
+    /// 人类情感交互界面 — 感知用户情绪/关系阶段/共情策略, 供数字人前端消费;
+    /// 由 Second Brain 经 KB 持久化跨 session 恢复。
+    pub affective: AffectiveInterface,
     /// 知识库句柄 — 意识核心主动查询记忆/知识，而非仅被动接收共振字符串。
     pub kb: Option<std::sync::Arc<KnowledgeBase>>,
     /// 最近一次 tick 从 KB 注入的意识条目 (title, score)。
@@ -71,6 +77,7 @@ impl ConsciousnessRuntime {
             volition: VolitionEngine::new(),
             critic: InnerCritic::new(),
             emotion_engine: EmotionEngine::default(),
+            affective: AffectiveInterface::new(),
             kb: None,
             last_kb_injections: Vec::new(),
             kb_cache: KbQueryCache::new(),
@@ -213,6 +220,54 @@ impl ConsciousnessRuntime {
 
     pub fn set_emotion_engine(&mut self, engine: EmotionEngine) {
         self.emotion_engine = engine;
+    }
+
+    /// 意识影响: 将用户情感快照经 OCC 事件评估映射为自身六维情绪变化 —
+    /// 用户情绪经由意识核心转化为代理自己的情绪基调, 使代理"感受"到对话对象。
+    pub fn observe_user_affect(&mut self, affect: &UserAffectSnapshot) {
+        let novelty = affect.arousal;
+        let goal_conduciveness = affect.valence;
+        let coping = affect.dominance;
+        self.emotion_engine
+            .observe_appraisal(novelty, goal_conduciveness, coping, "user_affect");
+        match affect.emotion {
+            UserEmotion::Joy | UserEmotion::Trust | UserEmotion::Anticipation => {
+                self.emotion_engine
+                    .observe(EmotionDimension::Joy, 0.6 + 0.4 * affect.valence, "user_affect");
+            }
+            UserEmotion::Sadness | UserEmotion::Fear => {
+                self.emotion_engine.observe(
+                    EmotionDimension::Fatigue,
+                    0.4 + 0.5 * (1.0 - affect.valence),
+                    "user_affect",
+                );
+                self.emotion_engine.observe(
+                    EmotionDimension::Urgency,
+                    0.4 + 0.4 * affect.arousal,
+                    "user_affect",
+                );
+            }
+            UserEmotion::Anger | UserEmotion::Disgust => {
+                self.emotion_engine.observe(
+                    EmotionDimension::Frustration,
+                    0.5 + 0.4 * affect.arousal,
+                    "user_affect",
+                );
+            }
+            UserEmotion::Surprise => {
+                self.emotion_engine
+                    .observe(EmotionDimension::Curiosity, 0.7, "user_affect");
+            }
+            UserEmotion::Neutral => {}
+        }
+    }
+
+    pub fn affective(&self) -> &AffectiveInterface {
+        &self.affective
+    }
+
+    pub fn affective_mut(&mut self) -> &mut AffectiveInterface {
+        &mut self.affective
     }
 
     /// Advance one consciousness tick.
@@ -456,5 +511,33 @@ mod tests {
         cr2.awaken();
         let _ = cr2.tick("cache probe resonance content for cache test");
         assert!(cr2.last_kb_injections.is_empty());
+    }
+
+    #[test]
+    fn test_observe_user_affect_maps_to_engine() {
+        use crate::core::nt_core_self::affective_interface::UserAffectModel;
+        let mut cr = ConsciousnessRuntime::new();
+        let mut model = UserAffectModel::default();
+        let snap = model.detect_from_text("我很难过", None);
+        cr.observe_user_affect(&snap);
+        let report = cr.emotion_engine.report();
+        // 意识影响: 用户负价 → 代理情绪转向低 valence + 疲劳上升 (困扰态)。
+        assert!(report.valence < 0.5, "valence={}", report.valence);
+        assert!(report.fatigue > 0.5);
+        let mut model2 = UserAffectModel::default();
+        let snap2 = model2.detect_from_text("太开心了", None);
+        cr.observe_user_affect(&snap2);
+        let report2 = cr.emotion_engine.report();
+        assert!(report2.joy > 0.5);
+        assert_eq!(cr.affective().user.history.len(), 0);
+    }
+
+    #[test]
+    fn test_affective_interface_exposed() {
+        let cr = ConsciousnessRuntime::new();
+        assert_eq!(cr.affective().relationship.interactions, 0);
+        let mut cr2 = ConsciousnessRuntime::new();
+        cr2.affective_mut().relationship.on_turn(true, 0.5, 0.8);
+        assert_eq!(cr2.affective().relationship.interactions, 1);
     }
 }

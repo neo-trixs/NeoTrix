@@ -1198,6 +1198,8 @@ mod tests {
                 0.5,
             ),
             observation_count: 0,
+            dominance: 0.5,
+            emotion_label: crate::core::nt_core_self::emotion_state::EmotionLabel::Neutral,
         };
         grown.apply_emotion_report(report);
         assert!(

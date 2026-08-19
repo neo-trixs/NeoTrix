@@ -1129,6 +1129,9 @@ impl BackgroundLoopHandle {
                 // Persist emotion state to KB every tick (600s)
                 let engine = cr.emotion_engine();
                 sb.save_emotion_raw(engine);
+                // Persist human affective interface (user emotion + relationship) for
+                // cross-session continuity — restored by the 5s startup handler.
+                sb.save_affective(cr.affective());
             } else {
                 sb.tick(None, None);
             }

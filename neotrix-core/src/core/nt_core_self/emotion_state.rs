@@ -12,6 +12,36 @@ pub enum EmotionDimension {
     Fatigue,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum EmotionLabel {
+    #[default]
+    Neutral,
+    Joy,
+    Sadness,
+    Anger,
+    Fear,
+    Trust,
+    Disgust,
+    Surprise,
+    Anticipation,
+}
+
+impl EmotionLabel {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Neutral => "neutral",
+            Self::Joy => "joy",
+            Self::Sadness => "sadness",
+            Self::Anger => "anger",
+            Self::Fear => "fear",
+            Self::Trust => "trust",
+            Self::Disgust => "disgust",
+            Self::Surprise => "surprise",
+            Self::Anticipation => "anticipation",
+        }
+    }
+}
+
 impl EmotionDimension {
     pub fn all() -> [EmotionDimension; 6] {
         use EmotionDimension::*;
@@ -104,6 +134,69 @@ impl EmotionState {
             + 0.5
     }
 
+    /// PAD 第三轴支配感 — confidence + urgency 对 frustration 的净余量。
+    /// 用于区分恐惧(低支配)与愤怒(高支配)两个同高唤醒、同负价的情绪。
+    pub fn dominance(&self) -> f64 {
+        ((self.get(EmotionDimension::Confidence) + self.get(EmotionDimension::Urgency)
+            - self.get(EmotionDimension::Frustration)
+            - 0.5)
+            / 2.0
+            + 0.5)
+            .max(0.0)
+            .min(1.0)
+    }
+
+    /// 从 (valence, arousal, dominance) 映射为 Plutchik 8 主情绪标签。
+    pub fn label(&self) -> EmotionLabel {
+        let v = self.valence();
+        let a = self.arousal();
+        let d = self.dominance();
+        if v < 0.45 {
+            if a >= 0.55 {
+                if d >= 0.55 {
+                    EmotionLabel::Anger
+                } else {
+                    EmotionLabel::Fear
+                }
+            } else if d >= 0.55 {
+                EmotionLabel::Disgust
+            } else {
+                EmotionLabel::Sadness
+            }
+        } else if v > 0.6 {
+            if a >= 0.55 {
+                EmotionLabel::Joy
+            } else {
+                EmotionLabel::Trust
+            }
+        } else if a >= 0.65 {
+            EmotionLabel::Surprise
+        } else if a <= 0.35 {
+            EmotionLabel::Neutral
+        } else {
+            EmotionLabel::Anticipation
+        }
+    }
+
+    /// OCC 事件评估: novelty/goal_conduciveness/coping 三评估变量驱动情绪位移。
+    /// 高新颖 → 好奇升; 目标受阻 → 挫败升自信降; 高应对 → 自信升急迫降。
+    pub fn observe_appraisal(&mut self, novelty: f64, goal_conduciveness: f64, coping: f64) {
+        let novelty = novelty.max(0.0).min(1.0);
+        let gc = goal_conduciveness.max(0.0).min(1.0);
+        let coping = coping.max(0.0).min(1.0);
+        if novelty >= 0.6 {
+            self.update(EmotionDimension::Curiosity, novelty);
+        }
+        if gc < 0.4 {
+            self.update(EmotionDimension::Frustration, 1.0 - gc);
+            self.update(EmotionDimension::Confidence, gc);
+        }
+        if coping >= 0.6 {
+            self.update(EmotionDimension::Confidence, coping);
+            self.update(EmotionDimension::Urgency, 1.0 - coping);
+        }
+    }
+
     pub fn confidence_score(&self) -> f64 {
         (0.3 * self.get(EmotionDimension::Confidence)
             + 0.2 * self.get(EmotionDimension::Joy)
@@ -143,6 +236,10 @@ pub struct EmotionReport {
     pub confidence_score: f64,
     pub dominant: (EmotionDimension, f64),
     pub observation_count: usize,
+    #[serde(default)]
+    pub dominance: f64,
+    #[serde(default)]
+    pub emotion_label: EmotionLabel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -179,6 +276,28 @@ impl EmotionEngine {
         self.history.push_back(obs);
     }
 
+    /// OCC 事件评估观察: 以 (novelty, goal_conduciveness, coping) 驱动情绪位移,
+    /// 记录一条触发历史。
+    pub fn observe_appraisal(
+        &mut self,
+        novelty: f64,
+        goal_conduciveness: f64,
+        coping: f64,
+        trigger: impl Into<String>,
+    ) {
+        self.state.observe_appraisal(novelty, goal_conduciveness, coping);
+        let obs = EmotionObservation {
+            dimension: EmotionDimension::Curiosity,
+            value: novelty.max(0.0).min(1.0),
+            trigger: trigger.into(),
+            timestamp: 0,
+        };
+        if self.history.len() >= self.config.max_history {
+            self.history.pop_front();
+        }
+        self.history.push_back(obs);
+    }
+
     pub fn tick(&mut self) {
         self.state.decay();
     }
@@ -196,6 +315,8 @@ impl EmotionEngine {
             confidence_score: self.state.confidence_score(),
             dominant: self.state.dominant(),
             observation_count: self.history.len(),
+            dominance: self.state.dominance(),
+            emotion_label: self.state.label(),
         }
     }
 
@@ -300,5 +421,64 @@ mod tests {
         assert!(state.get(EmotionDimension::Frustration) <= 1.0);
         state.update(EmotionDimension::Frustration, -1.0);
         assert!(state.get(EmotionDimension::Frustration) >= 0.0);
+    }
+
+    #[test]
+    fn test_dominance_baseline_and_range() {
+        let mut state = EmotionState::new();
+        assert!((state.dominance() - 0.5).abs() < 1e-6);
+        state.update(EmotionDimension::Confidence, 1.0);
+        state.update(EmotionDimension::Urgency, 0.5);
+        state.update(EmotionDimension::Frustration, 0.0);
+        assert!(state.dominance() >= 0.5);
+        let mut low = EmotionState::new();
+        low.update(EmotionDimension::Frustration, 1.0);
+        low.update(EmotionDimension::Confidence, 0.0);
+        low.update(EmotionDimension::Urgency, 0.0);
+        assert!(low.dominance() < 0.5);
+    }
+
+    #[test]
+    fn test_label_distinguishes_fear_from_anger() {
+        fn converge(state: &mut EmotionState, dim: EmotionDimension, value: f64) {
+            for _ in 0..20 {
+                state.update(dim, value);
+            }
+        }
+        let mut fear = EmotionState::new();
+        converge(&mut fear, EmotionDimension::Frustration, 0.8);
+        converge(&mut fear, EmotionDimension::Urgency, 0.8);
+        converge(&mut fear, EmotionDimension::Confidence, 0.0);
+        converge(&mut fear, EmotionDimension::Joy, 0.0);
+        assert_eq!(fear.label(), EmotionLabel::Fear);
+        let mut anger = EmotionState::new();
+        converge(&mut anger, EmotionDimension::Frustration, 0.8);
+        converge(&mut anger, EmotionDimension::Urgency, 0.8);
+        converge(&mut anger, EmotionDimension::Confidence, 1.0);
+        converge(&mut anger, EmotionDimension::Joy, 0.0);
+        assert_eq!(anger.label(), EmotionLabel::Anger);
+    }
+
+    #[test]
+    fn test_observe_appraisal_drives_dims() {
+        let mut engine = EmotionEngine::default();
+        engine.observe_appraisal(0.9, 0.9, 0.9, "novel coping task");
+        let report = engine.report();
+        assert!(report.curiosity > 0.5);
+        assert!(report.confidence > 0.5);
+        assert!(report.urgency < 0.6);
+        let mut blocked = EmotionEngine::default();
+        blocked.observe_appraisal(0.1, 0.1, 0.1, "blocked goal");
+        let report = blocked.report();
+        assert!(report.frustration > 0.5);
+        assert!(report.confidence < 0.5);
+    }
+
+    #[test]
+    fn test_report_serde_backward_compat() {
+        let legacy = r#"{"frustration":0.3,"confidence":0.5,"joy":0.5,"urgency":0.5,"curiosity":0.5,"fatigue":0.5,"arousal":0.5,"valence":0.5,"confidence_score":0.5,"dominant":["Joy",0.0],"observation_count":0}"#;
+        let report: EmotionReport = serde_json::from_str(legacy).unwrap();
+        assert_eq!(report.emotion_label, EmotionLabel::Neutral);
+        assert!((report.dominance - 0.0).abs() < 1e-6);
     }
 }
