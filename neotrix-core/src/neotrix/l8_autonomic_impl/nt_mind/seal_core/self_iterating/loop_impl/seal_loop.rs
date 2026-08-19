@@ -1030,7 +1030,7 @@ mod tests {
     // 1. 构造：核心字段在构建后被正确初始化。
     #[test]
     fn seal_loop_construct_initializes_core_fields() {
-        let brain = SelfIteratingBrain::new();
+        let brain = SelfIteratingBrain::new_lightweight();
 
         assert_eq!(brain.iteration, 0);
         assert_eq!(brain.quality_threshold, 0.85);
@@ -1058,7 +1058,7 @@ mod tests {
     // 2. 状态转换：iterate() 推进 iteration 并记录评估历史。
     #[test]
     fn seal_loop_iterate_advances_state() {
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
 
         let r1 = brain.iterate(TaskType::General);
         assert_eq!(r1.iteration, 1);
@@ -1081,7 +1081,7 @@ mod tests {
     // 2b. 状态转换：kernel_iterate 走四条支管线，iteration 单调递增。
     #[test]
     fn seal_loop_kernel_iterate_runs_pipeline() {
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
 
         let k1 = brain.kernel_iterate("unit test a dataset loader");
         assert_eq!(k1.iteration, 1);
@@ -1190,7 +1190,7 @@ mod tests {
     // 5. 预算存活门禁：delta 太小则不吸收（拒绝），否则允许吸收并计数。
     #[test]
     fn seal_loop_safe_absorb_gate() {
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         let (_before, _after, delta) = brain.preview_absorb(KnowledgeSource::DesignPhilosophy);
         let before_count = brain.brain.total_absorb_count;
 
