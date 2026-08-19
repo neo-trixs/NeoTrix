@@ -512,6 +512,9 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("文件", "file_parsing", "NT-WORLD", "CodeAnalyzer"),
     ("解析", "file_parsing", "NT-WORLD", "CodeAnalyzer"),
     ("提取", "content_extraction", "NT-WORLD", "CodeAnalyzer"),
+    ("pdf编辑", "pdf_edit", "NT-ACT", "CodeAnalyzer"),
+    ("pdf编辑:", "pdf_edit", "NT-ACT", "CodeAnalyzer"),
+    ("编辑pdf", "pdf_edit", "NT-ACT", "CodeAnalyzer"),
     (
         "检索",
         "hybrid_retrieval",
@@ -1045,6 +1048,101 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 ),
             }
         }
+        // PDF 文本编辑 (R-P79): span redact + 原位替换。
+        // 摘要语法: <in.pdf> <out.pdf> <page> <find> => <replace>  (省略 => 为仅删除)
+        "pdf_edit" => {
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.len() < 2 {
+                return (
+                    false,
+                    format!(
+                        "子任务 '{}' 缺少 输入/输出 PDF 路径, 无法编辑",
+                        task.summary
+                    ),
+                );
+            }
+            let (src, out) = (paths[0].clone(), paths[1].clone());
+            // 定位路径之后的首个整数 token 作为页号
+            let after_paths: Vec<&str> = words
+                .iter()
+                .skip_while(|w| {
+                    let w = w.trim_matches('"').trim_matches('，').trim_matches(',');
+                    !(w.contains('/') || w.contains('\\'))
+                })
+                .skip(2)
+                .copied()
+                .collect();
+            let page = after_paths
+                .iter()
+                .find_map(|w| w.parse::<u32>().ok())
+                .unwrap_or(1);
+            // find => replace 语法; 无 => 时 find = 页号之后全部剩余 token (删除模式)
+            let (find, replace) = match task.summary.split_once("=>") {
+                Some((left, right)) => {
+                    let find = left
+                        .split_whitespace()
+                        .filter(|w| !w.contains('/') && w.parse::<u32>().is_err())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let replace = right.trim();
+                    (find, Some(replace.to_string()))
+                }
+                None => {
+                    let find = after_paths
+                        .iter()
+                        .filter(|w| w.parse::<u32>().is_err())
+                        .copied()
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    (find, None)
+                }
+            };
+            if find.is_empty() {
+                return (
+                    false,
+                    format!("子任务 '{}' 未解析出待编辑文本", task.summary),
+                );
+            }
+            // 替换文本超出 Latin-1 → 自动选取系统字体嵌入 (非 Latin-1 需真实字体)
+            let ttf = match &replace {
+                Some(rep) if rep.chars().any(|c| (c as u32) > 0xFF) => {
+                    match find_system_font_for(rep) {
+                        Some(font) => Some(font),
+                        None => {
+                            return (
+                                false,
+                                format!(
+                                    "替换文本含非 Latin-1 字符但未找到支持的系统字体: {rep}"
+                                ),
+                            );
+                        }
+                    }
+                }
+                _ => None,
+            };
+            let edit = crate::neotrix::PdfEdit {
+                page,
+                find,
+                replace,
+            };
+            match crate::neotrix::edit_pdf(&src, &out, &[edit], ttf.as_deref()) {
+                Ok(_) => (
+                    true,
+                    format!(
+                        "PDF 编辑完成 (页 {page}): {}\n输出: {}",
+                        src.display(),
+                        out.display()
+                    ),
+                ),
+                Err(e) => (false, format!("PDF 编辑失败: {e}")),
+            }
+        }
         _ => (
             true,
             format!(
@@ -1053,6 +1151,30 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             ),
         ),
     }
+}
+
+/// 查找覆盖给定文本全部字形的系统 TTF (西里尔等非 Latin-1 替换用)。
+/// 找不到返回 None — 调用方应提示用户, 而非静默降级。
+fn find_system_font_for(text: &str) -> Option<Vec<u8>> {
+    let candidates = [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Georgia.ttf",
+        "/System/Library/Fonts/Supplemental/Verdana.ttf",
+        "/System/Library/Fonts/Supplemental/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+    ];
+    for path in candidates {
+        let Ok(data) = std::fs::read(path) else { continue };
+        let Ok(face) = ttf_parser::Face::parse(&data, 0) else {
+            continue;
+        };
+        if text.chars().all(|c| face.glyph_index(c).is_some()) {
+            return Some(data);
+        }
+    }
+    None
 }
 
 /// 进程内单例入口: 意识核心直接处理人类语言 (不依赖 CLI/MCP 子命令)。
@@ -1293,6 +1415,7 @@ fn estimate_tokens(s: &str) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lopdf::dictionary;
 
     /// 测试隔离: 将 HOME 重定向到临时目录, 避免污染生产 KB (~/.neotrix/knowledge.db),
     /// 且各测试间共享同一隔离 DB (Once 保证仅初始化一次)。
@@ -1922,5 +2045,101 @@ mod tests {
         };
         let (executed, _) = dispatch_internal_capability(&generic);
         assert!(executed, "未覆盖标签应保持 executed=true 向后兼容");
+    }
+
+    #[test]
+    fn dispatch_internal_routes_pdf_edit_to_real_call() {
+        // R-P79 真实调度: pdf_edit → 真调 edit_pdf (span redact + 原位替换), 非仅标记。
+        // 摘要语法: <in.pdf> <out.pdf> <page> <find> => <replace>; 无有效路径 → (false, 提示)。
+        let tmp = std::env::temp_dir().join(format!("nt_pdf_edit_dispatch_{}", std::process::id()));
+        let src = tmp.with_extension("src.pdf");
+        let out = tmp.with_extension("out.pdf");
+
+        // 构造最小 PDF (未压缩内容流)
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Courier",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let content = lopdf::content::Content {
+            operations: vec![
+                lopdf::content::Operation::new("BT", vec![]),
+                lopdf::content::Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                lopdf::content::Operation::new("Td", vec![100.into(), 600.into()]),
+                lopdf::content::Operation::new("Tj", vec![lopdf::Object::string_literal("Gate Valve")]),
+                lopdf::content::Operation::new("ET", vec![]),
+            ],
+        };
+        let content_id = doc.add_object(lopdf::Stream::new(
+            lopdf::Dictionary::new(),
+            content.encode().expect("encode content"),
+        ));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+        });
+        doc.objects.insert(
+            pages_id,
+            lopdf::Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog_id);
+        let mut pdf = Vec::new();
+        doc.save_to(&mut pdf).expect("save pdf");
+        std::fs::write(&src, &pdf).expect("write src pdf");
+
+        let task = ConsciousTask {
+            id: "t-pdf".into(),
+            summary: format!(
+                "{} {} 1 Gate Valve => Задвижка клиновая",
+                src.display(),
+                out.display()
+            ),
+            capability_tag: "pdf_edit".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&task);
+        assert!(executed, "pdf_edit 应真实执行, 得到: {output}");
+        assert!(out.exists(), "输出 PDF 应已生成");
+        let edited = std::fs::read(&out).expect("read out pdf");
+        let result = neotrix_types::core::file_parser::FileParser::extract_text(
+            "out.pdf",
+            "application/pdf",
+            &edited,
+        );
+        assert!(
+            result.text.contains("Задвижка"),
+            "调度后替换文本缺失: {:?}",
+            result.text
+        );
+
+        // 缺路径 → (false, 提示), 不 panic
+        let bad = ConsciousTask {
+            id: "t-pdf-bad".into(),
+            summary: "pdf编辑 无有效路径".into(),
+            capability_tag: "pdf_edit".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&bad);
+        assert!(!executed, "无有效路径不应误报执行成功");
+        assert!(!output.is_empty());
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&out);
     }
 }

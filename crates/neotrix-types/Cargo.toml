@@ -21,6 +21,7 @@ quick-xml = "0.41"
 zip = { version = "2", default-features = false, features = ["deflate", "time"] }
 lru = "0.18"
 lopdf = "0.42"
+ttf-parser = "0.25"
 hex = "0.4"
 log = "0.4"
 rand = "0.8"

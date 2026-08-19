@@ -26,11 +26,11 @@ pub struct FileCmd;
 impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate <args>" }
+    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|editpdf <args>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格");
+            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -94,7 +94,43 @@ impl CliCommand for FileCmd {
                     Err(e) => CommandOutput::err(&format!("schema 初稿生成失败: {e}")),
                 }
             }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest", sub)),
+            "editpdf" => {
+                // 用法: /file editpdf <in.pdf> <out.pdf> <page> <find> [replace] [font.ttf]
+                if rest.len() < 4 {
+                    return CommandOutput::err("用法: /file editpdf <in.pdf> <out.pdf> <page> <find> [replace] [font.ttf]\n  替换文本省略 = 仅删除 (redact); 非 Latin-1 文本需提供 font.ttf");
+                }
+                let src = std::path::PathBuf::from(&rest[0]);
+                let out = std::path::PathBuf::from(&rest[1]);
+                let page: u32 = match rest[2].parse() {
+                    Ok(p) => p,
+                    Err(_) => return CommandOutput::err("页号必须为整数 (1-based)"),
+                };
+                let find = &rest[3];
+                let replace = rest.get(4).cloned();
+                let has_replace = replace.is_some();
+                let ttf = rest.get(5).map(|p| std::fs::read(p)).transpose();
+                match ttf {
+                    Err(e) => CommandOutput::err(&format!("读取字体失败: {e}")),
+                    Ok(ttf_bytes) => {
+                        let edit = crate::neotrix::PdfEdit {
+                            page,
+                            find: find.clone(),
+                            replace,
+                        };
+                        match crate::neotrix::edit_pdf(&src, &out, &[edit], ttf_bytes.as_deref()) {
+                            Ok(_) => {
+                                let mode = if has_replace { "替换" } else { "删除" };
+                                CommandOutput::ok(&format!(
+                                    "PDF {mode}完成: 页 {page} 文本 {find:?}\n输出: {}",
+                                    out.display()
+                                ))
+                            }
+                            Err(e) => CommandOutput::err(&format!("PDF 编辑失败: {e}")),
+                        }
+                    }
+                }
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest, editpdf", sub)),
         }
     }
 }

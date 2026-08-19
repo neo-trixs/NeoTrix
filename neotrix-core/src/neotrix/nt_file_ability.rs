@@ -28,6 +28,7 @@ mod gwt;
 mod helpers;
 mod merge;
 mod ocr;
+mod pdfedit;
 mod selftest;
 mod structured;
 mod tables;
@@ -43,6 +44,7 @@ pub use gwt::*;
 pub use helpers::*;
 pub use merge::*;
 pub use ocr::*;
+pub use pdfedit::*;
 pub use selftest::*;
 pub use structured::*;
 pub use tables::*;
@@ -53,6 +55,8 @@ pub use visual::*;
 mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
+
+    use lopdf::dictionary;
 
     use crate::core::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
     use crate::core::nt_core_hex::ReasoningHexagram;
@@ -1341,6 +1345,77 @@ mod tests {
         let r = visual_extract(FileKind::Pdf, "plain-text-no-images", "some text", &cfg, fake);
         // PDF 走 VLM 视为合法调用; 核心断言: 调用本身不 panic, 结果可失败可成功
         let _ = r;
+    }
+
+    #[test]
+    fn test_edit_pdf_free_function_wiring() {
+        // R-P79 生产接线验证: edit_pdf 自由函数 → FileParser::edit_pdf_text 端到端。
+        use super::pdfedit::{edit_pdf, PdfEdit};
+
+        // 构造最小 PDF (未压缩内容流)
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Courier",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let content = lopdf::content::Content {
+            operations: vec![
+                lopdf::content::Operation::new("BT", vec![]),
+                lopdf::content::Operation::new("Tf", vec!["F1".into(), 12.into()]),
+                lopdf::content::Operation::new("Td", vec![100.into(), 600.into()]),
+                lopdf::content::Operation::new("Tj", vec![lopdf::Object::string_literal("Hello World")]),
+                lopdf::content::Operation::new("ET", vec![]),
+            ],
+        };
+        let content_id = doc.add_object(lopdf::Stream::new(
+            lopdf::Dictionary::new(),
+            content.encode().expect("encode content"),
+        ));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+        });
+        doc.objects.insert(
+            pages_id,
+            lopdf::Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog_id);
+        let mut pdf = Vec::new();
+        doc.save_to(&mut pdf).expect("save pdf");
+
+        let tmp = std::env::temp_dir().join(format!("nt_edit_pdf_{}", std::process::id()));
+        let src = tmp.with_extension("src.pdf");
+        let out = tmp.with_extension("out.pdf");
+        std::fs::write(&src, &pdf).expect("write src");
+        let n = edit_pdf(
+            &src,
+            &out,
+            &[PdfEdit { page: 1, find: "Hello World".into(), replace: Some("Hola".into()) }],
+            None,
+        )
+        .expect("edit_pdf");
+        assert_eq!(n, 1);
+        let edited = std::fs::read(&out).expect("read out");
+        let result = neotrix_types::core::file_parser::FileParser::extract_text(
+            "out.pdf",
+            "application/pdf",
+            &edited,
+        );
+        assert!(result.text.contains("Hola"), "替换文本缺失: {:?}", result.text);
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&out);
     }
 
     #[test]

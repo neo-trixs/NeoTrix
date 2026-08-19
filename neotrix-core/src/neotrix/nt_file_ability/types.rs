@@ -24,6 +24,8 @@ pub enum FileAbilityError {
     Empty { path: PathBuf },
     #[error("结构化解析失败: {0}")]
     Parse(String),
+    #[error("{0}")]
+    Other(String),
 }
 
 /// 统一结果类型
