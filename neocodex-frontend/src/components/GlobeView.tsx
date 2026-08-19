@@ -350,7 +350,6 @@ export function GlobeView(props: GlobeViewProps) {
     const bbox: [number, number, number, number] = [-180, -90, 180, 90]
     geoOfflinePack(bbox, offlineName())
       .then((res: { path: string; count: number; bytes: number }) => {
-        console.log('离线包导出:', res)
         alert(`离线包已导出: ${res.path} (${res.count} 点, ${res.bytes} bytes)`)
       })
       .catch((e: Error) => console.error('导出离线包失败:', e))

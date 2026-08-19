@@ -23,33 +23,46 @@ export interface StreamEventHandlers {
   onEnd?: (content: string) => void
   onDone?: (payload: { cancelled: boolean; elapsed_ms: number; content: string }) => void
   onTool?: (payload: StreamToolPayload) => void
+  /** 单个事件订阅失败时回调（用于向用户暴露流式降级提示） */
+  onSubscribeError?: (event: string, error: unknown) => void
 }
 
 /** 订阅聊天流式事件（neocodex_stream_*），返回解除订阅函数 */
 export async function subscribeStream(handlers: StreamEventHandlers): Promise<UnlistenFn> {
   const unlisteners: UnlistenFn[] = []
-  try {
-    if (handlers.onStart) {
-      unlisteners.push(await listen<string>('neocodex_stream_start', (e) => handlers.onStart?.(e.payload)))
+  const subscribe = async (event: string, cb: () => Promise<UnlistenFn>) => {
+    try {
+      unlisteners.push(await cb())
+    } catch (e) {
+      handlers.onSubscribeError?.(event, e)
     }
-    if (handlers.onToken) {
-      unlisteners.push(await listen<string>('neocodex_stream_token', (e) => handlers.onToken?.(e.payload)))
-    }
-    if (handlers.onEnd) {
-      unlisteners.push(await listen<string>('neocodex_stream_end', (e) => handlers.onEnd?.(e.payload)))
-    }
-    if (handlers.onDone) {
-      unlisteners.push(
-        await listen<{ cancelled: boolean; elapsed_ms: number; content: string }>('neocodex_stream_done', (e) =>
-          handlers.onDone?.(e.payload),
-        ),
-      )
-    }
-    if (handlers.onTool) {
-      unlisteners.push(await listen<StreamToolPayload>('neocodex_stream_tool', (e) => handlers.onTool?.(e.payload)))
-    }
-  } catch {
-    // 部分订阅失败：尽力而为，返回已注册的解除函数
+  }
+  if (handlers.onStart) {
+    await subscribe('neocodex_stream_start', () =>
+      listen<string>('neocodex_stream_start', (e) => handlers.onStart?.(e.payload)),
+    )
+  }
+  if (handlers.onToken) {
+    await subscribe('neocodex_stream_token', () =>
+      listen<string>('neocodex_stream_token', (e) => handlers.onToken?.(e.payload)),
+    )
+  }
+  if (handlers.onEnd) {
+    await subscribe('neocodex_stream_end', () =>
+      listen<string>('neocodex_stream_end', (e) => handlers.onEnd?.(e.payload)),
+    )
+  }
+  if (handlers.onDone) {
+    await subscribe('neocodex_stream_done', () =>
+      listen<{ cancelled: boolean; elapsed_ms: number; content: string }>('neocodex_stream_done', (e) =>
+        handlers.onDone?.(e.payload),
+      ),
+    )
+  }
+  if (handlers.onTool) {
+    await subscribe('neocodex_stream_tool', () =>
+      listen<StreamToolPayload>('neocodex_stream_tool', (e) => handlers.onTool?.(e.payload)),
+    )
   }
   return () => {
     for (const un of unlisteners) un()

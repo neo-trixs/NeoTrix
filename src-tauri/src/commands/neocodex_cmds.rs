@@ -2202,14 +2202,22 @@ pub fn neocodex_open_file(app: tauri::AppHandle, path: String) -> Result<(), Str
 pub async fn neocodex_open_external(path: String) -> Result<(), String> {
     // 输入校验（W-5）：仅允许主目录内的本地文件路径，
     // 拒绝 URL/任意路径——否则可被用于打开任意文件/URL。
-    let safe = super::project_cmds::resolve_safe_path(&path)
-        .map_err(|e| format!("path rejected: {e}"))?;
-    let status = if cfg!(target_os = "windows") {
-        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&safe).status()
-    } else if cfg!(target_os = "macos") {
-        std::process::Command::new("open").arg(&safe).status()
+    // http/https URL 走 scheme 白名单分支（如 LivePreview 的 dev server），
+    // 其余 scheme（file:// 之外的协议注入）一律拒绝。
+    let target = if path.starts_with("http://") || path.starts_with("https://") {
+        path
     } else {
-        std::process::Command::new("xdg-open").arg(&safe).status()
+        super::project_cmds::resolve_safe_path(&path)
+            .map_err(|e| format!("path rejected: {e}"))?
+            .to_string_lossy()
+            .to_string()
+    };
+    let status = if cfg!(target_os = "windows") {
+        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&target).status()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(&target).status()
+    } else {
+        std::process::Command::new("xdg-open").arg(&target).status()
     };
     status.map_err(|e| format!("failed to launch external opener: {e}"))?;
     Ok(())

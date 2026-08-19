@@ -385,7 +385,6 @@ export function Chat() {
       onStart: () => {
         // 记录代次：每次后端真正起流开启一个新代次，token/done/tool 仅接受同代次事件
         activeGen = ++generation
-        console.log('[Chat] Stream started')
       },
       onToken: (delta) => {
         if (activeGen !== generation) return
@@ -439,6 +438,10 @@ export function Chat() {
           }
           chatStore.appendToolCall(msgId, toolCall)
         }
+      },
+      onSubscribeError: (event) => {
+        setStreamError(`流式事件 ${event} 订阅失败，回复可能不完整`)
+        setTimeout(() => setStreamError(null), 5000)
       },
     })
     setUnlistenStream(() => unlistenStream)

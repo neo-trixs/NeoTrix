@@ -47,6 +47,14 @@ export function toApiError(e: unknown): ApiError {
       return new ApiError(shape.message, shape.code ?? null, shape.details)
     }
   }
+  // 末级兜底：非 Error 对象（如 Tauri 封装的不透明 rejection）序列化后再取文本
+  if (e && typeof e === 'object') {
+    try {
+      return new ApiError(JSON.stringify(e))
+    } catch {
+      /* 序列化失败则退回字符串化 */
+    }
+  }
   return new ApiError(String(e))
 }
 

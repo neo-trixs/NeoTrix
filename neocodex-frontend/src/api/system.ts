@@ -1,4 +1,4 @@
-import { call } from './client'
+import { call, errText } from './client'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { ProjectTreeItem, ProjectView, UpdateProgress, VoiceTranscript } from './types'
 
@@ -61,7 +61,7 @@ export async function listenUpdateEvents(handlers: UpdateEventHandlers): Promise
     }
   } catch (e) {
     for (const un of unlisteners) un()
-    handlers.onError?.(e instanceof Error ? e.message : String(e))
+    handlers.onError?.(errText(e))
     throw e
   }
 

@@ -108,7 +108,14 @@ export async function runSlashExport(ctx: SlashContext): Promise<void> {
 export function runSlashDispatch(ctx: SlashContext, cmd: SlashCommandDef): void {
   if (cmd.id === 'clear') {
     ctx.store.clearMessages()
-    void neocodex
+    const sid = ctx.currentSessionId()
+    if (sid) {
+      // 后端落盘同步清除：仅清本地 store 会在会话重载后复活
+      void neocodex.clearSession(sid).catch((error) => {
+        console.error('[Chat] /clear failed:', error)
+        ctx.showError('清除会话失败，请重试')
+      })
+    }
   } else if (cmd.id === 'new') {
     void ctx.store.addSession()
   } else if (cmd.id === 'model') {

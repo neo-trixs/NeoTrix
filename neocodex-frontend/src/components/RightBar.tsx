@@ -47,7 +47,12 @@ type PreviewMode = (typeof PREVIEW_FORMATS)[number]['id']
 const RUST_KEYWORDS = ['pub', 'struct', 'impl', 'fn', 'let', 'mut', 'const', 'Self', 'for', 'in', 'return', 'if', 'else', 'match', 'use', 'mod', 'trait', 'enum', 'type', 'where', 'as', 'async', 'await', 'move']
 
 function escHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 /* 轻量 MD → 安全 HTML（仅用于 artifact 预览）
@@ -252,7 +257,7 @@ export function RightBar() {
         node.content = content
         setCurrentFile({ ...node, content })
       } catch (e) {
-        node.content = `// 读取失败: ${e}`
+        node.content = `// 读取失败: ${errText(e)}`
         setCurrentFile({ ...node })
       } finally {
         setFileLoading(false)
