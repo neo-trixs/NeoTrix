@@ -44,7 +44,7 @@ const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
 ]
 
 const actionBtnClass =
-  'p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors'
+  'action-btn p-1.5 rounded-lg text-text-muted/70 hover:text-text-primary hover:bg-white/70 hover:shadow-sm transition-all duration-150'
 
 /* 长消息内容折叠阈值（任务4：超长 assistant 消息折叠；末条/流式消息始终全量渲染，保证流式安全） */
 const LONG_MSG_FOLD_CHARS = 6000
@@ -1086,7 +1086,7 @@ export function Chat() {
             when={messages().length > 0}
             fallback={
               /* ===== 空状态：hero + cic 输入区（设计 v2） ===== */
-              <div class="wc-inner h-full max-w-[640px] w-full mx-auto flex flex-col items-center justify-center gap-6 px-6 py-10 select-none">
+              <div class="wc-inner h-full max-w-[800px] w-full mx-auto flex flex-col items-center justify-center gap-6 px-6 py-10 select-none">
                 <div class="hero">
                   <div class="hero-svg">
                     <HeroMark />
@@ -1184,7 +1184,7 @@ export function Chat() {
               </div>
             }
           >
-            <div class="cs max-w-[640px] mx-auto">
+            <div class="cs max-w-[800px] mx-auto">
               <For each={messages()}>
                 {(message: Message, i) => {
                   const isUser = message.role === 'user'
@@ -1313,9 +1313,10 @@ export function Chat() {
                           </>
                         )}
 
-                        {/* hover 操作行 */}
+                        {/* hover 操作行：opacity-0→100，150ms 过渡（iPolloWork duration-150 语言）；用户消息右对齐 */}
                         <div class={clsx(
-                          'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity',
+                          'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150',
+                          isUser && 'justify-end',
                           isEditing && 'opacity-0'
                         )}>
                           <div class="flex items-center gap-1">
@@ -1469,7 +1470,7 @@ export function Chat() {
         <Show when={messages().length > 0}>
           {/* 上下文即将用尽提示（任务3，对标 Claude /compact 建议；只读数据源，非侵入可关闭） */}
           <Show when={compactHintVisible()}>
-            <div class="mx-auto w-full max-w-[640px] px-6 pt-3">
+            <div class="mx-auto w-full max-w-[800px] px-6 pt-3">
               <div
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs animate-in shadow-sm"
                 role="status"
@@ -1497,7 +1498,7 @@ export function Chat() {
 
           {/* 批次1：Plan 模式激活提示（只读横幅，对标 Claude Code plan 只读阶段的视觉区分） */}
           <Show when={permissionMode() === 'plan' && !planPending() && !isGenerating()}>
-            <div class="mx-auto w-full max-w-[640px] px-6 pt-3">
+            <div class="mx-auto w-full max-w-[800px] px-6 pt-3">
               <div
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-nt-core-500/10 border border-nt-core-500/30 text-nt-core-700 text-xs animate-in shadow-sm"
                 role="status"
@@ -1518,7 +1519,7 @@ export function Chat() {
 
           {/* 批次1：Plan 批准条（规划产出待批准；批准→切换 accept_edits 并同轮执行，拒绝/取消→留规划态） */}
           <Show when={planPending() && !isGenerating()}>
-            <div class="mx-auto w-full max-w-[640px] px-6 pt-3">
+            <div class="mx-auto w-full max-w-[800px] px-6 pt-3">
               <div
                 class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs animate-in shadow-sm"
                 role="dialog"
@@ -1556,7 +1557,7 @@ export function Chat() {
           <div class="flex-shrink-0 border-t border-border-primary/40 bg-white/10 backdrop-blur-xl">
             {/* 斜杠命令菜单（输入以 / 开头时浮层；Esc 可临时收起） */}
             <Show when={slashActive()}>
-              <div class="relative max-w-[640px] mx-auto px-6 pt-2">
+              <div class="relative max-w-[800px] mx-auto px-6 pt-2">
                 <SlashMenu
                   query={slashQuery() ?? ''}
                   commands={slashFiltered()}
@@ -1566,7 +1567,7 @@ export function Chat() {
                 />
               </div>
             </Show>
-            <div class="max-w-[640px] mx-auto w-full px-6 pt-3 pb-2">
+            <div class="max-w-[800px] mx-auto w-full px-6 pt-3 pb-2">
               <div class="cic">
                 <textarea
                   ref={setTextareaRef}

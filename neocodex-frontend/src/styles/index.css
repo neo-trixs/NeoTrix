@@ -371,21 +371,25 @@
     gap: 6px;
   }
 
-  /* —— 消息行：用户右对齐红色渐变 / 助手左对齐玻璃 —— */
+  /* —— 消息行：用户右对齐渐变 / 助手左对齐玻璃 —— */
   .msg {
     display: flex;
     gap: 10px;
-    max-width: 78%;
+    max-width: 100%;
     animation: fi 0.25s ease-out;
   }
 
   .msg.r {
     align-self: flex-end;
     flex-direction: row-reverse;
+    /* 用户消息约束行宽（气泡 75-85%），assistant 全宽 */
+    max-width: 85%;
   }
 
   .msg.l {
     align-self: flex-start;
+    /* assistant 内容列全宽（iPolloWork：无窄气泡限制） */
+    width: 100%;
   }
 
   @keyframes fi {
@@ -440,16 +444,21 @@
     position: relative;
   }
 
+  /* 用户气泡：实心渐变，24px 大圆角 + 右下小尾角（iPolloWork rounded-3xl 语言） */
   .msg.r .mb {
     background: linear-gradient(135deg, #f0913a, #df7f2b);
     color: #fff;
+    border-radius: 24px 24px 8px 24px;
+    box-shadow: 0 2px 12px rgba(223, 127, 43, 0.28);
   }
 
+  /* assistant 气泡：玻璃质感，16px 圆角，左侧小尾角 */
   .msg.l .mb {
     background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.32) 100%);
     backdrop-filter: blur(12px) saturate(1.4);
     border: 1px solid rgba(255, 255, 255, 0.45);
     box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.55), 0 2px 8px rgba(40, 30, 20, 0.05);
+    border-radius: 24px 24px 24px 8px;
   }
 
   .mb code {
@@ -469,6 +478,37 @@
     font-size: 10px;
     opacity: 0.35;
     margin-top: 4px;
+  }
+
+  /* 用户实心气泡内时间戳：白色半透明，可读性优先 */
+  .msg.r .mb-t {
+    color: #fff;
+    opacity: 0.55;
+  }
+
+  /* —— 消息操作栏按钮：ghost icon（iPolloWork variant=ghost size=icon 语言） —— */
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .action-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .action-btn:focus-visible {
+    outline: 2px solid rgba(240, 145, 58, 0.6);
+    outline-offset: 1px;
   }
 
   /* —— 输入区 cic：圆角 24px 液态玻璃容器 —— */
@@ -616,29 +656,44 @@
     50% { box-shadow: 0 0 0 5px rgba(232, 84, 84, 0); }
   }
 
+  /* 发送按钮：实心 accent 圆钮（iPolloWork dls-accent + ArrowUp 语言）
+     默认禁用态灰色；可发送态常驻橙色，hover 加深 */
   .vc-send {
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(8px);
     width: 36px;
     height: 36px;
+    background: #f0913a;
+    border: none;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(240, 145, 58, 0.32);
   }
 
-  .vc-send:hover {
-    background: #f0913a;
-    border-color: #f0913a;
-    color: #fff;
+  .vc-send:hover:not(:disabled) {
+    background: #df7f2b;
+    box-shadow: 0 3px 12px rgba(223, 127, 43, 0.40);
+    transform: translateY(-1px);
+  }
+
+  .vc-send:active:not(:disabled) {
+    transform: translateY(0) scale(0.96);
   }
 
   .vc-send:disabled {
-    opacity: 0.3;
+    background: rgba(0, 0, 0, 0.06);
+    color: rgba(0, 0, 0, 0.28);
+    box-shadow: none;
     cursor: default;
   }
 
   .vc-send svg {
     width: 18px;
-    height: 14px;
+    height: 18px;
     stroke-width: 2;
+  }
+
+  /* 停止生成态：同尺寸深色方块 */
+  .vc-send[aria-label="停止生成"] {
+    background: #1a1a20;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.20);
   }
 
   /* —— 快速问答胶囊按钮 —— */
