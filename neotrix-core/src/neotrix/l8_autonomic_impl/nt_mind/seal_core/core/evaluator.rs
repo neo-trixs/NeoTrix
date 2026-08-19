@@ -73,6 +73,7 @@ impl PerformanceEvaluator {
     /// - `commits`: LLM 对一组分类特征提交的 bool 承诺 (每特征一票)。
     /// - `weights`: 与 commits 对齐的票权, 长度需一致。
     /// - `threshold`: 加权支持率门限, ≥ 则采纳 (决定输出, 非概率)。
+    ///
     /// 返回 (采纳, 支持率, 反对率): 决定性 bool + 可解释的边际。
     pub fn deterministic_pick(
         commits: &[bool],

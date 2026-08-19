@@ -8268,6 +8268,14 @@
       "rationale": "经验 '[蒸馏-NT-META] 聚合 3 条经验的模式: 接线完整性闭环验证 (cycle 1189 防偷懒门禁的正面案例): 12 源批量吸收 4 个高价值源全部接线 — agentmemory→hybrid_search 时间衰减重排, deepcrawl→分层链接树, CUDA Agent→ExecutionFeedback 奖励融合, NIE→trace_reward。方法: (1)先列接线清单 (源→目标 [关键词: agentmemory, agent, cuda, deepcrawl, deepteam, hybrid, importance, search]' 命中能力标签 'skill_crystallize' 于域 Meta, 应强化对应能力节点",
       "signal": 0.76,
       "promoted_at": 1787064374
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1787100585
     }
   ]
 }
