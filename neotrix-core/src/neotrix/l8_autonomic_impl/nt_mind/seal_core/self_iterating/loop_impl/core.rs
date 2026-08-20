@@ -588,8 +588,17 @@ impl SelfIteratingBrain {
     /// Persist any pending memory orchestrator entries through the KnowledgeBase.
     /// Drains expired entries from all tiers, promotes qualifying entries, and
     /// persists them to the SQLite agent_memory_entries table.
+    /// 分层 salience 衰减 (ai-memory M8): 每 tick 先按 tier 半衰期指数衰减,
+    /// 遗忘项落盘后移除 — 生产路径接线, 非死代码。
     pub fn persist_pending_entries(&mut self, kb: &KnowledgeBase) -> usize {
         let mut persisted = 0;
+        let now = chrono::Utc::now().timestamp();
+        let forgotten = self._memory_orch.decay_salience(0.05, now);
+        for entry in forgotten {
+            if MemoryOrchestrator::persist_entry(kb, &entry).is_ok() {
+                persisted += 1;
+            }
+        }
         let tiers = [MemoryTier::Working, MemoryTier::Episodic, MemoryTier::Procedural];
         for tier in tiers {
             let expired = self._memory_orch.drain_expired(tier, tier.ttl_secs());

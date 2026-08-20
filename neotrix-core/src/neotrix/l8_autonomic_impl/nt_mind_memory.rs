@@ -23,6 +23,18 @@ impl MemoryTier {
         }
     }
 
+    /// ai-memory 分层衰减半衰期 (吸收): 每层 salience 按自己的时间尺度指数衰减 —
+    /// 工作记忆分钟级挥发, 情景记忆天级, 程序记忆周级, 语义记忆永久。对应
+    /// ai-memory M8 的 salience = salience · exp(-λΔt), 各层 λ 不同。
+    pub fn half_life_secs(&self) -> u64 {
+        match self {
+            MemoryTier::Working => 600,
+            MemoryTier::Episodic => 86_400,
+            MemoryTier::Procedural => 604_800,
+            MemoryTier::Semantic => 0,
+        }
+    }
+
     pub fn priority(&self) -> u8 {
         match self {
             MemoryTier::Working => 0,
@@ -230,6 +242,35 @@ impl MemoryOrchestrator {
         kb.agent_memory_store(&entry.agent_id, &entry.session_id, &content, tier_str, metadata, entry.semantic.embedding.as_deref())
     }
 
+    /// ai-memory M8 分层 salience 衰减 — 半衰期模型而非硬 TTL 截断。
+    /// 每层按 half_life_secs 指数衰减 salience, 低于 `floor` 的条目视为遗忘并移除。
+    /// 返回被遗忘的条目 (供上层决定是落盘还是丢弃)。
+    pub fn decay_salience(&mut self, floor: f64, now: i64) -> Vec<DualTrackEntry> {
+        let mut forgotten = Vec::new();
+        for tier in [MemoryTier::Working, MemoryTier::Episodic, MemoryTier::Procedural] {
+            let hl = tier.half_life_secs() as f64;
+            let pool = match tier {
+                MemoryTier::Working => &mut self.working,
+                MemoryTier::Episodic => &mut self.episodic,
+                MemoryTier::Procedural => &mut self.procedural,
+                MemoryTier::Semantic => continue,
+            };
+            let mut kept = Vec::new();
+            for e in pool.drain(..) {
+                let age = (now - e.accessed_at.max(e.created_at)).max(0) as f64;
+                let decay = (-age * std::f64::consts::LN_2 / hl).exp();
+                let salience = e.access_count as f64 * decay;
+                if salience < floor {
+                    forgotten.push(e);
+                } else {
+                    kept.push(e);
+                }
+            }
+            *pool = kept;
+        }
+        forgotten
+    }
+
     /// Drain expired entries from this tier. Removes entries older than `max_age_secs`.
     pub fn drain_expired(&mut self, tier: MemoryTier, max_age_secs: u64) -> Vec<DualTrackEntry> {
         let now = chrono::Utc::now().timestamp();
@@ -303,6 +344,46 @@ mod tests {
     fn test_memory_tier_ttl() {
         assert_eq!(MemoryTier::Working.ttl_secs(), 300);
         assert_eq!(MemoryTier::Semantic.ttl_secs(), 0);
+    }
+
+    #[test]
+    fn test_memory_tier_half_life_ordering() {
+        assert!(MemoryTier::Working.half_life_secs() < MemoryTier::Episodic.half_life_secs());
+        assert!(MemoryTier::Episodic.half_life_secs() < MemoryTier::Procedural.half_life_secs());
+        assert_eq!(MemoryTier::Semantic.half_life_secs(), 0);
+    }
+
+    #[test]
+    fn test_decay_salience_forgets_old_single_access() {
+        let mut orch = MemoryOrchestrator::new();
+        orch.store(make_entry("old", MemoryTier::Working, "a", "stale")).unwrap();
+        // accessed_at=0, now 远超 Working 半衰期 (600s) → 单次访问 salience 衰减到 floor 下
+        let forgotten = orch.decay_salience(0.5, 3_600);
+        assert_eq!(forgotten.len(), 1);
+        assert_eq!(forgotten[0].id, "old");
+        assert_eq!(orch.tier_size(MemoryTier::Working), 0);
+    }
+
+    #[test]
+    fn test_decay_salience_keeps_frequent_access() {
+        let mut orch = MemoryOrchestrator::new();
+        orch.store(make_entry("hot", MemoryTier::Working, "a", "frequent")).unwrap();
+        if let Some(e) = orch.working.iter_mut().find(|e| e.id == "hot") {
+            e.access_count = 10; // 高频访问 → 高 base salience
+            e.accessed_at = 3_600; // 最近访问 → age≈0, 无衰减
+        }
+        let forgotten = orch.decay_salience(0.5, 3_600);
+        assert!(forgotten.is_empty(), "高频访问不应被遗忘");
+        assert_eq!(orch.tier_size(MemoryTier::Working), 1);
+    }
+
+    #[test]
+    fn test_decay_salience_skips_semantic() {
+        let mut orch = MemoryOrchestrator::new();
+        orch.store(make_entry("fact", MemoryTier::Semantic, "a", "permanent")).unwrap();
+        let forgotten = orch.decay_salience(0.5, 1_000_000);
+        assert!(forgotten.is_empty());
+        assert_eq!(orch.tier_size(MemoryTier::Semantic), 1);
     }
 
     #[test]
