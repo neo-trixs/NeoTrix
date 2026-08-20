@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show } from 'solid-js'
+import { createSignal, createEffect, Show, onCleanup } from 'solid-js'
 import { RefreshCw, ExternalLink, MonitorPlay, Loader2, X } from 'lucide-solid'
 import { neocodex, errText } from '../api'
 import { clsx } from 'clsx'
@@ -115,7 +115,7 @@ export function LivePreview(props: Props) {
       props.onClose()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    onCleanup(() => window.removeEventListener('keydown', onKey))
   })
 
   return (

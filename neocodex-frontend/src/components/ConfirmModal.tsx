@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal } from 'solid-js'
+import { Show, createEffect, createSignal, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
@@ -90,7 +90,7 @@ export function ConfirmModal(props: Props) {
       }
     }
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    onCleanup(() => window.removeEventListener('keydown', onKey, true))
   })
 
   const submit = () => props.onConfirm(inputVal())

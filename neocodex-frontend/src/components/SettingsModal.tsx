@@ -374,10 +374,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     }
     window.addEventListener('keydown', onKey)
     navRef()?.querySelector<HTMLButtonElement>('button')?.focus()
-    return () => {
+    onCleanup(() => {
       window.removeEventListener('keydown', onKey)
       if (restoreFocusEl?.isConnected) restoreFocusEl.focus()
-    }
+    })
   })
 
   return (

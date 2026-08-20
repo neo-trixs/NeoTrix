@@ -1,4 +1,4 @@
-import { createSignal, onMount, createEffect, Show } from 'solid-js'
+import { createSignal, onMount, createEffect, Show, onCleanup } from 'solid-js'
 import { Coins, X, RefreshCw, Loader2, Cpu, Activity, Wallet, Repeat } from 'lucide-solid'
 import { neocodex, errText } from '../api'
 import type { AgentStatus } from '../api/types'
@@ -48,7 +48,7 @@ export function CostDashboard(props: Props) {
       props.onClose()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    onCleanup(() => window.removeEventListener('keydown', onKey))
   })
 
   const load = async () => {
@@ -60,6 +60,24 @@ export function CostDashboard(props: Props) {
         'agent_status',
         () => neocodex.agentStatus(),
         { ttlMs: 3000 },
+      )
+      setStatus(s)
+    } catch (e) {
+      setError(errText(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 刷新按钮：强制绕过 TTL 缓存重新拉取（load 被 onMount 复用走缓存，刷新必须拿到最新）
+  const refresh = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const s = await query<AgentStatus>(
+        'agent_status',
+        () => neocodex.agentStatus(),
+        { ttlMs: 3000, force: true },
       )
       setStatus(s)
     } catch (e) {
@@ -181,7 +199,7 @@ export function CostDashboard(props: Props) {
           <button
             ref={firstBtnRef}
             class="panel-close"
-            onClick={load}
+            onClick={refresh}
             aria-label="刷新"
           >
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
