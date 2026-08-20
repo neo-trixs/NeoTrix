@@ -22,6 +22,8 @@ function isImage(mime: string): boolean {
 }
 
 function isCode(mime: string, name: string): boolean {
+  // CSV/表格 MIME（text/csv 等）优先走表格分支，不得被 text/* 通配捕获
+  if (isTable(mime, name)) return false
   const codeExts = ['rs', 'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'java', 'c', 'cpp', 'h', 'rb', 'sh', 'json', 'yaml', 'yml', 'toml', 'md', 'sql', 'html', 'css', 'vue', 'svelte']
   const ext = name.split('.').pop()?.toLowerCase() || ''
   return codeExts.includes(ext) || mime.startsWith('text/') || mime.includes('json') || mime.includes('javascript')
