@@ -716,6 +716,76 @@ impl WebSearchRouter {
     pub fn backends(&self) -> &[Box<dyn SearchBackend>] {
         &self.backends
     }
+
+    /// Agent-Reach 吸收 (2026-08-20): doctor 全后端体检 + 修复处方。
+    /// 与 `search` 只到首个成功即停不同, doctor **逐个探测所有后端**,
+    /// 每个后端独立体检 (真实调用, 非存在性检查), 坏掉的给出修复处方。
+    pub fn doctor(&mut self, probe_query: &str) -> Vec<BackendHealth> {
+        let mut report = Vec::with_capacity(self.backends.len());
+        for backend in &self.backends {
+            let name = backend.name().to_string();
+            let health = match backend.search(probe_query, 3) {
+                Ok(results) if !results.is_empty() => BackendHealth {
+                    name: name.clone(),
+                    ok: true,
+                    error: None,
+                    prescription: "ok".to_string(),
+                },
+                Ok(_) => {
+                    let err = "empty results".to_string();
+                    BackendHealth {
+                        name: name.clone(),
+                        ok: false,
+                        error: Some(err.clone()),
+                        prescription: Self::repair_prescription(&name, &err),
+                    }
+                }
+                Err(e) => BackendHealth {
+                    name: name.clone(),
+                    ok: false,
+                    error: Some(e.clone()),
+                    prescription: Self::repair_prescription(&name, &e),
+                },
+            };
+            report.push(health);
+        }
+        report
+    }
+
+    /// 修复处方: 按错误签名映射可执行动作 (Agent-Reach '坏掉的给修复处方')。
+    pub fn repair_prescription(backend: &str, err: &str) -> String {
+        let e = err.to_lowercase();
+        if e.contains("403") || e.contains("429") || e.contains("status: 403") || e.contains("status: 429") {
+            "限流/封禁: 冷却后重试, 或调整 backend 顺序把更稳的备选提前 (R-P82 列表序即接入序)".to_string()
+        } else if e.contains("timed out") || e.contains("timeout") || e.contains("connect") {
+            "网络不可达/超时: 检查连通性, 或本地换镜像/代理后重试".to_string()
+        } else if e.contains("empty results") {
+            "空结果: 查询过窄或词面不匹配, 换同义关键词重试".to_string()
+        } else if e.contains("403") {
+            "UA/反爬拦截: Wikipedia 等需 UA, 检查 user_agent 头".to_string()
+        } else {
+            format!("未知错误 '{}' (backend={}): 查看 last_errors 诊断, 必要时换后端", err, backend)
+        }
+    }
+}
+
+/// doctor 体检结果 (Agent-Reach 吸收)。
+#[derive(Debug, Clone)]
+pub struct BackendHealth {
+    pub name: String,
+    pub ok: bool,
+    pub error: Option<String>,
+    pub prescription: String,
+}
+
+impl BackendHealth {
+    pub fn label(&self) -> String {
+        if self.ok {
+            format!("[✓] {}: ok", self.name)
+        } else {
+            format!("[✗] {}: {} → {}", self.name, self.error.as_deref().unwrap_or("unknown"), self.prescription)
+        }
+    }
 }
 
 /// 统一搜索表面 — 给 agent/工具一条路由, 封装 router 的可变状态。
@@ -763,6 +833,17 @@ impl UnifiedSearch {
 
     pub fn active_backend(&self) -> String {
         self.router.lock().map(|g| g.current_backend().to_string()).unwrap_or_default()
+    }
+
+    /// Agent-Reach 吸收: 全后端体检 — 逐后端真实探测, 坏掉的给修复处方。
+    /// 生产消费点: agent / CLI / tool 做搜索故障诊断 (doctor 语义)。
+    pub fn doctor(&self, probe_query: &str) -> Vec<BackendHealth> {
+        self.router.lock().map(|mut g| g.doctor(probe_query)).unwrap_or_default()
+    }
+
+    /// 修复处方 (静态): 按错误签名生成可执行动作。
+    pub fn repair_prescription(backend: &str, err: &str) -> String {
+        WebSearchRouter::repair_prescription(backend, err)
     }
 }
 
@@ -1172,5 +1253,45 @@ mod tests {
         // `*.gov.cn` 不匹配 apex gov.cn, 但 URL 宿主名带 www 时应匹配。
         assert_eq!(reg.for_host("www.gov.cn").len(), 1);
         assert_eq!(reg.for_host("www.gov.cn")[0].category, "official");
+    }
+
+    #[test]
+    fn doctor_reports_all_backends_with_prescriptions() {
+        // Agent-Reach 吸收: doctor 逐个探测所有后端 (非首个成功即停),
+        // 坏后端必须带修复处方。
+        let mut router = WebSearchRouter::new(vec![
+            Box::new(ProbeBackend { name: "primary", succeed: true, results: 3 }),
+            Box::new(ProbeBackend { name: "backup", succeed: false, results: 0 }),
+        ]);
+        let report = router.doctor("test");
+        assert_eq!(report.len(), 2, "doctor 应体检所有后端");
+        assert!(report[0].ok, "primary 应 ok");
+        assert!(!report[1].ok, "backup 应失败");
+        assert!(report[1].prescription.len() > 0, "坏后端必须带修复处方");
+    }
+
+    #[test]
+    fn repair_prescription_maps_error_signatures() {
+        // 错误签名 → 可执行动作的映射 (403/429/网络/空结果)
+        let rate = WebSearchRouter::repair_prescription("ddg", "API returned status: 429");
+        assert!(rate.contains("限流"), "429 → 限流处方: {rate}");
+        let net = WebSearchRouter::repair_prescription("wikipedia", "connect timed out");
+        assert!(net.contains("网络"), "timeout → 网络处方: {net}");
+        let empty = WebSearchRouter::repair_prescription("ddg", "empty results");
+        assert!(empty.contains("空结果"), "empty → 空结果处方: {empty}");
+        let unk = WebSearchRouter::repair_prescription("ddg", "weird boom");
+        assert!(unk.contains("未知"), "未知 → 兜底处方: {unk}");
+    }
+
+    #[test]
+    fn unified_search_doctor_probes_through_surface() {
+        // 生产消费面: UnifiedSearch::doctor 是 agent/CLI 可调用的体检入口
+        let search = UnifiedSearch::new();
+        let report = search.doctor("Rust");
+        assert!(!report.is_empty(), "统一面应返回体检结果");
+        for h in &report {
+            assert!(!h.name.is_empty());
+            assert!(!h.prescription.is_empty());
+        }
     }
 }
