@@ -357,9 +357,18 @@ impl CapabilityRegistry {
     }
 
     /// 查询: 孤儿节点 (无 dependents 且非入口点)
+    /// 排除有 wiring_evidence 的节点: wiring_evidence 是 T3 生产接线证明
+    /// (被生产代码直接调用, 消费链超出能力树 dependents 边), 不属孤儿。
     pub fn orphan_nodes(&self) -> Vec<&CapabilityNode> {
         self.nodes.values()
             .filter(|n| n.dependents.is_empty() && !n.is_constellation())
+            .filter(|n| {
+                !n.metadata
+                    .get("wiring_evidence")
+                    .and_then(|v| v.as_str())
+                    .map(|s| !s.is_empty())
+                    .unwrap_or(false)
+            })
             .collect()
     }
 
@@ -793,6 +802,20 @@ mod tests {
         c3.requires = vec!["c2".into()];
         reg.register(c3).unwrap();
         reg
+    }
+
+    #[test]
+    fn test_orphan_nodes_excludes_wired() {
+        let mut reg = CapabilityRegistry::new();
+        // 无 dependents、无 wiring_evidence → 孤儿
+        reg.register(CapabilityNode::new_primitive("orphan_a".into(), Domain::Core, vec!["x".into()])).unwrap();
+        // 无 dependents 但有 wiring_evidence (T3 生产接线) → 非孤儿
+        let mut wired = CapabilityNode::new_primitive("wired_b".into(), Domain::Nexus, vec!["y".into()]);
+        wired.metadata.insert("wiring_evidence".into(), serde_json::Value::String("handlers_consciousness.rs weave_once".into()));
+        reg.register(wired).unwrap();
+        let orphans: Vec<String> = reg.orphan_nodes().iter().map(|n| n.id.clone()).collect();
+        assert!(orphans.contains(&"orphan_a".to_string()));
+        assert!(!orphans.contains(&"wired_b".to_string()), "wired node must not be orphan: {orphans:?}");
     }
 
     #[test]
