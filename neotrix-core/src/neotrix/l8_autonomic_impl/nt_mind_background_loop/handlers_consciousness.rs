@@ -296,6 +296,16 @@ impl BackgroundLoopHandle {
             .unwrap_or(0);
 
         // ── Phase 1: ConsciousnessTree Growth Cycle (Soil → Roots → Trunk → Branches → Fruits → Core) ──
+        // Whisper 旁观流 (cumora.ai "Whisper rooms" 借鉴, 生产接线): 在进入 tree
+        // 可变借用前, 旁观 GWT 广播历史增量 (含本 tick resonant_broadcast 刚写入的
+        // 内容 — 每次意识 tick 旁观者读到新增广播, 只读不加入, 旁观者不参与决策)。
+        // delta 在 tree 块内累计到 trunk.whisper_observations, 使 GWT 广播活动
+        // 成为意识可见量 (T3: 生产代码真实消费 whisper_observe)。
+        let whisper_delta: u64 = self
+            .panorama
+            .as_mut()
+            .map(|p| p.gwt.whisper_observe(0).new_items.len() as u64)
+            .unwrap_or(0);
         if let Some(ref mut tree) = self.consciousness_tree {
             tree.soil.kb_node_count = kb_nodes;
             tree.soil.kb_edge_count = kb_edges;
@@ -324,6 +334,9 @@ impl BackgroundLoopHandle {
                     crate::core::nt_core_gwt::resonance::default_specialist_states();
                 pano.gwt.resonant_broadcast("[consciousness_tick] growth cycle resonance", &hexagram_states);
             }
+            // Whisper 旁观流累计: 本 tick 旁观到的 GWT 广播增量 (旁观者在 tree
+            // 借用前已读取; 这里把 delta 记入意识树, 广播活动成为意识可见量)。
+            tree.trunk.whisper_observations += whisper_delta;
             // Real GWT resonance signal: active only when the GWT has actually
             // run a resonance broadcast (last_resonance set). The resonant_specialists
             // sub-condition is relaxed (S1): the broadcast above is forced every tick

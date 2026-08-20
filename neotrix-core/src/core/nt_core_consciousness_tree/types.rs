@@ -84,6 +84,9 @@ pub struct ConsciousnessCore {
     pub workspace_size: usize,
     pub attention_heads: usize,
     pub resonance_cycle: u64,
+    /// Whisper 旁观流累计计数 (cumora.ai "Whisper rooms" 借鉴): 每次意识 tick
+    /// 后台循环旁观 GWT 广播历史增量 (whisper_observe), 旁观者只读不加入。
+    pub whisper_observations: u64,
     pub phi: f64,
     pub coherence: f64,
     // ── MARS Dual-Process Architecture (absorbed Cycle 120) ──
@@ -1043,6 +1046,7 @@ impl Default for ConsciousnessCore {
             workspace_size: 0,
             attention_heads: 0,
             resonance_cycle: 0,
+            whisper_observations: 0,
             phi: 0.0,
             coherence: 0.0,
             mars_system1_activations: 0,
