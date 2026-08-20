@@ -1,4 +1,5 @@
 mod activation;
+mod affective_observation;
 mod sources;
 mod tracker;
 mod types;
@@ -9,5 +10,6 @@ pub mod versioning;
 pub use activation::{
     ActivationPolicy, CascadeSelector, KSActivationEngine, KsLifecycle, RegisteredSource,
 };
+pub use affective_observation::{publish as publish_affective_observation, take as take_affective_observation};
 pub use tracker::*;
 pub use types::*;

@@ -1,4 +1,5 @@
 use super::capability::CapabilityVector;
+use super::knowledge_source::AffectiveFeedback;
 
 // RewardSource re-exported via knowledge_source.rs (core::knowledge).
 // Removed local definition to avoid conflict with knowledge_source re-export.
@@ -120,6 +121,54 @@ impl PerformanceEvaluator {
         };
         let internal_score = capability_score.clamp(0.0, 1.0);
         let combined = external_score * w + internal_score * (1.0 - w);
+        combined.clamp(0.0, 1.0)
+    }
+
+    /// combine_reward 的情感扩展 (Q2, 设计: docs/1-DESIGN/affective-reward-context.md):
+    /// external 通道内部再细分 — 执行验证信号 (verified/latency/quality) 与
+    /// 情感引导信号 (AffectiveFeedback)。`affective == None` 时退化为 combine_reward。
+    ///
+    /// 合成 (确定性, 防 LLM 打分 flat-band):
+    /// - `affective_guide = valence * trust_k * engagement_k`
+    ///   - `trust_k = 0.6 + 0.1 * stage` (Stranger 0.6 → Bond 1.0, 高信任加权)
+    ///   - `engagement_k = if interactions >= 3 { 1.0 } else { 0.0 }` (冷启动抑制)
+    ///   - `arousal` 修正: `valence < 0.5 && arousal > 0.5` (挫败) → guide *= 0.5
+    /// - `signal_weight = min(signal_weight, 0.3)` — 情感幅度上限 30%
+    /// - `combined = external_execution * (1 - sw) + guide * sw`, 再与内部自评加权
+    pub fn combine_reward_with_affective(
+        capability_score: f64,
+        feedback: ExecutionFeedback,
+        affective: Option<AffectiveFeedback>,
+        external_weight: f64,
+    ) -> f64 {
+        let w = external_weight.clamp(0.0, 1.0);
+        let latency_bonus = (1.0 / feedback.latency_ratio.max(0.05)).clamp(0.5, 2.0);
+        let external_score = if !feedback.verified {
+            feedback.quality * 0.3
+        } else {
+            (feedback.quality * latency_bonus).min(1.0)
+        };
+        let Some(a) = affective else {
+            let internal_score = capability_score.clamp(0.0, 1.0);
+            let combined = external_score * w + internal_score * (1.0 - w);
+            return combined.clamp(0.0, 1.0);
+        };
+        let valence = a.valence.clamp(0.0, 1.0);
+        let arousal = a.arousal.clamp(0.0, 1.0);
+        let trust_k = (0.6 + 0.1 * a.stage.clamp(0, 4) as f64).clamp(0.6, 1.0);
+        let engagement_k = if a.interactions >= 3 { 1.0 } else { 0.0 };
+        let mut guide = valence * trust_k * engagement_k;
+        if valence < 0.5 && arousal > 0.5 {
+            guide *= 0.5;
+        }
+        let sw = if engagement_k == 0.0 {
+            0.0
+        } else {
+            a.signal_weight.clamp(0.0, 1.0).min(0.3)
+        };
+        let external_guided = external_score * (1.0 - sw) + guide * sw;
+        let internal_score = capability_score.clamp(0.0, 1.0);
+        let combined = external_guided * w + internal_score * (1.0 - w);
         combined.clamp(0.0, 1.0)
     }
 }
@@ -384,5 +433,79 @@ mod tests {
             0.5,
         );
         assert!(adopt);
+    }
+
+    fn fb(verified: bool, quality: f64) -> ExecutionFeedback {
+        ExecutionFeedback::new(verified, 1.0, quality)
+    }
+
+    fn aff(valence: f64, stage: u8, interactions: u32) -> AffectiveFeedback {
+        AffectiveFeedback {
+            valence,
+            arousal: 0.3,
+            stage,
+            interactions,
+            signal_weight: 0.3,
+        }
+    }
+
+    #[test]
+    fn test_combine_reward_with_affective_boost() {
+        // 高 valence + Bond(stage=4) + interactions≥3 → 情感引导抬高外部通道奖励
+        let base = PerformanceEvaluator::combine_reward(0.5, fb(true, 0.7), 1.0);
+        let boosted = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), Some(aff(0.9, 4, 10)), 1.0,
+        );
+        assert!(boosted > base, "boosted={boosted} base={base}");
+    }
+
+    #[test]
+    fn test_combine_reward_with_affective_cold_start() {
+        // interactions<3 → engagement_k=0 → guide=0 → 与无情感信号等价
+        let no_aff = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), None, 1.0,
+        );
+        let cold = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), Some(aff(0.9, 4, 2)), 1.0,
+        );
+        assert!((no_aff - cold).abs() < 1e-9, "cold={cold} no_aff={no_aff}");
+    }
+
+    #[test]
+    fn test_combine_reward_with_affective_frustration() {
+        // 低 valence + 高 arousal (挫败) → guide 砍半
+        let calm = AffectiveFeedback { arousal: 0.3, ..aff(0.3, 4, 10) };
+        let frustrated = AffectiveFeedback { arousal: 0.9, ..aff(0.3, 4, 10) };
+        let a = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), Some(calm), 1.0,
+        );
+        let b = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), Some(frustrated), 1.0,
+        );
+        assert!(b < a, "frustrated={b} calm={a}");
+    }
+
+    #[test]
+    fn test_combine_reward_with_affective_cap_30() {
+        // signal_weight=1.0 仍被 cap 至 0.3 — 情感只做引导不做裁判
+        let maxed = AffectiveFeedback { signal_weight: 1.0, ..aff(1.0, 4, 10) };
+        let capped = AffectiveFeedback { signal_weight: 0.3, ..aff(1.0, 4, 10) };
+        let a = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), Some(maxed), 1.0,
+        );
+        let b = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), Some(capped), 1.0,
+        );
+        assert!((a - b).abs() < 1e-9, "cap violated: maxed={a} capped={b}");
+    }
+
+    #[test]
+    fn test_combine_reward_with_affective_none_regression() {
+        // None 时与 combine_reward 逐位一致 (回归)
+        let plain = PerformanceEvaluator::combine_reward(0.5, fb(true, 0.7), 0.5);
+        let with_none = PerformanceEvaluator::combine_reward_with_affective(
+            0.5, fb(true, 0.7), None, 0.5,
+        );
+        assert!((plain - with_none).abs() < 1e-12);
     }
 }

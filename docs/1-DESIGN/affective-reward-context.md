@@ -1,6 +1,6 @@
 # 情感奖励上下文 — affective → SEAL reward 注入设计 (Affective Reward Context)
 
-> 状态: **Draft (待评审)** | 作者: NT-CORE + NT-MIND | 日期: 2026-08-20
+> 状态: **Draft (P1-P4 全部实现, 待评审/提交)** | 作者: NT-CORE + NT-MIND | 日期: 2026-08-20
 > 前置: Q2 延期项 (KB cycle 1203 待办) — 把用户情感检测/信任阶段信号作为 SEAL 进化奖励
 > 上下文注入, 使进化受用户情绪反馈引导。本文为纯设计 (不写码), 待 seal_core 无并发
 > 编辑窗口实现。
@@ -116,10 +116,10 @@ impl PerformanceEvaluator {
 
 | 阶段 | 内容 | 风险 |
 |------|------|------|
-| P1 | `AffectiveFeedback` 类型 + `combine_reward_with_affective` 纯函数 + 测试 1-5 (evaluator.rs) | 低 — evaluator.rs 现无并发占用 |
-| P2 | 数字人消费处产出情感快照事件 (步骤 1) | 中 — nt_io_digital_human.rs 稳定 |
-| P3 | loop_impl 计算点接线 (步骤 2) | **高 — 需并发窗口, loop_impl/core.rs 正被重构** |
-| P4 | 生产接线验证 (测试 6) + 能力树晋升证据 | 低 |
+| P1 | `AffectiveFeedback` 类型 + `combine_reward_with_affective` 纯函数 + 测试 1-5 (evaluator.rs) | ✅ **已实现** (2026-08-20, 33 测试过; 冷启动时 sw 亦归 0 保持信号完全惰性) |
+| P2 | 数字人消费处产出情感快照事件 (步骤 1) | ✅ **已实现** (AffectiveFeedback 迁共享层 nt_core_knowledge; last_affective_feedback 字段 + process_audio_input 旁路快照, 13 测试过) |
+| P3 | loop_impl 计算点接线 (步骤 2) | ✅ **已实现** (RewardCalculationStage 融合; 负外部奖励原样保留防 rewind 回归; 共享观测槽 publish/take 跨域桥) |
+| P4 | 生产接线验证 (测试 6) + 能力树晋升证据 | ✅ **已实现** (3 集成测试 = T3 验证; 全量 444 测试过) |
 
 **验收**: `cargo check --lib` 0 error + 上述 6 测试全过 + P3 接线后 reward_source
 生产路径可观测情感引导。能力树: `nt_mind_seal_core::affective_reward_context` 新节点

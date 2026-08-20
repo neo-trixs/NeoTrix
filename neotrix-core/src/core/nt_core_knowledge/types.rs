@@ -69,6 +69,19 @@ impl RewardSource {
     }
 }
 
+/// 情感奖励上下文 (affective → SEAL reward, 设计: docs/1-DESIGN/affective-reward-context.md)。
+/// 语义: 用户情感观测作为奖励的**引导信号, 不做裁判** — 情感幅度上限
+/// `signal_weight` 被 `combine_reward_with_affective` cap 至 0.3, 防止「讨好用户」
+/// 替代「验证通过」成为进化主信号。冷启动抑制: `interactions < 3` 时情感信号不生效。
+#[derive(Debug, Clone, Copy)]
+pub struct AffectiveFeedback {
+    pub valence: f64,          // 0..1, 用户情绪愉悦度 (UserAffectSnapshot::valence)
+    pub arousal: f64,          // 0..1, 唤醒度 (UserAffectSnapshot::arousal)
+    pub stage: u8,             // RelationshipStage 序数 (0=Stranger..4=Bond)
+    pub interactions: u32,     // 交互计数 (冷启动门限 <3 抑制)
+    pub signal_weight: f64,    // 0..1, 情感信号占总奖励比例 (cap 0.3)
+}
+
 /// Trait for objects that can provide domain-specific knowledge with capability vectors.
 pub trait KnowledgeProvider {
     fn name(&self) -> &str;

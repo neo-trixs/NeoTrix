@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
+use crate::core::nt_core_knowledge::AffectiveFeedback;
 use crate::core::nt_core_self::affective_interface::{
     AffectiveInterface, AffectiveReadout, GuideMode, ResponseIntent,
 };
@@ -255,6 +256,10 @@ pub struct DigitalHumanPipeline {
     pub avatar: AvatarController,
     /// 人类情感交互界面 — 感知用户情绪/关系阶段/共情策略, 驱动表情/韵律/回复意图。
     pub affective: AffectiveInterface,
+    /// 情感奖励上下文候选 (Q2 P2): 最近一次 process_audio_input 产出的情感观测快照,
+    /// 供 SEAL 奖励管线消费 (经 RewardSource::External 引导通道, 设计见
+    /// docs/1-DESIGN/affective-reward-context.md)。
+    pub last_affective_feedback: Option<AffectiveFeedback>,
     session_active: bool,
     session_start: Option<Instant>,
     utterance_count: u64,
@@ -269,6 +274,7 @@ impl DigitalHumanPipeline {
             emotion: EmotionEngine::new(),
             avatar: AvatarController::new(),
             affective: AffectiveInterface::new(),
+            last_affective_feedback: None,
             session_active: false,
             session_start: None,
             utterance_count: 0,
@@ -304,6 +310,16 @@ impl DigitalHumanPipeline {
         self.tts_config.pitch = readout.rhythm.voice_pitch;
         self.tts_config.energy = readout.rhythm.voice_energy;
         let reply = self.reply_affective(text, &readout);
+        // Q2 P2 旁路事件: 产出情感奖励上下文候选, 供 SEAL 奖励管线消费。
+        self.last_affective_feedback = Some(AffectiveFeedback {
+            valence: self.affective.user.valence,
+            arousal: self.affective.user.arousal,
+            stage: self.affective.relationship.stage.order() as u8,
+            interactions: self.affective.relationship.interactions as u32,
+            signal_weight: 0.3,
+        });
+        // Q2 P3: 经共享观测槽发布到 NT-MIND 奖励管线 (跨域旁路通道)。
+        crate::core::nt_core_knowledge::publish_affective_observation(self.last_affective_feedback);
         PipelineResponse {
             reply: reply.clone(),
             emotion,
@@ -496,6 +512,19 @@ mod tests {
         assert_eq!(resp.animation, "smile");
         assert!(resp.reply.contains("开心"));
         assert!(pipeline.tts_config.energy >= 0.5);
+    }
+
+    #[test]
+    fn test_affective_feedback_snapshot_produced() {
+        // Q2 P2: process_audio_input 产出情感奖励上下文候选 (旁路事件)
+        let mut pipeline = DigitalHumanPipeline::new(PersonaConfig::default());
+        assert!(pipeline.last_affective_feedback.is_none());
+        pipeline.process_audio_input("太开心了，终于成功了");
+        let fb = pipeline.last_affective_feedback.expect("candidate produced");
+        assert!(fb.valence > 0.5, "happy → 高愉悦, got {}", fb.valence);
+        assert!(fb.interactions >= 1, "interactions 递增");
+        assert!(fb.signal_weight <= 0.3, "情感幅度上限 0.3, got {}", fb.signal_weight);
+        assert!(fb.stage <= 4, "RelationshipStage 序数 0..4, got {}", fb.stage);
     }
 
     #[test]

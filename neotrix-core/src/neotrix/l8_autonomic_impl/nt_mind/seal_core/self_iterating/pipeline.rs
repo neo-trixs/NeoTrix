@@ -2649,7 +2649,24 @@ impl BrainStage for RewardCalculationStage {
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let external = brain._external_reward();
         let (reward, source) = if let Some(ext) = external {
-            (ext, crate::core::RewardSource::External)
+            // Q2 P3 情感引导: 若共享观测槽有情感候选 (数字人旁路事件发布), 经
+            // combine_reward_with_affective 融合进外部奖励 (经 RewardSource::External)。
+            // 负外部奖励**原样保留** (触发 snapshot restore rewind 语义, 不夹取到 0)。
+            let blended = if ext >= 0.0 {
+                let affective = crate::core::nt_core_knowledge::take_affective_observation();
+                match affective {
+                    Some(a) => crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::core::PerformanceEvaluator::combine_reward_with_affective(
+                        brain._snapshot_score(),
+                        crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::core::ExecutionFeedback::new(true, 1.0, ext),
+                        Some(a),
+                        1.0,
+                    ),
+                    None => ext,
+                }
+            } else {
+                ext
+            };
+            (blended, crate::core::RewardSource::External)
         } else {
             let task_type = brain._current_task_type();
             let score_before = brain._snapshot_score();

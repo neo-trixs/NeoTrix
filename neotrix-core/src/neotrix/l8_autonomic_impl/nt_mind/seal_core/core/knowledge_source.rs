@@ -3,7 +3,7 @@
 
 pub use crate::core::nt_core_knowledge::{
     KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, AbsorptionRecord,
-    MaturityLevel,
+    MaturityLevel, AffectiveFeedback,
 };
 
 #[cfg(test)]

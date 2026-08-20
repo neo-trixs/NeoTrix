@@ -82,3 +82,47 @@
             .count();
         assert_eq!(before, after, "no re-consumption after clear");
     }
+
+    #[test]
+    fn test_reward_calc_affective_guided_external() {
+        // Q2 P3: 外部奖励 + 情感候选 (高愉悦 + Bond + 充足交互) → reward 被引导抬高
+        use crate::core::nt_core_knowledge::{
+            publish_affective_observation, take_affective_observation, AffectiveFeedback,
+        };
+        let mut brain = SelfIteratingBrain::new();
+        brain._external_reward = Some(0.5);
+        publish_affective_observation(Some(AffectiveFeedback {
+            valence: 0.9,
+            arousal: 0.2,
+            stage: 4,
+            interactions: 10,
+            signal_weight: 0.3,
+        }));
+        let stage = RewardCalculationStage::new();
+        stage.process(&mut brain).expect("reward calc ok");
+        let boosted = brain._reward();
+        assert!(boosted > 0.5, "affective 引导应抬高, got {boosted}");
+        assert_eq!(brain._reward_source(), crate::core::RewardSource::External);
+        assert!(take_affective_observation().is_none(), "情感观测被消费即取走");
+    }
+
+    #[test]
+    fn test_reward_calc_negative_external_preserved() {
+        // Q2 P3 防回归: 负外部奖励原样保留 (触发 snapshot restore rewind), 不夹取到 0
+        let mut brain = SelfIteratingBrain::new();
+        brain._external_reward = Some(-0.3);
+        let stage = RewardCalculationStage::new();
+        stage.process(&mut brain).expect("reward calc ok");
+        assert!((brain._reward() + 0.3).abs() < 1e-9, "负奖励应保留, got {}", brain._reward());
+        assert_eq!(brain._reward_source(), crate::core::RewardSource::External);
+    }
+
+    #[test]
+    fn test_reward_calc_external_unchanged_without_affective() {
+        // Q2 P3 防回归: 无情感候选时外部奖励原样透传
+        let mut brain = SelfIteratingBrain::new();
+        brain._external_reward = Some(0.5);
+        let stage = RewardCalculationStage::new();
+        stage.process(&mut brain).expect("reward calc ok");
+        assert!((brain._reward() - 0.5).abs() < 1e-9, "应原样透传, got {}", brain._reward());
+    }
