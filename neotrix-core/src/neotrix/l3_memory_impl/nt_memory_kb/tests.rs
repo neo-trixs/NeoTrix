@@ -130,8 +130,10 @@
     #[test]
     #[ignore]
     fn absorb_external_knowledge_5_sources() {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let db_path = std::path::PathBuf::from(&home).join(".neotrix").join("knowledge.db");
+        // D7 修复: 隔离到 temp dir, 禁止触碰真实 ~/.neotrix/knowledge.db
+        let dir = std::env::temp_dir().join(format!("nt_kb_absorb5_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("knowledge.db");
         let conn = rusqlite::Connection::open(&db_path).expect("open kb");
         super::nt_memory_schema::initialize(&conn).ok();
 
@@ -177,8 +179,10 @@
     #[test]
     #[ignore]
     fn absorb_architecture_fixes_0703() {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let db_path = std::path::PathBuf::from(&home).join(".neotrix").join("knowledge.db");
+        // D7 修复: 隔离到 temp dir, 禁止触碰真实 ~/.neotrix/knowledge.db
+        let dir = std::env::temp_dir().join(format!("nt_kb_absorbarch_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("knowledge.db");
         let conn = rusqlite::Connection::open(&db_path).expect("open kb");
         super::nt_memory_schema::initialize(&conn).ok();
 

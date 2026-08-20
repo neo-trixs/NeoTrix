@@ -10,8 +10,6 @@ import { Show } from 'solid-js'
    ProviderMeta 契约见 api/types.ts（单一事实源）
    ════════════════════════════════════════════ */
 
-export type { ProviderMeta } from '../api/types'
-
 /** 品牌色 + 首字 monogram（无版权风险的自绘标识） */
 const BRAND: Record<string, { color: string; glyph: string }> = {
   openai: { color: '#10a37f', glyph: 'O' },

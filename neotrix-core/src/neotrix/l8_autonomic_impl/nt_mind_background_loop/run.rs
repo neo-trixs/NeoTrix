@@ -18,6 +18,30 @@ mod handlers_absorption;
 #[path = "handlers_daily_intel.rs"]
 mod handlers_daily_intel;
 
+// ── 常驻定时器间隔 (D5: 魔法常量命名化, 保留原值语义) ──
+// 独立小周期定时器不纳入 BackgroundConfig (避免配置面膨胀), 以具名常量固化。
+const BACKUP_INTERVAL_SECS: u64 = 21_600; // every 6h
+const AGENT_DISCOVERY_INTERVAL_SECS: u64 = 60;
+const PENDING_ABSORPTION_INTERVAL_SECS: u64 = 60; // pending-absorb.json 检查 (cycle 1053)
+const DAILY_INTEL_INTERVAL_SECS: u64 = 86_400; // 每日例行感知检查 (cycle 1107)
+const ALWAYS_ON_INTERVAL_SECS: u64 = 120;
+const SKILL_SCAN_INTERVAL_SECS: u64 = 3600;
+const SESSION_ROUTER_FLUSH_INTERVAL_SECS: u64 = 300;
+const HEALER_SCAN_INTERVAL_SECS: u64 = 3600;
+const AVATAR_AUTO_DISTILL_INTERVAL_SECS: u64 = 600;
+const KB_ABSORB_INTERVAL_SECS: u64 = 7200;
+const SEED_CRAWL_QUEUE_INTERVAL_SECS: u64 = 86_400;
+const SESSION_RECOVERY_INTERVAL_SECS: u64 = 600;
+const CRAWL_QUEUE_INTERVAL_SECS: u64 = 300;
+const ARCHITECTURE_AUDIT_INTERVAL_SECS: u64 = 3600;
+const NOVEL_INGEST_INTERVAL_SECS: u64 = 43_200; // 12h 网络小说世界构建吸收
+const CONSTITUTION_RELOAD_INTERVAL_SECS: u64 = 86_400;
+const SECOND_BRAIN_TICK_INTERVAL_SECS: u64 = 600;
+const EMOTION_RESTORE_DEFER_SECS: u64 = 5;
+const LOOP_READINESS_INTERVAL_SECS: u64 = 300;
+const MARKET_RE_EVAL_INTERVAL_SECS: u64 = 300;
+const TELEMETRY_INTERVAL_SECS: u64 = 60;
+
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
     pub critical_quality: f64,
@@ -721,46 +745,46 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.world_prediction_interval_secs, |h| h.handle_prediction().await);
         spawn_handler!(cfg.metacog_interval_secs, |h| h.handle_awareness().await);
         spawn_handler!(cfg.cleanup_interval_secs, |h| h.handle_cleanup().await);
-        spawn_handler!(21_600, |h| h.handle_backup().await); // every 6h
+        spawn_handler!(BACKUP_INTERVAL_SECS, |h| h.handle_backup().await); // every 6h
         // ── 守卫层 (Rust 化自 sh 守护脚本, cycle 207) ──
         spawn_handler!(cfg.kb_guard_interval_secs, "kb_guard", |h| h.handle_kb_guard().await);
         spawn_handler!(cfg.kb_backup_interval_secs, "kb_backup", |h| h.handle_kb_backup().await);
         spawn_handler!(cfg.workspace_guard_interval_secs, "workspace_guard", |h| h.handle_workspace_guard().await);
-        spawn_handler!(60, |h| h.handle_agent_discovery().await);
+        spawn_handler!(AGENT_DISCOVERY_INTERVAL_SECS, |h| h.handle_agent_discovery().await);
         // ── 意识能力网内化吸收 (cycle 1053): 60s 检查 pending-absorb.json,
         //    替代原 .opencode/plugins/experience-tree-absorption.js idle 插件。
-        spawn_handler!(60, |h| h.handle_pending_absorption().await);
+        spawn_handler!(PENDING_ABSORPTION_INTERVAL_SECS, |h| h.handle_pending_absorption().await);
         // ── 每日信息例行感知检查 (cycle 1107): 每日 1 次检查今日信息是否落盘,
         //    缺失则记录感知盲区到 KB (NT-WORLD 感知缺失信号)。
-        spawn_handler!(86_400, "daily_intel", |h| h.handle_daily_intel_check().await);
-        spawn_handler!(120, "always_on", |h| h.handle_always_on().await);
+        spawn_handler!(DAILY_INTEL_INTERVAL_SECS, "daily_intel", |h| h.handle_daily_intel_check().await);
+        spawn_handler!(ALWAYS_ON_INTERVAL_SECS, "always_on", |h| h.handle_always_on().await);
         spawn_handler!(cfg.scheduler_interval_secs, "scheduler", |h| h.handle_scheduler_tick().await);
         spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
-        spawn_handler!(3600, |h| h.handle_skill_scan().await);
-        spawn_handler!(300, "session_router", |h| h.handle_session_router_flush().await);
-        spawn_handler!(3600, "healers", |h| h.handle_healer_scan().await);
-        spawn_handler!(600, |h| h.handle_avatar_auto_distill().await);
-        spawn_handler!(7200, |h| {
+        spawn_handler!(SKILL_SCAN_INTERVAL_SECS, |h| h.handle_skill_scan().await);
+        spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
+        spawn_handler!(HEALER_SCAN_INTERVAL_SECS, "healers", |h| h.handle_healer_scan().await);
+        spawn_handler!(AVATAR_AUTO_DISTILL_INTERVAL_SECS, |h| h.handle_avatar_auto_distill().await);
+        spawn_handler!(KB_ABSORB_INTERVAL_SECS, |h| {
             h.handle_kb_absorb().await;
         });
-        spawn_handler!(86400, |h| h.handle_seed_crawl_queue().await);
-        spawn_handler!(600, |h| h.handle_session_recovery().await);
-        spawn_handler!(300, |h| h.handle_crawl_queue().await);
-        spawn_handler!(3600, "architecture_audit", |h| h.handle_architecture_audit().await);
+        spawn_handler!(SEED_CRAWL_QUEUE_INTERVAL_SECS, |h| h.handle_seed_crawl_queue().await);
+        spawn_handler!(SESSION_RECOVERY_INTERVAL_SECS, |h| h.handle_session_recovery().await);
+        spawn_handler!(CRAWL_QUEUE_INTERVAL_SECS, |h| h.handle_crawl_queue().await);
+        spawn_handler!(ARCHITECTURE_AUDIT_INTERVAL_SECS, "architecture_audit", |h| h.handle_architecture_audit().await);
         // 43200s — 网络小说世界构建吸收 (novel_queue drain + 离线重分类), 12h cadence
-        spawn_handler!(43_200, "novel_ingest", |h| h.handle_novel_ingest().await);
+        spawn_handler!(NOVEL_INGEST_INTERVAL_SECS, "novel_ingest", |h| h.handle_novel_ingest().await);
         // ── Constitution hot-reload ──
-        spawn_handler!(86400, "constitution_reload", |h| h.handle_constitution_reload().await);
+        spawn_handler!(CONSTITUTION_RELOAD_INTERVAL_SECS, "constitution_reload", |h| h.handle_constitution_reload().await);
         // 缺陷1修复 (自我运转实际情况): 意识核心进化周期改为配置驱动
         // (cfg.consciousness_interval_secs, 默认 600s), 与 SEAL 果实消费节奏对齐。
         // 此前硬编码 3600s (1h) 且不可配置 — SEAL (goal_interval 180s) 在大部分
         // 时间消费空果实, 意识核心进化节奏严重滞后于消费节奏。
         spawn_handler!(cfg.consciousness_interval_secs, |h| h.handle_consciousness_tick().await);
         // 600s — Second Brain auto-sync (emotion + session notes to KB)
-        spawn_handler!(600, |h| h.handle_second_brain_tick().await);
+        spawn_handler!(SECOND_BRAIN_TICK_INTERVAL_SECS, |h| h.handle_second_brain_tick().await);
         // Startup: restore emotion state from KB (deferred 5s, then skips)
-        spawn_handler!(5, |h| {
+        spawn_handler!(EMOTION_RESTORE_DEFER_SECS, |h| {
             if !h.emotion_restored.load(std::sync::atomic::Ordering::Relaxed) {
                 // 先把两个持久化 JSON 读成 owned 值, 释放对 kb 的借用, 再改 runtime。
                 let engine_json = h.kb.as_ref()
@@ -791,15 +815,15 @@ cognitive_load: self.cognitive_load.take(),
             }
         });
         // ── G9 Loop Ready 巡检 — 5min 重算自治梯度; G12 denylist gate 每 tick 生效 ──
-        spawn_handler!(300, "loop_readiness", |h| h.handle_loop_readiness().await);
+        spawn_handler!(LOOP_READINESS_INTERVAL_SECS, "loop_readiness", |h| h.handle_loop_readiness().await);
         // ── Auto Exacto 市场重估 (R-P79): 5min cadence 周期驱动 GatewayV2
         //    market_router 重算权重 (与 DEFAULT_INTERVAL=300s 对齐), 不再仅
         //    依赖 route() 调用时的惰性重估。经 gateway::run_periodic_re_evaluation()
         //    tick 进程级注册表中的活跃网关 ──
-        spawn_handler!(300, "market_re_eval", |h| h.handle_market_re_evaluation().await);
+        spawn_handler!(MARKET_RE_EVAL_INTERVAL_SECS, "market_re_eval", |h| h.handle_market_re_evaluation().await);
         // ── G29 隐私聚合遥测 (R-P79): 60s 周期把全局 TelemetryStore 数值指标喂
         //    AnomalyDetector 做 spike/drop 检测, 告警经 EventBus 注入意识监控 ──
-        spawn_handler!(60, "telemetry", |h| h.handle_telemetry().await);
+        spawn_handler!(TELEMETRY_INTERVAL_SECS, "telemetry", |h| h.handle_telemetry().await);
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {

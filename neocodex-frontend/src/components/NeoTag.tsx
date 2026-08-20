@@ -86,31 +86,3 @@ export function NeoTag(props: NeoTagProps) {
   )
 }
 
-/** 会话标题下的标签行（渲染该会话全部标签，可点击筛选/移除） */
-export function NeoTagRow(props: {
-  tags: { name: string; color: string }[]
-  activeTag?: string | null
-  onTagClick?: (name: string) => void
-  onTagRemove?: (name: string) => void
-  className?: string
-}) {
-  return (
-    <div class={clsx('flex flex-wrap gap-1', props.className)}>
-      <For each={props.tags}>
-        {(t) => (
-          <NeoTag
-            name={t.name}
-            color={t.color}
-            size="sm"
-            active={props.activeTag === t.name}
-            removable={!!props.onTagRemove}
-            onClick={props.onTagClick}
-            onRemove={props.onTagRemove}
-            showHierarchy
-          />
-        )}
-      </For>
-    </div>
-  )
-}
-

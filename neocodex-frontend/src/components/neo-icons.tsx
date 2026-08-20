@@ -71,16 +71,6 @@ export function NeoSearch(props: IconProps) {
   )
 }
 
-/** 设置：齿轮 + 外扩刻度（配置语义） */
-export function NeoGear(props: IconProps) {
-  return (
-    <svg {...base(props)}>
-      <circle cx="8" cy="8" r="2.8" stroke="currentColor" stroke-width="1.3" />
-      <path d="M8 2.8v-1M8 14.2v-1M2.8 8h-1M14.2 8h-1M4.3 4.3L3.6 3.6M12.4 12.4l-.7-.7M12.4 3.6l-.7.7M4.3 11.7l-.7.7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.5" />
-    </svg>
-  )
-}
-
 /** 折叠：外扩右箭头（展开/打开语义） */
 export function NeoChevronRight(props: IconProps) {
   return (
