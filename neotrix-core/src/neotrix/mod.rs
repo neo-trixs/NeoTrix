@@ -203,7 +203,6 @@ pub use l1_body_impl::nt_shield_audit::{
 pub use l2_world_impl::nt_world_scrape::{
     AntiDetect, BrowserScraper, RequestScraper, ScrapeResult, ScraperConfig,
 };
-pub use l8_autonomic_impl::nt_mind::export_import::ReasoningBankExporter;
 pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
     ConsciousnessGoldStandard, ConsciousnessLevel, DetectionTrend, E8HexagramState,
     GoldStandardReport,
@@ -217,17 +216,19 @@ pub mod proxy_daemon_wrapper;
 // + image crate (图像元数据)。复用 ConstellationLevel 成熟度 + SelfTest T1-T3 接线。
 // Dark Forest 合规: 模块需有消费者方可存活，每次编辑后需 register_consumer
 pub use nt_file_ability::{
-     check_health, consolidate_tables, consolidate_tables_first_sheet, content_similarity,
+     check_health, consolidate_tables, consolidate_tables_first_sheet,
+     consolidate_tables_with_mode, content_similarity,
      create_from_markdown, decode_bytes,
      detect_encoding, edit_pdf, edit_xlsx_table, embed_text, extract_text, extract_pdf_tables,
      load_snapshot,
-     merge_tables_with,
+     merge_tables_with, merge_tables_with_mode,
      normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
      replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
      suggest_schema, to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport,
      ContentSnapshot, FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation,
      ImageMetadata, MergeSchema, OcrEngine, OcrResult, PRICE_STANDARD_COLUMNS, PRICE_TABLE_SCHEMA,
-     RuleBasedOcr, SchemaSuggestion, SheetCellData, SheetCellValueType, SheetData, SheetRowData,
+     RuleBasedOcr, SchemaSuggestion, SheetCellData, SheetCellValueType, SheetData, SheetMode,
+     SheetRowData,
      StructuredData, TableData, TableEdit, TextEncoding, UnitRule, PdfEdit,
  };
 

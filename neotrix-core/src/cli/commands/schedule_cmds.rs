@@ -119,7 +119,10 @@ impl CliCommand for ScheduleCmd {
                 let mut engine = ALWAYS_ON_ENGINE.lock().unwrap_or_else(|e| e.into_inner());
                 match engine.remove_task(id) {
                     Ok(()) => {
-                        let _ = engine.save();
+                        if let Err(e) = engine.save() {
+                            return CommandOutput::err(&format!(
+                                "Removed task but FAILED to persist (will revert on restart): {}", e));
+                        }
                         CommandOutput::ok(&format!("Removed scheduled task: {}", id))
                     }
                     Err(e) => CommandOutput::err(&e),
@@ -133,7 +136,10 @@ impl CliCommand for ScheduleCmd {
                 let mut engine = ALWAYS_ON_ENGINE.lock().unwrap_or_else(|e| e.into_inner());
                 match engine.pause_scheduled(id) {
                     Ok(()) => {
-                        let _ = engine.save();
+                        if let Err(e) = engine.save() {
+                            return CommandOutput::err(&format!(
+                                "Paused task but FAILED to persist (will revert on restart): {}", e));
+                        }
                         CommandOutput::ok(&format!("Paused scheduled task: {}", id))
                     }
                     Err(e) => CommandOutput::err(&e),
@@ -147,7 +153,10 @@ impl CliCommand for ScheduleCmd {
                 let mut engine = ALWAYS_ON_ENGINE.lock().unwrap_or_else(|e| e.into_inner());
                 match engine.resume_scheduled(id) {
                     Ok(()) => {
-                        let _ = engine.save();
+                        if let Err(e) = engine.save() {
+                            return CommandOutput::err(&format!(
+                                "Resumed task but FAILED to persist (will revert on restart): {}", e));
+                        }
                         CommandOutput::ok(&format!("Resumed scheduled task: {}", id))
                     }
                     Err(e) => CommandOutput::err(&e),

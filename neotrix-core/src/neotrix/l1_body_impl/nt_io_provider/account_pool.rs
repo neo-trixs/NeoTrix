@@ -356,7 +356,10 @@ impl AccountPool {
         if !acc.contains_key(name) {
             return Err(AccountPoolError::NoAccounts(name.to_string()));
         }
-        let state = acc.get_mut(name).expect("account exists (checked above)");
+        let state = match acc.get_mut(name) {
+            Some(s) => s,
+            None => return Err(AccountPoolError::NoAccounts(name.to_string())),
+        };
         if state.in_flight >= state.max_concurrent {
             return Err(AccountPoolError::Saturated(name.to_string()));
         }

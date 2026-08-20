@@ -93,7 +93,7 @@ impl VideoPipeline {
         self.key_frames.push(0);
 
         for i in 1..self.frames.len() {
-            let last_kept = &self.frames[*self.key_frames.last().expect("first frame is always a key frame")];
+            let last_kept = &self.frames[*self.key_frames.last().unwrap_or(&0)];
             let diff = self.frames[i].mean_diff(last_kept);
             if diff > 5.0 {
                 self.key_frames.push(i);
@@ -104,11 +104,7 @@ impl VideoPipeline {
     /// Run the full pipeline: dedup then produce a summary.
     pub fn process(&mut self) -> VideoSummary {
         self.dedup_frames();
-        let duration = if self.frames.is_empty() {
-            0.0
-        } else {
-            self.frames.last().expect("non-empty frames").timestamp - self.frames[0].timestamp
-        };
+        let duration = self.frames.last().map(|f| f.timestamp - self.frames[0].timestamp).unwrap_or(0.0);
         VideoSummary {
             frame_count: self.frames.len() as u64,
             key_frame_count: self.key_frames.len() as u64,
@@ -118,11 +114,7 @@ impl VideoPipeline {
 
     /// Produce a summary without deduplicating (uses all frames as key).
     pub fn summary_raw(&self) -> VideoSummary {
-        let duration = if self.frames.is_empty() {
-            0.0
-        } else {
-            self.frames.last().expect("non-empty frames").timestamp - self.frames[0].timestamp
-        };
+        let duration = self.frames.last().map(|f| f.timestamp - self.frames[0].timestamp).unwrap_or(0.0);
         VideoSummary {
             frame_count: self.frames.len() as u64,
             key_frame_count: self.frames.len() as u64,

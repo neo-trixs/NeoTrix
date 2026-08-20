@@ -89,7 +89,14 @@ impl SEALPipelineImpl {
     pub fn run_stage(&self, stage_id: &str) -> PipelineStage {
         let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         run_stage_inner(&mut inner, stage_id);
-        inner.status.stages.iter().find(|s| s.stage_id == stage_id).cloned().unwrap()
+        inner.status.stages.iter().find(|s| s.stage_id == stage_id).cloned().unwrap_or_else(|| PipelineStage {
+            stage_id: stage_id.to_string(),
+            status: "unknown".into(),
+            progress: 0.0,
+            started_at: 0,
+            completed_at: 0,
+            metrics: HashMap::new(),
+        })
     }
 
     pub fn get_exploration_results(&self) -> ExplorationResult {

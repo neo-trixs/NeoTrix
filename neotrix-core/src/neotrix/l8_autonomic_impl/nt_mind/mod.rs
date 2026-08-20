@@ -37,7 +37,6 @@ pub mod goal_register;           // ExplicitGoalRegister: goal tracking + progre
 pub use knowledge::exploration_seeds;       // URL seed data extracted from exploration_pipeline
 pub use knowledge::change_archive;          // Structured Archive + Delta Spec + 冲突检测
 pub use knowledge::context_artifacts;       // Context Artifacts — index non-code knowledge alongside source code
-pub use knowledge::export_import;           // v2.0: ReasoningBank 导出/导入（借鉴 MapCN）
 
 // ============================================================================
 // Domain 3: 自我改进与进化（Self-Improvement & Evolution）
@@ -143,7 +142,6 @@ pub use knowledge_miner::{KnowledgeMiner, MinedKnowledge, MinedRoundResult};
 pub use knowledge_chain::{KnowledgeChain, KnowledgeChainPhase, KnowledgeChainStatus, ChainRunResult};
 pub use web_miner::{WebKnowledgeMiner, WebMinedKnowledge, WebSourceType, WebMineResult};
 pub use cortex_memory::{CortexMemory, MemoryTrace, DimensionTag, Modality, CortexStats, MemoryLayer, CmsConfig, CmsResult};
-pub use export_import::ReasoningBankExporter;
 pub use knowledge_engine::{KnowledgeEngine, KnowledgeEntry, KnowledgeRelation, RelationType, SourceType, LiteratureSearcher, KnowledgeEngineStats};
 pub use change_archive::{ChangeArchive, DeltaChange, DeltaKind, ArchiveEntry, ConflictWarning, generate_delta_spec_report};
 

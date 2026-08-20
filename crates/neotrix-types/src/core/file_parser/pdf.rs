@@ -189,7 +189,7 @@ pub fn find_system_font_for_text(text: &str) -> Option<Vec<u8>> {
         let Ok(data) = std::fs::read(&path) else { continue };
         let nfaces = ttf_parser::fonts_in_collection(&data).unwrap_or(1);
         for face_index in 0..nfaces {
-            let Ok(face) = ttf_parser::Face::parse(&data, face_index.into()) else {
+            let Ok(face) = ttf_parser::Face::parse(&data, face_index) else {
                 continue;
             };
             if text.chars().all(|c| {
@@ -627,7 +627,7 @@ impl FileParser {
                     let mstart = offset + rel;
                     let mend = mstart + find_len;
                     let op_start = starts.partition_point(|&s| s <= mstart).saturating_sub(1);
-                    let op_end = starts.partition_point(|&s| s <= mend - 1).saturating_sub(1);
+                    let op_end = starts.partition_point(|&s| s < mend).saturating_sub(1);
                     if op_start <= op_end && op_end < run.ops.len() && starts[op_end + 1] >= mend {
                         for i in op_start..=op_end {
                             to_clear.insert(run.ops[i].0);
@@ -778,8 +778,7 @@ impl FileParser {
              <0000> <FFFF>\n\
              endcodespacerange\n",
         );
-        let mut n = 0;
-        for (ch, gid, _) in &used {
+        for (n, (ch, gid, _)) in used.iter().enumerate() {
             if n % 100 == 0 {
                 if n > 0 {
                     cmap.push_str("endbfchar\n");
@@ -788,7 +787,6 @@ impl FileParser {
                 cmap.push_str(&format!("{batch} beginbfchar\n"));
             }
             cmap.push_str(&format!("<{:04X}> <{:04X}>\n", gid, *ch as u32));
-            n += 1;
         }
         cmap.push_str("endbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
         let to_unicode_id = doc.add_object(lopdf::Stream::new(
@@ -859,7 +857,7 @@ impl FileParser {
     ) -> Result<(lopdf::ObjectId, String, Vec<u8>), PdfEditError> {
         for ch in text.chars() {
             let cp = ch as u32;
-            if cp > 0xFF || (cp >= 0x80 && cp < 0xA0) {
+            if cp > 0xFF || (0x80..0xA0).contains(&cp) {
                 return Err(PdfEditError::UnsupportedGlyph(ch));
             }
         }
@@ -880,34 +878,35 @@ impl FileParser {
         x: f32,
         y: f32,
     ) -> lopdf::content::Content<Vec<lopdf::content::Operation>> {
-        let mut ops = Vec::new();
-        ops.push(lopdf::content::Operation::new("q", vec![]));
-        ops.push(lopdf::content::Operation::new("0", vec![lopdf::Object::Integer(0)]));
-        ops.push(lopdf::content::Operation::new("BT", vec![]));
-        ops.push(lopdf::content::Operation::new(
-            "Tf",
-            vec![
-                lopdf::Object::Name(font_key.as_bytes().to_vec()),
-                lopdf::Object::Real(size),
-            ],
-        ));
-        ops.push(lopdf::content::Operation::new(
-            "Tm",
-            vec![
-                lopdf::Object::Real(1.0),
-                lopdf::Object::Real(0.0),
-                lopdf::Object::Real(0.0),
-                lopdf::Object::Real(1.0),
-                lopdf::Object::Real(x),
-                lopdf::Object::Real(y),
-            ],
-        ));
-        ops.push(lopdf::content::Operation::new(
-            "Tj",
-            vec![lopdf::Object::String(encoded.to_vec(), lopdf::StringFormat::Hexadecimal)],
-        ));
-        ops.push(lopdf::content::Operation::new("ET", vec![]));
-        ops.push(lopdf::content::Operation::new("Q", vec![]));
+        let ops = vec![
+            lopdf::content::Operation::new("q", vec![]),
+            lopdf::content::Operation::new("0", vec![lopdf::Object::Integer(0)]),
+            lopdf::content::Operation::new("BT", vec![]),
+            lopdf::content::Operation::new(
+                "Tf",
+                vec![
+                    lopdf::Object::Name(font_key.as_bytes().to_vec()),
+                    lopdf::Object::Real(size),
+                ],
+            ),
+            lopdf::content::Operation::new(
+                "Tm",
+                vec![
+                    lopdf::Object::Real(1.0),
+                    lopdf::Object::Real(0.0),
+                    lopdf::Object::Real(0.0),
+                    lopdf::Object::Real(1.0),
+                    lopdf::Object::Real(x),
+                    lopdf::Object::Real(y),
+                ],
+            ),
+            lopdf::content::Operation::new(
+                "Tj",
+                vec![lopdf::Object::String(encoded.to_vec(), lopdf::StringFormat::Hexadecimal)],
+            ),
+            lopdf::content::Operation::new("ET", vec![]),
+            lopdf::content::Operation::new("Q", vec![]),
+        ];
         lopdf::content::Content { operations: ops }
     }
 

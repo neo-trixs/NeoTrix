@@ -36,6 +36,21 @@ pub enum ColumnType {
     Text,
 }
 
+/// 多 sheet 选择策略 — 运行时参数 (替代编译期 preferred_sheets 变体函数)。
+///
+/// 之前每新增一个 sheet 策略就要新写编译期变体函数 (如
+/// `consolidate_tables_first_sheet`) 并重新编译 — 变体爆炸。本枚举将策略
+/// 数据化, 一个引擎 + 运行时参数覆盖全部场景 (R-2026-08-20)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SheetMode {
+    /// 只取第一个 sheet (每个文件首个 sheet 即目标数据)
+    FirstSheet,
+    /// 按 preferred_sheets 精确匹配 (trim), 命中则只用该 sheet; 否则取第一个
+    Preferred(&'static [&'static str]),
+    /// 保留全部 sheet (旧行为)
+    AllSheets,
+}
+
 /// 合并 Schema — 领域知识数据 (纯 const, 编译期校验)
 #[derive(Debug, Clone, Copy)]
 pub struct MergeSchema {
@@ -279,6 +294,27 @@ pub fn merge_tables_with(
     src_dir: impl AsRef<Path>,
     output: impl AsRef<Path>,
 ) -> Result<ConsolidationReport> {
+    let mode = if schema.preferred_sheets.is_empty() {
+        SheetMode::AllSheets
+    } else {
+        SheetMode::Preferred(schema.preferred_sheets)
+    };
+    merge_tables_with_mode(schema, src_dir, output, mode)
+}
+
+/// 通用多表合并引擎 + 运行时 sheet 策略 (R-2026-08-20)。
+///
+/// 与 [`merge_tables_with`] 同实现, 但 sheet 选择策略由 `SheetMode` 运行时决定,
+/// 无需编译期变体函数。覆盖:
+/// - `FirstSheet` — 每个文件取第一个 sheet (本次"已核对待确认"场景)
+/// - `Preferred`  — 修改版优先 (默认 schema.preferred_sheets)
+/// - `AllSheets`  — 旧行为 (全 sheet 遍历合并)
+pub fn merge_tables_with_mode(
+    schema: &MergeSchema,
+    src_dir: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    mode: SheetMode,
+) -> Result<ConsolidationReport> {
     schema.validate().map_err(FileAbilityError::Parse)?;
     let mut report = ConsolidationReport::default();
     let mut table = TableData {
@@ -334,7 +370,7 @@ pub fn merge_tables_with(
             .to_lowercase();
         let srcs: Vec<TableData> = match ext.as_str() {
             "xlsx" => match read_xlsx_sheets_all(&path) {
-                Ok(tables) => select_preferred_sheets(tables, schema.preferred_sheets),
+                Ok(tables) => select_preferred_sheets(tables, mode),
                 Err(e) => {
                     report
                         .files_failed
@@ -528,7 +564,35 @@ pub fn consolidate_tables(
     src_dir: impl AsRef<Path>,
     output: impl AsRef<Path>,
 ) -> Result<ConsolidationReport> {
-    merge_tables_with(&PRICE_TABLE_SCHEMA, src_dir, output)
+    let mode = if PRICE_TABLE_SCHEMA.preferred_sheets.is_empty() {
+        SheetMode::AllSheets
+    } else {
+        SheetMode::Preferred(PRICE_TABLE_SCHEMA.preferred_sheets)
+    };
+    merge_tables_with_mode(&PRICE_TABLE_SCHEMA, src_dir, output, mode)
+}
+
+/// 首个 sheet 专用入口 — 每个文件只取第一个 sheet 合并 (不优先"修改版")。
+///
+/// 与 [`consolidate_tables`] 的差异仅在 sheet 选择策略;
+/// 委托运行时 `SheetMode::FirstSheet`, 无需编译期哨兵变体 (R-2026-08-20 收敛)。
+///
+/// 适用: 目录文件已人工核对待确认 (如 "已核对待确认-0810"), 首个 sheet 即目标数据。
+pub fn consolidate_tables_first_sheet(
+    src_dir: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+) -> Result<ConsolidationReport> {
+    merge_tables_with_mode(&PRICE_TABLE_SCHEMA, src_dir, output, SheetMode::FirstSheet)
+}
+
+/// 价格表合并 + 运行时 sheet 策略 — 统一参数化入口 (推荐)。
+/// 覆盖全部场景: 首 sheet / 修改版优先 / 全 sheet, 无需编译期变体。
+pub fn consolidate_tables_with_mode(
+    src_dir: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    mode: SheetMode,
+) -> Result<ConsolidationReport> {
+    merge_tables_with_mode(&PRICE_TABLE_SCHEMA, src_dir, output, mode)
 }
 
 /// 建议 schema 草稿 (P3 选项 B: LLM 生成初稿 → 人工确认固化, 不直入生产)。
@@ -674,19 +738,27 @@ pub fn suggest_schema(
     })
 }
 
-/// 多 sheet 表格按 preferred_sheets 选择: 命中任一 (trim 精确匹配) 只保留该 sheet;
-/// 未命中则取第一个 sheet。preferred_sheets 为空 = 保留全部 (旧行为)。
-fn select_preferred_sheets(tables: Vec<TableData>, preferred: &[&str]) -> Vec<TableData> {
-    if preferred.is_empty() {
-        return tables;
+/// 多 sheet 表格按 sheet_mode 选择 (运行时策略):
+/// - FirstSheet: 只取第一个 sheet
+/// - Preferred(list): 命中任一 (trim 精确匹配) 只保留该 sheet; 未命中取第一个
+/// - AllSheets: 保留全部
+fn select_preferred_sheets(tables: Vec<TableData>, mode: SheetMode) -> Vec<TableData> {
+    match mode {
+        SheetMode::FirstSheet => tables.into_iter().take(1).collect(),
+        SheetMode::AllSheets => tables,
+        SheetMode::Preferred(preferred) => {
+            if preferred.is_empty() {
+                return tables;
+            }
+            if let Some(t) = tables
+                .iter()
+                .find(|t| preferred.iter().any(|p| t.name.trim() == *p))
+            {
+                return vec![t.clone()];
+            }
+            tables.into_iter().take(1).collect()
+        }
     }
-    if let Some(t) = tables
-        .iter()
-        .find(|t| preferred.iter().any(|p| t.name.trim() == *p))
-    {
-        return vec![t.clone()];
-    }
-    tables.into_iter().take(1).collect()
 }
 
 /// 从文件名推导来源名 (通用: 剥离序号/后缀, 后缀来自 schema.filename_suffixes)。

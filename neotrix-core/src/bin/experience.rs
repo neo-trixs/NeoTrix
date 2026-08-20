@@ -881,12 +881,27 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
     // 否则按文件路径读取。
     let raw = if input == "-" {
         let mut buf = String::new();
-        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf).expect("read stdin");
+        if let Err(e) = std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf) {
+            eprintln!("[absorb] 读取 stdin 失败: {e}");
+            std::process::exit(1);
+        }
         buf
     } else {
-        std::fs::read_to_string(input).expect("read session.json")
+        match std::fs::read_to_string(input) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[absorb] 读取 {} 失败: {e}", input);
+                std::process::exit(1);
+            }
+        }
     };
-    let session: Value = serde_json::from_str(&raw).expect("session.json is valid JSON");
+    let session: Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("[absorb] session.json 不是合法 JSON: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let sid = session
         .get("session_id")
