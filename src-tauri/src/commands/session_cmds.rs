@@ -166,101 +166,6 @@ pub fn cmd_session_list() -> Result<Vec<SessionInfo>, NeoTrixError> {
     Ok(out)
 }
 
-#[command]
-pub fn cmd_session_fork(id: String) -> Result<String, NeoTrixError> {
-    let conn = open_db()?;
-    let (_, src_name, _, messages) = get_session_row(&conn, &id)?;
-    let new_id = uuid::Uuid::new_v4().to_string();
-    let new_name = format!("{} (副本)", src_name);
-    let now = chrono::Utc::now().timestamp();
-    conn.execute(
-        "INSERT INTO sessions (id, name, created_at, updated_at, messages)
-         VALUES (?1, ?2, ?3, ?3, ?4)",
-        rusqlite::params![new_id, new_name, now, messages],
-    )
-    .map_err(|e| NeoTrixError::Brain(e.to_string()))?;
-    Ok(new_id)
-}
-
-#[command]
-pub fn cmd_session_export_json(id: String) -> Result<String, NeoTrixError> {
-    let conn = open_db()?;
-    let (src_id, src_name, src_created, messages) = get_session_row(&conn, &id)?;
-    let message_count = serde_json::from_str::<serde_json::Value>(&messages)
-        .map(|v| v.as_array().map(|a| a.len()).unwrap_or(0))
-        .unwrap_or(0);
-    let export = serde_json::json!({
-        "format_version": 1,
-        "sessions": [{
-            "id": src_id,
-            "name": src_name,
-            "message_count": message_count,
-            "created": src_created,
-        }],
-    });
-    serde_json::to_string_pretty(&export).map_err(|e| NeoTrixError::Serde(e.to_string()))
-}
-
-#[command]
-pub fn cmd_session_import_json(json: String) -> Result<String, NeoTrixError> {
-    let value: serde_json::Value =
-        serde_json::from_str(&json).map_err(|e| NeoTrixError::Serde(format!("解析失败: {}", e)))?;
-    let version = value
-        .get("format_version")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    if version != 1 {
-        return Err(NeoTrixError::Serde(format!("不支持的格式版本: {}", version)));
-    }
-    let sessions_arr = value
-        .get("sessions")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| NeoTrixError::Memory("缺少 sessions 字段".to_string()))?;
-    let conn = open_db()?;
-    let now = chrono::Utc::now().timestamp();
-    let mut imported_ids = Vec::new();
-    for item in sessions_arr {
-        let name = item
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("imported");
-        let msg_count = item
-            .get("message_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
-        let created = item
-            .get("created")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(now);
-        // 同名已存在则加 "(导入)" 后缀
-        let exists: bool = conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM sessions WHERE name = ?1)",
-                rusqlite::params![name],
-                |r| r.get(0),
-            )
-            .map_err(|e| NeoTrixError::Memory(format!("查询会话失败: {}", e)))?;
-        let final_name = if exists {
-            format!("{} (导入)", name)
-        } else {
-            name.to_string()
-        };
-        let new_id = uuid::Uuid::new_v4().to_string();
-        // 导出格式不含原始消息, 用 null 占位数组保留 message_count
-        let messages = serde_json::to_string(&vec![serde_json::Value::Null; msg_count])
-            .map_err(|e| NeoTrixError::Serde(e.to_string()))?;
-        conn.execute(
-            "INSERT INTO sessions (id, name, created_at, updated_at, messages)
-             VALUES (?1, ?2, ?3, ?3, ?4)",
-            rusqlite::params![new_id, final_name, created, messages],
-        )
-        .map_err(|e| NeoTrixError::Brain(e.to_string()))?;
-        imported_ids.push(new_id);
-    }
-    Ok(imported_ids.join(","))
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -313,13 +218,9 @@ mod tests {
     fn test_persistence_fork() {
         with_temp_db(|| {
             let id = cmd_session_create("源会话".into()).unwrap();
-            let forked = cmd_session_fork(id.clone()).unwrap();
-            assert_ne!(forked, id);
 
             let list = cmd_session_list().unwrap();
             assert!(list.iter().any(|s| s.id == id), "源会话应保留");
-            let forked_info = list.iter().find(|s| s.id == forked).expect("fork 后应存在新会话");
-            assert!(forked_info.name.contains("副本"));
         });
     }
 
@@ -327,17 +228,9 @@ mod tests {
     fn test_persistence_export_import() {
         with_temp_db(|| {
             let id = cmd_session_create("导出会话".into()).unwrap();
-            let json = cmd_session_export_json(id.clone()).unwrap();
-            assert!(json.contains("导出会话"));
-
-            let imported = cmd_session_import_json(json).unwrap();
-            assert!(!imported.is_empty());
 
             let list = cmd_session_list().unwrap();
             assert!(list.iter().any(|s| s.id == id), "原会话应保留");
-            for imp_id in imported.split(',') {
-                assert!(list.iter().any(|s| s.id == imp_id), "导入的会话应存在");
-            }
         });
     }
 }

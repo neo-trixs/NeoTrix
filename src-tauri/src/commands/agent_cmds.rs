@@ -46,66 +46,6 @@ pub fn payload_to_provider_config(payload: &ProviderConfigPayload) -> ProviderCo
 // ===== Agent commands =====
 
 #[command]
-pub async fn agent_reason(app: tauri::AppHandle, req: ReasonRequest) -> ReasonResponse {
-    let payload = match read_provider_config() {
-        Ok(p) => p,
-        Err(e) => return ReasonResponse { output: e.to_string(), success: false },
-    };
-    let config = payload_to_provider_config(&payload);
-    let provider = create_provider(config);
-    let request = LlmRequest::new(&payload.model, &req.prompt);
-
-    if let Ok(mut rx) = provider.stream_complete(&request).await {
-        let mut full_output = String::new();
-        loop {
-            // 无超时 recv 会在 sender 卡死时冻结前端流式输出；包一层 90s 兜底
-            let next = match tokio::time::timeout(std::time::Duration::from_secs(90), rx.recv()).await {
-                Ok(Some(chunk_result)) => chunk_result,
-                Ok(None) => break, // 正常结束
-                Err(_) => {
-                    let _ = app.emit("streaming-token", serde_json::json!({
-                        "token": "",
-                        "error": "stream timed out",
-                        "full": full_output,
-                    }));
-                    return ReasonResponse { output: "LLM 流超时".to_string(), success: false };
-                }
-            };
-            match next {
-                Ok(chunk) => {
-                    full_output.push_str(&chunk.content);
-                    let _ = app.emit("streaming-token", serde_json::json!({
-                        "token": chunk.content,
-                        "full": full_output,
-                    }));
-                }
-                Err(e) => {
-                    let _ = app.emit("streaming-token", serde_json::json!({
-                        "token": "",
-                        "error": format!("{}", e),
-                        "full": full_output,
-                    }));
-                    return ReasonResponse { output: format!("LLM 流错误: {}", e), success: false };
-                }
-            }
-        }
-        let _ = app.emit("streaming-done", serde_json::json!({ "full": full_output }));
-        return ReasonResponse { output: full_output, success: true };
-    }
-
-    match provider.complete(&request).await {
-        Ok(response) => ReasonResponse {
-            output: response.content,
-            success: true,
-        },
-        Err(e) => ReasonResponse {
-            output: format!("LLM 错误: {}", e),
-            success: false,
-        },
-    }
-}
-
-#[command]
 pub fn cmd_agent_start(prompt: String) -> Result<String, NeoTrixError> {
     let mut state = AGENT_RUNNING.lock().map_err(|e| NeoTrixError::Brain(e.to_string()))?;
     *state = AgentStatus { running: true, current_task: Some(prompt.clone()), uptime_secs: 0 };

@@ -245,17 +245,6 @@ pub fn preview_set_config(config: PreviewConfig) -> Result<(), String> {
 // ── Chrome Debug Integration ──────────────────────────────────────────
 
 #[tauri::command]
-pub fn chrome_debug_connect(host: Option<String>, port: Option<u16>) -> Result<String, String> {
-    let mut state = STATE.lock().map_err(|e| format!("lock: {}", e))?;
-    let h = host.unwrap_or_else(|| "localhost".to_string());
-    let p = port.unwrap_or(9222);
-    state.chrome_config.host = h.clone();
-    state.chrome_config.port = p;
-    state.chrome_connected = true;
-    Ok(format!("connected to {}:{}", h, p))
-}
-
-#[tauri::command]
 pub fn chrome_debug_disconnect() -> Result<(), String> {
     let mut state = STATE.lock().map_err(|e| format!("lock: {}", e))?;
     state.chrome_connected = false;
@@ -376,17 +365,6 @@ mod tests {
         assert!(list.iter().any(|s| s.id == id));
         assert_eq!(list.iter().find(|s| s.id == id).unwrap().width, 800);
         assert_eq!(list.iter().find(|s| s.id == id).unwrap().height, 600);
-    }
-
-    #[test]
-    fn test_chrome_connect_disconnect() {
-        let _ = chrome_debug_disconnect();
-        let msg = chrome_debug_connect(Some("127.0.0.1".into()), Some(9333)).unwrap();
-        assert!(msg.contains("127.0.0.1:9333"));
-        let cfg = chrome_debug_status().unwrap();
-        assert_eq!(cfg.host, "127.0.0.1");
-        assert_eq!(cfg.port, 9333);
-        assert!(chrome_debug_disconnect().is_ok());
     }
 
     #[test]

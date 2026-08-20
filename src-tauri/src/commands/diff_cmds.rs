@@ -36,51 +36,11 @@ fn run_git_cmd(args: &[&str]) -> Result<String, NeoTrixError> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-#[command]
-pub fn cmd_diff_staged() -> Result<Vec<DiffBlock>, NeoTrixError> {
-    run_git_cmd(&["diff", "--cached"]).map(|s| parse_git_diff(&s))
-}
-
-#[command]
-pub fn cmd_diff_unstaged() -> Result<Vec<DiffBlock>, NeoTrixError> {
-    run_git_cmd(&["diff"]).map(|s| parse_git_diff(&s))
-}
-
-#[command]
-pub fn cmd_diff_file(path: String) -> Result<Vec<DiffBlock>, NeoTrixError> {
-    run_git_cmd(&["diff", "HEAD", "--", &path]).map(|s| parse_git_diff(&s))
-}
-
 /// Stage the given paths (or all changes when `paths` is empty). Returns the
 /// updated list of changed files for the review UI.
 /// Structured changed-file list for the diff review UI (Codex #1 gap: the
 /// review file tree was hidden behind a button). Returns porcelain entries
 /// with their two-letter status + path, split into staged/unstaged buckets.
-#[command]
-pub fn cmd_diff_changed_files() -> Result<serde_json::Value, NeoTrixError> {
-    let out = run_git_cmd(&["status", "--porcelain"])?;
-    Ok(parse_porcelain_changed(&out))
-}
-
-#[command]
-pub fn cmd_diff_stage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTrixError> {
-    match paths {
-        Some(p) if !p.is_empty() => {
-            let mut args: Vec<String> = vec!["add".into(), "--".into()];
-            args.extend(p);
-            let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-            run_git_cmd(&arg_refs)?;
-        }
-        _ => { run_git_cmd(&["add", "-A"])?; }
-    };
-    changed_files_porcelain()
-}
-
-fn changed_files_porcelain() -> Result<Vec<String>, NeoTrixError> {
-    let out = run_git_cmd(&["status", "--porcelain"])?;
-    Ok(parse_porcelain_paths(&out))
-}
-
 /// Parse `git status --porcelain` output into bare file paths.
 pub(crate) fn parse_porcelain_paths(out: &str) -> Vec<String> {
     out.lines()
@@ -118,74 +78,8 @@ pub(crate) fn parse_porcelain_changed(out: &str) -> serde_json::Value {
     serde_json::json!({ "staged": staged, "unstaged": unstaged, "untracked": untracked })
 }
 
-/// Unstage the given paths (or everything when `paths` is empty). Returns the
-/// updated porcelain file list.
-#[command]
-pub fn cmd_diff_unstage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTrixError> {
-    match paths {
-        Some(p) if !p.is_empty() => {
-            let mut args: Vec<String> = vec!["reset".into(), "HEAD".into(), "--".into()];
-            args.extend(p);
-            let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-            run_git_cmd(&arg_refs)?;
-        }
-        _ => { run_git_cmd(&["reset"])?; }
-    };
-    changed_files_porcelain()
-}
-
-/// Discard working-tree changes for the given paths (per-file "reject" in the
-/// diff review UI, Claude Code Manual / Codex review parity). Untracked files
-/// are removed; tracked files are restored to HEAD. Returns the updated
-/// porcelain changed-file list.
-#[command]
-pub fn cmd_diff_restore(paths: Vec<String>) -> Result<Vec<String>, NeoTrixError> {
-    if paths.is_empty() {
-        return Err(NeoTrixError::Memory("no paths to restore".into()));
-    }
-    for p in &paths {
-        // Untracked (??) files have no HEAD entry; remove them outright.
-        let porcelain = run_git_cmd(&["status", "--porcelain", "--", p])?;
-        let untracked = porcelain.lines().any(|l| l.starts_with("??"));
-        if untracked {
-            let _ = std::fs::remove_file(p);
-            continue;
-        }
-        // Restore to HEAD (not `--worktree` alone, which restores from the
-        // INDEX and leaves staged changes behind — an accept/reject reject
-        // must fully discard the change). `--staged --worktree --source=HEAD`
-        // resets both the index and the working tree to HEAD semantics.
-        run_git_cmd(&["restore", "--staged", "--worktree", "--source=HEAD", "--", p])?;
-    }
-    changed_files_porcelain()
-}
-
-/// Commit staged changes with the given message (Codex "Review changes" parity).
-#[command]
-pub fn cmd_diff_commit(message: String) -> Result<(), NeoTrixError> {
-    run_git_cmd(&["commit", "-m", &message]).map(|_| ())
-}
-
-/// Diff against a base branch (Codex "Review against base branch" parity).
-/// `git diff <base>...HEAD` shows commits on HEAD since diverging from base.
-/// Falls back to `git diff <base>` when no merge base exists (unrelated
-/// histories / fresh repos).
-#[command]
-pub fn cmd_diff_base(base: String) -> Result<Vec<DiffBlock>, NeoTrixError> {
-    let merge_base = run_git_cmd(&["merge-base", &base, "HEAD"]);
-    let args: Vec<&str> = if merge_base.is_ok() {
-        vec!["diff", &base, "...HEAD"]
-    } else {
-        vec!["diff", &base, "HEAD"]
-    };
-    run_git_cmd(&args).map(|s| parse_git_diff(&s))
-}
-
-/// Changed-file list for base-branch review (parity with cmd_diff_changed_files
-/// but scoped to the base branch). Returns porcelain-style {staged, unstaged,
-/// untracked} buckets by reusing the same parser on `git diff --name-status`.
 /// Parse `git diff --name-status` output into porcelain-style {staged} entries
-/// (status letter + path). Shared by `cmd_diff_base_files`; testable in isolation.
+/// (status letter + path). Shared by base-branch review; testable in isolation.
 pub(crate) fn parse_name_status(out: &str, base: &str) -> serde_json::Value {
     let mut staged = Vec::new();
     for line in out.lines() {
@@ -196,18 +90,6 @@ pub(crate) fn parse_name_status(out: &str, base: &str) -> serde_json::Value {
         staged.push(serde_json::json!({ "status": status, "path": path }));
     }
     serde_json::json!({ "staged": staged, "unstaged": serde_json::Value::Array(vec![]), "untracked": serde_json::Value::Array(vec![]), "base": base })
-}
-
-#[command]
-pub fn cmd_diff_base_files(base: String) -> Result<serde_json::Value, NeoTrixError> {
-    let merge_base = run_git_cmd(&["merge-base", &base, "HEAD"]);
-    let args: Vec<&str> = if merge_base.is_ok() {
-        vec!["diff", "--name-status", &base, "...HEAD"]
-    } else {
-        vec!["diff", "--name-status", &base, "HEAD"]
-    };
-    let out = run_git_cmd(&args)?;
-    Ok(parse_name_status(&out, &base))
 }
 
 /// Gather the full working-tree diff (staged + unstaged) and run the static

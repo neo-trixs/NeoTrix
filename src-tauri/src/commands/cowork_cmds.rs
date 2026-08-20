@@ -107,17 +107,6 @@ impl Default for CoworkConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoworkStats {
-    pub total_sessions: u32,
-    pub total_deliverables: u32,
-    pub files_processed: u32,
-    pub active_sessions: u32,
-    pub avg_files_per_session: f64,
-    pub top_category: String,
-    pub top_template: String,
-}
-
 // ============================================================================
 // State
 // ============================================================================
@@ -572,42 +561,9 @@ pub fn cowork_write_file(session_id: String, path: String, content: String) -> R
 }
 
 #[command]
-pub fn cowork_delete_file(session_id: String, path: String) -> Result<(), String> {
-    let session = find_session(&session_id)?;
-    let allowed = {
-        let state = COWORK.lock().map_err(|e| e.to_string())?;
-        state.config.allow_file_delete
-    };
-    if !allowed {
-        return Err("File deletion is disabled by cowork config".into());
-    }
-    let abs_path = resolve_workspace_path(&session, &path)?;
-    std::fs::remove_file(&abs_path).map_err(|e| format!("Failed to delete file: {}", e))?;
-
-    let mut state = COWORK.lock().map_err(|e| e.to_string())?;
-    if let Some(session) = state.sessions.get_mut(&session_id) {
-        session.files_modified = session.files_modified.saturating_add(1);
-        session.last_active_at = now_ts();
-    }
-
-    Ok(())
-}
-
-#[command]
 pub fn cowork_list_deliverables(session_id: String) -> Result<Vec<CoworkDeliverable>, String> {
     let state = COWORK.lock().map_err(|e| e.to_string())?;
     state.deliverables.get(&session_id).cloned().ok_or_else(|| format!("Session not found: {}", session_id))
-}
-
-#[command]
-pub fn cowork_get_deliverable(deliverable_id: String) -> Result<CoworkDeliverable, String> {
-    let state = COWORK.lock().map_err(|e| e.to_string())?;
-    for dels in state.deliverables.values() {
-        if let Some(d) = dels.iter().find(|d| d.id == deliverable_id) {
-            return Ok(d.clone());
-        }
-    }
-    Err(format!("Deliverable not found: {}", deliverable_id))
 }
 
 #[command]
@@ -620,139 +576,9 @@ pub fn cowork_templates(category: Option<String>) -> Result<Vec<CoworkTemplate>,
 }
 
 #[command]
-pub fn cowork_apply_template(session_id: String, template_id: String) -> Result<Vec<CoworkAction>, String> {
-    find_session(&session_id)?;
-    let templates = default_templates();
-    let tpl = templates.into_iter().find(|t| t.id == template_id)
-        .ok_or_else(|| format!("Template not found: {}", template_id))?;
-
-    let now = now_ts();
-    let actions: Vec<CoworkAction> = tpl.steps.into_iter().map(|step| {
-        let action_id = format!("act-{}-{}", template_id, step.order);
-        CoworkAction {
-            id: action_id.clone(),
-            session_id: session_id.clone(),
-            action_type: step.action.clone(),
-            target_path: session_id.clone(),
-            status: "pending".into(),
-            started_at: now,
-            completed_at: None,
-            details: Some(step.description),
-            result_summary: None,
-        }
-    }).collect();
-
-    let mut state = COWORK.lock().map_err(|e| e.to_string())?;
-    let session_actions = state.actions.entry(session_id).or_default();
-    for action in &actions {
-        session_actions.push(action.clone());
-    }
-
-    Ok(actions)
-}
-
-#[command]
 pub fn cowork_actions(session_id: String) -> Result<Vec<CoworkAction>, String> {
     let state = COWORK.lock().map_err(|e| e.to_string())?;
     state.actions.get(&session_id).cloned().ok_or_else(|| format!("Session not found: {}", session_id))
-}
-
-#[command]
-pub fn cowork_config() -> Result<CoworkConfig, String> {
-    let state = COWORK.lock().map_err(|e| e.to_string())?;
-    Ok(state.config.clone())
-}
-
-#[command]
-pub fn cowork_set_config(config: CoworkConfig) -> Result<(), String> {
-    let mut state = COWORK.lock().map_err(|e| e.to_string())?;
-    state.config = config;
-    Ok(())
-}
-
-#[command]
-pub fn cowork_stats() -> Result<CoworkStats, String> {
-    let state = COWORK.lock().map_err(|e| e.to_string())?;
-    let total_sessions = state.sessions.len() as u32;
-    let active_sessions = state.sessions.values().filter(|s| s.status == "active").count() as u32;
-    let total_deliverables: u32 = state.deliverables.values().map(|d| d.len() as u32).sum();
-    let files_processed: u32 = state.sessions.values().map(|s| s.files_read).sum();
-    let avg_files_per_session = if total_sessions > 0 {
-        files_processed as f64 / total_sessions as f64
-    } else {
-        0.0
-    };
-
-    let templates = default_templates();
-    let top_template = templates.first().map(|t| t.name.clone()).unwrap_or_default();
-    let top_category = {
-        let mut counts: HashMap<&str, u32> = HashMap::new();
-        for t in &templates {
-            *counts.entry(t.category.as_str()).or_insert(0) += 1;
-        }
-        counts.into_iter().max_by_key(|&(_, c)| c).map(|(k, _)| k.to_string()).unwrap_or_default()
-    };
-
-    Ok(CoworkStats {
-        total_sessions,
-        total_deliverables,
-        files_processed,
-        active_sessions,
-        avg_files_per_session,
-        top_category,
-        top_template,
-    })
-}
-
-#[command]
-pub fn cowork_export_session(session_id: String, format: Option<String>) -> Result<String, String> {
-    let state = COWORK.lock().map_err(|e| e.to_string())?;
-    let session = state.sessions.get(&session_id).ok_or_else(|| format!("Session not found: {}", session_id))?;
-    let actions = state.actions.get(&session_id).cloned().unwrap_or_default();
-    let deliverables = state.deliverables.get(&session_id).cloned().unwrap_or_default();
-
-    let fmt = format.unwrap_or_else(|| "json".into());
-    match fmt.as_str() {
-        "json" => {
-            let export = serde_json::json!({
-                "session": session,
-                "actions": actions,
-                "deliverables": deliverables,
-                "exported_at": now_ts(),
-            });
-            serde_json::to_string_pretty(&export).map_err(|e| e.to_string())
-        }
-        "markdown" | "md" => {
-            let mut md = String::new();
-            md.push_str(&format!("# Cowork Session: {}\n\n", session.name));
-            md.push_str(&format!("- **ID**: {}\n", session.id));
-            md.push_str(&format!("- **Status**: {}\n", session.status));
-            md.push_str(&format!("- **Workspace**: {}\n", session.workspace_path));
-            md.push_str(&format!("- **Files Read**: {}\n", session.files_read));
-            md.push_str(&format!("- **Files Created**: {}\n", session.files_created));
-            md.push_str(&format!("- **Files Modified**: {}\n", session.files_modified));
-            md.push_str(&format!("- **Description**: {}\n", session.description));
-            if !session.tags.is_empty() {
-                md.push_str(&format!("- **Tags**: {}\n", session.tags.join(", ")));
-            }
-            md.push('\n');
-            if !deliverables.is_empty() {
-                md.push_str("## Deliverables\n\n");
-                for d in &deliverables {
-                    md.push_str(&format!("- **{}**: {} ({} bytes, {})\n", d.name, d.description, d.size_bytes, d.kind));
-                }
-                md.push('\n');
-            }
-            if !actions.is_empty() {
-                md.push_str("## Actions\n\n");
-                for a in &actions {
-                    md.push_str(&format!("- [{}] {} → {} ({})\n", a.status, a.action_type, a.target_path, a.started_at));
-                }
-            }
-            Ok(md)
-        }
-        _ => Err(format!("Unsupported export format: {}. Supported: json, markdown", fmt)),
-    }
 }
 
 // ============================================================================
@@ -822,17 +648,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cowork_config_default() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        reset_state();
-        let cfg = cowork_config().unwrap();
-        assert!(cfg.enabled);
-        assert_eq!(cfg.max_files_per_scan, 500);
-        assert!(cfg.allow_file_create);
-        assert!(!cfg.allow_file_delete);
-    }
-
-    #[test]
     fn test_cowork_templates() {
         let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
@@ -840,38 +655,5 @@ mod tests {
         assert_eq!(templates.len(), 6);
         let doc_templates = cowork_templates(Some("writing".into())).unwrap();
         assert_eq!(doc_templates.len(), 2);
-    }
-
-    #[test]
-    fn test_cowork_set_config() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        reset_state();
-        let cfg = CoworkConfig {
-            enabled: false,
-            max_files_per_scan: 100,
-            max_file_size_kb: 512,
-            auto_save: false,
-            deliverable_formats: vec!["md".into()],
-            allow_file_create: false,
-            allow_file_modify: false,
-            allow_file_delete: true,
-        };
-        cowork_set_config(cfg).unwrap();
-        let updated = cowork_config().unwrap();
-        assert!(!updated.enabled);
-        assert_eq!(updated.max_files_per_scan, 100);
-        assert!(updated.allow_file_delete);
-    }
-
-    #[test]
-    fn test_cowork_stats() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        reset_state();
-        let id = cowork_start("/tmp".into(), "stats test".into(), None, None).unwrap();
-        let _ = cowork_write_file(id.clone(), "/tmp/cowork_test_stats.txt".into(), "hello".into());
-        let stats = cowork_stats().unwrap();
-        assert!(stats.total_sessions > 0);
-        assert_eq!(stats.total_deliverables, 1);
-        let _ = std::fs::remove_file("/tmp/cowork_test_stats.txt");
     }
 }

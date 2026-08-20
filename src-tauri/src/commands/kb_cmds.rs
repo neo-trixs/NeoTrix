@@ -223,38 +223,6 @@ pub fn kb_get_related(id: String, relation_type: Option<String>, limit: Option<u
     Ok(results)
 }
 
-#[command]
-pub fn kb_feed(limit: Option<usize>, offset: Option<usize>, sort: Option<String>) -> Result<Vec<KbSearchResult>, NeoTrixError> {
-    let path = kb_path();
-    let conn = rusqlite::Connection::open(&path)
-        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
-    let limit = limit.unwrap_or(50);
-    let offset = offset.unwrap_or(0);
-    let order = match sort.as_deref() {
-        Some("confidence") => "n.confidence DESC, n.created_at DESC",
-        Some("importance") => "n.importance DESC, n.created_at DESC",
-        _ => "n.created_at DESC, n.confidence DESC",
-    };
-    let sql = format!(
-        "SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain, n.confidence, n.importance, n.created_at
-         FROM nodes n
-         ORDER BY {}
-         LIMIT ?1 OFFSET ?2", order
-    );
-    let mut stmt = conn.prepare(&sql)
-        .map_err(|e| NeoTrixError::Memory(format!("feed prep: {}", e)))?;
-    let results = stmt.query_map(params![limit as i64, offset as i64], |row| {
-        Ok(KbSearchResult {
-            id: row.get(0)?, node_type: row.get(1)?, title: row.get(2)?,
-            summary: row.get(3)?, content: row.get(4)?, url: row.get(5)?,
-            domain: row.get(6)?, confidence: row.get(7)?, importance: row.get(8)?, created_at: row.get(9)?,
-        })
-    }).map_err(|e| NeoTrixError::Memory(format!("feed query: {}", e)))?
-    .filter_map(|r| r.ok())
-    .collect();
-    Ok(results)
-}
-
 /// 地理索引记录 (geo_index 表) — 供前端 3D 地图渲染.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeoPoint {

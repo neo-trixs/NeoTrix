@@ -6,19 +6,6 @@ use super::ProviderConfigPayload;
 use super::agent_cmds::payload_to_provider_config;
 
 #[command]
-pub async fn test_provider(config: ProviderConfigPayload) -> Result<String, NeoTrixError> {
-    if config.api_key.is_empty() || config.model.is_empty() {
-        return Err(NeoTrixError::Config("API Key 和模型不能为空".into()));
-    }
-    let provider_config = payload_to_provider_config(&config);
-    let provider = create_provider(provider_config);
-    let request = LlmRequest::new(&config.model, "Hello");
-    provider.complete(&request).await
-        .map(|_| "ok".into())
-        .map_err(|e| NeoTrixError::Brain(format!("测试失败: {}", e)))
-}
-
-#[command]
 pub fn save_provider_config(config: ProviderConfigPayload) -> Result<String, NeoTrixError> {
     let path = dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))

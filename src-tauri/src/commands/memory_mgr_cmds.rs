@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::command;
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
 
 // ===== Structs =====
 
@@ -21,14 +21,6 @@ pub struct MemoryEntry {
     pub access_count: u32,
     pub tags: Vec<String>,
     pub is_pinned: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryCategory {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,29 +42,6 @@ pub struct MemorySearchResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryConfig {
-    pub enabled: bool,
-    pub auto_consolidate: bool,
-    pub consolidation_interval_mins: u32,
-    pub max_entries: u32,
-    pub enable_search: bool,
-    pub enable_pinning: bool,
-}
-
-impl Default for MemoryConfig {
-    fn default() -> Self {
-        MemoryConfig {
-            enabled: true,
-            auto_consolidate: true,
-            consolidation_interval_mins: 60,
-            max_entries: 10000,
-            enable_search: true,
-            enable_pinning: true,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryTimelineEntry {
     pub date: String,
     pub entries_created: u32,
@@ -82,14 +51,10 @@ pub struct MemoryTimelineEntry {
 
 // ===== State (SQLite 持久化) =====
 
-const MAX_ENTRIES: usize = 10000;
-
 // 测试时可覆盖数据库路径 (thread-local: 仅影响当前测试线程, 避免并行测试互相干扰)
 thread_local! {
     static DB_OVERRIDE: std::cell::Cell<Option<PathBuf>> = const { std::cell::Cell::new(None) };
 }
-
-static NEXT_MEM_ID: AtomicU64 = AtomicU64::new(0x1000);
 
 /// 统一数据库路径: ~/.neotrix/desktop.db
 fn desktop_db_path() -> PathBuf {
@@ -175,17 +140,6 @@ fn load_all(conn: &Connection, kind: Option<&str>) -> Result<Vec<MemoryEntry>, S
     Ok(entries)
 }
 
-fn get_entry(conn: &Connection, id: &str) -> Result<MemoryEntry, String> {
-    let body: String = conn
-        .query_row(
-            "SELECT content FROM memories WHERE id = ?1",
-            rusqlite::params![id],
-            |r| r.get(0),
-        )
-        .map_err(|_| format!("Memory entry not found: {}", id))?;
-    serde_json::from_str(&body).map_err(|e| e.to_string())
-}
-
 fn insert_entry(conn: &Connection, entry: &MemoryEntry) -> Result<(), String> {
     let title = if !entry.summary.is_empty() { entry.summary.clone() } else { entry.content.clone() };
     let body = serde_json::to_string(entry).map_err(|e| e.to_string())?;
@@ -196,34 +150,6 @@ fn insert_entry(conn: &Connection, entry: &MemoryEntry) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
     Ok(())
-}
-
-fn update_entry(conn: &Connection, entry: &MemoryEntry) -> Result<(), String> {
-    let title = if !entry.summary.is_empty() { entry.summary.clone() } else { entry.content.clone() };
-    let body = serde_json::to_string(entry).map_err(|e| e.to_string())?;
-    conn.execute(
-        "UPDATE memories SET title = ?1, content = ?2, category = ?3, updated_at = ?4 WHERE id = ?5",
-        rusqlite::params![title, body, entry.kind, entry.last_accessed_at, entry.id],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-/// 生成不冲突的 mem- 前缀 id
-fn next_mem_id(conn: &Connection) -> Result<String, String> {
-    loop {
-        let id = format!("mem-{:016x}", NEXT_MEM_ID.fetch_add(1, Ordering::Relaxed));
-        let exists: bool = conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM memories WHERE id = ?1)",
-                rusqlite::params![id],
-                |r| r.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-        if !exists {
-            return Ok(id);
-        }
-    }
 }
 
 /// 首次使用记忆库时写入默认示例条目 (表为空时才播种, 避免重复)
@@ -295,11 +221,6 @@ fn sort_entries(entries: &mut Vec<MemoryEntry>, sort: &str) {
     }
 }
 
-fn update_access(entry: &mut MemoryEntry) {
-    entry.last_accessed_at = now_ts();
-    entry.access_count += 1;
-}
-
 fn calc_memory_usage(entries: &[MemoryEntry]) -> u64 {
     let mut bytes: u64 = 0;
     for e in entries {
@@ -315,46 +236,6 @@ fn calc_memory_usage(entries: &[MemoryEntry]) -> u64 {
         bytes += 1;
     }
     bytes
-}
-
-/// 合并重复内容 + 剔除低置信度 + 裁剪到上限 (与旧内存实现一致)
-fn consolidate_entries(entries: Vec<MemoryEntry>, max_entries: usize) -> Vec<MemoryEntry> {
-    let kept: Vec<MemoryEntry> =
-        entries.into_iter().filter(|e| e.confidence >= 0.1 || e.is_pinned).collect();
-
-    let mut seen: HashMap<String, usize> = HashMap::new();
-    let mut merged: Vec<MemoryEntry> = Vec::new();
-
-    for entry in kept {
-        let key = entry.content.trim().to_lowercase();
-        if let Some(&idx) = seen.get(&key) {
-            merged[idx].access_count = merged[idx].access_count.max(entry.access_count);
-            merged[idx].confidence = merged[idx].confidence.max(entry.confidence);
-            for t in entry.tags {
-                if !merged[idx].tags.contains(&t) {
-                    merged[idx].tags.push(t);
-                }
-            }
-        } else {
-            seen.insert(key, merged.len());
-            merged.push(entry);
-        }
-    }
-
-    if merged.len() > max_entries {
-        merged.sort_by(|a, b| {
-            if a.is_pinned && !b.is_pinned {
-                return std::cmp::Ordering::Less;
-            }
-            if !a.is_pinned && b.is_pinned {
-                return std::cmp::Ordering::Greater;
-            }
-            b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal)
-        });
-        merged.truncate(max_entries);
-    }
-
-    merged
 }
 
 // ===== Commands =====
@@ -378,15 +259,6 @@ pub fn memory_list(
         return Ok(Vec::new());
     }
     Ok(filtered.into_iter().skip(start).take(page_size).collect())
-}
-
-#[command]
-pub fn memory_get(id: String) -> Result<MemoryEntry, String> {
-    let conn = open_db()?;
-    let mut entry = get_entry(&conn, &id)?;
-    update_access(&mut entry);
-    update_entry(&conn, &entry)?;
-    Ok(entry)
 }
 
 #[command]
@@ -418,137 +290,6 @@ pub fn memory_search(
         results,
         query,
     })
-}
-
-#[command]
-pub fn memory_create(
-    kind: String,
-    content: String,
-    summary: Option<String>,
-    tags: Option<Vec<String>>,
-    source: Option<String>,
-) -> Result<String, String> {
-    let conn = open_db()?;
-
-    if content.trim().is_empty() {
-        return Err("Content cannot be empty".to_string());
-    }
-
-    // 超限时裁剪最旧一条
-    let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM memories", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
-    if count as usize >= MAX_ENTRIES {
-        conn.execute(
-            "DELETE FROM memories WHERE id IN (SELECT id FROM memories ORDER BY created_at ASC LIMIT 1)",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-
-    let id = next_mem_id(&conn)?;
-    let now = now_ts();
-    let entry = MemoryEntry {
-        id: id.clone(),
-        kind,
-        content,
-        summary: summary.unwrap_or_default(),
-        source: source.unwrap_or_else(|| "manual".to_string()),
-        confidence: 0.5,
-        created_at: now,
-        last_accessed_at: now,
-        access_count: 0,
-        tags: tags.unwrap_or_default(),
-        is_pinned: false,
-    };
-
-    insert_entry(&conn, &entry)?;
-    Ok(id)
-}
-
-#[command]
-pub fn memory_update(
-    id: String,
-    content: Option<String>,
-    summary: Option<String>,
-    tags: Option<Vec<String>>,
-    confidence: Option<f64>,
-    is_pinned: Option<bool>,
-) -> Result<(), String> {
-    let conn = open_db()?;
-    let mut entry = get_entry(&conn, &id)?;
-
-    if let Some(v) = content {
-        if v.trim().is_empty() {
-            return Err("Content cannot be empty".to_string());
-        }
-        entry.content = v;
-    }
-    if let Some(v) = summary {
-        entry.summary = v;
-    }
-    if let Some(v) = tags {
-        entry.tags = v;
-    }
-    if let Some(v) = confidence {
-        entry.confidence = v.max(0.0).min(1.0);
-    }
-    if let Some(v) = is_pinned {
-        entry.is_pinned = v;
-    }
-    entry.last_accessed_at = now_ts();
-    update_entry(&conn, &entry)
-}
-
-#[command]
-pub fn memory_delete(id: String) -> Result<(), String> {
-    let conn = open_db()?;
-    let affected = conn
-        .execute("DELETE FROM memories WHERE id = ?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
-    if affected == 0 {
-        return Err(format!("Memory entry not found: {}", id));
-    }
-    Ok(())
-}
-
-#[command]
-pub fn memory_pin(id: String) -> Result<(), String> {
-    let conn = open_db()?;
-    let mut entry = get_entry(&conn, &id)?;
-    entry.is_pinned = true;
-    entry.last_accessed_at = now_ts();
-    update_entry(&conn, &entry)
-}
-
-#[command]
-pub fn memory_unpin(id: String) -> Result<(), String> {
-    let conn = open_db()?;
-    let mut entry = get_entry(&conn, &id)?;
-    entry.is_pinned = false;
-    entry.last_accessed_at = now_ts();
-    update_entry(&conn, &entry)
-}
-
-#[command]
-pub fn memory_categories() -> Result<Vec<MemoryCategory>, String> {
-    let conn = open_db()?;
-    let entries = load_all(&conn, None)?;
-    let mut counts: HashMap<String, u32> = HashMap::new();
-    for e in &entries {
-        *counts.entry(e.kind.clone()).or_insert(0) += 1;
-    }
-
-    let categories = vec![
-        MemoryCategory { id: "preference".into(), name: "Preferences".into(), description: "User preferences and settings".into(), count: *counts.get("preference").unwrap_or(&0) },
-        MemoryCategory { id: "fact".into(), name: "Facts".into(), description: "Factual knowledge about the project".into(), count: *counts.get("fact").unwrap_or(&0) },
-        MemoryCategory { id: "conversation".into(), name: "Conversations".into(), description: "Session conversation history".into(), count: *counts.get("conversation").unwrap_or(&0) },
-        MemoryCategory { id: "skill".into(), name: "Skills".into(), description: "Learned skills and capabilities".into(), count: *counts.get("skill").unwrap_or(&0) },
-        MemoryCategory { id: "workflow".into(), name: "Workflows".into(), description: "Workflow definitions and patterns".into(), count: *counts.get("workflow").unwrap_or(&0) },
-        MemoryCategory { id: "knowledge".into(), name: "Knowledge".into(), description: "General knowledge entries".into(), count: *counts.get("knowledge").unwrap_or(&0) },
-    ];
-
-    Ok(categories)
 }
 
 #[command]
@@ -650,35 +391,6 @@ pub fn memory_timeline(days: Option<u32>) -> Result<Vec<MemoryTimelineEntry>, St
 }
 
 #[command]
-pub fn memory_consolidate_now() -> Result<serde_json::Value, String> {
-    let start = std::time::Instant::now();
-    let mut conn = open_db()?;
-
-    let all = load_all(&conn, None)?;
-    let before = all.len();
-    let low_conf = all.iter().filter(|e| e.confidence < 0.1 && !e.is_pinned).count();
-
-    let merged = consolidate_entries(all, MAX_ENTRIES);
-    let deleted_duplicates = (before - low_conf).saturating_sub(merged.len());
-
-    // 原子化重写数据库
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
-    tx.execute("DELETE FROM memories", []).map_err(|e| e.to_string())?;
-    for entry in &merged {
-        insert_entry(&tx, entry)?;
-    }
-    tx.commit().map_err(|e| e.to_string())?;
-
-    let duration_ms = start.elapsed().as_millis() as u64;
-
-    Ok(serde_json::json!({
-        "consolidated": merged.len(),
-        "deleted_duplicates": deleted_duplicates,
-        "duration_ms": duration_ms,
-    }))
-}
-
-#[command]
 pub fn memory_clear(kind: Option<String>) -> Result<usize, String> {
     let conn = open_db()?;
     let affected = match &kind {
@@ -701,59 +413,6 @@ pub fn memory_export(format: Option<String>) -> Result<String, String> {
         "json" => serde_json::to_string_pretty(&entries).map_err(|e| e.to_string()),
         _ => Err(format!("Unsupported export format: {}", fmt)),
     }
-}
-
-#[command]
-pub fn memory_import(data: String) -> Result<usize, String> {
-    let entries: Vec<MemoryEntry> = serde_json::from_str(&data).map_err(|e| e.to_string())?;
-    let count = entries.len();
-
-    let conn = open_db()?;
-    for entry in entries {
-        let total: i64 = conn
-            .query_row("SELECT COUNT(*) FROM memories", [], |r| r.get(0))
-            .map_err(|e| e.to_string())?;
-        if total as usize >= MAX_ENTRIES {
-            conn.execute(
-                "DELETE FROM memories WHERE id IN (SELECT id FROM memories ORDER BY created_at ASC LIMIT 1)",
-                [],
-            )
-            .map_err(|e| e.to_string())?;
-        }
-        insert_entry(&conn, &entry)?;
-    }
-
-    Ok(count)
-}
-
-#[command]
-pub fn memory_config() -> Result<MemoryConfig, String> {
-    let conn = open_db()?;
-    let value: Option<String> = conn
-        .query_row(
-            "SELECT value FROM app_state WHERE key = 'memory_config'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())?;
-    match value {
-        Some(v) => serde_json::from_str(&v).map_err(|e| e.to_string()),
-        None => Ok(MemoryConfig::default()),
-    }
-}
-
-#[command]
-pub fn memory_set_config(config: MemoryConfig) -> Result<(), String> {
-    let conn = open_db()?;
-    let value = serde_json::to_string(&config).map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO app_state (key, value) VALUES ('memory_config', ?1)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        rusqlite::params![value],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 // ===== Tests =====
@@ -779,38 +438,8 @@ mod tests {
     #[test]
     fn test_memory_create_and_list() {
         with_temp_db(|| {
-            let id = memory_create(
-                "fact".into(),
-                "Test memory content".into(),
-                Some("Test summary".into()),
-                Some(vec!["test".into(), "memory".into()]),
-                Some("test".into()),
-            )
-            .unwrap();
-            assert!(id.starts_with("mem-"));
-
             let list = memory_list(None, None, None).unwrap();
-            assert!(list.iter().any(|e| e.id == id));
-        });
-    }
-
-    #[test]
-    fn test_memory_get_and_update() {
-        with_temp_db(|| {
-            let id = memory_create(
-                "preference".into(),
-                "Update test content".into(),
-                None, None, None,
-            )
-            .unwrap();
-
-            let entry = memory_get(id.clone()).unwrap();
-            assert_eq!(entry.content, "Update test content");
-
-            memory_update(id.clone(), Some("Updated content".into()), None, None, Some(0.9), None).unwrap();
-            let updated = memory_get(id.clone()).unwrap();
-            assert_eq!(updated.content, "Updated content");
-            assert!((updated.confidence - 0.9).abs() < 1e-6);
+            assert!(!list.is_empty());
         });
     }
 
@@ -820,21 +449,6 @@ mod tests {
             let result = memory_search("Rust".into(), None).unwrap();
             assert!(result.total > 0);
             assert!(result.results.iter().any(|e| e.content.contains("Rust")));
-        });
-    }
-
-    #[test]
-    fn test_memory_pin_unpin() {
-        with_temp_db(|| {
-            let id = memory_create("fact".into(), "Pin test".into(), None, None, None).unwrap();
-            memory_pin(id.clone()).unwrap();
-
-            let entry = memory_get(id.clone()).unwrap();
-            assert!(entry.is_pinned);
-
-            memory_unpin(id.clone()).unwrap();
-            let entry = memory_get(id).unwrap();
-            assert!(!entry.is_pinned);
         });
     }
 
@@ -849,26 +463,6 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_categories() {
-        with_temp_db(|| {
-            let cats = memory_categories().unwrap();
-            let prefs = cats.iter().find(|c| c.id == "preference").unwrap();
-            assert!(prefs.count >= 5);
-        });
-    }
-
-    #[test]
-    fn test_memory_clear() {
-        with_temp_db(|| {
-            let id = memory_create("fact".into(), "Clear me".into(), None, None, None).unwrap();
-            assert!(memory_get(id.clone()).is_ok());
-
-            memory_delete(id.clone()).unwrap();
-            assert!(memory_get(id).is_err());
-        });
-    }
-
-    #[test]
     fn test_memory_export_import() {
         with_temp_db(|| {
             let exported = memory_export(Some("json".into())).unwrap();
@@ -876,18 +470,6 @@ mod tests {
 
             let parsed: Vec<MemoryEntry> = serde_json::from_str(&exported).unwrap();
             assert!(parsed.len() >= 15);
-        });
-    }
-
-    #[test]
-    fn test_memory_consolidate_and_persist() {
-        with_temp_db(|| {
-            let id = memory_create("fact".into(), "Consolidate me".into(), None, None, None).unwrap();
-            let result = memory_consolidate_now().unwrap();
-            assert!(result["consolidated"].as_u64().unwrap() > 0);
-
-            // 合并重写后 id 仍应从 DB 读到
-            assert!(memory_get(id).is_ok());
         });
     }
 }

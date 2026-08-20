@@ -3,9 +3,9 @@ use tauri::{command, State, Emitter};
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_mind::{ReasoningBrain, ReasoningBank};
 use neotrix::neotrix::nt_mind::KnowledgeSource;
-use neotrix::neotrix::nt_io_avatar_channel::{AvatarIdentity, MessageDirection};
-use neotrix::neotrix::nt_io_user_avatar::{DistillationEngine, DistillationFlowEvent, UserAvatar, AuthRequest};
-use super::{BrainStats, ChainStats};
+use neotrix::neotrix::nt_io_avatar_channel::AvatarIdentity;
+use neotrix::neotrix::nt_io_user_avatar::{DistillationEngine, DistillationFlowEvent, AuthRequest};
+use super::BrainStats;
 
 #[command]
 pub fn get_brain_stats(brain: State<'_, Mutex<ReasoningBrain>>, bank: State<'_, Mutex<ReasoningBank>>) -> BrainStats {
@@ -76,16 +76,6 @@ pub fn search_knowledge(query: String) -> Result<String, NeoTrixError> {
 }
 
 #[command]
-pub fn get_user_avatar(engine: State<'_, Mutex<DistillationEngine>>) -> UserAvatar {
-    engine.lock().unwrap_or_else(|e| { log::warn!("DistillationEngine mutex poisoned"); e.into_inner() }).get_avatar().clone()
-}
-
-#[command]
-pub fn get_distillation_flow(engine: State<'_, Mutex<DistillationEngine>>) -> DistillationFlowEvent {
-    engine.lock().unwrap_or_else(|e| { log::warn!("DistillationEngine mutex poisoned"); e.into_inner() }).get_flow()
-}
-
-#[command]
 pub fn distill_message(app: tauri::AppHandle, engine: State<'_, Mutex<DistillationEngine>>, text: String) -> DistillationFlowEvent {
     let mut eng = engine.lock().unwrap_or_else(|e| { log::warn!("DistillationEngine mutex poisoned"); e.into_inner() });
     let event = eng.distill_message(&text);
@@ -95,36 +85,8 @@ pub fn distill_message(app: tauri::AppHandle, engine: State<'_, Mutex<Distillati
 }
 
 #[command]
-pub fn set_user_identity(app: tauri::AppHandle, engine: State<'_, Mutex<DistillationEngine>>, name: String) -> UserAvatar {
-    let mut eng = engine.lock().unwrap_or_else(|e| { log::warn!("DistillationEngine mutex poisoned"); e.into_inner() });
-    eng.set_identity(&name);
-    let avatar = eng.get_avatar().clone();
-    let _ = app.emit("distillation-update", &eng.get_flow());
-    let _ = app.emit("avatar-updated", &avatar);
-    avatar
-}
-
-#[command]
 pub fn get_identity(engine: State<'_, Mutex<DistillationEngine>>) -> Option<AvatarIdentity> {
     engine.lock().unwrap_or_else(|e| { log::warn!("DistillationEngine mutex poisoned"); e.into_inner() }).identity.clone()
-}
-
-#[command]
-pub fn get_chain_stats(engine: State<'_, Mutex<DistillationEngine>>) -> ChainStats {
-    let eng = engine.lock().unwrap_or_else(|e| { log::warn!("DistillationEngine mutex poisoned"); e.into_inner() });
-    let outbound = eng.chain.query_by_direction(&MessageDirection::Outbound).len();
-    let inbound = eng.chain.query_by_direction(&MessageDirection::Inbound).len();
-    ChainStats {
-        total_entries: eng.chain.len(),
-        outbound_count: outbound,
-        inbound_count: inbound,
-        genesis_hash: eng.chain.genesis_hash.clone(),
-        chain_valid: eng.chain.entries.is_empty() || eng.chain.verify_chain(
-            &eng.identity.as_ref().map(|i| i.secret()).unwrap_or_default()
-        ),
-        identity_name: eng.avatar.identity_name.clone(),
-        identity_edition: eng.avatar.edition,
-    }
 }
 
 #[command]

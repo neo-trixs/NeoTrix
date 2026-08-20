@@ -328,21 +328,6 @@ pub fn api_config() -> Result<RealApiConfig, String> {
 }
 
 #[tauri::command]
-pub fn api_set_config(timeout: Option<u64>, retry_count: Option<u8>, verify_ssl: Option<bool>) -> Result<(), String> {
-    let mut state = STATE.lock().map_err(|e| format!("lock: {}", e))?;
-    if let Some(t) = timeout {
-        state.api_config.default_timeout_secs = t;
-    }
-    if let Some(r) = retry_count {
-        state.api_config.retry_count = r;
-    }
-    if let Some(v) = verify_ssl {
-        state.api_config.verify_ssl = v;
-    }
-    Ok(())
-}
-
-#[tauri::command]
 pub fn api_call(name: String, body: Option<String>) -> Result<serde_json::Value, String> {
     let mut state = STATE.lock().map_err(|e| format!("lock: {}", e))?;
     let endpoint = state.endpoints.iter_mut()

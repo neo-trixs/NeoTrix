@@ -299,43 +299,6 @@ pub fn term_tabs_layout(session_id: String) -> Result<TerminalTabLayout, String>
 }
 
 #[tauri::command]
-pub fn term_tabs_set_layout(
-    session_id: String,
-    layout: String,
-    split_pct: Option<f64>,
-) -> Result<(), String> {
-    if !["horizontal", "vertical", "grid"].contains(&layout.as_str()) {
-        return Err(format!(
-            "Invalid layout '{}'. Must be horizontal, vertical, or grid",
-            layout
-        ));
-    }
-
-    let mut state = STATE.lock().map_err(|e| e.to_string())?;
-    let tabs = state.sessions.get(&session_id).cloned().unwrap_or_default();
-    let active_id = tabs.iter().find(|t| t.is_active).map(|t| t.id.clone());
-
-    let tab_layout = state.layouts.entry(session_id.clone()).or_insert_with(|| {
-        TerminalTabLayout {
-            session_id: session_id.clone(),
-            tabs: Vec::new(),
-            active_tab_id: None,
-            layout: "horizontal".into(),
-            split_pct: 50.0,
-        }
-    });
-
-    tab_layout.tabs = tabs;
-    tab_layout.active_tab_id = active_id;
-    tab_layout.layout = layout;
-    if let Some(pct) = split_pct {
-        tab_layout.split_pct = pct.max(10.0).min(90.0);
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
 pub fn term_tabs_group_create(
     name: String,
     session_id: String,

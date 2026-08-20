@@ -125,12 +125,6 @@ pub fn unified_invoke(
     dispatch(&module, &action, &args)
 }
 
-/// 列出统一门面目录（自动生成前端能力清单）
-#[tauri::command]
-pub fn unified_invoke_catalog() -> Result<Vec<Value>, String> {
-    Ok(include!("_catalog_table.rs"))
-}
-
 /* ══════════════ 静态 match 分发（由 gate_gen.py 生成）══════════════ */
 
 fn dispatch(module: &str, action: &str, args: &Value) -> Result<Value, String> {
