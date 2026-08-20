@@ -1,7 +1,7 @@
 //! 能力注册表
 
 use crate::evolution::{EvolutionAction, EvolutionPlan};
-use crate::node::{Domain, NodeLayer};
+use crate::node::{Domain, EvolutionOp, NodeLayer};
 pub use crate::node::CapabilityNode;
 use indexmap::IndexMap;
 use petgraph::visit::EdgeRef;
@@ -369,11 +369,18 @@ impl CapabilityRegistry {
         // 缺陷修复 (R-P42 吸收): 新注册节点 (evolution_log 为空或仅 1 条吸收记录)
         // 不应被误判为 stale — stale 只针对"已存在多 cycle 但无新演化"的节点。
         // 判定: 有 >=2 条演化记录 (非吸收期) 且记录数 < 阈值 → stale。
+        // 缺陷修复 (R-P42 吸收): 末条演化为 Maturation/Budding (近期刚晋升/刚创建)
+        // 的节点不判 stale — 刚晋升到 C1 的节点 log 恰好 2 条会被误判"建了又删"。
         self.nodes.values()
             .filter(|n| {
                 n.constellation as u8 <= 1 &&
                 n.evolution_log.len() >= 2 &&
-                n.evolution_log.len() < cycles_threshold as usize
+                n.evolution_log.len() < cycles_threshold as usize &&
+                // 末条演化若为 Maturation/Budding → 近期有演化活动, 跳过 stale 判定
+                !matches!(
+                    n.evolution_log.last().map(|e| &e.op),
+                    Some(EvolutionOp::Maturation) | Some(EvolutionOp::Budding)
+                )
             })
             .collect()
     }

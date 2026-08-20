@@ -242,4 +242,23 @@ mod tests {
         assert!(node.promote_constellation().is_ok());
         assert_eq!(node.constellation, ConstellationLevel::C6EvolutionLoop);
     }
+
+    #[test]
+    fn test_stale_nodes_skips_recently_matured() {
+        // 刚晋升到 C1 的节点 (budding + maturation 两条记录) 不应被判 stale
+        let mut reg = CapabilityRegistry::new();
+        let mut node = CapabilityNode::new_primitive(
+            "nt_nexus_memory::cross_session_link_store".into(),
+            Domain::Nexus,
+            vec!["cross_session_link".into()],
+        );
+        node.evolution_log = vec![
+            EvolutionLogEntry { cycle: "pending".into(), op: EvolutionOp::Budding, from_nodes: vec![], to_node: None, note: String::new(), timestamp: chrono::Utc::now() },
+            EvolutionLogEntry { cycle: "auto".into(), op: EvolutionOp::Maturation, from_nodes: vec![], to_node: None, note: String::new(), timestamp: chrono::Utc::now() },
+        ];
+        node.promote_constellation().ok();
+        reg.register(node).unwrap();
+        let stale = reg.stale_nodes(3);
+        assert!(stale.is_empty(), "recently matured C1 node must not be stale: {:?}", stale.iter().map(|n| n.id.clone()).collect::<Vec<_>>());
+    }
 }
