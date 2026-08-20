@@ -96,6 +96,36 @@ pub fn neotrix_mcp_tools() -> Vec<McpToolDef> {
             schema_version: None,
         },
         McpToolDef {
+            name: "neotrix_kb_snapshot".into(),
+            description: "Capture a full KB snapshot (nodes/edges/stats) to a JSON file (read-only). \
+                          Returns the snapshot path plus node/edge/stats summary".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["kb".into(), "snapshot".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "out": {"type": "string", "description": "snapshot output path (default ~/.neotrix/snapshots/kb-<ts>.json)"}
+            }, "required": []}),
+            schema_version: None,
+        },
+        McpToolDef {
+            name: "neotrix_kb_diff".into(),
+            description: "Diff two KB snapshots, or one snapshot against the current KB (read-only). \
+                          Returns added/removed/changed nodes and edges".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["kb".into(), "diff".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "snap_a": {"type": "string", "description": "path to the first snapshot"},
+                "snap_b": {"type": "string", "description": "path to the second snapshot (omit to diff against current KB)"},
+                "detail": {"type": "integer", "description": "max detail rows per section (default 10)"}
+            }, "required": ["snap_a"]}),
+            schema_version: None,
+        },
+        McpToolDef {
             name: "neotrix_kb_write".into(),
             description: "Guarded KB write (node:create/update, edge:upsert, kv:set, node:delete, edge:delete). \
                          All writes pass the deterministic kb_write_guard (title/url/weight/protected-namespace checks); \
@@ -147,7 +177,7 @@ mod tests {
     #[test]
     fn builtin_tools_are_valid_mcp_defs() {
         let tools = neotrix_mcp_tools();
-        assert_eq!(tools.len(), 8, "built-in tool registry must expose 8 tools");
+        assert_eq!(tools.len(), 10, "built-in tool registry must expose 10 tools");
         for t in &tools {
             assert!(!t.name.is_empty(), "tool name must be non-empty");
             assert!(!t.description.is_empty(), "tool description must be non-empty");
@@ -163,18 +193,20 @@ mod tests {
         assert!(names.contains(&"neotrix_kb_get"));
         assert!(names.contains(&"neotrix_kb_stats"));
         assert!(names.contains(&"neotrix_kb_query"));
+        assert!(names.contains(&"neotrix_kb_snapshot"));
+        assert!(names.contains(&"neotrix_kb_diff"));
         assert!(names.contains(&"neotrix_kb_write"));
     }
 
     #[test]
-    fn registration_folds_n_to_8() {
+    fn registration_folds_n_to_10() {
         let mut registry = McpRegistry::new();
         let folded = register_neotrix_tools(&mut registry);
         assert_eq!(folded.categories.len(), 4, "N→4 fold must produce exactly 4 categories");
         assert!(folded.saved_tokens > 0, "folding must reduce token budget vs raw specs");
         assert!(folded.savings_percent > 0.0);
         let registered = registry.list_tools();
-        assert_eq!(registered.len(), 8, "all 8 built-in tools must register");
+        assert_eq!(registered.len(), 10, "all 10 built-in tools must register");
         assert!(
             registered.iter().any(|t| t.name == "neotrix_kb_write"),
             "kb write tool must be registered"
@@ -186,7 +218,7 @@ mod tests {
         let mut registry = McpRegistry::new();
         let first = register_neotrix_tools(&mut registry);
         let second = register_neotrix_tools(&mut registry);
-        assert_eq!(registry.list_tools().len(), 8, "re-registration must not duplicate");
+        assert_eq!(registry.list_tools().len(), 10, "re-registration must not duplicate");
         assert_eq!(first.folded_chars, second.folded_chars, "fold result must be stable");
     }
 }

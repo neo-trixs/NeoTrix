@@ -6,7 +6,11 @@
 //! 删除/批量重建要求审批 (Tier3/Tier4)。守卫是纯函数 (无 I/O), 便于单元测试;
 //! 证据记录是唯一副作用。
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
+
+use crate::neotrix::l1_body_impl::nt_shield_audit::{CheckResult, CheckStatus};
 
 /// 守卫证据落盘命名空间 (kv_store)。
 pub const WRITE_GUARD_NS: &str = "write_guard";
@@ -149,6 +153,10 @@ pub fn kb_write_guard(action: &str, payload: &serde_json::Value) -> WriteGuardVe
     }
 }
 
+/// 证据 key 全局单调序号 — 同毫秒内同 action 多次裁决时保证 key 唯一
+/// (kv_store 以 key 为追加语义, key 碰撞会导致证据互相覆盖)。
+static WRITE_GUARD_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// 记录一次守卫裁决到 kv_store `write_guard` 命名空间 (证据链, 追加式)。
 /// 失败仅告警不阻断主路径。
 pub fn record_write_evidence(
@@ -162,7 +170,8 @@ pub fn record_write_evidence(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let key = format!("{}-{}", ts, action.replace(':', "_"));
+    let seq = WRITE_GUARD_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let key = format!("{}-{}-{}", ts, action.replace(':', "_"), seq);
     let value = serde_json::json!({
         "action": action,
         "payload": payload,
@@ -172,6 +181,206 @@ pub fn record_write_evidence(
     })
     .to_string();
     let _ = kb.kv_set(WRITE_GUARD_NS, &key, &value);
+}
+
+// ────────────────────────────────────────────────────────────────
+// 守卫证据检测 (dbx 缺口 G4 闭环): write_guard 证据 → 聚合统计 →
+// NT-SHIELD 审计 CheckResult (含 evidence) + SelfTest (T1/T2/T3)。
+// 形成 "守卫拦截 → 证据 → 审计可查 → 自检可见" 的可审计闭环。
+// ────────────────────────────────────────────────────────────────
+
+/// 一条 write_guard 证据的结构化视图 (从 kv_store 反序列化)。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WriteGuardEvidence {
+    pub key: String,
+    pub action: String,
+    pub verdict: WriteGuardVerdict,
+    pub executed: bool,
+    pub ts_ms: u64,
+}
+
+/// write_guard 命名空间证据聚合统计 (NT-SHIELD 审计输入)。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WriteGuardStats {
+    /// 证据总数。
+    pub total: usize,
+    /// 放行 (Allow) 的裁决数。
+    pub allowed: usize,
+    /// 需人工审批 (RequiresApproval) 数。
+    pub requires_approval: usize,
+    /// 硬阻断 (Reject) 数。
+    pub rejected: usize,
+    /// 被拒操作的 action 分布。
+    pub rejected_actions: BTreeMap<String, usize>,
+    /// 异常清单: 被拒/需审批的写操作仍标记 executed。
+    pub anomalies: Vec<String>,
+}
+
+/// 把一条 kv_store `write_guard` 条目解析为结构化证据; 解析失败返回 None。
+pub fn parse_write_evidence(key: &str, raw: &str) -> Option<WriteGuardEvidence> {
+    let v: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let verdict: WriteGuardVerdict = serde_json::from_value(v.get("verdict").cloned()?).ok()?;
+    Some(WriteGuardEvidence {
+        key: key.to_string(),
+        action: v.get("action").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+        verdict,
+        executed: v.get("executed").and_then(|x| x.as_bool()).unwrap_or(false),
+        ts_ms: v.get("ts_ms").and_then(|x| x.as_u64()).unwrap_or(0),
+    })
+}
+
+/// 扫描 `write_guard` 证据命名空间, 聚合守卫拦截统计 + 异常检测。
+///
+/// 异常 (anomaly): 裁决为 Reject / RequiresApproval 的写操作仍标记
+/// executed=true — 表示守卫被绕过或执行语义失配, 审计必须 FAIL。
+/// 命名空间读取失败或单条证据解析失败也记入异常 (证据链完整性受损)。
+pub fn scan_write_guard_evidence(kb: &super::KnowledgeBase) -> WriteGuardStats {
+    let mut stats = WriteGuardStats::default();
+    let entries = match kb.kv_list(WRITE_GUARD_NS) {
+        Ok(e) => e,
+        Err(e) => {
+            stats.anomalies.push(format!("write_guard 命名空间读取失败: {}", e));
+            return stats;
+        }
+    };
+    for (key, raw) in entries {
+        let Some(ev) = parse_write_evidence(&key, &raw) else {
+            stats.anomalies.push(format!("write_guard 证据解析失败: {}", key));
+            continue;
+        };
+        stats.total += 1;
+        match &ev.verdict {
+            WriteGuardVerdict::Allow => stats.allowed += 1,
+            WriteGuardVerdict::RequiresApproval => {
+                stats.requires_approval += 1;
+                if ev.executed {
+                    stats.anomalies.push(format!("action={} 需审批仍执行", ev.action));
+                }
+            }
+            WriteGuardVerdict::Reject(_) => {
+                stats.rejected += 1;
+                *stats.rejected_actions.entry(ev.action.clone()).or_insert(0) += 1;
+                if ev.executed {
+                    stats.anomalies.push(format!("action={} 被拒仍执行", ev.action));
+                }
+            }
+        }
+    }
+    stats
+}
+
+/// 把 write_guard 聚合统计折叠为 NT-SHIELD 审计检查项 (CheckResult + evidence)。
+/// 无异常 → Passed (confidence 1.0); 存在异常 → Failed (confidence 0.0)。
+pub fn write_guard_check_result(stats: &WriteGuardStats) -> CheckResult {
+    let has_anomaly = !stats.anomalies.is_empty();
+    let evidence = format!(
+        "write_guard: total={} allowed={} requires_approval={} rejected={} rejected_actions={:?} anomalies={}: {:?}",
+        stats.total,
+        stats.allowed,
+        stats.requires_approval,
+        stats.rejected,
+        stats.rejected_actions,
+        stats.anomalies.len(),
+        stats.anomalies,
+    );
+    CheckResult {
+        check_id: "WG-001".into(),
+        status: if has_anomaly {
+            CheckStatus::Failed
+        } else {
+            CheckStatus::Passed
+        },
+        evidence: Some(evidence),
+        confidence: if has_anomaly { 0.0 } else { 1.0 },
+    }
+}
+
+/// write_guard 证据检测件 — T1 SelfTest。
+/// T2 注册: `register_absorbed_modules` (run.rs 架构审计) +
+/// `register_lightweight_modules` + `pipeline.rs SelfTestStage`。
+/// T3 生产接线: `handle_architecture_audit` 对生产 KB 调 `scan_write_guard_evidence`。
+///
+/// `self_test` 在内存 KB 中制造含异常的证据并验证检测统计 + 审计折叠正确,
+/// 纯内存无磁盘/网络 IO (可安全进入轻量注册表)。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WriteGuardAudit;
+
+impl crate::core::nt_core_self_test::SelfTest for WriteGuardAudit {
+    fn name(&self) -> &str {
+        "nt_memory_write_guard_audit"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let kb = match super::KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))) {
+            Ok(kb) => kb,
+            Err(e) => return Err(vec![format!("in-memory KB open failed: {}", e)]),
+        };
+        let mut failures = Vec::new();
+
+        // 1) 正常放行: Allow + executed。
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": "ok"}),
+            &WriteGuardVerdict::Allow,
+            true,
+        );
+        // 2) 正常拦截: Reject + 未执行。
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": ""}),
+            &WriteGuardVerdict::Reject(vec!["title 为空".into()]),
+            false,
+        );
+        // 3) 异常: Reject + executed=true (守卫被绕过)。
+        record_write_evidence(
+            &kb,
+            "kv:set",
+            &serde_json::json!({"namespace": "secrets"}),
+            &WriteGuardVerdict::Reject(vec!["namespace 'secrets' 受保护".into()]),
+            true,
+        );
+        // 4) 异常: RequiresApproval + executed=true。
+        record_write_evidence(
+            &kb,
+            "node:delete",
+            &serde_json::json!({"id": "u_1"}),
+            &WriteGuardVerdict::RequiresApproval,
+            true,
+        );
+
+        let stats = scan_write_guard_evidence(&kb);
+        if stats.total != 4 {
+            failures.push(format!("expected 4 evidence, got {}", stats.total));
+        }
+        if stats.allowed != 1 || stats.requires_approval != 1 || stats.rejected != 2 {
+            failures.push(format!("verdict counts wrong: {:?}", stats));
+        }
+        if stats.rejected_actions.get("kv:set") != Some(&1)
+            || stats.rejected_actions.get("node:create") != Some(&1)
+        {
+            failures.push(format!(
+                "rejected_actions distribution wrong: {:?}",
+                stats.rejected_actions
+            ));
+        }
+        if stats.anomalies.len() != 2 {
+            failures.push(format!("expected 2 anomalies, got {:?}", stats.anomalies));
+        }
+        let check = write_guard_check_result(&stats);
+        if !matches!(check.status, CheckStatus::Failed) {
+            failures.push(format!("anomaly 应报 Failed, got {:?}", check.status));
+        }
+        if check.evidence.as_deref().is_none_or(|e| e.is_empty()) {
+            failures.push("CheckResult.evidence 不应为空".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -283,5 +492,170 @@ mod tests {
         assert!(entries[0].1.contains("node:create"));
         assert!(entries[0].1.contains("Reject"));
         let _ = std::fs::remove_file(&tmp);
+    }
+
+    fn in_memory_kb() -> crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase {
+        crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(Some(
+            std::path::PathBuf::from(":memory:"),
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_record_write_evidence_unique_keys_in_same_ms() {
+        let kb = in_memory_kb();
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": ""}),
+            &WriteGuardVerdict::Reject(vec!["title 为空".into()]),
+            false,
+        );
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": ""}),
+            &WriteGuardVerdict::Reject(vec!["title 为空".into()]),
+            false,
+        );
+        let entries = kb.kv_list(WRITE_GUARD_NS).unwrap();
+        assert_eq!(entries.len(), 2, "同毫秒同 action 两次裁决不得互相覆盖");
+    }
+
+    #[test]
+    fn test_parse_write_evidence_roundtrip_reject() {
+        let raw = serde_json::json!({
+            "action": "node:create",
+            "payload": {"title": "t"},
+            "verdict": {"Reject": ["title 为空"]},
+            "executed": false,
+            "ts_ms": 1234,
+        })
+        .to_string();
+        let ev = parse_write_evidence("k-1", &raw).unwrap();
+        assert_eq!(ev.key, "k-1");
+        assert_eq!(ev.action, "node:create");
+        assert_eq!(ev.verdict, WriteGuardVerdict::Reject(vec!["title 为空".into()]));
+        assert!(!ev.executed);
+        assert_eq!(ev.ts_ms, 1234);
+    }
+
+    #[test]
+    fn test_parse_write_evidence_allow() {
+        let raw = serde_json::json!({
+            "action": "edge:upsert",
+            "verdict": "Allow",
+            "executed": true,
+            "ts_ms": 5,
+        })
+        .to_string();
+        let ev = parse_write_evidence("k", &raw).unwrap();
+        assert_eq!(ev.verdict, WriteGuardVerdict::Allow);
+        assert!(ev.executed);
+    }
+
+    #[test]
+    fn test_parse_write_evidence_malformed_returns_none() {
+        assert!(parse_write_evidence("k", "not json").is_none());
+        assert!(parse_write_evidence("k", "{\"action\":\"x\"}").is_none());
+        assert!(parse_write_evidence("k", "{\"action\":\"x\",\"verdict\":\"Weird\"}").is_none());
+    }
+
+    #[test]
+    fn test_scan_counts_and_detects_anomalies() {
+        let kb = in_memory_kb();
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": "ok"}),
+            &WriteGuardVerdict::Allow,
+            true,
+        );
+        record_write_evidence(
+            &kb,
+            "node:create",
+            &serde_json::json!({"title": ""}),
+            &WriteGuardVerdict::Reject(vec!["title 为空".into()]),
+            false,
+        );
+        record_write_evidence(
+            &kb,
+            "kv:set",
+            &serde_json::json!({"namespace": "secrets"}),
+            &WriteGuardVerdict::Reject(vec!["namespace 'secrets' 受保护".into()]),
+            true,
+        );
+        record_write_evidence(
+            &kb,
+            "node:delete",
+            &serde_json::json!({"id": "u_1"}),
+            &WriteGuardVerdict::RequiresApproval,
+            true,
+        );
+
+        let stats = scan_write_guard_evidence(&kb);
+        assert_eq!(stats.total, 4);
+        assert_eq!(stats.allowed, 1);
+        assert_eq!(stats.requires_approval, 1);
+        assert_eq!(stats.rejected, 2);
+        assert_eq!(stats.rejected_actions.get("node:create"), Some(&1));
+        assert_eq!(stats.rejected_actions.get("kv:set"), Some(&1));
+        assert_eq!(stats.anomalies.len(), 2, "anomalies: {:?}", stats.anomalies);
+        assert!(stats.anomalies.iter().any(|a| a.contains("kv:set") && a.contains("被拒仍执行")));
+        assert!(stats.anomalies.iter().any(|a| a.contains("node:delete") && a.contains("需审批仍执行")));
+    }
+
+    #[test]
+    fn test_scan_empty_namespace_clean() {
+        let kb = in_memory_kb();
+        let stats = scan_write_guard_evidence(&kb);
+        assert_eq!(stats.total, 0);
+        assert!(stats.anomalies.is_empty());
+        let check = write_guard_check_result(&stats);
+        assert!(matches!(check.status, CheckStatus::Passed));
+        assert_eq!(check.confidence, 1.0);
+    }
+
+    #[test]
+    fn test_scan_flags_malformed_evidence() {
+        let kb = in_memory_kb();
+        kb.kv_set(WRITE_GUARD_NS, "bad-key", "not-json").unwrap();
+        let stats = scan_write_guard_evidence(&kb);
+        assert_eq!(stats.total, 0);
+        assert!(!stats.anomalies.is_empty());
+        assert!(stats.anomalies.iter().any(|a| a.contains("解析失败")));
+        assert!(matches!(
+            write_guard_check_result(&stats).status,
+            CheckStatus::Failed
+        ));
+    }
+
+    #[test]
+    fn test_check_result_failed_with_evidence() {
+        let kb = in_memory_kb();
+        record_write_evidence(
+            &kb,
+            "node:delete",
+            &serde_json::json!({"id": "x"}),
+            &WriteGuardVerdict::RequiresApproval,
+            true,
+        );
+        let stats = scan_write_guard_evidence(&kb);
+        let check = write_guard_check_result(&stats);
+        assert!(matches!(check.status, CheckStatus::Failed));
+        assert_eq!(check.check_id, "WG-001");
+        let evidence = check.evidence.unwrap();
+        assert!(evidence.contains("total=1"));
+        assert!(evidence.contains("requires_approval=1"));
+        assert!(evidence.contains("anomalies=1"));
+        assert_eq!(check.confidence, 0.0);
+    }
+
+    #[test]
+    fn test_write_guard_audit_selftest_passes() {
+        use crate::core::nt_core_self_test::SelfTest;
+        let audit = WriteGuardAudit::default();
+        assert_eq!(audit.name(), "nt_memory_write_guard_audit");
+        assert!(audit.self_test().is_ok());
     }
 }

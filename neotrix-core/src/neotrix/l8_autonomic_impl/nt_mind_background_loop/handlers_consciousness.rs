@@ -1343,6 +1343,44 @@ impl BackgroundLoopHandle {
             }
         }
 
+        // ── write_guard 守卫证据审计 (dbx G4, T3 生产接线) ──
+        // 扫描 write_guard 命名空间证据 → 聚合统计 → NT-SHIELD CheckResult。
+        // 异常 (被拒/需审批仍 executed = 守卫被绕过) 汇入 MetaAuditor +
+        // 落盘 KB `consciousness` 命名空间 (行为接地, 与 converge_check 同模式)。
+        if let Some(ref kb) = self.kb {
+            use crate::neotrix::l1_body_impl::nt_shield_audit::CheckStatus;
+            use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::{
+                scan_write_guard_evidence, write_guard_check_result,
+            };
+            let stats = scan_write_guard_evidence(kb);
+            let check = write_guard_check_result(&stats);
+            log::info!(
+                "[bg] write_guard_audit: status={:?} {}",
+                check.status,
+                check.evidence.as_deref().unwrap_or("no evidence")
+            );
+            if let Some(evidence) = check.evidence.as_deref() {
+                let _ = kb.kv_set("consciousness", "write_guard_audit", evidence);
+            }
+            if matches!(check.status, CheckStatus::Failed) {
+                use crate::core::nt_core_meta::nt_core_meta_auditor::AuditorFinding;
+                meta_auditor.record_finding(AuditorFinding {
+                    file: "nt_memory_write_guard".into(),
+                    category: "write_guard_anomaly".into(),
+                    severity: 0.8,
+                    description: check
+                        .evidence
+                        .clone()
+                        .unwrap_or_else(|| "write_guard anomaly".into()),
+                });
+                log::warn!(
+                    "[bg] write_guard_audit: {} — {} anomalies",
+                    check.evidence.as_deref().unwrap_or("no evidence"),
+                    stats.anomalies.len()
+                );
+            }
+        }
+
         // ── Inline self-test: types WITHOUT persistent fields use fresh instances (acceptable) ──
         let model = SelfModel::new();
         let scanner = CodeScanner::new(".");

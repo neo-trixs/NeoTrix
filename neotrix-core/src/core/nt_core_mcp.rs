@@ -341,6 +341,32 @@ impl McpServer {
             }),
             schema_version: None,
         });
+        self.register_tool(McpTool {
+            name: "kb_snapshot".into(),
+            description: "Capture a full KB snapshot (nodes/edges/stats) to a JSON file (read-only, Tier1)".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "out": {"type": "string", "description": "snapshot output path (default ~/.neotrix/snapshots/kb-<ts>.json)"}
+                },
+                "required": []
+            }),
+            schema_version: None,
+        });
+        self.register_tool(McpTool {
+            name: "kb_diff".into(),
+            description: "Diff two KB snapshots, or one snapshot against the current KB (read-only, Tier1)".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "snap_a": {"type": "string", "description": "path to the first snapshot"},
+                    "snap_b": {"type": "string", "description": "path to the second snapshot (omit to diff against current KB)"},
+                    "detail": {"type": "integer", "description": "max detail rows per section (default 10)"}
+                },
+                "required": ["snap_a"]
+            }),
+            schema_version: None,
+        });
     }
 
     pub fn register_tool(&mut self, tool: McpTool) {
@@ -594,23 +620,24 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> Result<String, String> 
         "kb_stats" => call_kb_tool("kb_stats", args),
         "kb_query" => call_kb_tool("kb_query", args),
         "kb_write" => call_kb_tool("kb_write", args),
+        "kb_snapshot" => call_kb_tool("kb_snapshot", args),
+        "kb_diff" => call_kb_tool("kb_diff", args),
         other => Err(format!("Unknown tool: {}", other)),
     }
 }
 
-/// KB 工具执行 — 构建 `/kb <sub>` CLI 命令并进程内执行。
-/// 写路径经 kb_cmds::cmd_write 内部的 kb_write_guard 再次确定性把关
-/// (防御纵深: 守卫在 run_mcp_server 裁决一次, 执行层再校验一次)。
-fn call_kb_tool(name: &str, args: &serde_json::Value) -> Result<String, String> {
-    let command = match name {
+/// KB 工具命令构建 — 纯函数 (无 I/O), 供测试直接断言命令文本。
+/// 与 `call_kb_tool` 共享, 避免执行副作用进入单元测试路径。
+fn kb_tool_command(name: &str, args: &serde_json::Value) -> Result<String, String> {
+    match name {
         "kb_get" => {
             let id = args
                 .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "Missing required field: id".to_string())?;
-            format!("/kb get {}", id)
+            Ok(format!("/kb get {}", id))
         }
-        "kb_stats" => "/kb stats".to_string(),
+        "kb_stats" => Ok("/kb stats".to_string()),
         "kb_query" => {
             let text = args
                 .get("text")
@@ -621,7 +648,7 @@ fn call_kb_tool(name: &str, args: &serde_json::Value) -> Result<String, String> 
                 .and_then(|v| v.as_u64())
                 .unwrap_or(10)
                 .min(50);
-            format!("/kb query {} --limit {}", text, limit)
+            Ok(format!("/kb query {} --limit {}", text, limit))
         }
         "kb_write" => {
             let action = args
@@ -649,10 +676,46 @@ fn call_kb_tool(name: &str, args: &serde_json::Value) -> Result<String, String> 
             }
             let json = serde_json::to_string(&serde_json::Value::Object(payload))
                 .map_err(|e| format!("Serialize payload: {}", e))?;
-            format!("/kb write {}", json)
+            Ok(format!("/kb write {}", json))
         }
-        _ => return Err(format!("Unknown KB tool: {}", name)),
-    };
+        "kb_snapshot" => {
+            // 读操作: 可选 --out, 缺省写到 ~/.neotrix/snapshots/kb-<ts>.json。
+            let out = args
+                .get("out")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty());
+            match out {
+                Some(path) => Ok(format!("/kb snapshot --out {}", path)),
+                None => Ok("/kb snapshot".to_string()),
+            }
+        }
+        "kb_diff" => {
+            let snap_a = args
+                .get("snap_a")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Missing required field: snap_a".to_string())?;
+            let mut cmd = format!("/kb diff {}", snap_a);
+            if let Some(snap_b) = args
+                .get("snap_b")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+            {
+                cmd.push_str(&format!(" {}", snap_b));
+            }
+            if let Some(detail) = args.get("detail").and_then(|v| v.as_u64()) {
+                cmd.push_str(&format!(" --detail {}", detail.min(50)));
+            }
+            Ok(cmd)
+        }
+        other => Err(format!("Unknown KB tool: {}", other)),
+    }
+}
+
+/// KB 工具执行 — 构建 `/kb <sub>` CLI 命令并进程内执行。
+/// 写路径经 kb_cmds::cmd_write 内部的 kb_write_guard 再次确定性把关
+/// (防御纵深: 守卫在 run_mcp_server 裁决一次, 执行层再校验一次)。
+fn call_kb_tool(name: &str, args: &serde_json::Value) -> Result<String, String> {
+    let command = kb_tool_command(name, args)?;
 
     let reg = crate::cli::commands::registry::default_registry();
     let out = reg.execute(&command, None);
@@ -1335,7 +1398,7 @@ mod tests {
     fn test_register_all_tools() {
         let mut server = McpServer::new();
         server.register_all_tools();
-        assert_eq!(server.tools.len(), 14);
+        assert_eq!(server.tools.len(), 16);
         let names: Vec<&str> = server.tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -1352,6 +1415,8 @@ mod tests {
         assert!(names.contains(&"kb_stats"));
         assert!(names.contains(&"kb_query"));
         assert!(names.contains(&"kb_write"));
+        assert!(names.contains(&"kb_snapshot"));
+        assert!(names.contains(&"kb_diff"));
     }
 
     #[test]
@@ -1362,7 +1427,70 @@ mod tests {
         assert!(resp.error.is_none());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 14);
+        assert_eq!(tools.len(), 16);
+    }
+
+    #[test]
+    fn test_kb_snapshot_and_diff_dispatch() {
+        // 纯函数命令构建 (无 I/O, 不触碰真实 HOME)。
+        assert_eq!(
+            kb_tool_command("kb_snapshot", &serde_json::json!({})).unwrap(),
+            "/kb snapshot"
+        );
+        assert_eq!(
+            kb_tool_command("kb_snapshot", &serde_json::json!({"out": "/tmp/nt-snap.json"}))
+                .unwrap(),
+            "/kb snapshot --out /tmp/nt-snap.json"
+        );
+        assert_eq!(
+            kb_tool_command("kb_diff", &serde_json::json!({"snap_a": "/tmp/a.json"})).unwrap(),
+            "/kb diff /tmp/a.json"
+        );
+        assert_eq!(
+            kb_tool_command(
+                "kb_diff",
+                &serde_json::json!({"snap_a": "/tmp/a.json", "snap_b": "/tmp/b.json", "detail": 99})
+            )
+            .unwrap(),
+            "/kb diff /tmp/a.json /tmp/b.json --detail 50"
+        );
+        assert!(
+            kb_tool_command("kb_diff", &serde_json::json!({})).is_err(),
+            "缺 snap_a 应报错"
+        );
+
+        // execute_tool 分派臂接线 — 隔离 HOME (共享 TEST_ENV_LOCK, 与 kb_cmds
+        // 等 HOME 修改测试互斥, 防全局 env 竞争)。显式 --out 走临时文件, 避免
+        // 对真实 ~/.neotrix 做 23 万节点全量快照。
+        let _g = crate::core::nt_core_self_test::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let old_home = std::env::var("HOME").ok();
+        let dir = std::env::temp_dir().join(format!("nt_core_mcp_kb_{}", std::process::id()));
+        std::fs::create_dir_all(dir.join(".neotrix")).unwrap();
+        std::env::set_var("HOME", &dir);
+        let snap_path = dir.join("snap.json");
+        let snap_path_s = snap_path.to_string_lossy().to_string();
+        let r = (|| {
+            let snap = execute_tool("kb_snapshot", &serde_json::json!({"out": snap_path_s}));
+            assert!(snap.is_ok(), "快照分派应成功: {:?}", snap.err());
+            assert!(snap.unwrap().contains("快照"), "应报告快照已捕获");
+            let diff = execute_tool(
+                "kb_diff",
+                &serde_json::json!({"snap_a": snap_path_s, "snap_b": snap_path_s}),
+            );
+            assert!(
+                diff.is_ok(),
+                "分派臂应可达 call_kb_tool (快照相同 → 无差异输出而非分派失败): {:?}",
+                diff.err()
+            );
+        })();
+        let _ = snap_path; // keep path alive (dir retained for debug)
+        match old_home {
+            Some(h) => std::env::set_var("HOME", h),
+            None => std::env::remove_var("HOME"),
+        }
+        let _ = r;
     }
 
     #[test]

@@ -2834,6 +2834,9 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::neotrix::l7_capability_impl::CapabilityClusterSelfTest,
         ));
+        registry.register(Box::new(
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+        ));
         for t in crate::core::nt_core_arch_fitness::arch_fitness_tests() {
             registry.register(t);
         }
