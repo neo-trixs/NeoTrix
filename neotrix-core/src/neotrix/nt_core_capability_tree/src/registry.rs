@@ -508,10 +508,16 @@ impl CapabilityRegistry {
                     rationale: format!("经验驱动: 强化 {} | {}", capability_tag, rationale),
                 });
             } else {
+                let new_id = format!("exp::{}::{}", domain.as_str().to_lowercase(), capability_tag);
+                // 同名 exp:: 节点已存在 (含 deprecated): 不重复 Bud。
+                // 该能力已沉淀为真实模块节点时由经验蒸馏切换目标, deprecated 占位不应复活。
+                if self.nodes.contains_key(&new_id) {
+                    continue;
+                }
                 plans.push(EvolutionPlan {
                     cycle: cycle.to_string(),
                     actions: vec![EvolutionAction::Budding {
-                        new_node_id: format!("exp::{}::{}", domain.as_str().to_lowercase(), capability_tag),
+                        new_node_id: new_id,
                         domain,
                         provides: vec![capability_tag.clone()],
                         layer: NodeLayer::L0Primitive,

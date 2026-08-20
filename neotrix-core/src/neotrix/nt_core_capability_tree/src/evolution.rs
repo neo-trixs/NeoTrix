@@ -299,6 +299,9 @@ impl<'a> EvolutionEngine<'a> {
         // 4. 发现分散重复能力 (同 provides 标签下有多个同层节点)
         let mut provides_map: HashMap<String, Vec<&CapabilityNode>> = HashMap::new();
         for node in self.registry.nodes.values() {
+            if node.deprecated {
+                continue;
+            }
             for tag in &node.provides {
                 provides_map.entry(tag.clone()).or_default().push(node);
             }
