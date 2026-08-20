@@ -52,10 +52,10 @@ export function CheckpointTimeline(props: Props) {
       if (firstBtnRef) firstBtnRef.focus()
       else panelRef?.focus()
     })
-    return () => {
+    onCleanup(() => {
       cancelAnimationFrame(raf)
       if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
-    }
+    })
   })
 
   // ConfirmModal 仅在有输入框时处理 Esc；纯确认模式在此补全局 Esc + 焦点迁入 dialog
@@ -72,10 +72,10 @@ export function CheckpointTimeline(props: Props) {
     const raf = requestAnimationFrame(() => {
       document.querySelector<HTMLElement>('.glass-modal button:last-child')?.focus()
     })
-    return () => {
+    onCleanup(() => {
       document.removeEventListener('keydown', onKey, true)
       cancelAnimationFrame(raf)
-    }
+    })
   })
 
   const load = async () => {

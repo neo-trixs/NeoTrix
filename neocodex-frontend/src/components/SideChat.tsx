@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show, For } from 'solid-js'
+import { createSignal, createEffect, onCleanup, Show, For } from 'solid-js'
 import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
 import { neocodex, errText } from '../api'
 import type { NeoCodexMessageItem } from '../api/types'
@@ -32,10 +32,10 @@ export function SideChat(props: Props) {
       if (inputRef) inputRef.focus()
       else panelRef?.focus()
     })
-    return () => {
+    onCleanup(() => {
       cancelAnimationFrame(raf)
       if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
-    }
+    })
   })
 
   const load = async () => {

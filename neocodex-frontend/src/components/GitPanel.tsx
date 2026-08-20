@@ -67,10 +67,10 @@ export function GitPanel(props: Props) {
       if (firstBtnRef) firstBtnRef.focus()
       else panelRef?.focus()
     })
-    return () => {
+    onCleanup(() => {
       cancelAnimationFrame(raf)
       if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
-    }
+    })
   })
 
   // 仅首次加载自动展开第一个文件；刷新/操作后重载不重置用户当前的展开状态

@@ -32,10 +32,10 @@ export function CostDashboard(props: Props) {
       if (firstBtnRef) firstBtnRef.focus()
       else panelRef?.focus()
     })
-    return () => {
+    onCleanup(() => {
       cancelAnimationFrame(raf)
       if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
-    }
+    })
   })
 
   // Esc 关闭（参照 SettingsModal 浮层关闭模式：window keydown + 打开时挂载；

@@ -1,4 +1,4 @@
-import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
+import { createSignal, onMount, createEffect, Show, For, onCleanup } from 'solid-js'
 import { CalendarClock, X, RefreshCw, Loader2, Play, Plus, Trash2, Pause, CirclePlay, History } from 'lucide-solid'
 import { tasks as tasksApi, errText } from '../api'
 import type { BackgroundTask } from '../api/types'
@@ -63,10 +63,10 @@ export function ScheduledTasks(props: Props) {
       if (firstBtnRef) firstBtnRef.focus()
       else panelRef?.focus()
     })
-    return () => {
+    onCleanup(() => {
       cancelAnimationFrame(raf)
       if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
-    }
+    })
   })
 
   const load = async () => {
