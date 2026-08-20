@@ -111,6 +111,8 @@ impl CapabilityRegistry {
     /// 契约通过 metadata 承载: metadata["input_schema"], metadata["output_schema"],
     /// metadata["fallback_chain"] (字符串数组)。缺失即违规 (true)。
     /// 审计为只读, 不阻塞注册 — 保持对既有 100+ 节点的向后兼容 (R-P42 强化现有节点, 非强制改写)。
+    /// `contract_deferred` 标记: 由 P1 写门注入的占位, 表明节点尚无真实契约 (计入违规缺口,
+    /// 但可由自动补全流程后续补齐 — 审计报告据此区分 deferred vs 缺项)。
     pub fn contract_violations(&self) -> Vec<(String, Vec<String>)> {
         self.nodes
             .iter()
@@ -123,6 +125,9 @@ impl CapabilityRegistry {
                 }
                 if !node.metadata.contains_key("fallback_chain") {
                     missing.push("missing fallback_chain".to_string());
+                }
+                if node.metadata.get("contract_deferred").and_then(|v| v.as_bool()) == Some(true) {
+                    missing.push("contract_deferred".to_string());
                 }
                 if missing.is_empty() {
                     None

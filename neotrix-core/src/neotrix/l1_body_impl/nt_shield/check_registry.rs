@@ -396,6 +396,12 @@ impl CheckRegistry {
             check_fn: Box::new(move |ctx: &ToolCallContext| {
                 let url = extract_url(&ctx.args);
                 if let Some(ref u) = url {
+                    // SEC-004 加固: 仅对"像 URL"的字符串做出口域检查 — 裸单词 (hello/foo 等)
+                    // 跳过, 防任意字符串参数被误判为网络出口 (曾致 CheckRegistry::self_test
+                    // 金丝雀恒失败, Shield 分支健康被拖到 0.100)。URL 形判定: 含 :// 或点分域。
+                    if !u.contains("://") && !u.contains('.') {
+                        return CheckVerdict::Pass;
+                    }
                     if let Some(domain) = domain_from_url(u) {
                         if !domain_matches_allowlist(&domain, &domains2) {
                             return CheckVerdict::Fail(format!(
@@ -411,6 +417,12 @@ impl CheckRegistry {
                     }
                 } else {
                     for s in collect_all_string_args(&ctx.args) {
+                        // SEC-004 兜底加固: 仅对"像 URL"的字符串 (含 :// 或点分域) 做出口域检查,
+                        // 裸单词 (hello/foo/echo 等) 跳过 — 防任意字符串参数被误判为网络出口
+                        // (曾导致 CheckRegistry::self_test 金丝雀 "hello" 被当 https://hello 拦截)。
+                        if !s.contains("://") && !s.contains('.') {
+                            continue;
+                        }
                         if let Some(domain) = domain_from_url(&s) {
                             if !domain_matches_allowlist(&domain, &domains2) {
                                 return CheckVerdict::Fail(format!(
@@ -741,7 +753,7 @@ impl crate::core::nt_core_self_test::SelfTest for CheckRegistry {
         if self.checks.is_empty() {
             failures.push("no checks registered".into());
         }
-        let safe = self.evaluate("echo", &serde_json::json!(["hello"]), &super::ToolSource::User);
+        let safe = self.evaluate("echo", &serde_json::json!("hello"), &super::ToolSource::User);
         if safe.iter().any(|(_, v)| matches!(v, super::CheckVerdict::Fail(_))) {
             failures.push("echo hello was blocked unexpectedly".into());
         }
@@ -758,11 +770,21 @@ impl crate::core::nt_core_self_test::SelfTest for CheckRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
     use serde_json::json;
 
     fn fresh_registry() -> CheckRegistry {
         let reg = CheckRegistry::new();
         reg
+    }
+
+    #[test]
+    fn test_self_test_passes() {
+        // D16 回归门禁: CheckRegistry::self_test 金丝雀曾用数组参数被自家 SEC-004
+        // 误判为 URL 出口 (hello → https://hello) 恒失败, 拖低 Shield 分支健康至 0.100。
+        let reg = fresh_registry();
+        let r = reg.self_test();
+        assert!(r.is_ok(), "CheckRegistry self_test must pass: {:?}", r);
     }
 
     #[test]

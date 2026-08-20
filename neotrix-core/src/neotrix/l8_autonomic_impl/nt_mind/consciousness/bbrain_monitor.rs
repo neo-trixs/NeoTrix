@@ -403,8 +403,8 @@ impl crate::core::nt_core_self_test::SelfTest for BMonitor {
         if self.config.max_history == 0 {
             failures.push("max_history must be > 0".into());
         }
-        if self.config.green_threshold > self.config.yellow_threshold {
-            failures.push("green_threshold > yellow_threshold is invalid".into());
+        if self.config.green_threshold <= self.config.yellow_threshold {
+            failures.push("green_threshold must be > yellow_threshold (green = top alert tier)".into());
         }
         if self.history.len() > self.config.max_history {
             failures.push("history exceeds max_history".into());
@@ -488,6 +488,22 @@ mod tests {
         assert!(bm.history.is_empty());
         assert_eq!(bm.max_history, 20);
         assert!(bm.latest_report().is_none());
+    }
+
+    #[test]
+    fn test_self_test_passes_with_default_config() {
+        // D16 回归门禁: self_test 曾将 green>yellow 判为非法 (极性倒置),
+        // 但默认配置 green=70>yellow=40 且分级语义要求 green 为最高档 →
+        // 默认配置恒 Fail, 拖低 NT-CORE 分支健康至 0.667。
+        use crate::core::nt_core_self_test::SelfTest;
+        let bm = BMonitor::new();
+        let r = bm.self_test();
+        assert!(r.is_ok(), "default config must pass self_test: {:?}", r);
+        // 极性校验: green <= yellow 应拒绝
+        let mut bad = BMonitor::new();
+        bad.config.green_threshold = 40.0;
+        bad.config.yellow_threshold = 70.0;
+        assert!(bad.self_test().is_err(), "green<=yellow must be rejected");
     }
 
     #[test]

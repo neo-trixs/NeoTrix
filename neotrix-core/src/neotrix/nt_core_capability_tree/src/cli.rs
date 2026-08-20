@@ -645,8 +645,10 @@ impl CapabilityCli {
             if capability_tag.is_empty() {
                 continue;
             }
-            // 意识体觉醒目标: 不映射能力节点, 仅记录 (消费在 NT-META 层)
-            if capability_tag.starts_with("consciousness::") {
+            // 意识体觉醒目标 (consciousness:: 前缀): 去前缀后按普通能力参与映射,
+            // 在对应域 (如 NT-META) Bud/Strengthen 能力节点 — 修复 60 条 META targets 永不消费的缺陷。
+            let capability_tag = capability_tag.strip_prefix("consciousness::").unwrap_or(&capability_tag).to_string();
+            if capability_tag.is_empty() {
                 continue;
             }
             if !already_planned.insert(format!("{}::{}", domain_s, capability_tag)) {

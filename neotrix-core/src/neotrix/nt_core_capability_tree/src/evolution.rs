@@ -160,6 +160,19 @@ impl<'a> EvolutionEngine<'a> {
                             CapabilityNode::new_constellation(new_node_id.clone(), domain, layer, provides, vec![])
                         }
                     };
+                    // P1 契约写门: bud 未声明契约 (input_schema/output_schema/fallback_chain)
+                    // 时标记 contract_deferred — 允许注册 (R-P42 不强制改写既有路径),
+                    // 但契约合规率如实区分 deferred, 供 consciousness_status/审查暴露缺口。
+                    if !node
+                        .metadata
+                        .iter()
+                        .any(|(k, _)| k == "input_schema" || k == "output_schema" || k == "fallback_chain")
+                    {
+                        node.metadata.insert(
+                            "contract_deferred".into(),
+                            serde_json::Value::Bool(true),
+                        );
+                    }
                     node.record_evolution(EvolutionLogEntry {
                         cycle: plan.cycle.clone(),
                         op: EvolutionOp::Budding,

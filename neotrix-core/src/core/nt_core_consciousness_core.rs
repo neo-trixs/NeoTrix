@@ -515,6 +515,16 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("pdf编辑", "pdf_edit", "NT-ACT", "CodeAnalyzer"),
     ("pdf编辑:", "pdf_edit", "NT-ACT", "CodeAnalyzer"),
     ("编辑pdf", "pdf_edit", "NT-ACT", "CodeAnalyzer"),
+    ("图片转换", "image_convert", "NT-ACT", "CodeAnalyzer"),
+    ("图像转换", "image_convert", "NT-ACT", "CodeAnalyzer"),
+    ("格式转换", "image_convert", "NT-ACT", "CodeAnalyzer"),
+    ("提取目录", "dir_extract", "NT-WORLD", "CodeAnalyzer"),
+    ("目录提取", "dir_extract", "NT-WORLD", "CodeAnalyzer"),
+    ("批量提取", "dir_extract", "NT-WORLD", "CodeAnalyzer"),
+    ("合并pdf", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
+    ("合并PDF", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
+    ("pdf合并", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
+    ("PDF合并", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
     (
         "检索",
         "hybrid_retrieval",
@@ -687,22 +697,23 @@ pub fn decompose_instruction(instruction: &str) -> Vec<ConsciousTask> {
     tasks
 }
 
-/// 能力网注册表路径 — 优先 `HOME/.neotrix/capability_registry.json` (与 KB 同目录,
-/// 被 isolate_home 测试隔离); 缺失时回退 cwd `.neotrix/capability_registry.json`
-/// (后台 handlers_maintenance 用相对 cwd 路径, 生产一致时统一收敛到本函数)。
-/// 读路径以存在者为准; 写路径固化在 HOME (隔离测试可写; 生产与后台读同源)。
+/// 能力网注册表路径 — 优先 cwd `.neotrix/capability_registry.json` (与后台
+/// handlers_maintenance、CLI 默认路径同源的全量树, 单一事实源);
+/// HOME 仅兜底 (隔离测试可写; 旧会话可能遗留陈旧单节点文件, 不作为生产源)。
+/// 读路径以存在者为准; 写路径同读路径 (读源即写源, 避免读写分离造成的
+/// 双 registry 分裂: 意识核心曾读 HOME 旧文件只见 1 节点而误判全部外部缺口)。
 pub fn capability_registry_path() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let home_path = std::path::PathBuf::from(&home)
         .join(".neotrix")
         .join("capability_registry.json");
     let cwd_path = std::path::PathBuf::from(".neotrix").join("capability_registry.json");
-    if home_path.exists() {
-        home_path
-    } else if cwd_path.exists() {
+    if cwd_path.exists() {
         cwd_path
-    } else {
+    } else if home_path.exists() {
         home_path
+    } else {
+        cwd_path
     }
 }
 
@@ -1143,6 +1154,105 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 Err(e) => (false, format!("PDF 编辑失败: {e}")),
             }
         }
+        "image_convert" => {
+            // 摘要语法: <in> <out> 两个路径 (扩展名差异 = 转换目标)
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.len() < 2 {
+                return (
+                    false,
+                    format!(
+                        "子任务 '{}' 缺少 输入/输出 图像路径, 无法转换",
+                        task.summary
+                    ),
+                );
+            }
+            let (src, out) = (paths[0].clone(), paths[1].clone());
+            match crate::neotrix::FileAbility::open(&src) {
+                Ok(fa) => match fa.convert_image(&out) {
+                    Ok(()) => (
+                        true,
+                        format!("图像转换完成: {} → {}", src.display(), out.display()),
+                    ),
+                    Err(e) => (false, format!("图像转换失败: {e}")),
+                },
+                Err(e) => (false, format!("打开源图像失败: {e}")),
+            }
+        }
+        "dir_extract" => {
+            // 摘要语法: <目录> — 目录级统一提取 (混合格式 → 文本/表格清单)
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let dir = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .find(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from);
+            let Some(dir) = dir else {
+                return (
+                    false,
+                    format!("子任务 '{}' 缺少目录路径, 无法提取", task.summary),
+                );
+            };
+            if !dir.is_dir() {
+                return (false, format!("路径不是目录: {}", dir.display()));
+            }
+            match crate::neotrix::extract_dir(&dir) {
+                Ok(report) => (
+                    true,
+                    format!(
+                        "目录统一提取完成: 成功 {} / 失败 {} / 总字符 {}\n共 {} 个文件",
+                        report.succeeded,
+                        report.failed,
+                        report.total_chars,
+                        report.entries.len()
+                    ),
+                ),
+                Err(e) => (false, format!("目录提取失败: {e}")),
+            }
+        }
+        "pdf_merge" => {
+            // 摘要语法: <out.pdf> <in1.pdf> <in2.pdf> ... — 结构级合并
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.len() < 3 {
+                return (
+                    false,
+                    format!(
+                        "子任务 '{}' 缺少 输出+输入 PDF 路径, 无法合并",
+                        task.summary
+                    ),
+                );
+            }
+            let out = paths[0].clone();
+            let inputs = &paths[1..];
+            match crate::neotrix::merge_pdfs(inputs) {
+                Ok(bytes) => {
+                    match std::fs::write(&out, &bytes) {
+                        Ok(()) => (
+                            true,
+                            format!(
+                                "PDF 合并完成: {} 个文件 → {} ({} 字节)",
+                                inputs.len(),
+                                out.display(),
+                                bytes.len()
+                            ),
+                        ),
+                        Err(e) => (false, format!("写出合并结果失败: {e}")),
+                    }
+                }
+                Err(e) => (false, format!("PDF 合并失败: {e}")),
+            }
+        }
         _ => (
             true,
             format!(
@@ -1399,6 +1509,7 @@ fn estimate_tokens(s: &str) -> u32 {
 mod tests {
     use super::*;
     use lopdf::dictionary;
+    use image::GenericImageView;
 
     /// 测试隔离: 将 HOME 重定向到临时目录, 避免污染生产 KB (~/.neotrix/knowledge.db),
     /// 且各测试间共享同一隔离 DB (Once 保证仅初始化一次)。
@@ -2124,5 +2235,162 @@ mod tests {
 
         let _ = std::fs::remove_file(&src);
         let _ = std::fs::remove_file(&out);
+    }
+
+    #[test]
+    fn dispatch_internal_routes_image_convert_and_dir_extract() {
+        // 横向推广接线: image_convert + dir_extract → 真实调用 (非标记)
+        let tmp = std::env::temp_dir().join(format!(
+            "nt_cap_dispatch2_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        // 目录内含 xlsx + 文本 + 图像
+        let xlsx = tmp.join("数据.xlsx");
+        let t = crate::neotrix::TableData {
+            name: "s".into(),
+            headers: vec!["型号".into(), "单价".into()],
+            rows: vec![vec!["闸阀A".into(), "100".into()]],
+        };
+        crate::neotrix::write_xlsx_table(&xlsx, &t).unwrap();
+        std::fs::write(tmp.join("notes.txt"), "目录提取测试").unwrap();
+        let img = image::RgbaImage::from_pixel(4, 4, image::Rgba([1, 2, 3, 255]));
+        img.save(tmp.join("logo.png")).unwrap();
+
+        // dir_extract 真实执行
+        let de = ConsciousTask {
+            id: "t-de".into(),
+            summary: format!("提取目录 {}", tmp.display()),
+            capability_tag: "dir_extract".into(),
+            domain: "NT-WORLD".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&de);
+        assert!(executed, "dir_extract 应真实执行: {output}");
+        assert!(output.contains("成功 3"), "应统计 3 个成功条目: {output}");
+        assert!(output.contains("总字符"), "应报告总字符: {output}");
+
+        // image_convert 真实执行
+        let src = tmp.join("logo.png");
+        let out = tmp.join("logo.jpg");
+        let ic = ConsciousTask {
+            id: "t-ic".into(),
+            summary: format!("转换 {} {}", src.display(), out.display()),
+            capability_tag: "image_convert".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&ic);
+        assert!(executed, "image_convert 应真实执行: {output}");
+        assert!(out.exists(), "输出图像应生成");
+        let back = image::open(&out).unwrap();
+        assert_eq!(back.dimensions(), (4, 4), "转换后尺寸应保持");
+
+        // 缺路径 → (false, 提示), 不 panic
+        let bad = ConsciousTask {
+            id: "t-bad".into(),
+            summary: "批量提取 无有效路径".into(),
+            capability_tag: "dir_extract".into(),
+            domain: "NT-WORLD".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&bad);
+        assert!(!executed, "无有效路径不应误报执行成功");
+        assert!(!output.is_empty());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn dispatch_internal_routes_pdf_merge_to_real_call() {
+        // R-P79: pdf_merge → 真调 merge_pdfs, 输出可解析, 缺路径不 panic
+        use lopdf::content::{Content, Operation};
+        fn page_pdf(text: &str) -> Vec<u8> {
+            let mut doc = lopdf::Document::with_version("1.5");
+            let pages_id = doc.new_object_id();
+            let font_id = doc.add_object(lopdf::dictionary! {
+                "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Courier",
+            });
+            let resources_id = doc.add_object(lopdf::dictionary! {
+                "Font" => lopdf::dictionary! { "F1" => font_id },
+            });
+            let content = Content {
+                operations: vec![
+                    Operation::new("BT", vec![]),
+                    Operation::new("Tf", vec!["F1".into(), 48.into()]),
+                    Operation::new("Td", vec![100.into(), 600.into()]),
+                    Operation::new("Tj", vec![lopdf::Object::string_literal(text)]),
+                    Operation::new("ET", vec![]),
+                ],
+            };
+            let content_id = doc.add_object(lopdf::Stream::new(
+                lopdf::Dictionary::new(),
+                content.encode().expect("encode"),
+            ));
+            let page_id = doc.add_object(lopdf::dictionary! {
+                "Type" => "Page", "Parent" => pages_id, "Contents" => content_id,
+                "Resources" => resources_id,
+                "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+            });
+            let pages = lopdf::dictionary! {
+                "Type" => "Pages", "Kids" => vec![page_id.into()], "Count" => 1,
+            };
+            doc.objects.insert(pages_id, lopdf::Object::Dictionary(pages));
+            let catalog_id = doc.add_object(lopdf::dictionary! {
+                "Type" => "Catalog", "Pages" => pages_id,
+            });
+            doc.trailer.set("Root", catalog_id);
+            doc.compress();
+            let mut buf = Vec::new();
+            doc.save_to(&mut buf).expect("save");
+            buf
+        }
+        let tmp = std::env::temp_dir().join(format!("nt_pdfmerge_dispatch_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let p1 = tmp.join("a.pdf");
+        let p2 = tmp.join("b.pdf");
+        let out = tmp.join("merged.pdf");
+        std::fs::write(&p1, page_pdf("Alpha")).unwrap();
+        std::fs::write(&p2, page_pdf("Beta")).unwrap();
+
+        let task = ConsciousTask {
+            id: "t-pm".into(),
+            summary: format!(
+                "合并pdf {} {} {}",
+                out.display(),
+                p1.display(),
+                p2.display()
+            ),
+            capability_tag: "pdf_merge".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&task);
+        assert!(executed, "pdf_merge 应真实执行: {output}");
+        assert!(out.exists(), "合并输出应生成");
+        let merged = std::fs::read(&out).unwrap();
+        let pages = neotrix_types::core::file_parser::FileParser::extract_pdf_pages(&merged);
+        assert_eq!(pages.len(), 2, "合并后应 2 页: {pages:?}");
+
+        // 缺路径 → (false, 提示)
+        let bad = ConsciousTask {
+            id: "t-pm-bad".into(),
+            summary: "合并pdf 无有效路径".into(),
+            capability_tag: "pdf_merge".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&bad);
+        assert!(!executed, "无有效路径不应误报执行成功");
+        assert!(!output.is_empty());
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

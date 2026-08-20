@@ -376,7 +376,33 @@ impl CapabilityNode {
                 }
             }
             ConstellationLevel::C5SelfHealing | ConstellationLevel::C6EvolutionLoop => {
-                (true, None)
+                // D16 自欺防线收紧: C5/C6 亦须 evidence_gated='passed' + 生产接线证据,
+                // 防止无证据节点被晋升到最高阶 (历史上 C5/C6 无门禁直接放行)。
+                let gated = self
+                    .metadata
+                    .get("evidence_gated")
+                    .map(|v| v == "passed")
+                    .unwrap_or(false);
+                let has_wiring = self
+                    .metadata
+                    .get("wiring_evidence")
+                    .map(|v| v.is_string() && !v.as_str().unwrap_or("").is_empty())
+                    .unwrap_or(false);
+                if gated && has_wiring {
+                    (true, None)
+                } else {
+                    let mut reasons = Vec::new();
+                    if !gated {
+                        reasons.push("evidence_gated='passed' required");
+                    }
+                    if !has_wiring {
+                        reasons.push("production wiring_evidence (file:line) required");
+                    }
+                    (
+                        false,
+                        Some(format!("C5+ gate: {}", reasons.join(", "))),
+                    )
+                }
             }
         }
     }

@@ -213,4 +213,33 @@ mod tests {
         assert!(node.promote_constellation().is_ok());
         assert_eq!(node.constellation, ConstellationLevel::C3Benchmark);
     }
+
+    #[test]
+    fn test_promotion_evidence_gate_c5_c6_requires_evidence() {
+        // D16 自欺防线收紧: C5/C6 不再无条件放行, 须 evidence_gated + wiring_evidence。
+        // 修复前 C5/C6 分支直接 (true, None) — 无证据节点可被晋升到最高阶。
+        let mut node = CapabilityNode::new_primitive("t::e".into(), Domain::Mind, vec!["delta".into()]);
+        // C2+ 均需 evidence_gated, 逐级注入并晋升到 C5
+        node.metadata.insert("wiring_evidence".into(), serde_json::Value::String("wired".into()));
+        node.metadata.insert("evidence_gated".into(), serde_json::Value::String("passed".into()));
+        for _ in 0..5 {
+            assert!(node.promote_constellation().is_ok(), "晋升到 C5 失败");
+        }
+        assert_eq!(node.constellation, ConstellationLevel::C5SelfHealing);
+        // 缺 evidence_gated → 拒绝
+        node.metadata.remove("evidence_gated");
+        let (ok, reason) = node.promotion_evidence_gate();
+        assert!(!ok, "C5 without evidence_gated must be rejected: {:?}", reason);
+        // 仅 gated 而无 wiring → 拒绝
+        node.metadata.insert("evidence_gated".into(), serde_json::Value::String("passed".into()));
+        node.metadata.remove("wiring_evidence");
+        let (ok2, reason2) = node.promotion_evidence_gate();
+        assert!(!ok2, "C5 without wiring must be rejected: {:?}", reason2);
+        // 双证据齐全 → 通过并可晋升 C6
+        node.metadata.insert("wiring_evidence".into(), serde_json::Value::String("src/pipeline.rs:2653".into()));
+        let (ok3, reason3) = node.promotion_evidence_gate();
+        assert!(ok3, "C5 with full evidence must pass: {:?}", reason3);
+        assert!(node.promote_constellation().is_ok());
+        assert_eq!(node.constellation, ConstellationLevel::C6EvolutionLoop);
+    }
 }
