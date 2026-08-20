@@ -100,8 +100,94 @@ impl SelfTest for LayerBoundaryFitness {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 2. NoCycleFitness — 能力网 DAG 无环守卫
+// 1.5 CoreBoundaryFitness — core/→neotrix/ 反向依赖边界守卫
 // ─────────────────────────────────────────────────────────────
+
+/// 核心层 (core/) 不得反向依赖实现层 (neotrix/)。
+/// 例外 (受控边界, 既有约定 "受控边界" 注释) 列入 allowlist:
+/// - KnowledgeBase 共享状态层 (l3_memory_impl) 是 NT-MEMORY 契约,
+///   core 侧 5 文件经此消费节点/边/嵌入, 属 sanctioned shared-state 访问
+/// - ReasoningEngine / CodeGraph (l8 nt_mind) 为既有 documented 受控边界
+/// - nt_io_provider (L1) 是 forecast 的 provider 工厂, 既有 documented 边界
+/// - nt_core_self_test_integration 需注册全仓检测件, 天然依赖全模块
+/// 除 allowlist 外新增 core→neotrix 引用视为层边界违规。
+pub struct CoreBoundaryFitness;
+
+/// 受控边界 allowlist: (core 文件, 允许引用的 neotrix 目标前缀)
+const CORE_BOUNDARY_ALLOW: &[(&str, &str)] = &[
+    // KB 共享状态层访问 (NT-MEMORY 契约)
+    ("nt_core_consciousness_core.rs", "nt_memory_kb"),
+    ("nt_core_consciousness_core.rs", "l3_memory_impl::nt_memory_kb"),
+    ("nt_core_second_brain.rs", "nt_memory_kb"),
+    ("nt_core_consciousness/consciousness_runtime.rs", "nt_memory_kb"),
+    ("nt_core_e8/nt_core_community_ingester.rs", "nt_memory_kb"),
+    ("l7_capability/nt_core_orch_agent.rs", "nt_memory_kb"),
+    // 能力网聚合 (nt_file_ability) 供 consciousness_core 消费
+    ("nt_core_consciousness_core.rs", "consolidate_tables"),
+    ("nt_core_consciousness_core.rs", "extract_text"),
+    ("nt_core_consciousness_core.rs", "to_markdown"),
+    ("nt_core_consciousness_core.rs", "edit_pdf"),
+    ("nt_core_consciousness_core.rs", "l1_body_impl::nt_io_neocodex"),
+    // documented 受控边界 (engine / codegraph / provider)
+    ("nt_core_task_dispatcher.rs", "l8_autonomic_impl"),
+    ("nt_core_retrieval.rs", "l8_autonomic_impl"),
+    ("nt_core_reasoning.rs", "l3_memory_impl"),
+    ("nt_core_forecast.rs", "l1_body_impl::nt_io_provider"),
+    // 全仓检测件注册 (天然依赖全模块)
+    ("nt_core_self_test_integration.rs", ""),
+];
+
+impl SelfTest for CoreBoundaryFitness {
+    fn name(&self) -> &str {
+        "arch_fitness_core_boundary"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let core_root = src_root().join("core");
+        let re = Regex::new(r"crate::neotrix::([a-z0-9_:]+)").expect("valid regex");
+        let mut violations = Vec::new();
+        for file in rs_files(&core_root) {
+            let fname = file.strip_prefix(&core_root).unwrap_or(&file);
+            let rel = fname.to_string_lossy().to_string();
+            // tests.rs / *_tests.rs 是测试模块文件, 天然引用实现层, 不视为违规
+            if rel.ends_with("tests.rs") || rel.ends_with("_tests.rs") {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&file) else {
+                continue;
+            };
+            let lines: Vec<&str> = content.lines().collect();
+            for (i, line) in lines.iter().enumerate() {
+                if line.contains("crate::neotrix::") && !in_test_context(&content, i) {
+                    for cap in re.captures_iter(line) {
+                        let target = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+                        let allowed = CORE_BOUNDARY_ALLOW
+                            .iter()
+                            .any(|(a, p)| rel.ends_with(a) && target.starts_with(p));
+                        if !allowed {
+                            violations.push(format!(
+                                "core→neotrix 越层: {}:{} | {}",
+                                file.strip_prefix(repo_root()).unwrap_or(&file).display(),
+                                i + 1,
+                                line.trim()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        if violations.is_empty() {
+            Ok(())
+        } else {
+            let mut msg = vec![format!(
+                "core→neotrix 层边界违规 {} 处 (core 不得依赖实现层, 除受控边界)",
+                violations.len()
+            )];
+            msg.extend(violations.iter().take(20).cloned());
+            Err(msg)
+        }
+    }
+}
 
 /// 能力网无环: .neotrix/capability_registry.json 的 edges 必须构成 DAG。
 /// 环 = 能力路由 (optimal_provider) 死循环风险。
@@ -540,6 +626,7 @@ impl SelfTest for PanicDensityFitness {
 pub fn arch_fitness_tests() -> Vec<Box<dyn SelfTest>> {
     vec![
         Box::new(LayerBoundaryFitness),
+        Box::new(CoreBoundaryFitness),
         Box::new(NoCycleFitness),
         Box::new(CapabilityConsistencyFitness),
         Box::new(TreeSingletonFitness),
@@ -609,5 +696,18 @@ mod tests {
         let guard = PanicDensityFitness::default();
         // 守卫可运行且返回 Ok 或 Err 都算通过 (仅验证不 panic)
         let _ = guard.self_test();
+    }
+
+    #[test]
+    fn test_core_boundary_allowlist_covers_all_reverse_deps() {
+        let guard = CoreBoundaryFitness;
+        // 针对真实仓库运行守卫 — allowlist 必须覆盖现有全部受控边界,
+        // 否则本次接线自身即引入违规。
+        let result = guard.self_test();
+        assert!(
+            result.is_ok(),
+            "core→neotrix 守卫必须在现状下通过: {:?}",
+            result
+        );
     }
 }

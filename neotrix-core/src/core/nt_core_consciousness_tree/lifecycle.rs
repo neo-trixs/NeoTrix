@@ -153,6 +153,26 @@ impl ConsciousnessTree {
                 }
             }
         }
+        // ── Phase 5 结构健康分 → 演化参数调制 (D14 死数据接线) ──
+        // topology/connectivity/health_chain 由 Phase 5 ConsciousnessReview 计算并存入
+        // core, 但从未被行为代码读取 — 死数据。此处消费: 结构健康差 → 收缩探索 +
+        // 放宽生长门加速恢复; 结构健康好 → 微幅加大探索 (上限保护)。
+        let structural_health =
+            (self.core.topology_score + self.core.connectivity_score + self.core.health_chain_score)
+                / 3.0;
+        if structural_health > 0.0 {
+            if let Some(contract) = self.core.last_contract.as_mut() {
+                if structural_health < 0.4 {
+                    contract.exploration_budget =
+                        (contract.exploration_budget - 0.03).max(0.1);
+                    self.config.fruit_growth_health =
+                        (self.config.fruit_growth_health - 0.03).max(0.4);
+                } else if structural_health > 0.7 {
+                    contract.exploration_budget =
+                        (contract.exploration_budget + 0.02).min(0.4);
+                }
+            }
+        }
         // 未 fulfilled 且无 drift: 保持现状 (等待下一 cycle 观察)
     }
 
