@@ -1356,6 +1356,26 @@ impl BackgroundLoopHandle {
             }
         }
 
+        // ── 跨会话织网 (NT-NEXUS T3 生产接线): 图谱维护 + 连接强化 ──
+        // nexus-weaver 方法论 Phase 4 的周期性强制: 标记 30 天未引用弱连接、
+        // 统计强连接 (>5 引用置永久)。与 galaxy_hygiene (星辰健康) 互补。
+        if let Some(ref kb) = self.kb {
+            match kb.weave_once() {
+                Ok(report) => {
+                    if report.permanent_links.len() > 0 || report.stale_links_marked.len() > 0 {
+                        log::info!(
+                            "[bg] nexus_weave: {} 弱连接标记, {} 强连接永久, {} 新建, {} 强化",
+                            report.stale_links_marked.len(),
+                            report.permanent_links.len(),
+                            report.new_links.len(),
+                            report.reinforced_links.len()
+                        );
+                    }
+                }
+                Err(e) => log::warn!("[bg] nexus_weave: {e}"),
+            }
+        }
+
         // ── write_guard 守卫证据审计 (dbx G4, T3 生产接线) ──
         // 扫描 write_guard 命名空间证据 → 聚合统计 → NT-SHIELD CheckResult。
         // 异常 (被拒/需审批仍 executed = 守卫被绕过) 汇入 MetaAuditor +

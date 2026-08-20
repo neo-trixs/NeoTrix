@@ -24,6 +24,7 @@ pub mod nt_memory_pack_chunked;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
+pub mod nt_memory_distill;
 pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;
 pub mod nt_memory_geo;
@@ -56,6 +57,7 @@ pub mod nt_memory_commit_tracker;
 pub mod nt_memory_coeffect;
 pub mod nt_memory_graph_cache;
 pub mod nt_memory_galaxy_hygiene;
+pub mod nt_memory_weave;
 pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
@@ -2397,6 +2399,35 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
     pub fn galaxy_wake_star(&self, ns: &str) -> Result<String, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_galaxy_hygiene::galaxy_wake_star(&conn, ns)
+    }
+
+    /// 跨会话织网一次 (NT-NEXUS T3 生产接线): 图谱维护 + 连接强化。
+    /// 由 BackgroundLoop 周期调用, 与会话收尾 (experience absorb) 互补。
+    pub fn weave_once(&self) -> Result<nt_memory_weave::WeaveReport, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_weave::weave_once(&conn)
+    }
+
+    /// 记录跨会话桥接 (NT-NEXUS): 显式连接两个 session 的共享主题。
+    pub fn record_session_bridge(
+        &self,
+        session_a: &str,
+        session_b: &str,
+        implicit_keyword: &str,
+        bridge_note: &str,
+    ) -> Result<nt_memory_weave::SessionBridge, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_weave::record_session_bridge(&conn, session_a, session_b, implicit_keyword, bridge_note)
+    }
+
+    /// 连接两个 pattern (NT-NEXUS): 命中强化 / 未命中新建。返回 (新建, 强化)。
+    pub fn connect_patterns(
+        &self,
+        from_pattern: &str,
+        to_pattern: &str,
+    ) -> Result<(bool, bool), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_weave::connect_patterns(&conn, from_pattern, to_pattern)
     }
 
     /// 星辰 Persona 读取 (cumora.ai "Personas, not prompts" 借鉴): 返回 hub 的

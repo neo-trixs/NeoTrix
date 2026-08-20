@@ -27,6 +27,7 @@ mod grounding;
 mod gwt;
 mod helpers;
 mod merge;
+pub mod merge_docx;
 mod ocr;
 mod pdfedit;
 mod selftest;
@@ -50,6 +51,152 @@ pub use structured::*;
 pub use tables::*;
 pub use types::*;
 pub use visual::*;
+
+/// 构造最小 DOCX (zip 包: [Content_Types].xml + _rels/.rels + word/document.xml)。
+/// 测试辅助: 模块内 + 意识核心 dispatch 测试复用 (R-P42 复用, 不平行重造)。
+#[cfg(test)]
+pub(crate) fn make_min_docx(text: &str) -> Vec<u8> {
+    use std::io::Write;
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default();
+    zw.start_file("[Content_Types].xml", opts)
+        .expect("ct start");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#,
+    )
+    .expect("ct write");
+    zw.start_file("_rels/.rels", opts).expect("rels start");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#,
+    )
+    .expect("rels write");
+    zw.start_file("word/document.xml", opts).expect("doc start");
+    let doc = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body>
+</w:document>"#
+    );
+    zw.write_all(doc.as_bytes()).expect("doc write");
+    let buf = zw.finish().expect("zip finish");
+    buf.into_inner()
+}
+
+/// 构造带内嵌图片的最小 DOCX: 段落含 `<w:drawing>` 引用 `rId2` → `media/image1.png`。
+/// 用于验证合并时媒体 part 冲突重命名 + rels 的 rId 冲突重编号。
+#[cfg(test)]
+pub(crate) fn make_min_docx_with_media(text: &str, media_name: &str, media_bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default();
+    zw.start_file("[Content_Types].xml", opts).expect("ct");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Default Extension="png" ContentType="image/png"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#,
+    )
+    .expect("ct write");
+    zw.start_file("_rels/.rels", opts).expect("rels");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#,
+    )
+    .expect("rels write");
+    zw.start_file("word/document.xml", opts).expect("doc");
+    let doc = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>
+<w:p><w:r><w:t>{text}</w:t></w:r></w:p>
+<w:p><w:r><w:drawing xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:blip r:embed="rId2"/></w:drawing></w:r></w:p>
+</w:body>
+</w:document>"#
+    );
+    zw.write_all(doc.as_bytes()).expect("doc write");
+    zw.start_file("word/_rels/document.xml.rels", opts).expect("doc rels");
+    let rels = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{media_name}"/>
+</Relationships>"#
+    );
+    zw.write_all(rels.as_bytes()).expect("doc rels write");
+    zw.start_file("word/media/image1.png", opts).expect("media");
+    zw.write_all(media_bytes).expect("media write");
+    let buf = zw.finish().expect("zip");
+    buf.into_inner()
+}
+
+/// 构造最小 PPTX (zip 包: [Content_Types].xml + _rels/.rels + ppt/presentation.xml +
+/// ppt/_rels/presentation.xml.rels + ppt/slides/slide1.xml)。测试辅助。
+#[cfg(test)]
+pub(crate) fn make_min_pptx(text: &str) -> Vec<u8> {
+    use std::io::Write;
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default();
+    zw.start_file("[Content_Types].xml", opts).expect("ct");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+<Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>
+</Types>"#,
+    )
+    .expect("ct w");
+    zw.start_file("_rels/.rels", opts).expect("rels");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
+</Relationships>"#,
+    )
+    .expect("rels w");
+    zw.start_file("ppt/presentation.xml", opts).expect("pres");
+    let pres = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst>
+  <p:sldSz cx="9144000" cy="6858000"/>
+</p:presentation>"#
+    );
+    zw.write_all(pres.as_bytes()).expect("pres w");
+    zw.start_file("ppt/_rels/presentation.xml.rels", opts).expect("pres rels");
+    zw.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+</Relationships>"#,
+    )
+    .expect("pres rels w");
+    zw.start_file("ppt/slides/slide1.xml", opts).expect("slide");
+    let slide = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/></p:nvGrpSpPr><p:grpSpPr/>
+    <p:sp><p:nvSpPr><p:cNvPr id="2" name="t"/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+</p:sld>"#
+    );
+    zw.write_all(slide.as_bytes()).expect("slide w");
+    let buf = zw.finish().expect("zip");
+    buf.into_inner()
+}
 
 #[cfg(test)]
 mod tests {
@@ -1663,5 +1810,108 @@ mod tests {
         let r = visual_extract(FileKind::Text, "img", "版本 2.5.1 发布", &cfg, fake);
         assert!(!r.failed);
         assert!(!r.extraction_bound_ok, "丢失关键 token 应标记超限 (分发二次校正)");
+    }
+
+    #[test]
+    fn test_merge_docx_concatenates_bodies() {
+        // 3 个单段 DOCX → 合并后 document.xml 含全部 3 段文本
+        let tmp = std::env::temp_dir().join(format!("nt_mergedocx_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let a = tmp.join("a.docx");
+        let b = tmp.join("b.docx");
+        let c = tmp.join("c.docx");
+        let out = tmp.join("merged.docx");
+        std::fs::write(&a, make_min_docx("Alpha")).unwrap();
+        std::fs::write(&b, make_min_docx("Beta")).unwrap();
+        std::fs::write(&c, make_min_docx("Gamma")).unwrap();
+
+        let report = merge_docx::merge_docx(&[a, b, c], &out).expect("合并成功");
+        assert_eq!(report.items, 3, "应合并 3 个文档");
+        // 用 office_oxide 打开验证文本
+        let mut ed = office_oxide::docx::edit::EditableDocx::open(&out)
+            .expect("office_oxide 应能打开合并结果");
+        // 通过替换空串计数不可靠, 直接解析 XML 验证
+        let bytes = std::fs::read(&out).unwrap();
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+        let mut docxml = Vec::new();
+        {
+            let mut f = z.by_name("word/document.xml").unwrap();
+            std::io::Read::read_to_end(&mut f, &mut docxml).unwrap();
+        }
+        let s = String::from_utf8_lossy(&docxml);
+        assert!(s.contains("Alpha"), "应含 Alpha: {s}");
+        assert!(s.contains("Beta"), "应含 Beta: {s}");
+        assert!(s.contains("Gamma"), "应含 Gamma: {s}");
+        assert!(ed.replace_text("Alpha", "OK") >= 1, "合并后 office_oxide 可编辑");
+
+        // 单文件透传
+        let single = tmp.join("single.docx");
+        std::fs::write(&single, make_min_docx("Solo")).unwrap();
+        let r2 = merge_docx::merge_docx(&[single.clone()], &tmp.join("single_out.docx")).expect("单文件透传");
+        assert_eq!(r2.items, 1);
+
+        // 空输入报错
+        assert!(merge_docx::merge_docx(&[], &tmp.join("empty.docx")).is_err());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// 构造最小 PPTX (zip 包: [Content_Types].xml + _rels/.rels + ppt/presentation.xml +
+    /// ppt/_rels/presentation.xml.rels + ppt/slides/slide1.xml)。
+    #[test]
+    fn test_merge_pptx_concatenates_slides() {
+        // 3 个单 slide PPTX → 合并后 3 个 slide part + sldIdLst 3 条
+        let tmp = std::env::temp_dir().join(format!("nt_mergepptx_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let a = tmp.join("a.pptx");
+        let b = tmp.join("b.pptx");
+        let c = tmp.join("c.pptx");
+        let out = tmp.join("merged.pptx");
+        std::fs::write(&a, make_min_pptx("SlideAlpha")).unwrap();
+        std::fs::write(&b, make_min_pptx("SlideBeta")).unwrap();
+        std::fs::write(&c, make_min_pptx("SlideGamma")).unwrap();
+
+        let report = merge_docx::merge_pptx(&[a.clone(), b, c], &out).expect("合并成功");
+        assert_eq!(report.items, 3, "应合并 3 个文档");
+
+        let bytes = std::fs::read(&out).unwrap();
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+        // 应有 3 个 slide part
+        let mut slides: Vec<String> = z
+            .file_names()
+            .filter(|n| n.starts_with("ppt/slides/slide") && n.ends_with(".xml"))
+            .map(ToOwned::to_owned)
+            .collect();
+        slides.sort();
+        assert_eq!(slides.len(), 3, "应有 3 个 slide part: {slides:?}");
+        // 每个 slide 内容正确
+        for (name, expect) in [
+            ("ppt/slides/slide1.xml", "SlideAlpha"),
+            ("ppt/slides/slide2.xml", "SlideBeta"),
+            ("ppt/slides/slide3.xml", "SlideGamma"),
+        ] {
+            let mut f = z.by_name(name).expect("slide part");
+            let mut data = Vec::new();
+            std::io::Read::read_to_end(&mut f, &mut data).unwrap();
+            let s = String::from_utf8_lossy(&data);
+            assert!(s.contains(expect), "{name} 应含 {expect}: {s}");
+        }
+        // sldIdLst 应有 3 条
+        let mut f = z.by_name("ppt/presentation.xml").unwrap();
+        let mut data = Vec::new();
+        std::io::Read::read_to_end(&mut f, &mut data).unwrap();
+        let s = String::from_utf8_lossy(&data);
+        assert_eq!(s.matches("<p:sldId ").count(), 3, "sldIdLst 应有 3 条: {s}");
+
+        // 单文件透传
+        let r2 = merge_docx::merge_pptx(&[a], &tmp.join("single_out.pptx")).expect("单文件透传");
+        assert_eq!(r2.items, 1);
+
+        // 空输入报错
+        assert!(merge_docx::merge_pptx(&[], &tmp.join("empty.pptx")).is_err());
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

@@ -525,6 +525,12 @@ const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
     ("合并PDF", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
     ("pdf合并", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
     ("PDF合并", "pdf_merge", "NT-ACT", "CodeAnalyzer"),
+    ("合并文档", "doc_merge", "NT-ACT", "CodeAnalyzer"),
+    ("文档合并", "doc_merge", "NT-ACT", "CodeAnalyzer"),
+    ("合并word", "doc_merge", "NT-ACT", "CodeAnalyzer"),
+    ("合并docx", "doc_merge", "NT-ACT", "CodeAnalyzer"),
+    ("合并ppt", "doc_merge", "NT-ACT", "CodeAnalyzer"),
+    ("合并pptx", "doc_merge", "NT-ACT", "CodeAnalyzer"),
     (
         "检索",
         "hybrid_retrieval",
@@ -1251,6 +1257,51 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                     }
                 }
                 Err(e) => (false, format!("PDF 合并失败: {e}")),
+            }
+        }
+        "doc_merge" => {
+            // 摘要语法: <out.docx|pptx> <in1> <in2> ... — 结构级合并 Office 文档
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.len() < 3 {
+                return (
+                    false,
+                    format!(
+                        "子任务 '{}' 缺少 输出+输入 Office 文档路径, 无法合并",
+                        task.summary
+                    ),
+                );
+            }
+            let out = paths[0].clone();
+            let inputs = &paths[1..];
+            let ext = out
+                .extension()
+                .map(|e| e.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            match (ext.as_str(), inputs) {
+                ("docx", _) => match crate::neotrix::merge_docx::merge_docx(inputs, &out) {
+                    Ok(r) => (
+                        true,
+                        format!("DOCX 合并完成: {} 个文件 → {} ({:?})", r.items, out.display(), r),
+                    ),
+                    Err(e) => (false, format!("DOCX 合并失败: {e}")),
+                },
+                ("pptx", _) => match crate::neotrix::merge_docx::merge_pptx(inputs, &out) {
+                    Ok(r) => (
+                        true,
+                        format!("PPTX 合并完成: {} 个文件 → {} ({:?})", r.items, out.display(), r),
+                    ),
+                    Err(e) => (false, format!("PPTX 合并失败: {e}")),
+                },
+                _ => (
+                    false,
+                    format!("doc_merge 仅支持 .docx/.pptx 输出, 收到: {ext}"),
+                ),
             }
         }
         _ => (
@@ -2383,6 +2434,88 @@ mod tests {
             id: "t-pm-bad".into(),
             summary: "合并pdf 无有效路径".into(),
             capability_tag: "pdf_merge".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&bad);
+        assert!(!executed, "无有效路径不应误报执行成功");
+        assert!(!output.is_empty());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn dispatch_internal_routes_doc_merge_to_real_call() {
+        // R-P79: doc_merge → 真调 merge_docx/merge_pptx; 缺路径不 panic; 错误扩展名报错
+        use crate::neotrix::make_min_docx;
+        use crate::neotrix::make_min_pptx;
+        let tmp = std::env::temp_dir().join(format!("nt_docmerge_dispatch_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let d1 = tmp.join("a.docx");
+        let d2 = tmp.join("b.docx");
+        let out_d = tmp.join("merged.docx");
+        std::fs::write(&d1, make_min_docx("Alpha")).unwrap();
+        std::fs::write(&d2, make_min_docx("Beta")).unwrap();
+        let p1 = tmp.join("a.pptx");
+        let p2 = tmp.join("b.pptx");
+        let out_p = tmp.join("merged.pptx");
+        std::fs::write(&p1, make_min_pptx("SlideAlpha")).unwrap();
+        std::fs::write(&p2, make_min_pptx("SlideBeta")).unwrap();
+
+        let task_d = ConsciousTask {
+            id: "t-dm".into(),
+            summary: format!(
+                "合并文档 {} {} {}",
+                out_d.display(),
+                d1.display(),
+                d2.display()
+            ),
+            capability_tag: "doc_merge".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&task_d);
+        assert!(executed, "doc_merge(docx) 应真实执行: {output}");
+        assert!(out_d.exists(), "DOCX 合并输出应生成");
+
+        let task_p = ConsciousTask {
+            id: "t-pm".into(),
+            summary: format!(
+                "合并pptx {} {} {}",
+                out_p.display(),
+                p1.display(),
+                p2.display()
+            ),
+            capability_tag: "doc_merge".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&task_p);
+        assert!(executed, "doc_merge(pptx) 应真实执行: {output}");
+        assert!(out_p.exists(), "PPTX 合并输出应生成");
+
+        // 不支持扩展名 → (false, 提示)
+        let bad_ext = tmp.join("merged.xls");
+        let task_x = ConsciousTask {
+            id: "t-x".into(),
+            summary: format!("合并文档 {} {} {}", bad_ext.display(), d1.display(), d2.display()),
+            capability_tag: "doc_merge".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let (executed, output) = dispatch_internal_capability(&task_x);
+        assert!(!executed, "不支持扩展名不应误报执行成功: {output}");
+
+        // 缺路径 → (false, 提示)
+        let bad = ConsciousTask {
+            id: "t-dm-bad".into(),
+            summary: "合并文档 无有效路径".into(),
+            capability_tag: "doc_merge".into(),
             domain: "NT-ACT".into(),
             specialist: "CodeAnalyzer".into(),
             priority: 5,

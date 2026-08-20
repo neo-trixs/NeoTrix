@@ -211,6 +211,9 @@ pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
 mod nt_file_ability;
 pub mod proxy_daemon_wrapper;
 
+#[cfg(test)]
+pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};
+
 // ─── Unified File Ability (统一文件能力) — 文件读写编辑统一入口 ────────────────
 // office_oxide (Office 6 格式) + neotrix-types FileParser (通用文本/PDF/图像/音频/视频)
 // + image crate (图像元数据)。复用 ConstellationLevel 成熟度 + SelfTest T1-T3 接线。
@@ -234,6 +237,8 @@ pub use nt_file_ability::{
      StructuredData, TableData, TableEdit, TextEncoding, UnitRule, PdfEdit,
      DirExtractEntry, DirExtractReport,
  };
+
+pub use nt_file_ability::merge_docx;
 
 // ─── L7 Capability Tree 採入 (经验 → 能力节点迭代目标) ─────────────────────
 // 能力树 crate 作为 workspace 成员, 此处接入主管线 (Dark Forest 合规: 有消费者)
