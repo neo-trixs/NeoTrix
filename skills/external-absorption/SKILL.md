@@ -205,3 +205,21 @@ pub trait MyTrait: Send + Sync { }
 
 ### Module registration
 New file → declare in parent's `mod.rs` → add `pub use` re-exports → `cargo check`
+
+### Skill security vetting gate (2026-08-19, P6)
+Skills are a core asset but lack vetting. Static scan (zero-LLM) of skill content before it enters the skill engine:
+```rust
+let (scan, _) = scan_skill_content(md, title, desc);
+if scan.rejected { /* deny load, log::warn! */ }
+```
+Rule-set pattern: `trust_rule!(id, T0N, category, regex, reason)` → reject if any rule hits. Never use LLM for gates; regex is deterministic and auditable.
+
+### Reversible output distillation (2026-08-19, P2)
+Compress tool output errors-first for the model, keep a `[ref#N]` marker to expand from tool_log. Budgeting under tiktoken BPE:
+- Reserve tail budget (exit code / summary) BEFORE body — status lines must not be dropped
+- Reserve the `[ref#N]` marker cost in the body loop, else the fallback truncator slices the marker off
+- `truncate_preserving` uses conservative char estimates — do not rely on it when an exact tokenizer is available
+
+### Skill residency audit (2026-08-19, P4)
+Resident frontmatter is loaded every session — measure it with the real tokenizer, not char heuristics:
+`resident_tokens > 1500` → thin-entry skill, audit + rank by descending cost. Wire into the background maintenance loop so the audit runs in production (R-P79), not only in tests.
