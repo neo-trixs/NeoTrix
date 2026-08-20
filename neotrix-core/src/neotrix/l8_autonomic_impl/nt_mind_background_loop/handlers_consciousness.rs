@@ -1348,9 +1348,11 @@ impl BackgroundLoopHandle {
         // 异常 (被拒/需审批仍 executed = 守卫被绕过) 汇入 MetaAuditor +
         // 落盘 KB `consciousness` 命名空间 (行为接地, 与 converge_check 同模式)。
         if let Some(ref kb) = self.kb {
-            use crate::neotrix::l1_body_impl::nt_shield_audit::CheckStatus;
+            use crate::neotrix::l1_body_impl::nt_shield_audit::{
+                write_guard_check_result, CheckStatus,
+            };
             use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::{
-                scan_write_guard_evidence, write_guard_check_result,
+                scan_write_guard_evidence,
             };
             let stats = scan_write_guard_evidence(kb);
             let check = write_guard_check_result(&stats);

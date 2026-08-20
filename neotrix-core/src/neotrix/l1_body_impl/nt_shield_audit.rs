@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardStats;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AuditMode {
     Static,
@@ -105,6 +107,33 @@ pub struct AuditReport {
     pub suspicious: usize,
     pub score: f64,
     pub results: Vec<CheckResult>,
+}
+
+/// 把 write_guard 聚合统计折叠为 NT-SHIELD 审计检查项 (CheckResult + evidence)。
+/// 无异常 → Passed (confidence 1.0); 存在异常 → Failed (confidence 0.0)。
+/// (rev-officer 建议: 折叠侧从 l3 移至审计域, 消除 l1↔l3 双向层依赖。)
+pub fn write_guard_check_result(stats: &WriteGuardStats) -> CheckResult {
+    let has_anomaly = !stats.anomalies.is_empty();
+    let evidence = format!(
+        "write_guard: total={} allowed={} requires_approval={} rejected={} rejected_actions={:?} anomalies={}: {:?}",
+        stats.total,
+        stats.allowed,
+        stats.requires_approval,
+        stats.rejected,
+        stats.rejected_actions,
+        stats.anomalies.len(),
+        stats.anomalies,
+    );
+    CheckResult {
+        check_id: "WG-001".into(),
+        status: if has_anomaly {
+            CheckStatus::Failed
+        } else {
+            CheckStatus::Passed
+        },
+        evidence: Some(evidence),
+        confidence: if has_anomaly { 0.0 } else { 1.0 },
+    }
 }
 
 pub struct SecurityAuditor;
@@ -1444,5 +1473,43 @@ mod tests {
     fn test_api_scanner_selftest_passes() {
         let scanner = ApiScanner::default();
         assert!(scanner.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_write_guard_check_result_failed_with_evidence() {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::{
+            record_write_evidence, scan_write_guard_evidence, WriteGuardVerdict,
+        };
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))).unwrap();
+        record_write_evidence(
+            &kb,
+            "node:delete",
+            &serde_json::json!({"id": "x"}),
+            &WriteGuardVerdict::RequiresApproval,
+            true,
+        );
+        let stats = scan_write_guard_evidence(&kb);
+        let check = write_guard_check_result(&stats);
+        assert!(matches!(check.status, CheckStatus::Failed));
+        assert_eq!(check.check_id, "WG-001");
+        let evidence = check.evidence.clone().unwrap();
+        assert!(evidence.contains("total=1"));
+        assert!(evidence.contains("requires_approval=1"));
+        assert!(evidence.contains("anomalies=1"));
+        assert_eq!(check.confidence, 0.0);
+    }
+
+    #[test]
+    fn test_write_guard_check_result_clean_passed() {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::{
+            scan_write_guard_evidence,
+        };
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))).unwrap();
+        let stats = scan_write_guard_evidence(&kb);
+        let check = write_guard_check_result(&stats);
+        assert!(matches!(check.status, CheckStatus::Passed));
+        assert_eq!(check.confidence, 1.0);
     }
 }

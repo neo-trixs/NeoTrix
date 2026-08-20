@@ -10,8 +10,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::neotrix::l1_body_impl::nt_shield_audit::{CheckResult, CheckStatus};
-
 /// 守卫证据落盘命名空间 (kv_store)。
 pub const WRITE_GUARD_NS: &str = "write_guard";
 
@@ -269,38 +267,13 @@ pub fn scan_write_guard_evidence(kb: &super::KnowledgeBase) -> WriteGuardStats {
     stats
 }
 
-/// 把 write_guard 聚合统计折叠为 NT-SHIELD 审计检查项 (CheckResult + evidence)。
-/// 无异常 → Passed (confidence 1.0); 存在异常 → Failed (confidence 0.0)。
-pub fn write_guard_check_result(stats: &WriteGuardStats) -> CheckResult {
-    let has_anomaly = !stats.anomalies.is_empty();
-    let evidence = format!(
-        "write_guard: total={} allowed={} requires_approval={} rejected={} rejected_actions={:?} anomalies={}: {:?}",
-        stats.total,
-        stats.allowed,
-        stats.requires_approval,
-        stats.rejected,
-        stats.rejected_actions,
-        stats.anomalies.len(),
-        stats.anomalies,
-    );
-    CheckResult {
-        check_id: "WG-001".into(),
-        status: if has_anomaly {
-            CheckStatus::Failed
-        } else {
-            CheckStatus::Passed
-        },
-        evidence: Some(evidence),
-        confidence: if has_anomaly { 0.0 } else { 1.0 },
-    }
-}
-
 /// write_guard 证据检测件 — T1 SelfTest。
 /// T2 注册: `register_absorbed_modules` (run.rs 架构审计) +
 /// `register_lightweight_modules` + `pipeline.rs SelfTestStage`。
-/// T3 生产接线: `handle_architecture_audit` 对生产 KB 调 `scan_write_guard_evidence`。
+/// T3 生产接线: `handle_architecture_audit` 对生产 KB 调 `scan_write_guard_evidence`,
+/// 折叠侧 (write_guard_check_result) 在 NT-SHIELD 审计域 (nt_shield_audit)。
 ///
-/// `self_test` 在内存 KB 中制造含异常的证据并验证检测统计 + 审计折叠正确,
+/// `self_test` 在内存 KB 中制造含异常的证据并验证检测统计正确,
 /// 纯内存无磁盘/网络 IO (可安全进入轻量注册表)。
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WriteGuardAudit;
@@ -367,13 +340,6 @@ impl crate::core::nt_core_self_test::SelfTest for WriteGuardAudit {
         }
         if stats.anomalies.len() != 2 {
             failures.push(format!("expected 2 anomalies, got {:?}", stats.anomalies));
-        }
-        let check = write_guard_check_result(&stats);
-        if !matches!(check.status, CheckStatus::Failed) {
-            failures.push(format!("anomaly 应报 Failed, got {:?}", check.status));
-        }
-        if check.evidence.as_deref().is_none_or(|e| e.is_empty()) {
-            failures.push("CheckResult.evidence 不应为空".into());
         }
         if failures.is_empty() {
             Ok(())
@@ -611,9 +577,6 @@ mod tests {
         let stats = scan_write_guard_evidence(&kb);
         assert_eq!(stats.total, 0);
         assert!(stats.anomalies.is_empty());
-        let check = write_guard_check_result(&stats);
-        assert!(matches!(check.status, CheckStatus::Passed));
-        assert_eq!(check.confidence, 1.0);
     }
 
     #[test]
@@ -624,31 +587,6 @@ mod tests {
         assert_eq!(stats.total, 0);
         assert!(!stats.anomalies.is_empty());
         assert!(stats.anomalies.iter().any(|a| a.contains("解析失败")));
-        assert!(matches!(
-            write_guard_check_result(&stats).status,
-            CheckStatus::Failed
-        ));
-    }
-
-    #[test]
-    fn test_check_result_failed_with_evidence() {
-        let kb = in_memory_kb();
-        record_write_evidence(
-            &kb,
-            "node:delete",
-            &serde_json::json!({"id": "x"}),
-            &WriteGuardVerdict::RequiresApproval,
-            true,
-        );
-        let stats = scan_write_guard_evidence(&kb);
-        let check = write_guard_check_result(&stats);
-        assert!(matches!(check.status, CheckStatus::Failed));
-        assert_eq!(check.check_id, "WG-001");
-        let evidence = check.evidence.unwrap();
-        assert!(evidence.contains("total=1"));
-        assert!(evidence.contains("requires_approval=1"));
-        assert!(evidence.contains("anomalies=1"));
-        assert_eq!(check.confidence, 0.0);
     }
 
     #[test]
