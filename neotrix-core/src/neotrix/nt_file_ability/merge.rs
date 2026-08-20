@@ -2,18 +2,20 @@
 //!
 //! 分层架构 (贯穿整个文件能力体系):
 //!   L1 格式编解码 (通用): read_xlsx_table/write_csv/detect_encoding — 任何类型文件
-//!   L2 表格语义 (通用):   merge_tables_with(schema) — 零领域知识的多表合并引擎
-//!   L3 领域 schema (差异化): PRICE_TABLE_SCHEMA + skills md 镜像 — 唯一个性化层
-//!   L4 意图层 (通用):     意识核心 xlsx_consolidation → 选 schema → 调 merge_tables_with
+//!   L2 表格语义 (通用):   merge_tables_with_mode(schema, mode) — 零领域知识的多表合并引擎
+//!   L3 领域 schema (差异化): SchemaStore 数据化 (JSON: price_table/product_lib + 内置回退)
+//!   L4 意图层 (通用):     意识核心 xlsx_consolidation → SchemaStore 选 schema → 调 merge_tables_with_mode
+//!                          CLI /file consolidate --schema <name> --sheet-mode first|preferred|all
 //!
 //! 领域知识 (列名变体/标准列序/单位规则/供应商命名/跳过前缀) 全部数据化进 MergeSchema,
-//! 不再编译进引擎函数。换行业 = 新增一个 schema const, 不改引擎代码。
+//! 不再编译进引擎函数。换行业/换策略 = 新增 JSON schema 或传 SheetMode, 不改引擎代码。
+//! sheet 选择策略由 SheetMode 运行时参数化 (FirstSheet/Preferred/AllSheets), 消除变体爆炸。
 
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::tables::{read_csv, read_xlsx_sheets_all, write_xlsx_table};
+use super::tables::{read_csv, read_xlsx_sheets_all, write_csv, write_xlsx_table};
 use super::types::{FileAbilityError, Result, TableData};
 
 /// 单重/尺寸等列的补单位规则
@@ -541,7 +543,18 @@ pub fn merge_tables_with_mode(
         }
     }
 
-    write_xlsx_table(output, &table)?;
+    // 输出按扩展名分发: .csv/.tsv → 文本表格 (UTF-8 BOM + 逗号/制表符), 否则 xlsx
+    let ext = output
+        .as_ref()
+        .extension()
+        .and_then(|x| x.to_str())
+        .map(|x| x.to_lowercase())
+        .unwrap_or_default();
+    match ext.as_str() {
+        "csv" => write_csv(output, &table, ',', true)?,
+        "tsv" => write_csv(output, &table, '\t', true)?,
+        _ => write_xlsx_table(output, &table)?,
+    }
     Ok(report)
 }
 
@@ -614,10 +627,35 @@ pub struct SchemaSuggestion {
 }
 
 impl SchemaSuggestion {
-    /// 生成可固化为 MergeSchema 的草稿 — 仅输出确定性可验证部分,
-    /// 未确认的变体一律不进 (防止幻觉污染生产 schema)。
-    pub fn draft(&self) -> MergeSchema {
-        PRICE_TABLE_SCHEMA
+    /// 生成可固化为 JSON schema 的草稿 (owned) — 基于价格表 schema 克隆,
+    /// 不含 LLM 未确认变体 (deterministic matched 已含在 base 变体),
+    /// 保持生产 schema 纯净。
+    pub fn draft(&self) -> MergeSchemaJson {
+        MergeSchemaJson::from_price_table()
+    }
+
+    /// 显式纳入 LLM 建议变体的固化草稿 (suggest --save 用) —
+    /// 仅在调用方明确确认后使用, 防止幻觉污染生产 schema。
+    pub fn draft_with_variants(&self) -> MergeSchemaJson {
+        let mut j = self.draft();
+        for (std_col, variants) in &self.suggested_variants {
+            // 追加到既有变体列表 (若变体已存在则跳过)
+            if let Some(existing) = j
+                .column_variants
+                .iter_mut()
+                .find(|(c, _)| *c == *std_col)
+            {
+                for v in variants {
+                    if !existing.1.contains(v) {
+                        existing.1.push(v.clone());
+                    }
+                }
+            } else {
+                j.column_variants
+                    .push((std_col.clone(), variants.clone()));
+            }
+        }
+        j
     }
 }
 
@@ -799,5 +837,634 @@ fn strip_leading_num(s: &str) -> Option<&str> {
         None
     } else {
         Some(rest)
+    }
+}
+
+// ─── Schema 数据化 (R-2026-08-20) ────────────────────────────────────────────
+// MergeSchema 是编译期 const (`&'static str`), 引擎零领域知识。
+// 领域 schema 数据化为 JSON 文件, 运行时经 SchemaStore 加载 → `Box::leak` 转
+// static → MergeSchema。新增领域 (如"中央产品信息库") 只需写 JSON, 零重编译。
+
+/// Schema 的 JSON 表示 (owned, 可 serde) — 与 MergeSchema 字段一一对应。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeSchemaJson {
+    pub name: String,
+    pub standard_columns: Vec<String>,
+    pub column_variants: Vec<(String, Vec<String>)>,
+    pub filename_suffixes: Vec<String>,
+    /// 补单位规则: (列, 后缀, [skip_if_contains])
+    #[serde(default)]
+    pub unit_rules: Vec<(String, String, Vec<String>)>,
+    #[serde(default)]
+    pub preferred_sheets: Vec<String>,
+    /// 空值标记: (列, [标记])
+    #[serde(default)]
+    pub empty_markers: Vec<(String, Vec<String>)>,
+    pub value_columns: Vec<String>,
+    #[serde(default)]
+    pub extra_columns: Vec<String>,
+    #[serde(default)]
+    pub skip_prefixes: Vec<String>,
+    #[serde(default)]
+    pub supplier_column: Option<String>,
+    #[serde(default)]
+    pub dedup_columns: Vec<String>,
+    /// 数字列: ["列名"...] (仅 Numeric 需列出, Text 为默认)
+    #[serde(default)]
+    pub numeric_columns: Vec<String>,
+}
+
+impl MergeSchemaJson {
+    /// 从 PRICE_TABLE_SCHEMA 导出 (作为默认 schema 文件的事实源)
+    pub fn from_price_table() -> Self {
+        Self {
+            name: PRICE_TABLE_SCHEMA.name.to_string(),
+            standard_columns: PRICE_TABLE_SCHEMA
+                .standard_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            column_variants: PRICE_TABLE_SCHEMA
+                .column_variants
+                .iter()
+                .map(|(std, vs)| (std.to_string(), vs.iter().map(|v| v.to_string()).collect()))
+                .collect(),
+            filename_suffixes: PRICE_TABLE_SCHEMA
+                .filename_suffixes
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            unit_rules: PRICE_TABLE_SCHEMA
+                .unit_rules
+                .iter()
+                .map(|r| {
+                    (
+                        r.column.to_string(),
+                        r.suffix.to_string(),
+                        r.skip_if_contains.iter().map(|s| s.to_string()).collect(),
+                    )
+                })
+                .collect(),
+            preferred_sheets: PRICE_TABLE_SCHEMA
+                .preferred_sheets
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            empty_markers: PRICE_TABLE_SCHEMA
+                .empty_markers
+                .iter()
+                .map(|(c, ms)| (c.to_string(), ms.iter().map(|m| m.to_string()).collect()))
+                .collect(),
+            value_columns: PRICE_TABLE_SCHEMA
+                .value_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            extra_columns: PRICE_TABLE_SCHEMA
+                .extra_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            skip_prefixes: PRICE_TABLE_SCHEMA
+                .skip_prefixes
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            supplier_column: PRICE_TABLE_SCHEMA.supplier_column.map(|s| s.to_string()),
+            dedup_columns: PRICE_TABLE_SCHEMA
+                .dedup_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            numeric_columns: PRICE_TABLE_SCHEMA
+                .column_types
+                .iter()
+                .filter(|(_, t)| *t == ColumnType::Numeric)
+                .map(|(c, _)| c.to_string())
+                .collect(),
+        }
+    }
+
+    /// 从任意 MergeSchema 序列化为 JSON (可重命名 name) — suggest → 固化闭环。
+    pub fn from_schema(schema: &MergeSchema, name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            standard_columns: schema
+                .standard_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            column_variants: schema
+                .column_variants
+                .iter()
+                .map(|(std, vs)| (std.to_string(), vs.iter().map(|v| v.to_string()).collect()))
+                .collect(),
+            filename_suffixes: schema
+                .filename_suffixes
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            unit_rules: schema
+                .unit_rules
+                .iter()
+                .map(|r| {
+                    (
+                        r.column.to_string(),
+                        r.suffix.to_string(),
+                        r.skip_if_contains.iter().map(|s| s.to_string()).collect(),
+                    )
+                })
+                .collect(),
+            preferred_sheets: schema
+                .preferred_sheets
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            empty_markers: schema
+                .empty_markers
+                .iter()
+                .map(|(c, ms)| (c.to_string(), ms.iter().map(|m| m.to_string()).collect()))
+                .collect(),
+            value_columns: schema
+                .value_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            extra_columns: schema
+                .extra_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            skip_prefixes: schema
+                .skip_prefixes
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            supplier_column: schema.supplier_column.map(|s| s.to_string()),
+            dedup_columns: schema
+                .dedup_columns
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            numeric_columns: schema
+                .column_types
+                .iter()
+                .filter(|(_, t)| *t == ColumnType::Numeric)
+                .map(|(c, _)| c.to_string())
+                .collect(),
+        }
+    }
+
+    /// 转换为编译期 MergeSchema (Box::leak 保 static; 进程级一次性加载可接受)。
+    pub fn to_schema(&self) -> MergeSchema {
+        fn leak(s: &str) -> &'static str {
+            Box::leak(s.to_string().into_boxed_str())
+        }
+        fn leak_list(v: &[String]) -> &'static [&'static str] {
+            Box::leak(v.iter().map(|s| leak(s)).collect::<Vec<_>>().into_boxed_slice())
+        }
+        fn leak_variants(v: &[(String, Vec<String>)]) -> &'static [(&'static str, &'static [&'static str])] {
+            Box::leak(
+                v.iter()
+                    .map(|(std, vs)| (leak(std), leak_list(vs)))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            )
+        }
+        fn leak_markers(v: &[(String, Vec<String>)]) -> &'static [(&'static str, &'static [&'static str])] {
+            leak_variants(v)
+        }
+        fn leak_units(v: &[(String, String, Vec<String>)]) -> &'static [UnitRule] {
+            Box::leak(
+                v.iter()
+                    .map(|(c, s, skip)| UnitRule {
+                        column: leak(c),
+                        suffix: leak(s),
+                        skip_if_contains: leak_list(skip),
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            )
+        }
+        MergeSchema {
+            name: leak(&self.name),
+            standard_columns: leak_list(&self.standard_columns),
+            column_variants: leak_variants(&self.column_variants),
+            filename_suffixes: leak_list(&self.filename_suffixes),
+            unit_rules: leak_units(&self.unit_rules),
+            preferred_sheets: leak_list(&self.preferred_sheets),
+            empty_markers: leak_markers(&self.empty_markers),
+            value_columns: leak_list(&self.value_columns),
+            extra_columns: leak_list(&self.extra_columns),
+            skip_prefixes: leak_list(&self.skip_prefixes),
+            supplier_column: self.supplier_column.as_deref().map(leak),
+            dedup_columns: leak_list(&self.dedup_columns),
+            column_types: Box::leak(
+                self.numeric_columns
+                    .iter()
+                    .map(|c| (leak(c), ColumnType::Numeric))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
+        }
+    }
+
+    /// schema.validate() 等价校验 (JSON 加载后执行, 防坏 schema 进入引擎)
+    pub fn validate_json(&self) -> std::result::Result<(), String> {
+        let mut seen = std::collections::HashSet::new();
+        for c in &self.standard_columns {
+            if !seen.insert(c.clone()) {
+                return Err(format!("standard_columns 重复: '{c}'"));
+            }
+        }
+        for v in &self.value_columns {
+            if !self.standard_columns.contains(v) {
+                return Err(format!("value_column '{v}' 不在 standard_columns"));
+            }
+        }
+        for e in &self.extra_columns {
+            if self.standard_columns.contains(e) {
+                return Err(format!("extra_column '{e}' 与 standard_columns 冲突"));
+            }
+        }
+        if let Some(s) = &self.supplier_column {
+            if !self.standard_columns.contains(s) {
+                return Err(format!("supplier_column '{s}' 不在 standard_columns"));
+            }
+        }
+        for d in &self.dedup_columns {
+            if !self.standard_columns.contains(d) {
+                return Err(format!("dedup_column '{d}' 不在 standard_columns"));
+            }
+        }
+        for c in &self.numeric_columns {
+            if !self.standard_columns.contains(c) {
+                return Err(format!("numeric_column '{c}' 不在 standard_columns"));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Schema 注册表 — 从 JSON 文件加载领域 schema (L3 知识外置)。
+/// 加载后缓存, 同一 schema 进程内只 leak 一次。
+pub struct SchemaStore {
+    dir: std::path::PathBuf,
+    cache: std::collections::HashMap<String, MergeSchema>,
+}
+
+impl Default for SchemaStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SchemaStore {
+    /// 默认目录: $NEOTRIX_SCHEMA_DIR 或 ~/.neotrix/schemas
+    pub fn new() -> Self {
+        let dir = std::env::var_os("NEOTRIX_SCHEMA_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                dirs::home_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join(".neotrix")
+                    .join("schemas")
+            });
+        Self {
+            dir,
+            cache: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn with_dir(dir: impl AsRef<Path>) -> Self {
+        Self {
+            dir: dir.as_ref().to_path_buf(),
+            cache: std::collections::HashMap::new(),
+        }
+    }
+
+    /// 当前 schema 目录 (供 CLI 展示/落盘定位)
+    pub fn dir(&self) -> &std::path::Path {
+        &self.dir
+    }
+
+    /// 加载 schema by name (name.json)。
+    /// 内置 "price_table" 回退到编译期常量 (零文件依赖)。
+    pub fn load(&mut self, name: &str) -> Result<MergeSchema> {
+        if let Some(s) = self.cache.get(name) {
+            return Ok(*s);
+        }
+        let schema = if name == "price_table" {
+            PRICE_TABLE_SCHEMA
+        } else {
+            let path = self.dir.join(format!("{name}.json"));
+            let text = std::fs::read_to_string(&path).map_err(|e| {
+                FileAbilityError::Parse(format!(
+                    "schema '{name}' 加载失败 ({}): {e}",
+                    path.display()
+                ))
+            })?;
+            let json: MergeSchemaJson =
+                serde_json::from_str(&text).map_err(|e| FileAbilityError::Parse(e.to_string()))?;
+            json.validate_json().map_err(FileAbilityError::Parse)?;
+            json.to_schema()
+        };
+        self.cache.insert(name.to_string(), schema);
+        Ok(schema)
+    }
+
+    /// 列出已注册的 schema 文件名 (不含 .json)
+    pub fn list(&self) -> Vec<String> {
+        let mut out = vec!["price_table".to_string()];
+        if let Ok(rd) = std::fs::read_dir(&self.dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.extension().and_then(|x| x.to_str()) == Some("json") {
+                    if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                        out.push(stem.to_string());
+                    }
+                }
+            }
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use super::*;
+
+    #[test]
+    fn test_sheet_mode_first_takes_one() {
+        // FirstSheet: 只取第一个 sheet
+        let tables = vec![
+            TableData {
+                name: "修改版".into(),
+                headers: vec![],
+                rows: vec![],
+            },
+            TableData {
+                name: "工作表1".into(),
+                headers: vec![],
+                rows: vec![],
+            },
+        ];
+        let got = select_preferred_sheets(tables, SheetMode::FirstSheet);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].name, "修改版");
+    }
+
+    #[test]
+    fn test_sheet_mode_preferred_hits_else_first() {
+        let tables = vec![
+            TableData {
+                name: "工作表1".into(),
+                headers: vec![],
+                rows: vec![],
+            },
+            TableData {
+                name: "修改版".into(),
+                headers: vec![],
+                rows: vec![],
+            },
+        ];
+        // 命中 preferred → 只用修改版
+        let got = select_preferred_sheets(tables.clone(), SheetMode::Preferred(&["修改版"]));
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].name, "修改版");
+        // 未命中 → 取第一个
+        let got = select_preferred_sheets(tables, SheetMode::Preferred(&["不存在"]));
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].name, "工作表1");
+    }
+
+    #[test]
+    fn test_sheet_mode_all_keeps_all() {
+        let tables = vec![
+            TableData {
+                name: "a".into(),
+                headers: vec![],
+                rows: vec![],
+            },
+            TableData {
+                name: "b".into(),
+                headers: vec![],
+                rows: vec![],
+            },
+        ];
+        let got = select_preferred_sheets(tables, SheetMode::AllSheets);
+        assert_eq!(got.len(), 2);
+    }
+
+    #[test]
+    fn test_schema_json_roundtrip_from_price_table() {
+        let json = MergeSchemaJson::from_price_table();
+        json.validate_json().unwrap();
+        // 往返: JSON → MergeSchema → 校验通过
+        let schema = json.to_schema();
+        schema.validate().unwrap();
+        assert_eq!(schema.name, "价格表");
+        assert_eq!(schema.standard_columns.len(), 19);
+        assert!(schema.value_columns.contains(&"美元报价(USD)"));
+        assert!(schema.dedup_columns.contains(&"口径"));
+    }
+
+    #[test]
+    fn test_schema_store_load_price_table_builtin() {
+        let mut store = SchemaStore::with_dir(std::env::temp_dir());
+        let schema = store.load("price_table").unwrap();
+        assert_eq!(schema.name, "价格表");
+        assert!(store.list().contains(&"price_table".to_string()));
+    }
+
+    #[test]
+    fn test_schema_store_load_failure_paths() {
+        // 空目录: 非内置 schema 不存在 → 清晰报错 (不 panic, 不回退到内置)
+        let dir = std::env::temp_dir().join(format!(
+            "nt_schema_store_fail_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut store = SchemaStore::with_dir(&dir);
+        let err = store.load("not_exist_xyz").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("not_exist_xyz"), "报错应含 schema 名: {msg}");
+        assert!(msg.contains("加载失败"), "报错应标明加载失败: {msg}");
+
+        // 坏 JSON 文件 → 解析报错 (不 panic)
+        std::fs::write(dir.join("broken.json"), b"{ not valid json ").unwrap();
+        let err = store.load("broken").unwrap_err();
+        assert!(!err.to_string().is_empty(), "坏 JSON 应报错");
+
+        // 合法 JSON 但校验失败 (value_column 不在标准列) → 校验报错
+        let mut bad = MergeSchemaJson::from_price_table();
+        bad.name = "bad_schema".to_string();
+        bad.value_columns.push("幽灵列".to_string());
+        std::fs::write(
+            dir.join("bad_schema.json"),
+            serde_json::to_string_pretty(&bad).unwrap(),
+        )
+        .unwrap();
+        let err = store.load("bad_schema").unwrap_err();
+        assert!(
+            err.to_string().contains("幽灵列"),
+            "校验失败应报列名: {}",
+            err
+        );
+
+        // 缓存命中: 二次加载同 schema 不重新读文件 (删除文件后仍可加载)
+        let mut store2 = SchemaStore::with_dir(&dir);
+        let _ = store2.load("bad_schema").is_err(); // 首次失败不缓存
+        // 写一个有效 schema, 加载后删文件, 再加载 → 缓存命中
+        let good = MergeSchemaJson::from_price_table();
+        std::fs::write(
+            dir.join("good_schema.json"),
+            serde_json::to_string_pretty(&good).unwrap(),
+        )
+        .unwrap();
+        let _ = store2.load("good_schema").unwrap();
+        std::fs::remove_file(dir.join("good_schema.json")).ok();
+        let cached = store2.load("good_schema").unwrap();
+        assert_eq!(cached.name, "价格表", "缓存命中应返回原 schema");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_schema_store_load_json_file() {
+        // 写一个临时 JSON schema, 验证文件加载路径
+        let dir = std::env::temp_dir().join("nt_schema_store_test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = MergeSchemaJson {
+            name: "临时目录".to_string(),
+            standard_columns: vec!["品名".to_string(), "价格".to_string()],
+            column_variants: vec![(
+                "品名".to_string(),
+                vec!["型号".to_string(), "产品型号".to_string()],
+            )],
+            filename_suffixes: vec!["目录".to_string()],
+            unit_rules: vec![],
+            preferred_sheets: vec![],
+            empty_markers: vec![],
+            value_columns: vec!["价格".to_string()],
+            extra_columns: vec!["_source_file".to_string()],
+            skip_prefixes: vec!["consolidated".to_string()],
+            supplier_column: None,
+            dedup_columns: vec!["品名".to_string()],
+            numeric_columns: vec!["价格".to_string()],
+        };
+        json.validate_json().unwrap();
+        let path = dir.join("tmp_dir.json");
+        std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        let mut store = SchemaStore::with_dir(&dir);
+        let schema = store.load("tmp_dir").unwrap();
+        assert_eq!(schema.name, "临时目录");
+        schema.validate().unwrap();
+    }
+
+    #[test]
+    fn test_schema_json_bad_validation_rejected() {
+        let mut bad = MergeSchemaJson::from_price_table();
+        // value_column 不在 standard_columns → 校验必须失败
+        bad.value_columns.push("不存在列".to_string());
+        assert!(bad.validate_json().is_err());
+    }
+
+    #[test]
+    fn test_merge_tables_output_csv_with_bom() {
+        // 输出扩展名分发: .csv → UTF-8 BOM + 逗号; 数据与 xlsx 输出一致
+        let dir = std::env::temp_dir().join("nt_merge_csv_out");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let t = TableData {
+            name: "s1".into(),
+            headers: vec![
+                "产品型号".to_string(),
+                "含税单价(元)".to_string(),
+            ],
+            rows: vec![vec![
+                "闸阀\"双引号\"".to_string(),
+                "100".to_string(),
+            ]],
+        };
+        write_xlsx_table(dir.join("1_华东_价格.xlsx"), &t).unwrap();
+        let out = dir.join("native_consolidated.csv");
+        let rep = merge_tables_with_mode(
+            &PRICE_TABLE_SCHEMA,
+            &dir,
+            &out,
+            SheetMode::FirstSheet,
+        )
+        .unwrap();
+        assert_eq!(rep.total_rows, 1);
+        let raw = std::fs::read(&out).unwrap();
+        assert!(raw.starts_with(&[0xEF, 0xBB, 0xBF]), "CSV 应带 UTF-8 BOM");
+        let text = String::from_utf8_lossy(&raw);
+        assert!(
+            text.contains("产品大类") || text.contains("产品型号"),
+            "输出表头应包含标准列: {text}"
+        );
+        // 含引号的单元格应双引号包裹 + 内部引号双写
+        assert!(
+            text.contains("闸阀\"\"双引号\"\""),
+            "引号单元格应正确转义: {text}"
+        );
+        // 读回一致性
+        let back = read_csv(&out).unwrap();
+        assert_eq!(back.row_count(), 1);
+        let found = back
+            .headers
+            .iter()
+            .position(|h| h == "产品型号")
+            .map(|i| back.rows[0][i].as_str())
+            .unwrap_or("");
+        assert_eq!(found, "闸阀\"双引号\"");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_merge_tables_mixed_csv_and_xlsx_input() {
+        // CSV 混合目录: 引擎同时消费 xlsx + csv 输入, 去重与单一格式行为一致
+        let dir = std::env::temp_dir().join("nt_merge_mixed_in");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // xlsx 源 (1 行)
+        let t1 = TableData {
+            name: "s1".into(),
+            headers: vec!["产品型号".to_string(), "含税单价(元)".to_string()],
+            rows: vec![vec!["闸阀X".to_string(), "100".to_string()]],
+        };
+        write_xlsx_table(dir.join("1_华东_价格.xlsx"), &t1).unwrap();
+        // csv 源 (1 行, 同 schema 列)
+        let t2 = TableData {
+            name: "s2".into(),
+            headers: vec!["产品型号".to_string(), "含税单价(元)".to_string()],
+            rows: vec![vec!["蝶阀Y".to_string(), "200".to_string()]],
+        };
+        write_csv(dir.join("2_华南_价格.csv"), &t2, ',', true).unwrap();
+        // 输出 csv
+        let out = dir.join("native_consolidated.csv");
+        let rep = merge_tables_with_mode(
+            &PRICE_TABLE_SCHEMA,
+            &dir,
+            &out,
+            SheetMode::FirstSheet,
+        )
+        .unwrap();
+        assert_eq!(rep.files_processed, 2, "xlsx + csv 都应处理");
+        assert_eq!(rep.total_rows, 2, "各 1 行 → 2 行");
+        let back = read_csv(&out).unwrap();
+        assert_eq!(back.row_count(), 2);
+        let model = back
+            .headers
+            .iter()
+            .position(|h| h == "产品型号")
+            .unwrap();
+        let mut models: Vec<&str> = back.rows.iter().map(|r| r[model].as_str()).collect();
+        models.sort();
+        assert_eq!(models, vec!["蝶阀Y", "闸阀X"], "两个源的数据都应进入");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

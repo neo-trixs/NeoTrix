@@ -59,6 +59,7 @@ pub fn edit_pdf(
                 FileAbilityError::Other(format!("字形不支持: {c}"))
             }
             PdfEditError::Write(m) => FileAbilityError::Other(format!("写 PDF 失败: {m}")),
+            PdfEditError::Merge(m) => FileAbilityError::Other(format!("PDF 合并失败: {m}")),
         })?;
     std::fs::write(output.as_ref(), out).map_err(FileAbilityError::Io)?;
     Ok(edits.len())

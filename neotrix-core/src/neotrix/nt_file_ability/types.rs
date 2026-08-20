@@ -302,3 +302,30 @@ impl TextEncoding {
         }
     }
 }
+
+/// 目录级统一提取条目 (横向推广: FileKind×读 的统一入口)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirExtractEntry {
+    /// 相对路径 (相对源目录)
+    pub path: String,
+    /// 文件大类
+    pub kind: String,
+    /// 提取的文本 (office/文本/PDF; 图像/音视频仅元数据)
+    pub text: String,
+    /// 表格数据 (xlsx/csv → 行数统计)
+    pub table_rows: Option<usize>,
+    /// 提取失败信息 (None = 成功)
+    pub error: Option<String>,
+}
+
+/// 目录级统一提取报告
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirExtractReport {
+    pub entries: Vec<DirExtractEntry>,
+    /// 成功条目数
+    pub succeeded: usize,
+    /// 失败条目数
+    pub failed: usize,
+    /// 总文本字符数
+    pub total_chars: usize,
+}

@@ -57,6 +57,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use lopdf::dictionary;
+    use image::GenericImageView;
 
     use crate::core::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
     use crate::core::nt_core_hex::ReasoningHexagram;
@@ -434,7 +435,10 @@ mod tests {
 
         // draft() 不返回未确认变体 — 保持生产 schema 纯净
         let draft = s.draft();
-        assert!(!draft.column_variants.iter().any(|(_, vs)| vs.contains(&"完全未知列A")));
+        assert!(!draft
+            .column_variants
+            .iter()
+            .any(|(_, vs)| vs.iter().any(|v| v == "完全未知列A")));
 
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -957,6 +961,164 @@ mod tests {
         assert!(meta.bit_depth >= 24, "RGBA8 位深应 >=24");
         assert!((meta.aspect_ratio - 2.0 / 3.0).abs() < 1e-9);
         std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_convert_image_formats() {
+        // 横向推广: FileKind::Image 写缺口 — png→jpg, jpg→png, 重编码
+        let dir = std::env::temp_dir().join("nt_file_ability_test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("src_pixel.png");
+        let img = image::RgbaImage::from_pixel(4, 5, image::Rgba([10, 20, 30, 255]));
+        img.save(&src).unwrap();
+        let fa = FileAbility::open(&src).unwrap();
+        assert_eq!(fa.kind(), FileKind::Image);
+
+        // png → jpg
+        let jpg = dir.join("out_pixel.jpg");
+        fa.convert_image(&jpg).unwrap();
+        assert!(jpg.exists());
+        let back = image::open(&jpg).unwrap();
+        assert_eq!(back.dimensions(), (4, 5), "jpg 尺寸应保持");
+
+        // jpg → png
+        let png2 = dir.join("out_pixel2.png");
+        let fa2 = FileAbility::open(&jpg).unwrap();
+        fa2.convert_image(&png2).unwrap();
+        assert!(png2.exists());
+        let back2 = image::open(&png2).unwrap();
+        assert_eq!(back2.dimensions(), (4, 5));
+
+        // 不支持的目标格式 → UnsupportedFormat
+        let webp = dir.join("out_pixel.webp");
+        let err = fa2.convert_image(&webp).unwrap_err();
+        assert!(
+            err.to_string().contains("webp"),
+            "webp 未启用 encoder 应报不支持的格式: {err}"
+        );
+
+        // 非图像输入 → UnsupportedFormat
+        let txt = dir.join("not_image.txt");
+        std::fs::write(&txt, "hello").unwrap();
+        let fa3 = FileAbility::open(&txt).unwrap();
+        assert!(fa3.convert_image(&dir.join("x.png")).is_err());
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&jpg);
+        let _ = std::fs::remove_file(&png2);
+        let _ = std::fs::remove_file(&webp);
+        let _ = std::fs::remove_file(&txt);
+    }
+
+    #[test]
+    fn test_extract_dir_mixed_formats() {
+        // 横向推广: 目录级统一提取 (FileKind×读 统一入口)
+        let dir = std::env::temp_dir().join("nt_extract_dir_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // xlsx
+        let t = TableData {
+            name: "s".into(),
+            headers: vec!["产品型号".into(), "单价".into()],
+            rows: vec![vec!["闸阀A".into(), "100".into()]],
+        };
+        write_xlsx_table(dir.join("1_华东_价格.xlsx"), &t).unwrap();
+        // csv
+        write_csv(dir.join("2_华南.csv"), &t, ',', true).unwrap();
+        // 文本
+        std::fs::write(dir.join("readme.md"), "hello 世界").unwrap();
+        // 图像
+        let img = image::RgbaImage::from_pixel(2, 2, image::Rgba([0, 0, 0, 255]));
+        img.save(dir.join("logo.png")).unwrap();
+
+        let report = extract_dir(&dir).unwrap();
+        assert_eq!(report.succeeded, 4, "4 个文件都应提取成功: {:?}", report.entries);
+        assert_eq!(report.failed, 0);
+        assert!(report.total_chars >= 2, "文本字符应被统计");
+        // 找到 xlsx 条目: 表格行数 = 1, 含数据
+        let xlsx = report
+            .entries
+            .iter()
+            .find(|e| e.path.ends_with("xlsx"))
+            .unwrap();
+        assert_eq!(xlsx.table_rows, Some(1), "xlsx 应报告表格行数");
+        assert!(xlsx.text.contains("闸阀A"), "xlsx 文本应含数据: {}", xlsx.text);
+        // 图像条目: 无表格数据 (text 为元数据描述或空)
+        let png = report
+            .entries
+            .iter()
+            .find(|e| e.path.ends_with("png"))
+            .unwrap();
+        assert_eq!(png.table_rows, None, "图像无表格行数");
+        assert!(png.kind.contains("Image"), "图像应识别为 Image: {}", png.kind);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_merge_pdfs_wiring() {
+        // 横向推广: PDF 结构级合并接线 (helpers 层, 含错误映射)
+        use lopdf::content::{Content, Operation};
+        fn page_pdf(text: &str) -> Vec<u8> {
+            let mut doc = lopdf::Document::with_version("1.5");
+            let pages_id = doc.new_object_id();
+            let font_id = doc.add_object(lopdf::dictionary! {
+                "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Courier",
+            });
+            let resources_id = doc.add_object(lopdf::dictionary! {
+                "Font" => lopdf::dictionary! { "F1" => font_id },
+            });
+            let content = Content {
+                operations: vec![
+                    Operation::new("BT", vec![]),
+                    Operation::new("Tf", vec!["F1".into(), 48.into()]),
+                    Operation::new("Td", vec![100.into(), 600.into()]),
+                    Operation::new("Tj", vec![lopdf::Object::string_literal(text)]),
+                    Operation::new("ET", vec![]),
+                ],
+            };
+            let content_id = doc.add_object(lopdf::Stream::new(
+                lopdf::Dictionary::new(),
+                content.encode().expect("encode"),
+            ));
+            let page_id = doc.add_object(lopdf::dictionary! {
+                "Type" => "Page", "Parent" => pages_id, "Contents" => content_id,
+                "Resources" => resources_id,
+                "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+            });
+            let pages = lopdf::dictionary! {
+                "Type" => "Pages", "Kids" => vec![page_id.into()], "Count" => 1,
+            };
+            doc.objects.insert(pages_id, lopdf::Object::Dictionary(pages));
+            let catalog_id = doc.add_object(lopdf::dictionary! {
+                "Type" => "Catalog", "Pages" => pages_id,
+            });
+            doc.trailer.set("Root", catalog_id);
+            doc.compress();
+            let mut buf = Vec::new();
+            doc.save_to(&mut buf).expect("save");
+            buf
+        }
+        let tmp = std::env::temp_dir().join(format!("nt_mergepdf_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let p1 = tmp.join("a.pdf");
+        let p2 = tmp.join("b.pdf");
+        std::fs::write(&p1, page_pdf("Alpha")).unwrap();
+        std::fs::write(&p2, page_pdf("Beta")).unwrap();
+
+        // 正常合并: 输出可被 neotrix-types 分页提取
+        let merged = merge_pdfs(&[p1.clone(), p2.clone()]).expect("合并成功");
+        let pages =
+            neotrix_types::core::file_parser::FileParser::extract_pdf_pages(&merged);
+        assert_eq!(pages.len(), 2, "合并后应 2 页: {pages:?}");
+        assert!(pages[0].1.contains("Alpha"), "首页应含 Alpha: {:?}", pages[0].1);
+        assert!(pages[1].1.contains("Beta"), "次页应含 Beta: {:?}", pages[1].1);
+
+        // 空输入 → 错误映射 (FileAbilityError::Other/Parse)
+        let err = merge_pdfs(&[]).err().expect("空输入应报错");
+        assert!(format!("{err}").contains("PDF"), "错误信息应含 PDF: {err}");
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]

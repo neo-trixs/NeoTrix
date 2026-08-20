@@ -50,6 +50,8 @@ pub enum PdfEditError {
     UnsupportedGlyph(char),
     /// PDF 输出失败
     Write(String),
+    /// PDF 合并失败 (多文档)
+    Merge(String),
 }
 
 impl std::fmt::Display for PdfEditError {
@@ -61,6 +63,7 @@ impl std::fmt::Display for PdfEditError {
             Self::Font(e) => write!(f, "字体失败: {e}"),
             Self::UnsupportedGlyph(c) => write!(f, "字形不支持: {c}"),
             Self::Write(e) => write!(f, "PDF 写出失败: {e}"),
+            Self::Merge(e) => write!(f, "PDF 合并失败: {e}"),
         }
     }
 }
@@ -138,6 +141,139 @@ impl PdfTable {
         }
         out
     }
+}
+
+/// 合并多个 PDF 为单个文档 (R-P79 生产接线)。
+///
+/// 采用 lopdf 官方 merge 流程: 对每个输入文档 `renumber_objects_with` 偏移对象
+/// 图, 收集全部对象, 丢弃各文档自己的 Catalog/Pages/Page, 以首个文档的 Catalog
+/// 为基座, 重建单一 Pages 树 (Kids = 全部页面, 扁平化嵌套 Pages), 最后
+/// `renumber_objects` 统一重排。字体/资源对象随对象图整体迁移, 跨文件 ID 不冲突
+/// (对象号偏移保证唯一); 不做资源去重 (可接受冗余, 与研究结论一致)。
+///
+/// 输入为空或单文件时分别报错/透传。任一无页面输入报 Merge 错误。
+pub fn merge_pdfs(inputs: &[Vec<u8>]) -> Result<Vec<u8>, PdfEditError> {
+    use std::collections::BTreeMap;
+
+    if inputs.is_empty() {
+        return Err(PdfEditError::Merge("无输入 PDF".to_string()));
+    }
+    if inputs.len() == 1 {
+        return Ok(inputs[0].clone());
+    }
+
+    // 收集全部文档的对象与页面
+    let mut documents_objects: BTreeMap<lopdf::ObjectId, lopdf::Object> = BTreeMap::new();
+    let mut documents_pages: BTreeMap<lopdf::ObjectId, lopdf::Object> = BTreeMap::new();
+    let mut max_id = 1u32;
+
+    for (idx, data) in inputs.iter().enumerate() {
+        let mut doc = lopdf::Document::load_mem(data)
+            .map_err(|e| PdfEditError::Parse(format!("输入 {idx} 解析失败: {e}")))?;
+        doc.renumber_objects_with(max_id);
+        max_id = doc.max_id + 1;
+
+        // 提取该文档全部页面 (get_pages 只返回叶子 Page, 扁平化嵌套 Pages 树)
+        let pages = doc.get_pages();
+        if pages.is_empty() {
+            return Err(PdfEditError::Merge(format!("输入 {idx} 无页面")));
+        }
+        for (_seq, page_obj) in pages {
+            documents_pages.insert(
+                page_obj,
+                doc.get_object(page_obj)
+                    .map_err(|e| PdfEditError::Merge(format!("输入 {idx} 页面读取失败: {e}")))?
+                    .clone(),
+            );
+        }
+        // 其余对象全部收集 (Catalog/Pages 稍后特殊处理)
+        documents_objects.extend(doc.objects);
+    }
+
+    // 分类对象: 以首个 Catalog 为基座, 丢弃其余 Catalog/Outlines, 合并 Pages 字典
+    let mut catalog_object: Option<(lopdf::ObjectId, lopdf::Object)> = None;
+    let mut pages_object: Option<(lopdf::ObjectId, lopdf::Object)> = None;
+    let mut main = lopdf::Document::with_version("1.7");
+
+    for (object_id, object) in documents_objects.into_iter() {
+        match object.type_name().unwrap_or(b"") {
+            b"Catalog" => {
+                if catalog_object.is_none() {
+                    catalog_object = Some((object_id, object));
+                }
+            }
+            b"Pages" => {
+                if let Ok(dict) = object.as_dict() {
+                    let mut dict = dict.clone();
+                    if let Some((_, ref old)) = pages_object {
+                        if let Ok(old_dict) = old.as_dict() {
+                            // 合入全部 Pages 树字典字段 (非 Kids/Count, 由重建覆盖)
+                            for (k, v) in old_dict.iter() {
+                                if dict.get(k).is_err() {
+                                    dict.set(k.clone(), v.clone());
+                                }
+                            }
+                        }
+                    }
+                    pages_object = Some((
+                        if let Some((id, _)) = pages_object { id } else { object_id },
+                        lopdf::Object::Dictionary(dict),
+                    ));
+                }
+            }
+            b"Page" | b"Outlines" | b"Outline" => {} // 忽略 (Pages/Outlines 不支持)
+            _ => {
+                main.objects.insert(object_id, object);
+            }
+        }
+    }
+
+    let Some((catalog_id, catalog_obj)) = catalog_object else {
+        return Err(PdfEditError::Merge("未找到 Catalog 根".to_string()));
+    };
+    let Some((pages_id, pages_obj)) = pages_object else {
+        return Err(PdfEditError::Merge("未找到 Pages 根".to_string()));
+    };
+
+    // 重建 Pages: 全部叶子页 → 单一 Kids, 更新 Count
+    if let Ok(dict) = pages_obj.as_dict() {
+        let mut dict = dict.clone();
+        dict.set("Count", documents_pages.len() as u32);
+        dict.set(
+            "Kids",
+            documents_pages
+                .keys()
+                .map(|id| lopdf::Object::Reference(*id))
+                .collect::<Vec<_>>(),
+        );
+        main.objects.insert(pages_id, lopdf::Object::Dictionary(dict));
+    }
+
+    // 重建 Catalog: Pages 指向单一根, 移除 Outlines (合并后不可用)
+    if let Ok(dict) = catalog_obj.as_dict() {
+        let mut dict = dict.clone();
+        dict.set("Pages", pages_id);
+        dict.remove(b"Outlines");
+        main.objects.insert(catalog_id, lopdf::Object::Dictionary(dict));
+    }
+
+    // 全部页面改指向合并后的 Pages 根
+    for (obj_id, obj) in documents_pages.iter() {
+        if let Ok(dict) = obj.as_dict() {
+            let mut dict = dict.clone();
+            dict.set("Parent", pages_id);
+            main.objects.insert(*obj_id, lopdf::Object::Dictionary(dict));
+        }
+    }
+
+    main.trailer.set("Root", catalog_id);
+    main.max_id = main.objects.len() as u32;
+    main.renumber_objects();
+
+    let mut buf = Vec::new();
+    main.save_to(&mut buf)
+        .map_err(|e| PdfEditError::Write(e.to_string()))?;
+    Ok(buf)
 }
 
 /// 查找覆盖 `text` 全部字形 (且非 .notdef 空字形) 的系统字体字节。
@@ -1611,5 +1747,42 @@ mod tests {
         assert!(!text.contains("Gate"), "跨 op 匹配未清除原文本: {text:?}");
         assert!(text.contains("Xyz"), "替换文本缺失: {text:?}");
         assert!(text.contains("Valve"), "未匹配的相邻文本被误清: {text:?}");
+    }
+
+    #[test]
+    fn merge_pdfs_concatenates_pages_in_order() {
+        // 多文档合并: 3 个单页文档 → 合并后 3 页, 文本按序保留
+        let docs = vec![
+            multi_page_pdf_bytes(&["Alpha"]),
+            multi_page_pdf_bytes(&["Beta"]),
+            multi_page_pdf_bytes(&["Gamma"]),
+        ];
+        let merged = merge_pdfs(&docs).expect("合并应成功");
+        let pages = FileParser::extract_pdf_pages(&merged);
+        assert_eq!(pages.len(), 3, "合并后应为 3 页: {pages:?}");
+        assert_eq!(pages[0].1, "Alpha Page 1");
+        assert_eq!(pages[1].1, "Beta Page 1");
+        assert_eq!(pages[2].1, "Gamma Page 1");
+    }
+
+    #[test]
+    fn merge_pdfs_rejects_empty_and_no_page() {
+        // 空输入 / 全无页面 → Merge 错误
+        assert!(merge_pdfs(&[]).is_err(), "空输入应报错");
+        // 单文件透传
+        let single = multi_page_pdf_bytes(&["Only"]);
+        let out = merge_pdfs(&[single.clone()]).expect("单文件应透传");
+        assert_eq!(out, single);
+        // 无页面输入: 构造缺 Pages 的文档
+        let mut doc = lopdf::Document::with_version("1.4");
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog" });
+        doc.trailer.set("Root", catalog_id);
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save empty pdf");
+        let err = merge_pdfs(&[single, buf]).err().expect("无页面输入应报错");
+        assert!(
+            format!("{err}").contains("无页面"),
+            "错误信息应指明无页面: {err}"
+        );
     }
 }

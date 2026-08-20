@@ -368,6 +368,41 @@ impl FileAbility {
         })
     }
 
+    /// 图像格式转换 (横向推广: 补齐 FileKind::Image 写缺口)。
+    ///
+    /// 读任意 image crate 支持的解码格式 → 按 `target` 扩展名编码写出。
+    /// 支持目标格式: png / jpeg / jpg (当前 features 已启用 encoder)。
+    /// 输入输出不同扩展名即转换; 相同扩展名即重编码 (归一化)。
+    pub fn convert_image(&self, target: impl AsRef<Path>) -> Result<()> {
+        if self.kind != FileKind::Image {
+            return Err(FileAbilityError::UnsupportedFormat {
+                ext: self
+                    .path
+                    .extension()
+                    .map(|e| e.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+            });
+        }
+        let ext = target
+            .as_ref()
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let format = match ext.as_str() {
+            "png" => image::ImageFormat::Png,
+            "jpeg" | "jpg" => image::ImageFormat::Jpeg,
+            other => {
+                return Err(FileAbilityError::UnsupportedFormat {
+                    ext: other.to_string(),
+                })
+            }
+        };
+        let img = image::open(&self.path).map_err(FileAbilityError::Image)?;
+        img.save_with_format(target.as_ref(), format)
+            .map_err(FileAbilityError::Image)
+    }
+
     /// 音频时长探测 (纯字节解析 WAV RIFF 头, 零额外依赖, 真实多模态元数据)
     ///
     /// 仅支持 WAV: 解析 `fmt ` 子块字节率 + `data` 子块长度 → 时长毫秒。

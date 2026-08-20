@@ -220,6 +220,7 @@ pub use nt_file_ability::{
      consolidate_tables_with_mode, content_similarity,
      create_from_markdown, decode_bytes,
      detect_encoding, edit_pdf, edit_xlsx_table, embed_text, extract_text, extract_pdf_tables,
+     extract_dir, merge_pdfs,
      load_snapshot,
      merge_tables_with, merge_tables_with_mode,
      normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
@@ -227,9 +228,11 @@ pub use nt_file_ability::{
      suggest_schema, to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport,
      ContentSnapshot, FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation,
      ImageMetadata, MergeSchema, OcrEngine, OcrResult, PRICE_STANDARD_COLUMNS, PRICE_TABLE_SCHEMA,
-     RuleBasedOcr, SchemaSuggestion, SheetCellData, SheetCellValueType, SheetData, SheetMode,
+     RuleBasedOcr, SchemaSuggestion, SchemaStore, MergeSchemaJson, SheetCellData,
+     SheetCellValueType, SheetData, SheetMode,
      SheetRowData,
      StructuredData, TableData, TableEdit, TextEncoding, UnitRule, PdfEdit,
+     DirExtractEntry, DirExtractReport,
  };
 
 // ─── L7 Capability Tree 採入 (经验 → 能力节点迭代目标) ─────────────────────

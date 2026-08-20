@@ -118,6 +118,8 @@ extract → dedup → categorize → capability map → insert + 显式 FTS → 
 | **接线裁决 = 落地/路线图/拒绝三选一 (Cycle 1201)** | 每个 New 机制必须明确: ✅ 本 session 接线落地 (同 session 消费者) / 📋 路线图降级 (现有能力已覆盖, 给出覆盖依据) / ❌ R-P79 拒 (实体依据: 已有消费者或已有实现)。拒绝不能因"不方便", 要有代码引用。P2(蒸馏)/P4(驻留审计) 降级均因 SkillQualityScorer.cost_awareness + ToolOutput 截断已覆盖 | 6 New → 3 落地 + 2 降级 + 1 评估中 |
 | **能力树 bud/strengthen 随接线同步 (Cycle 1201)** | 接线落地后立即: 新能力节点 bud (如 `nt_shield::policy_monotonic_invariant`, `nt_mind_evolution_loop::checkpoint_reanchor`), 既有节点 strengthen (如 `nt_memory_kb::retrieval_self_evolution` ← staleness_signal)。能力树是 R-P79 闭环的审计面 | 3 接线 → 2 bud + 1 strengthen |
 | **session-batch cycle 冲突检查 (Cycle 1201)** | `absorb-session-batch.sh` 按 `branch_<cycle>_%` 前缀判幂等; 若 cycle 号已被当日其他会话占用 → 静默 SKIP, 新会话经验不落盘。写 pending JSON 前查 `SELECT DISTINCT substr(key,8,4) FROM kv_store WHERE key LIKE 'branch_%' ORDER BY CAST(...) DESC LIMIT 1` 取未占用 cycle | 首次吸收误 SKIP (cycle 1193 已占用) → 改 1201 成功 |
+| **并发 workers 漏源核对 (Cycle 1208)** | 38 源 dry-run 全显示 would_insert, 正式运行 (8 workers) 后 2 源 (mdflux/apache-maka) 无节点 — 并发临时文件竞态。**必须**用正式运行后 `SELECT COUNT(*) FROM nodes WHERE id LIKE 'batch_%'` 与 dry-run would_insert 数核对, 差额源单独重跑 (`printf ... | kb_batch_absorb.py --workers 4`) | 漏 2 → 补插成功 |
+| **文档转换/上下文压缩类仓库 keyword 误映射 (Cycle 1208)** | mdflux (文档→Markdown 转换, README 含 "clean") 与 openwolf (上下文压缩, README 含 "sharper context/fewer tokens") 被 keyword 规则误映射到 NT-SHIELD/audit。校正门判定: 文档转换→NT-MIND/transform; 上下文/语境管理→NT-MEMORY/transform。校正走 `update-node-metadata` merge 路径 (读原 metadata → patch absorbed_capability → 写回) | 2 误映射 → 校正 |
 
 #### absorbed_capability 数据层追踪 (R-P79 闭环)
 
