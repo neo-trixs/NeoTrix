@@ -30,7 +30,7 @@ impl CliCommand for FileCmd {
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)");
+            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -41,18 +41,49 @@ impl CliCommand for FileCmd {
             "edit" => delegate!("/edit", &rest, brain),
             "patch" => delegate!("/patch", &rest, brain),
             "diff" => delegate!("/diff", &rest, brain),
-            "consolidate" => {
-                if rest.is_empty() {
-                    return CommandOutput::err("用法: /file consolidate <目录> [输出路径]");
+            "tables" => {
+                if rest.len() != 1 {
+                    return CommandOutput::err("用法: /file tables <in.pdf>");
                 }
                 let src = std::path::PathBuf::from(&rest[0]);
-                let out = rest
+                match crate::neotrix::extract_pdf_tables(&src) {
+                    Ok(tables) => {
+                        let mut out = format!("提取到 {} 张表格\n", tables.len());
+                        for (page, cols, md) in tables {
+                            out.push_str(&format!("--- 页 {page} ({cols} 列)\n{md}\n"));
+                        }
+                        CommandOutput::ok(out.trim_end())
+                    }
+                    Err(e) => CommandOutput::err(&format!("PDF 表格提取失败: {e}")),
+                }
+            }
+            "consolidate" => {
+                if rest.is_empty() {
+                    return CommandOutput::err("用法: /file consolidate <目录> [输出路径] [--first-sheet]");
+                }
+                let first_sheet = rest.iter().any(|a| a == "--first-sheet");
+                let positional: Vec<String> = rest
+                    .iter()
+                    .filter(|a| *a != "--first-sheet")
+                    .cloned()
+                    .collect();
+                if positional.is_empty() {
+                    return CommandOutput::err("用法: /file consolidate <目录> [输出路径] [--first-sheet]");
+                }
+                let src = std::path::PathBuf::from(&positional[0]);
+                let out = positional
                     .get(1)
                     .map(std::path::PathBuf::from)
                     .unwrap_or_else(|| src.join("native_consolidated.xlsx"));
-                match crate::neotrix::consolidate_tables(&src, &out) {
+                let result = if first_sheet {
+                    crate::neotrix::consolidate_tables_first_sheet(&src, &out)
+                } else {
+                    crate::neotrix::consolidate_tables(&src, &out)
+                };
+                match result {
                     Ok(rep) => CommandOutput::ok(&format!(
-                        "合并完成: 处理 {} 个文件 / {} 行 / {} 行含 USD 报价\n输出: {}",
+                        "合并完成 ({}): 处理 {} 个文件 / {} 行 / {} 行含 USD 报价\n输出: {}",
+                        if first_sheet { "每个文件首个 sheet" } else { "修改版优先" },
                         rep.files_processed,
                         rep.total_rows,
                         rep.usd_rows,

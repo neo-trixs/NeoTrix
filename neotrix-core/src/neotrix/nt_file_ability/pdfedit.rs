@@ -1,8 +1,10 @@
-//! PDF 文本编辑 (R-P79 生产接线): span 级 redact + 原位替换。
+//! PDF 文本编辑 + 表格结构化提取 (R-P79 生产接线)。
 //!
-//! 包装 neotrix-types FileParser::edit_pdf_text — 纯 Rust 实现, 不依赖外部二进制
-//! (R-P48)。替换文本支持任意 Unicode: 提供 TTF 时嵌入 Type0/Identity-H 子集字体,
-//! 否则回退 Helvetica base14 (仅 Latin-1)。
+//! - 编辑: span 级 redact + 原位替换, 包装 neotrix-types FileParser::edit_pdf_text。
+//! - 表格: 从解码内容流文本 run 做行/列聚类重建网格, 包装 extract_pdf_tables。
+//!
+//! 纯 Rust 实现, 不依赖外部二进制 (R-P48)。替换文本支持任意 Unicode: 提供 TTF
+//! 时嵌入 Type0/Identity-H 子集字体, 否则回退 Helvetica base14 (仅 Latin-1)。
 
 use std::path::Path;
 
@@ -60,4 +62,22 @@ pub fn edit_pdf(
         })?;
     std::fs::write(output.as_ref(), out).map_err(FileAbilityError::Io)?;
     Ok(edits.len())
+}
+
+/// 从 PDF 提取表格网格 (行/列聚类), 每张表格渲染 Markdown。
+///
+/// 纯坐标启发式, 对逐单元格绘制的表格型 PDF (设备清单/报价表) 有效;
+/// 复杂合并单元格需外部分析器。返回 (页号, 列数, markdown)。
+pub fn extract_pdf_tables(src: impl AsRef<Path>) -> Result<Vec<(u32, usize, String)>> {
+    use neotrix_types::core::file_parser::pdf::PdfTable;
+
+    let data = std::fs::read(src.as_ref()).map_err(FileAbilityError::Io)?;
+    let tables = neotrix_types::core::file_parser::FileParser::extract_pdf_tables(&data);
+    if tables.is_empty() {
+        return Err(FileAbilityError::Other("未检测到表格形态的文本布局".to_string()));
+    }
+    Ok(tables
+        .iter()
+        .map(|t: &PdfTable| (t.page, t.columns.len(), t.to_markdown()))
+        .collect())
 }

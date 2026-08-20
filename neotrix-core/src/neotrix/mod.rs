@@ -217,8 +217,10 @@ pub mod proxy_daemon_wrapper;
 // + image crate (图像元数据)。复用 ConstellationLevel 成熟度 + SelfTest T1-T3 接线。
 // Dark Forest 合规: 模块需有消费者方可存活，每次编辑后需 register_consumer
 pub use nt_file_ability::{
-     check_health, consolidate_tables, content_similarity, create_from_markdown, decode_bytes,
-     detect_encoding, edit_pdf, edit_xlsx_table, embed_text, extract_text, load_snapshot,
+     check_health, consolidate_tables, consolidate_tables_first_sheet, content_similarity,
+     create_from_markdown, decode_bytes,
+     detect_encoding, edit_pdf, edit_xlsx_table, embed_text, extract_text, extract_pdf_tables,
+     load_snapshot,
      merge_tables_with,
      normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
      replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
