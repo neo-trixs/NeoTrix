@@ -125,6 +125,21 @@ impl PerformanceEvaluator {
 生产路径可观测情感引导。能力树: `nt_mind_seal_core::affective_reward_context` 新节点
 bud → C4 (wiring 证据: 数字人事件 + loop_impl 消费点)。
 
+**基准基线 (C3 证据, 2026-08-20)**: `cargo bench --bench affective_c3 --profile dev`
+(debug profile 近似基线 — release 精确数字受环境阻塞, 见 KB `branch_1203_4_4a0a8b`,
+后续无并发窗口重跑补充)。中位数 (µs):
+
+| bench | median | bench | median |
+|-------|--------|-------|--------|
+| lexicon/detect_11 | 5.97 | disclosure/cjk | 4.61 |
+| lexicon/detect_12 | 6.19 | disclosure/en | 9.12 |
+| lexicon/detect_17 | 7.36 | pipeline/process_Auto | 9.42 |
+| lexicon/detect_31 | 6.58 | pipeline/process_Mirror | 9.39 |
+| appraisal/observe_appraisal | 3.37 | pipeline/process_Toward | 9.48 |
+
+全链路 (lexicon+disclosure+pipeline) 单次处理 ≈ 9-10 µs, OCC 评估 3.4 µs —
+数量级亚毫秒, 满足实时交互预算 (每交互 60Hz 轮询远低于 1ms 上限)。
+
 ---
 
 ## 6. 相关引用
