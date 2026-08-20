@@ -326,6 +326,33 @@ impl BackgroundLoopHandle {
                 severity: "warning".into(),
             });
         }
+        // P4 技能驻留成本审计 (asm absorbed 2026-08-19, R-P79): load_all 已
+        // 在 quality_stats 计量 resident/body token, 此处派生降级候选 —
+        // LAZY LOAD 下 resident 最肥的技能应优先改渐进披露薄入口。
+        let residency = self.skill_engine.audit_residency();
+        let fat: Vec<&crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::ResidencyAuditRow> =
+            residency.iter().filter(|r| r.action == "thin-entry").collect();
+        if !fat.is_empty() {
+            let names: Vec<String> = fat
+                .iter()
+                .map(|r| format!("{} ({} tok)", r.skill, r.resident_tokens))
+                .collect();
+            log::warn!(
+                "[bg] skill_residency: {} skills exceed resident budget: {:?}",
+                fat.len(),
+                names
+            );
+            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                component: "skill_residency".into(),
+                error: format!("resident-heavy skills (thin-entry candidates): {:?}", names),
+                severity: "warning".into(),
+            });
+        } else if !residency.is_empty() {
+            log::info!(
+                "[bg] skill_residency: all {} skills within resident budget",
+                residency.len()
+            );
+        }
     }
 
     /// G18 统一会话 digest flush (novu 吸收): 周期清出超窗摘要桶, 报告会话拓扑。

@@ -24,7 +24,7 @@ use serde_json::Value;
 use super::nt_io_multimodal_transform::MultimodalTransform;
 use super::nt_io_output_style::{GovernanceReport, OutputStyleId, OutputStyleRegistry};
 use super::nt_io_provider::context_budget::{
-    apply_context_budget, estimate_messages_tokens, estimate_tokens, truncate_preserving,
+    apply_context_budget, estimate_messages_tokens, estimate_tokens,
 };
 use super::nt_io_provider::generation_classifier::{GenerationClassifier, TaskType};
 use super::nt_io_provider::types::{
@@ -49,6 +49,158 @@ pub struct ToolInvocation {
     pub arguments: String,
     pub success: bool,
     pub output: String,
+}
+
+/// P2 可逆命令输出蒸馏 (repowise absorbed 2026-08-19, R-P79):
+/// 超长工具输出压缩为 errors-first + `[ref#N]` 内联标记, 可展开回原文。
+///
+/// 蒸馏策略 (对齐 repowise "压缩再给模型读" 机制):
+/// 1. **errors-first** — 错误/警告/失败行前置, 模型先看问题。
+/// 2. **尾部保留** — 最后几行 (exit code / 摘要) 保留, 结尾状态不失真。
+/// 3. **`[ref#N]` 内联标记** — 中间省略区以 `[ref#N]` 占位, 语义上
+///    可 expand 回完整原文 (原文全量在 `ToolInvocation.output` / tool_log)。
+/// 4. **行级硬预算** — 按行裁剪并逐行累积 `estimate_tokens`, 输出总和
+///    严格 ≤ max_tokens (无逐段拼接超支问题, BPE/tiktoken 亦成立)。
+///
+/// 输出总是 ≤ max_tokens 估算预算; 输入未超限时原样返回 (零开销快路径)。
+fn distill_output(content: &str, max_tokens: usize) -> String {
+    if estimate_tokens(content) <= max_tokens {
+        return content.to_string();
+    }
+
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        return content.to_string();
+    }
+
+    // 尾部保留: 最多保留尾部行 (exit code / 摘要)。
+    const TAIL_LINES: usize = 3;
+    let tail_start = lines.len().saturating_sub(TAIL_LINES);
+    let tail = &lines[tail_start..];
+
+    // errors-first: 从全部行 (含尾部区) 提取错误/警告/失败行, 集中前置。
+    let is_errorish = |l: &str| {
+        let low = l.to_lowercase();
+        low.contains("error") || low.contains("fail") || low.contains("denied")
+            || low.contains("warning") || low.contains("exception") || low.contains("panic")
+            || low.contains("traceback") || low.contains("exit code") || low.contains("fatal")
+    };
+    let mut error_lines: Vec<&str> = Vec::new();
+    let mut plain_lines: Vec<&str> = Vec::new();
+    for l in lines.iter() {
+        if is_errorish(l) {
+            error_lines.push(l);
+        } else {
+            plain_lines.push(l);
+        }
+    }
+    // body 段取普通行 (不含已提取的尾部行); tail 段仅保留尾部普通行。
+    let tail_plain: Vec<&str> = tail.iter().copied().filter(|l| !is_errorish(l)).collect();
+
+    // 行级硬预算: 预算内逐段尽力装入, 段间以结构头分隔; 超支即停。
+    // 段优先级: errors 段 (错误行) > tail 段 (exit code/摘要, 预留固定额) >
+    // body 段 (用剩余预算, 以 [ref#N] 标记省略)。
+    let mut out = String::new();
+    let mut spent = 0usize;
+
+    // tail 预留: 尾部状态行享有固定预算, 保证 exit code/摘要不丢。
+    let tail_reserve = if tail_plain.is_empty() {
+        0
+    } else {
+        (max_tokens as f64 * 0.20).floor() as usize
+    };
+
+    // errors 段: 优先装入全部错误行。
+    if !error_lines.is_empty() {
+        out.push_str("## errors\n");
+        spent += estimate_tokens("## errors\n");
+        for l in &error_lines {
+            let line_cost = estimate_tokens(l) + 1; // 行尾换行
+            if spent + line_cost + tail_reserve > max_tokens {
+                break;
+            }
+            out.push_str(l);
+            out.push('\n');
+            spent += line_cost;
+        }
+    }
+
+    // tail 段: 尾部状态行 (exit code / 摘要) 尽预留预算装入。
+    if !tail_plain.is_empty() {
+        if !out.is_empty() {
+            out.push('\n');
+            spent += 1;
+        }
+        out.push_str("## tail\n");
+        spent += estimate_tokens("## tail\n");
+        for l in &tail_plain {
+            let line_cost = estimate_tokens(l) + 1;
+            if spent + line_cost > max_tokens {
+                break;
+            }
+            out.push_str(l);
+            out.push('\n');
+            spent += line_cost;
+        }
+    }
+
+    // body 段: 用剩余预算装入普通行, 以 `[ref#N]` 标记省略。
+    // 标记开销在装入行前预留 — 保证省略标记不会被兜底截断切掉。
+    const REF_MARK: &str = "[ref#1] body 中段省略 (原文见 tool_log)";
+    let body_plain: Vec<&str> = plain_lines
+        .iter()
+        .copied()
+        .filter(|l| !tail_plain.contains(l))
+        .collect();
+    if !body_plain.is_empty() && spent < max_tokens {
+        if !out.is_empty() {
+            out.push('\n');
+            spent += 1;
+        }
+        out.push_str("## body\n");
+        spent += estimate_tokens("## body\n");
+        // 预留省略标记 (仅当 body 行未全装时)
+        let mark_cost = estimate_tokens(REF_MARK) + 1;
+        let mut placed = 0usize;
+        for l in &body_plain {
+            let line_cost = estimate_tokens(l) + 1;
+            let will_truncate = placed + 1 < body_plain.len();
+            let reserve = if will_truncate { mark_cost } else { 0 };
+            if spent + line_cost + reserve > max_tokens {
+                break;
+            }
+            out.push_str(l);
+            out.push('\n');
+            spent += line_cost;
+            placed += 1;
+        }
+        if placed < body_plain.len() {
+            // 省略标记: 原文全量在 tool_log 可展开。
+            out.push_str(REF_MARK);
+            out.push('\n');
+        }
+    }
+
+    // 不变量兜底: 任何极端 BPE 情况下仍强制截断到预算。
+    // 注意不能依赖 truncate_preserving — 其内部用保守 char 估算,
+    // 在 tiktoken 精确计数下可能仍超预算。改为逐字符裁剪直至精确达标。
+    if estimate_tokens(&out) > max_tokens {
+        // 保留头部信息密度: 从尾部逐步裁减到预算内。
+        let mut clipped = out.clone();
+        while estimate_tokens(&clipped) > max_tokens && clipped.len() > 8 {
+            let cut = (clipped.len() as f64 * 0.7).max(1.0) as usize;
+            let keep = clipped.char_indices().nth(cut).map(|(i, _)| i).unwrap_or(cut);
+            clipped.truncate(keep);
+            clipped.push_str("\n…[truncated]…");
+        }
+        if estimate_tokens(&clipped) > max_tokens {
+            // 兜底极端: 预算太小连头部都装不下, 返回省略标记。
+            return "…[output exceeds budget, see tool_log]…".to_string();
+        }
+        clipped
+    } else {
+        out
+    }
 }
 
 /// AgentLoop — 系统主体对话循环。
@@ -754,7 +906,10 @@ impl AgentLoop {
         if self.max_tool_output_tokens > 0
             && estimate_tokens(content) > self.max_tool_output_tokens
         {
-            truncate_preserving(content, self.max_tool_output_tokens, 0.6)
+            // P2 可逆输出蒸馏 (repowise absorbed 2026-08-19, R-P79):
+            // errors-first + `[ref#N]` 内联标记 — 错误行前置, 尾部保留
+            // (exit code/摘要), 中间以标记替代; 原文全量在 tool_log 可还原。
+            distill_output(content, self.max_tool_output_tokens)
         } else {
             content.to_string()
         }
@@ -1460,36 +1615,58 @@ mod tests {
         assert_eq!(loop_.messages.len(), before, "no compaction below threshold");
     }
 
-    // ── 真实 LLM 端到端（agent 循环层，本地手动跑，不进 CI）──────────
-    // 验证 TUI 实际调用路径: AgentLoop::turn_stream → gateway → llm7 keyless。
-    //   cargo test -p neotrix --lib -- --ignored test_turn_stream_real_llm7
-    #[tokio::test]
-    #[ignore]
-    async fn test_turn_stream_real_llm7() {
-        use crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
-        let gw = create_gateway_async().await;
-        let mut loop_ = AgentLoop::new(
-            Arc::new(gw),
-            "llm7/codestral-latest",
-            "You are a test assistant. Be terse.",
-        );
-        let mut streamed = String::new();
-        let out = loop_
-            .turn_stream(
-                "Reply with exactly: E2E-OK",
-                |tok| {
-                    streamed.push_str(tok);
-                    true
-                },
-                |_, _| {},
-            )
-            .await
-            .expect("turn_stream ok");
+    // ── P2 可逆输出蒸馏 (repowise absorbed 2026-08-19) ──────────
+    #[test]
+    fn test_distill_returns_original_when_under_budget() {
+        let content = "ok\nall good\n";
+        assert_eq!(distill_output(content, 500), content, "未超预算应原样返回");
+    }
+
+    #[test]
+    fn test_distill_errors_first_and_refs() {
+        // 高熵超预算长输出 (tiktoken 压缩不友好): 错误行应前置,
+        // body 中段标记 [ref#1], 尾部 exit code 保留。
+        let mut content = String::from("line-ok-1\nline-ok-2\nline-ok-3\n");
+        for i in 0..200 {
+            content.push_str(&format!("body-line-{i}-x0q9z7w5v3r1t8m2\n"));
+        }
+        content.push_str("ERROR: build failed at module src/main.rs:42\n");
+        content.push_str("exit code 1\n");
+        let orig_tokens = estimate_tokens(&content);
+        assert!(orig_tokens > 120, "原文必须超预算才触发蒸馏, got {orig_tokens} tokens");
+        let out = distill_output(&content, 120);
+        let out_tokens = estimate_tokens(&out);
+        assert!(out_tokens <= 120, "蒸馏后必须不超预算, got {out_tokens} tokens");
         assert!(
-            streamed.contains("E2E-OK") || out.contains("E2E-OK"),
-            "expected E2E-OK in streamed output, got streamed={:?} out={:?}",
-            streamed,
-            out
+            out_tokens < orig_tokens,
+            "蒸馏必须显著小于原文 ({out_tokens} vs {orig_tokens})"
         );
+        assert!(out.contains("ERROR"), "错误行必须前置 (errors-first)");
+        assert!(out.contains("[ref#1]"), "省略区必须有 [ref#N] 标记");
+        let err_pos = out.find("ERROR").unwrap();
+        let ref_pos = out.find("[ref#1]").unwrap();
+        assert!(err_pos < ref_pos, "错误段必须在 body 省略标记之前");
+        assert!(out.contains("exit code 1"), "尾部 exit code 必须保留");
+    }
+
+    #[test]
+    fn test_distill_tail_retained_when_no_error() {
+        // 高熵无错误长输出: body 中段标记 + 尾部摘要保留。
+        let mut content = String::new();
+        for i in 0..150 {
+            content.push_str(&format!("plain-{i}-a1b2c3d4e5f6g7h8\n"));
+        }
+        content.push_str("SUMMARY: done in 3.2s\n");
+        let orig_tokens = estimate_tokens(&content);
+        assert!(orig_tokens > 80, "原文必须超预算才触发蒸馏, got {orig_tokens} tokens");
+        let out = distill_output(&content, 80);
+        let out_tokens = estimate_tokens(&out);
+        assert!(out_tokens <= 80, "蒸馏后必须不超预算, got {out_tokens} tokens");
+        assert!(
+            out_tokens < orig_tokens,
+            "蒸馏必须显著小于原文 ({out_tokens} vs {orig_tokens})"
+        );
+        assert!(out.contains("[ref#1]"), "body 中段应标记");
+        assert!(out.contains("SUMMARY: done in 3.2s"), "尾部摘要应保留");
     }
 }

@@ -117,6 +117,8 @@ pub struct SelfIteratingBrain {
     pub(crate) _goal_complete: bool,
     pub(crate) permission: PermissionLevel,
     pub(crate) _checkpoint_manager: CheckpointManager,
+    /// ESTRA 最近一次 re-anchor 决策 (Continue/Redirect, P6)。
+    pub(crate) _last_anchor_decision: Option<super::super::checkpoint::AnchorDecision>,
     pub echo_bridge: crate::core::nt_core_echo_terminal::EchoPrmBridge,
     pub(crate) _memory_orch: MemoryOrchestrator,
     pub(crate) _per_loop: Option<crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop>,
@@ -234,6 +236,7 @@ impl SelfIteratingBrain {
             _goal_complete: false,
             permission: PermissionLevel::Suggest,
             _checkpoint_manager: CheckpointManager::new(),
+            _last_anchor_decision: None,
             echo_bridge: crate::core::nt_core_echo_terminal::EchoPrmBridge::new(),
             _memory_orch: MemoryOrchestrator::new(),
             _per_loop: Some(crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop::new(

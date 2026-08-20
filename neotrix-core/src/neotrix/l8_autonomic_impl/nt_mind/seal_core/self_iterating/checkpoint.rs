@@ -252,6 +252,20 @@ impl SelfIteratingBrain {
         let Some(cp) = CheckpointManager::load_from_conn(conn) else {
             return;
         };
+        // ESTRA re-anchoring 全量 (absorbed 2026-08-19, P6): 决策矩阵
+        // 选择 continue (内存轨迹优于/持平 KB 锚点) 或 redirect (回退锚点)。
+        // 内存内已有 checkpoints (进程内多轮) → 与锚点奖励对比;
+        // 空环 (冷启动) → 无条件 re-anchor (P3 语义不变)。
+        let decision = self._anchor_decision(&cp);
+        self._last_anchor_decision = Some(decision.clone());
+        if decision == AnchorDecision::Continue {
+            log::info!(
+                "[re-anchor] CONTINUE iter={} reward={:.4} (内存轨迹优于锚点, 保持)",
+                cp.iteration,
+                cp.reward
+            );
+            return;
+        }
         self.iteration = cp.iteration;
         self._reward = cp.reward;
         self.brain.capability = cp.capability.clone();
@@ -266,12 +280,49 @@ impl SelfIteratingBrain {
             _ => AutonomyLevel::Proposal,
         };
         log::info!(
-            "[re-anchor] restored checkpoint iter={} reward={:.4} lr={:.3}",
+            "[re-anchor] REDIRECT restored iter={} reward={:.4} lr={:.3}",
             cp.iteration,
             cp.reward,
             cp.learning_rate
         );
     }
+
+    /// ESTRA continue/redirect 决策矩阵 (absorbed 2026-08-19, P6):
+    /// - 内存 checkpoint 环为空 → 冷启动, 必须 re-anchor (Redirect)。
+    /// - 内存环最近奖励 >= KB 锚点奖励 - ε → 当前轨迹不劣于锚点,
+    ///   继续 (Continue) — 避免破坏进程内已跑出的更优状态。
+    /// - 内存环最近奖励 < 锚点 → 轨迹退化, 回退到锚点 (Redirect)。
+    fn _anchor_decision(&self, cp: &PersistedCheckpoint) -> AnchorDecision {
+        const EPS: f64 = 1e-9;
+        if self._checkpoint_manager.is_empty() {
+            return AnchorDecision::Redirect;
+        }
+        let latest = self
+            ._checkpoint_manager
+            .list()
+            .back()
+            .map(|c| c.reward)
+            .unwrap_or(f64::NEG_INFINITY);
+        if latest + EPS >= cp.reward {
+            AnchorDecision::Continue
+        } else {
+            AnchorDecision::Redirect
+        }
+    }
+
+    /// 最近一次 re-anchor 的决策 (Continue/Redirect), 供测试与诊断。
+    pub fn last_anchor_decision(&self) -> Option<AnchorDecision> {
+        self._last_anchor_decision
+    }
+}
+
+/// ESTRA continue-vs-redirect 决策 (absorbed 2026-08-19, P6)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnchorDecision {
+    /// 当前内存轨迹不劣于 KB 锚点 → 继续进化, 不覆盖状态。
+    Continue,
+    /// 冷启动或轨迹退化 → 回退到 KB 持久化锚点。
+    Redirect,
 }
 
 make_stage!(CheckpointStage);
@@ -542,5 +593,107 @@ mod tests {
     fn test_load_absent_returns_none() {
         let conn = mem_conn();
         assert!(CheckpointManager::load_from_conn(Some(&conn)).is_none(), "无持久化时应 None");
+    }
+
+    // ── P6 ESTRA continue/redirect 决策矩阵 ─────────────────────
+    #[test]
+    fn test_anchor_decision_cold_start_redirects() {
+        // 内存环为空 (冷启动) + KB 有锚点 → 必须 Redirect。
+        let mut mgr = CheckpointManager::new();
+        let snap = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.1,
+            score: 0.5,
+        };
+        mgr.push(3, &snap, PermissionLevel::Full, AutonomyLevel::Full, 0.9, "cp");
+        let conn = mem_conn();
+        mgr.persist_to_conn(Some(&conn)).ok();
+
+        let mut fresh = SelfIteratingBrain::new_lightweight();
+        fresh.skip_kb_io = false;
+        fresh.re_anchor_from_conn(Some(&conn));
+        assert_eq!(
+            fresh.last_anchor_decision(),
+            Some(AnchorDecision::Redirect),
+            "冷启动应回退锚点"
+        );
+        assert_eq!(fresh.iteration, 3);
+        assert!((fresh._reward - 0.9).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_anchor_decision_continue_when_memory_newer() {
+        // 内存环已有更优 checkpoint (进程内多轮) → 不覆盖 (Continue)。
+        let mut mgr = CheckpointManager::new();
+        let snap = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.1,
+            score: 0.5,
+        };
+        mgr.push(5, &snap, PermissionLevel::Full, AutonomyLevel::Full, 0.5, "cp");
+        let conn = mem_conn();
+        mgr.persist_to_conn(Some(&conn)).ok();
+
+        let mut fresh = SelfIteratingBrain::new_lightweight();
+        fresh.skip_kb_io = false;
+        // 内存环推入奖励更高 (0.9 > 0.5) 的 checkpoint → 决策 Continue。
+        let better = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.2,
+            score: 0.8,
+        };
+        fresh._checkpoint_manager.push(
+            6,
+            &better,
+            PermissionLevel::Full,
+            AutonomyLevel::Full,
+            0.9,
+            "memory",
+        );
+        fresh.re_anchor_from_conn(Some(&conn));
+        assert_eq!(
+            fresh.last_anchor_decision(),
+            Some(AnchorDecision::Continue),
+            "内存轨迹更优应 Continue"
+        );
+        assert_eq!(fresh.iteration, 0, "Continue 不应覆盖内存状态");
+    }
+
+    #[test]
+    fn test_anchor_decision_redirect_when_memory_worse() {
+        // 内存环奖励低于 KB 锚点 → 轨迹退化, Redirect 回退锚点。
+        let mut mgr = CheckpointManager::new();
+        let snap = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.1,
+            score: 0.5,
+        };
+        mgr.push(7, &snap, PermissionLevel::Full, AutonomyLevel::Full, 0.9, "cp");
+        let conn = mem_conn();
+        mgr.persist_to_conn(Some(&conn)).ok();
+
+        let mut fresh = SelfIteratingBrain::new_lightweight();
+        fresh.skip_kb_io = false;
+        let worse = BrainSnapshot {
+            capability: Default::default(),
+            learning_rate: 0.2,
+            score: 0.4,
+        };
+        fresh._checkpoint_manager.push(
+            8,
+            &worse,
+            PermissionLevel::Full,
+            AutonomyLevel::Full,
+            0.2,
+            "memory",
+        );
+        fresh.re_anchor_from_conn(Some(&conn));
+        assert_eq!(
+            fresh.last_anchor_decision(),
+            Some(AnchorDecision::Redirect),
+            "内存退化应 Redirect"
+        );
+        assert_eq!(fresh.iteration, 7, "应回退到 KB 锚点迭代号");
+        assert!((fresh._reward - 0.9).abs() < 1e-9);
     }
 }
