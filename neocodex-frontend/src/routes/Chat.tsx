@@ -1210,7 +1210,7 @@ export function Chat() {
                     </div>
                     <div class="cic-right">
                       <Show when={inputValue().trim() || pendingAttachments().length > 0}>
-                        <span class="text-[10px] text-text-muted/70 font-mono mr-2">
+                        <span class="text-10px text-text-muted/70 font-mono mr-2">
                           ≈{estimateTokens(inputValue())} tok
                           <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>
                         </span>
@@ -1510,7 +1510,7 @@ export function Chat() {
                 </div>
               )}
             </For>
-            <span class="text-[10px] font-mono text-text-muted">
+            <span class="text-10px font-mono text-text-muted">
               引用预算 ≈{mentionRefs().reduce((s, r) => s + r.tokens, 0)} tok
             </span>
           </div>
@@ -1682,7 +1682,7 @@ export function Chat() {
                       </svg>
                     </button>
                     <Show when={inputValue().trim() || pendingAttachments().length > 0}>
-                      <span class="text-[10px] text-text-muted/70 font-mono mr-2">
+                      <span class="text-10px text-text-muted/70 font-mono mr-2">
                         ≈{estimateTokens(inputValue())} tok
                         <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>
                       </span>
@@ -1702,10 +1702,10 @@ export function Chat() {
 
               {/* 底部状态条 */}
               <div class="flex items-center justify-between mt-2 px-1 pb-1">
-                <div class="flex items-center gap-3 text-[10px] text-text-muted/80">
+                <div class="flex items-center gap-3 text-10px text-text-muted/80">
                   {/* 权限模式徽章（对标 Claude 顶栏 mode 徽章）：短标签 + 色点，点击循环切换 */}
                   <button
-                    class="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-white/30 bg-white/40 hover:bg-white/60 transition-colors text-[10px] font-medium text-text-primary focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-white/30 bg-white/40 hover:bg-white/60 transition-colors text-10px font-medium text-text-primary focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={cyclePermissionMode}
                     disabled={isGenerating()}
                     aria-label={`权限模式：${permissionModeInfo().label}，点击切换`}

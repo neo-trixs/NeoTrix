@@ -33,7 +33,7 @@ export function AppearanceSection(props: Props) {
               <div class="ss-row-label">雪域白 · 浅橙</div>
               <div class="ss-row-desc">唯一主题 · 极简 Mac 圆角</div>
             </div>
-            <span class="text-[10px] text-nt-io-600">✓ 当前</span>
+            <span class="text-10px text-nt-io-600">✓ 当前</span>
           </div>
         </div>
       </div>
@@ -52,7 +52,7 @@ export function AppearanceSection(props: Props) {
               aria-checked={props.fontSizePref() === size}
             >
               <div class="text-[12.5px] text-text-primary">{size === 'sm' ? '小' : size === 'md' ? '中' : '大'}</div>
-              <Show when={props.fontSizePref() === size}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+              <Show when={props.fontSizePref() === size}><span class="text-10px text-nt-io-600">✓ 当前</span></Show>
             </button>
           ))}
         </div>
@@ -71,7 +71,7 @@ export function AppearanceSection(props: Props) {
             aria-checked={props.motionPref() === 'full'}
           >
             <div class="text-[12.5px] text-text-primary">完整动效</div>
-            <Show when={props.motionPref() === 'full'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+            <Show when={props.motionPref() === 'full'}><span class="text-10px text-nt-io-600">✓ 当前</span></Show>
           </button>
           <button
             class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', props.motionPref() === 'reduced' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
@@ -80,7 +80,7 @@ export function AppearanceSection(props: Props) {
             aria-checked={props.motionPref() === 'reduced'}
           >
             <div class="text-[12.5px] text-text-primary">减弱动效</div>
-            <Show when={props.motionPref() === 'reduced'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+            <Show when={props.motionPref() === 'reduced'}><span class="text-10px text-nt-io-600">✓ 当前</span></Show>
           </button>
         </div>
         <div class="px-4 pb-3 -mt-1">
@@ -101,7 +101,7 @@ export function AppearanceSection(props: Props) {
             aria-checked={props.densityPref() === 'comfortable'}
           >
             <div class="text-[12.5px] text-text-primary">舒适</div>
-            <Show when={props.densityPref() === 'comfortable'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+            <Show when={props.densityPref() === 'comfortable'}><span class="text-10px text-nt-io-600">✓ 当前</span></Show>
           </button>
           <button
             class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', props.densityPref() === 'compact' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
@@ -110,7 +110,7 @@ export function AppearanceSection(props: Props) {
             aria-checked={props.densityPref() === 'compact'}
           >
             <div class="text-[12.5px] text-text-primary">紧凑</div>
-            <Show when={props.densityPref() === 'compact'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+            <Show when={props.densityPref() === 'compact'}><span class="text-10px text-nt-io-600">✓ 当前</span></Show>
           </button>
         </div>
         <div class="px-4 pb-3 -mt-1">

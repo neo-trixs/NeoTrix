@@ -270,7 +270,7 @@ export function ScheduledTasks(props: Props) {
           <Show when={showCreate()}>
             <div class="rounded-xl border border-border-primary bg-bg-primary/40 p-3 space-y-3">
               <div>
-                <label class="text-[10px] text-text-muted uppercase tracking-wider">任务名</label>
+                <label class="text-10px text-text-muted uppercase tracking-wider">任务名</label>
                 <input
                   value={name()}
                   onInput={(e) => setName(e.currentTarget.value)}
@@ -280,7 +280,7 @@ export function ScheduledTasks(props: Props) {
                 />
               </div>
               <div>
-                <label class="text-[10px] text-text-muted uppercase tracking-wider">提示词</label>
+                <label class="text-10px text-text-muted uppercase tracking-wider">提示词</label>
                 <textarea
                   value={prompt()}
                   onInput={(e) => setPrompt(e.currentTarget.value)}
@@ -290,7 +290,7 @@ export function ScheduledTasks(props: Props) {
                 />
               </div>
               <div>
-                <label class="text-[10px] text-text-muted uppercase tracking-wider">调度（RRULE）</label>
+                <label class="text-10px text-text-muted uppercase tracking-wider">调度（RRULE）</label>
                 <div class="mt-1 flex gap-2 flex-wrap">
                   <For each={SCHEDULE_PRESETS}>
                     {(p) => (
@@ -349,7 +349,7 @@ export function ScheduledTasks(props: Props) {
                     <span class={clsx('badge', statusBadge(task.status))}>{statusLabel(task.status)}</span>
                   </div>
                   <div class="mt-1 text-xs text-text-secondary line-clamp-2">{task.prompt}</div>
-                  <div class="mt-1 text-[10px] font-mono text-text-muted truncate">{task.schedule}</div>
+                  <div class="mt-1 text-10px font-mono text-text-muted truncate">{task.schedule}</div>
                   <div class="mt-2 flex items-center gap-2">
                     <button
                       class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-nt-core-300 hover:bg-nt-core-500/10 border border-nt-core-500/30 transition-colors"
@@ -388,7 +388,7 @@ export function ScheduledTasks(props: Props) {
                       删除
                     </button>
                   </div>
-                  <div class="mt-2 pt-2 border-t border-border-primary/50 flex items-center justify-between gap-2 text-[10px] text-text-muted">
+                  <div class="mt-2 pt-2 border-t border-border-primary/50 flex items-center justify-between gap-2 text-10px text-text-muted">
                     <span>上次: {formatTime(task.last_run)}</span>
                     <span>下次: {formatTime(task.next_run)}</span>
                     <span class="flex items-center gap-1">

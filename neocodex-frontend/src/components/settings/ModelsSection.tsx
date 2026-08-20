@@ -80,23 +80,23 @@ export function ModelsSection(props: Props) {
                     <div class="flex items-center gap-4">
                       <div>
                         <div class="text-[18px] font-semibold text-text-primary leading-none">{total}</div>
-                        <div class="text-[10px] text-text-muted mt-1">可用模型</div>
+                        <div class="text-10px text-text-muted mt-1">可用模型</div>
                       </div>
                       <div class="w-px h-8 bg-border-primary/60" />
                       <div>
                         <div class="text-[18px] font-semibold text-text-primary leading-none">{usable.length}</div>
-                        <div class="text-[10px] text-text-muted mt-1">可用提供商</div>
+                        <div class="text-10px text-text-muted mt-1">可用提供商</div>
                       </div>
                       <div class="w-px h-8 bg-border-primary/60" />
                       <div class="min-w-0">
                         <div class="text-[13px] font-medium text-text-primary truncate">{cfg().active_model || '未激活'}</div>
-                        <div class="text-[10px] text-text-muted mt-0.5 flex items-center gap-1">
+                        <div class="text-10px text-text-muted mt-0.5 flex items-center gap-1">
                           <ActiveDotIcon class="w-2 h-2 text-nt-core-600" />
                           当前模型
                         </div>
                       </div>
                     </div>
-                    <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium flex-shrink-0', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
+                    <span class={clsx('text-10px px-2 py-1 rounded-full font-medium flex-shrink-0', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
                       {cfg().resolvable ? 'API 可达' : 'API 不可达'}
                     </span>
                   </div>
@@ -121,13 +121,13 @@ export function ModelsSection(props: Props) {
                     <div class="ss-card">
                       <div class="ss-card-header">
                         {group.title}
-                        <span class="ml-auto text-[10px] text-text-muted font-mono flex items-center gap-1">
+                        <span class="ml-auto text-10px text-text-muted font-mono flex items-center gap-1">
                           {group.providers.reduce((s, p) => s + p.models.length, 0)} 模型 · {group.providers.length} 提供商
                         </span>
                       </div>
                       <div class="ss-card-body space-y-3">
                         <Show when={group.desc}>
-                          <p class="text-[10px] text-text-muted/80 -mt-1">{group.desc}</p>
+                          <p class="text-10px text-text-muted/80 -mt-1">{group.desc}</p>
                         </Show>
                         <For each={group.providers}>
                           {(p) => {
@@ -145,7 +145,7 @@ export function ModelsSection(props: Props) {
                                   </div>
                                   <div class="flex items-center gap-2 flex-shrink-0">
                                     <CategoryBadge category={p.category} />
-                                    <span class="text-[10px] text-text-muted font-mono">{p.models.length} 个</span>
+                                    <span class="text-10px text-text-muted font-mono">{p.models.length} 个</span>
                                   </div>
                                 </div>
                                 {/* 模型列表：代理池行 */}
@@ -171,7 +171,7 @@ export function ModelsSection(props: Props) {
                                           </span>
                                           <span class="flex-shrink-0">
                                             <Show when={isActive} fallback={<span class="w-2 h-2 rounded-full border border-border-primary/70 group-hover/model:border-nt-io-500/50" />}>
-                                              <span class="inline-flex items-center gap-1 text-[10px] text-nt-io-600 font-medium">
+                                              <span class="inline-flex items-center gap-1 text-10px text-nt-io-600 font-medium">
                                                 <CheckIcon class="w-3 h-3" /> 当前
                                               </span>
                                             </Show>

@@ -3,34 +3,25 @@
 use crate::cli::commands::types::CommandRegistry;
 use crate::cli::commands::bench_cmds::BenchmarkCmd;
 use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd, McpCmd};
-use crate::cli::commands::acp_cmds::AcpCmd;
 use crate::cli::commands::brain_cmds::E8Cmd;
-use crate::cli::commands::second_brain_cmds::BrainCmd;
 use crate::cli::commands::consciousness_cmds::ConsciousnessCmd;
 use crate::cli::commands::core_cmds::{ClearCmd, CompletionsCmd, ExitCmd, HelpCmd, StatsCmd, VersionCmd, ConfigCmd, CatalogCmd};
-use crate::cli::commands::cost_cmds::{CostCmd, ApprovalCmd};
+use crate::cli::commands::cost_cmds::CostCmd;
 use crate::cli::commands::budget_cmds::BudgetCmd;
-use crate::cli::commands::file_cmds::{FileCreateCmd, FileDiffCmd, FileEditCmd, FilePatchCmd, FileReadCmd, FileWriteCmd};
-use crate::cli::commands::git_cmds::{CommitCmd, GitCmd, PrCmd};
+use crate::cli::commands::file_cmds::{FileDiffCmd, FileReadCmd, FileWriteCmd};
+use crate::cli::commands::git_cmds::{CommitCmd, GitCmd};
 use crate::cli::commands::goal_cmds::GoalCmd;
-use crate::cli::commands::session_cmds::{CompactCmd, ContextCmd, DistillCmd, ForkCmd, HistoryCmd, ResumeCmd, SessionCmd};
+use crate::cli::commands::session_cmds::{CompactCmd, ContextCmd, DistillCmd, HistoryCmd, ResumeCmd, SessionCmd};
 use crate::cli::commands::theme_cmd::ThemeCmd;
 use crate::cli::commands::connector_cmds::ConnectorCmd;
-use crate::cli::commands::review_cmds::ReviewCmd;
-use crate::cli::commands::schedule_cmds::ScheduleCmd;
 use crate::cli::commands::ui_cmds::{BackgroundCommand, RouterCmd, SideCmd, VimCmd, WorkSpaceCmd};
 use crate::cli::commands::wallet_cmd::WalletCmd;
-use crate::cli::commands::swap_cmd::{ApproveCmd, SwapCmd, TransferCmd};
+use crate::cli::commands::swap_cmd::{SwapCmd, TransferCmd};
 use crate::cli::commands::doctor_cmds::DoctorCmd;
 use crate::cli::commands::plugin_cmds::PluginCmd;
 use crate::cli::commands::search_cmds::SearchCmd;
 use crate::cli::commands::model_cmds::ModelCmd;
-use crate::cli::commands::contract_cmds::ContractCmd;
-use crate::cli::commands::perm_cmds::PermCmd;
-use crate::cli::commands::redact_cmds::RedactCmd;
 use crate::cli::commands::profile_cmds::ProfileCmd;
-use crate::cli::commands::sandbox_cmds::SandboxCmd;
-use crate::cli::commands::judge_cmds::JudgeCmd;
 use crate::cli::commands::hypothesis_cmds::HypothesisCmd;
 use crate::cli::commands::evidence_cmds::EvidenceCmd;
 use crate::cli::commands::kanban_cmds::BoardCmd;
@@ -41,13 +32,7 @@ use crate::cli::commands::provider_cmds::ProviderCmd;
 use crate::cli::commands::free_cmds::FreeCmd;
 use crate::cli::commands::kb_cmds::KbCmd;
 use crate::cli::commands::wiki_cmds::WikiCmd;
-use crate::cli::commands::self_audit_cmds::SelfAuditCmd;
-use crate::cli::commands::osint_cmds::OsintCmd;
-use crate::cli::commands::comm_cmds::CommCmd;
 use crate::cli::commands::chain_cmds::ChainCmd;
-use crate::cli::commands::quantum_cmds::QTestCmd;
-use crate::cli::commands::code_graph_cmds::CodeGraphCmd;
-use crate::cli::commands::sources_cmds::SourcesCmd;
 use crate::cli::commands::explore_cmds::ExploreCmd;
 use crate::cli::commands::consolidated_cmds::{
     FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd, MemoryAggCmd,
@@ -75,27 +60,20 @@ pub fn default_registry() -> CommandRegistry {
 
     // E8 (diagnostic, kept as System)
     reg.register(Box::new(E8Cmd));
-    // Second Brain (memory graph command)
-    reg.register(Box::new(BrainCmd));
 
     // File
     reg.register(Box::new(FileCmd));          // aggregator
     reg.register(Box::new(FileReadCmd));
     reg.register(Box::new(FileWriteCmd));
-    reg.register(Box::new(FileCreateCmd));
-    reg.register(Box::new(FileEditCmd));
-    reg.register(Box::new(FilePatchCmd));
     reg.register(Box::new(FileDiffCmd));
 
     // Git
     reg.register(Box::new(GitCmd));
     reg.register(Box::new(CommitCmd));
-    reg.register(Box::new(PrCmd));
 
     // Session
     reg.register(Box::new(SessionCmd));
     reg.register(Box::new(ResumeCmd));
-    reg.register(Box::new(ForkCmd));
     reg.register(Box::new(HistoryCmd));
     reg.register(Box::new(ContextCmd));
     reg.register(Box::new(CompactCmd));
@@ -105,25 +83,21 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(AgentCmd));
     reg.register(Box::new(DiscoverCmd));
     reg.register(Box::new(McpCmd));
-    reg.register(Box::new(AcpCmd));
 
     // Crypto/Finance
     reg.register(Box::new(WalletAggCmd));
     reg.register(Box::new(WalletCmd));
     reg.register(Box::new(SwapCmd));
     reg.register(Box::new(TransferCmd));
-    reg.register(Box::new(ApproveCmd));
     reg.register(Box::new(CostCmd));
     reg.register(Box::new(BudgetCmd));
 
     // Goal/Plan
     reg.register(Box::new(GoalCmd));
     reg.register(Box::new(PlanCmd));
-    reg.register(Box::new(ScheduleCmd));
 
     // Memory
     reg.register(Box::new(EvidenceCmd));
-    reg.register(Box::new(CodeGraphCmd));
     reg.register(Box::new(HypothesisCmd));
     reg.register(Box::new(SearchCmd));
     reg.register(Box::new(BoardCmd));
@@ -144,45 +118,23 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ProviderCmd));
     reg.register(Box::new(FreeCmd));
     reg.register(Box::new(ModelCmd));
-    reg.register(Box::new(ContractCmd));
-    reg.register(Box::new(PermCmd));
-    reg.register(Box::new(RedactCmd));
 
     // Skills
     reg.register(Box::new(SkillCmd));
 
-    // Sandbox
-    reg.register(Box::new(SandboxCmd));
-    reg.register(Box::new(JudgeCmd));
-
     // Other
     reg.register(Box::new(ConnectorCmd));
-    reg.register(Box::new(ReviewCmd));
     reg.register(Box::new(PluginCmd));
     reg.register(Box::new(ProfileCmd));
     reg.register(Box::new(SessionRecoveryCmd));
-    reg.register(Box::new(ApprovalCmd));
 
     // Aggregation
     reg.register(Box::new(ConsolidatedAgentCmd));
     reg.register(Box::new(GitAggCmd));
     reg.register(Box::new(SessionAggCmd));
 
-    // L4 capability: Rust-native OSINT and self-audit
-    reg.register(Box::new(OsintCmd));
-    reg.register(Box::new(SelfAuditCmd));
-
-    // L1 capability: NT-SHIELD 通信伪装层观测
-    reg.register(Box::new(CommCmd));
-
     // 链路命令 (Chain) — 端到端工作流编排
     reg.register(Box::new(ChainCmd));
-
-    // 量子态测试选择 (Quantum Test) — 变更驱动坍缩, 避免全量测试
-    reg.register(Box::new(QTestCmd));
-
-    // 外部知识源 (Sources) — GitHub/书籍/arXiv/Wiki 定向爬取
-    reg.register(Box::new(SourcesCmd));
     // 外部探索 (Explore) — URL/GitHub 仓库吸收 + 蒸馏
     reg.register(Box::new(ExploreCmd));
 

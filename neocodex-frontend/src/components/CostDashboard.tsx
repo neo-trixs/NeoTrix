@@ -134,7 +134,7 @@ export function CostDashboard(props: Props) {
         {label}
       </div>
       <div class="text-lg font-semibold text-text-primary">{value}</div>
-      {sub && <div class="text-[10px] text-text-muted mt-1">{sub}</div>}
+      {sub && <div class="text-10px text-text-muted mt-1">{sub}</div>}
     </div>
   )
 

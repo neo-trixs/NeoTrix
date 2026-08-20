@@ -168,7 +168,7 @@ export function PluginMarketplace(props: Props) {
             <div class="py-8 text-center text-xs text-text-muted space-y-2">
               <Box class="w-8 h-8 mx-auto text-text-muted/40" />
               <p>暂无插件</p>
-              <p class="text-[10px]">将插件 manifest.json 放入 {`${pluginsDirLabel()}`} 或点击上方安装</p>
+              <p class="text-10px">将插件 manifest.json 放入 {`${pluginsDirLabel()}`} 或点击上方安装</p>
             </div>
           </Show>
 
@@ -179,7 +179,7 @@ export function PluginMarketplace(props: Props) {
                   <div class="flex items-center gap-2">
                     <Puzzle class={clsx('w-4 h-4 flex-shrink-0', p.enabled ? 'text-nt-mind-600' : 'text-text-muted')} />
                     <span class="text-sm font-medium text-text-primary truncate flex-1">{p.name}</span>
-                    <span class="text-[10px] text-text-muted font-mono">{p.version}</span>
+                    <span class="text-10px text-text-muted font-mono">{p.version}</span>
                     <span
                       class={clsx('badge', p.enabled ? 'badge-success' : 'badge-warn')}
                       title={p.enabled ? '已启用' : '已禁用'}
@@ -216,7 +216,7 @@ export function PluginMarketplace(props: Props) {
                       {busy() === `uninstall:${p.id}` ? <Loader2 class="w-3.5 h-3.5 animate-spin" /> : <Trash2 class="w-3.5 h-3.5" />}
                       卸载
                     </button>
-                    <span class="ml-auto text-[10px] text-text-muted font-mono">{p.id}</span>
+                    <span class="ml-auto text-10px text-text-muted font-mono">{p.id}</span>
                   </div>
                 </div>
               )}

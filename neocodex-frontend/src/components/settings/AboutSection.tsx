@@ -170,21 +170,21 @@ export function AboutSection(props: Props) {
         <div class="ss-card-body">
           <div class="grid grid-cols-2 gap-2">
             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-              <div class="text-[10px] text-text-muted mb-1">提供商</div>
+              <div class="text-10px text-text-muted mb-1">提供商</div>
               <div class="text-[12.5px] text-text-primary font-medium">{props.config()?.provider_count ?? '—'} 个</div>
             </div>
             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-              <div class="text-[10px] text-text-muted mb-1">API 状态</div>
+              <div class="text-10px text-text-muted mb-1">API 状态</div>
               <div class={clsx('text-[12.5px] font-medium', props.config()?.resolvable ? 'text-nt-core-700' : 'text-nt-shield-600')}>
                 {props.config()?.resolvable ? '可用' : '不可达'}
               </div>
             </div>
             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-              <div class="text-[10px] text-text-muted mb-1">当前模型</div>
+              <div class="text-10px text-text-muted mb-1">当前模型</div>
               <div class="text-[12.5px] text-text-primary font-mono truncate">{props.config()?.active_model ?? '—'}</div>
             </div>
             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-              <div class="text-[10px] text-text-muted mb-1">平台</div>
+              <div class="text-10px text-text-muted mb-1">平台</div>
               <div class="text-[12.5px] text-text-primary">macOS</div>
             </div>
           </div>

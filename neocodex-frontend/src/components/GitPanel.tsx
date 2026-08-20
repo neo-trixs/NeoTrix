@@ -370,7 +370,7 @@ export function GitPanel(props: Props) {
           </div>
 <Show when={unreviewedFiles() > 0}>
               <div
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] text-amber-700 bg-amber-500/10 border border-amber-500/30"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-10px text-amber-700 bg-amber-500/10 border border-amber-500/30"
                 role="status"
                 title="这些变更尚未在面板中接受（git add 暂存），提交前将提示确认"
               >
@@ -468,7 +468,7 @@ export function GitPanel(props: Props) {
                         </button>
                         <Show when={isStaged()}>
                           <span
-                            class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-emerald-600 bg-emerald-500/15 border border-emerald-500/30 flex-shrink-0"
+                            class="flex items-center gap-1 px-1.5 py-0.5 rounded text-10px text-emerald-600 bg-emerald-500/15 border border-emerald-500/30 flex-shrink-0"
                             title="已通过 git add 暂存"
                           >
                             <Check class="w-3 h-3" />

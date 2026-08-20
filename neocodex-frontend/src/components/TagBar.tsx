@@ -67,7 +67,7 @@ export function TagBar(props: TagBarProps) {
               <For each={RECOMMENDED_TAGS.slice(0, 6)}>
                 {(t) => (
                   <span
-                    class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                    class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-10px font-medium"
                     style={{ 'background-color': `${t.color}1a`, color: t.color }}
                   >
                     {t.name}
@@ -87,13 +87,13 @@ export function TagBar(props: TagBarProps) {
       >
         {/* 标签区头部：标题 + 清除筛选 */}
         <div class="flex items-center justify-between px-1 pb-1 pt-2">
-          <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-text-muted/60 font-medium">
+          <div class="flex items-center gap-1.5 text-10px uppercase tracking-widest text-text-muted/60 font-medium">
             <HashIcon class="w-3 h-3" />
             标签
           </div>
           <Show when={activeCount() > 0}>
             <button
-              class="text-[10px] text-nt-io-600 hover:text-nt-io-700 font-medium px-1.5 py-0.5 rounded hover:bg-nt-io-500/10 transition-colors"
+              class="text-10px text-nt-io-600 hover:text-nt-io-700 font-medium px-1.5 py-0.5 rounded hover:bg-nt-io-500/10 transition-colors"
               onClick={props.onClearTags}
               aria-label="清除标签筛选"
             >

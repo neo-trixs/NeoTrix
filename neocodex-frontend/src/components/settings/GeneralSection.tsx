@@ -54,7 +54,7 @@ export function GeneralSection(props: Props) {
                 }}
               </Show>
             </div>
-            <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium flex-shrink-0', props.config()?.resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
+            <span class={clsx('text-10px px-2 py-1 rounded-full font-medium flex-shrink-0', props.config()?.resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
               {props.config()?.resolvable ? 'API 可达' : 'API 不可达'}
             </span>
           </div>

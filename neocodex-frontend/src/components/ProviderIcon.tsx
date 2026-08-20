@@ -71,7 +71,7 @@ export function ProviderIcon(props: { name: string; size?: 'sm' | 'md'; classNam
     <span
       class={clsx(
         'rounded-lg flex items-center justify-center font-semibold text-white flex-shrink-0 select-none',
-        size() === 'md' ? 'w-8 h-8 text-[12px]' : 'w-6 h-6 text-[10px]',
+        size() === 'md' ? 'w-8 h-8 text-[12px]' : 'w-6 h-6 text-10px',
         props.className
       )}
       style={{
@@ -91,7 +91,7 @@ export function CategoryBadge(props: { category: string; className?: string }) {
   return (
     <span
       class={clsx(
-        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-9px font-medium whitespace-nowrap',
         cat() === 'local' && 'bg-nt-core-500/10 text-nt-core-700',
         cat() === 'proxy' && 'bg-nt-act-500/12 text-nt-act-700',
         cat() === 'cloud' && 'bg-nt-memory-500/10 text-nt-memory-700',
@@ -119,7 +119,7 @@ export function FreeBadge(props: { free: boolean; className?: string }) {
     <Show when={props.free}>
       <span
         class={clsx(
-          'inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium whitespace-nowrap bg-nt-repair-500/10 text-nt-repair-700',
+          'inline-flex items-center px-1.5 py-0.5 rounded-full text-9px font-medium whitespace-nowrap bg-nt-repair-500/10 text-nt-repair-700',
           props.className
         )}
         title="免费 / keyless 提供商"

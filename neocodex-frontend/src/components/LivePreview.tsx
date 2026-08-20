@@ -170,9 +170,9 @@ export function LivePreview(props: Props) {
 
         {/* 端口快速选择 */}
         <div class="flex items-center gap-1.5 px-4 py-1.5 border-b border-white/20 flex-shrink-0 overflow-x-auto">
-          <span class="text-[10px] text-text-muted flex-shrink-0">端口:</span>
+          <span class="text-10px text-text-muted flex-shrink-0">端口:</span>
           <For0 ports={COMMON_PORTS} onPick={pickPort} />
-          <span class="text-[10px] text-text-muted flex-shrink-0">
+          <span class="text-10px text-text-muted flex-shrink-0">
             {PORT_HINTS.vite} · {PORT_HINTS.next} · {PORT_HINTS.astro}
           </span>
         </div>
@@ -229,7 +229,7 @@ function For0(props: { ports: number[]; onPick: (p: number) => void }) {
     <>{props.ports.map((p, i) => (
       <button
         data-port={i}
-        class="px-1.5 py-0.5 rounded text-[10px] font-mono text-text-muted hover:text-nt-io-700 hover:bg-nt-io-500/10 transition-colors flex-shrink-0"
+        class="px-1.5 py-0.5 rounded text-10px font-mono text-text-muted hover:text-nt-io-700 hover:bg-nt-io-500/10 transition-colors flex-shrink-0"
         onClick={() => props.onPick(p)}
         title={`使用 localhost:${p}`}
       >

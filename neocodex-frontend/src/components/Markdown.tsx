@@ -20,14 +20,17 @@ type Block =
 
 /* ---------- 行内解析 ---------- */
 
-const INLINE_RE = /(`[^`]+`)|(\*\*[^*]+?\*\*)|(\*[^*\n]+?\*)|(\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\))/g
+const INLINE_RE_SRC =
+  /(`[^`]+`)|(\*\*[^*]+?\*\*)|(\*[^*\n]+?\*)|(\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\))/g
 
 function renderInline(text: string): JSX.Element[] {
   const nodes: JSX.Element[] = []
-  INLINE_RE.lastIndex = 0
+  // 每次调用创建新正则实例（递归安全：全局正则的 lastIndex 是共享可变状态，
+  // 递归渲染嵌套样式时会互相污染导致 exec 从头匹配同一文本 → 无限循环挂死 UI）。
+  const RE = new RegExp(INLINE_RE_SRC.source, 'g')
   let lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = INLINE_RE.exec(text)) !== null) {
+  while ((m = RE.exec(text)) !== null) {
     if (m.index > lastIndex) nodes.push(text.slice(lastIndex, m.index))
     if (m[1] !== undefined) {
       nodes.push(<code class="inline-code">{m[1].slice(1, -1)}</code>)
@@ -51,7 +54,7 @@ function renderInline(text: string): JSX.Element[] {
         </a>,
       )
     }
-    lastIndex = INLINE_RE.lastIndex
+    lastIndex = RE.lastIndex
   }
   if (lastIndex < text.length) nodes.push(text.slice(lastIndex))
   return nodes
@@ -174,6 +177,11 @@ function parseBlocks(content: string): Block[] {
       paraLines.push(l)
       i++
     }
+    // 防死循环（流式半截块：行未被任何分支消费但也不匹配段落聚合条件时）
+    if (paraLines.length === 0 && i < lines.length) {
+      paraLines.push(lines[i])
+      i++
+    }
     blocks.push({ type: 'paragraph', text: paraLines.join('\n') })
   }
 
@@ -238,12 +246,22 @@ function renderBlock(block: Block): JSX.Element {
       )
 
     case 'heading': {
-      const Tag = `h${block.level}` as 'h1' | 'h2' | 'h3' | 'h4'
-      return (
-        <Tag class={HEADING_CLASS[block.level]}>
-          {renderInline(block.text)}
-        </Tag>
-      )
+      const { level, text } = block
+      const cls = HEADING_CLASS[level]
+      const inline = renderInline(text)
+      // SolidJS 动态标签名会触发 "Comp is not a function"（dev 模式抛错），
+      // 这里显式展开为静态标签。
+      switch (level) {
+        case 1:
+          return <h1 class={cls}>{inline}</h1>
+        case 2:
+          return <h2 class={cls}>{inline}</h2>
+        case 3:
+          return <h3 class={cls}>{inline}</h3>
+        case 4:
+          return <h4 class={cls}>{inline}</h4>
+      }
+      return <span />
     }
 
     case 'code':

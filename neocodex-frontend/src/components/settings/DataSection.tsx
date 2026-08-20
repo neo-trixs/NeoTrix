@@ -33,19 +33,19 @@ export function DataSection(props: Props) {
             {(ms) => (
               <div class="grid grid-cols-2 gap-2">
                 <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                  <div class="text-[10px] text-text-muted mb-1">记忆条目</div>
+                  <div class="text-10px text-text-muted mb-1">记忆条目</div>
                   <div class="text-[13px] text-text-primary font-medium">{ms().total_entries}</div>
                 </div>
                 <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                  <div class="text-[10px] text-text-muted mb-1">分类</div>
+                  <div class="text-10px text-text-muted mb-1">分类</div>
                   <div class="text-[13px] text-text-primary font-medium">{ms().total_categories}</div>
                 </div>
                 <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                  <div class="text-[10px] text-text-muted mb-1">平均置信度</div>
+                  <div class="text-10px text-text-muted mb-1">平均置信度</div>
                   <div class="text-[13px] text-text-primary font-medium">{(ms().avg_confidence * 100).toFixed(0)}%</div>
                 </div>
                 <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                  <div class="text-[10px] text-text-muted mb-1">占用空间</div>
+                  <div class="text-10px text-text-muted mb-1">占用空间</div>
                   <div class="text-[13px] text-text-primary font-medium">{(ms().memory_usage_bytes / 1024).toFixed(1)} KB</div>
                 </div>
               </div>
@@ -66,7 +66,7 @@ export function DataSection(props: Props) {
             disabled={props.dataBusy()}
           >
             <span class="text-[12.5px] text-text-primary">导出记忆（JSON）</span>
-            <span class="text-[10px] text-text-muted">→ 文件</span>
+            <span class="text-10px text-text-muted">→ 文件</span>
           </button>
           <button
             class="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-colors"
@@ -74,7 +74,7 @@ export function DataSection(props: Props) {
             disabled={props.dataBusy()}
           >
             <span class="text-[12.5px] text-red-500">清空全部记忆</span>
-            <span class="text-[10px] text-red-400">不可恢复</span>
+            <span class="text-10px text-red-400">不可恢复</span>
           </button>
         </div>
       </div>

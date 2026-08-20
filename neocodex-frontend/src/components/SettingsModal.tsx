@@ -405,7 +405,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
             <For each={NAV_GROUPS}>
               {(group) => (
                 <div class="mb-2" role="presentation">
-                  <div class="px-3 pb-2 pt-2 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium" role="presentation">
+                  <div class="px-3 pb-2 pt-2 text-10px uppercase tracking-[0.14em] text-text-muted/70 font-medium" role="presentation">
                     {group.title}
                   </div>
                   <For each={group.ids}>

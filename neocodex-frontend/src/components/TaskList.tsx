@@ -84,7 +84,7 @@ export function TaskList(props: { content: string; messageId: string }) {
         <div class="flex items-center gap-2 px-3 py-2 border-b border-nt-act-500/15">
           <ListTodo class="w-3.5 h-3.5 text-nt-act-600 flex-shrink-0" />
           <span class="text-xs font-medium text-text-primary flex-1 min-w-0 truncate">任务清单</span>
-          <span class={clsx('text-[10px] font-mono flex-shrink-0', completed() === items().length ? 'text-emerald-600' : 'text-text-muted')}>
+          <span class={clsx('text-10px font-mono flex-shrink-0', completed() === items().length ? 'text-emerald-600' : 'text-text-muted')}>
             {completed()}/{items().length}
           </span>
         </div>

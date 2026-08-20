@@ -4,6 +4,11 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::cli::commands::acp_cmds::AcpCmd;
+use crate::cli::commands::file_cmds::{FileCreateCmd, FileEditCmd, FilePatchCmd};
+use crate::cli::commands::git_cmds::PrCmd;
+use crate::cli::commands::session_cmds::ForkCmd;
+use crate::cli::commands::swap_cmd::ApproveCmd;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
@@ -26,20 +31,20 @@ pub struct FileCmd;
 impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|schema|suggest|convert|extract|mergepdf|editpdf <args>" }
+    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|schema|suggest|convert|extract|mergepdf|merge|editpdf <args>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格 [--schema <name>] [--sheet-mode first|preferred|all]\n  /file schema list|show <name>  列出/查看已注册领域 schema (SchemaStore)\n  /file suggest <dir> [--save <name>]  扫描表头生成 schema 初稿 (可固化)\n  /file convert <in> <out>   图像格式转换 (png/jpeg)\n  /file extract <dir>   目录级统一提取 (混合格式 → 文本/表格清单)\n  /file mergepdf <out> <in1> <in2> ...  结构级合并多个 PDF (页面按序拼接)\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)");
+            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格 [--schema <name>] [--sheet-mode first|preferred|all]\n  /file schema list|show <name>  列出/查看已注册领域 schema (SchemaStore)\n  /file suggest <dir> [--save <name>]  扫描表头生成 schema 初稿 (可固化)\n  /file convert <in> <out>   图像格式转换 (png/jpeg)\n  /file extract <dir>   目录级统一提取 (混合格式 → 文本/表格清单)\n  /file mergepdf <out> <in1> <in2> ...  结构级合并多个 PDF (页面按序拼接)\n  /file merge <out.docx|pptx> <in1> <in2> ...  结构级合并 Office 文档 (DOCX 段落 / PPTX 幻灯片)\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
         match sub {
             "read" => delegate!("/read", &rest, brain),
             "write" => delegate!("/write", &rest, brain),
-            "create" => delegate!("/create", &rest, brain),
-            "edit" => delegate!("/edit", &rest, brain),
-            "patch" => delegate!("/patch", &rest, brain),
+            "create" => FileCreateCmd.execute(&rest, brain),
+            "edit" => FileEditCmd.execute(&rest, brain),
+            "patch" => FilePatchCmd.execute(&rest, brain),
             "diff" => delegate!("/diff", &rest, brain),
             "tables" => {
                 if rest.len() != 1 {
@@ -321,6 +326,32 @@ impl CliCommand for FileCmd {
                     Err(e) => CommandOutput::err(&format!("PDF 合并失败: {e}")),
                 }
             }
+            "merge" => {
+                // 用法: /file merge <out.docx|pptx> <in1> <in2> ... — Office 结构级合并
+                if rest.len() < 3 {
+                    return CommandOutput::err("用法: /file merge <out.docx|pptx> <in1> <in2> ...\n  (DOCX 段落拼接 / PPTX 幻灯片追加, 结构级合并)");
+                }
+                let out = std::path::PathBuf::from(&rest[0]);
+                let inputs: Vec<std::path::PathBuf> =
+                    rest[1..].iter().map(std::path::PathBuf::from).collect();
+                let ext = out
+                    .extension()
+                    .map(|e| e.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                let result = match ext.as_str() {
+                    "docx" => crate::neotrix::merge_docx::merge_docx(&inputs, &out)
+                        .map(|r| format!("已合并 {} 个 DOCX → {} (part {})", r.items, out.display(), r.parts)),
+                    "pptx" => crate::neotrix::merge_docx::merge_pptx(&inputs, &out)
+                        .map(|r| format!("已合并 {} 个 PPTX → {} (slide part {})", r.items, out.display(), r.parts)),
+                    _ => Err(crate::neotrix::FileAbilityError::Other(format!(
+                        "仅支持 .docx/.pptx 输出, 收到: {ext}"
+                    ))),
+                };
+                match result {
+                    Ok(msg) => CommandOutput::ok(&msg),
+                    Err(e) => CommandOutput::err(&format!("Office 合并失败: {e}")),
+                }
+            }
             "editpdf" => {
                 // 用法: /file editpdf <in.pdf> <out.pdf> <page> <find> [replace] [font.ttf]
                 if rest.len() < 4 {
@@ -395,7 +426,7 @@ impl CliCommand for WalletAggCmd {
             "wallet" => delegate!("/wallet", &rest, brain),
             "swap" => delegate!("/swap", &rest, brain),
             "transfer" => delegate!("/transfer", &rest, brain),
-            "approve" => delegate!("/approve", &rest, brain),
+            "approve" => ApproveCmd.execute(&rest, brain),
             "cost" => delegate!("/cost", &rest, brain),
             "budget" => delegate!("/budget", &rest, brain),
             _ => CommandOutput::err(&format!("未知子命令: {}. 可用: wallet, swap, transfer, approve, cost, budget", sub)),
@@ -446,7 +477,7 @@ impl CliCommand for GitAggCmd {
         match sub {
             "git" => delegate!("/git", &rest, brain),
             "commit" => delegate!("/commit", &rest, brain),
-            "pr" => delegate!("/pr", &rest, brain),
+            "pr" => PrCmd.execute(&rest, brain),
             _ => CommandOutput::err(&format!("未知子命令: {}. 可用: git, commit, pr", sub)),
         }
     }
@@ -469,7 +500,7 @@ impl CliCommand for SessionAggCmd {
         match sub {
             "session" => delegate!("/session", &rest, brain),
             "resume" => delegate!("/resume", &rest, brain),
-            "fork" => delegate!("/fork", &rest, brain),
+            "fork" => ForkCmd.execute(&rest, brain),
             "history" => delegate!("/history", &rest, brain),
             "context" | "ctx" => delegate!("/context", &rest, brain),
             "compact" => delegate!("/compact", &rest, brain),
@@ -498,7 +529,7 @@ impl CliCommand for ConsolidatedAgentCmd {
                 delegate!("/agent", args, brain),
             "discover" | "scan" => delegate!("/discover", &rest, brain),
             "mcp" => delegate!("/mcp", &rest, brain),
-            "acp" => delegate!("/acp", &rest, brain),
+            "acp" => AcpCmd.execute(&rest, brain),
             _ => CommandOutput::err(&format!("未知子命令: {}. 可用: spawn, list, talk, kill, status, background, tasks, discover, mcp, acp", sub)),
         }
     }

@@ -314,7 +314,7 @@ export function ComputerUse(props: Props) {
               键盘控制
             </div>
             <div>
-              <label class="text-[10px] text-text-muted uppercase tracking-wider">输入文本</label>
+              <label class="text-10px text-text-muted uppercase tracking-wider">输入文本</label>
               <div class="flex gap-2 mt-1">
                 <input
                   value={keyText()}
@@ -334,7 +334,7 @@ export function ComputerUse(props: Props) {
               </div>
             </div>
             <div>
-              <label class="text-[10px] text-text-muted uppercase tracking-wider">按键 (key code) + 修饰键</label>
+              <label class="text-10px text-text-muted uppercase tracking-wider">按键 (key code) + 修饰键</label>
               <div class="flex gap-2 mt-1">
                 <input
                   value={keyCode()}
@@ -384,7 +384,7 @@ export function ComputerUse(props: Props) {
               <For each={windows()}>
                 {(w) => (
                   <div class="flex items-center gap-2 px-2 py-2 rounded-lg bg-bg-primary/40 text-xs">
-                    <span class="text-text-muted w-6 h-6 rounded bg-bg-tertiary flex items-center justify-center font-mono text-[10px] flex-shrink-0">
+                    <span class="text-text-muted w-6 h-6 rounded bg-bg-tertiary flex items-center justify-center font-mono text-10px flex-shrink-0">
                       {w.pid || '—'}
                     </span>
                     <span class="text-text-primary truncate flex-1">{w.app_name}</span>

@@ -171,7 +171,7 @@ export function SideChat(props: Props) {
                       : 'bg-bg-tertiary text-text-primary rounded-bl-sm'
                   )}
                 >
-                  <div class="text-[10px] text-text-muted mb-1">{formatTime(msg.timestamp)}</div>
+                  <div class="text-10px text-text-muted mb-1">{formatTime(msg.timestamp)}</div>
                   {/* assistant 回答接入 Markdown 渲染（代码块/列表/链接，XSS 已转义）；
                       user 输入保持纯文本等宽回显 */}
                   {msg.role === 'user' ? (

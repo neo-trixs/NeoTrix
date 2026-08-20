@@ -120,7 +120,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
           ) : currentProvider() ? (
             <ProviderIcon name={currentProvider()!.name} size="sm" />
           ) : (
-            <span class="w-6 h-6 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[10px] font-semibold">?</span>
+            <span class="w-6 h-6 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-10px font-semibold">?</span>
           )
         ) : (
           <>

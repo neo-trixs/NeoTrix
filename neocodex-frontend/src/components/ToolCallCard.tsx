@@ -94,7 +94,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
           <Show when={props.call.args}>
             <div>
               <div class="flex items-center justify-between mb-1">
-                <span class="text-[10px] font-medium text-text-muted uppercase tracking-wider">args</span>
+                <span class="text-10px font-medium text-text-muted uppercase tracking-wider">args</span>
                 <button
                   class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                   onClick={() => copyText('args', props.call.args)}
@@ -113,7 +113,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
           <Show when={props.call.result}>
             <div>
               <div class="flex items-center justify-between mb-1">
-                <span class="text-[10px] font-medium text-text-muted uppercase tracking-wider">result</span>
+                <span class="text-10px font-medium text-text-muted uppercase tracking-wider">result</span>
                 <button
                   class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                   onClick={() => copyText('result', props.call.result)}

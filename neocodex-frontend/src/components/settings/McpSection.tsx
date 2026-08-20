@@ -87,7 +87,7 @@ export function McpSection(props: Props) {
       <div class="ss-card-header">
         <DataIcon />
         MCP 服务器
-        <span class="ml-auto text-[10px] text-text-muted font-mono">{mcpServers().length} 个</span>
+        <span class="ml-auto text-10px text-text-muted font-mono">{mcpServers().length} 个</span>
       </div>
       <div class="ss-card-body space-y-3">
         <p class="text-[11px] text-text-muted leading-relaxed -mt-1">
@@ -110,9 +110,9 @@ export function McpSection(props: Props) {
               <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-primary/40 bg-white/40">
                 <span class={clsx('w-2 h-2 rounded-full flex-shrink-0', srv.healthy ? 'bg-emerald-500' : 'bg-red-500')} />
                 <span class="text-[12px] text-text-primary font-medium truncate flex-1">{srv.name}</span>
-                <span class="text-[10px] text-text-muted font-mono flex-shrink-0">{srv.transport}</span>
-                <span class="text-[10px] text-text-muted font-mono flex-shrink-0">{srv.tool_count} 工具</span>
-                <span class={clsx('text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0', srv.healthy ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500')}>
+                <span class="text-10px text-text-muted font-mono flex-shrink-0">{srv.transport}</span>
+                <span class="text-10px text-text-muted font-mono flex-shrink-0">{srv.tool_count} 工具</span>
+                <span class={clsx('text-10px px-1.5 py-0.5 rounded-full font-medium flex-shrink-0', srv.healthy ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500')}>
                   {srv.healthy ? '健康' : '异常'}
                 </span>
               </div>

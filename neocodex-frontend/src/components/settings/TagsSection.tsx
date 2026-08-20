@@ -87,7 +87,7 @@ export function TagsSection(props: Props) {
           <ExpandIcon />
           推荐标签
           <Show when={props.missingRecommended().length === 0}>
-            <span class="ml-auto text-[10px] font-medium text-nt-core-700 bg-nt-core-500/10 px-2 py-0.5 rounded-full">已全部添加</span>
+            <span class="ml-auto text-10px font-medium text-nt-core-700 bg-nt-core-500/10 px-2 py-0.5 rounded-full">已全部添加</span>
           </Show>
         </div>
         <div class="ss-card-body">
@@ -114,7 +114,7 @@ export function TagsSection(props: Props) {
                   >
                     <span class="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
                     <span class="font-mono">#{r.name}</span>
-                    {exists() && <span class="text-[9px] text-nt-core-700">✓</span>}
+                    {exists() && <span class="text-9px text-nt-core-700">✓</span>}
                   </button>
                 )
               }}

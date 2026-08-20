@@ -775,7 +775,7 @@ export function Sidebar(props: SidebarProps) {
                                         <For each={tagSuggestions()}>
                                           {(sugg) => (
                                             <button
-                                              class="px-1.5 py-0.5 rounded text-[10px] text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-colors"
+                                              class="px-1.5 py-0.5 rounded text-10px text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-colors"
                                               onClick={() => { chatStore.tagSession(session.id, sugg); setTagInput('') }}
                                             >
                                               # {sugg}

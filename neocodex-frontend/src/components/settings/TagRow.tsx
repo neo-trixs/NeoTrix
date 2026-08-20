@@ -59,7 +59,7 @@ export function TagRow(props: Props) {
             )}
           </For>
           <label class="relative flex-shrink-0">
-            <span class="w-4 h-4 rounded-full border border-dashed border-text-muted flex items-center justify-center text-[9px] text-text-muted cursor-pointer" title="自定义颜色">
+            <span class="w-4 h-4 rounded-full border border-dashed border-text-muted flex items-center justify-center text-9px text-text-muted cursor-pointer" title="自定义颜色">
               +
             </span>
             <input
@@ -112,7 +112,7 @@ export function TagRow(props: Props) {
       {/* 使用计数（Obsidian 风格徽章） */}
       <Show when={!editing() && (props.count ?? 0) > 0}>
         <span
-          class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full bg-black/4 text-text-muted tabular-nums flex-shrink-0"
+          class="text-9px font-mono font-semibold px-1.5 py-0.5 rounded-full bg-black/4 text-text-muted tabular-nums flex-shrink-0"
           title={`${props.count} 个会话使用此标签`}
         >
           {props.count}
