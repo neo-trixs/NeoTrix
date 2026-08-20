@@ -396,6 +396,25 @@ impl SelfIteratingBrain {
                             score, verdict.agreement
                         );
                     }
+                    // ── Convene 决策档案 (cumora.ai Convene rooms 借鉴, T3 行为接地) ──
+                    // 每次评审裁决落盘 KB `convene` 命名空间 (key=decision:<iter>), 供
+                    // 回溯与跨迭代趋势分析。裁决已驱动行为 (低分衰减奖励), 落盘为只增档案。
+                    if let Some(ref kb) = engine.kb {
+                        let _ = kb.kv_set(
+                            "convene",
+                            &format!("decision:{}", self.iteration),
+                            &serde_json::json!({
+                                "iteration": self.iteration,
+                                "task": self._current_task,
+                                "score": verdict.median_score,
+                                "agreement": verdict.agreement,
+                                "verdict": format!("{:?}", verdict.verdict),
+                                "routed_to_human": verdict.routed_to_human,
+                                "reasoning": verdict.reasoning,
+                                "ts": chrono::Utc::now().timestamp(),
+                            }).to_string(),
+                        );
+                    }
                 }
             }
 

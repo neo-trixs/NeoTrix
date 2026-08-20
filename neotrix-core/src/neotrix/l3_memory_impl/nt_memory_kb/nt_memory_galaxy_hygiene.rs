@@ -137,6 +137,55 @@ pub fn galaxy_wake_star(conn: &Connection, ns: &str) -> Result<String, String> {
     ))
 }
 
+/// 星辰 Persona 读取 (cumora.ai "Personas, not prompts" 借鉴): 返回 hub 的
+/// `persona` 子对象 `{role, voice, system_prompt}`。无 persona → None。
+/// 纯身份元数据, 不改变唤醒逻辑。
+pub fn galaxy_get_persona(conn: &Connection, ns: &str) -> Result<Option<Value>, String> {
+    let raw = kv_get(conn, ns, "hub")
+        .map_err(|e| format!("hub 读取失败 ({ns}): {e}"))?
+        .ok_or_else(|| format!("星辰 {ns} 不存在 hub"))?;
+    let hub: Value =
+        serde_json::from_str(&raw).map_err(|e| format!("hub 解析失败 ({ns}): {e}"))?;
+    if hub.get("star_name").is_none() {
+        return Err(format!("{ns} 非星辰 hub, 无 persona"));
+    }
+    Ok(hub.get("persona").cloned())
+}
+
+/// 星辰 Persona 写入 (cumora.ai "Personas, not prompts" 借鉴): 更新 hub 的
+/// `persona` 子对象。仅提供非 None 的字段 (role/voice/system_prompt) 更新,
+/// 其余字段保留 (部分更新语义, 与 cmd_absorb 的逐字段 merge 一致)。
+pub fn galaxy_set_persona(
+    conn: &Connection,
+    ns: &str,
+    role: Option<&str>,
+    voice: Option<&str>,
+    system_prompt: Option<&str>,
+) -> Result<String, String> {
+    let raw = kv_get(conn, ns, "hub")
+        .map_err(|e| format!("hub 读取失败 ({ns}): {e}"))?
+        .ok_or_else(|| format!("星辰 {ns} 不存在 hub"))?;
+    let mut hub: Value =
+        serde_json::from_str(&raw).map_err(|e| format!("hub 解析失败 ({ns}): {e}"))?;
+    if hub.get("star_name").is_none() {
+        return Err(format!("{ns} 非星辰 hub, 拒绝写入 persona"));
+    }
+    let mut persona = hub.get("persona").cloned().unwrap_or_else(|| serde_json::json!({}));
+    if let Some(r) = role {
+        persona["role"] = serde_json::json!(r);
+    }
+    if let Some(v) = voice {
+        persona["voice"] = serde_json::json!(v);
+    }
+    if let Some(sp) = system_prompt {
+        persona["system_prompt"] = serde_json::json!(sp);
+    }
+    hub["persona"] = persona;
+    let out = serde_json::to_string(&hub).map_err(|e| format!("hub 序列化失败: {e}"))?;
+    kv_set(conn, ns, "hub", &out)?;
+    Ok(format!("[csgn] ✓ {ns} persona 已更新: {}", hub["persona"]))
+}
+
 /// 沉寂星辰扫描: 返回 `(ns, 上次活跃 epoch, invocations)`，`None` 表示从未加载。
 /// 对应 `nt_csgn_evolve.py stale` 的生产路径 (供 BackgroundLoop 巡检)。
 pub fn galaxy_wake_scan(conn: &Connection, staleness_days: u64) -> Vec<(String, Option<u64>, u64)> {
@@ -474,6 +523,68 @@ mod tests {
         let conn = test_conn();
         super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#).unwrap();
         assert!(galaxy_wake_star(&conn, "plain_ns").is_err(), "非星辰应拒绝唤醒");
+    }
+
+    #[test]
+    fn test_galaxy_persona_set_and_get_roundtrip() {
+        let conn = test_conn();
+        insert_real_hub(&conn, "star_persona", 1, Some("2026-08-18T10:00:00"));
+
+        // 初始无 persona
+        assert!(galaxy_get_persona(&conn, "star_persona").unwrap().is_none());
+
+        // 部分更新: 先只设 role
+        let msg = galaxy_set_persona(&conn, "star_persona", Some("Researcher"), None, None).unwrap();
+        assert!(msg.contains("persona 已更新"));
+        let p = galaxy_get_persona(&conn, "star_persona").unwrap().unwrap();
+        assert_eq!(p["role"].as_str(), Some("Researcher"));
+        assert!(p.get("voice").is_none(), "未提供的字段不应被写入");
+
+        // 部分更新: 追加 voice + system_prompt, role 保留
+        galaxy_set_persona(
+            &conn,
+            "star_persona",
+            None,
+            Some("calm, precise"),
+            Some("You find patterns across noise. Best at long-form research."),
+        ).unwrap();
+        let p = galaxy_get_persona(&conn, "star_persona").unwrap().unwrap();
+        assert_eq!(p["role"].as_str(), Some("Researcher"), "role 必须保留 (部分更新)");
+        assert_eq!(p["voice"].as_str(), Some("calm, precise"));
+        assert!(p["system_prompt"].as_str().unwrap().contains("patterns across noise"));
+
+        // 完整覆盖: 提供全部三字段
+        galaxy_set_persona(
+            &conn,
+            "star_persona",
+            Some("Designer"),
+            Some("sharp eye"),
+            Some("The team's eye. From sketch to ship."),
+        ).unwrap();
+        let p = galaxy_get_persona(&conn, "star_persona").unwrap().unwrap();
+        assert_eq!(p["role"].as_str(), Some("Designer"));
+        assert_eq!(p["voice"].as_str(), Some("sharp eye"));
+    }
+
+    #[test]
+    fn test_galaxy_persona_rejects_non_star() {
+        let conn = test_conn();
+        super::super::nt_memory_unify::kv_set(&conn, "plain_ns", "hub", r#"{"no_star": true}"#).unwrap();
+        assert!(galaxy_get_persona(&conn, "plain_ns").is_err());
+        assert!(galaxy_set_persona(&conn, "plain_ns", Some("x"), None, None).is_err());
+        assert!(galaxy_get_persona(&conn, "missing_ns").is_err(), "不存在 hub 应报错");
+    }
+
+    #[test]
+    fn test_galaxy_persona_does_not_affect_wake_counters() {
+        let conn = test_conn();
+        insert_real_hub(&conn, "star_p", 3, Some("2026-08-18T10:00:00"));
+        galaxy_set_persona(&conn, "star_p", Some("Engineer"), None, None).unwrap();
+        // persona 写入不得改变 invocations
+        let raw = super::super::nt_memory_unify::kv_get(&conn, "star_p", "hub").unwrap().unwrap();
+        let v: Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(v["invocations"].as_u64(), Some(3), "persona 写入不得影响唤醒计数");
+        assert_eq!(v["star_name"].as_str(), Some("Test-star_p"));
     }
 
     #[test]

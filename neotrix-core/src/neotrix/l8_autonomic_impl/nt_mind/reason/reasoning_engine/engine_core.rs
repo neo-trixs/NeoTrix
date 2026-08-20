@@ -1569,7 +1569,12 @@ impl ReasoningEngine {
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {
         if let Some(ref gateway) = self.gateway {
-            let mut request = LlmRequest::new(&self.default_model, prompt);
+            // cumora 借鉴接线 (T3): ModelRouter T0-T4 分级路由决策驱动实际模型选择。
+            // route() 按 prompt 特征 (长度/代码占比/推理关键词) 选 tier → 映射模型名 + max_tokens。
+            // default_model 保留为 trace/cost 归因的 fallback 标记; 行为由 route 决策驱动。
+            let route_decision = self.router.route(prompt);
+            let mut request = LlmRequest::new(&route_decision.model, prompt);
+            request.max_tokens = route_decision.max_tokens as u32;
             if let Some(tier) = self.last_effort_tier {
                 let think = tier.thinking_budget_tokens();
                 let max_tok = tier.max_tokens_budget();
@@ -2423,5 +2428,55 @@ mod tests {
         assert_eq!(reloaded.current_state.meta.0, 2);
         assert_eq!(reloaded.state_trajectory.len(), 1);
         assert_eq!(reloaded.state_trajectory[0].mode.0, 9);
+    }
+
+    #[test]
+    fn test_call_llm_wires_model_router_route() {
+        // cumora 借鉴接线回归 (T3): call_llm 必须经 ModelRouter.route() 选模型,
+        // 而非恒用 default_model。捕获 LlmRequest.model 断言 route 决策生效。
+        use crate::core::nt_core_llm::{FinishReason, LlmProvider, LlmRequest, LlmResponse, Usage};
+        use crate::core::nt_core_span::CostTracker;
+
+        struct CapturingProvider {
+            seen_model: std::sync::Mutex<Option<String>>,
+            seen_max_tokens: std::sync::Mutex<Option<u32>>,
+        }
+        #[async_trait::async_trait]
+        impl LlmProvider for CapturingProvider {
+            async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, crate::core::nt_core_llm::LlmError> {
+                *self.seen_model.lock().unwrap() = Some(request.model.clone());
+                *self.seen_max_tokens.lock().unwrap() = Some(request.max_tokens);
+                Ok(LlmResponse::plain(
+                    "routed response".to_string(),
+                    request.model.clone(),
+                    Usage { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 },
+                    FinishReason::Stop,
+                ))
+            }
+            async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, crate::core::nt_core_llm::LlmError>>, crate::core::nt_core_llm::LlmError> {
+                unimplemented!("not used in this test")
+            }
+        }
+
+        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio rt");
+        rt.block_on(async {
+            let provider = std::sync::Arc::new(CapturingProvider {
+                seen_model: std::sync::Mutex::new(None),
+                seen_max_tokens: std::sync::Mutex::new(None),
+            });
+            let provider_clone = provider.clone();
+            let mut engine = ReasoningEngine::from_env().with_gateway(provider);
+            engine.cost_tracker = Some(CostTracker::default());
+
+            // 简单问候 → T0 → pinned 模型名 (cumora 模型 pin)
+            let res = engine.call_llm("Hello, how are you?");
+            assert!(res.is_ok(), "call_llm must succeed with routed model");
+            assert_eq!(res.unwrap(), "routed response");
+            let model = provider_clone.seen_model.lock().unwrap().clone();
+            let max_tokens = provider_clone.seen_max_tokens.lock().unwrap().clone();
+            assert_eq!(model.as_deref(), Some("openai/gpt-4o-mini-2024-07-18"),
+                "T0 greeting must route to pinned mini model, got {:?}", model);
+            assert_eq!(max_tokens, Some(256), "route max_tokens must flow into request");
+        });
     }
 }

@@ -2399,6 +2399,26 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         nt_memory_galaxy_hygiene::galaxy_wake_star(&conn, ns)
     }
 
+    /// 星辰 Persona 读取 (cumora.ai "Personas, not prompts" 借鉴): 返回 hub 的
+    /// `persona` 子对象 `{role, voice, system_prompt}`。
+    pub fn galaxy_get_persona(&self, ns: &str) -> Result<Option<serde_json::Value>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_galaxy_hygiene::galaxy_get_persona(&conn, ns)
+    }
+
+    /// 星辰 Persona 写入 (cumora.ai "Personas, not prompts" 借鉴): 部分更新
+    /// hub 的 `persona` 子对象 (仅写入提供的字段)。
+    pub fn galaxy_set_persona(
+        &self,
+        ns: &str,
+        role: Option<&str>,
+        voice: Option<&str>,
+        system_prompt: Option<&str>,
+    ) -> Result<String, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_galaxy_hygiene::galaxy_set_persona(&conn, ns, role, voice, system_prompt)
+    }
+
     /// 沉寂星辰扫描: 返回 `(ns, 上次活跃 epoch, invocations)`。
     pub fn galaxy_wake_scan(&self, staleness_days: u64) -> Vec<(String, Option<u64>, u64)> {
         match self.conn.lock() {

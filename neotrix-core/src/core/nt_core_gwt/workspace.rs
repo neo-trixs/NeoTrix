@@ -126,6 +126,24 @@ pub struct GlobalWorkspace {
     /// §3.3.2 Theorem 42 可交换性判定器 — 广播前判定 specialist effect 的
     /// 独立性 (任意序撤回) vs 顺序敏感 (须外部强加次序)。
     pub independence: IndependenceGate,
+    /// Whisper 旁观流游标 (cumora.ai "Whisper rooms" 借鉴): 记录旁观者已读
+    /// 的 broadcast_history 位置。whisper_observe() 只返回游标之后的增量,
+    /// 只读不加入广播, 不影响容量/共振 — 旁观者读对话但不参与。
+    pub last_observed: usize,
+}
+
+/// Whisper 旁观流视图 (cumora.ai "Whisper rooms" 借鉴) — 只读旁观快照。
+/// 旁观者不加入广播、不参与决策; 通过 whisper_observe() 获取增量广播。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WhisperView {
+    /// 自上次旁观以来的新增广播条目。
+    pub new_items: Vec<String>,
+    /// 广播历史总条数 (旁观者视角的"房间消息总数")。
+    pub total_history: usize,
+    /// 本次旁观后的已读游标位置。
+    pub last_observed: usize,
+    /// 广播容量瓶颈 (旁观者了解房间吞吐上限)。
+    pub capacity: usize,
 }
 
 /// Events that trigger an audit block
@@ -189,6 +207,7 @@ impl GlobalWorkspace {
             active_broadcast: VecDeque::new(),
             event_pending: false,
             independence: IndependenceGate::new(),
+            last_observed: 0,
         }
     }
 
@@ -220,6 +239,32 @@ impl GlobalWorkspace {
         self.active_broadcast.push_back(content.to_string());
         self.broadcast_history.push(content.to_string());
         true
+    }
+
+    /// Whisper 旁观流 (cumora.ai "Whisper rooms" 借鉴): 返回旁观者上次
+    /// 已读位置之后的广播增量, 只读不加入广播。cumora 的 Whisper room
+    /// 让你读 agent 间对话而不加入; 本 API 提供同样的旁观视角 — 不写
+    /// broadcast_history、不改 active_broadcast、不触发共振。旁观看历史,
+    /// 决策仍由广播参与者完成。
+    ///
+    /// `limit` 裁剪返回条数 (0 = 不裁剪)。返回的 new_items 为
+    /// `last_observed..` 的新增段; 游标推进到本次返回的末尾, 后续调用
+    /// 只返回新的增量 (seen-cursor freshness 语义)。
+    pub fn whisper_observe(&mut self, limit: usize) -> WhisperView {
+        let end = self.broadcast_history.len();
+        let start = self.last_observed.min(end);
+        let mut new_items: Vec<String> = self.broadcast_history[start..end].to_vec();
+        self.last_observed = end;
+        let total_history = end;
+        if limit > 0 && new_items.len() > limit {
+            new_items = new_items.split_off(new_items.len() - limit);
+        }
+        WhisperView {
+            new_items,
+            total_history,
+            last_observed: self.last_observed,
+            capacity: self.broadcast_capacity,
+        }
     }
 
     /// Inject E8 attention weights [f64; 64] to bias expert selection before resonance.
@@ -1078,6 +1123,59 @@ mod tests {
         }
         assert_eq!(ws.active_broadcast.len(), 5);
         assert_eq!(ws.broadcast_history.len(), 5);
+    }
+
+    #[test]
+    fn test_whisper_observe_returns_increments() {
+        // cumora "Whisper rooms" 借鉴: 旁观者只读增量, 不加入广播。
+        let mut ws = GlobalWorkspace::new(0.3);
+        ws.broadcast("alpha");
+        ws.broadcast("beta");
+
+        // 第一次旁观 → 全部历史 (游标 0→2)
+        let view = ws.whisper_observe(0);
+        assert_eq!(view.new_items, vec!["alpha".to_string(), "beta".to_string()]);
+        assert_eq!(view.total_history, 2);
+        assert_eq!(view.last_observed, 2);
+
+        // 新广播 → 第二次旁观只返回增量 (seen-cursor freshness)
+        ws.broadcast("gamma");
+        let view2 = ws.whisper_observe(0);
+        assert_eq!(view2.new_items, vec!["gamma".to_string()]);
+        assert_eq!(view2.total_history, 3);
+        assert_eq!(view2.last_observed, 3);
+
+        // 无新增 → 空增量, 游标不动
+        let view3 = ws.whisper_observe(0);
+        assert!(view3.new_items.is_empty());
+        assert_eq!(view3.last_observed, 3);
+    }
+
+    #[test]
+    fn test_whisper_observe_limits_and_readonly() {
+        // limit 裁剪最近 N 条; 旁观只读 — 不改变 active_broadcast / 容量
+        let mut ws = GlobalWorkspace::new(0.3).with_broadcast_capacity(4);
+        ws.broadcast("one");
+        ws.broadcast("two");
+        ws.broadcast("three");
+        ws.broadcast("four");
+        assert_eq!(ws.broadcast_history.len(), 4);
+
+        let view = ws.whisper_observe(2);
+        assert_eq!(view.new_items, vec!["three".to_string(), "four".to_string()]);
+        assert_eq!(view.capacity, 4);
+        // 旁观不触碰活动槽位 (容量瓶颈仍生效)
+        assert_eq!(ws.active_broadcast.len(), 4);
+        assert!(!ws.broadcast("five"), "旁观后容量仍满, 广播仍被拒绝");
+    }
+
+    #[test]
+    fn test_whisper_observe_empty_workspace() {
+        let mut ws = GlobalWorkspace::new(0.3);
+        let view = ws.whisper_observe(0);
+        assert!(view.new_items.is_empty());
+        assert_eq!(view.total_history, 0);
+        assert_eq!(view.last_observed, 0);
     }
 
     #[test]

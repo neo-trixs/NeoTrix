@@ -3,6 +3,7 @@
 //! /consciousness tick       手动触发意识循环 (经持久化意识核心单例, 写回 KB)
 //! /consciousness status     显示当前 phi、coherence、fog、MARS (转调 nt_core_consciousness_core)
 //! /consciousness tree       显示 ConsciousnessTree 状态 (cycle, branches, fruits)
+//! /consciousness persona <star> [--role= --voice= --prompt=]  星辰 persona 读改 (cumora.ai "Personas, not prompts")
 //!
 //! 统一通道: 与 `entry::run_consciousness_core` 同源 (nt_core_consciousness_core),
 //! R-P42 反对平行路径 — 不再读 brain 旧字段 (不暴露真实 phi/fog)。
@@ -11,6 +12,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 // ====== /consciousness ======
@@ -27,7 +29,7 @@ impl CliCommand for ConsciousnessCmd {
     }
 
     fn description(&self) -> &str {
-        "意识状态查询:\n  /consciousness tick       手动触发意识 tick (写回 KB)\n  /consciousness status     显示 phi、coherence、fog、MARS\n  /consciousness tree       显示 ConsciousnessTree 状态 (branches/fruits)"
+        "意识状态查询:\n  /consciousness tick       手动触发意识 tick (写回 KB)\n  /consciousness status     显示 phi、coherence、fog、MARS\n  /consciousness tree       显示 ConsciousnessTree 状态 (branches/fruits)\n  /consciousness persona <star> [--role= --voice= --prompt=]   星辰 persona 读改"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -161,12 +163,68 @@ impl CliCommand for ConsciousnessCmd {
                 }
             }
 
+            "persona" => {
+                let star = args.iter()
+                    .find(|a| !a.starts_with("--") && *a != "persona")
+                    .map(|s| s.as_str());
+                let role = args.iter().find_map(|a| a.strip_prefix("--role="));
+                let voice = args.iter().find_map(|a| a.strip_prefix("--voice="));
+                let prompt = args.iter().find_map(|a| a.strip_prefix("--prompt="));
+
+                let Some(star) = star else {
+                    let msg = "用法: /consciousness persona <star> [--role=X] [--voice=X] [--prompt=X]\n\n当前星辰 (可用 persona):";
+                    let mut body = msg.to_string();
+                    if let Ok(kb) = KnowledgeBase::open(None) {
+                        for (ns, _hub) in kb.galaxy_list_hubs() {
+                            body.push_str(&format!("\n  · {}", ns));
+                        }
+                    }
+                    return CommandOutput::ok(&body);
+                };
+
+                let Ok(kb) = KnowledgeBase::open(None) else {
+                    return CommandOutput::err("无法打开知识库 (KB)");
+                };
+
+                let writing = role.is_some() || voice.is_some() || prompt.is_some();
+                let out = if writing {
+                    match kb.galaxy_set_persona(star, role, voice, prompt) {
+                        Ok(msg) => CommandOutput::ok(&msg),
+                        Err(e) => CommandOutput::err(&e),
+                    }
+                } else {
+                    match kb.galaxy_get_persona(star) {
+                        Ok(Some(p)) => CommandOutput::ok(&format!(
+                            "⭐ {} persona:\n  role: {}\n  voice: {}\n  system_prompt: {}",
+                            star,
+                            p.get("role").and_then(|v| v.as_str()).unwrap_or("(未设置)"),
+                            p.get("voice").and_then(|v| v.as_str()).unwrap_or("(未设置)"),
+                            p.get("system_prompt").and_then(|v| v.as_str()).unwrap_or("(未设置)"),
+                        )),
+                        Ok(None) => CommandOutput::ok(&format!("⭐ {} 暂无 persona (用 --role/--voice/--prompt 设置)", star)),
+                        Err(e) => CommandOutput::err(&e),
+                    }
+                };
+                if want_json {
+                    match &out.json {
+                        Some(_) => out,
+                        None => out.with_json(serde_json::json!({
+                            "op": "persona",
+                            "star": star,
+                            "persona": kb.galaxy_get_persona(star).ok().flatten(),
+                        })),
+                    }
+                } else {
+                    out
+                }
+            }
+
             _ => {
                 let msg = self.description();
                 let out = CommandOutput::ok(msg);
                 if want_json {
                     out.with_json(serde_json::json!({
-                        "subcommands": ["tick", "status", "tree"]
+                        "subcommands": ["tick", "status", "tree", "persona"]
                     }))
                 } else {
                     out

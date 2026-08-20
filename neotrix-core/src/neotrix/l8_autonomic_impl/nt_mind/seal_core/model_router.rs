@@ -223,14 +223,16 @@ impl Default for RouterConfig {
                 TierModelMapping {
                     tier: ModelTier::T0,
                     provider: "openrouter".into(),
-                    model: "openai/gpt-4o-mini".into(),
+                    // cumora 模型 pin 教训 (BYOA.md §Engine integration): 别名模型名
+                    // (gpt-4o-mini) 被 provider 静默升级会改变 agent 行为 — pin 到具体版本。
+                    model: "openai/gpt-4o-mini-2024-07-18".into(),
                     max_tokens: 256,
                     fallback_models: vec!["anthropic/claude-3-haiku".into()],
                 },
                 TierModelMapping {
                     tier: ModelTier::T1,
                     provider: "openrouter".into(),
-                    model: "openai/gpt-4o".into(),
+                    model: "openai/gpt-4o-2024-11-20".into(),
                     max_tokens: 1024,
                     fallback_models: vec!["anthropic/claude-3.5-sonnet".into()],
                 },
