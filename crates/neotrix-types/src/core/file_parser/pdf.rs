@@ -82,6 +82,64 @@ pub struct PdfTextEdit {
     pub replace: Option<String>,
 }
 
+/// PDF 表格单元格 (保留坐标供布局校验)。
+#[derive(Debug, Clone, PartialEq)]
+pub struct PdfTableCell {
+    /// 单元格文本
+    pub text: String,
+    /// 列 x 位置 (用户空间)
+    pub x: f32,
+    /// 行 y 位置
+    pub y: f32,
+}
+
+/// 从 PDF 文本布局中重建的表格网格。
+///
+/// 纯文本坐标启发式 (行 y 聚类 + 列 x 聚类), 不依赖 OCR/外部分析器 —
+/// 对逐单元格绘制的表格型 PDF (设备清单/报价表) 精度高, 复杂合并单元格需外部后端。
+#[derive(Debug, Clone)]
+pub struct PdfTable {
+    /// 页号 (1-based)
+    pub page: u32,
+    /// 全局列 x 中心 (升序)
+    pub columns: Vec<f32>,
+    /// 行 (从上到下), 每行与 `columns` 等宽, 空单元格为 `None`
+    pub rows: Vec<Vec<Option<PdfTableCell>>>,
+}
+
+impl PdfTable {
+    /// 纯文本网格 (空单元格 → 空串)。
+    pub fn to_grid(&self) -> Vec<Vec<String>> {
+        self.rows
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|c| c.as_ref().map_or(String::new(), |c| c.text.clone()))
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// 渲染为 Markdown 表格 (首行作表头)。
+    pub fn to_markdown(&self) -> String {
+        let grid = self.to_grid();
+        if grid.is_empty() || grid[0].is_empty() {
+            return String::new();
+        }
+        let header = grid[0].iter().map(|c| c.trim()).collect::<Vec<_>>();
+        let mut out = format!("| {} |\n", header.join(" | "));
+        out.push_str(&format!(
+            "|{}|\n",
+            header.iter().map(|_| " --- ").collect::<Vec<_>>().join("|")
+        ));
+        for row in grid.iter().skip(1) {
+            let cells = row.iter().map(|c| c.trim()).collect::<Vec<_>>();
+            out.push_str(&format!("| {} |\n", cells.join(" | ")));
+        }
+        out
+    }
+}
+
 /// 查找覆盖 `text` 全部字形 (且非 .notdef 空字形) 的系统字体字节。
 ///
 /// 非 Latin-1 替换文本 (西里尔/中文等) 需真实 TTF/OTF 嵌入; base14 Helvetica 仅支持
@@ -206,6 +264,118 @@ struct TextState {
     font: Option<Vec<u8>>,
 }
 
+/// 单个文本 run: 同一 BT..ET 段内连续文本操作 (跨 Tf/Td/Tm 排版操作) 累积的
+/// 解码串与其起始坐标。编辑侧用操作索引清空, 提取侧用坐标聚类重建布局。
+#[derive(Debug, Clone)]
+struct TextRun {
+    x: f32,
+    y: f32,
+    size: f32,
+    /// (操作索引, 解码串)
+    ops: Vec<(usize, String)>,
+}
+
+impl TextRun {
+    fn text(&self) -> String {
+        self.ops.iter().map(|(_, s)| s.as_str()).collect()
+    }
+}
+
+fn flush_run(
+    cur_ops: &mut Vec<(usize, String)>,
+    cur_start: &mut Option<(f32, f32, f32)>,
+    runs: &mut Vec<TextRun>,
+) {
+    if cur_ops.is_empty() {
+        *cur_start = None;
+        return;
+    }
+    let (x, y, size) = cur_start.unwrap_or((0.0, 0.0, 12.0));
+    runs.push(TextRun {
+        x,
+        y,
+        size,
+        ops: std::mem::take(cur_ops),
+    });
+    *cur_start = None;
+}
+
+/// 从解码后的内容操作累积文本 run (跨 Tf/Td/Tm 等排版操作, 遇 BT/ET/'/其他 op 断 run)。
+/// 编辑与表格提取共用此收集逻辑, 保证两处坐标/解码一致性。
+fn collect_text_runs(
+    operations: &[lopdf::content::Operation],
+    encodings: &std::collections::BTreeMap<Vec<u8>, lopdf::Encoding<'_>>,
+) -> Result<Vec<TextRun>, PdfEditError> {
+    let mut st = TextState::default();
+    let mut runs: Vec<TextRun> = Vec::new();
+    let mut cur_ops: Vec<(usize, String)> = Vec::new();
+    let mut cur_start: Option<(f32, f32, f32)> = None;
+    let mut in_text = false;
+
+    for (idx, op) in operations.iter().enumerate() {
+        match op.operator.as_str() {
+            "BT" => {
+                in_text = true;
+                st = TextState::default();
+                st.in_text = true;
+                cur_ops.clear();
+                cur_start = None;
+            }
+            "ET" => {
+                in_text = false;
+                flush_run(&mut cur_ops, &mut cur_start, &mut runs);
+            }
+            "Tf" => {
+                if let Some(name) = op.operands.first().and_then(|o| o.as_name().ok()) {
+                    st.font = Some(name.to_vec());
+                }
+                if let Some(sz) = op.operands.get(1).and_then(|o| o.as_float().ok()) {
+                    st.size = sz;
+                }
+            }
+            "Td" | "TD" => {
+                if let (Some(a), Some(b)) = (
+                    op.operands.first().and_then(|o| o.as_float().ok()),
+                    op.operands.get(1).and_then(|o| o.as_float().ok()),
+                ) {
+                    st.tx += a;
+                    st.ty += b;
+                    if op.operator == "TD" {
+                        st.leading = -b;
+                    }
+                }
+            }
+            "T*" => st.ty -= st.leading,
+            "Tm" => {
+                if let (Some(e), Some(f)) = (
+                    op.operands.get(4).and_then(|o| o.as_float().ok()),
+                    op.operands.get(5).and_then(|o| o.as_float().ok()),
+                ) {
+                    st.tx = e;
+                    st.ty = f;
+                }
+            }
+            "Tj" | "TJ" | "'" if in_text => {
+                let enc = st.font.as_ref().and_then(|f| encodings.get(f));
+                let decoded = decode_text_operand(op, enc)?;
+                if decoded.is_empty() {
+                    continue;
+                }
+                if cur_start.is_none() {
+                    cur_start = Some((st.tx, st.ty, st.size));
+                }
+                cur_ops.push((idx, decoded));
+                if op.operator == "'" {
+                    flush_run(&mut cur_ops, &mut cur_start, &mut runs);
+                }
+            }
+            _ => flush_run(&mut cur_ops, &mut cur_start, &mut runs),
+        }
+    }
+    flush_run(&mut cur_ops, &mut cur_start, &mut runs);
+    Ok(runs)
+}
+
 impl FileParser {
     /// PDF 文本提取 — 首选 lopdf 完整解析 (支持 FlateDecode 压缩流 / TJ 数组 / 字体映射),
     /// 失败或空结果时回退到朴素正则提取 (未压缩内容流)。
@@ -262,6 +432,135 @@ impl FileParser {
         result
     }
 
+    /// 表格结构化提取 — 从解码内容流收集带坐标的文本 run, 按 y 行聚类 + x 列
+    /// 聚类重建网格。启发式判定表格: ≥2 行且 ≥2 列。走 lopdf 完整解析
+    /// (压缩流/ToUnicode/TJ), 与 `edit_pdf_text` 共用 run 收集逻辑。
+    pub fn extract_pdf_tables(data: &[u8]) -> Vec<PdfTable> {
+        let Ok(doc) = lopdf::Document::load_mem(data) else {
+            return Vec::new();
+        };
+        let pages = doc.get_pages();
+        let mut tables = Vec::new();
+        for (page_num, page_id) in pages.iter().map(|(n, id)| (*n, *id)) {
+            let Ok(fonts) = doc.get_page_fonts(page_id) else {
+                continue;
+            };
+            let encodings: std::collections::BTreeMap<Vec<u8>, lopdf::Encoding<'_>> =
+                match fonts
+                    .iter()
+                    .map(|(name, font)| {
+                        font.get_font_encoding(&doc).map(|e| (name.clone(), e))
+                    })
+                    .collect::<Result<_, lopdf::Error>>()
+                {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+            let Ok(content_data) = doc.get_page_content(page_id) else {
+                continue;
+            };
+            let Ok(content) = lopdf::content::Content::decode(&content_data) else {
+                continue;
+            };
+            let Ok(runs) = collect_text_runs(&content.operations, &encodings) else {
+                continue;
+            };
+            if let Some(table) = Self::build_table_grid(page_num, &runs) {
+                tables.push(table);
+            }
+        }
+        tables
+    }
+
+    /// 将文本 run 聚类为表格网格; 不足表格形态 (行<2 或列<2) 返回 None。
+    fn build_table_grid(page: u32, runs: &[TextRun]) -> Option<PdfTable> {
+        if runs.is_empty() {
+            return None;
+        }
+        // 1. 行聚类: y 误差 5.0 内同属一行; 行从上到下 (y 降序)。
+        let mut sorted: Vec<&TextRun> = runs.iter().collect();
+        sorted.sort_by(|a, b| {
+            b.y.partial_cmp(&a.y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
+        });
+        const ROW_EPS: f32 = 5.0;
+        let mut row_groups: Vec<Vec<&TextRun>> = Vec::new();
+        for run in sorted {
+            let grouped = row_groups
+                .last_mut()
+                .map(|last| (last[0].y - run.y).abs() <= ROW_EPS)
+                .unwrap_or(false);
+            if grouped {
+                row_groups.last_mut().expect("grouped implies non-empty").push(run);
+            } else {
+                row_groups.push(vec![run]);
+            }
+        }
+        // 2. 列聚类: 全局 x 中心, 误差 10.0 内归同一列。
+        const COL_EPS: f32 = 10.0;
+        let mut xs: Vec<f32> = runs.iter().map(|r| r.x).collect();
+        xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let mut columns: Vec<f32> = Vec::new();
+        for x in xs {
+            if let Some(last) = columns.last_mut() {
+                if (x - *last) <= COL_EPS {
+                    *last = (*last + x) / 2.0;
+                    continue;
+                }
+            }
+            columns.push(x);
+        }
+        if columns.len() < 2 || row_groups.len() < 2 {
+            return None;
+        }
+        // 3. 单元格归列: 每行按 x 就近归入列; 同列多个 run (碎片) 拼接。
+        let col_for = |x: f32| -> usize {
+            let mut best = 0usize;
+            let mut best_d = f32::INFINITY;
+            for (i, c) in columns.iter().enumerate() {
+                let d = (x - c).abs();
+                if d < best_d {
+                    best_d = d;
+                    best = i;
+                }
+            }
+            best
+        };
+        let mut rows: Vec<Vec<Option<PdfTableCell>>> = Vec::new();
+        for group in &row_groups {
+            let mut row: Vec<Option<PdfTableCell>> =
+                (0..columns.len()).map(|_| None).collect();
+            for run in group {
+                let text = run.text();
+                if text.is_empty() {
+                    continue;
+                }
+                let ci = col_for(run.x);
+                let merged = row[ci]
+                    .as_mut()
+                    .map(|cell| {
+                        cell.text.push(' ');
+                        cell.text.push_str(&text);
+                    })
+                    .is_some();
+                if !merged {
+                    row[ci] = Some(PdfTableCell {
+                        text,
+                        x: run.x,
+                        y: run.y,
+                    });
+                }
+            }
+            rows.push(row);
+        }
+        Some(PdfTable {
+            page,
+            columns,
+            rows,
+        })
+    }
+
     /// 编辑 PDF 文本 — span 级 redact + 原位替换。
     ///
     /// 对每个 `PdfTextEdit`: 在目标页内容流中定位所有匹配 `find` 的文本操作,
@@ -301,105 +600,23 @@ impl FileParser {
             let mut content = lopdf::content::Content::decode(&content_data)
                 .map_err(|e| PdfEditError::Parse(e.to_string()))?;
 
-            let mut st = TextState::default();
             let mut positions: Vec<(f32, f32, f32)> = Vec::new();
             let mut matched = false;
 
             // 多字符 span 跨相邻 op 匹配: CAD 类导出 PDF 常逐字符 Tj 绘制,
-            // 单 op 解码串==find 无法命中「闸阀」等多字符目标。此处按 BT..ET 段
-            // 累积连续文本操作 (跨 Tf/Td/Tm 等排版操作), 在累积串上做子串查找,
-            // 命中后清空覆盖的全部操作数 (保守整 op 清空, 兼容部分命中)。
-            let mut runs: Vec<Vec<(usize, String)>> = Vec::new();
-            let mut run_starts: Vec<Option<(f32, f32, f32)>> = Vec::new();
-            let mut cur_run: Vec<(usize, String)> = Vec::new();
-            let mut cur_start: Option<(f32, f32, f32)> = None;
-            let mut in_text = false;
-
-            for (idx, op) in content.operations.iter().enumerate() {
-                match op.operator.as_str() {
-                    "BT" => {
-                        in_text = true;
-                        st = TextState::default();
-                        st.in_text = true;
-                        cur_run.clear();
-                        cur_start = None;
-                    }
-                    "ET" => {
-                        in_text = false;
-                        if !cur_run.is_empty() {
-                            runs.push(std::mem::take(&mut cur_run));
-                            run_starts.push(cur_start);
-                        }
-                        cur_start = None;
-                    }
-                    "Tf" => {
-                        if let Some(name) = op.operands.first().and_then(|o| o.as_name().ok()) {
-                            st.font = Some(name.to_vec());
-                        }
-                        if let Some(sz) = op.operands.get(1).and_then(|o| o.as_float().ok()) {
-                            st.size = sz;
-                        }
-                    }
-                    "Td" | "TD" => {
-                        if let (Some(a), Some(b)) = (
-                            op.operands.first().and_then(|o| o.as_float().ok()),
-                            op.operands.get(1).and_then(|o| o.as_float().ok()),
-                        ) {
-                            st.tx += a;
-                            st.ty += b;
-                            if op.operator == "TD" {
-                                st.leading = -b;
-                            }
-                        }
-                    }
-                    "T*" => st.ty -= st.leading,
-                    "Tm" => {
-                        if let (Some(e), Some(f)) = (
-                            op.operands.get(4).and_then(|o| o.as_float().ok()),
-                            op.operands.get(5).and_then(|o| o.as_float().ok()),
-                        ) {
-                            st.tx = e;
-                            st.ty = f;
-                        }
-                    }
-                    "Tj" | "TJ" | "'" if in_text => {
-                        let enc = st.font.as_ref().and_then(|f| encodings.get(f));
-                        let decoded = decode_text_operand(op, enc)?;
-                        if decoded.is_empty() {
-                            continue;
-                        }
-                        if cur_start.is_none() {
-                            cur_start = Some((st.tx, st.ty, st.size));
-                        }
-                        cur_run.push((idx, decoded));
-                        if op.operator == "'" {
-                            runs.push(std::mem::take(&mut cur_run));
-                            run_starts.push(cur_start);
-                            cur_start = None;
-                        }
-                    }
-                    _ => {
-                        if !cur_run.is_empty() {
-                            runs.push(std::mem::take(&mut cur_run));
-                            run_starts.push(cur_start);
-                            cur_start = None;
-                        }
-                    }
-                }
-            }
-            if !cur_run.is_empty() {
-                runs.push(std::mem::take(&mut cur_run));
-                run_starts.push(cur_start);
-            }
+            // 单 op 解码串==find 无法命中「闸阀」等多字符目标。run 收集逻辑
+            // 见 collect_text_runs (与表格提取共用); 此处对每个 run 的累积串
+            // 做子串查找, 命中后清空覆盖的全部操作数 (保守整 op 清空)。
+            let runs = collect_text_runs(&content.operations, &encodings)?;
 
             let mut to_clear: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
-            for (run, start) in runs.iter().zip(run_starts.iter()) {
-                if run.is_empty() {
+            for run in &runs {
+                if run.ops.is_empty() {
                     continue;
                 }
                 let mut concat = String::new();
-                let mut starts: Vec<usize> = Vec::with_capacity(run.len() + 1);
-                for (_, decoded) in run {
+                let mut starts: Vec<usize> = Vec::with_capacity(run.ops.len() + 1);
+                for (_, decoded) in &run.ops {
                     starts.push(concat.len());
                     concat.push_str(decoded);
                 }
@@ -411,13 +628,11 @@ impl FileParser {
                     let mend = mstart + find_len;
                     let op_start = starts.partition_point(|&s| s <= mstart).saturating_sub(1);
                     let op_end = starts.partition_point(|&s| s <= mend - 1).saturating_sub(1);
-                    if op_start <= op_end && op_end < run.len() && starts[op_end + 1] >= mend {
+                    if op_start <= op_end && op_end < run.ops.len() && starts[op_end + 1] >= mend {
                         for i in op_start..=op_end {
-                            to_clear.insert(run[i].0);
+                            to_clear.insert(run.ops[i].0);
                         }
-                        if let Some((x, y, size)) = start {
-                            positions.push((*x, *y, *size));
-                        }
+                        positions.push((run.x, run.y, run.size));
                         matched = true;
                         offset = mend;
                     } else {
@@ -1190,6 +1405,98 @@ mod tests {
         )
         .expect_err("应返回 PageNotFound");
         assert!(matches!(err, PdfEditError::PageNotFound { .. }));
+    }
+
+    /// 生成逐单元格绝对定位 (Tm) 的表格 PDF: 4 行 × 3 列, 模拟 CAD 表格导出形态。
+    fn table_pdf_bytes(rows: &[&[&str]]) -> Vec<u8> {
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font",
+            "Subtype" => "Type1",
+            "BaseFont" => "Courier",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let mut ops: Vec<Operation> = Vec::new();
+        let cols: Vec<f32> = vec![50.0, 150.0, 250.0];
+        for (ri, row) in rows.iter().enumerate() {
+            let y = 620.0 - ri as f32 * 20.0;
+            for (ci, cell) in row.iter().enumerate() {
+                let x = cols.get(ci).copied().unwrap_or(50.0 + ci as f32 * 100.0);
+                ops.push(Operation::new("BT", vec![]));
+                ops.push(Operation::new("Tf", vec!["F1".into(), 12.into()]));
+                ops.push(Operation::new(
+                    "Tm",
+                    vec![1.into(), 0.into(), 0.into(), 1.into(), x.into(), y.into()],
+                ));
+                ops.push(Operation::new(
+                    "Tj",
+                    vec![lopdf::Object::string_literal(cell.to_string())],
+                ));
+                ops.push(Operation::new("ET", vec![]));
+            }
+        }
+        let content = Content { operations: ops };
+        let content_id = doc.add_object(lopdf::Stream::new(
+            lopdf::Dictionary::new(),
+            content.encode().expect("encode table PDF content"),
+        ));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        });
+        doc.objects.insert(
+            pages_id,
+            lopdf::Object::Dictionary(dictionary! {
+                "Type" => "Pages",
+                "Kids" => vec![page.into()],
+                "Count" => 1,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog_id);
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save table test PDF");
+        buf
+    }
+
+    #[test]
+    fn extract_pdf_tables_reconstructs_grid() {
+        let buf = table_pdf_bytes(&[
+            &["ID", "Name", "Mat"],
+            &["001", "Gate", "CI"],
+            &["002", "Check", "SS"],
+        ]);
+        let tables = FileParser::extract_pdf_tables(&buf);
+        assert_eq!(tables.len(), 1, "应识别出一张表格, 得到 {tables:?}");
+        let table = &tables[0];
+        assert_eq!(table.page, 1);
+        assert_eq!(table.columns.len(), 3, "列数应为 3: {:?}", table.columns);
+        let grid = table.to_grid();
+        assert_eq!(
+            grid,
+            vec![
+                vec!["ID".to_string(), "Name".to_string(), "Mat".to_string()],
+                vec!["001".to_string(), "Gate".to_string(), "CI".to_string()],
+                vec!["002".to_string(), "Check".to_string(), "SS".to_string()],
+            ]
+        );
+        let md = table.to_markdown();
+        assert!(md.contains("| ID | Name | Mat |"), "表头缺失: {md}");
+        assert!(md.contains("| 002 | Check | SS |"), "数据行缺失: {md}");
+    }
+
+    #[test]
+    fn extract_pdf_tables_skips_paragraph_text() {
+        // 单列段落文本不构成表格 (列数 < 2)。
+        let buf = single_page_pdf_bytes("Hello World Plain Paragraph");
+        let tables = FileParser::extract_pdf_tables(&buf);
+        assert!(tables.is_empty(), "段落不应识别为表格: {tables:?}");
     }
 
     #[test]
