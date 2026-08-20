@@ -271,6 +271,9 @@ impl UnifiedCrawler {
                     Some(&extract_domain(&mapped.url)),
                     Some(&evidence),
                 );
+                // ARTEX 双图分离 (R-P79 接线): 每吸收一页即更新资产图,
+                // URL → root_domain→subdomain→service→endpoint 层级落 KB 边。
+                let _ = super::asset_graph::AssetGraphWriter::ingest_url(kb, &mapped.url);
             }
 
             if let Some(body) = &result.body {

@@ -130,12 +130,13 @@ impl CliCommand for KbCmd {
             "import-review" => cmd_import_review(rest),
             "absorb-map" => cmd_absorb_map(rest),
             "embed" => cmd_embed(rest),
+            "distill" => cmd_distill(rest),
             "consistency" => cmd_consistency(rest),
             "axioms" => cmd_axioms(rest),
             "snapshot" => cmd_snapshot(rest),
             "diff" => cmd_diff(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, consistency, axioms, snapshot, diff",
+                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, distill, consistency, axioms, snapshot, diff",
                 sub
             )),
         }
@@ -327,6 +328,69 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
             n, mode_label
         )),
         Err(e) => CommandOutput::err(&format!("Embedding 补跑失败: {}", e)),
+    }
+}
+
+/// /kb distill [--pairs N] [--epochs N] — DistilVDR 蒸馏学生训练 (R-P79 生产接线)。
+/// 从 KB 已有向量采样 (q,d) 对, teacher = 余弦, 点级回归训练双塔对角学生,
+/// 落盘 ~/.neotrix/distill_student.json; hybrid_search Tier 3 自动消费。
+fn cmd_distill(args: &[String]) -> CommandOutput {
+    use crate::neotrix::nt_memory_kb::nt_memory_embed::load_all_embeddings;
+    use crate::neotrix::nt_memory_kb::nt_memory_distill::{
+        load_student, sample_training_pairs, save_student, PointwiseDistillStudent,
+    };
+    let conn = match open_raw_conn() {
+        Some(c) => c,
+        None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
+    };
+    let embeddings = match load_all_embeddings(&conn) {
+        Ok(e) => e,
+        Err(err) => return CommandOutput::err(&format!("读取 embeddings 失败: {}", err)),
+    };
+    if embeddings.len() < 2 {
+        return CommandOutput::err(&format!(
+            "向量不足 ({} 条), 先跑 /kb embed 或确认已有嵌入。",
+            embeddings.len()
+        ));
+    }
+    let pairs = parse_usize(args, "--pairs", 400).min(embeddings.len().saturating_mul(8));
+    let epochs = parse_usize(args, "--epochs", 12).min(200);
+    let (samples, dim) = sample_training_pairs(&embeddings, pairs, 0x9E37_79B9);
+    let before = load_student();
+    let student = PointwiseDistillStudent::train(&samples, dim, epochs, 0.05, 0.9);
+    match save_student(&student) {
+        Ok(()) => {
+            let before_mse = before
+                .as_ref()
+                .map(|s| {
+                    samples
+                        .iter()
+                        .map(|(q, d, t)| (s.score(q, d) - t).powi(2))
+                        .sum::<f64>()
+                        / samples.len() as f64
+                });
+            let after_mse = samples
+                .iter()
+                .map(|(q, d, t)| (student.score(q, d) - t).powi(2))
+                .sum::<f64>()
+                / samples.len() as f64;
+            let mut out = format!(
+                "DistilVDR 蒸馏完成: 样本 {} 对, 维度 {}, 迭代 {} epoch\n\
+                 MSE: 训练前 {:.6} → 训练后 {:.6}\n\
+                 已落盘 ~/.neotrix/distill_student.json\n\
+                 hybrid_search Tier 3 将自动消费蒸馏分数 (无学生时退化回余弦)。",
+                samples.len(),
+                dim,
+                epochs,
+                before_mse.unwrap_or(0.0),
+                after_mse
+            );
+            if before_mse.map(|b| after_mse >= b).unwrap_or(false) {
+                out.push_str("\n警告: MSE 未下降 — 向量可能过稀疏或样本不足。");
+            }
+            CommandOutput::ok(&out)
+        }
+        Err(e) => CommandOutput::err(&format!("蒸馏落盘失败: {}", e)),
     }
 }
 

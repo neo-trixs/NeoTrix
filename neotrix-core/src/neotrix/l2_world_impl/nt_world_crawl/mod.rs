@@ -20,6 +20,7 @@ pub mod spider;
 pub mod stealth;
 pub mod resilient;
 pub mod unified;
+pub mod asset_graph;
 
 pub use config::{CrawlerConfig, CrawlStrategy, CrawlTopic, CrawlFormat, SeedEntry, default_seed_urls};
 pub use frontier::{DualQueueFrontier, UrlEntry, FrontierStats, extract_domain, extract_links};
@@ -29,3 +30,6 @@ pub use mapper::{KnowledgeMapper, MappedKnowledge, MapperSummary};
 pub use unified::{UnifiedCrawler, CrawlerSummary, CycleResult, HealAction};
 pub use stealth::{StealthCrawler, StealthConfig, CrawlResult, BypassMethod, SessionPool, CrawlSession};
 pub use resilient::{ResilientCrawler, ThrottlePolicy, PersistentQueue, AutoThrottle, CrawlReport};
+pub use asset_graph::{
+    AssetGraphWriter, AssetHierarchy, ScopeFrontier, ExplorationGraph, parse_asset_hierarchy,
+};

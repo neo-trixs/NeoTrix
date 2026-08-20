@@ -852,6 +852,21 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
             .map_err(|e| format!("upsert_edge: {}", e))
     }
 
+    /// 边是否已存在 (同 source/target/relation)。供幂等写入计数。
+    pub fn edge_exists(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: RelationType,
+    ) -> Result<bool, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let edges = nt_memory_store::get_edges_for_node(&conn, source_id)
+            .map_err(|e| format!("edge_exists: {}", e))?;
+        Ok(edges.iter().any(|e| {
+            e.source_id == source_id && e.target_id == target_id && e.relation_type == relation_type
+        }))
+    }
+
     /// T0.1 类型化边 (metadata 增强版): 承载结构化溯源 (evidence/source/extractor)。
     /// 来自 39 仓库吸收 — codebase-memory-mcp 类型化边 + semantica PROV-O 溯源:
     /// edges 应带 source/confidence/extractor 元数据, 而非只塞进 description。

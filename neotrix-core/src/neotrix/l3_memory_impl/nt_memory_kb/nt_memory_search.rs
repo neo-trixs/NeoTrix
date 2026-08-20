@@ -436,10 +436,16 @@ pub fn hybrid_search(
         if !embeddings.is_empty() {
             // Build a simple avg-word-embedding from query words as proxy
             let query_embedding = query_to_avg_embedding(query, &embeddings);
+            // DistilVDR 蒸馏学生 (R-P79 接线): 已训练学生存在则用蒸馏分数,
+            // 否则退化回裸余弦。学生 = 两塔对角线性, 从余弦 teacher 点级回归。
+            let student = super::nt_memory_distill::load_student();
             let mut scored: Vec<(SearchResult, f64)> = Vec::new();
             for r in &results {
                 let emb_score = if let Some(emb) = embeddings.iter().find(|(id, _)| *id == r.node.id) {
-                    cosine_similarity(&query_embedding, &emb.1)
+                    match &student {
+                        Some(s) => s.score(&query_embedding, &emb.1),
+                        None => cosine_similarity(&query_embedding, &emb.1),
+                    }
                 } else {
                     0.0
                 };
