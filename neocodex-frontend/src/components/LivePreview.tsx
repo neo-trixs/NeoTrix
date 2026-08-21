@@ -118,9 +118,10 @@ export function LivePreview(props: Props) {
     onCleanup(() => window.removeEventListener('keydown', onKey))
   })
 
-  return (
-    <div
-      class="fixed inset-0 z-40 flex items-center justify-center bg-black/20 animate-fade-in"
+return (
+    <Show when={props.open}>
+      <div
+        class="fixed inset-0 z-40 flex items-center justify-center bg-black/20 animate-fade-in"
       role="dialog"
       aria-label="Live Preview"
       ref={(el) => (props.open ? el?.focus?.() : undefined)}
@@ -202,9 +203,10 @@ export function LivePreview(props: Props) {
               title="Live Preview"
             />
           </Show>
-        </div>
-      </div>
+</div>
     </div>
+    </div>
+      </Show>
   )
 }
 
