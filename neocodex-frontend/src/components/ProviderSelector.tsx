@@ -164,18 +164,19 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
           <div class="max-h-64 overflow-y-auto" role="listbox" aria-label="模型提供商列表">
             <For each={config()?.providers || []}>
               {(provider: import('../api/types').ProviderMeta, i) => {
-                const isActive = provider.model === config()?.active_model
+                // 响应式 getter：const 捕获在 For 不重跑时会失效（同 SettingsModal/ProjectView 反模式）
+                const isActive = () => provider.model === config()?.active_model
                 return (
                   <button
                     class={clsx(
                       'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
                       'hover:bg-bg-tertiary focus-visible:bg-bg-tertiary focus-visible:outline-none',
-                      isActive && 'bg-nt-io-500/10 text-nt-io-600'
+                      isActive() && 'bg-nt-io-500/10 text-nt-io-600'
                     )}
                     onClick={() => handleSelectProvider(provider.name)}
-                    disabled={loading() || isActive}
+                    disabled={loading() || isActive()}
                     role="option"
-                    aria-selected={isActive}
+                    aria-selected={isActive()}
                     onKeyDown={(e) => {
                       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
                       e.preventDefault()
@@ -200,7 +201,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                         <CategoryBadge category={provider.category} className="hidden sm:inline-flex" />
                       </div>
                     </div>
-                    {isActive && <Check class="w-4 h-4 text-nt-io-500 flex-shrink-0" />}
+                    {isActive() && <Check class="w-4 h-4 text-nt-io-500 flex-shrink-0" />}
                     {!provider.resolvable && (
                       <span class="text-xs text-amber-600 px-2 py-1 rounded bg-amber-500/10 flex-shrink-0">不可用</span>
                     )}

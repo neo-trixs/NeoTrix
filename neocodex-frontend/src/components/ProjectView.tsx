@@ -58,7 +58,8 @@ export function ProjectView(props: Props) {
   const baseName = () => view()?.root.split('/').filter(Boolean).pop() || '项目'
 
   const renderNode = (item: ProjectTreeItem, depth: number) => {
-    const isOpen = expanded().has(item.path)
+    // 响应式 getter：JSX 内每次读取都追踪 expanded signal（const 捕获会因 For 不重跑而失效）
+    const isOpen = () => expanded().has(item.path)
     return (
       <div>
         <button
@@ -69,16 +70,16 @@ export function ProjectView(props: Props) {
             else props.onOpenFile?.(item.path)
           }}
           title={item.path}
-          aria-expanded={item.is_dir ? isOpen : undefined}
+          aria-expanded={item.is_dir ? isOpen() : undefined}
         >
           {item.is_dir ? (
             <>
-              {isOpen ? (
+              {isOpen() ? (
                 <ChevronDown class="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
               ) : (
                 <ChevronRight class="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
               )}
-              {isOpen ? (
+              {isOpen() ? (
                 <FolderOpen class="w-4 h-4 text-nt-core-600 flex-shrink-0" />
               ) : (
                 <Folder class="w-4 h-4 text-nt-core-600 flex-shrink-0" />
@@ -98,7 +99,7 @@ export function ProjectView(props: Props) {
             {item.name}
           </span>
         </button>
-        <Show when={item.is_dir && isOpen && item.children}>
+        <Show when={item.is_dir && isOpen() && item.children}>
           <For each={item.children}>
             {(child) => renderNode(child, depth + 1)}
           </For>

@@ -411,20 +411,20 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   <For each={group.ids}>
                     {(id) => {
                       const s = sectionById(id)
-                      const isActive = section() === id
+                      const isActive = () => section() === id
                       return (
                         <button
                           class={clsx(
                             'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[12.5px] transition-colors relative',
-                            isActive
+                            isActive()
                               ? 'bg-nt-io-500/12 text-nt-io-700 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
                               : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
                           )}
                           role="tab"
                           id={`settings-tab-${id}`}
-                          aria-selected={isActive}
+                          aria-selected={isActive()}
                           aria-controls="settings-tabpanel"
-                          tabIndex={isActive ? 0 : -1}
+                          tabIndex={isActive() ? 0 : -1}
                           onClick={() => setSection(id)}
                           onKeyDown={(e) => {
                             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -446,11 +446,11 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                             }
                           }}
                         >
-                          <span class={clsx('w-4 h-4 flex-shrink-0', isActive ? 'text-nt-io-600' : 'text-text-muted')}>
+                          <span class={clsx('w-4 h-4 flex-shrink-0', isActive() ? 'text-nt-io-600' : 'text-text-muted')}>
                             <s.icon />
                           </span>
                           <span class="flex-1 text-left truncate">{s.label}</span>
-                          {isActive && <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500 flex-shrink-0" />}
+                          {isActive() && <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500 flex-shrink-0" />}
                         </button>
                       )
                     }}
