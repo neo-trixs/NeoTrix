@@ -94,7 +94,7 @@ impl AssetGraphWriter {
             &format!("asset:{}", h.full_host),
             NodeType::Source,
             Some(&format!("Host asset: {}", h.full_host)),
-            Some(url),
+            None,
             Some(&h.full_host),
         )?;
         if host_id != root_id {

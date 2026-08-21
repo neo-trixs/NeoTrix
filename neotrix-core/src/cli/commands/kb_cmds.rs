@@ -131,12 +131,13 @@ impl CliCommand for KbCmd {
             "absorb-map" => cmd_absorb_map(rest),
             "embed" => cmd_embed(rest),
             "distill" => cmd_distill(rest),
+            "ingest-asset" => cmd_ingest_asset(rest),
             "consistency" => cmd_consistency(rest),
             "axioms" => cmd_axioms(rest),
             "snapshot" => cmd_snapshot(rest),
             "diff" => cmd_diff(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, distill, consistency, axioms, snapshot, diff",
+                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, distill, ingest-asset, consistency, axioms, snapshot, diff",
                 sub
             )),
         }
@@ -391,6 +392,26 @@ fn cmd_distill(args: &[String]) -> CommandOutput {
             CommandOutput::ok(&out)
         }
         Err(e) => CommandOutput::err(&format!("蒸馏落盘失败: {}", e)),
+    }
+}
+
+/// /kb ingest-asset <url> — ARTEX 资产图手动入口 (R-P79 生产验证)。
+/// 把单个 URL 的资产层级 (root_domain→subdomain→service→endpoint) 落 KB。
+fn cmd_ingest_asset(args: &[String]) -> CommandOutput {
+    use crate::neotrix::l2_world_impl::nt_world_crawl::asset_graph::AssetGraphWriter;
+    let Some(url) = args.first() else {
+        return CommandOutput::err("用法: /kb ingest-asset <url>");
+    };
+    let kb = match KnowledgeBase::open(None) {
+        Ok(kb) => kb,
+        Err(e) => return CommandOutput::err(&format!("无法打开知识库: {}", e)),
+    };
+    match AssetGraphWriter::ingest_url(&kb, url) {
+        Ok(edges) => CommandOutput::ok(&format!(
+            "资产图写入完成: 新增/确认边 {} 条 (幂等, 重复 ingest 不重复计数)。",
+            edges
+        )),
+        Err(e) => CommandOutput::err(&format!("资产图写入失败: {}", e)),
     }
 }
 
