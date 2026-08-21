@@ -1220,6 +1220,8 @@ pub struct CollectionMergeRequest {
     pub schema: Option<MergeSchemaJson>,
     /// 输出路径
     pub output: std::path::PathBuf,
+    /// 预览模式: true 时不写入文件, 仅返回预览信息 (输入排序/预估大小/策略说明)
+    pub dry_run: bool,
 }
 
 impl Default for CollectionMergeRequest {
@@ -1229,6 +1231,7 @@ impl Default for CollectionMergeRequest {
             strategy: MergeStrategy::All,
             schema: None,
             output: std::path::PathBuf::new(),
+            dry_run: false,
         }
     }
 }
@@ -1271,6 +1274,29 @@ pub fn collection_merge(req: &CollectionMergeRequest) -> Result<MergeOutcome> {
         })
         .collect();
 
+    // dry_run: 仅返回预览, 不写文件
+    if req.dry_run {
+        let sorted_inputs = if req.strategy == MergeStrategy::Preferred {
+            let mut inputs = req.inputs.clone();
+            sort_by_preferred(&mut inputs);
+            inputs
+        } else {
+            req.inputs.clone()
+        };
+        let preview = format!(
+            "CollectionMerge 预览 (dry_run):\n  策略: {:?}\n  输入数: {}\n  输入顺序:\n{}  输出: {}\n  Schema: {}\n  预估: 按输入顺序合并, 首个作为基座",
+            req.strategy,
+            sorted_inputs.len(),
+            sorted_inputs.iter().enumerate().map(|(i,p)| format!("    {}. {}", i+1, p.display())).collect::<Vec<_>>().join("\n"),
+            req.output.display(),
+            req.schema.as_ref().map(|s| s.name.as_str()).unwrap_or("默认(价格表)")
+        );
+        return Ok(MergeOutcome::Text {
+            items: sorted_inputs.len(),
+            note: preview,
+        });
+    }
+
     match req.strategy {
         MergeStrategy::FirstOnly => {
             // 透传首个输入 (结构级语义: 只取首个文档)
@@ -1283,12 +1309,39 @@ pub fn collection_merge(req: &CollectionMergeRequest) -> Result<MergeOutcome> {
             })
         }
         MergeStrategy::Preferred => {
-            // Preferred 语义: 结构级合并但同资源优先取"修改版" — 当前实现等同 All
-            // (修改版优先已由 xlsx schema.preferred_sheets 承担, 非结构级资源场景)
-            dispatch_collection_merge(req, &exts)
+            // Preferred: 先按文件名识别"修改版"排序 (修改版优先作为基座), 再分发
+            let mut inputs = req.inputs.clone();
+            sort_by_preferred(&mut inputs);
+            let mut req_preferred = req.clone();
+            req_preferred.inputs = inputs;
+            dispatch_collection_merge(&req_preferred, &exts)
         }
         MergeStrategy::All => dispatch_collection_merge(req, &exts),
     }
+}
+
+fn sort_by_preferred(inputs: &mut [std::path::PathBuf]) {
+    // 将包含"修改版"/"已更新"/"已完善"等标记的文件排到前面 (作为基座)
+    inputs.sort_by(|a, b| {
+        let a_pref = is_preferred(a);
+        let b_pref = is_preferred(b);
+        match (a_pref, b_pref) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        }
+    });
+}
+
+fn is_preferred(path: &std::path::Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    ["修改版", "已更新", "已完善", "更新版", "最新版", "final", "modified", "updated"]
+        .iter()
+        .any(|kw| name.contains(kw))
 }
 
 fn dispatch_collection_merge(
@@ -1717,6 +1770,7 @@ mod schema_tests {
             schema: None,
             strategy: MergeStrategy::All,
             output: tmp.join("merged.pdf"),
+            dry_run: false,
         };
         match collection_merge(&req).expect("pdf 合并") {
             MergeOutcome::Pdf { pages } => assert_eq!(pages, 2, "两 PDF → 2 页"),
@@ -1733,6 +1787,7 @@ mod schema_tests {
             schema: None,
             strategy: MergeStrategy::All,
             output: tmp.join("merged.docx"),
+            dry_run: false,
         };
         match collection_merge(&req).expect("docx 合并") {
             MergeOutcome::Docx { items, .. } => assert_eq!(items, 2),
@@ -1745,6 +1800,7 @@ mod schema_tests {
             schema: None,
             strategy: MergeStrategy::All,
             output: tmp.join("merged.txt"),
+            dry_run: false,
         };
         // 混合输入中 docx 用 make_min_docx 写入
         std::fs::write(&req.inputs[1], crate::neotrix::nt_file_ability::make_min_docx("C")).unwrap();
@@ -1766,8 +1822,77 @@ mod schema_tests {
             schema: None,
             strategy: MergeStrategy::All,
             output: tmp.join("empty.docx"),
+            dry_run: false,
         };
         assert!(collection_merge(&req).is_err(), "空输入应报错");
+
+        // 5. Preferred 策略: 修改版优先作为基座
+        let doc_modified = tmp.join("报价_修改版.docx");
+        let doc_normal = tmp.join("报价_标准版.docx");
+        std::fs::write(&doc_modified, crate::neotrix::nt_file_ability::make_min_docx("Modified")).unwrap();
+        std::fs::write(&doc_normal, crate::neotrix::nt_file_ability::make_min_docx("Normal")).unwrap();
+        let req = CollectionMergeRequest {
+            inputs: vec![doc_normal.clone(), doc_modified.clone()], // 故意把普通版放前面
+            schema: None,
+            strategy: MergeStrategy::Preferred,
+            output: tmp.join("preferred.docx"),
+            dry_run: false,
+        };
+        match collection_merge(&req).expect("Preferred 合并") {
+            MergeOutcome::Docx { items, .. } => assert_eq!(items, 2),
+            other => panic!("应为 Docx outcome: {other:?}"),
+        };
+        // 验证修改版作为基座: 其内容应在最前
+        let merged_text = std::fs::read_to_string(&tmp.join("preferred.docx")).unwrap();
+        assert!(merged_text.find("Modified").unwrap() < merged_text.find("Normal").unwrap(),
+            "Preferred 策略应把修改版作为基座 (内容在前)");
+
+        // 6. dry_run 预览模式: 不写文件, 仅返回预览信息
+        let req = CollectionMergeRequest {
+            inputs: vec![doc_normal, doc_modified],
+            schema: None,
+            strategy: MergeStrategy::Preferred,
+            output: tmp.join("dry_run.txt"),
+            dry_run: true,
+        };
+        match collection_merge(&req).expect("dry_run 预览") {
+            MergeOutcome::Text { items, note } => {
+                assert_eq!(items, 2);
+                assert!(note.contains("dry_run"), "预览应标注 dry_run");
+                assert!(note.contains("修改版"), "预览应包含排序信息");
+            }
+            other => panic!("dry_run 应返回 Text: {other:?}"),
+        };
+        assert!(!tmp.join("dry_run.txt").exists(), "dry_run 不应生成输出文件");
+
+        // 7. FirstOnly 策略: 只透传首个
+        let req = CollectionMergeRequest {
+            inputs: vec![p1.clone(), p2.clone()],
+            schema: None,
+            strategy: MergeStrategy::FirstOnly,
+            output: tmp.join("firstonly.pdf"),
+            dry_run: false,
+        };
+        match collection_merge(&req).expect("FirstOnly") {
+            MergeOutcome::Text { items, note } => {
+                assert_eq!(items, 1);
+                assert!(note.contains("FirstOnly"));
+            }
+            other => panic!("FirstOnly 应返回 Text: {other:?}"),
+        };
+
+        // 8. 单文档透传 (所有策略)
+        let req = CollectionMergeRequest {
+            inputs: vec![p1],
+            schema: None,
+            strategy: MergeStrategy::All,
+            output: tmp.join("single.docx"),
+            dry_run: false,
+        };
+        match collection_merge(&req).expect("单文档") {
+            MergeOutcome::Docx { items, .. } => assert_eq!(items, 1),
+            other => panic!("单文档应 Docx outcome: {other:?}"),
+        };
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

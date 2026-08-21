@@ -236,6 +236,7 @@ pub use nt_file_ability::{
      SheetRowData,
      StructuredData, TableData, TableEdit, TextEncoding, UnitRule, PdfEdit,
      DirExtractEntry, DirExtractReport,
+     CollectionMergeRequest, MergeOutcome, MergeStrategy, collection_merge,
  };
 
 pub use nt_file_ability::merge_docx;

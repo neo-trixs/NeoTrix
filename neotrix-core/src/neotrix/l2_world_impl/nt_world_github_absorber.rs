@@ -22,6 +22,12 @@ fn github_token() -> Option<String> {
     std::env::var("GITHUB_TOKEN").ok()
 }
 
+/// 分支名展平为文件系统安全段: '/' → '-' (防 PathBuf::join 嵌套目录)。
+/// 同时剥离路径穿越段 (防御性, GitHub 分支名本不允许 "..")。
+fn sanitize_branch_for_path(branch: &str) -> String {
+    branch.replace('/', "-").replace("..", "-")
+}
+
 fn github_api_get(path: &str) -> Result<serde_json::Value, String> {
     let client = http_client().ok_or_else(|| "HTTP client not available".to_string())?;
     let url = format!("https://api.github.com/{}", path);
@@ -328,6 +334,67 @@ impl GitHubAbsorber {
         let owner = parts[parts.len() - 2];
         let repo = parts[parts.len() - 1];
         self.absorb(owner, repo)
+    }
+
+    /// Download the entire repo as a codeload tarball to a local directory.
+    ///
+    /// 补全「全仓库下载」能力缺口: GitHubAbsorber 的 REST 路径只摄取 ≤30 个关键文件,
+    /// 此路径下载完整源码归档 (codeload.github.com tarball), 供整库分析/落盘。
+    /// 使用 nt_http 断点续传原语 (.tmp 暂存 + 原子 rename + Range 续传 + 网络重试)。
+    ///
+    /// 返回 (tarball 路径, 解压后目录路径)。tarball 保留在 `dest` 下, 解压目录同前缀。
+    pub fn download_archive(
+        &self,
+        owner: &str,
+        repo: &str,
+        dest: &std::path::Path,
+    ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::{
+            download_to_file, DownloadOptions,
+        };
+
+        // 默认分支: 用 repo 元数据 default_branch (branches.first() 是字母序首个,
+        // 会误选 "bak-feat/..." 之类特性分支 — project-nomad 实证缺陷)。
+        let branch = match github_api_get(&format!("repos/{}/{}", owner, repo)) {
+            Ok(v) => v["default_branch"].as_str().unwrap_or("main").to_string(),
+            Err(_) => "main".to_string(),
+        };
+        // 分支名可含 '/' (如 "feat/x") — 直接 join 会产生嵌套目录, 展平为 '-'。
+        let branch_fs = sanitize_branch_for_path(&branch);
+        let url = format!(
+            "https://codeload.github.com/{}/{}/tar.gz/refs/heads/{}",
+            owner, repo, branch
+        );
+        let tarball_path = dest.join(format!("{}-{}.tar.gz", repo, branch_fs));
+        let proxy = crate::neotrix::l1_body_impl::nt_io_http_factory::proxy_from_env();
+        let result = download_to_file(&DownloadOptions {
+            url: &url,
+            dest: &tarball_path,
+            user_agent: Some("NeoTrix/0.19 (nt_http; +https://neotrix.dev)"),
+            allowed_mime_types: &["application/gzip", "application/x-gzip", "application/octet-stream"],
+            max_bytes: 0,
+            total_timeout: None,
+            proxy: proxy.as_deref(),
+            // C5 代理池轮换: fake-ip 分流网络下直连超时, 池节点被封时重试自动换 egress。
+            proxy_pool: true,
+            host: Some("codeload.github.com"),
+        })?;
+
+        // 解压 tarball (flate2 + tar 已在依赖中)
+        let extract_dir = dest.join(format!("{}-{}-src", repo, branch_fs));
+        std::fs::create_dir_all(&extract_dir).map_err(|e| format!("mkdir: {e}"))?;
+        let f = std::fs::File::open(&result.path).map_err(|e| format!("open tarball: {e}"))?;
+        let gz = flate2::read::GzDecoder::new(f);
+        let mut archive = tar::Archive::new(gz);
+        archive
+            .set_preserve_permissions(false);
+        archive
+            .set_unpack_xattrs(false);
+        archive
+            .unpack(&extract_dir)
+            .map_err(|e| format!("unpack: {e}"))?;
+
+        Ok((result.path, extract_dir))
     }
 
     /// Refresh an absorbed repo — checks GitHub pushed_at vs stored, re-absorbs if newer.
@@ -822,6 +889,20 @@ fn decode_base64(input: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sanitize_branch_for_path() {
+        // 普通分支不变
+        assert_eq!(sanitize_branch_for_path("main"), "main");
+        // 斜杠分支展平 (project-nomad "bak-feat/kb-tier-estimate-on-disk" 实证)
+        assert_eq!(
+            sanitize_branch_for_path("bak-feat/kb-tier-estimate-on-disk"),
+            "bak-feat-kb-tier-estimate-on-disk"
+        );
+        // 防御性: 路径穿越段剥离
+        assert_eq!(sanitize_branch_for_path("a/../../etc"), "a---etc");
+        assert_eq!(sanitize_branch_for_path("..hidden"), "-hidden");
+    }
 
     #[test]
     fn test_parse_github_time() {

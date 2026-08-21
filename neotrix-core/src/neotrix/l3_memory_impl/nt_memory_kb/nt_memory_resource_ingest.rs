@@ -861,4 +861,89 @@ mod tests {
         assert!(fetched.title.ends_with("..."));
         assert_eq!(fetched.summary.unwrap(), long);
     }
+
+    #[test]
+    #[ignore = "requires downloaded project-nomad source at ~/.neotrix/downloads/project-nomad-main-src/project-nomad-main/collections/"]
+    fn test_ingest_project_nomad_data_sources() {
+        let conn = test_conn();
+        let mut ingester = ResourceIngester::new(&conn);
+        let src = std::path::Path::new("/Users/neo/.neotrix/downloads/project-nomad-main-src/project-nomad-main/collections");
+        let mut ingested = 0;
+
+        // kiwix-categories.json
+        if let Ok(content) = std::fs::read_to_string(src.join("kiwix-categories.json")) {
+            if let Ok(kiwix) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(cats) = kiwix["categories"].as_array() {
+                    for cat in cats {
+                        if let Some(resources) = cat["resources"].as_array() {
+                            for res in resources {
+                                if let Some(url) = res["url"].as_str() {
+                                    let title = format!("Kiwix: {} - {}", cat["name"].as_str().unwrap_or(""), res["title"].as_str().unwrap_or(""));
+                                    let summary = res["description"].as_str().unwrap_or("");
+                                    let tags = vec!["kiwix".to_string(), "data-source".to_string(), cat["slug"].as_str().unwrap_or("").to_string()];
+                                    let desc = ResourceDescriptor::article(&title, summary, url)
+                                        .with_tags(tags.iter().map(|s| s.as_str()).collect())
+                                        .with_importance(0.7);
+                                    if ingester.ingest(&desc).is_ok() {
+                                        ingested += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // maps.json
+        if let Ok(content) = std::fs::read_to_string(src.join("maps.json")) {
+            if let Ok(maps) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(colls) = maps["collections"].as_array() {
+                    for coll in colls {
+                        if let Some(resources) = coll["resources"].as_array() {
+                            for res in resources {
+                                if let Some(url) = res["url"].as_str() {
+                                    let title = format!("Map: {} - {}", coll["name"].as_str().unwrap_or(""), res["title"].as_str().unwrap_or(""));
+                                    let summary = res["description"].as_str().unwrap_or("");
+                                    let tags = vec!["maps".to_string(), "pmtiles".to_string(), "data-source".to_string(), coll["slug"].as_str().unwrap_or("").to_string()];
+                                    let desc = ResourceDescriptor::article(&title, summary, url)
+                                        .with_tags(tags.iter().map(|s| s.as_str()).collect())
+                                        .with_importance(0.7);
+                                    if ingester.ingest(&desc).is_ok() {
+                                        ingested += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // wikipedia.json
+        if let Ok(content) = std::fs::read_to_string(src.join("wikipedia.json")) {
+            if let Ok(wiki) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(opts) = wiki["options"].as_array() {
+                    for opt in opts {
+                        if let Some(url) = opt["url"].as_str() {
+                            if !url.is_empty() && url != "null" {
+                                let title = format!("Wikipedia: {}", opt["name"].as_str().unwrap_or(""));
+                                let summary = opt["description"].as_str().unwrap_or("");
+                                let tags = vec!["wikipedia".to_string(), "zim".to_string(), "data-source".to_string()];
+                                let desc = ResourceDescriptor::article(&title, summary, url)
+                                    .with_tags(tags.iter().map(|s| s.as_str()).collect())
+                                    .with_importance(0.7);
+                                if ingester.ingest(&desc).is_ok() {
+                                    ingested += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        assert!(ingested > 0, "at least one project-nomad data source should be ingested");
+        println!("project-nomad data sources ingested: {}", ingested);
+    }
 }

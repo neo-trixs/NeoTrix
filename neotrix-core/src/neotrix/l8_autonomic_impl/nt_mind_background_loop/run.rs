@@ -609,6 +609,10 @@ impl BackgroundLoop {
             world_consciousness: self.world_consciousness.take(),
             #[cfg(not(feature = "stealth-net"))]
             world_consciousness: None,
+            #[cfg(feature = "stealth-net")]
+            heartbeat_engine: self.heartbeat_engine.take(),
+            #[cfg(feature = "stealth-net")]
+            proxy_client: self.proxy_client.take(),
             consciousness_runtime: {
                 let mut cr = std::mem::take(&mut self.consciousness_runtime);
                 if let Some(ref kb_ref) = self.kb {
@@ -761,6 +765,8 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.scheduler_interval_secs, "scheduler", |h| h.handle_scheduler_tick().await);
         spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
+        #[cfg(feature = "stealth-net")]
+        spawn_handler!(cfg.nt_world_sense_interval_secs, "proxy_heartbeat", |h| h.handle_proxy_heartbeat().await);
         spawn_handler!(SKILL_SCAN_INTERVAL_SECS, |h| h.handle_skill_scan().await);
         spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
         spawn_handler!(HEALER_SCAN_INTERVAL_SECS, "healers", |h| h.handle_healer_scan().await);
@@ -906,6 +912,10 @@ pub struct BackgroundLoopHandle {
     event_bus: Option<EventBus>,
     metacognition: Option<MetaCognitionBridge>,
     world_consciousness: Option<crate::neotrix::nt_world_sense::WorldConsciousness>,
+    #[cfg(feature = "stealth-net")]
+    heartbeat_engine: Option<crate::neotrix::nt_shield_stealth_net::ProxyHeartbeatEngine>,
+    #[cfg(feature = "stealth-net")]
+    proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
     consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,

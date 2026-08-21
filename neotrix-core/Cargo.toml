@@ -90,8 +90,11 @@ rand = "0.8"
 async-trait = "0.1"
 rmcp = { version = "1.4", features = ["server", "macros"] }
 lru = "0.18"
-base64 = "0.22"
 hex = "0.4"
+blake2 = "0.10"
+bytes = "1"
+ed25519-dalek = { version = "1.0", features = ["rand", "legacy_compatibility"] }
+base64 = "0.21"
 filetime = "0.2"
 k256 = { version = "0.13", features = ["ecdsa"] }
 sha3 = "0.10"
@@ -101,6 +104,7 @@ html-escape = "0.2"
 uniffi = { version = "0.28", features = ["cli", "scaffolding-ffi-buffer-fns"], optional = true }
 unicode-normalization = "0.1"
 flate2 = "1"
+tar = "0.4"
 zstd = "0.13"
 crc32fast = "1"
 syn = { version = "2", features = ["full", "visit"] }
@@ -143,13 +147,15 @@ rusqlite = { version = "0.31", features = ["bundled", "backup"] }
 lopdf = "0.42"
 ttf-parser = "0.25"
 noyalib = { version = "0.0.24", features = ["compat-serde-yaml"] }
-zip = { version = "2", optional = true }
-quick-xml = { version = "0.41", optional = true }
+zip = { version = "2", default-features = false, features = ["deflate", "time"] }
+quick-xml = "0.41"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 tiktoken-rs = "0.12.0"
 office_oxide = "0.1"
 encoding_rs = "0.8"
 calamine = { version = "0.36.1", features = ["chrono"] }
+zim = "0.5"
+pmtiles = { version = "0.24", default-features = false, features = ["write", "tilejson", "zstd", "brotli", "http-async"] }
 
 [dev-dependencies]
 tempfile = "3"
@@ -204,7 +210,9 @@ harness = false
 # keyring 纳入 default：API key 加密默认走 OS keychain（macOS Keychain/Linux Secret Service），
 # 避免静默降级到可推导的机器派生密钥（C-3 安全加固）。
 default = ["keyring"]
-office = ["dep:zip", "dep:quick-xml"]
+office = []
+wip = []
+# pmtiles feature removed - now a regular dependency
 stealth-net = ["dep:chromiumoxide"]
 sandbox = ["dep:wasmtime", "dep:agent-sandbox"]
 telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]

@@ -55,7 +55,7 @@ pub use visual::*;
 /// 构造最小 DOCX (zip 包: [Content_Types].xml + _rels/.rels + word/document.xml)。
 /// 测试辅助: 模块内 + 意识核心 dispatch 测试复用 (R-P42 复用, 不平行重造)。
 #[cfg(test)]
-pub(crate) fn make_min_docx(text: &str) -> Vec<u8> {
+pub fn make_min_docx(text: &str) -> Vec<u8> {
     use std::io::Write;
     let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let opts = zip::write::SimpleFileOptions::default();
@@ -144,7 +144,7 @@ pub(crate) fn make_min_docx_with_media(text: &str, media_name: &str, media_bytes
 /// 构造最小 PPTX (zip 包: [Content_Types].xml + _rels/.rels + ppt/presentation.xml +
 /// ppt/_rels/presentation.xml.rels + ppt/slides/slide1.xml)。测试辅助。
 #[cfg(test)]
-pub(crate) fn make_min_pptx(text: &str) -> Vec<u8> {
+pub fn make_min_pptx(text: &str) -> Vec<u8> {
     use std::io::Write;
     let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let opts = zip::write::SimpleFileOptions::default();
@@ -1853,6 +1853,74 @@ mod tests {
 
         // 空输入报错
         assert!(merge_docx::merge_docx(&[], &tmp.join("empty.docx")).is_err());
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_merge_docx_renames_conflicting_media_and_rids() {
+        // 两个文档各含 media/image1.png (内容不同) + rId2 → 合并后:
+        // - 第二个媒体重命名为 doc2_word/media/image1.png (经 rename_part)
+        // - 追加段落里 r:embed 引用重编号 (rId2 → rId3)
+        // - document.xml.rels Target 指向新名
+        let png_a = b"\x89PNG\r\n\x1a\n__A__";
+        let png_b = b"\x89PNG\r\n\x1a\n__B__";
+        let tmp = std::env::temp_dir().join(format!("nt_mergedocx_media_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let a = tmp.join("a.docx");
+        let b = tmp.join("b.docx");
+        let out = tmp.join("merged.docx");
+        std::fs::write(&a, make_min_docx_with_media("DocA", "media/image1.png", png_a)).unwrap();
+        std::fs::write(&b, make_min_docx_with_media("DocB", "media/image1.png", png_b)).unwrap();
+
+        let report = merge_docx::merge_docx(&[a, b], &out).expect("合并成功");
+        assert_eq!(report.items, 2);
+
+        let bytes = std::fs::read(&out).unwrap();
+        let mut z = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+        // 媒体 part 名 (先收集, 避免与后续 mut 借用冲突)
+        let media: Vec<String> = z
+            .file_names()
+            .filter(|n| n.contains("media/"))
+            .map(ToOwned::to_owned)
+            .collect();
+        let mut read_part = |name: &str| -> Vec<u8> {
+            let mut f = z.by_name(name).unwrap();
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut f, &mut buf).unwrap();
+            buf
+        };
+        assert!(
+            media.iter().any(|n| n == "word/media/image1.png"),
+            "应保留基座媒体: {media:?}"
+        );
+        assert!(
+            media.iter().any(|n| n.contains("doc1_") && n.ends_with("image1.png")),
+            "冲突媒体应重命名: {media:?}"
+        );
+        // 基座媒体内容为 A (不变), 重命名媒体为 B
+        assert_eq!(read_part("word/media/image1.png"), png_a, "基座媒体内容不变");
+        let renamed = media
+            .iter()
+            .find(|n| n.contains("doc1_"))
+            .cloned()
+            .unwrap();
+        assert_eq!(read_part(&renamed), png_b, "重命名媒体内容为 B");
+
+        // document.xml: 基座段落 rId2 + 追加段落 rId3 (重编号)
+        let doc = String::from_utf8_lossy(&read_part("word/document.xml")).to_string();
+        assert!(doc.contains("DocA") && doc.contains("DocB"), "两段文本都在");
+        assert!(doc.contains("r:embed=\"rId2\""), "基座段落保留 rId2");
+        assert!(doc.contains("r:embed=\"rId3\""), "追加段落重编号为 rId3");
+
+        // document.xml.rels: rId2 → image1.png (基座), rId3 → doc2_ 媒体
+        let rels = String::from_utf8_lossy(&read_part("word/_rels/document.xml.rels")).to_string();
+        assert!(rels.contains("Target=\"media/image1.png\""), "rId2 指向基座媒体");
+        assert!(
+            rels.contains(&format!("Target=\"{}\"", renamed.strip_prefix("word/").unwrap())),
+            "rId3 指向重命名媒体: {rels}"
+        );
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

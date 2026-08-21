@@ -178,6 +178,74 @@ impl StepResult {
     }
 }
 
+/// 生产接线 SelfTest (T1→T2/T3): 验证声明式重构引擎核心路径,
+/// 注册于 BackgroundLoop 后台循环, 结果喂入分支健康治理。
+pub struct RecipeRefactorSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for RecipeRefactorSelfTest {
+    fn name(&self) -> &str {
+        "nt_act_code::recipe_refactor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let engine = RecipeRefactor::new();
+
+        // 字面替换 + 命中计数
+        let recipe = Recipe {
+            name: "st_rename".to_string(),
+            description: "自测替换".to_string(),
+            steps: vec![RecipeStep::Replace {
+                from: "old_name".to_string(),
+                to: "new_name".to_string(),
+            }],
+        };
+        match engine.apply(&recipe, "old_name + old_name", false) {
+            Ok(res) => {
+                if res.hit_total != 2 {
+                    failures.push(format!("expected 2 hits, got {}", res.hit_total));
+                }
+                if !res.output().contains("new_name") {
+                    failures.push("expected transformed output".into());
+                }
+            }
+            Err(e) => failures.push(format!("apply failed: {e}")),
+        }
+
+        // 正则重写 + 反向引用
+        let regex_recipe = Recipe {
+            name: "st_regex".to_string(),
+            description: "正则替换".to_string(),
+            steps: vec![RecipeStep::RegexReplace {
+                pattern: r"compute_(\w+)".to_string(),
+                to: "calc_$1".to_string(),
+            }],
+        };
+        if let Err(e) = engine.apply(&regex_recipe, "compute_foo()", false) {
+            failures.push(format!("regex apply failed: {e}"));
+        }
+
+        // dry_run 不累计
+        let dry = engine.apply(&recipe, "old_name", true);
+        if let Ok(res) = dry {
+            if res.hit_total != 1 {
+                failures.push("dry-run should report hits".into());
+            }
+        } else {
+            failures.push("dry-run failed".into());
+        }
+        if engine.applied_count() != 2 {
+            failures.push(format!("applied_count = {}, want 2", engine.applied_count()));
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

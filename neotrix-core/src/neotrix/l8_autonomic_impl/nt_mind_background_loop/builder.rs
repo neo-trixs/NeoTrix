@@ -64,12 +64,10 @@ impl BackgroundLoop {
     #[cfg(feature = "stealth-net")]
     pub fn with_proxy_heartbeat(mut self, interval_secs: u64) -> Self {
         use crate::neotrix::nt_shield_stealth_net::{ProxyHeartbeatEngine, FingerprintManager};
-        use crate::neotrix::nt_shield_stealth_net::proxy_pool::ProxyPool;
-        use std::sync::Arc;
+        use crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool;
 
         let fm = FingerprintManager::new();
-        let pool = Arc::new(ProxyPool::new());
-        let engine = ProxyHeartbeatEngine::new(pool, fm, interval_secs);
+        let engine = ProxyHeartbeatEngine::new(global_pool(), fm, interval_secs);
         self.heartbeat_engine = Some(engine);
         self
     }

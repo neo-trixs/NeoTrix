@@ -359,9 +359,42 @@ impl ProxyPool {
         *self.strategy.write().await = strategy;
     }
 
+    /// 同步 (blocking) 选择器 — 供 blocking 下载原语在重试循环内轮换 egress。
+    /// 用 `try_read` 免 async runtime; 锁争用时回退 fastest (同样 try_read),
+    /// 池空返回 None (调用方回退直连/env 代理)。
+    pub fn select_node_blocking(&self) -> Option<ProxyNode> {
+        let nodes = self.nodes.try_read().ok()?;
+        let mut candidates: Vec<ProxyNode> = nodes
+            .iter()
+            .filter(|n| n.latency_ms.is_some() && !n.is_stale())
+            .cloned()
+            .collect();
+        if candidates.is_empty() { return None; }
+        candidates.sort_by(|a, b| {
+            a.latency_ms
+                .partial_cmp(&b.latency_ms)
+                .unwrap_or(Ordering::Equal)
+        });
+        candidates.into_iter().next()
+    }
+
     pub async fn record_strategy_result(&self, host: &str, success: bool) {
         let mut learner = self.learner.write().await;
         let strategy = self.strategy.read().await.clone();
+        if strategy == NodeSelectionStrategy::Adaptive || strategy == NodeSelectionStrategy::Auto {
+            let sub = learner.select_strategy(host);
+            learner.record_reward(host, &sub, success);
+        }
+        if learner.record_count % 20 < 5 {
+            learner.save();
+        }
+    }
+
+    /// 同步失败记账 (blocking 下载原语内 fire-and-forget)。
+    /// `try_write` 免 async; 锁争用时静默放弃 (不影响下载主路径)。
+    pub fn record_strategy_result_blocking(&self, host: &str, success: bool) {
+        let Ok(mut learner) = self.learner.try_write() else { return };
+        let strategy = self.strategy.try_read().map(|s| s.clone()).unwrap_or(NodeSelectionStrategy::Auto);
         if strategy == NodeSelectionStrategy::Adaptive || strategy == NodeSelectionStrategy::Auto {
             let sub = learner.select_strategy(host);
             learner.record_reward(host, &sub, success);
@@ -808,5 +841,117 @@ mod tests {
         let second = pool.select_node_with_strategy(&NodeSelectionStrategy::RoundRobin).await;
         assert!(first.is_some() && second.is_some());
         assert_ne!(first.unwrap().tag, second.unwrap().tag);
+    }
+
+    #[tokio::test]
+    async fn test_heal_if_needed_replenishes_below_min_nodes() {
+        let pool = ProxyPool::new().with_min_nodes(3);
+        pool.add("socks5://a:1080", "a").await;
+        assert_eq!(pool.total_count().await, 1);
+
+        // 无订阅时自愈为 no-op (不 panic, 不联网)。
+        pool.heal_if_needed().await;
+        assert_eq!(pool.total_count().await, 1);
+
+        // 订阅拉取失败时自愈静默降级 (不 panic, 节点数不变)。
+        pool.add_subscription("http://127.0.0.1:9/invalid-sub").await;
+        pool.heal_if_needed().await;
+        assert_eq!(pool.total_count().await, 1);
+
+        // min_nodes 兜底仍可手动补入节点。
+        pool.add_batch(&[
+            ("socks5://b:1080".to_string(), "b".to_string()),
+            ("socks5://c:1080".to_string(), "c".to_string()),
+        ]).await;
+        assert_eq!(pool.total_count().await, 3);
+    }
+
+    #[tokio::test]
+    async fn test_supervisor_replenish_closure_when_below_min() {
+        // 验证 start_supervisor 的补货闭包语义: 低于 min_nodes 才拉订阅, 达到后不再补。
+        let pool = Arc::new(ProxyPool::new().with_min_nodes(2));
+        pool.add_batch(&[
+            ("socks5://a:1080".to_string(), "a".to_string()),
+            ("socks5://b:1080".to_string(), "b".to_string()),
+        ]).await;
+        assert!(pool.total_count().await >= 2, "已达 min_nodes 即无需补货");
+        pool.heal_if_needed().await;
+        assert_eq!(pool.total_count().await, 2, "达到阈值后自愈不重复补货");
+    }
+
+    #[test]
+    fn test_select_node_blocking_empty_pool_returns_none() {
+        let pool = ProxyPool::new();
+        assert!(pool.select_node_blocking().is_none(), "空池 blocking 选择返回 None");
+    }
+
+    #[test]
+    fn test_select_node_blocking_returns_fastest() {
+        let pool = ProxyPool::new();
+        // 无 runtime 场景无法 await add — 直接用 try_write 注入节点 (blocking 同步路径)。
+        let mut nodes = pool.nodes.try_write().unwrap();
+        nodes.push(ProxyNode {
+            url: "socks5://slow:1080".into(),
+            tag: "slow".into(),
+            latency_ms: Some(500.0),
+            last_success: Some(Instant::now()),
+            fail_count: 0,
+            success_count: 10,
+            from_subscription: false,
+            geo_tag: None,
+            ip_addr: None,
+            timezone: None,
+        });
+        nodes.push(ProxyNode {
+            url: "socks5://fast:1080".into(),
+            tag: "fast".into(),
+            latency_ms: Some(50.0),
+            last_success: Some(Instant::now()),
+            fail_count: 0,
+            success_count: 10,
+            from_subscription: false,
+            geo_tag: None,
+            ip_addr: None,
+            timezone: None,
+        });
+        drop(nodes);
+
+        let sel = pool.select_node_blocking().expect("应选出节点");
+        assert_eq!(sel.tag, "fast", "blocking 选择返回最低延迟节点");
+    }
+
+    #[test]
+    fn test_select_node_blocking_filters_stale_and_unmeasured() {
+        let pool = ProxyPool::new();
+        let mut nodes = pool.nodes.try_write().unwrap();
+        // 无 latency (未健康检查) — 应被过滤
+        nodes.push(ProxyNode {
+            url: "socks5://unmeasured:1080".into(),
+            tag: "unmeasured".into(),
+            latency_ms: None,
+            last_success: None,
+            fail_count: 0,
+            success_count: 0,
+            from_subscription: false,
+            geo_tag: None,
+            ip_addr: None,
+            timezone: None,
+        });
+        // stale (last_success 过久) — 应被过滤
+        nodes.push(ProxyNode {
+            url: "socks5://stale:1080".into(),
+            tag: "stale".into(),
+            latency_ms: Some(10.0),
+            last_success: Some(Instant::now() - Duration::from_secs(3600)),
+            fail_count: 0,
+            success_count: 0,
+            from_subscription: false,
+            geo_tag: None,
+            ip_addr: None,
+            timezone: None,
+        });
+        drop(nodes);
+
+        assert!(pool.select_node_blocking().is_none(), "只有 stale/未测节点时返回 None");
     }
 }

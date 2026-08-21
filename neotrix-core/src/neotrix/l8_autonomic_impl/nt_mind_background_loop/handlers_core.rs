@@ -283,6 +283,21 @@ impl BackgroundLoopHandle {
         }
     }
 
+    #[cfg(feature = "stealth-net")]
+    pub(crate) async fn handle_proxy_heartbeat(&mut self) {
+        if let Some(ref engine) = self.heartbeat_engine {
+            let record = engine.tick().await;
+            log::info!(
+                "[bg] proxy_heartbeat tick={} success={} proxy={} dns_flushed={}",
+                record.tick, record.success, record.proxy_url, record.dns_flushed,
+            );
+        }
+        if let Some(ref client) = self.proxy_client {
+            let reachable = client.is_reachable().await;
+            log::info!("[bg] proxy_daemon reachable={}", reachable);
+        }
+    }
+
     pub(crate) async fn handle_always_on(&mut self) {
         if self.always_on.enabled {
             if let Ok(r) = self.always_on.full_cycle() {

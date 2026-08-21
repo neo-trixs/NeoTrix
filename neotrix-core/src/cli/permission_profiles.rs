@@ -12,6 +12,21 @@ pub enum ProfileDecision {
     Ask,
 }
 
+impl ProfileDecision {
+    /// 单调收紧 (策略单调性不变量, NT-SHIELD policy_monotonic_invariant):
+    /// 新决策只能把规则收紧到更严格 (Allow→Ask/Deny, Ask→Deny), 永不放宽已保存策略。
+    /// Deny 不可被覆盖为 Ask/Allow; Ask 不可被覆盖为 Allow。
+    pub fn tightened_with(&self, incoming: &ProfileDecision) -> ProfileDecision {
+        match (self, incoming) {
+            (ProfileDecision::Deny, _) => ProfileDecision::Deny,
+            (ProfileDecision::Ask, ProfileDecision::Allow) => ProfileDecision::Ask,
+            (_, ProfileDecision::Deny) => ProfileDecision::Deny,
+            (ProfileDecision::Ask, ProfileDecision::Ask) => ProfileDecision::Ask,
+            (ProfileDecision::Allow, _) => *incoming,
+        }
+    }
+}
+
 /// A named, inheritable permission profile.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionProfile {
@@ -271,9 +286,15 @@ pub fn set_rule(profile_name: &str, action_key: &str, decision: &str) -> Result<
         .profiles
         .get_mut(profile_name)
         .ok_or_else(|| format!("Profile '{}' not found.", profile_name))?;
-    profile.rules.insert(action_key.to_string(), decision);
+    // 策略单调性不变量: 新决策只能收紧已保存规则, 永不放宽 (policy_monotonic_invariant)
+    let effective = profile
+        .rules
+        .get(action_key)
+        .map(|existing| existing.tightened_with(&decision))
+        .unwrap_or(decision);
+    profile.rules.insert(action_key.to_string(), effective);
     save_profiles_to_disk(&guard)?;
-    Ok(format!("Set rule: {} → {:?} in profile '{}'", action_key, decision, profile_name))
+    Ok(format!("Set rule: {} → {:?} in profile '{}'", action_key, effective, profile_name))
 }
 
 /// Public API: get profile info (rules, parent, effective mode).
@@ -528,6 +549,22 @@ mod tests {
 
         // invalid decision
         assert!(set_rule("nt_shield", "foo", "maybe").is_err());
+
+        // 策略单调性不变量 (policy_monotonic_invariant): Deny 不可被放宽
+        assert!(set_rule("nt_shield", "mono_guard", "deny").is_ok());
+        assert!(set_rule("nt_shield", "mono_guard", "allow").is_ok()); // 尝试放宽 → 应保持 Deny
+        {
+            let guard = global_profile_manager().lock().unwrap();
+            let profile = guard.profiles.get("nt_shield").unwrap();
+            assert_eq!(profile.rules.get("mono_guard"), Some(&ProfileDecision::Deny), "Deny 不可被放宽为 Allow");
+        }
+        // Allow 可被收紧为 Deny
+        assert!(set_rule("nt_shield", "mono_guard", "deny").is_ok());
+        {
+            let guard = global_profile_manager().lock().unwrap();
+            let profile = guard.profiles.get("nt_shield").unwrap();
+            assert_eq!(profile.rules.get("mono_guard"), Some(&ProfileDecision::Deny));
+        }
 
         // switch profile
         assert!(switch_profile("developer").is_ok());

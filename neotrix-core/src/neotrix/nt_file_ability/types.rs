@@ -46,6 +46,10 @@ pub enum FileKind {
     Audio,
     /// 视频 (mp4/avi/mkv/mov/webm)
     Video,
+    /// ZIM 离线百科/知识库 (zim crate 解析)
+    Zim,
+    /// PMTiles 矢量地图瓦片 (pmtiles crate 解析)
+    PMTiles,
     /// 其他二进制
     Binary,
 }
@@ -60,13 +64,15 @@ impl FileKind {
             FileKind::Image => SpecialistType::ImageGenerator,
             FileKind::Audio => SpecialistType::CreativityGenerator,
             FileKind::Video => SpecialistType::CreativityGenerator,
+            FileKind::Zim => SpecialistType::KnowledgeRetriever,
+            FileKind::PMTiles => SpecialistType::KnowledgeIntegrator,
             FileKind::Binary => SpecialistType::PatternMatcher,
         }
     }
 
     /// 是否为文本可提取类
     pub(super) fn is_textual(&self) -> bool {
-        matches!(self, FileKind::Office(_) | FileKind::Text | FileKind::Pdf)
+        matches!(self, FileKind::Office(_) | FileKind::Text | FileKind::Pdf | FileKind::Zim)
     }
 
     /// 是否为 Office 格式

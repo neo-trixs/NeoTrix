@@ -8,12 +8,20 @@
 //! - `resolve_safe_origin` 提供 connect-期 DNS pinning,防 DNS rebinding (TOCTOU)
 #![forbid(unsafe_code)]
 
+use std::fs::File;
+use std::io::{Read, Write};
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 const USER_AGENT: &str = "NeoTrix/0.19 (nt_http)";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+/// 断点续传下载的总生命周期超时 (reqwest `.timeout()` 覆盖整个请求含 body 读取)。
+/// 大文件需要宽松预算; 挂起由该超时兜底 → 外层网络错误重试。
+const DOWNLOAD_TOTAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+/// 断点续传下载单块读取大小。
+const DOWNLOAD_CHUNK_SIZE: usize = 64 * 1024;
 
 /// 在 tokio runtime 上下文内执行阻塞闭包时用 block_in_place 包裹,
 /// 避免 reqwest::blocking 内部 runtime 创建/drop 在异步上下文 panic
@@ -216,7 +224,349 @@ pub(crate) async fn fetch_safe_http_async(url: &str) -> Result<(String, String),
     Ok((body, host))
 }
 
+/// 断点续传下载原语配置 (吸收 project-nomad `downloads.ts` 模式)。
+///
+/// 对齐的可靠性模式:
+/// - `.tmp` 暂存 + 原子 rename — 消费者永不见半成品
+/// - Range 断点续传 — 从已下载字节偏移恢复
+/// - 服务器文件缩小丢弃 stale partial — 防止 416 死循环 (openZIM 滚动构建)
+/// - 服务器忽略 Range (200) 降级重试 — 防 .tmp 损坏
+/// - 非 200/206 一律失败 (含 3xx — redirect 保持 SSRF 安全)
+/// - 网络错误重试 (仅 ECONNRESET/ENOTFOUND/ETIMEDOUT 语义)
+/// - 自定义 UA — Wikimedia/Cloudflare CDN 403 规避
+/// - 可选 MIME 白名单 + 大小上限
+pub(crate) struct DownloadOptions<'a> {
+    pub url: &'a str,
+    pub dest: &'a Path,
+    /// 覆盖默认 UA (默认 `NeoTrix/0.19 (nt_http)`)。上游 403 时设可辨识 UA。
+    pub user_agent: Option<&'a str>,
+    /// MIME 白名单 (substring 匹配); 空 = 跳过检查。
+    pub allowed_mime_types: &'a [&'a str],
+    /// 最大下载字节数; 0 = 不限制。
+    pub max_bytes: u64,
+    /// 总生命周期超时 (默认 300s, 覆盖整个请求含 body 读取)。
+    pub total_timeout: Option<std::time::Duration>,
+    /// 代理地址 (如 `socks5h://127.0.0.1:9050`)。fake-ip 分流网络下直连超时,
+    /// 经此代理路由。None = 直连 (保留 SSRF pin)。
+    pub proxy: Option<&'a str>,
+    /// 启用代理池轮换 (C5 nt_shield_stealth_net::proxy_pool): 每次重试尝试前从池
+    /// 选最快可用节点作为 egress。池空/锁争用 → 回退 `proxy`, 再回退直连。
+    /// 与 `host` 配合做失败记账 (RL 策略学习器)。
+    pub proxy_pool: bool,
+    /// 下载目标 host — 供代理池失败记账 (record_strategy_result_blocking) 按域学习。
+    pub host: Option<&'a str>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct DownloadResult {
+    pub path: PathBuf,
+    pub bytes_written: u64,
+    /// 是否从已有 .tmp 断点续传。
+    pub resumed: bool,
+}
+
+/// 断点续传下载到文件 (blocking)。返回最终文件路径。
+/// 网络错误自动重试 (最多 3 次, 指数退避 2s→8s)。HTTP 4xx/5xx 不重试。
+pub(crate) fn download_to_file(opts: &DownloadOptions<'_>) -> Result<DownloadResult, String> {
+    download_to_file_with_retry(opts, 3)
+}
+
+/// 断点续传下载到文件 (blocking), 指定重试次数。
+/// 网络错误重试; 非网络错误 (SSRF guard / HTTP 4xx-5xx / MIME 拒绝) 立即返回。
+/// 启用 `proxy_pool` 时, 每次尝试前从全局代理池选最快节点轮换 egress,
+/// 失败记账回传池学习器 (`record_strategy_result_blocking`)。
+pub(crate) fn download_to_file_with_retry(
+    opts: &DownloadOptions<'_>,
+    max_retries: u32,
+) -> Result<DownloadResult, String> {
+    run_blocking(|| {
+        let mut wait = std::time::Duration::from_secs(2);
+        let mut last_err: Option<String> = None;
+        // 池节点 URL 缓冲 — 存活于整个重试循环, 供按次轮换 egress。
+        let mut pool_proxy_buf: Option<String> = None;
+        for attempt in 0..=max_retries {
+            if opts.proxy_pool {
+                pool_proxy_buf = pool_select_blocking();
+            }
+            let attempt_opts = DownloadOptions {
+                url: opts.url,
+                dest: opts.dest,
+                user_agent: opts.user_agent,
+                allowed_mime_types: opts.allowed_mime_types,
+                max_bytes: opts.max_bytes,
+                total_timeout: opts.total_timeout,
+                proxy: if opts.proxy_pool {
+                    pool_proxy_buf.as_deref().or(opts.proxy)
+                } else {
+                    opts.proxy
+                },
+                proxy_pool: false,
+                host: opts.host,
+            };
+            match download_to_file_inner(&attempt_opts) {
+                Ok(ok) => {
+                    if opts.proxy_pool {
+                        pool_record_result(opts.host, true);
+                    }
+                    return Ok(ok);
+                }
+                Err(e) => {
+                    let retriable = is_retriable_network_err(&e);
+                    if opts.proxy_pool {
+                        pool_record_result(opts.host, false);
+                    }
+                    if retriable && attempt < max_retries {
+                        std::thread::sleep(wait);
+                        wait = (wait * 2).min(std::time::Duration::from_secs(8));
+                        continue;
+                    }
+                    last_err = Some(e);
+                    if attempt >= max_retries {
+                        break;
+                    }
+                    return Err(last_err.take().unwrap_or_else(|| "download failed".into()));
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| "download failed".to_string()))
+    })
+}
+
+#[cfg(feature = "stealth-net")]
+fn pool_select_blocking() -> Option<String> {
+    crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool()
+        .select_node_blocking()
+        .map(|n| n.url.clone())
+}
+
+#[cfg(feature = "stealth-net")]
+fn pool_record_result(host: Option<&str>, success: bool) {
+    if let Some(host) = host {
+        crate::neotrix::nt_shield_stealth_net::proxy_pool::global_pool()
+            .record_strategy_result_blocking(host, success);
+    }
+}
+
+#[cfg(not(feature = "stealth-net"))]
+fn pool_select_blocking() -> Option<String> {
+    None
+}
+
+#[cfg(not(feature = "stealth-net"))]
+fn pool_record_result(_host: Option<&str>, _success: bool) {}
+
+/// 判定错误是否属于可重试网络错误 (project-nomad: ECONNRESET/ENOTFOUND/ETIMEDOUT 语义)。
+/// 非网络错误 (SSRF guard 拒绝 / HTTP 状态码 / MIME 拒绝) 不重试 — 保证 guard 语义不被绕过。
+fn is_retriable_network_err(e: &str) -> bool {
+    e.contains("timed out") || e.contains("Connection reset") || e.contains("connect error")
+        || e.contains("peer closed") || e.contains("connection closed") || e.contains("refused")
+}
+
+fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, String> {
+    let (addr, parsed) = resolve_safe_origin(opts.url)?;
+    let host = parsed.host_str().ok_or("no host")?.to_string();
+
+    let dir = opts.dest.parent().ok_or("dest has no parent dir")?;
+    std::fs::create_dir_all(dir).map_err(|e| format!("mkdir {}: {e}", dir.display()))?;
+
+    // .tmp 暂存: 消费者永不见半成品 (project-nomad 模式)
+    let temp_path = PathBuf::from(format!("{}.tmp", opts.dest.display()));
+
+    // 断点续传: 检测已有 .tmp 偏移
+    let mut start_byte: u64 = 0;
+    let mut append_mode = false;
+    if let Ok(meta) = std::fs::metadata(&temp_path) {
+        start_byte = meta.len();
+        append_mode = true;
+    }
+
+    // 自定义 UA (Wikimedia/Cloudflare 403 规避)
+    let ua = opts.user_agent.unwrap_or(USER_AGENT);
+
+    // HEAD 预检: 大小 / accept-ranges / MIME
+    let mut cbuilder = reqwest::blocking::Client::builder()
+        .user_agent(ua)
+        .timeout(opts.total_timeout.unwrap_or(DOWNLOAD_TOTAL_TIMEOUT))
+        .connect_timeout(CONNECT_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .resolve(&host, addr);
+    if let Some(proxy) = opts.proxy {
+        match reqwest::Proxy::all(proxy) {
+            Ok(p) => {
+                cbuilder = cbuilder.proxy(p);
+            }
+            Err(e) => {
+                return Err(format!("invalid proxy {proxy:?}: {e}"));
+            }
+        }
+    }
+    let pin_client = cbuilder
+        .build()
+        .map_err(|e| format!("pin client: {e}"))?;
+
+    let head = pin_client
+        .head(opts.url)
+        .send()
+        .map_err(|e| format!("head: {e}"))?;
+    if !head.status().is_success() {
+        return Err(format!("HEAD HTTP {}", head.status()));
+    }
+    let total_bytes: u64 = head
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let supports_range = head
+        .headers()
+        .get("accept-ranges")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.eq_ignore_ascii_case("bytes"))
+        .unwrap_or(false);
+    let content_type = head
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .to_string();
+
+    // MIME 白名单校验
+    if !opts.allowed_mime_types.is_empty() {
+        let allowed = opts
+            .allowed_mime_types
+            .iter()
+            .any(|m| content_type.contains(m));
+        if !allowed {
+            return Err(format!("MIME type {} is not allowed", content_type));
+        }
+    }
+
+    // 幂等: 最终文件已存在且大小正确 → 直接返回
+    if let Ok(fmeta) = std::fs::metadata(opts.dest) {
+        if fmeta.len() == total_bytes && total_bytes > 0 {
+            return Ok(DownloadResult {
+                path: opts.dest.to_path_buf(),
+                bytes_written: total_bytes,
+                resumed: false,
+            });
+        }
+    }
+
+    // .tmp 已完整但未 rename → 直接 rename
+    if start_byte == total_bytes && total_bytes > 0 {
+        std::fs::rename(&temp_path, opts.dest)
+            .map_err(|e| format!("rename complete tmp: {e}"))?;
+        return Ok(DownloadResult {
+            path: opts.dest.to_path_buf(),
+            bytes_written: total_bytes,
+            resumed: true,
+        });
+    }
+
+    // 服务器不支持 range 且有 partial → 删除重来
+    if !supports_range && start_byte > 0 {
+        let _ = std::fs::remove_file(&temp_path);
+        start_byte = 0;
+        append_mode = false;
+    }
+
+    // 服务器文件缩小 (openZIM 滚动构建) → 丢弃 stale partial, 防 416 死循环
+    if start_byte > total_bytes && total_bytes > 0 {
+        let _ = std::fs::remove_file(&temp_path);
+        start_byte = 0;
+        append_mode = false;
+    }
+
+    // 大小上限预检
+    if opts.max_bytes > 0 && total_bytes > opts.max_bytes {
+        return Err(format!(
+            "download exceeds max_bytes ({} > {})",
+            total_bytes, opts.max_bytes
+        ));
+    }
+
+    // Range 头 (支持时)
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(reqwest::header::USER_AGENT, reqwest::header::HeaderValue::from_str(ua).map_err(|e| format!("UA: {e}"))?);
+    if supports_range && start_byte > 0 {
+        let range = format!("bytes={}-", start_byte);
+        headers.insert(
+            reqwest::header::RANGE,
+            reqwest::header::HeaderValue::from_str(&range).map_err(|e| format!("Range: {e}"))?,
+        );
+    }
+
+    let get = pin_client.get(opts.url).headers(headers.clone());
+    let mut resp = get.send().map_err(|e| format!("get: {e}"))?;
+    let status = resp.status();
+    if status != reqwest::StatusCode::OK && status != reqwest::StatusCode::PARTIAL_CONTENT {
+        return Err(format!("GET HTTP {}", status));
+    }
+
+    // 请求了 range 但服务器返回 200 (忽略 Range) → 丢弃重来, 防 .tmp 损坏
+    if headers.contains_key(reqwest::header::RANGE) && status == reqwest::StatusCode::OK {
+        drop(resp);
+        let _ = std::fs::remove_file(&temp_path);
+        start_byte = 0;
+        append_mode = false;
+        headers.remove(reqwest::header::RANGE);
+        let get2 = pin_client.get(opts.url).headers(headers.clone());
+        resp = get2.send().map_err(|e| format!("get2: {e}"))?;
+        let s2 = resp.status();
+        if s2 != reqwest::StatusCode::OK && s2 != reqwest::StatusCode::PARTIAL_CONTENT {
+            return Err(format!("GET2 HTTP {}", s2));
+        }
+    }
+
+    // 流式写入 + 读超时兜底 (stall: 连接挂起时 read 最终超时报错, 由外层 retry)
+    let mut out: File = if append_mode {
+        File::options()
+            .append(true)
+            .open(&temp_path)
+            .map_err(|e| format!("append open {}: {e}", temp_path.display()))?
+    } else {
+        File::create(&temp_path)
+            .map_err(|e| format!("create {}: {e}", temp_path.display()))?
+    };
+
+    let mut buf = vec![0u8; DOWNLOAD_CHUNK_SIZE];
+    let mut written: u64 = start_byte;
+    loop {
+        let n = resp
+            .read(&mut buf)
+            .map_err(|e| format!("read: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        written += n as u64;
+        if opts.max_bytes > 0 && written > opts.max_bytes {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(format!("download exceeded max_bytes {}", opts.max_bytes));
+        }
+        out.write_all(&buf[..n])
+            .map_err(|e| format!("write: {e}"))?;
+    }
+    out.flush().map_err(|e| format!("flush: {e}"))?;
+    drop(out);
+
+    // 原子 rename 完成
+    std::fs::rename(&temp_path, opts.dest)
+        .map_err(|e| format!("rename final: {e}"))?;
+
+    Ok(DownloadResult {
+        path: opts.dest.to_path_buf(),
+        bytes_written: written,
+        resumed: start_byte > 0,
+    })
+}
+
 fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    let allow_fake_ip = std::env::var("NEOTRIX_ALLOW_FAKE_IP").as_deref() == Ok("1");
+    is_private_ip_with(ip, allow_fake_ip)
+}
+
+/// 带 fake-ip 放行开关的私有地址判定 (纯函数, 便于测试 fake-ip 隧道环境)。
+fn is_private_ip_with(ip: std::net::IpAddr, allow_fake_ip: bool) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => {
             // std 已覆盖: loopback/private(10,172.16-31,192.168)/link-local(169.254)
@@ -225,14 +575,22 @@ fn is_private_ip(ip: std::net::IpAddr) -> bool {
                 || v4.is_unspecified() || v4.is_documentation()
                 // CGNAT 100.64.0.0/10 — is_private() 不覆盖 (RFC 6598)
                 || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 0x40)
-                // benchmarking 198.18.0.0/15 (RFC 2544) — 公网可达但禁止路由进服务
-                || (v4.octets()[0] == 198 && (v4.octets()[1] & 0xfe) == 0x12)
+                // benchmarking 198.18.0.0/15 (RFC 2544) — 公网可达但禁止路由进服务。
+                // fake-ip 分流网络 (198.18.x 透明隧道, 见 CONTEXT fake-ip 策略) 下
+                // DNS 污染会把公网域名解析到 198.18.x — 该段实为公网转发隧道而非本地
+                // 私有服务, 需显式 NEOTRIX_ALLOW_FAKE_IP=1 才放行 (默认保持拒绝)。
+                || ((v4.octets()[0] == 198 && (v4.octets()[1] & 0xfe) == 0x12) && !allow_fake_ip)
                 // 240.0.0.0/4 reserved + 0.0.0.0/8
                 || v4.octets()[0] >= 240 || v4.octets()[0] == 0
         }
         std::net::IpAddr::V6(v6) => {
             if let Some(v4) = v6.to_ipv4_mapped() {
                 return is_private_ip(std::net::IpAddr::V4(v4));
+            }
+            // fake-ip 隧道 ULA (Clash 系默认 fdfe:dcba:9876::/48) — allow_fake_ip 时放行
+            let is_fake_ip_ula = v6.segments()[0..4] == [0xfdfe, 0xdcba, 0x9876, 0x0000];
+            if is_fake_ip_ula && allow_fake_ip {
+                return false;
             }
             v6.is_loopback() || v6.is_unspecified() || v6.is_unique_local()
                 || v6.is_unicast_link_local() || v6.is_multicast()
@@ -295,6 +653,24 @@ mod tests {
     }
 
     #[test]
+    fn is_private_ip_fake_ip_env_override() {
+        use std::net::IpAddr;
+        // 默认 (allow_fake_ip=false): 198.18/15 拒绝 (RFC 2544)
+        assert!(is_private_ip_with(IpAddr::V4("198.18.0.1".parse().unwrap()), false));
+        // allow_fake_ip=true: fake-ip 透明隧道放行
+        assert!(!is_private_ip_with(IpAddr::V4("198.18.0.5".parse().unwrap()), true));
+        // fake-ip 隧道 ULA (Clash 系 fdfe:dcba:9876::/48) — allow 时放行
+        assert!(is_private_ip_with("fdfe:dcba:9876::12".parse().unwrap(), false));
+        assert!(!is_private_ip_with("fdfe:dcba:9876::12".parse().unwrap(), true));
+        // 其他私有段不受 override 影响 (仍拒绝)
+        assert!(is_private_ip_with(IpAddr::V4("10.0.0.1".parse().unwrap()), true));
+        assert!(is_private_ip_with(IpAddr::V4("192.168.1.1".parse().unwrap()), true));
+        assert!(is_private_ip_with(IpAddr::V4("100.64.0.1".parse().unwrap()), true));
+        // 非 fake-ip ULA (其他 fdfe 变体) 仍拒绝
+        assert!(is_private_ip_with("fd00::1".parse().unwrap(), true));
+    }
+
+    #[test]
     fn resolve_safe_origin_rejects_cgnat_literal() {
         // CGNAT 块走 IP 字面量路径直接拒绝
         assert!(resolve_safe_origin("http://100.64.0.1/").is_err());
@@ -326,6 +702,81 @@ mod tests {
         assert!(
             !err.starts_with("HTTP 429") && !err.starts_with("HTTP 503"),
             "non-429/503 error must not be retried: {err}"
+        );
+    }
+
+    #[test]
+    fn is_retriable_network_err_heuristics() {
+        // 网络错误语义 → 可重试
+        assert!(is_retriable_network_err("connection timed out"));
+        assert!(is_retriable_network_err("Connection reset by peer"));
+        assert!(is_retriable_network_err("connect error: refused"));
+        assert!(is_retriable_network_err("peer closed connection"));
+        // 非网络错误 (guard / HTTP 状态 / MIME) → 不重试 (R-P42 guard 语义)
+        assert!(!is_retriable_network_err("private/reserved resolved IP rejected"));
+        assert!(!is_retriable_network_err("MIME type text/html is not allowed"));
+        assert!(!is_retriable_network_err("GET HTTP 404"));
+        assert!(!is_retriable_network_err("HEAD HTTP 403"));
+    }
+
+    #[test]
+    fn download_rejects_ssrf_guard_without_retry() {
+        // SSRF guard 拒绝 (loopback) 必须立即失败, 不得进入重试循环 (R-P42/R-P107)
+        let opts = DownloadOptions {
+            url: "http://127.0.0.1:8080/secret",
+            dest: Path::new("/tmp/neotrix-download-ssrf-test"),
+            user_agent: None,
+            allowed_mime_types: &[],
+            max_bytes: 0,
+            total_timeout: None,
+                    proxy: None,
+                    proxy_pool: false,
+                    host: None,
+        };
+        let err = download_to_file_with_retry(&opts, 3).unwrap_err();
+        assert!(
+            err.contains("private") || err.contains("reject") || err.contains("loopback"),
+            "guard error surfaced: {err}"
+        );
+    }
+
+    #[test]
+    fn download_rejects_userinfo_credentials() {
+        // URL 内嵌 userinfo — guard 必须拒绝
+        let opts = DownloadOptions {
+            url: "https://user:pass@codeload.github.com/owner/repo/tar.gz/refs/heads/main",
+            dest: Path::new("/tmp/neotrix-download-userinfo-test"),
+            user_agent: None,
+            allowed_mime_types: &[],
+            max_bytes: 0,
+            total_timeout: None,
+                    proxy: None,
+                    proxy_pool: false,
+                    host: None,
+        };
+        let err = download_to_file(&opts).unwrap_err();
+        assert!(err.contains("credentials"), "userinfo rejected: {err}");
+    }
+
+    #[test]
+    fn download_proxy_pool_enabled_falls_back_to_guard_semantics() {
+        // proxy_pool=true 时: 池空 → select_node_blocking 返回 None → 回退直连。
+        // SSRF guard 语义必须保持 (guard 错误不因池轮换被绕过)。
+        let opts = DownloadOptions {
+            url: "http://127.0.0.1:8080/secret",
+            dest: Path::new("/tmp/neotrix-download-ssrf-pool-test"),
+            user_agent: None,
+            allowed_mime_types: &[],
+            max_bytes: 0,
+            total_timeout: None,
+                    proxy: None,
+                    proxy_pool: true,
+                    host: Some("codeload.github.com"),
+        };
+        let err = download_to_file_with_retry(&opts, 3).unwrap_err();
+        assert!(
+            err.contains("private") || err.contains("reject") || err.contains("loopback"),
+            "pool-enabled path keeps guard error: {err}"
         );
     }
 }

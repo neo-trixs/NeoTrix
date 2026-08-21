@@ -62,6 +62,32 @@ impl FileAbility {
             });
         }
 
+        // 1.5) ZIM / PMTiles 明确扩展名识别
+        if ext == "zim" {
+            return Ok(Self {
+                path,
+                kind: FileKind::Zim,
+                mime_type: "application/zim".to_string(),
+                size_bytes,
+                has_consumers: false,
+                maturity: ConstellationLevel::C1UnitTest,
+                e8_state: ReasoningHexagram::new(0b001100),
+                doc: None,
+            });
+        }
+        if ext == "pmtiles" {
+            return Ok(Self {
+                path,
+                kind: FileKind::PMTiles,
+                mime_type: "application/pmtiles".to_string(),
+                size_bytes,
+                has_consumers: false,
+                maturity: ConstellationLevel::C1UnitTest,
+                e8_state: ReasoningHexagram::new(0b001100),
+                doc: None,
+            });
+        }
+
         // 2) 其余交给 neotrix-types FileParser 探测
         let data = std::fs::read(&path).map_err(FileAbilityError::Io)?;
         let parsed = neotrix_types::core::file_parser::FileParser::detect_format(
@@ -139,18 +165,70 @@ impl FileAbility {
 
     /// 提取纯文本 — office 走 office_oxide, 通用格式走 FileParser
     pub fn plain_text(&self) -> String {
-        if let Some(doc) = &self.doc {
-            doc.plain_text()
-        } else if let Ok(data) = std::fs::read(&self.path) {
-            neotrix_types::core::file_parser::FileParser::extract_text(
-                &self.path.to_string_lossy(),
-                &self.mime_type,
-                &data,
-            )
-            .text
-        } else {
-            String::new()
+        match self.kind {
+            FileKind::Office(_) => {
+                if let Some(doc) = &self.doc {
+                    doc.plain_text()
+                } else {
+                    String::new()
+                }
+            }
+            FileKind::Zim => self.extract_zim_text(),
+            FileKind::PMTiles => self.extract_pmtiles_text(),
+            _ => {
+                if let Ok(data) = std::fs::read(&self.path) {
+                    neotrix_types::core::file_parser::FileParser::extract_text(
+                        &self.path.to_string_lossy(),
+                        &self.mime_type,
+                        &data,
+                    )
+                    .text
+                } else {
+                    String::new()
+                }
+            }
         }
+    }
+
+    fn extract_zim_text(&self) -> String {
+        let data = match std::fs::read(&self.path) {
+            Ok(d) => d,
+            Err(_) => return String::new(),
+        };
+        let temp_path = std::env::temp_dir().join(format!("zim_{}.tmp", std::process::id()));
+        if std::fs::write(&temp_path, &data).is_err() {
+            return String::new();
+        }
+        let zim = match zim::Zim::new(&temp_path) {
+            Ok(z) => z,
+            Err(_) => {
+                let _ = std::fs::remove_file(&temp_path);
+                return String::new();
+            }
+        };
+        let mut texts = Vec::new();
+        for entry_result in zim.iterate_by_urls() {
+            if let Ok(entry) = entry_result {
+                if let Ok(Some(content)) = zim.entry_content(&entry) {
+                    let text = content.with(|bytes| String::from_utf8_lossy(bytes).into_owned()).unwrap_or_default();
+                    texts.push(text);
+                }
+            }
+        }
+        let _ = std::fs::remove_file(&temp_path);
+        texts.join("\n\n")
+    }
+
+    fn extract_pmtiles_text(&self) -> String {
+        if let Ok(data) = std::fs::read(&self.path) {
+            if let Ok(header) = pmtiles::Header::try_from_bytes(bytes::Bytes::copy_from_slice(&data)) {
+                return format!(
+                    "PMTiles: (zoom {}-{}, type: {:?}, compression: {:?})",
+                    header.min_zoom, header.max_zoom, header.tile_type, header.tile_compression
+                );
+            }
+        }
+        String::new()
     }
 
     /// 转 Markdown (仅 Office 格式支持; 其余返回 plain_text)

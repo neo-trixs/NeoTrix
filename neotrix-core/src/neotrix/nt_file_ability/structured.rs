@@ -1,4 +1,4 @@
-//! 结构化数据读写 (D5/D6): JSON/YAML 读写 + ContentSnapshot 快照存读。
+//! 结构化数据读写 (D5/D6): JSON/YAML/ZIM/PMTiles 读写 + ContentSnapshot 快照存读。
 
 use std::path::Path;
 
@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use super::encoding::decode_bytes;
 use super::types::{ContentSnapshot, FileAbilityError, Result};
+
+
 
 /// 结构化文件读取结果 — 统一 JSON/YAML 为 serde_json::Value
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -38,6 +40,52 @@ pub fn read_structured(path: impl AsRef<Path>) -> Result<StructuredData> {
             Ok(StructuredData {
                 format: "yaml".to_string(),
                 value,
+            })
+        }
+        "zim" => {
+            let temp_path = std::env::temp_dir().join(format!("zim_{}.tmp", std::process::id()));
+            std::fs::write(&temp_path, raw).map_err(FileAbilityError::Io)?;
+            let zim: zim::Zim = zim::Zim::new(&temp_path).map_err(|e| FileAbilityError::Parse(e.to_string()))?;
+            let mut entries = Vec::new();
+            for entry_result in zim.iterate_by_urls() {
+                if let Ok(entry) = entry_result {
+                    if let Ok(Some(content)) = zim.entry_content(&entry) {
+                        let text = content.with(|bytes| {
+                            String::from_utf8_lossy(bytes).chars().take(5000).collect::<String>()
+                        }).unwrap_or_default();
+                        entries.push(serde_json::json!({
+                            "title": entry.title,
+                            "url": entry.url,
+                            "text": text,
+                        }));
+                    }
+                }
+            }
+            let _ = std::fs::remove_file(&temp_path);
+            Ok(StructuredData {
+                format: "zim".to_string(),
+                value: serde_json::json!({"entries": entries}),
+            })
+        }
+"pmtiles" => {
+            let header: pmtiles::Header = pmtiles::Header::try_from_bytes(bytes::Bytes::copy_from_slice(&raw))
+                .map_err(|e| FileAbilityError::Parse(e.to_string()))?;
+            // 仅使用公开字段
+            let metadata = serde_json::json!({
+                "min_zoom": header.min_zoom,
+                "max_zoom": header.max_zoom,
+                "min_longitude": header.min_longitude,
+                "min_latitude": header.min_latitude,
+                "max_longitude": header.max_longitude,
+                "max_latitude": header.max_latitude,
+                "tile_type": format!("{:?}", header.tile_type),
+                "tile_compression": format!("{:?}", header.tile_compression),
+                "n_addressed_tiles": header.n_addressed_tiles().map(|v| v.get()),
+                "n_tile_entries": header.n_tile_entries().map(|v| v.get()),
+            });
+            Ok(StructuredData {
+                format: "pmtiles".to_string(),
+                value: metadata,
             })
         }
         other => Err(FileAbilityError::UnsupportedFormat {

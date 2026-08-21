@@ -1514,6 +1514,11 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(
             crate::neotrix::l8_autonomic_impl::nt_repair_causal_trace::CausalTraceSelfTest,
         ));
+        // ── 声明式重构引擎 SelfTest (recipe_refactor 接线, T1→T2) ──
+        // T3: results 流入 set_branch_health_from_self_tests (见下) 驱动分支健康。
+        self_tests.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_act_code::recipe_refactor::RecipeRefactorSelfTest,
+        ));
         // ── 统一文件能力 SelfTest (nt_file_ability 救活接线, T1→T2) ──
         // T3: results 流入 set_branch_health_from_self_tests (见下) 驱动分支健康。
         self_tests.register(Box::new(

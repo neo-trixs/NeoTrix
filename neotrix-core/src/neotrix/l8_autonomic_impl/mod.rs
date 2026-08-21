@@ -12,6 +12,8 @@ pub mod nt_mind_build_runner;
 pub mod nt_mind_background_config;
 pub mod nt_mind_benchmark;
 pub mod nt_mind_cleanup;
+pub mod nt_mind_repair;
+pub mod nt_mind_recovery_verify;
 // nt_mind_consciousness_gold_standard and nt_mind_consciousness_monitor
 // have been migrated to L9 (l9_transcendent_impl/).
 // Re-exported from neotrix/mod.rs via l9_transcendent_impl.

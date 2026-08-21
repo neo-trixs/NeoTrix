@@ -28,6 +28,8 @@ pub mod nt_io_session_recovery;
 pub mod nt_io_agents_md;
 pub mod nt_io_digital_human;
 pub mod nt_io_neocodex;
+#[cfg(feature = "wip")]
+pub mod nt_io_desktop;
 
 // Shield
 pub mod nt_shield;
