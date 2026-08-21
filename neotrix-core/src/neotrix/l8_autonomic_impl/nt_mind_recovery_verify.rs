@@ -75,12 +75,22 @@ mod tests {
 
     #[test]
     fn test_recovery_verify_service() {
-        let mut svc = RecoveryVerifyService::new();
-        let mut pattern_received = false;
-        let mut trap_received = false;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
 
-        svc.on_pattern_learned(|_| pattern_received = true);
-        svc.on_trap_promoted(|_| trap_received = true);
+        let mut svc = RecoveryVerifyService::new();
+        let pattern_received = Arc::new(AtomicBool::new(false));
+        let trap_received = Arc::new(AtomicBool::new(false));
+
+        let pattern_received_clone = pattern_received.clone();
+        svc.on_pattern_learned(move |_| {
+            pattern_received_clone.store(true, Ordering::SeqCst);
+        });
+
+        let trap_received_clone = trap_received.clone();
+        svc.on_trap_promoted(move |_| {
+            trap_received_clone.store(true, Ordering::SeqCst);
+        });
 
         let fix = FixResult {
             plan: RepairPlan {
@@ -106,5 +116,7 @@ mod tests {
 
         let result = svc.verify_recovery(&fix, &verify, &history);
         assert_eq!(result.verdict, crate::neotrix::l8_autonomic_impl::nt_mind_repair::VerifyVerdict::Recovered);
+        assert!(pattern_received.load(Ordering::SeqCst), "pattern callback should be called");
+        assert!(!trap_received.load(Ordering::SeqCst), "trap callback should NOT be called for success");
     }
 }

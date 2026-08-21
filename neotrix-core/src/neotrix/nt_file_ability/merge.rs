@@ -1795,8 +1795,10 @@ mod schema_tests {
         }
 
         // 3. 混合格式 → L0 文本级 (pdf + docx)
+        let p1_c = tmp.join("a.pdf");
+        std::fs::write(&p1_c, pdf_bytes()).unwrap();
         let req = CollectionMergeRequest {
-            inputs: vec![p1, tmp.join("c.docx")],
+            inputs: vec![p1_c, tmp.join("c.docx")],
             schema: None,
             strategy: MergeStrategy::All,
             output: tmp.join("merged.txt"),
@@ -1843,13 +1845,19 @@ mod schema_tests {
             other => panic!("应为 Docx outcome: {other:?}"),
         };
         // 验证修改版作为基座: 其内容应在最前
-        let merged_text = std::fs::read_to_string(&tmp.join("preferred.docx")).unwrap();
+        let merged_bytes = std::fs::read(&tmp.join("preferred.docx")).unwrap();
+        let merged_result = neotrix_types::core::file_parser::FileParser::extract_text(
+            "preferred.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            &merged_bytes,
+        );
+        let merged_text = merged_result.text;
         assert!(merged_text.find("Modified").unwrap() < merged_text.find("Normal").unwrap(),
             "Preferred 策略应把修改版作为基座 (内容在前)");
 
         // 6. dry_run 预览模式: 不写文件, 仅返回预览信息
         let req = CollectionMergeRequest {
-            inputs: vec![doc_normal, doc_modified],
+            inputs: vec![doc_normal.clone(), doc_modified.clone()],
             schema: None,
             strategy: MergeStrategy::Preferred,
             output: tmp.join("dry_run.txt"),
@@ -1883,7 +1891,7 @@ mod schema_tests {
 
         // 8. 单文档透传 (所有策略)
         let req = CollectionMergeRequest {
-            inputs: vec![p1],
+            inputs: vec![doc_normal.clone()],
             schema: None,
             strategy: MergeStrategy::All,
             output: tmp.join("single.docx"),

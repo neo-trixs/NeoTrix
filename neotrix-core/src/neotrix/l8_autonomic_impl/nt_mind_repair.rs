@@ -245,7 +245,11 @@ impl RepairPlanner {
 
         // 置信度高 + 严重 -> Patch/CompileFix
         if max_confidence >= 0.7 && matches!(diagnosis.severity, Severity::Critical | Severity::High) {
-            if diagnosis.root_causes.iter().any(|rc| rc.hypothesis.contains("compile") || rc.hypothesis.contains("type")) {
+            let hyp = diagnosis.root_causes.iter()
+                .map(|rc| rc.hypothesis.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            if hyp.contains("compile") || hyp.contains("type") || hyp.contains("编译") || hyp.contains("类型") {
                 return RepairStrategyType::CompileFix;
             }
             return RepairStrategyType::Patch;
