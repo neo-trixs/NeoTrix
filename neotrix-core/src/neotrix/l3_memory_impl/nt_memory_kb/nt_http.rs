@@ -120,6 +120,61 @@ pub(crate) fn fetch_safe_http_with_headers(
     fetch_safe_http_inner(url, extra_headers)
 }
 
+
+/// 安全解析重定向链：最多 max_redirects 跳，每跳都经 resolve_safe_origin 校验。
+/// 防止开放重定向攻击 (open redirect) 并保持 SSRF 防护一致性。
+fn resolve_redirects_safely(url: &str, max_redirects: usize) -> Result<String, String> {
+    let mut current_url = url.to_string();
+    let mut redirects = 0;
+    
+    loop {
+        let (addr, parsed) = resolve_safe_origin(&current_url)?;
+        let host = parsed.host_str().ok_or("no host")?.to_string();
+        
+        let client = reqwest::blocking::Client::builder()
+            .user_agent(USER_AGENT)
+            .timeout(CONNECT_TIMEOUT)
+            .connect_timeout(CONNECT_TIMEOUT)
+            .redirect(reqwest::redirect::Policy::none())
+            .resolve(&host, addr)
+            .build()
+            .map_err(|e| format!("redirect client: {e}"))?;
+        
+        let resp = client
+            .head(&current_url)
+            .send()
+            .map_err(|e| format!("redirect head: {e}"))?;
+        
+        if resp.status().is_redirection() {
+            if redirects >= max_redirects {
+                return Err(format!("too many redirects (> {})", max_redirects));
+            }
+            let location = resp
+                .headers()
+                .get("location")
+                .ok_or("redirect without Location header")?
+                .to_str()
+                .map_err(|e| format!("invalid Location header: {e}"))?
+                .to_string();
+            
+            // 解析重定向 URL（支持相对路径）
+            let next_url = if let Ok(abs) = url::Url::parse(&location) {
+                abs.to_string()
+            } else {
+                let base = url::Url::parse(&current_url).map_err(|e| format!("base URL parse: {e}"))?;
+                base.join(&location).map_err(|e| format!("redirect join: {e}"))?.to_string()
+            };
+            
+            current_url = next_url;
+            redirects += 1;
+            continue;
+        }
+        
+        // 非重定向：返回当前 URL
+        return Ok(current_url);
+    }
+}
+
 fn fetch_safe_http_inner(
     url: &str,
     extra_headers: &[(&str, &str)],
@@ -363,8 +418,8 @@ fn is_retriable_network_err(e: &str) -> bool {
 }
 
 fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, String> {
-    let (addr, parsed) = resolve_safe_origin(opts.url)?;
-    let host = parsed.host_str().ok_or("no host")?.to_string();
+    let (_addr, parsed) = resolve_safe_origin(opts.url)?;
+    let _host = parsed.host_str().ok_or("no host")?.to_string();
 
     let dir = opts.dest.parent().ok_or("dest has no parent dir")?;
     std::fs::create_dir_all(dir).map_err(|e| format!("mkdir {}: {e}", dir.display()))?;
@@ -384,12 +439,18 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
     let ua = opts.user_agent.unwrap_or(USER_AGENT);
 
     // HEAD 预检: 大小 / accept-ranges / MIME
+    // 先安全解析重定向链（最多5跳），验证每跳都通过 SSRF guard
+    let final_url = resolve_redirects_safely(opts.url, 5)?;
+    
+    let (final_addr, final_parsed) = resolve_safe_origin(&final_url)?;
+    let final_host = final_parsed.host_str().ok_or("no host")?.to_string();
+    
     let mut cbuilder = reqwest::blocking::Client::builder()
         .user_agent(ua)
         .timeout(opts.total_timeout.unwrap_or(DOWNLOAD_TOTAL_TIMEOUT))
         .connect_timeout(CONNECT_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
-        .resolve(&host, addr);
+        .resolve(&final_host, final_addr);
     if let Some(proxy) = opts.proxy {
         match reqwest::Proxy::all(proxy) {
             Ok(p) => {
@@ -405,7 +466,7 @@ fn download_to_file_inner(opts: &DownloadOptions<'_>) -> Result<DownloadResult, 
         .map_err(|e| format!("pin client: {e}"))?;
 
     let head = pin_client
-        .head(opts.url)
+        .head(&final_url)
         .send()
         .map_err(|e| format!("head: {e}"))?;
     if !head.status().is_success() {

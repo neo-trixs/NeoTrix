@@ -976,3 +976,69 @@ mod tests {
             .any(|s| s.pattern_id == "conclusion-signpost"));
     }
 }
+
+// ────────────────────────────────────────────────────────────────
+// SelfTest: OutputGovernor — 输出治理器 (10 条纪律规则 + 可机械修复)
+// ────────────────────────────────────────────────────────────────
+
+pub struct OutputGovernorSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for OutputGovernorSelfTest {
+    fn name(&self) -> &str {
+        "nt_io_output_style::output_governor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let gov = OutputGovernor::new();
+
+        // 1. 规则数量正确
+        if gov.rule_count() != 10 {
+            failures.push(format!("expected 10 rules, got {}", gov.rule_count()));
+        }
+
+        // 2. 空输入通过
+        let report = gov.govern("", OutputStyleId::Plain);
+        if !report.rule_results.iter().all(|r| r.passed) {
+            failures.push("empty input should pass all rules".into());
+        }
+
+        // 3. 结尾道歉被捕获
+        let report = gov.govern("结论是 x。\n抱歉", OutputStyleId::Plain);
+        let r10_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 10);
+        if !r10_caught {
+            failures.push("trailing apology should be caught by R10".into());
+        }
+
+        // 4. 空消息被捕获
+        let report = gov.govern("   \n\n   ", OutputStyleId::Plain);
+        let r02_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 2);
+        if !r02_caught {
+            failures.push("pure placeholder lines should be caught by R02".into());
+        }
+
+        // 5. autofix 能去除结尾道歉
+        let report = gov.govern_with_autofix("结论是 x。\n抱歉", OutputStyleId::Plain);
+        if report.fixed_text.is_none() || report.fixed_text.as_deref().unwrap_or("").contains("抱歉") {
+            failures.push("autofix should strip trailing apology".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_output_governor_selftest {
+    use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
+
+    #[test]
+    fn test_output_governor_selftest() {
+        let t = OutputGovernorSelfTest;
+        assert!(t.self_test().is_ok());
+    }
+}

@@ -65,6 +65,19 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l3_memory_impl::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
     ));
+    // TODO: Re-enable after adding missing SelfTests to nt_memory_sweep_20260815.rs
+    // registry.register(Box::new(
+    //     crate::neotrix::l3_memory_impl::nt_memory_kb::ExperienceTripletPoolSelfTest,
+    // ));
+    // registry.register(Box::new(
+    //     crate::neotrix::l3_memory_impl::nt_memory_kb::GuardMutationSelfTest,
+    // ));
+    // registry.register(Box::new(
+    //     crate::neotrix::l3_memory_impl::nt_memory_kb::RetrievalSelfEvolutionSelfTest,
+    // ));
+    // registry.register(Box::new(
+    //     crate::neotrix::l3_memory_impl::nt_memory_kb::SignedProvenanceSelfTest,
+    // ));
     // 2026-08-15 sweep absorption batch (Phase D): 编排治理 / harness / 感知 / 多模态 / 元数据
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_agent_orchestrator::arbiter_mediation::ArbiterMediator::new(),
@@ -91,6 +104,9 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     ));
     registry.register(Box::new(
         crate::neotrix::l2_world_impl::nt_world_osint::sweep::SweepDeltaSelfTest,
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_io_output_style::OutputGovernorSelfTest,
     ));
     // 2026-08-16 T2 补齐: UnifiedAbsorber (in-memory KB, 无网络)
     registry.register(Box::new(UnifiedAbsorberSelfTest));
