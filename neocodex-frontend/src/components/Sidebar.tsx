@@ -348,18 +348,26 @@ export function Sidebar(props: SidebarProps) {
       'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative',
       collapsed() ? 'w-[64px] border-r border-black/5' : 'w-[280px]'
     )}>
-      {/* Header: Claude Code 极简 40px 头部 — 交通灯占位仅展开态保留，收起态居中单钮 */}
-      <div class={clsx('flex items-center h-10 px-3', collapsed() ? 'justify-center' : 'justify-end pl-[56px]')} data-tauri-drag-region>
+      {/* Header: 三色灯占位（macOS 28px 拖拽区） */}
+      <div class="h-7 shrink-0" data-tauri-drag-region />
+      {/* 折叠标签：置于三色灯正下方，对标 Claude Code 侧栏手柄 */}
+      <div class={clsx('px-3 pb-3', collapsed() && 'flex justify-center')}>
         <button
           class={clsx(
-            'flex items-center justify-center rounded-lg transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none',
-            collapsed() ? 'w-8 h-8 bg-white border border-black/8 shadow-sm text-zinc-500 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50' : 'w-7 h-7 text-zinc-400 hover:text-zinc-900 hover:bg-white'
+            'flex items-center gap-2 rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none',
+            collapsed()
+              ? 'w-8 h-8 justify-center bg-white border-black/8 shadow-sm text-zinc-500 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50'
+              : 'w-full px-3 py-2 bg-white border-black/8 shadow-sm text-[12.5px] font-medium text-zinc-700 hover:border-orange-200 hover:text-orange-700 hover:bg-orange-50/50 justify-between'
           )}
           onClick={props.onToggleCollapse}
           aria-label={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
           title={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
         >
-          <NeoChevronRight class={clsx('w-4 h-4 transition-transform', !collapsed() && 'rotate-180')} />
+          <span class="flex items-center gap-2">
+            <NeoChevronRight class={clsx('w-4 h-4 transition-transform', !collapsed() && 'rotate-180')} />
+            <Show when={!collapsed()}><span>收起侧边栏</span></Show>
+          </span>
+          <Show when={!collapsed()}><span class="text-[10px] text-zinc-400">⌘B</span></Show>
         </button>
       </div>
 
