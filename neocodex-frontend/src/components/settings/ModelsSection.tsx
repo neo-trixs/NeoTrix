@@ -5,7 +5,7 @@
    数据源：neocodex.providerConfig()（静态目录，零后端改动）。
    交互：点击模型行 = 切到该 provider（setProvider → active_model 更新）。
    ════════════════════════════════════════════ */
-import { For, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
 import type { ProviderConfig, ProviderMeta } from '../../api/types'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
@@ -51,15 +51,27 @@ const providerPoolGroups = (cfg: ProviderConfig) => {
 }
 
 export function ModelsSection(props: Props) {
-  // 单击提供商图标也可切换（修复 SiliconFlow 图标点击无界面）：点击头即选中该提供商首个模型
   const handleProviderHeadClick = (p: ProviderMeta) => {
     if (props.switching()) return
     if (p.model === props.config()?.active_model) return
     props.onSwitchProvider(p.name)
   }
+  // 双栏：自定义配置 vs 代理池（参考同类产品模型广场）
+  const [subTab, setSubTab] = createSignal<'custom' | 'pool'>('pool')
 
   return (
     <div class="space-y-4">
+      {/* 顶部切换：自定义配置 / 代理池 — Mac 圆角药丸 */}
+      <div class="flex items-center gap-2 p-1 rounded-full bg-zinc-100 border border-black/5 w-fit">
+        <button
+          class={clsx('px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all', subTab() === 'custom' ? 'bg-white shadow-sm text-zinc-900 border border-black/5' : 'text-zinc-500 hover:text-zinc-700')}
+          onClick={() => setSubTab('custom')}
+        >自定义配置</button>
+        <button
+          class={clsx('px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all', subTab() === 'pool' ? 'bg-white shadow-sm text-zinc-900 border border-black/5' : 'text-zinc-500 hover:text-zinc-700')}
+          onClick={() => setSubTab('pool')}
+        >代理池 · {(props.config() ? usableProviders(props.config()!).length : 0)} 提供商</button>
+      </div>
       <Show
         when={props.config()}
         fallback={
@@ -74,65 +86,103 @@ export function ModelsSection(props: Props) {
           const usable = usableProviders(cfg())
           const total = usable.reduce((s, p) => s + p.models.length, 0)
           const groups = providerPoolGroups(cfg())
+          const customProviders = usable.filter(p => p.category === 'proxy' || p.category === 'local')
+          const active = cfg().providers.find(p => p.model === cfg().active_model) ?? null
           return (
             <>
-              {/* 池概览：可用模型数 + 提供商数 + 当前激活 */}
-              <div class="ss-card">
-                <div class="ss-card-header">
+              {/* 池概览：Mac 圆角白卡，极简数字 */}
+              <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
+                <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">
                   <ModelIcon />
-                  模型代理池
+                  {subTab() === 'custom' ? '自定义配置' : '模型广场'}
+                  <span class="ml-auto text-[11px] font-mono text-zinc-500">{subTab() === 'custom' ? `${customProviders.length} 已接入` : `${total} 模型 · ${usable.length} 提供商`}</span>
                 </div>
-                <div class="ss-card-body">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-4">
-                      <div>
-                        <div class="text-[18px] font-semibold text-text-primary leading-none">{total}</div>
-                        <div class="text-10px text-text-muted mt-1">可用模型</div>
-                      </div>
-                      <div class="w-px h-8 bg-border-primary/60" />
-                      <div>
-                        <div class="text-[18px] font-semibold text-text-primary leading-none">{usable.length}</div>
-                        <div class="text-10px text-text-muted mt-1">可用提供商</div>
-                      </div>
-                      <div class="w-px h-8 bg-border-primary/60" />
-                      <div class="min-w-0">
-                        <div class="text-[13px] font-medium text-text-primary truncate">{cfg().active_model || '未激活'}</div>
-                        <div class="text-10px text-text-muted mt-0.5 flex items-center gap-1">
-                          <ActiveDotIcon class="w-2 h-2 text-nt-core-600" />
-                          当前模型
+                <div class="ss-card-body bg-white">
+                  <Show when={subTab() === 'custom'} fallback={
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-4">
+                        <div>
+                          <div class="text-[18px] font-semibold text-zinc-900 leading-none">{total}</div>
+                          <div class="text-10px text-zinc-500 mt-1">可用模型</div>
+                        </div>
+                        <div class="w-px h-8 bg-black/5" />
+                        <div>
+                          <div class="text-[18px] font-semibold text-zinc-900 leading-none">{usable.length}</div>
+                          <div class="text-10px text-zinc-500 mt-1">可用提供商</div>
+                        </div>
+                        <div class="w-px h-8 bg-black/5" />
+                        <div class="min-w-0">
+                          <div class="text-[13px] font-medium text-zinc-900 truncate">{cfg().active_model || '未激活'}</div>
+                          <div class="text-10px text-zinc-500 mt-0.5 flex items-center gap-1">
+                            <ActiveDotIcon class="w-2 h-2 text-emerald-500" />
+                            当前模型
+                          </div>
                         </div>
                       </div>
+                      <span class={clsx('text-10px px-2.5 py-1 rounded-full font-medium border flex-shrink-0', cfg().resolvable ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200')}>
+                        {cfg().resolvable ? '● 可用' : '○ 不可用'}
+                      </span>
                     </div>
-                    <span class={clsx('text-10px px-2 py-1 rounded-full font-medium flex-shrink-0', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
-                      {cfg().resolvable ? 'API 可达' : 'API 不可达'}
-                    </span>
-                  </div>
+                  }>
+                    <div class="flex items-center gap-3">
+                      <Show when={active} fallback={<span class="w-10 h-10 rounded-xl bg-zinc-100 border border-black/5 flex items-center justify-center text-sm">?</span>}>
+                        {(a) => <ProviderIcon name={a().name} size="md" />}
+                      </Show>
+                      <div class="min-w-0">
+                        <div class="text-[13px] font-medium text-zinc-900 truncate">{active?.display_name ?? '未选择'}</div>
+                        <div class="text-[11px] font-mono text-zinc-500 truncate">{active?.model ?? '—'} · {active?.category ?? 'unknown'}</div>
+                      </div>
+                      <span class="ml-auto text-10px px-2.5 py-1 rounded-full bg-white border border-black/8 shadow-sm text-zinc-600">{customProviders.length} 自定义</span>
+                    </div>
+                  </Show>
                 </div>
               </div>
 
-              {/* 分组代理池：按分类展开可用模型 */}
-              <Show
-                when={groups.length > 0}
-                fallback={
-                  <div class="ss-card">
-                    <div class="ss-card-body">
-                      <div class="text-[11px] text-text-muted text-center py-3 border border-dashed border-border-primary/60 rounded-lg">
-                        当前没有可用的模型。请在「通用」配置 API 密钥后重试。
+              <Show when={subTab() === 'custom'}>
+                <div class="ss-card rounded-2xl border-black/5 shadow-sm">
+                  <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">已接入的自定义提供商</div>
+                  <div class="ss-card-body bg-white">
+                    <Show when={customProviders.length > 0} fallback={<div class="text-[11px] text-zinc-500 text-center py-6 border border-dashed border-zinc-200 rounded-xl">暂无自定义配置，请在代理池中选择云端模型或在通用页配置 API Key</div>}>
+                      <div class="grid grid-cols-1 gap-2">
+                        <For each={customProviders}>
+                          {(p) => (
+                            <button class={clsx('w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors', p.model === cfg().active_model ? 'bg-orange-50 border-orange-200' : 'bg-white hover:bg-zinc-50 border-zinc-200')} onClick={() => handleProviderHeadClick(p)}>
+                              <ProviderIcon name={p.name} size="sm" />
+                              <span class="text-[12.5px] font-medium truncate">{p.display_name}</span>
+                              <CategoryBadge category={p.category} className="ml-auto" />
+                            </button>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+              </Show>
+
+              {/* 代理池：按分类展开可用模型 — Mac 极简白卡 */}
+              <Show when={subTab() === 'pool'}>
+                <Show
+                  when={groups.length > 0}
+                  fallback={
+                    <div class="ss-card rounded-2xl border-black/5 shadow-sm">
+                      <div class="ss-card-body bg-white">
+                        <div class="text-[11px] text-zinc-500 text-center py-6 border border-dashed border-zinc-200 rounded-xl">
+                          当前没有可用的模型。请在「自定义配置」中接入提供商
+                        </div>
                       </div>
                     </div>
-                  </div>
-                }
-              >
-                <For each={groups}>
-                  {(group) => (
-                    <div class="ss-card">
-                      <div class="ss-card-header">
-                        {group.title}
-                        <span class="ml-auto text-10px text-text-muted font-mono flex items-center gap-1">
-                          {group.providers.reduce((s, p) => s + p.models.length, 0)} 模型 · {group.providers.length} 提供商
-                        </span>
-                      </div>
-                      <div class="ss-card-body space-y-3">
+                  }
+                >
+                  <For each={groups}>
+                    {(group) => (
+                      <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
+                        <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">
+                          {group.title}
+                          <span class="ml-auto text-10px text-zinc-500 font-mono flex items-center gap-1">
+                            {group.providers.reduce((s, p) => s + p.models.length, 0)} 模型 · {group.providers.length} 提供商
+                          </span>
+                        </div>
+                        <div class="ss-card-body bg-white space-y-3">
                         <Show when={group.desc}>
                           <p class="text-10px text-text-muted/80 -mt-1">{group.desc}</p>
                         </Show>
@@ -204,6 +254,7 @@ export function ModelsSection(props: Props) {
                     </div>
                   )}
                 </For>
+              </Show>
               </Show>
             </>
           )
