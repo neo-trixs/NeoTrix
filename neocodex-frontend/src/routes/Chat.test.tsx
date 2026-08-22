@@ -21,12 +21,10 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
     vi.clearAllMocks()
   })
 
-  it('侧栏 seg 有 对话/协同 两个标签（极简去电脑）', () => {
+  it('侧栏 seg 已移除协同（单态对话）', () => {
     render(() => <Chat />)
     const tabs = document.querySelectorAll('.seg [role="tab"]')
-    expect(tabs.length).toBe(2)
-    expect(tabs[0].textContent).toContain('对话')
-    expect(tabs[1].textContent).toContain('协同')
+    expect(tabs.length).toBe(0)
   })
 
   it('顶部 ch-top 极简：无功能按钮（仅拖拽区）', () => {
@@ -38,12 +36,11 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
     expect(headerBtns.length).toBe(0)
   })
 
-  it('点击协同 seg 标签切换到协同视图（CoworkView）', () => {
+  it('协同入口已移除（单态对话，ch-top 常驻）', () => {
     render(() => <Chat />)
-    const coworkTab = document.querySelectorAll('[role="tab"]')[1]
-    fireEvent.click(coworkTab)
-    // 协同视图应渲染（chat header 隐藏）
-    expect(document.querySelector('.ch-top')).toBeNull()
+    const tabs = document.querySelectorAll('.seg [role="tab"]')
+    expect(tabs.length).toBe(0)
+    expect(document.querySelector('.ch-top')).toBeTruthy()
   })
 
   it('侧栏用户条点击打开设置弹窗，含插件 section（技能插件市场放设置）', () => {

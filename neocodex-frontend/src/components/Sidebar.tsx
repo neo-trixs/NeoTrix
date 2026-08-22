@@ -29,8 +29,8 @@ interface SidebarProps {
 const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
 type GroupKey = (typeof GROUP_ORDER)[number]
 
-// Segmented Tab 顺序：仅保留对话/协同（移除电脑标签，极简两态）
-const VIEW_ORDER = ['chat', 'cowork'] as const
+// Segmented Tab：已移除（仅对话单态，极简无分段）
+const VIEW_ORDER = ['chat'] as const
 type ViewKey = (typeof VIEW_ORDER)[number]
 
 function getGroupKey(date: Date): GroupKey {
@@ -45,8 +45,8 @@ function getGroupKey(date: Date): GroupKey {
 
 export function Sidebar(props: SidebarProps) {
   const collapsed = () => props.collapsed ?? false
-  const view = () => props.activeView ?? 'chat'
-  const viewIdx = () => (view() === 'chat' ? 0 : 1)
+  const view = () => 'chat' as const
+  const viewIdx = () => 0
 
   // 会话操作错误提示：chatStore 会吞掉后端错误（chat.ts catch → console.error），
   // 因此部分操作用后端重查/状态后置条件验证真实结果，失败时给可见内联错误（对标 GitPanel toast）
@@ -373,43 +373,7 @@ export function Sidebar(props: SidebarProps) {
 
       {!collapsed() && (
         <>
-          {/* Segmented Tabs：极简两态 — 对话 / 协同，去除电脑，图标极细 1px 描边 */}
-          <div class="px-3 pb-3">
-            <div class="seg" role="tablist" aria-label="意识模式视图切换">
-              <button
-                class={clsx('segb', viewIdx() === 0 && 'on')}
-                onClick={() => switchView('chat')}
-                role="tab"
-                aria-selected={viewIdx() === 0}
-                tabIndex={viewIdx() === 0 ? 0 : -1}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') { e.preventDefault(); moveTab(1) }
-                  else if (e.key === 'ArrowLeft') { e.preventDefault(); moveTab(-1) }
-                }}
-                aria-label="对话"
-                title="对话"
-              >
-                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1" stroke="currentColor" stroke-width="1" /></svg>
-                <span class="segb-t">对话</span>
-              </button>
-              <button
-                class={clsx('segb', viewIdx() === 1 && 'on')}
-                onClick={() => switchView('cowork')}
-                role="tab"
-                aria-selected={viewIdx() === 1}
-                tabIndex={viewIdx() === 1 ? 0 : -1}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') { e.preventDefault(); moveTab(1) }
-                  else if (e.key === 'ArrowLeft') { e.preventDefault(); moveTab(-1) }
-                }}
-                aria-label="协同"
-                title="协同"
-              >
-                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1" /></svg>
-                <span class="segb-t">协同</span>
-              </button>
-            </div>
-          </div>
+          {/* 标题：单态对话（极简，无分段切换） */}
 
           {/* 搜索 + 新建 — 极简单行：搜索占满 + 新建图标 */}
           <div class="px-3 pb-2 flex items-center gap-2">
