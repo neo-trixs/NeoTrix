@@ -54,6 +54,13 @@ pub enum LlmProviderType {
     ApiAirforce,
     Vllm,
     Sglang,
+    Aihub,
+    Xai,
+    Moonshot,
+    Qwen,
+    Doubao,
+    MiniMax,
+    Perplexity,
 }
 
 impl LlmProviderType {
@@ -89,6 +96,13 @@ impl LlmProviderType {
             "api-airforce" | "api_airforce" => Some(Self::ApiAirforce),
             "vllm" => Some(Self::Vllm),
             "sglang" => Some(Self::Sglang),
+            "aihub" | "aihub.humorously.cn" => Some(Self::Aihub),
+            "xai" | "grok" => Some(Self::Xai),
+            "moonshot" | "kimi" => Some(Self::Moonshot),
+            "qwen" | "dashscope" => Some(Self::Qwen),
+            "doubao" | "ark" => Some(Self::Doubao),
+            "minimax" => Some(Self::MiniMax),
+            "perplexity" | "pplx" => Some(Self::Perplexity),
             _ => None,
         }
     }
@@ -112,7 +126,7 @@ impl LlmProviderType {
             Self::ZeroLimit | Self::CustomProxy |
             Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
             Self::Cohere | Self::TogetherFree | Self::SiliconFlow | Self::ZAI |
-            Self::DeepSeekFree | Self::OpenCodeZen | Self::FreeTheAi
+            Self::DeepSeekFree | Self::OpenCodeZen | Self::FreeTheAi | Self::Aihub
         )
     }
 
@@ -120,6 +134,7 @@ impl LlmProviderType {
         match self {
             Self::Ollama | Self::Vllm | Self::Sglang => ProviderCategory::Local,
             Self::CustomProxy => ProviderCategory::Proxy,
+            Self::Aihub => ProviderCategory::Cloud,
             _ => ProviderCategory::Cloud,
         }
     }
@@ -186,6 +201,7 @@ impl ProviderConfig {
             "api-airforce" | "api_airforce" => LlmProviderType::ApiAirforce,
             "vllm" => LlmProviderType::Vllm,
             "sglang" => LlmProviderType::Sglang,
+            "aihub" | "aihub.humorously.cn" => LlmProviderType::Aihub,
             _ => LlmProviderType::Anthropic,
         };
 
@@ -276,12 +292,19 @@ fn default_host(provider_type: LlmProviderType) -> Option<&'static str> {
         LlmProviderType::Llm7 => Some("api.llm7.io"),
         LlmProviderType::Kilo => Some("api.kilocode.ai"),
         LlmProviderType::SiliconFlow => Some("api.siliconflow.cn"),
+        LlmProviderType::Xai => Some("api.x.ai"),
+        LlmProviderType::Moonshot => Some("api.moonshot.cn"),
+        LlmProviderType::Qwen => Some("dashscope.aliyuncs.com"),
+        LlmProviderType::Doubao => Some("ark.cn-beijing.volces.com"),
+        LlmProviderType::MiniMax => Some("api.minimax.chat"),
+        LlmProviderType::Perplexity => Some("api.perplexity.ai"),
         LlmProviderType::ZAI => Some("open.bigmodel.cn"),
         LlmProviderType::OpenCodeZen => Some("opencode.ai"),
         LlmProviderType::Ovh => Some("ai-endpoints.ovh.net"),
         LlmProviderType::DeepSeekFree => Some("api.deepseek.com"),
         LlmProviderType::ModelScope => Some("api.modelscope.cn"),
         LlmProviderType::ApiAirforce => Some("api.airforce"),
+        LlmProviderType::Aihub => Some("aihub.humorously.cn"),
         // 本地主体: Ollama / vLLM / SGLang / 自定义代理默认走 localhost
         LlmProviderType::Ollama
         | LlmProviderType::Vllm
@@ -560,6 +583,48 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
         }
+        LlmProviderType::Xai => {
+            let api_key = config.api_key.unwrap_or_else(|| std::env::var("XAI_API_KEY").unwrap_or_default());
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.x.ai/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Moonshot => {
+            let api_key = config.api_key.unwrap_or_else(|| std::env::var("MOONSHOT_API_KEY").unwrap_or_default());
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.moonshot.cn/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Qwen => {
+            let api_key = config.api_key.unwrap_or_else(|| std::env::var("QWEN_API_KEY").unwrap_or_default());
+            let base_url = config.base_url.unwrap_or_else(|| "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Doubao => {
+            let api_key = config.api_key.unwrap_or_else(|| std::env::var("DOUBAO_API_KEY").unwrap_or_default());
+            let base_url = config.base_url.unwrap_or_else(|| "https://ark.cn-beijing.volces.com/api/v3".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::MiniMax => {
+            let api_key = config.api_key.unwrap_or_else(|| std::env::var("MINIMAX_API_KEY").unwrap_or_default());
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.minimax.chat/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Perplexity => {
+            let api_key = config.api_key.unwrap_or_else(|| std::env::var("PERPLEXITY_API_KEY").unwrap_or_default());
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.perplexity.ai".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
         LlmProviderType::ZAI => {
             let api_key = config.api_key.unwrap_or_else(|| {
                 std::env::var("ZAI_API_KEY").unwrap_or_default()
@@ -606,6 +671,17 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             // Verified working 2026-07-22: 209+ free models with `:free` suffix
             let base_url = config.base_url.unwrap_or_else(|| "https://api.airforce/v1".to_string());
             let api_key = config.api_key.unwrap_or_default();
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Aihub => {
+            // Aihub (aihub.humorously.cn) — OpenAI-compatible, requires API key
+            // Verified working 2026-08-21: models include glm-5.2, Qwen/Qwen3.6-35B-A3B-FP8
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_AIHUB_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://aihub.humorously.cn/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
@@ -718,6 +794,13 @@ pub async fn create_gateway_async() -> GatewayV2 {
     register_if!("DEEPSEEK_API_KEY", "deepseek-free", LlmProviderType::DeepSeekFree, true);
     register_if!("OPENCODE_API_KEY", "opencode-zen", LlmProviderType::OpenCodeZen, true);
     register_if!("FREETHEAI_API_KEY", "freetheai", LlmProviderType::FreeTheAi, true);
+    register_if!("NEOTRIX_AIHUB_API_KEY", "aihub", LlmProviderType::Aihub, false);
+    register_if!("XAI_API_KEY", "xai", LlmProviderType::Xai, false);
+    register_if!("MOONSHOT_API_KEY", "moonshot", LlmProviderType::Moonshot, false);
+    register_if!("QWEN_API_KEY", "qwen", LlmProviderType::Qwen, false);
+    register_if!("DOUBAO_API_KEY", "doubao", LlmProviderType::Doubao, false);
+    register_if!("MINIMAX_API_KEY", "minimax", LlmProviderType::MiniMax, false);
+    register_if!("PERPLEXITY_API_KEY", "perplexity", LlmProviderType::Perplexity, false);
 
     // ── 4. FreeModelCatalog: 从目录中发现并注册所有可用免费模型 ──
     // Use spawn_blocking to avoid tokio 1.52+ panic when reqwest::blocking drops
@@ -793,6 +876,17 @@ pub async fn create_gateway_async() -> GatewayV2 {
             log::info!("[gateway] LLM provider pool: {} entries registered", n);
         }
     }
+
+    // Read prefer_free from config/env (priority: env > config > default false)
+    let prefer_free = std::env::var("NEOTRIX_PREFER_FREE")
+        .map(|v| v != "0" && !v.eq_ignore_ascii_case("off"))
+        .unwrap_or_else(|_| {
+            crate::config::NeoTrixConfig::load()
+                .prefer_free
+                .unwrap_or(false)
+        });
+    gateway.set_prefer_free(prefer_free);
+    log::info!("[gateway] prefer_free = {}", prefer_free);
 
     gateway
 }
@@ -939,8 +1033,13 @@ mod tests {
         let mut gateway = GatewayV2::new();
         let n = pool.register_into_gateway(&mut gateway);
         assert_eq!(n, 1);
+        // 契约 (provider_pool.rs register_into_gateway): 注册名为 "{provider}/{model}",
+        // 使 provider_model() 可直接抽取模型; label 走 AccountPool 映射而非 gateway 名。
         let names = gateway.providers();
-        assert!(names.iter().any(|p| p == "t-pool-gw"), "label 应注册为 provider, got {names:?}");
+        assert!(
+            names.iter().any(|p| p == "openai/gpt-4o-mini"),
+            "provider/model 应注册为 gateway provider, got {names:?}"
+        );
         // AccountPool 也应登记
         let acc_pool = gateway.account_pool.lock().expect("lock");
         assert!(acc_pool.contains("t-pool-gw"));

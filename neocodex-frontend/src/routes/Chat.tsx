@@ -1075,7 +1075,7 @@ export function Chat() {
         onClearTags={clearTags}
       />
 
-      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative border-l border-white/20">
+      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
         {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅作窗口拖拽区） ===== */}
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>

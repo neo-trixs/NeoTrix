@@ -40,6 +40,17 @@ const BRAND: Record<string, { color: string; glyph: string }> = {
   zerolimit: { color: '#10b981', glyph: 'ZL' },
   llm7: { color: '#64748b', glyph: '7' },
   kilo: { color: '#e85454', glyph: 'K' },
+  // 主流供应商（2026-08 扩展）
+  xai: { color: '#111111', glyph: 'X' },
+  grok: { color: '#111111', glyph: 'X' },
+  moonshot: { color: '#16a34a', glyph: 'K2' },
+  kimi: { color: '#16a34a', glyph: 'K2' },
+  qwen: { color: '#615ced', glyph: 'Q' },
+  dashscope: { color: '#615ced', glyph: 'Q' },
+  doubao: { color: '#0d6efd', glyph: 'DB' },
+  ark: { color: '#0d6efd', glyph: 'DB' },
+  minimax: { color: '#ef4444', glyph: 'MM' },
+  perplexity: { color: '#20808d', glyph: 'PX' },
   // 本地推理 — 统一绿
   ollama: { color: '#16a34a', glyph: 'O' },
   'lm-studio': { color: '#0d9488', glyph: 'LM' },

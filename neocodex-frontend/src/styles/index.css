@@ -58,21 +58,20 @@
 }
 
 @layer components {
-  /* —— 玻璃层次：Claude Code 单主题白橙液态玻璃（统一圆角 16px） —— */
-  .glass-L1,
-  .glass-side {
-    background: #ffffff;
+  /* —— 单一画布：侧栏/主区/右栏同层融合，无浮卡（对标 Claude Code 单平面） —— */
+  .glass-L1 {
+    background: transparent;
     backdrop-filter: none;
-    border: 1px solid rgba(0,0,0,0.06);
-    border-radius: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .glass-side {
-    background: #fcfcfc;
+    background: #fbfbfa;
     border-right: 1px solid rgba(0,0,0,0.06);
-    border-radius: 0 16px 16px 0;
-    box-shadow: 1px 0 8px rgba(0,0,0,0.04);
+    border-radius: 0;
+    box-shadow: none;
   }
 
   /* 弹窗/面板液态玻璃（设置、悬浮层） */
@@ -1107,10 +1106,10 @@
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background: #ffffff;
+    background: #fbfbfa;
     border-left: 1px solid rgba(0,0,0,0.06);
-    border-radius: 16px 0 0 16px;
-    box-shadow: -1px 0 12px rgba(0,0,0,0.05);
+    border-radius: 0;
+    box-shadow: none;
     transition: width 0.32s cubic-bezier(0.22,1,0.36,1), min-width 0.32s cubic-bezier(0.22,1,0.36,1), opacity 0.2s;
     position: relative;
     overflow: hidden;

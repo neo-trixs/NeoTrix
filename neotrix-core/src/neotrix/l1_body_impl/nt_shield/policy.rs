@@ -55,6 +55,19 @@ fn default_llm_domains() -> HashSet<String> {
         "api.openrouter.ai",
         "api.fireworks.ai",
         "oapi.safety.cloud",
+        // 主流国产/海外 LLM API（2026-08 供应商扩展）
+        "api.x.ai",
+        "api.moonshot.cn",
+        "dashscope.aliyuncs.com",
+        "ark.cn-beijing.volces.com",
+        "api.minimax.chat",
+        "api.perplexity.ai",
+        "api.modelscope.cn",
+        "open.bigmodel.cn",
+        "integrate.api.nvidia.com",
+        "models.inference.ai.azure.com",
+        "api-inference.huggingface.co",
+        "ai-endpoints.ovh.net",
     ]
     .into_iter()
     .map(|s| s.to_string())

@@ -62,6 +62,12 @@ const ENV_VAR_MAP: &[(&str, &str, LlmProviderType, &str, bool)] = &[
     ("TOGETHER_API_KEY", "together-free", LlmProviderType::TogetherFree, "https://api.together.xyz/v1", true),
     ("SILICONFLOW_API_KEY", "siliconflow", LlmProviderType::SiliconFlow, "https://api.siliconflow.cn/v1", true),
     ("ZAI_API_KEY", "zai", LlmProviderType::ZAI, "https://open.bigmodel.cn/api/paas/v4", true),
+    ("XAI_API_KEY", "xai", LlmProviderType::Xai, "https://api.x.ai/v1", false),
+    ("MOONSHOT_API_KEY", "moonshot", LlmProviderType::Moonshot, "https://api.moonshot.cn/v1", false),
+    ("QWEN_API_KEY", "qwen", LlmProviderType::Qwen, "https://dashscope.aliyuncs.com/compatible-mode/v1", false),
+    ("DOUBAO_API_KEY", "doubao", LlmProviderType::Doubao, "https://ark.cn-beijing.volces.com/api/v3", false),
+    ("MINIMAX_API_KEY", "minimax", LlmProviderType::MiniMax, "https://api.minimax.chat/v1", false),
+    ("PERPLEXITY_API_KEY", "perplexity", LlmProviderType::Perplexity, "https://api.perplexity.ai", false),
     ("NEOTRIX_API_KEY", "neotrix", LlmProviderType::OpenAI, "", false),
 ];
 

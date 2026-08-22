@@ -204,6 +204,72 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
+        name: "xai",
+        display_name: "xAI Grok",
+        category: ProviderCategory::Cloud,
+        base_url: "https://api.x.ai/v1",
+        default_model: "grok-4",
+        api_key_env: Some("XAI_API_KEY"),
+        is_free: false,
+        models: &["grok-4", "grok-4-fast", "grok-3", "grok-3-mini", "grok-2-vision"],
+        security_profile: CommunicationProfile::Open,
+    },
+    ProviderInfo {
+        name: "moonshot",
+        display_name: "Moonshot Kimi",
+        category: ProviderCategory::Cloud,
+        base_url: "https://api.moonshot.cn/v1",
+        default_model: "kimi-k2-0905-preview",
+        api_key_env: Some("MOONSHOT_API_KEY"),
+        is_free: false,
+        models: &["kimi-k2-0905-preview", "kimi-k2-turbo-preview", "moonshot-v1-128k", "moonshot-v1-32k"],
+        security_profile: CommunicationProfile::Open,
+    },
+    ProviderInfo {
+        name: "qwen",
+        display_name: "Alibaba Qwen",
+        category: ProviderCategory::Cloud,
+        base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        default_model: "qwen-max",
+        api_key_env: Some("QWEN_API_KEY"),
+        is_free: false,
+        models: &["qwen-max", "qwen-plus", "qwen-turbo", "qwen3-coder-plus", "qwen2.5-coder-32b-instruct"],
+        security_profile: CommunicationProfile::Open,
+    },
+    ProviderInfo {
+        name: "doubao",
+        display_name: "ByteDance Doubao",
+        category: ProviderCategory::Cloud,
+        base_url: "https://ark.cn-beijing.volces.com/api/v3",
+        default_model: "doubao-seed-1.6",
+        api_key_env: Some("DOUBAO_API_KEY"),
+        is_free: false,
+        models: &["doubao-seed-1.6", "doubao-1.5-pro", "doubao-pro-32k"],
+        security_profile: CommunicationProfile::Open,
+    },
+    ProviderInfo {
+        name: "minimax",
+        display_name: "MiniMax",
+        category: ProviderCategory::Cloud,
+        base_url: "https://api.minimax.chat/v1",
+        default_model: "MiniMax-M2",
+        api_key_env: Some("MINIMAX_API_KEY"),
+        is_free: false,
+        models: &["MiniMax-M2", "abab6.5s-chat", "abab6-chat"],
+        security_profile: CommunicationProfile::Open,
+    },
+    ProviderInfo {
+        name: "perplexity",
+        display_name: "Perplexity",
+        category: ProviderCategory::Cloud,
+        base_url: "https://api.perplexity.ai",
+        default_model: "sonar-pro",
+        api_key_env: Some("PERPLEXITY_API_KEY"),
+        is_free: false,
+        models: &["sonar-pro", "sonar-reasoning-pro", "sonar-deep-research"],
+        security_profile: CommunicationProfile::Open,
+    },
+    ProviderInfo {
         name: "gemini",
         display_name: "Google Gemini",
         category: ProviderCategory::Cloud,
@@ -491,6 +557,17 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         models: &["Qwen/Qwen3-235B-A22B", "iic/LLM"],
         security_profile: CommunicationProfile::Open,
     },
+    ProviderInfo {
+        name: "aihub",
+        display_name: "Aihub (aihub.humorously.cn)",
+        category: ProviderCategory::Cloud,
+        base_url: "https://aihub.humorously.cn/v1",
+        default_model: "glm-5.2",
+        api_key_env: Some("NEOTRIX_AIHUB_API_KEY"),
+        is_free: false,
+        models: &["glm-5.2", "Qwen/Qwen3.6-35B-A3B-FP8"],
+        security_profile: CommunicationProfile::Open,
+    },
 ];
 
 /// 按名称查找 ProviderInfo
@@ -515,6 +592,35 @@ pub fn providers_with_key() -> Vec<&'static ProviderInfo> {
 /// 列出所有 keyless provider (本地端点 + 免费 API)
 pub fn keyless_providers() -> Vec<&'static ProviderInfo> {
     PROVIDER_CATALOG.iter().filter(|p| p.api_key_env.is_none()).collect()
+}
+
+/// 获取模型能力分数 (0.0-1.0)，越新/越强的模型分数越高
+/// 基于 provider catalog 中 models 数组的顺序：第一个为最新/最强 (1.0)，递减
+pub fn model_capability_score(provider_name: &str, model_id: &str) -> f64 {
+    if let Some(info) = lookup_provider(provider_name) {
+        if let Some(idx) = info.models.iter().position(|m| *m == model_id) {
+            // 线性递减: 第一个 1.0, 最后一个 0.1
+            let n = info.models.len() as f64;
+            return 1.0 - (idx as f64 / n) * 0.9;
+        }
+        // 未知模型但已知 provider: 给默认中等分
+        return 0.5;
+    }
+    // 未知 provider: 保守估计
+    0.3
+}
+
+/// 从注册名 (如 "aihub/glm-5.2" 或 "llm7") 提取 provider 名和模型名
+pub fn parse_provider_model(registered_name: &str) -> (String, String) {
+    if let Some((prov, model)) = registered_name.split_once('/') {
+        (prov.to_string(), model.to_string())
+    } else {
+        // 裸 provider 名: 尝试用 default_model
+        let model = lookup_provider(registered_name)
+            .map(|p| p.default_model.to_string())
+            .unwrap_or_else(|| registered_name.to_string());
+        (registered_name.to_string(), model)
+    }
 }
 
 #[cfg(test)]
