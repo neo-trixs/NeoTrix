@@ -76,8 +76,16 @@ export async function callOr<T>(cmd: string, args: Record<string, unknown> | und
   }
 }
 
-/** 从后端 Err(String) 提取人类可读信息（透传） */
+/** 从后端 Err(String) 提取人类可读信息（透传） — 对网络隔离等原文做友好中文化 */
 export function errText(e: unknown): string {
-  if (e instanceof ApiError) return e.message
-  return e instanceof Error ? e.message : String(e)
+  const raw = e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e)
+  // 15:12 前端对话报错：network access blocked by default isolation policy
+  if (raw.includes('blocked by default isolation policy')) {
+    const host = raw.match(/'([^']+)'/)?.[1] ?? '外部服务'
+    if (host.includes('siliconflow')) {
+      return `SiliconFlow 网络访问被隔离策略拦截 · 已在白名单中放行，请在“设置 → 通用 → SiliconFlow API Key”中配置密钥后重试；若仍失败请重启应用`
+    }
+    return `网络访问被隔离策略拦截 (${host}) · 已加入默认白名单，请配置对应 API Key 后重试`
+  }
+  return raw
 }

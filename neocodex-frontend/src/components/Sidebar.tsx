@@ -346,7 +346,7 @@ export function Sidebar(props: SidebarProps) {
   return (
     <aside class={clsx(
       'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative',
-      collapsed() ? 'w-16' : 'w-[250px]'
+      collapsed() ? 'w-[64px] border-r border-black/5' : 'w-[280px]'
     )}>
       {/* Header: 红绿灯（自绘 TrafficLights 组件，fixed 定位）+ 折叠按钮（设计 v2） */}
       <div class="flex items-center justify-between h-14 px-4 pl-[64px]" data-tauri-drag-region>
@@ -361,9 +361,22 @@ export function Sidebar(props: SidebarProps) {
         </button>
       </div>
 
+      {collapsed() && (
+        <button
+          class="absolute inset-y-0 right-0 w-[20px] flex items-center justify-center bg-white/80 border-l border-black/[0.06] hover:bg-orange-50 hover:border-orange-200 transition-all z-10 group/collapsed"
+          onClick={props.onToggleCollapse}
+          aria-label="展开侧边栏"
+          title="展开侧边栏"
+        >
+          <span class="w-[18px] h-[48px] rounded-l-lg bg-white border border-black/10 shadow-sm flex items-center justify-center group-hover/collapsed:border-orange-200 group-hover/collapsed:bg-orange-50 transition-colors">
+            <NeoChevronRight class="w-3.5 h-3.5 text-zinc-400 group-hover/collapsed:text-orange-600" />
+          </span>
+        </button>
+      )}
+
       {!collapsed() && (
         <>
-          {/* Segmented Tabs：意识模式（设计 v2）—— E8 六芒星 / 星群 */}
+          {/* Segmented Tabs：对标 Claude Code —— E8 六芒星 / 星群 / 电脑，三态等宽 */}
           <div class="px-3 pb-3">
             <div class="seg" role="tablist" aria-label="意识模式视图切换">
               <button

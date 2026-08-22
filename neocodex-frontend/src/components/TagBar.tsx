@@ -139,7 +139,7 @@ export function TagBar(props: TagBarProps) {
 
                   {/* 子标签（缩进） */}
                   <Show when={!isCollapsed() && root.children.length > 0}>
-                    <ul id={childrenListId(root.name)} class="ml-4 mt-0.5 space-y-0.5 border-l border-border-primary/50 pl-1.5">
+                    <ul id={childrenListId(root.name)} class="ml-3 mt-1 space-y-1 border-l-2 border-orange-100 pl-2.5 py-0.5 bg-orange-50/30 rounded-r-lg">
                       <For each={root.children}>
                         {(child) => (
                           <li>

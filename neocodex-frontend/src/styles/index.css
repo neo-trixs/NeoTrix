@@ -58,20 +58,21 @@
 }
 
 @layer components {
-  /* —— 玻璃层次 L1-L4（设计文件 v2 实色面，非半透明白） —— */
+  /* —— 玻璃层次：Claude Code 单主题白橙液态玻璃（统一圆角 16px） —— */
   .glass-L1,
   .glass-side {
-    /* Liquid Glass — 纯半透明 + 背景模糊 + 高光边缘（真实透过 body 光斑，无实色遮盖） */
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 100%);
-    backdrop-filter: blur(14px) saturate(1.6);
-    box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.40),
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.22);
+    background: #ffffff;
+    backdrop-filter: none;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04);
   }
 
-  /* 侧栏比主区更深一档，形成面板层次（同玻璃语言） */
   .glass-side {
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 100%);
+    background: #fcfcfc;
+    border-right: 1px solid rgba(0,0,0,0.06);
+    border-radius: 0 16px 16px 0;
+    box-shadow: 1px 0 8px rgba(0,0,0,0.04);
   }
 
   /* 弹窗/面板液态玻璃（设置、悬浮层） */
@@ -539,33 +540,31 @@
     outline-offset: 1px;
   }
 
-  /* —— 输入区 cic：圆角 24px 液态玻璃容器 —— */
+  /* —— 输入区 cic：Claude Code 1:1 圆角 20px 液态玻璃容器 —— */
   .cic {
     width: 100%;
-    border-radius: 24px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.40);
+    border-radius: 20px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.92);
     border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.70),
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.35),
-      inset 0 -10px 24px rgba(240, 145, 58, 0.04),
-      0 1px 3px rgba(0, 0, 0, 0.04);
-    backdrop-filter: blur(22px) saturate(1.6);
-    transition: border-color 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s cubic-bezier(0.22,1,0.36,1), background 0.2s ease;
+      inset 0 1px 0 0 rgba(255,255,255,1),
+      0 1px 4px rgba(0,0,0,0.06),
+      0 8px 24px rgba(0,0,0,0.06);
+    backdrop-filter: blur(18px) saturate(1.4);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
 
   .cic:focus-within {
-    border-color: rgba(240, 145, 58, 0.35);
+    border-color: rgba(240,145,58,0.45);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.75),
-      inset 0 0 0 0.5px rgba(255, 255, 255, 0.40),
-      inset 0 -10px 24px rgba(240, 145, 58, 0.05),
-      0 8px 32px rgba(40, 30, 20, 0.10);
-    background: rgba(255, 255, 255, 0.50);
+      inset 0 1px 0 0 rgba(255,255,255,1),
+      0 2px 8px rgba(0,0,0,0.07),
+      0 12px 36px rgba(240,145,58,0.12);
+    background: #ffffff;
   }
 
   .cic textarea {
@@ -598,25 +597,25 @@
   }
 
   .cic-attach {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
-    border-radius: 8px;
-    outline: none;
-    transition: all 0.2s ease;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 10px;
+    outline: none;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
-    color: #909098;
-    border: none;
+    transition: all 0.18s cubic-bezier(0.22,1,0.36,1);
+    color: #6b6b78;
+    border: 1px solid transparent;
     background: transparent;
   }
 
   .cic-attach:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: #ffffff;
     color: #1a1a20;
+    border-color: rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
 
   .cic-attach svg {
@@ -636,23 +635,25 @@
   }
 
   .vc-btn {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 10px;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
-    border: none;
+    transition: all 0.18s cubic-bezier(0.22,1,0.36,1);
+    border: 1px solid transparent;
     background: transparent;
-    color: #909098;
+    color: #6b6b78;
     position: relative;
   }
 
   .vc-btn:hover {
-    background: rgba(0, 0, 0, 0.03);
-    color: #5a5a62;
+    background: #ffffff;
+    color: #1a1a20;
+    border-color: rgba(0,0,0,0.06);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   .vc-btn:focus-visible {
     outline: 2px solid #f0913a;
@@ -684,38 +685,41 @@
     50% { box-shadow: 0 0 0 5px rgba(232, 84, 84, 0); }
   }
 
-  /* 发送按钮：实心 accent 圆钮（iPolloWork dls-accent + ArrowUp 语言）
-     默认禁用态灰色；可发送态常驻橙色，hover 加深 */
+  /* 发送按钮：Claude Code 1:1 实心上箭头圆钮 — 32px→40px 放大、强对比 */
   .vc-send {
-    width: 36px;
-    height: 36px;
-    background: #f0913a;
-    border: none;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(180deg, #ff8c3a 0%, #f0913a 100%);
+    border: 1px solid rgba(255,255,255,0.6);
     color: #fff;
-    box-shadow: 0 2px 8px rgba(240, 145, 58, 0.32);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(240,145,58,0.38), inset 0 1px 0 rgba(255,255,255,0.35);
   }
 
   .vc-send:hover:not(:disabled) {
-    background: #df7f2b;
-    box-shadow: 0 3px 12px rgba(223, 127, 43, 0.40);
+    background: linear-gradient(180deg, #ff7a1a 0%, #e67a28 100%);
+    box-shadow: 0 4px 14px rgba(223,127,43,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
     transform: translateY(-1px);
   }
 
   .vc-send:active:not(:disabled) {
-    transform: translateY(0) scale(0.96);
+    transform: translateY(0) scale(0.97);
+    box-shadow: 0 1px 6px rgba(240,145,58,0.32);
   }
 
   .vc-send:disabled {
-    background: rgba(0, 0, 0, 0.06);
-    color: rgba(0, 0, 0, 0.28);
+    background: #f0f0f2;
+    color: #b8b8c0;
+    border-color: #e8e8ea;
     box-shadow: none;
     cursor: default;
   }
 
   .vc-send svg {
-    width: 18px;
-    height: 18px;
-    stroke-width: 2;
+    width: 20px;
+    height: 20px;
+    stroke-width: 2.2;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.12));
   }
 
   /* 停止生成态：同尺寸深色方块 */
@@ -1099,16 +1103,17 @@
      Design v2 — 右栏 (rb) / Artifact Pane / File Tree
      ════════════════════════════════════════════ */
   .rb {
-    width: 280px;
+    width: 340px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.40) 100%);
-    backdrop-filter: blur(24px) saturate(1.6);
-    border-left: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.35);
-    transition: width 0.35s cubic-bezier(0.22,1,0.36,1), min-width 0.35s cubic-bezier(0.22,1,0.36,1), opacity 0.2s;
+    background: #ffffff;
+    border-left: 1px solid rgba(0,0,0,0.06);
+    border-radius: 16px 0 0 16px;
+    box-shadow: -1px 0 12px rgba(0,0,0,0.05);
+    transition: width 0.32s cubic-bezier(0.22,1,0.36,1), min-width 0.32s cubic-bezier(0.22,1,0.36,1), opacity 0.2s;
     position: relative;
+    overflow: hidden;
   }
 
   /* ── Auto-hide: 默认收起，hover/边缘展开 ── */
@@ -1122,8 +1127,8 @@
   .rb.auto-hide .rb-float { opacity: 1; pointer-events: auto; }
   .rb.auto-hide:hover,
   .rb.auto-hide.rb-hover {
-    width: 280px;
-    min-width: 280px;
+    width: 340px;
+    min-width: 340px;
     overflow: visible;
     border-left: 1px solid rgba(0, 0, 0, 0.06);
     opacity: 1;

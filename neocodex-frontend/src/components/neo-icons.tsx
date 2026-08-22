@@ -18,16 +18,11 @@ const base = (props: IconProps) => ({
   class: twMerge(clsx('w-4 h-4', props.class)),
 } as JSX.GSVGAttributes<SVGSVGElement>)
 
-/** 发送：中心点 + 四外射线 + 右主射线强化（E8 外扩语义） */
+/** 发送：Claude Code 箭头上送 — 实心圆内白色上箭头（1:1 对标 Claude Code 发送形态） */
 export function NeoSend(props: IconProps) {
   return (
     <svg {...base(props)}>
-      <circle cx="8" cy="8" r="1.2" stroke="currentColor" stroke-width="1.4" />
-      <line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.5" />
-      <line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-      <line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.5" />
-      <line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.5" />
-      <path d="M8 8l3-3M8 8l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.35" />
+      <path d="M8 3.8l-2.8 2.8M8 3.8l2.8 2.8M8 3.8v6.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   )
 }

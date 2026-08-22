@@ -43,6 +43,7 @@ pub struct ActionPolicy {
 /// LLM API 提供商默认域名白名单
 fn default_llm_domains() -> HashSet<String> {
     [
+        "api.siliconflow.cn",
         "api.openai.com",
         "api.anthropic.com",
         "generativelanguage.googleapis.com",

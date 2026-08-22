@@ -9,7 +9,7 @@ use axum::{
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
-use super::{api, AppState};
+use super::{api, AgentStatus, SessionInfo, AppState};
 
 const FRONTEND_HTML: &str = include_str!("frontend.html");
 
@@ -174,6 +174,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ws", get(ws_echo_handler))
         // B3 瓦片服务: NT-Pack 冷层 bbox 查询 (R-P42 强化 NT-IO 节点)
         .route("/api/geo/tiles", get(super::tiles::geo_tiles_handler))
+        // OpenAI 兼容 API (/v1/) — 标准化供外部消费
+        .route("/v1/chat/completions", post(api::openai_chat_completions))
+        .route("/v1/models", get(api::openai_list_models))
+        .route("/v1/models/{*model}", get(api::openai_get_model))
         // Frontend + fallback
         .route("/", get(handle_frontend))
         .route("/openapi.yaml", get(handle_openapi))
@@ -280,7 +284,7 @@ pub async fn start_server_with(
     let has_token = api_token.is_some();
     let bind_host = if has_token { "0.0.0.0" } else { "127.0.0.1" };
 
-    let state = AppState {
+    let mut state = AppState {
         brain: Arc::new(Mutex::new(brain)),
         bank: Arc::new(Mutex::new(bank)),
         sessions: Arc::new(Mutex::new(vec![SessionInfo {
@@ -304,7 +308,12 @@ pub async fn start_server_with(
                 crate::neotrix::l1_body_impl::nt_io_digital_human::PersonaConfig::default(),
             ),
         )),
+        gateway: None,
     };
+
+    // Initialize LLM gateway and store in state
+    let gateway = crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
+    state.gateway = Some(Arc::new(gateway));
 
     let mut app = build_router(state.clone());
 
@@ -346,8 +355,6 @@ pub async fn start_server_with(
         eprintln!("Server failed: {}", e);
     }
 }
-
-use super::{AgentStatus, SessionInfo};
 
 #[cfg(test)]
 mod tests {

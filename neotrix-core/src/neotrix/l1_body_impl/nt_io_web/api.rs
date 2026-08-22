@@ -3,14 +3,18 @@ use axum::{
     response::{
         sse::{Event, KeepAlive, Sse},
         Json,
+        IntoResponse,
     },
 };
 use futures::stream::{self, Stream};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::atomic::Ordering;
 
+
 use super::{AgentStatus, BrainStats, DiffBlock, FileNode, PermissionRequest, ProjectInfo, ProviderConfigPayload, SessionInfo};
+use crate::core::nt_core_llm::LlmProvider;
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -218,7 +222,7 @@ pub async fn reason_handler(
     };
     let provider_config = payload_to_provider_config(&payload);
     let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
-    let request = crate::neotrix::nt_io_provider::LlmRequest::new(&payload.model, &body.prompt);
+    let request = crate::core::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
     match provider.complete(&request).await {
         Ok(response) => json_ok(serde_json::json!({
             "output": response.content, "success": true
@@ -464,7 +468,7 @@ pub async fn agent_reason_stream_handler(
 
         let provider_config = payload_to_provider_config(&payload);
         let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
-        let request = crate::neotrix::nt_io_provider::LlmRequest::new(&payload.model, &body.prompt);
+        let request = crate::core::nt_core_llm::LlmRequest::new(&payload.model, &body.prompt);
 
         match provider.complete(&request).await {
             Ok(response) => {
@@ -716,7 +720,7 @@ pub async fn test_provider_handler(
     }
     let provider_config = payload_to_provider_config(&body);
     let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
-    let request = crate::neotrix::nt_io_provider::LlmRequest::new(&body.model, "Hello");
+    let request = crate::core::nt_core_llm::LlmRequest::new(&body.model, "Hello");
     match provider.complete(&request).await {
         Ok(_) => json_ok(serde_json::json!({"success": true, "message": "ok"})),
         Err(e) => json_ok(serde_json::json!({
@@ -907,6 +911,378 @@ pub fn cors_headers() -> axum::http::HeaderMap {
     h.insert("Access-Control-Allow-Methods", axum::http::HeaderValue::from_static("GET,POST,OPTIONS"));
     h.insert("Access-Control-Allow-Headers", axum::http::HeaderValue::from_static("Authorization,Content-Type"));
     h
+}
+
+/// ────────────────────────────────────────────────────────────────
+/// OpenAI 兼容 API (/v1/) — 标准化供外部消费
+/// ────────────────────────────────────────────────────────────────
+
+use uuid::Uuid;
+
+#[derive(Deserialize)]
+pub struct OpenAIChatCompletionRequest {
+    pub model: String,
+    pub messages: Vec<OpenAIMessage>,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
+    #[serde(default)]
+    pub stream: Option<bool>,
+    #[serde(default)]
+    pub top_p: Option<f32>,
+    #[serde(default)]
+    pub frequency_penalty: Option<f32>,
+    #[serde(default)]
+    pub presence_penalty: Option<f32>,
+    #[serde(default)]
+    pub stop: Option<Vec<String>>,
+    #[serde(default)]
+    pub user: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct OpenAIMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub tool_calls: Option<Vec<OpenAIToolCall>>,
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct OpenAIToolCall {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub call_type: String,
+    pub function: OpenAIToolCallFunction,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct OpenAIToolCallFunction {
+    pub name: String,
+    pub arguments: String,
+}
+
+#[derive(Serialize)]
+pub struct OpenAIChatCompletionResponse {
+    pub id: String,
+    pub object: String,
+    pub created: i64,
+    pub model: String,
+    pub choices: Vec<OpenAIChoice>,
+    pub usage: OpenAIUsage,
+    pub system_fingerprint: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct OpenAIChoice {
+    pub index: u32,
+    pub message: OpenAIMessage,
+    pub finish_reason: Option<String>,
+    pub logprobs: Option<serde_json::Value>,
+}
+
+#[derive(Serialize)]
+pub struct OpenAIUsage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+}
+
+#[derive(Serialize)]
+pub struct OpenAIModel {
+    pub id: String,
+    pub object: String,
+    pub created: i64,
+    pub owned_by: String,
+}
+
+#[derive(Serialize)]
+pub struct OpenAIModelList {
+    pub object: String,
+    pub data: Vec<OpenAIModel>,
+}
+
+/// POST /v1/chat/completions — OpenAI 兼容聊天完成
+pub async fn openai_chat_completions(
+    State(state): State<AppState>,
+    Json(req): Json<OpenAIChatCompletionRequest>,
+) -> impl IntoResponse {
+    // 验证模型是否在 gateway 中可用
+    let gateway = state.gateway.clone();
+    
+    let gateway = match gateway {
+        Some(g) => g,
+        None => {
+            return Json(serde_json::json!({
+                "error": {
+                    "message": "No LLM gateway available",
+                    "type": "server_error",
+                    "code": "gateway_unavailable"
+                }
+            })).into_response();
+        }
+    };
+
+    // 检查模型是否存在于注册列表中
+    let providers = gateway.providers();
+    let model_available = providers.iter().any(|p| {
+        // 匹配 "provider/model" 格式或直接匹配模型名
+        p.split('/').next_back().unwrap_or(p) == req.model.as_str() || *p == req.model
+    });
+    
+    if !model_available {
+        // 尝试按前缀匹配
+        let prefix_match = providers.iter().find(|p| {
+            req.model.starts_with(&format!("{}/", p.split('/').next().unwrap_or(p)))
+        });
+        if prefix_match.is_none() {
+            return Json(serde_json::json!({
+                "error": {
+                    "message": format!("Model '{}' not found", req.model),
+                    "type": "invalid_request_error",
+                    "code": "model_not_found"
+                }
+            })).into_response();
+        }
+    }
+
+    // 转换消息格式
+    let messages: Vec<crate::neotrix::nt_io_provider::Message> = req.messages.into_iter().map(|m| {
+        let role = match m.role.as_str() {
+            "system" => crate::core::nt_core_llm::Role::System,
+            "user" => crate::core::nt_core_llm::Role::User,
+            "assistant" => crate::core::nt_core_llm::Role::Assistant,
+            "tool" => crate::core::nt_core_llm::Role::Tool,
+            _ => crate::core::nt_core_llm::Role::User,
+        };
+        crate::neotrix::nt_io_provider::Message::new(role, m.content.as_str())
+    }).collect();
+
+    // 构建请求
+    let llm_request = crate::core::nt_core_llm::LlmRequest {
+        model: req.model.clone(),
+        messages,
+        temperature: req.temperature,
+        max_tokens: req.max_tokens.unwrap_or(4096),
+        tools: vec![],
+        image_data: None,
+        thinking_budget: None,
+        provider_params: HashMap::new(),
+        constraint_json: None,
+        structured_output: None,
+        cacheable_prefix_tokens: None,
+    };
+
+    let stream = req.stream.unwrap_or(false);
+
+    if stream {
+        // 流式响应 - 简化实现避免 async_stream 宏问题
+        let gateway_clone = gateway.clone();
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        
+        tokio::spawn(async move {
+            let mut stream_rx = match gateway_clone.stream_complete(&llm_request).await {
+                Ok(rx) => rx,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("Stream error: {}", e))).await;
+                    return;
+                }
+            };
+            
+            let mut first = true;
+            
+            while let Some(chunk) = stream_rx.recv().await {
+                match chunk {
+                    Ok(resp) => {
+                        let chunk_id = format!("chatcmpl-{}", Uuid::new_v4().simple());
+                        let mut choice_delta = serde_json::json!({
+                            "index": 0,
+                            "delta": {},
+                            "finish_reason": null
+                        });
+                        
+                        if first {
+                            choice_delta["delta"]["role"] = serde_json::json!("assistant");
+                            first = false;
+                        }
+                        
+                        if !resp.content.is_empty() {
+                            choice_delta["delta"]["content"] = serde_json::json!(resp.content);
+                        }
+                        
+                        if resp.finish_reason != crate::core::nt_core_llm::FinishReason::Stop {
+                            choice_delta["finish_reason"] = serde_json::json!(format!("{:?}", resp.finish_reason).to_lowercase());
+                        }
+                        
+                        let chunk = serde_json::json!({
+                            "id": chunk_id,
+                            "object": "chat.completion.chunk",
+                            "created": chrono::Utc::now().timestamp(),
+                            "model": req.model.clone(),
+                            "choices": [choice_delta]
+                        });
+                        
+                        if tx.send(Ok(Event::default().data(chunk.to_string()))).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e.to_string())).await;
+                        break;
+                    }
+                }
+            }
+            
+            // 发送结束标记
+            let _ = tx.send(Ok(Event::default().data("[DONE]"))).await;
+        });
+        
+        Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
+            .keep_alive(KeepAlive::new())
+            .into_response()
+    } else {
+        // 非流式响应
+        match gateway.complete(&llm_request).await {
+            Ok(resp) => {
+                let response = OpenAIChatCompletionResponse {
+                    id: format!("chatcmpl-{}", Uuid::new_v4().simple()),
+                    object: "chat.completion".to_string(),
+                    created: chrono::Utc::now().timestamp(),
+                    model: req.model,
+                    choices: vec![OpenAIChoice {
+                        index: 0,
+                        message: OpenAIMessage {
+                            role: "assistant".to_string(),
+                            content: resp.content.clone(),
+                            name: None,
+                            tool_calls: resp.tool_calls.map(|calls: Vec<crate::neotrix::nt_io_provider::ToolCallInfo>| calls.into_iter().map(|tc| OpenAIToolCall {
+                                id: tc.id,
+                                call_type: tc.call_type,
+                                function: OpenAIToolCallFunction {
+                                    name: tc.function.name,
+                                    arguments: tc.function.arguments,
+                                },
+                            }).collect()),
+                            tool_call_id: None,
+                        },
+                        finish_reason: Some(match resp.finish_reason {
+                            crate::neotrix::nt_io_provider::FinishReason::Stop => "stop",
+                            crate::neotrix::nt_io_provider::FinishReason::Length => "length",
+                            crate::neotrix::nt_io_provider::FinishReason::Tool => "tool_calls",
+                            crate::neotrix::nt_io_provider::FinishReason::ContentFilter => "content_filter",
+                            _ => "stop",
+                        }.to_string()),
+                        logprobs: None,
+                    }],
+                    usage: OpenAIUsage {
+                        prompt_tokens: resp.usage.prompt_tokens,
+                        completion_tokens: resp.usage.completion_tokens,
+                        total_tokens: resp.usage.total_tokens,
+                    },
+                    system_fingerprint: None,
+                };
+                Json(response).into_response()
+            }
+            Err(e) => {
+                Json(serde_json::json!({
+                    "error": {
+                        "message": format!("LLM call failed: {}", e),
+                        "type": "server_error",
+                        "code": "llm_error"
+                    }
+                })).into_response()
+            }
+        }
+    }
+}
+
+/// GET /v1/models — 列出可用模型 (OpenAI 兼容)
+pub async fn openai_list_models(
+    State(state): State<AppState>,
+) -> Json<OpenAIModelList> {
+    let gateway = state.gateway.clone();
+    
+    let models = match gateway {
+        Some(g) => {
+            let providers = g.providers();
+            providers.into_iter().map(|name: String| {
+                let (owned_by, _model_id) = if let Some((prov, model)) = name.split_once('/') {
+                    (prov, model)
+                } else {
+                    ("neotrix", name.as_str())
+                };
+                OpenAIModel {
+                    id: name.clone(),
+                    object: "model".to_string(),
+                    created: chrono::Utc::now().timestamp(),
+                    owned_by: owned_by.to_string(),
+                }
+            }).collect()
+        }
+        None => Vec::new(),
+    };
+    
+    Json(OpenAIModelList {
+        object: "list".to_string(),
+        data: models,
+    })
+}
+
+/// GET /v1/models/{*model} — 获取模型详情 (通配捕获, 剥离前导斜杠)
+pub async fn openai_get_model(
+    State(state): State<AppState>,
+    Path(raw): Path<String>,
+) -> impl IntoResponse {
+    // {*model} 捕获含前导斜杠: "/llm7/codestral-latest" → "llm7/codestral-latest"
+    let model = raw.trim_start_matches('/').to_string();
+    let gateway = state.gateway.clone();
+    
+    match gateway {
+        Some(g) => {
+            if g.providers().contains(&model) {
+                let model_clone = model.clone();
+                let (owned_by, _) = if let Some((prov, _)) = model.split_once('/') {
+                    (prov.to_string(), "")
+                } else {
+                    ("neotrix".to_string(), "")
+                };
+                Json(OpenAIModel {
+                    id: model_clone,
+                    object: "model".to_string(),
+                    created: chrono::Utc::now().timestamp(),
+                    owned_by,
+                }).into_response()
+            } else {
+                (
+                    axum::http::StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": {
+                            "message": format!("Model '{}' not found", model),
+                            "type": "invalid_request_error",
+                            "code": "model_not_found"
+                        }
+                    }))
+                ).into_response()
+            }
+        }
+        None => {
+            (
+                axum::http::StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": "No LLM gateway available",
+                        "type": "server_error",
+                        "code": "gateway_unavailable"
+                    }
+                }))
+            ).into_response()
+        }
+    }
 }
 
 #[cfg(test)]

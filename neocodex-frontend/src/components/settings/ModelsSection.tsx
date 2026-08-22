@@ -51,6 +51,13 @@ const providerPoolGroups = (cfg: ProviderConfig) => {
 }
 
 export function ModelsSection(props: Props) {
+  // 单击提供商图标也可切换（修复 SiliconFlow 图标点击无界面）：点击头即选中该提供商首个模型
+  const handleProviderHeadClick = (p: ProviderMeta) => {
+    if (props.switching()) return
+    if (p.model === props.config()?.active_model) return
+    props.onSwitchProvider(p.name)
+  }
+
   return (
     <div class="space-y-4">
       <Show
@@ -134,8 +141,16 @@ export function ModelsSection(props: Props) {
                             const isActiveProvider = p.model === cfg().active_model
                             return (
                               <div class={clsx('rounded-xl border transition-colors', isActiveProvider ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}>
-                                {/* 提供商头：图标 + 名 + 徽章 */}
-                                <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                                {/* 提供商头：整行可点击切换（SiliconFlow 等云端图标点击有反馈） */}
+                                <button
+                                  class={clsx('w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left rounded-t-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:ring-inset',
+                                    isActiveProvider ? 'bg-nt-io-500/8' : 'hover:bg-white/60'
+                                  )}
+                                  onClick={() => handleProviderHeadClick(p)}
+                                  disabled={props.switching() || isActiveProvider}
+                                  aria-label={`切换到 ${p.display_name}`}
+                                  title={isActiveProvider ? '当前提供商' : `点击切换到 ${p.display_name}`}
+                                >
                                   <div class="flex items-center gap-2.5 min-w-0">
                                     <ProviderIcon name={p.name} size="sm" />
                                     <div class="flex items-center gap-1.5 min-w-0">
@@ -147,7 +162,7 @@ export function ModelsSection(props: Props) {
                                     <CategoryBadge category={p.category} />
                                     <span class="text-10px text-text-muted font-mono">{p.models.length} 个</span>
                                   </div>
-                                </div>
+                                </button>
                                 {/* 模型列表：代理池行 */}
                                 <div class="px-2 pb-2 flex flex-col gap-1" role="radiogroup" aria-label={`${p.display_name} 模型池`}>
                                   <For each={p.models}>

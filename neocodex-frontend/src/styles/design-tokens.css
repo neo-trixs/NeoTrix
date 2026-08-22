@@ -1,0 +1,794 @@
+@layer base {
+  :root {
+    /* ═════════════════════════════════════════════════════════════════════
+       neotrix Design Tokens v2 — "Consciousness Glass"
+       Primitive → Semantic 两层 token 模型，单一事实源
+       ════════════════════════════════════════════════════════════════════ */
+
+    /* ─────────────────────────────────────────────────────────────────
+       Primitive Colors (原始色) — 不直接在组件中使用，仅供语义色引用
+       ───────────────────────────────────────────────────────────────── */
+
+    /* Brand Gold — neotrix 核心品牌色（浅金 #f0913a） */
+    --nt-color-gold-50:  #fef7ee;
+    --nt-color-gold-100: #fdf0dd;
+    --nt-color-gold-200: #fae0bc;
+    --nt-color-gold-300: #f5c98a;
+    --nt-color-gold-400: #f1ac58;
+    --nt-color-gold-500: #f0913a;   /* 主品牌色 */
+    --nt-color-gold-600: #df7f2b;
+    --nt-color-gold-700: #c96823;
+    --nt-color-gold-800: #a3501c;
+    --nt-color-gold-900: #824018;
+
+    /* Brand Orange — 交互强调色 */
+    --nt-color-orange-50:  #fff7ed;
+    --nt-color-orange-100: #ffedd5;
+    --nt-color-orange-200: #fed7aa;
+    --nt-color-orange-300: #fdba74;
+    --nt-color-orange-400: #fb923c;
+    --nt-color-orange-500: #f97316;
+    --nt-color-orange-600: #ea580c;
+    --nt-color-orange-700: #c2410c;
+    --nt-color-orange-800: #9a340f;
+    --nt-color-orange-900: #7c2d12;
+
+    /* Consciousness Teal — 意识流青绿（跨域连接色） */
+    --nt-color-teal-50:  #f0fdfa;
+    --nt-color-teal-100: #ccfbf1;
+    --nt-color-teal-200: #99f6e4;
+    --nt-color-teal-300: #5eead4;
+    --nt-color-teal-400: #2dd4bf;
+    --nt-color-teal-500: #14b8a6;
+    --nt-color-teal-600: #0d9488;
+    --nt-color-teal-700: #0f766e;
+    --nt-color-teal-800: #115e59;
+    --nt-color-teal-900: #134e4a;
+
+    /* Consciousness Violet — 元认知紫 */
+    --nt-color-violet-50:  #faf5ff;
+    --nt-color-violet-100: #f3e8ff;
+    --nt-color-violet-200: #e9d5ff;
+    --nt-color-violet-300: #d8b4fe;
+    --nt-color-violet-400: #c084fc;
+    --nt-color-violet-500: #a855f7;
+    --nt-color-violet-600: #9333ea;
+    --nt-color-violet-700: #7e22ce;
+    --nt-color-violet-800: #6b21a8;
+    --nt-color-violet-900: #581c87;
+
+    /* Neural Blue — 知识/记忆蓝 */
+    --nt-color-blue-50:  #eff6ff;
+    --nt-color-blue-100: #dbeafe;
+    --nt-color-blue-200: #bfdbfe;
+    --nt-color-blue-300: #93c5fd;
+    --nt-color-blue-400: #60a5fa;
+    --nt-color-blue-500: #3b82f6;
+    --nt-color-blue-600: #2563eb;
+    --nt-color-blue-600: #1d4ed8;
+    --nt-color-blue-700: #1e40af;
+    --nt-color-blue-800: #1e3a8a;
+    --nt-color-blue-900: #172554;
+
+    /* Memory Green — 记忆/成长绿 */
+    --nt-color-emerald-50:  #ecfdf5;
+    --nt-color-emerald-100: #d1fae5;
+    --nt-color-emerald-200: #a7f3d0;
+    --nt-color-emerald-300: #6ee7b7;
+    --nt-color-emerald-400: #34d399;
+    --nt-color-emerald-500: #10b981;
+    --nt-color-emerald-600: #059669;
+    --nt-color-emerald-700: #047857;
+    --nt-color-emerald-800: #065f46;
+    --nt-color-emerald-900: #064e3b;
+
+    /* Act Amber — 行动/执行琥珀 */
+    --nt-color-amber-50:  #fffbeb;
+    --nt-color-amber-100: #fef3c7;
+    --nt-color-amber-200: #fde68a;
+    --nt-color-amber-300: #fcd34d;
+    --nt-color-amber-400: #fbbf24;
+    --nt-color-amber-500: #f59e0b;
+    --nt-color-amber-600: #d97706;
+    --nt-color-amber-700: #b45309;
+    --nt-color-amber-800: #92400e;
+    --nt-color-amber-900: #78350f;
+
+    /* Shield Red — 安全/危险红 */
+    --nt-color-red-50:  #fef2f2;
+    --nt-color-red-100: #fee2e2;
+    --nt-color-red-200: #fecaca;
+    --nt-color-red-300: #fca5a5;
+    --nt-color-red-400: #f87171;
+    --nt-color-red-500: #ef4444;
+    --nt-color-red-600: #dc2626;
+    --nt-color-red-700: #b91c1c;
+    --nt-color-red-700: #991b1b;
+    --nt-color-red-800: #7f1d1d;
+    --nt-color-red-900: #450a0a;
+
+    /* Neutral Slate — 中性灰阶 */
+    --nt-color-slate-50:  #f8fafc;
+    --nt-color-slate-100: #f1f5f9;
+    --nt-color-slate-200: #e2e8f0;
+    --nt-color-slate-300: #cbd5e1;
+    --nt-color-slate-400: #94a3b8;
+    --nt-color-slate-500: #64748b;
+    --nt-color-slate-600: #475569;
+    --nt-color-slate-700: #334155;
+    --nt-color-slate-800: #1e293b;
+    --nt-color-slate-900: #0f172a;
+    --nt-color-slate-950: #020617;
+
+    /* ─────────────────────────────────────────────────────────────────
+       Semantic Colors (语义色) — 组件直接使用的 token
+       ───────────────────────────────────────────────────────────────── */
+
+    /* Label 文字层级 */
+    --nt-label-primary:   #1a1a20;  /* 主标题 */
+    --nt-label-secondary: #5a5a62;  /* 次级文字 */
+    --nt-label-tertiary:  #909098;  /* 辅助/占位/禁用 */
+    --nt-label-quaternary:#b0b0b8;  /* 最弱层级 */
+    --nt-label-inverse:   #ffffff;  /* 深色背景上的文字 */
+
+    /* Brand 语义色 */
+    --nt-brand-primary:   var(--nt-color-gold-500);
+    --nt-brand-hover:     var(--nt-color-gold-600);
+    --nt-brand-active:    var(--nt-color-gold-700);
+    --nt-brand-subtle:    var(--nt-color-gold-50);
+    --nt-brand-subtle-hover: var(--nt-color-gold-100);
+
+    /* State 状态色 */
+    --nt-state-success:   var(--nt-color-emerald-600);
+    --nt-state-success-bg: var(--nt-color-emerald-50);
+    --nt-state-warning:   var(--nt-color-amber-600);
+    --nt-state-warning-bg: var(--nt-color-amber-50);
+    --nt-state-error:     var(--nt-color-red-600);
+    --nt-state-error-bg:  var(--nt-color-red-50);
+    --nt-state-info:      var(--nt-color-blue-600);
+    --nt-state-info-bg:   var(--nt-color-blue-50);
+
+    /* Interactive 交互色 */
+    --nt-interactive-bg-hover:     var(--nt-color-slate-100);
+    --nt-interactive-bg-active:    var(--nt-color-slate-200);
+    --nt-interactive-bg-focus:     var(--nt-color-gold-50);
+    --nt-interactive-border-focus: var(--nt-color-gold-500);
+    --nt-interactive-border-hover: var(--nt-color-gold-300);
+
+    /* Border 边框层级 */
+    --nt-border-l1:  rgba(0, 0, 0, 0.04);  /* 最细分割线 */
+    --nt-border-l2:  rgba(0, 0, 0, 0.06);  /* 标准分割线 */
+    --nt-border-l3:  rgba(0, 0, 0, 0.08);  /* 卡片边框 */
+    --nt-border-l4:  rgba(0, 0, 0, 0.10);  /* 强调边框 */
+    --nt-border-brand: var(--nt-color-gold-300);
+    --nt-border-error: var(--nt-color-red-300);
+
+    /* Background 背景层级 */
+    --nt-bg-base:       #ffffff;                    /* 页面底色 */
+    --nt-bg-elevated:   #fafafa;                    /* 卡片/面板底色 */
+    --nt-bg-module:     rgba(255, 255, 255, 0.85);  /* 模块背景 */
+    --nt-bg-module-platform: rgba(255, 255, 255, 0.95);
+    --nt-bg-glass-L1:   rgba(255, 255, 255, 0.22);  /* Liquid Glass L1 */
+    --nt-bg-glass-L2:   rgba(255, 255, 255, 0.14);
+    --nt-bg-glass-L3:   rgba(255, 255, 255, 0.08);
+    --nt-bg-glass-L4:   rgba(255, 255, 255, 0.04);
+    --nt-bg-mask-1:     rgba(0, 0, 0, 0.32);        /* 模态遮罩 */
+    --nt-bg-mask-2:     rgba(0, 0, 0, 0.48);
+
+    /* Glass 液态玻璃渐变 */
+    --nt-glass-L1-start: rgba(255, 255, 255, 0.22);
+    --nt-glass-L1-end:   rgba(255, 255, 255, 0.05);
+    --nt-glass-L2-start: rgba(255, 255, 255, 0.14);
+    --nt-glass-L2-end:   rgba(255, 255, 255, 0.03);
+    --nt-glass-modal-start: rgba(255, 255, 255, 0.78);
+    --nt-glass-modal-end:   rgba(255, 255, 255, 0.60);
+    --nt-glass-pop-start:   rgba(255, 255, 255, 0.82);
+    --nt-glass-pop-end:     rgba(255, 255, 255, 0.62);
+
+    /* Shadow 阴影系统 */
+    --nt-shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.03);
+    --nt-shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --nt-shadow-md:  0 4px 8px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --nt-shadow-lg:  0 12px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.05);
+    --nt-shadow-xl:  0 20px 48px rgba(0, 0, 0, 0.10), 0 8px 16px rgba(0, 0, 0, 0.06);
+    --nt-shadow-2xl: 0 32px 64px rgba(0, 0, 0, 0.12), 0 12px 24px rgba(0, 0, 0, 0.08);
+    --nt-shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 0.5px rgba(255, 255, 255, 0.35);
+
+    /* Glass Shadow 液态玻璃专用阴影 */
+    --nt-glass-shadow-sm:  inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 0.5px rgba(255, 255, 255, 0.30);
+    --nt-glass-shadow-md:  inset 0 1px 0 rgba(255, 255, 255, 0.65), inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), 0 2px 8px rgba(40, 30, 20, 0.05);
+    --nt-glass-shadow-lg:  inset 0 1px 0 rgba(255, 255, 255, 0.75), inset 0 0 0 0.5px rgba(255, 255, 255, 0.35), 0 24px 64px rgba(40, 30, 20, 0.16), 0 4px 16px rgba(40, 30, 20, 0.08);
+
+    /* ─────────────────────────────────────────────────────────────────
+       Typography (字体系统)
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-font-family-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --nt-font-family-mono: "SF Mono", "JetBrains Mono", "Fira Code", "Menlo", "Consolas", ui-monospace, monospace;
+    --nt-font-family-serif: Georgia, Cambria, "Noto Serif SC", serif;
+
+    /* Font Size 字号阶梯 */
+    --nt-text-xs:    10px;  /* 标签、计数、脚注 */
+    --nt-text-sm:    11px;  /* 紧凑标签、描述 */
+    --nt-text-base:  13px;  /* 正文、标签、按钮 */
+    --nt-text-md:    14px;  /* 标准输入、消息 */
+    --nt-text-lg:    16px;  /* 标题、大号输入 */
+    --nt-text-xl:    18px;  /* 区块标题 */
+    --nt-text-2xl:   22px;  /* 页面标题 */
+    --nt-text-3xl:   28px;  /* Hero 标题 */
+    --nt-text-4xl:   36px;  /* 超大标题 */
+
+    /* Font Weight */
+    --nt-font-normal:   400;
+    --nt-font-medium:   500;
+    --nt-font-semibold: 600;
+    --nt-font-bold:     700;
+
+    /* Line Height */
+    --nt-leading-tight:  1.3;
+    --nt-leading-snug:   1.45;
+    --nt-leading-normal: 1.55;
+    --nt-leading-relaxed: 1.7;
+
+    /* Letter Spacing */
+    --nt-tracking-tight:  -0.02em;
+    --nt-tracking-normal: 0;
+    --nt-tracking-wide:   0.01em;
+    --nt-tracking-wider:  0.04em;
+
+    /* ─────────────────────────────────────────────────────────────────
+       Spacing (间距系统) — 4px 基准网格
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-space-0: 0;
+    --nt-space-1: 2px;
+    --nt-space-2: 4px;
+    --nt-space-3: 6px;
+    --nt-space-4: 8px;
+    --nt-space-5: 10px;
+    --nt-space-6: 12px;
+    --nt-space-8: 16px;
+    --nt-space-10: 20px;
+    --nt-space-12: 24px;
+    --nt-space-16: 32px;
+    --nt-space-20: 40px;
+    --nt-space-24: 48px;
+    --nt-space-32: 64px;
+
+    /* ─────────────────────────────────────────────────────────────────
+       Border Radius (圆角系统)
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-radius-none: 0;
+    --nt-radius-xs: 3px;
+    --nt-radius-sm: 4px;
+    --nt-radius-md: 6px;
+    --nt-radius-lg: 8px;
+    --nt-radius-xl: 10px;
+    --nt-radius-2xl: 12px;
+    --nt-radius-3xl: 16px;
+    --nt-radius-4xl: 24px;
+    --nt-radius-full: 9999px;
+
+    /* ─────────────────────────────────────────────────────────────────
+       Motion (动效系统)
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-duration-fast:    120ms;
+    --nt-duration-normal:  200ms;
+    --nt-duration-slow:    300ms;
+    --nt-duration-slower:  400ms;
+
+    --nt-easing-standard:   cubic-bezier(0.22, 1, 0.36, 1);   /* 标准弹性出 */
+    --nt-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);       /* 减速进 */
+    --nt-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);       /* 加速出 */
+    --nt-easing-sharp:      cubic-bezier(0.4, 0, 0.6, 1);     /* 标准曲线 */
+
+    /* Animation Duration 动画时长 */
+    --nt-anim-fade-in:       120ms;
+    --nt-anim-slide-in:      140ms;
+    --nt-anim-scale-in:      140ms;
+    --nt-anim-panel-slide:   220ms;
+    --nt-anim-panel-collapse: 350ms;
+
+    /* ─────────────────────────────────────────────────────────────────
+       Z-Index (层级系统)
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-z-dropdown:   50;
+    --nt-z-popover:    100;
+    --nt-z-modal:      200;
+    --nt-z-toast:      300;
+    --nt-z-tooltip:    400;
+    --nt-z-command-palette: 500;  /* 命令面板最高 */
+
+    /* ─────────────────────────────────────────────────────────────────
+       Breakpoints (断点)
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-bp-sm:  480px;
+    --nt-bp-md:  768px;
+    --nt-bp-lg:  1024px;
+    --nt-bp-xl:  1280px;
+    --nt-bp-2xl: 1536px;
+
+    /* ─────────────────────────────────────────────────────────────────
+       Component Specific (组件级语义色) — 避免硬编码
+       ───────────────────────────────────────────────────────────────── */
+
+    /* Panel 面板 */
+    --nt-panel-bg-start: var(--nt-glass-modal-start);
+    --nt-panel-bg-end:   var(--nt-glass-modal-end);
+    --nt-panel-border:   rgba(255, 255, 255, 0.30);
+    --nt-panel-shadow:   var(--nt-glass-shadow-lg);
+
+    /* Popover 下拉 */
+    --nt-popover-bg-start: var(--nt-glass-pop-start);
+    --nt-popover-bg-end:   var(--nt-glass-pop-end);
+    --nt-popover-border:   rgba(255, 255, 255, 0.40);
+    --nt-popover-shadow:   var(--nt-glass-shadow-md);
+
+    /* Input 输入框 */
+    --nt-input-bg:           rgba(255, 255, 255, 0.60);
+    --nt-input-border:       var(--nt-border-l3);
+    --nt-input-border-focus: var(--nt-brand-primary);
+    --nt-input-bg-focus:     rgba(255, 255, 255, 0.85);
+    --nt-input-placeholder:  var(--nt-label-tertiary);
+
+    /* Button 按钮 */
+    --nt-btn-height-sm: 28px;
+    --nt-btn-height-md: 36px;
+    --nt-btn-height-lg: 44px;
+    --nt-btn-padding-x-sm: 10px;
+    --nt-btn-padding-x-md: 16px;
+    --nt-btn-padding-x-lg: 24px;
+
+    /* Panel 面板宽度 */
+    --nt-panel-width-sm:  240px;
+    --nt-panel-width-md:  280px;
+    --nt-panel-width-lg:  320px;
+    --nt-panel-width-xl:  400px;
+
+    /* Sidebar 侧栏 */
+    --nt-sidebar-width: 280px;
+    --nt-sidebar-collapsed-width: 48px;
+
+    /* RightBar 右栏 */
+    --nt-rightbar-width: 280px;
+
+    /* Command Palette 命令面板 */
+    --nt-cmd-width: 620px;
+    --nt-cmd-max-height: 560px;
+
+    /* Scrollbar 滚动条 */
+    --nt-scrollbar-width: 6px;
+    --nt-scrollbar-thumb-bg: var(--nt-color-slate-300);
+    --nt-scrollbar-thumb-hover: var(--nt-color-slate-400);
+    --nt-scrollbar-thumb-active: var(--nt-color-slate-500);
+
+    /* ─────────────────────────────────────────────────────────────────
+       Domain Colors (7 大域语义色) — 用于域标识、图标、导航
+       ───────────────────────────────────────────────────────────────── */
+
+    --nt-domain-core:     var(--nt-color-gold-500);    /* NT-CORE: 金 - 基础/意识 */
+    --nt-domain-mind:     var(--nt-color-violet-500);  /* NT-MIND: 紫 - 进化/思维 */
+    --nt-domain-memory:   var(--nt-color-blue-500);    /* NT-MEMORY: 蓝 - 知识/记忆 */
+    --nt-domain-world:    var(--nt-color-teal-500);    /* NT-WORLD: 青 - 感知/世界 */
+    --nt-domain-act:      var(--nt-color-amber-500);   /* NT-ACT: 琥珀 - 行动/执行 */
+    --nt-domain-io:       var(--nt-color-orange-500);  /* NT-IO: 橙 - 界面/交互 */
+    --nt-domain-shield:   var(--nt-color-red-500);     /* NT-SHIELD: 红 - 安全/盾 */
+
+    /* Meta domains */
+    --nt-domain-meta:     var(--nt-color-teal-600);    /* NT-META: 青深 - 元认知 */
+    --nt-domain-repair:   var(--nt-color-emerald-600); /* NT-REPAIR: 绿 - 自愈 */
+    --nt-domain-governance: var(--nt-color-blue-700);  /* NT-GOVERNANCE: 蓝深 - 治理 */
+    --nt-domain-nexus:    var(--nt-color-violet-600);  /* NT-NEXUS: 紫深 - 枢纽 */
+    --nt-domain-scout:    var(--nt-color-amber-600);   /* NT-SCOUT: 琥珀深 - 侦察 */
+
+  }
+
+  /* ── 单主题锁定：仅白橙日间，不跟随系统深色 ── */
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: light; }
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Reduced Motion (动效克制) — 系统级 + 用户偏好双重保障
+     ───────────────────────────────────────────────────────────────── */
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  [data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Font Size Preference (字号偏好) — data-font-size 属性驱动
+     ───────────────────────────────────────────────────────────────── */
+
+  [data-font-size="lg"] html { font-size: 112.5%; }  /* 18px base */
+  [data-font-size="sm"] html { font-size: 87.5%; }   /* 14px base */
+
+  /* ─────────────────────────────────────────────────────────────────
+     Density Preference (密度偏好) — data-density 属性驱动
+     ───────────────────────────────────────────────────────────────── */
+
+  [data-density="compact"] {
+    --nt-space-1: 1px;
+    --nt-space-2: 2px;
+    --nt-space-3: 4px;
+    --nt-space-4: 6px;
+    --nt-space-5: 8px;
+    --nt-space-6: 10px;
+    --nt-space-8: 12px;
+    --nt-btn-height-sm: 24px;
+    --nt-btn-height-md: 32px;
+    --nt-btn-height-lg: 38px;
+  }
+
+  [data-density="comfortable"] {
+    --nt-space-1: 2px;
+    --nt-space-2: 4px;
+    --nt-space-3: 6px;
+    --nt-space-4: 8px;
+    --nt-space-5: 10px;
+    --nt-space-6: 12px;
+    --nt-space-8: 16px;
+  }
+}
+
+@layer components {
+  /* ─────────────────────────────────────────────────────────────────
+     Focus Visible (统一焦点样式)
+     ───────────────────────────────────────────────────────────────── */
+
+  :focus-visible {
+    outline: 2px solid var(--nt-interactive-border-focus);
+    outline-offset: 2px;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Selection (选区样式)
+     ───────────────────────────────────────────────────────────────── */
+
+  ::selection {
+    background: var(--nt-brand-primary);
+    color: var(--nt-label-inverse);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Scrollbar (统一滚动条)
+     ───────────────────────────────────────────────────────────────── */
+
+  ::-webkit-scrollbar {
+    width: var(--nt-scrollbar-width);
+    height: var(--nt-scrollbar-width);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--nt-scrollbar-thumb-bg);
+    border-radius: var(--nt-radius-full);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background var(--nt-duration-fast) var(--nt-easing-standard);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--nt-scrollbar-thumb-hover);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--nt-scrollbar-thumb-active);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Glass Layers (液态玻璃层次) — L1 到 L4 + Modal + Popover
+     ───────────────────────────────────────────────────────────────── */
+
+  .glass-L1,
+  .glass-side {
+    background-image: linear-gradient(180deg, var(--nt-glass-L1-start) 0%, var(--nt-glass-L1-end) 100%);
+    backdrop-filter: blur(14px) saturate(1.6);
+    box-shadow: var(--nt-glass-shadow-sm);
+  }
+
+  .glass-side {
+    background-image: linear-gradient(180deg, var(--nt-glass-L2-start) 0%, var(--nt-glass-L2-end) 100%);
+  }
+
+  .glass-modal {
+    background-image: linear-gradient(180deg, var(--nt-panel-bg-start) 0%, var(--nt-panel-bg-end) 100%);
+    backdrop-filter: blur(28px) saturate(1.7);
+    border: 1px solid var(--nt-panel-border);
+    box-shadow: var(--nt-panel-shadow);
+  }
+
+  .glass-pop {
+    background-image: linear-gradient(180deg, var(--nt-popover-bg-start) 0%, var(--nt-popover-bg-end) 100%);
+    backdrop-filter: blur(24px) saturate(1.7);
+    border: 1px solid var(--nt-popover-border);
+    box-shadow: var(--nt-popover-shadow);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Base Components (基础组件类)
+     ───────────────────────────────────────────────────────────────── */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--nt-space-2);
+    font-family: inherit;
+    font-size: var(--nt-text-base);
+    font-weight: var(--nt-font-medium);
+    line-height: 1;
+    border: none;
+    border-radius: var(--nt-radius-lg);
+    cursor: pointer;
+    transition: all var(--nt-duration-normal) var(--nt-easing-standard);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--nt-interactive-border-focus);
+    outline-offset: 2px;
+  }
+
+  .btn-sm {
+    height: var(--nt-btn-height-sm);
+    padding: 0 var(--nt-btn-padding-x-sm);
+    font-size: var(--nt-text-sm);
+    border-radius: var(--nt-radius-md);
+  }
+
+  .btn-md {
+    height: var(--nt-btn-height-md);
+    padding: 0 var(--nt-btn-padding-x-md);
+    font-size: var(--nt-text-base);
+    border-radius: var(--nt-radius-lg);
+  }
+
+  .btn-lg {
+    height: var(--nt-btn-height-lg);
+    padding: 0 var(--nt-btn-padding-x-lg);
+    font-size: var(--nt-text-lg);
+    border-radius: var(--nt-radius-xl);
+  }
+
+  .btn-primary {
+    background: var(--nt-brand-primary);
+    color: var(--nt-label-inverse);
+    box-shadow: var(--nt-shadow-sm);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--nt-brand-hover);
+    box-shadow: var(--nt-shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .btn-secondary {
+    background: var(--nt-bg-module);
+    color: var(--nt-label-primary);
+    border: 1px solid var(--nt-border-l2);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--nt-interactive-bg-hover);
+    border-color: var(--nt-border-l3);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--nt-label-secondary);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--nt-interactive-bg-hover);
+    color: var(--nt-label-primary);
+  }
+
+  .btn-danger {
+    background: var(--nt-state-error-bg);
+    color: var(--nt-state-error);
+    border: 1px solid var(--nt-border-error);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: var(--nt-state-error);
+    color: var(--nt-label-inverse);
+  }
+
+  .input {
+    width: 100%;
+    font-family: inherit;
+    font-size: var(--nt-text-md);
+    line-height: var(--nt-leading-normal);
+    color: var(--nt-label-primary);
+    background: var(--nt-input-bg);
+    border: 1px solid var(--nt-input-border);
+    border-radius: var(--nt-radius-lg);
+    padding: var(--nt-space-2) var(--nt-space-3);
+    box-sizing: border-box;
+    transition: all var(--nt-duration-fast) var(--nt-easing-standard);
+  }
+
+  .input::placeholder {
+    color: var(--nt-input-placeholder);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--nt-input-border-focus);
+    background: var(--nt-input-bg-focus);
+    box-shadow: 0 0 0 3px var(--nt-interactive-bg-focus);
+  }
+
+  .input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .card {
+    background: var(--nt-bg-module);
+    border: 1px solid var(--nt-border-l2);
+    border-radius: var(--nt-radius-2xl);
+    backdrop-filter: blur(12px) saturate(1.5);
+    box-shadow: var(--nt-shadow-sm);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--nt-space-1);
+    padding: var(--nt-space-1) var(--nt-space-2);
+    font-size: var(--nt-text-xs);
+    font-weight: var(--nt-font-medium);
+    line-height: 1;
+    border-radius: var(--nt-radius-full);
+  }
+
+  .badge-success {
+    background: var(--nt-state-success-bg);
+    color: var(--nt-state-success);
+  }
+
+  .badge-warn {
+    background: var(--nt-state-warning-bg);
+    color: var(--nt-state-warning);
+  }
+
+  .badge-error {
+    background: var(--nt-state-error-bg);
+    color: var(--nt-state-error);
+  }
+
+  .badge-info {
+    background: var(--nt-state-info-bg);
+    color: var(--nt-state-info);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Animations (关键帧动画)
+     ───────────────────────────────────────────────────────────────── */
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes slideInRight {
+    from { transform: translateX(16px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slideInLeft {
+    from { transform: translateX(-16px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slideInUp {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes slideInDown {
+    from { transform: translateY(-8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes scaleIn {
+    from { transform: scale(0.96); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 12px rgba(240, 145, 58, 0.12); }
+    50% { box-shadow: 0 0 24px rgba(240, 145, 58, 0.25); }
+  }
+
+  @keyframes heroPulse {
+    0%, 100% {
+      filter: drop-shadow(0 0 6px rgba(240, 145, 58, 0.2)) drop-shadow(0 0 12px rgba(240, 145, 58, 0.1));
+      transform: scale(1) rotate(0deg);
+    }
+    50% {
+      filter: drop-shadow(0 0 12px rgba(240, 145, 58, 0.35)) drop-shadow(0 0 24px rgba(240, 145, 58, 0.15));
+      transform: scale(1.04) rotate(-8deg);
+    }
+  }
+
+  @keyframes blinkCursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes nt-ic-breathe {
+    0%, 100% { opacity: 0.65; }
+    50% { opacity: 1; }
+  }
+
+  .animate-in {
+    animation: fadeIn var(--nt-anim-fade-in) var(--nt-easing-standard);
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight var(--nt-anim-slide-in) var(--nt-easing-standard);
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft var(--nt-anim-slide-in) var(--nt-easing-standard);
+  }
+
+  .animate-scale-in {
+    animation: scaleIn var(--nt-anim-scale-in) var(--nt-easing-standard);
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Utility Classes (工具类)
+     ───────────────────────────────────────────────────────────────── */
+
+  .text-balance { text-wrap: balance; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .flex-center { display: flex; align-items: center; justify-content: center; }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; }
+  .flex-gap-1 { gap: var(--nt-space-1); }
+  .flex-gap-2 { gap: var(--nt-space-2); }
+  .flex-gap-3 { gap: var(--nt-space-3); }
+  .flex-gap-4 { gap: var(--nt-space-4); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+}
