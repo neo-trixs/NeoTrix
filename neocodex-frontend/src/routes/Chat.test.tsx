@@ -21,13 +21,12 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
     vi.clearAllMocks()
   })
 
-  it('侧栏 seg 有 对话/协同/电脑 三个标签', () => {
+  it('侧栏 seg 有 对话/协同 两个标签（极简去电脑）', () => {
     render(() => <Chat />)
     const tabs = document.querySelectorAll('.seg [role="tab"]')
-    expect(tabs.length).toBe(3)
+    expect(tabs.length).toBe(2)
     expect(tabs[0].textContent).toContain('对话')
     expect(tabs[1].textContent).toContain('协同')
-    expect(tabs[2].textContent).toContain('电脑')
   })
 
   it('顶部 ch-top 极简：无功能按钮（仅拖拽区）', () => {
@@ -70,29 +69,18 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
     expect(opts.length).toBeGreaterThan(0)
   })
 
-  it('功能面板入口存在且点击可打开面板（对标 Claude Code 侧栏）', () => {
+  it('功能面板入口已移除（极简侧栏）', () => {
     render(() => <Chat />)
     const group = document.querySelector('[role="group"][aria-label="功能面板"]')
-    expect(group).toBeTruthy()
-    // 点击 Git 面板入口应渲染 GitPanel（role=dialog aria-label=Git 面板）
-    const gitBtn = [...group!.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Git')!
-    fireEvent.click(gitBtn)
-    const panel = document.querySelector('[role="dialog"][aria-label="Git 面板"]')
-    expect(panel).toBeTruthy()
+    expect(group).toBeNull()
   })
 
-  it('面板打开后按 Esc 关闭（全局 Esc 层级：面板→菜单→设置）', async () => {
+  it('折叠标签置于三色灯下方且同按钮复用', () => {
     render(() => <Chat />)
-    // 打开 Git 面板
-    const group = document.querySelector('[role="group"][aria-label="功能面板"]')
-    const gitBtn = [...group!.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Git')!
-    fireEvent.click(gitBtn)
-    expect(document.querySelector('[role="dialog"][aria-label="Git 面板"]')).toBeTruthy()
-    // 等待 onMount 注册全局 keydown 监听
-    await new Promise((r) => setTimeout(r, 0))
-    // 按 Esc 关闭面板（全局 window keydown 监听）
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    expect(document.querySelector('[role="dialog"][aria-label="Git 面板"]')).toBeNull()
+    const btn = document.querySelector('[aria-label="折叠侧边栏"]') as HTMLElement
+    expect(btn).toBeTruthy()
+    // 三色灯占位 h-7 紧邻折叠行
+    expect(document.querySelector('[data-tauri-drag-region]')).toBeTruthy()
   })
 
   it('斜杠 / 菜单包含 model/status/cost/export 命令（对标 Claude Code 命令菜单）', () => {

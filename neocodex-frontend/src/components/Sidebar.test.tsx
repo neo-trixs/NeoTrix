@@ -12,15 +12,14 @@ describe('Sidebar 标签交互（对标 Codex tablist 规范）', () => {
     vi.clearAllMocks()
   })
 
-  it('seg 标签组具备 role=tablist 与 role=tab 语义（对话/协同/电脑）', () => {
+  it('seg 标签组具备 role=tablist 与 role=tab 语义（对话/协同 极简两态）', () => {
     render(() => <Sidebar activeView="chat" />)
     const tablist = document.querySelector('[role="tablist"]')
     expect(tablist).toBeTruthy()
     const tabs = document.querySelectorAll('[role="tab"]')
-    expect(tabs.length).toBe(3)
+    expect(tabs.length).toBe(2)
     expect(tabs[0].getAttribute('aria-selected')).toBe('true')
     expect(tabs[1].getAttribute('aria-selected')).toBe('false')
-    expect(tabs[2].getAttribute('aria-selected')).toBe('false')
   })
 
   it('roving tabindex：仅激活标签可 Tab 聚焦', () => {
@@ -28,7 +27,6 @@ describe('Sidebar 标签交互（对标 Codex tablist 规范）', () => {
     const tabs = document.querySelectorAll<HTMLElement>('[role="tab"]')
     expect(tabs[0].tabIndex).toBe(0)
     expect(tabs[1].tabIndex).toBe(-1)
-    expect(tabs[2].tabIndex).toBe(-1)
   })
 
   it('方向键切换视图：←/→ 在 对话/协同 间轮转', () => {
@@ -45,41 +43,17 @@ describe('Sidebar 标签交互（对标 Codex tablist 规范）', () => {
     expect(currentView).toBe('cowork')
   })
 
-  it('功能面板入口：6 个面板按钮渲染，点击触发 onTogglePanel', () => {
-    let toggled: string | null = null
-    render(() => (
-      <Sidebar
-        activeView="chat"
-        activePanel={null}
-        onTogglePanel={(id) => { toggled = id }}
-      />
-    ))
+  it('功能面板入口已移除（极简侧栏，无 Git 行）', () => {
+    render(() => <Sidebar activeView="chat" activePanel={null} onTogglePanel={() => {}} />)
     const group = document.querySelector('[role="group"][aria-label="功能面板"]')
-    expect(group).toBeTruthy()
-    const btns = group!.querySelectorAll('button')
-    expect(btns.length).toBe(6)
-    // Git 按钮点击触发 onTogglePanel('git')
-    const gitBtn = [...btns].find(b => b.getAttribute('aria-label') === 'Git')!
-    fireEvent.click(gitBtn)
-    expect(toggled).toBe('git')
-    // Live Preview 入口存在（批次5）
-    const previewBtn = [...btns].find(b => b.getAttribute('aria-label') === '预览')!
-    expect(previewBtn).toBeTruthy()
+    expect(group).toBeNull()
   })
 
-  it('功能面板入口：激活面板高亮（aria-pressed），未激活不高亮', () => {
-    render(() => (
-      <Sidebar
-        activeView="chat"
-        activePanel="cost"
-        onTogglePanel={() => {}}
-      />
-    ))
-    const group = document.querySelector('[role="group"][aria-label="功能面板"]')
-    const btns = group!.querySelectorAll('button')
-    const costBtn = [...btns].find(b => b.getAttribute('aria-label') === '成本')!
-    const gitBtn = [...btns].find(b => b.getAttribute('aria-label') === 'Git')!
-    expect(costBtn.getAttribute('aria-pressed')).toBe('true')
-    expect(gitBtn.getAttribute('aria-pressed')).toBe('false')
+  it('折叠/展开同标签：同一按钮 rotate-180 切换（上线不再过长）', () => {
+    render(() => <Sidebar activeView="chat" collapsed={false} onToggleCollapse={() => {}} />)
+    const btn = document.querySelector('[aria-label="折叠侧边栏"]') as HTMLElement
+    expect(btn).toBeTruthy()
+    // 极简图标：单圆点而非多外扩射线
+    expect(btn.querySelector('svg')).toBeTruthy()
   })
 })

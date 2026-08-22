@@ -1,5 +1,5 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
-import { Settings, Archive, RotateCcw, GitBranch, Coins, ListTodo, History, MessageSquare, MonitorPlay } from 'lucide-solid'
+import { Settings, Archive, RotateCcw } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 import { tagsStore, normalizeTagName } from '../stores/tags'
 import { clsx } from 'clsx'
@@ -29,8 +29,8 @@ interface SidebarProps {
 const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
 type GroupKey = (typeof GROUP_ORDER)[number]
 
-// Segmented Tab 顺序（WAI-ARIA tabs：→ 前进到下一个，← 后退到上一个，边界停在原位）
-const VIEW_ORDER = ['chat', 'cowork', 'computer'] as const
+// Segmented Tab 顺序：仅保留对话/协同（移除电脑标签，极简两态）
+const VIEW_ORDER = ['chat', 'cowork'] as const
 type ViewKey = (typeof VIEW_ORDER)[number]
 
 function getGroupKey(date: Date): GroupKey {
@@ -46,7 +46,7 @@ function getGroupKey(date: Date): GroupKey {
 export function Sidebar(props: SidebarProps) {
   const collapsed = () => props.collapsed ?? false
   const view = () => props.activeView ?? 'chat'
-  const viewIdx = () => (view() === 'chat' ? 0 : view() === 'cowork' ? 1 : 2)
+  const viewIdx = () => (view() === 'chat' ? 0 : 1)
 
   // 会话操作错误提示：chatStore 会吞掉后端错误（chat.ts catch → console.error），
   // 因此部分操作用后端重查/状态后置条件验证真实结果，失败时给可见内联错误（对标 GitPanel toast）
@@ -373,7 +373,7 @@ export function Sidebar(props: SidebarProps) {
 
       {!collapsed() && (
         <>
-          {/* Segmented Tabs：对标 Claude Code —— E8 六芒星 / 星群 / 电脑，三态等宽 */}
+          {/* Segmented Tabs：极简两态 — 对话 / 协同，去除电脑，图标极细 1px 描边 */}
           <div class="px-3 pb-3">
             <div class="seg" role="tablist" aria-label="意识模式视图切换">
               <button
@@ -385,13 +385,11 @@ export function Sidebar(props: SidebarProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowRight') { e.preventDefault(); moveTab(1) }
                   else if (e.key === 'ArrowLeft') { e.preventDefault(); moveTab(-1) }
-                  else if (e.key === 'Home') { e.preventDefault(); activateView('chat') }
-                  else if (e.key === 'End') { e.preventDefault(); activateView('computer') }
                 }}
                 aria-label="对话"
                 title="对话"
               >
-                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1" stroke="currentColor" stroke-width="1" /></svg>
                 <span class="segb-t">对话</span>
               </button>
               <button
@@ -403,74 +401,17 @@ export function Sidebar(props: SidebarProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'ArrowRight') { e.preventDefault(); moveTab(1) }
                   else if (e.key === 'ArrowLeft') { e.preventDefault(); moveTab(-1) }
-                  else if (e.key === 'Home') { e.preventDefault(); activateView('chat') }
-                  else if (e.key === 'End') { e.preventDefault(); activateView('computer') }
                 }}
                 aria-label="协同"
                 title="协同"
               >
-                <svg viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5.5" r="1.2" stroke="currentColor" stroke-width="1.1" /><line x1="5.5" y1="1.5" x2="5.5" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="5.5" y1="9.5" x2="5.5" y2="10.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1.5" y1="5.5" x2="0.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="9.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="11" cy="11" r="1.2" stroke="currentColor" stroke-width="1.1" opacity="0.55" /><line x1="11" y1="7" x2="11" y2="6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="11" y1="13" x2="11" y2="14" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="7" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="13" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /></svg>
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1" /></svg>
                 <span class="segb-t">协同</span>
-              </button>
-              <button
-                class={clsx('segb', viewIdx() === 2 && 'on')}
-                onClick={() => switchView('computer')}
-                role="tab"
-                aria-selected={viewIdx() === 2}
-                tabIndex={viewIdx() === 2 ? 0 : -1}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') { e.preventDefault(); moveTab(1) }
-                  else if (e.key === 'ArrowLeft') { e.preventDefault(); moveTab(-1) }
-                  else if (e.key === 'Home') { e.preventDefault(); activateView('chat') }
-                  else if (e.key === 'End') { e.preventDefault(); activateView('computer') }
-                }}
-                aria-label="电脑"
-                title="电脑"
-              >
-                <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1" /><line x1="5.5" y1="14.5" x2="10.5" y2="14.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="11.5" x2="8" y2="14.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1.5" y1="7.5" x2="14.5" y2="7.5" stroke="currentColor" stroke-width="1" opacity="0.45" /></svg>
-                <span class="segb-t">电脑</span>
               </button>
             </div>
           </div>
 
-          {/* 功能面板入口（对标 Claude Code 侧栏：git/成本/任务/检查点/侧聊，点击打开，Esc 关闭）。
-              仅 chat 视图渲染面板（Chat.tsx 面板区有 activeView==='chat' 门禁），
-              非 chat 视图禁能防"点了没反应"的死按钮。 */}
-          <div class="px-3 pb-2 flex items-center gap-1" role="group" aria-label="功能面板">
-            <For each={[
-              { id: 'git', label: 'Git', icon: GitBranch, active: props.activePanel === 'git' },
-              { id: 'cost', label: '成本', icon: Coins, active: props.activePanel === 'cost' },
-              { id: 'tasks', label: '任务', icon: ListTodo, active: props.activePanel === 'tasks' },
-              { id: 'timeline', label: '检查点', icon: History, active: props.activePanel === 'timeline' },
-              { id: 'sidechat', label: '侧聊', icon: MessageSquare, active: props.activePanel === 'sidechat' },
-              { id: 'preview', label: '预览', icon: MonitorPlay, active: props.activePanel === 'preview' },
-            ]}>
-              {(p) => {
-                const inChat = view() === 'chat'
-                return (
-                  <button
-                    class={clsx(
-                      'flex-1 flex items-center justify-center gap-1 px-1 py-1.5 rounded-lg text-[11px] transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
-                      p.active
-                        ? 'bg-nt-io-500/15 text-nt-io-600'
-                        : 'text-text-muted hover:text-text-primary hover:bg-white/60',
-                      !inChat && 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-text-muted'
-                    )}
-                    onClick={() => inChat && props.onTogglePanel?.(p.id)}
-                    aria-label={p.label}
-                    aria-pressed={p.active}
-                    aria-disabled={!inChat}
-                    title={inChat ? p.label : '仅在对话视图可用'}
-                  >
-                    <p.icon class="w-3.5 h-3.5 flex-shrink-0" />
-                    <span class="truncate">{p.label}</span>
-                  </button>
-                )
-              }}
-            </For>
-          </div>
-
-          {/* 搜索 + 新建 */}
+          {/* 搜索 + 新建 — 极简单行：搜索占满 + 新建图标 */}
           <div class="px-3 pb-2 flex items-center gap-2">
             <Show
               when={searchOpen()}
