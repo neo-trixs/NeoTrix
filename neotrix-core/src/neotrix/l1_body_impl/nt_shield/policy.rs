@@ -67,7 +67,12 @@ fn default_llm_domains() -> HashSet<String> {
         "integrate.api.nvidia.com",
         "models.inference.ai.azure.com",
         "api-inference.huggingface.co",
-        "ai-endpoints.ovh.net",
+        "ai-endpoints.ovh.net",        // 已注册 provider 池实际端点（config.toml active provider 等）
+        "aihub.humorously.cn",
+        "opencode.ai",
+        // 2026-08: llm7 是 RouterConfig 默认 tier 端点 (keyless 实测 codestral-latest
+        // 匿名可用)，零配置可用性优先 — 从 default-deny 移入白名单。
+        "api.llm7.io",
     ]
     .into_iter()
     .map(|s| s.to_string())

@@ -26,6 +26,9 @@ impl GatewayV2 {
         // 兼容两种注册名: 裸 provider 名 (`llm7`) 与完整目录名 (`llm7/codestral-latest`)。
         // 完整目录名场景下请求 model 恰等于注册名, `{name}/` strip 会失败,
         // 需按首段前缀剥离, 否则上游收到 `llm7/codestral-latest` → model_unavailable。
+        // 2026-08-22: 请求 model 恰等于裸 keyless 注册名 (RouterConfig preferred_model
+        // = "llm7") 时同样视为"未指定模型" → 回退 catalog default_model (codestral-latest),
+        // 防止字面 "llm7" 作为模型名发给上游 → model_unavailable。
         let stripped = request
             .model
             .strip_prefix(&format!("{}/", name))
@@ -41,9 +44,29 @@ impl GatewayV2 {
                 }
             });
         let mut req = request.clone();
-        if let Some(m) = stripped {
-            req.model = m;
+        // 裸注册名等值 (model == name) 视作未指定
+        if req.model == name {
+            req.model.clear();
         }
+        let final_model = if let Some(m) = stripped {
+            if m.is_empty() {
+                // 模型被剥离为空 (如请求 model="llm7/codestral-latest" 且 provider="llm7/codestral-latest")
+                // 回退到该 provider 在 catalog 中的 default_model
+                super::super::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
+                    .map(|info| info.default_model.to_string())
+                    .unwrap_or_else(|| req.model.clone())
+            } else {
+                m
+            }
+        } else if req.model.is_empty() {
+            // 请求未指定模型: 使用 provider 的 default_model
+            super::super::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
+                .map(|info| info.default_model.to_string())
+                .unwrap_or_else(|| "auto".to_string())
+        } else {
+            req.model.clone()
+        };
+        req.model = final_model;
         // Cumora 吸收: 双脑并发门 — 按模型 tier 选 big/triage 槽位, 防雪崩。
         let tier = if ModelTier::parse(&req.model) >= ModelTier::Capable {
             BrainTier::Big
@@ -776,7 +799,12 @@ impl GatewayV2 {
                 }
             });
         let mut req = request.clone();
-        if let Some(m) = stripped {
+        // 裸注册名等值 (model == name) 视作未指定 → 回退 catalog default_model (同 call_provider)
+        if req.model == name {
+            req.model = super::super::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
+                .map(|info| info.default_model.to_string())
+                .unwrap_or_default();
+        } else if let Some(m) = stripped {
             req.model = m;
         }
         provider.stream_complete(&req).await

@@ -222,40 +222,40 @@ impl Default for RouterConfig {
             model_map: vec![
                 TierModelMapping {
                     tier: ModelTier::T0,
-                    provider: "openrouter".into(),
-                    // cumora 模型 pin 教训 (BYOA.md §Engine integration): 别名模型名
-                    // (gpt-4o-mini) 被 provider 静默升级会改变 agent 行为 — pin 到具体版本。
-                    model: "openai/gpt-4o-mini-2024-07-18".into(),
+                    provider: "llm7".into(),
+                    // 2026-08 实测: llm7 keyless 匿名可用 (codestral-latest 200 OK)。
+                    // openrouter 需付费 key，默认走免费端点保证零配置可用 (R-P56)。
+                    model: "codestral-latest".into(),
                     max_tokens: 256,
-                    fallback_models: vec!["anthropic/claude-3-haiku".into()],
+                    fallback_models: vec!["deepseek-v4-flash:0731".into()],
                 },
                 TierModelMapping {
                     tier: ModelTier::T1,
-                    provider: "openrouter".into(),
-                    model: "openai/gpt-4o-2024-11-20".into(),
+                    provider: "llm7".into(),
+                    model: "codestral-latest".into(),
                     max_tokens: 1024,
-                    fallback_models: vec!["anthropic/claude-3.5-sonnet".into()],
+                    fallback_models: vec!["deepseek-v4-flash:0731".into()],
                 },
                 TierModelMapping {
                     tier: ModelTier::T2,
-                    provider: "openrouter".into(),
-                    model: "anthropic/claude-opus".into(),
+                    provider: "llm7".into(),
+                    model: "codestral-latest".into(),
                     max_tokens: 4096,
-                    fallback_models: vec!["openai/gpt-4-turbo".into()],
+                    fallback_models: vec!["claude-fable-5".into()],
                 },
                 TierModelMapping {
                     tier: ModelTier::T3,
-                    provider: "openrouter".into(),
-                    model: "anthropic/claude-3.7-sonnet".into(),
+                    provider: "llm7".into(),
+                    model: "claude-opus-5".into(),
                     max_tokens: 8192,
-                    fallback_models: vec!["openai/gpt-4-0125-preview".into()],
+                    fallback_models: vec!["codestral-latest".into()],
                 },
                 TierModelMapping {
                     tier: ModelTier::T4,
-                    provider: "openrouter".into(),
-                    model: "anthropic/claude-opus-4".into(),
+                    provider: "llm7".into(),
+                    model: "claude-opus-5".into(),
                     max_tokens: 16384,
-                    fallback_models: vec!["openai/o1".into()],
+                    fallback_models: vec!["codestral-latest".into()],
                 },
             ],
             fallback_chain: vec![ModelTier::T4, ModelTier::T3, ModelTier::T2, ModelTier::T1, ModelTier::T0],
@@ -275,6 +275,8 @@ pub struct RouteDecision {
     pub features: RouterFeatures,
     pub fallback_used: Option<String>,
     pub confidence: f64,
+    /// 推荐的 gateway 注册模型名 (如 "aihub/glm-5.2")，为空则让 gateway 自动选
+    pub preferred_model: Option<String>,
 }
 
 impl RouteDecision {
@@ -559,6 +561,10 @@ impl ModelRouter {
             .find(|m| m.tier == tier)
             .unwrap_or(&self.config.model_map[2]);
 
+        // Map ModelRouter's provider/model to gateway registered names
+        // Format: {provider}/{model} for pool entries, or bare provider for keyless
+        let preferred_model = Self::map_to_gateway_name(&mapping.provider, &mapping.model);
+
         RouteDecision {
             tier,
             model: mapping.model.clone(),
@@ -567,6 +573,23 @@ impl ModelRouter {
             features,
             fallback_used: None,
             confidence: 1.0,
+            preferred_model,
+        }
+    }
+
+    /// Map ModelRouter provider/model to gateway registered name
+    fn map_to_gateway_name(provider: &str, model: &str) -> Option<String> {
+        // Pool entries use format "provider/model"
+        // Keyless providers use bare name (e.g., "llm7", "pollinations")
+        let keyless = ["llm7", "pollinations", "api-airforce", "freetheai", "zerolimit", "kilo", "opencode-zen", "ovh", "modelscope"];
+        if keyless.contains(&provider) {
+            Some(provider.to_string())
+        } else if model.contains('/') {
+            // 模型名已含 provider 前缀 (如 openrouter 的 "openai/gpt-4o-mini"),
+            // 原样使用 — 再拼 provider 会产生双前缀导致 gateway 永不匹配。
+            Some(model.to_string())
+        } else {
+            Some(format!("{}/{}", provider, model))
         }
     }
 

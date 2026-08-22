@@ -301,12 +301,20 @@
     box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset;
   }
 
-  /* —— 流式光标：红色块状闪烁（设计文件 .sc） —— */
+  /* —— 流式光标：Claude 风格橙色圆角竖条平滑呼吸 —— */
   .stream-cursor {
-    color: #f0913a;
-    font-weight: 500;
-    margin-left: 1px;
-    animation: blinkCursor 0.8s step-end infinite;
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    border-radius: 3px;
+    background: #f0913a;
+    animation: cursorBreathe 0.9s ease-in-out infinite;
+  }
+  @keyframes cursorBreathe {
+    0%, 100% { opacity: 1; transform: scaleY(1); }
+    50% { opacity: 0.35; transform: scaleY(0.82); }
   }
 
   /* —— Markdown 渲染的块间距 —— */
@@ -472,21 +480,20 @@
     position: relative;
   }
 
-  /* 用户气泡：实心渐变，24px 大圆角 + 右下小尾角（iPolloWork rounded-3xl 语言） */
+  /* 用户气泡：Claude 风格浅橙实底（低饱和，白字高对比） */
   .msg.r .mb {
-    background: linear-gradient(135deg, #f0913a, #df7f2b);
+    background: #f0913a;
     color: #fff;
-    border-radius: 24px 24px 8px 24px;
-    box-shadow: 0 2px 12px rgba(223, 127, 43, 0.28);
+    border-radius: 16px 4px 16px 16px;
+    box-shadow: 0 1px 3px rgba(240, 145, 58, 0.25);
   }
 
   /* assistant 气泡：玻璃质感，16px 圆角，左侧小尾角 */
   .msg.l .mb {
-    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.32) 100%);
-    backdrop-filter: blur(12px) saturate(1.4);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.55), 0 2px 8px rgba(40, 30, 20, 0.05);
-    border-radius: 24px 24px 24px 8px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border-radius: 4px 16px 16px 16px;
   }
 
   .mb code {

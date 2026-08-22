@@ -563,6 +563,8 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
         }
         LlmProviderType::Llm7 => {
             // .ai 域名已死（HTTP 000）；.io 是当前匿名可用端点（2026-08 实测 200）
+            // 2026-08-22 实测可用模型: codestral-latest（gpt-oss-20b 已下线 400）。
+            // catalog default_model 已更新，此处兜底同步，防 catalog 未命中时裸 "llm7" 上游。
             let base_url = config.base_url.unwrap_or_else(|| "https://api.llm7.io/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url(&base_url);
@@ -978,7 +980,8 @@ mod tests {
 
     #[test]
     fn test_default_deny_for_non_allowlisted_cloud_host() {
-        assert!(!network_access_allowed(LlmProviderType::Llm7, Some("https://api.llm7.io/v1")));
+        // llm7 已入白名单 (RouterConfig 默认 tier 端点, 2026-08)
+        assert!(network_access_allowed(LlmProviderType::Llm7, Some("https://api.llm7.io/v1")));
         assert!(!network_access_allowed(LlmProviderType::CustomProxy, Some("https://evil.example.com/v1")));
         assert!(!network_access_allowed(LlmProviderType::ApiAirforce, Some("https://api.airforce/v1")));
     }

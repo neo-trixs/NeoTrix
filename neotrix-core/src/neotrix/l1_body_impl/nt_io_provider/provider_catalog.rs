@@ -477,7 +477,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         default_model: "codestral-latest",
         api_key_env: None,
         is_free: true,
-        models: &["gpt-oss-20b", "llama-3.1-8b", "glm-4-flash"],
+        models: &["codestral-latest", "deepseek-v4-flash:0731", "claude-opus-5", "gpt-oss-20b", "glm-4-flash"],
         security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
