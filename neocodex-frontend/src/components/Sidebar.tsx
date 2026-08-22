@@ -1,12 +1,12 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
 import { Settings, Archive, RotateCcw } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
-import { tagsStore, normalizeTagName } from '../stores/tags'
+
 import { clsx } from 'clsx'
 import { neocodex } from '../api'
 import { NeoPlus, NeoMessage, NeoSearch, NeoChevronRight, NeoTrash, NeoPencil, NeoClose } from './neo-icons'
 import { NeoTag } from './NeoTag'
-import { TagBar } from './TagBar'
+
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import type { NeoCodexSessionInfo } from '../api/types'
 
@@ -283,7 +283,7 @@ export function Sidebar(props: SidebarProps) {
     return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   }
 
-  /* ── 打标交互（对标 Obsidian 标签输入） ── */
+  /* ── 打标交互已移除（极简侧栏） ── */
   const [taggingSessionId, setTaggingSessionId] = createSignal<string | null>(null)
   const [tagInput, setTagInput] = createSignal('')
 
@@ -331,16 +331,10 @@ export function Sidebar(props: SidebarProps) {
   }
 
   /* 已有标签建议（输入时联想，对标 Obsidian 标签自动补全） */
-  const tagSuggestions = () => {
-    const q = normalizeTagName(tagInput())
-    if (!q) return []
-    return Object.keys(tagsStore.state.tags)
-      .filter((t) => t.includes(q) && t !== q)
-      .slice(0, 5)
-  }
+  const tagSuggestions = () => [] as string[]
 
-  const handleToggleTag = (name: string) => {
-    props.onToggleTag?.(name)
+  const handleToggleTag = (_name: string) => {
+    props.onToggleTag?.(_name)
   }
 
   return (
@@ -450,13 +444,6 @@ export function Sidebar(props: SidebarProps) {
               按项目
             </button>
           </div>
-
-          {/* 标签区（对标 Obsidian Tag Pane：层级树 + 多选过滤） */}
-          <TagBar
-            activeTags={props.activeTags ?? []}
-            onToggleTag={handleToggleTag}
-            onClearTags={props.onClearTags ?? (() => {})}
-          />
 
           {/* 会话列表（按时间/项目分组）；showArchived 时切换为归档箱视图 */}
           <div ref={sessionListRef} class="flex-1 overflow-y-auto px-3 pb-4">
@@ -658,47 +645,13 @@ export function Sidebar(props: SidebarProps) {
                                         {(tag) => (
                                           <NeoTag
                                             name={tag}
-                                            color={tagsStore.state.tags[tag] ?? '#909098'}
+                                            color="#909098"
                                             size="sm"
                                             active={(props.activeTags ?? []).includes(tag)}
-                                            onClick={() => handleToggleTag(tag)}
-                                            onRemove={(t) => handleRemoveTag(session.id, t)}
-                                            showHierarchy
                                           />
                                         )}
                                       </For>
                                     </div>
-                                  </div>
-                                </Show>
-
-                                {/* 打标输入（inline 展开，含已有标签建议） */}
-                                <Show when={isTagging()}>
-                                  <div class="mx-3 mb-2 px-2 py-1.5 rounded-lg bg-white/70 border border-nt-io-500/30 backdrop-blur-sm">
-                                    <div class="flex items-center gap-1.5">
-                                      <span class="text-nt-io-600 flex-shrink-0 text-[11px] font-mono">#</span>
-                                      <input
-                                        ref={tagInputRef}
-                                        class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-text-primary placeholder-text-muted/60"
-                                        placeholder="输入标签，Enter 添加（支持 父/子 层级）"
-                                        value={tagInput()}
-                                        onInput={(e) => setTagInput(e.currentTarget.value)}
-                                        onKeyDown={(e) => handleTagInputKey(e, session.id)}
-                                      />
-                                    </div>
-                                    <Show when={tagSuggestions().length > 0}>
-                                      <div class="flex flex-wrap gap-1 pt-1">
-                                        <For each={tagSuggestions()}>
-                                          {(sugg) => (
-                                            <button
-                                              class="px-1.5 py-0.5 rounded text-10px text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-colors"
-                                              onClick={() => { chatStore.tagSession(session.id, sugg); setTagInput('') }}
-                                            >
-                                              # {sugg}
-                                            </button>
-                                          )}
-                                        </For>
-                                      </div>
-                                    </Show>
                                   </div>
                                 </Show>
                               </div>
