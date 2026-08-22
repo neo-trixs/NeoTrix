@@ -299,71 +299,30 @@ impl FreeModelCatalog {
     /// 发现 Keyless/Key-required 免费提供者 (OpenCode Zen free models with free-tier API key)
     pub fn discover_keyless_providers() -> Vec<FreeModelEntry> {
         let mut entries = Vec::new();
-        // Only OpenCode Zen — verified working with free tier API key (opencode.ai)
-        // NOTE: LLM7 .io endpoint re-verified alive 2026-08 (anonymous 200) — registered in factory keyless section;
-        // Kilo/OVH/ModelScope remain unverified (404/timeout as of 2026-07-22)
+        // 2026-08-22 实测 OpenCode Zen 匿名免费池：
+        // - nemotron-3-ultra-free: ✅ 200 + 真实回复 ×3 (稳定)
+        // - mimo-v2.5-free: 200 但 FreeUsageLimitError 429 限流 (gateway 重试可恢复)
+        // - deepseek-v4-flash-free: 400 Upstream unavailable (死，已移除)
+        // - qwen3.6-plus/minimax-m3/north-mini-code: 401 Model not supported (需 key，已移除)
+        // - big-pickle: 200 但恒空回复 (不可用，已移除)
+        // LLM7 .io 匿名可用见下方条目；Kilo/OVH/ModelScope unverified (2026-07-22)
         let zen_base = "https://opencode.ai/zen/v1";
         entries.push(FreeModelEntry {
             provider: "opencode-zen".into(),
-            model_id: "deepseek-v4-flash-free".into(),
-            display_name: "DeepSeek V4 Flash Free (OpenCode)".into(),
-            base_url: zen_base.into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
+            model_id: "nemotron-3-ultra-free".into(),
+            display_name: "Nemotron 3 Ultra Free (OpenCode, anonymous)".into(),
+            base_url: zen_base.into(), tier: "t3-powerful".into(),
+            is_free: true, requires_api_key: false,
+            api_key_env: None,
             provider_type: LlmProviderType::OpenCodeZen,
         });
         entries.push(FreeModelEntry {
             provider: "opencode-zen".into(),
             model_id: "mimo-v2.5-free".into(),
-            display_name: "MiMo V2.5 Free (OpenCode)".into(),
+            display_name: "MiMo V2.5 Free (OpenCode, anonymous)".into(),
             base_url: zen_base.into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "qwen3.6-plus-free".into(),
-            display_name: "Qwen 3.6 Plus Free (OpenCode)".into(),
-            base_url: zen_base.into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "minimax-m3-free".into(),
-            display_name: "MiniMax M3 Free (OpenCode)".into(),
-            base_url: zen_base.into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "nemotron-3-ultra-free".into(),
-            display_name: "Nemotron 3 Ultra Free (OpenCode)".into(),
-            base_url: zen_base.into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "north-mini-code-free".into(),
-            display_name: "North Mini Code Free (OpenCode)".into(),
-            base_url: zen_base.into(), tier: "t1-standard".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "big-pickle".into(),
-            display_name: "Big Pickle (OpenCode)".into(),
-            base_url: zen_base.into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: true,
-            api_key_env: Some("OPENCODE_API_KEY".into()),
+            is_free: true, requires_api_key: false,
+            api_key_env: None,
             provider_type: LlmProviderType::OpenCodeZen,
         });
         // LLM7 .io — 匿名可用端点 (2026-08-06 实测 200 + SSE 流式)。
