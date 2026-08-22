@@ -104,9 +104,9 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
       <div class="relative">
         <button
           class={clsx(
-            'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/40 bg-white/40',
-            'text-text-primary hover:bg-white/60 transition-colors backdrop-blur-sm',
-            'min-w-[120px] max-w-[180px] focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
+            'inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 rounded-full bg-white border border-black/8 shadow-sm',
+            'text-[12px] font-medium text-zinc-700 hover:border-orange-200 hover:bg-orange-50/60 hover:text-orange-700 transition-all',
+            'focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none',
             disabled && 'opacity-50 cursor-not-allowed'
           )}
           onClick={() => !disabled && setIsOpen(!isOpen())}
@@ -114,14 +114,15 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
           aria-label="权限模式"
           aria-expanded={isOpen()}
           aria-haspopup="listbox"
+          title={`${currentMode.label} · ${currentMode.description}`}
         >
-          <currentMode.icon class={clsx('w-4 h-4 flex-shrink-0', currentMode.color)} />
-          <span class="text-sm font-medium truncate">{currentMode.label}</span>
-          <ChevronDown class={clsx('w-4 h-4 text-text-muted flex-shrink-0 transition-transform', isOpen() && 'rotate-180')} />
+          <currentMode.icon class={clsx('w-3.5 h-3.5 flex-shrink-0', currentMode.color)} />
+          <span class="truncate max-w-[90px]">{currentMode.label}</span>
+          <ChevronDown class={clsx('w-3 h-3 text-zinc-400 flex-shrink-0 transition-transform', isOpen() && 'rotate-180')} />
         </button>
 
         <Show when={isOpen()}>
-          <div ref={panelRef} class="absolute bottom-full left-0 mb-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[180px]" role="listbox" aria-label="权限模式选择">
+          <div ref={panelRef} class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 glass-pop border border-black/8 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in min-w-[280px] max-w-[360px] w-[min(360px,90vw)]" role="listbox" aria-label="权限模式选择">
             <For each={PERMISSION_MODES}>
               {(mode: PermissionModeOption, i) => (
                 <button

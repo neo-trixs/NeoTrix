@@ -348,11 +348,13 @@ export function Sidebar(props: SidebarProps) {
       'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative',
       collapsed() ? 'w-[64px] border-r border-black/5' : 'w-[280px]'
     )}>
-      {/* Header: 红绿灯（自绘 TrafficLights 组件，fixed 定位）+ 折叠按钮（设计 v2） */}
-      <div class="flex items-center justify-between h-14 px-4 pl-[64px]" data-tauri-drag-region>
-        <div class="flex-1 min-w-0" data-tauri-drag-region />
+      {/* Header: Claude Code 极简 40px 头部 — 交通灯占位仅展开态保留，收起态居中单钮 */}
+      <div class={clsx('flex items-center h-10 px-3', collapsed() ? 'justify-center' : 'justify-end pl-[56px]')} data-tauri-drag-region>
         <button
-          class="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+          class={clsx(
+            'flex items-center justify-center rounded-lg transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none',
+            collapsed() ? 'w-8 h-8 bg-white border border-black/8 shadow-sm text-zinc-500 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50' : 'w-7 h-7 text-zinc-400 hover:text-zinc-900 hover:bg-white'
+          )}
           onClick={props.onToggleCollapse}
           aria-label={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
           title={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
@@ -360,19 +362,6 @@ export function Sidebar(props: SidebarProps) {
           <NeoChevronRight class={clsx('w-4 h-4 transition-transform', !collapsed() && 'rotate-180')} />
         </button>
       </div>
-
-      {collapsed() && (
-        <button
-          class="absolute inset-y-0 right-0 w-[20px] flex items-center justify-center bg-white/80 border-l border-black/[0.06] hover:bg-orange-50 hover:border-orange-200 transition-all z-10 group/collapsed"
-          onClick={props.onToggleCollapse}
-          aria-label="展开侧边栏"
-          title="展开侧边栏"
-        >
-          <span class="w-[18px] h-[48px] rounded-l-lg bg-white border border-black/10 shadow-sm flex items-center justify-center group-hover/collapsed:border-orange-200 group-hover/collapsed:bg-orange-50 transition-colors">
-            <NeoChevronRight class="w-3.5 h-3.5 text-zinc-400 group-hover/collapsed:text-orange-600" />
-          </span>
-        </button>
-      )}
 
       {!collapsed() && (
         <>

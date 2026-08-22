@@ -105,13 +105,14 @@ describe('ProviderSelector 提供商选择器回归（下拉/切换/广播）', 
     expect(document.querySelector('[role="listbox"]')).toBeNull()
   })
 
-  it('iconOnly 模式渲染紧凑图标按钮 + title', async () => {
+  it('iconOnly 模式渲染药丸按钮 + title（Claude Code 风格）', async () => {
     mockCommand('neocodex_provider_config', async () => cfg())
     render(() => <ProviderSelector iconOnly />)
     await settle()
     const btn = document.querySelector('[aria-label="选择模型提供商"]') as HTMLElement
-    expect(btn.className).toContain('w-8 h-8')
-    expect(btn.getAttribute('title')).toBe('OpenAI')
+    expect(btn.className).toContain('rounded-full')
+    expect(btn.textContent).toContain('gpt-4o')
+    expect(btn.getAttribute('title')).toContain('OpenAI')
   })
 
   it('配置加载失败显示错误 toast 可关闭', async () => {
