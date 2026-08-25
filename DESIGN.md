@@ -279,9 +279,6 @@ npx @google/design.md export --format tailwind DESIGN.md > tailwind.theme.json
 ```
 
 ## 变更记录
-- v1.3.0: 吸收 KunAgent/Kun — motion 时序 token (micro/standard/deep/pulse) +
-  z-index 六层刻度 + 架构反模式清单 (单运行时/R-P42/注册表单一事实源) +
-  错误文案人类可读规范
 - v1.2.0: 收敛全部债务 — 间距 0.5/1.5/2.5 → 4px 倍数 (全 18 文件); 橙底白字 → 橙底深字 (btn-primary/内联/::selection, 7.27:1); .hero h1 落地 clamp(24px,4vw,34px); 移除 Inter/Roboto/Arial 残留
 - v1.1.0: 吸收 Google Labs DESIGN.md 官方格式 — 新增 YAML 机器可读 token 层 /
   8 段结构 / 组件变体 token / Do's and Don'ts / lint CLI
