@@ -56,6 +56,24 @@ spacing:
   md: 16px
   lg: 24px
   xl: 32px
+# 动效时序 (吸收 Kun: micro/standard/deep 三档 + 特殊脉冲)
+motion:
+  micro-ms: 140      # hover bg / border / 色彩切换
+  standard-ms: 150   # 卡片 hover / transform / composer 边框聚焦
+  deep-ms: 300       # 弹窗打开 / 路由过渡
+  pulse-ms: 1800     # 状态点呼吸 (ease-in-out infinite)
+  transform:
+    card-lift: "translateY(-1px)"
+    button-press: "scale(0.985)"
+# 层级坐标 (吸收 Kun: 全局 z-index 收敛, 杜绝硬编码漂移)
+z-index:
+  background: -2
+  base: 0
+  sticky: 10        # 顶栏/粘性表头
+  side-panel: 40    # 右侧滑出面板 (Terminal/Git/Cost)
+  dropdown: 50
+  modal: 100
+  toast: 200
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -228,6 +246,16 @@ NeoTrix 是一个 AI-native 开发者工具, 界面是**自主行为与用户的
 - Don't 用非 4px 倍数间距 (0.5/1.5/2.5 档一律收敛到 4px 倍数)
 - Do 大标题用 `clamp()` 流体排版 (最小 24px / 4vw / 最大 34px)
 - Do 为 Agent 行为提供透明层/中止/恢复 (问责层)
+- Don't 错误文案输出裸堆栈 — 必须为人类可读完整句 (吸收 Kun i18n 规范)
+
+## 架构反模式 (吸收 Kun dont-list 纪律, 违反即 review 阻断)
+
+- **Don't 引入第二套会话运行时** — CLI 与桌面必须共享同一存储与命令分发
+  (对标 Kun "single runtime" 纪律; 当前割裂是已登记的结构性债务, 禁止恶化)
+- **Don't 新增平行适配器模块** — 吸收外部能力一律强化现有节点 (R-P42)
+- **Don't 绕过注册表直调命令** — MCP 桥接与 CLI 共享 default_registry 单一事实源
+- **Don't 在生产界面使用 emoji 作为功能可见性** (装饰性场景除外)
+- **Don't 使用色板外色相** — 新色须先入 TAG_PALETTE/token 再引用
 
 ## 可计算性检查 (输出前必跑)
 | 检查 | 标准 | 当前状态 |
@@ -251,6 +279,9 @@ npx @google/design.md export --format tailwind DESIGN.md > tailwind.theme.json
 ```
 
 ## 变更记录
+- v1.3.0: 吸收 KunAgent/Kun — motion 时序 token (micro/standard/deep/pulse) +
+  z-index 六层刻度 + 架构反模式清单 (单运行时/R-P42/注册表单一事实源) +
+  错误文案人类可读规范
 - v1.2.0: 收敛全部债务 — 间距 0.5/1.5/2.5 → 4px 倍数 (全 18 文件); 橙底白字 → 橙底深字 (btn-primary/内联/::selection, 7.27:1); .hero h1 落地 clamp(24px,4vw,34px); 移除 Inter/Roboto/Arial 残留
 - v1.1.0: 吸收 Google Labs DESIGN.md 官方格式 — 新增 YAML 机器可读 token 层 /
   8 段结构 / 组件变体 token / Do's and Don'ts / lint CLI
