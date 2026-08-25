@@ -49,6 +49,7 @@ pub struct NeoTrixConfig {
     pub log_level: String,
     pub data_directory: String,
     pub cache_size_mb: u32,
+    pub prefer_free: bool,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]

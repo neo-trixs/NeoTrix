@@ -1,5 +1,6 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
 import { Settings, Archive, RotateCcw } from 'lucide-solid'
+import { TagBar } from './TagBar'
 import { chatStore } from '../stores/chat'
 
 import { clsx } from 'clsx'
@@ -87,6 +88,8 @@ export function Sidebar(props: SidebarProps) {
   let sessionListRef: HTMLDivElement | undefined
   // 分组模式：时间 / 项目（对标 Claude group-by-project）
   const [groupMode, setGroupMode] = createSignal<'time' | 'project'>('time')
+  // 标签筛选面板展开态（默认收起保持极简；有筛选时徽标提示）
+  const [showTagFilter, setShowTagFilter] = createSignal(false)
 
   const toggleSearch = () => {
     const next = !searchOpen()
@@ -443,6 +446,51 @@ export function Sidebar(props: SidebarProps) {
             >
               按项目
             </button>
+          </div>
+
+          {/* 标签筛选：可折叠 TagBar（Obsidian Tag Pane 回归）。
+              折叠时若有多选筛选，徽标提示数量。 */}
+          <div class="px-3 pb-2">
+            <button
+              class={clsx(
+                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-11px transition-colors',
+                (props.activeTags ?? []).length > 0
+                  ? 'bg-nt-io-500/10 text-nt-io-700 font-medium'
+                  : 'text-text-muted hover:text-text-primary hover:bg-white/40'
+              )}
+              onClick={() => setShowTagFilter(!showTagFilter())}
+              aria-expanded={showTagFilter()}
+              aria-label="标签筛选"
+              title="按标签筛选会话"
+            >
+              <svg viewBox="0 0 16 16" fill="none" class="w-3.5 h-3.5 flex-shrink-0">
+                <line x1="5.5" y1="2.5" x2="4" y2="13.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="10.5" y1="2.5" x2="9" y2="13.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="2.5" y1="6" x2="13.5" y2="6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="2.5" y1="10" x2="13.5" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+              </svg>
+              <span class="flex-1 text-left">标签</span>
+              <Show when={(props.activeTags ?? []).length > 0}>
+                <span class="px-1.5 py-px rounded-full bg-nt-io-500 text-white text-9px font-medium leading-tight">
+                  {(props.activeTags ?? []).length}
+                </span>
+              </Show>
+              <svg
+                viewBox="0 0 12 12" fill="none"
+                class={clsx('w-3 h-3 transition-transform', showTagFilter() && 'rotate-90')}
+              >
+                <path d="M4 2.5 L8 6 L4 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <Show when={showTagFilter()}>
+              <div class="mt-1 max-h-[180px] overflow-y-auto">
+                <TagBar
+                  activeTags={props.activeTags ?? []}
+                  onToggleTag={(name) => props.onToggleTag?.(name)}
+                  onClearTags={() => props.onClearTags?.()}
+                />
+              </div>
+            </Show>
           </div>
 
           {/* 会话列表（按时间/项目分组）；showArchived 时切换为归档箱视图 */}

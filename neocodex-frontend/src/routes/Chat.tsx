@@ -6,6 +6,7 @@ import {
 } from 'lucide-solid'
 import { NeoSend } from '../components/neo-icons'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
+import { tagsStore } from '../stores/tags'
 import { Sidebar } from '../components/Sidebar'
 import { SettingsModal } from '../components/SettingsModal'
 import { RightBar } from '../components/RightBar'
@@ -23,6 +24,7 @@ import { SideChat } from '../components/SideChat'
 import { ComputerUse } from '../components/ComputerUse'
 import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
+import { TerminalPanel } from '../components/TerminalPanel'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
@@ -279,9 +281,9 @@ export function Chat() {
   const clearTags = () => setActiveTags([])
 
   // 顶部工具栏面板：一次只开一个
-  type PanelId = 'git' | 'tasks' | 'cost' | 'timeline' | 'sidechat' | 'preview'
+  type PanelId = 'git' | 'tasks' | 'cost' | 'terminal' | 'timeline' | 'sidechat' | 'preview'
   // 面板快捷键顺序（⌘1-⌘6）与侧栏入口一一对齐
-  const PANEL_ORDER: PanelId[] = ['git', 'cost', 'tasks', 'timeline', 'sidechat', 'preview']
+  const PANEL_ORDER: PanelId[] = ['git', 'cost', 'terminal', 'tasks', 'timeline', 'sidechat', 'preview']
   const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
   const togglePanel = (id: PanelId) => {
     setActivePanel(activePanel() === id ? null : id)
@@ -744,6 +746,9 @@ export function Chat() {
     let userMsgId: string | null = null
     if (!opts?.userMessageAdded) {
       userMsgId = chatStore.addMessage({ role: 'user', content })
+      // 自动打标：会话首条消息触发关键词匹配（每次会话至多一次，已有标签则跳过）
+      const sid = chatStore.state.currentSessionId
+      if (sid) tagsStore.autoTagFromText(sid, content)
     }
     const atts = pendingAttachments()
     setInputValue('')
@@ -1066,8 +1071,6 @@ export function Chat() {
         collapsed={sidebarCollapsed()}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed())}
         onOpenSettings={() => setSettingsOpen(true)}
-        activeView={activeView()}
-        onSwitchView={setActiveView}
         activePanel={activePanel()}
         onTogglePanel={(id) => togglePanel(id as PanelId)}
         activeTags={activeTags()}
@@ -1126,6 +1129,9 @@ export function Chat() {
           </Show>
           <Show when={activePanel() === 'cost'}>
             <CostDashboard open onClose={() => setActivePanel(null)} />
+          </Show>
+          <Show when={activePanel() === 'terminal'}>
+            <TerminalPanel />
           </Show>
           <Show when={activePanel() === 'timeline'}>
             <CheckpointTimeline

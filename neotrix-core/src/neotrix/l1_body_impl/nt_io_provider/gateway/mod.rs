@@ -136,6 +136,10 @@ impl GatewayV2 {
     pub fn set_cost_budget(&mut self, budget: f64) {
         self.cost_budget_per_query = budget;
     }
+
+    pub fn set_prefer_free(&mut self, prefer: bool) {
+        self.prefer_free = prefer;
+    }
 }
 
 impl Default for GatewayV2 {

@@ -36,6 +36,14 @@ export const RECOMMENDED_TAGS: { name: string; color: string }[] = [
   { name: '领域/后端', color: '#d97706' },
   { name: '领域/数据', color: '#2563eb' },
   { name: '领域/devops', color: '#64748b' },
+  // 星域/* — NeoTrix 七域（NT-* 品牌色，见 CONTEXT.md Faction System）
+  { name: '星域/核心', color: '#16a34a' },   // NT-CORE 绿：E8/HyperCube/GWT
+  { name: '星域/进化', color: '#9333ea' },   // NT-MIND 紫：SEAL 管线/蒸馏
+  { name: '星域/记忆', color: '#2563eb' },   // NT-MEMORY 蓝：KB/FTS5/embedding
+  { name: '星域/感知', color: '#0d9488' },   // NT-WORLD 青：爬取/搜索/世界模型
+  { name: '星域/行动', color: '#f0913a' },   // NT-ACT 橙：MCP/编排/自动化
+  { name: '星域/界面', color: '#e85454' },   // NT-IO 红：CLI/Tauri/Web/LLM网关
+  { name: '星域/影卫', color: '#64748b' },   // NT-SHIELD 石板灰：沙箱/审计/隐匿网络
 ]
 
 export interface TagsState {
@@ -99,6 +107,48 @@ export function tagDepth(name: string): number {
   return name.split('/').length
 }
 
+/* ════════════════════════════════════════════
+   自动打标 — 首条用户消息关键词 → 推荐标签映射
+   保守策略：命中即候选，最多取 2 个；仅会话无标签时触发一次。
+   ════════════════════════════════════════════ */
+
+/** 标签 → 触发关键词（子串匹配，小写化后执行） */
+export const TAG_KEYWORDS: Record<string, string[]> = {
+  '工作/修复': ['bug', '报错', '错误', '修复', 'fix', 'error', 'crash', '异常', '失败'],
+  '工作/测试': ['测试', 'test', '单测', '用例', '覆盖率', 'vitest', 'jest'],
+  '工作/文档': ['文档', '注释', 'readme', 'docs', '说明', '指南'],
+  '工作/重构': ['重构', 'refactor', '整理', '拆分', '抽离', '解耦'],
+  '工作/调研': ['调研', '研究', '分析', '为什么', '原理', '对比', '选型', '架构'],
+  '工作/功能': ['功能', 'feature', '实现', '添加', '新增', '支持', '做一个', '帮我写', '开发'],
+  '领域/前端': [
+    '前端', 'css', '样式', '组件', 'react', 'solid', 'vue',
+    'ui', '界面', '渲染', '布局', '按钮', '弹窗', '动画',
+  ],
+  '领域/后端': [
+    '后端', 'api', '接口', '服务端', 'rust', '数据库', 'sql',
+    'sqlite', '查询', '事务', '中间件',
+  ],
+  '领域/devops': ['部署', 'docker', 'ci', 'cd', '构建', '发布', 'pipeline', '运维', '打包'],
+  '领域/数据': ['数据', '迁移', 'schema', '索引', '备份'],
+}
+
+/** 从文本提取自动打标候选（≤2 个，按命中关键词数降序） */
+export function autoTagCandidates(text: string): string[] {
+  const lower = text.toLowerCase()
+  const scored: { name: string; hits: number }[] = []
+  for (const [name, keywords] of Object.entries(TAG_KEYWORDS)) {
+    let hits = 0
+    for (const kw of keywords) {
+      if (lower.includes(kw)) hits++
+    }
+    if (hits > 0) scored.push({ name, hits })
+  }
+  return scored
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, 2)
+    .map((s) => s.name)
+}
+
 function createTagsStore() {
   const init = loadPersisted()
   const [state, setState] = createStore<TagsState>(init)
@@ -131,6 +181,16 @@ function createTagsStore() {
       st[sessionId] = cur.filter(t => t !== name)
     }))
     persist(state)
+  }
+
+  /** 自动打标：会话尚无标签时按首条消息关键词匹配推荐标签（每会话至多一次） */
+  const autoTagFromText = (sessionId: string, text: string): string[] => {
+    if ((state.sessionTags[sessionId] ?? []).length > 0) return []
+    const candidates = autoTagCandidates(text)
+    for (const name of candidates) {
+      addSessionTag(sessionId, name)
+    }
+    return candidates
   }
 
   /** 从后端合并会话标签：注册表补色；本地缺该会话标签时才回填（不覆盖本地） */
@@ -288,6 +348,7 @@ function createTagsStore() {
     },
     addSessionTag,
     removeSessionTag,
+    autoTagFromText,
     clearSessionTags,
     importSessionTags,
     setTagColor,

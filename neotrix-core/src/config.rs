@@ -12,6 +12,9 @@ pub struct NeoTrixConfig {
     pub custom_endpoint: Option<String>,
     pub color_mode: Option<String>,
     pub log_level: Option<String>,
+    /// 免费优先路由 (env NEOTRIX_PREFER_FREE 优先于此值)
+    #[serde(default)]
+    pub prefer_free: Option<bool>,
 }
 
 impl NeoTrixConfig {

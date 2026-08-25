@@ -78,3 +78,8 @@ neotrix-core/.neotrix/
 
 # Frontend test coverage output
 neocodex-frontend/coverage/
+
+# Session fix scripts (transient)
+fix_*.py
+reapply_all.py
+.freebuff/
