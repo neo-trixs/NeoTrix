@@ -3,7 +3,7 @@ import { createKbStore } from './kb'
 
 describe('kb store (mock-first data source seam)', () => {
   it('refresh 载入种子库并按更新时间倒序', async () => {
-    const kb = createKbStore()
+    const kb = createKbStore('mock')
     await kb.refresh()
     expect(kb.loading()).toBe(false)
     expect(kb.libraries().length).toBeGreaterThanOrEqual(3)
@@ -13,7 +13,7 @@ describe('kb store (mock-first data source seam)', () => {
   })
 
   it('create 新库置顶且字段完整', async () => {
-    const kb = createKbStore()
+    const kb = createKbStore('mock')
     await kb.refresh()
     const lib = await kb.create('测试库', '测试描述')
     expect(kb.libraries()[0].id).toBe(lib.id)
@@ -22,7 +22,7 @@ describe('kb store (mock-first data source seam)', () => {
   })
 
   it('keyword 过滤名称与描述，空关键字返回全部', async () => {
-    const kb = createKbStore()
+    const kb = createKbStore('mock')
     await kb.refresh()
     kb.setKeyword('')
     expect(kb.filtered().length).toBe(kb.libraries().length)
@@ -33,7 +33,7 @@ describe('kb store (mock-first data source seam)', () => {
   })
 
   it('rename 更新目标库并刷新 updatedAt', async () => {
-    const kb = createKbStore()
+    const kb = createKbStore('mock')
     await kb.refresh()
     const first = kb.libraries()[0]
     const before = first.updatedAt
@@ -45,7 +45,7 @@ describe('kb store (mock-first data source seam)', () => {
   })
 
   it('remove 移除库；删除活跃库时清空 activeLibraryId', async () => {
-    const kb = createKbStore()
+    const kb = createKbStore('mock')
     await kb.refresh()
     const first = kb.libraries()[0]
     kb.setActiveLibraryId(first.id)

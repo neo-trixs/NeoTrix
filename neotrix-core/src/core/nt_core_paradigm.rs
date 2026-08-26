@@ -6,6 +6,7 @@ pub struct Anomaly {
     pub domain: String,
     pub description: String,
     pub severity: f64,
+    pub confidence: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,13 +24,24 @@ pub struct ParadigmShiftDetector {
 impl ParadigmShiftDetector {
     pub fn new(threshold: usize) -> Self { Self { anomalies: Vec::new(), threshold } }
     pub fn observe(&mut self, a: Anomaly) { self.anomalies.push(a); }
+    /// 计算跨域共振置信度
+    fn compute_confidence(&self, domains: &std::collections::HashSet<String>) -> f64 {
+        let n_domains = domains.len() as f64;
+        let n_anomalies = self.anomalies.len() as f64;
+        // 置信度 = 域多样性 * 异常数量 / (域多样性 + 异常数量) 归一化
+        let avg_severity: f64 = if self.anomalies.is_empty() { 0.0 } else {
+            self.anomalies.iter().map(|a| a.severity).sum::<f64>() / self.anomalies.len() as f64
+        };
+        ((n_domains * n_anomalies) / (n_domains + n_anomalies)).min(1.0) * avg_severity.max(0.5)
+    }
+
     pub fn detect(&self) -> Vec<ParadigmShiftHypothesis> {
         let domains: std::collections::HashSet<_> = self.anomalies.iter().map(|a| a.domain.clone()).collect();
         if domains.len() >= 2 && self.anomalies.len() >= self.threshold {
             vec![ParadigmShiftHypothesis {
                 description: format!("cross-domain resonance: {} domains, {} anomalies", domains.len(), self.anomalies.len()),
                 cross_domain: true,
-                novelty: 0.8,
+                novelty: self.compute_confidence(&domains),
             }]
         } else { vec![] }
     }
@@ -42,7 +54,7 @@ mod tests {
     fn test_detect() {
         let mut d = ParadigmShiftDetector::new(3);
         for domain in ["physics", "bio", "code"] {
-            d.observe(Anomaly { domain: domain.into(), description: "x".into(), severity: 0.9 });
+            d.observe(Anomaly { domain: domain.into(), description: "x".into(), severity: 0.9, confidence: 0.8 });
         }
         assert!(!d.detect().is_empty());
     }

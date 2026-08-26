@@ -113,9 +113,58 @@ function mockDataSource(): KbDataSource {
 
 /* ── 响应式 store ── */
 
+import { kbDocList, kbDocIngest, kbDocDelete, type KbDocSummary as TauriDoc } from '../api/kb'
+
 const dataSource: KbDataSource = mockDataSource()
 
-export function createKbStore() {
+/** 真实后端数据源 (B2 接线): 库 = 文档 metadata.library 聚合 (v1 虚拟分组) */
+const tauriDataSource: KbDataSource = {
+  async listLibraries() {
+    const docs = await kbDocList()
+    const groups = new Map<string, KbLibrary>()
+    for (const d of docs) {
+      const lib = d.library || 'default'
+      const g = groups.get(lib) ?? {
+        id: `lib-${lib}`, name: lib === 'default' ? '默认库' : lib,
+        description: `${docs.filter((x) => (x.library || 'default') === lib).length} 个文档`,
+        docCount: 0, chunkCount: 0, updatedAt: 0,
+      }
+      g.docCount += 1
+      g.chunkCount += d.chunk_count
+      g.updatedAt = Math.max(g.updatedAt, d.created_at)
+      groups.set(lib, g)
+    }
+    return [...groups.values()]
+  },
+  // v1 限制: 分组为派生视图 — create/rename/delete 仅作用于文档层,
+  // 空组不持久化 (诚实标注, 待 kb_library 表后再实体化)
+  async createLibrary(name) {
+    return { id: `lib-${name}`, name, description: '(虚拟分组 — 入库第一个文档后固化)', docCount: 0, chunkCount: 0, updatedAt: Date.now() }
+  },
+  async renameLibrary() { /* v1: 派生分组无实体 */ },
+  async deleteLibrary() { /* v1: 派生分组无实体 */ },
+  async listDocs(libraryId) {
+    const lib = libraryId.replace(/^lib-/, '')
+    const docs = await kbDocList()
+    return docs
+      .filter((d) => (d.library || 'default') === lib)
+      .map((d): KbDoc => ({
+        id: d.doc_id,
+        libraryId: `lib-${d.library || 'default'}`,
+        title: d.title,
+        status: d.status === 'ready' ? 'ready' : 'indexing',
+        sizeKb: Math.max(1, Math.round(d.total_chars / 1024)),
+        addedAt: d.created_at,
+      }))
+  },
+}
+
+export { kbDocIngest, kbDocDelete }
+export type { TauriDoc }
+
+/** 默认 mock; 传 'tauri' 切真实后端 (组件零改动) */
+export function createKbStore(source: 'mock' | 'tauri' = 'tauri') {
+  const ds = source === 'tauri' ? tauriDataSource : dataSource
   const [libraries, setLibraries] = createSignal<KbLibrary[]>([])
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
@@ -126,7 +175,7 @@ export function createKbStore() {
     setLoading(true)
     setError(null)
     try {
-      setLibraries(await dataSource.listLibraries())
+      setLibraries(await ds.listLibraries())
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -135,18 +184,18 @@ export function createKbStore() {
   }
 
   async function create(name: string, description: string) {
-    const lib = await dataSource.createLibrary(name, description)
+    const lib = await ds.createLibrary(name, description)
     setLibraries((prev) => [lib, ...prev])
     return lib
   }
 
   async function rename(id: string, name: string) {
-    await dataSource.renameLibrary(id, name)
+    await ds.renameLibrary(id, name)
     setLibraries((prev) => prev.map((l) => (l.id === id ? { ...l, name } : l)))
   }
 
   async function remove(id: string) {
-    await dataSource.deleteLibrary(id)
+    await ds.deleteLibrary(id)
     setLibraries((prev) => prev.filter((l) => l.id !== id))
     if (activeLibraryId() === id) setActiveLibraryId(null)
   }

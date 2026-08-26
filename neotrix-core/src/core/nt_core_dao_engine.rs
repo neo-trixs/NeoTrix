@@ -1,4 +1,4 @@
-//! 符号回归引擎 (Symbolic Regression) — 从数据中发现数学表达式。
+//! 符号回归引擎。
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -29,12 +29,6 @@ impl ExprNode {
             }
         }
     }
-    pub fn complexity(&self) -> usize {
-        match self {
-            ExprNode::Const(_) | ExprNode::Var(_) => 1,
-            ExprNode::Binary(_, l, r) => 1 + l.complexity() + r.complexity(),
-        }
-    }
 }
 
 impl std::fmt::Display for ExprNode {
@@ -43,8 +37,8 @@ impl std::fmt::Display for ExprNode {
             ExprNode::Const(v) => write!(f, "{}", v),
             ExprNode::Var(s) => write!(f, "{}", s),
             ExprNode::Binary(op, l, r) => {
-                let op_s = match op { BinaryOp::Add=>"+", BinaryOp::Sub=>"-", BinaryOp::Mul=>"*", BinaryOp::Div=>"/" };
-                write!(f, "({} {} {})", l, op_s, r)
+                let s = match op { BinaryOp::Add=>"+", BinaryOp::Sub=>"-", BinaryOp::Mul=>"*", BinaryOp::Div=>"/" };
+                write!(f, "({} {} {})", l, s, r)
             }
         }
     }
@@ -56,9 +50,9 @@ impl Default for DaoEngineConfig { fn default() -> Self { Self { population_size
 
 pub struct DaoEngine { pub config: DaoEngineConfig, pub best_expr: Option<String> }
 impl DaoEngine {
-    pub fn new(config: DaoEngineConfig) -> Self { Self { config, best_expr: None } }
+    pub fn new(c: DaoEngineConfig) -> Self { Self { config: c, best_expr: None } }
     pub fn fit_linear(&mut self, x: &[f64], y: &[f64]) -> Result<String, String> {
-        if x.len() != y.len() || x.is_empty() { return Err("data mismatch".into()); }
+        if x.len() != y.len() || x.is_empty() { return Err("mismatch".into()); }
         let n = x.len() as f64;
         let sx: f64 = x.iter().sum();
         let sy: f64 = y.iter().sum();

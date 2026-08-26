@@ -48,25 +48,18 @@ pub struct FederationMessage {
     pub guard_hash: u64,
 }
 
-/// 计算消息指纹（FNV-1a，与 rule_memory 同源）。
-fn fnv1a(bytes: &[u8]) -> u64 {
-    let mut h: u64 = 0xcbf29ce484222325;
-    for &b in bytes {
-        h ^= b as u64;
-        h = h.wrapping_mul(0x100000001b3);
-    }
-    h
-}
-
 /// 计算守卫哈希：msg_type + payload 摘要。
 fn compute_guard_hash(msg: &FederationMessage) -> u64 {
+    use sha2::{Digest, Sha256};
     let canonical = format!(
         "{}:{}:{}",
         serde_json::to_string(&msg.msg_type).unwrap_or_default(),
         msg.sender_id,
         serde_json::to_string(&msg.payload).unwrap_or_default()
     );
-    fnv1a(canonical.as_bytes())
+    let digest = Sha256::digest(canonical.as_bytes());
+    // 取前 8 字节作为 u64 指纹（碰撞概率 2^-64，足够防伪造）
+    u64::from_be_bytes(digest[..8].try_into().unwrap_or([0u8; 8]))
 }
 
 /// 验证消息完整性。
@@ -81,7 +74,11 @@ pub fn build_message(
     payload: serde_json::Value,
 ) -> FederationMessage {
     let mut msg = FederationMessage {
-        msg_id: format!("fm_{}_{}", now_secs(), fnv1a(sender_id.as_bytes())),
+        msg_id: {
+            use sha2::{Digest, Sha256};
+            let d = Sha256::digest(sender_id.as_bytes());
+            format!("fm_{}_{}", now_secs(), hex::encode(&d[..4]))
+        },
         sender_id: sender_id.to_string(),
         msg_type,
         payload,

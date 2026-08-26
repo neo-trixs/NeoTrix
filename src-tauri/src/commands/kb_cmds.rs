@@ -9,10 +9,16 @@ use neotrix::neotrix::nt_memory_kb::nt_memory_store;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store::{get_all_nodes, get_all_edges};
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
 use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{self, PackDecoder};
+use neotrix::neotrix::nt_memory_kb::nt_memory_store as kbs;
 
 fn kb_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(home).join(".neotrix").join("knowledge.db")
+}
+
+fn open_kb_conn() -> Result<rusqlite::Connection, NeoTrixError> {
+    rusqlite::Connection::open(kb_path())
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -854,6 +860,7 @@ fn write_chunks(conn: &rusqlite::Connection, doc_id: &str, chunks: &[String], ts
             target_id: doc_id.into(),
             relation_type: RelationType::PartOf,
             weight: 1.0,
+            description: None,
             created_at: ts,
             metadata: None,
         };
@@ -876,7 +883,14 @@ fn delete_chunks(conn: &rusqlite::Connection, doc_id: &str) -> Result<usize, Neo
     };
     let n = ids.len();
     for cid in ids {
-        kbs::delete_node(conn, &cid)
+        // 两步删 (FTS 行先于节点行) — 不用 kbs::delete_node: 其内部
+        // unchecked_transaction 在外层 reindex 事务中会嵌套炸 (测试抓到)
+        conn.execute(
+            "DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)",
+            params![cid],
+        )
+        .map_err(|e| NeoTrixError::Memory(format!("chunk fts del {}: {}", cid, e)))?;
+        conn.execute("DELETE FROM nodes WHERE id=?1", params![cid])
             .map_err(|e| NeoTrixError::Memory(format!("chunk del {}: {}", cid, e)))?;
     }
     // 清理残留 part_of 边 (delete_node 可能不级联边)
@@ -900,5 +914,114 @@ fn find_doc_by_title(conn: &rusqlite::Connection, title: &str) -> Result<Option<
     match rows.next() {
         Some(Ok(id)) => Ok(Some(id)),
         _ => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod doc_crud_tests {
+    use super::*;
+
+    /// 最小 KB schema (镜像 nt_memory_store 的 SQL 面) — 测试自足, 不依赖真实 knowledge.db
+    fn test_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().expect("mem db");
+        conn.execute_batch(
+            "CREATE TABLE nodes (
+                id TEXT PRIMARY KEY, node_type TEXT NOT NULL, title TEXT NOT NULL,
+                summary TEXT, content TEXT, url TEXT, domain TEXT, language TEXT DEFAULT 'zh',
+                confidence REAL DEFAULT 1.0, importance REAL DEFAULT 0.5,
+                created_at INTEGER, updated_at INTEGER, access_count INTEGER DEFAULT 0,
+                metadata TEXT, data_tier TEXT DEFAULT 'core', temporal TEXT,
+                supersedes TEXT, source_episode TEXT, tier TEXT DEFAULT 'warm'
+             );
+             CREATE VIRTUAL TABLE nodes_fts USING fts5(title, summary, content, domain);
+             CREATE TABLE edges (
+                id TEXT PRIMARY KEY, source_id TEXT NOT NULL, target_id TEXT NOT NULL,
+                relation_type TEXT NOT NULL, weight REAL DEFAULT 1.0,
+                description TEXT, created_at INTEGER, metadata TEXT
+             );",
+        )
+        .expect("schema");
+        conn
+    }
+
+    #[test]
+    fn test_split_chunks_deterministic_and_bounded() {
+        let long_para = "字".repeat(1500);
+        let chunks = split_chunks(&format!("第一段短文\n\n{}\n\n结尾段", long_para));
+        assert!(chunks.len() >= 3, "超长段应硬切: {}", chunks.len());
+        // 确定性
+        let again = split_chunks(&format!("第一段短文\n\n{}\n\n结尾段", long_para));
+        assert_eq!(chunks, again);
+        assert!(chunks.iter().all(|c| c.chars().count() <= 700), "切片不超过 ~600+overlap 上限");
+    }
+
+    #[test]
+    fn test_split_chunks_empty() {
+        assert!(split_chunks("").is_empty());
+        assert!(split_chunks("   \n\n  ").is_empty());
+    }
+
+    fn ingest_into(conn: &rusqlite::Connection, title: &str, text: &str) -> KbDocIngestResult {
+        let ts = now_ts();
+        let doc_id = format!("kbdoc-test-{}", title);
+        let chunks = split_chunks(text);
+        let doc = make_doc_node(&doc_id, title, text.trim(), "default", ts);
+        kbs::insert_node_rows(conn, &doc).expect("doc insert");
+        write_chunks(conn, &doc_id, &chunks, ts).expect("chunks");
+        KbDocIngestResult {
+            doc_id, title: title.into(), library: "default".into(),
+            chunk_count: chunks.len(), status: if chunks.is_empty() { "empty" } else { "ready" }.into(),
+        }
+    }
+
+    #[test]
+    fn test_doc_roundtrip_ingest_list_delete() {
+        let conn = test_conn();
+        let r = ingest_into(&conn, "设计文档", "## 一\n\n内容A\n\n内容B");
+        assert_eq!(r.chunk_count, 1);
+        assert_eq!(r.status, "ready");
+
+        // list 可见且计数正确
+        let n_chunks: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE relation_type='part_of' AND target_id=?1",
+                params![r.doc_id], |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(n_chunks, 1);
+
+        // delete 级联清 chunk
+        let deleted = delete_chunks(&conn, &r.doc_id).unwrap();
+        assert_eq!(deleted, 1);
+        kbs::delete_node(&conn, &r.doc_id).unwrap();
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes WHERE id LIKE 'kbdoc-test-%'", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(left, 0, "doc+chunk 节点应全部删除");
+    }
+
+    #[test]
+    fn test_reindex_replaces_old_chunks() {
+        let conn = test_conn();
+        let r = ingest_into(&conn, "重建文档", "旧内容一\n\n旧内容二");
+        assert!(r.chunk_count >= 1);
+
+        // 模拟全文更新后重索引为单段
+        let new_text = "全新单一内容";
+        conn.execute(
+            "UPDATE nodes SET content=?1 WHERE id=?2",
+            params![new_text, r.doc_id],
+        )
+        .unwrap();
+        let tx = conn.unchecked_transaction().unwrap();
+        delete_chunks(&tx, &r.doc_id).unwrap();
+        let n = write_chunks(&tx, &r.doc_id, &split_chunks(new_text), now_ts()).unwrap();
+        tx.commit().unwrap();
+        assert_eq!(n, 1, "重索引后仅剩新切片 (单短段合并为 1)");
+
+        let stale: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes WHERE id LIKE ?1", params![format!("{}-c%", r.doc_id)], |row| row.get(0))
+            .unwrap();
+        assert_eq!(stale, 1, "旧 chunk 不残留");
     }
 }

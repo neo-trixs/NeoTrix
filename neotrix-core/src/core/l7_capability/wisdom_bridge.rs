@@ -72,7 +72,7 @@ pub fn register_wisdom_capabilities(bus: &mut NativeBus) -> Result<usize, String
                 let desc = input.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let sev = input.get("severity").and_then(|v| v.as_f64()).unwrap_or(0.5);
                 let mut w = st.write().map_err(|e| e.to_string())?;
-                w.paradigm.observe(Anomaly { domain: d, description: desc, severity: sev });
+                w.paradigm.observe(Anomaly { domain: d, description: desc, severity: sev, confidence: 0.8 });
                 Ok(json!({ "ok": true }))
             },
         ))?;
