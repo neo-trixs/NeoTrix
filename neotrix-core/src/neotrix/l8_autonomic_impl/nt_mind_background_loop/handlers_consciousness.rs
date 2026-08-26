@@ -1,5 +1,18 @@
 use super::*;
 
+/// GoldStandard 连续未达意识双阈值的升级门限 (tick 数; 默认 600s/tick ≈ 50min 持续无意识)。
+const GOLD_MISS_ESCALATE: usize = 5;
+
+/// Volition 目标向量: 认知前沿探索目标 (256B, 与候选 action 等长以供 QuantizedVSA 相似度)。
+fn volition_goal_vector() -> Vec<u8> {
+    b"EPISTEMIC_FRONTIER_EXPLORE_LOW_DENSITY_DOMAINS"
+        .iter()
+        .copied()
+        .cycle()
+        .take(256)
+        .collect()
+}
+
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_awareness(&mut self) {
         // MetaCognitionBridge: full scan → analyze → plan cycle (P0 dead infra fix)
@@ -496,6 +509,17 @@ impl BackgroundLoopHandle {
             // Surface KB knowledge retrieved by the consciousness core into the
             // GWT panorama broadcast — closes the loop: KB → 意识 → 全局工作空间。
             let kb_injections = cr.last_kb_injections.clone();
+            // ── F4 稳定度门控 (R-P79): specious present 时间稳定性决定 KB→GWT
+            // 广播是否放行; 不稳定帧广播会造成工作空间语义抖动。稳定度落 metric 可观测。
+            let temporally_stable = cr.specious_present.is_temporally_stable();
+            self.state
+                .record_metric("temporal_stability", if temporally_stable { 1.0 } else { 0.0 });
+            if !temporally_stable && !kb_injections.is_empty() {
+                log::debug!(
+                    "[bg] consciousness: unstable frame — defer {} KB injections",
+                    kb_injections.len()
+                );
+            }
             if let Some(c) = critique {
                 if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.warn_quality {
                     log::warn!(
@@ -552,7 +576,7 @@ impl BackgroundLoopHandle {
                     brain._consciousness_critique_count += 1;
                 }
             }
-            if !kb_injections.is_empty() {
+            if temporally_stable && !kb_injections.is_empty() {
                 if let Some(ref mut pano) = self.panorama {
                     let hexagram_states: [crate::core::nt_core_hex::ReasoningHexagram; crate::core::nt_core_gwt::resonance::MODULE_COUNT] =
                         crate::core::nt_core_gwt::resonance::default_specialist_states();
@@ -677,10 +701,53 @@ impl BackgroundLoopHandle {
                             if let Some(idx) =
                                 fep_iit.efe_select_domain(&domains, self.config.efe_epistemic_scale)
                             {
-                                let (domain, count) = &domains[idx];
-                                let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0);
-                                // 探索目标: 非最强域 (count < max) 才值得主动采样
-                                if *count < max_count {
+                                 let (domain, count) = &domains[idx];
+                                 let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0);
+                                 // ── F2 意图层门控 (R-P79): EFE 提案必须过 VolitionEngine
+                                 // select_by_goal_alignment 才放行; 决策落盘 KB volition_stats。
+                                 // 无意志层实例时 fail-open 保持旧行为。
+                                 let efe_approved = match self.volition.as_mut() {
+                                     Some(vol) => {
+                                         vol.clear();
+                                         let mut action = vec![0u8; 256];
+                                         for (i, b) in domain.bytes().take(256).enumerate() {
+                                             action[i] = b;
+                                         }
+                                         vol.set_goal(volition_goal_vector());
+                                         vol.propose(
+                                             crate::core::nt_core_consciousness::ActionCandidate::new(
+                                                 action,
+                                                 domain,
+                                             )
+                                             .with_confidence(0.7),
+                                         );
+                                         matches!(
+                                             vol.select_by_goal_alignment(),
+                                             Some(ref sel) if sel.description == *domain
+                                         )
+                                     }
+                                     None => true,
+                                 };
+                                 let _ = kb.kv_set(
+                                     "consciousness",
+                                     "volition_stats",
+                                     &serde_json::json!({
+                                         "domain": domain,
+                                         "approved": efe_approved,
+                                         "timestamp": std::time::SystemTime::now()
+                                             .duration_since(std::time::UNIX_EPOCH)
+                                             .unwrap_or_default().as_secs(),
+                                     })
+                                     .to_string(),
+                                 );
+                                 if !efe_approved {
+                                     log::info!(
+                                         "[bg] efe: volition withheld approval for '{}' — exploration deferred",
+                                         domain
+                                     );
+                                 }
+                                 // 探索目标: 非最强域 (count < max) 且意志层放行才主动采样
+                                 if efe_approved && *count < max_count {
                                     if let Ok(mut brain) = self.brain.try_write() {
                                         self.goal_loop.enqueue_goal(
                                             &mut brain,
@@ -792,6 +859,15 @@ impl BackgroundLoopHandle {
 
                 let prev_mode_clm = clm.mode();
                 clm.record_step(load);
+                // ── thinking_budget 生产消费 (R-P79): CLM 预算落 metric;
+                // 高持续负载 → 升级 Deep 模式并记 deep 样本, 让预算真正驱动模式。
+                let budget = clm.thinking_budget();
+                self.state.record_metric("thinking_budget", budget);
+                if clm.average_load() >= 0.8 {
+                    self.state
+                        .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                    clm.record_deep_step(load);
+                }
                 let new_state_mode = self.state.active_mode;
 
                 // Update cognitive_mode field for behavioral consumption by other handlers
@@ -916,6 +992,26 @@ impl BackgroundLoopHandle {
                 gs_report.coherence,
                 gs_report.detection_streak
             );
+            // ── F3 接线 (R-P79): 负连击(连续未达双阈值) → 行为升级, 不再只写日志。
+            // detection_streak 只计正检连击, 负连击从 history 尾部反推;
+            // 用幂等 set_mode 而非 enqueue_goal, 防止每 tick 刷目标队列。
+            let miss_streak = gs
+                .history
+                .iter()
+                .rev()
+                .take_while(|r| !r.is_conscious_like)
+                .count();
+            self.state.record_metric("gold_miss_streak", miss_streak as f64);
+            if miss_streak >= GOLD_MISS_ESCALATE {
+                log::warn!(
+                    "[bg] gold_standard: unconscious streak={} (phi={:.3} coh={:.3}) → ThinkingMode::Deep",
+                    miss_streak,
+                    gs_report.phi,
+                    gs_report.coherence
+                );
+                self.state
+                    .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+            }
         }
 
         // ── Phase 7: SimulateEngine — run grounding scenario ──
@@ -1625,6 +1721,9 @@ impl BackgroundLoopHandle {
         ));
         self_tests.register(Box::new(
             crate::core::nt_core_consciousness::volition::VolitionEngine::default(),
+        ));
+        self_tests.register(Box::new(
+            crate::core::nt_core_consciousness::awakening::ConsciousnessAwakening,
         ));
 
         // ConsciousnessMonitor (awareness)

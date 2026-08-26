@@ -1633,9 +1633,16 @@ impl BrainStage for GwtAbsorbStage {
             caps.iter().sum::<f64>() / caps.len() as f64
         };
         if let Some(ref kb) = brain._nt_memory_kb {
+            // ── FirstPersonRef 生产读点 (F4 收尾): 自我-当前流一致性进快照摘要,
+            // 让 first_person 字段从"出生写一次"变为每 cycle 可观测。
+            let fp_coherence = brain
+                ._consciousness_stream
+                .current()
+                .map(|c| brain.first_person.coherence_with(&c.vector))
+                .unwrap_or(0.0);
             let summary = format!(
-                "gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?}",
-                iteration, reward, avg_cap, brain.autonomy
+                "gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?} fp_coh={:.3}",
+                iteration, reward, avg_cap, brain.autonomy, fp_coherence
             );
             let _ = kb.kv_set("gwt_absorb", &format!("snapshot_{}", iteration), &summary);
             // is_conscious derived from the real InnerCritic quality score
@@ -2780,6 +2787,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(BMonitor::default()));
         registry.register(Box::new(InnerCritic::new()));
         registry.register(Box::new(ConsciousnessRuntime::new()));
+        registry.register(Box::new(crate::core::nt_core_consciousness::ConsciousnessAwakening));
         registry.register(Box::new(SelfReviewGate::new(false)));
         registry.register(Box::new(ConsciousnessTree::new()));
         registry.register(Box::new(MetaAuditor::new()));

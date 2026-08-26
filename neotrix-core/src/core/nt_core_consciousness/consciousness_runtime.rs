@@ -278,6 +278,8 @@ impl ConsciousnessRuntime {
         self.tick_count += 1;
         // Feed resonance content into specious present as a VSA-tagged item
         let world_item = VsaTagged::world_input(resonance_content);
+        // ── F4 接线 (R-P79): 共振内容同步进自传体意识流, stream 不再只是唤醒门。
+        self.stream.push(world_item.clone());
         self.specious_present.push(world_item);
         // Query knowledge base with the resonance content — 意识核心主动检索知识
         self.inject_kb_knowledge(resonance_content);
@@ -292,9 +294,7 @@ impl ConsciousnessRuntime {
         }
         // Select the best action candidate (was never called before)
         let selected_action = self.volition.select_best();
-        // Compute temporal integral and difference for richer critique
-        let _temporal_integral = self.specious_present.temporal_integral();
-        let _temporal_delta = self.specious_present.temporal_difference();
+        let temporal_delta = self.specious_present.temporal_difference();
         // Re-borrow for critique: context = 前一帧 (current==current 会让 relevance 恒为 1.0)
         let mut critique = match self.specious_present.current() {
             Some(current) => {
@@ -304,11 +304,35 @@ impl ConsciousnessRuntime {
             }
             None => return None,
         };
+        // ── SourceHierarchy 溯源消费接线 (R-P79): 当前帧带 ProvenanceChain 时,
+        // validate_chain+effective_confidence 参与一致性评分; 弱链降分并留痕 reasons。
+        // 无溯源链的帧保持原一致性 (中性, 不惩罚)。
+        if let Some(cur_tagged) = self.specious_present.current() {
+            if let Some(ref chain) = cur_tagged.provenance {
+                let prov_conf = if chain.validate_chain() {
+                    // 有效置信度 = 链上最新层的抽象折扣置信度 (Raw 无折扣 / Structured×0.85 / Semantic×0.7)
+                    chain
+                        .layers
+                        .last()
+                        .map(|(layer, _)| layer.effective_confidence())
+                        .unwrap_or(0.0)
+                } else {
+                    0.2
+                };
+                critique.consistency_score =
+                    (critique.consistency_score * 0.8 + prov_conf * 0.2).clamp(0.0, 1.0);
+                if prov_conf < 0.35 {
+                    critique
+                        .reasons
+                        .push(format!("provenance_chain_weak: conf={:.2}", prov_conf));
+                }
+            }
+        }
         // Attach selected action info to critique
         if let Some(action) = selected_action {
             critique.selected_action = Some(action.description.clone());
         }
-        critique.temporal_delta = _temporal_delta;
+        critique.temporal_delta = temporal_delta;
         self.observe_from_critique(&critique);
         Some(critique)
     }

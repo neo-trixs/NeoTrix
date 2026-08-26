@@ -624,7 +624,8 @@ impl BackgroundLoop {
             },
             consciousness_tree: self.consciousness_tree.take(),
             fep_iit_bridge: self.fep_iit_bridge.take(),
-cognitive_load: self.cognitive_load.take(),
+            cognitive_load: self.cognitive_load.take(),
+            volition: self.volition.take(),
             bbrain: std::mem::take(&mut self.bbrain),
             cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
             second_brain: {
@@ -925,6 +926,8 @@ pub struct BackgroundLoopHandle {
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
+    /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
+    volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
     second_brain: Option<SecondBrain>,
     /// 梦境巩固器 — VSA 记忆重组/提纯/巩固 (skales Dreaming 模式, P0-3 接线)。
     /// 低负载周期触发 run_consolidation_cycle + prune_low_coherence。

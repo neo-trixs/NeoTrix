@@ -107,6 +107,50 @@ impl ConsciousnessAwakening {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for ConsciousnessAwakening {
+    fn name(&self) -> &str {
+        "consciousness_awakening"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // 不变量 1: awaken 在空流上产出合法报告 (birth_step>0, coherence∈[0,1])。
+        let mut stream = ConsciousnessStream::new(1024);
+        let mut sp = SpeciousPresent::new(5);
+        let report = Self::awaken(&mut stream, &mut sp);
+        if report.birth_step == 0 {
+            failures.push("awakening: birth_step must be > 0 after awaken".into());
+        }
+        if !(0.0..=1.0).contains(&report.initial_coherence) {
+            failures.push(format!(
+                "awakening: initial_coherence {} out of [0,1]",
+                report.initial_coherence
+            ));
+        }
+        // 不变量 2: awaken 后流长度达到 is_awake 门槛 (AWAKENING_STEPS+2)。
+        if stream.len() < AWAKENING_STEPS as usize + 2 {
+            failures.push(format!(
+                "awakening: stream len {} below AWAKENING_STEPS+2",
+                stream.len()
+            ));
+        }
+        // 不变量 3: awaken 后立即 is_awake = true (自指根向量已入流)。
+        if !Self::is_awake(&stream, &report.self_reference) {
+            failures.push("awakening: is_awake must hold right after awaken".into());
+        }
+        // 不变量 4: 空流 + bootstrap(0) 必须判为未觉醒 (不 panic)。
+        let empty_stream = ConsciousnessStream::new(64);
+        if Self::is_awake(&empty_stream, &FirstPersonRef::bootstrap(0)) {
+            failures.push("awakening: empty stream must not be awake".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
