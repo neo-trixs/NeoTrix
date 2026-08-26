@@ -45,21 +45,16 @@
   - 能力树: strengthen `nt_shield::skill_vetting_ruleset`
   - 判据: 构造 3 个恶意样本 skill 被 reject, 3 个良性 skill 通过; 规则单测覆盖
 
-- [ ] **W1.3 免费 LLM provider 聚合路由 + failover → LlmProvider 层** 〔与主路线图 2.1 CLIProxyAPI 合并〕
-  - 源: tashfeenahmed/freellmapi (IO/delegate) — 34 provider / 635 endpoint / key 加密 / per-key 用量追踪 / 限流 failover
-  - 目标模块: `neotrix-core/src/core/nt_core_llm.rs` (`trait LlmProvider`) + provider factory
-  - 动作: 在现有 provider 抽象上加 ordered-fallback 路由器 (限流→下一 provider) + 免费档用量记账; 不新建平行网关 (R-P42, 合并 CLIProxyAPI OAuth 工作为同一任务族)
-  - 消费者 (R-P79): `nt_io_provider` 生产调用面
-  - 能力树: bud `nt_io::provider_failover_router`
-  - 判据: 模拟 429 → 自动 failover 成功率 100%; per-provider 用量落 KB
+- [x] **W1.3 免费 LLM provider 聚合路由 + failover → LlmProvider 层** 〔❌ R-P79 拒绝 — 2026-08-26 缺口分析裁决〕
+  - 源: tashfeenahmed/freellmapi (IO/delegate)
+  - **拒绝依据 (代码引用)**: freellmapi 四大机制 NeoTrix 均已有实现 —
+    ① 单一 OpenAI 兼容端点: `nt_io_web/server.rs:178` `/v1/chat/completions`
+    ② 有序 failover + 免费档优先序: `nt_io_provider/agent_routing.rs:222 find_failover` + `circuit_breaker.rs` + `failover_history.rs`
+    ③ 免费档用量记账防超额: `free_pool.rs:267 record_usage` / `get_budget`
+    ④ 多账号池隔离: `account_pool.rs:114 AccountPool` (lease/quarantine, 超集)
+  - Key 静态加密缺口不适用: key 全部经环境变量注入 (`factory.rs:210,383-409`), 无静态存储面
+  - 教训: 立项前必须先 grep 目标机制是否已被前批吸收 — 本任务与主路线图 2.1 合并立项时未做存在性检查
 
-- [ ] **W1.4 Ingest-time 索引编译 → KB 入库管线策略**
-  - 源: arxiv 2608.20845 *RAG Deserves an Index* (MEMORY/persist) — ingest 时编译优于查询时解释
-  - 目标模块: KB 入库路径 (`neotrix-experience absorb-node` + `nodes_fts` 写入)
-  - 动作: 入库时同步生成结构化摘要字段 + 概念标签 (替代查询时全文扫描); 对齐既有显式 FTS 插入纪律
-  - 消费者 (R-P79): 本批 47 节点即生产数据; `query --kw` 检索延迟对比
-  - 能力树: strengthen `nt_memory_kb::ingest_index_compilation`
-  - 判据: 1000 节点级 query 延迟下降可测; 摘要字段入库即存在
 
 ---
 

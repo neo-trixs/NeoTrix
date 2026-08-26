@@ -89,6 +89,38 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
         else { 1 }
     };
     let mut results: Vec<SearchResult> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    // W1.4 (batch3 2026-08-26, arxiv 2608.20845 ingest-time compilation):
+    // 查询词与节点摄取时编译的概念索引求交 → 命中加分 (每词 +0.05, 封顶 +0.25)。
+    // 纯增量修正: 无 ingest_index 的存量节点行为不变。
+    let query_concepts = super::nt_memory_pipeline::compile_ingest_index(query, "", "");
+    if !query_concepts.is_empty() {
+        // 概念命中语义: 相等, 或双向包含且短侧 ≥3 字 (CJK 复合词窗口匹配)
+        let hit = |q: &str, concepts: &[&str]| -> bool {
+            concepts.iter().any(|c| {
+                *c == q
+                    || (q.chars().count().min(c.chars().count()) >= 3
+                        && (c.contains(q) || q.contains(c)))
+            })
+        };
+        for r in results.iter_mut() {
+            let Some(meta) = r.node.metadata.as_ref() else { continue };
+            let Some(idx) = meta.get("ingest_index").and_then(|v| v.get("concepts")).and_then(|v| v.as_array()) else {
+                continue;
+            };
+            let idx_terms: Vec<&str> = idx.iter().filter_map(|c| c.as_str()).collect();
+            if idx_terms.is_empty() {
+                continue;
+            }
+            let hits = query_concepts
+                .iter()
+                .filter(|q| hit(q.as_str(), &idx_terms))
+                .count();
+            if hits > 0 {
+                r.score += 0.05 * (hits as f64).min(5.0);
+                r.matched_on.push(SearchMatchType::IngestConcept);
+            }
+        }
+    }
     results.sort_by(|a, b| {
         let pa = title_pri(a);
         let pb = title_pri(b);

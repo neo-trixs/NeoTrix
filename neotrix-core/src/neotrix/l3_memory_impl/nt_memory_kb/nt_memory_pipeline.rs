@@ -171,9 +171,69 @@ fn extract_entities(query: &str) -> Vec<String> {
     tokens.into_iter().filter(|t| t.len() >= 2 && seen.insert(t.clone())).collect()
 }
 
+/// W1.4 摄取时概念编译 (单一分词口径, 写读两侧共用):
+/// ASCII 词 ≥4 字符 (小写化 + 停用词过滤) + CJK 连续段 ≥2 字。
+/// 语义对齐经验层 `_extract_concepts`。返回按首现序去重的 ≤24 个概念。
+pub fn compile_ingest_index(title: &str, summary: &str, content: &str) -> Vec<String> {
+    const ASCII_STOPWORDS: &[&str] = &[
+        "this", "that", "with", "from", "have", "has", "had", "will", "would", "could",
+        "should", "into", "than", "then", "them", "they", "when", "what", "which", "while",
+        "about", "after", "also", "been", "before", "being", "were", "your", "their",
+        "there", "these", "those", "some", "such", "through", "under", "until", "very",
+        "where", "other", "more", "most", "only", "over", "same", "just", "like", "make",
+        "made", "many", "much", "need", "each", "both", "between", "because", "used",
+        "using", "uses", "onto", "upon", "here", "does", "doing", "done", "from",
+    ];
+    const MAX_CONCEPTS: usize = 24;
+    let mut out: Vec<String> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let text = format!("{}\n{}\n{}", title, summary, content);
+    for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || ('\u{4e00}'..='\u{9fff}').contains(&c))) {
+        if word.is_empty() {
+            continue;
+        }
+        let is_cjk = word.chars().next().map(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)).unwrap_or(false);
+        if is_cjk {
+            // CJK 连续段 ≥2 字, 截断超长段 (12 字) 防整段正文混入。
+            // 段长 >6 时额外取前/后 6 字窗口 — 提升子串查询命中率
+            // ("研究记忆压缩断崖" → 追加 "研究记忆压缩"/"记忆压缩断崖")。
+            let n = word.chars().count();
+            if n >= 2 {
+                let chars: Vec<char> = word.chars().take(12).collect();
+                let m = chars.len();
+                let full: String = chars.iter().collect();
+                if seen.insert(full.clone()) {
+                    out.push(full);
+                }
+                if n > 6 && m >= 6 {
+                    for window in [chars[..6].iter().collect::<String>(), chars[m - 6..].iter().collect::<String>()] {
+                        if seen.insert(window.clone()) {
+                            out.push(window);
+                        }
+                    }
+                }
+            }
+        } else {
+            let lower = word.to_lowercase();
+            if lower.len() >= 4 && !ASCII_STOPWORDS.contains(&lower.as_str()) && seen.insert(lower.clone()) {
+                out.push(lower);
+            }
+        }
+        if out.len() >= MAX_CONCEPTS {
+            break;
+        }
+    }
+    out
+}
+
 impl KnowledgeBase {
     /// 写端管道 — 吸收一个知识条目到 KB 最短路径。
     /// 幂等 (url 或 title+node_type 已存在则跳过), 自动挂域枢纽边 + FTS 同步。
+    ///
+    /// W1.4 (batch3 2026-08-26, 源: arxiv 2608.20845 *RAG Deserves an Index*):
+    /// 新节点入库时同步编译 `metadata.ingest_index.concepts` (摄取时编译优于
+    /// 查询时解释)。读侧 `nt_memory_search::search_fts` 对概念命中节点加分,
+    /// 形成写↔读闭环 (R-P79 行为接地)。
     pub fn absorb_core(&self, entry: &AbsorbEntry) -> Result<AbsorbReport, String> {
         let node_type = NodeType::from_str(&entry.node_type);
         let conn = self.conn.lock().map_err(|e| format!("KB lock: {}", e))?;
@@ -194,6 +254,22 @@ impl KnowledgeBase {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
+            // W1.4: 摄取时编译概念索引 → metadata.ingest_index
+            let concepts = compile_ingest_index(
+                &entry.title,
+                entry.summary.as_deref().unwrap_or(""),
+                entry.content.as_deref().unwrap_or(""),
+            );
+            let metadata = if concepts.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!({
+                    "ingest_index": {
+                        "concepts": concepts,
+                        "compiled_at": ts,
+                    }
+                }))
+            };
             let node = KnowledgeNode {
                 id: uuid::Uuid::new_v4().to_string(),
                 node_type,
@@ -208,7 +284,7 @@ impl KnowledgeBase {
                 created_at: ts,
                 updated_at: ts,
                 access_count: 0,
-                metadata: None,
+                metadata,
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
@@ -517,5 +593,113 @@ mod tests {
         };
         let report = kb.absorb_core(&entry).expect("absorb");
         assert_eq!(report.edges_added, 1, "应添加 1 条关系边");
+    }
+}
+/// W1.4 (batch3 2026-08-26) 验收测试。
+#[cfg(test)]
+mod ingest_index_tests {
+    use super::*;
+
+    #[test]
+    fn test_compile_ingest_index_mixed_text() {
+        let concepts = compile_ingest_index(
+            "Compaction Cliff in Agent Memory",
+            "研究记忆压缩断崖",
+            "The compaction cliff collapses LLM task success when context is compressed. 记忆压缩是长会话核心问题。",
+        );
+        // ASCII 停用词被滤除, 词被小写化
+        assert!(concepts.contains(&"compaction".to_string()), "{concepts:?}");
+        assert!(concepts.contains(&"cliff".to_string()));
+        assert!(concepts.contains(&"agent".to_string()) || concepts.contains(&"memory".to_string()));
+        assert!(!concepts.contains(&"the".to_string()), "停用词泄漏");
+        assert!(!concepts.iter().any(|c| {
+            c.chars().next().map(|ch: char| ('\u{4e00}'..='\u{9fff}').contains(&ch)).unwrap_or(false)
+                && c.chars().count() < 2
+        }), "短 CJK 段泄漏");
+        // CJK 连续段保留 (≥2 字)
+        assert!(concepts.contains(&"记忆压缩断崖".to_string()), "{concepts:?}");
+        // 上限 24
+        let flood = compile_ingest_index(
+            &"word ".repeat(200),
+            "",
+            &("alpha beta gamma delta ".repeat(40)),
+        );
+        assert!(flood.len() <= 24);
+    }
+
+    #[test]
+    fn test_absorb_core_writes_ingest_index() {
+        let db = std::env::temp_dir().join(format!(
+            "nt_w14_{}_{}.db", std::process::id(), std::thread::current().name().unwrap_or("t").len()
+        ));
+        let _ = std::fs::remove_file(&db);
+        let kb = KnowledgeBase::open(Some(db.clone())).expect("kb");
+        let entry = AbsorbEntry {
+            title: "Compaction Study".into(),
+            summary: Some("量化长会话记忆压缩断崖".into()),
+            content: Some("Measures retention ratio collapse across compaction events.".into()),
+            node_type: "article".into(),
+            domain: Some("NT-MEMORY".into()),
+            url: Some(format!("https://example.test/compaction-{}", std::process::id())),
+            language: Some("en".into()),
+            importance: Some(0.6),
+            relations: vec![],
+        };
+        let report = kb.absorb_core(&entry).expect("absorb");
+        assert!(report.created);
+        let conn = kb.conn.lock().unwrap();
+        let meta_json: String = conn
+            .query_row(
+                "SELECT metadata FROM nodes WHERE url=?1",
+                rusqlite::params![entry.url.as_deref().unwrap()],
+                |r| r.get(0),
+            )
+            .expect("node exists");
+        let meta: serde_json::Value = serde_json::from_str(&meta_json).unwrap();
+        let idx = &meta["ingest_index"];
+        assert!(idx.is_object(), "ingest_index missing: {meta_json}");
+        let concepts: Vec<String> = idx["concepts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|c| c.as_str().map(String::from))
+            .collect();
+        assert!(concepts.contains(&"compaction".to_string()), "{concepts:?}");
+        assert!(concepts.contains(&"记忆压缩断崖".to_string()), "{concepts:?}");
+    }
+
+    #[test]
+    fn test_search_fts_boosts_concept_matches() {
+        let db = std::env::temp_dir().join(format!(
+            "nt_w14s_{}_{}.db", std::process::id(), std::thread::current().name().unwrap_or("t").len()
+        ));
+        let _ = std::fs::remove_file(&db);
+        let kb = KnowledgeBase::open(Some(db.clone())).expect("kb");
+        let entry = AbsorbEntry {
+            title: "Quantum Error Survey".into(),
+            summary: None,
+            content: Some("Deep dive into quantum correction codes and thresholds.".into()),
+            node_type: "article".into(),
+            domain: None,
+            url: Some(format!("https://example.test/quantum-{}", std::process::id())),
+            language: Some("en".into()),
+            importance: Some(0.5),
+            relations: vec![],
+        };
+        kb.absorb_core(&entry).expect("absorb");
+        let conn = kb.conn.lock().unwrap();
+        let results = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_search::search_fts(
+            &conn, "quantum", 10,
+        )
+        .expect("search");
+        assert!(!results.is_empty());
+        let top = &results[0];
+        assert!(
+            top.matched_on
+                .iter()
+                .any(|m| matches!(m, SearchMatchType::IngestConcept)),
+            "expected IngestConcept marker, got {:?}",
+            top.matched_on
+        );
     }
 }
