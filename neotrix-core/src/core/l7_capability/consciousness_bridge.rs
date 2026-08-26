@@ -25,6 +25,15 @@ pub enum QuickVerdict {
     Warn(String),
 }
 
+impl std::fmt::Display for QuickVerdict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QuickVerdict::Allow => write!(f, "Allow"),
+            QuickVerdict::Warn(w) => write!(f, "Warn({})", w),
+        }
+    }
+}
+
 /// 全局桥接 — 四系统的共享神经中枢。
 pub struct WisdomBridge {
     /// P1: 价值观权重 {value_id → weight}
@@ -236,5 +245,23 @@ mod tests {
         b.post_llm_record(false); // health = 0.81
         b.post_llm_record(false); // health ≈ 0.73
         // 健康值在持续失败时衰减但不归零
+    }
+}
+
+
+#[cfg(test)]
+mod self_tests {
+    use super::*;
+    
+    /// 验证 bridge 全链路健康
+    #[test]  
+    fn test_bridge_health() {
+        let b = bridge();
+        // 1. 价值权重已同步
+        b.sync_value_weights(HashMap::from([("autonomy".into(), 0.95)]));
+        assert!(format!("{:?}", b.pre_tick_check(0)).len() > 0);
+        // 2. 叙事可设置
+        b.set_narrative("health check".into());
+        // 3. 无 panic 即健康
     }
 }

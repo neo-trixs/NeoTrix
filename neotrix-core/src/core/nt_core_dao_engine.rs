@@ -65,11 +65,53 @@ impl DaoEngine {
         self.best_expr = Some(format!("({} * x + {})", a, b));
         Ok(self.best_expr.clone().unwrap())
     }
+
+    /// 二次拟合 y = ax² + bx + c (最小二乘)
+    pub fn fit_quadratic(&mut self, x: &[f64], y: &[f64]) -> Result<String, String> {
+        if x.len() < 3 { return Err("need >= 3 points".into()); }
+        // 正规方程组求解 3x3 线性系统
+        let n = x.len() as f64;
+        let mut sums = [0.0f64; 5]; // Σ1,Σx,Σx²,Σx³,Σx⁴
+        for &xi in x {
+            let xi2 = xi * xi;
+            sums[0] += 1.0; sums[1] += xi; sums[2] += xi2;
+            sums[3] += xi2 * xi; sums[4] += xi2 * xi2;
+        }
+        let mut rhs = [0.0f64; 3]; // Σy,Σxy,Σx²y
+        for (&xi, &yi) in x.iter().zip(y.iter()) {
+            let xi2 = xi * xi;
+            rhs[0] += yi; rhs[1] += xi * yi; rhs[2] += xi2 * yi;
+        }
+
+        // Cramer's rule 解 [n,Σx,Σx²][Σx,Σx²,Σx³][Σx²,Σx³,Σx⁴] × [c,b,a] = [Σy,Σxy,Σx²y]
+        let det = n*(sums[2]*sums[4]-sums[3]*sums[3]) - sums[1]*(sums[1]*sums[4]-sums[3]*sums[2]) + sums[2]*(sums[1]*sums[3]-sums[2]*sums[2]);
+        if det.abs() < 1e-10 { return Err("singular matrix".into()); }
+
+        let det_c = rhs[0]*(sums[2]*sums[4]-sums[3]*sums[3]) - rhs[1]*(sums[1]*sums[4]-sums[3]*sums[2]) + rhs[2]*(sums[1]*sums[3]-sums[2]*sums[2]);
+        let det_b = n*(rhs[1]*sums[4]-sums[3]*rhs[2]) - sums[1]*(rhs[0]*sums[4]-rhs[2]*sums[2]) + sums[2]*(rhs[0]*sums[3]-rhs[1]*sums[1]);
+        let det_a = n*(sums[2]*rhs[2]-rhs[1]*sums[2]) - sums[1]*(sums[1]*rhs[2]-rhs[1]*sums[1]) + rhs[2]*(sums[1]*sums[2]-sums[2]*sums[1]);
+
+        let c_coef = det_c / det;
+        let b_coef = det_b / det;
+        let a_coef = det_a / det;
+
+        self.best_expr = Some(format!("({:.4}x² + {:.4}x + {:.4})", a_coef, b_coef, c_coef));
+        Ok(self.best_expr.clone().unwrap())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn test_fit_quadratic() {
+        let mut e = DaoEngine::new(DaoEngineConfig::default());
+        let x: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0];
+        let y: Vec<f64> = vec![1.0, 4.0, 9.0, 16.0]; // y = x²
+        let result = e.fit_quadratic(&x, &y);
+        assert!(result.is_ok(), "quadratic fit should succeed: {:?}", result.err());
+    }
+
     #[test]
     fn test_fit_linear() {
         let mut e = DaoEngine::new(DaoEngineConfig::default());

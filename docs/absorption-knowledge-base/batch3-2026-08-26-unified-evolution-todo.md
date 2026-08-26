@@ -60,14 +60,14 @@
 
 ## Wave 2 — P1 结构强化 (下周)
 
-- [ ] **W2.1 poka-yoke 约束披露门 → approval confirmation_gate**
+- [x] **W2.1 poka-yoke 约束披露门 → approval confirmation_gate** ✅ 落点修正: 活审批引擎 `cli/approval.rs` (confirmation_gate 零消费者, R-P42 不装饰死代码); infer_foreclosures + Warning/Detection andon; 接线 agent_loop check_tool_approval
   - 源: rainmanjam/poka-yoke (SHIELD/constrain) — "fix makes impossible" 披露率 45%→80%
   - 目标模块: `neotrix-core/src/neotrix/l6_self_impl/nt_shield_approval/confirmation_gate/mod.rs`
   - 动作: 审批请求 schema 增加 `forecloses` 字段 — 高影响编辑必须声明其关闭的可能性; 未披露降级为 Warning 级 andon 信号
   - 能力树: bud `nt_shield::foreclosure_disclosure_gate`
   - 判据: 高危编辑审批流中出现 forecloses 字段; 严重度三级 (Control/Warning/Detection) 映射测试
 
-- [ ] **W2.2 测试时算力自适应分配 → AttentionManager**
+- [x] **W2.2 测试时算力自适应分配 → AttentionManager** ✅ estimate_task_difficulty + allocate_compute 三段路由 (System1<0.35 / >0.65 或 Ultra→System2 / 中间带 intensity 折中); decide_and_run System2 追加深思迭代
   - 源: arxiv 2608.20256 *Learning When to Think* (CORE/route)
   - 目标模块: `neotrix-core/core/nt_core_self/attention_head.rs` (`AttentionManager`)
   - 动作: Dual Specialization 路由增加 difficulty-proportional 思考预算 — 简单任务 System1 直通, 复杂任务触发 System2 迭代; 对齐已有 mars_system1/2 激活计数

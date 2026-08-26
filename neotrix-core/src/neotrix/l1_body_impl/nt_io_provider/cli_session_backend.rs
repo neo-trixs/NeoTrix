@@ -261,6 +261,7 @@ mod tests {
 
     /// 端到端: cat 后端原样回显 stdin → complete 返回 prompt 全文。
     #[test]
+    /// KNOWN FLAKY: 环境变量竞态 — 单独跑通过，全量跑可能因并行 set_var 竞态失败
     fn test_complete_echo_backend() {
         let _g = env_guard();
         clear_env();
@@ -276,6 +277,7 @@ mod tests {
 
     /// 负例: 后端非零退出 → Err(Server), stderr 进错误信息。
     #[test]
+    /// KNOWN FLAKY: 同上
     fn test_complete_failing_backend_is_server_error() {
         let _g = env_guard();
         clear_env();

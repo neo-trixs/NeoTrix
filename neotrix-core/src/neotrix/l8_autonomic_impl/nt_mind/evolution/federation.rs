@@ -50,15 +50,15 @@ pub struct FederationMessage {
 
 /// 计算守卫哈希：msg_type + payload 摘要。
 fn compute_guard_hash(msg: &FederationMessage) -> u64 {
-    use sha2::{Digest, Sha256};
+    use blake2::Digest;
     let canonical = format!(
         "{}:{}:{}",
         serde_json::to_string(&msg.msg_type).unwrap_or_default(),
         msg.sender_id,
         serde_json::to_string(&msg.payload).unwrap_or_default()
     );
-    let digest = Sha256::digest(canonical.as_bytes());
-    // 取前 8 字节作为 u64 指纹（碰撞概率 2^-64，足够防伪造）
+    let digest = blake2::Blake2b512::digest(canonical.as_bytes());
+    // 取前 8 字节作为 u64 指纹（BLAKE2b 512-bit 输出，前 8 字节碰撞概率 2^-64）
     u64::from_be_bytes(digest[..8].try_into().unwrap_or([0u8; 8]))
 }
 
@@ -75,8 +75,8 @@ pub fn build_message(
 ) -> FederationMessage {
     let mut msg = FederationMessage {
         msg_id: {
-            use sha2::{Digest, Sha256};
-            let d = Sha256::digest(sender_id.as_bytes());
+            use blake2::Digest;
+            let d = blake2::Blake2b512::digest(sender_id.as_bytes());
             format!("fm_{}_{}", now_secs(), hex::encode(&d[..4]))
         },
         sender_id: sender_id.to_string(),

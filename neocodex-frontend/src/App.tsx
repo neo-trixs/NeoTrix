@@ -13,6 +13,7 @@ const Insights = lazy(() => import('./routes/Insights').then((m) => ({ default: 
 const Skills = lazy(() => import('./routes/Skills').then((m) => ({ default: m.Skills })))
 const MemoryManager = lazy(() => import('./routes/MemoryManager').then((m) => ({ default: m.MemoryManager })))
 const Workflows = lazy(() => import('./routes/Workflows').then((m) => ({ default: m.Workflows })))
+const ChatShellProto = lazy(() => import('./routes/ChatShellProto').then((m) => ({ default: m.ChatShellProto })))
 
 function GlobeRoute() {
   return <GlobeView limit={5000} height={700} />
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/skills" component={Skills} />
             <Route path="/memory" component={MemoryManager} />
             <Route path="/workflows" component={Workflows} />
+            <Route path="/proto" component={ChatShellProto} />
             {/* ⌘1..7 页面快捷键 — catch-all 最低优先级, 返回 null */}
             <Route path="*" component={PageShortcuts} />
           </Router>

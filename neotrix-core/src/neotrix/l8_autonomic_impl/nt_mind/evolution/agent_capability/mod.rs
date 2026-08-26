@@ -924,7 +924,14 @@ impl MetaAgentShell {
         let dominant = self.attention.dominant_domain()?;
         let dispatched = self.route_to_catalog();
         self.last_dispatched = dispatched;
-        let result = self.metacog.run_cycle();
+        // W2.2 (batch3, arxiv 2608.20256 Learning When to Think):
+        // 测试时算力自适应分配 — System2 判定的任务追加一轮深思迭代,
+        // System1 直通单轮。行为差异即路由落地 (R-P79)。
+        let alloc = self.attention.allocate_for_task(&self.task_type);
+        let mut result = self.metacog.run_cycle();
+        if alloc.mode == crate::core::nt_core_self::attention_head::ThinkingMode::System2Deliberate {
+            result = self.metacog.run_cycle();
+        }
         self.iterations_run += 1;
         // 行为反馈: 规划/告警有产出 = 该档案对该域成功。
         let produced = !result.plans.is_empty() || !result.alerts.is_empty();
