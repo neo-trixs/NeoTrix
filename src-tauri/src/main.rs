@@ -175,6 +175,8 @@ fn main() {
                     commands::kb_doc_list,
                     commands::kb_doc_delete,
                     commands::kb_doc_reindex,
+                    commands::provider_usage_snapshot,
+                    commands::provider_test,
                     commands::kb_get_related,
                                         commands::kb_geo_points,
                     commands::kb_geo_stats,

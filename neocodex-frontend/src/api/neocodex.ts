@@ -133,6 +133,28 @@ export function setProvider(name: string): Promise<void> {
   return call('neocodex_set_provider', { name })
 }
 
+/** Phase3-M2: per-provider 用量账本快照 (活动记录, 非权威账单) */
+export interface ProviderUsageRow {
+  provider: string
+  request_count: number
+  prompt_tokens: number
+  completion_tokens: number
+  activity_record: boolean
+}
+export function providerUsageSnapshot(): Promise<ProviderUsageRow[]> {
+  return call('provider_usage_snapshot', {})
+}
+
+/** Phase3-M3: 提供商连通性探测 (任意 HTTP 状态=存活) */
+export interface ProviderTestResult {
+  ok: boolean
+  status_code: number
+  latency_ms: number
+}
+export function providerTest(baseUrl: string): Promise<ProviderTestResult> {
+  return call('provider_test', { base_url: baseUrl })
+}
+
 export function setMode(mode: string): Promise<void> {
   return call('neocodex_set_mode', { mode })
 }

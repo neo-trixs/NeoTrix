@@ -1,8 +1,14 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@solidjs/testing-library'
 import { createSignal } from 'solid-js'
 import type { ProviderConfig } from '../../api/types'
 import { ModelsSection } from './ModelsSection'
+import { resetInvokeMock, mockCommand } from '../../test/invokeMock'
+
+vi.mock('@tauri-apps/api/core', async () => {
+  const { mockInvokeImpl } = await import('../../test/invokeMock')
+  return { invoke: mockInvokeImpl }
+})
 
 const baseCfg = (overrides: Partial<ProviderConfig> = {}): ProviderConfig => ({
   provider_count: 3,
@@ -28,6 +34,7 @@ const mount = (cfg: ProviderConfig) => {
 }
 
 describe('ModelsSection', () => {
+  beforeEach(() => resetInvokeMock())
   it('只展示可用模型：过滤 resolvable=false 的提供商', () => {
     const { container, onSwitch } = mount(baseCfg())
     expect(container.textContent).toContain('本地引擎')
@@ -67,19 +74,24 @@ describe('ModelsSection', () => {
     expect(onSwitch).not.toHaveBeenCalled()
   })
 
-  it('连通测试：确定性模拟返回延迟标签（B3 seam）', async () => {
-    const utils = mount(baseCfg())
+
+
+  it('连通测试: provider_test 真契约返回延迟 (P3-M3 已接线)', async () => {
+    mockCommand('provider_test', () => ({ ok: true, status_code: 200, latency_ms: 137 }))
+    const cfg = baseCfg()
+    cfg.providers[0].base_url = 'https://api.local.example'
+    const utils = mount(cfg)
     const btn = await utils.findByLabelText('测试 本地引擎 连通')
     fireEvent.click(btn)
     const ok = await screen.findByLabelText('本地引擎 延迟')
-    expect(ok.textContent).toMatch(/^● \d+ms$/)
+    expect(ok.textContent).toBe('● 137ms')
   })
 
-  it('连通测试：%4===0 名字判定不可达', async () => {
+  it('连通测试: 无 endpoint 探测失败 → 不通 (fail-closed)', async () => {
     const cfg = baseCfg()
     cfg.providers.push({ name: 'Abcd', display_name: '四字服务', category: 'cloud', is_free: false, base_url: '', model: 'm4', models: ['m4'], resolvable: true })
-    const utils = mount(cfg)
-    const btn = await utils.findByLabelText('测试 四字服务 连通')
+    mount(cfg)
+    const btn = await screen.findByLabelText('测试 四字服务 连通')
     fireEvent.click(btn)
     expect(await screen.findByLabelText('四字服务 不可达')).toBeTruthy()
   })

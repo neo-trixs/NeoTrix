@@ -11,6 +11,8 @@ import { useNavigate } from '@solidjs/router'
 import { ArrowLeft, Gauge, RefreshCw, Loader2, Wallet, Coins, Database, Info } from 'lucide-solid'
 import { clsx } from 'clsx'
 import type { AgentStatus } from '../api/types'
+import { neocodex, providerUsageSnapshot, type ProviderUsageRow } from '../api'
+import { query } from '../api/query'
 import { createInsightsStore } from '../stores/insights'
 
 function fmtTokens(n: number): string {
@@ -22,22 +24,26 @@ function fmtTokens(n: number): string {
 export function Insights() {
   const navigate = useNavigate()
   const ins = createInsightsStore()
-  // Phase 3 M5 前为本地占位（形状对齐 AgentStatus）；接线时改走
-  // query<AgentStatus>('agent_status', ...) 与 CostDashboard 共享 3s TTL 缓存。
-  const [status, setStatus] = createSignal<AgentStatus | null>({
-    running: true,
-    current_task: null,
-    uptime_secs: 8422,
-    turn_count: 128,
-    tokens_used: 2_450_000,
-    context_usage: 0.31,
-    provider_model: 'cli-session/claude-code',
-    evolution_iterations: 14,
-    cost_spent: 3.42,
-    cost_budget: 50,
-  })
+  // P3-M5 已接线: 与 CostDashboard 共享 'agent_status' 3s TTL 缓存
+  const [status, setStatus] = createSignal<AgentStatus | null>(null)
 
-  onMount(() => void ins.refresh())
+  async function loadStatus(force = false) {
+    try {
+      setStatus(await query<AgentStatus>('agent_status', () => neocodex.agentStatus(), { ttlMs: 3000, force }))
+    } catch {
+      /* 静默 — 成本卡显示占位符 */
+    }
+  }
+
+  // P3-M4: 用量账本真源 (provider_usage_snapshot), 空账本回退 mock 种子
+  const [liveLedger, setLiveLedger] = createSignal<ProviderUsageRow[] | null>(null)
+  onMount(() => {
+    void ins.refresh()
+    void loadStatus()
+    void providerUsageSnapshot()
+      .then((rows) => setLiveLedger(rows.length > 0 ? rows : null))
+      .catch(() => undefined)
+  })
 
   const budgetPct = () => {
     const s = status()
@@ -66,7 +72,7 @@ export function Insights() {
         <div class="flex-1" />
         <button
           class="flex items-center gap-1.5 h-8 px-3 rounded-lg text-13px text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors"
-          onClick={() => void ins.refresh()}
+          onClick={() => { void ins.refresh(); void loadStatus(true) }}
           aria-label="刷新洞察"
           title="刷新"
         >
@@ -142,7 +148,24 @@ export function Insights() {
                     </tr>
                   </thead>
                   <tbody>
-                    <For each={ins.ledger()?.entries ?? []}>
+                    <Show when={!liveLedger()} fallback={
+                  <For each={liveLedger() ?? []}>
+                    {(e) => (
+                      <tr class="border-b border-border-primary/20 last:border-0">
+                        <td class="py-1.5 font-medium truncate max-w-[120px]" title={e.provider}>{e.provider}</td>
+                        <td class="py-1.5 text-right tabular-nums">{e.request_count}</td>
+                        <td class="py-1.5 text-right tabular-nums text-text-muted">{fmtTokens(e.prompt_tokens)}</td>
+                        <td class="py-1.5 text-right tabular-nums text-text-muted">{fmtTokens(e.completion_tokens)}</td>
+                        <td class="py-1.5 pl-4">
+                          <div class="h-1.5 rounded-full bg-black/10 overflow-hidden">
+                            <div class="h-full bg-nt-io-500/70 rounded-full" style={{ width: `${Math.round((e.request_count / Math.max(1, ...(liveLedger() ?? []).map((x) => x.request_count))) * 100)}%` }} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </For>
+                }>
+                <For each={ins.ledger()?.entries ?? []}>
                       {(e) => (
                         <tr class="border-b border-border-primary/20 last:border-0">
                           <td class="py-1.5 font-medium truncate max-w-[120px]" title={e.provider}>{e.provider}</td>
@@ -157,6 +180,7 @@ export function Insights() {
                         </tr>
                       )}
                     </For>
+                </Show>
                   </tbody>
                 </table>
               </section>

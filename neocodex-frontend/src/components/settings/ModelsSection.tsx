@@ -10,6 +10,7 @@ import { clsx } from 'clsx'
 import type { ProviderConfig, ProviderMeta } from '../../api/types'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
 import { ModelIcon, CheckIcon, ActiveDotIcon } from './settingsIcons'
+import { providerTest } from '../../api/neocodex'
 
 /** 提供商分类分组（对齐 ProviderIcon 分类徽章：本地绿/代理琥珀/云端蓝） */
 const CATEGORY_ORDER = ['local', 'proxy', 'cloud', 'unknown'] as const
@@ -57,20 +58,18 @@ export function ModelsSection(props: Props) {
     props.onSwitchProvider(p.name)
   }
   // ── 连通性测试（B3, 吸收 LM Studio endpoint health 模式）──
-  // ⚠️ seam: 当前为本地确定性模拟。P3-M3 后端落地 `provider_test` 命令后
-  // 切换为 invoke('provider_test', { name })，UI 零改动。
+  // P3-M3 已接线: invoke('provider_test', { base_url }) 真实探测。
   const [testState, setTestState] = createSignal<Record<string, { testing: boolean; latencyMs?: number; failed?: boolean }>>({})
   async function runConnectivityTest(name: string) {
     setTestState((m) => ({ ...m, [name]: { testing: true } }))
-    await new Promise((r) => setTimeout(r, 120))
-    // 确定性模拟：名字长度 %4===0 视为不可达（可测），真实探测由后端接管
-    const ok = name.length % 4 !== 0
-    setTestState((m) => ({
-      ...m,
-      [name]: ok
-        ? { testing: false, latencyMs: 100 + (name.length * 37) % 400 }
-        : { testing: false, failed: true },
-    }))
+    try {
+      const cfgp = props.config()?.providers.find((x) => x.name === name)
+      if (!cfgp?.base_url || !cfgp.base_url.startsWith('http')) throw new Error('no endpoint')
+      const r = await providerTest(cfgp.base_url)
+      setTestState((m) => ({ ...m, [name]: { testing: false, latencyMs: r.latency_ms } }))
+    } catch {
+      setTestState((m) => ({ ...m, [name]: { testing: false, failed: true } }))
+    }
   }
 
   // 双栏：自定义配置 vs 代理池（参考同类产品模型广场）
