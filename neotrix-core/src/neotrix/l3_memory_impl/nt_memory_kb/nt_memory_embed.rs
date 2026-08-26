@@ -845,56 +845,66 @@ pub fn fit_linear_map(old: &[Vec<f32>], new: &[Vec<f32>], lambda: f32) -> Result
     if old.len() != new.len() || old.is_empty() {
         return Err("paired embeddings required".into());
     }
-    let n = old.len();
+    let _n = old.len();
     let d_in = old[0].len();
     let d_out = new[0].len();
     if old.iter().any(|v| v.len() != d_in) || new.iter().any(|v| v.len() != d_out) {
         return Err("inconsistent dims".into());
     }
-    // XᵀX (d×d) 与每输出维 Xᵀy
-    let mut xtx = vec![0.0f32; d_in * d_in];
+    // W3.1 方法学 v2: 仿射映射 (偏置列) — 纯线性在均值非零空间欠拟合。
+    // 增广 xi' = [xi, 1], 拟合维度 d_in+1; apply_linear_map 同步增广。
+    let da = d_in + 1;
+    let mut xtx = vec![0.0f32; da * da];
     for xi in old {
-        for i in 0..d_in {
-            for j in 0..d_in {
-                xtx[i * d_in + j] += xi[i] * xi[j];
+        for i in 0..da {
+            let vi = if i < d_in { xi[i] } else { 1.0 };
+            for j in 0..da {
+                let vj = if j < d_in { xi[j] } else { 1.0 };
+                xtx[i * da + j] += vi * vj;
             }
         }
     }
-    for i in 0..d_in {
-        xtx[i * d_in + i] += lambda;
+    for i in 0..da {
+        xtx[i * da + i] += lambda;
     }
-    let mut rhs = vec![vec![0.0f32; n]; 0];
-    let mut xty = vec![vec![0.0f32; d_out]; d_in];
-    for (k, (xi, yi)) in old.iter().zip(new.iter()).enumerate() {
-        let _ = k;
-        for i in 0..d_in {
+    let mut xty = vec![vec![0.0f32; d_out]; da];
+    for (xi, yi) in old.iter().zip(new.iter()) {
+        for i in 0..da {
+            let vi = if i < d_in { xi[i] } else { 1.0 };
             for o in 0..d_out {
-                xty[i][o] += xi[i] * yi[o];
+                xty[i][o] += vi * yi[o];
             }
         }
     }
-    let _ = &mut rhs;
     // 对每个输出维解 (XᵀX+λI) w = Xᵀy — 复用同一分解: 直接高斯消元 d_out 次
     // (d≈128, 开销可忽略; 不引入外部 linalg 依赖)
-    let mut w_t = vec![vec![0.0f32; d_in]; d_out]; // [out][in]
+    let mut w_t = vec![vec![0.0f32; da]; d_out]; // [out][in+bias]
     for o in 0..d_out {
         let mut a = xtx.clone();
-        let mut b = vec![0.0f32; d_in];
-        for i in 0..d_in {
+        let mut b = vec![0.0f32; da];
+        for i in 0..da {
             b[i] = xty[i][o];
         }
-        solve_linear(&mut a, &mut b, d_in)?;
-        for i in 0..d_in {
+        solve_linear(&mut a, &mut b, da)?;
+        for i in 0..da {
             w_t[o][i] = b[i];
         }
     }
     Ok(w_t)
 }
 
-/// 应用映射: old_vec · Wᵀ → new_space
+/// 应用映射: [old_vec, 1] · Wᵀ → new_space (含偏置项)
 pub fn apply_linear_map(w_t: &[Vec<f32>], old_vec: &[f32]) -> Vec<f32> {
     w_t.iter()
-        .map(|row| row.iter().zip(old_vec.iter()).map(|(a, b)| a * b).sum())
+        .map(|row| {
+            row.iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let v = old_vec.get(i).copied().unwrap_or(1.0); // 越界位 = 偏置
+                    a * v
+                })
+                .sum()
+        })
         .collect()
 }
 
@@ -970,7 +980,7 @@ mod migration_probe_tests {
     #[test]
     fn linear_reader_adaptation_preserves_recall_over_70pct() {
         let topics = ["quantum computing", "coffee brewing", "mountain hiking", "stock market", "ocean biology", "car racing"];
-        let docs = cluster_docs(&topics, 8); // 48 docs
+        let docs = cluster_docs(&topics, 12); // 72 docs
         let olds = local_embed_texts(
             &docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 64,
         );
@@ -978,8 +988,8 @@ mod migration_probe_tests {
             &docs.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 256,
         );
         // 留出评估: 每 topic 取末 2 条
-        let train_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 8 < 6).collect();
-        let eval_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 8 >= 6).collect();
+        let train_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 12 < 9).collect();
+        let eval_idx: Vec<usize> = (0..docs.len()).filter(|i| i % 12 >= 9).collect();
         let train_old: Vec<Vec<f32>> = train_idx.iter().map(|&i| olds[i].clone()).collect();
         let train_new: Vec<Vec<f32>> = train_idx.iter().map(|&i| news[i].clone()).collect();
 

@@ -651,24 +651,29 @@ export function ChatShellProto() {
 
                     {/* 项目文件目录树 (全类型可入对话) */}
                     <div class="pl-1.5 pt-1 border-t border-border-primary/30 mt-1">
-                      <div class="flex items-center gap-1 px-1 py-0.5">
-                        <span class="text-[10px] font-semibold uppercase tracking-wide text-text-muted">文件</span>
-                        <button class="ml-auto p-0.5 rounded text-text-muted hover:text-text-primary" aria-label={`添加文件 ${g.name}`} title="添加文件"
-                          onClick={() => void addFileToProject(g.id)}>
-                          <Plus class="w-3 h-3" />
-                        </button>
-                      </div>
                       <For each={flattenVisible(projectFiles()[g.id] ?? [])}>
                         {(row) => (
-                          <button
-                            class="w-full flex items-center gap-1 text-left py-0.5 rounded hover:bg-white/50 transition-colors text-[12px]"
-                            style={{ 'padding-left': `${6 + row.depth * 12}px` }}
-                            onClick={() => { if (!row.isDir) { toggleDir(row.path); void attachFromTree(row.path) } else toggleDir(row.path) }}
-                            aria-label={`${row.isDir ? '目录' : '文件'} ${row.name}`}
-                          >
-                            <span class={clsx('text-text-muted text-[9px] w-3 shrink-0', !row.isDir && 'opacity-0')}>{collapsedDirs().includes(row.path) ? '▸' : '▾'}</span>
-                            <span class="truncate">{row.name}</span>
-                          </button>
+                          <div class="group/f w-full flex items-center gap-1 pr-1 rounded hover:bg-white/50 transition-colors text-[12px]" style={{ 'padding-left': `${6 + row.depth * 12}px` }}>
+                            <button
+                              class="flex-1 min-w-0 flex items-center gap-1 text-left py-0.5"
+                              onClick={() => { if (!row.isDir) { void attachFromTree(row.path) } else toggleDir(row.path) }}
+                              aria-label={`${row.isDir ? '目录' : '文件'} ${row.name}`}
+                              title={row.isDir ? undefined : `点击附加到对话 · ${row.path}`}
+                            >
+                              <span class={clsx('text-text-muted text-[9px] w-3 shrink-0', !row.isDir && 'opacity-0')}>{collapsedDirs().includes(row.path) ? '▸' : '▾'}</span>
+                              <span class="truncate">{row.name}</span>
+                            </button>
+                            <Show when={!row.isDir}>
+                              <button class="opacity-0 group-hover/f:opacity-100 p-0.5 text-text-muted hover:text-red-500 shrink-0"
+                                aria-label={`从项目中移除 ${row.name}`} title="移除"
+                                onClick={() => setProjectFiles((map) => {
+                                  const arr = (map[g.id] ?? []).filter((f) => f.path !== row.path)
+                                  return { ...map, [g.id]: arr }
+                                })}>
+                                ✕
+                              </button>
+                            </Show>
+                          </div>
                         )}
                       </For>
                     </div>
@@ -757,36 +762,7 @@ export function ChatShellProto() {
 
         {/* 居中悬浮输入框 */}
         <div class="px-6 pb-5">
-          {/* 当前项目面包屑: 切换归属 / 重命名 */}
-          <div class="max-w-3xl mx-auto pb-2 flex items-center relative">
-            <div class="relative">
-              <button class="flex items-center gap-1 text-[11px] text-text-muted hover:text-text-primary transition-colors"
-                onClick={() => setProjMenuOpen(!projMenuOpen())} aria-label="当前项目">
-                📁 {activeProjectName()}
-                <ChevronDown class="w-3 h-3" />
-              </button>
-              <Show when={projMenuOpen()}>
-                <div class="absolute bottom-full mb-1.5 left-0 w-56 rounded-xl border border-border-primary/60 bg-bg-primary shadow-xl p-1 z-20" role="menu" aria-label="切换项目">
-                  <For each={projects()}>
-                    {(pj) => (
-                      <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-text-muted hover:bg-white/60 hover:text-text-primary text-left"
-                        role="menuitem"
-                        onClick={() => { switchProject(pj.name); setProjMenuOpen(false) }}>
-                        <span class="truncate flex-1">{pj.name}</span>
-                        <Show when={activeProjectName() === pj.name}><Check class="w-3 h-3 text-nt-io-600" /></Show>
-                      </button>
-                    )}
-                  </For>
-                  <button class="w-full px-2 py-1.5 rounded-lg text-[11px] text-text-muted hover:text-text-primary hover:bg-white/60 text-left border-t border-border-primary/40"
-                    aria-label="重命名当前项目"
-                    onClick={() => { const pj = projects().find((x) => x.name === activeProjectName()); if (pj) { setProjRenamingId(pj.id); setProjRenameVal(pj.name) } setProjMenuOpen(false) }}>
-                    ✎ 重命名当前项目
-                  </button>
-                </div>
-              </Show>
-            </div>
-          </div>
-<div class={clsx('max-w-3xl mx-auto border bg-bg-secondary/80 backdrop-blur shadow-sm transition-colors', dragOver() ? 'border-nt-io-500 ring-2 ring-nt-io-500/30 bg-nt-io-500/5' : 'border-border-primary/60 focus-within:border-nt-io-500/60')}
+          <div class={clsx('max-w-3xl mx-auto border bg-bg-secondary/80 backdrop-blur shadow-sm transition-colors', dragOver() ? 'border-nt-io-500 ring-2 ring-nt-io-500/30 bg-nt-io-500/5' : 'border-border-primary/60 focus-within:border-nt-io-500/60')}
             style={{ 'border-radius': `${prefs().radius}px` }}>
             <Show when={fileError()}>
               <p class="mx-4 mt-2 text-[11px] text-red-500" role="alert">{fileError()}</p>
