@@ -106,8 +106,8 @@
 
 ## ⏸️ Deferred — 需独立 Session
 
-### ⬜ task-wave3-s1: nt_act 激活
-**状态**: blocked (209 类型冲突需专门重构)
+### ✅ task-wave3-s1: nt_act 激活
+**状态**: done
 
 ### ⬜ task-wave3-roadmap: 14项路线图批次
 **状态**: pending (大型工程)

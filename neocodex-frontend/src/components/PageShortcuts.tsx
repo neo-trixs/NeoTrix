@@ -8,6 +8,7 @@
    ════════════════════════════════════════════ */
 import { onMount, onCleanup, type JSX } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
+import { DeepLinkBridge } from './DeepLinkBridge'
 
 /** 顺序即编号语义 — 新页面追加到尾部，勿插入中间（用户肌肉记忆） */
 export const PAGE_PATHS = ['/chat', '/kb', '/plugins', '/insights', '/skills', '/memory', '/workflows']
@@ -28,5 +29,5 @@ export function PageShortcuts(props: { children?: JSX.Element }) {
   onMount(() => window.addEventListener('keydown', onKey))
   onCleanup(() => window.removeEventListener('keydown', onKey))
   // 通配路由唯一性: 本组件作为 catch-all 挂载并透传子路由内容
-  return <>{props.children}</>
+  return (<>{props.children}<DeepLinkBridge /></>)
 }
