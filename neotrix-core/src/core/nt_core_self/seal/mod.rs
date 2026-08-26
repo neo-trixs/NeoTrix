@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod constitution_gate;
 pub mod curriculum;
 pub mod grpo;
 pub mod self_edit_gen;
@@ -8,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_self::self_audit::{converge_check, AuditReport};
 
+pub use self::constitution_gate::{ConstitutionGate, SELF_EDIT_MIN_CONSCIOUSNESS};
 pub use self::curriculum::{
     CalibratedCurriculumGenerator, CurriculumRecord, IterationValidator,
     LearnabilityWindowAnalyzer, ValidationResult,

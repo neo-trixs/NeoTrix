@@ -133,6 +133,9 @@ pub struct SelfIteratingBrain {
     pub(crate) _consciousness_fruits: Vec<crate::core::nt_core_consciousness_tree::EvolutionFruit>,
     /// Total consciousness critiques received
     pub(crate) _consciousness_critique_count: u64,
+    /// G5 S 门控 (灵境 L4 自指闭环): 意识质量门控 SEAL 自编辑应用。
+    /// 裁决点: BoundedEditStage + code_review_iterate; 计数供 SelfTest 断言。
+    pub(crate) _constitution_gate: crate::core::nt_core_self::seal::ConstitutionGate,
     /// Phase 9.2 — dynamic self-model: continuous estimate of capability,
     /// uncertainty, and fatigue; its prediction error is the intrinsic
     /// self-reward blended into transition learning.
@@ -253,6 +256,7 @@ impl SelfIteratingBrain {
             _last_consciousness_quality: 0.0,
             _consciousness_fruits: Vec::new(),
             _consciousness_critique_count: 0,
+            _constitution_gate: crate::core::nt_core_self::seal::ConstitutionGate::new(),
             self_model: crate::core::nt_core_self::SelfModel::new(),
             element_registry: Self::build_element_registry(),
         };
@@ -426,6 +430,11 @@ impl SelfIteratingBrain {
     pub(crate) fn _set_lr_scheduler(&mut self, s: LrScheduler) { self._lr_scheduler = s; }
     pub(crate) fn _set_validation_gate(&mut self, g: ValidationGate) { self._validation_gate = g; }
     pub(crate) fn _set_aging_monitor(&mut self, m: AgingMonitor) { self._aging_monitor = m; }
+
+    /// G5 S 门控只读访问 (SelfTest 断言否决/放行计数用)。
+    pub fn edit_constitution_gate(&self) -> &crate::core::nt_core_self::seal::ConstitutionGate {
+        &self._constitution_gate
+    }
 
     pub fn record_tool_call(&mut self, name: &str, duration_ms: u64, success: bool) {
         self.tool_call_count += 1;
