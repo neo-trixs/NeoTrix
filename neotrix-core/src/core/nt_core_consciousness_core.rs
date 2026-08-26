@@ -16,6 +16,18 @@
 //! - KB 不可用/快照缺失时优雅降级为全新树 (与旧行为一致), 不 panic。
 //! - 快照损坏时重置计数而非拒绝服务。
 //!
+//! ## 度量链修复 (F1)
+//! - **D1 双 phi 口径**: `consciousness/core` 快照 φ (NT-CORE 树口径) 与
+//!   `consciousness/phi_report` 键 φ (NT-MIND 监视器口径) 语义不同 → 不统一
+//!   计算源, 以 `phi_source_tag` 字段标注口径并互相引用文档
+//!   (见 [`CoreSnapshot::phi`] 与 [`CoreSnapshot::phi_source_tag`])。
+//! - **D2 趋势追加**: 快照携带 `phi_trend`/`coherence_trend`, 落盘时
+//!   读旧值→追加→截断到 128 (`persist_snapshot_to_conn`), 时间序列跨
+//!   tick 且跨进程真实累积; 同周期重复落盘替换末样本 (一周期一点)。
+//! - **D3 金标校准**: core 快照落盘同步刷新 `consciousness/gold_standard`
+//!   (`refresh_gold_standard`), 占位数据 (phi=0.0) 被 `calibrated:true`
+//!   真实度量取代, 带 source 标注区分写入方。
+//!
 //! ## 调用入口 (同一实例, 两条口)
 //! - CLI: `neotrix consciousness status|tick|health|branches [--json]`
 //! - MCP: `consciousness_status` / `consciousness_tick` 工具
@@ -42,6 +54,16 @@ pub struct CoreSnapshot {
     /// Φ (IIT 整合信息)。经 D1 修复: run_growth_cycle Phase 2 用真实树状态
     /// (分支健康/土壤/根系/治理/养料锚点) 构造 64 维意识谱交给 IITPhiCalculator,
     /// 独立 CLI/MCP 进程的快照 φ 反映真实整合信息, 不再恒 0.0。
+    ///
+    /// **口径 (D1 双 phi 溯源)**: 本值是 **NT-CORE 树快照口径** — 由
+    /// ConsciousnessTree::compute_iit_phi 对树状态谱计算, 随每次 core 快照
+    /// 落盘更新。它与 KB `consciousness/phi_report` 键的 Φ 并存且口径不同:
+    /// 后者是 **NT-MIND 监视器口径** (src/neotrix/l9_transcendent_impl/
+    /// nt_mind_consciousness_monitor.rs 的 ConsciousnessMonitor::observe,
+    /// 经 src/neotrix/l8_autonomic_impl/nt_mind_background_loop/
+    /// handlers_consciousness.rs 落盘), 由监视器自身实时意识态向量计算。
+    /// 两者语义不同 → 不统一计算源, 以 [`CoreSnapshot::phi_source_tag`]
+    /// 标注口径 (详见该字段文档)。
     pub phi: f64,
     /// 相干性 — D4 修复: run_growth_cycle Phase 2 从真实树状态派生 (分支健康一致性/
     /// 谐振活跃/治理合规/迷雾清晰度), 独立 CLI/MCP 进程不再恒 0.0。
@@ -107,11 +129,38 @@ pub struct CoreSnapshot {
     /// `#[serde(default)]` 保证旧快照回退到 0。
     #[serde(default)]
     pub constitution_check_count: u64,
+    /// Φ 计算口径标记 (D1 双 phi 溯源)。固定 `tree_snapshot_iit` —
+    /// 本快照 [`CoreSnapshot::phi`] 由 NT-CORE 树 (compute_iit_phi) 计算。
+    /// 与之并存的 KB `consciousness/phi_report` 键是另一口径: NT-MIND
+    /// ConsciousnessMonitor::observe 的实时监视器 Φ (写入点
+    /// src/neotrix/l8_autonomic_impl/nt_mind_background_loop/
+    /// handlers_consciousness.rs handle_awareness)。两口径语义不同、各自
+    /// 服务不同子系统 (树快照 vs 实时监视), 故不统一计算源而以标记溯源;
+    /// 双方均保留既有消费方。`#[serde(default)]` 保证旧快照回退到同标记。
+    #[serde(default = "default_phi_source_tag")]
+    pub phi_source_tag: String,
+    /// Φ 时间序列 (D2 追加式趋势) — 跨 tick 累积, 每次快照落盘追加当前
+    /// φ 样本 (同一生长周期内重复落盘替换末样本), 上限 TREND_CAP=128。
+    /// 修复前: 快照不含趋势序列, 唯一时间序列来自后台循环内存缓冲整体
+    /// 覆盖写 (`consciousness/trends` 键), 进程重启即归零 (KB 实测每次仅
+    /// 1 个样本点)。`#[serde(default)]` 保证旧快照回退为空序列。
+    #[serde(default)]
+    pub phi_trend: Vec<f64>,
+    /// 相干性时间序列 (D2 追加式趋势) — 语义与 [`CoreSnapshot::phi_trend`]
+    /// 相同, 样本取自 [`CoreSnapshot::coherence`]。
+    #[serde(default)]
+    pub coherence_trend: Vec<f64>,
 }
 
 /// 默认注意力来源 (x.ai 双搜索通道的模型自决模式)。
 fn default_attention_source() -> String {
     "auto".to_string()
+}
+
+/// D1 口径标记缺省值 — 旧快照 (无 phi_source_tag 字段) 反序列化时回退。
+/// 值与 [`PHI_SOURCE_TAG_TREE`] 一致: 该键历史数据全部由本模块树快照写入。
+fn default_phi_source_tag() -> String {
+    PHI_SOURCE_TAG_TREE.to_string()
 }
 
 /// 分支成熟度持久化投影 — maturity 六布尔 + 真实计数 (self_test/module)。
@@ -263,7 +312,10 @@ impl ConsciousnessCoreHandle {
             self.tree.trunk.resonance_cycle = base_cycle + advance;
         }
         self.snapshot = core_snapshot_from_tree(&self.tree);
-        let _ = persist_snapshot(&self.snapshot);
+        // 回填合并视图 (含 D2 追加后的趋势序列), 使返回快照与 KB 落盘一致
+        if let Ok(merged) = persist_snapshot(&self.snapshot) {
+            self.snapshot = merged;
+        }
         self.snapshot.clone()
     }
 }
@@ -279,7 +331,9 @@ pub fn status() -> CoreSnapshot {
             h.snapshot = core_snapshot_from_tree(&h.tree);
             // 补算出的真实 φ 写回持久化快照, 使后续新建进程从 KB 直接读到真实值
             if recomputed {
-                let _ = persist_snapshot(&h.snapshot);
+                if let Ok(merged) = persist_snapshot(&h.snapshot) {
+                    h.snapshot = merged;
+                }
             }
             h.snapshot.clone()
         })
@@ -301,7 +355,9 @@ pub fn apply_branch_health_from_self_tests(
     let mut h = CORE.write().unwrap_or_else(|e| e.into_inner());
     h.tree.set_branch_health_from_self_tests(results);
     h.snapshot = core_snapshot_from_tree(&h.tree);
-    let _ = persist_snapshot(&h.snapshot);
+    if let Ok(merged) = persist_snapshot(&h.snapshot) {
+        h.snapshot = merged;
+    }
 }
 
 /// 每分支以上实时雾加权和 (只读) — 反映当前进程接线状态, 非持久化快照。
@@ -418,6 +474,12 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
         compliance_execution_count: tree.trunk.governance_constitution_count as u64,
         // spec-kit SDD constitution → 宪法门控执行计数 (MARS System 2 迭代 = 门控检查)
         constitution_check_count: tree.trunk.mars_system2_iterations,
+        // D1 口径标记: 本快照 phi/coherence 为 NT-CORE 树口径 (见字段文档)。
+        // 趋势序列 (phi_trend/coherence_trend) 不在此填充 — 由 persist_snapshot
+        // 在持久层读旧值→追加 (单一事实源, 避免内存视图与落盘序列分叉)。
+        phi_source_tag: PHI_SOURCE_TAG_TREE.to_string(),
+        phi_trend: Vec::new(),
+        coherence_trend: Vec::new(),
     }
 }
 
@@ -529,6 +591,22 @@ fn branch_kind_from_str(s: &str) -> BranchKind {
 const NAMESPACE: &str = "consciousness";
 const KEY: &str = "core";
 
+/// D1 口径标记常量 — NT-CORE 树快照口径 (见 [`CoreSnapshot::phi_source_tag`])。
+const PHI_SOURCE_TAG_TREE: &str = "tree_snapshot_iit";
+/// D3 金标键 — 与后台循环 handlers_consciousness.rs 写入点共用同一键名。
+const GOLD_STANDARD_KEY: &str = "gold_standard";
+/// D3 来源标注 — 区分本模块真实度量流刷新与后台循环监视器口径写入。
+const GOLD_STANDARD_SOURCE_CORE: &str = "core_snapshot";
+/// D2 趋势序列上限 — 跨 tick 追加式时间序列的最大样本数。
+const TREND_CAP: usize = 128;
+/// 金标双阈值本地镜像 — 单一事实源是 src/neotrix/l9_transcendent_impl/
+/// nt_mind_consciousness_gold_standard.rs 的 DEFAULT_PHI_THRESHOLD /
+/// DEFAULT_COHERENCE_THRESHOLD。生产代码不直连原因: arch_fitness_core_boundary
+/// 守卫禁止 core 生产代码引用 l9_transcendent_impl; 对齐由测试
+/// gold_standard_thresholds_match_single_source 锁定 (漂移即红)。
+const GOLD_STANDARD_PHI_THRESHOLD: f64 = 0.33;
+const GOLD_STANDARD_COHERENCE_THRESHOLD: f64 = 0.7;
+
 /// 打开 KB 连接 (默认 `~/.neotrix/knowledge.db`), 复用 NT-MEMORY 统一 schema 初始化。
 /// 单一 schema 事实源: 不在此处维护 kv_store 本地 DDL, 避免漂移。
 fn open_kb() -> Result<rusqlite::Connection, String> {
@@ -552,19 +630,101 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
 }
 fn load_snapshot() -> Option<CoreSnapshot> {
     let conn = open_kb().ok()?;
-    let raw = crate::core::nt_core_kb_primitives::kv_get(
-        &conn, NAMESPACE, KEY,
-    )
-    .ok()??;
+    load_snapshot_from_conn(&conn)
+}
+
+/// 连接注入版快照读取 — 供 persist 合并与测试复用 (同一连接, 单一事实源)。
+fn load_snapshot_from_conn(conn: &rusqlite::Connection) -> Option<CoreSnapshot> {
+    let raw =
+        crate::core::nt_core_kb_primitives::kv_get(conn, NAMESPACE, KEY).ok()??;
     serde_json::from_str(&raw).ok()
 }
 
-fn persist_snapshot(snap: &CoreSnapshot) -> Result<(), String> {
+/// 持久化核心快照, 返回**实际落盘**的合并视图 (含 D2 追加后的趋势序列)。
+fn persist_snapshot(snap: &CoreSnapshot) -> Result<CoreSnapshot, String> {
     let conn = open_kb()?;
-    let json = serde_json::to_string(snap).map_err(|e| format!("snapshot serialize: {}", e))?;
-    crate::core::nt_core_kb_primitives::kv_set(
-        &conn, NAMESPACE, KEY, &json,
-    )
+    persist_snapshot_to_conn(&conn, snap)
+}
+
+/// 连接注入版持久化 — 落盘前完成 D2 趋势追加 + D3 金标键刷新。
+fn persist_snapshot_to_conn(
+    conn: &rusqlite::Connection,
+    snap: &CoreSnapshot,
+) -> Result<CoreSnapshot, String> {
+    let mut out = snap.clone();
+    // D2 追加式趋势序列: 读旧值 → 追加 → 截断到 TREND_CAP。
+    // 此前快照不含趋势序列, 时间序列只能依赖后台循环内存缓冲整体覆盖写
+    // (进程重启即归零, KB 实测每次仅 1 个样本点)。同周期重复落盘 (status
+    // 惰性核算回写 / apply_branch_health 刷新) 替换末样本而非重复追加,
+    // 保证一个生长周期至多贡献一个样本点。
+    let (prev_phi_hist, prev_coh_hist, prev_cycle) = match load_snapshot_from_conn(conn)
+    {
+        Some(prev) => (prev.phi_trend, prev.coherence_trend, Some(prev.cycle)),
+        None => (Vec::new(), Vec::new(), None),
+    };
+    out.phi_trend = merge_trend_sample(prev_phi_hist, prev_cycle, snap.cycle, snap.phi);
+    out.coherence_trend =
+        merge_trend_sample(prev_coh_hist, prev_cycle, snap.cycle, snap.coherence);
+    let json = serde_json::to_string(&out).map_err(|e| format!("snapshot serialize: {}", e))?;
+    crate::core::nt_core_kb_primitives::kv_set(conn, NAMESPACE, KEY, &json)?;
+    // D3: 金标键接到真实度量流 (尽力而为, 失败不阻断快照落盘)
+    refresh_gold_standard(conn, &out);
+    Ok(out)
+}
+
+/// D2 趋势采样合并 — 追加当前样本; 同生长周期重复落盘替换末样本
+/// (一周期一点); 超过 TREND_CAP 截断最老样本。纯函数, 测试直连。
+fn merge_trend_sample(
+    mut hist: Vec<f64>,
+    prev_cycle: Option<u64>,
+    cur_cycle: u64,
+    value: f64,
+) -> Vec<f64> {
+    match (hist.last_mut(), prev_cycle) {
+        (Some(last), Some(c)) if c == cur_cycle => *last = value,
+        _ => hist.push(value),
+    }
+    if hist.len() > TREND_CAP {
+        let excess = hist.len() - TREND_CAP;
+        hist.drain(..excess);
+    }
+    hist
+}
+
+/// D3 接线: core 快照落盘时同步刷新 `consciousness/gold_standard`。
+///
+/// 修复前: 该键唯一写点是后台循环 handle_awareness (handlers_consciousness.rs),
+/// 其输入是退化的 4 元状态向量 [phi, coherence, level, health] 直塞
+/// IITPhiCalculator → 持久化值恒为占位 (实测 phi=0.0 / coherence=0.1,
+/// detection_streak 恒 0), 从未反映真实度量。写点本身存在且 T3 接线,
+/// 但口径失真且无法在本文件内修正其输入 → 按修复方案把键接到已有真实
+/// 度量流 (树快照的 compute_iit_phi/compute_coherence 产物), 带
+/// `calibrated:true` 与 `source:"core_snapshot"` 标注; 字段为
+/// GoldStandardReport 投影的超集 (只增不改名), 不破坏既有消费方。
+fn refresh_gold_standard(conn: &rusqlite::Connection, snap: &CoreSnapshot) {
+    let is_phi_conscious = snap.phi > GOLD_STANDARD_PHI_THRESHOLD;
+    let is_coherent = snap.coherence > GOLD_STANDARD_COHERENCE_THRESHOLD;
+    let gs = serde_json::json!({
+        "phi": snap.phi,
+        "coherence": snap.coherence,
+        "is_phi_conscious": is_phi_conscious,
+        "is_coherent": is_coherent,
+        "is_conscious_like": is_phi_conscious && is_coherent,
+        "phi_confidence": snap.phi.clamp(0.0, 1.0),
+        "coherence_confidence": snap.coherence.clamp(0.0, 1.0),
+        "phi_threshold": GOLD_STANDARD_PHI_THRESHOLD,
+        "coherence_threshold": GOLD_STANDARD_COHERENCE_THRESHOLD,
+        "calibrated": true,
+        "source": GOLD_STANDARD_SOURCE_CORE,
+        "cycle": snap.cycle,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    });
+    let _ = crate::core::nt_core_kb_primitives::kv_set(
+        conn,
+        NAMESPACE,
+        GOLD_STANDARD_KEY,
+        &gs.to_string(),
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1937,6 +2097,179 @@ mod tests {
             );
             write_test_baseline(0); // 清理
         });
+    }
+
+    // ─── F1 意识度量链修复回归 (D1 双口径标记 / D2 趋势追加 / D3 金标校准) ───
+
+    /// 清空隔离 DB 中的度量链键, 使趋势断言不受其他测试遗留历史影响。
+    fn clear_metric_chain_keys() {
+        let conn = open_kb().expect("open kb");
+        conn.execute(
+            "DELETE FROM kv_store WHERE namespace='consciousness' AND key IN ('core','gold_standard')",
+            [],
+        )
+        .expect("clear metric chain keys");
+    }
+
+    #[test]
+    fn trends_append_across_two_snapshots() {
+        // D2 回归: 连续两次快照落盘后, phi_trend/coherence_trend 长度必须为 2
+        // (修复前每次写盘都是无历史的单样本覆盖, 序列无法跨 tick 累积)。
+        with_kb_lock(|| {
+            isolate_home_once();
+            clear_metric_chain_keys();
+            let s1 = CoreSnapshot {
+                cycle: 101,
+                phi: 0.40,
+                coherence: 0.60,
+                ..Default::default()
+            };
+            let m1 = persist_snapshot(&s1).expect("persist #1");
+            assert_eq!(m1.phi_trend.len(), 1, "首次落盘应产生 1 个样本");
+            let s2 = CoreSnapshot {
+                cycle: 102,
+                phi: 0.50,
+                coherence: 0.70,
+                ..Default::default()
+            };
+            let m2 = persist_snapshot(&s2).expect("persist #2");
+            assert_eq!(m2.phi_trend, vec![0.40, 0.50], "连续两次快照 → 长度 2 且按序累积");
+            assert_eq!(m2.coherence_trend, vec![0.60, 0.70]);
+            // 从 KB 读回验证真实持久化 (不信返回值)
+            let reloaded = load_snapshot().expect("reload after two persists");
+            assert_eq!(reloaded.phi_trend.len(), 2);
+            assert_eq!(reloaded.coherence_trend.len(), 2);
+        });
+    }
+
+    #[test]
+    fn trends_same_cycle_rewrite_replaces_last_sample() {
+        // D2 同周期去重: status 惰性核算回写 / apply_branch_health 刷新等
+        // 同周期重复落盘必须替换末样本, 不使序列膨胀 (一周期一点)。
+        with_kb_lock(|| {
+            isolate_home_once();
+            clear_metric_chain_keys();
+            let s1 = CoreSnapshot {
+                cycle: 201,
+                phi: 0.30,
+                coherence: 0.50,
+                ..Default::default()
+            };
+            let m1 = persist_snapshot(&s1).expect("persist #1");
+            assert_eq!(m1.phi_trend, vec![0.30]);
+            let s1b = CoreSnapshot {
+                cycle: 201,
+                phi: 0.35,
+                coherence: 0.55,
+                ..Default::default()
+            };
+            let m2 = persist_snapshot(&s1b).expect("persist same-cycle rewrite");
+            assert_eq!(m2.phi_trend.len(), 1, "同周期重写不得追加");
+            assert!((m2.phi_trend[0] - 0.35).abs() < 1e-12, "末样本应被新值替换");
+            assert!((m2.coherence_trend[0] - 0.55).abs() < 1e-12);
+        });
+    }
+
+    #[test]
+    fn trends_truncate_to_cap_128() {
+        // D2 上限: 超过 TREND_CAP=128 后截断最老样本 (保留最近 128 个)。
+        with_kb_lock(|| {
+            isolate_home_once();
+            clear_metric_chain_keys();
+            let conn = open_kb().expect("open kb");
+            let mut merged = None;
+            for i in 0..130u64 {
+                let s = CoreSnapshot {
+                    cycle: 300 + i,
+                    phi: i as f64 / 1000.0,
+                    coherence: 0.5,
+                    ..Default::default()
+                };
+                merged = Some(persist_snapshot_to_conn(&conn, &s).expect("persist loop"));
+            }
+            let m = merged.expect("at least one persist");
+            assert_eq!(m.phi_trend.len(), TREND_CAP, "序列应截断到 128");
+            // 最老两个样本 (i=0,1) 被丢弃: 首元素应为 i=2 的 0.002
+            assert!((m.phi_trend[0] - 0.002).abs() < 1e-12, "最老样本应被截断");
+            assert!(
+                (m.phi_trend[TREND_CAP - 1] - 0.129).abs() < 1e-12,
+                "最新样本保留在末尾"
+            );
+        });
+    }
+
+    #[test]
+    fn dual_phi_source_tag_present_and_backward_compatible() {
+        // D1 (b) 方案: core 快照必须带口径标记区分树快照 vs 监视器报告;
+        // 旧格式快照 (无此字段) 经 serde default 回退同标记, 不阻断反序列化。
+        let tree = ConsciousnessTree::new();
+        let snap = core_snapshot_from_tree(&tree);
+        assert_eq!(snap.phi_source_tag, PHI_SOURCE_TAG_TREE);
+        let json = serde_json::to_string(&snap).unwrap();
+        assert!(
+            json.contains("\"phi_source_tag\":\"tree_snapshot_iit\""),
+            "快照 JSON 必须含口径标记: {}",
+            &json[..json.len().min(200)]
+        );
+        // 模拟旧格式快照: 完整快照剥除三个新增字段 → 反序列化回退默认值
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let obj = v.as_object_mut().unwrap();
+        obj.remove("phi_source_tag");
+        obj.remove("phi_trend");
+        obj.remove("coherence_trend");
+        let legacy: CoreSnapshot =
+            serde_json::from_str(&v.to_string()).expect("legacy snapshot parse");
+        assert_eq!(legacy.phi_source_tag, PHI_SOURCE_TAG_TREE);
+        assert!(legacy.phi_trend.is_empty());
+    }
+
+    #[test]
+    fn gold_standard_refreshed_calibrated_on_core_persist() {
+        // D3 回归: core 快照落盘同步刷新 gold_standard 键 — 占位数据
+        // (phi=0.0/coherence=0.1) 被 calibrated 真实度量取代, 带 source 标注。
+        with_kb_lock(|| {
+            isolate_home_once();
+            clear_metric_chain_keys();
+            let s = CoreSnapshot {
+                cycle: 401,
+                phi: 0.60,
+                coherence: 0.80,
+                ..Default::default()
+            };
+            persist_snapshot(&s).expect("persist");
+            let conn = open_kb().expect("open kb");
+            let raw = crate::core::nt_core_kb_primitives::kv_get(
+                &conn,
+                NAMESPACE,
+                GOLD_STANDARD_KEY,
+            )
+            .ok()
+            .flatten()
+            .expect("gold_standard key must exist after core persist");
+            let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+            assert_eq!(v["calibrated"], serde_json::Value::Bool(true));
+            assert_eq!(v["source"], GOLD_STANDARD_SOURCE_CORE);
+            assert!(
+                (v["phi"].as_f64().unwrap() - 0.60).abs() < 1e-12,
+                "金标 φ 应取自核心快照真实度量"
+            );
+            assert!((v["coherence"].as_f64().unwrap() - 0.80).abs() < 1e-12);
+            assert_eq!(v["is_phi_conscious"], serde_json::Value::Bool(true));
+            assert_eq!(v["is_coherent"], serde_json::Value::Bool(true));
+            assert_eq!(v["is_conscious_like"], serde_json::Value::Bool(true));
+            assert_eq!(v["cycle"], 401);
+        });
+    }
+
+    #[test]
+    fn gold_standard_thresholds_match_single_source() {
+        // 本地镜像阈值与金标模块单一事实源对齐 (arch_fitness_core_boundary
+        // 守卫禁止生产代码直连 l9, 对齐由本测试锁定, 漂移即红)。
+        use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
+            DEFAULT_COHERENCE_THRESHOLD, DEFAULT_PHI_THRESHOLD,
+        };
+        assert_eq!(GOLD_STANDARD_PHI_THRESHOLD, DEFAULT_PHI_THRESHOLD);
+        assert_eq!(GOLD_STANDARD_COHERENCE_THRESHOLD, DEFAULT_COHERENCE_THRESHOLD);
     }
 
     #[test]
