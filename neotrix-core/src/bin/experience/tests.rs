@@ -96,160 +96,192 @@
     }
 
     // ─── R-P97: absorb-node 测试 ──────────────────────────────
-    fn node_test_db() -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE nodes (
-                id TEXT PRIMARY KEY, node_type TEXT NOT NULL, title TEXT NOT NULL,
-                summary TEXT, content TEXT, url TEXT, domain TEXT,
-                language TEXT DEFAULT 'en', confidence REAL DEFAULT 1.0,
-                importance REAL DEFAULT 0.5, created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL, access_count INTEGER DEFAULT 0,
-                metadata TEXT, data_tier TEXT NOT NULL DEFAULT 'core',
-                temporal TEXT, supersedes TEXT, source_episode TEXT,
-                tier TEXT NOT NULL DEFAULT 'warm');
-             CREATE VIRTUAL TABLE nodes_fts USING fts5(title, summary, content, domain);",
-        )
-        .unwrap();
-        conn
+    /// [根因 a] 82d06141 起 cmd_absorb_node 经 KnowledgeBase::open(None) 写
+    /// $HOME/.neotrix/knowledge.db (不再直写传入 conn) — 旧 node_test_db() 内存库
+    /// 恒空且写路径污染生产 KB (失败日志: fresh 库上报 "duplicate ... hub=true")。
+    /// 正确语义: HOME 重定向到每测试独立临时目录, 断言 conn 打开同一 KB 文件。
+    /// 本 bin 仅这 4 个测试触碰 HOME: 本地锁串行化防 set_var 进程级竞态
+    /// (lib 的 TEST_ENV_LOCK 为 #[cfg(test)], bin 测试不可见; 跨测试进程 env 不共享)。
+    fn with_isolated_kb_home(name: &str, f: impl FnOnce(&Connection)) {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let home = std::env::temp_dir().join(format!(
+            "nt-experience-node-test-{}-{}",
+            name,
+            std::process::id()
+        ));
+        std::fs::create_dir_all(home.join(".neotrix")).expect("create temp home");
+        std::env::set_var("HOME", &home);
+        let conn = Connection::open(home.join(".neotrix").join("knowledge.db"))
+            .expect("open isolated kb file");
+        crate::nt_memory_schema::initialize(&conn).expect("init isolated schema");
+        f(&conn);
+        drop(conn);
+        std::fs::remove_dir_all(&home).ok();
     }
 
     #[test]
     fn test_absorb_node_insert_and_fts() {
-        let conn = node_test_db();
-        let node = json!({
-            "url": "https://example.github.io/demo/",
-            "title": "Demo Page",
-            "summary": "A test article",
-            "content": "This is a test article body with enough length to be meaningful for the FTS index.",
-            "node_type": "article",
-            "language": "en",
-            "domain": "example.github.io",
-            "importance": 0.7,
+        with_isolated_kb_home("insert_and_fts", |conn| {
+            let node = json!({
+                "url": "https://example.github.io/demo/",
+                "title": "Demo Page",
+                "summary": "A test article",
+                "content": "This is a test article body with enough length to be meaningful for the FTS index.",
+                "node_type": "article",
+                "language": "en",
+                "domain": "example.github.io",
+                "importance": 0.7,
+            });
+            // 写临时文件 (cmd_absorb_node 读文件)
+            let path = std::env::temp_dir().join(format!("nt_test_node_{}.json", std::process::id()));
+            std::fs::write(&path, node.to_string()).unwrap();
+            let dry_run = false;
+            let apply_cap = false;
+            cmd_absorb_node(conn, path.to_str().unwrap(), dry_run, apply_cap);
+            // 节点已写入 (按 title 定域: ensure_hub 的 KB-<DOMAIN> 枢纽同表落盘)
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes WHERE title='Demo Page'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 1, "node inserted");
+            // FTS 已同步 (防 PA011 desync; title 定域隔离枢纽行)
+            let fts_count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes_fts WHERE title='Demo Page'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(fts_count, 1, "FTS row inserted");
+            // [根因 b] id 由管道 uuid::new_v4 派生 (batch_ 前缀为旧裸 SQL 方案, 82d06141 移除)
+            let id: String = conn
+                .query_row("SELECT id FROM nodes WHERE title='Demo Page'", [], |r| r.get(0))
+                .unwrap();
+            assert!(!id.is_empty(), "pipeline-derived node id must be non-empty");
+            std::fs::remove_file(&path).ok();
         });
-        // 写临时文件 (cmd_absorb_node 读文件)
-        let path = std::env::temp_dir().join("nt_test_node.json");
-        std::fs::write(&path, node.to_string()).unwrap();
-        let dry_run = false;
-        let apply_cap = false;
-        cmd_absorb_node(&conn, path.to_str().unwrap(), dry_run, apply_cap);
-        // 节点已写入
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(count, 1, "node inserted");
-        // FTS 已同步 (防 PA011 desync)
-        let fts_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes_fts", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(fts_count, 1, "FTS row inserted");
-        // id 前缀 batch_
-        let id: String = conn
-            .query_row("SELECT id FROM nodes LIMIT 1", [], |r| r.get(0))
-            .unwrap();
-        assert!(id.starts_with("batch_"), "id prefix batch_: {}", id);
-        std::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn test_absorb_node_duplicate_dedup() {
-        let conn = node_test_db();
-        let node = json!({
-            "url": "https://example.github.io/demo/",
-            "title": "Demo Page",
-            "content": "Same URL must be deduplicated.",
-            "node_type": "article",
+        with_isolated_kb_home("duplicate_dedup", |conn| {
+            let node = json!({
+                "url": "https://example.github.io/demo/",
+                "title": "Demo Page",
+                "content": "Same URL must be deduplicated.",
+                "node_type": "article",
+            });
+            let path = std::env::temp_dir().join(format!("nt_test_node2_{}.json", std::process::id()));
+            std::fs::write(&path, node.to_string()).unwrap();
+            cmd_absorb_node(conn, path.to_str().unwrap(), false, false);
+            cmd_absorb_node(conn, path.to_str().unwrap(), false, false);
+            // title 定域: 隔离 ensure_hub 枢纽行, 只计内容节点
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes WHERE title='Demo Page'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 1, "duplicate URL must not double-insert");
+            let fts_count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes_fts WHERE title='Demo Page'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(fts_count, 1, "FTS also deduplicated");
+            std::fs::remove_file(&path).ok();
         });
-        let path = std::env::temp_dir().join("nt_test_node2.json");
-        std::fs::write(&path, node.to_string()).unwrap();
-        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
-        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(count, 1, "duplicate URL must not double-insert");
-        let fts_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes_fts", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(fts_count, 1, "FTS also deduplicated");
-        std::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn test_absorb_node_dry_run_and_capability() {
-        let conn = node_test_db();
-        let node = json!({
-            "url": "https://example.github.io/cap/",
-            "title": "Cap Page",
-            "content": "Capability mapping test node with sufficient content length.",
-            "node_type": "article",
-            "capability": {"branch": "NT-MIND", "capability": "generate", "evidence": "test"},
+        with_isolated_kb_home("dry_run_capability", |conn| {
+            let node = json!({
+                "url": "https://example.github.io/cap/",
+                "title": "Cap Page",
+                "content": "Capability mapping test node with sufficient content length.",
+                "node_type": "article",
+                "capability": {"branch": "NT-MIND", "capability": "generate", "evidence": "test"},
+            });
+            let path = std::env::temp_dir().join(format!("nt_test_node3_{}.json", std::process::id()));
+            std::fs::write(&path, node.to_string()).unwrap();
+            // dry-run: 不写入
+            cmd_absorb_node(conn, path.to_str().unwrap(), true, false);
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nodes WHERE title='Cap Page'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "dry-run must not insert");
+            // 实际写入 + capability (url 为 normalize_url 归一形: 去尾斜杠)
+            cmd_absorb_node(conn, path.to_str().unwrap(), false, true);
+            let meta: String = conn
+                .query_row("SELECT metadata FROM nodes WHERE url='https://example.github.io/cap'",
+                           [], |r| r.get(0))
+                .unwrap();
+            let m: Value = serde_json::from_str(&meta).unwrap();
+            assert_eq!(m["absorbed_capability"]["branch"], "NT-MIND");
+            assert_eq!(m["absorbed_capability"]["capability"], "generate");
+            assert_eq!(m["absorbed_capability"]["evidence"], "test");
+            std::fs::remove_file(&path).ok();
         });
-        let path = std::env::temp_dir().join("nt_test_node3.json");
-        std::fs::write(&path, node.to_string()).unwrap();
-        // dry-run: 不写入
-        cmd_absorb_node(&conn, path.to_str().unwrap(), true, false);
-        let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
-            .unwrap();
-        assert_eq!(count, 0, "dry-run must not insert");
-        // 实际写入 + capability
-        cmd_absorb_node(&conn, path.to_str().unwrap(), false, true);
-        let meta: String = conn
-            .query_row("SELECT metadata FROM nodes WHERE url='https://example.github.io/cap/'",
-                       [], |r| r.get(0))
-            .unwrap();
-        let m: Value = serde_json::from_str(&meta).unwrap();
-        assert_eq!(m["absorbed_capability"]["branch"], "NT-MIND");
-        assert_eq!(m["absorbed_capability"]["capability"], "generate");
-        assert_eq!(m["absorbed_capability"]["evidence"], "test");
-        std::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn test_update_node_metadata_merge_and_dry_run() {
-        let conn = node_test_db();
-        // 先插入一个带初始 metadata 的节点
-        let node = json!({
-            "url": "https://example.github.io/meta/",
-            "title": "Meta Page",
-            "content": "Metadata update test node with sufficient content length.",
-            "node_type": "article",
-            "meta": {"existing": "keep-me"},
+        with_isolated_kb_home("update_metadata", |conn| {
+            // 先插入一个带初始 metadata 的节点
+            let node = json!({
+                "url": "https://example.github.io/meta/",
+                "title": "Meta Page",
+                "content": "Metadata update test node with sufficient content length.",
+                "node_type": "article",
+                "meta": {"existing": "keep-me"},
+            });
+            let path = std::env::temp_dir().join(format!("nt_test_meta_node_{}.json", std::process::id()));
+            std::fs::write(&path, node.to_string()).unwrap();
+            cmd_absorb_node(conn, path.to_str().unwrap(), false, false);
+            // [根因 b] title 定域取内容节点 id — LIMIT 1 可能命中后插入的枢纽行
+            let nid: String = conn
+                .query_row("SELECT id FROM nodes WHERE title='Meta Page'", [], |r| r.get(0))
+                .unwrap();
+            std::fs::remove_file(&path).ok();
+
+            // dry-run: 不写入
+            let updates = json!([{
+                "node_id": nid,
+                "patch": {"absorbed_capability": {"branch": "NT-ACT", "capability": "execute"}}
+            }]);
+            let up = std::env::temp_dir().join(format!("nt_test_update_{}.json", std::process::id()));
+            std::fs::write(&up, updates.to_string()).unwrap();
+            cmd_update_node_metadata(conn, up.to_str().unwrap(), true);
+            let meta: String = conn
+                .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
+                .unwrap();
+            let m: Value = serde_json::from_str(&meta).unwrap();
+            assert_eq!(m["existing"], "keep-me", "dry-run must not modify metadata");
+            assert!(m.get("absorbed_capability").is_none(), "dry-run must not add capability");
+
+            // 实际写入: 合并 patch, 保留既有字段
+            cmd_update_node_metadata(conn, up.to_str().unwrap(), false);
+            let meta: String = conn
+                .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
+                .unwrap();
+            let m: Value = serde_json::from_str(&meta).unwrap();
+            assert_eq!(m["existing"], "keep-me", "existing metadata preserved");
+            assert_eq!(m["absorbed_capability"]["branch"], "NT-ACT");
+            assert_eq!(m["absorbed_capability"]["capability"], "execute");
+            std::fs::remove_file(&up).ok();
         });
-        let path = std::env::temp_dir().join("nt_test_meta_node.json");
-        std::fs::write(&path, node.to_string()).unwrap();
-        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
-        let nid: String = conn
-            .query_row("SELECT id FROM nodes LIMIT 1", [], |r| r.get(0))
-            .unwrap();
-        std::fs::remove_file(&path).ok();
-
-        // dry-run: 不写入
-        let updates = json!([{
-            "node_id": nid,
-            "patch": {"absorbed_capability": {"branch": "NT-ACT", "capability": "execute"}}
-        }]);
-        let up = std::env::temp_dir().join("nt_test_update.json");
-        std::fs::write(&up, updates.to_string()).unwrap();
-        cmd_update_node_metadata(&conn, up.to_str().unwrap(), true);
-        let meta: String = conn
-            .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
-            .unwrap();
-        let m: Value = serde_json::from_str(&meta).unwrap();
-        assert_eq!(m["existing"], "keep-me", "dry-run must not modify metadata");
-        assert!(m.get("absorbed_capability").is_none(), "dry-run must not add capability");
-
-        // 实际写入: 合并 patch, 保留既有字段
-        cmd_update_node_metadata(&conn, up.to_str().unwrap(), false);
-        let meta: String = conn
-            .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
-            .unwrap();
-        let m: Value = serde_json::from_str(&meta).unwrap();
-        assert_eq!(m["existing"], "keep-me", "existing metadata preserved");
-        assert_eq!(m["absorbed_capability"]["branch"], "NT-ACT");
-        assert_eq!(m["absorbed_capability"]["capability"], "execute");
-        std::fs::remove_file(&up).ok();
     }
 
     #[test]

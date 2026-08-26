@@ -1684,6 +1684,30 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
         let report = kb.absorb_core(&entry).expect("absorb_core pipeline");
         if report.created {
             inserted += 1;
+            // [根因 d] 82d06141 薄壳化回归: AbsorbEntry 无 metadata 通道, 输入 meta
+            // 不再随 INSERT 落库 (违背本函数步骤 6 "保留输入 meta 字段" 契约)。
+            // 读改写合并补齐, 同时保留管道写入的 ingest_index。
+            let db_meta: Option<String> = conn
+                .query_row(
+                    "SELECT metadata FROM nodes WHERE id=?1",
+                    params![report.node_id],
+                    |r| r.get(0),
+                )
+                .ok();
+            let mut merged: Map<String, Value> = db_meta
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok())
+                .unwrap_or_default();
+            if let Some(obj) = meta.as_object() {
+                for (k, val) in obj {
+                    merged.insert(k.clone(), val.clone());
+                }
+            }
+            conn.execute(
+                "UPDATE nodes SET metadata=?1 WHERE id=?2",
+                params![Value::Object(merged).to_string(), report.node_id],
+            )
+            .expect("persist input meta");
         } else {
             duplicated += 1;
         }
