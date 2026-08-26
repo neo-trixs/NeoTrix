@@ -9,6 +9,9 @@ const GlobeView = lazy(() => import('./components/GlobeView').then((m) => ({ def
 const KnowledgeBase = lazy(() => import('./routes/KnowledgeBase').then((m) => ({ default: m.KnowledgeBase })))
 const Marketplace = lazy(() => import('./routes/Marketplace').then((m) => ({ default: m.Marketplace })))
 const Insights = lazy(() => import('./routes/Insights').then((m) => ({ default: m.Insights })))
+const Skills = lazy(() => import('./routes/Skills').then((m) => ({ default: m.Skills })))
+const MemoryManager = lazy(() => import('./routes/MemoryManager').then((m) => ({ default: m.MemoryManager })))
+const Workflows = lazy(() => import('./routes/Workflows').then((m) => ({ default: m.Workflows })))
 
 function GlobeRoute() {
   return <GlobeView limit={5000} height={700} />
@@ -36,6 +39,9 @@ export default function App() {
             <Route path="/kb" component={KnowledgeBase} />
             <Route path="/plugins" component={Marketplace} />
             <Route path="/insights" component={Insights} />
+            <Route path="/skills" component={Skills} />
+            <Route path="/memory" component={MemoryManager} />
+            <Route path="/workflows" component={Workflows} />
           </Router>
         </ErrorBoundary>
       </Suspense>

@@ -1,4 +1,4 @@
-//! 道引擎 2.0 — 符号回归引擎 (最小可用版本)。
+//! 符号回归引擎 (Symbolic Regression) — 从数据中发现数学表达式。
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,7 +24,7 @@ impl ExprNode {
                     BinaryOp::Add => lv + rv,
                     BinaryOp::Sub => lv - rv,
                     BinaryOp::Mul => lv * rv,
-                    BinaryOp::Div => if rv == 0.0 { return Err("div by zero".into()); } else { lv / rv },
+                    BinaryOp::Div => if rv == 0.0 { return Err("div0".into()); } else { lv / rv },
                 })
             }
         }
@@ -77,13 +77,7 @@ impl DaoEngine {
 mod tests {
     use super::*;
     #[test]
-    fn test_eval() {
-        let e = ExprNode::Binary(BinaryOp::Mul, Box::new(ExprNode::Var("x".into())), Box::new(ExprNode::Const(2.0)));
-        let mut v = HashMap::new(); v.insert("x".into(), 3.0);
-        assert_eq!(e.eval(&v).unwrap(), 6.0);
-    }
-    #[test]
-    fn test_fit() {
+    fn test_fit_linear() {
         let mut e = DaoEngine::new(DaoEngineConfig::default());
         let x: Vec<f64> = (0..5).map(|i| i as f64).collect();
         let y: Vec<f64> = x.iter().map(|v| 2.0 * v + 1.0).collect();

@@ -50,6 +50,25 @@ impl Default for DaoEngine {
 }
 
 impl DaoEngine {
+    /// 简单线性回归: y = ax + b → 返回表达式字符串
+    pub fn fit_linear(&self, x: &[f64], y: &[f64]) -> Result<String, String> {
+        if x.len() != y.len() || x.len() < 2 {
+            return Err("insufficient data points for linear regression".to_string());
+        }
+        let n = x.len() as f64;
+        let sx: f64 = x.iter().sum();
+        let sy: f64 = y.iter().sum();
+        let sxy: f64 = x.iter().zip(y.iter()).map(|(a, b)| a * b).sum();
+        let sxx: f64 = x.iter().map(|a| a * a).sum();
+        let denom = n * sxx - sx * sx;
+        if denom.abs() < f64::EPSILON {
+            return Err("degenerate data (vertical line)".to_string());
+        }
+        let a = (n * sxy - sx * sy) / denom;
+        let b = (sy - a * sx) / n;
+        Ok(format!("y = {:.4}x + {:.4}", a, b))
+    }
+
     pub fn new() -> Self {
         Self {
             rules: Self::init_rules(),

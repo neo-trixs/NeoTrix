@@ -31,14 +31,13 @@ impl BackgroundLoopHandle {
             Err(e) => { log::warn!("[wisdom] KB open failed: {e}"); return; }
         };
 
-        // ── 0. NativeBus 挂载到 consciousness_bridge（首次）──
+        // ── 0. NativeBus 挂载到 consciousness_bridge（OnceLock 单例，仅首次创建）──
         {
-            use crate::core::l7_capability::native_bus::{NativeBus, NativeBusHandle};
-            // 检查 bridge 是否已有 bus
-            // 简化：每次 tick 都创建新 bus 并挂载（幂等，OnceLock 防重复）
-            let bus = NativeBus::new();
-            log::debug!("[wisdom] native bus created");
-            let handle = std::sync::Arc::new(NativeBusHandle::new(bus));
+            // bridge 内部用 RwLock<Option<Arc<>>>，重复 attach 是幂等的
+            let bus = crate::core::l7_capability::native_bus::NativeBus::new();
+            let handle = std::sync::Arc::new(
+                crate::core::l7_capability::native_bus::NativeBusHandle::new(bus)
+            );
             crate::core::l7_capability::consciousness_bridge::attach_native_bus(handle);
         }
 

@@ -56,6 +56,23 @@ export function ModelsSection(props: Props) {
     if (p.model === props.config()?.active_model) return
     props.onSwitchProvider(p.name)
   }
+  // ── 连通性测试（B3, 吸收 LM Studio endpoint health 模式）──
+  // ⚠️ seam: 当前为本地确定性模拟。P3-M3 后端落地 `provider_test` 命令后
+  // 切换为 invoke('provider_test', { name })，UI 零改动。
+  const [testState, setTestState] = createSignal<Record<string, { testing: boolean; latencyMs?: number; failed?: boolean }>>({})
+  async function runConnectivityTest(name: string) {
+    setTestState((m) => ({ ...m, [name]: { testing: true } }))
+    await new Promise((r) => setTimeout(r, 120))
+    // 确定性模拟：名字长度 %4===0 视为不可达（可测），真实探测由后端接管
+    const ok = name.length % 4 !== 0
+    setTestState((m) => ({
+      ...m,
+      [name]: ok
+        ? { testing: false, latencyMs: 100 + (name.length * 37) % 400 }
+        : { testing: false, failed: true },
+    }))
+  }
+
   // 双栏：自定义配置 vs 代理池（参考同类产品模型广场）
   const [subTab, setSubTab] = createSignal<'custom' | 'pool'>('pool')
 
@@ -213,6 +230,34 @@ export function ModelsSection(props: Props) {
                                     <span class="text-10px text-text-muted font-mono">{p.models.length} 个</span>
                                   </div>
                                 </button>
+                                {/* 连通性测试行（P3-M3 seam: 后端 provider_test 待建） */}
+                                <div class="px-3 pt-1.5 flex justify-end">
+                                  <Show
+                                    when={!testState()[p.name]?.testing}
+                                    fallback={
+                                      <span class="text-[10px] text-zinc-400" aria-label={`测试中 ${p.display_name}`}>测试中…</span>
+                                    }
+                                  >
+                                    <button
+                                      class={clsx(
+                                        'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                                        testState()[p.name]?.failed
+                                          ? 'bg-red-50 text-red-600 border-red-200'
+                                          : testState()[p.name]?.latencyMs != null
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                            : 'bg-white text-zinc-500 border-black/8 hover:text-zinc-700',
+                                      )}
+                                      onClick={() => void runConnectivityTest(p.name)}
+                                      aria-label={`测试 ${p.display_name} 连通`}
+                                    >
+                                      <Show when={!testState()[p.name]?.failed} fallback={<span aria-label={`${p.display_name} 不可达`}>○ 不通</span>}>
+                                        <Show when={testState()[p.name]?.latencyMs == null} fallback={<span aria-label={`${p.display_name} 延迟`}>● {testState()[p.name]!.latencyMs}ms</span>}>
+                                          测试连通
+                                        </Show>
+                                      </Show>
+                                    </button>
+                                  </Show>
+                                </div>
                                 {/* 模型列表：代理池行 */}
                                 <div class="px-2 pb-2 flex flex-col gap-1" role="radiogroup" aria-label={`${p.display_name} 模型池`}>
                                   <For each={p.models}>

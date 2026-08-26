@@ -1,6 +1,6 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { Settings, Archive, RotateCcw, Database, Store, Gauge } from 'lucide-solid'
+import { Settings, Archive, RotateCcw, Database, Store, Gauge, Sparkles, BrainCircuit, Workflow } from 'lucide-solid'
 import { TagBar } from './TagBar'
 import { chatStore } from '../stores/chat'
 
@@ -771,6 +771,33 @@ export function Sidebar(props: SidebarProps) {
             >
               <Gauge class="w-4 h-4" />
               <span>洞察</span>
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              onClick={() => navigate('/skills')}
+              aria-label="技能"
+              title="技能"
+            >
+              <Sparkles class="w-4 h-4" />
+              <span>技能</span>
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              onClick={() => navigate('/memory')}
+              aria-label="记忆"
+              title="记忆"
+            >
+              <BrainCircuit class="w-4 h-4" />
+              <span>记忆</span>
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              onClick={() => navigate('/workflows')}
+              aria-label="工作流"
+              title="工作流"
+            >
+              <Workflow class="w-4 h-4" />
+              <span>流程</span>
             </button>
           </div>
 

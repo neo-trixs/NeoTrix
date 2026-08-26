@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render } from '@solidjs/testing-library'
+import { render, screen, fireEvent } from '@solidjs/testing-library'
 import { createSignal } from 'solid-js'
 import type { ProviderConfig } from '../../api/types'
 import { ModelsSection } from './ModelsSection'
@@ -65,6 +65,23 @@ describe('ModelsSection', () => {
     expect(activeBtn!.getAttribute('aria-checked')).toBe('true')
     activeBtn!.click()
     expect(onSwitch).not.toHaveBeenCalled()
+  })
+
+  it('连通测试：确定性模拟返回延迟标签（B3 seam）', async () => {
+    const utils = mount(baseCfg())
+    const btn = await utils.findByLabelText('测试 本地引擎 连通')
+    fireEvent.click(btn)
+    const ok = await screen.findByLabelText('本地引擎 延迟')
+    expect(ok.textContent).toMatch(/^● \d+ms$/)
+  })
+
+  it('连通测试：%4===0 名字判定不可达', async () => {
+    const cfg = baseCfg()
+    cfg.providers.push({ name: 'Abcd', display_name: '四字服务', category: 'cloud', is_free: false, base_url: '', model: 'm4', models: ['m4'], resolvable: true })
+    const utils = mount(cfg)
+    const btn = await utils.findByLabelText('测试 四字服务 连通')
+    fireEvent.click(btn)
+    expect(await screen.findByLabelText('四字服务 不可达')).toBeTruthy()
   })
 
   it('全部不可用时的空态提示', () => {

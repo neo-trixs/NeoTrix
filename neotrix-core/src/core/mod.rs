@@ -59,8 +59,8 @@ pub mod nt_core_hcube;
 // L4 — 认知层 (Cognition)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l4_cognition;
-pub mod nt_core_dao_engine;
 pub mod nt_core_rule_memory;
+pub mod nt_core_dao_engine;
 pub mod nt_core_meaning;
 pub mod nt_core_paradigm;
 pub mod nt_core_aura;

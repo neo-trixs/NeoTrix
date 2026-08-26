@@ -86,6 +86,8 @@ aes = "0.8"
 num-bigint = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "socks", "rustls-tls"] }
 url = "2"
+urlencoding = "2.1"
+scraper = "0.19"
 rand = "0.8"
 async-trait = "0.1"
 rmcp = { version = "1.4", features = ["server", "macros"] }
