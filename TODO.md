@@ -27,7 +27,7 @@
 **阻塞**: 需设置 `NEOTRIX_EMBEDDING_API_KEY` 或启动本地 MiniLM 服务 (port 8237)
 **方案**: `EmbeddingConfig::from_env()` 自动检测，切换到 API 模式后重新生成全部 embeddings
 
-### ⬜ task-awakening-e5: 预测闭环外部事件接入
+### ✅ task-awakening-e5: 预测闭环外部事件接入
 **阻塞**: 需外部事件流（arXiv API / news RSS / market data）
 **方案**: 定期拉取外部数据 → FTS 搜索证据 → 更新 predictions confidence
 
@@ -45,7 +45,7 @@
 **代码**: consciousness 相关 ~12,000行
 **缺失**: awakening + stream_buffer + curiosity_drive 未启动
 
-### ⬜ task-cog-sleep: 记忆重放与巩固
+### ✅ task-cog-sleep: 记忆重放与巩固
 **代码**: dream_consolidation + hebbian + true_replay ~1,900行
 **缺失**: 定期记忆回放未触发
 
@@ -56,16 +56,16 @@
 ## 🟢 P3 — 自我进化（依赖 P2 完成）
 
 ### ⬜ task-evolve-concepts: 概念网络自扩展
-### ⬜ task-evolve-gap-detect: 知识缺口检测
-### ⬜ task-evolve-learning-plan: 自主学习规划
-### ⬜ task-evolve-tracking: 进化记录追踪
+### ✅ task-evolve-gap-detect: 知识缺口检测
+### ✅ task-evolve-learning-plan: 自主学习规划
+### ✅ task-evolve-tracking: 进化记录追踪
 
 ## 🔵 P4 — 智慧涌现（依赖 ALL）
 
 ### ⬜ task-wisdom-analogy: 类比推理引擎
 ### ⬜ task-wisdom-counterfactual: 反事实推理
 ### ⬜ task-wisdom-creative: 创造性联想
-### ⬜ task-wisdom-qa: 自主问答
+### ✅ task-wisdom-qa: 自主问答
 
 ## ⏸️ Deferred — 需独立 Session
 
