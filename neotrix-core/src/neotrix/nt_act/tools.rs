@@ -836,3 +836,10 @@ mod tests {
         assert!(tools.contains(&"shell_command".to_string()));
     }
 }
+
+
+pub struct ToolExecutor;
+
+impl ToolExecutor {
+    pub fn new() -> Self { Self }
+}

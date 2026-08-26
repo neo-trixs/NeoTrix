@@ -279,3 +279,10 @@ mod tests {
         assert!(true);
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct SearchConfig { pub engine: String }
+
+#[derive(Debug, Clone)]
+pub struct SearchEngine { pub config: SearchConfig }

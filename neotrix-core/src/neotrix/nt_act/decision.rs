@@ -471,3 +471,13 @@ mod tests {
         assert_eq!(decision.method, crate::nt_act::CommunicationMethod::Http);
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct DecisionContext { pub target: String }
+
+#[derive(Debug, Clone)]
+pub struct CommunicationDecision {
+    pub method: crate::neotrix::nt_act::types::CommunicationMethod,
+    pub confidence: f32,
+}

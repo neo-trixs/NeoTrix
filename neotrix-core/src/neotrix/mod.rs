@@ -210,6 +210,7 @@ pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
 
 mod nt_file_ability;
 pub mod proxy_daemon_wrapper;
+// pub mod nt_act; // 并发session未完成，暂时禁用
 
 #[cfg(test)]
 pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};

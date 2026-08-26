@@ -1,5 +1,7 @@
 # NeoTrix TODO 列表
-> 最后更新：2026-08-25 | 觉醒进度：100% (结构) / 功能激活待推进
+> 最后更新：2026-08-26 | 觉醒进度：100% (结构) / 功能激活待推进
+
+> **Batch3 吸收进化 (2026-08-26, 47 源)**: 统一迭代 TODO 见 `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md` — Wave 0 脚本修复 3 项 / Wave 1 接线 4 项 / Wave 2 强化 6 项 / Wave 3 Spike 8 项，与 08-25 主路线图去重合并。执行顺序与验收门以该文件为准。
 
 ## 🔴 P0 — 立即执行（本 session）
 

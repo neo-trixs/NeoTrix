@@ -29,6 +29,7 @@ import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
+import { useNavigate } from '@solidjs/router'
 import { clsx } from 'clsx'
 import { neocodex, system, unified, errText } from '../api'
 import { query } from '../api/query'
@@ -1052,6 +1053,15 @@ export function Chat() {
   }
 
   // ⌘K 命令面板动作（复用既有 handler，单一事实源）
+  // 容错导航: 冒烟测试裸渲染无 Router 上下文, 降级为空操作 (与 Sidebar 同款)
+  let navigate: (to: string) => void
+  try {
+    const n = useNavigate()
+    navigate = (to) => n(to)
+  } catch {
+    navigate = () => {}
+  }
+
   const paletteCommands: PaletteCommand[] = [
     { id: 'new', label: '新建对话', desc: '开启一段新对话', keywords: ['new', '新建', '对话'], run: () => chatStore.addSession() },
     { id: 'clear', label: '清除会话', desc: '清空当前会话全部消息', keywords: ['clear', '清除', '清空'], run: () => { chatStore.clearMessages(); setMentionRefs([]) } },
@@ -1062,6 +1072,13 @@ export function Chat() {
     { id: 'mode', label: '切换权限模式', desc: '自动 / 手动 / 接受编辑 / 规划', keywords: ['mode', '权限', '模式'], run: () => cyclePermissionMode() },
     { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '帮助', '快捷键'], run: () => runSlash(SLASH_COMMANDS[3]) },
     { id: 'settings', label: '打开设置', desc: '提供商配置与应用设置', keywords: ['settings', '设置', '配置'], run: () => setSettingsOpen(true) },
+    // ── Phase4 页面动作 (⌘数字 同源) ──
+    { id: 'page-kb', label: '打开知识库', desc: '文档库管理与检索', keywords: ['kb', '知识库', '页面'], run: () => navigate('/kb') },
+    { id: 'page-plugins', label: '打开插件市场', desc: '插件安装与管理', keywords: ['plugins', '插件', '市场'], run: () => navigate('/plugins') },
+    { id: 'page-insights', label: '打开洞察', desc: '成本与活动仪表盘', keywords: ['insights', '洞察', '成本'], run: () => navigate('/insights') },
+    { id: 'page-skills', label: '打开技能中心', desc: '已安装技能浏览与搜索', keywords: ['skills', '技能'], run: () => navigate('/skills') },
+    { id: 'page-memory', label: '打开记忆管理', desc: '记忆统计/时间线/搜索', keywords: ['memory', '记忆'], run: () => navigate('/memory') },
+    { id: 'page-workflows', label: '打开工作流', desc: '工作流列表与运行', keywords: ['workflow', '工作流', '流程'], run: () => navigate('/workflows') },
     ...unifiedCliCmds(),
   ]
 

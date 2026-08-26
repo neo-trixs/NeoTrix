@@ -261,3 +261,14 @@ mod tests {
         assert_eq!(config.transport, crate::nt_act::McpTransport::Stdio);
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct McpServer {
+    pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct McpConfig {
+    pub server_url: String,
+}

@@ -1,6 +1,48 @@
 //! HTTP Client with retry, circuit breaker, rate limiting
 
 use std::sync::Arc;
+
+use std::sync::Arc;
+
+#[derive(Debug, Clone)]
+pub struct HttpClientConfig {
+    pub base_url: String,
+    pub timeout_secs: u64,
+    pub max_retries: u32,
+}
+
+impl Default for HttpClientConfig {
+    fn default() -> Self {
+        Self { base_url: "http://localhost".to_string(), timeout_secs: 30, max_retries: 3 }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HttpRequest {
+    pub method: String,
+    pub url: String,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HttpResponse {
+    pub status: u16,
+    pub headers: HashMap<String, String>,
+    pub body: String,
+}
+
+impl HttpClientBuilder {
+    pub fn new() -> Self { Self { config: HttpClientConfig::default() } }
+    pub fn build(self) -> HttpClient { HttpClient::new(self.config) }
+}
+
+#[derive(Debug, Clone)]
+pub struct DeliveryOutcome {
+    pub success: bool,
+    pub detail: String,
+}
+
 use std::collections::HashMap;
 use std::time::Duration;
 use reqwest::{Client, ClientBuilder, RequestBuilder, Method, header::HeaderMap};

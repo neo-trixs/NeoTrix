@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'solid-js'
 import { Router, Route } from '@solidjs/router'
 import { TrafficLights } from './components/TrafficLights'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { PageShortcuts } from './components/PageShortcuts'
 
 // 代码分割：重组件（Chat / 3D GlobeView）按需懒加载，配合 vite manualChunks 分包
 const Chat = lazy(() => import('./routes/Chat').then((m) => ({ default: m.Chat })))
@@ -42,6 +43,8 @@ export default function App() {
             <Route path="/skills" component={Skills} />
             <Route path="/memory" component={MemoryManager} />
             <Route path="/workflows" component={Workflows} />
+            {/* ⌘1..7 页面快捷键 — catch-all 最低优先级, 返回 null */}
+            <Route path="*" component={PageShortcuts} />
           </Router>
         </ErrorBoundary>
       </Suspense>

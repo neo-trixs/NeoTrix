@@ -150,3 +150,13 @@ mod tests {
         assert_eq!(config.timeout_secs, 60);
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct AcpServer { pub endpoint: String }
+
+#[derive(Debug, Clone)]
+pub struct AcpConfig { pub server_url: String }
+
+#[derive(Debug, Clone)]
+pub struct AcpSession { pub id: String }

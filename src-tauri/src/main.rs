@@ -118,6 +118,37 @@ fn main() {
                 log::info!("[boundary] updater disabled (NEOTRIX_UPDATER unset + debug build)");
                 builder
             };
+            // Phase4 deep link: neotrix://page/<name> → 转发事件给前端路由
+            {
+                use tauri::Manager;
+                builder.setup(move |_app| {
+                    #[cfg(desktop)]
+                    {
+                        use tauri::Manager;
+                        use tauri_plugin_deep_link::DeepLinkExt;
+                        let handle = _app.handle().clone();
+                        _app.deep_link().on_open_url(move |event| {
+                            let paths: Vec<String> = event
+                                .urls()
+                                .iter()
+                                .filter_map(|u| {
+                                    let s = u.as_str();
+                                    s.split("://").nth(1).map(|rest| {
+                                        let p = rest.trim_start_matches("page/").trim_start_matches('/');
+                                        format!("/{}", p)
+                                    })
+                                })
+                                .collect();
+                            if let Some(first) = paths.first() {
+                                if let Some(w) = handle.get_webview_window("main") {
+                                    let _ = w.emit("neotrix-navigate", first.clone());
+                                }
+                            }
+                        });
+                    }
+                    Ok(())
+                });
+            }
             builder
                 .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
                     if let Some(window) = app.get_webview_window("main") {
