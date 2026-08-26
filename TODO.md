@@ -15,7 +15,7 @@
 **更新**: 2026-08-25
 **描述**: 64GB 膨胀库 → 精简 1.6MB。方案 B 执行完成：nodes/edges swap → FTS 重建 → 孤儿清理。归档回滚点 `~/.neotrix/knowledge-archive-corpus-20260825.db` (64GB)。精简后 5077 节点 / 85 treats 边 / FTS 5077 行 / 1.6MB。
 
-### ⬜ task-kb-p03: 部署 KB 写入门禁
+### ✅ task-kb-p03: 部署 KB 写入门禁
 **状态**: done
 **更新**: 2026-08-25
 **描述**: 写入门禁已部署 `~/.neotrix/kb_write_gate.sh`。规则：KB >2MB 拒绝写入、批量 >10000 告警、活跃连接告警。门禁配置存于 kb_gate_config 表。
@@ -41,9 +41,9 @@
 
 ### ⬜ task-wave3-s1: 激活 nt_act 幽灵模块使 S1 三分态语义生效
 
-**状态**: blocked (BLOCKED-by-concurrency)
+**状态**: blocked (类型冲突需专门重构)
 **更新**: 2026-08-25
-**描述**: 并发 session (commit 4ab738e7) 提交的 `src/neotrix/nt_act/` 无 mod 声明，激活暴露 210 errors。本 session 的 DeliveryOutcome 三分态实现已留置其内 (types/client/tools 三文件 + 7 测试)。接续步骤见 notes/absorption-20260825-wave3-dshim-grokbot.md §五。完成后 `cargo test --lib -p neotrix nt_act::client` 应 7/7 绿。
+**描述**: `src/neotrix/nt_act/` 模块存在但未在 neotrix/mod.rs 声明。添加声明暴露 209 errors（与 nt_act_autonomy/nt_act_code 类型冲突）。需专门 session 解决：合并重复类型定义、更新 import 路径、解决 E0119 conflicting implementations。相关测试 (nt_act_autonomy 等) 已全部通过 568/568。接续步骤见 notes/absorption-20260825-wave3-dshim-grokbot.md §五。
 
 ### ⬜ task-wave3-roadmap: dsh-im/grok-bot 路线图批次
 

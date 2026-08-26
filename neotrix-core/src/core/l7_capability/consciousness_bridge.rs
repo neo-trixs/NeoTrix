@@ -195,6 +195,7 @@ mod tests {
     #[test]
     fn test_narrative_injection() {
         let b = bridge();
+        b.enable_narrative_injection();
         b.set_narrative("I am NeoTrix".into());
         assert!(b.narrative_prefix().unwrap().contains("NeoTrix"));
     }

@@ -1,6 +1,6 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { Settings, Archive, RotateCcw, Database, Store } from 'lucide-solid'
+import { Settings, Archive, RotateCcw, Database, Store, Gauge } from 'lucide-solid'
 import { TagBar } from './TagBar'
 import { chatStore } from '../stores/chat'
 
@@ -743,7 +743,7 @@ export function Sidebar(props: SidebarProps) {
             </button>
           </Show>
 
-          {/* 功能导航：知识库 / 插件市场（Phase 1 页面化入口） */}
+          {/* 功能导航：知识库 / 插件市场 / 洞察（Phase 1-2 页面化入口） */}
           <div class="flex items-center gap-1 mx-3 mb-2" role="navigation" aria-label="功能页面">
             <button
               class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
@@ -762,6 +762,15 @@ export function Sidebar(props: SidebarProps) {
             >
               <Store class="w-4 h-4" />
               <span>插件</span>
+            </button>
+            <button
+              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              onClick={() => navigate('/insights')}
+              aria-label="洞察"
+              title="洞察"
+            >
+              <Gauge class="w-4 h-4" />
+              <span>洞察</span>
             </button>
           </div>
 

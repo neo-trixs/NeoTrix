@@ -8,6 +8,7 @@ const Chat = lazy(() => import('./routes/Chat').then((m) => ({ default: m.Chat }
 const GlobeView = lazy(() => import('./components/GlobeView').then((m) => ({ default: m.GlobeView })))
 const KnowledgeBase = lazy(() => import('./routes/KnowledgeBase').then((m) => ({ default: m.KnowledgeBase })))
 const Marketplace = lazy(() => import('./routes/Marketplace').then((m) => ({ default: m.Marketplace })))
+const Insights = lazy(() => import('./routes/Insights').then((m) => ({ default: m.Insights })))
 
 function GlobeRoute() {
   return <GlobeView limit={5000} height={700} />
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/globe" component={GlobeRoute} />
             <Route path="/kb" component={KnowledgeBase} />
             <Route path="/plugins" component={Marketplace} />
+            <Route path="/insights" component={Insights} />
           </Router>
         </ErrorBoundary>
       </Suspense>

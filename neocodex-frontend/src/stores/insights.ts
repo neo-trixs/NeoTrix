@@ -122,7 +122,8 @@ function mockDataSource(): InsightsDataSource {
 
 const dataSource: InsightsDataSource = mockDataSource()
 
-export function createInsightsStore() {
+/** 可注入数据源（测试用），默认 mock */
+export function createInsightsStore(source: InsightsDataSource = dataSource) {
   const [ledger, setLedger] = createSignal<UsageLedgerReport | null>(null)
   const [daily, setDaily] = createSignal<DailyActivity | null>(null)
   const [weekly, setWeekly] = createSignal<WeeklySummary | null>(null)
@@ -133,7 +134,7 @@ export function createInsightsStore() {
     setLoading(true)
     setError(null)
     try {
-      const [l, d, w] = await Promise.all([dataSource.getLedger(), dataSource.getDaily(), dataSource.getWeekly()])
+      const [l, d, w] = await Promise.all([source.getLedger(), source.getDaily(), source.getWeekly()])
       setLedger(l)
       setDaily(d)
       setWeekly(w)
