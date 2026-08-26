@@ -2432,6 +2432,18 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         nt_field_ledger::field_verify_chain(&conn)
     }
 
+    /// G4: 各写者已参与求解的最高版本游标 (未入链的写者不出现)。
+    pub fn field_writer_cursors(&self) -> Result<Vec<(String, u64)>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::field_writer_cursors(&conn)
+    }
+
+    /// G4: 多锚点共识帧 (head / quorum / 各写者滞后量)。
+    pub fn field_consensus_frame(&self) -> Result<nt_field_ledger::ConsensusFrame, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::consensus_frame(&conn)
+    }
+
     /// 星系卫生代码强制 (T3 生产接线): 跨 namespace 校验真实 hub 的
     /// 幽灵分支 / 沉寂星辰 / 缺失 hub。由 BackgroundLoop 周期调用。
     pub fn galaxy_hygiene_check(&self, config: &nt_memory_galaxy_hygiene::GalaxyHygieneConfig) -> nt_memory_galaxy_hygiene::GalaxyHygieneReport {

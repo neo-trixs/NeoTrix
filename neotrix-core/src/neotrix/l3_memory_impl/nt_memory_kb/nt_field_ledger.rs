@@ -302,6 +302,58 @@ pub fn field_verify_chain(conn: &Connection) -> Result<bool, String> {
     Ok(head_version == expect_version.saturating_sub(1) && (head_version == 0 || head_hash == prev_hash))
 }
 
+/// G4 多锚点共识 (灵境协议6 收尾): 聚合每个 writer 已参与求解的最高版本游标。
+/// 按版本序升序扫描链上条目, 后见覆盖先见 ⇒ 终值为 writer 出现的最高版本;
+/// 从未入链的写者不出现。返回按 writer 字典序稳定排列。
+pub fn field_writer_cursors(conn: &Connection) -> Result<Vec<(String, u64)>, String> {
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(BUSY_TIMEOUT_MS));
+    ensure_tables(conn)?;
+    let mut stmt = conn
+        .prepare("SELECT version, entries_json FROM field_journal ORDER BY version")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get::<_, u64>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| e.to_string())?;
+    let mut cursors: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
+    for row in rows {
+        let (version, entries_json) = row.map_err(|e| e.to_string())?;
+        let entries: Vec<FieldEntry> = serde_json::from_str(&entries_json)
+            .map_err(|e| format!("parse v{}: {}", version, e))?;
+        for e in entries {
+            cursors.insert(e.writer, version);
+        }
+    }
+    Ok(cursors.into_iter().collect())
+}
+
+/// 多锚点共识帧: 头版本 + 全体锚点的最小安全对齐点 (quorum) + 各写者滞后量。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusFrame {
+    /// 当前场头版本号
+    pub head: u64,
+    /// 所有锚点 cursor 的最小值 (无锚点时 = head); 追赶至此即全员对齐
+    pub quorum: u64,
+    /// (writer, cursor, lag = head - cursor), 按 writer 字典序
+    pub anchors: Vec<(String, u64, i64)>,
+}
+
+/// 求解当前共识帧: head 来自 field_head, 锚点游标来自 journal 聚合。
+pub fn consensus_frame(conn: &Connection) -> Result<ConsensusFrame, String> {
+    let head = field_version(conn)?;
+    let mut quorum: Option<u64> = None;
+    let mut anchors = Vec::new();
+    for (writer, cursor) in field_writer_cursors(conn)? {
+        let lag = head as i64 - cursor as i64;
+        quorum = Some(quorum.unwrap_or(cursor).min(cursor));
+        anchors.push((writer, cursor, lag));
+    }
+    Ok(ConsensusFrame {
+        head,
+        quorum: quorum.unwrap_or(head),
+        anchors,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,5 +534,71 @@ mod tests {
             let capped = field_journal_since(&conn, 0, 2).unwrap();
             assert_eq!(capped.len(), 2, "cap 生效");
         }
+    }
+
+    #[test]
+    fn test_writer_cursors_and_consensus_frame() {
+        let kb = temp_kb("consensus");
+        // 空库: 无版本无锚点 → quorum 兜底为 head (0)
+        {
+            let conn = kb.raw_conn().unwrap();
+            assert!(field_writer_cursors(&conn).unwrap().is_empty());
+            let f = consensus_frame(&conn).unwrap();
+            assert_eq!(f.head, 0);
+            assert_eq!(f.quorum, 0);
+            assert!(f.anchors.is_empty());
+        }
+        // 3 写者不同节奏入场: v1=w1, v2=w2, v3=w1+w3
+        kb.field_stage("g4", "k1", "v", "w1").unwrap();
+        kb.field_tick().unwrap();
+        kb.field_stage("g4", "k2", "v", "w2").unwrap();
+        kb.field_tick().unwrap();
+        kb.field_stage("g4", "k3", "va", "w1").unwrap();
+        kb.field_stage("g4", "k4", "vb", "w3").unwrap();
+        kb.field_tick().unwrap();
+
+        {
+            let conn = kb.raw_conn().unwrap();
+            let cursors = field_writer_cursors(&conn).unwrap();
+            assert_eq!(
+                cursors,
+                vec![
+                    ("w1".to_string(), 3u64),
+                    ("w2".to_string(), 2),
+                    ("w3".to_string(), 3)
+                ],
+                "cursor = writer 参与求解的最高版本 (w1 复出于 v3)"
+            );
+            let f = consensus_frame(&conn).unwrap();
+            assert_eq!(f.head, 3);
+            assert_eq!(f.quorum, 2, "quorum = 全体锚点 cursor 最小值 (停在 v2 的 w2)");
+            assert_eq!(f.anchors.len(), 3);
+            assert_eq!(f.anchors[0], ("w1".to_string(), 3, 0));
+            assert_eq!(f.anchors[1], ("w2".to_string(), 2, 1));
+            assert_eq!(f.anchors[2], ("w3".to_string(), 3, 0));
+        }
+    }
+
+    #[test]
+    fn test_consensus_frame_after_writer_catch_up() {
+        // 落后写者追平后 quorum 必须单调抬升 (安全对齐点只进不退)
+        let kb = temp_kb("catchup");
+        kb.field_stage("g4", "a", "1", "slow").unwrap();
+        kb.field_tick().unwrap(); // slow cursor = 1
+        for i in 0..2 {
+            kb.field_stage("g4", &format!("b{}", i), "x", "fast").unwrap();
+            kb.field_tick().unwrap(); // fast cursor = 3
+        }
+        {
+            let conn = kb.raw_conn().unwrap();
+            let f = consensus_frame(&conn).unwrap();
+            assert_eq!(f.head, 3);
+            assert_eq!(f.quorum, 1);
+        }
+        kb.field_stage("g4", "a2", "2", "slow").unwrap();
+        kb.field_tick().unwrap(); // slow 追至 v4
+        let f = consensus_frame(&kb.raw_conn().unwrap()).unwrap();
+        assert_eq!(f.head, 4);
+        assert_eq!(f.quorum, 3, "fast 未动, quorum 随 slow 抬升");
     }
 }
