@@ -10,7 +10,6 @@ import { tagsStore } from '../stores/tags'
 import { Sidebar } from '../components/Sidebar'
 import { SettingsModal } from '../components/SettingsModal'
 import { RightBar } from '../components/RightBar'
-import { CoworkView } from '../components/CoworkView'
 import { ProviderSelector } from '../components/ProviderSelector'
 import { PermissionModeSelector, PERMISSION_MODES, type PermissionMode } from '../components/PermissionModeSelector'
 import { ToolCallCard } from '../components/ToolCallCard'
@@ -18,14 +17,13 @@ import { FilePreview } from '../components/FilePreview'
 import { Markdown } from '../components/Markdown'
 import { GitPanel } from '../components/GitPanel'
 import { ScheduledTasks } from '../components/ScheduledTasks'
-import { CostDashboard } from '../components/CostDashboard'
 import { CheckpointTimeline } from '../components/CheckpointTimeline'
 import { SideChat } from '../components/SideChat'
-import { ComputerUse } from '../components/ComputerUse'
 import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
 import { TerminalPanel } from '../components/TerminalPanel'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
+import { buildPaletteCommands } from './chat/paletteCommands'
 import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
@@ -270,7 +268,8 @@ export function Chat() {
   }
 
   // 视图切换：chat / cowork / computer（对应侧栏 segmented tabs）
-  const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
+  // 单态对话: 视图切换已移除, activeView 仅存兼容签名
+  const [activeView, setActiveView] = createSignal<'chat'>('chat')
 
   // 标签筛选（对标 Obsidian Tag Pane 多选过滤）
   const [activeTags, setActiveTags] = createSignal<string[]>([])
@@ -282,6 +281,13 @@ export function Chat() {
   const clearTags = () => setActiveTags([])
 
   // 顶部工具栏面板：一次只开一个
+  // 成本面板已收敛至 /insights 页 (Phase2 B1) — 旧入口自动重定向
+  createEffect(() => {
+    if (activePanel() === 'cost') {
+      setActivePanel(null)
+      navigate('/insights')
+    }
+  })
   type PanelId = 'git' | 'tasks' | 'cost' | 'terminal' | 'timeline' | 'sidechat' | 'preview'
   // 面板快捷键顺序（⌘1-⌘6）与侧栏入口一一对齐
   const PANEL_ORDER: PanelId[] = ['git', 'cost', 'terminal', 'tasks', 'timeline', 'sidechat', 'preview']
@@ -701,18 +707,9 @@ export function Chat() {
     // 面板仅 chat 视图可渲染，非 chat 视图按下自动先切回 chat
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '7') {
       const idx = Number(e.key) - 1
-      if (idx === 6) {
-        // ⌘7：电脑控制 → 侧栏内嵌视图
-        e.preventDefault()
-        if (activeView() === 'chat') setActivePanel(null)
-        setActiveView(activeView() === 'computer' ? 'chat' : 'computer')
-        return
-      }
       const target: PanelId = PANEL_ORDER[idx]
       if (target) {
         e.preventDefault()
-        // 非 chat 视图点按面板：先回 chat 再开面板（面板区被 activeView 门禁，避免无响应）
-        if (activeView() !== 'chat') setActiveView('chat')
         togglePanel(target)
       }
       return
@@ -1062,23 +1059,16 @@ export function Chat() {
     navigate = () => {}
   }
 
-  const paletteCommands: PaletteCommand[] = [
-    { id: 'new', label: '新建对话', desc: '开启一段新对话', keywords: ['new', '新建', '对话'], run: () => chatStore.addSession() },
-    { id: 'clear', label: '清除会话', desc: '清空当前会话全部消息', keywords: ['clear', '清除', '清空'], run: () => { chatStore.clearMessages(); setMentionRefs([]) } },
-    { id: 'compact', label: '压缩会话', desc: '精简上下文继续对话', keywords: ['compact', '压缩'], run: () => runCompact() },
-    { id: 'view-chat', label: '切换到对话视图', desc: '聊天主界面', keywords: ['chat', '对话', '视图'], run: () => setActiveView('chat') },
-    { id: 'mode', label: '切换权限模式', desc: '自动 / 手动 / 接受编辑 / 规划', keywords: ['mode', '权限', '模式'], run: () => cyclePermissionMode() },
-    { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '帮助', '快捷键'], run: () => runSlash(SLASH_COMMANDS[3]) },
-    { id: 'settings', label: '打开设置', desc: '提供商配置与应用设置', keywords: ['settings', '设置', '配置'], run: () => setSettingsOpen(true) },
-    // ── Phase4 页面动作 (⌘数字 同源) ──
-    { id: 'page-kb', label: '打开知识库', desc: '文档库管理与检索', keywords: ['kb', '知识库', '页面'], run: () => navigate('/kb') },
-    { id: 'page-plugins', label: '打开插件市场', desc: '插件安装与管理', keywords: ['plugins', '插件', '市场'], run: () => navigate('/plugins') },
-    { id: 'page-insights', label: '打开洞察', desc: '成本与活动仪表盘', keywords: ['insights', '洞察', '成本'], run: () => navigate('/insights') },
-    { id: 'page-skills', label: '打开技能中心', desc: '已安装技能浏览与搜索', keywords: ['skills', '技能'], run: () => navigate('/skills') },
-    { id: 'page-memory', label: '打开记忆管理', desc: '记忆统计/时间线/搜索', keywords: ['memory', '记忆'], run: () => navigate('/memory') },
-    { id: 'page-workflows', label: '打开工作流', desc: '工作流列表与运行', keywords: ['workflow', '工作流', '流程'], run: () => navigate('/workflows') },
-    ...unifiedCliCmds(),
-  ]
+  const paletteCommands = buildPaletteCommands({
+    addSession: () => chatStore.addSession(),
+    clearMessages: () => { chatStore.clearMessages(); setMentionRefs([]) },
+    runCompact,
+    navigate,
+    cyclePermissionMode,
+    openHelp: () => runSlash(SLASH_COMMANDS[3]),
+    openSettings: () => setSettingsOpen(true),
+    unifiedCliCmds,
+  })
 
   return (
     <div class="flex h-screen bg-transparent overflow-hidden">
@@ -1142,9 +1132,7 @@ export function Chat() {
           <Show when={activePanel() === 'tasks'}>
             <ScheduledTasks open onClose={() => setActivePanel(null)} />
           </Show>
-          <Show when={activePanel() === 'cost'}>
-            <CostDashboard open onClose={() => setActivePanel(null)} />
-          </Show>
+
           <Show when={activePanel() === 'terminal'}>
             <TerminalPanel />
           </Show>
@@ -1747,15 +1735,6 @@ export function Chat() {
         </Show>
         </Show>
 
-        {/* ===== 协同视图（cowork） ===== */}
-        <Show when={activeView() === 'cowork'}>
-          <CoworkView />
-        </Show>
-
-        {/* ===== 电脑控制：侧栏内嵌标签页（对标 Claude 侧栏） ===== */}
-        <Show when={activeView() === 'computer'}>
-          <ComputerUse embedded open onClose={() => setActiveView('chat')} />
-        </Show>
       </main>
 
       {/* ===== 右栏：Artifact Pane + 文件树（设计 v2） ===== */}

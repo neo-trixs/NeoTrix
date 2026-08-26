@@ -822,6 +822,8 @@ impl ConsciousnessTree {
         self.run_governance_audit();
 
         // CHMA Phase 0: 迷雾地图主量纲 — 全仓加权雾和 + 每域迷雾摘要
+        // D2: 地板先于量纲 — 无检测数据的域在本周期内即被抬升, 不出假清晰报告
+        self.enforce_unverified_fog_floor();
         report.weighted_fog_sum = self.weighted_fog_sum();
         report.fog_by_branch = self.fog_by_branch();
 

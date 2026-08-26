@@ -276,6 +276,12 @@ export function ChatShellProto() {
       .filter((sx) => { const t = activeTag(); return !t || sx.tags?.includes(t) })
       .sort((a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false))
 
+  const PROJECT_COLORS = ['#f0913a', '#3b82f6', '#8b5cf6', '#10b981', '#ef4444']
+  const projectColor = (name: string) => {
+    let h = 0
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+    return PROJECT_COLORS[h % PROJECT_COLORS.length]
+  }
   const [collapsedDirs, setCollapsedDirs] = createSignal<string[]>([])
   const [openKebab, setOpenKebab] = createSignal<string | null>(null)
   const kebab = (key: string) => (e: MouseEvent) => { e.stopPropagation(); setOpenKebab(openKebab() === key ? null : key) }
@@ -546,6 +552,7 @@ export function ChatShellProto() {
                   <div class="group/p flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-white/40 transition-colors">
                     <button class="flex items-center gap-1.5 min-w-0 flex-1 text-left" onClick={() => toggleProject(g.name)} aria-label={`展开/折叠项目 ${g.name}`}>
                       <ChevronDown class={clsx('w-3 h-3 text-text-muted transition-transform shrink-0', collapsedProjects().includes(g.name) && '-rotate-90')} />
+                      <span class="w-2 h-2 rounded-full shrink-0" style={{ background: projectColor(g.name) }} />
                       <span class="text-[11px] font-semibold uppercase tracking-wide truncate">{g.name}</span>
                       <span class="text-[10px] text-text-muted">{g.sessions.length}</span>
 
@@ -649,7 +656,8 @@ export function ChatShellProto() {
                       </For>
                     </div>
 
-                    {/* 项目文件目录树 (全类型可入对话) */}
+                    {/* 项目文件目录树 (全类型可入对话) — 空项目整区隐藏 */}
+                    <Show when={(projectFiles()[g.id]?.length ?? 0) > 0}>
                     <div class="pl-1.5 pt-1 border-t border-border-primary/30 mt-1">
                       <For each={flattenVisible(projectFiles()[g.id] ?? [])}>
                         {(row) => (
@@ -677,6 +685,7 @@ export function ChatShellProto() {
                         )}
                       </For>
                     </div>
+                    </Show>
                   </Show>
                 </div>
               )}
@@ -904,10 +913,11 @@ export function ChatShellProto() {
               <nav class="w-[176px] shrink-0 bg-bg-secondary/70 border-r border-border-primary/40 p-3 space-y-1" aria-label="设置分类">
                 <p class="px-2 pb-2 text-[15px] font-semibold">{T().settings}</p>
                 <For each={[
-                  { id: 'appearance', icon: '◍', label: prefs().lang === 'zh' ? '外观' : 'Appearance' },
                   { id: 'general', icon: '✦', label: prefs().lang === 'zh' ? '通用' : 'General' },
+                  { id: 'appearance', icon: '◍', label: prefs().lang === 'zh' ? '外观' : 'Appearance' },
                   { id: 'models', icon: '◈', label: prefs().lang === 'zh' ? '模型' : 'Models' },
                   { id: 'data', icon: '⬡', label: prefs().lang === 'zh' ? '数据' : 'Data' },
+                  { id: 'about', icon: '✧', label: prefs().lang === 'zh' ? '关于' : 'About' },
                 ]}>
                   {(sec) => (
                     <button
@@ -976,25 +986,46 @@ export function ChatShellProto() {
                       )}
                     </For>
                   </SettingRow>
+                  <SettingRow label={prefs().lang === 'zh' ? '清空演示数据' : 'Clear Demo Data'}>
+                    <button class="h-7 px-3 rounded-lg text-[12px] border border-red-200 text-red-500 hover:bg-red-50"
+                      onClick={() => {
+                        ;['neotrix-proto-sessions','neotrix-proto-prefs','neotrix-proto-projects','neotrix-proto-files'].forEach((k)=>localStorage.removeItem(k))
+                        location.reload()
+                      }}>
+                      {prefs().lang === 'zh' ? '清除并重启' : 'Reset'}
+                    </button>
+                  </SettingRow>
                   <p class="mt-4 text-[12px] text-text-muted leading-relaxed">
                     {prefs().lang === 'zh'
-                      ? '偏好即时保存于本机。更多通用项 (启动行为/通知) 在后续版本提供。'
-                      : 'Preferences persist locally. More general options arrive later.'}
+                      ? '偏好即时保存于本机。'
+                      : 'Preferences persist locally.'}
                   </p>
                 </Show>
 
                 <Show when={settingsSection() === 'models'}>
                   <div class="space-y-3">
+                    <p class="text-[11px] text-text-muted">{prefs().lang === 'zh' ? '点击设为默认对话模型 · ● 为网关可用性' : 'Click to set default · ● gateway availability'}</p>
+                    <For each={[{ name: 'cli-session', self: true }, ...gatewayModels().filter((m) => m !== 'cli-session').map((m) => ({ name: m, self: false }))]}>
+                      {(m) => (
+                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left"
+                          style={{ 'border-color': prefs().defaultModel === m.name ? `${prefs().accent}80` : undefined, background: prefs().defaultModel === m.name ? `${prefs().accent}0D` : undefined }}
+                          onClick={() => setPref('defaultModel', m.name)}
+                          role="radio" aria-checked={prefs().defaultModel === m.name}
+                        >
+                          <span class="w-2 h-2 rounded-full shrink-0" style={{ background: m.self ? '#10b981' : '#9ca3af' }} />
+                          <span class="text-[13px] font-medium flex-1">{m.name}</span>
+                          <Show when={m.self}><span class="text-[9px] px-1.5 py-0.5 rounded bg-nt-io-500/15 text-nt-io-700 font-semibold">自有核</span></Show>
+                          <span class={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', prefs().defaultModel === m.name ? '' : 'border-border-primary/60')} style={prefs().defaultModel === m.name ? { 'border-color': prefs().accent } : undefined}>
+                            <Show when={prefs().defaultModel === m.name}><span class="w-2 h-2 rounded-full" style={{ background: prefs().accent }} /></Show>
+                          </span>
+                        </button>
+                      )}
+                    </For>
                     <SettingRow label={prefs().lang === 'zh' ? '提供商广场与连通测试' : 'Providers & Test'}>
                       <button class="h-7 px-3 rounded-lg text-[12px] font-medium text-white" style={{ background: prefs().accent }} onClick={() => { setShowSettings(false); navigate('/plugins') }}>
                         {prefs().lang === 'zh' ? '打开' : 'Open'}
                       </button>
                     </SettingRow>
-                    <p class="text-[12px] text-text-muted leading-relaxed mt-3">
-                      {prefs().lang === 'zh'
-                        ? '完整路由策略/密钥管理在「插件市场」页维护。'
-                        : 'Full routing & keys live in Plugins page.'}
-                    </p>
                   </div>
                 </Show>
 
@@ -1016,6 +1047,25 @@ export function ChatShellProto() {
                         ? '遥测默认关闭 (打包边界)。会话与偏好仅存本机 localStorage / knowledge.db。'
                         : 'Telemetry off by default. Sessions & prefs stay local.'}
                     </p>
+                  </div>
+                </Show>
+
+                <Show when={settingsSection() === 'about'}>
+                  <div class="space-y-4 text-center pt-6">
+                    <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-nt-io-400 to-nt-io-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">N</div>
+                    <div>
+                      <p class="text-[15px] font-semibold">NeoTrix</p>
+                      <p class="text-[11px] text-text-muted font-mono mt-0.5">v0.19.0-rc1 · aarch64</p>
+                    </div>
+                    <p class="text-[12px] text-text-muted leading-relaxed max-w-xs mx-auto">
+                      {prefs().lang === 'zh'
+                        ? 'AI 原生开发者工具箱 — 与意识体对话的工作台。自进化推理 · VSA 知识表示 · GWT 注意力路由。'
+                        : 'AI-native developer toolkit — a workbench to talk with your consciousness entity.'}
+                    </p>
+                    <div class="flex justify-center gap-4 text-[11px] text-text-muted">
+                      <span>隐私优先</span><span>·</span><span>本地优先</span><span>·</span><span>开源精神</span>
+                    </div>
+                    <p class="text-[10px] text-text-muted/70">© 2026 NeoTrix · Built with Rust + SolidJS</p>
                   </div>
                 </Show>
               </div>
