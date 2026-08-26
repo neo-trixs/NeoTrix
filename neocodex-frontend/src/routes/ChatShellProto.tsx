@@ -162,14 +162,14 @@ export function ChatShellProto() {
     }
 
     void subscribeStream({
-      onToken: (delta) => { started = true; appendDelta(delta) },
+      onToken: (delta: string) => { started = true; appendDelta(delta) },
       onDone: () => { setStreaming(false); unlisten?.() },
-      onError: (payload) => {
+      onError: (payload: { message?: string }) => {
         setLastError(payload.message ?? '生成中断')
         setStreaming(false)
         unlisten?.()
       },
-    }).then((un) => {
+    }).then((un: () => void) => {
       unlisten = un
       return sendMessageStream({ content, regenerate: regen })
     }).catch((err: unknown) => {

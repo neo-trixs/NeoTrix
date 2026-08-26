@@ -16,4 +16,6 @@ export * as fs from './fs'
 export * from './client'
 export * from './types'
 
-export { providerUsageSnapshot, providerTest, type ProviderUsageRow, type ProviderTestResult } from "./neocodex"
+export { providerUsageSnapshot, providerTest, stopStream, sendMessageStream, type ProviderUsageRow, type ProviderTestResult } from "./neocodex"
+
+export { subscribeStream, type StreamEventHandlers } from "./events"

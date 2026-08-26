@@ -2077,13 +2077,16 @@ mod native_structurer_tests {
 
     #[test]
     fn drops_repeated_header_footer_and_splits_sections() {
-        let header = "ACME 设备维修手册 Rev 3";
-        let footer = "第 1 页 · 机密";
+        // 注: 合成 PDF 用标准 Courier 字体无 CJK ToUnicode 映射, 测试内容用
+        // 英文; 中文篇章切分分支由 heading_level_heuristics 纯单测覆盖,
+        // 真实中文 PDF 走 ToUnicode 编码路径。
+        let header = "ACME Device Manual Rev 3";
+        let footer = "Page 1 - Confidential";
         let pdf = manual_pdf_bytes(
             &[
-                &["第1章 安装要求", "安装前请确认接地。", "使用专用工具。"],
-                &["1.1 电气规格", "电压范围 220V 至 240V。"],
-                &["第2章 维护流程", "每季度清洁滤网一次。"],
+                &["1 Installation Requirements", "Check grounding before install.", "Use approved tools only."],
+                &["1.1 Electrical Specifications", "Voltage range 220V to 240V AC."],
+                &["2 Maintenance Procedure", "Clean filters quarterly."],
             ],
             header,
             footer,
@@ -2096,15 +2099,29 @@ mod native_structurer_tests {
             "per-page hdr+footer rows, got {}",
             doc.dropped_header_footer_lines
         );
-        assert!(!doc.sections.iter().any(|s| s.title.contains(header)));
-        assert!(!doc.sections.iter().any(|s| s.title.contains("机密")));
-        // 章节切分: 第1章(L1) + 1.1(L2) + 第2章(L1)
+        assert!(!doc.sections.iter().any(|s| s.title.contains("Manual")));
+        assert!(!doc.sections.iter().any(|s| s.title.contains("Confidential")));
+        // 章节切分: 1 (L1) + 1.1 (L2) + 2 (L1)
         let titles: Vec<&str> = doc.sections.iter().map(|s| s.title.as_str()).collect();
-        assert!(titles.contains(&"第1章 安装要求"), "{titles:?}");
-        assert!(titles.contains(&"1.1 电气规格"), "{titles:?}");
-        assert!(titles.contains(&"第2章 维护流程"), "{titles:?}");
-        let ch1 = doc.sections.iter().find(|s| s.title == "第1章 安装要求").unwrap();
-        assert!(ch1.body_lines.contains(&"安装前请确认接地。".to_string()));
+        assert!(titles.iter().any(|t| t.starts_with("1 Installation")), "{titles:?}");
+        assert!(titles.iter().any(|t| t.starts_with("1.1 Electrical")), "{titles:?}");
+        assert!(titles.iter().any(|t| t.starts_with("2 Maintenance")), "{titles:?}");
+        let lvl = |prefix: &str| {
+            doc.sections
+                .iter()
+                .find(|s| s.title.starts_with(prefix))
+                .map(|s| s.level)
+                .unwrap_or(0)
+        };
+        assert_eq!(lvl("1 Installation"), 1);
+        assert_eq!(lvl("1.1 Electrical"), 2);
+        assert_eq!(lvl("2 Maintenance"), 1);
+        let ch1 = doc
+            .sections
+            .iter()
+            .find(|s| s.title.starts_with("1 Installation"))
+            .unwrap();
+        assert!(ch1.body_lines.iter().any(|l| l.contains("grounding")));
     }
 
     #[test]
