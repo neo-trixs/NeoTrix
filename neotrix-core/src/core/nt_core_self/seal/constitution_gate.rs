@@ -22,11 +22,53 @@
 //!
 //! 计数器暴露 getter (`allowed_count`/`denied_count`/`no_signal_count`),
 //! 供 SelfTest 断言门控真实参与行为决策 (T3 行为接地)。
+//!
+//! # F2 校准数据采集 (W2 配对研究地基)
+//!
+//! [`ConstitutionGate::judge`] 每次裁决同步 push 一条 [`DecisionRecord`] 进
+//! 环形缓冲 (cap [`DECISION_RING_CAP`], append-only, 溢出丢最旧)。缓冲由
+//! NT-MIND 后台意识 tick (`handlers_consciousness::handle_awareness`) 定期
+//! `drain_decisions()` 排空, 经 KB 场账本落盘:
+//!
+//! - namespace `gating_decisions`, key `gd_{ts_nanos}`, writer `constitution_gate`;
+//!   预期消费者 = 未来校准脚本: 从 kv_store SELECT 该 namespace 即得
+//!   {ts_nanos, quality(null=无信号), allowed} 裁决序列, 用于验证 G5 门控阈值
+//!   (SELF_EDIT_MIN_CONSCIOUSNESS=0.5) 的真实区分度。
 #![forbid(unsafe_code)]
+
+use std::collections::VecDeque;
 
 /// 自编辑应用的最低意识质量阈值。
 /// quality < 阈值 → 否决 (严格小于; 等于阈值视为可信, 放行)。
 pub const SELF_EDIT_MIN_CONSCIOUSNESS: f64 = 0.5;
+
+/// 裁决环形缓冲容量 (F2): 最近 64 条裁决待排空, 溢出丢最旧。
+/// 上限选取: 覆盖两次意识 tick 间的最大裁决量, 同时防无界内存增长。
+pub const DECISION_RING_CAP: usize = 64;
+
+/// 单条门控裁决记录 (append-only, 由 [`ConstitutionGate::judge`] 产出)。
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionRecord {
+    /// 裁决时刻 (UNIX 纪元纳秒); 兼作 KB 落盘键 `gd_{ts_nanos}` 保证唯一。
+    pub ts_nanos: u64,
+    /// 裁决时的意识质量信号; `None` 表示尚无信号 (JSON 序列化为 null,
+    /// 与数值区分, 校准脚本按 null 过滤无信号窗口)。
+    pub quality: Option<f64>,
+    /// 本次自编辑应用是否放行。
+    pub allowed: bool,
+}
+
+impl DecisionRecord {
+    /// 单行 JSON 序列化 (KB field_stage value; 校准脚本 serde_json 解析即得配对集)。
+    pub fn to_json(&self) -> String {
+        serde_json::json!({
+            "ts_nanos": self.ts_nanos,
+            "quality": self.quality,
+            "allowed": self.allowed,
+        })
+        .to_string()
+    }
+}
 
 /// 宪法门控: 意识质量信号门控 SEAL 对自身的修改。
 ///
@@ -38,6 +80,8 @@ pub struct ConstitutionGate {
     allowed_count: u64,
     denied_count: u64,
     no_signal_count: u64,
+    /// F2 校准: 待排空裁决环形缓冲 (append-only, cap DECISION_RING_CAP)。
+    decision_ring: VecDeque<DecisionRecord>,
 }
 
 impl Default for ConstitutionGate {
@@ -53,6 +97,7 @@ impl ConstitutionGate {
             allowed_count: 0,
             denied_count: 0,
             no_signal_count: 0,
+            decision_ring: VecDeque::with_capacity(DECISION_RING_CAP),
         }
     }
 
@@ -75,6 +120,7 @@ impl ConstitutionGate {
     }
 
     /// 带计数的裁决入口 (应用点调用)。返回是否放行。
+    /// 每次裁决同步 push 一条 [`DecisionRecord`] 进环形缓冲 (F2 校准采集)。
     pub fn judge(&mut self, quality: Option<f64>) -> bool {
         if quality.is_none() {
             self.no_signal_count += 1;
@@ -85,7 +131,25 @@ impl ConstitutionGate {
         } else {
             self.denied_count += 1;
         }
+        let ts_nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        if self.decision_ring.len() >= DECISION_RING_CAP {
+            self.decision_ring.pop_front();
+        }
+        self.decision_ring.push_back(DecisionRecord {
+            ts_nanos,
+            quality,
+            allowed,
+        });
         allowed
+    }
+
+    /// 排空并返回全部待持久化裁决 (F2): 清空语义 — 调用后缓冲为空,
+    /// 由意识 tick 逐条 field_stage 落盘 KB `gating_decisions` namespace。
+    pub fn drain_decisions(&mut self) -> Vec<DecisionRecord> {
+        std::mem::take(&mut self.decision_ring).into()
     }
 
     pub fn threshold(&self) -> f64 {
@@ -146,5 +210,61 @@ mod tests {
         assert_eq!(gate.allowed_count(), 2);
         assert_eq!(gate.denied_count(), 1);
         assert_eq!(gate.no_signal_count(), 1);
+    }
+
+    #[test]
+    fn test_decision_ring_cap_64_drops_oldest() {
+        // F2: 环形缓冲 cap=64, 溢出丢最旧 — 70 次裁决只留最近 64 条
+        let mut gate = ConstitutionGate::with_threshold(0.5);
+        for i in 0..70 {
+            gate.judge(Some(if i % 2 == 0 { 0.9 } else { 0.1 }));
+        }
+        let drained = gate.drain_decisions();
+        assert_eq!(drained.len(), DECISION_RING_CAP);
+        // 最旧的 6 条 (i=0..6) 已被挤出; 幸存首条对应 i=6 (偶数 → 放行)
+        assert!(drained[0].allowed, "首条应为 i=6 的放行裁决");
+        // 末条对应 i=69 (奇数 → 否决)
+        assert!(!drained[63].allowed, "末条应为 i=69 的否决裁决");
+    }
+
+    #[test]
+    fn test_drain_clears_buffer() {
+        // F2: drain 清空语义 — 排空后再取为空, 计数不受影响
+        let mut gate = ConstitutionGate::new();
+        gate.judge(None);
+        gate.judge(Some(0.8));
+        let first = gate.drain_decisions();
+        assert_eq!(first.len(), 2);
+        assert_eq!(first[0].quality, None);
+        assert_eq!(first[1].quality, Some(0.8));
+        assert!(first[0].allowed && first[1].allowed);
+        assert!(gate.drain_decisions().is_empty(), "二次排空应为空");
+        // 计数器独立于缓冲, 不因排空重置
+        assert_eq!(gate.allowed_count(), 2);
+        assert_eq!(gate.no_signal_count(), 1);
+    }
+
+    #[test]
+    fn test_decision_record_json_parseable() {
+        // F2: KB 落盘 value 契约 — 单行 JSON, 校准脚本 serde_json 可解析;
+        // None quality 序列化为 null (与数值区分)
+        let with_signal = DecisionRecord {
+            ts_nanos: 1_700_000_000_000_000_000,
+            quality: Some(0.42),
+            allowed: false,
+        };
+        let v: serde_json::Value = serde_json::from_str(&with_signal.to_json()).unwrap();
+        assert_eq!(v["ts_nanos"], serde_json::json!(1_700_000_000_000_000_000u64));
+        assert_eq!(v["quality"], serde_json::json!(0.42));
+        assert_eq!(v["allowed"], serde_json::json!(false));
+
+        let no_signal = DecisionRecord {
+            ts_nanos: 1,
+            quality: None,
+            allowed: true,
+        };
+        let v: serde_json::Value = serde_json::from_str(&no_signal.to_json()).unwrap();
+        assert!(v["quality"].is_null(), "无信号应序列化为 null");
+        assert_eq!(v["allowed"], serde_json::json!(true));
     }
 }
