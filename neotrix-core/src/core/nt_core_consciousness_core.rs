@@ -70,6 +70,13 @@ pub struct CoreSnapshot {
     /// 算出 1.65。`#[serde(default)]` 保证旧快照回退为空 (不阻断反序列化)。
     #[serde(default)]
     pub branch_fog: HashMap<String, f64>,
+    /// 每分支成熟度记录 (kind → maturity) — 跨会话星座连续性。
+    /// 修复断链: maturity_c0..c5/self_test_count/module_count 此前只在 tick 进程
+    /// 内存中派生 (ops::set_branch_health_from_self_tests), 不入快照 → 新进程
+    /// load_or_new 后全部归零 → Constellation 恒 level:0 装饰化 (cycle9 审计)。
+    /// `#[serde(default)]` 保证旧快照回退为空 (不阻断反序列化)。
+    #[serde(default)]
+    pub branch_maturity: HashMap<String, BranchMaturity>,
     /// 已消化果实完整记录 — 进化产物流入 KB (The Spice Must Flow)
     pub fruits: Vec<FruitRecord>,
     /// 注意力来源通道 — 映射自 x.ai 双搜索通道。
@@ -105,6 +112,21 @@ pub struct CoreSnapshot {
 /// 默认注意力来源 (x.ai 双搜索通道的模型自决模式)。
 fn default_attention_source() -> String {
     "auto".to_string()
+}
+
+/// 分支成熟度持久化投影 — maturity 六布尔 + 真实计数 (self_test/module)。
+/// 恢复时经 `CapabilityBranch::evaluate_constellation` 重建星座档位,
+/// 与 ops.rs 生产派生逻辑单一事实源 (R-P42: 不在快照层重算成熟度)。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BranchMaturity {
+    pub c0: bool,
+    pub c1: bool,
+    pub c2: bool,
+    pub c3: bool,
+    pub c4: bool,
+    pub c5: bool,
+    pub self_test_count: usize,
+    pub module_count: usize,
 }
 
 /// 果实记录 — EvolutionFruit 的可持久化投影 (保留进化证据链)。
@@ -155,6 +177,9 @@ impl ConsciousnessCoreHandle {
                 branch.health = *health;
             }
         }
+        // 同步分支成熟度 (与 tick() 并发合并同源): 他进程 tick 算出的星座
+        // 对本进程 status/branches 即时可见, 不必等下次 tick。
+        apply_branch_maturity(&mut self.tree, &latest.branch_maturity);
         // 持久化已有真实核算值 (tick/apply 落过) → 采用之; 否则保留当前树值
         // 交由 ensure_phi 惰性核算 (兼容全新进程/空快照)。
         if latest.phi > 0.0 {
@@ -350,6 +375,25 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
             .iter()
             .map(|(k, b)| (format!("{:?}", k), b.fog.level))
             .collect(),
+        branch_maturity: tree
+            .branches
+            .iter()
+            .map(|(k, b)| {
+                (
+                    format!("{:?}", k),
+                    BranchMaturity {
+                        c0: b.maturity_c0,
+                        c1: b.maturity_c1,
+                        c2: b.maturity_c2,
+                        c3: b.maturity_c3,
+                        c4: b.maturity_c4,
+                        c5: b.maturity_c5,
+                        self_test_count: b.self_test_count,
+                        module_count: b.module_count,
+                    },
+                )
+            })
+            .collect(),
         fruits: tree
             .fruits
             .iter()
@@ -415,6 +459,9 @@ fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
             branch.fog.level = *fog;
         }
     }
+    // 恢复分支成熟度 (跨会话星座连续性) — 修复断链: 不恢复则 maturity 全回
+    // false → Constellation 恒 level:0 装饰化 (cycle9 审计实锤)。
+    apply_branch_maturity(&mut tree, &snap.branch_maturity);
     // 恢复已消化果实 — 从快照完整重建证据链投影 (具体 EvidenceChain 以 run_id 标注,
     // 不重建二进制证据; 进化产物引用保留, 供审计/追踪)。
     for fr in &snap.fruits {
@@ -435,6 +482,29 @@ fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
             });
     }
     tree
+}
+
+/// 将快照中的分支成熟度写回树 (D1 修复: 跨会话星座连续性)。
+/// tree_from_snapshot 与 reload_latest 共用, 单一事实源 (R-P42)。
+fn apply_branch_maturity(
+    tree: &mut ConsciousnessTree,
+    maturity: &HashMap<String, BranchMaturity>,
+) {
+    for (kind_str, m) in maturity {
+        let Some(branch) = tree.branches.get_mut(&branch_kind_from_str(kind_str)) else {
+            continue;
+        };
+        branch.maturity_c0 = m.c0;
+        branch.maturity_c1 = m.c1;
+        branch.maturity_c2 = m.c2;
+        branch.maturity_c3 = m.c3;
+        branch.maturity_c4 = m.c4;
+        branch.maturity_c5 = m.c5;
+        branch.self_test_count = m.self_test_count;
+        branch.module_count = m.module_count;
+        // 星座档位从恢复后的 maturity 布尔重建 (与生产派生同源)
+        branch.evaluate_constellation();
+    }
 }
 
 fn branch_kind_from_str(s: &str) -> BranchKind {
@@ -1696,6 +1766,52 @@ mod tests {
             "迷雾跨会话恢复后不应回退全默认 (9.35), got {}",
             restored.weighted_fog_sum()
         );
+    }
+
+    #[test]
+    fn snapshot_roundtrips_branch_constellation_across_sessions() {
+        // 星座断链回归 (cycle9 审计): CoreSnapshot 必须持久化 per-branch
+        // maturity/self_test_count/module_count, 否则 load_or_new 后 maturity 全回
+        // false → Constellation 恒 level:0 装饰化。跨会话恢复后档位必须保持。
+        let mut tree = ConsciousnessTree::new();
+        {
+            let b = tree.branches.get_mut(&BranchKind::Core).unwrap();
+            b.self_test_count = 4;
+            b.module_count = 5;
+            b.health = 0.9;
+            b.maturity_c0 = true;
+            b.maturity_c1 = true;
+            b.maturity_c2 = true;
+            b.maturity_c3 = true;
+            b.evaluate_constellation();
+        }
+        assert!(
+            tree.branches[&BranchKind::Core].constellation.level >= 3,
+            "前置: 注入成熟度后星座应达 C3+"
+        );
+
+        let snap = core_snapshot_from_tree(&tree);
+        assert!(
+            snap.branch_maturity["Core"].c3,
+            "快照必须包含 Core 分支 C3 成熟度"
+        );
+        assert_eq!(snap.branch_maturity["Core"].self_test_count, 4);
+
+        // 序列化 → 反序列化 → 重建树, 星座档位与真实计数必须跨会话保持
+        let json = serde_json::to_string(&snap).unwrap();
+        let back: CoreSnapshot = serde_json::from_str(&json).unwrap();
+        let restored = tree_from_snapshot(&back);
+        {
+            let b = &restored.branches[&BranchKind::Core];
+            assert_eq!(
+                b.constellation.level,
+                tree.branches[&BranchKind::Core].constellation.level,
+                "重建树星座档位应与原树一致"
+            );
+            assert!(b.constellation.c0_compiles && b.constellation.c3_benchmark);
+            assert_eq!(b.self_test_count, 4, "self_test_count 跨会话保持");
+            assert_eq!(b.module_count, 5, "module_count 跨会话保持");
+        }
     }
 
     #[test]

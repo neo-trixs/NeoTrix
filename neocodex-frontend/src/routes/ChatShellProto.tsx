@@ -619,20 +619,31 @@ export function ChatShellProto() {
                                 aria-label={`重命名 ${s.title}`}
                               />
                             </Show>
-                            <span class="hidden group-hover:flex items-center gap-0.5 pr-1.5 shrink-0">
-                              <button class="p-1 rounded text-text-muted hover:text-text-primary" aria-label={`置顶 ${s.title}`} title="置顶"
-                                onClick={() => setSessions((all) => all.map((x) => (x.id === s.id ? { ...x, pinned: !x.pinned } : x)))}>
-                                <Pin class="w-3 h-3" />
-                              </button>
-                              <button class="p-1 rounded text-text-muted hover:text-text-primary" aria-label={`重命名 ${s.title}`} title="重命名"
-                                onClick={() => { setRenamingId(s.id); setRenameVal(s.title) }}>
-                                ✎
-                              </button>
-                              <button class="p-1 rounded text-text-muted hover:text-red-500" aria-label={`删除 ${s.title}`} title="删除"
-                                onClick={() => deleteSession(s.id)}>
-                                ✕
-                              </button>
-                            </span>
+                  <div class="relative shrink-0">
+                    <button
+                      class="opacity-0 group-hover:opacity-100 p-1 rounded text-text-muted hover:text-text-primary transition-colors"
+                      onClick={kebab('sess:' + s.id)}
+                      aria-label={`会话 ${s.title} 操作`}
+                    >
+                      <MoreVertical class="w-3.5 h-3.5" />
+                    </button>
+                    <Show when={openKebab() === 'sess:' + s.id}>
+                      <div class="absolute right-0 top-full mt-1 w-40 rounded-xl border border-border-primary/60 bg-bg-primary shadow-xl p-1 z-30" role="menu" onClick={menuStop}>
+                        <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-text-muted hover:bg-white/60 hover:text-text-primary text-left"
+                          onClick={() => { setSessions((all) => all.map((x) => (x.id === s.id ? { ...x, pinned: !x.pinned } : x))); setOpenKebab(null) }}>
+                          <Pin class="w-3.5 h-3.5" /> {s.pinned ? '取消置顶' : '置顶'}
+                        </button>
+                        <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-text-muted hover:bg-white/60 hover:text-text-primary text-left"
+                          onClick={() => { setRenamingId(s.id); setRenameVal(s.title); setOpenKebab(null) }}>
+                          <Pencil class="w-3.5 h-3.5" /> 重命名
+                        </button>
+                        <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-red-500 hover:bg-red-50 text-left"
+                          onClick={() => { deleteSession(s.id); setOpenKebab(null) }}>
+                          <Trash2 class="w-3.5 h-3.5" /> 删除会话
+                        </button>
+                      </div>
+                    </Show>
+                  </div>
                           </div>
                         )}
                       </For>
