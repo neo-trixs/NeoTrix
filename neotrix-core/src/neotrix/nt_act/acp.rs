@@ -8,7 +8,7 @@ use tokio::net::TcpStream;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::UnixStream;
 
-use crate::nt_act::{AcpConfig, AcpMessage, AcpResponse};
+use super::{AcpConfig, AcpMessage, AcpResponse};
 
 /// ACP Client
 pub struct AcpClient {

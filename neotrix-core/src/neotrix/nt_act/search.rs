@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
 
-use crate::nt_act::{SearchConfig, SearchEngine, SearchOptions, SearchResult};
+use super::{SearchConfig, SearchEngine, SearchOptions, SearchResult};
 
 /// Web Search Engine
 pub struct WebSearch {

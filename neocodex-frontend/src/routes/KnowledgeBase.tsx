@@ -24,6 +24,10 @@ export function KnowledgeBase() {
   const [renameTarget, setRenameTarget] = createSignal<KbLibrary | null>(null)
   const [renameVal, setRenameVal] = createSignal('')
   const [deleteTarget, setDeleteTarget] = createSignal<KbLibrary | null>(null)
+  const [showAddDoc, setShowAddDoc] = createSignal(false)
+  const [newDocTitle, setNewDocTitle] = createSignal('')
+  const [newDocText, setNewDocText] = createSignal('')
+  const [docDeleting, setDocDeleting] = createSignal<string | null>(null)
 
   onMount(() => void kb.refresh())
 
@@ -136,7 +140,11 @@ export function KnowledgeBase() {
                 <For each={kb.filtered()}>
                   {(lib) => (
                     <article
-                      class="group relative rounded-xl border border-border-primary/50 bg-bg-secondary p-4 hover:border-nt-io-500/50 hover:shadow-sm transition-all"
+                      class={clsx(
+                        'group relative rounded-xl border bg-bg-secondary p-4 hover:shadow-sm transition-all cursor-pointer',
+                        kb.activeLibraryId() === lib.id ? 'border-nt-io-500/60 ring-1 ring-nt-io-500/30' : 'border-border-primary/50 hover:border-nt-io-500/50',
+                      )}
+                      onClick={() => kb.setActiveLibraryId(kb.activeLibraryId() === lib.id ? null : lib.id)}
                       aria-label={`知识库 ${lib.name}`}
                     >
                       <div class="flex items-start gap-2.5">
@@ -161,7 +169,7 @@ export function KnowledgeBase() {
                           class="p-1.5 rounded-md hover:bg-white/60 text-text-muted hover:text-text-primary"
                           aria-label={`重命名 ${lib.name}`}
                           title="重命名"
-                          onClick={() => { setRenameTarget(lib); setRenameVal(lib.name) }}
+                          onClick={(e) => { e.stopPropagation(); setRenameTarget(lib); setRenameVal(lib.name) }}
                         >
                           <Pencil class="w-3.5 h-3.5" />
                         </button>
@@ -169,7 +177,7 @@ export function KnowledgeBase() {
                           class="p-1.5 rounded-md hover:bg-red-50 text-text-muted hover:text-red-500"
                           aria-label={`删除 ${lib.name}`}
                           title="删除"
-                          onClick={() => askDelete(lib)}
+                          onClick={(e) => { e.stopPropagation(); askDelete(lib) }}
                         >
                           <Trash2 class="w-3.5 h-3.5" />
                         </button>
@@ -178,6 +186,64 @@ export function KnowledgeBase() {
                   )}
                 </For>
               </div>
+
+              {/* ── B2: 选中库的文档列表 (kb_doc_list/ingest/delete 直连) ── */}
+              <Show when={kb.activeLibraryId()}>
+                <section class="max-w-5xl mx-auto mt-6 rounded-xl border border-border-primary/50 bg-bg-secondary p-4" aria-label="文档列表">
+                  <div class="flex items-center gap-2 mb-3">
+                    <h2 class="text-13px font-semibold">文档</h2>
+                    <span class="text-11px text-text-muted">{kb.docs().length} 个</span>
+                    <div class="flex-1" />
+                    <button
+                      class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-12px font-medium bg-nt-io-500 text-white hover:bg-nt-io-600 transition-colors"
+                      onClick={() => setShowAddDoc(true)}
+                      aria-label="添加文档"
+                    >
+                      <Plus class="w-3.5 h-3.5" />
+                      入库
+                    </button>
+                  </div>
+                  <Show when={!kb.docsLoading()} fallback={
+                    <p class="text-12px text-text-muted py-4 text-center" role="status">加载文档…</p>
+                  }>
+                    <Show when={kb.docs().length > 0} fallback={
+                      <p class="text-12px text-text-muted py-4 text-center border border-dashed border-border-primary/50 rounded-lg">
+                        库内暂无文档 — 点「入库」添加第一篇
+                      </p>
+                    }>
+                      <ul class="space-y-2">
+                        <For each={kb.docs()}>
+                          {(doc) => (
+                            <li class="flex items-center gap-3 rounded-lg border border-border-primary/40 px-3 py-2">
+                              <FileText class="w-4 h-4 text-text-muted shrink-0" />
+                              <span class="text-13px font-medium truncate flex-1">{doc.title}</span>
+                              <span class={clsx(
+                                'text-10px px-1.5 py-0.5 rounded-full font-medium',
+                                doc.status === 'ready' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+                              )}>
+                                {doc.status === 'ready' ? '已索引' : '索引中'}
+                              </span>
+                              <span class="text-11px text-text-muted shrink-0">{doc.sizeKb} KB</span>
+                              <button
+                                class="p-1 rounded-md hover:bg-red-50 text-text-muted hover:text-red-500 disabled:opacity-40"
+                                aria-label={`删除文档 ${doc.title}`}
+                                title="删除"
+                                disabled={docDeleting() === doc.id}
+                                onClick={() => {
+                                  setDocDeleting(doc.id)
+                                  void kb.removeDoc(doc.id).finally(() => setDocDeleting(null))
+                                }}
+                              >
+                                <Trash2 class="w-3.5 h-3.5" />
+                              </button>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </Show>
+                  </Show>
+                </section>
+              </Show>
             </Show>
           </Show>
         </Show>
@@ -250,6 +316,56 @@ export function KnowledgeBase() {
               </button>
               <button class="h-8 px-4 rounded-lg text-13px font-medium bg-nt-io-500 text-white hover:bg-nt-io-600" onClick={() => void confirmRename()}>
                 保存
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* 入库文档弹层 */}
+      <Show when={showAddDoc()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowAddDoc(false)}>
+          <div
+            class="w-[440px] rounded-xl bg-bg-primary border border-border-primary shadow-lg p-5"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="入库文档"
+          >
+            <h2 class="text-14px font-semibold mb-4">入库文档</h2>
+            <label class="block text-12px text-text-muted mb-1">标题</label>
+            <input
+              class="w-full h-9 px-3 rounded-lg text-13px bg-bg-secondary border border-border-primary/50 focus:border-nt-io-500 focus:outline-none mb-3"
+              value={newDocTitle()}
+              onInput={(e) => setNewDocTitle(e.currentTarget.value)}
+              aria-label="文档标题"
+              autofocus
+            />
+            <label class="block text-12px text-text-muted mb-1">正文 (自动切片入 FTS 索引)</label>
+            <textarea
+              class="w-full h-32 px-3 py-2 rounded-lg text-13px bg-bg-secondary border border-border-primary/50 focus:border-nt-io-500 focus:outline-none resize-none font-mono"
+              value={newDocText()}
+              onInput={(e) => setNewDocText(e.currentTarget.value)}
+              aria-label="文档正文"
+            />
+            <div class="flex justify-end gap-2 mt-4">
+              <button class="h-8 px-3 rounded-lg text-13px text-text-muted hover:text-text-primary" onClick={() => setShowAddDoc(false)}>
+                取消
+              </button>
+              <button
+                class={clsx(
+                  'h-8 px-4 rounded-lg text-13px font-medium text-white transition-colors',
+                  newDocTitle().trim() && newDocText().trim() ? 'bg-nt-io-500 hover:bg-nt-io-600' : 'bg-nt-io-500/40 cursor-not-allowed',
+                )}
+                disabled={!newDocTitle().trim() || !newDocText().trim()}
+                onClick={() => {
+                  void kb.ingestDoc(newDocTitle().trim(), newDocText()).then(() => {
+                    setNewDocTitle('')
+                    setNewDocText('')
+                    setShowAddDoc(false)
+                  })
+                }}
+              >
+                入库
               </button>
             </div>
           </div>

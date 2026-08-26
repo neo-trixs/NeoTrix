@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::nt_act::{DecisionConfig, CommunicationIntent, CommunicationDecision, CommunicationMethod, CommunicationCapabilities};
+use super::{DecisionConfig, CommunicationIntent, CommunicationDecision, CommunicationMethod, CommunicationCapabilities};
 
 /// Decision Maker for Autonomous Communication
 pub struct DecisionMaker {

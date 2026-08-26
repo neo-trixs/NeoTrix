@@ -10,7 +10,7 @@
    tauriDataSource（invoke kb_list/kb_create/...）并在此
    文件内切换引用 — 组件层零改动。
    ════════════════════════════════════════════ */
-import { createSignal } from 'solid-js'
+import { createSignal, createEffect } from 'solid-js'
 
 export interface KbLibrary {
   id: string
@@ -200,6 +200,11 @@ export function createKbStore(source: 'mock' | 'tauri' = 'tauri') {
     if (activeLibraryId() === id) setActiveLibraryId(null)
   }
 
+  // 切换活跃库时自动拉取其文档列表
+  createEffect(() => {
+    if (activeLibraryId()) void refreshDocs()
+  })
+
   /** 关键字过滤（名称+描述不区分大小写）；空关键字返回全部 */
   function filtered() {
     const kw = keyword().trim().toLowerCase()
@@ -207,6 +212,35 @@ export function createKbStore(source: 'mock' | 'tauri' = 'tauri') {
     return libraries().filter(
       (l) => l.name.toLowerCase().includes(kw) || l.description.toLowerCase().includes(kw),
     )
+  }
+
+  // ── B2 文档域 (直连 kb_doc_* 命令) ──
+  const [docs, setDocs] = createSignal<KbDoc[]>([])
+  const [docsLoading, setDocsLoading] = createSignal(false)
+
+  async function refreshDocs() {
+    const libId = activeLibraryId()
+    if (!libId) return
+    setDocsLoading(true)
+    try {
+      setDocs(await ds.listDocs(libId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDocsLoading(false)
+    }
+  }
+
+  /** 入库文档: 调后端切片→FTS 入库, 成功后刷新库计数与文档列表 */
+  async function ingestDoc(title: string, text: string) {
+    await kbDocIngest(title, text, activeLibraryId()?.replace(/^lib-/, '') ?? 'default')
+    await Promise.all([refresh(), refreshDocs()])
+  }
+
+  async function removeDoc(docId: string) {
+    await kbDocDelete(docId)
+    setDocs((prev) => prev.filter((d) => d.id !== docId))
+    await refresh()
   }
 
   return {
@@ -222,6 +256,11 @@ export function createKbStore(source: 'mock' | 'tauri' = 'tauri') {
     create,
     rename,
     remove,
+    docs,
+    docsLoading,
+    refreshDocs,
+    ingestDoc,
+    removeDoc,
   }
 }
 

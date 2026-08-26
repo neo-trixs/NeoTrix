@@ -7,7 +7,7 @@ use reqwest::{Client, ClientBuilder, RequestBuilder, Method, header::HeaderMap};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::nt_act::{DeliveryOutcome, HttpClientConfig, HttpRequest, HttpResponse};
+use super::{DeliveryOutcome, HttpClientConfig, HttpRequest, HttpResponse};
 
 /// HTTP Client with retry, circuit breaker, rate limiting
 pub struct HttpClient {

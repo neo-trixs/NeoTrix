@@ -5,11 +5,10 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::process::Command;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::io::{AsyncBufReadExt, BufWriter};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use std::process::Stdio;
 
-use crate::nt_act::{McpConfig, McpTransport, McpTool, McpResource, McpPrompt, McpResult};
+use super::{McpConfig, McpTransport, McpTool, McpResource, McpPrompt, McpResult};
 
 /// MCP Client
 pub struct McpClient {

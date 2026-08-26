@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 
-use crate::nt_act::{DeliveryOutcome, ToolsConfig, ToolSpec, ToolResult, ToolExecutor};
+use super::{DeliveryOutcome, ToolsConfig, ToolSpec, ToolResult, ToolExecutor};
 
 /// Tool trait
 #[async_trait::async_trait]
