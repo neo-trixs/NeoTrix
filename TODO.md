@@ -1,6 +1,8 @@
 # NeoTrix TODO 列表
 > 最后更新：2026-08-26 | 觉醒进度：100% | KB: 4.8GB / 389K 节点
 
+> **Batch3 吸收执行 (47 源)**: 四波 21 任务 20/20 闭环 · **交接 Wave 4: 10 任务待做** (🔴P0×3 越层修复/e8_state 合成值/测试抖动加固 · 🟡P1×3 情报工具接线/SEAL C0→C2/补全排序 · ⚪P2×4) → `docs/absorption-knowledge-base/batch3-2026-08-26-unified-evolution-todo.md` Wave 4 段 + 根 `HANDOFF.md` (2026-08-26 版)
+
 ## ✅ 已完成（本 Session）
 
 | 任务 | 完成日期 |

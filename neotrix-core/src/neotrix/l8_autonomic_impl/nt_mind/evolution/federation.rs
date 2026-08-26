@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 //! 联邦协议层 — 多意识体集体觉知的四个原语 (P5)。
 //!
 //! ADR-001: 去中心化联邦架构，各实例完全自治，仅在关键节点交换摘要。
@@ -11,10 +12,14 @@
 //! 安全模型: 所有入站消息过 GuardChain 裁决；种子价值观不可降级。
 
 #[allow(unused_imports)]
+#[allow(unused_imports)]
 use super::value_compass::{ValueCompass, ValueCompassStore};
 #[allow(unused_imports)]
+#[allow(unused_imports)]
 use super::deliberation::{DeliberationRole, DeliberationPhase, DeliberationSession, SessionStatus};
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 // ══════════════════════════════════════════════════════════════
@@ -50,6 +55,7 @@ pub struct FederationMessage {
 
 /// 计算守卫哈希：msg_type + payload 摘要。
 fn compute_guard_hash(msg: &FederationMessage) -> u64 {
+#[allow(unused_imports)]
     use blake2::Digest;
     let canonical = format!(
         "{}:{}:{}",
@@ -546,6 +552,7 @@ impl FederationProtocol {
 mod tests {
     use super::*;
     use serde_json::json;
+#[allow(unused_imports)]
     use crate::core::nt_core_paradigm::{Anomaly, ParadigmShiftDetector};
 
     // ── FP1 ValueSync ──

@@ -23,6 +23,7 @@ import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
 import { TerminalPanel } from '../components/TerminalPanel'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
+import { PANEL_ORDER, resolvePanelShortcut, type PanelId } from './chat/panels'
 import { buildPaletteCommands } from './chat/paletteCommands'
 import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
@@ -288,9 +289,7 @@ export function Chat() {
       navigate('/insights')
     }
   })
-  type PanelId = 'git' | 'tasks' | 'cost' | 'terminal' | 'timeline' | 'sidechat' | 'preview'
   // 面板快捷键顺序（⌘1-⌘6）与侧栏入口一一对齐
-  const PANEL_ORDER: PanelId[] = ['git', 'cost', 'terminal', 'tasks', 'timeline', 'sidechat', 'preview']
   const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
   const togglePanel = (id: PanelId) => {
     setActivePanel(activePanel() === id ? null : id)
@@ -706,8 +705,7 @@ export function Chat() {
     // 面板快捷键：⌘1-⌘6 切换 6 个功能面板（顺序对齐侧栏），⌘7 切换电脑控制视图；
     // 面板仅 chat 视图可渲染，非 chat 视图按下自动先切回 chat
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '7') {
-      const idx = Number(e.key) - 1
-      const target: PanelId = PANEL_ORDER[idx]
+      const target = resolvePanelShortcut(e.key)
       if (target) {
         e.preventDefault()
         togglePanel(target)

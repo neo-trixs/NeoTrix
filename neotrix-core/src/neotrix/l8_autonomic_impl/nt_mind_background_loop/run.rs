@@ -698,7 +698,9 @@ impl BackgroundLoop {
                         tokio::select! {
                             biased;
                             _ = ticker.tick() => {
+                                eprintln!("[bg-tick] {} fired", $name); // TODO(temp diagnostics, remove)
                                 let mut $lock = h.lock().await;
+                                eprintln!("[bg-tick] {} acquired lock", $name); // TODO(temp diagnostics, remove)
                                 // G12 denylist gate — 机械执行, 每个 handler tick 前置 fail-closed
                                 if let Err(e) = $lock.denylist.check($name) {
                                     log::warn!("[bg-loop] handler '{}' 被 denylist gate 拦截: {}", $name, e);

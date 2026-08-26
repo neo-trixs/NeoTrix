@@ -133,6 +133,9 @@ const CORE_BOUNDARY_ALLOW: &[(&str, &str)] = &[
     ("nt_core_consciousness_core.rs", "merge_pdfs"),
     ("nt_core_consciousness_core.rs", "merge_docx::merge_docx"),
     ("nt_core_consciousness_core.rs", "merge_docx::merge_pptx"),
+    // P1-P5 新模块受控边界
+    ("nt_core_consciousness_core.rs", "consciousness_bridge"),
+    ("nt_core_consciousness_core.rs", "consciousness_orchestrator"),
     // documented 受控边界 (engine / codegraph / provider)
     ("nt_core_task_dispatcher.rs", "l8_autonomic_impl"),
     ("nt_core_retrieval.rs", "l8_autonomic_impl"),

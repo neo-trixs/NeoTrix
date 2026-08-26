@@ -171,7 +171,6 @@ impl ThemeManager {
     }
 
     pub fn set_preset(&mut self, _preset: ThemePreset) {
-        // TODO
     }
 
     pub fn set_custom(&mut self, theme: Theme) {

@@ -59,13 +59,13 @@ export function ChatShellProto() {
   const [lastError, setLastError] = createSignal<string | null>(null)
 
   // ── 统一偏好: 强调色/字号/密度/圆角/语言 (持久化, 全原型生效) ──
-  type Prefs = { accent: string; fontSize: number; density: 'cozy' | 'compact'; radius: number; lang: 'zh' | 'en'; enterSends: boolean; motion: boolean; msgWidth: 'md' | 'lg'; defaultModel: string; autoTag: boolean }
+  type Prefs = { accent: string; fontSize: number; density: 'cozy' | 'compact'; radius: number; lang: 'zh' | 'en'; enterSends: boolean; motion: boolean; msgWidth: 'md' | 'lg'; defaultModel: string; autoTag: boolean; restoreLast: boolean }
   const loadPrefs = (): Prefs => {
     try {
       const raw = localStorage.getItem('neotrix-proto-prefs')
-      if (raw) return { accent: '#f0913a', fontSize: 15, density: 'cozy', radius: 20, lang: 'zh', enterSends: true, motion: true, msgWidth: 'md', defaultModel: 'cli-session · claude', autoTag: true, ...JSON.parse(raw) }
+      if (raw) return { accent: '#f0913a', fontSize: 15, density: 'cozy', radius: 20, lang: 'zh', enterSends: true, motion: true, msgWidth: 'md', defaultModel: 'cli-session · claude', autoTag: true, restoreLast: true, ...JSON.parse(raw) }
     } catch { /* ignore */ }
-    return { accent: '#f0913a', fontSize: 15, density: 'cozy', radius: 20, lang: 'zh', enterSends: true, motion: true, msgWidth: 'md', defaultModel: 'cli-session · claude', autoTag: true }
+    return { accent: '#f0913a', fontSize: 15, density: 'cozy', radius: 20, lang: 'zh', enterSends: true, motion: true, msgWidth: 'md', defaultModel: 'cli-session · claude', autoTag: true, restoreLast: true }
   }
   const [prefs, setPrefs] = createSignal<Prefs>(loadPrefs())
   createEffect(() => {
@@ -191,6 +191,7 @@ export function ChatShellProto() {
   const deriveTags = (title: string): string[] => TAG_RULES.filter(([re]) => re.test(title)).map(([, t]) => t)
   const [autoTagCount, setAutoTagCount] = createSignal(0)
   createEffect(() => {
+    try { localStorage.setItem('neotrix-proto-active', activeId()) } catch { /* ignore */ }
     if (!prefs().autoTag) return
     const all = sessions()
     let changed = false
@@ -975,6 +976,20 @@ export function ChatShellProto() {
                         )}
                       </For>
                     </SettingRow>
+                    <SettingRow label={prefs().lang === 'zh' ? '消息行宽' : 'Line Width'}>
+                      <For each={[{ v: 'md', l: '适中' }, { v: 'lg', l: '宽' }]}>
+                        {(o) => (
+                          <button class={segCls(prefs().msgWidth === o.v)} onClick={() => setPref('msgWidth', o.v as 'md' | 'lg')}>{o.l}</button>
+                        )}
+                      </For>
+                    </SettingRow>
+                    <SettingRow label={prefs().lang === 'zh' ? '动效' : 'Motion'}>
+                      <button class={clsx('h-6 px-2.5 rounded-md text-[11px] font-medium transition-colors', prefs().motion ? 'text-white' : 'bg-black/5 text-text-muted')}
+                        style={prefs().motion ? { background: prefs().accent } : undefined}
+                        onClick={() => setPref('motion', !prefs().motion)}>
+                        {prefs().motion ? (prefs().lang === 'zh' ? '开' : 'On') : (prefs().lang === 'zh' ? '关' : 'Off')}
+                      </button>
+                    </SettingRow>
                   </div>
                 </Show>
 
@@ -986,7 +1001,23 @@ export function ChatShellProto() {
                       )}
                     </For>
                   </SettingRow>
-                  <SettingRow label={prefs().lang === 'zh' ? '清空演示数据' : 'Clear Demo Data'}>
+                                      <SettingRow label="Enter 键">
+                      <For each={[{ v: true, l: '发送' }, { v: false, l: '换行' }]}>
+                        {(o) => (
+                          <button class={segCls(prefs().enterSends === o.v)} onClick={() => setPref('enterSends', o.v)}>
+                            {o.l}{o.v && <span class="text-[9px] ml-1 opacity-60">⏎</span>}
+                          </button>
+                        )}
+                      </For>
+                    </SettingRow>
+                    <SettingRow label={prefs().lang === 'zh' ? '恢复上次会话' : 'Restore Session'}>
+                      <button class={clsx('h-6 px-2.5 rounded-md text-[11px] font-medium transition-colors', prefs().restoreLast ? 'text-white' : 'bg-black/5 text-text-muted')}
+                        style={prefs().restoreLast ? { background: prefs().accent } : undefined}
+                        onClick={() => setPref('restoreLast', !prefs().restoreLast)}>
+                        {prefs().restoreLast ? (prefs().lang === 'zh' ? '开' : 'On') : (prefs().lang === 'zh' ? '关' : 'Off')}
+                      </button>
+                    </SettingRow>
+<SettingRow label={prefs().lang === 'zh' ? '清空演示数据' : 'Clear Demo Data'}>
                     <button class="h-7 px-3 rounded-lg text-[12px] border border-red-200 text-red-500 hover:bg-red-50"
                       onClick={() => {
                         ;['neotrix-proto-sessions','neotrix-proto-prefs','neotrix-proto-projects','neotrix-proto-files'].forEach((k)=>localStorage.removeItem(k))
@@ -1003,24 +1034,81 @@ export function ChatShellProto() {
                 </Show>
 
                 <Show when={settingsSection() === 'models'}>
-                  <div class="space-y-3">
-                    <p class="text-[11px] text-text-muted">{prefs().lang === 'zh' ? '点击设为默认对话模型 · ● 为网关可用性' : 'Click to set default · ● gateway availability'}</p>
-                    <For each={[{ name: 'cli-session', self: true }, ...gatewayModels().filter((m) => m !== 'cli-session').map((m) => ({ name: m, self: false }))]}>
-                      {(m) => (
-                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left"
-                          style={{ 'border-color': prefs().defaultModel === m.name ? `${prefs().accent}80` : undefined, background: prefs().defaultModel === m.name ? `${prefs().accent}0D` : undefined }}
-                          onClick={() => setPref('defaultModel', m.name)}
-                          role="radio" aria-checked={prefs().defaultModel === m.name}
-                        >
-                          <span class="w-2 h-2 rounded-full shrink-0" style={{ background: m.self ? '#10b981' : '#9ca3af' }} />
-                          <span class="text-[13px] font-medium flex-1">{m.name}</span>
-                          <Show when={m.self}><span class="text-[9px] px-1.5 py-0.5 rounded bg-nt-io-500/15 text-nt-io-700 font-semibold">自有核</span></Show>
-                          <span class={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center', prefs().defaultModel === m.name ? '' : 'border-border-primary/60')} style={prefs().defaultModel === m.name ? { 'border-color': prefs().accent } : undefined}>
-                            <Show when={prefs().defaultModel === m.name}><span class="w-2 h-2 rounded-full" style={{ background: prefs().accent }} /></Show>
-                          </span>
+                  <div class="space-y-2">
+                    <p class="text-[11px] text-text-muted">{prefs().lang === 'zh' ? 'LLM 池 · 点击设为默认对话模型' : 'LLM Pool · click to set default'}</p>
+
+                    {/* OpenWebUI 吸收: 连接配置区 — URL/密钥/真实验证 */}
+                    <div class="rounded-xl border border-border-primary/50 bg-bg-secondary/60 p-3 space-y-2">
+                      <p class="text-[11px] font-semibold text-text-muted uppercase tracking-wide">连接 Connection</p>
+                      <div class="flex gap-2">
+                        <input class="flex-1 h-8 px-2.5 rounded-lg text-[12px] bg-bg-primary border border-border-primary/50 focus:border-nt-io-500 focus:outline-none font-mono"
+                          value={connUrl()} onInput={(e) => setConnUrl(e.currentTarget.value)} aria-label="Base URL" placeholder="https://…/v1" spellcheck={false} />
+                        <input class="w-32 h-8 px-2.5 rounded-lg text-[12px] bg-bg-primary border border-border-primary/50 focus:border-nt-io-500 focus:outline-none font-mono"
+                          type="password" value={connKey()} onInput={(e) => setConnKey(e.currentTarget.value)} aria-label="API Key" placeholder="API Key (可选)" spellcheck={false} />
+                        <button class="h-8 px-3 rounded-lg text-[12px] font-medium text-white disabled:opacity-40 shrink-0"
+                          style={{ background: prefs().accent }}
+                          disabled={connTesting()}
+                          onClick={() => void testConnection()}>
+                          {connTesting() ? '…' : '验证'}
                         </button>
-                      )}
+                      </div>
+                      <Show when={connResult()}>
+                        <p class={`text-[11px] ${connResult()!.ok ? 'text-emerald-600' : 'text-red-500'}`} role="status">{connResult()!.text}</p>
+                      </Show>
+                    </div>
+
+                    {/* 自有核置顶 */}
+                    <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left"
+                      style={{ 'border-color': prefs().defaultModel === 'cli-session' ? `${prefs().accent}80` : undefined, background: prefs().defaultModel === 'cli-session' ? `${prefs().accent}0D` : undefined }}
+                      onClick={() => setPref('defaultModel', 'cli-session')} role="radio" aria-checked={prefs().defaultModel === 'cli-session'}>
+                      <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      <span class="text-[13px] font-medium flex-1">cli-session</span>
+                      <span class="text-[9px] px-1.5 py-0.5 rounded bg-nt-io-500/15 text-nt-io-700 font-semibold">自有核</span>
+                      <span class={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0', prefs().defaultModel === 'cli-session' ? '' : 'border-border-primary/60')} style={prefs().defaultModel === 'cli-session' ? { 'border-color': prefs().accent } : undefined}>
+                        <Show when={prefs().defaultModel === 'cli-session'}><span class="w-2 h-2 rounded-full" style={{ background: prefs().accent }} /></Show>
+                      </span>
+                    </button>
+
+                    {/* 网关注册的第三方池 (provider_status ∪ provider_config 模型数) */}
+                    <For each={gatewayModels().filter((m) => m !== 'cli-session')}>
+                      {(name) => {
+                        const meta = cfg()?.providers.find((x: { name: string }) => x.name === name)
+                        return (
+                          <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left"
+                            style={{ 'border-color': prefs().defaultModel === name ? `${prefs().accent}80` : undefined, background: prefs().defaultModel === name ? `${prefs().accent}0D` : undefined }}
+                            onClick={() => setPref('defaultModel', name)}
+                            role="radio" aria-checked={prefs().defaultModel === name}
+                          >
+                            <span class="w-2 h-2 rounded-full bg-zinc-400 shrink-0" />
+                            <span class="min-w-0 flex-1">
+                              <span class="block text-[13px] font-medium truncate">{meta?.display_name ?? name}</span>
+                              <span class="block text-[10px] text-text-muted truncate">{meta?.model ?? name}</span>
+                            </span>
+                            <Show when={meta?.models.length}>
+                              <span class="hidden sm:flex flex-wrap gap-1 max-w-[180px] overflow-hidden">
+                                <For each={meta!.models.slice(0, 4)}>
+                                  {(mo) => (
+                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-black/5 text-text-muted whitespace-nowrap"
+                                      onClick={(e) => { e.stopPropagation(); setPref('defaultModel', `${name}:${mo}`) }}
+                                      title={`设为默认: ${name}:${mo}`}>
+                                      {mo}
+                                    </span>
+                                  )}
+                                </For>
+                                <Show when={meta!.models.length > 4}>
+                                  <span class="text-[9px] text-text-muted self-center">+{meta!.models.length - 4}</span>
+                                </Show>
+                              </span>
+                            </Show>
+                            <Show when={meta?.is_free}><span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600">free</span></Show>
+                            <span class={clsx('w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0', prefs().defaultModel === name ? '' : 'border-border-primary/60')} style={prefs().defaultModel === name ? { 'border-color': prefs().accent } : undefined}>
+                              <Show when={prefs().defaultModel === name}><span class="w-2 h-2 rounded-full" style={{ background: prefs().accent }} /></Show>
+                            </span>
+                          </button>
+                        )
+                      }}
                     </For>
+
                     <SettingRow label={prefs().lang === 'zh' ? '提供商广场与连通测试' : 'Providers & Test'}>
                       <button class="h-7 px-3 rounded-lg text-[12px] font-medium text-white" style={{ background: prefs().accent }} onClick={() => { setShowSettings(false); navigate('/plugins') }}>
                         {prefs().lang === 'zh' ? '打开' : 'Open'}
@@ -1076,3 +1164,21 @@ export function ChatShellProto() {
     </div>
   )
 }
+  const [cfg, setCfg] = createSignal<import('../api/types').ProviderConfig | null>(null)
+  const [connUrl, setConnUrl] = createSignal('https://api.openai.com/v1')
+  const [connKey, setConnKey] = createSignal('')
+  const [connTesting, setConnTesting] = createSignal(false)
+  const [connResult, setConnResult] = createSignal<{ ok: boolean; text: string } | null>(null)
+  async function testConnection() {
+    setConnTesting(true)
+    setConnResult(null)
+    try {
+      const { providerTest } = await import('../api/neocodex')
+      const r = await providerTest(connUrl().trim())
+      setConnResult({ ok: r.ok, text: `● ${r.status_code} · ${r.latency_ms}ms` })
+    } catch (e) {
+      setConnResult({ ok: false, text: `○ ${e instanceof Error ? e.message.slice(0, 40) : 'unreachable'}` })
+    } finally {
+      setConnTesting(false)
+    }
+  }

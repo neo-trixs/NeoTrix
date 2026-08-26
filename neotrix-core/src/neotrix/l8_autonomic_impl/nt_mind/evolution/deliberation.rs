@@ -7,11 +7,15 @@
 //! - 共识度量：基于论证图的共识度量
 //! - 落盘：辩论记录落 KB 供审计/学习
 
+#[allow(unused_imports)]
 use crate::core::nt_core_kb_primitives::now;
 #[allow(unused_imports)]
 use crate::neotrix::l8_autonomic_impl::nt_mind::evolution::casebase::Severity;
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
 use std::collections::{BTreeMap, HashMap};
+#[allow(unused_imports)]
 use std::sync::{Arc, RwLock};
 
 /// DeliberationEngine namespace。
@@ -492,10 +496,15 @@ pub fn start_deliberation(
 
 #[cfg(test)]
 mod tests {
+#[allow(unused_imports)]
     use super::*;
+#[allow(unused_imports)]
     use crate::neotrix::l8_autonomic_impl::nt_mind::evolution::casebase::{EthicalCase, ConflictType};
+#[allow(unused_imports)]
     use crate::neotrix::l8_autonomic_impl::nt_mind::evolution::ethical_intuition::IntuitionJudgment;
+#[allow(unused_imports)]
     use std::collections::HashSet;
+#[allow(unused_imports)]
     use crate::core::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 

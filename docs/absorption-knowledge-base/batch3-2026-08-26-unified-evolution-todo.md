@@ -164,3 +164,53 @@ Wave 3 spike 并行, 每个 spike 出 Given/When/Then 判定后才允许 bud
 3. 落地项 `neotrix-capability` bud/strengthen 登记 (R-P100)
 4. 经验五阶段吸收 → cycle 递增落 KB
 5. 本文件 checkbox 勾选 + TODO.md 指针同步
+
+
+---
+
+## Wave 4 — P0/P1/P2 交接任务 (2026-08-26 收官盘点, 移交后续 session)
+
+> 来源: 本批执行中发现的治理违规 / 审计留痕 / 判定暂缓项
+> 纪律不变: R-P42 强化现有节点 · R-P79 消费者具名 · 每任务四要素
+
+### 🔴 P0 — 下 session 必做
+
+- [ ] **H1: core→impl 越层 ×2 修复** 〔NT-GOVERNANCE〕
+  - 违规点: `core/neotrix_consciousness/consciousness_runtime.rs:150` (nt_field_ledger 引用) + `core/l7_capability/consciousness_bridge.rs:315` (federation import)
+  - 检测面: `test_core_boundary_allowlist_covers_all_reverse_deps` 当前红
+  - 注意: 两处均属并行 session 在途工作, 先确认归属/意图再动 (可能待加受控边界 allowlist 而非回改)
+  - 判据: 守卫测试绿; `cargo test --lib -p neotrix test_core_boundary` 通过
+
+- [ ] **H2: e8_state 合成值修复** 〔NT-CORE, StepCreditAuditStage 首靶点〕
+  - 缺陷: `pipeline.rs CreditAssignmentStage` 用 `let e8_state = (step % 64)` 合成 E8 卦位, 非真实转移 → 信用图 E8 维度不可解释
+  - 动作: 从 `TrajectoryStep.reasoning_hexagram` (nt_core_prm/types.rs) 取真实卦位回填; credit_event 构造处替换
+  - 判据: StepCreditAudit 结构发现不再报该条; 信用图 JSON 中 e8_state 与 trajectory 一致抽样 ≥95%
+
+- [ ] **H3: cli_session_backend 并发抖动加固** 〔NT-ACT〕
+  - 症状: 全量套件下 echo/failing_backend 偶发失败 (本 session 两次观察到), 单跑稳定 8/8
+  - 动作: 测试间端口/临时目录隔离或进程级串行标记
+  - 判据: 连续 3 次全量 `cargo test --lib` 该模块零失败
+
+### 🟡 P1 — 本周
+
+- [ ] **H4: 情报准入工具分批接线 ×10** 〔NT-WORLD, W3.4 交付物消费〕
+  - 清单: GDELT search / SEC EDGAR filings / USGS 地震 / GDACS 灾害 / UCDP 冲突 / adsb.lol 军航(med 风险) / URLhaus+CISA KEV / OFAC 制裁 / Polymarket / AOI 围栏模式
+  - 首个: GDELT DOC API (免费无 key, 直喂 intel-watch) — fetch→解析→KB 入库 E2E + Egress Policy allow 登记
+  - 判据(每工具): 单源拉取入库 E2E 通过 + `neotrix-capability` bud 登记
+  - 参考: notes/w34-world-intel-tool-assessment.md
+
+- [ ] **H5: W3.7 SEAL 自改进对照实验** 〔NT-MIND〕
+  - 前置已就位: StepCreditAuditStage 信号面 (credit_audit KB namespace)
+  - 动作: 选一项 L0 技能跑完整 SEAL 循环验证 C0→C2; 审计分歧信号驱动迭代判定
+  - 判据: 技能成熟度晋升有 audit 证据链
+
+- [ ] **H6: W3.8 频次学习排序微增量** 〔NT-IO, ~30 行〕
+  - 动作: CompletionsCmd.candidates 接 usage 计数 (KB kv 计数器) 降序输出
+  - 判据: 高频命令排前; 零计数保持字典序兜底
+
+### ⚪ P2 — 观察项 (解锁条件驱动)
+
+- [ ] **H7: W3.2 学术插图自动化** — 解锁条件: 多模态生成模型面接入
+- [ ] **H8: W3.3 easy_tdx 行情源** — 解锁条件: 有网环境 (TDX 裸 TCP 7709)
+- [ ] **H9: kb_vector_index instant_distance 迁移收尾** — 归属并行 session 在途, 仅跟踪不代做 (15:50 仍在编辑)
+- [ ] **H10: 未提交文件处置** — 5 文件 (Chat.tsx/ChatShellProto.tsx/tui theme/arch_fitness/chat panels.ts), 归属并行 session 前端工作流, 提交决策归 owner
