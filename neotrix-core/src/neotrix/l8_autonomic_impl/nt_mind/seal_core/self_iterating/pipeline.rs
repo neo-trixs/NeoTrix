@@ -2440,6 +2440,14 @@ pub fn compute_credit_divergence(
     discount: f64,
 ) -> CreditAuditReport {
     let n = rewards.len();
+    // 常值奖励 ⇒ 无信用分歧可言: raw z 分母退化归零, 几何回传坡度纯属折现伪影
+    if rewards.windows(2).all(|w| (w[0].1 - w[1].1).abs() < 1e-12) {
+        return CreditAuditReport {
+            steps_audited: n,
+            max_divergence: 0.0,
+            divergent_steps: Vec::new(),
+        };
+    }
     let mut backprop = vec![0.0f64; n];
     // 回传: credit[i] = r[i] + discount * credit[i+1]
     for i in (0..n).rev() {

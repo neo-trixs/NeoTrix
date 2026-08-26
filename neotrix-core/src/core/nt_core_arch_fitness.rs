@@ -120,6 +120,10 @@ const CORE_BOUNDARY_ALLOW: &[(&str, &str)] = &[
     ("nt_core_consciousness_core.rs", "l3_memory_impl::nt_memory_kb"),
     ("nt_core_second_brain.rs", "nt_memory_kb"),
     ("nt_core_consciousness/consciousness_runtime.rs", "nt_memory_kb"),
+    // G3 场账本受控边界: 场感知游标经 field_journal_since 读 KB 版本链
+    ("nt_core_consciousness/consciousness_runtime.rs", "l3_memory_impl::nt_memory_kb"),
+    // 既有 documented 边界: 桥接层消费 l8 进化联邦信号
+    ("l7_capability/consciousness_bridge.rs", "l8_autonomic_impl::nt_mind::evolution::federation"),
     ("nt_core_e8/nt_core_community_ingester.rs", "nt_memory_kb"),
     ("l7_capability/nt_core_orch_agent.rs", "nt_memory_kb"),
     // 能力网聚合 (nt_file_ability) 供 consciousness_core 消费

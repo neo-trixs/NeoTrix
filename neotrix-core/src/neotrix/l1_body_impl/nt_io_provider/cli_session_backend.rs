@@ -38,6 +38,16 @@ impl CliSessionProvider {
         Some(Self { command, model_label })
     }
 
+    /// 测试专用直构器: 绕开进程级 env (多线程测试下 set_var/remove_var 是
+    /// UB 温床, KNOWN FLAKY 根因)。生产路径仍唯一走 from_env。
+    #[cfg(test)]
+    fn from_command_for_test(cmd: &str, model_label: &str) -> Self {
+        Self {
+            command: split_command(cmd).expect("valid test command"),
+            model_label: model_label.to_string(),
+        }
+    }
+
     /// Flatten a multi-turn request into one single-shot prompt. CLI agent
     /// backends are stateless per invocation; roles are tagged so the model
     /// can reconstruct the conversation shape.
@@ -261,34 +271,29 @@ mod tests {
 
     /// 端到端: cat 后端原样回显 stdin → complete 返回 prompt 全文。
     #[test]
-    /// KNOWN FLAKY: 环境变量竞态 — 单独跑通过，全量跑可能因并行 set_var 竞态失败
+    /// 经 from_command_for_test 直构 — 不触碰进程级 env, 根治 KNOWN FLAKY
     fn test_complete_echo_backend() {
-        let _g = env_guard();
-        clear_env();
-        std::env::set_var(ENV_BACKEND_CMD, "sh -c cat");
-        let p = CliSessionProvider::from_env().expect("env set");
+        let p = CliSessionProvider::from_command_for_test("sh -c cat", "cli-session");
         let request = LlmRequest::new("m", "echo-me");
         let rt = tokio::runtime::Runtime::new().expect("rt");
         let resp = rt.block_on(p.complete(&request)).expect("complete ok");
         assert_eq!(resp.content, "[User] echo-me");
         assert_eq!(resp.usage.total_tokens, 0, "activity record only — zeroed usage");
-        clear_env();
     }
 
     /// 负例: 后端非零退出 → Err(Server), stderr 进错误信息。
     #[test]
-    /// KNOWN FLAKY: 同上
+    /// 经直构器绕开 env 竞态 (同上)
     fn test_complete_failing_backend_is_server_error() {
-        let _g = env_guard();
-        clear_env();
-        std::env::set_var(ENV_BACKEND_CMD, "sh -c 'cat >/dev/null; echo boom >&2; exit 3'");
-        let p = CliSessionProvider::from_env().expect("env set");
+        let p = CliSessionProvider::from_command_for_test(
+            "sh -c 'cat >/dev/null; echo boom >&2; exit 3'",
+            "cli-session",
+        );
         let request = LlmRequest::new("m", "hi");
         let rt = tokio::runtime::Runtime::new().expect("rt");
         match rt.block_on(p.complete(&request)) {
             Err(LlmError::Server(msg)) => assert!(msg.contains("boom"), "stderr surfaced: {}", msg),
             other => panic!("expected Server error, got {:?}", other.map(|_| ())),
         }
-        clear_env();
     }
 }
