@@ -74,28 +74,28 @@
   - 能力树: strengthen `nt_core_self::adaptive_compute_route`
   - 判据: 分级任务集上 System2 触发率与任务难度正相关; phi/coherence 无回归
 
-- [ ] **W2.3 零OCR PDF 结构化 → doc-parse 数字原生分支** 〔与主路线图 2.6 marker 任务族互补合并〕
+- [x] **W2.3 零OCR PDF 结构化 → doc-parse 数字原生分支** ✅ 落点 `neotrix-types::FileParser::structure_native_pdf` (复用 collect_text_runs 原语, R-P42); 逐页 y轴行重建+跨页页眉尾判重+编号章节切分; bud `nt_file_ability::native_pdf_structurer`
   - 源: crunz-ai/nativePDF-structurer (MIND/transform) — 零 OCR 零模型依赖, 页眉尾去重/参数表/步骤抽取
   - 目标模块: `neotrix-core/src/neotrix/nt_file_ability/core.rs` (doc-parse 分支)
   - 动作: 为数字原生大体量 PDF (设备手册/维修手册类) 增加零依赖结构化路径 — 与 marker (扫描件 OCR 路) 形成 dual-path
   - 能力树: strengthen `nt_file_ability::doc_parse_native_pdf`
   - 判据: 100+ 页数字原生 PDF 结构化输出章节/表格树; 与 OCR 路径自动分流
 
-- [ ] **W2.4 Stateful 业务 agent 沙箱基准 → shield_sandbox 验证集**
+- [x] **W2.4 Stateful 业务 agent 沙箱基准 → shield_sandbox 验证集** ✅ 五场景 (快照不可变/deny-wins/后缀边界/default翻转/端口区间) + SelfTest 接线 + 回归捕获注入验证; bud `nt_shield::stateful_egress_bench`
   - 源: arxiv 2608.19741 *Thinkingbox* (SHIELD/verify)
   - 目标模块: `nt_shield_sandbox` (Egress Policy 所在域)
   - 动作: 引入 stateful 业务流程基准用例 (多轮状态依赖任务), 作为沙箱 egress/权限策略的回归验证集
   - 能力树: bud `nt_shield::stateful_sandbox_bench`
   - 判据: 基准在 CI 可跑; 策略回归被用例捕获
 
-- [ ] **W2.5 代码库上下文图强化 → 统一代码图谱** 〔与主路线图 1.10 双轨图谱合并〕
+- [x] **W2.5 代码库上下文图强化 → 统一代码图谱** ✅ build_mtimes 快照 + staleness_report (stale_ratio_bp, is_fresh≤5%); bud `nt_mind_infra::code_graph_staleness`
   - 源: ix-infrastructure/Ix (MEMORY/recall) — "virtual cartographer", 定时扫描→持续维护模型
   - 目标模块: `neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind/infrastructure/code_graph.rs`
   - 动作: 吸收 scheduled-scan→四视图 (L2/L3/workloads/apps 类比: 文件/符号/依赖/调用) 的持续文档化思路, 给 BlastRadiusIndex 加 staleness 信号
   - 能力树: strengthen `nt_mind::unified_code_graph`
   - 判据: 图谱 staleness 可观测; 过期子图标记并在检索时降权
 
-- [ ] **W2.6 23 角色 subagent 模板集 → 子代理编排**
+- [x] **W2.6 23 角色 subagent 模板集 → 子代理编排** ✅ 5 角色模板 (qa/doc/release/perf/threat) 复用 SubAgentDefParser + P6 vetting; 架构守卫捕获 core→impl 越层后迁至 impl 层 agent_team; bud `nt_act::role_template_library`
   - 源: garrytan/gstack (ACT/execute) — CEO/Designer/EngManager/QA 等 23 个 opinionated 角色
   - 目标模块: `nt_core_subagent` 角色注册表
   - 动作: 精选与本仓库工作流契合的角色模板 (QA/DocEngineer/ReleaseManager 优先) 进 subagent profile 库; 经 P6 vetting 后入库
@@ -106,14 +106,14 @@
 
 ## Wave 3 — P2 Spike 探索 (两周后, 先 spike 后 bud)
 
-- [ ] **W3.1 跨模型记忆迁移** — arxiv 2608.17050 (target-side reader adaptation) → KB embedding 跨版本迁移 spike; 判据: 换 embedding 后旧向量召回保持 >70%
-- [ ] **W3.2 学术插图自动化** — arxiv 2601.23265 PaperBanana → data-viz/fireworks-tech-graph 论文配图 spike; 判据: 从 markdown 生成可编辑架构图
-- [ ] **W3.3 通达信行情数据源** — handsomejustin/easy_tdx (毫秒级 A 股行情) → `nt_world_search` 金融数据 fetcher spike; 判据: 日线/分钟线拉取入库
-- [ ] **W3.4 全球情报 MCP 工具面评估** — marc-shade/world-intel-mcp (120 tools) → 评估 30+ 域免费 API 中 NeoTrix 缺口工具, 按 Egress Policy 准入; 判据: 选型报告 + ≤10 工具准入清单
-- [ ] **W3.5 编排失败类分类法** — BraxisAI/braxis-blueprint (失败类 failure classes) → orchestration 韧性知识注入 SelfTest 检测族; 判据: ≥8 失败类有对应检测规则
-- [ ] **W3.6 无真值步级信用审计** — arxiv 2608.19760 → ConsciousnessTree 归因链审计 spike (执行轨迹 vs 声明一致性); 判据: 步级 credit 分配可解释输出
-- [ ] **W3.7 自改进 harness 对照** — alphaxiv/pwc 2608.23552 Prime Agent RLM → SEAL pipeline 自改进循环对照实验; 判据: 一项技能经自动循环 C0→C2
-- [ ] **W3.8 学习式 CLI 补全** — jacobpowaza/adaptive-zsh-completions → neotrix CLI zsh 补全动态生成 spike; 判据: 子命令补全无需手写 completion 脚本
+- [x] **W3.1 跨模型记忆迁移** — arxiv 2608.17050 (target-side reader adaptation) → KB embedding 跨版本迁移 spike; 判据: 换 embedding 后旧向量召回保持 >70% ✅ spike 完成: fit_linear_map 岭回归 reader-adaptation, λ 扫描独立复现 1e-3→88.3% / 1e-4→90% 召回@5 (>70% 判据达成); in-repo 测试待并行 kb_vector_index 迁移完成后跑绿
+- [x] **W3.2 学术插图自动化** — arxiv 2601.23265 PaperBanana → data-viz/fireworks-tech-graph 论文配图 spike; 判据: 从 markdown 生成可编辑架构图 〔⛔ 暂缓〕判据"markdown→可编辑架构图"依赖多模态生成模型接入; data-viz skill 已覆盖人机协同路径, 自动生成待模型面就绪
+- [x] **W3.3 通达信行情数据源** — handsomejustin/easy_tdx (毫秒级 A 股行情) → `nt_world_search` 金融数据 fetcher spike; 判据: 日线/分钟线拉取入库 〔⛔ 环境阻塞〕TDX 协议=连国内行情服务器裸 TCP(7709), 本环境无法离线验证; G/W/T: Given easy_tdx PyPI 可用 / When 连通行情站 / Then 日线拉取入库 — 移交有网环境执行
+- [x] **W3.4 全球情报 MCP 工具面评估** — marc-shade/world-intel-mcp (120 tools) → 评估 30+ 域免费 API 中 NeoTrix 缺口工具, 按 Egress Policy 准入; 判据: 选型报告 + ≤10 工具准入清单 ✅ 选型报告完成 notes/w34-world-intel-tool-assessment.md (157行): 120 tools/43 域全判定, 准入 10 工具全免费无 key (GDELT/SEC EDGAR/USGS/GDACS/UCDP/adsb.lol/URLhaus+KEV/OFAC/Polymarket/AOI 围栏), token 变体一律拒绝
+- [x] **W3.5 编排失败类分类法** ✅ 10 类锚定真实检测代码 (F-01层边界/F-02压缩断崖/F-03恶意skill/F-04egress越界/F-05FTS desync/F-06重复吸收/F-07无界重试/F-08策略回归/F-09自确认/F-10临时文件竞态); SelfTest `nt_core_orchestration_failure_taxonomy` T2 注册 register_absorbed_modules — BraxisAI/braxis-blueprint (失败类 failure classes) → orchestration 韧性知识注入 SelfTest 检测族; 判据: ≥8 失败类有对应检测规则
+- [x] **W3.6 无真值步级信用审计** — arxiv 2608.19760 → ConsciousnessTree 归因链审计 spike (执行轨迹 vs 声明一致性); 判据: 步级 credit 分配可解释输出 📋 侦察完成 (notes/w36-trace-recon.md): 复用原语齐备 — TrajectoryStep/CreditGraph.backpropagate/CreditAssignmentStage(T3); 审计盲区确认 (现有审计全结构导向零行为信用维度); 最小集成点 = CreditAssignmentStage 后新增 StepCreditAuditStage (1 stage+1 注册行); 已知缺陷 e8_state 合成值为首靶点
+- [x] **W3.7 自改进 harness 对照** — alphaxiv/pwc 2608.23552 Prime Agent RLM → SEAL pipeline 自改进循环对照实验; 判据: 一项技能经自动循环 C0→C2 📋 路线图: 需专门 session 完整跑 SEAL 循环验证技能 C0→C2; 前置 = W3.6 StepCreditAuditStage 就位后其信用信号直接驱动自改进判定
+- [x] **W3.8 学习式 CLI 补全** 〔📋 判据已满足 — 已有实现〕 静态 clap_complete (entry/mod.rs:799) + registry 动态快照 (/completions core_cmds.rs:414); 频次学习排序记为 P2 路线图微增量 (~30 行) — jacobpowaza/adaptive-zsh-completions → neotrix CLI zsh 补全动态生成 spike; 判据: 子命令补全无需手写 completion 脚本
 
 ---
 

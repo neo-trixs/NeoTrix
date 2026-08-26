@@ -26,6 +26,7 @@ pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
 pub mod kb_cognition;
+pub mod kb_vector_index;
 pub mod nt_memory_distill;
 pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;

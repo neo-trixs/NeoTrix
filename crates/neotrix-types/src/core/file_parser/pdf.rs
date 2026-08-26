@@ -1354,10 +1354,9 @@ impl FileParser {
                         body_lines: Vec::new(),
                     }),
                     None => match sections.last_mut() {
-                        Some(last) if last.title == "\u{0}preamble" => {
-                            last.body_lines.push(text.clone());
-                        }
-                        _ => sections.push(PdfSection {
+                        // 正文挂到最近章节 (或文档开头隐式导语节)
+                        Some(last) => last.body_lines.push(text.clone()),
+                        None => sections.push(PdfSection {
                             level: 3,
                             title: "\u{0}preamble".into(),
                             body_lines: vec![text.clone()],
@@ -2121,6 +2120,7 @@ mod native_structurer_tests {
             .iter()
             .find(|s| s.title.starts_with("1 Installation"))
             .unwrap();
+        println!("DEBUG sections: {:?}", doc.sections);
         assert!(ch1.body_lines.iter().any(|l| l.contains("grounding")));
     }
 
@@ -2138,44 +2138,5 @@ mod native_structurer_tests {
         let doc = FileParser::structure_native_pdf(b"not a pdf");
         assert_eq!(doc.pages, 0);
         assert!(doc.sections.is_empty());
-    }
-}
-
-#[cfg(test)]
-mod debug_probe {
-    use super::*;
-    use lopdf::Stream;
-    use lopdf::content::Operation;
-    use lopdf::dictionary;
-    #[test]
-    fn probe_pages_output() {
-        let mut doc = lopdf::Document::with_version("1.4");
-        let pages_id = doc.new_object_id();
-        let font_id = doc.add_object(dictionary! {"Type"=>"Font","Subtype"=>"Type1","BaseFont"=>"Courier"});
-        let resources_id = doc.add_object(dictionary! {"Font"=>dictionary!{"F1"=>font_id}});
-        let mut kids = vec![];
-        for body in ["AAA", "BBB", "CCC"] {
-            let mut ops = vec![];
-            let mut y = 780.0f32;
-            for l in ["HDRX HEADER LINE", body, "FOOTX FOOTER LINE"] {
-                ops.push(Operation::new("BT", vec![]));
-                ops.push(Operation::new("Tf", vec!["F1".into(), 11.into()]));
-                ops.push(Operation::new("Tm", vec![1.into(),0.into(),0.into(),1.into(),60.into(),y.into()]));
-                ops.push(Operation::new("Tj", vec![lopdf::Object::string_literal(l.to_string())]));
-                ops.push(Operation::new("ET", vec![]));
-                y -= 30.0;
-            }
-            let cid = doc.add_object(Stream::new(dictionary!{}, lopdf::content::Content{operations:ops}.encode().unwrap()));
-            let page = doc.add_object(dictionary!{"Type"=>"Page","Parent"=>pages_id,"Contents"=>cid,"Resources"=>resources_id,"MediaBox"=>vec![0.into(),0.into(),595.into(),842.into()]});
-            kids.push(page.into());
-        }
-        doc.objects.insert(pages_id, lopdf::Object::Dictionary(dictionary!{"Type"=>"Pages","Kids"=>kids,"Count"=>3}));
-        let cat = doc.add_object(dictionary!{"Type"=>"Catalog","Pages"=>pages_id});
-        doc.trailer.set("Root", cat);
-        let mut buf = Vec::new(); doc.save_to(&mut buf).unwrap();
-        println!("PAGES: {:?}", FileParser::extract_pdf_pages(&buf));
-        for b in FileParser::extract_pdf_spatial(&buf) { println!("BLK y={:.0} x={:.0} t={}", b.y, b.x, b.text); }
-        let d = FileParser::structure_native_pdf(&buf);
-        println!("STRUCT: pages={} dropped={} sections={:?}", d.pages, d.dropped_header_footer_lines, d.sections.iter().map(|s| (&s.title, s.level)).collect::<Vec<_>>());
     }
 }

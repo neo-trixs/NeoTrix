@@ -45,12 +45,12 @@ impl std::fmt::Display for ExprNode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DaoEngineConfig { pub population_size: usize, pub max_generations: usize }
-impl Default for DaoEngineConfig { fn default() -> Self { Self { population_size: 100, max_generations: 50 } } }
+pub struct SymRegConfig { pub population_size: usize, pub max_generations: usize }
+impl Default for SymRegConfig { fn default() -> Self { Self { population_size: 100, max_generations: 50 } } }
 
-pub struct DaoEngine { pub config: DaoEngineConfig, pub best_expr: Option<String> }
-impl DaoEngine {
-    pub fn new(c: DaoEngineConfig) -> Self { Self { config: c, best_expr: None } }
+pub struct SymbolicRegressionEngine { pub config: SymRegConfig, pub best_expr: Option<String> }
+impl SymbolicRegressionEngine {
+    pub fn new(c: SymRegConfig) -> Self { Self { config: c, best_expr: None } }
     pub fn fit_linear(&mut self, x: &[f64], y: &[f64]) -> Result<String, String> {
         if x.len() != y.len() || x.is_empty() { return Err("mismatch".into()); }
         let n = x.len() as f64;
@@ -105,7 +105,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_fit_quadratic() {
-        let mut e = DaoEngine::new(DaoEngineConfig::default());
+        let mut e = SymbolicRegressionEngine::new(SymRegConfig::default());
         let x: Vec<f64> = vec![1.0, 2.0, 3.0, 4.0];
         let y: Vec<f64> = vec![1.0, 4.0, 9.0, 16.0]; // y = x²
         let result = e.fit_quadratic(&x, &y);
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_fit_linear() {
-        let mut e = DaoEngine::new(DaoEngineConfig::default());
+        let mut e = SymbolicRegressionEngine::new(SymRegConfig::default());
         let x: Vec<f64> = (0..5).map(|i| i as f64).collect();
         let y: Vec<f64> = x.iter().map(|v| 2.0 * v + 1.0).collect();
         assert!(e.fit_linear(&x, &y).unwrap().contains("x"));

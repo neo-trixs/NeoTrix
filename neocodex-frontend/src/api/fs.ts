@@ -41,3 +41,14 @@ export async function writeTextFileAt(path: string, contents: string): Promise<v
   if (!isTauriRuntime()) throw new Error('文件写入仅在桌面宿主可用')
   await writeTextFile(path, contents)
 }
+
+/** 弹出系统目录选择器，返回所选目录路径（取消返回 null） */
+export async function openDirectoryDialog(): Promise<string | null> {
+  try {
+    const dlg = await import('@tauri-apps/plugin-dialog')
+    const selected = await dlg.open({ directory: true })
+    return typeof selected === 'string' ? selected : null
+  } catch {
+    return null
+  }
+}

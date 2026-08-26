@@ -172,6 +172,7 @@ pub mod nt_core_schema_watchdog;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_second_brain;
 pub mod nt_core_self_test;
+pub mod nt_core_orchestration_failure_taxonomy;
 pub mod nt_core_self_test_integration;
 pub mod nt_core_simulate_engine;
 #[cfg(feature = "research")]

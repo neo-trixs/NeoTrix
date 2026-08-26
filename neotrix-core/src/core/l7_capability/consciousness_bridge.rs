@@ -265,3 +265,58 @@ mod self_tests {
         // 3. 无 panic 即健康
     }
 }
+
+// ═══ SelfTest 覆盖扩展 — P1-P5 新模块自动健康检测 (E2) ═══
+
+/// 规则记忆体健康检测
+pub struct RuleMemorySelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for RuleMemorySelfTest {
+    fn name(&self) -> &str { "rule_memory" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut errs = Vec::new();
+        let conn = match crate::core::nt_core_kb_primitives::open_raw_conn() {
+            Some(c) => c,
+            None => { errs.push("KB unavailable".into()); return Err(errs); }
+        };
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).ok();
+        // 验证 rule namespace 可读写
+        if crate::core::nt_core_kb_primitives::kv_set(&conn, "rule", "_health_check", "ok").is_err() {
+            errs.push("rule namespace write failed".into());
+        }
+        if crate::core::nt_core_rule_memory::rule_list(&conn).is_err() {
+            errs.push("rule_list failed".into());
+        }
+        crate::core::nt_core_kb_primitives::kv_delete(&conn, "rule", "_health_check").ok();
+        if errs.is_empty() { Ok(()) } else { Err(errs) }
+    }
+}
+
+/// 意识体桥接健康检测
+pub struct ConsciousnessBridgeSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for ConsciousnessBridgeSelfTest {
+    fn name(&self) -> &str { "consciousness_bridge" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let b = bridge();
+        b.sync_value_weights(HashMap::from([("test".to_string(), 0.8)]));
+        b.set_narrative("health check".into());
+        let _ = b.pre_tick_check(0);
+        Ok(())
+    }
+}
+
+/// 联邦协议健康检测
+pub struct FederationSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for FederationSelfTest {
+    fn name(&self) -> &str { "federation" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        use crate::neotrix::l8_autonomic_impl::nt_mind::evolution::federation::*;
+        let msg = build_message("self_test", FederationMessageType::InsightShare, serde_json::json!({}));
+        if !verify_message(&msg) {
+            return Err(vec!["federation message integrity check failed".into()]);
+        }
+        Ok(())
+    }
+}

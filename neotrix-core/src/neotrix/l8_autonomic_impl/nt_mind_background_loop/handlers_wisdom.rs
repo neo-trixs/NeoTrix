@@ -11,6 +11,18 @@ use super::*;
 // 挂载点: run.rs spawn_handler!(WISDOM_TICK_INTERVAL_SECS, "wisdom", |h| h.handle_wisdom_tick().await)
 // ============================================================================
 
+/// 全局 NativeBus 单例 — 仅创建一次，后续 tick 复用。
+static GLOBAL_BUS: std::sync::OnceLock<std::sync::Arc<crate::core::l7_capability::native_bus::NativeBusHandle>> =
+    std::sync::OnceLock::new();
+
+fn get_or_create_bus() -> std::sync::Arc<crate::core::l7_capability::native_bus::NativeBusHandle> {
+    GLOBAL_BUS.get_or_init(|| {
+        let bus = crate::core::l7_capability::native_bus::NativeBus::new();
+        std::sync::Arc::new(crate::core::l7_capability::native_bus::NativeBusHandle::new(bus))
+    }).clone()
+}
+
+
 pub const WISDOM_TICK_INTERVAL_SECS: u64 = 300;
 
 static WISDOM_AWAKENED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -34,10 +46,7 @@ impl BackgroundLoopHandle {
         // ── 0. NativeBus 挂载到 consciousness_bridge（OnceLock 单例，仅首次创建）──
         {
             // bridge 内部用 RwLock<Option<Arc<>>>，重复 attach 是幂等的
-            let bus = crate::core::l7_capability::native_bus::NativeBus::new();
-            let handle = std::sync::Arc::new(
-                crate::core::l7_capability::native_bus::NativeBusHandle::new(bus)
-            );
+            let handle = get_or_create_bus();
             crate::core::l7_capability::consciousness_bridge::attach_native_bus(handle);
         }
 

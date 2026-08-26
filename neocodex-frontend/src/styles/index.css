@@ -773,6 +773,10 @@
   }
 
   /* —— 红绿灯窗口点（自绘，decorations:false） —— */
+  /* 三色灯安全区: 页面根挂 mac-safe, 交互元素避开左上 (12,14)-(62,26) */
+  .mac-safe {
+    padding-top: 40px;
+  }
   .traffic {
     position: fixed;
     left: 12px;

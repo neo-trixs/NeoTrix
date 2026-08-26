@@ -12,7 +12,7 @@ import { PluginMarketplace } from '../components/PluginMarketplace'
 export function Marketplace() {
   const navigate = useNavigate()
   return (
-    <div class="min-h-screen bg-bg-primary text-text-primary flex flex-col">
+    <div class="min-h-screen mac-safe bg-bg-primary text-text-primary flex flex-col">
       <header class="flex items-center gap-3 px-5 h-12 border-b border-border-primary/40 shrink-0">
         <button
           class="flex items-center gap-1.5 text-13px text-text-muted hover:text-text-primary transition-colors"

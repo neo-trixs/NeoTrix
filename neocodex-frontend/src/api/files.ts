@@ -13,7 +13,10 @@ export interface ParsedDocFile {
   tables: unknown[] | null
 }
 
-const DOC_FILTERS = [{ name: '文档', extensions: ['md', 'txt', 'pdf', 'docx', 'xlsx', 'csv'] }]
+const DOC_FILTERS = [
+  { name: '文档', extensions: ['md', 'txt', 'pdf', 'docx', 'xlsx', 'csv'] },
+  { name: '所有文件', extensions: ['*'] },
+]
 
 /** 打开选择器并解析为统一文本; 取消返回 null */
 export async function pickAndParseDoc(): Promise<ParsedDocFile | null> {
@@ -24,4 +27,9 @@ export async function pickAndParseDoc(): Promise<ParsedDocFile | null> {
 
 export function parseDocAt(path: string): Promise<ParsedDocFile> {
   return call('parse_doc_file', { path })
+}
+
+/** 任意文本类文件读取 (代码/配置等) — 走 commands::read_file */
+export function readTextFileAt(path: string): Promise<string> {
+  return call('read_file', { path })
 }

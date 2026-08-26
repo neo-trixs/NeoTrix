@@ -90,7 +90,7 @@ export function Skills() {
   }
 
   return (
-    <div class="min-h-screen bg-bg-primary text-text-primary flex flex-col">
+    <div class="min-h-screen mac-safe bg-bg-primary text-text-primary flex flex-col">
       {/* 顶栏 */}
       <header class="flex items-center gap-3 px-5 h-12 border-b border-border-primary/40 shrink-0">
         <button
