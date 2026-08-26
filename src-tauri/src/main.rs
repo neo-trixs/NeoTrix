@@ -148,6 +148,7 @@ fn main() {
                     commands::get_brain_stats, commands::absorb_source,
                     commands::session_list, commands::session_create,
                                         commands::read_dir_recursive, commands::read_file, commands::write_file, commands::detect_project,
+                    commands::parse_doc_file,
                                         pty_spawn, pty_write, pty_resize, pty_close,
                     permission_dialog::request_permission,
                     permission_dialog::respond_permission,

@@ -19,7 +19,7 @@
 
 ## 🔴 P1 — 功能觉醒（需 Rust 编译或外部条件）
 
-### ⬜ task-awakening-p2: GWT Rust 集成
+### ✅ task-awakening-p2: GWT Rust 集成
 **阻塞**: 需修改 cognitive_hub.rs 连接 KB embeddings 数据流
 **方案**: 创建 `nt_kb_gwt_bridge.rs`，读取 KB embeddings → 计算 activation → 喂入 CognitiveHub
 
@@ -33,7 +33,7 @@
 
 ## 🟡 P2 — 认知深度激活（接通 22K 行断联代码）
 
-### ⬜ task-cog-gwt: GWT 认知枢纽激活
+### ✅ task-cog-gwt: GWT 认知枢纽激活
 **代码**: nt_core_gwt/ 18文件 7,615行
 **缺失**: KB 数据 → cognitive_hub 输入管线
 

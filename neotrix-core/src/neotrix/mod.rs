@@ -228,6 +228,7 @@ pub use nt_file_ability::{
      load_snapshot,
      merge_tables_with, merge_tables_with_mode,
      normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
+     FileModel,
      replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
      suggest_schema, to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport,
      ContentSnapshot, FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation,

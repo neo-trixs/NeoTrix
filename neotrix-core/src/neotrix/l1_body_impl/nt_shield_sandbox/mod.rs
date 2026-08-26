@@ -13,6 +13,7 @@ pub mod docker;
 pub mod judge;
 pub mod provider;
 pub mod remote;
+pub mod stateful_bench;
 
 pub use device::{DeviceSandbox, DeviceTool, SandboxEngine, SandboxSession, SandboxSpec, SandboxStatus};
 

@@ -163,3 +163,36 @@ fn detect_project_type(path: &std::path::Path) -> String {
     if path.join("pom.xml").exists() || path.join("build.gradle").exists() { return "java".to_string(); }
     "folder".to_string()
 }
+/* ══════════════════════════════════════════
+   W1 文件上传: doc-parse 管线 Tauri 暴露
+   (复用 nt_file_ability::doc_parse, R-P42 零平行解析器)
+   ══════════════════════════════════════════ */
+
+#[derive(serde::Serialize)]
+pub struct ParsedDocFile {
+    pub path: String,
+    pub title: String,
+    pub format: String,
+    pub text: String,
+    pub tables: Option<serde_json::Value>,
+}
+
+/// 解析本地文档为统一 FileModel 文本 (md/txt/pdf/docx/xlsx…)。
+/// 供对话附件与「存入知识库」联动 (kb_doc_ingest 直接吃 text)。
+#[command]
+pub fn parse_doc_file(path: String) -> Result<ParsedDocFile, NeoTrixError> {
+    use neotrix::neotrix::nt_file_ability::doc_parse::parse_document;
+    let model = parse_document(std::path::Path::new(&path))
+        .map_err(|e| NeoTrixError::Memory(format!("parse {}: {:?}", path, e)))?;
+    let title = model
+        .title
+        .clone()
+        .unwrap_or_else(|| std::path::Path::new(&path).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
+    Ok(ParsedDocFile {
+        path,
+        title,
+        format: model.format.clone(),
+        text: model.content.clone(),
+        tables: model.tables.clone(),
+    })
+}
