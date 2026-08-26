@@ -3,6 +3,43 @@ use super::*;
 /// GoldStandard 连续未达意识双阈值的升级门限 (tick 数; 默认 600s/tick ≈ 50min 持续无意识)。
 const GOLD_MISS_ESCALATE: usize = 5;
 
+// ── F2 校准数据采集 (W2 配对研究地基) ──
+//
+// 两个 append-only KB namespace (经 field_stage + field_tick 落盘 kv_store):
+//
+// - `gating_decisions` (writer=constitution_gate): ConstitutionGate 裁决日志,
+//   key=`gd_{ts_nanos}`, value={ts_nanos, quality(null|数值), allowed}。
+//   由 handle_awareness 每 tick 从 brain._constitution_gate 环形缓冲排空。
+// - `calibration_pairs` (writer=w3_calibration): 同窗共现配对
+//   quality × selftest 通过率, key=`cp_{ts_nanos}`,
+//   value={quality, pass_rate, total}。由 handle_architecture_audit 在完整
+//   registry 运行后写入, 每次至多一条。
+//
+// **预期消费者**: 未来校准脚本对 kv_store 执行
+// `SELECT key, value FROM kv_store WHERE ns IN ('gating_decisions','calibration_pairs')`
+// 按时间窗 join 即得 {quality → allowed / pass_rate} 配对集, 用于验证 G5 门控阈值
+// (SELF_EDIT_MIN_CONSCIOUSNESS=0.5) 的真实区分度。W2 基线: 有效配对点=0
+// (experience feedback 全零、fruit quality 循环推导), 本机制让配对数据从
+// 接线日起真实积累。
+
+/// 当前时刻 UNIX 纪元纳秒 (F2 落盘键时间源; 兜底 0 保证不 panic)。
+fn now_nanos_u64() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64
+}
+
+/// 构造同窗共现配对 JSON (quality × selftest 通过率; calibration_pairs 的 value 契约)。
+fn calibration_pair_json(quality: f64, pass_rate: f64, total: usize) -> String {
+    serde_json::json!({
+        "quality": quality,
+        "pass_rate": pass_rate,
+        "total": total,
+    })
+    .to_string()
+}
+
 /// Volition 目标向量: 认知前沿探索目标 (256B, 与候选 action 等长以供 QuantizedVSA 相似度)。
 fn volition_goal_vector() -> Vec<u8> {
     b"EPISTEMIC_FRONTIER_EXPLORE_LOW_DENSITY_DOMAINS"
@@ -600,6 +637,36 @@ impl BackgroundLoopHandle {
                 );
             }
         }
+        // ── F2 机制一: 门控裁决日志排空 (append-only → KB `gating_decisions`) ──
+        // ConstitutionGate 的两条应用通路 (skillopt BoundedEditStage / seal_loop
+        // code_review_iterate) 均不持有 kb, 故在此意识 tick 统一排空环形缓冲:
+        // 写锁窗口只覆盖 drain 本身, KB 写在锁外执行 (短临界区)。
+        // kb 缺失时不排空 — 数据留缓冲等下次 tick (cap 64 兜底防无界)。
+        if let Some(ref kb) = self.kb {
+            let decisions = if let Ok(mut brain) = self.brain.try_write() {
+                brain._constitution_gate.drain_decisions()
+            } else {
+                Vec::new()
+            };
+            if !decisions.is_empty() {
+                for d in &decisions {
+                    let _ = kb.field_stage(
+                        "gating_decisions",
+                        &format!("gd_{}", d.ts_nanos),
+                        &d.to_json(),
+                        "constitution_gate",
+                    );
+                }
+                match kb.field_tick() {
+                    Ok(_) => log::debug!(
+                        "[bg] constitution_gate: drained {} decisions to KB gating_decisions",
+                        decisions.len()
+                    ),
+                    Err(e) => log::warn!("[bg] constitution_gate: field_tick failed: {e}"),
+                }
+            }
+        }
+
         // Record state metrics from the runtime tick
         self.state.record_metric(
             "phi",
@@ -1867,6 +1934,40 @@ impl BackgroundLoopHandle {
             results.len()
         );
 
+        // ── F2 机制二: 同窗共现配对 (quality × selftest 通过率 → KB `calibration_pairs`) ──
+        // 完整 registry 每次运行产出至多一条配对 (防刷屏): 通过率取自本次
+        // run_all 结果汇总 (passed/total), quality 取 brain._last_consciousness_quality —
+        // 两者同窗采集, 构成 W2 校准研究的真实观测点 (此前有效配对点=0)。
+        let total = results.len();
+        if total > 0 {
+            let passed = results.iter().filter(|r| r.passed).count();
+            let pass_rate = passed as f64 / total as f64;
+            if let Some(ref kb) = self.kb {
+                if let Ok(brain) = self.brain.try_read() {
+                    let quality = brain._last_consciousness_quality;
+                    drop(brain);
+                    let pair_json = calibration_pair_json(quality, pass_rate, total);
+                    if let Err(e) = kb.field_stage(
+                        "calibration_pairs",
+                        &format!("cp_{}", now_nanos_u64()),
+                        &pair_json,
+                        "w3_calibration",
+                    ) {
+                        log::warn!("[bg] calibration_pairs: field_stage failed: {e}");
+                    } else if let Err(e) = kb.field_tick() {
+                        log::warn!("[bg] calibration_pairs: field_tick failed: {e}");
+                    } else {
+                        log::debug!(
+                            "[bg] calibration_pairs: staged quality={:.3} pass_rate={:.3} total={}",
+                            quality,
+                            pass_rate,
+                            total
+                        );
+                    }
+                }
+            }
+        }
+
         // Cycle 206 R-P79 闭环: 从 KB absorbed_capability 元数据同步到能力网分支
         if let Some(kb) = self.kb.clone() {
             if let Some(ref mut tree) = self.consciousness_tree {
@@ -2061,5 +2162,41 @@ impl BackgroundLoopHandle {
             "[bg] consciousness_core: tick branch health from {} lightweight SelfTest results",
             results.len()
         );
+    }
+}
+
+#[cfg(test)]
+mod f2_calibration_tests {
+    use super::*;
+
+    #[test]
+    fn test_calibration_pair_json_parseable() {
+        // F2 机制二契约: calibration_pairs value 为单行 JSON,
+        // W2 校准脚本 serde_json 解析即得 {quality, pass_rate, total} 配对。
+        let raw = calibration_pair_json(0.62, 0.75, 40);
+        let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(v["quality"], serde_json::json!(0.62));
+        assert_eq!(v["pass_rate"], serde_json::json!(0.75));
+        assert_eq!(v["total"], serde_json::json!(40));
+        assert_eq!(v.as_object().unwrap().len(), 3, "配对 JSON 应恰含三键");
+    }
+
+    #[test]
+    fn test_calibration_pair_pass_rate_bounds() {
+        // 全过 / 全挂两个极端: pass_rate ∈ [0,1], total 保真
+        let all_pass: serde_json::Value =
+            serde_json::from_str(&calibration_pair_json(0.9, 30.0 / 30.0, 30)).unwrap();
+        assert_eq!(all_pass["pass_rate"], serde_json::json!(1.0));
+        let all_fail: serde_json::Value =
+            serde_json::from_str(&calibration_pair_json(0.1, 0.0 / 17.0, 17)).unwrap();
+        assert_eq!(all_fail["pass_rate"], serde_json::json!(0.0));
+    }
+
+    #[test]
+    fn test_now_nanos_u64_monotonic_within_window() {
+        // F2 落盘键唯一性前提: 同进程两次取号严格递增 (或兜底 0 场景不 panic)
+        let a = now_nanos_u64();
+        let b = now_nanos_u64();
+        assert!(b >= a, "纳秒时间戳应非递减: {a} -> {b}");
     }
 }
