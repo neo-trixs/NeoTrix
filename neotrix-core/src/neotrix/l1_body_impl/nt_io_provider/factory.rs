@@ -853,6 +853,19 @@ pub async fn create_gateway_async() -> GatewayV2 {
     //   ovh(modelscope/freetheai)   ❌ DNS 不可达 (fake-ip 未命中) → 不注册
     // 结论: 当前真 keyless 仅 llm7 + pollinations(匿名层已关, 探测项)。
 
+    // ── CLI session-reuse backend (absorbed: grok-bot inference router) ──
+    // 本地已认证 CLI agent 作为推理后端 — 复用其现有登录会话, 免 API key。
+    // 打包边界隐私默认: 仅 NEOTRIX_CLI_BACKEND_CMD 显式配置才注册 (fail-closed)。
+    if let Some(cli_backend) = super::cli_session_backend::CliSessionProvider::from_env() {
+        gateway.register_provider_with_category(
+            "cli-session",
+            Box::new(cli_backend),
+            false,
+            ProviderCategory::Cloud,
+        );
+        log::info!("[gateway] CLI session backend registered from {}", super::cli_session_backend::ENV_BACKEND_CMD);
+    }
+
     // Install CostTracker for per-query budget enforcement
     let tracker = CostTracker::new();
     gateway.set_cost_tracker(tracker);

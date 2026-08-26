@@ -92,6 +92,35 @@ const EN_STOP: [&str; 66] = [
 const CONCEPT_MIN_LEN: usize = 3;
 const CONCEPT_MAX_LEN: usize = 8;
 
+// ── Mastra OM 吸收 (experience-tree v2, 2026-08-24) ──
+// 观察/反射 token 预算常量
+const OBS_TOKEN_BUDGET: usize = 30_000;
+const OBS_BUFFER_RATIO: f64 = 0.2;
+const OBS_BUFFER_ACTIVATION: f64 = 0.8;
+const REF_TOKEN_BUDGET: usize = 40_000;
+const REF_BUFFER_ACTIVATION: f64 = 0.5;
+const OBS_BLOCK_AFTER: f64 = 1.2;
+
+/// 简易 token 估算 (单一事实源, 兼容 CJK): 无 tiktoken 时回退逐字符估算 (保守上界, 最小 1)。
+fn estimate_tokens(text: &str) -> usize {
+    if text.is_empty() { return 1; }
+    let mut tokens = 0.0f64;
+    for c in text.chars() {
+        tokens += char_token_cost(c);
+    }
+    (tokens.ceil() as usize).max(1)
+}
+
+/// 单字符 token 成本 (CJK ≈ 1.3, ASCII alnum ≈ 0.25, 其他 ≈ 0.5)。
+fn char_token_cost(c: char) -> f64 {
+    if c.is_ascii_alphanumeric() { 0.25 }
+    else if c.is_ascii_punctuation() || c.is_ascii_whitespace() { 0.2 }
+    else if c as u32 >= 0x4E00 && c as u32 <= 0x9FFF { 1.3 }
+    else if c as u32 >= 0x3040 && c as u32 <= 0x30FF { 1.0 }
+    else if c as u32 >= 0xAC00 && c as u32 <= 0xD7AF { 1.0 }
+    else { 0.5 }
+}
+
 fn en_stop() -> &'static HashSet<&'static str> {
     static SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
     SET.get_or_init(|| EN_STOP.iter().copied().collect())
@@ -1042,6 +1071,8 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
     let mut audit_log: Vec<Value> = Vec::new();
     // 已实际落盘的高信号条目 (供即时 promote, 拒绝冗余/质量门过滤噪声)
     let mut written_high_signal: Vec<Value> = Vec::new();
+    // P0-1 观察阶段收集: (branch_key, entry_json, domain)
+    let mut written_entries: Vec<(String, Value, String)> = Vec::new();
     for (i, raw_entry) in entries.iter().enumerate() {
         let mut e = json!({
             "schema_version": SCHEMA_VERSION,
@@ -1212,6 +1243,10 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
         if e.get("importance").and_then(|x| x.as_f64()).unwrap_or(0.0) >= 0.6 {
             written_high_signal.push(e.clone());
         }
+        // 收集写入成功的条目用于观察阶段 (P0-1 Mastra OM 吸收)
+        let dom = e.get("domain").and_then(|d| d.as_str()).unwrap_or("unknown").to_string();
+        let entry_for_obs = e.clone();
+        written_entries.push((key.clone(), entry_for_obs, dom));
         audit_log.push(json!({
             "idx": i, "decision": "written", "key": key,
             "content_hash": content_hash, "ts": ts,
@@ -1261,7 +1296,7 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
         let mut obs_chunks: Vec<Vec<(String, Value, String)>> = Vec::new();
         let mut current_chunk = Vec::new();
         let mut current_tokens = 0usize;
-        for (bkey, entry, dom) in written_entries {
+        for (bkey, entry, dom) in &written_entries {
             let content = entry.get("content").and_then(|c| c.as_str()).unwrap_or("");
             let tok = estimate_tokens(content);
             if current_tokens + tok > OBS_TOKEN_BUDGET && !current_chunk.is_empty() {
@@ -1270,7 +1305,7 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
                 current_tokens = 0;
             }
             current_tokens += tok;
-            current_chunk.push((bkey, entry, dom));
+            current_chunk.push((bkey.clone(), entry.clone(), dom.clone()));
         }
         if !current_chunk.is_empty() {
             obs_chunks.push(current_chunk);
@@ -3178,9 +3213,9 @@ fn cmd_reflect(conn: &mut Connection, domain: Option<&str>, dry_run: bool) {
         kv_set(conn, NS, &refl_key, &refl_entry.to_string());
         println!("[reflect] reflection entry written: {}", refl_key);
     }
-
     // 5. 更新观察条目: reflection.version++ / last_reflect_ts
-    for (obs_key, mut obs_entry) in observations {
+    for (obs_key, obs_entry) in &observations {
+        let mut obs_entry = obs_entry.clone();
         if let Some(obj) = obs_entry.as_object_mut() {
             let mut refl_meta = obj.get("reflection").cloned().unwrap_or(json!({}));
             if let Some(r) = refl_meta.as_object_mut() {
@@ -3188,8 +3223,6 @@ fn cmd_reflect(conn: &mut Connection, domain: Option<&str>, dry_run: bool) {
                 r.insert("version".to_string(), json!(ver));
                 r.insert("last_reflect_ts".to_string(), json!(now));
             }
-            obj.insert("reflection".to_string(), refl_meta);
-            kv_set(conn, NS, &obs_key, &obs_entry.to_string());
         }
     }
     println!("[reflect] updated {} observation entries with reflection metadata (version={})", observations.len(), version);
@@ -3682,7 +3715,8 @@ fn main() {
         }
         Cmd::Compress { all } => cmd_compress(&mut conn, all),
         Cmd::GenIndex { out, limit } => cmd_gen_index(&conn, &out, limit),
-        Cmd::Sim { a, b, dim } => cmd_sim(&a, &b, dim),        Cmd::Topology {
+        Cmd::Sim { a, b, dim } => cmd_sim(&a, &b, dim),
+        Cmd::Topology {
             dim,
             steps,
             max_points,

@@ -171,7 +171,9 @@ impl ProviderPool {
                 .map(|t| t.is_free())
                 .unwrap_or(false);
             gateway.register_provider_with_category(
-                &entry.label,
+                // 契约: gateway 注册名 = "{provider}/{model}" (与目录命名规范一致,
+                // provider_model() 可直接抽取模型); label 走 AccountPool 映射。
+                &format!("{}/{}", entry.provider, entry.model),
                 provider,
                 is_free,
                 super::provider_catalog::ProviderCategory::Cloud,

@@ -59,6 +59,146 @@ impl LocalDockerProvider {
             CloudRuntime::GenericLinux => ("bash".into(), vec!["-c".into(), code.into()]),
         }
     }
+
+    /// Pure assembly of the `docker run` argument vector for one execution.
+    /// Hardened per the absorbed grok-bot local-sandbox pattern:
+    /// - no network namespace egress (`--network none`);
+    /// - read-only root filesystem; the only writable surface is a size-capped
+    ///   tmpfs at `/tmp` (wrap_command scratch files live there);
+    /// - host uploads are content-addressed per session and mounted `:ro`.
+    fn run_args(
+        session_id: &str,
+        has_uploads: bool,
+        env: &HashMap<String, String>,
+    ) -> Vec<String> {
+        let mut args: Vec<String> = vec![
+            "run".into(),
+            "--rm".into(),
+            "--network".into(),
+            "none".into(),
+            "--read-only".into(),
+            "--tmpfs".into(),
+            "/tmp:rw,size=64m,noexec,nosuid".into(),
+            "--memory".into(),
+            "512m".into(),
+            "--cpus".into(),
+            "1".into(),
+            "--pids-limit".into(),
+            "128".into(),
+            "--label".into(),
+            format!("neotrix-session={}", session_id),
+        ];
+
+        if has_uploads {
+            let tmpdir = format!("/tmp/neotrix-upload-{}", session_id);
+            args.push("-v".into());
+            args.push(format!("{}:/workspace:ro", tmpdir));
+        }
+
+        // 注入 vault 凭据为容器环境变量。仅记录 key 名 — value 永不进日志/遥测。
+        if !env.is_empty() {
+            let mut keys: Vec<&str> = env.keys().map(|k| k.as_str()).collect();
+            keys.sort();
+            log::info!(
+                "[sandbox] injecting {} vault secret(s) into container env (keys: {})",
+                env.len(),
+                keys.join(", ")
+            );
+            for (k, v) in env {
+                args.push("--env".into());
+                args.push(format!("{}={}", k, v));
+            }
+        }
+        args
+    }
+
+    /// Structural fail-closed gate over docker args (defense-in-depth: even
+    /// though we construct args ourselves, future edits cannot silently weaken
+    /// the boundary). Enforces the absorbed loopback-only + read-only-mount
+    /// invariants:
+    /// - `--privileged` and `--network host` are hard denials;
+    /// - every bind mount (`-v`/`--volume`/`--mount`) must be read-only;
+    /// - any published port (`-p`/`--publish`) must be bound to `127.0.0.1` —
+    ///   a bare `"host:container"` spec binds 0.0.0.0 and is denied.
+    pub fn validate_docker_args(args: &[String]) -> Result<(), String> {
+        let mut i = 0;
+        while i < args.len() {
+            let flag = args[i].as_str();
+            match flag {
+                "--privileged" => {
+                    return Err("docker sandbox denies `--privileged`".into());
+                }
+                "--network=host" | "--net=host" => {
+                    return Err("docker sandbox denies `--network host`".into());
+                }
+                "-v" | "--volume" | "--mount" => {
+                    let spec =
+                        args.get(i + 1).ok_or("docker sandbox: volume flag missing value")?;
+                    Self::validate_mount_spec(spec)?;
+                    i += 2;
+                    continue;
+                }
+                "-p" | "--publish" => {
+                    let spec =
+                        args.get(i + 1).ok_or("docker sandbox: publish flag missing value")?;
+                    Self::validate_publish_spec(spec)?;
+                    i += 2;
+                    continue;
+                }
+                "--network" | "--net" => {
+                    let mode = args.get(i + 1).map(|s| s.as_str()).unwrap_or("");
+                    if mode == "host" {
+                        return Err("docker sandbox denies `--network host`".into());
+                    }
+                    i += 2;
+                    continue;
+                }
+                _ => {}
+            }
+            if let Some(spec) = flag.strip_prefix("--publish=") {
+                Self::validate_publish_spec(spec)?;
+            } else if let Some(spec) = flag.strip_prefix("--volume=") {
+                Self::validate_mount_spec(spec)?;
+            }
+            i += 1;
+        }
+        Ok(())
+    }
+
+    /// Bind mounts must be read-only. Accepted forms end with an option list
+    /// containing the `ro` token (`:ro`, `:ro,z`, ...) or use the `--mount`
+    /// long form with `,readonly`. A trailing `rw`, or a bare two-part spec
+    /// (which Docker defaults to rw), is denied.
+    fn validate_mount_spec(spec: &str) -> Result<(), String> {
+        if spec.contains(",readonly") || spec.contains("=readonly") {
+            return Ok(());
+        }
+        let opts = spec.rsplit(':').next().unwrap_or("");
+        let has_ro = opts.split(',').any(|o| o.trim() == "ro");
+        if has_ro {
+            Ok(())
+        } else {
+            Err(format!(
+                "docker sandbox mount must be read-only (`:ro`): got `{}`",
+                spec
+            ))
+        }
+    }
+
+    /// Published ports must be loopback-bound. `"127.0.0.1:8080:80"` passes;
+    /// `"8080:80"` or `"0.0.0.0:8080:80"` would expose on all interfaces and
+    /// is denied fail-closed.
+    fn validate_publish_spec(spec: &str) -> Result<(), String> {
+        let host_part = spec.split(':').next().unwrap_or("");
+        if host_part == "127.0.0.1" || host_part == "[::1]" || host_part == "localhost" {
+            Ok(())
+        } else {
+            Err(format!(
+                "docker sandbox port publish must bind loopback (127.0.0.1): got `{}`",
+                spec
+            ))
+        }
+    }
 }
 
 /// Render docker args for logging with secret values masked (Redactor).
@@ -81,7 +221,7 @@ impl CloudSandboxProvider for LocalDockerProvider {
         env: &HashMap<String, String>,
     ) -> Result<CloudResult, String> {
         let image = Self::image_for(runtime);
-        let (entrypoint, args) = Self::wrap_command(runtime, code);
+        let (entrypoint, cmd_args) = Self::wrap_command(runtime, code);
 
         let has_uploads = self
             .uploaded_files
@@ -89,43 +229,14 @@ impl CloudSandboxProvider for LocalDockerProvider {
             .map(|f| f.contains_key(session_id))
             .unwrap_or(false);
 
-        let mut docker_args: Vec<String> = vec![
-            "run".into(),
-            "--rm".into(),
-            "--network".into(),
-            "none".into(),
-            "--memory".into(),
-            "512m".into(),
-            "--cpus".into(),
-            "1".into(),
-            "--label".into(),
-            format!("neotrix-session={}", session_id),
-        ];
-
-        if has_uploads {
-            let tmpdir = format!("/tmp/neotrix-upload-{}", session_id);
-            docker_args.push("-v".into());
-            docker_args.push(format!("{}:/workspace:ro", tmpdir));
-        }
-
-        // 注入 vault 凭据为容器环境变量。仅记录 key 名 — value 永不进日志/遥测。
-        if !env.is_empty() {
-            let mut keys: Vec<&str> = env.keys().map(|k| k.as_str()).collect();
-            keys.sort();
-            log::info!(
-                "[sandbox] injecting {} vault secret(s) into container env (keys: {})",
-                env.len(),
-                keys.join(", ")
-            );
-            for (k, v) in env {
-                docker_args.push("--env".into());
-                docker_args.push(format!("{}={}", k, v));
-            }
-        }
-
+        let mut docker_args = Self::run_args(session_id, has_uploads, env);
         docker_args.push(image.into());
         docker_args.push(entrypoint);
-        docker_args.extend(args);
+        docker_args.extend(cmd_args);
+
+        // Fail-closed structural gate: loopback-only publish / ro mounts /
+        // no privileged. Runs on every execution before any container starts.
+        Self::validate_docker_args(&docker_args)?;
 
         log::debug!("[sandbox] docker run: {}", redact_docker_args(&docker_args));
 
@@ -242,6 +353,29 @@ impl CloudSandboxProvider for LocalDockerProvider {
         }
         Ok(())
     }
+
+    /// Validate-before-connect gate: the docker daemon must be reachable
+    /// before any workload is dispatched to this provider. A broken local
+    /// environment surfaces as a clean fail-closed denial, never as a
+    /// mid-flight container failure.
+    async fn validate_ready(&self) -> Result<(), String> {
+        let output = tokio::process::Command::new("docker")
+            .args(["info", "--format", "{{.ServerVersion}}"])
+            .output()
+            .await
+            .map_err(|e| format!("docker sandbox unavailable (daemon not reachable): {}", e))?;
+
+        if output.status.success() {
+            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            log::info!("[sandbox] docker daemon validated (server {})", version);
+            Ok(())
+        } else {
+            Err(format!(
+                "docker sandbox unavailable (daemon not reachable): {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    }
 }
 
 #[cfg(all(test, feature = "sandbox"))]
@@ -266,5 +400,92 @@ mod tests {
         let rendered = redact_docker_args(&args);
         assert!(!rendered.contains("sk-supersecret"), "secret must be masked in command log");
         assert!(rendered.contains("[REDACTED]"));
+    }
+
+    fn to_owned(args: &[&str]) -> Vec<String> {
+        args.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// 生产形态参数 (run_args + image + entrypoint) 必须通过结构门。
+    #[test]
+    fn test_production_args_pass_structural_gate() {
+        let mut env = HashMap::new();
+        env.insert("NEOTRIX_VAULT_API_KEY".to_string(), "sk-x".to_string());
+        let mut args = LocalDockerProvider::run_args("sess-1", true, &env);
+        args.push("python:3.11-slim".into());
+        args.push("python3".into());
+        args.push("-c".into());
+        args.push("print(1)".into());
+        LocalDockerProvider::validate_docker_args(&args).expect("production args must pass");
+    }
+
+    /// run_args 硬化结构: 无网络 / 只读根 fs / 上传挂载 :ro。
+    #[test]
+    fn test_run_args_hardened_shape() {
+        let args = LocalDockerProvider::run_args("sess-2", true, &HashMap::new());
+        let joined = args.join(" ");
+        assert!(joined.contains("--network none"), "no egress");
+        assert!(joined.contains("--read-only"), "read-only rootfs");
+        assert!(
+            args.windows(2).any(|w| w[0] == "-v" && w[1].ends_with(":/workspace:ro")),
+            "upload mount must be read-only"
+        );
+    }
+
+    #[test]
+    fn test_gate_denies_privileged() {
+        let mut args = vec!["run".to_string(), "--privileged".to_string()];
+        args.push("img".into());
+        assert!(LocalDockerProvider::validate_docker_args(&args).is_err());
+    }
+
+    #[test]
+    fn test_gate_denies_network_host() {
+        for form in [
+            to_owned(&["run", "--network", "host", "img"]),
+            to_owned(&["run", "--network=host", "img"]),
+            to_owned(&["run", "--net", "host", "img"]),
+        ] {
+            assert!(
+                LocalDockerProvider::validate_docker_args(&form).is_err(),
+                "network host must be denied"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gate_denies_rw_and_bare_mounts() {
+        for spec in ["/tmp/data:/workspace", "/tmp/data:/workspace:rw"] {
+            let args = to_owned(&["run", "-v", spec, "img"]);
+            assert!(
+                LocalDockerProvider::validate_docker_args(&args).is_err(),
+                "mount `{}` must be denied (rw default/explicit)",
+                spec
+            );
+        }
+    }
+
+    #[test]
+    fn test_gate_allows_ro_mount() {
+        for spec in ["/tmp/a:/workspace:ro", "/tmp/b:/workspace:ro,z"] {
+            let args = to_owned(&["run", "-v", spec, "img"]);
+            LocalDockerProvider::validate_docker_args(&args)
+                .unwrap_or_else(|e| panic!("mount `{}` should pass: {}", spec, e));
+        }
+    }
+
+    #[test]
+    fn test_publish_requires_loopback_bind() {
+        let ok = to_owned(&["run", "-p", "127.0.0.1:8080:80", "img"]);
+        LocalDockerProvider::validate_docker_args(&ok).expect("loopback bind allowed");
+
+        for bad in ["8080:80", "0.0.0.0:8080:80"] {
+            let args = to_owned(&["run", "--publish", bad, "img"]);
+            assert!(
+                LocalDockerProvider::validate_docker_args(&args).is_err(),
+                "publish `{}` must be denied (non-loopback bind)",
+                bad
+            );
+        }
     }
 }

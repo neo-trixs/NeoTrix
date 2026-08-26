@@ -203,6 +203,25 @@ impl ConsciousnessCoreHandle {
             crate::core::nt_core_self_test_integration::run_lightweight_self_tests();
         self.tree
             .set_branch_health_from_self_tests(&selftest_results);
+        // T1: 价值观检查（非阻断式）— P1 融合注入点
+        {
+            let bridge = crate::core::l7_capability::consciousness_bridge::bridge();
+            match bridge.pre_tick_check(base_cycle) {
+                crate::core::l7_capability::consciousness_bridge::QuickVerdict::Warn(msg) => {
+                    log::warn!("[consciousness-tick] value warning: {}", msg);
+                }
+                _ => {}
+            }
+            // 协调器 pre_tick 统计由 l8 侧经 consciousness_bridge 驱动;
+            // core 不直接引用实现层 (arch_fitness_core_boundary 守卫)。
+            let _ = base_cycle;
+
+            // T4: 意识核心通过 NativeBus 感知可用能力 — 四系统融合
+            let stats = bridge.dispatch_stats();
+            if !stats.is_empty() {
+                log::debug!("[consciousness-tick] {} capabilities dispatched this session", stats.len());
+            }
+        }
         for _ in 0..n {
             // GWT 谐振激活前置: 独立 tick 首个 cycle 即可桥接 (此前赋值在
             // run_growth_cycle 之后, 首个 cycle 内桥接判定仍为 false, 第二个

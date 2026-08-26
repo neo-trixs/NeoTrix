@@ -899,8 +899,8 @@ mod tests {
             sanitize_branch_for_path("bak-feat/kb-tier-estimate-on-disk"),
             "bak-feat-kb-tier-estimate-on-disk"
         );
-        // 防御性: 路径穿越段剥离
-        assert_eq!(sanitize_branch_for_path("a/../../etc"), "a---etc");
+        // 防御性: 路径穿越段剥离 (两级 ".." → 每段压成一个 '-')
+        assert_eq!(sanitize_branch_for_path("a/../../etc"), "a-----etc");
         assert_eq!(sanitize_branch_for_path("..hidden"), "-hidden");
     }
 

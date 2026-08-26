@@ -32,6 +32,23 @@ impl RemoteApiProvider {
             .as_ref()
             .map(|k| ("Authorization", k.as_str()))
     }
+
+    /// Dedicated short-timeout client for the readiness gate — never reuse the
+    /// workload client (its 300s timeout would hang the gate on a dead host).
+    fn gate_client() -> reqwest::Client {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .connect_timeout(Duration::from_secs(3))
+            .build()
+            .unwrap_or_default()
+    }
+
+    /// Endpoint URL probed by the readiness gate. Any HTTP response (including
+    /// 404/405) proves the service is alive; route specifics stay out of the
+    /// contract so older remotes without a `/health` route still pass.
+    fn health_url(&self) -> String {
+        format!("{}/api/v1/health", self.endpoint)
+    }
 }
 
 #[async_trait]
@@ -186,5 +203,61 @@ impl CloudSandboxProvider for RemoteApiProvider {
             return Err(body["error"].as_str().unwrap_or("cancel failed").to_string());
         }
         Ok(())
+    }
+
+    /// Validate-before-connect gate (same trait door as the docker provider):
+    /// the remote endpoint must prove reachability before any workload ships.
+    /// Any HTTP status counts as alive; only connect/DNS/timeout failures are
+    /// an Err — fail-closed without demanding a specific health route.
+    async fn validate_ready(&self) -> Result<(), String> {
+        match Self::gate_client()
+            .get(self.health_url())
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                log::info!(
+                    "[sandbox] remote endpoint validated ({} responded {})",
+                    self.endpoint,
+                    resp.status()
+                );
+                Ok(())
+            }
+            Err(e) => Err(format!(
+                "remote sandbox unavailable (endpoint not reachable): {} — {}",
+                self.endpoint, e
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unreachable_provider() -> RemoteApiProvider {
+        RemoteApiProvider::new("http://127.0.0.1:0".to_string(), None)
+    }
+
+    /// 门负例: endpoint 不可达 (port 0 必然拒连) → validate_ready fail-closed。
+    #[test]
+    fn test_validate_ready_denies_unreachable_endpoint() {
+        let provider = unreachable_provider();
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let err = rt
+            .block_on(provider.validate_ready())
+            .expect_err("unreachable endpoint must fail the gate");
+        assert!(
+            err.contains("not reachable"),
+            "gate error must be classified as unreachable: {}",
+            err
+        );
+    }
+
+    /// health_url 拼接契约: endpoint + 固定 /api/v1/health 探针路径。
+    #[test]
+    fn test_health_url_contract() {
+        let p = RemoteApiProvider::new("https://sb.example.com".to_string(), None);
+        assert_eq!(p.health_url(), "https://sb.example.com/api/v1/health");
     }
 }

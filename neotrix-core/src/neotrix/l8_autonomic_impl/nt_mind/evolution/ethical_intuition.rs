@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_intuition_judgment_trolley() {
-        let conn = mem_conn();
+        let _conn = mem_conn();
         let casebase = Arc::new(CaseBase::new(Default::default()));
         casebase.load_from_kb(&mem_conn()).unwrap();
         let intuition = EthicalIntuitionRuntime::new(casebase.clone(), Default::default());
@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn test_calibration() {
-        let conn = mem_conn();
+        let _conn = mem_conn();
         let cb = Arc::new(CaseBase::new(Default::default()));
         cb.load_from_kb(&mem_conn()).unwrap();
         let intuition = EthicalIntuitionRuntime::new(cb.clone(), IntuitionConfig { calibration_enabled: true, ..Default::default() });

@@ -7,7 +7,7 @@ use reqwest::{Client, ClientBuilder, RequestBuilder, Method, header::HeaderMap};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::nt_act::{HttpClientConfig, HttpRequest, HttpResponse};
+use crate::nt_act::{DeliveryOutcome, HttpClientConfig, HttpRequest, HttpResponse};
 
 /// HTTP Client with retry, circuit breaker, rate limiting
 pub struct HttpClient {
@@ -29,6 +29,64 @@ enum CircuitState {
     Closed,
     Open,
     HalfOpen,
+}
+
+/// A transport failure annotated with its delivery outcome.
+struct RequestFailure {
+    message: String,
+    outcome: DeliveryOutcome,
+}
+
+impl RequestFailure {
+    fn pre_send(message: String) -> Self {
+        Self {
+            message,
+            outcome: DeliveryOutcome::Failed,
+        }
+    }
+}
+
+/// Which phase a transport error occurred in (extracted from reqwest for pure testing).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TransportCause {
+    /// Deadline hit; request may or may not have been sent.
+    pub timeout: bool,
+    /// Connection/DNS/TLS failure; nothing was sent.
+    pub connect: bool,
+    /// Response-phase failure (body read/decode); peer already processed the request.
+    pub response_phase: bool,
+}
+
+fn transport_cause(err: &reqwest::Error) -> TransportCause {
+    TransportCause {
+        timeout: err.is_timeout(),
+        connect: err.is_connect(),
+        response_phase: err.is_body() || err.is_decode(),
+    }
+}
+
+/// Pure classifier: map a transport cause to its delivery outcome.
+///
+/// Conservative per dsh-im: timeouts map to `Unknown` even when they might be
+/// connect timeouts — preventing duplicate sends outranks recovering a retry.
+pub(crate) fn classify_failure(cause: TransportCause) -> DeliveryOutcome {
+    if cause.response_phase || cause.timeout {
+        DeliveryOutcome::Unknown
+    } else {
+        DeliveryOutcome::Failed
+    }
+}
+
+/// Pure classifier: map an HTTP status to its delivery outcome.
+/// 5xx = peer may have processed side effects (`Unknown`); 4xx = definitive rejection.
+pub(crate) fn classify_status(status: u16) -> DeliveryOutcome {
+    if status >= 500 {
+        DeliveryOutcome::Unknown
+    } else if status >= 400 {
+        DeliveryOutcome::Failed
+    } else {
+        DeliveryOutcome::Delivered
+    }
 }
 
 impl HttpClient {
@@ -59,45 +117,77 @@ impl HttpClient {
 
     /// Execute HTTP request with retry, circuit breaker, rate limiting
     pub async fn request(&self, request: HttpRequest) -> Result<HttpResponse, String> {
+        self.request_with_outcome(request).await.0
+    }
+
+    /// Execute HTTP request and report the delivery outcome alongside the result.
+    ///
+    /// dsh-im three-state semantics: failures classified `Unknown` (timeout after
+    /// possible send, response-phase errors, 5xx) abort the retry loop immediately —
+    /// the peer may have processed a non-idempotent request, so auto-retry risks
+    /// duplicate execution. Only `Failed` outcomes (request never left / definitive
+    /// rejection) consume retries.
+    pub async fn request_with_outcome(
+        &self,
+        request: HttpRequest,
+    ) -> (Result<HttpResponse, String>, DeliveryOutcome) {
         let url = self.build_url(&request);
         self.check_rate_limit(&url).await;
-        self.check_circuit_breaker(&url).await?;
+        if let Err(e) = self.check_circuit_breaker(&url).await {
+            return (Err(e), DeliveryOutcome::Failed);
+        }
 
-        let mut last_error = String::new();
+        let mut last_failure: Option<RequestFailure> = None;
         for attempt in 0..=self.config.max_retries {
-            let response = self.execute_request(&request).await;
-            
-            match response {
+            match self.execute_request(&request).await {
                 Ok(resp) => {
+                    let outcome = classify_status(resp.status);
                     self.record_success(&url).await;
-                    return Ok(resp);
+                    return (Ok(resp), outcome);
                 }
-                Err(e) => {
-                    last_error = e;
+                Err(fail) => {
+                    // Unknown still counts as host-trouble evidence for the breaker.
                     self.record_failure(&url).await;
-                    
-                    if attempt < self.config.max_retries {
-                        tokio::time::sleep(Duration::from_millis(self.config.retry_delay_ms)).await;
+                    if fail.outcome == DeliveryOutcome::Unknown {
+                        // At-most-once: never spend retries on an unverifiable delivery.
+                        return (Err(fail.message), DeliveryOutcome::Unknown);
+                    }
+                    let retryable = attempt < self.config.max_retries;
+                    last_failure = Some(fail);
+                    if retryable {
+                        tokio::time::sleep(Duration::from_millis(self.config.retry_delay_ms))
+                            .await;
                     }
                 }
             }
         }
-        
-        Err(last_error)
+
+        match last_failure {
+            Some(f) => (Err(f.message), f.outcome),
+            None => (
+                Err("Request loop exited without attempts".to_string()),
+                DeliveryOutcome::Failed,
+            ),
+        }
     }
 
-    async fn execute_request(&self, request: &HttpRequest) -> Result<HttpResponse, String> {
+    async fn execute_request(&self, request: &HttpRequest) -> Result<HttpResponse, RequestFailure> {
         let url = self.build_url(request);
         let method = Method::from_bytes(request.method.as_bytes())
-            .map_err(|e| format!("Invalid method: {}", e))?;
+            .map_err(|e| RequestFailure::pre_send(format!("Invalid method: {}", e)))?;
 
         let mut req = self.client.request(method, &url);
 
         // Add headers
         let mut headers = HeaderMap::new();
         for (k, v) in &request.headers {
-            headers.insert(k.parse().map_err(|e| format!("Invalid header key: {}", e))?,
-                          v.parse().map_err(|e| format!("Invalid header value: {}", e))?);
+            headers.insert(
+                k.parse()
+                    .map_err(|e| RequestFailure::pre_send(format!("Invalid header key: {}", e)))?,
+                v.parse().map_err(|e| {
+                    RequestFailure::pre_send(format!("Invalid header value: {}", e))
+                })?,
+            );
         }
         // Add default headers
         for (k, v) in &self.config.headers {
@@ -115,13 +205,17 @@ impl HttpClient {
             req = req.query(params);
         }
 
-        let resp = req.send().await
-            .map_err(|e| format!("Request failed: {}", e))?;
+        let resp = req.send().await.map_err(|e| RequestFailure {
+            message: format!("Request failed: {}", e),
+            outcome: classify_failure(transport_cause(&e)),
+        })?;
 
         let status = resp.status().as_u16();
         let headers = resp.headers().clone();
-        let body = resp.bytes().await
-            .map_err(|e| format!("Failed to read body: {}", e))?;
+        let body = resp.bytes().await.map_err(|e| RequestFailure {
+            message: format!("Failed to read body: {}", e),
+            outcome: DeliveryOutcome::Unknown,
+        })?;
 
         Ok(HttpResponse {
             status,
@@ -207,10 +301,79 @@ impl HttpClient {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_client_creation() {
+    #[test]
+    fn test_client_creation() {
         let config = crate::nt_act::HttpClientConfig::default();
+        let _client = HttpClient::new(config);
+    }
+
+    #[test]
+    fn classify_failure_connect_is_retryable() {
+        let outcome = classify_failure(TransportCause {
+            timeout: false,
+            connect: true,
+            response_phase: false,
+        });
+        assert_eq!(outcome, DeliveryOutcome::Failed);
+    }
+
+    #[test]
+    fn classify_failure_timeout_is_unknown() {
+        let outcome = classify_failure(TransportCause {
+            timeout: true,
+            connect: false,
+            response_phase: false,
+        });
+        assert_eq!(outcome, DeliveryOutcome::Unknown);
+    }
+
+    #[test]
+    fn classify_failure_response_phase_is_unknown_even_if_connect_flag_set() {
+        let outcome = classify_failure(TransportCause {
+            timeout: false,
+            connect: true,
+            response_phase: true,
+        });
+        assert_eq!(outcome, DeliveryOutcome::Unknown);
+    }
+
+    #[test]
+    fn classify_status_matrix() {
+        assert_eq!(classify_status(200), DeliveryOutcome::Delivered);
+        assert_eq!(classify_status(302), DeliveryOutcome::Delivered);
+        assert_eq!(classify_status(403), DeliveryOutcome::Failed);
+        assert_eq!(classify_status(413), DeliveryOutcome::Failed);
+        assert_eq!(classify_status(429), DeliveryOutcome::Failed);
+        assert_eq!(classify_status(502), DeliveryOutcome::Unknown);
+    }
+
+    #[tokio::test]
+    async fn connect_refused_classifies_failed_and_retries_then_fails() {
+        // Port 1 on loopback: connection refused, nothing ever sent -> Failed.
+        let config = crate::nt_act::HttpClientConfig {
+            base_url: Some("http://127.0.0.1:1".to_string()),
+            max_retries: 1,
+            retry_delay_ms: 1,
+            timeout_secs: 2,
+            ..Default::default()
+        };
         let client = HttpClient::new(config);
-        assert!(true);
+        let request = HttpRequest {
+            method: "POST".to_string(),
+            url: "/non-idempotent".to_string(),
+            headers: HashMap::new(),
+            body: Some("{}" .to_string()),
+            query: None,
+        };
+        let (result, outcome) = client.request_with_outcome(request).await;
+        assert!(result.is_err());
+        assert_eq!(outcome, DeliveryOutcome::Failed);
+    }
+
+    #[test]
+    fn delivery_outcome_str_roundtrip_labels() {
+        assert_eq!(DeliveryOutcome::Delivered.as_str(), "delivered");
+        assert_eq!(DeliveryOutcome::Unknown.as_str(), "unknown");
+        assert_eq!(DeliveryOutcome::Failed.as_str(), "failed");
     }
 }

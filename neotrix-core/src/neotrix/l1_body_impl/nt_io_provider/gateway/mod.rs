@@ -1380,7 +1380,7 @@ mod provider_reliability_tests {
         // 完整目录注册名 (`llm7/codestral-latest`) 被选为候选链第一名时,
         // `{name}/` strip 会失败 (model 无尾斜杠), 必须按首段剥离,
         // 否则上游收到 `llm7/codestral-latest` → model_unavailable。
-        let gw = GatewayV2::new();
+        let _gw = GatewayV2::new();
         let cases = [
             // (注册名, 请求 model, 期望传给 provider 的 model)
             ("llm7", "llm7/codestral-latest", Some("codestral-latest")),

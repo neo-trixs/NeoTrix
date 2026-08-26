@@ -21,6 +21,32 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 }
 
+/// Delivery outcome for side-effectful operations (dsh-im absorption).
+///
+/// Three-state semantics: `Unknown` means the peer may or may not have
+/// processed the request (timeout after send, 5xx, response read failure).
+/// Retrying an `Unknown` outcome risks duplicate execution of non-idempotent
+/// requests, so callers must stop retrying and surface the ambiguity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeliveryOutcome {
+    /// Peer confirmed receipt (success response).
+    Delivered,
+    /// Request may have been delivered; result is unverifiable. Never safe to auto-retry.
+    Unknown,
+    /// Peer definitively did not process the request (connect failure, 4xx rejection). Safe to retry.
+    Failed,
+}
+
+impl DeliveryOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DeliveryOutcome::Delivered => "delivered",
+            DeliveryOutcome::Unknown => "unknown",
+            DeliveryOutcome::Failed => "failed",
+        }
+    }
+}
+
 /// MCP Tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpTool {

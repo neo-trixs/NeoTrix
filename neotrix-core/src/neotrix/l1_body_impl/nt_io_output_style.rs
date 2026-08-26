@@ -1010,11 +1010,11 @@ impl crate::core::nt_core_self_test::SelfTest for OutputGovernorSelfTest {
             failures.push("trailing apology should be caught by R10".into());
         }
 
-        // 4. 空消息被捕获
-        let report = gov.govern("   \n\n   ", OutputStyleId::Plain);
-        let r02_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 2);
-        if !r02_caught {
-            failures.push("pure placeholder lines should be caught by R02".into());
+        // 4. 纯占位行被捕获 (规则重编号后 placeholder 归 R04)
+        let report = gov.govern("结论如下:\nTODO\n待补充", OutputStyleId::Plain);
+        let r04_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 4);
+        if !r04_caught {
+            failures.push("pure placeholder lines should be caught by R04".into());
         }
 
         // 5. autofix 能去除结尾道歉
@@ -1039,6 +1039,8 @@ mod tests_output_governor_selftest {
     #[test]
     fn test_output_governor_selftest() {
         let t = OutputGovernorSelfTest;
-        assert!(t.self_test().is_ok());
+        if let Err(failures) = t.self_test() {
+            panic!("output governor selftest failed: {:?}", failures);
+        }
     }
 }

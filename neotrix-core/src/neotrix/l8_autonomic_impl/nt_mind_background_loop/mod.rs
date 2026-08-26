@@ -41,6 +41,8 @@ mod builder;
 mod run;
 mod handlers;
 pub mod always_on;
+pub mod consciousness_orchestrator;
+pub mod handlers_wisdom;
 
 pub use run::BackgroundLoopHandle;
 pub use run::CONSCIOUSNESS_THRESHOLDS;

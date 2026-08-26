@@ -2,6 +2,12 @@ use std::sync::LazyLock;
 
 // TODO: inject via DI — pass sentry options through application config
 static SENTRY_GUARD: LazyLock<Option<sentry::ClientInitGuard>> = LazyLock::new(|| {
+    // 打包边界隐私默认 (absorbed: grok-bot-0.18-reconstructed): 遥测默认关,
+    // DSN 显式配置才启用; `NEOTRIX_TELEMETRY=0` kill-switch 优先级最高,
+    // 即使 DSN 因 shell 环境残留存在也不外发。
+    if telemetry_killed() {
+        return None;
+    }
     let dsn = match std::env::var("NEOTRIX_SENTRY_DSN") {
         Ok(dsn) if !dsn.is_empty() => dsn,
         _ => return None,
@@ -27,6 +33,11 @@ static SENTRY_GUARD: LazyLock<Option<sentry::ClientInitGuard>> = LazyLock::new(|
 
 pub fn init_sentry() -> &'static Option<sentry::ClientInitGuard> {
     &SENTRY_GUARD
+}
+
+/// `NEOTRIX_TELEMETRY=0` → telemetry hard-off, overriding any DSN presence.
+fn telemetry_killed() -> bool {
+    std::env::var("NEOTRIX_TELEMETRY").as_deref() == Ok("0")
 }
 
 pub fn capture_error(msg: &str) {

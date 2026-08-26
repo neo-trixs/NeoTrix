@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 
-use crate::nt_act::{ToolsConfig, ToolSpec, ToolResult, ToolExecutor};
+use crate::nt_act::{DeliveryOutcome, ToolsConfig, ToolSpec, ToolResult, ToolExecutor};
 
 /// Tool trait
 #[async_trait::async_trait]
@@ -213,19 +213,57 @@ impl Tool for HttpRequestTool {
             request = request.body(body.to_string());
         }
 
-        let response = timeout(std::time::Duration::from_secs(30), request.send())
-            .await
-            .map_err(|_| "Request timeout".to_string())?
-            .map_err(|e| format!("Request failed: {}", e))?;
+        let send_result = timeout(std::time::Duration::from_secs(30), request.send()).await;
+
+        // dsh-im three-state delivery semantics: structured failure results carry a
+        // `delivery_outcome` so callers can distinguish "definitively not executed"
+        // (retryable) from "may have been executed" (never auto-retry).
+        let response = match send_result {
+            Err(_) => {
+                return Ok(ToolResult {
+                    success: false,
+                    output: serde_json::json!({}),
+                    error: Some("Request timeout".to_string()),
+                    duration_ms: 0,
+                    metadata: Self::delivery_metadata(DeliveryOutcome::Unknown),
+                });
+            }
+            Ok(Err(e)) => {
+                let outcome = crate::nt_act::client::classify_failure(
+                    crate::nt_act::client::transport_cause(&e),
+                );
+                return Ok(ToolResult {
+                    success: false,
+                    output: serde_json::json!({}),
+                    error: Some(format!("Request failed: {}", e)),
+                    duration_ms: 0,
+                    metadata: Self::delivery_metadata(outcome),
+                });
+            }
+            Ok(Ok(response)) => response,
+        };
 
         let status = response.status().as_u16();
         let headers = response.headers().iter()
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect();
-        let body = response.text().await.map_err(|e| e.to_string())?;
 
+        let body = match response.text().await {
+            Ok(text) => text,
+            Err(e) => {
+                return Ok(ToolResult {
+                    success: false,
+                    output: serde_json::json!({ "status": status }),
+                    error: Some(format!("Failed to read body: {}", e)),
+                    duration_ms: 0,
+                    metadata: Self::delivery_metadata(DeliveryOutcome::Unknown),
+                });
+            }
+        };
+
+        let outcome = crate::nt_act::client::classify_status(status);
         Ok(ToolResult {
-            success: true,
+            success: status < 400,
             output: serde_json::json!({
                 "status": status,
                 "headers": headers,
@@ -233,8 +271,16 @@ impl Tool for HttpRequestTool {
             }),
             error: None,
             duration_ms: 0,
-            metadata: HashMap::new(),
+            metadata: Self::delivery_metadata(outcome),
         })
+    }
+}
+
+impl HttpRequestTool {
+    fn delivery_metadata(outcome: DeliveryOutcome) -> HashMap<String, String> {
+        let mut metadata = HashMap::new();
+        metadata.insert("delivery_outcome".to_string(), outcome.as_str().to_string());
+        metadata
     }
 }
 

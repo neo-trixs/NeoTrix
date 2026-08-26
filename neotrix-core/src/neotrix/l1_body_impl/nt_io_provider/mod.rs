@@ -9,6 +9,7 @@ pub mod agent_routing;
 pub mod anthropic;
 pub mod account_pool;
 pub mod circuit_breaker;
+pub mod cli_session_backend;
 pub mod compaction;
 pub mod context_budget;
 pub mod discovery;

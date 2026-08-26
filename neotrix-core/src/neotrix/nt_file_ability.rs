@@ -35,6 +35,8 @@ mod structured;
 mod tables;
 mod types;
 mod visual;
+#[cfg(feature = "anydoc")]
+pub mod doc_parse;
 
 pub use core::*;
 pub use e8::*;

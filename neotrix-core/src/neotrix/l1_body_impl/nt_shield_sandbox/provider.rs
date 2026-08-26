@@ -33,6 +33,14 @@ pub trait CloudSandboxProvider: Send + Sync {
     fn stream_logs(&self, session_id: &str) -> BoxStream<'static, String>;
 
     async fn cancel(&self, session_id: &str) -> Result<(), String>;
+
+    /// Validate-before-connect gate (absorbed: grok-bot-0.18-reconstructed
+    /// local Docker sandbox). Called before any workload is dispatched; an
+    /// Err blocks execution fail-closed so a broken backend environment is
+    /// surfaced as a clean denial instead of a mid-flight workload failure.
+    async fn validate_ready(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 pub struct NoopProvider;

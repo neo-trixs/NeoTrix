@@ -12,6 +12,7 @@ pub mod nt_memory_gwt_router;
 pub mod nt_memory_e8_agent;
 pub mod nt_memory_vsa_expand;
 pub mod nt_memory_decompose;
+pub mod nt_memory_domain_adapter;
 pub mod nt_memory_agent_driven;
 pub mod nt_memory_agent_session;
 pub mod nt_memory_api;

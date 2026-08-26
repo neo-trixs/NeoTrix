@@ -6,6 +6,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 // 代码分割：重组件（Chat / 3D GlobeView）按需懒加载，配合 vite manualChunks 分包
 const Chat = lazy(() => import('./routes/Chat').then((m) => ({ default: m.Chat })))
 const GlobeView = lazy(() => import('./components/GlobeView').then((m) => ({ default: m.GlobeView })))
+const KnowledgeBase = lazy(() => import('./routes/KnowledgeBase').then((m) => ({ default: m.KnowledgeBase })))
+const Marketplace = lazy(() => import('./routes/Marketplace').then((m) => ({ default: m.Marketplace })))
 
 function GlobeRoute() {
   return <GlobeView limit={5000} height={700} />
@@ -30,6 +32,8 @@ export default function App() {
             <Route path="/" component={Chat} />
             <Route path="/chat" component={Chat} />
             <Route path="/globe" component={GlobeRoute} />
+            <Route path="/kb" component={KnowledgeBase} />
+            <Route path="/plugins" component={Marketplace} />
           </Router>
         </ErrorBoundary>
       </Suspense>

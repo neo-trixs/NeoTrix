@@ -830,6 +830,11 @@ cognitive_load: self.cognitive_load.take(),
         // ── G29 隐私聚合遥测 (R-P79): 60s 周期把全局 TelemetryStore 数值指标喂
         //    AnomalyDetector 做 spike/drop 检测, 告警经 EventBus 注入意识监控 ──
         spawn_handler!(TELEMETRY_INTERVAL_SECS, "telemetry", |h| h.handle_telemetry().await);
+        // 意识体智慧周期 — 价值观学习 + 叙事整合 + 规则结晶 + GC (E1)
+        {
+            const WISDOM_TICK_INTERVAL_SECS: u64 = 300; // 5 min
+            spawn_handler!(WISDOM_TICK_INTERVAL_SECS, "wisdom", |h| h.handle_wisdom_tick().await);
+        }
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {

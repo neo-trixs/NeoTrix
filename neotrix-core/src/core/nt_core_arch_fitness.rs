@@ -128,6 +128,11 @@ const CORE_BOUNDARY_ALLOW: &[(&str, &str)] = &[
     ("nt_core_consciousness_core.rs", "to_markdown"),
     ("nt_core_consciousness_core.rs", "edit_pdf"),
     ("nt_core_consciousness_core.rs", "l1_body_impl::nt_io_neocodex"),
+    // 文件合并操作 (extract_dir / merge_pdfs / merge_docx / merge_pptx)
+    ("nt_core_consciousness_core.rs", "extract_dir"),
+    ("nt_core_consciousness_core.rs", "merge_pdfs"),
+    ("nt_core_consciousness_core.rs", "merge_docx::merge_docx"),
+    ("nt_core_consciousness_core.rs", "merge_docx::merge_pptx"),
     // documented 受控边界 (engine / codegraph / provider)
     ("nt_core_task_dispatcher.rs", "l8_autonomic_impl"),
     ("nt_core_retrieval.rs", "l8_autonomic_impl"),

@@ -379,6 +379,10 @@ impl CloudSandbox {
         code: &str,
         runtime: CloudRuntime,
     ) -> Result<CloudResult, String> {
+        // Validate-before-connect gate (absorbed: grok-bot local Docker
+        // sandbox): the backend must prove its environment healthy before any
+        // workload is dispatched — fail-closed, never mid-flight.
+        self.provider.validate_ready().await?;
         let env = self.vault_env();
         let session_id = self.create_session(runtime);
         let session = self.get_session_mut(&session_id).ok_or("session creation failed")?;
@@ -676,6 +680,106 @@ mod sandbox_vault_tests {
         let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
         let result = rt.block_on(cloud.run_code("echo hi", CloudRuntime::Python3)).expect("run");
         assert_eq!(result.exit_code, 0);
+    }
+}
+
+#[cfg(test)]
+mod validate_gate_tests {
+    use super::*;
+    use futures::StreamExt;
+
+    /// Stub whose readiness is configurable — proves the gate blocks workload
+    /// dispatch when the backend fails validation, and passes through when it
+    /// succeeds.
+    struct GateStub {
+        ready: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl provider::CloudSandboxProvider for GateStub {
+        fn name(&self) -> &'static str {
+            "gate-stub"
+        }
+
+        async fn execute(
+            &self,
+            _session_id: &str,
+            _code: &str,
+            _runtime: CloudRuntime,
+            _env: &HashMap<String, String>,
+        ) -> Result<CloudResult, String> {
+            Ok(CloudResult {
+                stdout: "executed".into(),
+                stderr: String::new(),
+                exit_code: 0,
+                execution_time: Duration::from_secs(0),
+                resource_usage: ResourceUsage::default(),
+            })
+        }
+
+        async fn upload_file(&self, _: &str, _: &str, _: Vec<u8>) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn download_result(&self, _: &str) -> Result<CloudResult, String> {
+            Ok(CloudResult {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+                execution_time: Duration::from_secs(0),
+                resource_usage: ResourceUsage::default(),
+            })
+        }
+
+        fn stream_logs(&self, _: &str) -> futures::stream::BoxStream<'static, String> {
+            futures::stream::empty().boxed()
+        }
+
+        async fn cancel(&self, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn validate_ready(&self) -> Result<(), String> {
+            if self.ready {
+                Ok(())
+            } else {
+                Err("docker sandbox unavailable (daemon not reachable): gate-stub".into())
+            }
+        }
+    }
+
+    fn sandbox_with(ready: bool) -> CloudSandbox {
+        CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            Arc::new(GateStub { ready }),
+        )
+    }
+
+    /// 门负例: 后端验证失败 → run_code 拒绝执行, 工作负载不派发。
+    #[test]
+    fn test_run_code_blocked_when_backend_not_ready() {
+        let mut cloud = sandbox_with(false);
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let err = rt
+            .block_on(cloud.run_code("print('hi')", CloudRuntime::Python3))
+            .expect_err("unready backend must fail closed");
+        assert!(err.contains("daemon not reachable"), "gate error surfaced: {}", err);
+        // 工作负载未派发 → 无会话创建残留。
+        assert!(cloud.list_sessions().is_empty(), "no session may be created past a failed gate");
+    }
+
+    /// 门正例: 验证通过 → 正常派发执行。
+    #[test]
+    fn test_run_code_dispatches_when_backend_ready() {
+        let mut cloud = sandbox_with(true);
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let result = rt
+            .block_on(cloud.run_code("print('hi')", CloudRuntime::Python3))
+            .expect("ready backend must dispatch");
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(result.stdout, "executed");
     }
 }
 
