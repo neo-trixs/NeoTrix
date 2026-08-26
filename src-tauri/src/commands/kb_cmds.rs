@@ -7,7 +7,7 @@ use rusqlite::params;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store::{get_all_nodes, get_all_edges};
-use neotrix::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeNode, KnowledgeEdge};
+use neotrix::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
 use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{self, PackDecoder};
 
 fn kb_path() -> PathBuf {
@@ -603,4 +603,302 @@ pub fn kb_geo_offline_pack(
 fn cold_dir() -> String {
     let home = std::env::var("HOME").unwrap_or(".".to_string());
     format!("{}/.neotrix/geo", home)
+}
+
+/// 文档入库: 幂等 (同 title 覆盖重建)。切片 → chunk 节点 + part_of 边。
+#[command]
+pub fn kb_doc_ingest(title: String, text: String, library: Option<String>) -> Result<KbDocIngestResult, NeoTrixError> {
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err(NeoTrixError::Memory("title 不能为空".into()));
+    }
+    let library = library.unwrap_or_else(|| "default".into());
+    let conn = open_kb_conn()?;
+    let ts = now_ts();
+
+    // 幂等: 同标题旧 doc 先删 (含 chunks)
+    let existing = find_doc_by_title(&conn, &title)?;
+    let doc_id = match existing {
+        Some(old) => {
+            delete_chunks(&conn, &old)?;
+            kbs::delete_node(&conn, &old)
+                .map_err(|e| NeoTrixError::Memory(format!("old doc del: {}", e)))?;
+            old
+        }
+        None => format!("kbdoc-{}", uuid::Uuid::new_v4().simple()),
+    };
+
+    let chunks = split_chunks(&text);
+    let status = if chunks.is_empty() { "empty" } else { "ready" };
+    let doc = make_doc_node(&doc_id, &title, &text.trim(), &library, ts);
+
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| NeoTrixError::Memory(format!("ingest tx: {}", e)))?;
+    kbs::insert_node_rows(&tx, &doc)
+        .map_err(|e| NeoTrixError::Memory(format!("doc insert: {}", e)))?;
+    write_chunks(&tx, &doc_id, &chunks, ts)?;
+    tx.commit().map_err(|e| NeoTrixError::Memory(format!("ingest commit: {}", e)))?;
+
+    Ok(KbDocIngestResult { doc_id, title, library, chunk_count: chunks.len(), status: status.into() })
+}
+
+#[command]
+pub fn kb_doc_list() -> Result<Vec<KbDocSummary>, NeoTrixError> {
+    let conn = open_kb_conn()?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT n.id, n.title, n.created_at,
+                    COALESCE(LENGTH(n.content),0),
+                    COALESCE(json_extract(n.metadata,'$.library'),'default'),
+                    (SELECT COUNT(*) FROM edges e WHERE e.relation_type='part_of' AND e.target_id=n.id)
+             FROM nodes n
+             WHERE n.metadata LIKE ?1
+             ORDER BY n.created_at DESC",
+        )
+        .map_err(|e| NeoTrixError::Memory(format!("doc list prep: {}", e)))?;
+    let pat = format!("%{}%", KB_DOC_META);
+    let rows = stmt
+        .query_map(params![pat], |row| {
+            let chunk_count: i64 = row.get(5)?;
+            Ok(KbDocSummary {
+                doc_id: row.get(0)?,
+                title: row.get(1)?,
+                created_at: row.get(2)?,
+                total_chars: row.get(3)?,
+                library: row.get(4)?,
+                chunk_count,
+                status: if chunk_count > 0 { "ready" } else { "empty" }.into(),
+            })
+        })
+        .map_err(|e| NeoTrixError::Memory(format!("doc list: {}", e)))?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+/// 删除文档及其全部切片, 返回删除的切片数。
+#[command]
+pub fn kb_doc_delete(doc_id: String) -> Result<usize, NeoTrixError> {
+    let conn = open_kb_conn()?;
+    let deleted = delete_chunks(&conn, &doc_id)?;
+    kbs::delete_node(&conn, &doc_id)
+        .map_err(|e| NeoTrixError::Memory(format!("doc del: {}", e)))?;
+    Ok(deleted)
+}
+
+/// 重索引: 从 doc.content 全文重建切片。返回新切片数。
+#[command]
+pub fn kb_doc_reindex(doc_id: String) -> Result<usize, NeoTrixError> {
+    let conn = open_kb_conn()?;
+    let text: Option<String> = {
+        let mut stmt = conn
+            .prepare("SELECT content FROM nodes WHERE id=?1")
+            .map_err(|e| NeoTrixError::Memory(format!("reindex prep: {}", e)))?;
+        stmt.query_row(params![doc_id], |r| r.get(0))
+            .map_err(|_| NeoTrixError::Memory(format!("doc 不存在: {}", doc_id)))?
+    };
+    let text = text.unwrap_or_default();
+    let chunks = split_chunks(&text);
+    let ts = now_ts();
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| NeoTrixError::Memory(format!("reindex tx: {}", e)))?;
+    delete_chunks(&tx, &doc_id)?;
+    let n = write_chunks(&tx, &doc_id, &chunks, ts)?;
+    tx.commit().map_err(|e| NeoTrixError::Memory(format!("reindex commit: {}", e)))?;
+    Ok(n)
+}
+
+/* ══════════════════════════════════════════════════
+   KB 文档级 CRUD (B2, 吸收 Cherry Studio KB 模式)
+   复用 nodes/edges/nodes_fts 存储 (R-P42 零平行表):
+   - Doc   article + metadata{"kb_doc":true,"library":L}, content=全文
+   - Chunk article + metadata{"kb_chunk":true,"doc_id":D,"idx":I}
+   - 边    chunk --[part_of]--> doc
+   状态派生: chunk_count>0 → ready / ==0 → empty
+   ══════════════════════════════════════════════════ */
+
+/// 文档摘要 (列表面契约)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KbDocSummary {
+    pub doc_id: String,
+    pub title: String,
+    pub library: String,
+    pub chunk_count: i64,
+    pub total_chars: i64,
+    pub status: String,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KbDocIngestResult {
+    pub doc_id: String,
+    pub title: String,
+    pub library: String,
+    pub chunk_count: usize,
+    pub status: String,
+}
+
+/// 段落感知确定性切片: 目标 ~600 字符, 相邻切片 100 重叠。
+fn split_chunks(text: &str) -> Vec<String> {
+    const TARGET: usize = 600;
+    const OVERLAP: usize = 100;
+    let text = text.trim();
+    if text.is_empty() {
+        return vec![];
+    }
+    let paras: Vec<&str> = text
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    for para in paras {
+        if para.chars().count() > TARGET * 2 {
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+            }
+            let chars: Vec<char> = para.chars().collect();
+            let mut i = 0;
+            while i < chars.len() {
+                let end = (i + TARGET).min(chars.len());
+                out.push(chars[i..end].iter().collect());
+                if end >= chars.len() {
+                    break;
+                }
+                i = end.saturating_sub(OVERLAP);
+            }
+            continue;
+        }
+        if !cur.is_empty() && cur.chars().count() + para.chars().count() > TARGET {
+            out.push(std::mem::take(&mut cur));
+        }
+        if !cur.is_empty() {
+            cur.push_str("\n\n");
+        }
+        cur.push_str(para);
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/* ── 内部写路径 (可测: 接受 &Connection) ── */
+
+const KB_DOC_META: &str = "\"kb_doc\":true";
+const KB_CHUNK_META_PREFIX: &str = "{\"kb_chunk\":true";
+
+fn now_ts() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn make_doc_node(id: &str, title: &str, text: &str, library: &str, ts: i64) -> KnowledgeNode {
+    KnowledgeNode {
+        id: id.into(),
+        node_type: NodeType::Article,
+        title: title.into(),
+        summary: Some(text.chars().take(120).collect()),
+        content: Some(text.into()),
+        url: None,
+        domain: Some("app-kb".into()),
+        language: "zh".into(),
+        confidence: 1.0,
+        importance: 0.6,
+        created_at: ts,
+        updated_at: ts,
+        access_count: 0,
+        metadata: Some(serde_json::json!({"kb_doc": true, "library": library})),
+        temporal: None,
+        supersedes: None,
+        source_episode: None,
+    }
+}
+
+fn make_chunk_node(id: &str, doc_id: &str, idx: usize, text: &str, ts: i64) -> KnowledgeNode {
+    let summary: String = text.chars().take(80).collect();
+    KnowledgeNode {
+        id: id.into(),
+        node_type: NodeType::Article,
+        title: format!("{} · 段{}", doc_id.trim_start_matches("kbdoc-"), idx + 1),
+        summary: Some(summary),
+        content: Some(text.into()),
+        url: None,
+        domain: Some("app-kb".into()),
+        language: "zh".into(),
+        confidence: 1.0,
+        importance: 0.5,
+        created_at: ts,
+        updated_at: ts,
+        access_count: 0,
+        metadata: Some(serde_json::json!({"kb_chunk": true, "doc_id": doc_id, "idx": idx})),
+        temporal: None,
+        supersedes: None,
+        source_episode: None,
+    }
+}
+
+/// 写入 chunk 节点 + part_of 边 (事务)。返回切片数。
+fn write_chunks(conn: &rusqlite::Connection, doc_id: &str, chunks: &[String], ts: i64) -> Result<usize, NeoTrixError> {
+    for (idx, text) in chunks.iter().enumerate() {
+        let cid = format!("{}-c{:03}", doc_id, idx);
+        let node = make_chunk_node(&cid, doc_id, idx, text, ts);
+        kbs::insert_node_rows(conn, &node)
+            .map_err(|e| NeoTrixError::Memory(format!("chunk insert {}: {}", cid, e)))?;
+        let edge = KnowledgeEdge {
+            id: format!("{}-e{:03}", doc_id, idx),
+            source_id: cid.clone(),
+            target_id: doc_id.into(),
+            relation_type: RelationType::PartOf,
+            weight: 1.0,
+            created_at: ts,
+            metadata: None,
+        };
+        kbs::insert_edge(conn, &edge)
+            .map_err(|e| NeoTrixError::Memory(format!("chunk edge {}: {}", cid, e)))?;
+    }
+    Ok(chunks.len())
+}
+
+/// 删除文档的全部 chunk (节点+边), 返回删除数。
+fn delete_chunks(conn: &rusqlite::Connection, doc_id: &str) -> Result<usize, NeoTrixError> {
+    let ids: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT source_id FROM edges WHERE relation_type='part_of' AND target_id=?1")
+            .map_err(|e| NeoTrixError::Memory(format!("chunk q {}: {}", doc_id, e)))?;
+        let rows = stmt
+            .query_map(params![doc_id], |r| r.get::<_, String>(0))
+            .map_err(|e| NeoTrixError::Memory(format!("chunk q map: {}", e)))?;
+        rows.filter_map(|r| r.ok()).collect()
+    };
+    let n = ids.len();
+    for cid in ids {
+        kbs::delete_node(conn, &cid)
+            .map_err(|e| NeoTrixError::Memory(format!("chunk del {}: {}", cid, e)))?;
+    }
+    // 清理残留 part_of 边 (delete_node 可能不级联边)
+    conn.execute(
+        "DELETE FROM edges WHERE relation_type='part_of' AND target_id=?1",
+        params![doc_id],
+    )
+    .map_err(|e| NeoTrixError::Memory(format!("chunk edges del: {}", e)))?;
+    Ok(n)
+}
+
+/// 同 title 幂等查找已有 doc id。
+fn find_doc_by_title(conn: &rusqlite::Connection, title: &str) -> Result<Option<String>, NeoTrixError> {
+    let mut stmt = conn
+        .prepare("SELECT id FROM nodes WHERE node_type='article' AND title=?1 AND metadata LIKE ?2 LIMIT 1")
+        .map_err(|e| NeoTrixError::Memory(format!("doc find prep: {}", e)))?;
+    let pat = format!("%{}%", KB_DOC_META);
+    let mut rows = stmt
+        .query_map(params![title, pat], |r| r.get::<_, String>(0))
+        .map_err(|e| NeoTrixError::Memory(format!("doc find: {}", e)))?;
+    match rows.next() {
+        Some(Ok(id)) => Ok(Some(id)),
+        _ => Ok(None),
+    }
 }
