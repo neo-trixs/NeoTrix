@@ -190,6 +190,28 @@ impl BrainStage for BoundedEditStage {
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let budget = brain._lr_scheduler.current_budget();
         let edits = brain._take_micro_edits();
+
+        // ── G5 S 门控 (灵境引擎 L4「自指闭环」转译) ──
+        // 意识质量 (Φ 派生信号, 由 handlers_consciousness 写入 _last_consciousness_quality)
+        // 在自编辑应用前裁决: 无信号 → 保守放行; 低于阈值 → 否决并清空待应用队列
+        // (行为改变: 编辑不再流向下游采纳/归档)。回环证据链见 constitution_gate.rs 模块文档。
+        let quality = if brain._consciousness_critique_count > 0 {
+            Some(brain._last_consciousness_quality)
+        } else {
+            None
+        };
+        if !brain._constitution_gate.judge(quality) {
+            log::warn!(
+                "[bounded-edit] 宪法门控否决自编辑应用: quality={:.3} < threshold={:.3}, 跳过 {} 条待应用编辑 (iter {})",
+                quality.unwrap_or(f64::NAN),
+                brain.edit_constitution_gate().threshold(),
+                edits.len(),
+                brain.iteration,
+            );
+            brain._lr_scheduler.step();
+            return Ok(StageDecision::Continue);
+        }
+
         if edits.len() > budget {
             log::info!("[bounded-edit] trimming {} edits to budget {}", edits.len(), budget);
             let bounded: Vec<MicroEdit> = edits.into_iter().take(budget).collect();
@@ -269,5 +291,83 @@ impl BrainStage for EpochSlowUpdateStage {
             log::warn!("[epoch-slow] negative trend detected ({:.4}), consider revision", trend);
         }
         Ok(StageDecision::Continue)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// G5 管线级测试: 低意识质量下 BoundedEditStage 否决路径真的跳过应用 —
+    /// 待应用队列被清空, 门控计数 +1, brain 能力未被修改。
+    #[test]
+    fn test_bounded_edit_stage_veto_drops_pending_edits() {
+        let mut brain = SelfIteratingBrain::new_lightweight();
+        brain._consciousness_critique_count = 1;
+        brain._last_consciousness_quality = 0.2; // 低于阈值 0.5
+        brain._set_micro_edits(vec![
+            MicroEdit::AdjustDimension("analysis".into(), 0.05),
+            MicroEdit::NormalizeVector,
+        ]);
+        let cap_before = brain.brain.capability.arr().to_vec();
+
+        BoundedEditStage::new().process(&mut brain).unwrap();
+
+        assert!(brain._micro_edits().is_empty(), "否决后待应用队列应为空");
+        assert_eq!(
+            brain.edit_constitution_gate().denied_count(),
+            1,
+            "否决计数应 +1"
+        );
+        assert_eq!(
+            brain.brain.capability.arr().to_vec(),
+            cap_before,
+            "否决路径不得修改能力向量"
+        );
+    }
+
+    /// 放行路径: 高意识质量下编辑正常通过 (受预算约束保留在队列中)。
+    #[test]
+    fn test_bounded_edit_stage_high_quality_passes_edits_through() {
+        let mut brain = SelfIteratingBrain::new_lightweight();
+        brain._consciousness_critique_count = 1;
+        brain._last_consciousness_quality = 0.9; // 高于阈值 0.5
+        let edits = vec![MicroEdit::AdjustDimension("analysis".into(), 0.05)];
+        let n = edits.len();
+        brain._set_micro_edits(edits);
+
+        BoundedEditStage::new().process(&mut brain).unwrap();
+
+        assert_eq!(brain._micro_edits().len(), n, "放行时编辑应保留");
+        assert_eq!(brain.edit_constitution_gate().allowed_count(), 1);
+        assert_eq!(brain.edit_constitution_gate().denied_count(), 0);
+    }
+
+    /// 无信号路径: 尚无意识 critique → None → 保守放行并单独计数。
+    #[test]
+    fn test_bounded_edit_stage_no_signal_allows_conservatively() {
+        let mut brain = SelfIteratingBrain::new_lightweight();
+        assert_eq!(brain._consciousness_critique_count, 0);
+        brain._set_micro_edits(vec![MicroEdit::NormalizeVector]);
+
+        BoundedEditStage::new().process(&mut brain).unwrap();
+
+        assert_eq!(brain._micro_edits().len(), 1, "无信号保守放行");
+        assert_eq!(brain.edit_constitution_gate().no_signal_count(), 1);
+        assert_eq!(brain.edit_constitution_gate().denied_count(), 0);
+    }
+
+    /// 阈值边界: quality == 阈值 (0.5) 视为可信, 放行。
+    #[test]
+    fn test_bounded_edit_stage_threshold_boundary_allows() {
+        let mut brain = SelfIteratingBrain::new_lightweight();
+        brain._consciousness_critique_count = 1;
+        brain._last_consciousness_quality = 0.5; // 恰在阈值上
+        brain._set_micro_edits(vec![MicroEdit::NormalizeVector]);
+
+        BoundedEditStage::new().process(&mut brain).unwrap();
+
+        assert_eq!(brain._micro_edits().len(), 1, "等于阈值应放行 (否决是严格小于)");
+        assert_eq!(brain.edit_constitution_gate().allowed_count(), 1);
     }
 }
