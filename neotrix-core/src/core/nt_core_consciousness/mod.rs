@@ -1,4 +1,5 @@
 pub mod awakening;
+pub mod bubble_wall;
 pub mod cognitive_load;
 pub mod consciousness_runtime;
 pub mod first_person_ref;
@@ -10,6 +11,7 @@ pub mod volition;
 pub mod vsa_tag;
 
 pub use awakening::{AwakeningReport, ConsciousnessAwakening};
+pub use bubble_wall::{area_law_r2, BubbleWall, TokenBill};
 pub use cognitive_load::{CognitiveLoadMonitor, ThinkingMode};
 pub use first_person_ref::FirstPersonRef;
 pub use inner_critic::{CritiqueResult, InnerCritic};
