@@ -165,6 +165,15 @@ pub fn attach_native_bus(handle: Arc<crate::core::l7_capability::native_bus::Nat
     bridge().attach_bus(handle);
 }
 
+impl WisdomBridge {
+    /// 启用叙事注入（仅意识体完整初始化后调用）。
+    pub fn enable_narrative_injection(&self) {
+        if let Ok(mut f) = self.inject_narrative.write() {
+            *f = true;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

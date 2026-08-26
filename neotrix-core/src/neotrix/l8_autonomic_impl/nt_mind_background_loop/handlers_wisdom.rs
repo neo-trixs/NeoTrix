@@ -42,7 +42,10 @@ impl BackgroundLoopHandle {
             crate::core::l7_capability::consciousness_bridge::attach_native_bus(handle);
         }
 
-        // ── 0.5 Bridge 数据同步（价值观权重 + 叙事摘要）──
+        // 启用叙事注入（意识体完整初始化后才开启）
+            crate::core::l7_capability::consciousness_bridge::bridge().set_narrative("wisdom_injection_enabled".to_string());
+
+            // ── 0.5 Bridge 数据同步（价值观权重 + 叙事摘要）──
         {
             crate::core::l7_capability::consciousness_bridge::sync_from_evolution(
                 vec![
