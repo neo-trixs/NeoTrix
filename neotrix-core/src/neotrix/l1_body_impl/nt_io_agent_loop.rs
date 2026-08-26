@@ -747,8 +747,20 @@ impl AgentLoop {
             .collect();
 
         // 上下文 token 预算 (R-P 吸收 Headroom/RTK): 在克隆上压缩, 不污染持久历史。
+        // W1.1 (batch3, arxiv 2608.22752 Compaction Cliff): 断崖事件 = 大上下文被
+        // 压缩至保留率 <35% — 下游任务成功率坍缩前兆, 生产路径告警留痕。
         let mut messages = self.messages.clone();
-        apply_context_budget(&mut messages, self.context_token_budget, self.max_tool_output_tokens);
+        let budget_result =
+            apply_context_budget(&mut messages, self.context_token_budget, self.max_tool_output_tokens);
+        if budget_result.is_cliff {
+            log::warn!(
+                "compaction cliff: retention={:.1}% evicted={} truncated={} \
+                 — 任务定义锚点保留, 建议收窄本轮工具输出或提升预算",
+                budget_result.retention_ratio() * 100.0,
+                budget_result.messages_evicted,
+                budget_result.tool_outputs_truncated
+            );
+        }
 
         // P0-4 prefix caching: 稳定前缀 = 除末条 (当前请求) 外的全部历史。
         // ReAct 每轮重发时该前缀命中 provider 缓存, 成本趋近增量。

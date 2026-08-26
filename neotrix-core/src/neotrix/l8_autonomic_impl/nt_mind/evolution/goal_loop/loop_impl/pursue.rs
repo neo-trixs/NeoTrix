@@ -67,6 +67,18 @@ impl GoalLoop {
             return true;
         }
 
+        // E1.2: ValueGate 价值裁决 — 目标迭代前检查（非阻断式，log-and-pass）
+        {
+            let bridge = crate::core::l7_capability::consciousness_bridge::bridge();
+            match bridge.pre_tick_check(0) {
+                crate::core::l7_capability::consciousness_bridge::QuickVerdict::Warn(msg) => {
+                    log::warn!("[goal-loop] value warning during pursue: {}", msg);
+                    // 不阻断执行，但记录告警供审计
+                }
+                _ => {}
+            }
+        }
+
         let score_before = brain.brain.evaluate_capability(TaskType::General);
 
         let result = if is_complex {

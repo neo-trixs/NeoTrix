@@ -490,23 +490,44 @@ fn take_until_tokens(text: &str, budget: usize, from_start: bool) -> String {
 }
 
 /// 上下文预算压缩结果 (观测杠杆: 每次 apply 后可见具体削减量)。
+///
+/// W1.1 (batch3 2026-08-26, 源: arxiv 2608.22752 Compaction Cliff):
+/// 长会话压缩过猛 → 下游任务成功率断崖式衰减。本结构新增观测字段,
+/// 使调用方可在压缩事件发生时感知断崖风险 (retention_ratio / is_cliff)。
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BudgetResult {
     pub original_tokens: usize,
     pub final_tokens: usize,
     pub tool_outputs_truncated: usize,
     pub messages_evicted: usize,
+    /// 压缩保留率, 万分比 bp (final*10000/original; original=0 时记 10000)。
+    /// 用整数存储保持结构体 Eq 可用 (f64 不实现 Eq)。
+    pub retention_ratio_bp: u32,
+    /// 断崖事件: 上下文规模 ≥ `COMPACTION_CLIFF_MIN_TOKENS` 且保留率 < `COMPACTION_CLIFF_RATIO_BP`
+    pub is_cliff: bool,
 }
 
 impl BudgetResult {
     pub fn saved_tokens(&self) -> usize {
         self.original_tokens.saturating_sub(self.final_tokens)
     }
+
+    /// 压缩保留率 (0.0-1.0)。内部以 bp (万分比) 存储保持 Eq 可导出。
+    pub fn retention_ratio(&self) -> f64 {
+        self.retention_ratio_bp as f64 / 10_000.0
+    }
 }
+
+/// 断崖判定: 保留率低于此值 (35%) 视为激进压缩。
+pub const COMPACTION_CLIFF_RATIO_BP: u32 = 3_500;
+/// 断崖判定的最小上下文规模 — 微型对话天然高压缩率, 不构成断崖。
+pub const COMPACTION_CLIFF_MIN_TOKENS: usize = 2_048;
 
 /// 对消息序列应用 token 预算:
 /// 1. 单条工具输出 > `per_tool_output_tokens` 时截断 (0 = 禁用截断)
 /// 2. 总量仍超 `max_tokens` 时, 丢弃最旧非 System 轮次 (保留末条 = 当前请求)
+/// 3. 锚点保护 (W1.1): 首条 User 消息 (任务定义) 不被驱逐 — 压缩断崖研究中
+///    丢失任务定义是下游性能坍缩的主因之一; 仅当除锚点外无可弃消息时放行驱逐
 ///
 /// 保留不变量: 索引 0 若为 System 永不丢弃; 末条 (当前 user 请求/最新 tool 结果)
 /// 永不被驱逐 — 与 neocodex `budget_react_messages` 语义对齐。
@@ -521,6 +542,8 @@ pub fn apply_context_budget(
         final_tokens: original_tokens,
         tool_outputs_truncated: 0,
         messages_evicted: 0,
+        retention_ratio_bp: 10_000,
+        is_cliff: false,
     };
 
     // Pass 1: 截断超大工具输出 (最省且不丢历史轮次)
@@ -533,18 +556,33 @@ pub fn apply_context_budget(
         }
     }
 
-    // Pass 2: 超预算则逐条驱逐最旧可弃消息 (跳过 System 首条与末条)
+    // 锚点定位: System 头之后的首条 User 消息 = 任务定义锚点。
+    let anchor_idx: Option<usize> = {
+        let start = if messages.first().map(|m| m.role) == Some(Role::System) {
+            1
+        } else {
+            0
+        };
+        messages[start..]
+            .iter()
+            .position(|m| m.role == Role::User)
+            .map(|p| start + p)
+    };
+
+    // Pass 2: 超预算则逐条驱逐最旧可弃消息 (跳过 System 首条 / 任务锚点 / 末条)
     loop {
         let total = estimate_messages_tokens(messages);
         result.final_tokens = total;
         if total <= max_tokens || messages.len() <= 2 {
             break;
         }
+        let last_idx = messages.len() - 1;
         let mut evict_at: Option<usize> = None;
         for (idx, m) in messages.iter().enumerate() {
             let is_system_head = idx == 0 && m.role == Role::System;
-            let is_last = idx == messages.len() - 1;
-            if !is_system_head && !is_last {
+            let is_anchor = Some(idx) == anchor_idx;
+            let is_last = idx == last_idx;
+            if !is_system_head && !is_anchor && !is_last {
                 evict_at = Some(idx);
                 break;
             }
@@ -558,5 +596,91 @@ pub fn apply_context_budget(
         }
     }
     result.final_tokens = estimate_messages_tokens(messages);
+
+    // W1.1 断崖判定: 大上下文 + 激进压缩 → 标记断崖事件, 调用方据此告警/降级。
+    result.retention_ratio_bp = if original_tokens > 0 {
+        ((result.final_tokens as u64 * 10_000) / original_tokens as u64) as u32
+    } else {
+        10_000
+    };
+    result.is_cliff = original_tokens >= COMPACTION_CLIFF_MIN_TOKENS
+        && result.retention_ratio_bp < COMPACTION_CLIFF_RATIO_BP;
     result
+}
+
+/// W1.1 (batch3 2026-08-26, 源: arxiv 2608.22752 Compaction Cliff) 验收测试。
+#[cfg(test)]
+mod compaction_cliff_tests {
+    use super::*;
+
+    fn msg(role: Role, text: &str) -> Message {
+        Message::new(role, text)
+    }
+
+    /// 构造 CJK 长文 (fallback/tiktoken 双口径下都 ≈1 token/字, 口径无关)。
+    fn cjk_blob(chars: usize) -> String {
+        "压缩断崖研究用长文本。".repeat(chars / 11 + 1)
+    }
+
+    #[test]
+    fn task_anchor_survives_aggressive_eviction() {
+        let mut messages = vec![
+            msg(Role::System, "You are a helpful assistant."),
+            msg(Role::User, "任务定义锚点：分析季度财报并输出要点"),
+            msg(Role::Assistant, &cjk_blob(300)),
+            msg(Role::User, &cjk_blob(300)),
+            msg(Role::Assistant, &cjk_blob(300)),
+            msg(Role::User, "当前请求"),
+        ];
+        let r = apply_context_budget(&mut messages, 800, 0);
+        assert!(r.messages_evicted > 0, "expected evictions");
+        // 锚点 (首条 User = 任务定义) 必须存活
+        assert!(
+            messages.iter().any(|m| m.content.contains("任务定义锚点")),
+            "task anchor was evicted!"
+        );
+        // System 头与末条不变量
+        assert_eq!(messages.first().unwrap().role, Role::System);
+        assert_eq!(messages.last().unwrap().content, "当前请求");
+    }
+
+    #[test]
+    fn cliff_flag_fires_on_aggressive_compaction() {
+        let mut messages = vec![
+            msg(Role::System, "sys"),
+            msg(Role::User, "任务定义锚点"),
+            msg(Role::Assistant, &cjk_blob(4_000)),
+            msg(Role::User, &cjk_blob(4_000)),
+            msg(Role::Assistant, &cjk_blob(4_000)),
+            msg(Role::User, "当前请求"),
+        ];
+        let r = apply_context_budget(&mut messages, 3_000, 0);
+        assert!(r.original_tokens >= COMPACTION_CLIFF_MIN_TOKENS);
+        assert!(r.is_cliff, "retention={}bp", r.retention_ratio_bp);
+        assert!(r.retention_ratio() < 0.35);
+    }
+
+    #[test]
+    fn no_cliff_on_light_compaction() {
+        let mut messages = vec![
+            msg(Role::System, "sys head"),
+            msg(Role::User, "普通短对话"),
+            msg(Role::Assistant, "简短回答"),
+            msg(Role::User, "当前请求"),
+        ];
+        let r = apply_context_budget(&mut messages, 50, 0);
+        assert!(!r.is_cliff);
+        // 微型上下文即使高压缩率也不触发 (MIN_TOKENS 门)
+        assert!(r.retention_ratio_bp < COMPACTION_CLIFF_RATIO_BP || r.final_tokens <= 50);
+    }
+
+    #[test]
+    fn no_cliff_when_budget_not_exceeded() {
+        let mut messages = vec![msg(Role::User, &cjk_blob(500)), msg(Role::Assistant, "ok")];
+        let before = estimate_messages_tokens(&messages);
+        let r = apply_context_budget(&mut messages, before * 10, 0);
+        assert!(!r.is_cliff);
+        assert_eq!(r.retention_ratio_bp, 10_000);
+        assert_eq!(r.messages_evicted, 0);
+    }
 }

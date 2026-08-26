@@ -1067,8 +1067,6 @@ export function Chat() {
     { id: 'clear', label: '清除会话', desc: '清空当前会话全部消息', keywords: ['clear', '清除', '清空'], run: () => { chatStore.clearMessages(); setMentionRefs([]) } },
     { id: 'compact', label: '压缩会话', desc: '精简上下文继续对话', keywords: ['compact', '压缩'], run: () => runCompact() },
     { id: 'view-chat', label: '切换到对话视图', desc: '聊天主界面', keywords: ['chat', '对话', '视图'], run: () => setActiveView('chat') },
-    { id: 'view-cowork', label: '切换到协同视图', desc: '协同会话与任务看板', keywords: ['cowork', '协同'], run: () => setActiveView('cowork') },
-    { id: 'view-computer', label: '切换到电脑视图', desc: '屏幕操作与窗口管理', keywords: ['computer', '电脑'], run: () => setActiveView('computer') },
     { id: 'mode', label: '切换权限模式', desc: '自动 / 手动 / 接受编辑 / 规划', keywords: ['mode', '权限', '模式'], run: () => cyclePermissionMode() },
     { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '帮助', '快捷键'], run: () => runSlash(SLASH_COMMANDS[3]) },
     { id: 'settings', label: '打开设置', desc: '提供商配置与应用设置', keywords: ['settings', '设置', '配置'], run: () => setSettingsOpen(true) },

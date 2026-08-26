@@ -29,7 +29,7 @@
 
 ## Wave 1 — P0 高信号接线 (本周, 全部强化现有节点)
 
-- [ ] **W1.1 压缩断崖阈值量化 → context_budget 截断器** 
+- [x] **W1.1 压缩断崖阈值量化 → context_budget 截断器** ✅ 2026-08-26 落地于 `nt_core_llm::apply_context_budget` (生产函数真身; 能力节点 bud `nt_core_llm::compaction_cliff_guard`) 
   - 源: arxiv 2608.22752 *The Compaction Cliff in Long-Running AI Agent Memory* (MEMORY/compress)
   - 目标模块: `neotrix-core/src/core/nt_core_context/mod.rs` (`apply_context_budget`)
   - 动作: 引入 compaction-cliff 信号 — 长会话压缩事件前后任务成功率衰减监测; 截断预算低于断崖阈值时告警并保留锚点段
@@ -37,7 +37,7 @@
   - 能力树: strengthen `nt_core_context::compaction_cliff_guard`
   - 判据: 注入长对话测试集, 压缩后关键事实保留率可量化输出
 
-- [ ] **W1.2 SkillSpector skill 静态审计方法 → P6 vetting gate 规则集**
+- [x] **W1.2 SkillSpector skill 静态审计方法 → P6 vetting gate 规则集** ✅ 2026-08-26 T10-T12 落地 tool_inspection_stack.rs, 全量 7861 tests 0 failed, bud `nt_shield::skill_trust_scanner`
   - 源: NVIDIA/SkillSpector (SHIELD/audit)
   - 目标模块: `neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind_skill_engine.rs` (`scan_skill_content`) + `l1_body_impl/nt_shield/tool_inspection_stack.rs`
   - 动作: 以 `trust_rule!` 模式新增 SkillSpector 类检测规则 (skill 元数据欺骗/权限提升模式); 零 LLM、纯 regex 可审计

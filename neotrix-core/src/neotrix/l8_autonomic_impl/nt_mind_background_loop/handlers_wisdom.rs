@@ -61,6 +61,9 @@ impl BackgroundLoopHandle {
             );
         }
 
+        // E1.3: 启用叙事注入 — 意识体完整初始化后才开启
+        crate::core::l7_capability::consciousness_bridge::bridge().enable_narrative_injection();
+
         // ── 1. 规则结晶 ──
         {
             let cfg = crate::core::nt_core_rule_memory::ScanConfig {
