@@ -22,6 +22,8 @@ const KB_INJECT_LIMIT: usize = 4;
 const KB_QUERY_CACHE_CAP: usize = 64;
 /// G2 泡壁门控阈值: 域名与任务词元重合率 ≥ 此值才进清晰区 (灵境协议 7.2)。
 const BUBBLE_MIN_SCORE: f64 = 0.34;
+/// G3 每 tick 最多同步的场事实版本数 (防大增量淹没意识窗口)。
+const FIELD_FACT_CAP: usize = 8;
 
 /// 带 domain 标签的注入候选 (泡壁门控的判定单元)。
 #[derive(Debug, Clone)]
@@ -74,6 +76,8 @@ pub struct ConsciousnessRuntime {
     pub last_kb_injections: Vec<(String, f64)>,
     /// G2 面积律账单: 最近一次注入的清晰区/迷雾区成本核算。
     pub last_bubble_bill: Option<TokenBill>,
+    /// G3 场感知游标: 已消费到 field_journal 的哪个版本 (协议4-for-field)。
+    pub last_field_version_seen: u64,
     /// KB 查询缓存 — 防止共振内容重复触发同步搜索。
     kb_cache: KbQueryCache,
     pub awakened: bool,
@@ -94,6 +98,7 @@ impl ConsciousnessRuntime {
             kb: None,
             last_kb_injections: Vec::new(),
             last_bubble_bill: None,
+            last_field_version_seen: 0,
             kb_cache: KbQueryCache::new(),
             awakened: false,
             last_report: None,
@@ -131,6 +136,39 @@ impl ConsciousnessRuntime {
                 .map(|r| (r.node.title.clone(), r.score))
                 .collect(),
             Err(_) => Vec::new(),
+        }
+    }
+
+    /// G3 场感知 (协议4-for-field): 读取版本链增量, 把其他写者落下的源项事实
+    /// 注入意识流与当下感 —— 写回即事实, 感知无需消息传递。游标幂等, 不重复消费。
+    fn sync_field_facts(&mut self, kb: &KnowledgeBase) {
+        let facts = {
+            let conn = match kb.raw_conn() {
+                Ok(c) => c,
+                Err(_) => return,
+            };
+            match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_field_ledger::field_journal_since(
+                &conn,
+                self.last_field_version_seen,
+                FIELD_FACT_CAP,
+            ) {
+                Ok(f) => f,
+                Err(_) => return,
+            }
+        };
+        for (version, entries) in facts {
+            for e in &entries {
+                let mut value_short: String = e.value.chars().take(24).collect();
+                if e.value.chars().count() > 24 {
+                    value_short.push('…');
+                }
+                let desc = format!("[field] {}/{}={} ({})", e.ns, e.key, value_short, e.writer);
+                let item = VsaTagged::world_input(&desc);
+                // F4 纪律延续: 意识流与当下感同步进
+                self.stream.push(item.clone());
+                self.specious_present.push(item);
+            }
+            self.last_field_version_seen = version;
         }
     }
 
@@ -329,6 +367,11 @@ impl ConsciousnessRuntime {
         self.specious_present.push(world_item);
         // Query knowledge base with the resonance content — 意识核心主动检索知识
         self.inject_kb_knowledge(resonance_content);
+        // ── G3 场感知 (协议4-for-field): 读版本链增量, 他者的源项事实进入本 agent 意识窗口
+        if let Some(ref kb) = self.kb {
+            let kb = std::sync::Arc::clone(kb);
+            self.sync_field_facts(&kb);
+        }
         // Run volition: propose candidates from the specious present window
         for item in self.specious_present.window().iter() {
             let desc =
@@ -609,5 +652,42 @@ mod tests {
         let mut cr2 = ConsciousnessRuntime::new();
         cr2.affective_mut().relationship.on_turn(true, 0.5, 0.8);
         assert_eq!(cr2.affective().relationship.interactions, 1);
+    }
+
+    #[test]
+    fn test_g3_field_fact_perception_closed_loop() {
+        // 灵境协议 4+5 闭环: 写者落源项事实 → runtime 下个 tick 经版本链感知, 零消息传递
+        let path = std::env::temp_dir().join(format!(
+            "g3_loop_{}_{}.db",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let writer_kb = KnowledgeBase::open(Some(path.clone())).expect("writer kb");
+        writer_kb
+            .field_stage("act", "tool_call", "search_web(query=lingjing)", "agent_a")
+            .unwrap();
+        writer_kb.field_tick().unwrap();
+
+        let mut cr = ConsciousnessRuntime::new();
+        cr.attach_kb(std::sync::Arc::new(KnowledgeBase::open(Some(path)).expect("reader kb")));
+        cr.awaken();
+
+        let stream_before = cr.stream.len();
+        let _ = cr.tick("resonance");
+        assert_eq!(cr.last_field_version_seen, 1, "游标推进到最新场版本");
+        assert!(cr.stream.len() > stream_before, "场事实注入意识流");
+
+        // 幂等游标: 场事实不重复消费 (每 tick 另有固定 1 条共振自传体条目入流, F4 纪律)
+        let after_first = cr.stream.len();
+        let _ = cr.tick("again");
+        assert_eq!(cr.last_field_version_seen, 1);
+        assert_eq!(
+            cr.stream.len(),
+            after_first + 1,
+            "场事实不重复注入, 仅新增本 tick 共振条目"
+        );
     }
 }

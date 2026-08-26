@@ -758,8 +758,9 @@ impl BackgroundLoopHandle {
                                             None,
                                         );
                                     }
-                                    // 落盘探索决策 → 意识树果实/SEAL 可消费 (闭环)
-                                    let _ = kb.kv_set(
+                                    // ── G3: 探索决策经场账本落盘 (版本链+哈希审计),
+                                    // 立即 tick 使下游校准的 kv_get 读到同一事实。
+                                    let _ = kb.field_stage(
                                         "consciousness",
                                         "efe_explore",
                                         &serde_json::json!({
@@ -772,7 +773,9 @@ impl BackgroundLoopHandle {
                                                 .unwrap_or_default().as_secs(),
                                         })
                                         .to_string(),
+                                        "efe",
                                     );
+                                    let _ = kb.field_tick();
                                     // 注入意识树果实 → SEAL extract_from_consciousness_tree 自动消费,
                                     // 探索目标进入 SEAL 过程学习 (R-P79 闭环: 决策 → 果实 → 学习)。
                                     // L7 修复: quality 与 benchmark 由探索命中率驱动, 而非硬编码 0.6。
@@ -1135,6 +1138,20 @@ impl BackgroundLoopHandle {
 
     /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.
     pub(crate) async fn handle_event_bus_event(&mut self, event: CoreEvent) {
+        // ── G3 写回闭环 (R-P79): 事件作为源项 ΔJ 入场 (版本链可审计),
+        // EventBus 从"事实同步信道"降级为"观测仪器输入"。行为反应仍走下方 match。
+        if let Some(ref kb) = self.kb {
+            let kind = format!("{:?}", event);
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            let key = format!("ev_{}", ts);
+            let _ = kb.field_stage("field_events", &key, &kind, "event_bus");
+            if let Ok(Some(r)) = kb.field_tick() {
+                self.state.record_metric("field_version", r.version as f64);
+            }
+        }
         match &event {
             CoreEvent::SystemError {
                 severity,

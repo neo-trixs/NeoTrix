@@ -237,6 +237,34 @@ pub fn field_head_hash(conn: &Connection) -> Result<String, String> {
     Ok(read_head(conn)?.1)
 }
 
+/// G3 感知侧 (协议4-for-field): 读取版本链上 after_version 之后的事实增量。
+/// 其他写者经 tick 落下的源项条目由此进入任何 agent 的感知回路 ——
+/// 写回即事实, 共识靠读同一版本链, 无需消息传递。
+pub fn field_journal_since(
+    conn: &Connection,
+    after_version: u64,
+    cap: usize,
+) -> Result<Vec<(u64, Vec<FieldEntry>)>, String> {
+    let _ = conn.busy_timeout(std::time::Duration::from_millis(BUSY_TIMEOUT_MS));
+    ensure_tables(conn)?;
+    let mut stmt = conn
+        .prepare("SELECT version, entries_json FROM field_journal WHERE version > ?1 ORDER BY version LIMIT ?2")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![after_version, cap as i64], |r| {
+            Ok((r.get::<_, u64>(0)?, r.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (version, entries_json) = row.map_err(|e| e.to_string())?;
+        let entries: Vec<FieldEntry> =
+            serde_json::from_str(&entries_json).map_err(|e| format!("parse v{}: {}", version, e))?;
+        out.push((version, entries));
+    }
+    Ok(out)
+}
+
 /// 整链回放校验: 从创世逐版本重算哈希, 任何篡改返回 false。
 pub fn field_verify_chain(conn: &Connection) -> Result<bool, String> {
     let _ = conn.busy_timeout(std::time::Duration::from_millis(BUSY_TIMEOUT_MS));
@@ -435,5 +463,24 @@ mod tests {
         let r = kb.field_tick().unwrap().unwrap();
         assert_eq!(r.drained, 40);
         assert!(kb.field_verify_chain().unwrap());
+    }
+
+    #[test]
+    fn test_journal_since_cursor_semantics() {
+        let kb = temp_kb("since");
+        for i in 0..3 {
+            kb.field_stage("g1", &format!("k{}", i), &i.to_string(), "w").unwrap();
+            kb.field_tick().unwrap();
+        }
+        {
+            let conn = kb.raw_conn().unwrap();
+            let all = field_journal_since(&conn, 0, 10).unwrap();
+            assert_eq!(all.len(), 3, "从创世读全量");
+            let tail = field_journal_since(&conn, 1, 10).unwrap();
+            assert_eq!(tail.len(), 2);
+            assert_eq!(tail[0].0, 2, "游标后第一条是 v2");
+            let capped = field_journal_since(&conn, 0, 2).unwrap();
+            assert_eq!(capped.len(), 2, "cap 生效");
+        }
     }
 }
