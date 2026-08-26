@@ -438,3 +438,44 @@
         let res2 = cmd_query(&conn, "neural", None, None, 10, false, false, false, true);
         assert_eq!(res2, 3, "include_distilled 应含原始条目");
     }
+
+    #[test]
+    fn test_field_stage_tick_kv_get_equivalence() {
+        // W4 场账本写路径: 追加型经验写入 stage→tick 后, 下游 kv_get 读回必须与
+        // 直写 kv_set 完全等价 (ns/key/value 三元组不变), 且未 tick 前不可见。
+        let conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+
+        let branch = json!({
+            "schema_version": 1, "type": "insight", "session_id": "sess_w4",
+            "cycle": "1200", "ts": 1, "domain": "NT-MEMORY",
+            "content": "field ledger roundtrip", "evidence": "tests.rs"
+        });
+        let audit = json!({"idx": 0, "decision": "written", "session_id": "sess_w4"});
+
+        // 暂存阶段: 不入正式状态 — kv_get 不可见
+        kv_stage(&conn, NS, "branch_1200_0_w4aabb", &branch.to_string());
+        kv_stage(&conn, "audit", "audit_1200_sess_w4_0", &audit.to_string());
+        assert_eq!(kv_get(&conn, NS, "branch_1200_0_w4aabb"), None);
+        assert_eq!(kv_get(&conn, "audit", "audit_1200_sess_w4_0"), None);
+
+        // 一批一解: 统一求解下一版本
+        let r = crate::nt_field_ledger::field_tick(&conn).unwrap().expect("receipt");
+        assert_eq!(r.drained, 2, "两条暂存都参与合并");
+        assert_eq!(r.applied, 2, "新键无冲突, 全部落账");
+        assert_eq!(r.version, 1);
+
+        // 读回等价: 与直写 kv_set 的可见结果一致
+        assert_eq!(
+            kv_get(&conn, NS, "branch_1200_0_w4aabb").as_deref(),
+            Some(branch.to_string().as_str())
+        );
+        assert_eq!(
+            kv_get(&conn, "audit", "audit_1200_sess_w4_0").as_deref(),
+            Some(audit.to_string().as_str())
+        );
+
+        // 空集 tick 幂等 + 哈希链完整
+        assert!(crate::nt_field_ledger::field_tick(&conn).unwrap().is_none());
+        assert!(crate::nt_field_ledger::field_verify_chain(&conn).unwrap());
+    }

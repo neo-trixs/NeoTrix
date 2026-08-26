@@ -414,7 +414,6 @@ impl BackgroundLoopHandle {
     /// 供 hub 索引 / `neotrix-experience query` 检索 / 蒸馏升维复用。
     /// 幂等: 同 session_id 拒绝重复 (与 cmd_absorb 语义一致)。
     async fn report_auto_fix_experience(&mut self) {
-        use crate::neotrix::nt_memory_kb::nt_memory_unify::kv_set;
         let kb = match self.kb.as_ref() {
             Some(kb) => kb,
             None => {
@@ -454,19 +453,16 @@ impl BackgroundLoopHandle {
             "context": "handle_healer_scan / apply_auto_fixable",
         });
         let key = format!("branch_autofixer_{}_{}", now, landed.len());
-        let conn = match kb.conn.lock() {
-            Ok(c) => c,
-            Err(e) => {
-                log::warn!("[bg] auto-fix experience lock failed: {}", e);
-                return;
-            }
-        };
-        if let Err(e) = kv_set(&conn, "experience", &key, &entry.to_string()) {
-            log::warn!("[bg] auto-fix experience write failed: {}", e);
+        // W4 场账本写路径: 时序追加键先 stage 暂存 (G1 版本化审计), 一批一解统一求解。
+        if let Err(e) = kb.field_stage("experience", &key, &entry.to_string(), "absorption") {
+            log::warn!("[bg] auto-fix experience stage failed: {}", e);
             return;
         }
-        drop(conn);
+        let _ = kb.field_tick();
         log::info!("[bg] auto-fix experience recorded: {} ({} fixes)", key, landed.len());
+        if let Ok(v) = kb.field_version() {
+            log::debug!("[bg] field_version={v}");
+        }
     }
 
     pub(crate) async fn handle_avatar_auto_distill(&mut self) {

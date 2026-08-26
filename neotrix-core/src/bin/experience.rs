@@ -44,6 +44,7 @@ use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use neotrix::neotrix::nt_memory_kb::nt_field_ledger;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
 use neotrix::neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
 use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
@@ -260,6 +261,40 @@ fn kv_set(conn: &Connection, namespace: &str, key: &str, value: &str) {
         &[&namespace, &key, &encoded, &now_ts()],
     )
     .expect("kv_set");
+}
+
+// ─── G1 场账本写路径 (W4): 追加型经验写入先 stage 暂存, 命令收尾统一 field_tick
+// 一批一解求解下一版本 (哈希链审计 + 并发可交换合并)。覆盖型键保持 kv_set 直写 —
+// 合并语义不匹配 (字典序最大 ≠ 最新状态), 属 G4 共识帧后续工作。
+/// 场账本写者锚点 (field_journal 审计用)。
+const FIELD_WRITER: &str = "absorption";
+
+/// 追加型写入 → 场暂存 (不入正式状态)。暂存失败回退直写 — 数据不丢优先于审计完备。
+fn kv_stage(conn: &Connection, namespace: &str, key: &str, value: &str) {
+    if let Err(e) = nt_field_ledger::field_stage(conn, namespace, key, value, FIELD_WRITER) {
+        eprintln!("[field] stage 失败回退直写 ({e}): {namespace}/{key}");
+        kv_set(conn, namespace, key, value);
+    }
+}
+
+/// 一批一解: 统一求解当前全部暂存条目 (空集幂等返回 None)。
+/// 失败不致命 — 暂存留存于 field_staging, 下个命令的 tick 兜底重放。
+fn field_solve(conn: &Connection) {
+    match nt_field_ledger::field_tick(conn) {
+        Ok(Some(r)) => eprintln!(
+            "[field] tick v{} drained={} applied={}",
+            r.version, r.drained, r.applied
+        ),
+        Ok(None) => {}
+        Err(e) => eprintln!("[field] tick 延后 ({e}) — 暂存留存待下轮求解"),
+    }
+}
+
+/// 收尾观测: 当前场版本号 (诊断)。
+fn field_observe(conn: &Connection) {
+    if let Ok(v) = nt_field_ledger::field_version(conn) {
+        eprintln!("[field] field_version={v}");
+    }
 }
 
 /// 批量扫描 namespace 下 key LIKE '<prefix>%' 的行, 统一透明解压。
@@ -918,7 +953,9 @@ fn cmd_snapshot(conn: &Connection, cycle: &str, task: &str, domain: &str) {
         "source": "dialogue",
         "duration_s": Value::Null,
     });
-    kv_set(conn, NS, &format!("snapshot_{}", sid), &snap.to_string());
+    kv_stage(conn, NS, &format!("snapshot_{}", sid), &snap.to_string());
+    field_solve(conn);
+    field_observe(conn);
     println!("[snapshot] {} (cycle={})", sid, cycle);
 }
 
@@ -1213,7 +1250,7 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
             chs.push(concept_from_branch(conn, &term, &key, domain));
         }
         e["concepts"] = json!(chs);
-        kv_set(conn, NS, &key, &e.to_string());
+        kv_stage(conn, NS, &key, &e.to_string());
         // Hebb 共现突触: 同分支概念两两强化关联 (fire together, wire together)
         hebb_cooccurrence(conn, &chs);
         // 更新 hub cycle 索引
@@ -1267,8 +1304,11 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
             sid.replace(['/', '\\', ' ', ':'], "_"),
             idx
         );
-        kv_set(conn, "audit", &key, &r.to_string());
+        kv_stage(conn, "audit", &key, &r.to_string());
     }
+    // W4 一批一解: 先求解分支+审计批次, 再重建 hub 指标 — refresh_hub_metrics
+    // 全量重读 kv_store, 若暂存未落账会被 save_hub 持久化少计的指标。
+    field_solve(conn);
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
     println!("[absorb] {} entries from {} (cycle={})", written, sid, cycle);
@@ -1369,7 +1409,7 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
                 "concepts": Value::Null,
             });
             let obs_key = format!("obs_{}_{}_{}", cycle, chunk_idx, uuid_hex(6));
-            kv_set(conn, NS, &obs_key, &obs_entry.to_string());
+            kv_stage(conn, NS, &obs_key, &obs_entry.to_string());
             // 更新 hub
             let cycles = hub["hub"]["cycles"].as_object_mut().unwrap();
             let cmeta = cycles.entry(cycle.clone()).or_insert_with(|| json!({"count": 0, "types": [], "domains": []}));
@@ -1398,6 +1438,10 @@ fn cmd_absorb(conn: &mut Connection, input: &str) {
             println!("[absorb] hint: observation tokens {} > REF_TOKEN_BUDGET ({}), 建议运行 `neotrix-experience reflect --domain NT-MEMORY` 触发重写", total_obs_tokens, REF_TOKEN_BUDGET);
         }
     }
+
+    // W4: 观察批次收尾求解 + 场版本观测
+    field_solve(conn);
+    field_observe(conn);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -2859,11 +2903,9 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
         "verification_status": Value::Null,
     });
     let ckey = format!("branch_consciousness_{}", now);
-    conn.execute(
-        "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        params![NS, ckey, value_encode(&consciousness_entry.to_string()), now],
-    )
-    .expect("consciousness distill insert");
+    // W4: 时序追加键走场账本 (单条批次即写即解)
+    kv_stage(conn, NS, &ckey, &consciousness_entry.to_string());
+    field_solve(conn);
 
     // 5. 高信号提升: 蒸馏出的能力模式 → 能力树迭代目标 (经验升维到能力网维度)
     //    bridge 将每个蒸馏模式路由为 Strengthen/Bud 计划, 写入能力树 registry 文件的
@@ -3210,7 +3252,8 @@ fn cmd_reflect(conn: &mut Connection, domain: Option<&str>, dry_run: bool) {
     });
 
     if !dry_run {
-        kv_set(conn, NS, &refl_key, &refl_entry.to_string());
+        kv_stage(conn, NS, &refl_key, &refl_entry.to_string());
+        field_solve(conn);
         println!("[reflect] reflection entry written: {}", refl_key);
     }
     // 5. 更新观察条目: reflection.version++ / last_reflect_ts
