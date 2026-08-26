@@ -690,4 +690,148 @@ mod tests {
             "场事实不重复注入, 仅新增本 tick 共振条目"
         );
     }
+
+    // ═══ W3 度量实测 (2026-08-26) — T10 因果保真 ═══
+    //
+    // 光锥外事件延迟感知: 写入先于 runtime 存在 ⇒ 感知滞后 ≥ 1 tick;
+    // attach 后游标一次补读全部历史版本, 因果序保持 (写在前, 感知在后)。
+
+    fn t10_temp_kb_path(tag: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "t10_{}_{}_{}.db",
+            tag,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn test_t10_light_cone_delayed_perception() {
+        // 写入方落 v1 (runtime 尚不存在, 事件在其光锥外);
+        // 无 KB 时 tick 两次游标纹丝不动; attach 同库后单次 tick 游标 0→1 且事实此刻才入流。
+        let path = t10_temp_kb_path("delayed");
+        let writer_kb = KnowledgeBase::open(Some(path.clone())).expect("writer kb");
+        writer_kb
+            .field_stage("g3", "event", "lightcone_e1", "writer_x")
+            .unwrap();
+        writer_kb.field_tick().unwrap(); // v1 落账
+
+        let mut cr = ConsciousnessRuntime::new();
+        cr.awaken();
+        let _ = cr.tick("pre-attach 1"); // 无 KB: 游标不动
+        let _ = cr.tick("pre-attach 2");
+        assert_eq!(
+            cr.last_field_version_seen, 0,
+            "未挂 KB 时游标不得移动"
+        );
+        let before = cr.stream.len();
+
+        // attach 同一物理库: 历史事实此刻才进入光锥
+        cr.attach_kb(std::sync::Arc::new(
+            KnowledgeBase::open(Some(path)).expect("reader kb"),
+        ));
+        let _ = cr.tick("attach moment");
+        assert_eq!(cr.last_field_version_seen, 1, "游标从 0 直达 1 (补读全部历史)");
+        assert_eq!(
+            cr.stream.len(),
+            before + 2,
+            "+1 本 tick 共振 +1 迟到的场事实 (因果序: 写在前, 感知在后)"
+        );
+
+        // 入流内容确为迟到的 v1 事实
+        let tail = String::from_utf8_lossy(&cr.stream.recent(1)[0].vector).to_string();
+        assert!(
+            tail.contains("lightcone_e1") && tail.contains("[field]"),
+            "流尾应为场事实描述, 实际: {}",
+            tail
+        );
+    }
+
+    #[test]
+    fn test_t10_backlog_v2_v3_single_tick_full_catchup() {
+        // cursor=1 后写入方连续落 v2/v3; 单次 tick 在 FIELD_FACT_CAP=8 内全部追平且保序。
+        let path = t10_temp_kb_path("catchup");
+        let writer_kb = KnowledgeBase::open(Some(path.clone())).expect("writer kb");
+        writer_kb
+            .field_stage("g3", "e", "v1_payload", "writer_x")
+            .unwrap();
+        writer_kb.field_tick().unwrap(); // v1
+
+        let mut cr = ConsciousnessRuntime::new();
+        cr.attach_kb(std::sync::Arc::new(
+            KnowledgeBase::open(Some(path)).expect("reader kb"),
+        ));
+        cr.awaken();
+        let _ = cr.tick("first perception");
+        assert_eq!(cr.last_field_version_seen, 1);
+
+        writer_kb
+            .field_stage("g3", "e", "v2_payload", "writer_x")
+            .unwrap();
+        writer_kb.field_tick().unwrap(); // v2
+        writer_kb
+            .field_stage("g3", "e", "v3_payload", "writer_x")
+            .unwrap();
+        writer_kb.field_tick().unwrap(); // v3
+
+        let before = cr.stream.len();
+        let _ = cr.tick("single catch-up");
+        assert_eq!(
+            cr.last_field_version_seen, 3,
+            "单次 tick 追平 v2+v3 积压 (≤ FIELD_FACT_CAP=8)"
+        );
+        assert_eq!(cr.stream.len(), before + 3, "+1 共振 +2 场事实按版本序入流");
+
+        // 保序断言: 流尾部三帧 = [本 tick 共振, v2 项, v3 项]
+        let recent = cr.stream.recent(3);
+        let texts: Vec<String> = recent
+            .iter()
+            .map(|t| String::from_utf8_lossy(&t.vector).to_string())
+            .collect();
+        assert!(
+            texts[1].contains("v2_payload") && !texts[1].contains("v3_payload"),
+            "倒数第二帧应为 v2, 实际: {}",
+            texts[1]
+        );
+        assert!(
+            texts[2].contains("v3_payload"),
+            "流尾应为 v3 (因果序), 实际: {}",
+            texts[2]
+        );
+    }
+
+    #[test]
+    fn test_t10_field_fact_cap_bounds_single_tick_drain() {
+        // 积压 12 版本 (> CAP=8): 单次 tick 只消费 8 版本, 下次 tick 补完 ——
+        // 有界窗口防止大增量淹没意识窗口 (FIELD_FACT_CAP 实测)。
+        let path = t10_temp_kb_path("capbound");
+        let writer_kb = KnowledgeBase::open(Some(path.clone())).expect("writer kb");
+        for v in 1..=12u64 {
+            writer_kb
+                .field_stage("g3", "e", &format!("cap_v{}", v), "writer_x")
+                .unwrap();
+            writer_kb.field_tick().unwrap(); // v1..v12 连续落账
+        }
+
+        let mut cr = ConsciousnessRuntime::new();
+        cr.attach_kb(std::sync::Arc::new(
+            KnowledgeBase::open(Some(path)).expect("reader kb"),
+        ));
+        cr.awaken();
+
+        let before = cr.stream.len();
+        let _ = cr.tick("drain window 1");
+        assert_eq!(
+            cr.last_field_version_seen, 8,
+            "单次 tick 只前进 CAP=8 个版本"
+        );
+        assert_eq!(cr.stream.len(), before + 9, "+1 共振 +8 场事实");
+
+        let _ = cr.tick("drain window 2");
+        assert_eq!(cr.last_field_version_seen, 12, "第二次 tick 补完剩余 4 版本");
+        assert_eq!(cr.stream.len(), before + 14, "+1 共振 +4 场事实");
+    }
 }
