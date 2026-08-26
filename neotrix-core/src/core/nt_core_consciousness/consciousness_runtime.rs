@@ -1,6 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
 use super::awakening::{AwakeningReport, ConsciousnessAwakening};
+use super::bubble_wall::{BubbleWall, TokenBill};
 use super::inner_critic::{CritiqueResult, InnerCritic};
 use super::source_hierarchy::{
     ContextMeta, KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
@@ -19,10 +20,20 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 const KB_INJECT_LIMIT: usize = 4;
 /// KB 查询缓存容量：避免意识 tick 对相同共振内容重复同步搜索 KB。
 const KB_QUERY_CACHE_CAP: usize = 64;
+/// G2 泡壁门控阈值: 域名与任务词元重合率 ≥ 此值才进清晰区 (灵境协议 7.2)。
+const BUBBLE_MIN_SCORE: f64 = 0.34;
+
+/// 带 domain 标签的注入候选 (泡壁门控的判定单元)。
+#[derive(Debug, Clone)]
+struct KbCandidate {
+    title: String,
+    domain: Option<String>,
+    score: f64,
+}
 
 /// 有界 KB 查询缓存 — 以共振内容为 key，避免重复同步 DB 搜索。
 struct KbQueryCache {
-    entries: std::collections::VecDeque<(String, Vec<(String, f64)>)>,
+    entries: std::collections::VecDeque<(String, Vec<KbCandidate>)>,
 }
 
 impl KbQueryCache {
@@ -31,13 +42,13 @@ impl KbQueryCache {
             entries: std::collections::VecDeque::new(),
         }
     }
-    fn get(&self, query: &str) -> Option<&Vec<(String, f64)>> {
+    fn get(&self, query: &str) -> Option<&Vec<KbCandidate>> {
         self.entries
             .iter()
             .find(|(k, _)| k == query)
             .map(|(_, v)| v)
     }
-    fn put(&mut self, query: &str, results: Vec<(String, f64)>) {
+    fn put(&mut self, query: &str, results: Vec<KbCandidate>) {
         if self.entries.iter().any(|(k, _)| k == query) {
             return;
         }
@@ -61,6 +72,8 @@ pub struct ConsciousnessRuntime {
     pub kb: Option<std::sync::Arc<KnowledgeBase>>,
     /// 最近一次 tick 从 KB 注入的意识条目 (title, score)。
     pub last_kb_injections: Vec<(String, f64)>,
+    /// G2 面积律账单: 最近一次注入的清晰区/迷雾区成本核算。
+    pub last_bubble_bill: Option<TokenBill>,
     /// KB 查询缓存 — 防止共振内容重复触发同步搜索。
     kb_cache: KbQueryCache,
     pub awakened: bool,
@@ -80,6 +93,7 @@ impl ConsciousnessRuntime {
             affective: AffectiveInterface::new(),
             kb: None,
             last_kb_injections: Vec::new(),
+            last_bubble_bill: None,
             kb_cache: KbQueryCache::new(),
             awakened: false,
             last_report: None,
@@ -101,9 +115,11 @@ impl ConsciousnessRuntime {
     /// 返回 (title, score) 列表；未挂接 KB 时返回空。结果经有界缓存复用。
     pub fn query_kb(&self, query: &str, limit: usize) -> Vec<(String, f64)> {
         if let Some(cached) = self.kb_cache.get(query) {
-            let mut v = cached.clone();
-            v.truncate(limit);
-            return v;
+            return cached
+                .iter()
+                .take(limit)
+                .map(|c| (c.title.clone(), c.score))
+                .collect();
         }
         let kb = match self.kb.as_ref() {
             Some(kb) => kb,
@@ -120,52 +136,82 @@ impl ConsciousnessRuntime {
 
     /// 将 KB 检索结果注入意识流 (specious present) 作为带溯源的记忆条目。
     /// 返回注入条目数。每条带 Structured provenance 层，可被后续感知层级鉴别。
+    ///
+    /// G2 泡壁门控 (灵境协议 7.2): 注入前按任务光锥投影 BubbleWall ——
+    /// 清晰域条目放行, 迷雾域只进面积律账单不展开细节; 无域标签保守放行。
     fn inject_kb_knowledge(&mut self, query: &str) -> usize {
         let Some(kb) = self.kb.clone() else { return 0 };
         // 缓存命中: 直接复用上次搜索结果, 避免同步 DB 搜索阻塞意识 tick。
-        let results: Vec<(String, f64)> = if let Some(cached) = self.kb_cache.get(query) {
+        let candidates: Vec<KbCandidate> = if let Some(cached) = self.kb_cache.get(query) {
             cached.clone()
         } else {
             let fresh = match kb.search(query, KB_INJECT_LIMIT) {
                 Ok(r) => r,
                 Err(_) => return 0,
             };
-            let mapped: Vec<(String, f64)> = fresh
+            let mapped: Vec<KbCandidate> = fresh
                 .iter()
-                .map(|r| (r.node.title.clone(), r.score))
+                .map(|r| KbCandidate {
+                    title: r.node.title.clone(),
+                    domain: r.node.domain.clone(),
+                    score: r.score,
+                })
                 .collect();
             self.kb_cache.put(query, mapped.clone());
             mapped
         };
+
+        let by_domain = match kb.stats() {
+            Ok(s) => s.by_domain,
+            Err(_) => Vec::new(),
+        };
+        let total_volume: i64 = by_domain.iter().map(|(_, c)| *c).sum();
+        let wall = BubbleWall::project(query, &by_domain, BUBBLE_MIN_SCORE);
+        let pre_filter = candidates.len();
+        let gated: Vec<KbCandidate> = candidates
+            .iter()
+            .filter(|c| wall.allows(c.domain.as_deref()))
+            .cloned()
+            .collect();
+        let title_chars: Vec<usize> = gated.iter().map(|c| c.title.chars().count()).collect();
+        self.last_bubble_bill = Some(wall.bill(&title_chars, total_volume));
+        log::debug!(
+            "[bubble] clear={:?} fog_domains={} drained {}→{} entries",
+            wall.clear_domains,
+            wall.fog_domains.len(),
+            pre_filter,
+            gated.len()
+        );
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos() as i64;
         let mut injected = Vec::new();
-        for (title, score) in results {
-            if title.is_empty() {
+        for cand in &gated {
+            if cand.title.is_empty() {
                 continue;
             }
             let raw = KnowledgeLayer::Raw(PerceptionMeta {
                 source_type: PerceptionSource::SearchResult,
-                raw_confidence: score.clamp(0.0, 1.0),
+                raw_confidence: cand.score.clamp(0.0, 1.0),
                 timestamp: now,
             });
             let structured = KnowledgeLayer::Structured(ContextMeta {
-                source_ids: vec![title.clone()],
+                source_ids: vec![cand.title.clone()],
                 processing_steps: vec!["kb_hybrid_search".into()],
-                contextual_confidence: score.clamp(0.0, 1.0),
+                contextual_confidence: cand.score.clamp(0.0, 1.0),
             });
             let chain = ProvenanceChain::new(vec![(raw, now), (structured, now + 1)]);
             let mut item = VsaTagged::new(
-                title.as_bytes().to_vec(),
+                cand.title.as_bytes().to_vec(),
                 VsaOrigin::Self_(VsaSelfCategory::Memory),
             )
-            .with_confidence(score.clamp(0.0, 1.0))
+            .with_confidence(cand.score.clamp(0.0, 1.0))
             .with_provenance(chain);
-            item.salience = (0.5 + score * 0.5).min(1.0);
+            item.salience = (0.5 + cand.score * 0.5).min(1.0);
             self.specious_present.push(item);
-            injected.push((title, score));
+            injected.push((cand.title.clone(), cand.score));
         }
         self.last_kb_injections = injected;
         self.last_kb_injections.len()
