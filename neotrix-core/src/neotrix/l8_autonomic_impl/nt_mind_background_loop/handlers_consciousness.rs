@@ -1092,6 +1092,30 @@ impl BackgroundLoopHandle {
             log::debug!("[bg] {}", self.convergence_pulse.status_line());
         }
 
+        // ── G4 场共识观测 (灵境协议6 收尾, T3 行为接地) ──
+        // head/quorum/max-lag 进状态度量流: quorum 是全体锚点安全对齐点,
+        // lag_max 反映最落后写者与场头的距离。
+        if let Some(ref kb) = self.kb {
+            if let Ok(frame) = kb.field_consensus_frame() {
+                self.state.record_metric("field_head", frame.head as f64);
+                self.state.record_metric("field_quorum", frame.quorum as f64);
+                let lag_max = frame
+                    .anchors
+                    .iter()
+                    .map(|(_, _, lag)| *lag)
+                    .max()
+                    .unwrap_or(0);
+                self.state.record_metric("field_lag_max", lag_max as f64);
+                log::debug!(
+                    "[bg] field consensus: head={} quorum={} anchors={} lag_max={}",
+                    frame.head,
+                    frame.quorum,
+                    frame.anchors.len(),
+                    lag_max
+                );
+            }
+        }
+
         // ── Phase 9: Auto-Healing — C5 self-healing loop ──
         // 检测 degrade 信号 → 自动响应（enqueue remediation goal / log / circuit-break）
         // 这是分形收敛循环的"修复臂"：检测→诊断→行为修复闭环。
