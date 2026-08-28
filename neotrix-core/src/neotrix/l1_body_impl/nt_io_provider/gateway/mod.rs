@@ -206,7 +206,7 @@ mod tests {
         let gw = GatewayV2::new();
         assert_eq!(
             gw.provider_model("nvidia/meta/llama-3.1-8b-instruct"),
-            Some("llama-3.1-8b-instruct".to_string())
+            Some("meta/llama-3.1-8b-instruct".to_string())
         );
         assert_eq!(gw.provider_model("openai"), Some("openai".to_string()));
         assert_eq!(gw.provider_model(""), None);

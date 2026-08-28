@@ -88,6 +88,9 @@ impl GatewayV2 {
         if parts.len() <= 1 {
             // 无 `/` → keyless provider 回退到 catalog 默认模型 (避免把注册名当模型名发给端点)
             let name = parts.first().copied().unwrap_or(provider_name);
+            if name.is_empty() {
+                return None;
+            }
             if let Some(info) = lookup_provider(name) {
                 if info.is_free && !info.default_model.is_empty() {
                     return Some(info.default_model.to_string());
