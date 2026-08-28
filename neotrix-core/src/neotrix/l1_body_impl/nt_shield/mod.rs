@@ -18,6 +18,10 @@ pub mod keyvault;
 pub mod vault;
 pub mod cvss;
 pub mod nt_shield_mcp_security;
+/// 自毒化防火墙 (EVOMAL): 吸收边界前置扫描, 拒绝"检索内容→含 payload 的 skill 模板"固化。
+pub mod self_poison;
+/// 可验证回放收据 (agent-receipts): 进程内零依赖的运行/吸收动作收据, 供审计回放。
+pub mod receipt;
 pub mod safety_kernel;
 pub mod check_registry;
 pub mod http_proxy;

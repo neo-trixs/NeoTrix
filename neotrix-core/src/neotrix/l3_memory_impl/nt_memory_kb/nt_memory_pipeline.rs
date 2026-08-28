@@ -19,6 +19,7 @@ use super::KnowledgeBase;
 
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
+use crate::neotrix::l1_body_impl::nt_shield::self_poison::scan_absorb_text;
 
 use serde::{Deserialize, Serialize};
 
@@ -177,6 +178,19 @@ impl KnowledgeBase {
     /// 幂等 (url 或 title+node_type 已存在则跳过), 自动挂域枢纽边 + FTS 同步。
     pub fn absorb_core(&self, entry: &AbsorbEntry) -> Result<AbsorbReport, String> {
         let node_type = NodeType::from_str(&entry.node_type);
+
+        // 自毒化防火墙 (EVOMAL): 吸收边界前置扫描 — 拒绝"检索内容被固化为含 payload 的 skill 模板"。
+        // fail-closed: 命中 Blocked 直接拒绝写入, 不产生可验证收据 (拒绝即无痕)。
+        let verdict = scan_absorb_text(&entry.title, &entry.summary, &entry.content);
+        if verdict.is_blocked() {
+            return Err(format!(
+                "self_poison firewall: absorb_core blocked entry '{}' (signals: {}). \
+                 Refusing to instantiate retrieved content as a skill/memory template.",
+                entry.title,
+                verdict.reasons.join(", ")
+            ));
+        }
+
         let conn = self.conn.lock().map_err(|e| format!("KB lock: {}", e))?;
 
         // 1. 幂等判定
