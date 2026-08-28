@@ -209,6 +209,7 @@ impl FreeModelCatalog {
         merged.extend(Self::discover_github_models());
         merged.extend(Self::discover_huggingface_models());
         merged.extend(Self::discover_keyless_providers());
+        merged.extend(Self::discover_opencode_zen_free());
         merged.extend(Self::discover_together_free());
         merged.extend(Self::discover_siliconflow_models());
         merged.extend(Self::discover_zai_models());
@@ -355,35 +356,11 @@ impl FreeModelCatalog {
         ]
     }
 
-    /// 发现 Keyless/Key-required 免费提供者 (OpenCode Zen free models with free-tier API key)
+    /// 发现 Keyless 免费提供者 — 仅保留静态可验证的 LLM7 匿名端点。
+    /// OpenCode Zen 的免费模型改为由 `discover_opencode_zen_free()` 实时发现 (动态入池),
+    /// 不再硬编码, 以避免清单与线上 `/v1/models` 脱节。
     pub fn discover_keyless_providers() -> Vec<FreeModelEntry> {
         let mut entries = Vec::new();
-        // 2026-08-22 实测 OpenCode Zen 匿名免费池：
-        // - nemotron-3-ultra-free: ✅ 200 + 真实回复 ×3 (稳定)
-        // - mimo-v2.5-free: 200 但 FreeUsageLimitError 429 限流 (gateway 重试可恢复)
-        // - deepseek-v4-flash-free: 400 Upstream unavailable (死，已移除)
-        // - qwen3.6-plus/minimax-m3/north-mini-code: 401 Model not supported (需 key，已移除)
-        // - big-pickle: 200 但恒空回复 (不可用，已移除)
-        // LLM7 .io 匿名可用见下方条目；Kilo/OVH/ModelScope unverified (2026-07-22)
-        let zen_base = "https://opencode.ai/zen/v1";
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "nemotron-3-ultra-free".into(),
-            display_name: "Nemotron 3 Ultra Free (OpenCode, anonymous)".into(),
-            base_url: zen_base.into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None,
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
-        entries.push(FreeModelEntry {
-            provider: "opencode-zen".into(),
-            model_id: "mimo-v2.5-free".into(),
-            display_name: "MiMo V2.5 Free (OpenCode, anonymous)".into(),
-            base_url: zen_base.into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None,
-            provider_type: LlmProviderType::OpenCodeZen,
-        });
         // LLM7 .io — 匿名可用端点 (2026-08-06 实测 200 + SSE 流式)。
         // 仅 codestral-latest 匿名免费, 其余模型需 API key (missing_api_key)。
         entries.push(FreeModelEntry {
@@ -396,6 +373,99 @@ impl FreeModelCatalog {
             provider_type: LlmProviderType::Llm7,
         });
         entries
+    }
+
+    /// 发现 OpenCode Zen 匿名免费模型 — 实时拉取 `/v1/models` 过滤免费层并入池。
+    /// 无需 API key (匿名 client 头即可), 失败 (网络挂起/非 200/解析失败/空结果)
+    /// 回退 `opencode_zen_free_fallback()` 静态清单, 保证离线也可注册免费端点。
+    /// (E: 每次 refresh 自动获取全部 zen 免费模型)
+    pub fn discover_opencode_zen_free() -> Vec<FreeModelEntry> {
+        let client = match reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(8))
+            .build()
+        {
+            Ok(c) => c,
+            Err(_) => return Self::opencode_zen_free_fallback(),
+        };
+        let resp = match client
+            .get("https://opencode.ai/zen/v1/models")
+            .header("x-opencode-client", "opencode")
+            .header("x-opencode-project", "default")
+            .header("User-Agent", "opencode/1.18.3")
+            .send()
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => return Self::opencode_zen_free_fallback(),
+        };
+        let body: serde_json::Value = match resp.json() {
+            Ok(b) => b,
+            Err(_) => return Self::opencode_zen_free_fallback(),
+        };
+        let arr = match body.get("data").and_then(|d| d.as_array()) {
+            Some(a) => a,
+            None => return Self::opencode_zen_free_fallback(),
+        };
+        let mut out = Vec::new();
+        for m in arr {
+            let id = match m.get("id").and_then(|v| v.as_str()) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+            // 免费层: 以 `-free` 结尾, 或 big-pickle (无后缀但免费)。
+            if !(id.ends_with("-free") || id == "big-pickle") {
+                continue;
+            }
+            let display = m
+                .get("display_name")
+                .and_then(|v| v.as_str())
+                .or_else(|| m.get("name").and_then(|v| v.as_str()))
+                .unwrap_or(&id)
+                .to_string();
+            out.push(FreeModelEntry {
+                provider: "opencode-zen".into(),
+                model_id: id,
+                display_name: format!("{} (OpenCode, anonymous)", display),
+                base_url: "https://opencode.ai/zen/v1".into(),
+                tier: Self::classify_tier(&display),
+                is_free: true,
+                requires_api_key: false,
+                api_key_env: None,
+                provider_type: LlmProviderType::OpenCodeZen,
+            });
+        }
+        if out.is_empty() {
+            return Self::opencode_zen_free_fallback();
+        }
+        out
+    }
+
+    /// OpenCode Zen 免费模型静态回退清单 (2026-08-28 实测 `/v1/models` 免费层全量)。
+    fn opencode_zen_free_fallback() -> Vec<FreeModelEntry> {
+        let base = "https://opencode.ai/zen/v1";
+        let ids: &[(&str, &str)] = &[
+            ("big-pickle", "Big Pickle (OpenCode, anonymous)"),
+            ("deepseek-v4-flash-free", "DeepSeek V4 Flash Free (OpenCode, anonymous)"),
+            ("muse-spark-1.2-contributor-free", "Muse Spark 1.2 Contributor Free (OpenCode, anonymous)"),
+            ("mimo-v2.5-free", "MiMo V2.5 Free (OpenCode, anonymous)"),
+            ("hy3-free", "Hy3 Free (OpenCode, anonymous)"),
+            ("ling-3.0-flash-fin-free", "Ling 3.0 Flash Fin Free (OpenCode, anonymous)"),
+            ("nemotron-3-ultra-free", "Nemotron 3 Ultra Free (OpenCode, anonymous)"),
+            ("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning Free (OpenCode, anonymous)"),
+            ("laguna-s-2.1-free", "Laguna S 2.1 Free (OpenCode, anonymous)"),
+        ];
+        ids.iter()
+            .map(|(id, name)| FreeModelEntry {
+                provider: "opencode-zen".into(),
+                model_id: id.to_string(),
+                display_name: name.to_string(),
+                base_url: base.into(),
+                tier: Self::classify_tier(name),
+                is_free: true,
+                requires_api_key: false,
+                api_key_env: None,
+                provider_type: LlmProviderType::OpenCodeZen,
+            })
+            .collect()
     }
 
     /// 发现 Together AI 免费模型 (with -Free suffix)

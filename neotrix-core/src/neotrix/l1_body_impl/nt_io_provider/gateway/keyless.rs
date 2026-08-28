@@ -12,13 +12,25 @@ use super::GatewayV2;
 use crate::core::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
 
 impl GatewayV2 {
-    /// 有序 keyless 候选 (匿名, 无需 API key, 实测可返回文本)。
-    /// 新增匿名端点时在此追加, 即可被 `route_keyless` 自动纳入路由。
-    pub fn keyless_candidates() -> &'static [&'static str] {
-        &[
-            "opencode-zen/big-pickle",
-            "opencode-zen/mimo-v2.5-free",
-            "llm7/codestral-latest",
+    /// 有序 keyless 候选 (匿名, 无需 API key)。动态从已注册 provider 中收集
+    /// `opencode-zen/*` (E: 实时发现全部 zen 免费模型) 与 `llm7/*` 端点;
+    /// 注册表为空 (如单测) 时回退静态已知匿名端点。
+    pub fn keyless_candidates(&self) -> Vec<String> {
+        if let Ok(guard) = self.providers.read() {
+            let mut v: Vec<String> = guard
+                .keys()
+                .filter(|k| k.starts_with("opencode-zen/") || k.starts_with("llm7/"))
+                .cloned()
+                .collect();
+            if !v.is_empty() {
+                v.sort();
+                return v;
+            }
+        }
+        vec![
+            "opencode-zen/big-pickle".into(),
+            "opencode-zen/mimo-v2.5-free".into(),
+            "llm7/codestral-latest".into(),
         ]
     }
 
@@ -51,10 +63,10 @@ impl GatewayV2 {
     /// 跨 keyless 候选路由: 依次尝试 `keyless_candidates`, 每个候选经
     /// `call_provider_backoff` 退避重试; 全部失败返回最后一个错误。
     pub async fn route_keyless(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
-        let candidates = Self::keyless_candidates();
+        let candidates = self.keyless_candidates();
         let mut last_err = LlmError::Unknown("no keyless candidates configured".into());
         for cand in candidates {
-            match self.call_provider_backoff(cand, request).await {
+            match self.call_provider_backoff(&cand, request).await {
                 Ok(resp) => return Ok(resp),
                 Err(e) => {
                     last_err = e;
