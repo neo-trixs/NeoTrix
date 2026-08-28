@@ -491,9 +491,29 @@ pub fn prune_cortex_orphans(
     if !root.exists() {
         return Err("external brain not mounted — refuse to prune (would orphan everything)".into());
     }
-    let disk_uuids = disk_zim_uuids(root)?;
-    if disk_uuids.is_empty() {
+    let mut backed = disk_zim_uuids(root)?;
+    if backed.is_empty() {
         return Err("no ZIM files found on volume — abort prune".into());
+    }
+    // The mounted volume's ZIM set is often a DIFFERENT snapshot than the one that
+    // originally populated the live KB. The 68 GB corpus DB is the true superset backing
+    // store (it contains ~99% of live zim URLs). A KB source is only an ORPHAN if it is
+    // absent from BOTH the mounted volume AND the corpus — otherwise pruning would wrongly
+    // delete hundreds of thousands of valid article nodes.
+    if let Some(corpus) = local_corpus_path() {
+        if let Ok(cdb) = Connection::open(&corpus) {
+            if let Ok(mut st) = cdb.prepare(
+                "SELECT DISTINCT substr(url,10,36) FROM nodes WHERE url LIKE 'zimid://%'",
+            ) {
+                let rows = st
+                    .query_map([], |r| r.get::<_, String>(0))
+                    .map_err(|e| e.to_string())?
+                    .filter_map(|r| r.ok());
+                for u in rows {
+                    backed.insert(u);
+                }
+            }
+        }
     }
     let mut stmt = conn
         .prepare("SELECT DISTINCT substr(url,10,36) FROM nodes WHERE url LIKE 'zimid://%'")
@@ -506,7 +526,7 @@ pub fn prune_cortex_orphans(
     let mut orphan_nodes = 0usize;
     let mut orphan_sources = 0usize;
     for src in kb_sources {
-        if disk_uuids.contains(&src) {
+        if backed.contains(&src) {
             continue;
         }
         orphan_sources += 1;
