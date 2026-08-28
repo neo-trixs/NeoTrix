@@ -6,6 +6,7 @@
 
 use neotrix::core::nt_core_consciousness_core::{execute_task_loop, process_instruction, ExternalClosureConfig, LlmSolutionExecutor};
 use neotrix::neotrix::nt_core_error::NeoTrixError;
+use neotrix::neotrix::nt_harness::app_server::ApprovalState;
 use neotrix::neotrix::nt_harness::{HarnessExecuteRequest, HarnessGateway};
 use serde_json::{json, Value};
 use std::sync::{LazyLock, Mutex};
@@ -132,6 +133,23 @@ pub fn harness_approval_list() -> Result<Value, NeoTrixError> {
     let gateway = GATEWAY.lock().map_err(|e| NeoTrixError::Brain(format!("HarnessGateway poisoned: {e}")))?;
     let list: Vec<_> = gateway.threads.pending_approvals().into_iter().cloned().collect();
     serde_json::to_value(&list).map_err(|e| NeoTrixError::Serde(e.to_string()))
+}
+
+/// 审批交互：人工确认/拒绝 Harness 外部动作（决策写回 app_server 的 ApprovalRequest）。
+/// decision: "approve" | "reject"（大小写不敏感；reject 映射到 Denied）。
+#[tauri::command]
+pub fn harness_approval_resolve(id: String, decision: String) -> Result<Value, NeoTrixError> {
+    let mut gateway = GATEWAY.lock().map_err(|e| NeoTrixError::Brain(format!("HarnessGateway poisoned: {e}")))?;
+    let state = match decision.to_lowercase().as_str() {
+        "approve" | "approved" | "allow" => ApprovalState::Approved,
+        "reject" | "deny" | "denied" => ApprovalState::Denied,
+        other => return Err(NeoTrixError::Config(format!("未知审批决策: {other} (approve|reject)"))),
+    };
+    let resolved = gateway
+        .threads
+        .resolve_approval(&id, state)
+        .ok_or_else(|| NeoTrixError::Config(format!("审批项不存在或已决: {id}")))?;
+    serde_json::to_value(resolved).map_err(|e| NeoTrixError::Serde(e.to_string()))
 }
 
 #[cfg(test)]

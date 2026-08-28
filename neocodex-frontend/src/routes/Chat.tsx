@@ -34,6 +34,7 @@ import type { HarnessRunResponse, HarnessProgressEvent, HarnessApproval } from '
 import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
 import { ApprovalPanel } from '../components/ApprovalPanel'
+import { FileEditorPanel } from '../components/FileEditorPanel'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -97,11 +98,16 @@ export function Chat() {
   const [harnessRoute, setHarnessRoute] = createSignal<{ tag: string; domain: string; specialist: string } | null>(null)
   const [harnessReport, setHarnessReport] = createSignal<HarnessRunResponse | null>(null)
   const [harnessRunning, setHarnessRunning] = createSignal(false)
-  // 左栏 bot 审批流可见性：挂载时拉取待审批队列（只读；交互待后端 approve/reject 端点）
+  // 左栏 bot 审批流可见性：挂载时拉取待审批队列（可 approve/reject 交互）
   const [approvals, setApprovals] = createSignal<HarnessApproval[]>([])
-  onMount(() => {
+  const refreshApprovals = () => {
     harness.harnessApprovalList().then(setApprovals).catch(() => setApprovals([]))
+  }
+  onMount(() => {
+    refreshApprovals()
   })
+  // 左栏 bot 文件内联编辑面板开关
+  const [showFileEditor, setShowFileEditor] = createSignal(false)
   // Harness 能力地图（⌘K 面板发现用，挂载时懒加载）
   const [harnessCaps, setHarnessCaps] = createSignal<{ capability_tag: string; domain: string; specialist: string; keywords: string[]; description: string }[]>([])
   const loadHarnessCaps = async () => {
@@ -1195,12 +1201,25 @@ export function Chat() {
                   </div>
                 </Show>
 
-                {/* 左栏 bot 审批流可见性（挂载即拉取待审批队列，只读展示） */}
+                {/* 左栏 bot 审批流可见性（挂载即拉取待审批队列，可 approve/reject） */}
                 <Show when={approvals().length > 0}>
                   <div class="px-2 pb-2">
-                    <ApprovalPanel approvals={approvals()} onClose={() => setApprovals([])} />
+                    <ApprovalPanel approvals={approvals()} onClose={() => setApprovals([])} onResolved={refreshApprovals} />
                   </div>
                 </Show>
+
+                {/* 左栏 bot 文件内联编辑（read_file + write_file 闭环） */}
+                <div class="px-2 pb-2">
+                  <button
+                    class="w-full px-2 py-1 rounded bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 text-11px"
+                    onClick={() => setShowFileEditor(!showFileEditor())}
+                  >
+                    {showFileEditor() ? '收起文件编辑' : '文件内联编辑'}
+                  </button>
+                  <Show when={showFileEditor()}>
+                    <FileEditorPanel onClose={() => setShowFileEditor(false)} />
+                  </Show>
+                </div>
 
                 {/* cic 输入区 */}
                 <div class="cic w-full">
@@ -1652,12 +1671,25 @@ export function Chat() {
                 </div>
               </Show>
 
-              {/* 左栏 bot 审批流可见性（只读展示，交互待后端 approve/reject 端点） */}
+              {/* 左栏 bot 审批流可见性（可 approve/reject） */}
               <Show when={approvals().length > 0}>
                 <div class="pb-2">
-                  <ApprovalPanel approvals={approvals()} onClose={() => setApprovals([])} />
+                  <ApprovalPanel approvals={approvals()} onClose={() => setApprovals([])} onResolved={refreshApprovals} />
                 </div>
               </Show>
+
+              {/* 左栏 bot 文件内联编辑（read_file + write_file 闭环） */}
+              <div class="pb-2">
+                <button
+                  class="w-full px-2 py-1 rounded bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 text-11px"
+                  onClick={() => setShowFileEditor(!showFileEditor())}
+                >
+                  {showFileEditor() ? '收起文件编辑' : '文件内联编辑'}
+                </button>
+                <Show when={showFileEditor()}>
+                  <FileEditorPanel onClose={() => setShowFileEditor(false)} />
+                </Show>
+              </div>
 
               <div class="cic">
                 <textarea

@@ -25,6 +25,17 @@ export function listSessions(projectPath?: string | null): Promise<NeoCodexSessi
   return call('neocodex_list_sessions', { project_path: projectPath ?? null })
 }
 
+/* ── 通用 KV 网关（KB kv_store；智能画板等开放 JSON 落盘，对齐吸收纪律） ── */
+export function kbKvSet(namespace: string, key: string, value: string): Promise<void> {
+  return call('kb_kv_set', { namespace, key, value })
+}
+export function kbKvGet(namespace: string, key: string): Promise<string | null> {
+  return call('kb_kv_get', { namespace, key })
+}
+export function kbKvList(namespace: string): Promise<[string, string][]> {
+  return call('kb_kv_list', { namespace })
+}
+
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {
   return call('neocodex_create_session', { name: name ?? null })
 }

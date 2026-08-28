@@ -483,7 +483,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for MockLlmProvider {
-        async fn complete(&self, _request: &LlmRequest) -> Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError> {
             Ok(crate::neotrix::nt_io_provider::LlmResponse {
                 content: r#"{"topic":"science_and_technology","format":"academic_paper","confidence":0.92}"#.into(),
                 model: "mock".into(),
@@ -493,7 +497,7 @@ mod tests {
             })
         }
 
-        async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError>>, crate::neotrix::nt_io_provider::LlmError> {
+        async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError>>, crate::neotrix::nt_io_provider::LlmError> {
             let (_, rx) = tokio::sync::mpsc::channel(1);
             Ok(rx)
         }

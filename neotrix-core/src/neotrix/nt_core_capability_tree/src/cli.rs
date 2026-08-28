@@ -316,10 +316,27 @@ impl CapabilityCli {
             reg.set_defer_dep_warnings(false);
             // 保留经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
             reg.experience_targets = export.experience_targets;
+            // Durable 覆盖层: 合并提交的 overlay, 使手动写入在基础重新生成后仍生效。
+            if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
+                reg.merge_overlay(&ov);
+            }
             Ok(reg)
         } else {
-            Ok(CapabilityRegistry::new())
+            let mut reg = CapabilityRegistry::new();
+            if let Some(ov) = CapabilityRegistry::load_overlay_file(&self.overlay_path()) {
+                reg.merge_overlay(&ov);
+            }
+            Ok(reg)
         }
+    }
+
+    /// 覆盖层路径 — 与注册表同目录的 `capability_overrides.json` (提交进 git,
+    /// 不被 .gitignore 屏蔽), 承载手动 durable 写入 (bud/strengthen/graft/...)。
+    fn overlay_path(&self) -> std::path::PathBuf {
+        self.registry
+            .parent()
+            .map(|p| p.join("capability_overrides.json"))
+            .unwrap_or_else(|| std::path::PathBuf::from("capability_overrides.json"))
     }
 
     fn save_registry(&self, registry: &CapabilityRegistry) -> Result<(), Box<dyn std::error::Error>> {
@@ -328,6 +345,14 @@ impl CapabilityCli {
         }
         let content = serde_json::to_string_pretty(&registry.export())?;
         fs::write(&self.registry, content)?;
+        // Durable 层: 把完整注册表镜像写入提交的 overlay (capability_overrides.json),
+        // 使手动 durable 写入在基础被重新生成后仍生效。overlay 与基础文件同步,
+        // 加载时 overlay 节点优先合并 (merge_overlay), 故手动变更永不被覆盖丢弃。
+        let overlay = self.overlay_path();
+        if let Some(parent) = overlay.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&overlay, &content);
         Ok(())
     }
 

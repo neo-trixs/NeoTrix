@@ -2,8 +2,11 @@
 //  Smart Canvas — 节点存储（前端态；未来经 neocodex IPC 接后端 agent 结果流）
 //  种子演示 11 个格式族 → 证明"无限制类型"由能力网覆盖。
 // ══════════════════════════════════════════════════════════════════════════
-import { createSignal } from 'solid-js'
+import { createSignal, createRoot, createEffect } from 'solid-js'
 import type { CanvasNode } from '../canvas/types'
+import { getRenderer } from '../canvas/nodeRegistry'
+import { recordSpawn } from '../canvas/evolution'
+import { kbKvGet, kbKvSet } from '../api/neocodex'
 
 let seq = 0
 const nid = () => `node-${Date.now().toString(36)}-${seq++}`
@@ -73,16 +76,61 @@ function seed(): CanvasNode[] {
 
 const [nodes, setNodes] = createSignal<CanvasNode[]>(seed())
 
+/** KB kv_store 落盘命名空间 / key（开放 JSON，对齐吸收纪律）。 */
+const NS = 'canvas_board'
+const KEY = 'board'
+
 export const canvasStore = {
   get nodes() {
     return nodes()
   },
   setNodes,
-  /** 由 agent/工具结果派生新节点（spawn）。 */
+  /** 是否存在某 id 的节点（幂等去重，避免重载/桥重复 spawn）。 */
+  has(id: string): boolean {
+    return nodes().some((n) => n.id === id)
+  },
+  /** 整体替换（持久化加载用）。 */
+  replaceAll(list: CanvasNode[]) {
+    setNodes(list)
+  },
+  /** 由 agent/工具结果派生新节点（spawn）。id 可显式指定以支持幂等。 */
   spawn(n: Partial<CanvasNode> & { kind: string; data: unknown }) {
-    setNodes((cur) => [...cur, { id: nid(), x: 0, y: 0, salience: 0.5, ...n } as CanvasNode])
+    setNodes((cur) => [...cur, { id: n.id ?? nid(), x: 0, y: 0, salience: 0.5, ...n } as CanvasNode])
+    // 记录能力网遥测（自进化路线）
+    const r = getRenderer({ id: n.id ?? nid(), kind: n.kind, data: n.data, x: 0, y: 0 } as CanvasNode)
+    recordSpawn(n.kind, r.label)
   },
   setCollapsed(id: string, v: boolean) {
     setNodes((cur) => cur.map((n) => (n.id === id ? { ...n, collapsed: v } : n)))
   },
+}
+
+/**
+ * 画板持久化：启动一次。
+ * - 加载：优先用 KB 中已落盘的画板（否则保留种子演示）。
+ * - 自动保存：节点变更后防抖 800ms 写回 KB kv_store（开放 JSON）。
+ */
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+export function initCanvasPersistence(): void {
+  kbKvGet(NS, KEY)
+    .then((raw) => {
+      if (!raw) return
+      try {
+        const parsed = JSON.parse(raw) as CanvasNode[]
+        if (Array.isArray(parsed) && parsed.length) canvasStore.replaceAll(parsed)
+      } catch {
+        /* 损坏则忽略，保留当前（种子） */
+      }
+    })
+    .catch(() => {})
+
+  createRoot(() => {
+    createEffect(() => {
+      const snap = JSON.stringify(nodes())
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => {
+        kbKvSet(NS, KEY, snap).catch(() => {})
+      }, 800)
+    })
+  })
 }

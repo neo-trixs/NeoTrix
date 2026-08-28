@@ -1139,7 +1139,11 @@ mod tests {
 
     #[async_trait]
     impl LlmProvider for ScriptedLlm {
-        async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             self.seen_tools
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
@@ -1163,7 +1167,7 @@ mod tests {
             })
         }
 
-        async fn stream_complete(
+        async fn stream_complete_raw(
             &self,
             request: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {

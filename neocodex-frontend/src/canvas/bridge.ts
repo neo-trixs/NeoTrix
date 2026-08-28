@@ -2,7 +2,8 @@
 //  Smart Canvas — 会话桥 (Conversation Bridge)
 //  观察 chatStore 的对话结果（文本 / 附件 / 工具结果 / URL），
 //  自动 spawn 为画板节点。对话中产生的"图文视频 / 流程 / 网页"即实时上画板。
-//  去重：seen 集合按 msg/attachment/tool id 标记，避免重复与无限循环。
+//  幂等：每个节点用确定性 id（msg/att/tool 派生），canvasStore.has 去重，
+//  重载后桥不会重复 spawn（与持久化共存）。
 // ══════════════════════════════════════════════════════════════════════════
 import { createRoot, createEffect } from 'solid-js'
 import { chatStore } from '../stores/chat'
@@ -10,7 +11,6 @@ import type { Message, NeoCodexAttachmentDto } from '../stores/chat'
 import { canvasStore } from '../stores/canvas'
 
 let started = false
-const seen = new Set<string>()
 
 function dataUrlOf(att: NeoCodexAttachmentDto): string | null {
   if (!att.data) return null
@@ -20,29 +20,30 @@ function dataUrlOf(att: NeoCodexAttachmentDto): string | null {
 /** 工具结果 → 表格 / JSON / diff / 代码 节点 */
 function spawnTool(m: Message, idx: number) {
   const tc = m.toolCalls![idx]
-  const key = `tool:${tc.id}`
-  if (seen.has(key)) return
-  seen.add(key)
+  const id = `tool:${tc.id}`
+  if (canvasStore.has(id)) return
   const r = tc.result ?? ''
+  const spawn = (node: Parameters<typeof canvasStore.spawn>[0]) =>
+    canvasStore.spawn({ id, ...node })
   try {
     const parsed = JSON.parse(r)
     if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
-      canvasStore.spawn({ kind: 'table', title: tc.name, data: parsed, salience: 0.7, source: tc.name })
+      spawn({ kind: 'table', title: tc.name, data: parsed, salience: 0.7, source: tc.name })
       return
     }
     if (typeof parsed === 'object' && parsed !== null) {
-      canvasStore.spawn({ kind: 'json', title: tc.name, data: parsed, salience: 0.6, source: tc.name })
+      spawn({ kind: 'json', title: tc.name, data: parsed, salience: 0.6, source: tc.name })
       return
     }
   } catch {
     /* 非 JSON → 走文本类判定 */
   }
   if (/^\s*[-+]\s|^[+-].*\n[+-]/m.test(r)) {
-    canvasStore.spawn({ kind: 'diff', title: tc.name, data: r, salience: 0.6, source: tc.name })
+    spawn({ kind: 'diff', title: tc.name, data: r, salience: 0.6, source: tc.name })
     return
   }
   if (r.trim()) {
-    canvasStore.spawn({ kind: 'code', title: tc.name, data: r, salience: 0.55, source: tc.name })
+    spawn({ kind: 'code', title: tc.name, data: r, salience: 0.55, source: tc.name })
   }
 }
 
@@ -52,28 +53,22 @@ function spawnText(m: Message) {
   // 流程图：```mermaid 围栏
   const mer = c.match(/```mermaid\s*\n([\s\S]*?)```/)
   if (mer) {
-    const k = `mer:${m.id}`
-    if (!seen.has(k)) {
-      seen.add(k)
-      canvasStore.spawn({ kind: 'mermaid', title: '流程图', data: mer[1].trim(), salience: 0.7, source: m.role })
-    }
+    const id = `mer:${m.id}`
+    if (!canvasStore.has(id))
+      canvasStore.spawn({ id, kind: 'mermaid', title: '流程图', data: mer[1].trim(), salience: 0.7, source: m.role })
   }
   // 网页：消息中的 URL
   const url = c.match(/https?:\/\/[^\s)]+/)
   if (url) {
-    const k = `url:${m.id}`
-    if (!seen.has(k)) {
-      seen.add(k)
-      canvasStore.spawn({ kind: 'webpage', title: '网页', data: { url: url[0] }, salience: 0.6, source: m.role })
-    }
+    const id = `url:${m.id}`
+    if (!canvasStore.has(id))
+      canvasStore.spawn({ id, kind: 'webpage', title: '网页', data: { url: url[0] }, salience: 0.6, source: m.role })
   }
   // 长文：助手生成的较长说明/文档（避免每条聊天气泡都上画板，重复对话区）
   if (m.role === 'assistant' && c.length > 600) {
-    const k = `doc:${m.id}`
-    if (!seen.has(k)) {
-      seen.add(k)
-      canvasStore.spawn({ kind: 'markdown', title: '长文', data: c, salience: 0.5, source: 'assistant' })
-    }
+    const id = `doc:${m.id}`
+    if (!canvasStore.has(id))
+      canvasStore.spawn({ id, kind: 'markdown', title: '长文', data: c, salience: 0.5, source: 'assistant' })
   }
 }
 
@@ -85,19 +80,18 @@ function ingest() {
     if (atts) {
       for (let i = 0; i < atts.length; i++) {
         const akey = `att:${m.id}:${i}`
-        if (seen.has(akey)) continue
-        seen.add(akey)
+        if (canvasStore.has(akey)) continue
         const url = dataUrlOf(atts[i])
         if (!url) continue
         const mt = atts[i].mime_type
         if (mt.startsWith('image/')) {
           canvasStore.spawn({
-            kind: 'image', title: atts[i].name,
+            id: akey, kind: 'image', title: atts[i].name,
             data: { src: url, meta: `${mt} · ${Math.round(atts[i].size / 1024)}KB` },
             salience: 0.8, source: 'attachment',
           })
         } else if (mt.startsWith('video/')) {
-          canvasStore.spawn({ kind: 'video', title: atts[i].name, data: { src: url }, salience: 0.8, source: 'attachment' })
+          canvasStore.spawn({ id: akey, kind: 'video', title: atts[i].name, data: { src: url }, salience: 0.8, source: 'attachment' })
         }
       }
     }

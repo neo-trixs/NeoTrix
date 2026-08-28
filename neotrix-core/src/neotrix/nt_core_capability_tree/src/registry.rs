@@ -527,6 +527,54 @@ impl CapabilityRegistry {
         }
     }
 
+    /// 持久化覆盖层合并 — 把提交的 overlay (`.neotrix/capability_overrides.json`)
+    /// 合并到内存注册表之上, 使手动 durable 写入 (bud/strengthen/graft/mature/link)
+    /// 在任何"从基础重新生成"之后仍生效。overlay 节点在冲突时优先 (win)。
+    ///
+    /// 合并语义 (安全/可加, 不破坏基础 DAG):
+    /// - 新节点 (overlay 有, 基础无) → 直接注册 (bud 新建)。
+    /// - 既有节点 → 覆盖 durable 字段 (constellation/layer/provides/requires/
+    ///   rune_sockets/metadata/deprecated), 保留基础图的 dependents/created_at。
+    /// - overlay 边 → 两端存在且不存在时补加依赖 (link/graft 的边)。
+    /// - 注意: 不合并 experience_targets — 该区由 distill/auto-evolve 生成,
+    ///   不属于手动 durable 写入, 合并会随 load→save 循环无限累积重复。
+    pub fn merge_overlay(&mut self, o: &RegistryExport) {
+        for node in &o.nodes {
+            if let Some(existing) = self.nodes.get_mut(&node.id) {
+                existing.constellation = node.constellation;
+                existing.layer = node.layer;
+                existing.provides = node.provides.clone();
+                existing.requires = node.requires.clone();
+                existing.rune_sockets = node.rune_sockets.clone();
+                existing.metadata = node.metadata.clone();
+                existing.deprecated = node.deprecated;
+                existing.deprecated_reason = node.deprecated_reason.clone();
+                existing.updated_at = node.updated_at;
+            } else {
+                let _ = self.register(node.clone());
+            }
+        }
+        for (from, to) in &o.edges {
+            if self.nodes.contains_key(from) && self.nodes.contains_key(to) {
+                let already = self
+                    .nodes
+                    .get(from)
+                    .map(|n| n.requires.contains(to))
+                    .unwrap_or(false);
+                if !already {
+                    let _ = self.add_dependency(from, to);
+                }
+            }
+        }
+    }
+
+    /// 读取 overlay 文件 (`.neotrix/capability_overrides.json`)。
+    /// 缺失/解析失败 → None (容忍: overlay 是可选的持久化层)。
+    pub fn load_overlay_file(path: &std::path::Path) -> Option<RegistryExport> {
+        let json = std::fs::read_to_string(path).ok()?;
+        serde_json::from_str(&json).ok()
+    }
+
     /// 经验目标 → 演化计划 (断链 #2 修复: 后台自动消费 experience_targets)。
     ///
     /// 消费 distill 蒸馏写入的 experience_targets (capability_registry.json),

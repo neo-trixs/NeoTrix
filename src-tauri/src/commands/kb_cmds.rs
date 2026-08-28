@@ -7,6 +7,7 @@ use rusqlite::params;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store::{get_all_nodes, get_all_edges};
+use neotrix::core::nt_core_kb_primitives::{kv_set, kv_get, kv_list};
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeNode, KnowledgeEdge};
 use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{self, PackDecoder};
 
@@ -604,3 +605,27 @@ fn cold_dir() -> String {
     let home = std::env::var("HOME").unwrap_or(".".to_string());
     format!("{}/.neotrix/geo", home)
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+//  通用 KV 网关 — 复用 nt_core_kb_primitives 的 kv_store。
+//  供前端把任意开放 JSON 落盘进 KB（如智能画板节点状态），对齐吸收纪律。
+//  namespace 由调用方约定（画板用 "canvas_board"），key 区分画板/会话。
+// ══════════════════════════════════════════════════════════════════════════
+#[tauri::command(rename_all = "snake_case")]
+pub fn kb_kv_set(namespace: String, key: String, value: String) -> Result<(), NeoTrixError> {
+    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| NeoTrixError::from(e.to_string()))?;
+    kv_set(&conn, &namespace, &key, &value).map_err(NeoTrixError::from)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn kb_kv_get(namespace: String, key: String) -> Result<Option<String>, NeoTrixError> {
+    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| NeoTrixError::from(e.to_string()))?;
+    kv_get(&conn, &namespace, &key).map_err(NeoTrixError::from)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn kb_kv_list(namespace: String) -> Result<Vec<(String, String)>, NeoTrixError> {
+    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| NeoTrixError::from(e.to_string()))?;
+    kv_list(&conn, &namespace).map_err(NeoTrixError::from)
+}
+

@@ -211,16 +211,9 @@ impl LlmProviderType {
     }
 }
 
-/// 数据信任分级 (见 `LlmProviderType::data_trust`)。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum DataTrust {
-    /// 本地推理: 数据不出设备。
-    Trusted,
-    /// 付费云端: 有商业不训练条款, 仍脱敏内部指纹。
-    Contracted,
-    /// 免费/代理端点: 可能训练, 检测到内部指纹必须阻断或脱敏。
-    Untrusted,
-}
+/// 数据信任分级 — 复用 core 层定义 (`crate::core::nt_core_llm::DataTrust`),
+/// 避免 core/neotrix 双定义 (core 不得依赖 neotrix, 故单一事实源在 core)。
+pub use crate::core::nt_core_llm::DataTrust;
 
 #[derive(Debug, Clone)]
 pub struct ProviderConfig {
@@ -310,7 +303,11 @@ pub struct DeniedProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for DeniedProvider {
-    async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Untrusted
+    }
+
+    async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         Err(LlmError::InvalidRequest(format!(
             "network access to '{}' is blocked by default isolation policy; \
              allowlist it or set NEOTRIX_NETWORK_UNBLOCK=1 to opt out",
@@ -318,7 +315,7 @@ impl LlmProvider for DeniedProvider {
         )))
     }
 
-    async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         Err(LlmError::InvalidRequest(format!(
             "network access to '{}' is blocked by default isolation policy",
             self.host

@@ -5,7 +5,7 @@ import { clsx } from 'clsx'
 import { GlobeView } from './GlobeView'
 import { ProjectView as ProjectViewPanel } from './ProjectView'
 import { SmartCanvas, startCanvasBridge } from '../canvas'
-import { canvasStore } from '../stores/canvas'
+import { canvasStore, initCanvasPersistence } from '../stores/canvas'
 
 /* ════════════════════════════════════════════
    RightBar — 右栏（设计 v2，已接线后端）
@@ -240,6 +240,8 @@ export function RightBar() {
   onMount(loadTree)
   // 启动会话桥：对话结果实时上画板（幂等，全局一次）
   startCanvasBridge()
+  // 启动画板持久化：节点落盘 KB kv_store，重载恢复
+  initCanvasPersistence()
 
   const toggleRb = () => {
     if (autoHide()) {

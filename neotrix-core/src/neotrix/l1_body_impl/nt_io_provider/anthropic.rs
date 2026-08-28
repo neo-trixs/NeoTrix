@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
 use async_trait::async_trait;
 
 use super::context_budget::estimate_tokens;
@@ -69,11 +70,15 @@ fn serialize_system(s: &str, cache: bool) -> serde_json::Value {
 
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/v1/messages", self.base_url);
 
         let system_msg = request.messages.iter().find(|m| m.role == Role::System);
@@ -177,7 +182,7 @@ impl LlmProvider for AnthropicProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let url = format!("{}/v1/messages", self.base_url);
         let api_key = self.api_key.clone();
 

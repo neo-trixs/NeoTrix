@@ -29,6 +29,10 @@ export function readFile(path: string): Promise<string> {
   return call('read_file', { path })
 }
 
+export function writeFile(path: string, content: string): Promise<void> {
+  return call('write_file', { path, content })
+}
+
 /* ── 语音 ── */
 export function voiceGetTranscription(audioData: string, language?: string, model?: string): Promise<VoiceTranscript> {
   return call('voice_get_transcription', {

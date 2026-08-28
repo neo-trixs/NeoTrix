@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
 use super::types::*;
 use crate::neotrix::nt_io_http_factory::global_client;
 
@@ -80,11 +81,15 @@ impl GroqProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for GroqProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let body = self.build_request_body(request);
         let url = format!("{}/chat/completions", self.base_url);
 
@@ -109,7 +114,7 @@ impl LlmProvider for GroqProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| {
@@ -211,11 +216,15 @@ impl OpenRouterProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for OpenRouterProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let mut body = serde_json::json!({
             "model": request.model,
@@ -276,7 +285,7 @@ impl LlmProvider for OpenRouterProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| {
@@ -373,11 +382,15 @@ impl PollinationsProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for PollinationsProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Untrusted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| serde_json::json!({
@@ -428,7 +441,7 @@ impl LlmProvider for PollinationsProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| serde_json::json!({
@@ -525,11 +538,15 @@ impl CerebrasProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for CerebrasProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| serde_json::json!({
@@ -580,7 +597,7 @@ impl LlmProvider for CerebrasProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| serde_json::json!({

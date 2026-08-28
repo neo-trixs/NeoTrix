@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
 use async_trait::async_trait;
 
 use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
@@ -89,10 +90,14 @@ impl OpenAiProvider {
 
 #[async_trait]
 impl LlmProvider for OpenAiProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let body = self.build_body(request, false);
         let model_name = request.model.as_str();
@@ -164,7 +169,7 @@ impl LlmProvider for OpenAiProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let body = self.build_body(request, true);
         let api_key = self.api_key.clone();

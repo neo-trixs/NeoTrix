@@ -24,7 +24,6 @@ pub mod nt_memory_pack_chunked;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
-pub mod kb_vector_index;
 pub mod nt_memory_distill;
 pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;
@@ -75,7 +74,6 @@ pub use nt_discovery_orchestrator::{DiscoveryCycleConfig, DiscoveryCycleReport};
 pub use nt_memory_store::*;
 pub use nt_memory_types::*;
 pub use nt_memory_embed::EmbeddingConfig;
-pub use kb_vector_index::VectorIndex;
 pub use user_memory::UserMemory;
 pub use nt_memory_commitment::EmbeddingCommitmentStore;
 pub use nt_memory_gwt_router::{

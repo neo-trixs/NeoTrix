@@ -149,10 +149,20 @@ pub fn egress_privacy_guard(
     provider_label: &str,
 ) -> Result<(), String> {
     ensure_configured();
+    // 每调用决策: env 覆盖优先于持久化配置/默认值, 便于运行时降级与测试隔离。
+    let enabled = match std::env::var("NEOTRIX_PRIVACY_GUARD") {
+        Ok(v) => v != "0" && v != "false",
+        Err(_) => PRIVACY_ENABLED.load(Ordering::Relaxed),
+    };
+    let block_untrusted = match std::env::var("NEOTRIX_PRIVACY_BLOCK") {
+        Ok(v) => v != "0" && v != "false",
+        Err(_) => PRIVACY_BLOCK_UNTRUSTED.load(Ordering::Relaxed),
+    };
+
     // 1. 始终脱密钥 (即使总开关关, 密钥也绝不外泄)
     scrub_egress_secrets(req);
 
-    if !PRIVACY_ENABLED.load(Ordering::Relaxed) {
+    if !enabled {
         return Ok(());
     }
 
@@ -196,7 +206,7 @@ pub fn egress_privacy_guard(
             Ok(())
         }
         DataTrust::Untrusted => {
-            if PRIVACY_BLOCK_UNTRUSTED.load(Ordering::Relaxed) {
+            if block_untrusted {
                 // fail-closed: 免费/代理端点绝不放行 NeoTrix 内部代码/对话
                 let joined = leaks.join(", ");
                 Err(format!(
@@ -234,6 +244,10 @@ pub fn trust_from_name(registered_name: &str) -> DataTrust {
 mod tests {
     use super::*;
     use crate::neotrix::l1_body_impl::nt_io_provider::types::{LlmRequest, Message, Role};
+    use std::sync::Mutex;
+
+    // 守卫决策读取全局/环境变量, 并行测试会相互干扰; 串行化本模块所有测试。
+    static PRIVACY_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn req_with(content: &str) -> LlmRequest {
         let mut r = LlmRequest::new("gpt-4o-mini", content);
@@ -245,6 +259,7 @@ mod tests {
 
     #[test]
     fn test_scan_internals_detects_nt_core() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         // 良性代码不得误报为内部指纹
         assert!(scan_internals("fn foo() {} let x = 1;").is_empty());
         let hits = scan_internals("see nt_core_consciousness_core.rs for details");
@@ -255,6 +270,7 @@ mod tests {
 
     #[test]
     fn test_redact_internals_replaces_token() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         let out = redact_internals("import nt_core_consciousness_core as c");
         assert!(!out.contains("nt_core_consciousness_core"));
         assert!(out.contains("[REDACTED:neotrix-internal]"));
@@ -262,6 +278,7 @@ mod tests {
 
     #[test]
     fn test_trusted_local_passthrough() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         configure_privacy_guard(true, true);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
         let res = egress_privacy_guard(&mut r, LlmProviderType::Ollama.data_trust(), "ollama");
@@ -272,6 +289,7 @@ mod tests {
 
     #[test]
     fn test_contracted_redacts_internal() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         configure_privacy_guard(true, true);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
         let res = egress_privacy_guard(&mut r, LlmProviderType::OpenAI.data_trust(), "openai");
@@ -282,24 +300,30 @@ mod tests {
 
     #[test]
     fn test_untrusted_blocks_internal() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         configure_privacy_guard(true, true);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
+        let trust = LlmProviderType::Llm7.data_trust();
+        let res = egress_privacy_guard(&mut r, trust, "llm7");
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("privacy guard"));
     }
 
     #[test]
     fn test_untrusted_degrade_to_redaction() {
-        configure_privacy_guard(true, false);
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
+        // 显式降级: 经 env 覆盖关闭 untrusted 阻断 (per-call 决策, 不受全局缓存影响)
+        std::env::set_var("NEOTRIX_PRIVACY_BLOCK", "0");
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
         let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
+        std::env::remove_var("NEOTRIX_PRIVACY_BLOCK");
         assert!(res.is_ok());
         assert!(!r.messages[0].content.contains("nt_core_consciousness_core"));
     }
 
     #[test]
     fn test_untrusted_clean_passthrough() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         configure_privacy_guard(true, true);
         let mut r = req_with("write a hello world function in python");
         let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
@@ -308,6 +332,7 @@ mod tests {
 
     #[test]
     fn test_secrets_always_scrubbed() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
         configure_privacy_guard(true, true);
         let mut r = req_with("my key is sk-abcdEFGH1234567890abcdef and token AKIA1234567890ABCDEF");
         let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");

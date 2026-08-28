@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
@@ -158,11 +159,15 @@ impl Default for GatewayV2 {
 
 #[async_trait::async_trait]
 impl LlmProvider for GatewayV2 {
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         self.complete_with_selection(request).await
     }
 
-    async fn stream_complete(
+    async fn stream_complete_raw(
         &self,
         request: &LlmRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
@@ -449,7 +454,11 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for ConditionalFail {
-            async fn complete(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+            async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
                 let count = self
                     .fail_count
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -469,7 +478,7 @@ mod tests {
                     })
                 }
             }
-            async fn stream_complete(
+            async fn stream_complete_raw(
                 &self,
                 _req: &LlmRequest,
             ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>
@@ -513,12 +522,16 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for StreamConditionalFail {
-            async fn complete(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+            async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
                 Err(LlmError::Server(
                     "complete not implemented for StreamConditionalFail".to_string(),
                 ))
             }
-            async fn stream_complete(
+            async fn stream_complete_raw(
                 &self,
                 _req: &LlmRequest,
             ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>
@@ -1144,7 +1157,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for MockProvider {
-        async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             if self.should_fail {
                 Err(LlmError::Server("mock failure".to_string()))
             } else if self.quota_fail {
@@ -1166,7 +1183,7 @@ mod tests {
             }
         }
 
-        async fn stream_complete(
+        async fn stream_complete_raw(
             &self,
             _request: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {

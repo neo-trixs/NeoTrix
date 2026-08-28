@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
     use super::*;
     use crate::core::nt_core_hex::ReasoningHexagram;
     use crate::core::nt_core_prm::TrajectoryStep;
@@ -14,7 +15,11 @@
 
     #[async_trait::async_trait]
     impl LlmProvider for MockJudgeProvider {
-        async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             let content = format!(
                 r#"{{"score":{}, "confidence":{}, "rationale":"mock judge"}}"#,
                 self.score, self.confidence
@@ -28,7 +33,7 @@
             })
         }
 
-        async fn stream_complete(
+        async fn stream_complete_raw(
             &self,
             _request: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
@@ -628,7 +633,11 @@
 
     #[async_trait::async_trait]
     impl LlmProvider for MockRubricProvider {
-        async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             let content = format!(
                 r#"{{"score":{}, "confidence":0.8, "rationale":"rubric judge",
                     "criteria":[
@@ -649,7 +658,7 @@
             })
         }
 
-        async fn stream_complete(
+        async fn stream_complete_raw(
             &self,
             _request: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {

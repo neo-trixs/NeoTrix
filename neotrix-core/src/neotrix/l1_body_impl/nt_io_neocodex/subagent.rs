@@ -274,11 +274,15 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for FakeProvider {
-        async fn complete(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
             self.result.clone()
         }
 
-        async fn stream_complete(
+        async fn stream_complete_raw(
             &self,
             _req: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {

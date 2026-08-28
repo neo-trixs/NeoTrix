@@ -14,14 +14,60 @@ use serde_json::Value;
 use crate::core::nt_core_error::NeoTrixError;
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 
+/// 数据信任分级 — core 层出网隐私守卫的核心依据 (NeoTrix 自身源码/对话不外泄给外部模型)。
+///
+/// 与 neotrix 层 `LlmProviderType::data_trust()` 语义一致, 但定义在 core 层,
+/// 因为 `LlmProvider` trait 位于 core (core 不得反向依赖 neotrix 层)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DataTrust {
+    /// 本地推理: 数据不出设备 (Ollama/vLLM/SGLang) — 仅脱密钥即可。
+    Trusted,
+    /// 付费签约云端: 脱敏内部指纹后放行。
+    Contracted,
+    /// 免费/代理/keyless 端点: 命中内部指纹则阻断 (fail-closed)。
+    Untrusted,
+}
+
 #[async_trait::async_trait]
 pub trait LlmProvider: Send + Sync {
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError>;
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>;
+    /// 出网隐私守卫默认入口 — 每条外部请求出站前必经 (R-P42 强化现有节点, 单点全覆盖)。
+    ///
+    /// 默认实现: 脱密钥 → 按 `data_trust()` 拦截/脱敏 NeoTrix 内部指纹 → 委托 `complete_raw`。
+    /// 具体 provider 只需实现 `complete_raw` / `stream_complete_raw` / `data_trust`。
+    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+        let mut req = request.clone();
+        if let Err(reason) = egress_privacy_guard(&mut req, self.data_trust()) {
+            return Err(LlmError::InvalidRequest(reason));
+        }
+        self.complete_raw(&req).await
+    }
+
+    async fn stream_complete(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+        let mut req = request.clone();
+        if let Err(reason) = egress_privacy_guard(&mut req, self.data_trust()) {
+            return Err(LlmError::InvalidRequest(reason));
+        }
+        self.stream_complete_raw(&req).await
+    }
+
+    /// 实际出网实现 (守卫已先行处理 request)。
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError>;
+
+    /// 实际流式出网实现 (守卫已先行处理 request)。
+    async fn stream_complete_raw(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>;
 
     /// 将 provider 的 HTTP 客户端切换为代理路由 (子母阵 Proxied/Tor 画像注入)。
     /// 默认 no-op — 不支持代理注入的 provider 保持原客户端不变。
     fn set_proxy(&mut self, _proxy_url: &str) {}
+
+    /// 数据信任分级 — 决定出网守卫处置 (Trusted/Contracted/Untrusted)。
+    fn data_trust(&self) -> DataTrust;
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -315,6 +361,178 @@ impl From<LlmError> for NeoTrixError {
             LlmError::Server(s) => NeoTrixError::Brain(format!("LLM server: {s}")),
             LlmError::Unknown(s) => NeoTrixError::Brain(s),
         }
+    }
+}
+
+/// ============================================================================
+/// 出网隐私守卫 (Egress Privacy Guard) — core 层单点实现
+///
+/// 修复: 外部模型不应获取 NeoTrix 自身的源代码与对话信息。
+/// 机制 (与 neotrix 层 `privacy_guard` 语义一致, 但实现独立置于 core 以满足分层约束):
+/// 1. 密钥脱敏 — 剥离 sk-/AKIA/私钥/JWT/Bearer 等凭据。
+/// 2. 内部指纹检测 — 扫描 `nt_core_*` / `neotrix-core/` / `ConsciousnessTree` 等。
+/// 3. 信任分级门控 — `Trusted`(本地)仅脱密钥; `Contracted`(付费云)脱敏放行;
+///    `Untrusted`(免费/代理)命中内部指纹 → 阻断 (fail-closed)。
+/// ============================================================================
+
+/// NeoTrix 内部指纹 — 命中即表明消息可能泄露 NeoTrix 自身源代码/KB/对话。
+/// 刻意不含项目通用名 "NeoTrix"(用户正常对话会提及, 误伤率高), 只取结构性代码信号。
+const INTERNAL_TOKENS: &[&str] = &[
+    "neotrix-core/",
+    "neotrix_core",
+    "crates/neotrix",
+    "neotrix_knowledge.db",
+    ".neotrix/knowledge.db",
+    "nt_core_",
+    "nt_mind_",
+    "nt_world_",
+    "nt_io_",
+    "nt_memory_",
+    "nt_shield_",
+    "nt_act_",
+    "nt_governance_",
+    "nt_meta_",
+    "nt_repair_",
+    "nt_scout_",
+    "ConsciousnessTree",
+    "VSA HyperCube",
+    "E8 Hexagram",
+    "GWT",
+    "SEAL Pipeline",
+    "knowledge.db",
+    "kv_store",
+    "LlmProviderType",
+    "ProviderCategory",
+    "GatewayProvider",
+    "Redactor",
+    "CONTEXT.md",
+];
+
+/// 常见密钥/凭据前缀 — 出站前必脱 (与 neotrix 层 Redactor 行为一致)。
+const SECRET_PREFIXES: &[&str] = &[
+    "sk-", "AKIA", "eyJ", "ghp_", "gho_", "ghu_", "ghs_", "xoxb-", "xoxp-", "-----BEGIN",
+    "Bearer ", "api_key=", "apikey=", "secret=", "client_secret=", "password=", "token=",
+];
+
+/// 扫描消息中的 NeoTrix 内部指纹。
+pub fn scan_internals(content: &str) -> Vec<&'static str> {
+    INTERNAL_TOKENS
+        .iter()
+        .copied()
+        .filter(|tok| content.contains(tok))
+        .collect()
+}
+
+/// 将内部指纹替换为占位符, 防止 NeoTrix 源码/KB 泄露给外部模型。
+pub fn redact_internals(content: &str) -> String {
+    let mut out = content.to_string();
+    for tok in INTERNAL_TOKENS {
+        if out.contains(tok) {
+            out = out.replace(tok, "[REDACTED:neotrix-internal]");
+        }
+    }
+    out
+}
+
+/// 脱敏单条文本中的密钥/凭据 (子串匹配, 不引入 regex 依赖)。
+fn redact_secrets_str(s: &str) -> String {
+    let mut out = s.to_string();
+    for p in SECRET_PREFIXES {
+        let mut scan = 0;
+        while let Some(rel) = out[scan..].find(p) {
+            let idx = scan + rel;
+            let rest = &out[idx..];
+            // 终止: 下一个空白/引号, 或最长 64 字符 (避免吞掉整段正常文本)
+            let end = rest
+                .find(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == '`')
+                .unwrap_or(rest.len())
+                .min(64);
+            if end == 0 {
+                scan = idx + 1;
+                continue;
+            }
+            let secret = out[idx..idx + end].to_string();
+            out = out.replace(&secret, "[REDACTED:secret]");
+            scan = idx + "[REDACTED:secret]".len();
+        }
+    }
+    out
+}
+
+/// 脱密钥 (保留原 `scrub_egress_secrets` 行为)。
+fn scrub_secrets_core(req: &mut LlmRequest) {
+    for m in req.messages.iter_mut() {
+        if m.content.contains("sk-")
+            || m.content.contains("AKIA")
+            || m.content.contains("eyJ")
+            || m.content.contains("Bearer ")
+            || m.content.contains("-----BEGIN")
+            || m.content.contains("password=")
+            || m.content.contains("secret=")
+            || m.content.contains("api_key=")
+            || m.content.contains("token=")
+        {
+            m.content = redact_secrets_str(&m.content);
+        }
+    }
+}
+
+/// 出网隐私守卫主入口 — 由 `LlmProvider::{complete,stream_complete}` 默认方法调用。
+///
+/// 返回 `Err(reason)` 表示被阻断 (Untrusted + 命中内部指纹)。
+/// 返回 `Ok(())` 表示请求已就地脱敏, 可安全出站。
+pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<(), String> {
+    // 1. 始终脱密钥 (即使本地, 密钥也绝不外泄)
+    scrub_secrets_core(req);
+
+    if trust == DataTrust::Trusted {
+        // 本地推理: 数据不出设备, 仅脱密钥即可。
+        return Ok(());
+    }
+
+    // 2. 扫描所有消息与图像/约束数据中的内部指纹
+    let mut leaks: Vec<&'static str> = Vec::new();
+    for m in &req.messages {
+        leaks.extend(scan_internals(&m.content));
+    }
+    if let Some(ref img) = req.image_data {
+        leaks.extend(scan_internals(img));
+    }
+    if let Some(ref c) = req.constraint_json {
+        if let Ok(s) = serde_json::to_string(c) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    leaks.sort_unstable();
+    leaks.dedup();
+
+    if leaks.is_empty() {
+        return Ok(());
+    }
+
+    match trust {
+        DataTrust::Contracted => {
+            // 付费云: 脱敏内部指纹后放行
+            for m in req.messages.iter_mut() {
+                if !scan_internals(&m.content).is_empty() {
+                    m.content = redact_internals(&m.content);
+                }
+            }
+            if let Some(ref mut img) = req.image_data {
+                *img = redact_internals(img);
+            }
+            Ok(())
+        }
+        DataTrust::Untrusted => {
+            // fail-closed: 免费/代理端点绝不放行 NeoTrix 内部代码/对话
+            let joined = leaks.join(", ");
+            Err(format!(
+                "privacy guard: egress to untrusted provider would leak NeoTrix internal code/conversation ({}). \
+                 Blocked. Use a local (Ollama/vLLM/SGLang) or paid contracted provider.",
+                joined
+            ))
+        }
+        DataTrust::Trusted => Ok(()),
     }
 }
 

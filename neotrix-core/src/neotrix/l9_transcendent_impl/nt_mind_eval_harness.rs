@@ -12,7 +12,7 @@ use crate::neotrix::nt_io_provider::{
     create_provider_from_type, LlmError, LlmProvider, LlmProviderType, LlmRequest,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Semaphore;
@@ -296,6 +296,28 @@ struct JudgeSpec {
     model_id: String,
 }
 
+/// 自动生成的回归/对抗测试用例 (E3 自改进闭环, T11)。
+///
+/// 由 `EvalHarness::generate_regression_test` 从候选行为变更摘要合成, 运行
+/// (`run_regression_test`) 时对候选做确定性回归门禁 (无 provider 依赖):
+///   - `forbidden_tokens`: 候选不得包含的已知回归反模式 (引入即拒)。
+///   - `required_categories`: 候选须至少命中其一 (源自 harness 既有评测数据集
+///     的 category 维度); 若 harness 无任何数据集则为空 → 门禁自动放行。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegressionCase {
+    pub id: String,
+    pub candidate: String,
+    pub forbidden_tokens: Vec<String>,
+    pub required_categories: Vec<String>,
+}
+
+/// 回归测试运行结果。
+#[derive(Debug, Clone, Default)]
+pub struct RegressionResult {
+    pub passed: bool,
+    pub reasons: Vec<String>,
+}
+
 /// 评测 Harness 主结构
 pub struct EvalHarness {
     budget_grid: Vec<u32>,
@@ -359,6 +381,86 @@ impl EvalHarness {
             self.compliance.mean_ap_acc(),
             self.compliance.passes(),
         )
+    }
+
+    /// 从候选行为变更摘要合成一个回归/对抗测试用例 (E3 闭环, T11)。
+    ///
+    /// 确定性, 无 provider 依赖: 候选的回归门禁由两个真实不变量构成 —
+    ///   1. 禁止不变量: 候选不得引入已知退化反模式 (TODO/unimplemented/unsafe/…)。
+    ///   2. 覆盖不变量: 候选须命中 harness 既有评测数据集的至少一个 `category`
+    ///      维度, 否则视为无回归覆盖的孤儿变更 (Dark Forest: 不接线的变更即拒)。
+    /// harness 无任何数据集时, 覆盖不变量为空 → 门禁对该维自动放行。
+    pub fn generate_regression_test(&self, candidate: &str) -> RegressionCase {
+        let candidate = candidate.trim().to_string();
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        use std::hash::{Hash, Hasher};
+        candidate.hash(&mut hasher);
+        let id = format!("reg-{:016x}", hasher.finish());
+
+        // 禁止不变量: 真实退化反模式清单 (非占位)。
+        let forbidden_tokens = vec![
+            "TODO".to_string(),
+            "todo!".to_string(),
+            "unimplemented".to_string(),
+            "unimplemented!".to_string(),
+            "panic!".to_string(),
+            "unreachable!".to_string(),
+            "unsafe".to_string(),
+        ];
+
+        // 覆盖不变量: 取自 harness 既有评测数据集的 category 维度。
+        let required_categories: Vec<String> = self
+            .datasets
+            .iter()
+            .flat_map(|d| d.queries.iter().map(|q| q.category.clone()))
+            .filter(|c| !c.is_empty())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        RegressionCase {
+            id,
+            candidate,
+            forbidden_tokens,
+            required_categories,
+        }
+    }
+
+    /// 运行回归测试用例 (确定性, 同步)。
+    pub fn run_regression_test(&self, case: &RegressionCase) -> RegressionResult {
+        let mut reasons: Vec<String> = Vec::new();
+        let cand = case.candidate.trim();
+
+        if cand.is_empty() {
+            reasons.push("candidate is empty (no behavior change)".into());
+        }
+
+        for tok in &case.forbidden_tokens {
+            if cand.contains(tok) {
+                reasons.push(format!(
+                    "candidate regresses: contains forbidden token '{}'",
+                    tok
+                ));
+            }
+        }
+
+        if !case.required_categories.is_empty() && !cand.is_empty() {
+            let covered = case
+                .required_categories
+                .iter()
+                .any(|c| cand.contains(c.as_str()));
+            if !covered {
+                reasons.push(format!(
+                    "candidate has no regression coverage: must reference one of {:?}",
+                    case.required_categories
+                ));
+            }
+        }
+
+        RegressionResult {
+            passed: reasons.is_empty(),
+            reasons,
+        }
     }
 
     /// AP-Acc 矩阵: 逐预算点计算 against-prior 精度增量 (长度 = budget_grid)
@@ -1511,10 +1613,14 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for DummyProvider {
-        async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+        async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             unreachable!("DummyProvider::complete should not be called")
         }
-        async fn stream_complete(
+        async fn stream_complete_raw(
             &self,
             _request: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {

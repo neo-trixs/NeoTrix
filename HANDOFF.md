@@ -46,8 +46,9 @@
 > **P3c 结论**：`GhostView`/`PPTView` **根本不存在**为组件（仅 `design-tokens.css` 的 `.btn-ghost` 合法按钮样式 + `index.css` ghost icon 用语）；宽泛「未用组件扫描」因 import 路径正则误报（如 Sidebar/SlashMenu 被判未用）而不可信，**无安全可删项**。
 - [x] P3a：18 核心半完成重构可靠可达性 → 全部已连消费者，无删除（green 保护）
 - [x] P3c：前端 ghost 模块（GhostView/PPTView 不存在；扫描不可信，无删）
-- [x] P3b（部分）：左栏 bot「审批流」可见性面板 `ApprovalPanel` 已接 `harness_approval_list`（只读，挂载即拉取，双方视图均挂载）；`npm run typecheck` + `ApprovalPanel.test.tsx`(2) 通过
-- [ ] P3b（待后端）：文件内联编辑（`read_file`/`write_file` 命令已存在，需前端编辑器组件）、审批交互（需 `harness_approval_approve/reject` 端点，当前无）、归档策略 UI（需 `session_archive` 端点，当前无）
+- [x] P3b（审批流）：`harness_approval_resolve(id, decision)` 命令暴露（后端 `resolve_approval` 已存在）+ `ApprovalPanel` 接 approve/reject 按钮（写回 app_server，刷新列表）；`main.rs` invoke_handler 已注册；`ApprovalPanel.test.tsx`(4) 通过
+- [x] P3b（文件内联编辑）：`FileEditorPanel` 接 `read_file`/`write_file`（新增 `writeFile` wrapper），载入→编辑→写回闭环；`FileEditorPanel.test.tsx`(2) 通过；Chat 双视图挂载开关
+- [x] P3b（归档策略）：后端 `neocodex_archive_session`/`neocodex_restore_session` + 前端 `archiveSession` + Sidebar 归档逻辑 **已存在并接线**，本会话确认无需新增（仅验证）
 - [ ] 响应式/移动端验收
 
 ### 已验证（本会话续）
@@ -69,3 +70,5 @@
 4. **跨轮持久化**：编辑后 `git status` 确认落盘；「上次编辑消失」先查 git。
 5. **构建验证纪律**：本机并发会话抢默认 `CARGO_TARGET_DIR` → OOM/SIGKILL；必须用独立 `CARGO_TARGET_DIR` + `-j 2`，勿信主干全量 build 结果（见顶部验证命令）。
 6. **shell 元字符陷阱（Dark-Forest 探针）**：zsh 会把 `--glob '!pattern'` 当历史展开，导致 `rg` 搜空、可达性计数全 0（假孤儿）。排除自身文件用 `rg ... | grep -v "$file"` 而非 `!` glob；探针结论须人工抽样复核（已证实 competition_gate 被 workspace `use super::` 消费却报 0）。
+7. **新增 Tauri `#[command]` 必须注册 invoke_handler**：仅加 `#[tauri::command]` 不接 `tauri::generate_handler![...]` 会报 dead_code 且前端 `call` 运行时 "command not found"。每加命令同步在 `src-tauri/src/main.rs` generate_handler 列表追加。
+8. **并发 cargo 破坏增量缓存（瞬时 E0432/E0433/E0277）**：本机会话并发 build 会抢锁并产出假解析错误（如 `could not find core in neotrix`）。遇可疑 E0433 先排除源码真错：换**全新** `CARGO_TARGET_DIR`（如 `/tmp/nt-target-absorb2`）重 build 绕过损坏缓存，勿信首报。

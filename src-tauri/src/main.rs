@@ -162,6 +162,7 @@ fn main() {
                     commands::kb_trajectory_add,
                     commands::kb_trajectory_query,
                     commands::kb_geo_offline_pack,
+                    commands::kb_kv_set, commands::kb_kv_get, commands::kb_kv_list,
                     commands::send_notification,
                                                             commands::distill_message,
                                         commands::get_identity,
@@ -650,6 +651,7 @@ commands::workflow_schedule_delete,
                     commands::harness_thread_list,
                     commands::harness_turn_start,
                     commands::harness_approval_list,
+                    commands::harness_approval_resolve,
                                     ])
                 .setup(move |app| {
                     if let Err(e) = neotrix_tauri::setup_tray(app) {

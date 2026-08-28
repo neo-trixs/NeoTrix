@@ -1,22 +1,37 @@
 import { createSignal, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
+import { harness } from '../api'
 import type { HarnessApproval } from '../api/harness'
 
 /* ════════════════════════════════════════════
-   ApprovalPanel — 左栏 bot「审批流」可见性面板
-   对标 Claude Code 的权限审批队列：展示 Harness 外部动作待审批项。
-   当前后端仅暴露只读 harness_approval_list（无 approve/reject 端点），
-   故本面板为只读展示；待后端补齐审批动作端点后再接交互。
+   ApprovalPanel — 左栏 bot「审批流」面板
+   对标 Claude Code 的权限审批队列：展示 Harness 外部动作待审批项，
+   并提供 approve / reject 交互（写回 app_server）。
    ════════════════════════════════════════════ */
 
 interface Props {
   approvals: HarnessApproval[]
   onClose: () => void
+  /** 决策后回调（父组件重拉列表） */
+  onResolved?: () => void
 }
 
 export function ApprovalPanel(props: Props) {
   const [open, setOpen] = createSignal(true)
+  const [busy, setBusy] = createSignal<string | null>(null)
   const pending = () => props.approvals.filter((a) => a.state === 'pending' || a.state === 'awaiting')
+
+  const decide = async (id: string, decision: 'approve' | 'reject') => {
+    setBusy(id)
+    try {
+      await harness.harnessApprovalResolve(id, decision)
+      props.onResolved?.()
+    } catch (e) {
+      console.error('[ApprovalPanel] resolve failed', e)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <div class="approval-panel rounded-xl border border-amber-500/25 bg-white/55 backdrop-blur-sm shadow-sm overflow-hidden">
@@ -59,6 +74,24 @@ export function ApprovalPanel(props: Props) {
                   <span class={clsx('px-1.5 py-0.5 rounded-full text-10px', a.state === 'pending' || a.state === 'awaiting' ? 'bg-amber-500/15 text-amber-600' : 'bg-emerald-500/12 text-emerald-600')}>
                     {a.state}
                   </span>
+                  <Show when={a.state === 'pending' || a.state === 'awaiting'}>
+                    <div class="flex gap-1">
+                      <button
+                        class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 text-10px disabled:opacity-50"
+                        disabled={busy() !== null}
+                        onClick={() => decide(a.id, 'approve')}
+                      >
+                        通过
+                      </button>
+                      <button
+                        class="px-2 py-0.5 rounded bg-red-500/15 text-red-500 hover:bg-red-500/25 text-10px disabled:opacity-50"
+                        disabled={busy() !== null}
+                        onClick={() => decide(a.id, 'reject')}
+                      >
+                        拒绝
+                      </button>
+                    </div>
+                  </Show>
                 </div>
               )}
             </For>

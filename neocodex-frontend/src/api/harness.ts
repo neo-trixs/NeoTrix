@@ -137,3 +137,8 @@ export interface HarnessApproval {
 export function harnessApprovalList(): Promise<HarnessApproval[]> {
   return call<HarnessApproval[]>('harness_approval_list')
 }
+
+/** 审批交互：approve / reject 写回 app_server（决策 -> Approved / Denied） */
+export function harnessApprovalResolve(id: string, decision: 'approve' | 'reject'): Promise<HarnessApproval> {
+  return call<HarnessApproval>('harness_approval_resolve', { id, decision })
+}

@@ -5,13 +5,11 @@ mod nodes;
 mod contract;
 mod lifecycle;
 mod ops;
-mod kb_integration;
 mod selftest;
 
 pub use types::*;
 pub use nodes::*;
 pub use contract::*;
-pub use kb_integration::*;
 
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
 

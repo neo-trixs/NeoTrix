@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
 use async_trait::async_trait;
 
 use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Usage};
@@ -44,11 +45,15 @@ impl Default for OllamaProvider {
 
 #[async_trait]
 impl LlmProvider for OllamaProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let prompt = self.build_prompt(request);
         let mut body = serde_json::json!({
             "model": request.model,
@@ -91,7 +96,7 @@ impl LlmProvider for OllamaProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let prompt = self.build_prompt(request);
         let mut body = serde_json::json!({
             "model": request.model,

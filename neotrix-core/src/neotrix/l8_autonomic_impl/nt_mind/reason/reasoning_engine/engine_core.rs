@@ -2443,7 +2443,11 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for CapturingProvider {
-            async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, crate::core::nt_core_llm::LlmError> {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Trusted
+    }
+
+            async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, crate::core::nt_core_llm::LlmError> {
                 *self.seen_model.lock().unwrap() = Some(request.model.clone());
                 *self.seen_max_tokens.lock().unwrap() = Some(request.max_tokens);
                 Ok(LlmResponse::plain(
@@ -2453,7 +2457,7 @@ mod tests {
                     FinishReason::Stop,
                 ))
             }
-            async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, crate::core::nt_core_llm::LlmError>>, crate::core::nt_core_llm::LlmError> {
+            async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, crate::core::nt_core_llm::LlmError>>, crate::core::nt_core_llm::LlmError> {
                 unimplemented!("not used in this test")
             }
         }

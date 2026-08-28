@@ -6,6 +6,24 @@ import { createSignal, createMemo, onMount, onCleanup, Show, For, type JSX } fro
 import type { CanvasNode, CollapsePolicy, Viewport } from './types'
 import { getRenderer, listCapabilities } from './nodeRegistry'
 import { computeCollapse, DEFAULT_POLICY } from './smartCollapse'
+import { evolutionRoute, pruneCandidates } from './evolution'
+
+/** 搜索添加时用的示例载荷，保证节点可渲染。 */
+function sampleData(kind: string): unknown {
+  if (kind.startsWith('chart')) return { chart: 'bar', labels: ['a', 'b', 'c'], series: [{ name: '示例', values: [3, 7, 4] }] }
+  if (kind === 'table') return [['col1', 'col2'], ['x', '1'], ['y', '2']]
+  if (kind === 'image') return { src: 'https://www.gstatic.com/webp/gallery/1.jpg', meta: '示例' }
+  if (kind === 'mermaid') return 'graph TD; A-->B; B-->C;'
+  if (kind === 'json' || kind === '*') return { hello: 'world', nested: { a: 1 } }
+  if (kind === 'markdown' || kind === 'text') return '# 示例\n通过搜索添加的能力节点。'
+  if (kind === 'diff') return '- old\n+ new'
+  if (kind === 'code') return 'fn main() {}'
+  if (kind === 'kpi') return { value: '42', label: '示例指标' }
+  if (kind === 'heatmap') return { cells: [[1, 2], [3, 1]], max: 3 }
+  if (kind === 'webpage') return { url: 'https://example.com' }
+  if (kind === 'html') return '<div style="padding:8px">示例 HTML</div>'
+  return { note: '自定义能力示例' }
+}
 
 export interface SmartCanvasProps {
   nodes: () => CanvasNode[]
@@ -104,6 +122,23 @@ export function SmartCanvas(props: SmartCanvasProps) {
     props.spawn({ x: -tx() / k() + 40, y: -ty() / k() + 40, ...n })
   }
 
+  // ── 能力网搜索 / 进化路线 ──
+  const [search, setSearch] = createSignal('')
+  const [paletteOpen, setPaletteOpen] = createSignal(false)
+  const [evoOpen, setEvoOpen] = createSignal(false)
+  const matched = createMemo(() => {
+    const q = search().toLowerCase().trim()
+    const caps = listCapabilities()
+    if (!q) return caps
+    return caps.filter((c) => c.kind.toLowerCase().includes(q) || c.label.toLowerCase().includes(q))
+  })
+  const addBySearch = (kind: string, label: string) => {
+    const k = kind.split('|')[0] // 多 kind renderer 取首个
+    doSpawn({ kind: k, data: sampleData(k), title: `${label} 示例`, salience: 0.6, source: 'search' })
+    setPaletteOpen(false)
+    setSearch('')
+  }
+
   return (
     <div class="sc-root">
       {/* 工具条 */}
@@ -118,8 +153,35 @@ export function SmartCanvas(props: SmartCanvasProps) {
           title="智能收缩（salience 轴）"
           onClick={toggleAutoCollapse}
         >智能收缩</button>
+        <input
+          class="sc-search"
+          placeholder="搜索能力…"
+          value={search()}
+          onInput={(e) => { setSearch(e.currentTarget.value); setPaletteOpen(true) }}
+          onFocus={() => setPaletteOpen(true)}
+        />
+        <button
+          class="sc-tbtn"
+          classList={{ on: evoOpen() }}
+          title="能力网进化路线"
+          onClick={() => setEvoOpen(!evoOpen())}
+        >进化路线</button>
         <span class="sc-cap-count">能力网 {listCapabilities().length} 族</span>
       </div>
+
+      {/* 能力搜索面板 */}
+      <Show when={paletteOpen() && matched().length}>
+        <div class="sc-palette">
+          <For each={matched()}>
+            {(c) => (
+              <button class="sc-palette-item" onClick={() => addBySearch(c.kind, c.label)}>
+                <span class="sc-kind">{c.label}</span>
+                <span class="sc-palette-kind">{c.kind}</span>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
 
       {/* 画布表面 */}
       <div
@@ -179,6 +241,31 @@ export function SmartCanvas(props: SmartCanvasProps) {
             }}
           </For>
         </div>
+
+        {/* 能力网进化路线覆盖层 */}
+        <Show when={evoOpen()}>
+          <div class="sc-evo">
+            <div class="sc-evo-head">
+              <span>能力网进化路线</span>
+              <button class="sc-evo-close" onClick={() => setEvoOpen(false)}>×</button>
+            </div>
+            <div class="sc-evo-list">
+              <For each={evolutionRoute()}>
+                {(c) => (
+                  <div class="sc-evo-row" classList={{ dead: c.count === 0 && c.userAdded }}>
+                    <span class="sc-evo-stage">{c.stage}</span>
+                    <span class="sc-evo-label">{c.label}</span>
+                    <span class="sc-evo-kind">{c.kind}</span>
+                    <span class="sc-evo-count">×{c.count}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+            <Show when={pruneCandidates().length}>
+              <div class="sc-evo-prune">Dark Forest 回收候选：{pruneCandidates().join('，')}</div>
+            </Show>
+          </div>
+        </Show>
       </div>
     </div>
   )

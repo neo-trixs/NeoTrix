@@ -1,3 +1,4 @@
+use crate::core::nt_core_llm::DataTrust;
 use async_trait::async_trait;
 
 use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, Usage, Role};
@@ -25,11 +26,15 @@ impl GeminiProvider {
 
 #[async_trait]
 impl LlmProvider for GeminiProvider {
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
+
     fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 
-    async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let model = request.model.trim_start_matches("gemini-");
         let url = format!("{}/models/{}:generateContent?key={}", self.base_url, model, self.api_key);
 
@@ -94,7 +99,7 @@ impl LlmProvider for GeminiProvider {
         }
     }
 
-    async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+    async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let model_name = request.model.clone();
         let model = model_name.trim_start_matches("gemini-").to_string();
         let url = format!("{}/models/{}:streamGenerateContent?alt=sse&key={}", self.base_url, model, self.api_key);

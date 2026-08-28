@@ -647,16 +647,23 @@ impl SelfIteratingBrain {
         let mut regression_failed = false;
         let mut failure_reasons: Vec<String> = Vec::new();
 
-        // ── (a) 自动生成回归/对抗测试 ──
-        // EvalHarness 当前无 generate_regression_test API; 预留调用点,
-        // 现以既有 evaluate-style 入口 (compliance_report) 作为占位 evaluate。
-        // TODO(E3): 待 EvalHarness 暴露 `generate_regression_test(candidate)` 后接线;
-        //   届时改为 `let cases = harness.generate_regression_test(candidate)?;`
+        // ── (a) 自动生成并运行回归/对抗测试 ──
+        // E3 (T11): EvalHarness 现暴露真实 `generate_regression_test` + `run_regression_test`
+        // (确定性, 无 provider 依赖): 从候选合成回归用例 (禁止反模式 + 覆盖既有评测
+        // category 维度), 运行失败则标记 regression_failed → 走 CritiqueResult/回滚路径。
         if let Some(h) = harness {
-            let _report = h.compliance_report(); // TODO(E3): 替换为 generate_regression_test(candidate)
+            let case = h.generate_regression_test(candidate);
+            let result = h.run_regression_test(&case);
+            if !result.passed {
+                regression_failed = true;
+                failure_reasons.push(format!(
+                    "generated regression test failed (id={}): {}",
+                    case.id,
+                    result.reasons.join("; ")
+                ));
+            }
             // JIT-Agent test-benching / yoyo-gasp bench 旁路 (吸收源 l4 yoyo-gasp/gasp)。
             // TODO(E3): wire `nt_mind_yoyo_gasp` / `nt_mind_gasp` 作为 JIT bench backend。
-            let _ = _report;
         }
 
         // ── (b) 运行回归测试 (scope 内 BenchmarkGate 作为实际回归执行体) ──

@@ -76,7 +76,6 @@ pub mod nt_core_plan;
 pub mod nt_core_policy;
 pub mod nt_core_prm;
 pub mod nt_core_reasoning;
-pub mod reasoning_engine;
 pub mod nt_core_sae;
 pub mod nt_core_sae_bridge;
 pub mod nt_core_task_dispatcher;
@@ -277,11 +276,7 @@ pub use nt_core_reasoning::{
     ReasoningMethod, ReasoningStep, ReasoningTrace, TraceSource,
 };
 
-// --- Reasoning Engine (SESSION C) ---
-pub use reasoning_engine::{
-    CausalRule, ChainExecutor, EdgeStep, ReasoningChainRecord, ReasoningResult, ReasoningStepNode,
-    REASONING_RELATIONS,
-};
+
 
 // --- L5: Consciousness ---
 pub use l5_consciousness::resonance::{
