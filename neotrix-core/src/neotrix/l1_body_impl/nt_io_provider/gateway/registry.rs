@@ -46,3 +46,13 @@ pub fn run_periodic_re_evaluation() -> usize {
     }
     evaluated
 }
+
+/// 当前注册表中仍存活 (`strong_count > 0`) 的网关注册数。
+/// 仅供测试/观测使用：进程级全局表会被生产静态缓存 (SEAL / subagent) 预注册常驻网关,
+/// 测试不应假设其为空, 而应基于「基线差值」判定丢弃网关是否被剔除。
+pub fn registered_gateway_count() -> usize {
+    RE_EVALUATION_GATEWAYS
+        .lock()
+        .map(|reg| reg.iter().filter(|w| w.strong_count() > 0).count())
+        .unwrap_or(0)
+}

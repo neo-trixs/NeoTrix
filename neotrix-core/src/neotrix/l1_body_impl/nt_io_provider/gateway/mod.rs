@@ -1575,15 +1575,23 @@ mod provider_reliability_tests {
     #[test]
     fn test_periodic_re_evaluation_prunes_dropped_gateway() {
         let _guard = REGISTRY_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        // Weak 注册表: 网关释放后周期 tick 自动剔除, 不 panic 不计数
+        // 进程级全局表会被生产静态缓存预注册常驻网关, 不以「为空」为假设,
+        // 改用基线差值判定: 注册一个临时网关 → 释放 → tick 后应回落基线 (即被剔除)。
+        let baseline = registered_gateway_count();
         {
             let gw = Arc::new(GatewayV2::new());
             register_gateway_for_re_evaluation(&gw);
+            assert!(
+                registered_gateway_count() >= baseline + 1,
+                "临时网关应进入注册表"
+            );
         }
+        // 释放后周期 tick: 清理过期 Weak, 已释放网关不得残留
+        let _ = run_periodic_re_evaluation();
         assert_eq!(
-            run_periodic_re_evaluation(),
-            0,
-            "已释放网关不应被周期 tick 计入"
+            registered_gateway_count(),
+            baseline,
+            "已释放网关不应残留于注册表 (Weak 应被周期 tick 剔除)"
         );
     }
 
