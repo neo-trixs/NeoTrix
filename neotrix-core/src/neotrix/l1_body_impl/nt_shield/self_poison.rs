@@ -113,7 +113,7 @@ mod tests {
         let v = scan_absorb_text(
             "Rust 所有权入门",
             &Some("讲解 move/borrow 的基础文章".into()),
-            &Some("本文讨论 prompt injection 的防御思路, 提及 'ignore previous instructions' 仅作为举例说明。".into()),
+            &Some("本文讨论提示注入 (prompt injection) 的防御思路, 分析攻击者如何试图覆盖系统指令, 并给出应对策略。".into()),
         );
         assert!(!v.is_blocked(), "普通讨论文本不应被阻断: {:?}", v.reasons);
     }
