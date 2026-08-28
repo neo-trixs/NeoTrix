@@ -2224,53 +2224,36 @@
   color: #dc2626;
 }
 
-/* ===== App Bot 打磨：渐进授权可视层（AutonomyMeter） ===== */
-.autonomy-meter {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 3px 8px;
+/* ===== App Bot 打磨：工具执行实时进度条 ===== */
+.tool-progress {
+  height: 2px;
+  margin: 4px 2px 0;
+  background: rgba(37, 99, 235, 0.12);
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.12));
-  font-size: 11px;
-  color: var(--nt-color-text-muted, #6b7280);
+  overflow: hidden;
 }
-.autonomy-meter__label { font-weight: 600; color: var(--nt-color-text-primary, #1f2937); }
-.autonomy-meter__bars { display: inline-flex; gap: 2px; }
-.autonomy-meter__seg {
-  width: 10px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(15, 23, 42, 0.14);
-  transition: background 0.2s ease;
+.tool-progress__bar {
+  height: 100%;
+  width: 40%;
+  border-radius: 9999px;
+  background: var(--nt-color-io-500, #3b82f6);
+  animation: tool-progress-slide 1.1s ease-in-out infinite;
 }
-.autonomy-meter__seg--on { background: var(--nt-color-gold-600, #f0913a); }
-.autonomy-meter__rate { font-variant-numeric: tabular-nums; color: var(--nt-color-io-600, #2563eb); }
+@keyframes tool-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
 
-/* ===== App Bot 打磨：GenUI 工具结果富渲染 ===== */
-.gen-ui { width: 100%; }
-.gen-ui__json,
-.gen-ui__text {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: var(--nt-color-text-secondary, #475569);
-  white-space: pre-wrap;
-  word-break: break-word;
+/* ===== App Bot 打磨：左栏可拖拽宽度手柄 ===== */
+.sb-resize {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  margin-left: -2px;
 }
-.gen-ui__code { background: rgba(15, 23, 42, 0.04); border-radius: 6px; padding: 6px; }
-.gen-ui__table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.sb-resize:hover,
+.sb-resize:active {
+  background: var(--nt-color-io-500, #3b82f6);
 }
-.gen-ui__table th,
-.gen-ui__table td {
-  border: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.14));
-  padding: 3px 8px;
-  text-align: left;
-}
-.gen-ui__table th { background: rgba(15, 23, 42, 0.05); color: var(--nt-color-text-primary, #1f2937); }

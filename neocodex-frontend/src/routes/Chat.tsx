@@ -37,9 +37,6 @@ import { ApprovalPanel } from '../components/ApprovalPanel'
 import { FileEditorPanel } from '../components/FileEditorPanel'
 import { AgentActivityBar, type AgentPhase } from '../components/AgentActivityBar'
 import { AgentActivityLog, type ActivityStep } from '../components/AgentActivityLog'
-import { AutonomyMeter } from '../components/AutonomyMeter'
-import { GenUIView } from '../components/GenUIView'
-import { rootCause } from '../lib/errorRootCause'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -81,6 +78,24 @@ export function Chat() {
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null)
   const [editContent, setEditContent] = createSignal('')
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
+  // 左栏可拖拽宽度（毫米级 UI 打磨，对标灵活布局）
+  const [sidebarWidth, setSidebarWidth] = createSignal(280)
+  let sbResizing = false
+  const onSidebarResizeDown = (e: MouseEvent) => {
+    e.preventDefault()
+    sbResizing = true
+    const onMove = (ev: MouseEvent) => {
+      if (!sbResizing) return
+      setSidebarWidth(Math.min(460, Math.max(200, ev.clientX)))
+    }
+    const onUp = () => {
+      sbResizing = false
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [streamError, setStreamError] = createSignal<string | null>(null)
   // OS 活动透明度层（对标 2026 Agent UX：agent 操作必须可观测，anti black-box）
@@ -94,17 +109,6 @@ export function Chat() {
   const [logOpen, setLogOpen] = createSignal(false)
   // 结构化错误三段式（what/why/next）：后端可选填充，前端缺失时推导
   const [streamErrorDetail, setStreamErrorDetail] = createSignal<{ what: string; why: string; next: string } | null>(null)
-  // 渐进授权：审批通过/拒绝计数 → 通过率（自治可信度可视化，对标 2026 Agent UX）
-  const [approvalAccepted, setApprovalAccepted] = createSignal(0)
-  const [approvalRejected, setApprovalRejected] = createSignal(0)
-  const autonomyRate = () => {
-    const a = approvalAccepted()
-    const r = approvalRejected()
-    const total = a + r
-    return total === 0 ? 100 : Math.round((a / total) * 100)
-  }
-  const AUTONOMY_LEVEL: Record<PermissionMode, number> = { manual: 0, plan: 1, auto: 2, accept_edits: 3 }
-  const autonomyLevel = () => AUTONOMY_LEVEL[permissionMode()] ?? 2
   const pushLog = (step: Omit<ActivityStep, 'ts'>) => {
     setAgentLog((prev) => {
       const next = [...prev, { ...step, ts: Date.now() }]
@@ -282,7 +286,6 @@ export function Chat() {
     if (!pending) return
     const planText = chatStore.messageContent(pending.msgId) ?? ''
     setPlanPending(null)
-    setApprovalAccepted((n) => n + 1)
     const targetMode: PermissionMode = 'accept_edits'
     setPermissionMode(targetMode)
     showInfo(`计划已批准，切换至「${PERMISSION_MODES.find(m => m.value === targetMode)?.label}」执行`, 3000)
@@ -297,7 +300,6 @@ export function Chat() {
     const pending = planPending()
     if (!pending) return
     setPlanPending(null)
-    setApprovalRejected((n) => n + 1)
     showInfo('计划已拒绝，可继续规划或补充需求', 3000)
   }
 
@@ -532,12 +534,11 @@ export function Chat() {
         setCurrentAssistantMsgId(null)
         setStreamError(payload.message || '生成失败')
         setTimeout(() => setStreamError(null), 5000)
-        // 结构化错误三段式（后端可选填充，缺失则按根因模式推导）
-        const rc = rootCause(payload.message ?? '')
+        // 结构化错误三段式（后端可选填充，缺失则推导）
         setStreamErrorDetail({
           what: payload.what ?? payload.message ?? '生成失败',
-          why: payload.why ?? rc.why,
-          next: payload.next ?? rc.next,
+          why: payload.why ?? 'provider/流式阶段错误（F1），回复未落盘',
+          next: payload.next ?? '可重试；若持续出现，检查网络连通性或 API key',
         })
         setTimeout(() => setStreamErrorDetail(null), 6000)
         // OS 活动：错误阶段 + 最近活动描述
@@ -1169,20 +1170,41 @@ export function Chat() {
     ...unifiedCliCmds(),
   ]
 
+  // 空状态引导：首屏建议提示（点击填入输入框，用户可增删后发送）
+  const SUGGESTED_PROMPTS: string[] = [
+    '帮我规划一个新功能的实现方案',
+    '审查当前会话的代码改动',
+    '解释这段报错日志的根因',
+    '搜索并总结相关开源仓库',
+    '压缩会话上下文继续对话',
+    '运行 Harness 任务：抓取并吸收一个仓库',
+  ]
+
   return (
     <div class="flex h-screen bg-transparent overflow-hidden">
-      <Sidebar
-        collapsed={sidebarCollapsed()}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed())}
-        onOpenSettings={() => setSettingsOpen(true)}
-        activeView={activeView()}
-        onSwitchView={setActiveView}
-        activePanel={activePanel()}
-        onTogglePanel={(id) => togglePanel(id as PanelId)}
-        activeTags={activeTags()}
-        onToggleTag={toggleTag}
-        onClearTags={clearTags}
-      />
+        <Sidebar
+          collapsed={sidebarCollapsed()}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed())}
+          onOpenSettings={() => setSettingsOpen(true)}
+          activeView={activeView()}
+          onSwitchView={setActiveView}
+          activePanel={activePanel()}
+          onTogglePanel={(id) => togglePanel(id as PanelId)}
+          activeTags={activeTags()}
+          onToggleTag={toggleTag}
+          onClearTags={clearTags}
+          width={sidebarWidth()}
+        />
+        {/* 左栏拖拽手柄（仅在展开态） */}
+        <Show when={!sidebarCollapsed()}>
+          <div
+            class="sb-resize"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="拖拽调整侧边栏宽度"
+            onMouseDown={onSidebarResizeDown}
+          />
+        </Show>
 
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
         {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅作窗口拖拽区） ===== */}
@@ -1215,12 +1237,6 @@ export function Chat() {
                   </div>
                 </Show>
               </span>
-              {/* 渐进授权：自治等级 + 审批通过率（随时可见 OS 自主权） */}
-              <AutonomyMeter
-                level={autonomyLevel}
-                mode={() => permissionModeInfo().shortLabel}
-                rate={autonomyRate}
-              />
             </div>
             <Show when={harnessRoute()}>
               <span
@@ -1318,6 +1334,25 @@ export function Chat() {
                     <h1>{greeting()}</h1>
                     <p class="hero-sub">我是 NeoTrix，你的 AI 原生开发伙伴</p>
                   </div>
+                </div>
+
+                {/* 空状态引导：建议提示 chips（对标 2026 agent UX 首屏 onboarding） */}
+                <div class="flex flex-wrap justify-center gap-2 max-w-[640px]">
+                  <For each={SUGGESTED_PROMPTS}>
+                    {(p) => (
+                      <button
+                        class="px-3 py-1.5 rounded-full text-[12px] text-text-secondary bg-white/60 border border-border-primary/40 hover:border-nt-io-500/40 hover:text-nt-io-700 hover:bg-white/80 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+                        onClick={() => {
+                          setInputValue(p)
+                          adjustTextarea()
+                          textareaRef()?.focus()
+                        }}
+                        title={p}
+                      >
+                        {p}
+                      </button>
+                    )}
+                  </For>
                 </div>
 
                 {/* Harness 执行报告面板（/run 或 ⌘K 运行后展示，不污染会话历史） */}

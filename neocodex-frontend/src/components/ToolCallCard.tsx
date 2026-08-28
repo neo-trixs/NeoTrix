@@ -1,7 +1,6 @@
 import { createSignal, onCleanup, Show } from 'solid-js'
 import { ChevronDown, ChevronRight, Check, X, Wrench, Copy, Loader2 } from 'lucide-solid'
 import type { ToolCallRecord } from '../stores/chat'
-import { GenUIView } from './GenUIView'
 import { clsx } from 'clsx'
 
 /**
@@ -100,6 +99,13 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
         </span>
       </button>
 
+      {/* 执行中：实时进度条（对标 2026 agent UX 工具可见性） */}
+      <Show when={isRunning()}>
+        <div class="tool-progress" role="progressbar" aria-label="工具执行中">
+          <div class="tool-progress__bar" />
+        </div>
+      </Show>
+
       {/* 展开详情 */}
       <Show when={expanded()}>
         <div class="px-2 py-2 space-y-2 bg-white/30">
@@ -136,9 +142,9 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
                   </Show>
                 </button>
               </div>
-                <div class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
-                  <GenUIView content={() => props.call.result} />
-                </div>
+              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
+                {props.call.result}
+              </pre>
             </div>
           </Show>
         </div>

@@ -24,6 +24,8 @@ interface SidebarProps {
   activeTags?: string[]
   onToggleTag?: (name: string) => void
   onClearTags?: () => void
+  /** 展开态宽度（px），由 Chat 拖拽手柄控制 */
+  width?: number
 }
 
 // Segmented Tab：已移除（仅对话单态，极简无分段）
@@ -328,10 +330,13 @@ export function Sidebar(props: SidebarProps) {
   }
 
   return (
-    <aside class={clsx(
-      'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative max-w-[85vw]',
-      collapsed() ? 'w-[64px] border-r border-black/5' : 'w-[280px]'
-    )}>
+    <aside
+      class={clsx(
+        'flex-shrink-0 glass-side overflow-hidden flex flex-col relative max-w-[85vw]',
+        collapsed() ? 'w-[64px] border-r border-black/5' : 'border-r border-border-primary/40'
+      )}
+      style={collapsed() ? undefined : { width: `${props.width ?? 280}px` }}
+    >
       {/* Header: 三色灯占位（macOS 28px 拖拽区） */}
       <div class="h-7 shrink-0" data-tauri-drag-region />
       {/* 折叠标签：仅保留图标（对标 Claude Code 侧栏手柄） */}
