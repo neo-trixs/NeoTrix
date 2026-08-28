@@ -127,7 +127,10 @@ impl ProviderCmd {
         }
         let gateway = crate::neotrix::nt_io_provider::create_gateway();
         let available = gateway.providers();
-        if !available.iter().any(|p| p == name) {
+        let registered = available.iter().any(|p| p == name)
+            || (name.contains('/')
+                && available.iter().any(|p| p == name.split('/').next().unwrap_or(name)));
+        if !registered {
             return CommandOutput::err(&format!(
                 "provider '{}' 未注册 (env 未配置或不可用)。已注册: {:?}",
                 name, available

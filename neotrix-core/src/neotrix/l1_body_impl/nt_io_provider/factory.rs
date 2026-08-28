@@ -724,8 +724,13 @@ pub fn create_provider(config: ProviderConfig) -> Arc<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| {
                 std::env::var("NEOTRIX_ZEN_URL").unwrap_or_else(|_| "https://opencode.ai/zen/v1".to_string())
             });
+            let is_anon = api_key.is_empty();
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
+            // 无 key → 启用 Zen 匿名模式 (零 key 调免费模型)
+            if is_anon {
+                provider = provider.with_zen_anonymous(true);
+            }
             Arc::new(provider)
         }
         LlmProviderType::Ovh => {
@@ -886,7 +891,12 @@ pub async fn create_gateway_async() -> GatewayV2 {
     register_if!("SILICONFLOW_API_KEY", "siliconflow", LlmProviderType::SiliconFlow, true);
     register_if!("ZAI_API_KEY", "zai", LlmProviderType::ZAI, true);
     register_if!("DEEPSEEK_API_KEY", "deepseek-free", LlmProviderType::DeepSeekFree, true);
-    register_if!("OPENCODE_API_KEY", "opencode-zen", LlmProviderType::OpenCodeZen, true);
+    // opencode-zen: 匿名可用 (零 key 调免费模型), 始终注册 (有 key 走鉴权, 无 key 走匿名)
+    {
+        let provider = create_provider_from_type(LlmProviderType::OpenCodeZen, None);
+        gateway.register_provider_with_category("opencode-zen", provider, true, ProviderCategory::Cloud);
+        log::info!("[gateway] Auto-registered: opencode-zen (cloud, keyless-anonymous)");
+    }
     register_if!("FREETHEAI_API_KEY", "freetheai", LlmProviderType::FreeTheAi, true);
     register_if!("NEOTRIX_AIHUB_API_KEY", "aihub", LlmProviderType::Aihub, false);
     register_if!("XAI_API_KEY", "xai", LlmProviderType::Xai, false);
@@ -947,7 +957,7 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // 2026-08-06 走代理实测:
     //   llm7(api.llm7.io)           ✅ 匿名可用 (已在上面注册)
     //   kilo(api.kilocode.ai)       ❌ HTML 404 端点已死 → 不注册
-    //   opencode-zen(opencode.ai)   ❌ POST 需 API key (AuthError) → 不注册
+    //   opencode-zen(opencode.ai)   ✅ 匿名可用 (零 key, 注入 x-opencode-client 头) → 已注册
     //   ovh(modelscope/freetheai)   ❌ DNS 不可达 (fake-ip 未命中) → 不注册
     // 结论: 当前真 keyless 仅 llm7 + pollinations(匿名层已关, 探测项)。
 

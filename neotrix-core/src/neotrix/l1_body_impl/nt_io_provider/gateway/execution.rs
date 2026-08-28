@@ -51,13 +51,22 @@ impl GatewayV2 {
         name: &str,
         request: &LlmRequest,
     ) -> Result<LlmResponse, LlmError> {
-        let provider = self
-            .providers
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .get(name)
-            .cloned()
-            .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
+        let provider = {
+            let guard = self
+                .providers
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            guard
+                .get(name)
+                .cloned()
+                .or_else(|| {
+                    // "provider/model" 格式: 用 provider 前缀查找注册实例
+                    name.split('/')
+                        .next()
+                        .and_then(|p| guard.get(p).cloned())
+                })
+        }
+        .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
         // 兼容两种注册名: 裸 provider 名 (`llm7`) 与完整目录名 (`llm7/codestral-latest`)。
         // 完整目录名场景下请求 model 恰等于注册名, `{name}/` strip 会失败,
@@ -101,10 +110,15 @@ impl GatewayV2 {
                 m
             }
         } else if req.model.is_empty() {
-            // 请求未指定模型: 使用 provider 的 default_model
-            super::super::provider_catalog::lookup_provider(name.split('/').next().unwrap_or(name))
-                .map(|info| info.default_model.to_string())
-                .unwrap_or_else(|| "auto".to_string())
+            // 请求未指定模型: "provider/model" 格式优先从 name 提取模型部分,
+            // 否则回退 provider 的 default_model
+            if name.contains('/') {
+                name.split('/').skip(1).collect::<Vec<_>>().join("/")
+            } else {
+                super::super::provider_catalog::lookup_provider(name)
+                    .map(|info| info.default_model.to_string())
+                    .unwrap_or_else(|| "auto".to_string())
+            }
         } else {
             req.model.clone()
         };

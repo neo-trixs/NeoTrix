@@ -15,7 +15,11 @@ impl GatewayV2 {
     /// 有序 keyless 候选 (匿名, 无需 API key, 实测可返回文本)。
     /// 新增匿名端点时在此追加, 即可被 `route_keyless` 自动纳入路由。
     pub fn keyless_candidates() -> &'static [&'static str] {
-        &["llm7/codestral-latest"]
+        &[
+            "opencode-zen/big-pickle",
+            "opencode-zen/mimo-v2.5-free",
+            "llm7/codestral-latest",
+        ]
     }
 
     /// 单 provider RateLimit 退避重试: 遇 `RateLimit` 按 `retry_after` (默认 1s)

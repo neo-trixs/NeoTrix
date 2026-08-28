@@ -6,6 +6,7 @@ pub struct OpenAiProvider {
     api_key: String,
     base_url: String,
     client: reqwest::Client,
+    zen_anonymous: bool,
 }
 
 impl OpenAiProvider {
@@ -14,11 +15,18 @@ impl OpenAiProvider {
             api_key,
             base_url: "https://api.openai.com/v1".to_string(),
             client: crate::neotrix::nt_io_http_factory::global_client().clone(),
+            zen_anonymous: false,
         }
     }
 
     pub fn with_base_url(mut self, url: &str) -> Self {
         self.base_url = url.to_string();
+        self
+    }
+
+    /// OpenCode Zen 匿名模式: 无 API key 时由网关注入客户端头, 实现零 key 调用免费模型。
+    pub fn with_zen_anonymous(mut self, v: bool) -> Self {
+        self.zen_anonymous = v;
         self
     }
 
@@ -105,7 +113,13 @@ fn set_proxy(&mut self, proxy_url: &str) {
             .json(&body);
         // keyless provider（api.airforce 等）：无 API key 时发送占位 token
         // （api.airforce 接受任意 Bearer token，空 header 反而被拒为 Missing Authorization）
-        if !self.api_key.is_empty() {
+        if self.zen_anonymous && self.api_key.is_empty() {
+            // OpenCode Zen 匿名模式: 不带 Authorization, 注入客户端头授权免费调用
+            request_builder = request_builder
+                .header("x-opencode-client", "opencode")
+                .header("x-opencode-project", "default")
+                .header("User-Agent", "opencode/1.18.3");
+        } else if !self.api_key.is_empty() {
             request_builder = request_builder.header("Authorization", format!("Bearer {}", self.api_key));
         } else {
             request_builder = request_builder.header("Authorization", "Bearer free");
@@ -168,6 +182,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
         let url = format!("{}/chat/completions", self.base_url);
         let body = self.build_body(request, true);
         let api_key = self.api_key.clone();
+        let zen_anon = self.zen_anonymous;
         let (tx, rx) = tokio::sync::mpsc::channel(64);
 
         tokio::spawn(async move {
@@ -175,7 +190,13 @@ fn set_proxy(&mut self, proxy_url: &str) {
             let mut req = client.post(&url).json(&body);
             // keyless provider（api.airforce 等）：无 key 时发送占位 token，
             // 空 header 反而被服务端拒为 Missing Authorization
-            if !api_key.is_empty() {
+            if zen_anon && api_key.is_empty() {
+                // OpenCode Zen 匿名模式: 不带 Authorization, 注入客户端头
+                req = req
+                    .header("x-opencode-client", "opencode")
+                    .header("x-opencode-project", "default")
+                    .header("User-Agent", "opencode/1.18.3");
+            } else if !api_key.is_empty() {
                 req = req.header("Authorization", format!("Bearer {}", api_key));
             } else {
                 req = req.header("Authorization", "Bearer free");
