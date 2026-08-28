@@ -39,6 +39,10 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     crate::core::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
     // KB 类型核心 (NT-CORE): NodeType 枚举全变体往返
     crate::core::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
+    // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
+    crate::core::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
+    // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
+    crate::core::nt_core_iit_phi::register_iit_phi_self_tests(&mut registry);
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
     ));

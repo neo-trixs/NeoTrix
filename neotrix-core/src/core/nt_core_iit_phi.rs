@@ -398,3 +398,84 @@ mod tests {
         // Just ensure it doesn't panic
     }
 }
+
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
+/// NT-CORE 意识度量自测 (IIT Φ): 常数状态同步可约→phi=0, 变化状态 phi∈[0,1],
+/// 共振矩阵维度正确, NaN 被清洗为有限值 (卫生层 P0: 核心可自测)。
+pub struct IitPhiSelfTest;
+
+impl SelfTest for IitPhiSelfTest {
+    fn name(&self) -> &str {
+        "iit_phi"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let calc = IITPhiCalculator::new();
+
+        // 常数状态: 同步可约, phi 必为 0
+        let constant: Vec<f64> = vec![0.5; 16];
+        let r_const = calc.compute_phi(&constant);
+        if r_const.phi != 0.0 {
+            failures.push(format!(
+                "iit_phi: 常数状态应 phi=0 (同步可约), 实得 {}",
+                r_const.phi
+            ));
+        }
+
+        // 变化状态: phi 有限且在 [0,1]
+        let varied: Vec<f64> = (0..16).map(|i| (i as f64) * 0.3).collect();
+        let r_var = calc.compute_phi(&varied);
+        if !r_var.phi.is_finite() || r_var.phi < 0.0 || r_var.phi > 1.0 {
+            failures.push(format!(
+                "iit_phi: 变化状态 phi 应在 [0,1] 有限, 实得 {}",
+                r_var.phi
+            ));
+        }
+
+        // 共振矩阵维度应为 n×n
+        let rm = calc.resonance_matrix(&varied);
+        let cols = rm.first().map_or(0, |r| r.len());
+        if rm.len() != 16 || cols != 16 {
+            failures.push(format!(
+                "iit_phi: 共振矩阵维度应为 16x16, 实得 {}x{}",
+                rm.len(),
+                cols
+            ));
+        }
+
+        // NaN 清洗: 含 NaN 不应 panic, phi 有限
+        let dirty = vec![f64::NAN, 1.0, 2.0];
+        let r_dirty = calc.compute_phi(&dirty);
+        if !r_dirty.phi.is_finite() {
+            failures.push("iit_phi: 含 NaN 状态应被清洗为有限 phi".into());
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册 IIT Φ 自测到全局注册表 (T2)。
+pub fn register_iit_phi_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(IitPhiSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_iit_phi_self_test_passes() {
+        let t = super::IitPhiSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "IitPhiSelfTest failed: {:?}",
+            t.self_test().err()
+        );
+    }
+}

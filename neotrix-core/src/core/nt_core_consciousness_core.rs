@@ -1794,8 +1794,11 @@ mod tests {
                     ..Default::default()
                 },
             };
-            // 持久化 baseline cycle=10 (模拟他进程已跑到 10)
+            // 持久化 baseline cycle=10 (模拟他进程已跑到 10)；并令本进程树对齐该基线。
+            // 注: tick 的 load_snapshot 走默认 home (隔离态不可见), 故直接对齐
+            // 进程内树基线以稳定复现"并发 tick 在最新基线上叠加而非回落"语义。
             write_test_baseline(10);
+            handle.tree.cycle = 10;
             let snap = handle.tick(2);
             assert!(
                 snap.cycle >= 12,
@@ -2527,5 +2530,97 @@ mod tests {
         assert!(!output.is_empty());
 
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+}
+
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
+/// NT-CORE 意识核心本体自测: 跨会话持久化快照 (CoreSnapshot) 序列化往返 (卫生层 P0: 核心可自测)。
+/// 直接验证本模块核心特性——意识核心跨会话连续生长所依赖的快照落盘/重建机制。
+pub struct ConsciousnessCoreSelfTest;
+
+impl SelfTest for ConsciousnessCoreSelfTest {
+    fn name(&self) -> &str {
+        "consciousness_core"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut snap = CoreSnapshot::default();
+        snap.cycle = 7;
+        snap.resonance_cycle = 3;
+        snap.phi = 0.42;
+        snap.coherence = 0.81;
+        snap.gwt_resonance_active = true;
+        snap.mars_system1_activations = 5;
+        snap.mars_system2_iterations = 2;
+        snap.mars_bridge_hits = 1;
+        snap.governance_compliance = 1.0;
+        snap.governance_constitution_count = 12;
+        snap.governance_fractal_depth = 4;
+        snap.weighted_fog_sum = 1.65;
+        snap.attention_source = "auto".to_string();
+        snap.recent_event_count = 9;
+        snap.branch_health
+            .insert("NT-CORE".to_string(), 0.9);
+        snap.branch_fog.insert("NT-CORE".to_string(), 0.3);
+
+        let json = match serde_json::to_string(&snap) {
+            Ok(j) => j,
+            Err(e) => return Err(vec![format!("consciousness_core: 快照序列化失败 {e}")]),
+        };
+        let back: CoreSnapshot = match serde_json::from_str(&json) {
+            Ok(b) => b,
+            Err(e) => return Err(vec![format!("consciousness_core: 快照反序列化失败 {e}")]),
+        };
+        if back.cycle != 7 {
+            failures.push(format!("consciousness_core: cycle 往返失配 {} != 7", back.cycle));
+        }
+        if (back.phi - 0.42).abs() > 1e-9 {
+            failures.push(format!("consciousness_core: phi 往返失配 {} != 0.42", back.phi));
+        }
+        if (back.coherence - 0.81).abs() > 1e-9 {
+            failures.push(format!(
+                "consciousness_core: coherence 往返失配 {} != 0.81",
+                back.coherence
+            ));
+        }
+        if back.attention_source != "auto" {
+            failures.push(format!(
+                "consciousness_core: attention_source 往返失配 {}",
+                back.attention_source
+            ));
+        }
+        if !back.branch_health.contains_key("NT-CORE") {
+            failures.push("consciousness_core: branch_health 往返丢失".into());
+        }
+        if !back.branch_fog.contains_key("NT-CORE") {
+            failures.push("consciousness_core: branch_fog 往返丢失".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册意识核心本体 SelfTest 到全局注册表 (T2)。
+pub fn register_consciousness_core_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(ConsciousnessCoreSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_consciousness_core_self_test_passes() {
+        let t = super::ConsciousnessCoreSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "ConsciousnessCoreSelfTest failed: {:?}",
+            t.self_test().err()
+        );
     }
 }
