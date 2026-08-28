@@ -555,7 +555,7 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
                 }
             }
             if let Some(ref mut so) = req.structured_output {
-                if let Ok(s) = serde_json::to_string(&**so) {
+                if let Ok(s) = serde_json::to_string(&*so) {
                     if !scan_internals(&s).is_empty() {
                         if let Ok(redacted) =
                             serde_json::from_str::<StructuredOutputConfig>(&redact_internals(&s))
