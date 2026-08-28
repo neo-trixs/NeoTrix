@@ -1,7 +1,7 @@
 //! 能力注册表
 
 use crate::evolution::{EvolutionAction, EvolutionPlan};
-use crate::node::{Domain, EvolutionOp, NodeLayer};
+use crate::node::{ConstellationLevel, Domain, EvolutionOp, NodeLayer};
 pub use crate::node::CapabilityNode;
 use indexmap::IndexMap;
 use petgraph::visit::EdgeRef;
@@ -9,6 +9,15 @@ use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
+
+/// 成熟度审计发现 (E2 虚标治理)
+#[derive(Debug, Clone)]
+pub struct MaturityFinding {
+    pub id: String,
+    pub claimed: ConstellationLevel,    // 声称的 ConstellationLevel
+    pub supported: ConstellationLevel,  // 证据链实际支撑的最高等级
+    pub domain: Domain,
+}
 
 /// 最短路径结果 (意识能力网最优解路由)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,6 +283,15 @@ impl CapabilityRegistry {
         
         // 允许向下依赖 (高层依赖低层)，禁止向上依赖超过 1 层
         if to_layer > from_layer + 1 {
+            // 加载期容忍: 历史注册表可能含 L2->L4 等跨层依赖, CLI 必须能加载自身注册表
+            // (R-P42 兼容性)。运行时显式 add_dependency 仍严格拒绝 (defer_dep_warnings=false)。
+            if self.defer_dep_warnings {
+                eprintln!(
+                    "[capability_tree] WARNING: 层级跨度 (加载期容忍) {} (L{}) -> {} (L{})",
+                    from, from_layer, to, to_layer
+                );
+                return Ok(());
+            }
             return Err(RegistryError::InvalidLayerSpan(
                 from.into(), from_layer, to.into(), to_layer
             ));
@@ -432,6 +450,55 @@ impl CapabilityRegistry {
             deprecated_count: self.nodes.values().filter(|n| n.deprecated).count(),
             primitive_count: self.all_primitives().len(),
         }
+    }
+
+    /// 成熟度真相反查 (只读): 返回所有"声称成熟度 > 证据支撑成熟度"的虚标节点。
+    ///
+    /// 历史存量节点直接写 JSON 绕过 D16 `promotion_evidence_gate`, 导致声称值虚高。
+    /// 本方法用 `evidence_supported_constellation` 复算真实支撑等级, 与 registry 中声称值比对。
+    pub fn maturity_audit(&self) -> Vec<MaturityFinding> {
+        self.nodes
+            .values()
+            .filter(|n| !n.deprecated)
+            .map(|n| {
+                let supported = n.evidence_supported_constellation();
+                (n, supported)
+            })
+            .filter(|(n, supported)| n.constellation > *supported)
+            .map(|(n, supported)| MaturityFinding {
+                id: n.id.clone(),
+                claimed: n.constellation,
+                supported,
+                domain: n.domain,
+            })
+            .collect()
+    }
+
+    /// 降标虚标节点到证据支撑等级 (E2 写回, 可逆转: 后续补 evidence 可 re-mature)。
+    /// 每个降标节点追加 EvolutionLogEntry (op=Maturation, note 标注 audit 来源)。
+    pub fn demote_mislabeled(&mut self, cycle: &str) -> usize {
+        let findings = self.maturity_audit();
+        let mut count = 0;
+        for f in findings {
+            if let Some(node) = self.nodes.get_mut(&f.id) {
+                if node.constellation > f.supported {
+                    node.constellation = f.supported;
+                    node.record_evolution(crate::node::EvolutionLogEntry {
+                        cycle: cycle.to_string(),
+                        op: crate::node::EvolutionOp::Maturation,
+                        from_nodes: vec![],
+                        to_node: Some(node.id.clone()),
+                        note: format!(
+                            "E2 maturity audit: demoted {}->{} (no evidence, D16 gate)",
+                            f.claimed.as_str(), f.supported.as_str()
+                        ),
+                        timestamp: chrono::Utc::now(),
+                    });
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 
     /// 检查是否存在循环依赖

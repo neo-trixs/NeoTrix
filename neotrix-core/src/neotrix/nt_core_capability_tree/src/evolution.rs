@@ -159,6 +159,10 @@ impl<'a> EvolutionEngine<'a> {
                         NodeLayer::L3DomainService | NodeLayer::L4Application => {
                             CapabilityNode::new_constellation(new_node_id.clone(), domain, layer, provides, vec![])
                         }
+                        _ => {
+                            // L5-L8 (transcendent/autonomic) 仍作为 composite 注册, 行为同 L3/L4 域服务
+                            CapabilityNode::new_constellation(new_node_id.clone(), domain, layer, provides, vec![])
+                        }
                     };
                     // P1 契约写门: bud 未声明契约 (input_schema/output_schema/fallback_chain)
                     // 时标记 contract_deferred — 允许注册 (R-P42 不强制改写既有路径),

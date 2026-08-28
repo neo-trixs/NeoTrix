@@ -69,8 +69,15 @@ pub enum NodeLayer {
     L0Primitive,
     L1Composite,
     L2Orchestrator,
+    L2World,
     L3DomainService,
+    L3Memory,
     L4Application,
+    L4Cognition,
+    L5Conscious,
+    L6Self,
+    L7Capability,
+    L8Autonomic,
 }
 
 impl NodeLayer {
@@ -81,6 +88,13 @@ impl NodeLayer {
             NodeLayer::L2Orchestrator => "L2",
             NodeLayer::L3DomainService => "L3",
             NodeLayer::L4Application => "L4",
+            NodeLayer::L4Cognition => "L4",
+            NodeLayer::L2World => "L2",
+            NodeLayer::L3Memory => "L3",
+            NodeLayer::L5Conscious => "L5",
+            NodeLayer::L6Self => "L6",
+            NodeLayer::L7Capability => "L7",
+            NodeLayer::L8Autonomic => "L8",
         }
     }
 }
@@ -91,6 +105,7 @@ impl NodeLayer {
 pub enum ConstellationLevel {
     C0Compile,
     C1UnitTest,
+    #[serde(alias = "c2integration")]
     C2IntegrationTest,
     C3Benchmark,
     C4MainPipeline,
@@ -174,6 +189,8 @@ pub enum RuneSocket {
     Obsidian,   // 缓存
     Golden,     // 错误恢复
     Alabaster,  // 监控
+    #[serde(other)]
+    Unknown,    // 容忍注册表中非标准 rune 标记 (如 "indigo:transform")
 }
 
 impl RuneSocket {
@@ -184,6 +201,7 @@ impl RuneSocket {
             RuneSocket::Obsidian => "Obsidian",
             RuneSocket::Golden => "Golden",
             RuneSocket::Alabaster => "Alabaster",
+            RuneSocket::Unknown => "Unknown",
         }
     }
 }
@@ -208,6 +226,7 @@ pub struct EvolutionLogEntry {
     pub from_nodes: Vec<String>,      // 来源节点 (Grafting/Pruning 时)
     pub to_node: Option<String>,      // 目标节点 (Budding/Maturation 时)
     pub note: String,
+    #[serde(default)]
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
@@ -219,14 +238,23 @@ pub struct CapabilityNode {
     pub layer: NodeLayer,
     pub constellation: ConstellationLevel,
     pub provides: Vec<String>,                // 提供的能力标签
+    #[serde(default)]
     pub requires: Vec<String>,                // 依赖的能力标签
+    #[serde(default)]
     pub rune_sockets: Vec<RuneSocket>,        // 占用的 Rune 槽
+    #[serde(default)]
     pub dependents: Vec<String>,              // 反向依赖 (谁在用我)
+    #[serde(default)]
     pub evolution_log: Vec<EvolutionLogEntry>,
+    #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
+    #[serde(default)]
     pub created_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
     pub deprecated: bool,
+    #[serde(default)]
     pub deprecated_reason: Option<String>,
 }
 
@@ -407,6 +435,50 @@ impl CapabilityNode {
         }
     }
 
+    /// 复算"证据链实际支撑"的最高 ConstellationLevel (用于 E2 虚标审计)。
+    ///
+    /// 与 `promotion_evidence_gate` 互补: 后者决定"能否再晋升",
+    /// 本方法倒推"当前声称值是否已被证据支撑"。
+    /// C0 默认达成; C1 需 `provides` 非空; 更高等级需对应证据字段
+    /// (wiring_evidence / evidence_gated / self_healing_evidence)。
+    pub fn evidence_supported_constellation(&self) -> ConstellationLevel {
+        // 严格对齐 D16 promotion_evidence_gate 的逐步门禁:
+        // C0→C1: provides 非空; C1→C2: wiring_evidence (file:line);
+        // C2→C3 / C3→C4: evidence_gated='passed'; C4→C5 / C5→C6: gated && wiring.
+        let has_provides = !self.provides.is_empty();
+        let has_wiring = self
+            .metadata
+            .get("wiring_evidence")
+            .map(|v| v.is_string() && !v.as_str().unwrap_or("").is_empty())
+            .unwrap_or(false);
+        let gated = self
+            .metadata
+            .get("evidence_gated")
+            .map(|v| v == "passed")
+            .unwrap_or(false);
+
+        let mut level = ConstellationLevel::C0Compile;
+        if has_provides {
+            level = ConstellationLevel::C1UnitTest;
+        }
+        if matches!(level, ConstellationLevel::C1UnitTest) && has_wiring {
+            level = ConstellationLevel::C2IntegrationTest;
+        }
+        if matches!(level, ConstellationLevel::C2IntegrationTest) && gated {
+            level = ConstellationLevel::C3Benchmark;
+        }
+        if matches!(level, ConstellationLevel::C3Benchmark) && gated {
+            level = ConstellationLevel::C4MainPipeline;
+        }
+        if matches!(level, ConstellationLevel::C4MainPipeline) && gated && has_wiring {
+            level = ConstellationLevel::C5SelfHealing;
+        }
+        if matches!(level, ConstellationLevel::C5SelfHealing) && gated && has_wiring {
+            level = ConstellationLevel::C6EvolutionLoop;
+        }
+        level
+    }
+
     /// 晋升星座等级 (受证据门禁约束)
     pub fn promote_constellation(&mut self) -> Result<bool, String> {
         let (gate_ok, reason) = self.promotion_evidence_gate();
@@ -455,6 +527,6 @@ impl CapabilityNode {
 
     /// 检查是否为 Constellation
     pub fn is_constellation(&self) -> bool {
-        matches!(self.layer, NodeLayer::L3DomainService | NodeLayer::L4Application)
+        matches!(self.layer, NodeLayer::L3DomainService | NodeLayer::L4Application | NodeLayer::L4Cognition)
     }
 }

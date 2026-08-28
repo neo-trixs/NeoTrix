@@ -153,6 +153,7 @@ fn load_from_registry_path(path: &std::path::Path) -> Option<Vec<SkillNode>> {
             NodeLayer::L0Primitive | NodeLayer::L1Composite => "Small Passive",
             NodeLayer::L2Orchestrator => "Notable Passive",
             NodeLayer::L3DomainService | NodeLayer::L4Application => "Keystone",
+            _ => "Keystone",
         };
         let effects = node
             .provides

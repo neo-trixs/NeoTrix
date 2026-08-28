@@ -192,6 +192,14 @@ pub enum Commands {
     /// 契约审计 (P1): 报告缺失 input/output_schema + fallback_chain 的节点
     Contracts,
 
+    /// 成熟度真相反查 (E2): 报告声称 Constellation > 证据支撑的虚标节点。
+    /// 默认只读; --apply 将虚标节点降标到证据支撑等级并写回 (可逆转)。
+    AuditMaturity {
+        /// 执行降标写回 (默认仅报告)
+        #[arg(long)]
+        apply: bool,
+    },
+
     /// 最短路径路由: 计算目标能力的最优依赖链 (LoopX 吸收: 流程节点最优解)
     Route {
         /// 目标能力标签 (如 websearch) 或节点 ID
@@ -272,6 +280,9 @@ impl CapabilityCli {
             Commands::Contracts => {
                 self.cmd_contracts(&registry);
             }
+            Commands::AuditMaturity { apply } => {
+                self.cmd_audit_maturity(&mut registry, *apply)?;
+            }
             Commands::Route { target, from, to } => {
                 self.cmd_route(&registry, target, from.as_deref(), to.as_deref())?;
             }
@@ -292,7 +303,6 @@ impl CapabilityCli {
             for node in export.nodes {
                 reg.register(node).map_err(|e| format!("Failed to register node: {}", e))?;
             }
-            reg.set_defer_dep_warnings(false);
             reg.validate_dependencies();
             for (from, to) in export.edges {
                 // 外部消费者容错: 边的端点可能不在注册表中 (如 nt_io_neocodex::build_request 等外部模块)
@@ -303,6 +313,7 @@ impl CapabilityCli {
                 }
                 reg.add_dependency(&from, &to).map_err(|e| format!("Failed to add edge: {}", e))?;
             }
+            reg.set_defer_dep_warnings(false);
             // 保留经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
             reg.experience_targets = export.experience_targets;
             Ok(reg)
@@ -342,8 +353,15 @@ impl CapabilityCli {
             "L0" => Ok(NodeLayer::L0Primitive),
             "L1" => Ok(NodeLayer::L1Composite),
             "L2" => Ok(NodeLayer::L2Orchestrator),
+            "L2W" => Ok(NodeLayer::L2World),
             "L3" => Ok(NodeLayer::L3DomainService),
+            "L3M" => Ok(NodeLayer::L3Memory),
             "L4" => Ok(NodeLayer::L4Application),
+            "L4C" => Ok(NodeLayer::L4Cognition),
+            "L5" => Ok(NodeLayer::L5Conscious),
+            "L6" => Ok(NodeLayer::L6Self),
+            "L7" => Ok(NodeLayer::L7Capability),
+            "L8" => Ok(NodeLayer::L8Autonomic),
             _ => Err(format!("Unknown layer: {}", s).into()),
         }
     }
@@ -421,11 +439,12 @@ impl CapabilityCli {
         println!("```mermaid");
         println!("graph TD");
         for n in nodes {
-            let shape = match n.layer {
-                NodeLayer::L0Primitive => "(()",
-                NodeLayer::L1Composite | NodeLayer::L2Orchestrator => "(())",
-                NodeLayer::L3DomainService | NodeLayer::L4Application => "((()))",
-            };
+        let shape = match n.layer {
+            NodeLayer::L0Primitive => "(()",
+            NodeLayer::L1Composite | NodeLayer::L2Orchestrator => "(())",
+            NodeLayer::L3DomainService | NodeLayer::L4Application => "((()))",
+            _ => "((()))",
+        };
             let color = match n.constellation as u8 {
                 0 => "fill:#ffcccc",
                 1 => "fill:#ffe0cc",
@@ -854,6 +873,38 @@ impl CapabilityCli {
         if violations.len() > 40 {
             println!("  ... 其余 {} 个省略 (共 {})", violations.len() - 40, violations.len());
         }
+    }
+
+    /// 成熟度真相反查 (E2 虚标治理): 报告并可选降标虚标节点。
+    fn cmd_audit_maturity(
+        &self,
+        registry: &mut CapabilityRegistry,
+        apply: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let findings = registry.maturity_audit();
+        if findings.is_empty() {
+            println!("OK: 无成熟度虚标 (声称值均被证据支撑)");
+            return Ok(());
+        }
+        let mut by_domain: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for f in &findings {
+            println!(
+                "  {}  claimed={} supported={} ({})",
+                f.id, f.claimed.as_str(), f.supported.as_str(), f.domain.as_str()
+            );
+            *by_domain.entry(f.domain.as_str().to_string()).or_insert(0) += 1;
+        }
+        println!("\n虚标节点总数: {}", findings.len());
+        for (d, c) in by_domain.iter() {
+            println!("  {}: {}", d, c);
+        }
+        if apply {
+            let n = registry.demote_mislabeled(&self.cycle);
+            println!("\n已降标 {} 个节点到证据支撑等级 (可逆转: 补 evidence 后可 re-mature)", n);
+        } else {
+            println!("\n(只读报告; 加 --apply 执行降标写回)");
+        }
+        Ok(())
     }
 
     /// 最短路径路由 (LoopX 吸收: 流程节点最优解)。
