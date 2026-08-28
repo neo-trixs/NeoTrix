@@ -16,6 +16,7 @@
 //! (e.g. it believed it was capable but kept failing), the discrepancy is used
 //! to tighten the model and to drive corrective motivation.
 
+use crate::neotrix::l3_memory_impl::nt_memory_kb::DualBrainWorkingMemory;
 use serde::{Deserialize, Serialize};
 
 /// Number of observed-behavior samples retained for self-error estimation.
@@ -67,6 +68,11 @@ pub struct SelfModel {
     pub last_self_error: f64,
     /// Learning rate for the fatigue/capability estimator.
     pub lr: f64,
+    /// Dual-brain streaming working memory (E5, C2). The short-term / streaming
+    /// brain that feeds this self-model and the self-improvement loop. `None`
+    /// until a buffer is attached via [`SelfModel::attach_working_memory`].
+    #[serde(default)]
+    pub working_memory: Option<DualBrainWorkingMemory>,
 }
 
 impl Default for SelfModel {
@@ -86,6 +92,7 @@ impl SelfModel {
             updates: 0,
             last_self_error: 0.0,
             lr: 0.1,
+            working_memory: None,
         }
     }
 
@@ -151,6 +158,19 @@ impl SelfModel {
     /// Current self-estimate snapshot.
     pub fn current(&self) -> SelfState {
         self.state
+    }
+
+    /// E5 accessor — the dual-brain streaming working-memory buffer (if attached).
+    ///
+    /// The short-term / streaming brain (VoiceMem / SinkTrack / Agentic LTM & STM)
+    /// that feeds this self-model. Returns `None` until a buffer is attached.
+    pub fn working_memory(&self) -> Option<&DualBrainWorkingMemory> {
+        self.working_memory.as_ref()
+    }
+
+    /// Attach (or replace) the dual-brain streaming working-memory buffer (E5).
+    pub fn attach_working_memory(&mut self, wm: DualBrainWorkingMemory) {
+        self.working_memory = Some(wm);
     }
 
     /// Reset all estimation state to neutral priors.
@@ -271,6 +291,16 @@ mod tests {
         assert_eq!(m.state.capability, 0.5);
         assert_eq!(m.state.fatigue, 0.0);
         assert_eq!(m.updates, 0);
+    }
+
+    #[test]
+    fn test_working_memory_accessor_e5() {
+        let mut m = SelfModel::new();
+        assert!(m.working_memory().is_none(), "no buffer attached by default");
+        m.attach_working_memory(DualBrainWorkingMemory::default());
+        let wm = m.working_memory().expect("buffer attached");
+        assert_eq!(wm.capacity(), crate::neotrix::l3_memory_impl::nt_memory_kb::DEFAULT_WORKING_CAPACITY);
+        assert!(wm.is_empty());
     }
 
     #[test]

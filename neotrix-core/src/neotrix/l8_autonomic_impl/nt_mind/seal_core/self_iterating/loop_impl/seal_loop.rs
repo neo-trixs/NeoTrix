@@ -1,5 +1,8 @@
 use super::core::SelfIteratingBrain;
 use super::super::brain_impl::EvaluationRecord;
+use super::super::benchmark_gate::{BenchmarkGateDecision, BenchmarkSuite};
+use crate::core::nt_core_consciousness::inner_critic::CritiqueResult;
+use crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::EvalHarness;
 use super::super::super::core::{CapabilityVector, RewardSource};
 use super::super::super::self_edit::MicroEdit;
 use super::super::super::memory::{ReasoningMemory, ReasoningBank};
@@ -600,6 +603,16 @@ impl SelfIteratingBrain {
                 // 返回前 clamp 保证 transition learner / 调用方契约稳定。
                 let final_reward = self._reward.clamp(0.0, 1.0);
                 self._reward = final_reward;
+                // ── E3 自改进闭环闭合钩子: 候选行为变更产出后跑回归/对抗测试 ──
+                // 默认 harness=None / bench_suite=None → 透传 persist=true (不改动既有逻辑);
+                // 由外部 (其他意识维度 agent) 注入 EvalHarness 或 BenchmarkSuite 触发真实回归闸门。
+                {
+                    let cand = self._current_task.clone();
+                    if let Ok(false) = self.close_iteration_loop(&cand, None, None) {
+                        // 回归失败: E3 钩子内部已发 CritiqueResult 信号并回滚候选。
+                        log::warn!("[seal][E3] 候选未通过回归闸门 (默认透传不应触发)");
+                    }
+                }
                 Ok(final_reward)
             }
             Err(e) => {
@@ -608,6 +621,93 @@ impl SelfIteratingBrain {
                 }
                 Err(e)
             }
+        }
+    }
+
+    /// E3 — 自改进闭环闭合 (C1→C6): 一次 SEAL 迭代产出候选行为变更后,
+    /// 自动生成并运行回归/对抗测试; 失败则发 `CritiqueResult` 行为变更信号
+    /// (Red Queen 竞争), 并仅当测试通过才允许候选持久化。
+    ///
+    /// 闭环语义: Self-Model (FEP/IIT) ⟷ Self-Improvement Loop (SEAL) ⟷
+    /// Dual-Brain Working Memory ⟷ Shield. 本钩子把"进化"从一次性动作变成
+    /// 自愈、自测的循环 — 候选变更不通过回归则回滚 (Dark Forest: 不持久化即回滚)。
+    ///
+    /// 参数:
+    /// - `candidate`: 本迭代产出的候选行为变更摘要 (如 micro-edit 集 / 任务描述)。
+    /// - `harness`: 可选 L9 `EvalHarness` 评测旁路 (吸收源 l9_transcendent_impl)。
+    /// - `bench_suite`: 可选 scope 内 `BenchmarkSuite` 回归基准 (benchmark_gate.rs)。
+    ///
+    /// 返回 `Ok(true)` = 候选可持久化; `Ok(false)` = 回归失败, 候选已拒并回滚。
+    pub fn close_iteration_loop(
+        &mut self,
+        candidate: &str,
+        harness: Option<&EvalHarness>,
+        bench_suite: Option<&BenchmarkSuite>,
+    ) -> NeoTrixResult<bool> {
+        let mut regression_failed = false;
+        let mut failure_reasons: Vec<String> = Vec::new();
+
+        // ── (a) 自动生成回归/对抗测试 ──
+        // EvalHarness 当前无 generate_regression_test API; 预留调用点,
+        // 现以既有 evaluate-style 入口 (compliance_report) 作为占位 evaluate。
+        // TODO(E3): 待 EvalHarness 暴露 `generate_regression_test(candidate)` 后接线;
+        //   届时改为 `let cases = harness.generate_regression_test(candidate)?;`
+        if let Some(h) = harness {
+            let _report = h.compliance_report(); // TODO(E3): 替换为 generate_regression_test(candidate)
+            // JIT-Agent test-benching / yoyo-gasp bench 旁路 (吸收源 l4 yoyo-gasp/gasp)。
+            // TODO(E3): wire `nt_mind_yoyo_gasp` / `nt_mind_gasp` 作为 JIT bench backend。
+            let _ = _report;
+        }
+
+        // ── (b) 运行回归测试 (scope 内 BenchmarkGate 作为实际回归执行体) ──
+        if let Some(suite) = bench_suite {
+            let post = suite.run(self);
+            let pre = suite.pre_scores.clone();
+            let delta = BenchmarkSuite::compute_delta(&pre, &post);
+            match suite.gate(delta) {
+                BenchmarkGateDecision::Accept => {}
+                BenchmarkGateDecision::Retry => {
+                    regression_failed = true;
+                    failure_reasons.push(format!(
+                        "regression bench requests retry: delta={:.4} < threshold={:.4}",
+                        delta, suite.threshold
+                    ));
+                }
+                BenchmarkGateDecision::Rollback => {
+                    regression_failed = true;
+                    failure_reasons.push(format!(
+                        "regression bench rollback: delta={:.4} << threshold={:.4}",
+                        delta, suite.threshold
+                    ));
+                }
+            }
+        }
+
+        if regression_failed {
+            // ── (c) 发 CritiqueResult 行为变更信号 (Red Queen 竞争) ──
+            let critique = CritiqueResult {
+                passed: false,
+                relevance_score: 0.0,
+                consistency_score: 0.0,
+                uncertainty_score: 1.0,
+                overall_quality: 0.0,
+                reasons: failure_reasons.clone(),
+                temporal_delta: None,
+                selected_action: Some("reject_candidate".to_string()),
+            };
+            let msg = format!(
+                "[seal][E3] 回归测试失败 → 候选被拒 (Red Queen): candidate='{}' critique={:?}",
+                candidate, critique
+            );
+            log::warn!("{}", msg);
+            if let Some(ref mut router) = self.attention_router {
+                router.wm().broadcast(&msg);
+            }
+            // 行为变更信号: 持久化否决 → 回滚候选 (不持久化即回滚)。
+            self._snapshot_restore();
+            Ok(false)
+        } else {
+            Ok(true)
         }
     }
 

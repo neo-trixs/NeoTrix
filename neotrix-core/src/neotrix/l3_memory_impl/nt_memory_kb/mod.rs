@@ -38,6 +38,7 @@ pub mod nt_memory_visibility;
 pub mod nt_memory_provenance;
 pub mod nt_temporal_audit;
 pub mod nt_memory_skill_cost;
+pub mod nt_memory_dual_brain;
 pub mod nt_memory_ingest;
 pub mod nt_memory_proficiency;
 pub mod nt_memory_primitives;
@@ -96,6 +97,7 @@ pub use nt_memory_agent_session::{AgentSessionManager, AgentSession, AgentSessio
 pub use nt_memory_svaf_gate::{SvafGate, SvafDecision, SvafEvaluation};
 pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRecord, MemoryProficiencyReport};
 pub use nt_memory_primitives::MemoryPrimitives;
+pub use nt_memory_dual_brain::{DualBrainWorkingMemory, ExperienceAnchor, DEFAULT_WORKING_CAPACITY};
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
 pub use nt_memory_tech_reserve::{

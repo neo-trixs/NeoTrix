@@ -162,6 +162,66 @@ impl EgressPolicy {
         }
         Ok(())
     }
+
+    /// E6 防护层硬化 (R-P106, 吸收 src30 Storm-Breaker recon): Egress Policy
+    /// 的 `apply` 必须幂等 — 同一策略连续应用两次得到完全相同的规范化状态。
+    /// 策略本身是无副作用值类型; 此处返回规范化副本 (规则确定性排序 + 去重),
+    /// 对已是规范化的策略再 `apply` 一次得到逐字段相同的结构。
+    pub fn apply(&self) -> EgressPolicy {
+        let mut rules: Vec<EgressRule> = self.rules.clone();
+        rules.sort_by(|a, b| {
+            (a.host.as_str(), a.port.as_str(), a.allow)
+                .cmp(&(b.host.as_str(), b.port.as_str(), b.allow))
+        });
+        rules.dedup_by(|a, b| a.host == b.host && a.port == b.port && a.allow == b.allow);
+        EgressPolicy { rules, default_allow: self.default_allow }
+    }
+
+    /// 是否已处于规范化 (幂等后) 状态。
+    pub fn is_canonical(&self) -> bool {
+        let mut i = 0;
+        while i + 1 < self.rules.len() {
+            let a = &self.rules[i];
+            let b = &self.rules[i + 1];
+            let ord = (a.host.as_str(), a.port.as_str(), a.allow)
+                .cmp(&(b.host.as_str(), b.port.as_str(), b.allow));
+            if ord == std::cmp::Ordering::Greater {
+                return false;
+            }
+            if a.host == b.host && a.port == b.port && a.allow == b.allow {
+                return false; // duplicate → not canonical
+            }
+            i += 1;
+        }
+        true
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// E6 防护层硬化: Storm-Breaker recon (src30 吸收, R-P48 Rust-native)。
+// 纯 Rust 实现, 不 shell out 到外部工具 (无 `std::process::Command`)。
+// 此处为最小 stub 路径: 不发起真实网络, 仅做静态占位评估; 真实 recon 应扩展为
+// Rust-native socket 探测, 但保持零依赖、零 shell (R-P48)。
+// ────────────────────────────────────────────────────────────────
+
+/// Storm-Breaker recon 结果 (静态占位, 无网络 / 无 shell)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StormBreakerRecon {
+    pub host: String,
+    pub reachable: bool,
+    pub note: &'static str,
+}
+
+/// Rust-native Storm-Breaker 探测: 纯静态, 无外部进程、无网络调用 (R-P48)。
+/// 真实 recon 应在此扩展为 Rust 原生 TCP 探测, 但保持零第三方 crate、零 shell。
+pub fn storm_breaker_recon(host: &str) -> StormBreakerRecon {
+    // TODO(R-P48): 接 Rust-native 网络探测 (如 `std::net::TcpStream::connect`,
+    // 无第三方 crate); 当前为占位 stub, 不 shell out 到 nmap/dig 等外部工具。
+    StormBreakerRecon {
+        host: host.to_string(),
+        reachable: false,
+        note: "stub: rust-native recon path (no external tool, R-P48)",
+    }
 }
 
 /// GDELT Egress 主机 — 单一事实源 (P2)。

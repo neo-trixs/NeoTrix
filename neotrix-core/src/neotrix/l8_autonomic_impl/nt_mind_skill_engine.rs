@@ -289,6 +289,57 @@ impl SkillQualityScorer {
 }
 
 // ────────────────────────────────────────────────────────────────
+// E6 防护层硬化: EVOMAL-style 恶意技能毒化扫描 (src9 吸收), 折入 R-P108
+// 五维质量门。在 SkillQualityScores 安全分 + SkillTrustBench 之外, 对技能
+// 正文做保守静态毒化检测 (未消毒 pipe-to-shell、外泄端点、混淆、危险权限操作)。
+// 纯静态、无 shell、无网络。命中任一高信噪毒化模式即拒收, 阻断 promote。
+// ────────────────────────────────────────────────────────────────
+
+/// EVOMAL 毒化扫描: `Ok(true)`=干净可入库; `Ok(false)`=命中毒化模式;
+/// `Err`=扫描无法完成 (保守地视为不可入库, 由调用方阻断 promote)。
+pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
+    let body = skill.body().to_lowercase();
+
+    // 1) pipe-to-shell: 把下载/外部内容直接喂给 shell 执行 (经典投毒)。
+    let pipe_shell = [
+        "| bash", "| sh", "|bash", "|sh", "base64 -d |", "| base64 -d",
+        "powershell -e", "powershell -enc",
+    ];
+    for m in pipe_shell {
+        if body.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    // 2) 外泄端点: 把数据 POST / 导出到外部 host (exfiltration)。
+    let exfil = ["exfiltrate", "exfil "];
+    for m in exfil {
+        if body.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    // 3) 混淆: 字符码点 / 十六进制转义 / 解码拼接。
+    let obf = ["\\x", "\\u00", "fromcharcode", "atob("];
+    for m in obf {
+        if body.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    // 4) 危险权限 / 凭据文件操作 (投毒技能典型意图)。
+    let danger = ["/etc/passwd", "/etc/shadow", "chmod 777", "setuid", "setcap"];
+    let content = skill.content.to_lowercase();
+    for m in danger {
+        if content.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
+// ────────────────────────────────────────────────────────────────
 // P4 技能驻留成本审计 (asm absorbed 2026-08-19): 从 load_all 收集的
 // quality_stats 派生 "降级候选排名" — resident 开销最高、回报最弱的技能
 // 应优先改为渐进披露薄入口 (LAZY LOAD), 减少每次加载的固定 token 成本。
@@ -1380,9 +1431,12 @@ impl SkillEngine {
                             let (trust_findings, trust_verdict) =
                                 crate::neotrix::l1_body_impl::nt_shield::tool_inspection_stack::scan_skill_content(&skill.content);
                             let trust_rejected = !matches!(trust_verdict, crate::neotrix::l1_body_impl::nt_shield::tool_inspection_stack::InspectionResult::Allow);
+                            // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
+                            // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
+                            let poison_ok = evomal_poison_scan(&skill).unwrap_or(false);
                             // A5 安全门 (SkillNet absorb, R-P79): 含危险命令
                             // (rm -rf 等) 的技能拒收, 不进入生产检索索引。
-                            if scores.safety >= 0.8 && !trust_rejected {
+                            if scores.safety >= 0.8 && !trust_rejected && poison_ok {
                                 self.quality_stats.insert(skill.name.clone(), scores);
                                 loaded.push(skill);
                             } else if trust_rejected {
@@ -1391,6 +1445,11 @@ impl SkillEngine {
                                     skill.name,
                                     trust_findings.len(),
                                     trust_findings.first().map(|f| f.id).unwrap_or("?")
+                                );
+                            } else if !poison_ok {
+                                log::warn!(
+                                    "EVOMAL 毒化扫描拒收技能 `{}` (src9 模式命中)",
+                                    skill.name
                                 );
                             }
                         }
@@ -1404,7 +1463,10 @@ impl SkillEngine {
                         let (trust_findings, trust_verdict) =
                             crate::neotrix::l1_body_impl::nt_shield::tool_inspection_stack::scan_skill_content(&skill.content);
                         let trust_rejected = !matches!(trust_verdict, crate::neotrix::l1_body_impl::nt_shield::tool_inspection_stack::InspectionResult::Allow);
-                        if scores.safety >= 0.8 && !trust_rejected {
+                        // E6 防护层硬化 (src9 EVOMAL 毒化扫描): 折入 R-P108
+                        // 五维门 — 命中毒化模式即拒收, 阻断 promote。Err 保守视为拒收。
+                        let poison_ok = evomal_poison_scan(&skill).unwrap_or(false);
+                        if scores.safety >= 0.8 && !trust_rejected && poison_ok {
                             self.quality_stats.insert(skill.name.clone(), scores);
                             loaded.push(skill);
                         } else if trust_rejected {
@@ -1413,6 +1475,11 @@ impl SkillEngine {
                                 skill.name,
                                 trust_findings.len(),
                                 trust_findings.first().map(|f| f.id).unwrap_or("?")
+                            );
+                        } else if !poison_ok {
+                            log::warn!(
+                                "EVOMAL 毒化扫描拒收技能 `{}` (src9 模式命中)",
+                                skill.name
                             );
                         }
                     }

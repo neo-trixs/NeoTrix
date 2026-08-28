@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
+use crate::core::nt_core_event::CoreEvent;
 use crate::core::nt_core_hcube::vsa::{VsaBackend, VSAEngine};
+use crate::neotrix::nt_core_event_bus::EventBus;
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
 use crate::neotrix::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
 use super::types::{BridgeReport, FepIitHypervector, VSAUnifiedState};
@@ -235,6 +237,41 @@ impl FEPIITBridge {
                 phi_report.phi,
             ),
         }
+    }
+
+    /// Publish computed FEP/IIT signals to the EventBus so the other
+    /// consciousness dimensions can consume them (R-P25: behavior writes back
+    /// via EventBus, not just trace):
+    ///   - `ConsciousnessCritique` carries phi (relevance), coherence
+    ///     (consistency), and the unified consciousness score (quality) — read
+    ///     by the shield (poison scan) and dual-brain working-memory routes.
+    ///   - `ExternalReward` carries the IIT-bounded free energy — read by the
+    ///     self-improvement loop (SEAL/RedQueen) as a drive signal.
+    ///
+    /// `bus` is `None` at existing call sites → no-op, preserving prior
+    /// behavior. This is the least-invasive wiring point: it does not alter
+    /// `bridge_cycle`'s control flow or signature.
+    pub fn emit_to_eventbus(&self, report: &BridgeReport, bus: Option<&EventBus>) {
+        let Some(bus) = bus else { return; };
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        // 意识信号 (phi, coherence, unified_score) → ConsciousnessCritique
+        bus.emit_from(
+            "nt_core_fep_iit",
+            CoreEvent::ConsciousnessCritique {
+                quality: report.consciousness_score,
+                relevance: report.fe_derived_phi,
+                consistency: report.vsa_coherence,
+                timestamp,
+            },
+        );
+        // 自由能 (bounded free energy) → ExternalReward, 供自改进回路消费
+        bus.emit_from(
+            "nt_core_fep_iit",
+            CoreEvent::ExternalReward {
+                reward: report.bounded_free_energy,
+                source: "nt_core_fep_iit".into(),
+            },
+        );
     }
 
     /// Compute scores for multiple (FE, Φ) pairs
@@ -507,8 +544,66 @@ mod tests {
     use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
-    fn test_placeholder() {
+    fn test_emit_to_eventbus_publishes_signals() {
+        // E1 (意识核心硬化): FEP/IIT 信号必须经 EventBus 流出供其他维度消费。
+        use crate::core::nt_core_event::CoreEvent;
+        use crate::neotrix::nt_core_event_bus::EventBus;
+
         let bridge = FEPIITBridge::new();
+        let bus = EventBus::new(16);
+        let mut rx = bus.subscribe();
+        let report = BridgeReport {
+            consciousness_score: 0.8,
+            vsa_coherence: 0.6,
+            fe_derived_phi: 0.5,
+            bounded_free_energy: 0.3,
+            free_energy_bound: 0.9,
+            fe_improvement_from_iit: 0.1,
+            phi_improvement_from_fep: 0.2,
+            state_classification: "optimal",
+        };
+        bridge.emit_to_eventbus(&report, Some(&bus));
+
+        // 1) ConsciousnessCritique carries phi / coherence / unified_score
+        let crit = rx.try_recv().expect("should emit ConsciousnessCritique");
+        match crit {
+            CoreEvent::ConsciousnessCritique { quality, relevance, consistency, .. } => {
+                assert!((quality - 0.8).abs() < 1e-9, "unified_score mismatch: {quality}");
+                assert!((relevance - 0.5).abs() < 1e-9, "phi mismatch: {relevance}");
+                assert!((consistency - 0.6).abs() < 1e-9, "coherence mismatch: {consistency}");
+            }
+            other => panic!("expected ConsciousnessCritique, got {other:?}"),
+        }
+
+        // 2) ExternalReward carries bounded free energy
+        let reward = rx.try_recv().expect("should emit ExternalReward");
+        match reward {
+            CoreEvent::ExternalReward { reward: r, .. } => {
+                assert!((r - 0.3).abs() < 1e-9, "bounded_free_energy mismatch: {r}");
+            }
+            other => panic!("expected ExternalReward, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_emit_to_eventbus_none_is_noop() {
+        // None 句柄 → 不发射、不 panic, 既有行为不变。
+        let bridge = FEPIITBridge::new();
+        let report = BridgeReport {
+            consciousness_score: 0.8,
+            vsa_coherence: 0.6,
+            fe_derived_phi: 0.5,
+            bounded_free_energy: 0.3,
+            free_energy_bound: 0.9,
+            fe_improvement_from_iit: 0.1,
+            phi_improvement_from_fep: 0.2,
+            state_classification: "optimal",
+        };
+        bridge.emit_to_eventbus(&report, None);
+    }
+
+    #[test]
+    fn test_placeholder() {        let bridge = FEPIITBridge::new();
         let low = bridge.compute_score(10.0, 0.0);
         let high = bridge.compute_score(0.0, 1.0);
         assert!((0.0..=1.0).contains(&low), "low={low}");
