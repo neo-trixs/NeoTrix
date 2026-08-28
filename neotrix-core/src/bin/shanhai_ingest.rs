@@ -45,7 +45,7 @@ fn insert_person_node(conn: &Connection, title: &str, summary: &str, importance:
     let id = Uuid::new_v4().to_string();
     let now = ts();
     let meta = serde_json::json!({"tags": ["absorbed-2026-07-03"], "type": "researcher"});
-    let node = KnowledgeNode {
+    let node = KnowledgeNode { recall_weight: 1.0,
         id: id.clone(),
         node_type: NodeType::Person,
         title: title.to_string(),

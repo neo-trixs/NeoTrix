@@ -1201,6 +1201,7 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            recall_weight: 1.0,
         };
 
         let low_node = KnowledgeNode {
@@ -1221,6 +1222,7 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            recall_weight: 1.0,
         };
 
         kb.insert_node(&high_node).unwrap();

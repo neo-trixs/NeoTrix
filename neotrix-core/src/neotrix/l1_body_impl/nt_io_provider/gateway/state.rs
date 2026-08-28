@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
 use super::super::circuit_breaker::CircuitBreaker;
 use super::super::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::super::rate_limiter::RateLimiter;
@@ -14,6 +17,10 @@ pub struct ProviderState {
     pub cost_per_1k_tokens: f64,
     pub is_free: bool,
     pub category: ProviderCategory,
+    /// 模型级锁 (L3 韧性, 对齐 OmniRoute model lockout): 当某 provider 的特定模型返回
+    /// model_unavailable / 404 时, 仅锁定该模型而非熔断整个 provider, 使 provider 对其它
+    /// 模型仍可用 → 自有 LLM 池不会因单模型下线而缩水。键为请求级 model 串 (含 `{provider}/{id}`)。
+    pub model_locks: HashMap<String, Instant>,
 }
 
 impl ProviderState {
@@ -29,6 +36,7 @@ impl ProviderState {
             cost_per_1k_tokens: if is_free { 0.0 } else { 0.01 },
             is_free,
             category,
+            model_locks: HashMap::new(),
         }
     }
 
@@ -47,6 +55,29 @@ impl ProviderState {
     /// 配额耗尽后是否已过冷却期可再次尝试 (配额恢复探测)
     pub fn quota_recovery_elapsed(&self) -> bool {
         self.circuit_breaker.cooldown_elapsed()
+    }
+
+    /// 锁定某模型 (cooldown_secs 后自动解锁), 不影响该 provider 的其它模型。
+    /// 用于 L3 模型级韧性: 单模型 404/model_unavailable 不应拖垮整个 provider。
+    pub fn lock_model(&mut self, model: &str, cooldown_secs: u64) {
+        self.model_locks.insert(
+            model.to_string(),
+            Instant::now() + Duration::from_secs(cooldown_secs),
+        );
+    }
+
+    /// 该模型当前是否被锁定 (过期视为未锁, 但仍保留在 map 中, 由 prune 清理)。
+    pub fn is_model_locked(&self, model: &str) -> bool {
+        match self.model_locks.get(model) {
+            Some(&until) => Instant::now() < until,
+            None => false,
+        }
+    }
+
+    /// 清理已过期的模型锁, 防止 map 无限增长 (在 record_success/record_failure 内调用)。
+    pub fn prune_expired_model_locks(&mut self) {
+        let now = Instant::now();
+        self.model_locks.retain(|_, &mut until| now < until);
     }
 
     pub fn composite_score(&self) -> f64 {
@@ -82,6 +113,7 @@ impl ProviderState {
     }
 
     pub fn record_success(&mut self, latency_ms: f64, tokens: u32) {
+        self.prune_expired_model_locks();
         self.circuit_breaker.on_success();
         self.total_calls += 1;
         self.total_tokens += tokens as u64;
@@ -93,6 +125,7 @@ impl ProviderState {
     }
 
     pub fn record_failure(&mut self, latency_ms: f64) {
+        self.prune_expired_model_locks();
         self.circuit_breaker.on_failure();
         self.total_calls += 1;
         self.total_errors += 1;

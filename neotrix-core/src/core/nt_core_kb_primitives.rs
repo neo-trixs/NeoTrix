@@ -174,6 +174,7 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
             language TEXT DEFAULT 'en',
             confidence REAL DEFAULT 1.0,
             importance REAL DEFAULT 0.5,
+            recall_weight REAL DEFAULT 1.0,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             access_count INTEGER DEFAULT 0,

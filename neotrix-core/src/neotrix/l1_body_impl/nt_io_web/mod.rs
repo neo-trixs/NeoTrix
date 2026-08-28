@@ -128,4 +128,6 @@ pub struct AppState {
     pub rate_limiter: Arc<Mutex<RateWindow>>,
     /// 数字人管线 — /ws 文本消息经其情感化回复 (affective interface 生产消费者, R-P36)。
     pub digital_human: Arc<Mutex<crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline>>,
+    /// LLM 网关实例 — 由 server 启动时创建并存入 state, api 路由复用 (R-P36)。
+    pub gateway: Option<Arc<crate::neotrix::l1_body_impl::nt_io_provider::gateway::GatewayV2>>,
 }

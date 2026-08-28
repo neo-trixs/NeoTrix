@@ -151,7 +151,7 @@ mod tests {
     fn test_rollback_on_negative_reward() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
         let _original_capability = brain.brain.capability.clone();
 
         // 设置一个会导致负奖励的场景（通过空任务）
@@ -235,7 +235,7 @@ mod tests {
     fn test_reasoning_bank_integration() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
-        let mut brain = SelfIteratingBrain::new();
+        let mut brain = SelfIteratingBrain::new_lightweight();
 
         // 第一次运行
         if let Err(e) = brain.run_seal_loop("设计 UI 组件", None, None) {

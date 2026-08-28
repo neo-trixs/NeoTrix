@@ -13572,6 +13572,1136 @@
       "updated_at": "2026-08-21T06:46:07.803636Z",
       "deprecated": false,
       "deprecated_reason": null
+    },
+    {
+      "id": "nt_repair::hanzi_video",
+      "domain": "repair",
+      "layer": "l8autonomic",
+      "constellation": "c1unittest",
+      "provides": [
+        "hanzi_chaizi_video",
+        "repair_media_gen"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_repair::hanzi_video",
+          "note": "外部吸收: github.com/Mr-funny/hbg-hanzi-chaizi-video — 汉字组件视频生成修复引擎 (task18); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_shield::skill_doctor",
+      "domain": "shield",
+      "layer": "l8autonomic",
+      "constellation": "c1unittest",
+      "provides": [
+        "skill_health_check",
+        "skill_diagnosis"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shield::skill_doctor",
+          "note": "外部吸收: github.com/warpdotdev/common-skills/skill-doctor — 技能健康检查与诊断 (task31); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_core::gencad",
+      "domain": "core",
+      "layer": "l4cognition",
+      "constellation": "c0compile",
+      "provides": [
+        "cad_image_retrieval"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::gencad",
+          "note": "外部吸收: arXiv:2409.16294 (GenCAD) — CAD→图像对检索接口至KB FTS5 (task3, C0); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_core::design_extract",
+      "domain": "core",
+      "layer": "l4cognition",
+      "constellation": "c0compile",
+      "provides": [
+        "design_pattern_extract"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::design_extract",
+          "note": "外部吸收: github.com/Manavarya09/design-extract — 设计模式提取节点+能力映射 (task13, C0); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_memory::pdf_math_translate",
+      "domain": "memory",
+      "layer": "l3memory",
+      "constellation": "c1unittest",
+      "provides": [
+        "pdf_translate",
+        "math_pdf"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::pdf_math_translate",
+          "note": "外部吸收: github.com/PDFMathTranslate/PDFMathTranslate — 科学论文翻译 FTS5 节点 (task7); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_memory::babeldoc",
+      "domain": "memory",
+      "layer": "l3memory",
+      "constellation": "c1unittest",
+      "provides": [
+        "doc_translate",
+        "babeldoc_backend"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::babeldoc",
+          "note": "外部吸收: github.com/funstory-ai/BabelDOC — BabelDOC 后端文档翻译 (task12); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::recuris",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "recurrent_working_memory"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::recuris",
+          "note": "外部吸收: arXiv:2608.24876 (Recuris) — 递归经验工作记忆 Trait (task1); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::bpco",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c0compile",
+      "provides": [
+        "best_practice_critic"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::bpco",
+          "note": "外部吸收: arXiv:2608.23566v2 (BPCO) — 最佳实践评论优化 critic (task4, C0); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::wordpecker",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "nlp_processing",
+        "zh_en_nlp"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::wordpecker",
+          "note": "外部吸收: github.com/baturiyilmaz/wordpecker-app — 中英文 NLP 处理技能 (task25); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::ai_image_prompts",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "ai_image_prompt_gen"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::ai_image_prompts",
+          "note": "外部吸收: github.com/YouMind-OpenLab/ai-image-prompts-skill — AI 图像提示生成 (task16); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::promo_bgm",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "bgm_promo_skill"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::promo_bgm",
+          "note": "外部吸收: github.com/whyubel1eve/promo-bgm-skill — BGM 推广技能 (task17); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::excalidraw",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "diagram_render"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::excalidraw",
+          "note": "外部吸收: github.com/coleam00/excalidraw-diagram-skill — Excalidraw 图渲染 (task19); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::hermes_quota",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "hermes_quota",
+        "rate_limit"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::hermes_quota",
+          "note": "外部吸收: github.com/rarf/hermes-quota-plugin — Hermes 配额插件+速率限制 (task26); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::hermes_community",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "hermes_plugins",
+        "plugin_ecosystem"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::hermes_community",
+          "note": "外部吸收: github.com/kaishi00/hermes-community-plugins — Hermes 社区插件生态 (task27); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::eli5",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "eli5_explain"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::eli5",
+          "note": "外部吸收: github.com/anthropics/claude-plugins-community/eli5 — ELI5 plain-language 解释 (task29); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::show_me",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "interactive_viz"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::show_me",
+          "note": "外部吸收: github.com/humanlayer/skills/show-me — 交互式可视化辅助 (task30); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_io::unslop",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "writing_dedup",
+        "unslop"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::unslop",
+          "note": "外部吸收: github.com/cursor/plugins/pstack/skills/unslop — unslop 写作去赘 (task32); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::loop_engine",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "dag_eval_loop",
+        "loop_engine"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::loop_engine",
+          "note": "外部吸收: arXiv:2608.00267 (LoopsBench) — 编码代理 DAG 评估 loop-engine (task2); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::soulmate",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "model_routing",
+        "strong_weak_route"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::soulmate",
+          "note": "外部吸收: github.com/Soulmate-Halo/qiling-soulmate — Qiling 压缩+强/弱模型路由 (task6); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::squad",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "multi_agent_sqlite",
+        "squad_collab"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::squad",
+          "note": "外部吸收: github.com/mco-org/squad — SQLite 多代理协作 (task8); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::frontier_agent",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "agent_team",
+        "eval_harness"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::frontier_agent",
+          "note": "外部吸收: github.com/ApodexAI/FrontierAgent — Agent Team 沙箱+评估 (task9); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::thinkrail",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "thought_rail",
+        "decision_track"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::thinkrail",
+          "note": "外部吸收: github.com/JetBrains/thinkrail — 思考/决策轨道框架 (task14); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::rustdesk",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "remote_desktop",
+        "session_orch"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::rustdesk",
+          "note": "外部吸收: github.com/rustdesk/rustdesk — 远程桌面编排+跨平台API (task20); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::agentiker_plan",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "plan_follow",
+        "agentiker_plan"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::agentiker_plan",
+          "note": "外部吸收: github.com/IVRZ-da/agentiker-plan-follow — Agent 规划管线贯彻 (task21); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::agentiker_code_intel",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "code_intel",
+        "agentiker_code"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::agentiker_code_intel",
+          "note": "外部吸收: github.com/IVRZ-da/agentiker-code-intel — Agent 代码智能提取 (task22); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::hermeskill",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "hermes_skill_node"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::hermeskill",
+          "note": "外部吸收: github.com/theopitori/hermeskill — Hermes 技能节点 (task28); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::watercrawl",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "web_crawl",
+        "content_extract"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::watercrawl",
+          "note": "外部吸收: github.com/watercrawl/WaterCrawl — Web 爬虫内容提取 (task10); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::monitor",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "site_change_detect",
+        "fts5_index"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::monitor",
+          "note": "外部吸收: github.com/koala73/worldmonitor — 网站变更检测+FTS5索引 (task11); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::ods",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "ods_parse",
+        "doc_system"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::ods",
+          "note": "外部吸收: github.com/Osmantic/ODS — 开放文档系统解析器适配 (task15); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::pindo",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "pindo_monitor",
+        "quote_detect"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260827-full-iterative-evolution",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::pindo",
+          "note": "外部吸收: github.com/LunarXuan/Pindo — Pindo 网站监测变更检测 (task24); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_governance::human_oversight",
+      "domain": "governance",
+      "layer": "l5conscious",
+      "constellation": "c0compile",
+      "provides": [
+        "human_oversight",
+        "skill_atrophy_counteract"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_governance::human_oversight",
+          "note": "外部吸收: arXiv:2608.23642 人类监督治理协议 (设计级 affordance + 技能萎缩对策)"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::yoyobook",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c0compile",
+      "provides": [
+        "self_evolution_lesson_extract",
+        "narrative_pattern"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::yoyobook",
+          "note": "外部吸收: yoyobook.yolog.dev 自进化编码智能体叙事书(C0文献) — SelfEvolutionLesson 枚举 + NarrativePatternExtractor trait stub; SEAL/ConsciousnessTree 叙事侧对标"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::yoyo_gasp_site",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "gasp_vault_mapping",
+        "gasp_stage_to_seal_mapping"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::yoyo_gasp_site",
+          "note": "外部吸收: yoyo-gasp.yolog.dev GASP 运行时参考(C1) — GaspVault/GaspStage 字段映射 NeoTrix 对应模块; patch→eval→decision→promote 四阶段与 make_stage! 同构"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::yoyo_gasp",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c2integration",
+      "provides": [
+        "self_evolution",
+        "gasp_runtime",
+        "five_element_agent",
+        "seal_analog"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [
+            "nt_mind_yoyo_gasp_site"
+          ],
+          "to_node": "nt_mind::yoyo_gasp",
+          "note": "SEAL pipeline 对标: yoyo-gasp 自进化编码智能体 GASP 运行时 → SelfEvolvingCodingAgent 五要素(identity/skills/memory/journal/lineage)映射 NeoTrix 模块, 含 GASP→SEAL 对照注释",
+          "timestamp": "2026-08-28T01:22:38.877786Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::yoyo_evolve",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c2integration",
+      "provides": [
+        "stage_machine",
+        "evolution_loop",
+        "make_stage_map",
+        "rp42_eval_gate"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::yoyo_evolve",
+          "note": "SEAL pipeline 对标: yoyo-evolve 四阶段(patch.proposed→eval.finished→decision.created→Promoted) 直接映射 make_stage! 四阶段, transition 状态机含 R-P42 eval gate",
+          "timestamp": "2026-08-28T01:22:38.878107Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::gasp",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c2integration",
+      "provides": [
+        "gasp_schema",
+        "self_evolution_schema",
+        "lineage_journal",
+        "consciousness_tree_map"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::gasp",
+          "note": "SEAL pipeline 对标: gasp 标准(identity/skills/memory/journal/lineage) 采纳为 NeoTrix 自进化 schema, GaspRepo 五维度与 ConsciousnessTree 字段对应表, 补强 lineage/journal",
+          "timestamp": "2026-08-28T01:22:38.878125Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_memory::yopedia",
+      "domain": "memory",
+      "layer": "l3memory",
+      "constellation": "c1unittest",
+      "provides": [
+        "agentic_wiki_ref",
+        "entry_kb_reference"
+      ],
+      "requires": [
+        "nt_memory_kb::ingest_node"
+      ],
+      "rune_sockets": [
+        "indigo:transform",
+        "obsidian:cache"
+      ],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::yopedia",
+          "note": "外部吸收 github.com/yologdev/yopedia — 智能体 wiki/KB 条目化参考; AgentWikiRef trait 映射条目→KB WikiPage 节点 (C1 T1+3单测)",
+          "timestamp": "2026-08-28T01:22:40.011725Z"
+        }
+      ],
+      "metadata": {
+        "source": "github.com/yologdev/yopedia",
+        "module": "neotrix-core/src/neotrix/l3_memory_impl/nt_memory_yopedia.rs",
+        "trait": "AgentWikiRef",
+        "kb_mapping": "entry -> KnowledgeNode(NodeType::WikiPage)",
+        "evidence_gated": "passed"
+      },
+      "created_at": "2026-08-28T01:22:40.011991Z",
+      "updated_at": "2026-08-28T01:22:40.012008Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_memory::graphify",
+      "domain": "memory",
+      "layer": "l3memory",
+      "constellation": "c1unittest",
+      "provides": [
+        "kg_construction",
+        "entity_relation_extraction",
+        "graph_retrieval"
+      ],
+      "requires": [
+        "nt_memory_kb::insert_node",
+        "nt_memory_kb::insert_edge"
+      ],
+      "rune_sockets": [
+        "crimson:data",
+        "indigo:transform",
+        "obsidian:cache"
+      ],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_memory::graphify",
+          "note": "外部吸收 github.com/Graphify-Labs/graphify — 知识图谱构建/检索; KnowledgeGraphBuilder trait 实体/关系抽取→KB 节点+边 (C1 T1+3单测)",
+          "timestamp": "2026-08-28T01:22:40.012016Z"
+        }
+      ],
+      "metadata": {
+        "source": "github.com/Graphify-Labs/graphify",
+        "module": "neotrix-core/src/neotrix/l3_memory_impl/nt_memory_graphify.rs",
+        "trait": "KnowledgeGraphBuilder",
+        "kb_mapping": "entity -> KnowledgeNode(NodeType::Concept); relation -> KnowledgeEdge",
+        "evidence_gated": "passed"
+      },
+      "created_at": "2026-08-28T01:22:40.012025Z",
+      "updated_at": "2026-08-28T01:22:40.012029Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_core::doop",
+      "domain": "core",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "pointer_analysis",
+        "declarative_static_analysis"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::doop",
+          "note": "外部吸收 kgoedecke/doop: 声明式指针/静态分析 (points-to set 推导 + 别名传播) — L4 模块 nt_core_doop.rs 实现 PointerAnalysis trait (C1)",
+          "timestamp": "2026-08-28T01:22:42.733862+00:00"
+        }
+      ]
+    },
+    {
+      "id": "nt_core::simplify",
+      "domain": "core",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "codebase_simplification",
+        "redundancy_detection"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::simplify",
+          "note": "外部吸收 tt-a1i/simplify-codebase: 代码库简化/重构 (指纹重复检测 + 重构候选) — L4 模块 nt_core_simplify.rs 实现 CodeSimplifier trait (C1)",
+          "timestamp": "2026-08-28T01:22:42.734077+00:00"
+        }
+      ]
+    },
+    {
+      "id": "nt_core::blueprint",
+      "domain": "core",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "planning",
+        "blueprint_generation"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::blueprint",
+          "note": "外部吸收 haskaomni/blueprint: 蓝图/规划 (目标→分阶段执行蓝图) — L4 模块 nt_core_blueprint.rs 实现 BlueprintPlanner trait (C1)",
+          "timestamp": "2026-08-28T01:22:42.734083+00:00"
+        }
+      ]
+    },
+    {
+      "id": "nt_core::three_scope_map",
+      "domain": "core",
+      "layer": "l4cognition",
+      "constellation": "c1unittest",
+      "provides": [
+        "three_scope_reasoning",
+        "scope_mapping"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core::three_scope_map",
+          "note": "外部吸收 songsummer920-dazzle/three-scope-map-skill: 三范围映射推理 (micro/meso/macro 分层 + 跨范围提升) — L4 模块 nt_core_three_scope_map.rs 实现 ThreeScopeMap trait (C1)",
+          "timestamp": "2026-08-28T01:22:42.734087+00:00"
+        }
+      ]
+    },
+    {
+      "id": "nt_shield::cybersec_projects",
+      "domain": "shield",
+      "layer": "l8autonomic",
+      "constellation": "c1unittest",
+      "provides": [
+        "security_catalog",
+        "security_classification"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shield::cybersec_projects",
+          "note": "外部吸收: security catalog / anti-censor relay 模式吸收 (C1)",
+          "timestamp": "2026-08-28T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_shield::openrung",
+      "domain": "shield",
+      "layer": "l8autonomic",
+      "constellation": "c1unittest",
+      "provides": [
+        "stealth_relay",
+        "proxy_pool",
+        "broker_match"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shield::openrung",
+          "note": "外部吸收: security catalog / anti-censor relay 模式吸收 (C1)",
+          "timestamp": "2026-08-28T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::osint_arsenal",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "osint_source_index",
+        "osint_category_search",
+        "intel_source_catalog"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::osint_arsenal",
+          "note": "外部吸收 rawfilejson/awesome-osint-arsenal — OSINT 军火库索引 → 感知/情报源目录 (C1). 模块 nt_world_osint_arsenal.rs: trait OsintArsenal 分类检索 + SelfTest T1.",
+          "timestamp": "2026-08-28T01:25:50Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::myip",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "ip_probe_self",
+        "ip_probe_target",
+        "asn_lookup"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::myip",
+          "note": "外部吸收 jason5ng32/MyIP — IP/网络探测工具 → 感知工具 (C1). 模块 nt_world_myip.rs: trait IpProbeProvider stub + SelfTest T1.",
+          "timestamp": "2026-08-28T01:25:50Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::openbot",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "agent_runtime",
+        "bot_orchestration",
+        "embodied_dispatch"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::openbot",
+          "note": "外部吸收: github.com/CopilotKit/OpenBot — 智能体/机器人框架编排 (agent runtime stub); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::openexecutive",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "task_delegation",
+        "exec_coordination",
+        "decompose_reconcile"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::openexecutive",
+          "note": "外部吸收: github.com/SenteLabsAI/OpenExecutive — 执行智能体(任务委派/执行协调 stub); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
+    },
+    {
+      "id": "nt_act::omni_route",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "request_routing",
+        "gwt_attention_routing",
+        "handler_dispatch"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch2",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::omni_route",
+          "note": "外部吸收: github.com/diegosouzapw/OmniRoute — 路由 (请求/任务路由, 类比 GWT 注意力路由 stub); 模块落地 + SelfTest T1 + 单测"
+        }
+      ]
     }
   ],
   "edges": [

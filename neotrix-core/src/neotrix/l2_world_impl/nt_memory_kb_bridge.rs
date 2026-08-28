@@ -36,6 +36,7 @@ pub enum NodeType {
     ConversationEvolution,
     Textbook,
     Resource,
+    Filing,
     External,
     Summary,
     Guide,
@@ -468,6 +469,7 @@ mod conv {
             super::NodeType::DetectionFinding => real_types::NodeType::DetectionFinding,
             super::NodeType::GoalResult => real_types::NodeType::GoalResult,
             super::NodeType::Session => real_types::NodeType::Session,
+            super::NodeType::Filing => real_types::NodeType::Filing,
         }
     }
 
@@ -512,6 +514,7 @@ mod conv {
             real_types::NodeType::DetectionFinding => super::NodeType::DetectionFinding,
             real_types::NodeType::GoalResult => super::NodeType::GoalResult,
             real_types::NodeType::Session => super::NodeType::Session,
+            real_types::NodeType::Filing => super::NodeType::Filing,
         }
     }
 

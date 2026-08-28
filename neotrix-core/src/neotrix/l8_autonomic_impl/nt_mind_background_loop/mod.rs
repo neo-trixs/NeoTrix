@@ -125,6 +125,11 @@ impl BackgroundLoop {
         // (cycle 205 伪收敛溯源); 与 PanoramaPipeline::new() 保持一致。
         let mut shared_gwt = GlobalWorkspace::new(0.3).with_physics_attention(4);
         shared_gwt.register_default_specialists();
+        // CAD 能力 T3 生产接线: GWT 共振路由 (image→CAD 经意识核心) + 经验吸收落盘
+        let _ = crate::core::nt_core_gwt::cad_route::register_cad_gwt(&mut shared_gwt);
+        if let Ok(kb) = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(None) {
+            let _ = crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience(&kb);
+        }
         Self {
             cleanup_engine: Some(CleanupEngine::new()),
             knowledge_chain: None,

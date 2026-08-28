@@ -183,6 +183,7 @@ fn async_entry_points() -> Vec<CommandSpec> {
     push("kb_trajectory_query", "轨迹查询");
     push("memory_clear", "清空记忆");
     push("memory_export", "导出记忆");
+    push("memory_import", "导入记忆");
     push("memory_timeline", "记忆时间线");
     v
 }

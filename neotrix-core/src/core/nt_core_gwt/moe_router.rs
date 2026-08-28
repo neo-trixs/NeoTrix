@@ -513,7 +513,7 @@ mod tests {
     #[test]
     fn test_softmax_normalized() {
         let logits = [
-            2.0, 1.0, 0.5, 0.0, -1.0, -2.0, 0.0, 0.1, 0.3, 0.8, -0.5, 1.5, -1.0, 0.5,
+            2.0, 1.0, 0.5, 0.0, -1.0, -2.0, 0.0, 0.1, 0.3, 0.8, -0.5, 1.5, -1.0, 0.5, 0.2,
         ];
         let probs = softmax(&logits);
         let sum: f64 = probs.iter().sum();

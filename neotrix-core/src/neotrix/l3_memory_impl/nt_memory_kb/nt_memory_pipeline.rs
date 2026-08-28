@@ -105,6 +105,7 @@ fn ensure_hub(conn: &rusqlite::Connection, domain: &str) -> Result<String, Strin
         access_count: 0,
         metadata: Some(serde_json::json!({"tier": "hub"})),
         temporal: None,
+        recall_weight: 1.0,
         supersedes: None,
         source_episode: None,
     };
@@ -202,7 +203,8 @@ impl KnowledgeBase {
                 content: entry.content.clone(),
                 url: entry.url.clone(),
                 domain: entry.domain.clone(),
-                language: entry.language.clone().unwrap_or_else(|| "en".into()),
+                language: entry.language.clone().unwrap_or_else(|| "en".to_string()),
+                recall_weight: 1.0,
                 confidence: 1.0,
                 importance: entry.importance.unwrap_or(0.5),
                 created_at: ts,

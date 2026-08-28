@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::config::{CrawlFormat, CrawlTopic};
+use super::config::{CrawlTopic, CrawlFormat};
+use super::discover::DiscoveryExtractor;
 use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest};
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,8 @@ pub struct ContentClassifier {
     format_heuristics: HashMap<CrawlFormat, Vec<String>>,
     classification_count: u64,
     topic_distribution: HashMap<CrawlTopic, u64>,
+    #[allow(dead_code)]
+    discovery_extractor: DiscoveryExtractor,
 }
 
 impl Default for ContentClassifier {
@@ -150,6 +153,7 @@ impl ContentClassifier {
             format_heuristics,
             classification_count: 0,
             topic_distribution: HashMap::new(),
+            discovery_extractor: DiscoveryExtractor::new(),
         }
     }
 

@@ -13,6 +13,7 @@ This document defines the precise meaning of domain terms used across NeoTrix. E
 | **VSA HyperCube** | Vector Symbolic Architecture-based knowledge representation. Maps concepts to high-dimensional vectors, enabling associative recall and analogical reasoning. | "the cube", "hypercube" |
 | **SEAL Pipeline** | Self-Evolving Architecture Loop — the pipeline that runs exploration, distillation, self-test, and absorption cycles. Stages defined by `make_stage!` macro. | "the pipeline", "evolution loop" |
 | **KB** | Knowledge Base — SQLite-backed persistent store. Shared state layer for all 7 domains. Contains nodes (entities), edges (relations), embeddings, and BM25 index. | "the database", "storage" |
+| **total_calls ascending** | In gateway provider selection, lower total_calls takes priority for rotation, ensuring even distribution across available providers. Sorts ascending (least-used provider first). Related to NT-ACT load balancing. | "total_calls descending" |
 
 ## Faction System (7 Domains)
 

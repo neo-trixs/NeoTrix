@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 
 use super::contract::*;
 use super::nodes::*;
@@ -27,6 +30,24 @@ pub struct ConsciousnessTree {
     /// Vulnerability baseline for the "vuln reduction >= 20%" contract criterion.
     /// `None` until first measurement; set on first evaluation.
     pub vuln_baseline: Option<usize>,
+    /// KB handle — when present, the tree loads branch nodes and injects health
+    /// metrics from the shared knowledge base (Session B: task-cog-consciousness).
+    pub kb: Option<Arc<KnowledgeBase>>,
+    /// Awakened flag — set by `awaken()` once the 11 branch nodes are loaded.
+    pub awakened: bool,
+}
+
+/// KB-derived health metrics injected into each branch by `inject_kb_health`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct KbHealthMetrics {
+    pub node_count: u64,
+    pub edge_count: u64,
+    /// Embedded nodes / node count (0..1).
+    pub embedding_coverage: f64,
+    /// Edges / node count — graph connectivity density.
+    pub connectivity: f64,
+    /// Aggregate KB health contribution (0..1) blended into each branch.
+    pub global_health: f64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -183,6 +204,8 @@ pub struct CapabilityBranch {
     pub constellation: Constellation,
     /// 迷雾浓度 (CHMA Phase 0) — 节点未被生产验证的程度
     pub fog: FogLevel,
+    /// KB-derived health metrics injected by `inject_kb_health` (Session B).
+    pub kb_health: Option<KbHealthMetrics>,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1130,6 +1153,23 @@ impl BranchKind {
             _ => None,
         }
     }
+
+    /// KB node id used to address a branch node, e.g. `consciousness://branch/NT-CORE`.
+    pub fn kb_branch_id(&self) -> &'static str {
+        match self {
+            BranchKind::Core => "NT-CORE",
+            BranchKind::Mind => "NT-MIND",
+            BranchKind::Memory => "NT-MEMORY",
+            BranchKind::World => "NT-WORLD",
+            BranchKind::Act => "NT-ACT",
+            BranchKind::Io => "NT-IO",
+            BranchKind::Shield => "NT-SHIELD",
+            BranchKind::Meta => "NT-META",
+            BranchKind::Repair => "NT-REPAIR",
+            BranchKind::Governance => "NT-GOVERNANCE",
+            BranchKind::Nexus => "NT-NEXUS",
+        }
+    }
 }
 
 impl CapabilityBranch {
@@ -1169,6 +1209,7 @@ impl CapabilityBranch {
             runes: RuneSocket::default(),
             constellation: Constellation::new(),
             fog: FogLevel::default(),
+            kb_health: None,
         }
     }
 }

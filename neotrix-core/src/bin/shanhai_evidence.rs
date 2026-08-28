@@ -21,7 +21,7 @@ fn main() {
     // ─── 1. 秦始皇昆仑石刻 (2025年6月8日光明日报报道) ────────────
     println!("
 === 秦始皇昆仑石刻（光明日报 2025-06-08报道）===");
-    let qin_inscription = KnowledgeNode {
+    let qin_inscription = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:qin-stone-inscription-2025".into(),
         node_type: NodeType::Concept,
         title: "秦始皇遣使\u{201c}采药昆仑\u{201d}摩崖石刻（扎陵湖）".into(),
@@ -64,7 +64,7 @@ fn main() {
     // ─── 2. 石峁遗址（4300年前超级城市） ────────────────────────
     println!("
 === 石峁遗址（陕北龙山文化超大城市）===");
-    let shimao = KnowledgeNode {
+    let shimao = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:shimao-site".into(),
         node_type: NodeType::Source,
         title: "石峁遗址（陕西神木·4300年前超级城市）".into(),
@@ -100,7 +100,7 @@ fn main() {
     // ─── 3. Mertz北美山脉详细验证 ──────────────────────────────
     println!("
 === Mertz北美四列山脉GPS验证 ===");
-    let mertz_detail = KnowledgeNode {
+    let mertz_detail = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:mertz-na-mountains".into(),
         node_type: NodeType::Theory,
         title: "Henriette Mertz《东山经》北美四列山脉逐峰GPS验证".into(),
@@ -145,7 +145,7 @@ fn main() {
     // ─── 4. 宫玉海比较语言学体系 ──────────────────────────────
     println!("
 === 宫玉海比较语言学证据体系 ===");
-    let gong_linguistics = KnowledgeNode {
+    let gong_linguistics = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:gong-linguistics".into(),
         node_type: NodeType::Theory,
         title: "宫玉海比较语言学/语言民族学全球溯源体系".into(),
@@ -189,7 +189,7 @@ fn main() {
     // ─── 5. 赵自强不周山=火山理论（卫星地图验证） ────────────
     println!("
 === 赵自强：不周山/昆仑山=东非火山 ===");
-    let zhao_volcano = KnowledgeNode {
+    let zhao_volcano = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:zhao-volcano-theory".into(),
         node_type: NodeType::Theory,
         title: "赵自强：昆仑山=完整火山口 / 不周山=破损火山口（卫星图验证）".into(),
@@ -229,7 +229,7 @@ fn main() {
     // ─── 6. 印第安人DNA证据 ──────────────────────────────────────
     println!("
 === 印第安人与中国人DNA共性 ===");
-    let dna_evidence = KnowledgeNode {
+    let dna_evidence = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:indian-dna".into(),
         node_type: NodeType::Paper,
         title: "印第安人DNA 37个基因与中国人高度重合（埃墨里大学研究）".into(),
@@ -265,7 +265,7 @@ fn main() {
     // ─── 7. 大禹昆仑——尼罗河帝王谷定位 ────────────────────────
     println!("
 === 大禹昆仑：帝王谷=昆仑之丘（卫星+建筑学）===");
-    let dayu_kunlun = KnowledgeNode {
+    let dayu_kunlun = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:dayu-kunlun-valley".into(),
         node_type: NodeType::Theory,
         title: "大禹昆仑——埃及帝王谷=大荒西经昆仑之丘（卫星地图验证）".into(),
@@ -309,7 +309,7 @@ fn main() {
     // ─── 8. 光明日报昆仑定位——2025年最重大发现 ──────────────
     println!("
 === 光明日报：昆仑在巴颜喀拉（2025年定论）===");
-    let kunlun_location = KnowledgeNode {
+    let kunlun_location = KnowledgeNode { recall_weight: 1.0,
         id: "shanhai-evidence:kunlun-location-2025".into(),
         node_type: NodeType::Article,
         title: "光明日报（2025-06-08）实证：古昆仑=巴颜喀拉山".into(),

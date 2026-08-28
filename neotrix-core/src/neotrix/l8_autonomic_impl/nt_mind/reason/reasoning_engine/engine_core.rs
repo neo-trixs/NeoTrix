@@ -2474,8 +2474,8 @@ mod tests {
             assert_eq!(res.unwrap(), "routed response");
             let model = provider_clone.seen_model.lock().unwrap().clone();
             let max_tokens = provider_clone.seen_max_tokens.lock().unwrap().clone();
-            assert_eq!(model.as_deref(), Some("openai/gpt-4o-mini-2024-07-18"),
-                "T0 greeting must route to pinned mini model, got {:?}", model);
+            assert_eq!(model.as_deref(), Some("codestral-latest"),
+                "T0 greeting must route to pinned keyless mini model, got {:?}", model);
             assert_eq!(max_tokens, Some(256), "route max_tokens must flow into request");
         });
     }

@@ -73,6 +73,8 @@ fn default_llm_domains() -> HashSet<String> {
         // 2026-08: llm7 是 RouterConfig 默认 tier 端点 (keyless 实测 codestral-latest
         // 匿名可用)，零配置可用性优先 — 从 default-deny 移入白名单。
         "api.llm7.io",
+        // free.empero.org — keyless 免费端点, 收编进 failover mesh (R-P42)。
+        "free.empero.org",
     ]
     .into_iter()
     .map(|s| s.to_string())

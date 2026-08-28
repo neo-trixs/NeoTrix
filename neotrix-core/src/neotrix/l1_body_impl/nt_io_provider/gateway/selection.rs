@@ -1,7 +1,8 @@
 use crate::neotrix::l1_body_impl::nt_io_http_factory::proxy_from_env;
+use std::time::Instant;
 
 use super::super::factory::{create_provider, ProviderConfig};
-use super::super::free_catalog::FreeModelEntry;
+use super::super::free_catalog::{FreeModelCatalog, FreeModelEntry};
 use super::super::rate_limiter::RateLimiter;
 use super::super::rate_profiles::get_rate_profile;
 use super::*;
@@ -70,10 +71,14 @@ impl GatewayV2 {
         let free_best = states
             .iter()
             .filter(|(_, s)| s.is_available() && s.is_free)
-            .max_by(|(_, a), (_, b)| {
+            .max_by(|(na, a), (nb, b)| {
+                // 同分按 total_calls 升序轮询 (CONTEXT.md: 低 total_calls 优先均衡),
+                // 名字兜底消除 HashMap 遍历序偶发 (D13 确定性)。
                 a.composite_score()
                     .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.total_calls.cmp(&b.total_calls).reverse())
+                    .then(na.cmp(nb))
             })
             .map(|(name, _)| name.clone());
 
@@ -86,10 +91,12 @@ impl GatewayV2 {
             return states
                 .iter()
                 .filter(|(_, s)| s.is_available())
-                .max_by(|(_, a), (_, b)| {
+                .max_by(|(na, a), (nb, b)| {
                     a.composite_score()
                         .partial_cmp(&b.composite_score())
                         .unwrap_or(std::cmp::Ordering::Equal)
+                        .then(a.total_calls.cmp(&b.total_calls).reverse())
+                        .then(na.cmp(nb))
                 })
                 .map(|(name, _)| name.clone());
         }
@@ -98,10 +105,12 @@ impl GatewayV2 {
         states
             .iter()
             .filter(|(_, s)| s.is_available())
-            .max_by(|(_, a), (_, b)| {
+            .max_by(|(na, a), (nb, b)| {
                 a.composite_score()
                     .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.total_calls.cmp(&b.total_calls).reverse())
+                    .then(na.cmp(nb))
             })
             .map(|(name, _)| name.clone())
     }
@@ -123,11 +132,18 @@ impl GatewayV2 {
         // 1. 前缀 provider 优先 (完整注册名匹配优先, 再退化到裸 provider 名)
         if let Some(prefix) = model.split('/').next().filter(|p| !p.is_empty()) {
             // 完整注册名: `llm7/codestral-latest` 恰好是 catalog 注册名时直接用
-            if states.contains_key(model) && !chain.contains(&model.to_string()) {
+            // (该模型被锁定则跳过, 路由到其它 provider)
+            if states.contains_key(model)
+                && !chain.contains(&model.to_string())
+                && !states.get(model).map_or(false, |s| s.is_model_locked(model))
+            {
                 chain.push(model.to_string());
             }
             // 裸 provider 名: `llm7` keyless 注册名
-            if states.contains_key(prefix) && !chain.contains(&prefix.to_string()) {
+            if states.contains_key(prefix)
+                && !chain.contains(&prefix.to_string())
+                && !states.get(prefix).map_or(false, |s| s.is_model_locked(model))
+            {
                 chain.push(prefix.to_string());
             }
         }
@@ -160,9 +176,14 @@ impl GatewayV2 {
             if chain.len() >= limit {
                 break;
             }
-            if !chain.contains(name) {
-                chain.push(name.clone());
+            if chain.contains(name) {
+                continue;
             }
+            // 请求了具体模型且该 provider 上此模型被锁定 → 跳过, 路由到其它 provider
+            if !model.is_empty() && states.get(name).map_or(false, |s| s.is_model_locked(model)) {
+                continue;
+            }
+            chain.push(name.clone());
         }
 
         chain
@@ -216,8 +237,7 @@ impl GatewayV2 {
         }
     }
 
-    pub fn provider_status(&self) -> Vec<serde_json::Value> {
-        let states = self.states.read().unwrap_or_else(|e| {
+    pub fn provider_status(&self) -> Vec<serde_json::Value> {        let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
             e.into_inner()
         });
@@ -236,6 +256,70 @@ impl GatewayV2 {
                 })
             })
             .collect()
+    }
+
+    /// 当前可用 (circuit 未开) 的免费 provider 名称列表 — 用于池子充足度自检。
+    pub fn available_free_providers(&self) -> Vec<String> {
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
+        states
+            .iter()
+            .filter(|(_, s)| s.is_free && s.is_available())
+            .map(|(n, _)| n.clone())
+            .collect()
+    }
+
+    /// 池子充足度自检: 可用免费 provider 数 >= `min` 即视为充足。
+    /// 目标 "自有 LLM 池子里保持充足的模型" 的量化门槛 — 低于该数应触发 catalog 补充。
+    pub fn is_pool_sufficient(&self, min: usize) -> bool {
+        self.available_free_providers().len() >= min
+    }
+
+    /// 池子充足度报告 (JSON) — 供 telemetry / CLI 观测当前自有池健康度。
+    pub fn pool_sufficiency_report(&self, min: usize) -> serde_json::Value {
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
+        let total = states.len();
+        let free_total = states.values().filter(|s| s.is_free).count();
+        let free_available = states
+            .values()
+            .filter(|s| s.is_free && s.is_available())
+            .count();
+        let locked_models: usize = states
+            .values()
+            .map(|s| s.model_locks.iter().filter(|(_, &until)| Instant::now() < until).count())
+            .sum();
+        serde_json::json!({
+            "total_providers": total,
+            "free_total": free_total,
+            "free_available": free_available,
+            "model_locks_active": locked_models,
+            "min_required": min,
+            "sufficient": free_available >= min,
+        })
+    }
+
+    /// 从 FreeModelCatalog 重新发现并补充可用 keyless 源 (对齐 OmniRoute Radar 刷新)。
+    /// 幂等: 已注册名跳过。当 `is_pool_sufficient(min)` 为 false 时由调用方 (CLI 初始化 /
+    /// 后台循环) 周期调用, 使自有 LLM 池始终维持充足模型, 而非启动一次性注册后静止。
+    pub fn reconcile_pool_from_catalog(&mut self) {
+        let mut catalog = FreeModelCatalog::new();
+        let discovered = catalog.refresh();
+        let before = self.providers().len();
+        self.register_from_catalog(&discovered);
+        let after = self.providers().len();
+        if after > before {
+            log::info!(
+                "[gateway] reconcile_pool_from_catalog: +{} new providers ({}→{})",
+                after - before,
+                before,
+                after
+            );
+        }
     }
 
     /// 已注册 provider 名称列表

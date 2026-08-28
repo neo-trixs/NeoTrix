@@ -15,6 +15,10 @@ export function memoryExport(format?: string): Promise<string> {
   return call('memory_export', { format: format ?? null })
 }
 
+export function memoryImport(content: string, format?: string): Promise<number> {
+  return call('memory_import', { content, format: format ?? 'json' })
+}
+
 export function memoryClear(kind?: string | null): Promise<number> {
   return call('memory_clear', { kind: kind ?? null })
 }

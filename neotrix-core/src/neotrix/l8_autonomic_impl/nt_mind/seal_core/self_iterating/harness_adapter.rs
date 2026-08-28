@@ -38,6 +38,7 @@ impl HarnessKbExt for HarnessAdapter {
                 domain: Some("harness".to_string()),
                 language: "en".to_string(),
                 confidence: 0.9,
+                recall_weight: 1.0,
                 importance: 0.6,
                 created_at: 0,
                 updated_at: 0,

@@ -1,12 +1,12 @@
-/* ════════════════════════════════════════════
+/* ═══════════════════════════════════════════
    components/settings/settingsIcons.tsx — 设置页共享浅橙电流细线图标
    主题：轻灵电流（light-current）——细线轮廓 + 浅橙渐变发光节点 + 流动动画。
    - 主线 stroke=currentColor（导航灰→激活橙语义随父级 color 变化）
    - 端点/关键节点 fill=浅橙渐变（#fbd9b8 → #f5a862 → #e07f2b），带发光
    - 部分主线加 .ic-flow 电流流动（stroke-dasharray 循环）
    每个 svg 内嵌独立 defs（自包含；重复 id 浏览器取首个定义，内容一致无碍）。
-   ════════════════════════════════════════════ */
-
+   ══════════════════════════════════════════════ */
+ 
 /* 每个图标内嵌的浅橙电流渐变（浅金→浅橙→中橙） */
 const CURRENT_GRAD = (
   <defs>
@@ -17,7 +17,7 @@ const CURRENT_GRAD = (
     </linearGradient>
   </defs>
 )
-
+ 
 /* ── 外扩线条图标（open/expand 语义，非内敛） ── */
 export function ExpandIcon() {
   return (
@@ -36,7 +36,7 @@ export function ExpandIcon() {
     </svg>
   )
 }
-
+ 
 export function PaletteIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
@@ -49,7 +49,7 @@ export function PaletteIcon() {
     </svg>
   )
 }
-
+ 
 export function InfoIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
@@ -58,6 +58,18 @@ export function InfoIcon() {
       <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1" />
       <line x1="8" y1="7.5" x2="8" y2="11" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
       <circle cx="8" cy="4.6" r="0.85" fill="url(#nt-current-grad)" />
+    </svg>
+  )
+}
+
+export function AlertCircleIcon(props: { class?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class={props.class ?? 'nt-ic'}>
+      {CURRENT_GRAD}
+      {/* 警告圆环 + 电流节点 */}
+      <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1" />
+      <line x1="8" y1="5" x2="8" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <circle cx="8" cy="11.5" r="0.85" fill="url(#nt-current-grad)" />
     </svg>
   )
 }
@@ -79,7 +91,7 @@ export function PluginsIcon() {
     </svg>
   )
 }
-
+ 
 export function DataIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
@@ -91,7 +103,7 @@ export function DataIcon() {
       <circle cx="13" cy="4" r="0.8" fill="url(#nt-current-grad)" />
       <line x1="13" y1="8" x2="13" y2="3.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
       <line x1="13" y1="3.5" x2="11.5" y2="5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
-      <line x1="13" y1="3.5" x2="14.5" y2="5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+<line x1="13" y1="3.5" x2="14.5" y2="5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   )
 }
@@ -104,7 +116,7 @@ export function XIcon() {
     </svg>
   )
 }
-
+ 
 export function TagIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
@@ -114,6 +126,18 @@ export function TagIcon() {
       <circle cx="6.4" cy="6.4" r="1.05" fill="url(#nt-current-grad)" />
       <line x1="8" y1="14.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" opacity="0.4" />
       <line x1="15" y1="7" x2="15.5" y2="7" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" opacity="0.4" />
+    </svg>
+  )
+}
+
+/* ── 界面语言：地球（国际化语义） ── */
+export function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
+      {CURRENT_GRAD}
+      <circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1" />
+      <path d="M1.8 8h12.4" stroke="currentColor" stroke-width="1" />
+      <path d="M8 1.8c2.1 1.7 3.2 3.9 3.2 6.2S10.1 12.5 8 14.2C5.9 12.5 4.8 10.3 4.8 8S5.9 3.5 8 1.8z" stroke="currentColor" stroke-width="1" />
     </svg>
   )
 }
@@ -130,7 +154,7 @@ export function BoltIcon() {
     </svg>
   )
 }
-
+ 
 /* ── 模型：代理池语义（层叠立方体 + 顶部电流节点） ── */
 export function ModelIcon() {  return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
@@ -145,7 +169,7 @@ export function ModelIcon() {  return (
     </svg>
   )
 }
-
+ 
 export function CheckIcon(props: { class?: string }) {
   return (
     <svg viewBox="0 0 12 12" fill="none" class={props.class}>
@@ -159,6 +183,35 @@ export function ActiveDotIcon(props: { class?: string }) {
     <svg viewBox="0 0 8 8" fill="url(#nt-current-grad)" class={props.class}>
       {CURRENT_GRAD}
       <circle cx="4" cy="4" r="3.2" />
+    </svg>
+  )
+}
+ 
+/* ── 连接测试：试管图标（连接测试/验证语义） ── */
+export function TestTubeIcon(props: { class?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class={props.class}>
+      {CURRENT_GRAD}
+      {/* 试管主体 */}
+      <path d="M4 3v8a2 2 0 01-2 2h8a2 2 0 002-2V3a1 1 0 00-1-1H4a1 1 0 01-1-1V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+      {/* 液面 */}
+      <path d="M4 5h8" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+      {/* 液面气泡 */}
+      <circle cx="10" cy="7" r="0.8" fill="url(#nt-current-grad)" opacity="0.6" />
+      <circle cx="10" cy="9" r="0.6" fill="url(#nt-current-grad)" opacity="0.4" />
+      {/* 颈部高光 */}
+      <path d="M5 3h8" stroke="currentColor" stroke-width="0.6" opacity="0.3" stroke-linecap="round" />
+    </svg>
+  )
+}
+
+/* ── 新增外部模型：加号（智能配置入口） ── */
+export function PlusIcon(props: { class?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class={props.class}>
+      {CURRENT_GRAD}
+      <line x1="8" y1="3.5" x2="8" y2="12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+      <line x1="3.5" y1="8" x2="12.5" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
     </svg>
   )
 }

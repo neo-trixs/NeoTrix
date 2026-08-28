@@ -42,7 +42,7 @@ pub fn compute_semantic_entropy(data: &[f64]) -> f64 {
 pub const RESONANCE_THRESHOLD: u32 = 2;
 
 /// Number of specialist modules.
-pub const MODULE_COUNT: usize = 14;
+pub const MODULE_COUNT: usize = 15;
 
 /// Pre-computed resonance matrix: 14×14 pairwise resonance strengths (D6: 12×12 → MODULE_COUNT=14 对齐)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,6 +201,7 @@ pub fn default_specialist_states() -> [ReasoningHexagram; MODULE_COUNT] {
         s(2), // AISecurity: Vulnerability Analysis (concrete+focused+analytical+deep+collaborative)
         s(54), // ImageGenerator: Generate (abstract+broad+generative+fast+solo+certain)
         s(12), // EvidenceWeightedHypothesis: Evidence weighting (concrete+analytical+deep)
+        s(54), // CADGeneration: Generate (image→CAD, reuses ImageGenerator reasoning mode)
     ]
 }
 

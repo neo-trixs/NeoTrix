@@ -1,5 +1,5 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
-import { Settings, Archive, RotateCcw } from 'lucide-solid'
+import { Settings, Archive, RotateCcw, ChevronRight } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 
 import { clsx } from 'clsx'
@@ -26,22 +26,9 @@ interface SidebarProps {
   onClearTags?: () => void
 }
 
-const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
-type GroupKey = (typeof GROUP_ORDER)[number]
-
 // Segmented Tab：已移除（仅对话单态，极简无分段）
 const VIEW_ORDER = ['chat'] as const
 type ViewKey = (typeof VIEW_ORDER)[number]
-
-function getGroupKey(date: Date): GroupKey {
-  const now = new Date()
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const diffDays = Math.floor((startOfDay(now) - startOfDay(date)) / 86_400_000)
-  if (diffDays <= 0) return '今天'
-  if (diffDays === 1) return '昨天'
-  if (diffDays <= 7) return '前7天'
-  return '更早'
-}
 
 export function Sidebar(props: SidebarProps) {
   const collapsed = () => props.collapsed ?? false
@@ -85,8 +72,6 @@ export function Sidebar(props: SidebarProps) {
   let viewTabsRef: HTMLDivElement | undefined
   // 会话列表容器引用：删除/归档当前会话后焦点回移最近邻条目
   let sessionListRef: HTMLDivElement | undefined
-  // 分组模式：时间 / 项目（对标 Claude group-by-project）
-  const [groupMode, setGroupMode] = createSignal<'time' | 'project'>('time')
 
   const toggleSearch = () => {
     const next = !searchOpen()
@@ -144,24 +129,29 @@ export function Sidebar(props: SidebarProps) {
       }
       return true
     })
-    if (groupMode() === 'project') {
-      // 项目分组：按 session.project 归组，未知归「其他」
-      const map = new Map<string, typeof filtered>()
-      for (const s of filtered) {
-        const key = s.project || '其他'
-        if (!map.has(key)) map.set(key, [])
-        map.get(key)!.push(s)
-      }
-      const sorted = [...map.entries()].sort((a, b) => b[1].length - a[1].length)
-      return sorted.map(([key, items]) => ({ key, items }))
+    // 项目制对话机制（对标 Claude Code / OpenWebUI：按项目分组，项目名取会话工作目录）
+    const groups = new Map<string, typeof filtered>()
+    for (const s of filtered) {
+      const key = s.project || '未分类'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(s)
     }
-    const groups = new Map<GroupKey, typeof filtered>()
-    for (const key of GROUP_ORDER) groups.set(key, [])
-    for (const session of filtered) {
-      const key = getGroupKey(session.updatedAt)
-      groups.get(key)?.push(session)
-    }
-    return GROUP_ORDER.map((key) => ({ key, items: groups.get(key) ?? [] })).filter((g) => g.items.length > 0)
+    const arr = [...groups.entries()].map(([key, items]) => ({ key, items }))
+    // 项目组按最近活跃时间降序
+    arr.sort((a, b) => {
+      const ma = Math.max(...a.items.map((i) => i.updatedAt.getTime()), 0)
+      const mb = Math.max(...b.items.map((i) => i.updatedAt.getTime()), 0)
+      return mb - ma
+    })
+    return arr
+  }
+
+  // 项目分组折叠态（参考成熟产品：项目可折叠，默认展开）
+  const [collapsedProjects, setCollapsedProjects] = createSignal<Set<string>>(new Set())
+  const toggleProject = (key: string) => {
+    const next = new Set(collapsedProjects())
+    if (next.has(key)) next.delete(key); else next.add(key)
+    setCollapsedProjects(next)
   }
 
   const handleNewChat = async () => {
@@ -344,24 +334,15 @@ export function Sidebar(props: SidebarProps) {
     )}>
       {/* Header: 三色灯占位（macOS 28px 拖拽区） */}
       <div class="h-7 shrink-0" data-tauri-drag-region />
-      {/* 折叠标签：置于三色灯正下方，对标 Claude Code 侧栏手柄 */}
-      <div class={clsx('px-3 pb-3', collapsed() && 'flex justify-center')}>
+      {/* 折叠标签：仅保留图标（对标 Claude Code 侧栏手柄） */}
+      <div class={clsx('pt-2', collapsed() ? 'flex justify-center px-0' : 'px-3')}>
         <button
-          class={clsx(
-            'flex items-center gap-2 rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none',
-            collapsed()
-              ? 'w-8 h-8 justify-center bg-white border-black/8 shadow-sm text-zinc-500 hover:text-orange-600 hover:border-orange-200 hover:bg-orange-50'
-              : 'w-full px-3 py-2 bg-white border-black/8 shadow-sm text-[12.5px] font-medium text-zinc-700 hover:border-orange-200 hover:text-orange-700 hover:bg-orange-50/50 justify-between'
-          )}
+          class="p-1.5 rounded-md text-zinc-400 hover:text-orange-600 hover:bg-orange-50/60 transition-colors focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none"
           onClick={props.onToggleCollapse}
           aria-label={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
           title={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
         >
-          <span class="flex items-center gap-2">
-            <NeoChevronRight class={clsx('w-4 h-4 transition-transform', !collapsed() && 'rotate-180')} />
-            <Show when={!collapsed()}><span>收起侧边栏</span></Show>
-          </span>
-          <Show when={!collapsed()}><span class="text-[10px] text-zinc-400">⌘B</span></Show>
+          <NeoChevronRight class={clsx('w-4 h-4 transition-transform', !collapsed() && 'rotate-180')} />
         </button>
       </div>
 
@@ -417,35 +398,7 @@ export function Sidebar(props: SidebarProps) {
             </button>
           </div>
 
-          {/* 分组模式：时间 / 项目（对标 Claude group-by-project） */}
-          <div class="px-3 pb-2 flex items-center gap-1" role="group" aria-label="会话分组方式">
-            <button
-              class={clsx(
-                'flex-1 px-2 py-1 rounded-md text-11px transition-colors',
-                groupMode() === 'time'
-                  ? 'bg-white/70 text-text-primary font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]'
-                  : 'text-text-muted hover:text-text-primary hover:bg-white/40'
-              )}
-              onClick={() => setGroupMode('time')}
-              aria-pressed={groupMode() === 'time'}
-            >
-              按时间
-            </button>
-            <button
-              class={clsx(
-                'flex-1 px-2 py-1 rounded-md text-11px transition-colors',
-                groupMode() === 'project'
-                  ? 'bg-white/70 text-text-primary font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]'
-                  : 'text-text-muted hover:text-text-primary hover:bg-white/40'
-              )}
-              onClick={() => setGroupMode('project')}
-              aria-pressed={groupMode() === 'project'}
-            >
-              按项目
-            </button>
-          </div>
-
-          {/* 会话列表（按时间/项目分组）；showArchived 时切换为归档箱视图 */}
+          {/* 会话列表（极简扁平，按标签过滤）；showArchived 时切换为归档箱视图 */}
           <div ref={sessionListRef} class="flex-1 overflow-y-auto px-3 pb-4">
             {/* 会话操作错误内联提示（对标 GitPanel toast；6s 自动消失） */}
             <Show when={sidebarError()}>
@@ -552,10 +505,19 @@ export function Sidebar(props: SidebarProps) {
               <For each={groupedSessions()}>
                 {(group) => (
                   <div class="mb-4 last:mb-0">
-                    <div class="re-h px-2 pb-2 pt-2 text-10px uppercase tracking-widest text-text-muted/60 font-medium">
-                      {group.key}
-                    </div>
-                    <ul class="space-y-1" role="list" aria-label={`${group.key}会话`}>
+                    {/* 项目分组头（对标 Claude Code / OpenWebUI：项目可折叠） */}
+                    <button
+                      class="w-full flex items-center gap-1.5 px-2 pb-2 pt-2 text-left group/ph focus-visible:outline-none"
+                      onClick={() => toggleProject(group.key)}
+                      aria-expanded={!collapsedProjects().has(group.key)}
+                      aria-label={collapsedProjects().has(group.key) ? `展开 ${group.key}` : `折叠 ${group.key}`}
+                    >
+                      <ChevronRight class={clsx('w-3 h-3 text-text-muted/70 transition-transform flex-shrink-0', !collapsedProjects().has(group.key) && 'rotate-90')} />
+                      <span class="text-10px uppercase tracking-widest text-text-muted/70 font-semibold truncate">{group.key}</span>
+                      <span class="text-10px text-text-muted/50 ml-1">{group.items.length}</span>
+                    </button>
+                    <Show when={!collapsedProjects().has(group.key)}>
+                      <ul class="space-y-1" role="list" aria-label={`${group.key}会话`}>
                       <For each={group.items}>
                         {(session: { id: string; title: string; updatedAt: Date }) => {
                           const active = currentSessionId() === session.id
@@ -663,7 +625,8 @@ export function Sidebar(props: SidebarProps) {
                           )
                         }}
                       </For>
-                    </ul>
+                      </ul>
+                    </Show>
                   </div>
                 )}
               </For>

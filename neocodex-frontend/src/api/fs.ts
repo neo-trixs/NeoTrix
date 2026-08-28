@@ -5,7 +5,7 @@
    在非 Tauri 宿主（测试/浏览器）返回 null/抛错，由调用方兜底。
    ════════════════════════════════════════════ */
 import { open, save } from '@tauri-apps/plugin-dialog'
-import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { isTauriRuntime } from '../lib/env'
 
 export interface SaveDialogOptions {
@@ -40,4 +40,10 @@ export async function openFileDialog(options: OpenDialogOptions = {}): Promise<s
 export async function writeTextFileAt(path: string, contents: string): Promise<void> {
   if (!isTauriRuntime()) throw new Error('文件写入仅在桌面宿主可用')
   await writeTextFile(path, contents)
+}
+
+/** 读文本文件从指定路径（非 Tauri 宿主抛错） */
+export async function readTextFileAt(path: string): Promise<string> {
+  if (!isTauriRuntime()) throw new Error('文件读取仅在桌面宿主可用')
+  return await readTextFile(path)
 }

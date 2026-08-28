@@ -233,7 +233,8 @@ impl<'a> ResourceIngester<'a> {
             content,
             url,
             domain,
-            language: "en".into(),
+            language: "en".to_string(),
+            recall_weight: 1.0,
             confidence: desc.confidence,
             importance: desc.importance,
             created_at: ts,
@@ -268,13 +269,14 @@ impl<'a> ResourceIngester<'a> {
                 domain: None,
                 language: "en".into(),
                 confidence: desc.confidence * 0.8,
+                recall_weight: 1.0,
                 importance: desc.importance * 0.7,
                 created_at: ts,
                 updated_at: ts,
                 access_count: 0,
                 metadata: Some(serde_json::json!({
                     "parent_resource_id": node_id,
-                    "episode_id": self.episode_id,
+                    "episode_id": self.episode_id.clone(),
                 })),
                 temporal: None,
                 supersedes: None,
@@ -346,6 +348,7 @@ fn find_node_by_title(conn: &Connection, title: &str) -> rusqlite::Result<Option
     let mut rows = stmt.query(rusqlite::params![title])?;
     match rows.next()? {
         Some(row) => Ok(Some(KnowledgeNode {
+            recall_weight: 1.0,
             id: row.get(0)?,
             node_type: NodeType::from_str(&row.get::<_, String>(1)?),
             title: row.get(2)?,

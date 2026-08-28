@@ -1,7 +1,17 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+
 use super::self_model::SelfModel;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum GapCategory {
+    #[default]
     MissingModule,
     MissingApi,
     MissingKnowledgeSource,
@@ -9,6 +19,9 @@ pub enum GapCategory {
     LowCoverage,
     OutdatedPattern,
     MissingIntegration,
+    MissingAbstractionLayer,
+    WeakConnectivity,
+    StaleKnowledge,
 }
 
 impl GapCategory {
@@ -21,6 +34,9 @@ impl GapCategory {
             GapCategory::LowCoverage => "low_coverage",
             GapCategory::OutdatedPattern => "outdated_pattern",
             GapCategory::MissingIntegration => "missing_integration",
+            GapCategory::MissingAbstractionLayer => "missing_abstraction_layer",
+            GapCategory::WeakConnectivity => "weak_connectivity",
+            GapCategory::StaleKnowledge => "stale_knowledge",
         }
     }
 
@@ -33,11 +49,14 @@ impl GapCategory {
             GapCategory::LowCoverage => 0.4,
             GapCategory::OutdatedPattern => 0.3,
             GapCategory::MissingIntegration => 0.8,
+            GapCategory::MissingAbstractionLayer => 0.7,
+            GapCategory::WeakConnectivity => 0.5,
+            GapCategory::StaleKnowledge => 0.6,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnowledgeGap {
     pub id: usize,
     pub category: GapCategory,
@@ -47,18 +66,56 @@ pub struct KnowledgeGap {
     pub exploration_priority: f64,
     pub fill_strategy: String,
     pub suggested_sources: Vec<String>,
+    // KB integration fields
+    pub kb_node_ids: Vec<String>,           // Related KB node IDs
+    pub abstraction_level: Option<String>,  // Abstraction level from node_dimensions
+    pub scale_indicators: Vec<String>,      // Scale indicators from node_dimensions
+    pub concern_tags: Vec<String>,          // Concern tags from node_dimensions
+    pub temporal_order: Option<i64>,        // Temporal order from node_dimensions
+    pub source_gap_report_id: Option<String>, // Link to knowledge_gap_reports table
 }
 
-#[derive(Debug, Clone)]
+impl Default for KnowledgeGap {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            category: GapCategory::default(),
+            description: String::new(),
+            affected_modules: Vec::new(),
+            severity: 0.0,
+            exploration_priority: 0.0,
+            fill_strategy: String::new(),
+            suggested_sources: Vec::new(),
+            kb_node_ids: Vec::new(),
+            abstraction_level: None,
+            scale_indicators: Vec::new(),
+            concern_tags: Vec::new(),
+            temporal_order: None,
+            source_gap_report_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ConnectivityStats {
+    pub avg_degree: f64,
+    pub isolated_nodes: usize,
+    pub max_degree: usize,
+    pub weak_components: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GapCluster {
     pub id: usize,
     pub category: GapCategory,
     pub gaps: Vec<KnowledgeGap>,
     pub centroid_description: String,
     pub exploration_route: String,
+    pub avg_severity: f64,
+    pub kb_related_nodes: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GapReport {
     pub gaps: Vec<KnowledgeGap>,
     pub clusters: Vec<GapCluster>,
@@ -66,13 +123,21 @@ pub struct GapReport {
     pub high_priority_count: usize,
     pub exploration_suggestions: Vec<String>,
     pub coherence_score: f64,
+    // KB integration
+    pub kb_gap_report_ids: Vec<String>,  // IDs of reports written to knowledge_gap_reports table
+    pub abstraction_coverage: HashMap<String, usize>, // abstraction level -> count
+    pub connectivity_stats: ConnectivityStats,
 }
 
-/// Scans the codebase for knowledge gaps — missing modules, APIs, patterns.
+/// Scans the codebase AND knowledge base for knowledge gaps — missing modules, APIs, patterns, abstraction layers, connectivity.
 pub struct KnowledgeGapDetector {
     pub known_sources: Vec<String>,
     pub target_categories: Vec<GapCategory>,
     pub min_severity_threshold: f64,
+    // KB integration
+    pub kb: Option<Arc<KnowledgeBase>>,
+    pub min_connectivity_threshold: f64,
+    pub max_temporal_age_days: i64,
 }
 
 impl Default for KnowledgeGapDetector {
@@ -99,9 +164,30 @@ impl KnowledgeGapDetector {
                 GapCategory::MissingApi,
                 GapCategory::MissingKnowledgeSource,
                 GapCategory::MissingIntegration,
+                GapCategory::MissingAbstractionLayer,
+                GapCategory::WeakConnectivity,
+                GapCategory::StaleKnowledge,
             ],
             min_severity_threshold: 0.3,
+            kb: None,
+            min_connectivity_threshold: 5.0,
+            max_temporal_age_days: 365,
         }
+    }
+
+    pub fn with_kb(mut self, kb: Arc<KnowledgeBase>) -> Self {
+        self.kb = Some(kb);
+        self
+    }
+
+    pub fn with_connectivity_threshold(mut self, threshold: f64) -> Self {
+        self.min_connectivity_threshold = threshold;
+        self
+    }
+
+    pub fn with_temporal_age(mut self, days: i64) -> Self {
+        self.max_temporal_age_days = days;
+        self
     }
 
     pub fn add_source(&mut self, source: &str) {
@@ -110,16 +196,36 @@ impl KnowledgeGapDetector {
         }
     }
 
-    /// Full gap detection run: scan → cluster → suggest
+    /// Full gap detection run: scan codebase → scan KB → cluster → suggest
     pub fn detect_gaps(
         &self,
         model: &SelfModel,
         weaknesses: &[super::weakness::Weakness],
     ) -> GapReport {
-        let gaps = self.scan_all_gaps(model, weaknesses);
+        let mut gaps = self.scan_all_gaps(model, weaknesses);
+
+        // KB-based gap detection
+        if let Some(ref kb) = self.kb {
+            gaps.extend(self.scan_kb_gaps(kb));
+        }
+
         let clusters = self.cluster_gaps(&gaps);
         let suggestions = self.generate_exploration_suggestions(&gaps, &clusters);
         let coherence = self.calculate_coherence(&gaps, &clusters);
+
+        // Compute KB stats
+        let (abstraction_coverage, connectivity_stats) = if let Some(ref kb) = self.kb {
+            (self.compute_abstraction_coverage(kb), self.compute_connectivity_stats(kb))
+        } else {
+            (HashMap::new(), ConnectivityStats::default())
+        };
+
+        // Write new gap reports to KB
+        let kb_gap_report_ids = if let Some(ref kb) = self.kb {
+            self.write_gap_reports_to_kb(kb, &gaps)
+        } else {
+            Vec::new()
+        };
 
         GapReport {
             total_gaps: gaps.len(),
@@ -128,6 +234,9 @@ impl KnowledgeGapDetector {
             coherence_score: coherence,
             gaps,
             clusters,
+            kb_gap_report_ids,
+            abstraction_coverage,
+            connectivity_stats,
         }
     }
 
@@ -191,6 +300,7 @@ impl KnowledgeGapDetector {
                                 name
                             ),
                             suggested_sources: vec!["dreamerv3".to_string(), "jepa".to_string()],
+                            ..Default::default()
                         });
                     }
                 }
@@ -208,6 +318,7 @@ impl KnowledgeGapDetector {
                         exploration_priority: 0.85,
                         fill_strategy: "Implement RSSM-style world model prediction".to_string(),
                         suggested_sources: vec!["dreamerv3".to_string(), "jepa".to_string()],
+                        ..Default::default()
                     });
                 }
             }
@@ -230,6 +341,7 @@ impl KnowledgeGapDetector {
                                 module.test_count, module.name
                             ),
                             suggested_sources: vec!["standard".to_string()],
+                            ..Default::default()
                         });
                     }
                 }
@@ -261,6 +373,7 @@ impl KnowledgeGapDetector {
                                 name
                             ),
                             suggested_sources: vec![name.to_string()],
+                            ..Default::default()
                         });
                     }
                 }
@@ -299,6 +412,7 @@ impl KnowledgeGapDetector {
                 exploration_priority: 0.5,
                 fill_strategy: format!("Research and implement module for {}", source),
                 suggested_sources: vec![source.to_string()],
+                ..Default::default()
             });
         }
 
@@ -330,6 +444,7 @@ impl KnowledgeGapDetector {
                     exploration_priority: 0.75,
                     fill_strategy: format!("Implement {} and wire to {}", b, a),
                     suggested_sources: vec!["design_pattern".to_string()],
+                    ..Default::default()
                 });
             }
         }
@@ -372,7 +487,13 @@ impl KnowledgeGapDetector {
                 GapCategory::MissingApi => "design+implement",
                 GapCategory::OutdatedPattern => "refactor",
                 GapCategory::MissingRelationship => "analyze",
+                GapCategory::MissingAbstractionLayer => "abstract+implement",
+                GapCategory::WeakConnectivity => "connect+integrate",
+                GapCategory::StaleKnowledge => "refresh+reabsorb",
             };
+
+            let avg_sev = cluster_members.iter().map(|g| g.severity).sum::<f64>() / cluster_members.len() as f64;
+            let kb_related = cluster_members.iter().map(|g| g.kb_node_ids.len()).sum::<usize>();
 
             clusters.push(GapCluster {
                 id: clusters.len(),
@@ -380,6 +501,8 @@ impl KnowledgeGapDetector {
                 centroid_description: centroid,
                 gaps: cluster_members,
                 exploration_route: route.to_string(),
+                avg_severity: avg_sev,
+                kb_related_nodes: kb_related,
             });
         }
 
@@ -479,6 +602,325 @@ impl KnowledgeGapDetector {
             ));
         }
         plan
+    }
+
+    // ===== KB Integration Methods =====
+
+    /// Scan KB for knowledge gaps: missing abstraction layers, weak connectivity, stale knowledge
+    fn scan_kb_gaps(&self, kb: &KnowledgeBase) -> Vec<KnowledgeGap> {
+        let mut gaps = Vec::new();
+        let mut id = 0;
+
+        // 1. Load existing gap reports to avoid duplicates
+        let existing_reports = self.load_existing_gap_reports(kb);
+
+        // 2. Scan for missing abstraction layers
+        gaps.extend(self.scan_abstraction_gaps(kb, &mut id));
+
+        // 3. Scan for weak connectivity
+        gaps.extend(self.scan_connectivity_gaps(kb, &mut id));
+
+        // 4. Scan for stale knowledge
+        gaps.extend(self.scan_stale_knowledge(kb, &mut id));
+
+        // Filter out gaps that already have reports
+        gaps.retain(|g| {
+            !existing_reports.iter().any(|r| r.description == g.description)
+        });
+
+        gaps
+    }
+
+    /// Load existing gap reports from KB to avoid duplicates
+    fn load_existing_gap_reports(&self, kb: &KnowledgeBase) -> Vec<KnowledgeGap> {
+        let conn = kb.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT description FROM knowledge_gap_reports WHERE status != 'resolved'"
+        ).unwrap();
+        let rows = stmt.query_map([], |row| {
+            Ok(row.get::<_, String>(0)?)
+        }).unwrap();
+
+        rows.filter_map(|r| r.ok())
+            .map(|desc| KnowledgeGap {
+                id: 0,
+                category: GapCategory::MissingRelationship,
+                description: desc,
+                affected_modules: vec![],
+                severity: 0.0,
+                exploration_priority: 0.0,
+                fill_strategy: String::new(),
+                suggested_sources: vec![],
+                kb_node_ids: vec![],
+                abstraction_level: None,
+                scale_indicators: vec![],
+                concern_tags: vec![],
+                temporal_order: None,
+                source_gap_report_id: None,
+            })
+        .collect()
+    }
+
+    /// Scan for missing abstraction layers in KB (building_block → pattern → architecture → case_study)
+    fn scan_abstraction_gaps(&self, kb: &KnowledgeBase, id: &mut usize) -> Vec<KnowledgeGap> {
+        let conn = kb.conn.lock().unwrap();
+        let mut gaps = Vec::new();
+
+        // Query abstraction level distribution per domain
+        let mut stmt = conn.prepare(
+            "SELECT json_extract(metadata, '$.categories') as domain, 
+                    json_extract(metadata, '$.abstraction') as abstraction, 
+                    COUNT(*) as count
+             FROM nodes n
+             JOIN node_dimensions nd ON n.id = nd.node_id
+             WHERE n.url LIKE 'bytebytego://%' OR n.url LIKE 'easytier://%'
+             GROUP BY domain, abstraction"
+        ).unwrap();
+
+        let rows = stmt.query_map([], |row| {
+            let domain: String = row.get(0)?;
+            let abstraction: String = row.get(1)?;
+            let count: usize = row.get(2)?;
+            Ok((domain, abstraction, count))
+        }).unwrap();
+
+        let mut domain_abstractions: HashMap<String, HashMap<String, usize>> = HashMap::new();
+        for row in rows.flatten() {
+            let (domain, abstraction, count) = row;
+            domain_abstractions.entry(domain).or_default().insert(abstraction, count);
+        }
+
+        let levels = vec!["building_block", "pattern", "architecture", "case_study"];
+        for (domain, abs_map) in domain_abstractions {
+            for i in 0..levels.len()-1 {
+                let current = levels[i];
+                let next = levels[i+1];
+                let current_count = abs_map.get(current).unwrap_or(&0);
+                let next_count = abs_map.get(next).unwrap_or(&0);
+                
+                // If current level has nodes but next level has very few or zero
+                if *current_count > 5 && *next_count < *current_count / 3 {
+                    *id += 1;
+                    gaps.push(KnowledgeGap {
+                        id: *id,
+                        category: GapCategory::MissingAbstractionLayer,
+                        description: format!(
+                            "Domain '{}' has {} {} nodes but only {} {} nodes — missing abstraction layer",
+                            domain, current_count, current, next_count, next
+                        ),
+                        affected_modules: vec![domain.clone()],
+                        severity: 0.7,
+                        exploration_priority: 0.75,
+                        fill_strategy: format!(
+                            "Create {} synthesis nodes bridging {} to {} in {}",
+                            next, current, next, domain
+                        ),
+                        suggested_sources: vec!["synthesis".to_string(), "abstraction".to_string()],
+                        kb_node_ids: vec![],
+                        abstraction_level: Some(current.to_string()),
+                        scale_indicators: vec![],
+                        concern_tags: vec![],
+                        temporal_order: None,
+                        source_gap_report_id: None,
+                    });
+                }
+            }
+        }
+
+        gaps
+    }
+
+    /// Scan for weak connectivity in KB graph
+    fn scan_connectivity_gaps(&self, kb: &KnowledgeBase, id: &mut usize) -> Vec<KnowledgeGap> {
+        let conn = kb.conn.lock().unwrap();
+        let mut gaps = Vec::new();
+
+        // Find concepts with degree < threshold
+        let mut stmt = conn.prepare(
+            "SELECT n.id, n.title, COUNT(e.id) as degree
+             FROM nodes n
+             LEFT JOIN edges e ON e.source_id = n.id OR e.target_id = n.id
+             WHERE n.node_type = 'concept'
+             GROUP BY n.id
+             HAVING degree < ?"
+        ).unwrap();
+
+        let rows = stmt.query_map([self.min_connectivity_threshold as usize], |row| {
+            let id: String = row.get(0)?;
+            let title: String = row.get(1)?;
+            let degree: usize = row.get(2)?;
+            Ok((id, title, degree))
+        }).unwrap();
+
+        for row in rows.flatten() {
+            let (nid, title, degree) = row;
+            *id += 1;
+            gaps.push(KnowledgeGap {
+                id: *id,
+                category: GapCategory::WeakConnectivity,
+                description: format!(
+                    "Concept '{}' has only {} connections (threshold: {})",
+                    title, degree, self.min_connectivity_threshold
+                ),
+                affected_modules: vec!["knowledge_graph".to_string()],
+                severity: 0.5,
+                exploration_priority: 0.6,
+                fill_strategy: format!(
+                    "Add edges from '{}' to related concepts via analogy/co-occurrence",
+                    title
+                ),
+                suggested_sources: vec!["connectivity_analysis".to_string()],
+                kb_node_ids: vec![nid],
+                abstraction_level: None,
+                scale_indicators: vec![],
+                concern_tags: vec![],
+                temporal_order: None,
+                source_gap_report_id: None,
+            });
+        }
+
+        gaps
+    }
+
+    /// Scan for stale knowledge (nodes not updated in max_temporal_age_days)
+    fn scan_stale_knowledge(&self, kb: &KnowledgeBase, id: &mut usize) -> Vec<KnowledgeGap> {
+        let conn = kb.conn.lock().unwrap();
+        let mut gaps = Vec::new();
+
+        let cutoff = chrono::Utc::now().timestamp() - (self.max_temporal_age_days * 86400);
+        let mut stmt = conn.prepare(
+            "SELECT n.id, n.title, nd.updated_at
+             FROM nodes n
+             JOIN node_dimensions nd ON n.id = nd.node_id
+             WHERE nd.updated_at < ? AND n.node_type IN ('article', 'concept', 'insight')
+             LIMIT 50"
+        ).unwrap();
+
+        let rows = stmt.query_map([cutoff], |row| {
+            let id: String = row.get(0)?;
+            let title: String = row.get(1)?;
+            let updated: i64 = row.get(2)?;
+            Ok((id, title, updated))
+        }).unwrap();
+
+        for row in rows.flatten() {
+            let (nid, title, updated) = row;
+            let age_days = (chrono::Utc::now().timestamp() - updated) / 86400;
+            *id += 1;
+            gaps.push(KnowledgeGap {
+                id: *id,
+                category: GapCategory::StaleKnowledge,
+                description: format!(
+                    "Node '{}' not updated for {} days (last: {})",
+                    title, age_days, chrono::DateTime::from_timestamp(updated, 0).unwrap().format("%Y-%m-%d")
+                ),
+                affected_modules: vec!["knowledge_freshness".to_string()],
+                severity: 0.6,
+                exploration_priority: 0.55,
+                fill_strategy: format!(
+                    "Review and update '{}' with current knowledge", title
+                ),
+                suggested_sources: vec!["freshness_check".to_string()],
+                kb_node_ids: vec![nid],
+                abstraction_level: None,
+                scale_indicators: vec![],
+                concern_tags: vec![],
+                temporal_order: Some(updated),
+                source_gap_report_id: None,
+            });
+        }
+
+        gaps
+    }
+
+    /// Compute abstraction level coverage per domain
+    fn compute_abstraction_coverage(&self, kb: &KnowledgeBase) -> HashMap<String, usize> {
+        let conn = kb.conn.lock().unwrap();
+        let mut coverage = HashMap::new();
+
+        let mut stmt = conn.prepare(
+            "SELECT json_extract(metadata, '$.abstraction') as abstraction, COUNT(*) as count
+             FROM node_dimensions
+             WHERE abstraction IS NOT NULL
+             GROUP BY abstraction"
+        ).unwrap();
+
+        let rows = stmt.query_map([], |row| {
+            let abstraction: String = row.get(0)?;
+            let count: usize = row.get(1)?;
+            Ok((abstraction, count))
+        }).unwrap();
+
+        for row in rows.flatten() {
+            coverage.insert(row.0, row.1);
+        }
+
+        coverage
+    }
+
+    /// Compute connectivity statistics from KB graph
+    fn compute_connectivity_stats(&self, kb: &KnowledgeBase) -> ConnectivityStats {
+        let conn = kb.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT AVG(degree) as avg_deg,
+                    COUNT(CASE WHEN degree = 0 THEN 1 END) as isolated,
+                    MAX(degree) as max_deg
+             FROM (
+                 SELECT n.id, COUNT(e.id) as degree
+                 FROM nodes n
+                 LEFT JOIN edges e ON e.source_id = n.id OR e.target_id = n.id
+                 GROUP BY n.id
+             )"
+        ).unwrap();
+
+        let stats = stmt.query_row([], |row| {
+            Ok(ConnectivityStats {
+                avg_degree: row.get(0)?,
+                isolated_nodes: row.get(1)?,
+                max_degree: row.get(2)?,
+                weak_components: 0, // Would need connected components algorithm
+            })
+        }).unwrap_or_default();
+
+        stats
+    }
+
+    /// Write new gap reports to KB knowledge_gap_reports table
+    fn write_gap_reports_to_kb(&self, kb: &KnowledgeBase, gaps: &[KnowledgeGap]) -> Vec<String> {
+        let conn = kb.conn.lock().unwrap();
+        let mut report_ids = Vec::new();
+        let now = chrono::Utc::now().timestamp();
+
+        for gap in gaps {
+            // Skip if already has a source report ID
+            if gap.source_gap_report_id.is_some() {
+                continue;
+            }
+
+            let report_id = Uuid::new_v4().to_string();
+            let domain = gap.affected_modules.first().cloned().unwrap_or_else(|| "system-design".to_string());
+
+            conn.execute(
+                "INSERT OR IGNORE INTO knowledge_gap_reports 
+                 (id, domain, gap_type, description, severity, suggested_actions, related_nodes, created_at, status, resolved_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL)",
+                params![
+                    report_id,
+                    domain,
+                    gap.category.label(),
+                    gap.description,
+                    gap.severity,
+                    serde_json::to_string(&gap.suggested_sources).unwrap_or_default(),
+                    serde_json::to_string(&gap.kb_node_ids).unwrap_or_default(),
+                    now,
+                ]
+            ).unwrap();
+
+            report_ids.push(report_id);
+        }
+
+        report_ids
     }
 }
 

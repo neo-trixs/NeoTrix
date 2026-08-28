@@ -10,6 +10,7 @@ import type {
   NeoCodexSearchHit,
   NeoCodexSessionInfo,
   ProviderConfig,
+  CustomProviderReq,
   ProjectView,
   UpdateCheckResult,
 } from './types'
@@ -131,6 +132,36 @@ export function providerConfig(): Promise<ProviderConfig> {
 
 export function setProvider(name: string): Promise<void> {
   return call('neocodex_set_provider', { name })
+}
+
+/** 连接测试：验证指定提供商是否可达（需后端 neocodex_test_provider 命令）。 */
+export function testProvider(name: string): Promise<boolean> {
+  return call('neocodex_test_provider', { name })
+}
+
+/** 外部第三方模型 API 智能配置：新增一个自定义提供商（OpenAI 兼容 / 自定义网关）。 */
+export function addCustomProvider(req: CustomProviderReq): Promise<void> {
+  return call('neocodex_add_custom_provider', { req })
+}
+
+/**
+ * 智能检测：从 base_url 拉取可用模型列表（GET {base_url}/models，Bearer 鉴权）。
+ * 桌面端走 Tauri 命令；浏览器预览无 Tauri 时直连 /models 作为回退（受 CORS 限制）。
+ */
+export async function fetchProviderModels(baseUrl: string, apiKey: string): Promise<string[]> {
+  try {
+    return await call<string[]>('neocodex_fetch_provider_models', { base_url: baseUrl, api_key: apiKey })
+  } catch {
+    try {
+      const url = baseUrl.trim().replace(/\/+$/, '') + '/models'
+      const res = await fetch(url, { headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {} })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = (await res.json()) as { data?: { id?: string }[] }
+      return (json.data ?? []).map((m) => m.id).filter((id): id is string => !!id)
+    } catch {
+      throw new Error('智能检测失败：桌面后端不可用或存在跨域限制，请手动填写模型名')
+    }
+  }
 }
 
 export function setMode(mode: string): Promise<void> {

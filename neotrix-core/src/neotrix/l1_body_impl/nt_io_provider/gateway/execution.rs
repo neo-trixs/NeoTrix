@@ -12,6 +12,51 @@ use super::super::free_pool::global_free_pool;
 use super::super::rate_limiter::BrainTier;
 use super::*;
 
+/// 出站脱敏 (Egress Redaction) — 发送前剥离 prompt 中的密钥/凭据, 防止第三方免费
+/// provider (如 empero) 记录并用于训练。复用 nt_shield Redactor (R-P42 强化现有节点)。
+/// 仅脱 secrets (sk-/AKIA/私钥/JWT/password), 保留 email 等 PII 以免误伤正常代码。
+fn scrub_egress_secrets(req: &mut LlmRequest) {
+    use crate::neotrix::l1_body_impl::nt_shield::redaction::Redactor;
+    let redactor = Redactor::new();
+    for msg in req.messages.iter_mut() {
+        if !redactor.find_secrets(&msg.content).is_empty() {
+            msg.content = redactor.redact_secrets_only(&msg.content);
+        }
+    }
+}
+
+/// 检测 provider 返回的维护窗提示 (如 empero "switching to new models" / "retrying in"),
+/// 用于触发长冷却熔断, 避免在其维护期间反复重试浪费输入 token。
+fn is_maintenance_window(msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    m.contains("switching to new models")
+        || m.contains("retrying in")
+        || (m.contains("maintenance") && m.contains("window"))
+        || m.contains("temporarily unavailable for maintenance")
+}
+
+/// 检测"模型不可用"类错误 (404 / model not found / does not exist / not supported 等),
+/// 对应 L3 模型级锁: 该模型下线/改名时只锁定模型, 不熔断整个 provider,
+/// 使 provider 对其它模型仍可用 → 池子不因单模型故障而缩水 (对齐 OmniRoute model lockout)。
+fn is_model_unavailable(msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    m.contains("model not found")
+        || m.contains("model does not exist")
+        || m.contains("model_unavailable")
+        || m.contains("model unavailable")
+        || m.contains("unknown model")
+        || m.contains("model is not available")
+        || m.contains("no model named")
+        || m.contains("model not supported")
+        || m.contains("model '") && (m.contains("not found") || m.contains("does not exist"))
+        || (m.contains("the model") && (m.contains("does not exist") || m.contains("not exist")))
+        || (m.contains("currently not available") && m.contains("model"))
+        || m.contains("decommissioned")
+        || m.contains("no longer available")
+        || m.contains("invalid model")
+        || (m.contains("404") && m.contains("model"))
+}
+
 impl GatewayV2 {
     pub(super) async fn call_provider(
         &self,
@@ -95,6 +140,8 @@ impl GatewayV2 {
         if gate_wait > 0 {
             tokio::time::sleep(std::time::Duration::from_millis(gate_wait)).await;
         }
+        // 出站脱敏: 发送前剥离密钥, 防止免费 provider 记录 prompt 训模型 (隐私)。
+        scrub_egress_secrets(&mut req);
         let result = provider.complete(&req).await;
         {
             self.tiered_semaphore
@@ -403,6 +450,27 @@ impl GatewayV2 {
                                 log::warn!(
                                     "[gateway] provider '{}' quota exhausted → 熔断剔除: {}",
                                     name,
+                                    error_msg
+                                );
+                            } else if is_maintenance_window(&error_msg) {
+                                // 维护窗 (如 empero "switching to new models"): 非瞬时错误,
+                                // 强制熔断并设置 30min 冷却, selector 在冷却期内跳过该 provider,
+                                // 透明 failover 到备用源 — 无需手动等其恢复 (解决 29m 等待)。
+                                state.circuit_breaker.force_open_secs(1800);
+                                log::warn!(
+                                    "[gateway] provider '{}' maintenance window → circuit opened (30min), failover: {}",
+                                    name,
+                                    error_msg
+                                );
+                            } else if is_model_unavailable(&error_msg) {
+                                // L3 模型级锁 (对齐 OmniRoute): 单模型 404/model_unavailable
+                                // 只锁定该模型, 不熔断整个 provider → 池子不因单模型故障缩水。
+                                state.lock_model(&request.model, 1800);
+                                state.record_failure(elapsed);
+                                log::warn!(
+                                    "[gateway] provider '{}' model '{}' unavailable → model-locked (30min), routing next: {}",
+                                    name,
+                                    request.model,
                                     error_msg
                                 );
                             } else {
@@ -750,13 +818,18 @@ impl GatewayV2 {
                     self.fire_event(&name, false, 0.0, 0, &request.model, AttemptPhase::Normal);
                     return Err(err);
                 }
-                Err(_) => {
+                Err(err) => {
+                    let err_msg = err.to_string();
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| {
                             log::warn!("[gateway] states RwLock poisoned: {}", e);
                             e.into_inner()
                         });
                         if let Some(state) = states.get_mut(&name) {
+                            if is_model_unavailable(&err_msg) {
+                                // L3 模型级锁: 流式单模型不可用只锁模型, 不拖垮 provider。
+                                state.lock_model(&request.model, 1800);
+                            }
                             state.record_failure(0.0);
                         }
                     }
@@ -807,6 +880,8 @@ impl GatewayV2 {
         } else if let Some(m) = stripped {
             req.model = m;
         }
+        // 出站脱敏: 发送前剥离密钥, 防止免费 provider 记录 prompt 训模型 (隐私)。
+        scrub_egress_secrets(&mut req);
         provider.stream_complete(&req).await
     }
 
@@ -1032,5 +1107,38 @@ impl GatewayV2 {
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scrub_egress_secrets_redacts_key() {
+        let mut req = LlmRequest::new("glm-5.3-flash", "use sk-abcdef1234567890XYZ to login");
+        scrub_egress_secrets(&mut req);
+        assert!(
+            !req.messages[0].content.contains("sk-abcdef"),
+            "secrets must be redacted before egress"
+        );
+        assert!(req.messages[0].content.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_scrub_egress_secrets_keeps_plain_text() {
+        let mut req = LlmRequest::new("glm-5.3-flash", "just normal code with no secrets");
+        let original = req.messages[0].content.clone();
+        scrub_egress_secrets(&mut req);
+        assert_eq!(req.messages[0].content, original, "plain prompts unchanged");
+    }
+
+    #[test]
+    fn test_is_maintenance_window_detects_empero() {
+        assert!(is_maintenance_window(
+            "We are switching the free endpoint to new models. retrying in 29m 57s"
+        ));
+        assert!(!is_maintenance_window("503 Service Unavailable"));
+        assert!(!is_maintenance_window("rate limit exceeded"));
     }
 }

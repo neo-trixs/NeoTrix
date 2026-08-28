@@ -4,13 +4,14 @@
    ════════════════════════════════════════════ */
 import { Show } from 'solid-js'
 import type { MemoryStats } from '../../api/types'
-import { DataIcon, ExpandIcon } from './settingsIcons'
+import { DataIcon, ExpandIcon, InfoIcon } from './settingsIcons'
 
 interface Props {
   memStats: () => MemoryStats | null
   memStatsLoaded: () => boolean
   dataBusy: () => boolean
   onExport: () => void
+  onImport: () => void
   onRequestClear: () => void
 }
 
@@ -69,6 +70,14 @@ export function DataSection(props: Props) {
             <span class="text-10px text-text-muted">→ 文件</span>
           </button>
           <button
+            class="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-border-primary/50 bg-white/40 hover:bg-white/70 transition-colors"
+            onClick={props.onImport}
+            disabled={props.dataBusy()}
+          >
+            <span class="text-[12.5px] text-text-primary">导入记忆（JSON）</span>
+            <span class="text-10px text-text-muted">文件 →</span>
+          </button>
+          <button
             class="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-colors"
             onClick={props.onRequestClear}
             disabled={props.dataBusy()}
@@ -76,6 +85,20 @@ export function DataSection(props: Props) {
             <span class="text-[12.5px] text-red-500">清空全部记忆</span>
             <span class="text-10px text-red-400">不可恢复</span>
           </button>
+        </div>
+      </div>
+
+      <div class="ss-card">
+        <div class="ss-card-header">
+          <InfoIcon />
+          隐私声明
+        </div>
+        <div class="ss-card-body">
+          <p class="text-[11px] text-text-muted leading-relaxed">
+            所有记忆与对话数据仅存储在本地 <span class="font-mono">~/.neotrix</span> 目录，
+            不会上传到任何第三方服务器。云端模型提供商仅接收当前对话内容（用于生成回复），
+            密钥保存在本地环境变量中。导出文件为纯文本 JSON，可自行备份或迁移。
+          </p>
         </div>
       </div>
     </div>

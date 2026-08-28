@@ -24,6 +24,7 @@ pub mod nt_memory_pack_chunked;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
+pub mod kb_vector_index;
 pub mod nt_memory_distill;
 pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;
@@ -73,6 +74,7 @@ pub use nt_discovery_orchestrator::{DiscoveryCycleConfig, DiscoveryCycleReport};
 pub use nt_memory_store::*;
 pub use nt_memory_types::*;
 pub use nt_memory_embed::EmbeddingConfig;
+pub use kb_vector_index::VectorIndex;
 pub use user_memory::UserMemory;
 pub use nt_memory_commitment::EmbeddingCommitmentStore;
 pub use nt_memory_gwt_router::{
@@ -107,6 +109,9 @@ pub use nt_memory_write_guard::{kb_write_guard, record_write_evidence, WriteGuar
 pub use nt_memory_snapshot::{
     diff_snapshots, snapshot_from_file, snapshot_kb, snapshot_to_file, DiffEdge, DiffNode, KbDiff,
     KbSnapshot, SNAPSHOT_FORMAT, SNAPSHOT_VERSION,
+};
+pub use nt_memory_search::{
+    MaterializedNeighborCache, build_materialized_neighbors,
 };
 
 use rusqlite::Connection;
@@ -1190,6 +1195,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {}", e))?;
         let mapper = |row: &rusqlite::Row| {
             Ok(KnowledgeNode {
+                recall_weight: 1.0,
                 id: row.get(0)?, node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                 title: row.get(2)?, summary: row.get(3)?, content: row.get(4)?,
                 url: row.get(5)?, domain: row.get(6)?, language: row.get(7)?,
@@ -1475,6 +1481,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                 let row = stmt.query_row([nid], |row| {
                     Ok(SearchResult {
                         node: KnowledgeNode {
+                            recall_weight: 1.0,
                             id: row.get(0)?,
                             node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                             title: row.get(2)?,

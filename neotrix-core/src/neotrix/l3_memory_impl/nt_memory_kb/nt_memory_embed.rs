@@ -14,14 +14,19 @@ pub enum EmbedMode {
 }
 
 impl EmbedMode {
+    /// Resolve the embedding backend from `NEOTRIX_EMBEDDING_MODE`.
+    ///
+    /// Default (env unset or unrecognised) is `Local` so the whole pipeline is
+    /// autonomous with ZERO external process (R-P79 closure). Explicitly opt
+    /// into the HTTP/MiniLM server with `http`/`remote`/`openai`.
     pub fn from_env() -> Self {
         match std::env::var("NEOTRIX_EMBEDDING_MODE")
             .unwrap_or_default()
             .to_ascii_lowercase()
             .as_str()
         {
-            "local" | "builtin" | "hash" => EmbedMode::Local,
-            _ => EmbedMode::Http,
+            "http" | "remote" | "openai" => EmbedMode::Http,
+            _ => EmbedMode::Local,
         }
     }
 }
@@ -150,7 +155,7 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
     // reqwest::blocking (client 初始化 + send) 在 tokio runtime 上下文内
     // 会 panic (reason 的 rt.block_on → build_context → kb.search 路径)。
     // 统一经共享 run_blocking 包裹; 非 runtime 上下文行为不变。
-    super::nt_http::run_blocking(|| {
+    let http = super::nt_http::run_blocking(|| {
         let client = embedding_client()?;
 
         let input: Vec<&str> = texts.to_vec();
@@ -182,7 +187,20 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
         indexed.sort_by_key(|(idx, _)| *idx);
 
         Ok(indexed.into_iter().map(|(_, v)| v).collect())
-    })
+    });
+
+    // 自治兜底 (R-P79 闭环): HTTP/MiniLM 服务不可达时, 自动回退到内嵌
+    // hash-kernel, 保证 `/kb embed` 与 `ensure_embeddings` 零外部依赖可跑。
+    match http {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            log::warn!(
+                "embed_text_batch: HTTP embedding failed ({}); falling back to local hash-kernel (autonomous closure)",
+                e
+            );
+            Ok(local_embed_texts(texts, config.dimension))
+        }
+    }
 }
 
 /// Cosine similarity between two equal-length vectors.
@@ -681,12 +699,19 @@ mod tests {
 
     #[test]
     fn test_embed_mode_from_env() {
-        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "local");
+        // 默认 (env 未设置) 必须是 Local — 自治零依赖闭环 (R-P79)
+        std::env::remove_var("NEOTRIX_EMBEDDING_MODE");
         assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
         std::env::set_var("NEOTRIX_EMBEDDING_MODE", "");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "local");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
+        // 显式 opt-in 才走 HTTP
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "http");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "remote");
         assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
         std::env::remove_var("NEOTRIX_EMBEDDING_MODE");
-        assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
     }
 
     #[test]
@@ -695,6 +720,18 @@ mod tests {
         let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].len(), 384);
+    }
+
+    #[test]
+    fn test_embed_text_batch_http_failure_falls_back_to_local() {
+        // 即便 mode=Http, 若 server 不可达也必须回退到 hash-kernel (零依赖闭环).
+        let cfg = EmbeddingConfig { api_key: "x".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "mini".into(), dimension: 384, mode: EmbedMode::Http };
+        let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].len(), 384);
+        // 回退产物应与 Local 模式一致 (确定性)
+        let local = embed_text_batch(&EmbeddingConfig { mode: EmbedMode::Local, ..cfg.clone() }, &["t1", "t2"]).unwrap();
+        assert_eq!(v, local);
     }
 
     #[test]

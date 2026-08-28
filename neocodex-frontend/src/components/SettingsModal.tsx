@@ -6,10 +6,10 @@ import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import { tagsStore, RECOMMENDED_TAGS } from '../stores/tags'
 import { memory, neocodex, errText, fs as fsApi } from '../api'
 import { storageGet, storageSet } from '../lib/env'
-import type { MemoryStats, ProviderConfig } from '../api/types'
+import type { MemoryStats, ProviderConfig, ProviderMeta, CustomProviderReq } from '../api/types'
 import { GeneralSection } from './settings/GeneralSection'
 import { ModelsSection } from './settings/ModelsSection'
-import { AppearanceSection } from './settings/AppearanceSection'
+import { AppearanceSection, type MessageWidthPref } from './settings/AppearanceSection'
 import { DataSection } from './settings/DataSection'
 import { TagsSection } from './settings/TagsSection'
 import { AboutSection } from './settings/AboutSection'
@@ -51,16 +51,23 @@ const sectionById = (id: SectionId) => SECTIONS.find((s) => s.id === id)!
 export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [section, setSection] = createSignal<SectionId>('general')
   const [config, setConfig] = createSignal<ProviderConfig | null>(null)
+  // 已接入的外部自定义提供商（乐观本地态，跨标签持久）
+  const [customProviders, setCustomProviders] = createSignal<ProviderMeta[]>([])
   const [loading, setLoading] = createSignal(false)
   const [switching, setSwitching] = createSignal(false)
   const [notice, setNotice] = createSignal<string | null>(null)
   const [motionPref, setMotionPref] = createSignal<'full' | 'reduced'>('full')
   const [densityPref, setDensityPref] = createSignal<'comfortable' | 'compact'>('comfortable')
   const [fontSizePref, setFontSizePref] = createSignal<'sm' | 'md' | 'lg'>('md')
+  const [messageWidthPref, setMessageWidthPref] = createSignal<MessageWidthPref>('normal')
+  const [enterBehavior, setEnterBehaviorPref] = createSignal<'send' | 'newline'>('send')
+  const [restoreLastSession, setRestoreLastSession] = createSignal<boolean>(true)
   const [memStats, setMemStats] = createSignal<MemoryStats | null>(null)
   const [memStatsLoaded, setMemStatsLoaded] = createSignal(false)
   const [dataBusy, setDataBusy] = createSignal(false)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
+  // 连接测试状态（ModelsSection 展示）：provider name -> 状态
+  const [testState, setTestState] = createSignal<Record<string, 'testing' | 'ok' | 'fail'>>({})
   // 热更新状态（对标 Cursor/Claude 更新流：检查 → 下载进度 → 重启安装）
   // API 密钥管理（对标 Claude 设置）
   const [apiKey, setApiKey] = createSignal('')
@@ -91,30 +98,70 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   })
 
   // 偏好持久化：localStorage + 根元素 data-* 属性（CSS 属性选择器响应）
-  const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced', fontSize: 'sm' | 'md' | 'lg') => {
+  const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced', fontSize: 'sm' | 'md' | 'lg', messageWidth: MessageWidthPref) => {
     const root = document.documentElement
     root.dataset.density = density
     root.dataset.motion = motion
     root.dataset.fontSize = fontSize
+    root.dataset.messageWidth = messageWidth
     root.dataset.theme = 'light'
     try {
-      storageSet('neotrix:prefs', JSON.stringify({ density, motion, theme: 'light', fontSize }))
+      storageSet('neotrix:prefs', JSON.stringify({ density, motion, theme: 'light', fontSize, messageWidth }))
     } catch { /* 持久化失败静默 */ }
   }
 
   const setDensity = (d: 'comfortable' | 'compact') => {
     setDensityPref(d)
-    applyPrefs(d, motionPref(), fontSizePref())
+    applyPrefs(d, motionPref(), fontSizePref(), messageWidthPref())
   }
 
   const setMotion = (m: 'full' | 'reduced') => {
     setMotionPref(m)
-    applyPrefs(densityPref(), m, fontSizePref())
+    applyPrefs(densityPref(), m, fontSizePref(), messageWidthPref())
   }
 
   const setFontSize = (s: 'sm' | 'md' | 'lg') => {
     setFontSizePref(s)
-    applyPrefs(densityPref(), motionPref(), s)
+    applyPrefs(densityPref(), motionPref(), s, messageWidthPref())
+  }
+
+  const setMessageWidth = (w: MessageWidthPref) => {
+    setMessageWidthPref(w)
+    applyPrefs(densityPref(), motionPref(), fontSizePref(), w)
+  }
+
+  // 输入/启动行为持久化（独立 key，便于 chat 模块读取）
+  const applyInputPrefs = (enter: 'send' | 'newline', restore: boolean) => {
+    const root = document.documentElement
+    root.dataset.enterBehavior = enter
+    try {
+      storageSet('neotrix:input-prefs', JSON.stringify({ enter, restoreLastSession: restore }))
+    } catch { /* 持久化失败静默 */ }
+  }
+
+  const setEnterBehavior = (v: 'send' | 'newline') => {
+    setEnterBehaviorPref(v)
+    applyInputPrefs(v, restoreLastSession())
+  }
+
+  const setRestoreLastSessionPref = (v: boolean) => {
+    setRestoreLastSession(v)
+    applyInputPrefs(enterBehavior(), v)
+  }
+
+  const clearDemoData = async () => {
+    setDataBusy(true)
+    setNotice(null)
+    try {
+      // 演示数据以 demo 分类存储，清空该分类即重置首启动样例
+      const n = await memory.memoryClear('demo')
+      showNotice(`已清空 ${n} 条演示数据`)
+      await loadMemStats()
+    } catch (e) {
+      showNotice(errText(e))
+    } finally {
+      setDataBusy(false)
+    }
   }
 
   // 启动时恢复偏好
@@ -127,9 +174,21 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           if (p.density) setDensityPref(p.density)
           if (p.motion) setMotionPref(p.motion)
           if (p.fontSize) setFontSizePref(p.fontSize)
-          applyPrefs(p.density ?? 'comfortable', p.motion ?? 'full', p.fontSize ?? 'md')
+          if (p.messageWidth) setMessageWidthPref(p.messageWidth)
+          applyPrefs(p.density ?? 'comfortable', p.motion ?? 'full', p.fontSize ?? 'md', p.messageWidth ?? 'normal')
+          try {
+            const raw2 = storageGet('neotrix:input-prefs')
+            if (raw2) {
+              const ip = JSON.parse(raw2)
+              if (ip.enter) setEnterBehaviorPref(ip.enter)
+              if (typeof ip.restoreLastSession === 'boolean') setRestoreLastSession(ip.restoreLastSession)
+              applyInputPrefs(ip.enter ?? 'send', ip.restoreLastSession ?? true)
+            } else {
+              applyInputPrefs('send', true)
+            }
+          } catch { /* 解析失败用默认 */ }
         } else {
-          applyPrefs('comfortable', 'full', 'md')
+          applyPrefs('comfortable', 'full', 'md', 'normal')
         }
       } catch { /* 解析失败用默认 */ }
     }
@@ -180,6 +239,26 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       if (path) {
         await fsApi.writeTextFileAt(path, json)
         showNotice(`已导出记忆到 ${path}`)
+      }
+    } catch (e) {
+      showNotice(errText(e))
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const importMemory = async () => {
+    setDataBusy(true)
+    setNotice(null)
+    try {
+      const path = await fsApi.openFileDialog({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      })
+      if (path) {
+        const content = await fsApi.readTextFileAt(path)
+        const n = await memory.memoryImport(content, 'json')
+        showNotice(`已导入 ${n} 条记忆`)
+        await loadMemStats()
       }
     } catch (e) {
       showNotice(errText(e))
@@ -295,6 +374,39 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     const cfg = config()
     if (!cfg) return null
     return cfg.providers.find((p) => p.model === cfg.active_model) ?? cfg.providers[0] ?? null
+  }
+
+  // 连接测试（对标 ollama-config / iPolloWork 模型页连通性验证）
+  const testConnection = async (name: string) => {
+    setTestState({ ...testState(), [name]: 'testing' })
+    try {
+      const ok = await neocodex.testProvider(name)
+      setTestState({ ...testState(), [name]: ok ? 'ok' : 'fail' })
+    } catch {
+      setTestState({ ...testState(), [name]: 'fail' })
+    }
+  }
+
+  // 外部第三方模型 API 智能配置：乐观写入本地态，并尝试落盘后端
+  const handleAddCustomProvider = async (req: CustomProviderReq) => {
+    const meta: ProviderMeta = {
+      name: req.name,
+      display_name: req.display_name,
+      category: 'proxy',
+      is_free: false,
+      base_url: req.base_url,
+      model: req.model,
+      models: req.models.length > 0 ? req.models : [req.model],
+      resolvable: true,
+    }
+    setCustomProviders([...customProviders(), meta])
+    try {
+      await neocodex.addCustomProvider(req)
+      window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name: req.name } }))
+    } catch (e) {
+      // 浏览器预览无后端时静默：本地乐观态已生效，桌面端会真实落盘
+      console.warn('[SettingsModal] 自定义模型后端落盘失败（预览态可忽略）:', e)
+    }
   }
 
   /* ── 标签：快速新建 / 推荐标签 ── */
@@ -462,7 +574,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
 
           {/* ── 右侧内容 ── */}
           <div class="flex-1 flex flex-col min-w-0">
-            <header class="flex items-center justify-between px-6 py-4 border-b border-border-primary/40 flex-shrink-0 bg-white/20">
+            <header class="flex items-center px-6 py-4 border-b border-border-primary/40 flex-shrink-0 bg-white/20">
               <div class="flex items-center gap-3">
                 <span class="w-8 h-8 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center flex-shrink-0">
                   {sectionById(section()).icon()}
@@ -482,34 +594,26 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   </div>
                 </div>
               </div>
-              <button
-                class="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-                onClick={props.onClose}
-                aria-label="关闭设置"
-                title="关闭设置"
-              >
-                <XIcon />
-              </button>
             </header>
 
               <div class="flex-1 overflow-y-auto px-6 py-5" role="tabpanel" id="settings-tabpanel" aria-labelledby={`settings-tab-${section()}`}>
               <Show when={section() === 'general'}>
-                <Show when={loading() && !config()}>
-                  <div class="text-xs text-text-muted py-6 text-center">加载配置…</div>
-                </Show>
-                <Show when={config()} fallback={<Show when={!loading()}><div class="text-xs text-text-muted py-6 text-center">配置加载失败，请关闭后重试</div></Show>}>
-                  <GeneralSection
-                    config={config}
-                    activeProvider={activeProvider}
-                    apiKey={apiKey}
-                    setApiKey={setApiKey}
-                    hasKey={hasKey}
-                    keyBusy={keyBusy}
-                    onSaveApiKey={saveApiKey}
-                    onRequestDeleteKey={requestDeleteKey}
-                    showNotice={showNotice}
-                  />
-                </Show>
+                <GeneralSection
+                  config={config}
+                  activeProvider={activeProvider}
+                  apiKey={apiKey}
+                  setApiKey={setApiKey}
+                  hasKey={hasKey}
+                  keyBusy={keyBusy}
+                  onSaveApiKey={saveApiKey}
+                  onRequestDeleteKey={requestDeleteKey}
+                  showNotice={showNotice}
+                  enterBehavior={enterBehavior}
+                  setEnterBehavior={setEnterBehavior}
+                  restoreLastSession={restoreLastSession}
+                  setRestoreLastSession={setRestoreLastSessionPref}
+                  onClearDemoData={clearDemoData}
+                />
               </Show>
               <Show when={section() === 'models'}>
                 <ModelsSection
@@ -517,6 +621,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   loading={loading}
                   switching={switching}
                   onSwitchProvider={switchProvider}
+                  onTestConnection={testConnection}
+                  testState={testState}
+                  customProviders={customProviders}
+                  onAddCustomProvider={handleAddCustomProvider}
                 />
               </Show>
               <Show when={section() === 'appearance'}>
@@ -524,9 +632,11 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   fontSizePref={fontSizePref}
                   motionPref={motionPref}
                   densityPref={densityPref}
+                  messageWidthPref={messageWidthPref}
                   setFontSize={setFontSize}
                   setMotion={setMotion}
                   setDensity={setDensity}
+                  setMessageWidth={setMessageWidth}
                 />
               </Show>
               <Show when={section() === 'plugins'}>
@@ -538,6 +648,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   memStatsLoaded={memStatsLoaded}
                   dataBusy={dataBusy}
                   onExport={exportMemory}
+                  onImport={importMemory}
                   onRequestClear={requestClearMemory}
                 />
               </Show>

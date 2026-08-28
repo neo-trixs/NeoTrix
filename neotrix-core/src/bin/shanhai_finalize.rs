@@ -23,7 +23,7 @@ fn main() {
     // 1. 不周山=帕米尔高原论（华夏说内部分支）
     insert_or_ignore(
         &conn,
-        &KnowledgeNode {
+        &KnowledgeNode { recall_weight: 1.0,
             id: "shanhai-evidence:buzhou-pamir".into(),
             node_type: NodeType::Theory,
             title: "不周山=帕米尔高原（葱岭）——华夏说内部补充".into(),
@@ -62,7 +62,7 @@ fn main() {
     // 2. 三星堆与山海经联系
     insert_or_ignore(
         &conn,
-        &KnowledgeNode {
+        &KnowledgeNode { recall_weight: 1.0,
             id: "shanhai-evidence:sanxingdui-shanhai".into(),
             node_type: NodeType::Article,
             title: "三星堆考古新发现与《山海经》交叉验证".into(),
@@ -106,7 +106,7 @@ fn main() {
     // 3. 刘树人GIS东山经验证 (学术论文)
     insert_or_ignore(
         &conn,
-        &KnowledgeNode {
+        &KnowledgeNode { recall_weight: 1.0,
             id: "shanhai-evidence:liu-dongshan-gis".into(),
             node_type: NodeType::Paper,
             title: "刘树人GIS考古——《东山经》区位地理定量验证".into(),

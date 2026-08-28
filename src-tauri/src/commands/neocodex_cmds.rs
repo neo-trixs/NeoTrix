@@ -478,6 +478,91 @@ pub async fn neocodex_set_provider(name: String) -> Result<String, String> {
     }
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub async fn neocodex_test_provider(name: String) -> Result<bool, String> {
+    let guard = NEOCODEX_AGENT.lock().await;
+    match guard.as_ref() {
+        Some(a) => {
+            // 可达性 = provider 名称能映射到真实 LlmProvider 类型（非 stub）。
+            // 轻量校验，避免真实网络往返；云端密钥缺失由 resolvable 状态反映。
+            Ok(a.provider.is_resolvable_for(&name))
+        }
+        None => Ok(false),
+    }
+}
+
+/// 外部第三方模型 API 智能检测：从 base_url 拉取可用模型列表（GET {base_url}/models，Bearer 鉴权）。
+#[tauri::command(rename_all = "snake_case")]
+pub async fn neocodex_fetch_provider_models(base_url: String, api_key: String) -> Result<Vec<String>, String> {
+    let url = base_url.trim_end_matches('/').to_string() + "/models";
+    let client = reqwest::Client::new();
+    let mut builder = client.get(&url);
+    if !api_key.is_empty() {
+        builder = builder.bearer_auth(api_key);
+    }
+    let resp = builder
+        .send()
+        .await
+        .map_err(|e| format!("请求模型列表失败: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("模型列表接口返回 {}", resp.status()));
+    }
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("解析模型列表失败: {e}"))?;
+    let models = json
+        .get("data")
+        .and_then(|d| d.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(models)
+}
+
+/// 外部第三方模型 API 智能配置：新增一个自定义提供商（OpenAI 兼容 / 自定义网关）。
+#[derive(serde::Deserialize)]
+pub struct NeoCodexCustomProviderReq {
+    pub name: String,
+    pub display_name: String,
+    pub base_url: String,
+    pub api_key: String,
+    pub models: Vec<String>,
+    pub model: String,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn neocodex_add_custom_provider(req: NeoCodexCustomProviderReq) -> Result<String, String> {
+    use neotrix::neotrix::l1_body_impl::nt_io_neocodex::provider::{ModelCapability, ProviderInfo};
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    let agent = match guard.as_mut() {
+        Some(a) => a,
+        None => {
+            let mut a = NeoCodexAgent::new("neotrix-tauri");
+            a.provider.ensure_production_provider();
+            *guard = Some(a);
+            guard.as_mut().unwrap()
+        }
+    };
+    let info = ProviderInfo {
+        name: req.name.clone(),
+        model: req.model.clone(),
+        capabilities: vec![
+            ModelCapability::Code,
+            ModelCapability::Reasoning,
+            ModelCapability::FunctionCalling,
+            ModelCapability::LongContext,
+        ],
+        context_limit: 100_000,
+        cost_per_m_input: 0.5,
+        cost_per_m_output: 2.0,
+    };
+    agent.provider.add_provider(info);
+    agent.provider.set_active_provider(&req.name);
+    agent.provider.save_persisted();
+    Ok(format!("custom provider {} added", req.name))
+}
+
 fn sessions_dir() -> std::path::PathBuf {
     dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from(".neocodex"))

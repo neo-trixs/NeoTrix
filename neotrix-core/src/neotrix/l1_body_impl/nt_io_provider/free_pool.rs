@@ -41,6 +41,18 @@ impl FreePool {
             },
         );
         budgets.insert(
+            "empero".to_string(),
+            FreeTokenBudget {
+                provider_name: "empero".into(),
+                monthly_token_cap: 0,
+                tokens_used: 0,
+                daily_request_cap: 0,
+                requests_used: 0,
+                is_keyless: true,
+                is_active: true,
+            },
+        );
+        budgets.insert(
             "llm7".to_string(),
             FreeTokenBudget {
                 provider_name: "llm7".into(),

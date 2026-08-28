@@ -11,6 +11,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod config;
+pub mod discover;
 pub mod frontier;
 pub mod fetcher;
 pub mod classifier;
@@ -23,6 +24,7 @@ pub mod unified;
 pub mod asset_graph;
 
 pub use config::{CrawlerConfig, CrawlStrategy, CrawlTopic, CrawlFormat, SeedEntry, default_seed_urls};
+pub use discover::DiscoveryExtractor;
 pub use frontier::{DualQueueFrontier, UrlEntry, FrontierStats, extract_domain, extract_links};
 pub use fetcher::{FetcherPool, FetchResult, FetchError, FetcherProtocol, FetcherSummary};
 pub use classifier::{ContentClassifier, ClassifiedContent, ClassifierSummary};

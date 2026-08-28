@@ -568,6 +568,17 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         models: &["glm-5.2", "Qwen/Qwen3.6-35B-A3B-FP8"],
         security_profile: CommunicationProfile::Open,
     },
+    ProviderInfo {
+        name: "empero",
+        display_name: "Empero (free.empero.org)",
+        category: ProviderCategory::Cloud,
+        base_url: "https://free.empero.org/v1",
+        default_model: "glm-5.3-flash",
+        api_key_env: None,
+        is_free: true,
+        models: &["glm-5.3-flash", "qwen3.8-flash"],
+        security_profile: CommunicationProfile::Open,
+    },
 ];
 
 /// 按名称查找 ProviderInfo

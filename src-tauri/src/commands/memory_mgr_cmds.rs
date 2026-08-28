@@ -415,6 +415,22 @@ pub fn memory_export(format: Option<String>) -> Result<String, String> {
     }
 }
 
+#[command]
+pub fn memory_import(content: String, format: Option<String>) -> Result<usize, String> {
+    let fmt = format.as_deref().unwrap_or("json");
+    if fmt != "json" {
+        return Err(format!("Unsupported import format: {}", fmt));
+    }
+    let entries: Vec<MemoryEntry> = serde_json::from_str(&content).map_err(|e| format!("解析失败: {}", e))?;
+    let conn = open_db()?;
+    let mut count = 0usize;
+    for e in &entries {
+        insert_entry(&conn, e)?;
+        count += 1;
+    }
+    Ok(count)
+}
+
 // ===== Tests =====
 
 #[cfg(test)]

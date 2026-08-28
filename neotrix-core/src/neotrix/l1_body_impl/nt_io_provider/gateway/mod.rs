@@ -127,6 +127,10 @@ impl GatewayV2 {
         }
     }
 
+    pub fn set_prefer_free(&mut self, prefer: bool) {
+        self.prefer_free = prefer;
+    }
+
     pub fn set_cost_tracker(&self, tracker: CostTracker) {
         if let Ok(mut guard) = self.cost_tracker.write() {
             *guard = Some(tracker);
@@ -291,6 +295,103 @@ mod tests {
         let req = LlmRequest::new("test", "hello");
         let result = gw.complete_with_selection(&req).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_select_best_load_balance() {
+        let mut gw = GatewayV2::new();
+
+        // Register 4 providers to test sorting order:
+        // 1. free_a: free + available, total_calls=100
+        // 2. free_b: free + available, total_calls=50  (should be preferred - lower total_calls)
+        // 3. paid_c: paid + available, total_calls=10
+        // 4. paid_d: paid + available, total_calls=5
+        gw.register_provider("free_a", Box::new(MockProvider::new("a")), true);
+        gw.register_provider("free_b", Box::new(MockProvider::new("b")), true);
+        gw.register_provider("paid_c", Box::new(MockProvider::new("c")), false);
+        gw.register_provider("paid_d", Box::new(MockProvider::new("d")), false);
+
+        // Set total_calls and is_free directly on states
+        {
+            let mut states = gw.states.write().unwrap();
+            // free_a: free, total_calls=100
+            if let Some(s) = states.get_mut("free_a") {
+                s.is_free = true;
+                s.total_calls = 100;
+                s.success_ema = 0.9;
+            }
+            // free_b: free, total_calls=50 (lower = better for rotation)
+            if let Some(s) = states.get_mut("free_b") {
+                s.is_free = true;
+                s.total_calls = 50;
+                s.success_ema = 0.9;
+            }
+            // paid_c: paid, total_calls=10
+            if let Some(s) = states.get_mut("paid_c") {
+                s.is_free = false;
+                s.total_calls = 10;
+                s.success_ema = 0.9;
+            }
+            // paid_d: paid, total_calls=5
+            if let Some(s) = states.get_mut("paid_d") {
+                s.is_free = false;
+                s.total_calls = 5;
+                s.success_ema = 0.9;
+            }
+        }
+
+        // Test 1: Available free providers selected first, sorted by total_calls ascending
+        // Both free_a and free_b are available+free, so the one with lower total_calls (free_b=50) should be selected
+        let selected = gw.select_best().await;
+        assert!(
+            selected == Some("free_b".to_string()),
+            "Expected free_b (free, available, total_calls=50), got {:?}",
+            selected
+        );
+
+        // Test 2: Available paid providers come after free providers
+        // Make free providers paid — 同时下调 cost_per_1k_tokens, 否则构造期固定的
+        // 免费 cost_factor 仍使 composite 偏高, 无法验证 total_calls 轮询规则。
+        {
+            let mut states = gw.states.write().unwrap();
+            if let Some(s) = states.get_mut("free_a") {
+                s.is_free = false;
+                s.cost_per_1k_tokens = 0.01;
+            }
+            if let Some(s) = states.get_mut("free_b") {
+                s.is_free = false;
+                s.cost_per_1k_tokens = 0.01;
+            }
+        }
+        let selected = gw.select_best().await;
+        // Both paid_c and paid_d are available+paid. paid_d has lower total_calls (5 vs 10), so paid_d should be selected
+        assert!(
+            selected == Some("paid_d".to_string()),
+            "Expected paid_d (paid, total_calls=5), got {:?}",
+            selected
+        );
+
+        // Test 3: Unavailable provider should be skipped
+        {
+            let mut states = gw.states.write().unwrap();
+            // 恢复 free_a 为免费 (Test 2 已将其改为付费), 使其在同分轮询下优于付费 paid_d,
+            // 以验证 "跳过不可用 free_b → 选可用 free_a" 的意图。
+            if let Some(s) = states.get_mut("free_a") {
+                s.is_free = true;
+                s.cost_per_1k_tokens = 0.0;
+            }
+            // Make free_b unavailable
+            if let Some(s) = states.get_mut("free_b") {
+                s.circuit_breaker.force_open();
+            }
+        }
+        let selected = gw.select_best().await;
+        // free_a (available) should be selected over free_b (unavailable)
+        assert!(
+            selected == Some("free_a".to_string()),
+            "Expected free_a (available), got {:?}",
+            selected
+        );
     }
 
     #[tokio::test]
@@ -921,10 +1022,74 @@ mod tests {
         assert!(!is_quota_exhaustion("429 too many requests"));
     }
 
+    #[tokio::test]
+    async fn test_model_unavailable_locks_and_failover() {
+        // L3 模型级锁 (对齐 OmniRoute model lockout): 单模型 404 只锁定该模型,
+        // 不熔断整个 provider, 且自动 failover 到其它可用 provider → 池子不缩水。
+        let mut gw = GatewayV2::new();
+        gw.register_provider("model-dead", Box::new(MockProvider::model_failing()), true);
+        // working 注册为付费, 确保 free-first 链确定性先试 model-dead (free) 再 failover 到 working
+        gw.register_provider("working", Box::new(MockProvider::new("ok")), false);
+
+        let req = LlmRequest::new("badmodel", "hi");
+        let result = gw.complete_with_selection(&req).await;
+        assert!(result.is_ok(), "must fail over to working provider");
+        assert_eq!(result.unwrap().content, "ok");
+
+        let states = gw.states.read().unwrap();
+        let dead = states.get("model-dead").unwrap();
+        assert!(
+            dead.is_model_locked("badmodel"),
+            "model 'badmodel' should be lockout-locked on model-dead"
+        );
+        assert!(
+            dead.is_available(),
+            "provider must remain available (L3: not tripped by single model failure)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_candidate_chain_skips_model_locked() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider("a", Box::new(MockProvider::new("a")), true);
+        gw.register_provider("b", Box::new(MockProvider::new("b")), true);
+        {
+            let mut states = gw.states.write().unwrap();
+            states.get_mut("a").unwrap().lock_model("x/m", 1800);
+        }
+        let chain = gw.build_candidate_chain("x/m", 8);
+        assert!(
+            !chain.contains(&"a".to_string()),
+            "model-locked provider must be skipped: {:?}",
+            chain
+        );
+        assert!(chain.contains(&"b".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_pool_sufficiency_report() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider("f1", Box::new(MockProvider::new("a")), true);
+        gw.register_provider("f2", Box::new(MockProvider::new("b")), true);
+        assert!(
+            gw.is_pool_sufficient(2),
+            "2 free available → sufficient at min=2"
+        );
+        assert!(
+            !gw.is_pool_sufficient(3),
+            "only 2 free → insufficient at min=3"
+        );
+        let rep = gw.pool_sufficiency_report(2);
+        assert_eq!(rep["free_available"], 2);
+        assert_eq!(rep["sufficient"], true);
+        assert_eq!(rep["total_providers"], 2);
+    }
+
     struct MockProvider {
         response: String,
         should_fail: bool,
         quota_fail: bool,
+        model_fail: bool,
     }
 
     impl MockProvider {
@@ -933,6 +1098,7 @@ mod tests {
                 response: response.to_string(),
                 should_fail: false,
                 quota_fail: false,
+                model_fail: false,
             }
         }
         fn failing() -> Self {
@@ -940,6 +1106,7 @@ mod tests {
                 response: String::new(),
                 should_fail: true,
                 quota_fail: false,
+                model_fail: false,
             }
         }
         fn quota_failing() -> Self {
@@ -947,6 +1114,15 @@ mod tests {
                 response: String::new(),
                 should_fail: false,
                 quota_fail: true,
+                model_fail: false,
+            }
+        }
+        fn model_failing() -> Self {
+            Self {
+                response: String::new(),
+                should_fail: false,
+                quota_fail: false,
+                model_fail: true,
             }
         }
     }
@@ -959,6 +1135,10 @@ mod tests {
             } else if self.quota_fail {
                 Err(LlmError::Unknown(
                     "insufficient_quota: quota exceeded for your account".to_string(),
+                ))
+            } else if self.model_fail {
+                Err(LlmError::Unknown(
+                    "model 'badmodel' was not found".to_string(),
                 ))
             } else {
                 Ok(LlmResponse {
@@ -975,6 +1155,11 @@ mod tests {
             &self,
             _request: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            if self.model_fail {
+                return Err(LlmError::Unknown(
+                    "model 'badmodel' was not found".to_string(),
+                ));
+            }
             let (tx, rx) = tokio::sync::mpsc::channel(1);
             let resp = self.response.clone();
             tokio::spawn(async move {

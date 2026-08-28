@@ -60,6 +60,8 @@ impl ConsciousnessTree {
             drift_report: None,
             atoms,
             vuln_baseline: None,
+            kb: None,
+            awakened: false,
         }
     }
 

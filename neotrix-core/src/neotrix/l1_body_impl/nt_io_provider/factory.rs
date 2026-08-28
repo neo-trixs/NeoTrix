@@ -52,6 +52,7 @@ pub enum LlmProviderType {
     DeepSeekFree,
     ModelScope,
     ApiAirforce,
+    Empero,
     Vllm,
     Sglang,
     Aihub,
@@ -94,6 +95,7 @@ impl LlmProviderType {
             "deepseek-free" | "deepseek_free" => Some(Self::DeepSeekFree),
             "modelscope" => Some(Self::ModelScope),
             "api-airforce" | "api_airforce" => Some(Self::ApiAirforce),
+            "empero" | "free-empero" | "free_empero" => Some(Self::Empero),
             "vllm" => Some(Self::Vllm),
             "sglang" => Some(Self::Sglang),
             "aihub" | "aihub.humorously.cn" => Some(Self::Aihub),
@@ -115,7 +117,7 @@ impl LlmProviderType {
             Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
             Self::TogetherFree | Self::Llm7 | Self::Kilo | Self::SiliconFlow |
             Self::ZAI | Self::OpenCodeZen | Self::Ovh | Self::DeepSeekFree | Self::ModelScope |
-            Self::ApiAirforce
+            Self::ApiAirforce | Self::Empero
         )
     }
 
@@ -199,6 +201,7 @@ impl ProviderConfig {
             "deepseek-free" | "deepseek_free" => LlmProviderType::DeepSeekFree,
             "modelscope" => LlmProviderType::ModelScope,
             "api-airforce" | "api_airforce" => LlmProviderType::ApiAirforce,
+            "empero" | "free-empero" | "free_empero" => LlmProviderType::Empero,
             "vllm" => LlmProviderType::Vllm,
             "sglang" => LlmProviderType::Sglang,
             "aihub" | "aihub.humorously.cn" => LlmProviderType::Aihub,
@@ -304,6 +307,7 @@ fn default_host(provider_type: LlmProviderType) -> Option<&'static str> {
         LlmProviderType::DeepSeekFree => Some("api.deepseek.com"),
         LlmProviderType::ModelScope => Some("api.modelscope.cn"),
         LlmProviderType::ApiAirforce => Some("api.airforce"),
+        LlmProviderType::Empero => Some("free.empero.org"),
         LlmProviderType::Aihub => Some("aihub.humorously.cn"),
         // 本地主体: Ollama / vLLM / SGLang / 自定义代理默认走 localhost
         LlmProviderType::Ollama
@@ -688,6 +692,15 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
         }
+        LlmProviderType::Empero => {
+            // free.empero.org — keyless OpenAI 兼容免费端点, key 随便填 "free" 即可。
+            // 收编进 failover mesh: 503/维护窗由 CircuitBreaker + ProviderSwapManager
+            // 透明切换备用源, 无需手动等其维护 (R-P42 复用 OpenAiProvider 节点)。
+            let base_url = config.base_url.unwrap_or_else(|| "https://free.empero.org/v1".to_string());
+            let mut provider = OpenAiProvider::new("free".to_string());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
     };
 
     // 代理注入: 若配置了代理 (子母阵 Proxied/Tor 画像), 将 provider 客户端切换到代理路由
@@ -844,6 +857,13 @@ pub async fn create_gateway_async() -> GatewayV2 {
     let api_airforce = keyless_provider(LlmProviderType::ApiAirforce);
     gateway.register_provider_with_category("api-airforce", api_airforce, true, ProviderCategory::Cloud);
     log::info!("[gateway] Registered keyless: api-airforce (api.airforce, 254+ models; 实测 POST 需真 key 时返回 401)");
+
+    // Empero (free.empero.org) — keyless OpenAI 兼容免费端点 (glm-5.3-flash / qwen3.8-flash)。
+    // 收编进 failover mesh: 503/维护窗由 CircuitBreaker 透明切换 Groq/OpenRouter/Pollinations 等,
+    // 出站的密钥经 gateway egress redaction 脱敏 (防其记录 prompt 训模型)。
+    let empero = keyless_provider(LlmProviderType::Empero);
+    gateway.register_provider_with_category("empero", empero, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: empero (free.empero.org, glm-5.3-flash / qwen3.8-flash)");
 
     // ── free_pool 已断言 budget 的 keyless 提供者 (类型实现齐全, 此处补接线) ──
     // 2026-08-06 走代理实测:
@@ -1046,5 +1066,47 @@ mod tests {
         // AccountPool 也应登记
         let acc_pool = gateway.account_pool.lock().expect("lock");
         assert!(acc_pool.contains("t-pool-gw"));
+    }
+
+    #[test]
+    fn test_empero_provider_type_wiring() {
+        assert_eq!(LlmProviderType::from_name("empero"), Some(LlmProviderType::Empero));
+        assert!(LlmProviderType::Empero.is_free());
+        assert!(!LlmProviderType::Empero.needs_api_key());
+        assert_eq!(LlmProviderType::Empero.category(), ProviderCategory::Cloud);
+        assert_eq!(default_host(LlmProviderType::Empero), Some("free.empero.org"));
+    }
+
+    #[test]
+    fn test_empero_network_allowed_by_allowlist() {
+        // free.empero.org 已加入 shield 网络白名单 (policy.rs default_llm_domains),
+        // 否则网络隔离默认 Deny 会直接拒绝连接。
+        assert!(network_access_allowed(LlmProviderType::Empero, None));
+        assert!(network_access_allowed(
+            LlmProviderType::Empero,
+            Some("https://free.empero.org/v1")
+        ));
+    }
+
+    #[test]
+    fn test_create_provider_empero_is_openai_compatible() {
+        // 收编进 failover mesh: empero 复用 OpenAiProvider 节点 (R-P42), keyless。
+        let p = create_provider(ProviderConfig {
+            provider_type: LlmProviderType::Empero,
+            api_key: None,
+            base_url: None,
+            model: Some("glm-5.3-flash".into()),
+            timeout_secs: 10,
+            proxy: None,
+        });
+        // 网络放行 → 不是 DeniedProvider
+        let rt = tokio::runtime::Runtime::new().expect("tokio");
+        let err = rt
+            .block_on(p.complete(&LlmRequest::new("glm-5.3-flash", "hi")))
+            .expect_err("expected network/upstream error, not a block");
+        assert!(
+            !err.to_string().contains("blocked"),
+            "empero must not be network-blocked, got: {err}"
+        );
     }
 }

@@ -12,6 +12,7 @@ pub struct NeoTrixConfig {
     pub custom_endpoint: Option<String>,
     pub color_mode: Option<String>,
     pub log_level: Option<String>,
+    pub prefer_free: Option<bool>,
 }
 
 impl NeoTrixConfig {

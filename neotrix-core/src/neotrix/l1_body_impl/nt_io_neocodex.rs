@@ -13,7 +13,7 @@ mod goals;
 mod hooks;
 mod markdown;
 mod permissions;
-mod provider;
+pub mod provider;
 mod stream;
 mod subagent;
 mod tui;

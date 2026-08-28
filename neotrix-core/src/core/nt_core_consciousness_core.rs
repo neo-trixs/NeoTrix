@@ -742,6 +742,8 @@ pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::C
         }
     }
     registry.experience_targets = export.experience_targets;
+    // CAD 能力节点 (GenCAD 四步框架) — 幂等: 若导出已含同名节点则忽略
+    let _ = nt_core_capability_tree::cad_node::register_cad_capability(&mut registry);
     Some(registry)
 }
 

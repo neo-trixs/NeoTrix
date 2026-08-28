@@ -78,6 +78,16 @@ impl CircuitBreaker {
         self.half_open_probes_used = 0;
     }
 
+    /// 强制 Open 并自定义冷却时长 (秒) — 用于维护窗等非瞬时错误 (如 empero
+    /// "switching to new models"): 让 selector 在冷却期内跳过该 provider,
+    /// 透明 failover 到备用源, 无需手动等其恢复。
+    pub fn force_open_secs(&mut self, cooldown_secs: u64) {
+        self.state = BreakerState::Open;
+        self.cooldown = Duration::from_secs(cooldown_secs);
+        self.last_state_change = Some(Instant::now());
+        self.half_open_probes_used = 0;
+    }
+
     /// 熔断冷却是否已过 (配额恢复探测窗口)
     pub fn cooldown_elapsed(&self) -> bool {
         match self.last_state_change {

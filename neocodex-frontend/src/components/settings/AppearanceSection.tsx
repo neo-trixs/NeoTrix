@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════
-   components/settings/AppearanceSection.tsx — 外观：主题/字号/动效/密度
+   components/settings/AppearanceSection.tsx — 外观：主题/字号/动效/密度/消息行宽
    纯偏好 UI：值 + setter 回调由父组件注入（父组件负责持久化）。
    ════════════════════════════════════════════ */
 import { Show } from 'solid-js'
@@ -9,14 +9,17 @@ import { PaletteIcon, ExpandIcon, BoltIcon, InfoIcon } from './settingsIcons'
 export type FontSize = 'sm' | 'md' | 'lg'
 export type MotionPref = 'full' | 'reduced'
 export type DensityPref = 'comfortable' | 'compact'
+export type MessageWidthPref = 'narrow' | 'normal' | 'wide'
 
 interface Props {
   fontSizePref: () => FontSize
   motionPref: () => MotionPref
   densityPref: () => DensityPref
+  messageWidthPref: () => MessageWidthPref
   setFontSize: (v: FontSize) => void
   setMotion: (v: MotionPref) => void
   setDensity: (v: DensityPref) => void
+  setMessageWidth: (v: MessageWidthPref) => void
 }
 
 export function AppearanceSection(props: Props) {

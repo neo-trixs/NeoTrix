@@ -10,8 +10,8 @@ import { Sidebar } from '../components/Sidebar'
 import { SettingsModal } from '../components/SettingsModal'
 import { RightBar } from '../components/RightBar'
 import { CoworkView } from '../components/CoworkView'
-import { ProviderSelector } from '../components/ProviderSelector'
-import { PermissionModeSelector, PERMISSION_MODES, type PermissionMode } from '../components/PermissionModeSelector'
+import { PERMISSION_MODES, type PermissionMode } from '../components/PermissionModeSelector'
+import { ModelSwitcher } from '../components/ModelSwitcher'
 import { ToolCallCard } from '../components/ToolCallCard'
 import { FilePreview } from '../components/FilePreview'
 import { Markdown } from '../components/Markdown'
@@ -25,6 +25,7 @@ import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
+import { HeroMark, UserIcon, BotIcon } from './chat/avatars'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
@@ -33,15 +34,6 @@ import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
 import type { AgentStatus } from '../api/types'
-
-const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
-  { text: '解释当前项目结构', icon: FolderTree },
-  { text: '修复最近的编译错误', icon: Bug },
-  { text: '生成测试用例', icon: FlaskConical },
-  { text: '搜索代码中的符号', icon: Search },
-  { text: '分析性能瓶颈', icon: Cpu },
-  { text: '优化依赖与构建', icon: Zap },
-]
 
 const actionBtnClass =
   'action-btn p-1.5 rounded-lg text-text-muted/70 hover:text-text-primary hover:bg-white/70 hover:shadow-sm transition-all duration-150'
@@ -70,37 +62,7 @@ const SLASH_COMMANDS: SlashCommandDef[] = [
   { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '?'] },
 ]
 
-/* —— 设计 v2 图标：E8 六芒星（hero） —— */
-function HeroMark() {
-  return (
-    <svg viewBox="0 0 32 32" fill="none">
-      <path d="M16 2l4 8 8 4-8 4-4 8-4-8-8-4 8-4 4-8z" fill="#E85454" opacity="0.25" />
-      <path d="M16 6l2.5 5 5.5 2.5-5.5 2.5-2.5 5-2.5-5L8 13.5l5.5-2.5 2.5-5z" fill="#E85454" />
-      <circle cx="16" cy="13.5" r="2.5" fill="#E85454" stroke="none" />
-      <circle cx="16" cy="13.5" r="1" fill="#fff" stroke="none" />
-      <path d="M4 20q4-4 8 0t8-8 8 4" stroke="#D04040" stroke-width="0.8" stroke-linecap="round" opacity="0.4" fill="none" />
-    </svg>
-  )
-}
-
-/* —— 设计 v2 头像图标：用户（人形）/ 助手（方框·意识） —— */
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 14 14">
-      <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
-      <path d="M2 12.5a5 5 0 0110 0" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
-    </svg>
-  )
-}
-
-function BotIcon() {
-  return (
-    <svg viewBox="0 0 14 14">
-      <rect x="2" y="3" width="10" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none" />
-      <circle cx="7" cy="7" r="1.5" stroke="currentColor" stroke-width="1" fill="none" />
-    </svg>
-  )
-}
+/* —— 设计 v2 图标（HeroMark/UserIcon/BotIcon）见 chat/avatars.tsx —— */
 
 export function Chat() {
   const [inputValue, setInputValue] = createSignal('')
@@ -550,12 +512,6 @@ export function Chat() {
     if (globalKeydownHandler) {
       window.removeEventListener('keydown', globalKeydownHandler)
     }
-    // 释放麦克风资源：卸载时若仍在录音，停止 recorder 并关闭所有 tracks
-    if (recording()) {
-      mediaRecorder?.stop()
-    }
-    audioStream?.getTracks().forEach((t) => t.stop())
-    audioStream = null
     // F5: 流式进行中卸载（路由切换 / → /chat 或 /globe）时复位 store——
     // 否则重挂后 isGenerating 恒 true 锁死发送守卫，且流式消息红色光标永久残留
     if (isGenerating()) {
@@ -874,63 +830,6 @@ export function Chat() {
     }
   }
 
-  /* ── 语音输入：MediaRecorder 录音 → voice_get_transcription → 填入输入框 ── */
-  const [recording, setRecording] = createSignal(false)
-  let mediaRecorder: MediaRecorder | null = null
-  let audioStream: MediaStream | null = null
-  let audioChunks: Blob[] = []
-
-  const handleVoiceToggle = async () => {
-    if (recording()) {
-      // 停止录音并转写
-      mediaRecorder?.stop()
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      audioStream = stream
-      mediaRecorder = new MediaRecorder(stream)
-      audioChunks = []
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data)
-      }
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        setRecording(false)
-        const blob = new Blob(audioChunks, { type: 'audio/webm' })
-        if (blob.size === 0) return
-        try {
-          const buf = await blob.arrayBuffer()
-          const bytes = new Uint8Array(buf)
-          let bin = ''
-          const chunkSize = 0x8000
-          for (let i = 0; i < bytes.length; i += chunkSize) {
-            bin += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-          }
-          const base64 = btoa(bin)
-          const tr = await system.voiceGetTranscription(base64)
-          if (tr.text) {
-            setInputValue((prev) => (prev ? `${prev} ${tr.text}` : tr.text))
-            adjustTextarea()
-          }
-        } catch (e) {
-          console.error('[Chat] Transcription failed:', e)
-          showInfo('语音转写失败，请重试', 3000)
-        }
-      }
-      mediaRecorder.start()
-      setRecording(true)
-    } catch (e) {
-      console.error('[Chat] Mic access denied:', e)
-      showInfo('无法访问麦克风，请检查权限设置', 3000)
-    }
-  }
-
-  const handleSuggestion = (text: string) => {
-    setInputValue(text)
-    handleSend()
-  }
-
   const handleStop = async () => {
     // 立即作废旧代次：停止后迟到的事件（token/done/tool）一律丢弃，防止污染下一轮
     generation++
@@ -1201,12 +1100,7 @@ export function Chat() {
                           <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
                         </svg>
                       </button>
-                      <PermissionModeSelector
-                        value={permissionMode()}
-                        onChange={setPermissionMode}
-                        disabled={isGenerating()}
-                        compact
-                      />
+                      <ModelSwitcher disabled={isGenerating()} />
                     </div>
                     <div class="cic-right">
                       <Show when={inputValue().trim() || pendingAttachments().length > 0}>
@@ -1215,20 +1109,6 @@ export function Chat() {
                           <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>
                         </span>
                       </Show>
-                      <ProviderSelector iconOnly />
-                      <button
-                        class={clsx('vc-btn vc-lang', recording() && 'recording')}
-                        onClick={handleVoiceToggle}
-                        aria-label={recording() ? '停止录音' : '语音输入'}
-                        title={recording() ? '停止录音并转写' : '语音输入'}
-                      >
-                        <svg viewBox="0 0 16 16">
-                          <rect x="5.5" y="2" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
-                          <path d="M3 7v.5a5 5 0 0010 0V7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
-                          <line x1="8" y1="12" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-                          <line x1="5" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-                        </svg>
-                      </button>
                       <button
                         class="vc-btn vc-send"
                         disabled={!inputValue().trim() && pendingAttachments().length === 0 && !annotationHint() && !isGenerating()}
@@ -1240,18 +1120,6 @@ export function Chat() {
                       </button>
                     </div>
                   </div>
-                </div>
-
-                {/* 快速问答 */}
-                <div class="qa flex flex-wrap gap-2 justify-center">
-                  <For each={SUGGESTIONS}>
-                    {(s) => (
-                      <button class="qa-btn" onClick={() => handleSuggestion(s.text)}>
-                        <s.icon />
-                        <span>{s.text}</span>
-                      </button>
-                    )}
-                  </For>
                 </div>
               </div>
             }
@@ -1659,29 +1527,10 @@ export function Chat() {
                         <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
                       </svg>
                     </button>
-                    <PermissionModeSelector
-                      value={permissionMode()}
-                      onChange={setPermissionMode}
-                      disabled={isGenerating()}
-                      compact
-                    />
-                  </div>
-                  <div class="cic-right">
-                    <ProviderSelector iconOnly />
-                    <button
-                      class={clsx('vc-btn vc-lang', recording() && 'recording')}
-                      onClick={handleVoiceToggle}
-                      aria-label={recording() ? '停止录音' : '语音输入'}
-                      title={recording() ? '停止录音并转写' : '语音输入'}
-                    >
-                      <svg viewBox="0 0 16 16">
-                        <rect x="5.5" y="2" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
-                        <path d="M3 7v.5a5 5 0 0010 0V7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
-                        <line x1="8" y1="12" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-                        <line x1="5" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-                      </svg>
-                    </button>
-                    <Show when={inputValue().trim() || pendingAttachments().length > 0}>
+                      <ModelSwitcher disabled={isGenerating()} />
+                    </div>
+                    <div class="cic-right">
+                      <Show when={inputValue().trim() || pendingAttachments().length > 0}>
                       <span class="text-10px text-text-muted/70 font-mono mr-2">
                         ≈{estimateTokens(inputValue())} tok
                         <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>

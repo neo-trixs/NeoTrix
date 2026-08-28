@@ -5,11 +5,11 @@
    数据源：neocodex.providerConfig()（静态目录，零后端改动）。
    交互：点击模型行 = 切到该 provider（setProvider → active_model 更新）。
    ════════════════════════════════════════════ */
-import { createSignal, For, Show } from 'solid-js'
+ import { createSignal, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
-import type { ProviderConfig, ProviderMeta } from '../../api/types'
+import type { ProviderConfig, ProviderMeta, CustomProviderReq } from '../../api/types'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
-import { ModelIcon, CheckIcon, ActiveDotIcon } from './settingsIcons'
+import { ModelIcon, CheckIcon, ActiveDotIcon, TestTubeIcon, AlertCircleIcon, PlusIcon } from './settingsIcons'
 
 /** 提供商分类分组（对齐 ProviderIcon 分类徽章：本地绿/代理琥珀/云端蓝） */
 const CATEGORY_ORDER = ['local', 'proxy', 'cloud', 'unknown'] as const
@@ -31,6 +31,12 @@ interface Props {
   loading: () => boolean
   switching: () => boolean
   onSwitchProvider: (name: string) => void
+  onTestConnection?: (name: string) => void
+  testState?: () => Record<string, 'testing' | 'ok' | 'fail'>
+  /** 已接入的外部自定义提供商（乐观本地态，跨标签持久） */
+  customProviders: () => ProviderMeta[]
+  /** 新增外部第三方模型 API（智能配置） */
+  onAddCustomProvider: (req: CustomProviderReq) => Promise<void>
 }
 
 /** 只保留"可用"提供商（resolvable=true：name 映射到真实 LlmProviderType） */
@@ -58,6 +64,72 @@ export function ModelsSection(props: Props) {
   }
   // 双栏：自定义配置 vs 代理池（参考同类产品模型广场）
   const [subTab, setSubTab] = createSignal<'custom' | 'pool'>('pool')
+  // 连接测试状态来自父组件（SettingsModal 统一管理异步测试）
+  const testState: () => Record<string, 'testing' | 'ok' | 'fail'> = props.testState ?? (() => ({}))
+
+  const handleTest = (p: ProviderMeta) => {
+    if (props.switching() || testState()[p.name] === 'testing') return
+    props.onTestConnection?.(p.name)
+  }
+
+  /* ── 外部第三方模型 API 智能配置 ── */
+  const [showAddForm, setShowAddForm] = createSignal(false)
+  const [addName, setAddName] = createSignal('')
+  const [addBaseUrl, setAddBaseUrl] = createSignal('')
+  const [addApiKey, setAddApiKey] = createSignal('')
+  const [addModel, setAddModel] = createSignal('')
+  const [detectedModels, setDetectedModels] = createSignal<string[]>([])
+  const [detecting, setDetecting] = createSignal(false)
+  const [detectError, setDetectError] = createSignal<string | null>(null)
+  const [saving, setSaving] = createSignal(false)
+  const [saveError, setSaveError] = createSignal<string | null>(null)
+
+  const smartDetect = async () => {
+    const base = addBaseUrl().trim()
+    if (!base) { setDetectError('请先填写 API 基地址'); return }
+    setDetecting(true); setDetectError(null); setDetectedModels([])
+    try {
+      const models = await import('../../api/neocodex').then((m) => m.fetchProviderModels(base, addApiKey().trim()))
+      setDetectedModels(models)
+      if (models.length > 0 && !addModel().trim()) setAddModel(models[0])
+    } catch (e) {
+      setDetectError((e as Error).message || '智能检测失败')
+    } finally {
+      setDetecting(false)
+    }
+  }
+
+  const handleAddCustom = async () => {
+    const name = addName().trim()
+    const base = addBaseUrl().trim()
+    const model = addModel().trim()
+    if (!name || !base || !model) { setSaveError('名称、API 基地址、模型均为必填'); return }
+    setSaving(true); setSaveError(null)
+    try {
+      const req: CustomProviderReq = {
+        name: `custom-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
+        display_name: name,
+        base_url: base,
+        api_key: addApiKey().trim(),
+        models: detectedModels().length > 0 ? detectedModels() : [model],
+        model,
+      }
+      await props.onAddCustomProvider(req)
+      setShowAddForm(false)
+      setAddName(''); setAddBaseUrl(''); setAddApiKey(''); setAddModel(''); setDetectedModels([])
+    } catch (e) {
+      setSaveError((e as Error).message || '保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 自定义提供商（含后端目录中的 proxy/local + 本地乐观接入的外部模型）
+  const customProvidersList = () => [
+    ...(props.config() ? usableProviders(props.config()!).filter((p) => p.category === 'proxy' || p.category === 'local') : []),
+    ...props.customProviders(),
+  ]
+  const activeModel = () => props.config()?.active_model ?? ''
 
   return (
     <div class="space-y-4">
@@ -72,33 +144,147 @@ export function ModelsSection(props: Props) {
           onClick={() => setSubTab('pool')}
         >代理池 · {(props.config() ? usableProviders(props.config()!).length : 0)} 提供商</button>
       </div>
-      <Show
-        when={props.config()}
-        fallback={
-          <div class="ss-card">
-            <div class="ss-card-body text-[11px] text-text-muted text-center py-4">
-              {props.loading() ? '加载模型目录…' : '暂无模型配置'}
-            </div>
+
+      {/* 自定义配置：外部第三方模型 API 智能配置（不依赖后端 config，浏览器预览可用） */}
+      <Show when={subTab() === 'custom'}>
+        <div class="ss-card rounded-2xl border-black/5 shadow-sm">
+          <div class="ss-card-header bg-zinc-50/60 border-b border-black/5 flex items-center">
+            外部第三方模型 API
+            <button
+              class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-nt-io-500/10 text-nt-io-700 text-[11px] font-medium hover:bg-nt-io-500/20 transition-colors"
+              onClick={() => setShowAddForm(!showAddForm())}
+            >
+              <PlusIcon class="w-3.5 h-3.5" />
+              {showAddForm() ? '收起' : '添加'}
+            </button>
           </div>
-        }
-      >
-        {(cfg) => {
-          const usable = usableProviders(cfg())
-          const total = usable.reduce((s, p) => s + p.models.length, 0)
-          const groups = providerPoolGroups(cfg())
-          const customProviders = usable.filter(p => p.category === 'proxy' || p.category === 'local')
-          const active = cfg().providers.find(p => p.model === cfg().active_model) ?? null
-          return (
-            <>
-              {/* 池概览：Mac 圆角白卡，极简数字 */}
-              <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
-                <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">
-                  <ModelIcon />
-                  {subTab() === 'custom' ? '自定义配置' : '模型广场'}
-                  <span class="ml-auto text-[11px] font-mono text-zinc-500">{subTab() === 'custom' ? `${customProviders.length} 已接入` : `${total} 模型 · ${usable.length} 提供商`}</span>
+          <div class="ss-card-body bg-white space-y-3">
+            <Show when={showAddForm()}>
+              <div class="space-y-2.5">
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="block">
+                    <span class="text-[11px] text-text-muted">显示名称</span>
+                    <input
+                      class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-white border border-border-primary text-[12px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                      placeholder="如 My OpenAI 代理"
+                      value={addName()}
+                      onInput={(e) => setAddName(e.currentTarget.value)}
+                    />
+                  </label>
+                  <label class="block">
+                    <span class="text-[11px] text-text-muted">API 基地址</span>
+                    <input
+                      class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-white border border-border-primary text-[12px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                      placeholder="https://api.openai.com/v1"
+                      value={addBaseUrl()}
+                      onInput={(e) => setAddBaseUrl(e.currentTarget.value)}
+                    />
+                  </label>
                 </div>
-                <div class="ss-card-body bg-white">
-                  <Show when={subTab() === 'custom'} fallback={
+                <label class="block">
+                  <span class="text-[11px] text-text-muted">API 密钥</span>
+                  <input
+                    type="password"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-white border border-border-primary text-[12px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                    placeholder="sk-...（部分网关可留空）"
+                    value={addApiKey()}
+                    onInput={(e) => setAddApiKey(e.currentTarget.value)}
+                  />
+                </label>
+                <label class="block">
+                  <span class="text-[11px] text-text-muted">模型</span>
+                  <div class="mt-1 flex items-center gap-2">
+                    <Show when={detectedModels().length > 0} fallback={
+                      <input
+                        class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg bg-white border border-border-primary text-[12px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                        placeholder="gpt-4o / 自定义模型 id"
+                        value={addModel()}
+                        onInput={(e) => setAddModel(e.currentTarget.value)}
+                      />
+                    }>
+                      <select
+                        class="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg bg-white border border-border-primary text-[12px] text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                        value={addModel()}
+                        onChange={(e) => setAddModel(e.currentTarget.value)}
+                      >
+                        <For each={detectedModels()}>{(m) => <option value={m}>{m}</option>}</For>
+                      </select>
+                    </Show>
+                    <button
+                      class="px-2.5 py-1.5 rounded-lg border border-border-primary/60 text-[11px] text-text-secondary hover:bg-white/70 transition-colors disabled:opacity-50 flex-shrink-0"
+                      onClick={smartDetect}
+                      disabled={detecting()}
+                    >
+                      {detecting() ? '检测中…' : '智能检测'}
+                    </button>
+                  </div>
+                </label>
+                <Show when={detectError()}><div class="text-[11px] text-red-500">{detectError()}</div></Show>
+                <Show when={saveError()}><div class="text-[11px] text-red-500">{saveError()}</div></Show>
+                <div class="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    class="px-3 py-1.5 rounded-lg text-[11px] text-text-muted hover:bg-bg-tertiary transition-colors"
+                    onClick={() => setShowAddForm(false)}
+                  >取消</button>
+                  <button
+                    class="px-3 py-1.5 rounded-lg bg-nt-io-500 text-text-primary text-[11px] font-medium hover:bg-nt-io-600 disabled:opacity-50 transition-colors"
+                    onClick={handleAddCustom}
+                    disabled={saving()}
+                  >{saving() ? '保存中…' : '保存'}</button>
+                </div>
+              </div>
+            </Show>
+          </div>
+        </div>
+
+        {/* 已接入的自定义提供商 */}
+        <div class="ss-card rounded-2xl border-black/5 shadow-sm">
+          <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">已接入的自定义提供商</div>
+          <div class="ss-card-body bg-white">
+            <Show when={customProvidersList().length > 0} fallback={<div class="text-[11px] text-zinc-500 text-center py-6 border border-dashed border-zinc-200 rounded-xl">暂无自定义配置，点击上方「添加」接入 OpenAI 兼容 / 自定义网关</div>}>
+              <div class="grid grid-cols-1 gap-2">
+                <For each={customProvidersList()}>
+                  {(p) => (
+                    <button class={clsx('w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors', p.model === activeModel() ? 'bg-orange-50 border-orange-200' : 'bg-white hover:bg-zinc-50 border-zinc-200')} onClick={() => handleProviderHeadClick(p)}>
+                      <ProviderIcon name={p.name} size="sm" />
+                      <span class="text-[12.5px] font-medium truncate">{p.display_name}</span>
+                      <CategoryBadge category={p.category} className="ml-auto" />
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </div>
+      </Show>
+
+      {/* 代理池：依赖后端 config */}
+      <Show when={subTab() === 'pool'}>
+        <Show
+          when={props.config()}
+          fallback={
+            <div class="ss-card">
+              <div class="ss-card-body text-[11px] text-text-muted text-center py-4">
+                {props.loading() ? '加载模型目录…' : '暂无模型配置（桌面后端未连接，浏览器预览仅支持「自定义配置」）'}
+              </div>
+            </div>
+          }
+        >
+          {(cfg) => {
+            const usable = usableProviders(cfg())
+            const total = usable.reduce((s, p) => s + p.models.length, 0)
+            const groups = providerPoolGroups(cfg())
+            const active = cfg().providers.find((p) => p.model === cfg().active_model) ?? null
+            return (
+              <>
+                {/* 池概览 */}
+                <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
+                  <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">
+                    <ModelIcon />
+                    模型广场
+                    <span class="ml-auto text-[11px] font-mono text-zinc-500">{total} 模型 · {usable.length} 提供商</span>
+                  </div>
+                  <div class="ss-card-body bg-white">
                     <div class="flex items-center justify-between gap-3">
                       <div class="flex items-center gap-4">
                         <div>
@@ -123,44 +309,10 @@ export function ModelsSection(props: Props) {
                         {cfg().resolvable ? '● 可用' : '○ 不可用'}
                       </span>
                     </div>
-                  }>
-                    <div class="flex items-center gap-3">
-                      <Show when={active} fallback={<span class="w-10 h-10 rounded-xl bg-zinc-100 border border-black/5 flex items-center justify-center text-sm">?</span>}>
-                        {(a) => <ProviderIcon name={a().name} size="md" />}
-                      </Show>
-                      <div class="min-w-0">
-                        <div class="text-[13px] font-medium text-zinc-900 truncate">{active?.display_name ?? '未选择'}</div>
-                        <div class="text-[11px] font-mono text-zinc-500 truncate">{active?.model ?? '—'} · {active?.category ?? 'unknown'}</div>
-                      </div>
-                      <span class="ml-auto text-10px px-2.5 py-1 rounded-full bg-white border border-black/8 shadow-sm text-zinc-600">{customProviders.length} 自定义</span>
-                    </div>
-                  </Show>
-                </div>
-              </div>
-
-              <Show when={subTab() === 'custom'}>
-                <div class="ss-card rounded-2xl border-black/5 shadow-sm">
-                  <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">已接入的自定义提供商</div>
-                  <div class="ss-card-body bg-white">
-                    <Show when={customProviders.length > 0} fallback={<div class="text-[11px] text-zinc-500 text-center py-6 border border-dashed border-zinc-200 rounded-xl">暂无自定义配置，请在代理池中选择云端模型或在通用页配置 API Key</div>}>
-                      <div class="grid grid-cols-1 gap-2">
-                        <For each={customProviders}>
-                          {(p) => (
-                            <button class={clsx('w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors', p.model === cfg().active_model ? 'bg-orange-50 border-orange-200' : 'bg-white hover:bg-zinc-50 border-zinc-200')} onClick={() => handleProviderHeadClick(p)}>
-                              <ProviderIcon name={p.name} size="sm" />
-                              <span class="text-[12.5px] font-medium truncate">{p.display_name}</span>
-                              <CategoryBadge category={p.category} className="ml-auto" />
-                            </button>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
                   </div>
                 </div>
-              </Show>
 
-              {/* 代理池：按分类展开可用模型 — Mac 极简白卡 */}
-              <Show when={subTab() === 'pool'}>
+                {/* 代理池：按分类展开可用模型 */}
                 <Show
                   when={groups.length > 0}
                   fallback={
@@ -191,7 +343,6 @@ export function ModelsSection(props: Props) {
                             const isActiveProvider = p.model === cfg().active_model
                             return (
                               <div class={clsx('rounded-xl border transition-colors', isActiveProvider ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}>
-                                {/* 提供商头：整行可点击切换（SiliconFlow 等云端图标点击有反馈） */}
                                 <button
                                   class={clsx('w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left rounded-t-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:ring-inset',
                                     isActiveProvider ? 'bg-nt-io-500/8' : 'hover:bg-white/60'
@@ -209,11 +360,33 @@ export function ModelsSection(props: Props) {
                                     </div>
                                   </div>
                                   <div class="flex items-center gap-2 flex-shrink-0">
+                                    <Show when={props.onTestConnection}>
+                                      <button
+                                        class="p-1.5 rounded-lg border border-border-primary/50 bg-white/40 hover:bg-white/70 transition-colors flex-shrink-0"
+                                        onClick={(e) => { e.stopPropagation(); handleTest(p) }}
+                                        disabled={props.switching() || testState()[p.name] === 'testing'}
+                                        title="测试连接"
+                                        aria-label={`测试 ${p.display_name} 连接`}
+                                      >
+                                        <Show when={testState()[p.name] === 'testing'} fallback={
+                                          <Show when={testState()[p.name] === 'ok'} fallback={
+                                            <Show when={testState()[p.name] === 'fail'} fallback={<TestTubeIcon class="w-3.5 h-3.5 text-text-muted" />}>
+                                              <AlertCircleIcon class="w-3.5 h-3.5 text-red-500" />
+                                            </Show>
+                                          }>
+                                            <CheckIcon class="w-3.5 h-3.5 text-emerald-500" />
+                                          </Show>
+                                        }>
+                                          <span class="w-3.5 h-3.5 flex items-center justify-center">
+                                            <span class="w-3 h-3 border-2 border-nt-io-500/30 border-t-nt-io-500 rounded-full animate-spin" />
+                                          </span>
+                                        </Show>
+                                      </button>
+                                    </Show>
                                     <CategoryBadge category={p.category} />
                                     <span class="text-10px text-text-muted font-mono">{p.models.length} 个</span>
                                   </div>
                                 </button>
-                                {/* 模型列表：代理池行 */}
                                 <div class="px-2 pb-2 flex flex-col gap-1" role="radiogroup" aria-label={`${p.display_name} 模型池`}>
                                   <For each={p.models}>
                                     {(modelId) => {
@@ -255,10 +428,10 @@ export function ModelsSection(props: Props) {
                   )}
                 </For>
               </Show>
-              </Show>
-            </>
-          )
-        }}
+              </>
+            )
+          }}
+        </Show>
       </Show>
     </div>
   )

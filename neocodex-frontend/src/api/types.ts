@@ -74,6 +74,18 @@ export interface ProviderConfig {
   providers: ProviderMeta[]
 }
 
+/** 外部第三方模型 API 智能配置请求（OpenAI 兼容 / 自定义网关） */
+export interface CustomProviderReq {
+  name: string
+  display_name: string
+  base_url: string
+  api_key: string
+  /** 智能检测得到的模型列表（若为空则仅用 model 单模型） */
+  models: string[]
+  /** 主模型（默认激活） */
+  model: string
+}
+
 /* ── 系统 / 更新 ── */
 export interface UpdateCheckResult {
   current: string

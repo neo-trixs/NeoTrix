@@ -6,6 +6,7 @@ mod types;
 mod vectors_group_a;
 mod vectors_group_b;
 pub mod versioning;
+pub mod cad_absorb;
 
 pub use activation::{
     ActivationPolicy, CascadeSelector, KSActivationEngine, KsLifecycle, RegisteredSource,

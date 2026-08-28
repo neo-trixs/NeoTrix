@@ -76,6 +76,7 @@ pub mod nt_core_plan;
 pub mod nt_core_policy;
 pub mod nt_core_prm;
 pub mod nt_core_reasoning;
+pub mod reasoning_engine;
 pub mod nt_core_sae;
 pub mod nt_core_sae_bridge;
 pub mod nt_core_task_dispatcher;
@@ -169,6 +170,7 @@ pub mod nt_core_scoring_substrate;
 pub mod nt_core_second_brain;
 pub mod nt_core_self_test;
 pub mod nt_core_self_test_integration;
+pub mod nt_core_cad_consciousness;
 pub mod nt_core_simulate_engine;
 #[cfg(feature = "research")]
 pub mod nt_core_source_edit;
@@ -273,6 +275,12 @@ pub use nt_core_e8::e8_abduction_bridge::{AbductiveTransitionReport, E8Abduction
 pub use nt_core_reasoning::{
     default_context_builder, default_method_registry, ContextBuilder, MethodRegistry, MethodSpec,
     ReasoningMethod, ReasoningStep, ReasoningTrace, TraceSource,
+};
+
+// --- Reasoning Engine (SESSION C) ---
+pub use reasoning_engine::{
+    CausalRule, ChainExecutor, EdgeStep, ReasoningChainRecord, ReasoningResult, ReasoningStepNode,
+    REASONING_RELATIONS,
 };
 
 // --- L5: Consciousness ---

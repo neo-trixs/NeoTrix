@@ -495,6 +495,7 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            recall_weight: 1.0,
         }
     }
 

@@ -135,6 +135,7 @@ opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true
 opentelemetry-otlp = { version = "0.27", optional = true }
 tracing-opentelemetry = { version = "0.28", optional = true }
 anyhow = { version = "1", optional = true }
+anydoc = { version = "0.2", optional = true }
 rcgen = { version = "0.13", features = ["x509-parser"] }
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 tokio-rustls = "0.24"
@@ -209,7 +210,7 @@ harness = false
 [features]
 # keyring 纳入 default：API key 加密默认走 OS keychain（macOS Keychain/Linux Secret Service），
 # 避免静默降级到可推导的机器派生密钥（C-3 安全加固）。
-default = ["keyring"]
+default = ["keyring", "anydoc"]
 office = []
 wip = []
 # pmtiles feature removed - now a regular dependency
@@ -220,6 +221,7 @@ research = []
 rkyv-storage = ["dep:rkyv", "dep:memmap2"]
 keyring = ["dep:keyring"]
 anyhow = ["dep:anyhow"]
+anydoc = ["dep:anydoc"]
 simd-vsa = ["dep:holon"]
 self-update = ["dep:self_update"]
 integration_tests = []

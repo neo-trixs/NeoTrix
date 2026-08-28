@@ -982,6 +982,7 @@ impl InMemoryKB {
             url: None,
             domain: None,
             language: "en".to_string(),
+            recall_weight: 1.0,
             confidence: 1.0,
             importance: 0.5,
             created_at: 0,

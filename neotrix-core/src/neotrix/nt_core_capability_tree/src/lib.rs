@@ -12,6 +12,7 @@ pub mod evolution;
 pub mod cli;
 pub mod serialize;
 pub mod fusion;
+pub mod cad_node;
 
 pub use node::{CapabilityNode, NodeLayer, ConstellationLevel, Domain, RuneSocket, EvolutionOp, EvolutionLogEntry};
 pub use registry::{CapabilityRegistry, RegistryError};

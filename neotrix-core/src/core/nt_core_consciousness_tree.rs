@@ -5,11 +5,13 @@ mod nodes;
 mod contract;
 mod lifecycle;
 mod ops;
+mod kb_integration;
 mod selftest;
 
 pub use types::*;
 pub use nodes::*;
 pub use contract::*;
+pub use kb_integration::*;
 
 #[cfg(test)]
 mod tests {

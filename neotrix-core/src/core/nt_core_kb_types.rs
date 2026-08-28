@@ -63,6 +63,8 @@ pub enum NodeType {
     GoalResult,
     /// Session — session lifecycle event (start/stop/checkpoint)
     Session,
+    /// SEC filing / regulatory document
+    Filing,
 }
 
 impl NodeType {
@@ -107,6 +109,7 @@ impl NodeType {
             NodeType::DetectionFinding => "detection_finding",
             NodeType::GoalResult => "goal_result",
             NodeType::Session => "session",
+            NodeType::Filing => "filing",
         }
     }
 
@@ -151,6 +154,7 @@ impl NodeType {
             "detection_finding" => NodeType::DetectionFinding,
             "goal_result" => NodeType::GoalResult,
             "session" => NodeType::Session,
+            "filing" => NodeType::Filing,
             _ => NodeType::Concept,
         }
     }
@@ -339,6 +343,7 @@ pub struct KnowledgeNode {
     pub language: String,
     pub confidence: f64,
     pub importance: f64,
+    pub recall_weight: f64,
     pub created_at: i64,
     pub updated_at: i64,
     pub access_count: i64,

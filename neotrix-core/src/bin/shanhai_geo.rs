@@ -31,7 +31,7 @@ fn main() {
         });
         safe_insert_node(
             &conn,
-            &KnowledgeNode {
+            &KnowledgeNode { recall_weight: 1.0,
                 id: format!("shanhai-school:{}", s.name),
                 node_type: NodeType::Theory,
                 title: s.name.clone(),
@@ -79,7 +79,7 @@ fn main() {
         let title = format!("[山] {} ({})", p.name, p.range_id);
         safe_insert_node(
             &conn,
-            &KnowledgeNode {
+            &KnowledgeNode { recall_weight: 1.0,
                 id: format!("shanhai-peak:{}", p.id),
                 node_type: NodeType::Concept,
                 title,
@@ -130,7 +130,7 @@ fn main() {
 
         safe_insert_node(
             &conn,
-            &KnowledgeNode {
+            &KnowledgeNode { recall_weight: 1.0,
                 id: format!("shanhai-map:{}", m.shanhai_name),
                 node_type: NodeType::Concept,
                 title: m.relation_type.clone(),

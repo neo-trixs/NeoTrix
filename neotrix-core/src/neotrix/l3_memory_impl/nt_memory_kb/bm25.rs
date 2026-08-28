@@ -15,6 +15,7 @@ struct DocEntry {
     doc_id: String,
     field_length: usize,
     term_freqs: HashMap<String, f64>,
+    recall_weight: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +49,7 @@ impl Bm25Index {
                     doc_id: d.id.clone(),
                     field_length: tokens.len(),
                     term_freqs: tf,
+                    recall_weight: 1.0,
                 }
             })
             .collect();
@@ -94,7 +96,8 @@ impl Bm25Index {
             doc_id: doc.id.clone(),
             field_length: field_len,
             term_freqs: tf,
-        });
+                    recall_weight: 1.0,
+                });
         self.n_docs += 1;
     }
 
@@ -150,7 +153,7 @@ impl Bm25Index {
             .into_iter()
             .filter(|(s, _)| *s > 0.0)
             .take(k)
-            .map(|(s, i)| (s, self.docs[i].doc_id.clone()))
+            .map(|(s, i)| (s * self.docs[i].recall_weight, self.docs[i].doc_id.clone()))
             .collect()
     }
 

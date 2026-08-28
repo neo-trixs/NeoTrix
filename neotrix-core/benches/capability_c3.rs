@@ -29,6 +29,7 @@ fn make_results(n: usize) -> Vec<SearchResult> {
                 language: "zh".into(),
                 confidence: 0.9,
                 importance: 0.5,
+                recall_weight: 0.0,
                 created_at: 0,
                 updated_at: 0,
                 access_count: 0,
