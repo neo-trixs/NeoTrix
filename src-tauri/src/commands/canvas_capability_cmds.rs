@@ -15,7 +15,7 @@
 
 use chrono::Utc;
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, EvolutionAction, EvolutionEngine,
+    CapabilityNode, ConstellationLevel, Domain, EvolutionAction, EvolutionEngine,
     EvolutionLogEntry, EvolutionOp, NodeLayer,
 };
 use neotrix::core::nt_core_consciousness_core::{load_capability_registry, persist_capability_registry};
