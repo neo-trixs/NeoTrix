@@ -495,9 +495,12 @@ fn local_corpus_source() -> Option<std::path::PathBuf> {
 }
 
 /// Copy the local 68 GB corpus DB onto the external brain volume as cold storage.
-/// Idempotent: no-op if the destination already exists. Refuses unless the volume is mounted
+/// Idempotent: if a complete copy already exists, skip. Refuses unless the volume is mounted
 /// and has enough free space. `dry_run` reports the plan without copying. The source file is
 /// preserved (a second copy is kept per the cold-archive redundancy guideline).
+///
+/// The actual copy is resumable (see `copy_resumable`): if the flaky external volume drops
+/// mid-transfer, re-running resumes from the last verified chunk instead of restarting.
 pub fn migrate_cortex_corpus(
     conn: &Connection,
     root: &std::path::Path,
@@ -506,10 +509,16 @@ pub fn migrate_cortex_corpus(
     let src = local_corpus_source()
         .ok_or_else(|| "本地未找到 68GB corpus (knowledge-archive-corpus-20260825.db)".to_string())?;
     let dest = root.join("knowledge-archive-corpus-20260825.db");
-    if dest.exists() {
-        return Ok("外置大脑上已存在 corpus 副本，迁移幂等跳过。".into());
-    }
     let size = std::fs::metadata(&src).map(|m| m.len()).map_err(|e| e.to_string())?;
+    // idempotent: a complete copy already present
+    if dest.exists() {
+        let dsz = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
+        if dsz == size {
+            update_corpus_catalog(conn, &dest, &src)?;
+            return Ok("外置大脑上已存在完整 corpus 副本，迁移幂等跳过（已刷新编目指向）。".into());
+        }
+        // otherwise a partial copy exists → copy_resumable resumes from its .prog checkpoint
+    }
     let avail = free_space_bytes(root)?;
     if avail < size * 11 / 10 {
         return Err(format!(
@@ -519,28 +528,99 @@ pub fn migrate_cortex_corpus(
     }
     if dry_run {
         return Ok(format!(
-            "[dry-run] 将拷贝 {} → {}\n  大小 {:.1} GB, 外置盘可用 {:.1} GB (保留本地源副本)",
+            "[dry-run] 将续传/拷贝 {} → {}\n  大小 {:.1} GB, 外置盘可用 {:.1} GB (保留本地源副本)\n  支持掉盘续传：中断后重挂载重跑即可从校验点继续",
             src.display(),
             dest.display(),
             size as f64 / 1e9,
             avail as f64 / 1e9
         ));
     }
-    // copy (buffered, reports progress to stderr)
-    copy_with_progress(&src, &dest)?;
-    let dest_size = std::fs::metadata(&dest).map(|m| m.len()).map_err(|e| e.to_string())?;
+    copy_resumable(&src, &dest)?;
+    update_corpus_catalog(conn, &dest, &src)?;
+    Ok(format!(
+        "已迁移 corpus 到外置大脑: {}\n  大小 {:.1} GB, 本地源副本已保留。",
+        dest.display(),
+        size as f64 / 1e9
+    ))
+}
+
+/// Resumable chunked copy with per-chunk readback verification. A `<dest>.prog` sidecar stores
+/// the last *verified* byte offset; on restart it seeks there and overwrites any corrupt tail,
+/// so a dropped volume only costs the current chunk — never a full restart. Any I/O error
+/// (e.g. volume unmount) returns a resume hint instead of corrupting the destination.
+fn copy_resumable(src: &std::path::Path, dest: &std::path::Path) -> Result<u64, String> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    const CHUNK: usize = 256 * 1024 * 1024; // 256 MiB
+    let size = std::fs::metadata(src).map(|m| m.len()).map_err(|e| e.to_string())?;
+    let prog = std::path::PathBuf::from(format!("{}.prog", dest.display()));
+    let mut verified = read_progress(&prog).unwrap_or(0);
+    // sanity: dest shorter than verified means a corrupt/truncated tail → restart from 0
+    if let Ok(dmeta) = std::fs::metadata(dest) {
+        if dmeta.len() < verified {
+            verified = 0;
+            let _ = std::fs::remove_file(&prog);
+        }
+    }
+    let mut sf = std::fs::File::open(src).map_err(|e| e.to_string())?;
+    let mut df = std::fs::OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create(true)
+        .open(dest)
+        .map_err(|e| e.to_string())?;
+    sf.seek(SeekFrom::Start(verified)).map_err(|e| e.to_string())?;
+    df.seek(SeekFrom::Start(verified)).map_err(|e| e.to_string())?;
+    let mut buf = vec![0u8; CHUNK];
+    let mut check = vec![0u8; CHUNK];
+    let mut offset = verified;
+    while offset < size {
+        let n = std::cmp::min(CHUNK as u64, size - offset) as usize;
+        // read source → write dest → read back & compare; any I/O error ⇒ likely掉盘
+        let io = (|| -> std::io::Result<()> {
+            sf.read_exact(&mut buf[..n])?;
+            df.write_all(&buf[..n])?;
+            df.flush()?;
+            df.seek(SeekFrom::Start(offset))?;
+            df.read_exact(&mut check[..n])?;
+            Ok(())
+        })();
+        if let Err(e) = io {
+            return Err(format!(
+                "传输中断（外置盘可能掉盘）: {e}；重挂载后重跑 /cortex corpus migrate --force 可从 {:.1} GB 校验点续传",
+                offset as f64 / 1e9
+            ));
+        }
+        offset += n as u64;
+        write_progress(&prog, offset)?;
+        eprintln!(
+            "[corpus migrate] 校验通过 {:.1} / {:.1} GB",
+            offset as f64 / 1e9,
+            size as f64 / 1e9
+        );
+    }
+    let _ = std::fs::remove_file(&prog);
+    let dest_size = std::fs::metadata(dest).map(|m| m.len()).map_err(|e| e.to_string())?;
     if dest_size != size {
-        let _ = std::fs::remove_file(&dest);
+        let _ = std::fs::remove_file(dest);
         return Err(format!(
-            "拷贝校验失败: 源 {} 字节, 目标 {} 字节 (已删除不完整副本)",
+            "最终大小校验失败: 源 {} 目标 {} (已删除损坏副本)",
             size, dest_size
         ));
     }
-    // update catalog node to point at the external-brain copy
+    Ok(size)
+}
+
+/// Update the `cortex_source://corpus-archive` catalog node to point at the external copy.
+fn update_corpus_catalog(
+    conn: &Connection,
+    dest: &std::path::Path,
+    src: &std::path::Path,
+) -> Result<(), String> {
+    let sz = std::fs::metadata(dest).map(|m| m.len()).unwrap_or(0);
     let payload = serde_json::json!({
         "kind": "corpus_cold_archive",
         "path": dest.to_string_lossy(),
-        "bytes": dest_size,
+        "bytes": sz,
         "note": "superset snapshot of live KB; cold storage on external brain",
         "migrated_from": src.to_string_lossy(),
     });
@@ -550,36 +630,17 @@ pub fn migrate_cortex_corpus(
         "Corpus (cold archive, on external brain)",
         &payload.to_string(),
         &payload,
-    )?;
-    Ok(format!(
-        "已迁移 corpus 到外置大脑: {}\n  大小 {:.1} GB, 本地源副本已保留。",
-        dest.display(),
-        dest_size as f64 / 1e9
-    ))
+    )
 }
 
-/// Copy `src`→`dest` in buffered chunks, logging progress to stderr every ~1 GB.
-fn copy_with_progress(src: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
-    use std::io::{BufReader, BufWriter, Read, Write};
-    let in_f = std::fs::File::open(src).map_err(|e| e.to_string())?;
-    let out_f = std::fs::File::create(dest).map_err(|e| e.to_string())?;
-    let mut reader = BufReader::with_capacity(1 << 20, in_f);
-    let mut writer = BufWriter::with_capacity(1 << 20, out_f);
-    let mut buf = [0u8; 1 << 20];
-    let mut total = 0u64;
-    loop {
-        let n = reader.read(&mut buf).map_err(|e| e.to_string())?;
-        if n == 0 {
-            break;
-        }
-        writer.write_all(&buf[..n]).map_err(|e| e.to_string())?;
-        total += n as u64;
-        if total % (1u64 << 30) < (1u64 << 20) {
-            eprintln!("[corpus migrate] {:.1} GB copied", total as f64 / 1e9);
-        }
-    }
-    writer.flush().map_err(|e| e.to_string())?;
-    Ok(())
+fn read_progress(path: &std::path::Path) -> Option<u64> {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+}
+
+fn write_progress(path: &std::path::Path, offset: u64) -> Result<(), String> {
+    std::fs::write(path, offset.to_string()).map_err(|e| e.to_string())
 }
 
 /// Available free space (bytes) on the filesystem hosting `path`, via `df`.
@@ -1356,6 +1417,40 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let r = prune_cortex_orphans(&conn, &dir, true);
         assert!(r.is_err(), "should error when no ZIM files on volume");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Resumable copy must finish correctly when a partial copy + progress sidecar already exist.
+    #[test]
+    fn test_copy_resumable_resumes_from_partial() {
+        let dir = std::env::temp_dir().join(format!("cortex_copy_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("src.bin");
+        let dest = dir.join("dest.bin");
+        let data: Vec<u8> = (0..10 * 1024 * 1024).map(|i| (i % 251) as u8).collect();
+        std::fs::write(&src, &data).unwrap();
+        // simulate a prior interrupted run: 3 MiB written + .prog checkpoint at 3 MiB
+        let partial = 3 * 1024 * 1024;
+        std::fs::write(&dest, &data[..partial]).unwrap();
+        std::fs::write(format!("{}.prog", dest.display()), partial.to_string()).unwrap();
+        copy_resumable(&src, &dest).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), data);
+        assert!(!std::path::Path::new(&format!("{}.prog", dest.display())).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Fresh resumable copy (no prior partial) must produce a byte-identical destination.
+    #[test]
+    fn test_copy_resumable_fresh() {
+        let dir = std::env::temp_dir().join(format!("cortex_copy2_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("src.bin");
+        let dest = dir.join("dest.bin");
+        let data: Vec<u8> = (0..7 * 1024 * 1024).map(|i| (i % 197) as u8).collect();
+        std::fs::write(&src, &data).unwrap();
+        copy_resumable(&src, &dest).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), data);
+        assert!(!std::path::Path::new(&format!("{}.prog", dest.display())).exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
