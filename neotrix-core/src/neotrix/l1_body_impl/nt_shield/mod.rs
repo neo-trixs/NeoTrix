@@ -22,6 +22,9 @@ pub mod nt_shield_mcp_security;
 pub mod receipt;
 /// EVOMAL 自毒化防火墙 (分析建议 #7): 吸收边界前置扫描, 拒绝"检索内容→含 payload 的 skill 模板"固化。
 pub mod evomal_guard;
+/// 确定性欺骗基准 `agent-mafia` (#10): 复用 EVOMAL + 启发式操纵话术检测, 在不依赖
+/// LLM 随机性的前提下确定性识别"欺骗者"样本, 输出可复现的 precision/recall/f1。
+pub mod deception_bench;
 /// 自毒化防火墙 (EVOMAL): 吸收边界前置扫描, 拒绝"检索内容→含 payload 的 skill 模板"固化。
 pub mod self_poison;
 pub mod safety_kernel;
