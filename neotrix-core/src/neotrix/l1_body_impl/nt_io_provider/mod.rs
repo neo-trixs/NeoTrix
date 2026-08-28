@@ -25,6 +25,7 @@ pub mod openai;
 pub mod provider_catalog;
 pub mod provider_pool;
 pub mod provider_swap;
+pub mod privacy_guard;
 pub mod rate_limiter;
 pub mod rate_profiles;
 pub mod search_router;

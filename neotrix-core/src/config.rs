@@ -13,6 +13,11 @@ pub struct NeoTrixConfig {
     pub color_mode: Option<String>,
     pub log_level: Option<String>,
     pub prefer_free: Option<bool>,
+    /// 出网隐私守卫总开关 (默认 true)。关闭则退化为仅脱密钥。
+    pub privacy_guard: Option<bool>,
+    /// Untrusted provider 命中 NeoTrix 内部指纹时是否阻断 (默认 true, fail-closed)。
+    /// 设为 false 退化为脱敏放行。
+    pub privacy_block_untrusted: Option<bool>,
 }
 
 impl NeoTrixConfig {
@@ -78,6 +83,8 @@ impl NeoTrixConfig {
             "custom_endpoint" => cfg.custom_endpoint = Some(value.to_string()),
             "color_mode" => cfg.color_mode = Some(value.to_string()),
             "log_level" => cfg.log_level = Some(value.to_string()),
+            "privacy_guard" => cfg.privacy_guard = value.parse::<bool>().ok(),
+            "privacy_block_untrusted" => cfg.privacy_block_untrusted = value.parse::<bool>().ok(),
             _ => return false,
         }
         if let Some(dir) = Self::path().parent() {

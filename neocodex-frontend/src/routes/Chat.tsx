@@ -24,13 +24,14 @@ import { ComputerUse } from '../components/ComputerUse'
 import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
-import { runSlashDispatch, type SlashContext } from './chat/slashCommands'
+import { runSlashDispatch, parseRunCommand, type SlashContext } from './chat/slashCommands'
 import { HeroMark, UserIcon, BotIcon } from './chat/avatars'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
 import { neocodex, system, unified, errText, harness } from '../api'
-import type { HarnessRunResponse } from '../api/harness'
+import type { HarnessRunResponse, HarnessProgressEvent } from '../api/harness'
+import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
@@ -204,10 +205,10 @@ export function Chat() {
   const runSlash = (cmd: SlashCommandDef) => {
     // 「运行 Harness 任务」：从当前输入提取 /run 参数，先于清空执行（保留参数）
     if (cmd.id === 'run') {
-      const instr = inputValue().replace(/^\/run\s*/, '').trim()
+      const { isRun, instruction } = parseRunCommand(inputValue())
       setInputValue('')
       adjustTextarea()
-      if (instr) void runHarness(instr)
+      if (isRun && instruction) void runHarness(instruction)
       else showInfo('用法：/run <要执行的任务>', 3000)
       return
     }
@@ -798,11 +799,11 @@ export function Chat() {
     let content = inputValue().trim()
     if (!content && !annotationHint() && pendingAttachments().length === 0) return
     // 对话即OS「运行」入口：/run <任务> 显式触发重路径真实执行闭环（对标 Claude Code /命令带参）
-    if (content.startsWith('/run ')) {
-      const instr = content.slice(5).trim()
+    const runCmd = parseRunCommand(content)
+    if (runCmd.isRun) {
       setInputValue('')
       adjustTextarea()
-      if (instr) await runHarness(instr)
+      if (runCmd.instruction) await runHarness(runCmd.instruction)
       else showInfo('用法：/run <要执行的任务>', 3000)
       return
     }
@@ -823,17 +824,34 @@ export function Chat() {
     await sendMessage(content)
   }
 
-  /* Harness 重路径真实执行（⌘K「运行 Harness 任务」/ /run 触发）— 完整闭环，结果落报告面板 */
+  /* Harness 重路径真实执行（⌘K「运行 Harness 任务」/ /run 触发）— 完整闭环，结果落报告面板
+     真·流式: 订阅 harness-progress 事件, 阶段1(allocated) 先渲染分配视图, 阶段2(done) 落全量报告 */
   const runHarness = async (instruction: string) => {
     const text = instruction.trim()
     if (!text) {
       showInfo('先在输入框写下要执行的任务', 3000)
       return
     }
+    const runId = (globalThis.crypto?.randomUUID?.() ?? `run-${Date.now()}`)
     setHarnessRunning(true)
     setHarnessReport(null)
+    let unlisten: (() => void) | undefined
     try {
-      const r = await harness.harnessRun({ instruction: text })
+      unlisten = await listen<HarnessProgressEvent>('harness-progress', (e) => {
+        const p = e.payload
+        if (p.run_id && p.run_id !== runId) return
+        if (p.phase === 'allocated') {
+          // 阶段1: 拆解+分配已就绪 → 即时渲染 (执行中)
+          setHarnessReport(p.report)
+        } else if (p.phase === 'done') {
+          // 阶段2: 完整闭环报告 → 落盘并停止脉冲
+          setHarnessReport(p.report)
+          setHarnessRunning(false)
+          unlisten?.()
+        }
+      })
+      const r = await harness.harnessRun({ instruction: text, run_id: runId })
+      // 兜底: 若事件未到达 (非 tauri 环境等), 以返回值填充
       setHarnessReport(r)
       const solvedInternal = r.internal_results.filter((x) => x.executed).length
       const solvedExternal = r.external_closures.filter((x) => x.solved).length
@@ -842,6 +860,7 @@ export function Chat() {
       showError(`Harness 执行失败：${errText(e)}`)
     } finally {
       setHarnessRunning(false)
+      unlisten?.()
     }
   }
 

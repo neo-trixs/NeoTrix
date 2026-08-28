@@ -7,8 +7,9 @@
 use neotrix::core::nt_core_consciousness_core::{execute_task_loop, process_instruction, ExternalClosureConfig, LlmSolutionExecutor};
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_harness::{HarnessExecuteRequest, HarnessGateway};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::sync::{LazyLock, Mutex};
+use tauri::{AppHandle, Emitter};
 
 static GATEWAY: LazyLock<Mutex<HarnessGateway>> = LazyLock::new(|| Mutex::new(HarnessGateway::new()));
 
@@ -28,9 +29,26 @@ pub fn harness_execute(instruction: String, capability_tag: Option<String>, proj
 /// (LlmSolutionExecutor)。离线/未配置 LLM 时 executor 返回 Failed, 报告仍透明返回
 /// (外部缺口标注未解), 不 panic（降级到拆解→分配闭环）。
 #[tauri::command]
-pub fn harness_run(instruction: String, capability_tag: Option<String>, project: Option<String>) -> Result<Value, NeoTrixError> {
+pub async fn harness_run(
+    app: AppHandle,
+    instruction: String,
+    run_id: Option<String>,
+    capability_tag: Option<String>,
+    project: Option<String>,
+) -> Result<Value, NeoTrixError> {
     let _ = (capability_tag, project);
+    // 阶段1: 拆解 + 能力网分配 (离线安全, 无 LLM) — 即时推送, 前端先渲染分配视图
+    let alloc_report = process_instruction(&instruction);
+    let _ = app.emit(
+        "harness-progress",
+        json!({ "run_id": run_id, "phase": "allocated", "report": &alloc_report }),
+    );
+    // 阶段2: 完整闭环 (内置能力网执行 + 外部缺口 LLM 试错求解) — 完成后推送全量报告
     let report = execute_task_loop(&instruction, &LlmSolutionExecutor, &ExternalClosureConfig::frugal());
+    let _ = app.emit(
+        "harness-progress",
+        json!({ "run_id": run_id, "phase": "done", "report": &report }),
+    );
     serde_json::to_value(&report).map_err(|e| NeoTrixError::Serde(e.to_string()))
 }
 

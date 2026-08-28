@@ -10,20 +10,8 @@ use super::super::circuit_breaker::BreakerState;
 use super::super::context_budget::estimate_tokens;
 use super::super::free_pool::global_free_pool;
 use super::super::rate_limiter::BrainTier;
+use super::super::privacy_guard::{egress_privacy_guard, trust_from_name};
 use super::*;
-
-/// 出站脱敏 (Egress Redaction) — 发送前剥离 prompt 中的密钥/凭据, 防止第三方免费
-/// provider (如 empero) 记录并用于训练。复用 nt_shield Redactor (R-P42 强化现有节点)。
-/// 仅脱 secrets (sk-/AKIA/私钥/JWT/password), 保留 email 等 PII 以免误伤正常代码。
-fn scrub_egress_secrets(req: &mut LlmRequest) {
-    use crate::neotrix::l1_body_impl::nt_shield::redaction::Redactor;
-    let redactor = Redactor::new();
-    for msg in req.messages.iter_mut() {
-        if !redactor.find_secrets(&msg.content).is_empty() {
-            msg.content = redactor.redact_secrets_only(&msg.content);
-        }
-    }
-}
 
 /// 检测 provider 返回的维护窗提示 (如 empero "switching to new models" / "retrying in"),
 /// 用于触发长冷却熔断, 避免在其维护期间反复重试浪费输入 token。
@@ -143,8 +131,11 @@ impl GatewayV2 {
         if gate_wait > 0 {
             tokio::time::sleep(std::time::Duration::from_millis(gate_wait)).await;
         }
-        // 出站脱敏: 发送前剥离密钥, 防止免费 provider 记录 prompt 训模型 (隐私)。
-        scrub_egress_secrets(&mut req);
+        // 出站隐私守卫: 剥离密钥 + 阻断/脱敏 NeoTrix 内部源码与对话指纹,
+        // 防止免费/代理 provider 记录并用于训练 (fail-closed for untrusted)。
+        if let Err(reason) = egress_privacy_guard(&mut req, trust_from_name(name), name) {
+            return Err(LlmError::InvalidRequest(reason));
+        }
         let result = provider.complete(&req).await;
         {
             self.tiered_semaphore
@@ -900,8 +891,10 @@ impl GatewayV2 {
         } else if let Some(m) = stripped {
             req.model = m;
         }
-        // 出站脱敏: 发送前剥离密钥, 防止免费 provider 记录 prompt 训模型 (隐私)。
-        scrub_egress_secrets(&mut req);
+        // 出站隐私守卫: 剥离密钥 + 阻断/脱敏 NeoTrix 内部源码与对话指纹。
+        if let Err(reason) = egress_privacy_guard(&mut req, trust_from_name(name), name) {
+            return Err(LlmError::InvalidRequest(reason));
+        }
         provider.stream_complete(&req).await
     }
 
@@ -1133,25 +1126,6 @@ impl GatewayV2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_scrub_egress_secrets_redacts_key() {
-        let mut req = LlmRequest::new("glm-5.3-flash", "use sk-abcdef1234567890XYZ to login");
-        scrub_egress_secrets(&mut req);
-        assert!(
-            !req.messages[0].content.contains("sk-abcdef"),
-            "secrets must be redacted before egress"
-        );
-        assert!(req.messages[0].content.contains("[REDACTED]"));
-    }
-
-    #[test]
-    fn test_scrub_egress_secrets_keeps_plain_text() {
-        let mut req = LlmRequest::new("glm-5.3-flash", "just normal code with no secrets");
-        let original = req.messages[0].content.clone();
-        scrub_egress_secrets(&mut req);
-        assert_eq!(req.messages[0].content, original, "plain prompts unchanged");
-    }
 
     #[test]
     fn test_is_maintenance_window_detects_empero() {

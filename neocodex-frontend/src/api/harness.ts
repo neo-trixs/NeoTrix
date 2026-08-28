@@ -10,6 +10,15 @@ export interface HarnessExecuteRequest {
   instruction: string
   capability_tag?: string
   project?: string
+  /** 流式进度关联 id (harness_run 推送 harness-progress 事件时用) */
+  run_id?: string
+}
+
+/** harness_run 真·流式进度事件载荷 */
+export interface HarnessProgressEvent {
+  run_id?: string
+  phase: 'allocated' | 'done'
+  report: HarnessRunResponse
 }
 
 export interface HarnessExecuteResponse {
@@ -72,6 +81,7 @@ export interface HarnessRunResponse {
 export function harnessRun(req: HarnessExecuteRequest): Promise<HarnessRunResponse> {
   return call<HarnessRunResponse>('harness_run', {
     instruction: req.instruction,
+    run_id: req.run_id ?? null,
     capability_tag: req.capability_tag ?? null,
     project: req.project ?? null,
   })

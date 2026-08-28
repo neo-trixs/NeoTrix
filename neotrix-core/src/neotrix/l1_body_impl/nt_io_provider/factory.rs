@@ -141,6 +141,85 @@ impl LlmProviderType {
             _ => ProviderCategory::Cloud,
         }
     }
+
+    /// 是否本地推理 (数据不出设备)。`Ollama`/`Vllm`/`Sglang` 为 localhost 自托管。
+    pub fn is_local(self) -> bool {
+        matches!(self, Self::Ollama | Self::Vllm | Self::Sglang)
+    }
+
+    /// 规范名 (用于日志 / 隐私守卫错误信息)。反向映射 `from_name`。
+    pub fn as_name(self) -> &'static str {
+        match self {
+            Self::OpenAI => "openai",
+            Self::Anthropic => "anthropic",
+            Self::Gemini => "gemini",
+            Self::Ollama => "ollama",
+            Self::Groq => "groq",
+            Self::OpenRouter => "openrouter",
+            Self::Cerebras => "cerebras",
+            Self::SambaNova => "sambanova",
+            Self::Pollinations => "pollinations",
+            Self::BazaarLink => "bazaarlink",
+            Self::FreeTheAi => "freetheai",
+            Self::ZeroLimit => "zerolimit",
+            Self::FreeApi => "freeapi",
+            Self::CustomProxy => "custom-proxy",
+            Self::Cloudflare => "cloudflare",
+            Self::Nvidia => "nvidia",
+            Self::GitHubModels => "github-models",
+            Self::HuggingFace => "huggingface",
+            Self::Cohere => "cohere",
+            Self::TogetherFree => "together-free",
+            Self::Llm7 => "llm7",
+            Self::Kilo => "kilo",
+            Self::SiliconFlow => "siliconflow",
+            Self::ZAI => "zai",
+            Self::OpenCodeZen => "opencode-zen",
+            Self::Ovh => "ovh",
+            Self::DeepSeekFree => "deepseek-free",
+            Self::ModelScope => "modelscope",
+            Self::ApiAirforce => "api-airforce",
+            Self::Empero => "empero",
+            Self::Vllm => "vllm",
+            Self::Sglang => "sglang",
+            Self::Aihub => "aihub",
+            Self::Xai => "xai",
+            Self::Moonshot => "moonshot",
+            Self::Qwen => "qwen",
+            Self::Doubao => "doubao",
+            Self::MiniMax => "minimax",
+            Self::Perplexity => "perplexity",
+        }
+    }
+
+    /// 数据信任分级 — 隐私出网门控的核心依据 (R-P42 强化现有节点, 不建平行适配器)。
+    ///
+    /// - `Trusted`  : 本地推理, 数据不出设备, 无需脱敏。
+    /// - `Contracted`: 付费云端 (OpenAI/Anthropic 等), 有"不拿 API 数据训练"商业条款,
+    ///                 作为belt-and-suspenders 仍脱敏 NeoTrix 内部指纹。
+    /// - `Untrusted`: 免费/代理端点 (xiaohuxing/llm7/pollinations/opencode-zen 等),
+    ///                靠日志/数据回灌维持免费, 是"拿去喂模型训练"的真实载体 —
+    ///                检测到 NeoTrix 内部指纹时必须阻断 (fail-closed) 或脱敏。
+    pub fn data_trust(self) -> DataTrust {
+        if self.is_local() {
+            DataTrust::Trusted
+        } else if self.is_free() || self.category() == ProviderCategory::Proxy {
+            DataTrust::Untrusted
+        } else {
+            DataTrust::Contracted
+        }
+    }
+}
+
+/// 数据信任分级 (见 `LlmProviderType::data_trust`)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum DataTrust {
+    /// 本地推理: 数据不出设备。
+    Trusted,
+    /// 付费云端: 有商业不训练条款, 仍脱敏内部指纹。
+    Contracted,
+    /// 免费/代理端点: 可能训练, 检测到内部指纹必须阻断或脱敏。
+    Untrusted,
 }
 
 #[derive(Debug, Clone)]

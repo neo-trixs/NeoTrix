@@ -157,7 +157,7 @@ pub fn run_provider_wizard() {
             print!("Enter custom base URL: ");
             let _ = io::stdout().flush();
             let mut url = String::new();
-            if io::stdin().read_line(&mut url).is_err() {
+            if io::stdin().read_line(&url).is_err() {
                 eprintln!("Failed to read stdin; using default endpoint.");
             }
             let url = url.trim().to_string();
@@ -165,6 +165,20 @@ pub fn run_provider_wizard() {
         }
         _ => None,
     };
+
+    // 隐私提示: 免费/代理端点靠日志/数据回灌维持免费, 可能将你的代码与对话用于训练。
+    // NeoTrix 出网隐私守卫默认开启 (privacy_guard=true, 阻断未信任端点泄露内部指纹),
+    // 但仍建议优先使用本地 (Ollama) 或付费签约云端。
+    if matches!(provider, "opencode" | "xiaohuxing" | "custom") {
+        println!();
+        println!(
+            "{} 隐私提醒: '{}' 属免费/代理端点, 可能记录并利用你的代码与对话训练模型。",
+            warn("⚠"),
+            provider
+        );
+        println!("  NeoTrix 已默认开启出网隐私守卫 (阻断未信任端点泄露内部源码/对话)。");
+        println!("  生产建议: 改用本地 Ollama (provider = \"ollama\") 或付费签约云端。");
+    }
 
     // Encrypt the API key before persisting to disk
     // 加密失败即拒绝保存，禁止明文回退 (fail-closed，防密钥落盘可读)
@@ -184,7 +198,10 @@ pub fn run_provider_wizard() {
         "# NeoTrix Configuration\n\
          provider = {:?}\n\
          api_key = {:?}\n\
-         default_model = {:?}\n",
+         default_model = {:?}\n\
+         # 出网隐私守卫: 阻止未信任 (免费/代理) 端点获取 NeoTrix 内部源码与对话\n\
+         privacy_guard = true\n\
+         privacy_block_untrusted = true\n",
         provider, stored_key, default_model,
     );
     if let Some(ref ep) = custom_endpoint {

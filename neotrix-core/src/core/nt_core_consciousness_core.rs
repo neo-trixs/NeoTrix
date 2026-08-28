@@ -2135,6 +2135,36 @@ mod tests {
     }
 
     #[test]
+    fn harness_run_real_executor_wires_subagent_dispatch_offline_safe() {
+        // 生产路径 harness_run 使用 LlmSolutionExecutor (→ SubagentDispatch::run)。
+        // 离线/未配置 LLM 时应安全降级 (attempt 返回 Failed), 不 panic, 报告仍透明返回。
+        // 验证「端到端 LLM 接线」在未配 provider 时的健壮性 (配 provider 后同一路径即真·LLM)。
+        with_kb_lock(|| {
+            isolate_home_once();
+            let mut handle = ConsciousnessCoreHandle {
+                tree: ConsciousnessTree::new(),
+                snapshot: CoreSnapshot::default(),
+            };
+            let report = handle.execute_task_loop(
+                "检索 GitHub 上 rust 异步运行时对比资料并给出选型建议",
+                &LlmSolutionExecutor,
+                &ExternalClosureConfig {
+                    acquire_knowledge: false,
+                    max_attempts: 2,
+                    token_budget: 512,
+                    max_llm_tokens: 128,
+                },
+            );
+            // 不 panic: 至少拆解出一个子任务, 报告结构完整
+            assert!(report.allocations.len() >= 1, "应至少拆解出一个子任务");
+            // 离线无 LLM → 外部闭环应进入试错 (绝不 panic / 绝不隐式谎报成功)
+            for c in &report.external_closures {
+                assert!(!c.task_id.is_empty(), "外部缺口应带任务 id");
+            }
+        });
+    }
+
+    #[test]
     fn native_file_ability_routes_xlsx_consolidation_internal() {
         // 原生文件能力已接入能力网: xlsx_consolidation 由 nt_file_ability::unified_file_ops 提供
         // → 意识核心拆解 "价格表" 指令时命中内置 provider (非外部缺口)。

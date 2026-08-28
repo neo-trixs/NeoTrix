@@ -8,6 +8,19 @@ import type { SlashCommandDef } from '../../components/SlashMenu'
 import { neocodex } from '../../api'
 import type { ChatStore } from '../../stores/chat'
 
+/**
+ * 解析 `/run <任务>` 命令 — 纯函数，可单测。
+ * 仅匹配以 `/run ` 开头（后跟非空任务），`/run` 单独出现视为无参（用法提示由调用方处理）。
+ */
+export function parseRunCommand(text: string): { isRun: boolean; instruction: string } {
+  const trimmed = text.trimStart()
+  if (!trimmed.startsWith('/run ')) {
+    return { isRun: false, instruction: '' }
+  }
+  const instruction = trimmed.slice('/run '.length).trim()
+  return { isRun: instruction.length > 0, instruction }
+}
+
 /** 执行斜杠命令所需的外部依赖（由 Chat.tsx 提供） */
 export interface SlashContext {
   store: ChatStore

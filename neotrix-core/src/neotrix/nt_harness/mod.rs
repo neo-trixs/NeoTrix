@@ -309,4 +309,116 @@ mod tests {
         let g = HarnessGateway::new();
         assert_eq!(g.tool_catalog().len(), 11);
     }
+
+    #[test]
+    fn harness_tool_all_and_str_roundtrip() {
+        let all = HarnessTool::all();
+        assert_eq!(all.len(), 11);
+        // 每个 tool 的 as_str 唯一且非空
+        let mut seen = std::collections::HashSet::new();
+        for t in all {
+            let s = t.as_str();
+            assert!(!s.is_empty());
+            assert!(seen.insert(s));
+        }
+        // 已知映射
+        assert_eq!(HarnessTool::Execute.as_str(), "harness_execute");
+        assert_eq!(HarnessTool::HqlRun.as_str(), "hql:run");
+        assert_eq!(HarnessTool::List.as_str(), "harness_list");
+    }
+
+    #[test]
+    fn capability_api_entry_new_basic() {
+        let e = CapabilityApiEntry::new(
+            "demo_tag",
+            "NT-ACT",
+            "CodeAnalyzer",
+            &["关键词a", "kw_b"],
+            HarnessTool::Execute,
+            "演示能力",
+        );
+        assert_eq!(e.capability_tag, "demo_tag");
+        assert_eq!(e.domain, "NT-ACT");
+        assert_eq!(e.specialist, "CodeAnalyzer");
+        assert_eq!(e.harness_tool, HarnessTool::Execute);
+        assert_eq!(e.keywords, vec!["关键词a".to_string(), "kw_b".to_string()]);
+        // 全量地图里的 entry 都带非空描述与合法 tool
+        for entry in capability_api_map() {
+            assert!(!entry.description.is_empty());
+            assert!(HarnessTool::all().contains(&entry.harness_tool));
+        }
+    }
+
+    #[test]
+    fn lookup_by_tag_exact_and_keyword_case_insensitive() {
+        let g = HarnessGateway::new();
+        // 精确 tag
+        let e = g.lookup_by_tag("hybrid_retrieval").expect("tag exists");
+        assert_eq!(e.domain, "NT-MEMORY");
+        assert!(g.lookup_by_tag("no_such_tag").is_none());
+        // 关键词命中（大小写不敏感）
+        let hit = g.lookup_by_keyword("EXCEL").expect("keyword matches");
+        assert_eq!(hit.capability_tag, "xlsx_consolidation");
+        // 多关键词之一命中
+        let hit2 = g.lookup_by_keyword("重构一下").expect("keyword matches");
+        assert_eq!(hit2.capability_tag, "code_refactor");
+    }
+
+    #[test]
+    fn resolve_instruction_is_case_insensitive() {
+        let g = HarnessGateway::new();
+        let upper = g.resolve_instruction("合并 EXCEL 价格表").unwrap();
+        let lower = g.resolve_instruction("合并 excel 价格表").unwrap();
+        assert_eq!(upper.capability_tag, lower.capability_tag);
+        assert_eq!(upper.capability_tag, "xlsx_consolidation");
+    }
+
+    #[test]
+    fn execute_real_maps_report_fields() {
+        use crate::core::nt_core_consciousness_core::{
+            AllocationProvider, ConsciousTask, TaskAllocation, TaskLoopReport,
+        };
+        let g = HarnessGateway::new();
+        let task = ConsciousTask {
+            id: "task_1".into(),
+            summary: "合并表格".into(),
+            capability_tag: "xlsx_consolidation".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        };
+        let report = TaskLoopReport {
+            instruction: "合并价格表".into(),
+            allocations: vec![TaskAllocation {
+                task,
+                provider: AllocationProvider::Internal { node_id: "n1".into(), path: vec![], cost: 0.0 },
+            }],
+            internal_count: 3,
+            external_gap_count: 2,
+            strengthening_actions: 1,
+            external_gaps: vec!["gap_a".into()],
+            external_closures: vec![],
+            internal_results: vec![],
+        };
+        let req = HarnessExecuteRequest {
+            instruction: "合并价格表".into(),
+            capability_tag: None,
+            project: None,
+            permission_mode: None,
+        };
+        let resp = g.execute_real(&req, &report);
+        assert_eq!(resp.capability_tag, "xlsx_consolidation");
+        assert_eq!(resp.allocations.len(), 1);
+        assert_eq!(resp.internal_count, 3);
+        assert_eq!(resp.external_gap_count, 2);
+        assert_eq!(resp.strengthening_actions, 1);
+        assert_eq!(resp.external_gaps, vec!["gap_a".to_string()]);
+        assert!(resp.message.contains("拆解 1 子任务"));
+        // 无 allocation 时 allocations 为空但字段仍正确映射
+        let empty = TaskLoopReport::default();
+        let resp2 = g.execute_real(&req, &empty);
+        assert!(resp2.allocations.is_empty());
+        assert_eq!(resp2.internal_count, 0);
+        assert_eq!(resp2.external_gap_count, 0);
+    }
 }
