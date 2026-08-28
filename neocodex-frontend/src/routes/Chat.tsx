@@ -1101,6 +1101,15 @@ export function Chat() {
         onClearTags={clearTags}
       />
 
+      {/* 窄屏遮罩：侧栏展开时覆盖主区，点击收起（仅在 <md 视口可见） */}
+      <Show when={!sidebarCollapsed()}>
+        <div
+          class="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] md:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+          aria-hidden="true"
+        />
+      </Show>
+
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
         {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅作窗口拖拽区） ===== */}
         <Show when={activeView() === 'chat'}>

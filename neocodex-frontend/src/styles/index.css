@@ -2032,3 +2032,15 @@
 .sc-jrow { white-space: nowrap; }
 .sc-note { font-size: 10px; color: #aaa; margin-bottom: 4px; }
 .sc-fallback code { color: var(--nt-color-gold-700, #c96823); }
+
+/* ── 左栏响应式：窄屏 (<768px) 展开态改为覆盖式抽屉，避免挤压主区 ── */
+@media (max-width: 767px) {
+  .nt-sidebar:not(.is-collapsed) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  }
+}
