@@ -396,6 +396,27 @@ pub fn ingest_session_resources(conn: &Connection) -> Result<String, String> {
 /// Mount point of the external Cortex-Brain volume (cold offline archive).
 const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
 
+/// Upsert a `cortex_brain` registry node. `kind` (causal_graph / corpus_archive / archive_dir)
+/// is stored inside `metadata` because the `nodes` table has no `kind` column.
+fn upsert_cortex_node(
+    conn: &Connection,
+    url: &str,
+    title: &str,
+    content: &str,
+    meta: &serde_json::Value,
+) -> Result<(), String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let ts = now();
+    conn.execute(
+        "INSERT OR REPLACE INTO nodes \
+         (id, node_type, title, content, url, created_at, updated_at, data_tier, tier, metadata) \
+         VALUES (?1,'cortex_brain',?2,?3,?4,?5,?5,'cache','warm',?6)",
+        rusqlite::params![id, title, content, url, ts, meta.to_string()],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Register the external Cortex-Brain volume (`/Volumes/NeoTrixBrain`) as a KB resource
 /// catalog. Scans `cortex-archive/{zim,pmtiles,wikipedia}` and `working/causal_graph.json`,
 /// upserting lightweight `cortex_source://` registry nodes so the volume is discoverable and
@@ -414,17 +435,13 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
             "path": causal.to_string_lossy(),
             "loaded_by": "E8AbductionBridge",
         });
-        conn.execute(
-            "INSERT OR REPLACE INTO nodes (url, title, content, kind, node_type, created_at) \
-             VALUES (?1,?2,?3,'resource','cortex_brain',?4)",
-            rusqlite::params![
-                "cortex_source://causal_graph",
-                "Cortex causal graph (E8 abduction)",
-                payload.to_string(),
-                now()
-            ],
-        )
-        .map_err(|e| e.to_string())?;
+        upsert_cortex_node(
+            conn,
+            "cortex_source://causal_graph",
+            "Cortex causal graph (E8 abduction)",
+            &payload.to_string(),
+            &payload,
+        )?;
         count += 1;
     }
     // Local 68 GB corpus (knowledge-archive-corpus-20260825.db) is a SUPERSET snapshot of
@@ -438,17 +455,13 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
             "bytes": sz,
             "note": "superset snapshot of live KB; cold storage",
         });
-        conn.execute(
-            "INSERT OR REPLACE INTO nodes (url, title, content, kind, node_type, created_at) \
-             VALUES (?1,?2,?3,'resource','cortex_brain',?4)",
-            rusqlite::params![
-                "cortex_source://corpus-archive",
-                "Local 68GB corpus (cold archive, superset of live KB)",
-                payload.to_string(),
-                now()
-            ],
-        )
-        .map_err(|e| e.to_string())?;
+        upsert_cortex_node(
+            conn,
+            "cortex_source://corpus-archive",
+            "Local 68GB corpus (cold archive, superset of live KB)",
+            &payload.to_string(),
+            &payload,
+        )?;
         count += 1;
     }
     Ok(count)
@@ -563,17 +576,13 @@ fn register_archive_dir(conn: &Connection, dir: &std::path::Path) -> Result<usiz
             "path": p.to_string_lossy(),
             "files": n,
         });
-        conn.execute(
-            "INSERT OR REPLACE INTO nodes (url, title, content, kind, node_type, created_at) \
-             VALUES (?1,?2,?3,'resource','cortex_brain',?4)",
-            rusqlite::params![
-                url,
-                format!("Cortex archive: {sub}"),
-                payload.to_string(),
-                now()
-            ],
-        )
-        .map_err(|e| e.to_string())?;
+        upsert_cortex_node(
+            conn,
+            &url,
+            &format!("Cortex archive: {sub}"),
+            &payload.to_string(),
+            &payload,
+        )?;
         count += 1;
     }
     Ok(count)
@@ -1151,9 +1160,17 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("cortex_test_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(dir.join("cortex-archive").join("zim")).unwrap();
         std::fs::write(dir.join("cortex-archive").join("zim").join("x.zim"), b"z").unwrap();
+        std::fs::create_dir_all(dir.join("working")).unwrap();
         std::fs::write(dir.join("working").join("causal_graph.json"), b"{}").unwrap();
+        let baseline: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE node_type='cortex_brain'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
         let n = register_cortex_brain(&conn, &dir).unwrap();
-        assert!(n >= 1, "should register zim dir + causal graph node, got {n}");
+        assert!(n >= 2, "should register zim dir + causal graph node, got {n}");
         let cnt: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM nodes WHERE node_type='cortex_brain'",
@@ -1161,7 +1178,11 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(cnt as usize, n);
+        assert_eq!(
+            cnt,
+            baseline + n as i64,
+            "cortex_brain node count drift (baseline={baseline} n={n} cnt={cnt})"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
