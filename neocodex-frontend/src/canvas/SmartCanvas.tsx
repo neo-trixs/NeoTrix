@@ -6,7 +6,7 @@ import { createSignal, createMemo, onMount, onCleanup, Show, For, type JSX } fro
 import type { CanvasNode, CollapsePolicy, Viewport } from './types'
 import { getRenderer, listCapabilities } from './nodeRegistry'
 import { computeCollapse, DEFAULT_POLICY } from './smartCollapse'
-import { evolutionRoute, pruneCandidates, treeStatus, pruneNode, setDesired, syncToCapabilityTree } from './evolution'
+import { evolutionRoute, pruneCandidates, treeStatus, pruneNode, setDesired, applyEvolutionRoute, syncToCapabilityTree } from './evolution'
 
 /** 搜索添加时用的示例载荷，保证节点可渲染。 */
 function sampleData(kind: string): unknown {
@@ -126,6 +126,7 @@ export function SmartCanvas(props: SmartCanvasProps) {
   const [search, setSearch] = createSignal('')
   const [paletteOpen, setPaletteOpen] = createSignal(false)
   const [evoOpen, setEvoOpen] = createSignal(false)
+  const [routeResult, setRouteResult] = createSignal<{ matured: number; pruned: number; applied: string[] } | null>(null)
   const matched = createMemo(() => {
     const q = search().toLowerCase().trim()
     const caps = listCapabilities()
@@ -247,8 +248,21 @@ export function SmartCanvas(props: SmartCanvasProps) {
           <div class="sc-evo">
             <div class="sc-evo-head">
               <span>能力网进化路线</span>
+              <button
+                class="sc-evo-auto"
+                title="按能力树自身 SEAL 路线自动进化 (树提议, 画板执行)"
+                onClick={() => applyEvolutionRoute().then(setRouteResult)}
+              >⚡ 自动进化</button>
               <button class="sc-evo-close" onClick={() => setEvoOpen(false)}>×</button>
             </div>
+            <Show when={routeResult()}>
+              {(r) => (
+                <div class="sc-evo-route">
+                  自动进化完成 · 晋升 {r().matured} · 回收 {r().pruned}
+                  <For each={r().applied}>{(a) => <div class="sc-evo-route-item">↳ {a}</div>}</For>
+                </div>
+              )}
+            </Show>
             <div class="sc-evo-list">
               <For each={evolutionRoute()}>
                 {(c) => (

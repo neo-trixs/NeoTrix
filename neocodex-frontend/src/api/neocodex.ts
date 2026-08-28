@@ -67,6 +67,11 @@ export function canvasSetDesired(kind: string, stage: number | null): Promise<{ 
   return call('canvas_set_desired', { kind, stage })
 }
 
+/** 画板按自身能力树 SEAL 进化路线自动进化：执行所有作用于 canvas::* 的计划 (Mature/Prune)。 */
+export function canvasApplyEvolutionRoute(): Promise<{ matured: number; pruned: number; applied: string[] }> {
+  return call('canvas_apply_evolution_route', {})
+}
+
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {
   return call('neocodex_create_session', { name: name ?? null })
 }

@@ -1990,6 +1990,15 @@
   background: var(--nt-color-gold-100, #fef3e2); cursor: pointer;
 }
 .sc-evo-resync:hover { background: var(--nt-color-gold-200, #fbe6c8); }
+.sc-evo-auto {
+  margin-left: auto; font: 600 10px ui-monospace, monospace; padding: 3px 8px; border-radius: 4px;
+  border: 1px solid var(--nt-color-gold-600, #d9a441); color: var(--nt-color-gold-800, #a3501c);
+  background: linear-gradient(135deg, var(--nt-color-gold-100, #fef3e2), var(--nt-color-gold-300, #f6d9a8));
+  cursor: pointer;
+}
+.sc-evo-auto:hover { filter: brightness(1.05); }
+.sc-evo-route { padding: 6px 10px; font-size: 10px; color: var(--nt-color-gold-800, #a3501c); border-top: 1px solid rgba(0,0,0,0.08); }
+.sc-evo-route-item { padding-left: 8px; color: #6b7280; }
 .sc-evo-plans { border-top: 1px solid rgba(0,0,0,0.06); max-height: 140px; overflow: auto; }
 .sc-evo-plan { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px; font-size: 10px; }
 .sc-evo-plan-act { font-weight: 700; color: var(--nt-color-teal-700, #0f766e); min-width: 56px; }

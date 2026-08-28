@@ -5,7 +5,7 @@
 //  → 落盘 KB kv_store，使 SEAL / ConsciousnessTree 可读取此进化轨迹。
 // ══════════════════════════════════════════════════════════════════════════
 import { createSignal, createRoot, createEffect } from 'solid-js'
-import { kbKvGet, kbKvSet, canvasSyncCapabilities, canvasPruneCapability, canvasSetDesired } from '../api/neocodex'
+import { kbKvGet, kbKvSet, canvasSyncCapabilities, canvasPruneCapability, canvasSetDesired, canvasApplyEvolutionRoute } from '../api/neocodex'
 import { listCapabilities } from './nodeRegistry'
 
 const NS = 'canvas_evo'
@@ -107,6 +107,18 @@ export async function setDesired(kind: string, stage: number | null): Promise<vo
     }
   } catch (e) {
     console.warn('[evo] set desired failed:', e)
+  }
+}
+
+/** 画板按自身能力树 SEAL 进化路线自动进化 (树提议、画板执行)，随后重新同步以刷新 canonical。 */
+export async function applyEvolutionRoute(): Promise<{ matured: number; pruned: number; applied: string[] } | null> {
+  try {
+    const res = await canvasApplyEvolutionRoute()
+    await syncToCapabilityTree()
+    return res
+  } catch (e) {
+    console.warn('[evo] apply evolution route failed:', e)
+    return null
   }
 }
 
