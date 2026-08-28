@@ -61,20 +61,26 @@ impl GatewayV2 {
         // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
         // 兼容两种注册名: 裸 provider 名 (`llm7`) 与完整目录名 (`llm7/codestral-latest`)。
         // 完整目录名场景下请求 model 恰等于注册名, `{name}/` strip 会失败,
-        // 需按首段前缀剥离, 否则上游收到 `llm7/codestral-latest` → model_unavailable。
+        // 需按 provider 前缀剥离, 否则上游收到 `llm7/codestral-latest` → model_unavailable。
         // 2026-08-22: 请求 model 恰等于裸 keyless 注册名 (RouterConfig preferred_model
         // = "llm7") 时同样视为"未指定模型" → 回退 catalog default_model (codestral-latest),
         // 防止字面 "llm7" 作为模型名发给上游 → model_unavailable。
+        // 修复 (2026-08-28): 仅当 request.model 以 `name/` 开头时才剥离 provider 前缀;
+        // 纯 model 名含内部 '/' (如 `meta/llama-3.2-11b-vision-instruct`) 原样保留,
+        // 防误把模型内的 '/' 当 provider 前缀截断 → 404 model not found。
         let stripped = request
             .model
             .strip_prefix(&format!("{}/", name))
             .map(|m| m.to_string())
             .or_else(|| {
-                if name.contains('/') {
+                // 仅当 request.model 以 `name/` 开头时才剥离 provider 前缀;
+                // 否则 (纯 model 名含内部 '/', 如 `meta/llama-3.2-11b-vision-instruct`)
+                // 不剥离, 保留完整 model 名
+                if name.contains('/') && request.model.starts_with(&format!("{}/", name)) {
                     request
                         .model
-                        .split_once('/')
-                        .map(|(_, rest)| rest.to_string())
+                        .strip_prefix(&format!("{}/", name))
+                        .map(|m| m.to_string())
                 } else {
                     None
                 }

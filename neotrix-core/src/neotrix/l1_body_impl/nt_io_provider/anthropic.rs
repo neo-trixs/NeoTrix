@@ -69,11 +69,7 @@ fn serialize_system(s: &str, cache: bool) -> serde_json::Value {
 
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
-    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
-        crate::core::nt_core_llm::DataTrust::Contracted
-    }
-
-    fn set_proxy(&mut self, proxy_url: &str) {
+fn set_proxy(&mut self, proxy_url: &str) {
         self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
     }
 

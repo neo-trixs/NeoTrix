@@ -84,22 +84,20 @@ impl GatewayV2 {
     /// 避免把注册名当模型名发给端点 (pollinations 会 404 "Model not found")。
     /// 非 keyless 的 provider (如 `openai`) 保持返回注册名本身。
     pub(super) fn provider_model(&self, provider_name: &str) -> Option<String> {
-        let model = provider_name
-            .split('/')
-            .next_back()
-            .unwrap_or(provider_name);
-        if model.is_empty() {
-            return None;
-        }
-        if model == provider_name {
-            // 无 `/` → 仅 keyless provider 回退到 catalog 默认模型
-            if let Some(info) = lookup_provider(provider_name) {
+        let parts: Vec<&str> = provider_name.split('/').collect();
+        if parts.len() <= 1 {
+            // 无 `/` → keyless provider 回退到 catalog 默认模型 (避免把注册名当模型名发给端点)
+            let name = parts.first().copied().unwrap_or(provider_name);
+            if let Some(info) = lookup_provider(name) {
                 if info.is_free && !info.default_model.is_empty() {
                     return Some(info.default_model.to_string());
                 }
             }
+            return Some(name.to_string());
         }
-        Some(model.to_string())
+        // 有 `/` → 返回 provider 之后的完整 model_id, 保留模型名内部的 '/'
+        // (如 `openai/meta/llama-3.2-11b-vision-instruct` → `meta/llama-3.2-11b-vision-instruct`)
+        Some(parts[1..].join("/"))
     }
 
     /// F7: Ori-Eval 生产接线 (R-P79) — 以自身 (GatewayV2 实现 LlmProvider) 作为

@@ -158,77 +158,27 @@ pub fn egress_privacy_guard(
         Ok(v) => v != "0" && v != "false",
         Err(_) => PRIVACY_BLOCK_UNTRUSTED.load(Ordering::Relaxed),
     };
-
-    // 1. 始终脱密钥 (即使总开关关, 密钥也绝不外泄)
-    scrub_egress_secrets(req);
-
     if !enabled {
         return Ok(());
     }
-
-    if trust == DataTrust::Trusted {
-        // 本地推理: 数据不出设备, 仅脱密钥即可。
-        return Ok(());
-    }
-
-    // 2. 扫描所有消息 (含 System/User/Tool/Assistant) 与图像数据中的内部指纹
-    let mut leaks: Vec<&'static str> = Vec::new();
-    for msg in req.messages.iter() {
-        leaks.extend(scan_internals(&msg.content));
-    }
-    if let Some(ref img) = req.image_data {
-        leaks.extend(scan_internals(img));
-    }
-    if let Some(ref c) = req.constraint_json {
-        if let Ok(s) = serde_json::to_string(c) {
-            leaks.extend(scan_internals(&s));
-        }
-    }
-    leaks.sort_unstable();
-    leaks.dedup();
-
-    if leaks.is_empty() {
-        return Ok(());
-    }
-
-    match trust {
-        DataTrust::Contracted => {
-            // 付费云: 脱敏内部指纹后放行
-            for msg in req.messages.iter_mut() {
-                if scan_internals(&msg.content).is_empty() {
-                    continue;
+    // P1 收敛: 单一逻辑源 = core::nt_core_llm::egress_privacy_guard (扫描/脱敏/阻断决策);
+    // neotrix 层仅保留启用开关与 untrusted 降级策略, 不再复制守卫逻辑。
+    let _ = provider_label;
+    match crate::core::nt_core_llm::egress_privacy_guard(req, trust) {
+        Ok(()) => Ok(()),
+        Err(_) if !block_untrusted && trust == DataTrust::Untrusted => {
+            // 显式降级: 不阻断, 改为脱敏内部指纹后放行
+            for m in req.messages.iter_mut() {
+                if !scan_internals(&m.content).is_empty() {
+                    m.content = redact_internals(&m.content);
                 }
-                msg.content = redact_internals(&msg.content);
             }
             if let Some(ref mut img) = req.image_data {
                 *img = redact_internals(img);
             }
             Ok(())
         }
-        DataTrust::Untrusted => {
-            if block_untrusted {
-                // fail-closed: 免费/代理端点绝不放行 NeoTrix 内部代码/对话
-                let joined = leaks.join(", ");
-                Err(format!(
-                    "privacy guard: egress to untrusted provider '{}' would leak NeoTrix internal code/conversation ({}). \
-                     Blocked. Use a local (Ollama/vLLM) or paid contracted provider, or set NEOTRIX_PRIVACY_BLOCK=0 to degrade to redaction.",
-                    provider_label, joined
-                ))
-            } else {
-                // 显式降级: 退化为脱敏放行
-                for msg in req.messages.iter_mut() {
-                    if scan_internals(&msg.content).is_empty() {
-                        continue;
-                    }
-                    msg.content = redact_internals(&msg.content);
-                }
-                if let Some(ref mut img) = req.image_data {
-                    *img = redact_internals(img);
-                }
-                Ok(())
-            }
-        }
-        DataTrust::Trusted => Ok(()),
+        Err(e) => Err(e),
     }
 }
 

@@ -154,7 +154,7 @@ impl ModelDiscovery {
     /// 内置免费模型（无需 API Key）
     pub fn discover_builtin_free() -> Vec<DiscoveredModel> {
         let mut models = Vec::new();
-        let neotrix_base = std::env::var("NEOTRIX_ZEN_URL").unwrap_or_else(|_| "https://api.opencode.ai/zen/v1".to_string());
+        let neotrix_base = std::env::var("NEOTRIX_ZEN_URL").unwrap_or_else(|_| "https://opencode.ai/zen/v1".to_string());
 
         // 如果用户明确配置了 NEOTRIX_ZEN_URL 或者我们检测到可用
         if std::env::var("NEOTRIX_ZEN_URL").is_ok() {

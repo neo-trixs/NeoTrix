@@ -67,7 +67,11 @@ pub trait LlmProvider: Send + Sync {
     fn set_proxy(&mut self, _proxy_url: &str) {}
 
     /// 数据信任分级 — 决定出网守卫处置 (Trusted/Contracted/Untrusted)。
-    fn data_trust(&self) -> DataTrust;
+    /// 外部 LLM 的信任级别. 默认 `Contracted` (脱敏不阻断); 本地/Ollama 与未受信/免费端点覆写.
+    /// 单一来源: trait 默认 + 少量显式覆写, 不再逐 provider 手写 (`P2`).
+    fn data_trust(&self) -> DataTrust {
+        DataTrust::Contracted
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
