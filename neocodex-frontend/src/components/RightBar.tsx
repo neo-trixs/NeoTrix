@@ -4,6 +4,8 @@ import type { ProjectTreeItem } from '../api/types'
 import { clsx } from 'clsx'
 import { GlobeView } from './GlobeView'
 import { ProjectView as ProjectViewPanel } from './ProjectView'
+import { SmartCanvas, startCanvasBridge } from '../canvas'
+import { canvasStore } from '../stores/canvas'
 
 /* ════════════════════════════════════════════
    RightBar — 右栏（设计 v2，已接线后端）
@@ -13,9 +15,9 @@ import { ProjectView as ProjectViewPanel } from './ProjectView'
    交互：auto-hide（hover/右侧边缘展开）或 collapsed 固定
    ════════════════════════════════════════════ */
 
-type RbTab = 'files' | 'map' | 'project'
+type RbTab = 'files' | 'map' | 'project' | 'canvas'
 
-const RB_TABS: RbTab[] = ['files', 'map', 'project']
+const RB_TABS: RbTab[] = ['files', 'map', 'project', 'canvas']
 
 interface FileNode {
   name: string
@@ -236,6 +238,8 @@ export function RightBar() {
    * 对后端 neocodex_project_tree IPC 持续轰炸。改为 onMount 单次加载 +
    * 显式刷新按钮（ap-footer「刷新」已复用 loadTree）。 */
   onMount(loadTree)
+  // 启动会话桥：对话结果实时上画板（幂等，全局一次）
+  startCanvasBridge()
 
   const toggleRb = () => {
     if (autoHide()) {
@@ -412,9 +416,25 @@ export function RightBar() {
               <path d="M1.5 2.5h4.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 00-1.5-1.5H1.5z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round" />
               <path d="M12.5 2.5H8a1.5 1.5 0 00-1.5 1.5v7.5a1.5 1.5 0 011.5-1.5h4.5z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round" />
             </svg>
-            项目
-          </button>
-        </div>
+             项目
+           </button>
+           <button
+             class={clsx('rb-tab', rbTab() === 'canvas' && 'on')}
+             onClick={() => setRbTab('canvas')}
+             role="tab"
+             aria-selected={rbTab() === 'canvas'}
+             tabIndex={rbTab() === 'canvas' ? 0 : -1}
+             onKeyDown={tabKeyDown}
+           >
+             <svg viewBox="0 0 14 14" class="rb-tab-ic">
+               <rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
+               <rect x="8" y="1.5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
+               <rect x="1.5" y="8" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
+               <rect x="8" y="8" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
+             </svg>
+             画板
+           </button>
+         </div>
 
         {/* ── 地图视图：shanhai 3D 地球 ── */}
         <Show when={rbTab() === 'map'}>
@@ -427,6 +447,17 @@ export function RightBar() {
         <Show when={rbTab() === 'project'}>
           <div class="rb-project flex-1 min-h-0 overflow-hidden flex flex-col">
             <ProjectViewPanel open onClose={() => setRbTab('files')} onOpenFile={openPath} />
+          </div>
+        </Show>
+
+        {/* ── 画板视图：智能画板（无限制类型 + 智能收缩） ── */}
+        <Show when={rbTab() === 'canvas'}>
+          <div class="rb-canvas flex-1 min-h-0 flex flex-col">
+            <SmartCanvas
+              nodes={() => canvasStore.nodes}
+              spawn={(n) => canvasStore.spawn(n)}
+              setCollapsed={(id, v) => canvasStore.setCollapsed(id, v)}
+            />
           </div>
         </Show>
 

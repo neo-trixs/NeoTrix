@@ -30,9 +30,10 @@ import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '..
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
 import { neocodex, system, unified, errText, harness } from '../api'
-import type { HarnessRunResponse, HarnessProgressEvent } from '../api/harness'
+import type { HarnessRunResponse, HarnessProgressEvent, HarnessApproval } from '../api/harness'
 import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
+import { ApprovalPanel } from '../components/ApprovalPanel'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -96,6 +97,11 @@ export function Chat() {
   const [harnessRoute, setHarnessRoute] = createSignal<{ tag: string; domain: string; specialist: string } | null>(null)
   const [harnessReport, setHarnessReport] = createSignal<HarnessRunResponse | null>(null)
   const [harnessRunning, setHarnessRunning] = createSignal(false)
+  // 左栏 bot 审批流可见性：挂载时拉取待审批队列（只读；交互待后端 approve/reject 端点）
+  const [approvals, setApprovals] = createSignal<HarnessApproval[]>([])
+  onMount(() => {
+    harness.harnessApprovalList().then(setApprovals).catch(() => setApprovals([]))
+  })
   // Harness 能力地图（⌘K 面板发现用，挂载时懒加载）
   const [harnessCaps, setHarnessCaps] = createSignal<{ capability_tag: string; domain: string; specialist: string; keywords: string[]; description: string }[]>([])
   const loadHarnessCaps = async () => {
@@ -1189,6 +1195,13 @@ export function Chat() {
                   </div>
                 </Show>
 
+                {/* 左栏 bot 审批流可见性（挂载即拉取待审批队列，只读展示） */}
+                <Show when={approvals().length > 0}>
+                  <div class="px-2 pb-2">
+                    <ApprovalPanel approvals={approvals()} onClose={() => setApprovals([])} />
+                  </div>
+                </Show>
+
                 {/* cic 输入区 */}
                 <div class="cic w-full">
                   {/* 斜杠命令菜单：空态同样渲染，保证 / 命令在任何输入态都有可见菜单 */}
@@ -1636,6 +1649,13 @@ export function Chat() {
               <Show when={harnessRunning() || harnessReport()}>
                 <div class="pb-2">
                   <HarnessReportCard running={harnessRunning()} report={harnessReport()} onClose={() => setHarnessReport(null)} />
+                </div>
+              </Show>
+
+              {/* 左栏 bot 审批流可见性（只读展示，交互待后端 approve/reject 端点） */}
+              <Show when={approvals().length > 0}>
+                <div class="pb-2">
+                  <ApprovalPanel approvals={approvals()} onClose={() => setApprovals([])} />
                 </div>
               </Show>
 

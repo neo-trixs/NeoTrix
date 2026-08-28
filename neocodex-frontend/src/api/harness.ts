@@ -127,6 +127,13 @@ export function harnessTurnStart(thread_id: string, instruction: string): Promis
   return call<HarnessTurn>('harness_turn_start', { thread_id, instruction })
 }
 
-export function harnessApprovalList(): Promise<{ id: string; action: string; state: string }[]> {
-  return call<{ id: string; action: string; state: string }[]>('harness_approval_list')
+/** 审批流：Harness 外部动作待人工确认队列（只读；后端暂未暴露 approve/reject 端点） */
+export interface HarnessApproval {
+  id: string
+  action: string
+  state: string
+}
+
+export function harnessApprovalList(): Promise<HarnessApproval[]> {
+  return call<HarnessApproval[]>('harness_approval_list')
 }

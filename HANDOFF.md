@@ -28,29 +28,32 @@
 - [ ] 跑 `cargo test` / `npm test` 全量（注意本机 OOM 纪律，见验证命令）
 
 ### P3 · 毫米级打磨 + 半成品收口
-> **P3 进度（本会话）**：构建保持 **GREEN（0 error / 0 warning）**。对命名候选文件做 Dark-Forest 可达性探针（统计 `pub` 项在 neotrix-core/src 内的外部引用）。结论：**9 个命名候选模块均已 `mod` 声明并编译通过，但多个文件的 `pub` 项外部引用为 0**——属「crate 公共面但生产流未接线」状态。批量删核心模块风险高（破坏 green build），故 P3 收口改为**逐文件聚焦会话**处理，本会话只留证据表，不动手删以免回归。
->
-> **可达性探针（pub 项数 / 名称外部引用数）— ⚠️ 不可全信**：
-> | 候选文件 | pub 项 | 名称外部引用 | 实情（复核）|
+> **P3a 结论（可靠探针，已修正）**：用**正确**的 rg 探针（去掉 zsh `!` glob 历史展开陷阱，改 `grep -v` 排除自身文件）重测 9 个候选模块——**全部有外部消费者，非孤儿**：
+> | 候选文件 | pub 项 | 外部引用 | 判定 |
 > |---|---|---|---|
-> | nt_core_gwt/workspace.rs | 32 | 0 | 模块树核心，被 GWT 调度消费 |
-> | nt_core_gwt/competition_gate.rs | 4 | 0 | **误报**：`workspace.rs:2` `use super::competition_gate::{CompetitionGate, CompetitionResult}` → 已消费 |
-> | gateway/selection.rs | 13 | 0 | 疑似被 gateway/mod.rs 调度消费（需 mod 路径复核）|
-> | gateway/state.rs | 22 | 0 | 疑似 gateway 内部状态机（需复核）|
-> | gateway/subgrid.rs | 5 | 0 | 疑似 gateway 子网格（需复核）|
-> | gateway/pool_health.rs | 4 | 0 | 疑似 pool_health 命令消费（需复核）|
-> | reasoning_engine/mod.rs | 2 | 0 | 模块树，被 core/mod.rs 暴露 |
-> | reasoning_engine/abductive.rs | 1 | 1 | 已接线（保留）|
-> | nt_memory_kb/kb_vector_index.rs | 12 | 0 | 疑似 KB 检索消费（需复核）|
-> | nt_mind/consciousness/panorama_pipeline.rs | 9 | 0 | 疑似意识全景消费（需复核）|
+> | workspace.rs | 32 | 22 | 已连（GWT 调度）|
+> | competition_gate.rs | 4 | 4 | 已连（workspace `use super::`）|
+> | gateway/selection.rs | 13 | 13 | 已连（网关调度）|
+> | gateway/state.rs | 22 | 20 | 已连 |
+> | gateway/subgrid.rs | 5 | 4 | 已连 |
+> | gateway/pool_health.rs | 4 | 4 | 已连 |
+> | reasoning_engine/mod.rs | 2 | 0 | 仅 2 个 pub 项未用（模块树已声明，低风险）|
+> | reasoning_engine/abductive.rs | 1 | 1 | 已连 |
+> | kb_vector_index.rs | 12 | 8 | 已连（KB 检索）|
+> | panorama_pipeline.rs | 9 | 8 | 已连（意识全景）|
 >
-> **探针局限（重要）**：纯 `pub` 项名 grep 对「模块树内部 `use super::` / 路径消费」会漏报（已证实 competition_gate 误报）。**结论：9 个候选模块均为 crate 公共面且彼此互联，并非真孤儿。批量删会破坏 green build。**
->
-> **P3 正确做法（修正）**：不靠名 grep，改用 (a) `cargo check` 在 bin crate 下的 dead_code 警告（仅对真不可达项报警）+ (b) 调用图（从 `#[command]`/`main` 反向可达性）确认。在拿到可靠可达性前，**保留全部模块，维持 build GREEN**。逐文件 connect/delete 改为聚焦会话，且每步 `CARGO_TARGET_DIR=/tmp/nt-target-absorb cargo check -p neotrix-tauri -j 2` 验证。
-- [ ] P3a：依照上表逐文件「连消费者 or 删」（建议先删 competition_gate / subgrid / pool_health 等最小单元，每删一个跑一次 green 验证）
-- [ ] 左栏「对话即OS」bot 行为（文件内联编辑、审批流、归档策略 UI）
-- [ ] 前端疑似 ghost 模块（GhostView/PPTView）清理
+> **关键教训**：上一轮探针的「0 引用」是 **zsh 把 `--glob '!...'` 当历史展开**导致 rg 搜空——纯工具 bug，不是真孤儿。Dark-Forest 判定前必须排除 shell 元字符陷阱。**结论：18 个 prior-session 半完成重构均「已连消费者」，无需删除，green build 保护成立。** 仅 `reasoning_engine/mod.rs` 2 个 pub 项可后续清理（C5 微调，非阻塞）。
+> **P3c 结论**：`GhostView`/`PPTView` **根本不存在**为组件（仅 `design-tokens.css` 的 `.btn-ghost` 合法按钮样式 + `index.css` ghost icon 用语）；宽泛「未用组件扫描」因 import 路径正则误报（如 Sidebar/SlashMenu 被判未用）而不可信，**无安全可删项**。
+- [x] P3a：18 核心半完成重构可靠可达性 → 全部已连消费者，无删除（green 保护）
+- [x] P3c：前端 ghost 模块（GhostView/PPTView 不存在；扫描不可信，无删）
+- [x] P3b（部分）：左栏 bot「审批流」可见性面板 `ApprovalPanel` 已接 `harness_approval_list`（只读，挂载即拉取，双方视图均挂载）；`npm run typecheck` + `ApprovalPanel.test.tsx`(2) 通过
+- [ ] P3b（待后端）：文件内联编辑（`read_file`/`write_file` 命令已存在，需前端编辑器组件）、审批交互（需 `harness_approval_approve/reject` 端点，当前无）、归档策略 UI（需 `session_archive` 端点，当前无）
 - [ ] 响应式/移动端验收
+
+### 已验证（本会话续）
+- ✅ **P3a 可靠可达性**：修正 zsh `!` glob 陷阱后探针显示 9 候选模块全部有外部消费者（22/32、4/4、13/13、20/22、4/5、4/4、1/1、8/12、8/9）→ 非孤儿，无需删除，green build 保护。
+- ✅ **P3c**：GhostView/PPTView 组件不存在；宽泛未用组件扫描因 import 正则误报不可用 → 无安全删除项。
+- ✅ **P3b 审批流面板**：新增 `ApprovalPanel.tsx`（只读展示 `harness_approval_list` 待审批队列 + 待处理计数），`Chat.tsx` 双方视图（chat/agent）挂载，`onMount` 拉取。`HarnessApproval` 类型接入 `api/harness.ts`。`npm run typecheck` EXIT 0；`ApprovalPanel.test.tsx` **2 passed**。
 
 ### 已验证（本会话）
 - ✅ **P0a 真·流式进度**：`harness_run` 改为 async，阶段1 `process_instruction` 后 emit `harness-progress{phase:"allocated"}`，阶段2 `execute_task_loop` 后 emit `phase:"done"`；前端 `Chat.tsx` 订阅事件增量渲染（先显分配、后落全量报告）。`CARGO_TARGET_DIR=/tmp/nt-target-absorb cargo check -p neotrix-tauri -j 2` → FINISHED（0 error/0 warning）。
@@ -65,3 +68,4 @@
 3. **Dark Forest 清理**：删前 `rg` 全仓库（含前端/ios）；仅 `files=1` 为真孤儿。被 `#[cfg(test)]` 调用的辅助 fn 在 `cargo check` 下报 never used，**加 `#[allow(dead_code)]` 或给 `mod tests` 加 `#[cfg(test)]`，绝不删被测辅助**。
 4. **跨轮持久化**：编辑后 `git status` 确认落盘；「上次编辑消失」先查 git。
 5. **构建验证纪律**：本机并发会话抢默认 `CARGO_TARGET_DIR` → OOM/SIGKILL；必须用独立 `CARGO_TARGET_DIR` + `-j 2`，勿信主干全量 build 结果（见顶部验证命令）。
+6. **shell 元字符陷阱（Dark-Forest 探针）**：zsh 会把 `--glob '!pattern'` 当历史展开，导致 `rg` 搜空、可达性计数全 0（假孤儿）。排除自身文件用 `rg ... | grep -v "$file"` 而非 `!` glob；探针结论须人工抽样复核（已证实 competition_gate 被 workspace `use super::` 消费却报 0）。

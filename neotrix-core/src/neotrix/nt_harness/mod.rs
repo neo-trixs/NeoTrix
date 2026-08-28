@@ -406,7 +406,7 @@ mod tests {
             project: None,
             permission_mode: None,
         };
-        let resp = g.execute_real(&req, &report);
+        let resp = g.execute_real(req.clone(), &report);
         assert_eq!(resp.capability_tag, "xlsx_consolidation");
         assert_eq!(resp.allocations.len(), 1);
         assert_eq!(resp.internal_count, 3);
@@ -416,7 +416,7 @@ mod tests {
         assert!(resp.message.contains("拆解 1 子任务"));
         // 无 allocation 时 allocations 为空但字段仍正确映射
         let empty = TaskLoopReport::default();
-        let resp2 = g.execute_real(&req, &empty);
+        let resp2 = g.execute_real(req.clone(), &empty);
         assert!(resp2.allocations.is_empty());
         assert_eq!(resp2.internal_count, 0);
         assert_eq!(resp2.external_gap_count, 0);

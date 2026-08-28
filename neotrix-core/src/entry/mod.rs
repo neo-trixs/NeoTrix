@@ -157,7 +157,7 @@ pub fn run_provider_wizard() {
             print!("Enter custom base URL: ");
             let _ = io::stdout().flush();
             let mut url = String::new();
-            if io::stdin().read_line(&url).is_err() {
+            if io::stdin().read_line(&mut url).is_err() {
                 eprintln!("Failed to read stdin; using default endpoint.");
             }
             let url = url.trim().to_string();

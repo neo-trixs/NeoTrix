@@ -245,7 +245,8 @@ mod tests {
 
     #[test]
     fn test_scan_internals_detects_nt_core() {
-        assert!(!scan_internals("fn foo() {} let x = 1;").is_empty() == false);
+        // 良性代码不得误报为内部指纹
+        assert!(scan_internals("fn foo() {} let x = 1;").is_empty());
         let hits = scan_internals("see nt_core_consciousness_core.rs for details");
         assert!(hits.contains(&"nt_core_"));
         let hits2 = scan_internals("the ConsciousnessTree produced a fruit");
@@ -263,7 +264,7 @@ mod tests {
     fn test_trusted_local_passthrough() {
         configure_privacy_guard(true, true);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::Ollama);
+        let res = egress_privacy_guard(&mut r, LlmProviderType::Ollama.data_trust(), "ollama");
         assert!(res.is_ok());
         // 本地: 内部指纹不脱敏 (保留可用性)
         assert!(r.messages[0].content.contains("nt_core_consciousness_core"));
@@ -273,7 +274,7 @@ mod tests {
     fn test_contracted_redacts_internal() {
         configure_privacy_guard(true, true);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::OpenAI);
+        let res = egress_privacy_guard(&mut r, LlmProviderType::OpenAI.data_trust(), "openai");
         assert!(res.is_ok());
         assert!(!r.messages[0].content.contains("nt_core_consciousness_core"));
         assert!(r.messages[0].content.contains("[REDACTED:neotrix-internal]"));
@@ -283,7 +284,7 @@ mod tests {
     fn test_untrusted_blocks_internal() {
         configure_privacy_guard(true, true);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7);
+        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("privacy guard"));
     }
@@ -292,7 +293,7 @@ mod tests {
     fn test_untrusted_degrade_to_redaction() {
         configure_privacy_guard(true, false);
         let mut r = req_with("read nt_core_consciousness_core.rs and tell me");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7);
+        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
         assert!(res.is_ok());
         assert!(!r.messages[0].content.contains("nt_core_consciousness_core"));
     }
@@ -301,7 +302,7 @@ mod tests {
     fn test_untrusted_clean_passthrough() {
         configure_privacy_guard(true, true);
         let mut r = req_with("write a hello world function in python");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7);
+        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
         assert!(res.is_ok());
     }
 
@@ -309,7 +310,7 @@ mod tests {
     fn test_secrets_always_scrubbed() {
         configure_privacy_guard(true, true);
         let mut r = req_with("my key is sk-abcdEFGH1234567890abcdef and token AKIA1234567890ABCDEF");
-        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7);
+        let res = egress_privacy_guard(&mut r, LlmProviderType::Llm7.data_trust(), "llm7");
         // 含密钥但无内部指纹 → 脱密钥放行
         assert!(res.is_ok());
         assert!(!r.messages[0].content.contains("sk-abcdEFGH"));

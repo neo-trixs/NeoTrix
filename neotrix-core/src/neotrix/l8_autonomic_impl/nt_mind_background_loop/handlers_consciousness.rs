@@ -609,6 +609,28 @@ impl BackgroundLoopHandle {
                     report.coherence,
                     fe_val
                 );
+                // R-P25: write FEP/IIT signals back to the EventBus so the
+                // shield poison-scan and dual-brain working-memory routes can
+                // consume them (ConsciousnessCritique = phi/coherence/unified),
+                // and the self-improvement loop (SEAL/RedQueen) can consume the
+                // IIT-bounded free energy (ExternalReward) as a drive signal.
+                // try_emit no-ops when self.event_bus is None, preserving the
+                // optional-bus semantics of the bridge publisher.
+                let bounded_fe = fep_iit.iit_bounded_free_energy(fe_val, report.phi);
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as i64;
+                self.try_emit(crate::core::nt_core_event::CoreEvent::ConsciousnessCritique {
+                    quality: score,
+                    relevance: report.phi,
+                    consistency: report.coherence,
+                    timestamp: ts,
+                });
+                self.try_emit(crate::core::nt_core_event::CoreEvent::ExternalReward {
+                    reward: bounded_fe,
+                    source: "nt_core_fep_iit".into(),
+                });
             }
         }
 
