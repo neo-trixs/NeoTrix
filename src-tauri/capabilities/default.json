@@ -1,7 +1,9 @@
 {
   "identifier": "default",
   "description": "Granular capability set for NeoTrix main window — core, shell, filesystem, notification, HTTP",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:default",
@@ -17,19 +19,47 @@
     "fs:default",
     {
       "identifier": "fs:allow-read",
-      "allow": [{ "path": "$HOME/**" }, { "path": "$TEMP/**" }]
+      "allow": [
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$TEMP/**"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-write",
-      "allow": [{ "path": "$HOME/**" }, { "path": "$TEMP/**" }]
+      "allow": [
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$TEMP/**"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$HOME/**" }, { "path": "$TEMP/**" }]
+      "allow": [
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$TEMP/**"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-stat",
-      "allow": [{ "path": "$HOME/**" }, { "path": "$TEMP/**" }]
+      "allow": [
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$TEMP/**"
+        }
+      ]
     },
     "notification:default",
     "notification:allow-notify",
@@ -49,6 +79,7 @@
     "global-shortcut:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",
-    "global-shortcut:allow-is-registered"
+    "global-shortcut:allow-is-registered",
+    "allow-neotrix-commands"
   ]
 }

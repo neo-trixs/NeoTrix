@@ -31,6 +31,8 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     nt_core_cad_consciousness::register_cad_consciousness_self_tests(&mut registry);
     // CAD 真实生成管线 (GenCAD 四步: CSR→CCIP→CDP→Decoder) — 替换架构占位
     crate::neotrix::l2_world_impl::cad_generator::register_cad_generator_self_tests(&mut registry);
+    // LLM 核心 (NT-CORE): 统一错误域接入 + token 预算引擎自测 (卫生层 P0)
+    crate::core::nt_core_llm::register_llm_self_tests(&mut registry);
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
     ));

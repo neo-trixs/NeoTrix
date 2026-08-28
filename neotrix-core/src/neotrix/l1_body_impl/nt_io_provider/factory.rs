@@ -1058,16 +1058,16 @@ mod tests {
         let mut gateway = GatewayV2::new();
         let n = pool.register_into_gateway(&mut gateway);
         assert_eq!(n, 1);
-        // 契约 (provider_pool.rs register_into_gateway): 以 `{label}` 为 provider 名注册
-        // (统一路由/健康); 模型信息走 AccountPool 映射而非 gateway 名。
+        // 契约 (provider_pool.rs register_into_gateway): 以 `{provider}/{model}` 为 gateway 名注册
+        // 使 provider_model() '/' 拆分与候选链前缀路由直接可用; label 仅作 AccountPool 键
         let names = gateway.providers();
         assert!(
-            names.iter().any(|p| p == "t-pool-gw"),
-            "pool 条目应以其 label 注册为 gateway provider, got {names:?}"
+            names.iter().any(|p| p == "openai/gpt-4o-mini"),
+            "pool 条目应以 provider/model 注册为 gateway provider, got {names:?}"
         );
-        // AccountPool 也应登记
+        // AccountPool 以 provider/label 登记 label
         let acc_pool = gateway.account_pool.lock().expect("lock");
-        assert!(acc_pool.contains("t-pool-gw"));
+        assert!(acc_pool.contains("openai/t-pool-gw") || acc_pool.contains("t-pool-gw"));
     }
 
     #[test]

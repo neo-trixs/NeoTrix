@@ -15,3 +15,4 @@ pub mod nt_core_blueprint;
 pub mod nt_core_three_scope_map;
 pub mod nt_mind_yoyobook;
 pub mod nt_mind_yoyo_gasp_site;
+pub mod nt_mind_rsi_exam;

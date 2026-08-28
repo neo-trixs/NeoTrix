@@ -76,6 +76,7 @@ pub struct EdgarFilings {
 
 /// 最近文件详情
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EdgarRecentFilings {
     #[serde(default)]
     pub accession_number: Vec<String>,

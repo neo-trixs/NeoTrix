@@ -17,3 +17,8 @@ pub mod nt_io_hermes_community;
 pub mod nt_io_eli5;
 pub mod nt_io_show_me;
 pub mod nt_io_unslop;
+// NT-IO 吸收模块 (C1, 来自 notes/absorption-20260828-batch3.md 条目 3,5,6,7)
+pub mod nt_io_pi_agent_desktop;
+pub mod nt_io_video_shotcraft;
+pub mod nt_io_cozyclay;
+pub mod nt_io_generative_media_skills;

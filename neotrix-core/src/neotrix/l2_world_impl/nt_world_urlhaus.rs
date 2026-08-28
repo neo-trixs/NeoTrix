@@ -69,6 +69,7 @@ pub struct CisaKevResponse {
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CisaKevVuln {
     #[serde(default)]
     pub cve_id: String,

@@ -1092,11 +1092,19 @@ mod tests {
 
     #[test]
     fn default_router_has_ordered_backends() {
-        // 默认路由 = DDG 首选 + Wikipedia 备选。
+        // 默认有序路由 (H4 Wave6 情报工具 + 外部吸收批次):
+        // DDG 首选 → Wikipedia 备选 → GDELT/EDGAR/... 数据后端有序回退。
         let router = WebSearchRouter::default_ordered();
         let names: Vec<String> = router.backends().iter().map(|b| b.name().to_string()).collect();
-        assert_eq!(names, vec!["duckduckgo", "wikipedia"]);
-        // doctor 体检: 未搜索前 current 应为 none。
+        assert_eq!(names, vec![
+            "duckduckgo", "wikipedia", "gdelt", "edgar", "usgs", "gdacs",
+            "ucdp", "urlhaus", "ofac", "polymarket", "aoi", "adsb",
+            "bgpview", "opencorporates",
+        ]);
+        // 契约: DDG 为首选, Wikipedia 为次选。
+        assert_eq!(names.first().map(|s| s.as_str()), Some("duckduckgo"));
+        assert_eq!(names.get(1).map(|s| s.as_str()), Some("wikipedia"));
+        // 未搜索前 current 应为 none。
         assert_eq!(router.current_backend(), "none");
     }
 

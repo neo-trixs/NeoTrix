@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::core::nt_core_error::NeoTrixError;
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
 #[async_trait::async_trait]
 pub trait LlmProvider: Send + Sync {
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError>;
@@ -300,6 +303,77 @@ impl From<&str> for LlmError {
     }
 }
 
+/// 统一错误域接入 (进化路线卫生层 P0): 将本地 `LlmError` 映射到核心 `NeoTrixError`,
+/// 使 LLM 层错误可经 `?` 传播至统一错误域, 消除散落 `.unwrap()`/`expect()`。
+impl From<LlmError> for NeoTrixError {
+    fn from(e: LlmError) -> Self {
+        match e {
+            LlmError::Network(s) => NeoTrixError::Network(s),
+            LlmError::Authentication(s) => NeoTrixError::SafetyViolation(format!("LLM auth: {s}")),
+            LlmError::RateLimit(s) => NeoTrixError::Brain(format!("LLM rate limit: {s}")),
+            LlmError::InvalidRequest(s) => NeoTrixError::InvalidInput(s),
+            LlmError::Server(s) => NeoTrixError::Brain(format!("LLM server: {s}")),
+            LlmError::Unknown(s) => NeoTrixError::Brain(s),
+        }
+    }
+}
+
+/// T1 检测: LLM 核心类型 + token 预算引擎 (D3 下沉) 自测。
+///
+/// 接入 SelfTest 注册表, 使该核心模块具备 T1 存在 + T2 注册 (进化路线卫生层:
+/// "无测试的进化=盲目重构" → 核心模块必须可自测)。
+pub struct LlmSelfTest;
+
+impl SelfTest for LlmSelfTest {
+    fn name(&self) -> &str {
+        "llm_core"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        // 1) 统一错误域转换: LlmError -> NeoTrixError 必须保留语义
+        let nt: NeoTrixError = LlmError::Authentication("bad key".into()).into();
+        if !nt.to_string().contains("LLM") && !nt.to_string().contains("auth") {
+            failures.push("llm_core: LlmError::Authentication 未能映射到 NeoTrixError".into());
+        }
+        let nt2: NeoTrixError = LlmError::InvalidRequest("bad req".into()).into();
+        if !matches!(nt2, NeoTrixError::InvalidInput(_)) {
+            failures.push("llm_core: LlmError::InvalidRequest 应映射到 InvalidInput".into());
+        }
+
+        // 2) token 估算单一事实源: 非空文本必须 >=1 token
+        if estimate_tokens("NeoTrix 核心") == 0 {
+            failures.push("llm_core: estimate_tokens 对非空文本返回 0".into());
+        }
+
+        // 3) 上下文预算压缩: 超长文本截断后 token 必须削减且在预算内
+        let long = "工具输出 ".repeat(2000);
+        let original = estimate_tokens(&long);
+        let truncated = truncate_preserving(&long, 100, 0.6);
+        let after = estimate_tokens(&truncated);
+        if after >= original {
+            failures.push(format!(
+                "llm_core: truncate_preserving 未削减 token ({after} >= {original})"
+            ));
+        }
+        if after > 120 {
+            failures.push(format!("llm_core: 截断超出预算 (got {after} > 120)"));
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册 LLM 核心 SelfTest 到全局注册表。
+pub fn register_llm_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(LlmSelfTest));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,6 +438,18 @@ mod tests {
         let req = LlmRequest::new("gpt-4o", "describe").with_temperature(Some(0.3333f32));
         let clean = req.temperature_clean().expect("temperature set");
         assert_eq!(clean, 0.33, "got {clean}");
+    }
+
+    #[test]
+    fn test_llm_self_test_passes() {
+        // 锁定 T1 检测: LlmSelfTest 必须自洽通过 (进化路线卫生层)
+        let t = super::LlmSelfTest;
+        let result = t.self_test();
+        assert!(
+            result.is_ok(),
+            "llm_core self_test 必须通过: {:?}",
+            result.err()
+        );
     }
 }
 

@@ -16,3 +16,6 @@ pub mod nt_act_hermeskill;
 pub mod nt_act_openbot;
 pub mod nt_act_openexecutive;
 pub mod nt_act_omni_route;
+
+// NT-ACT 吸收节点 (absorption-20260828-batch3, 条目 2)
+pub mod nt_act_cashclaw;

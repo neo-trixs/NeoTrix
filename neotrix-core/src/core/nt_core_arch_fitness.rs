@@ -125,9 +125,18 @@ const CORE_BOUNDARY_ALLOW: &[(&str, &str)] = &[
     // 能力网聚合 (nt_file_ability) 供 consciousness_core 消费
     ("nt_core_consciousness_core.rs", "consolidate_tables"),
     ("nt_core_consciousness_core.rs", "extract_text"),
+    ("nt_core_consciousness_core.rs", "extract_dir"),
     ("nt_core_consciousness_core.rs", "to_markdown"),
     ("nt_core_consciousness_core.rs", "edit_pdf"),
+    ("nt_core_consciousness_core.rs", "merge_pdfs"),
+    ("nt_core_consciousness_core.rs", "merge_docx"),
     ("nt_core_consciousness_core.rs", "l1_body_impl::nt_io_neocodex"),
+    // KB 共享状态层访问 (NT-MEMORY 契约) — 新增 sanctioned 反向引用
+    ("nt_core_meta/knowledge_gap_detector.rs", "l3_memory_impl"),
+    ("nt_core_knowledge/cad_absorb.rs", "l3_memory_impl"),
+    ("nt_core_consciousness_tree/types.rs", "l3_memory_impl"),
+    ("nt_core_consciousness_tree/kb_integration.rs", "l3_memory_impl"),
+    ("reasoning_engine/chain_executor.rs", "l3_memory_impl"),
     // documented 受控边界 (engine / codegraph / provider)
     ("nt_core_task_dispatcher.rs", "l8_autonomic_impl"),
     ("nt_core_retrieval.rs", "l8_autonomic_impl"),

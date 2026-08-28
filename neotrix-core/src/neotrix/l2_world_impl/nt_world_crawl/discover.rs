@@ -149,9 +149,13 @@ impl DiscoveryExtractor {
             "Remove navigation/link anchor patterns",
         ).expect("valid regex"));
 
+        let total_rules = rules.len();
         Self {
             rules,
-            stats: ExtractorStats::default(),
+            stats: ExtractorStats {
+                total_rules,
+                ..Default::default()
+            },
         }
     }
 
@@ -327,7 +331,9 @@ mod tests {
         let mut extractor = DiscoveryExtractor::new();
         let nav_links = "<a href='#' class='nav-link'>Home</a> <a href='/about'>About</a>";
         let results = extractor.extract(nav_links);
-        let pruned: Vec<_> = results.iter().filter(|r| r.rule_description.contains("navigation link")).collect();
+        let pruned: Vec<_> = results.iter().filter(|r| {
+            r.action == DiscoveryAction::Prune && r.rule_description.contains("navigation")
+        }).collect();
         assert!(!pruned.is_empty(), "navigation links should be pruned");
     }
 

@@ -14702,6 +14702,52 @@
           "note": "外部吸收: github.com/diegosouzapw/OmniRoute — 路由 (请求/任务路由, 类比 GWT 注意力路由 stub); 模块落地 + SelfTest T1 + 单测"
         }
       ]
+    },
+    {
+      "id": "nt_act::cashclaw",
+      "domain": "act",
+      "layer": "l6self",
+      "constellation": "c1unittest",
+      "provides": [
+        "autonomous_work_agent",
+        "self_learning_memory"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_act::cashclaw",
+          "note": "外部吸收 cashclaw (moltlaunch/cashclaw): 自治工作智能体闭环 接单→报价→执行→交付→收费→评分反馈 + BM25 自学习记忆(study sessions+时间衰减), 对齐 NeoTrix experience-tree 经验吸收",
+          "timestamp": "2026-08-28T03:15:00Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_mind::rsi_exam",
+      "domain": "mind",
+      "layer": "l4cognition",
+      "constellation": "c0compile",
+      "provides": [
+        "rsi_benchmark",
+        "self_improvement_eval"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_mind::rsi_exam",
+          "note": "SEAL 自进化外部评测锚点: RSI-Exam (rsi-exam.ai) 递归自改进可执行基准, inherited_artifact/visible_set/hidden_set/rollout/version_history 概念结构映射 ConsciousnessTree 自进化闭环",
+          "timestamp": "2026-08-28T03:30:43Z"
+        }
+      ]
     }
   ],
   "edges": [
