@@ -1056,4 +1056,36 @@ mod tests {
         let dup = export.edges.iter().filter(|(a, b)| a == "c2" && b == "p2").count();
         assert_eq!(dup, 1, "export 必须去重平行边, 得到 {}", dup);
     }
+
+    /// E2 回归门禁 (R-P39 单调性): maturity_audit 必须精确命中虚标, demote 后归零。
+    /// 锁定 evidence_supported_constellation 与 D16 promotion_evidence_gate 的逐步对齐,
+    /// 防止后续改动把审计误判回"119 虚标"或漏报真实虚标。
+    #[test]
+    fn test_maturity_audit_demote_regression() {
+        let mut reg = CapabilityRegistry::new();
+        // 声称 C2 但无 provides/wiring_evidence → 实际支撑 C0
+        let mut ghost = CapabilityNode::new_primitive("mind::ghost".into(), Domain::Mind, vec![]);
+        ghost.constellation = ConstellationLevel::C2IntegrationTest;
+        reg.register(ghost).unwrap();
+        // 声称 C2 且有 provides → 实际支撑 C1
+        let mut half = CapabilityNode::new_primitive("mind::half".into(), Domain::Mind, vec!["cap".into()]);
+        half.constellation = ConstellationLevel::C2IntegrationTest;
+        reg.register(half).unwrap();
+        // 合法节点: 声称 C2 且有 wiring_evidence → 支撑 C2, 不应命中
+        let mut ok = CapabilityNode::new_primitive("mind::ok".into(), Domain::Mind, vec!["cap".into()]);
+        ok.constellation = ConstellationLevel::C2IntegrationTest;
+        ok.metadata.insert("wiring_evidence".into(), serde_json::Value::String("src:line".into()));
+        reg.register(ok).unwrap();
+
+        let findings = reg.maturity_audit();
+        assert_eq!(findings.len(), 2, "应精确命中 2 个虚标, 得到 {}", findings.len());
+
+        let demoted = reg.demote_mislabeled("cycle-test");
+        assert_eq!(demoted, 2);
+        assert_eq!(reg.nodes["mind::ghost"].constellation, ConstellationLevel::C0Compile);
+        assert_eq!(reg.nodes["mind::half"].constellation, ConstellationLevel::C1UnitTest);
+        assert!(reg.maturity_audit().is_empty(), "demote 后必须 0 虚标");
+        // 合法节点未被降级
+        assert_eq!(reg.nodes["mind::ok"].constellation, ConstellationLevel::C2IntegrationTest);
+    }
 }
