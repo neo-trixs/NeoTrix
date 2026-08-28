@@ -1151,6 +1151,15 @@ export function Chat() {
     setEditContent(message.content)
   }
 
+  // 消息 hover 操作条：复制
+  const copyMessage = async (m: Message) => {
+    try {
+      await navigator.clipboard.writeText(m.content)
+    } catch {
+      /* 剪贴板不可用时忽略 */
+    }
+  }
+
   const handleSaveEdit = () => {
     // 流式进行中禁止编辑重发（审计 F2：本地截断 + 重发被守卫吞 → 会话截断无响应）
     if (isGenerating()) return
@@ -1539,6 +1548,30 @@ export function Chat() {
                       <div class="ma2">
                         {isUser ? <UserIcon /> : <BotIcon />}
                       </div>
+
+                      {/* 消息 hover 操作条：复制 / 重新生成（对标 2026 agent UX） */}
+                      <Show when={!isEditing}>
+                        <div class="msg-action">
+                          <button
+                            class="msg-action__btn"
+                            onClick={() => copyMessage(message)}
+                            title="复制消息"
+                            aria-label="复制消息"
+                          >
+                            复制
+                          </button>
+                          <Show when={!isUser && !message.isStreaming && !isGenerating()}>
+                            <button
+                              class="msg-action__btn"
+                              onClick={() => handleRegenerate(message)}
+                              title="重新生成回复"
+                              aria-label="重新生成回复"
+                            >
+                              重新生成
+                            </button>
+                          </Show>
+                        </div>
+                      </Show>
 
                       <div class="flex-1 min-w-0">
                         {isEditing ? (

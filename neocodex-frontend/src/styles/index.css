@@ -412,7 +412,38 @@
     display: flex;
     gap: 10px;
     max-width: 100%;
+    position: relative;
     animation: fi 0.25s ease-out;
+  }
+
+  /* 消息 hover 操作条（复制 / 重新生成） */
+  .msg-action {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    z-index: 6;
+  }
+  .msg:hover .msg-action {
+    opacity: 1;
+  }
+  .msg-action__btn {
+    font-size: 11px;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: var(--nt-color-gold-800, #a3501c);
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+  .msg-action__btn:hover {
+    background: #fff;
+    border-color: var(--nt-color-gold-500, #f0913a);
   }
 
   .msg.r {

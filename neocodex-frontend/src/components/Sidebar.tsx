@@ -1,6 +1,7 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
 import { Settings, Archive, RotateCcw, ChevronRight } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
+import type { Session } from '../stores/chat'
 
 import { clsx } from 'clsx'
 import { neocodex } from '../api'
@@ -112,6 +113,15 @@ export function Sidebar(props: SidebarProps) {
   }
 
   const currentSessionId = () => chatStore.state.currentSessionId
+
+  // 会话置顶（本地 pin，未持久化；对标 2026 会话列表置顶）
+  const [pinnedIds, setPinnedIds] = createSignal<string[]>([])
+  const togglePin = (id: string) =>
+    setPinnedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [id, ...ids]))
+  const pinnedSessions = () =>
+    pinnedIds()
+      .map((id) => chatStore.state.sessions.find((s) => s.id === id))
+      .filter((s): s is Session => !!s)
 
   const groupedSessions = () => {
     const sessions = chatStore.state.sessions
@@ -507,7 +517,51 @@ export function Sidebar(props: SidebarProps) {
                 )
               }
             >
-              <For each={groupedSessions()}>
+              {/* 置顶会话（本地 pin，置顶于列表最前） */}
+              <Show when={pinnedSessions().length > 0}>
+                <div class="mb-4">
+                  <div class="px-2 pb-2 pt-1 text-10px uppercase tracking-widest text-text-muted/70 font-semibold">置顶</div>
+                  <ul class="space-y-1" role="list" aria-label="置顶会话">
+                    <For each={pinnedSessions()}>
+                      {(session) => {
+                        const active = currentSessionId() === session.id
+                        return (
+                          <li class="group relative">
+                            <div class={clsx(
+                              'rounded-lg transition-colors flex items-center',
+                              active ? 'bg-nt-io-500/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]' : 'hover:bg-white/40'
+                            )}>
+                              <button
+                                class="flex-1 flex items-center gap-3 px-3 py-2 min-w-0 text-left"
+                                onClick={() => handleSwitchSession(session.id)}
+                                aria-current={active ? 'true' : undefined}
+                                title={session.title}
+                              >
+                                <NeoMessage class={clsx('w-4 h-4 flex-shrink-0', active ? 'text-nt-io-600' : 'text-text-muted')} />
+                                <span class={clsx('flex-1 min-w-0 truncate text-[13px]', active ? 'text-text-primary font-medium' : 'text-text-secondary')}>
+                                  {session.title}
+                                </span>
+                              </button>
+                              <button
+                                class="p-1 mr-2 rounded text-nt-io-600 bg-nt-io-500/10 hover:bg-white/70 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+                                onClick={(e) => { e.stopPropagation(); togglePin(session.id) }}
+                                aria-label="取消置顶"
+                                title="取消置顶"
+                              >
+                                <svg viewBox="0 0 16 16" fill="none" class="w-3.5 h-3.5">
+                                  <path d="M9.5 2.5l4 4L8.5 11.5 4 13l1.5-4.5L9.5 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                                </svg>
+                              </button>
+                            </div>
+                          </li>
+                        )
+                      }}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
+
+              <For each={groupedSessions().map((g) => ({ ...g, items: g.items.filter((s) => !pinnedIds().includes(s.id)) }))}>
                 {(group) => (
                   <div class="mb-4 last:mb-0">
                     {/* 项目分组头（对标 Claude Code / OpenWebUI：项目可折叠） */}
@@ -559,6 +613,21 @@ export function Sidebar(props: SidebarProps) {
                                     </span>
                                   </button>
                                   <div class="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                    <button
+                                      class={clsx(
+                                        'p-1 rounded transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
+                                        pinnedIds().includes(session.id)
+                                          ? 'text-nt-io-600 bg-nt-io-500/10'
+                                          : 'text-text-muted hover:text-text-primary hover:bg-white/70'
+                                      )}
+                                      onClick={(e) => { e.stopPropagation(); togglePin(session.id) }}
+                                      aria-label={pinnedIds().includes(session.id) ? '取消置顶' : '置顶'}
+                                      title={pinnedIds().includes(session.id) ? '取消置顶' : '置顶'}
+                                    >
+                                      <svg viewBox="0 0 16 16" fill="none" class="w-3.5 h-3.5">
+                                        <path d="M9.5 2.5l4 4L8.5 11.5 4 13l1.5-4.5L9.5 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                                      </svg>
+                                    </button>
                                     <button
                                       class={clsx(
                                         'p-1 rounded transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
