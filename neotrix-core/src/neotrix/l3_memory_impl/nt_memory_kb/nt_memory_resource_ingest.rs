@@ -381,7 +381,91 @@ pub fn ingest_session_resources(conn: &Connection) -> Result<String, String> {
     ingest_new_modules(&mut ingester)?;
     link_related_resources(&mut ingester)?;
 
+    // External "Cortex-Brain" volume: register as a discoverable KB catalog so the
+    // 114 GB offline archive is connected (Dark Forest), not inert. No-op if unmounted.
+    // This runs in production (ingest_session_resources is called at startup) → T3 wiring.
+    if let Err(e) = register_cortex_brain(conn, std::path::Path::new(CORTEX_ROOT)) {
+        eprintln!("[cortex] register skipped: {e}");
+    }
+
     Ok(ingester.report())
+}
+
+/// Mount point of the external Cortex-Brain volume (cold offline archive).
+const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
+
+/// Register the external Cortex-Brain volume (`/Volumes/NeoTrixBrain`) as a KB resource
+/// catalog. Scans `cortex-archive/{zim,pmtiles,wikipedia}` and `working/causal_graph.json`,
+/// upserting lightweight `cortex_source://` registry nodes so the volume is discoverable and
+/// connected rather than dead weight. Returns the number of registry nodes created.
+///
+/// Refuses to fabricate nodes when the volume is unmounted (avoids phantom catalog entries).
+pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Result<usize, String> {
+    if !root.exists() {
+        return Ok(0);
+    }
+    let mut count = register_archive_dir(conn, &root.join("cortex-archive"))?;
+    let causal = root.join("working").join("causal_graph.json");
+    if causal.exists() {
+        let payload = serde_json::json!({
+            "kind": "cortex_causal_graph",
+            "path": causal.to_string_lossy(),
+            "loaded_by": "E8AbductionBridge",
+        });
+        conn.execute(
+            "INSERT OR REPLACE INTO nodes (url, title, content, kind, node_type, created_at) \
+             VALUES (?1,?2,?3,'resource','cortex_brain',?4)",
+            rusqlite::params![
+                "cortex_source://causal_graph",
+                "Cortex causal graph (E8 abduction)",
+                payload.to_string(),
+                now()
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+/// Scan one directory and upsert a `cortex_source://<sub>` registry node per populated
+/// sub-directory (zim / pmtiles / wikipedia), recording file counts for discoverability.
+fn register_archive_dir(conn: &Connection, dir: &std::path::Path) -> Result<usize, String> {
+    if !dir.exists() {
+        return Ok(0);
+    }
+    let mut count = 0;
+    for sub in ["zim", "pmtiles", "wikipedia"] {
+        let p = dir.join(sub);
+        if !p.exists() {
+            continue;
+        }
+        let n = std::fs::read_dir(&p)
+            .map(|rd| rd.filter_map(|e| e.ok()).count())
+            .unwrap_or(0);
+        if n == 0 {
+            continue;
+        }
+        let url = format!("cortex_source://{sub}");
+        let payload = serde_json::json!({
+            "kind": "cortex_archive_dir",
+            "path": p.to_string_lossy(),
+            "files": n,
+        });
+        conn.execute(
+            "INSERT OR REPLACE INTO nodes (url, title, content, kind, node_type, created_at) \
+             VALUES (?1,?2,?3,'resource','cortex_brain',?4)",
+            rusqlite::params![
+                url,
+                format!("Cortex archive: {sub}"),
+                payload.to_string(),
+                now()
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    Ok(count)
 }
 
 fn ingest_github_resources(ingester: &mut ResourceIngester) -> Result<Vec<String>, String> {
@@ -948,5 +1032,40 @@ mod tests {
 
         assert!(ingested > 0, "at least one project-nomad data source should be ingested");
         println!("project-nomad data sources ingested: {}", ingested);
+    }
+
+    #[test]
+    fn test_register_cortex_brain_temp_dir() {
+        let conn = test_conn();
+        let dir = std::env::temp_dir().join(format!("cortex_test_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(dir.join("cortex-archive").join("zim")).unwrap();
+        std::fs::write(dir.join("cortex-archive").join("zim").join("x.zim"), b"z").unwrap();
+        std::fs::write(dir.join("working").join("causal_graph.json"), b"{}").unwrap();
+        let n = register_cortex_brain(&conn, &dir).unwrap();
+        assert!(n >= 1, "should register zim dir + causal graph node, got {n}");
+        let cnt: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE node_type='cortex_brain'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cnt as usize, n);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_register_cortex_brain_missing_mount_is_noop() {
+        let conn = test_conn();
+        let missing = std::path::Path::new("/Volumes/NeoTrixBrain__definitely_not_mounted");
+        assert_eq!(register_cortex_brain(&conn, missing).unwrap(), 0);
+        let cnt: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE node_type='cortex_brain'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cnt, 0);
     }
 }
