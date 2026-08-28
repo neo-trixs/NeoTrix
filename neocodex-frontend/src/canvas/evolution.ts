@@ -35,6 +35,7 @@ export const [treeStatus, setTreeStatus] = createSignal<{
   cycle: string
   matured: number
   plans: { action: string; nodeId: string; rationale: string }[]
+  canonical: Record<string, { constellation: string; deprecated: boolean }>
 } | null>(null)
 
 /**
@@ -56,12 +57,15 @@ async function syncToCapabilityTree(): Promise<void> {
       user_added: c.userAdded,
     }))
     const res = await canvasSyncCapabilities(payload)
+    const canonical: Record<string, { constellation: string; deprecated: boolean }> = {}
+    for (const c of res.canonical) canonical[c.kind] = { constellation: c.constellation, deprecated: c.deprecated }
     setTreeStatus({
       canvasNodes: res.nodes_synced,
       deprecated: res.deprecated,
       cycle: res.tree_cycle,
       matured: res.matured,
       plans: res.plans.map((p) => ({ action: p.action, nodeId: p.node_id, rationale: p.rationale })),
+      canonical,
     })
   } catch (e) {
     console.warn('[evo] sync to capability tree failed:', e)

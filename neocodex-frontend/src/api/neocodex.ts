@@ -50,6 +50,7 @@ export interface CanvasCapabilitySyncResult {
   deprecated: number
   matured: number
   plans: { action: string; node_id: string; rationale: string }[]
+  canonical: { kind: string; label: string; constellation: string; usage: number; deprecated: boolean }[]
 }
 /** 把画板能力网快照并入 NeoTrix 能力树 (KB kv_store capability_tree)，执行 Budding/Strengthen/Dark-Forest 回收。 */
 export function canvasSyncCapabilities(caps: CanvasCapabilityInput[]): Promise<CanvasCapabilitySyncResult> {

@@ -47,6 +47,17 @@ pub struct CanvasEvoPlan {
     pub rationale: String,
 }
 
+/// 画板节点在 NeoTrix 能力树中的 canonical 状态（SEAL 实算后回读，单一事实源）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasNodeStatus {
+    pub kind: String,
+    pub label: String,
+    /// C0..C5 (NeoTrix Constellations, 经证据门禁后的权威成熟度)
+    pub constellation: String,
+    pub usage: u32,
+    pub deprecated: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanvasCapabilitySyncResult {
     pub nodes_synced: usize,
@@ -57,6 +68,8 @@ pub struct CanvasCapabilitySyncResult {
     pub matured: usize,
     /// SEAL auto_scan 给出的、作用于画板节点的进化建议 (透明展示)
     pub plans: Vec<CanvasEvoPlan>,
+    /// 回读的画板节点 canonical 状态（证明双向融合：树 → 画板）
+    pub canonical: Vec<CanvasNodeStatus>,
 }
 
 fn stage_to_constellation(stage: u8) -> ConstellationLevel {
@@ -238,6 +251,29 @@ pub fn canvas_sync_capabilities(
         (m, p, pls)
     };
 
+    // 回读 canvas 节点 canonical 状态 (SEAL 实算后的权威成熟度)，证明双向融合
+    let canonical: Vec<CanvasNodeStatus> = registry
+        .nodes
+        .values()
+        .filter(|n| n.id.starts_with("canvas::"))
+        .map(|n| CanvasNodeStatus {
+            kind: n.id.trim_start_matches("canvas::").to_string(),
+            label: n
+                .metadata
+                .get("canvas_label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            constellation: n.constellation.as_str().to_string(),
+            usage: n
+                .metadata
+                .get("canvas_usage")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u32,
+            deprecated: n.deprecated,
+        })
+        .collect();
+
     let kb = KBCapabilityTree::from_registry(&registry);
     let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
     kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
@@ -248,5 +284,6 @@ pub fn canvas_sync_capabilities(
         deprecated: seal_pruned,
         matured,
         plans,
+        canonical,
     })
 }

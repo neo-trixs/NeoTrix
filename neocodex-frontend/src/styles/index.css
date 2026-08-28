@@ -1960,6 +1960,11 @@
 .sc-evo-label { font-weight: 500; color: #222; }
 .sc-evo-kind { margin-left: auto; font-size: 9px; color: #aaa; font-family: ui-monospace, monospace; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-evo-count { font-size: 10px; color: #999; min-width: 28px; text-align: right; }
+.sc-evo-canon {
+  margin-left: 4px; font: 600 9px ui-monospace, monospace; padding: 1px 4px; border-radius: 4px;
+  background: var(--nt-color-gold-100, #fef3e2); color: var(--nt-color-gold-800, #a3501c);
+}
+.sc-evo-canon.dead { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
 .sc-evo-prune { padding: 8px 10px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 10px; color: var(--nt-color-orange-600, #ea580c); }
 .sc-evo-plans { border-top: 1px solid rgba(0,0,0,0.06); max-height: 140px; overflow: auto; }
 .sc-evo-plan { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px; font-size: 10px; }
@@ -2032,15 +2037,3 @@
 .sc-jrow { white-space: nowrap; }
 .sc-note { font-size: 10px; color: #aaa; margin-bottom: 4px; }
 .sc-fallback code { color: var(--nt-color-gold-700, #c96823); }
-
-/* ── 左栏响应式：窄屏 (<768px) 展开态改为覆盖式抽屉，避免挤压主区 ── */
-@media (max-width: 767px) {
-  .nt-sidebar:not(.is-collapsed) {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 50;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
-  }
-}

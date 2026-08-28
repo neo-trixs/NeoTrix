@@ -257,6 +257,15 @@ export function SmartCanvas(props: SmartCanvasProps) {
                     <span class="sc-evo-label">{c.label}</span>
                     <span class="sc-evo-kind">{c.kind}</span>
                     <span class="sc-evo-count">×{c.count}</span>
+                    <Show when={treeStatus()?.canonical[c.kind]}>
+                      {(cn) => (
+                        <span
+                          class="sc-evo-canon"
+                          classList={{ dead: cn().deprecated }}
+                          title="NeoTrix 能力树 canonical 成熟度 (SEAL 实算)"
+                        >NeoTrix {cn().constellation}</span>
+                      )}
+                    </Show>
                   </div>
                 )}
               </For>
