@@ -110,7 +110,10 @@ impl ActivationAuditStage {
     /// 生成可量化报告（含健康分级）。
     pub fn report(&self) -> ActivationAuditReport {
         let r = self.cumulative_rates();
-        let health = if r.slr < 0.5 {
+        let health = if self.samples.is_empty() {
+            // 无进化轮 → 无故障数据，判 Healthy 而非 Critical。
+            AuditHealth::Healthy
+        } else if r.slr < 0.5 {
             AuditHealth::Critical
         } else if r.slr < 0.8 {
             AuditHealth::Degraded
