@@ -163,7 +163,7 @@ fn main() {
                     commands::kb_trajectory_query,
                     commands::kb_geo_offline_pack,
                     commands::kb_kv_set, commands::kb_kv_get, commands::kb_kv_list,
-                    commands::canvas_sync_capabilities, commands::canvas_prune_capability,
+                    commands::canvas_sync_capabilities, commands::canvas_prune_capability, commands::canvas_set_desired,
                     commands::send_notification,
                                                             commands::distill_message,
                                         commands::get_identity,

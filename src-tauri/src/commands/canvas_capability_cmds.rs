@@ -56,6 +56,8 @@ pub struct CanvasNodeStatus {
     pub constellation: String,
     pub usage: u32,
     pub deprecated: bool,
+    /// 用户经画板推回的「期望成熟度」目标 (canvas_desired 元数据)，None 表示跟随遥测阶段
+    pub desired: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,7 +209,14 @@ pub fn canvas_sync_capabilities(
     let mut seal_targets: Vec<(String, u8, u8, bool)> = Vec::new();
     for cap in &caps {
         let id = format!("canvas::{}", cap.kind);
-        let desired = stage_to_constellation(cap.stage) as u8;
+        let reported = stage_to_constellation(cap.stage) as u8;
+        // 用户经画板推回的「期望成熟度」优先于遥测阶段作为晋升目标 (意图双向控制)
+        let desired = registry
+            .get(&id)
+            .and_then(|n| n.metadata.get("canvas_desired"))
+            .and_then(|v| v.as_u64())
+            .map(|d| d as u8)
+            .unwrap_or(reported);
         let current = registry.get(&id).map(|n| n.constellation as u8).unwrap_or(0);
         let dead = cap.user_added && cap.usage == 0;
         seal_targets.push((id, desired, current, dead));
@@ -281,6 +290,11 @@ pub fn canvas_sync_capabilities(
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0) as u32,
             deprecated: n.deprecated,
+            desired: n
+                .metadata
+                .get("canvas_desired")
+                .and_then(|v| v.as_u64())
+                .map(|d| d as u8),
         })
         .collect();
 
@@ -329,6 +343,50 @@ pub fn canvas_prune_capability(kind: String) -> Result<CanvasPruneResult, String
     Ok(CanvasPruneResult {
         kind,
         pruned,
+        constellation,
+    })
+}
+
+/// 画板覆盖层把「期望成熟度」推回能力树：写入 `canvas::<kind>` 的 `canvas_desired` 元数据，
+/// 使 SEAL 晋升循环以用户意图为目标 (而非仅跟随遥测阶段)。这是闭环中「画板意图 → 树」的写回。
+/// `stage` 为 0..=5 (C0..C5)；传 None 则清除意图、回退到遥测驱动。
+#[tauri::command]
+pub fn canvas_set_desired(kind: String, stage: Option<u8>) -> Result<CanvasPruneResult, String> {
+    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
+
+    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
+        Some(json) => {
+            let kb: KBCapabilityTree =
+                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
+            kb.to_registry()
+        }
+        None => CapabilityRegistry::new(),
+    };
+
+    let id = format!("canvas::{}", kind);
+    let (ok, constellation) = match registry.get_mut(&id) {
+        Some(node) => {
+            match stage {
+                Some(s) if s <= 5 => {
+                    node.metadata.insert("canvas_desired".into(), serde_json::json!(s));
+                }
+                Some(_) => return Err("stage 超出范围 (0..=5)".into()),
+                None => {
+                    node.metadata.remove("canvas_desired");
+                }
+            }
+            (true, node.constellation.as_str().to_string())
+        }
+        None => (false, "C0".to_string()),
+    };
+
+    let kb = KBCapabilityTree::from_registry(&registry);
+    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
+    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+
+    Ok(CanvasPruneResult {
+        kind,
+        pruned: ok,
         constellation,
     })
 }
