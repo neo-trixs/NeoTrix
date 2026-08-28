@@ -426,6 +426,8 @@ mod tests {
         assert!(report.created, "应新建节点");
         assert!(report.hub_linked, "应挂域枢纽边");
         assert_eq!(report.edges_added, 0);
+        // 可验证回放收据: 成功写入节点应产出签名 (被 Blocked 的吸收不在此处)
+        assert!(report.receipt_signature.is_some(), "新建节点应产出发票签名");
         // FTS 检索闭环验证
         let served = kb.serve_core("最短路径管道", 5).expect("serve");
         assert!(!served.results.is_empty(), "FTS 应检索到新节点");
