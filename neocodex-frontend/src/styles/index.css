@@ -446,6 +446,25 @@
     border-color: var(--nt-color-gold-500, #f0913a);
   }
 
+  /* 会话内搜索：未命中消息淡化聚焦 */
+  .msg-dim {
+    opacity: 0.22;
+    transition: opacity 0.15s ease;
+  }
+  .msg-search-input {
+    width: 140px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: #fff;
+    font-size: 11px;
+    color: var(--nt-color-gold-800);
+    outline: none;
+  }
+  .msg-search-input:focus {
+    border-color: var(--nt-color-gold-500, #f0913a);
+  }
+
   .msg.r {
     align-self: flex-end;
     flex-direction: row-reverse;
@@ -2449,6 +2468,11 @@
 }
 .theme-toggle:hover {
   background: rgba(0, 0, 0, 0.07);
+}
+.theme-toggle.on {
+  background: var(--nt-color-gold-500, #f0913a);
+  color: #fff;
+  border-color: transparent;
 }
 .theme-toggle__swatch {
   width: 12px;

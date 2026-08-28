@@ -170,6 +170,9 @@ export function Chat() {
   // ⌘K 命令面板（对标 Claude Code / Osaurus 命令菜单）：全局唤起，动作复用既有 handler
   const [paletteOpen, setPaletteOpen] = createSignal(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = createSignal(false)
+  // 会话内消息搜索（高亮/聚焦匹配，对标 2026 agent UX 检索）
+  const [msgSearch, setMsgSearch] = createSignal('')
+  const [msgSearchOpen, setMsgSearchOpen] = createSignal(false)
   // ⌘K 最近使用（对标 Raycast：置顶高频命令）
   const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
   const pushRecentCmd = (id: string) =>
@@ -1350,6 +1353,28 @@ export function Chat() {
               >
                 <span>导出</span>
               </button>
+              {/* 会话内消息搜索 */}
+              <button
+                class="theme-toggle"
+                classList={{ 'on': msgSearchOpen() }}
+                onClick={() => {
+                  setMsgSearchOpen((o) => !o)
+                  setMsgSearch('')
+                }}
+                title="会话内搜索（聚焦匹配消息）"
+                aria-label="会话内搜索"
+              >
+                <span>🔍</span>
+              </button>
+              <Show when={msgSearchOpen()}>
+                <input
+                  class="msg-search-input"
+                  placeholder="搜索本会话…"
+                  value={msgSearch()}
+                  onInput={(e) => setMsgSearch(e.currentTarget.value)}
+                  aria-label="搜索本会话"
+                />
+              </Show>
               {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
               <span class="relative flex-shrink-0">
                 <button
@@ -1587,7 +1612,7 @@ export function Chat() {
                   const collapsible = isLong && !message.isStreaming && !isLast
                   const collapsed = collapsible && !expanded
                   return (
-                    <div class={clsx('group msg', isUser ? 'r' : 'l')}>
+                    <div class={clsx('group msg', isUser ? 'r' : 'l', msgSearch() && !message.content.toLowerCase().includes(msgSearch().toLowerCase()) && 'msg-dim')}>
                       {/* 头像 */}
                       <div class="ma2">
                         {isUser ? <UserIcon /> : <BotIcon />}
