@@ -390,3 +390,69 @@ pub fn canvas_set_desired(kind: String, stage: Option<u8>) -> Result<CanvasPrune
         constellation,
     })
 }
+
+/// 画板按自身能力树 SEAL 进化路线「自动进化」：执行所有作用于 `canvas::*` 的 SEAL 计划
+/// (Mature / Prune 等)。方向与步数完全由能力树自己推导 (auto_scan)，画板仅执行 ——
+/// 这是「深化方向符合自己进化路线」的闭环：树提议，画板自动构建。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasRouteApplyResult {
+    pub matured: usize,
+    pub pruned: usize,
+    /// 已执行的计划理由 (透明)
+    pub applied: Vec<String>,
+}
+
+#[tauri::command]
+pub fn canvas_apply_evolution_route() -> Result<CanvasRouteApplyResult, String> {
+    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
+
+    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
+        Some(json) => {
+            let kb: KBCapabilityTree =
+                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
+            kb.to_registry()
+        }
+        None => CapabilityRegistry::new(),
+    };
+
+    let cycle = format!("canvas-{}", Utc::now().format("%Y%m%d"));
+
+    let (matured, pruned, applied) = {
+        let mut engine = EvolutionEngine::new(&mut registry);
+        let scan = engine.auto_scan(&cycle);
+        let mut m = 0usize;
+        let mut p = 0usize;
+        let mut applied: Vec<String> = Vec::new();
+        for pl in scan {
+            if pl.actions.iter().any(|a| action_node_id(a).starts_with("canvas::")) {
+                let matched_m = pl
+                    .actions
+                    .iter()
+                    .filter(|a| matches!(a, EvolutionAction::Mature { .. }))
+                    .count();
+                let matched_p = pl
+                    .actions
+                    .iter()
+                    .filter(|a| matches!(a, EvolutionAction::Prune { .. }))
+                    .count();
+                let rationale = pl.rationale.clone();
+                if engine.execute(pl).is_ok() {
+                    m += matched_m;
+                    p += matched_p;
+                    applied.push(rationale);
+                }
+            }
+        }
+        (m, p, applied)
+    };
+
+    let kb = KBCapabilityTree::from_registry(&registry);
+    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
+    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+
+    Ok(CanvasRouteApplyResult {
+        matured: m,
+        pruned: p,
+        applied,
+    })
+}
