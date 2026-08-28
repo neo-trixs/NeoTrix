@@ -1,4 +1,16 @@
 use serde::{Deserialize, Serialize};
+use crate::neotrix::l2_world_impl::nt_world_edgar::EdgarBackend;
+use crate::neotrix::l2_world_impl::nt_world_gdelt::GdeltBackend;
+use crate::neotrix::l2_world_impl::nt_world_usgs::UsgsBackend;
+use crate::neotrix::l2_world_impl::nt_world_gdacs::GdacsBackend;
+use crate::neotrix::l2_world_impl::nt_world_ucdp::UcdpBackend;
+use crate::neotrix::l2_world_impl::nt_world_urlhaus::UrlhausBackend;
+use crate::neotrix::l2_world_impl::nt_world_ofac::OfacBackend;
+use crate::neotrix::l2_world_impl::nt_world_polymarket::PolymarketBackend;
+use crate::neotrix::l2_world_impl::nt_world_aoi::AoiBackend;
+use crate::neotrix::l2_world_impl::nt_world_adsb::AdsbBackend;
+use crate::neotrix::l2_world_impl::nt_world_bgpview::BgpviewBackend;
+use crate::neotrix::l2_world_impl::nt_world_opencorporates::OpencorporatesBackend;
 
 /// argo 吸收 (2026-08-17): 证据可信度评分管线 — selection(权威) ×
 /// absorption(证据密度) + freshness(时效) + 共识. 强化 nt_world_search 现有节点
@@ -675,11 +687,24 @@ impl WebSearchRouter {
         }
     }
 
-    /// 默认有序后端: DuckDuckGo 首选 → Wikipedia 备选。
+    /// 默认有序后端 (H4 Wave6 情报工具 + 外部吸收批次):
+    /// DDG → Wikipedia → GDELT → EDGAR → USGS → GDACS → UCDP → URLhaus → OFAC → Polymarket → AOI → adsb.lol → BGPview → OpenCorporates
     pub fn default_ordered() -> Self {
         Self::new(vec![
             Box::new(DuckDuckGoBackend::default()),
             Box::new(WikipediaBackend::default()),
+            Box::new(GdeltBackend::new()),
+            Box::new(EdgarBackend::new()),
+            Box::new(UsgsBackend::new()),
+            Box::new(GdacsBackend::new()),
+            Box::new(UcdpBackend::new()),
+            Box::new(UrlhausBackend::new()),
+            Box::new(OfacBackend::new()),
+            Box::new(PolymarketBackend::new()),
+            Box::new(AoiBackend::default()),
+            Box::new(AdsbBackend::new()),
+            Box::new(BgpviewBackend::new()),
+            Box::new(OpencorporatesBackend::new()),
         ])
     }
 

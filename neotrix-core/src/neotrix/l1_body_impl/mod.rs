@@ -35,6 +35,7 @@ pub mod nt_io_desktop;
 pub mod nt_shield;
 pub mod nt_shield_propagation_guard;
 pub mod nt_shield_audit;
+pub mod nt_shield_oversight;
 pub mod nt_shield_sandbox;
 #[cfg(feature = "sandbox")]
 pub mod nt_shield_sandbox_entry;

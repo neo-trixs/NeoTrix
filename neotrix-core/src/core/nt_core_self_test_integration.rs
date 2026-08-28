@@ -1,8 +1,10 @@
 use crate::core::nt_core_arch_fitness::arch_fitness_tests;
 use crate::core::nt_core_qtest::QTestEngineSelfTest;
 use crate::core::nt_core_self_test::{ConstitutionComplianceTest, SelfTest, SelfTestRegistry};
+use crate::neotrix::l2_world_impl::cad_selftest;
+use crate::core::nt_core_cad_consciousness;
 
-pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
+pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
     registry.register(Box::new(AgentTeamSelfTest));
     registry.register(Box::new(AgenticScanSelfTest));
@@ -19,6 +21,16 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_shield_audit::ReasoningTraceGuard::default(),
     ));
+    // CAD SelfTest (NT-WORLD 实现层): GenCAD 四步框架生成能力
+    cad_selftest::register_cad_self_tests(&mut registry);
+    // 跨模态检索增强: 文本/点云/草图查询支持 (CCIP 表征空间)
+    crate::neotrix::l2_world_impl::cad_crossmodal_selftest::register_cad_crossmodal_self_tests(
+        &mut registry,
+    );
+    // CAD 意识核心统一编排 (NT-CORE): SEAL级联 / Runeword / T3证据 / 经验吸收
+    nt_core_cad_consciousness::register_cad_consciousness_self_tests(&mut registry);
+    // CAD 真实生成管线 (GenCAD 四步: CSR→CCIP→CDP→Decoder) — 替换架构占位
+    crate::neotrix::l2_world_impl::cad_generator::register_cad_generator_self_tests(&mut registry);
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
     ));
@@ -133,6 +145,12 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
         crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
     ));
     register_c5_healers(registry);
+    // 2026-08-27 Wave6 H4: 10 情报工具 SelfTest 注册 (激活 ConsciousnessTree NT-WORLD 分支)
+    crate::neotrix::l2_world_impl::nt_world_intel_selftest::register_intel_self_tests(registry);
+    // 2026-08-27 外部吸收 (arXiv:2608.23642): NT-SHIELD 监督退化 canary (Rev-明 审计强化)
+    crate::neotrix::l1_body_impl::nt_shield_oversight::register_oversight_self_tests(registry);
+    // 2026-08-28 外部吸收 (arXiv:2608.23642): NT-GOVERNANCE 人类监督治理 affordance + 萎缩对策
+    crate::neotrix::l5_consciousness_impl::nt_governance_human_oversight::register_human_oversight_self_tests(registry);
 }
 
 /// C5 自愈回路检测件 (检测异常 → 自动恢复)。纯内存, 无网络/磁盘/env IO。
@@ -156,6 +174,18 @@ pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
     ));
     registry.register(Box::new(
         crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::OracleLadderHealer,
+    ));
+    // 2026-08-17 C5 自愈回路扩展: CAD 生成能力自我修复
+    registry.register(Box::new(
+        crate::neotrix::l2_world_impl::cad_ch_selftest::CadCHSelfTest,
+    ));
+    // SynthBal 合成数据平衡
+    registry.register(Box::new(
+        crate::neotrix::l2_world_impl::cad_synthbal_selftest::CadSynthBalSelfTest,
+    ));
+    // B-Rep 拓扑验证
+    registry.register(Box::new(
+        crate::neotrix::l2_world_impl::cad_brep_selftest::CadBRepTopologySelfTest,
     ));
     // 2026-08-17 C5 自愈回路扩展: CORE scheduler 认领池一致性 + IO 账户池健康度
     registry.register(Box::new(

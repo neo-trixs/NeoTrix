@@ -164,6 +164,129 @@ impl EgressPolicy {
     }
 }
 
+/// GDELT Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_GDELT_HOST: &str = "api.gdeltproject.org";
+/// GDELT Egress allow 规则 (deny-wins 体系中的 allow 分支)。
+pub fn gdelt_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_GDELT_HOST, "443")
+}
+/// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn intel_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![gdelt_egress_rule()], false)
+}
+
+/// SEC EDGAR Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_EDGAR_HOST: &str = "data.sec.gov";
+/// SEC EDGAR Egress allow 规则 (deny-wins 体系中的 allow 分支)。
+pub fn edgar_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_EDGAR_HOST, "443")
+}
+/// SEC EDGAR 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn edgar_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![edgar_egress_rule()], false)
+}
+
+/// USGS Earthquakes Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_USGS_HOST: &str = "earthquake.usgs.gov";
+/// USGS Egress allow 规则 (deny-wins 体系中的 allow 分支)。
+pub fn usgs_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_USGS_HOST, "443")
+}
+/// USGS 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn usgs_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![usgs_egress_rule()], false)
+}
+
+/// GDACS Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_GDACS_HOST: &str = "www.gdacs.org";
+pub fn gdacs_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_GDACS_HOST, "443")
+}
+pub fn gdacs_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![gdacs_egress_rule()], false)
+}
+
+/// UCDP Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_UCDP_HOST: &str = "ucdp.uu.se";
+pub fn ucdp_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_UCDP_HOST, "443")
+}
+pub fn ucdp_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![ucdp_egress_rule()], false)
+}
+
+/// URLhaus Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_URLHAUS_HOST: &str = "urlhaus-api.abuse.ch";
+pub fn urlhaus_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_URLHAUS_HOST, "443")
+}
+pub fn urlhaus_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![urlhaus_egress_rule()], false)
+}
+
+/// CISA KEV Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_CISA_KEV_HOST: &str = "www.cisa.gov";
+pub fn cisa_kev_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_CISA_KEV_HOST, "443")
+}
+pub fn cisa_kev_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![cisa_kev_egress_rule()], false)
+}
+
+/// OFAC Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_OFAC_HOST: &str = "www.treasury.gov";
+pub fn ofac_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_OFAC_HOST, "443")
+}
+pub fn ofac_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![ofac_egress_rule()], false)
+}
+
+/// Polymarket Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_POLYMARKET_HOST: &str = "gamma-api.polymarket.com";
+pub fn polymarket_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_POLYMARKET_HOST, "443")
+}
+pub fn polymarket_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![polymarket_egress_rule()], false)
+}
+
+/// AOI (Area of Interest) Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_AOI_HOST: &str = "earthquake.usgs.gov";
+pub fn aoi_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_AOI_HOST, "443")
+}
+pub fn aoi_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![aoi_egress_rule()], false)
+}
+
+/// adsb.lol Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_ADSB_HOST: &str = "api.adsb.lol";
+pub fn adsb_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_ADSB_HOST, "443")
+}
+pub fn adsb_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![adsb_egress_rule()], false)
+}
+
+/// BGPview.io Egress 主机 — 单一事实源 (外部吸收批次).
+pub const INTEL_BGPVIEW_HOST: &str = "api.bgpview.io";
+pub fn bgpview_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_BGPVIEW_HOST, "443")
+}
+pub fn bgpview_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![bgpview_egress_rule()], false)
+}
+
+/// OpenCorporates Egress 主机 — 单一事实源 (外部吸收批次).
+pub const INTEL_OPENCORPORATES_HOST: &str = "api.opencorporates.com";
+pub fn opencorporates_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_OPENCORPORATES_HOST, "443")
+}
+pub fn opencorporates_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![opencorporates_egress_rule()], false)
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ResourceUsage {
     pub cpu_time: f64,
