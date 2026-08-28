@@ -1174,6 +1174,13 @@ export function Chat() {
   }
 
   // 消息 hover 操作条：复制
+  // 消息级「分支新话题」：以该消息为种子开全新会话（前端 fork；后端 history 固化待并发会话释放）
+  const handleBranch = (message: Message) => {
+    chatStore.addSession()
+    setInputValue(message.content)
+    setMsgSearch('')
+  }
+
   const copyMessage = async (m: Message) => {
     try {
       await navigator.clipboard.writeText(m.content)
@@ -1644,6 +1651,16 @@ export function Chat() {
                               aria-label="重新生成回复"
                             >
                               重新生成
+                            </button>
+                          </Show>
+                          <Show when={isUser}>
+                            <button
+                              class="msg-action__btn"
+                              onClick={() => handleBranch(message)}
+                              title="分支为新话题（以该消息为新会话种子）"
+                              aria-label="分支新话题"
+                            >
+                              分支
                             </button>
                           </Show>
                         </div>

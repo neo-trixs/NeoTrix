@@ -118,6 +118,29 @@ export function Sidebar(props: SidebarProps) {
   const [pinnedIds, setPinnedIds] = createSignal<string[]>([])
   const togglePin = (id: string) =>
     setPinnedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [id, ...ids]))
+
+  // 会话拖拽排序（前端本地序；后端固化待并发会话释放）：localStorage 持久化
+  const ORDER_KEY = 'nt_session_manual_order'
+  const loadOrder = (): string[] => {
+    try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '[]') } catch { return [] }
+  }
+  const [manualOrder, setManualOrder] = createSignal<string[]>(loadOrder())
+  const persistOrder = () => localStorage.setItem(ORDER_KEY, JSON.stringify(manualOrder()))
+  let dragSessionId: string | null = null
+  const reorderSession = (targetId: string) => {
+    if (!dragSessionId || dragSessionId === targetId) return
+    const allIds = chatStore.state.sessions.map((s) => s.id)
+    const valid = manualOrder().filter((id) => allIds.includes(id))
+    for (const id of allIds) if (!valid.includes(id)) valid.push(id)
+    const from = valid.indexOf(dragSessionId)
+    if (from === -1) return
+    valid.splice(from, 1)
+    const to = valid.indexOf(targetId)
+    valid.splice(to === -1 ? valid.length : to, 0, dragSessionId)
+    setManualOrder(valid)
+    persistOrder()
+    dragSessionId = null
+  }
   const pinnedSessions = () =>
     pinnedIds()
       .map((id) => chatStore.state.sessions.find((s) => s.id === id))
@@ -149,6 +172,19 @@ export function Sidebar(props: SidebarProps) {
       groups.get(key)!.push(s)
     }
     const arr = [...groups.entries()].map(([key, items]) => ({ key, items }))
+    // 组内应用手动拖拽序（未排序的会话回落按更新时间降序）
+    const orderIdx = (id: string) => {
+      const i = manualOrder().indexOf(id)
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i
+    }
+    arr.forEach((g) => {
+      g.items.sort((a, b) => {
+        const ia = orderIdx(a.id)
+        const ib = orderIdx(b.id)
+        if (ia !== ib) return ia - ib
+        return b.updatedAt.getTime() - a.updatedAt.getTime()
+      })
+    })
     // 项目组按最近活跃时间降序
     arr.sort((a, b) => {
       const ma = Math.max(...a.items.map((i) => i.updatedAt.getTime()), 0)
@@ -583,7 +619,17 @@ export function Sidebar(props: SidebarProps) {
                           const sessionTags = () => chatStore.tagsForSession(session.id)
                           const isTagging = () => taggingSessionId() === session.id
                           return (
-                            <li class="group relative">
+                            <li
+                              class="group relative"
+                              draggable={true}
+                              onDragStart={(e) => {
+                                dragSessionId = session.id
+                                e.dataTransfer.effectAllowed = 'move'
+                                try { e.dataTransfer.setData('text/plain', session.id) } catch { /* 旧浏览器兼容 */ }
+                              }}
+                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                              onDrop={(e) => { e.preventDefault(); reorderSession(session.id) }}
+                            >
                               <div class={clsx(
                                 'rounded-lg transition-colors',
                                 active

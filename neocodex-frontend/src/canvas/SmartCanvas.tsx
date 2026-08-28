@@ -124,7 +124,15 @@ export function SmartCanvas(props: SmartCanvasProps) {
 
   // ── 能力网搜索 / 进化路线 ──
   const [search, setSearch] = createSignal('')
-  const [paletteOpen, setPaletteOpen] = createSignal(false)
+  // 能力地图维度筛选（按 kind 维度过滤可见节点，对标 2026 标签筛选）
+  const [kindFilter, setKindFilter] = createSignal<Set<string>>(new Set())
+  const toggleKind = (kind: string) =>
+    setKindFilter((s) => {
+      const n = new Set(s)
+      if (n.has(kind)) n.delete(kind)
+      else n.add(kind)
+      return n
+    })
   const [evoOpen, setEvoOpen] = createSignal(false)
   const [routeResult, setRouteResult] = createSignal<{ matured: number; pruned: number; applied: string[] } | null>(null)
   const matched = createMemo(() => {
@@ -170,6 +178,22 @@ export function SmartCanvas(props: SmartCanvasProps) {
         <span class="sc-cap-count">能力网 {listCapabilities().length} 族</span>
       </div>
 
+      {/* 维度筛选：按 kind 过滤可见节点 */}
+      <div class="sc-dimbar">
+        <For each={[...new Set(props.nodes().map((n) => n.kind))]}>
+          {(kind) => (
+            <button
+              class="sc-dim"
+              classList={{ on: kindFilter().has(kind) }}
+              onClick={() => toggleKind(kind)}
+            >{kind}</button>
+          )}
+        </For>
+        <Show when={kindFilter().size > 0}>
+          <button class="sc-dim sc-dim-clear" onClick={() => setKindFilter(new Set())}>清除</button>
+        </Show>
+      </div>
+
       {/* 能力搜索面板 */}
       <Show when={paletteOpen() && matched().length}>
         <div class="sc-palette">
@@ -205,7 +229,10 @@ export function SmartCanvas(props: SmartCanvasProps) {
               return (
                 <div
                   class="sc-node"
-                  classList={{ 'sc-collapsed': isCollapsed() }}
+                  classList={{
+                    'sc-collapsed': isCollapsed(),
+                    'sc-dimmed': kindFilter().size > 0 && !kindFilter().has(node.kind),
+                  }}
                   style={{
                     left: `${node.x}px`,
                     top: `${node.y}px`,
