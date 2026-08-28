@@ -236,6 +236,56 @@ const HEADING_CLASS: Record<number, string> = {
   4: 'md-heading text-sm font-semibold text-text-secondary leading-snug',
 }
 
+// 表格增强：表头置顶 + 行 hover 高亮 + 一键复制为 CSV（对标 2026 数据表格 UX）
+function TableView(props: { header: string[]; rows: string[][] }) {
+  const toCsv = () => {
+    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`
+    const lines = [
+      props.header.map(esc).join(','),
+      ...props.rows.map((r) => r.map(esc).join(',')),
+    ]
+    navigator.clipboard?.writeText(lines.join('\n'))
+  }
+  return (
+    <div class="my-2 overflow-x-auto rounded-md border border-border-primary/80 bg-white/40 relative group/tbl">
+      <button
+        class="tbl-copy"
+        onClick={toCsv}
+        title="复制表格为 CSV"
+        aria-label="复制表格为 CSV"
+      >CSV</button>
+      <table class="w-full text-xs border-collapse">
+        <thead class="tbl-head">
+          <tr>
+            <For each={props.header}>
+              {(h) => (
+                <th class="border-b border-r border-border-primary/60 px-3 py-2 text-left font-semibold text-text-primary bg-white/60 last:border-r-0">
+                  {renderInline(h)}
+                </th>
+              )}
+            </For>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={props.rows}>
+            {(row) => (
+              <tr class="odd:bg-white/40 hover:bg-nt-io-500/10 transition-colors">
+                <For each={row}>
+                  {(cell) => (
+                    <td class="border-b border-r border-border-primary/40 px-3 py-2 text-text-secondary last:border-r-0 last:border-b-0">
+                      {renderInline(cell)}
+                    </td>
+                  )}
+                </For>
+              </tr>
+            )}
+          </For>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function renderBlock(block: Block): JSX.Element {
   switch (block.type) {
     case 'paragraph':
@@ -295,38 +345,7 @@ function renderBlock(block: Block): JSX.Element {
       )
 
     case 'table':
-      return (
-        <div class="my-2 overflow-x-auto rounded-md border border-border-primary/80 bg-white/40">
-          <table class="w-full text-xs border-collapse">
-            <thead>
-              <tr>
-                <For each={block.header}>
-                  {(h) => (
-                    <th class="border-b border-r border-border-primary/60 px-3 py-2 text-left font-semibold text-text-primary bg-white/60 last:border-r-0">
-                      {renderInline(h)}
-                    </th>
-                  )}
-                </For>
-              </tr>
-            </thead>
-            <tbody>
-              <For each={block.rows}>
-                {(row) => (
-                  <tr class="odd:bg-white/40">
-                    <For each={row}>
-                      {(cell) => (
-                        <td class="border-b border-r border-border-primary/40 px-3 py-2 text-text-secondary last:border-r-0 last:border-b-0">
-                          {renderInline(cell)}
-                        </td>
-                      )}
-                    </For>
-                  </tr>
-                )}
-              </For>
-            </tbody>
-          </table>
-        </div>
-      )
+      return <TableView header={block.header} rows={block.rows} />
 
     default:
       return <span />

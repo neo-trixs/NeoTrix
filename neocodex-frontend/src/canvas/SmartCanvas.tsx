@@ -142,6 +142,17 @@ export function SmartCanvas(props: SmartCanvasProps) {
     if (!q) return caps
     return caps.filter((c) => c.kind.toLowerCase().includes(q) || c.label.toLowerCase().includes(q))
   })
+  // 搜索联想：键盘上下导航 + 空查询时热门能力推荐
+  const [activeIdx, setActiveIdx] = createSignal(0)
+  const resetActive = () => setActiveIdx(0)
+  const onSearchKey = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(matched().length - 1, i + 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(0, i - 1)) }
+    else if (e.key === 'Enter') {
+      const c = matched()[activeIdx()]
+      if (c) { e.preventDefault(); addBySearch(c.kind, c.label) }
+    }
+  }
   const addBySearch = (kind: string, label: string) => {
     const k = kind.split('|')[0] // 多 kind renderer 取首个
     doSpawn({ kind: k, data: sampleData(k), title: `${label} 示例`, salience: 0.6, source: 'search' })
@@ -167,7 +178,8 @@ export function SmartCanvas(props: SmartCanvasProps) {
           class="sc-search"
           placeholder="搜索能力…"
           value={search()}
-          onInput={(e) => { setSearch(e.currentTarget.value); setPaletteOpen(true) }}
+          onInput={(e) => { setSearch(e.currentTarget.value); setPaletteOpen(true); resetActive() }}
+          onKeyDown={onSearchKey}
           onFocus={() => setPaletteOpen(true)}
         />
         <button
@@ -198,9 +210,17 @@ export function SmartCanvas(props: SmartCanvasProps) {
       {/* 能力搜索面板 */}
       <Show when={paletteOpen() && matched().length}>
         <div class="sc-palette">
+          <Show when={!search().trim()}>
+            <div class="sc-palette-hint">热门能力（↑↓ 选择 · ↵ 添加）</div>
+          </Show>
           <For each={matched()}>
-            {(c) => (
-              <button class="sc-palette-item" onClick={() => addBySearch(c.kind, c.label)}>
+            {(c, i) => (
+              <button
+                class="sc-palette-item"
+                classList={{ on: i() === activeIdx() }}
+                onMouseEnter={() => setActiveIdx(i())}
+                onClick={() => addBySearch(c.kind, c.label)}
+              >
                 <span class="sc-kind">{c.label}</span>
                 <span class="sc-palette-kind">{c.kind}</span>
               </button>

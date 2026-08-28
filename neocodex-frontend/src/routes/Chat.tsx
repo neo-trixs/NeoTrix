@@ -75,6 +75,17 @@ const SLASH_COMMANDS: SlashCommandDef[] = [
 
 /* —— 设计 v2 图标（HeroMark/UserIcon/BotIcon）见 chat/avatars.tsx —— */
 
+// 消息流日期分隔：相邻消息跨日时插入「今天 / 昨天 / M月D日」分隔条
+function dayLabel(d: Date): string {
+  const now = new Date()
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diff = Math.round((start(now) - start(d)) / 86400000)
+  if (diff === 0) return '今天'
+  if (diff === 1) return '昨天'
+  if (diff < 7) return `${diff} 天前`
+  return `${d.getMonth() + 1}月${d.getDate()}日`
+}
+
 export function Chat() {
   const [inputValue, setInputValue] = createSignal('')
   const [textareaRef, setTextareaRef] = createSignal<HTMLTextAreaElement | null>(null)
@@ -184,7 +195,10 @@ export function Chat() {
   type Theme = (typeof THEMES)[number]
   const THEME_LABEL: Record<Theme, string> = { gold: '浅金', lilac: '浅紫', mint: '浅青' }
   const [theme, setTheme] = createSignal<Theme>(
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt-theme') as Theme)) || 'gold',
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt-theme') as Theme)) ||
+      (typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: light)').matches
+        ? 'lilac'
+        : 'gold'),
   )
   createEffect(() => {
     document.documentElement.dataset.theme = theme()
@@ -1625,7 +1639,17 @@ export function Chat() {
                   const expanded = !!expandedMsgIds()[message.id]
                   const collapsible = isLong && !message.isStreaming && !isLast
                   const collapsed = collapsible && !expanded
+                  // 跨日分隔：首条或上一条日期不同则插入日期条
+                  const prevMsg = () => messages()[i() - 1]
+                  const showDaySep = () =>
+                    i() === 0 ||
+                    !prevMsg() ||
+                    dayLabel(prevMsg()!.timestamp) !== dayLabel(message.timestamp)
                   return (
+                    <>
+                      <Show when={showDaySep()}>
+                        <div class="msg-date-sep"><span class="msg-date-pill">{dayLabel(message.timestamp)}</span></div>
+                      </Show>
                     <div class={clsx('group msg', isUser ? 'r' : 'l', msgSearch() && !message.content.toLowerCase().includes(msgSearch().toLowerCase()) && 'msg-dim')}>
                       {/* 头像 */}
                       <div class="ma2">
@@ -1829,6 +1853,7 @@ export function Chat() {
                         </div>
                       </div>
                     </div>
+                    </>
                   )
                 }}
               </For>
