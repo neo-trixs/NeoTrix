@@ -29,7 +29,9 @@ import { HeroMark, UserIcon, BotIcon } from './chat/avatars'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
-import { neocodex, system, unified, errText } from '../api'
+import { neocodex, system, unified, errText, harness } from '../api'
+import type { HarnessRunResponse } from '../api/harness'
+import { HarnessReportCard } from '../components/HarnessReportCard'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -59,6 +61,7 @@ const SLASH_COMMANDS: SlashCommandDef[] = [
   { id: 'status', label: '运行状态', desc: '查看模型/上下文/成本与用量', keywords: ['status', 'health'] },
   { id: 'cost', label: '成本统计', desc: '查看 token 用量与估算成本', keywords: ['cost', 'spend', 'usage'] },
   { id: 'export', label: '导出会话', desc: '导出当前会话为 Markdown', keywords: ['export', 'share'] },
+  { id: 'run', label: '运行 Harness 任务', desc: '完整执行闭环：/run <任务>', keywords: ['run', 'harness', '执行'] },
   { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '?'] },
 ]
 
@@ -84,6 +87,25 @@ export function Chat() {
     setInfoNotice(msg)
     infoNoticeTimer = setTimeout(() => setInfoNotice(null), ms)
   }
+  const showError = (msg: string) => {
+    setStreamError(msg)
+    setTimeout(() => setStreamError(null), 3000)
+  }
+  // Harness 能力路由（对话即OS）— 每次发送后非阻塞解析，透明展示命中域
+  const [harnessRoute, setHarnessRoute] = createSignal<{ tag: string; domain: string; specialist: string } | null>(null)
+  const [harnessReport, setHarnessReport] = createSignal<HarnessRunResponse | null>(null)
+  const [harnessRunning, setHarnessRunning] = createSignal(false)
+  // Harness 能力地图（⌘K 面板发现用，挂载时懒加载）
+  const [harnessCaps, setHarnessCaps] = createSignal<{ capability_tag: string; domain: string; specialist: string; keywords: string[]; description: string }[]>([])
+  const loadHarnessCaps = async () => {
+    try {
+      const caps = await harness.harnessApiMap()
+      setHarnessCaps(caps)
+    } catch {
+      /* 发现性能力，失败静默 */
+    }
+  }
+  onMount(() => { void loadHarnessCaps() })
   const [copiedId, setCopiedId] = createSignal<string | null>(null)
   const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
   const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
@@ -180,6 +202,15 @@ export function Chat() {
     },
   }
   const runSlash = (cmd: SlashCommandDef) => {
+    // 「运行 Harness 任务」：从当前输入提取 /run 参数，先于清空执行（保留参数）
+    if (cmd.id === 'run') {
+      const instr = inputValue().replace(/^\/run\s*/, '').trim()
+      setInputValue('')
+      adjustTextarea()
+      if (instr) void runHarness(instr)
+      else showInfo('用法：/run <要执行的任务>', 3000)
+      return
+    }
     setInputValue('')
     setSlashDismissed(false)
     adjustTextarea()
@@ -766,11 +797,52 @@ export function Chat() {
   const handleSend = async () => {
     let content = inputValue().trim()
     if (!content && !annotationHint() && pendingAttachments().length === 0) return
+    // 对话即OS「运行」入口：/run <任务> 显式触发重路径真实执行闭环（对标 Claude Code /命令带参）
+    if (content.startsWith('/run ')) {
+      const instr = content.slice(5).trim()
+      setInputValue('')
+      adjustTextarea()
+      if (instr) await runHarness(instr)
+      else showInfo('用法：/run <要执行的任务>', 3000)
+      return
+    }
     if (!content) content = annotationHint()! // send the annotation even with empty text
     if (annotationHint() && content !== annotationHint()!) {
       content = `${content}\n\n${annotationHint()}`
     }
+    // 对话即OS：非阻塞解析能力路由，透明展示命中域（不替换 LLM 主链路）
+    setHarnessRoute(null)
+    void harness
+      .harnessExecute({ instruction: content })
+      .then((r) => {
+        if (r.capability_tag && r.capability_tag !== 'orchestration') {
+          setHarnessRoute({ tag: r.capability_tag, domain: r.domain, specialist: r.specialist })
+        }
+      })
+      .catch(() => {})
     await sendMessage(content)
+  }
+
+  /* Harness 重路径真实执行（⌘K「运行 Harness 任务」/ /run 触发）— 完整闭环，结果落报告面板 */
+  const runHarness = async (instruction: string) => {
+    const text = instruction.trim()
+    if (!text) {
+      showInfo('先在输入框写下要执行的任务', 3000)
+      return
+    }
+    setHarnessRunning(true)
+    setHarnessReport(null)
+    try {
+      const r = await harness.harnessRun({ instruction: text })
+      setHarnessReport(r)
+      const solvedInternal = r.internal_results.filter((x) => x.executed).length
+      const solvedExternal = r.external_closures.filter((x) => x.solved).length
+      showInfo(`Harness 完成 · 拆解 ${r.allocations.length} · 内置 ${solvedInternal}/${r.internal_count} · 外部 ${solvedExternal}/${r.external_gap_count}`, 3000)
+    } catch (e) {
+      showError(`Harness 执行失败：${errText(e)}`)
+    } finally {
+      setHarnessRunning(false)
+    }
   }
 
   /* 附件选择：dialog 选文件 → read_file 读取 → 暂存待发送 */
@@ -956,6 +1028,20 @@ export function Chat() {
     { id: 'mode', label: '切换权限模式', desc: '自动 / 手动 / 接受编辑 / 规划', keywords: ['mode', '权限', '模式'], run: () => cyclePermissionMode() },
     { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '帮助', '快捷键'], run: () => runSlash(SLASH_COMMANDS[3]) },
     { id: 'settings', label: '打开设置', desc: '提供商配置与应用设置', keywords: ['settings', '设置', '配置'], run: () => setSettingsOpen(true) },
+    // Harness 融合入口：重路径真实执行（用当前输入框内容触发完整闭环）
+    { id: 'harness-run', label: '运行 Harness 任务', desc: '用输入框内容触发完整执行闭环（内置+外部试错）', keywords: ['harness', '运行', '执行', 'run', '能力'], run: () => runHarness(inputValue()) },
+    // 能力地图发现（Raycast 风格）：选中后把能力提示填入输入框，用户补充具体内容后发送
+    ...harnessCaps().map((c) => ({
+      id: `harness-${c.capability_tag}`,
+      label: `能力：${c.description}`,
+      desc: `${c.domain} · ${c.specialist}`,
+      keywords: [c.capability_tag, ...c.keywords],
+      run: () => {
+        setInputValue(`/run ${c.description} `)
+        adjustTextarea()
+        textareaRef()?.focus()
+      },
+    })),
     ...unifiedCliCmds(),
   ]
 
@@ -979,6 +1065,15 @@ export function Chat() {
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>
             <div class="flex items-center gap-2 flex-shrink-0 min-w-0" data-tauri-drag-region />
+            <Show when={harnessRoute()}>
+              <span
+                class="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-nt-io-500/10 text-nt-io-600 border border-nt-io-500/20 flex-shrink-0"
+                title={`已路由到 ${harnessRoute()!.domain} · ${harnessRoute()!.specialist}`}
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500" />
+                {harnessRoute()!.domain} · {harnessRoute()!.specialist}
+              </span>
+            </Show>
           </header>
           {/* 批次2：上下文占用 gauge 条（可交互，只读轮询数据源；>80% 自动亮起 /compact 一键） */}
           <Show when={contextPct() !== null}>
@@ -1068,6 +1163,13 @@ export function Chat() {
                   </div>
                 </div>
 
+                {/* Harness 执行报告面板（/run 或 ⌘K 运行后展示，不污染会话历史） */}
+                <Show when={harnessRunning() || harnessReport()}>
+                  <div class="px-2 pb-2">
+                    <HarnessReportCard running={harnessRunning()} report={harnessReport()} onClose={() => setHarnessReport(null)} />
+                  </div>
+                </Show>
+
                 {/* cic 输入区 */}
                 <div class="cic w-full">
                   {/* 斜杠命令菜单：空态同样渲染，保证 / 命令在任何输入态都有可见菜单 */}
@@ -1091,6 +1193,9 @@ export function Chat() {
                     onKeyDown={handleKeyDown}
                     onPaste={handlePasteImage}
                     ref={setTextareaRef}
+                    aria-label="对话输入框"
+                    aria-busy={isGenerating()}
+                    aria-disabled={isGenerating()}
                   />
                   <div class="cic-actions">
                     <div class="cic-left">
@@ -1508,6 +1613,13 @@ export function Chat() {
               </div>
             </Show>
             <div class="max-w-[800px] mx-auto w-full px-6 pt-3 pb-2">
+              {/* Harness 执行报告面板（/run 或 ⌘K 运行后展示，不污染会话历史） */}
+              <Show when={harnessRunning() || harnessReport()}>
+                <div class="pb-2">
+                  <HarnessReportCard running={harnessRunning()} report={harnessReport()} onClose={() => setHarnessReport(null)} />
+                </div>
+              </Show>
+
               <div class="cic">
                 <textarea
                   ref={setTextareaRef}

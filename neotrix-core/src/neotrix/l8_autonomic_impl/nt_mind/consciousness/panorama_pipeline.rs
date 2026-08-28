@@ -56,6 +56,16 @@ impl PanoramaPipeline {
         // 有真实竞争池 (cycle 206 观测: 此前仅 wm_pred_N 单专家, 无竞争无熵)。
         let mut gwt = GlobalWorkspace::new(0.3);
         gwt.register_default_specialists();
+        // 补全共振竞争池: register_default_specialists 仅注册 14 个专家,
+        // 但 MODULE_COUNT=15 (第 15 位 = Orchestrator)。resonance 矩阵为 15×15,
+        // argmax 可能落在未注册的第 15 位, 导致 resonance_winner() 恒为 None
+        // (core::resonance::default_specialist_states 第 15 项指向 CADGeneration 模式,
+        // 却无对应 specialist 注册)。此处补注册 Orchestrator 以闭合竞争池, 保证必有 winner。
+        {
+            let mut orch = SpecialistModule::new(SpecialistType::Orchestrator, "Orchestrator".into());
+            orch.activation = 0.3;
+            gwt.register(orch);
+        }
         Self {
             cycle: 0,
             hypercube: KnowledgeHyperCube::new(),

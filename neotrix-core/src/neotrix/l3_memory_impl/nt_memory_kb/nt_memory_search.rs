@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
@@ -1587,5 +1588,69 @@ mod materialized_neighbors_tests {
         let hit_p95 = hit_lat[(QUERIES as f64 * 0.95) as usize];
         eprintln!("[bench] 缓存命中路径 p95={:.4}ms", hit_p95);
         assert!(hit_p95 < p95, "缓存命中应快于全扫描");
+    }
+}
+
+/// T3 SelfTest 接线 (NT-MEMORY nt_memory_search): 校验物化邻居缓存
+/// `MaterializedNeighborCache` 的命中正确性 — 最近邻必须被物化且按余弦相似度排序
+/// (核心不变量: 物化不能丢失最近邻)。
+pub struct MaterializedNeighborCacheSelfTest;
+
+impl SelfTest for MaterializedNeighborCacheSelfTest {
+    fn name(&self) -> &str {
+        "nt_memory_search"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let emb: Vec<(String, Vec<f32>)> = vec![
+            ("a".to_string(), vec![1.0, 0.0, 0.0]),
+            ("b".to_string(), vec![1.0, 0.0, 0.0]),
+            ("c".to_string(), vec![0.0, 1.0, 0.0]),
+        ];
+        let cache = MaterializedNeighborCache::build(&emb, 2);
+        if cache.len() != 3 {
+            failures.push(format!(
+                "nt_memory_search: materialized node count {} != 3",
+                cache.len()
+            ));
+        }
+        match cache.get("a") {
+            None => failures.push("nt_memory_search: node 'a' not materialized".into()),
+            Some(neighbors) => {
+                if neighbors.is_empty() {
+                    failures.push("nt_memory_search: 'a' has no materialized neighbors".into());
+                } else if neighbors[0].0 != "b" || (neighbors[0].1 - 1.0).abs() > 1e-4 {
+                    failures.push(format!(
+                        "nt_memory_search: 'a' nearest neighbor not captured (top={:?})",
+                        neighbors.first()
+                    ));
+                }
+            }
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+pub fn register_nt_memory_search_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(MaterializedNeighborCacheSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_nt_memory_search_self_test_passes() {
+        let t = super::MaterializedNeighborCacheSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "MaterializedNeighborCacheSelfTest failed: {:?}",
+            t.self_test().err()
+        );
     }
 }

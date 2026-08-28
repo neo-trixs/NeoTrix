@@ -1010,8 +1010,8 @@ impl crate::core::nt_core_self_test::SelfTest for OutputGovernorSelfTest {
             failures.push("trailing apology should be caught by R10".into());
         }
 
-        // 4. 空消息被捕获 (占位规则为 R04)
-        let report = gov.govern("   \n\n   ", OutputStyleId::Plain);
+        // 4. 纯占位行被捕获 (占位规则为 R04)
+        let report = gov.govern("待补充", OutputStyleId::Plain);
         let r04_caught = report.rule_results.iter().any(|r| !r.passed && r.rule_id == 4);
         if !r04_caught {
             failures.push("pure placeholder lines should be caught by R04".into());
@@ -1039,6 +1039,10 @@ mod tests_output_governor_selftest {
     #[test]
     fn test_output_governor_selftest() {
         let t = OutputGovernorSelfTest;
-        assert!(t.self_test().is_ok());
+        let res = t.self_test();
+        if let Err(ref f) = res {
+            eprintln!("OUTPUT_GOV SELFTEST FAILURES: {f:?}");
+        }
+        assert!(res.is_ok());
     }
 }

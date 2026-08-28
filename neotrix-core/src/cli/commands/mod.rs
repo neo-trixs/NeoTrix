@@ -38,6 +38,7 @@ pub mod wiki_cmds;
 pub mod consciousness_cmds;
 pub mod acp_cmds;
 pub mod chain_cmds;
+pub mod pool_health_cmds;
 
 pub use types::*;
 pub use bench_cmds::*;
@@ -72,3 +73,4 @@ pub use wiki_cmds::*;
 pub use consciousness_cmds::*;
 pub use acp_cmds::*;
 pub use chain_cmds::*;
+pub use pool_health_cmds::*;

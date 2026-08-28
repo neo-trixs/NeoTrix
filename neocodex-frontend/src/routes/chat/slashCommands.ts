@@ -127,6 +127,6 @@ export function runSlashDispatch(ctx: SlashContext, cmd: SlashCommandDef): void 
   } else if (cmd.id === 'export') {
     void runSlashExport(ctx)
   } else if (cmd.id === 'help') {
-    ctx.showInfo('快捷键：Enter 发送 · Shift+Enter 换行 · ⌘K 命令面板 · ⌘1-6 功能面板 · ⌘7 电脑视图 · ⌘N 新建对话 · Esc 关闭', 5000)
+    ctx.showInfo('快捷键：Enter 发送 · Shift+Enter 换行 · ⌘K 命令面板 · /run <任务> 运行 Harness · ⌘1-6 功能面板 · ⌘7 电脑视图 · ⌘N 新建对话 · Esc 关闭', 5000)
   }
 }

@@ -11,6 +11,7 @@ use crate::cli::commands::budget_cmds::BudgetCmd;
 use crate::cli::commands::file_cmds::{FileDiffCmd, FileReadCmd, FileWriteCmd};
 use crate::cli::commands::git_cmds::{CommitCmd, GitCmd};
 use crate::cli::commands::goal_cmds::GoalCmd;
+use crate::cli::commands::pool_health_cmds::PoolHealthCmd;
 use crate::cli::commands::session_cmds::{CompactCmd, ContextCmd, DistillCmd, HistoryCmd, ResumeCmd, SessionCmd};
 use crate::cli::commands::theme_cmd::ThemeCmd;
 use crate::cli::commands::connector_cmds::ConnectorCmd;
@@ -137,6 +138,8 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ChainCmd));
     // 外部探索 (Explore) — URL/GitHub 仓库吸收 + 蒸馏
     reg.register(Box::new(ExploreCmd));
+    // LLM 池健康 (NT-REPAIR 自愈可观测性) — /pool-health
+    reg.register(Box::new(PoolHealthCmd));
 
     // 快照: 全部命令名 + 别名 (剥离前导 '/'), 供 /completions 动态生成
     {

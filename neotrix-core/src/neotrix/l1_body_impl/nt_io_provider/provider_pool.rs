@@ -250,12 +250,6 @@ pub fn global_provider_pool() -> &'static std::sync::Mutex<ProviderPool> {
 mod tests {
     use super::*;
 
-    fn tmp_pool_path() -> PathBuf {
-        let mut p = std::env::temp_dir();
-        p.push(format!("provider_pool_test_{}.toml", std::process::id()));
-        p
-    }
-
     #[test]
     fn test_pool_roundtrip() {
         let mut pool = ProviderPool::default();

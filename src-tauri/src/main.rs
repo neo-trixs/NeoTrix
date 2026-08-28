@@ -639,6 +639,7 @@ commands::workflow_schedule_delete,
                     commands::unified_invoke,
                     // Harness 统一网关 — 11工具 + 线程/审批 (L1 Body)
                     commands::harness_execute,
+                    commands::harness_run,
                     commands::harness_api_map,
                     commands::harness_tool_catalog,
                     commands::harness_resolve,

@@ -10,7 +10,7 @@
 //! 分发由 `include!("_gate_table.rs")` 的 `dispatch()` 函数完成 ——
 //! 编译期静态 match, 零反射、零装箱。参数经下方 helper 从 `&Value` 提取。
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use super::*;
 

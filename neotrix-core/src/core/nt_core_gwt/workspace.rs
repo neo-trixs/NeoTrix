@@ -830,7 +830,18 @@ impl GlobalWorkspace {
     /// Get the winner module from the last resonance cycle.
     pub fn resonance_winner(&self) -> Option<&SpecialistModule> {
         let report = self.last_resonance.as_ref()?;
-        self.specialist_at_index(report.winner)
+        if let Some(m) = self.specialist_at_index(report.winner) {
+            return Some(m);
+        }
+        // 退化兜底: 路由选出的 winner 索引越界时, 回退到有效显著度 argmax,
+        // 保证始终返回有效专家 (与 Inner Speech 对越界 winner 的容忍一致)。
+        let best = report
+            .effective_saliences
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)?;
+        self.specialist_at_index(best)
     }
 
     /// Run the CTM-AI formal alignment verification over a resonance snapshot.

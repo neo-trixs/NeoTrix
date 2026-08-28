@@ -524,10 +524,6 @@ pub async fn neocodex_fetch_provider_models(base_url: String, api_key: String) -
 #[derive(serde::Deserialize)]
 pub struct NeoCodexCustomProviderReq {
     pub name: String,
-    pub display_name: String,
-    pub base_url: String,
-    pub api_key: String,
-    pub models: Vec<String>,
     pub model: String,
 }
 

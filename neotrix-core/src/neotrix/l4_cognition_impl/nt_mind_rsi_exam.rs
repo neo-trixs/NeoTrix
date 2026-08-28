@@ -215,7 +215,11 @@ mod tests {
                 kept: false,
             })
             .is_err());
-        assert_eq!(exam.history.transfer_ratio(), 0.9);
+        assert!(
+            (exam.history.transfer_ratio() - 0.9).abs() < 1e-9,
+            "transfer_ratio 应≈0.9 (float), got {}",
+            exam.history.transfer_ratio()
+        );
     }
 
     #[test]

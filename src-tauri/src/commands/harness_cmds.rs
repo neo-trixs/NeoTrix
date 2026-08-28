@@ -4,6 +4,7 @@
 //! 单入口 `harness_execute` 复用 ConsciousnessCore 的 CAPABILITY_ROUTES，
 //! 前端仅调对话，其余隐藏。线程/审批为高级能力，前端按需调用。
 
+use neotrix::core::nt_core_consciousness_core::{execute_task_loop, process_instruction, ExternalClosureConfig, LlmSolutionExecutor};
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_harness::{HarnessExecuteRequest, HarnessGateway};
 use serde_json::Value;
@@ -16,8 +17,21 @@ static GATEWAY: LazyLock<Mutex<HarnessGateway>> = LazyLock::new(|| Mutex::new(Ha
 pub fn harness_execute(instruction: String, capability_tag: Option<String>, project: Option<String>) -> Result<Value, NeoTrixError> {
     let gateway = GATEWAY.lock().map_err(|e| NeoTrixError::Brain(format!("HarnessGateway poisoned: {e}")))?;
     let req = HarnessExecuteRequest { instruction, capability_tag, project, permission_mode: None };
-    let resp = gateway.execute(req);
+    // 真实执行链路: 复用意识核心单例 process_instruction (进程内 CORE, 离线安全)
+    let report = process_instruction(&req.instruction);
+    let resp = gateway.execute_real(req, &report);
     serde_json::to_value(&resp).map_err(|e| NeoTrixError::Serde(e.to_string()))
+}
+
+/// 重路径真实执行（按需触发，区别于 harness_execute 的轻量路由）—
+/// 经 `execute_task_loop` 跑完整闭环: 内置能力网执行 + 外部缺口 LLM 试错求解
+/// (LlmSolutionExecutor)。离线/未配置 LLM 时 executor 返回 Failed, 报告仍透明返回
+/// (外部缺口标注未解), 不 panic（降级到拆解→分配闭环）。
+#[tauri::command]
+pub fn harness_run(instruction: String, capability_tag: Option<String>, project: Option<String>) -> Result<Value, NeoTrixError> {
+    let _ = (capability_tag, project);
+    let report = execute_task_loop(&instruction, &LlmSolutionExecutor, &ExternalClosureConfig::frugal());
+    serde_json::to_value(&report).map_err(|e| NeoTrixError::Serde(e.to_string()))
 }
 
 /// 能力标签API地图（前端可审计，调试用；生产隐藏）

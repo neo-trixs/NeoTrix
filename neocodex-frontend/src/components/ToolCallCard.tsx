@@ -44,7 +44,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
   }
 
   return (
-    <div class={clsx('tool-inline overflow-hidden my-2', props.call.success ? '' : 'border-red-600/30')}>
+    <div class={clsx('tool-inline overflow-hidden my-2', props.call.success ? '' : 'border-red-500/30')}>
       {/* 单行头部 */}
       <button
         class={clsx(
@@ -59,7 +59,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
         ) : (
           <ChevronRight class="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
         )}
-        <Wrench class={clsx('w-3.5 h-3.5 flex-shrink-0', isRunning() ? 'text-text-muted' : props.call.success ? 'text-nt-io-600' : 'text-red-600')} />
+        <Wrench class={clsx('w-3.5 h-3.5 flex-shrink-0', isRunning() ? 'text-text-muted' : props.call.success ? 'text-nt-io-600' : 'text-red-500')} />
         <span class="text-xs font-medium text-text-primary font-mono truncate">{props.call.name}</span>
 
         {isRunning() ? (
@@ -72,13 +72,13 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
             <Check class="w-3.5 h-3.5" />
           </span>
         ) : (
-          <span class="inline-flex items-center gap-1 text-red-600 flex-shrink-0" role="status" aria-label="工具调用失败">
+          <span class="inline-flex items-center gap-1 text-red-500 flex-shrink-0" role="status" aria-label="工具调用失败">
             <X class="w-3.5 h-3.5" />
           </span>
         )}
 
         {!isRunning() && !props.call.success && failureReason() && (
-          <span class="text-[11px] text-red-600/80 flex-shrink-0 min-w-0 truncate max-w-[220px]" title={props.call.result}>
+          <span class="text-[11px] text-red-500/80 flex-shrink-0 min-w-0 truncate max-w-[220px]" title={props.call.result}>
             {failureReason()}
           </span>
         )}

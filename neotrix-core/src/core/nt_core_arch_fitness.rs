@@ -137,6 +137,12 @@ const CORE_BOUNDARY_ALLOW: &[(&str, &str)] = &[
     ("nt_core_consciousness_tree/types.rs", "l3_memory_impl"),
     ("nt_core_consciousness_tree/kb_integration.rs", "l3_memory_impl"),
     ("reasoning_engine/chain_executor.rs", "l3_memory_impl"),
+    ("reasoning_engine/mod.rs", "l3_memory_impl::nt_memory_kb"),
+    // 受控边界 (core 共享状态/KP 访问) — 吸收过程引入的 sanctioned 反向引用 (NT-MEMORY 契约)
+    ("nt_core_cad_consciousness.rs", "l3_memory_impl"),
+    ("nt_core_self/self_model.rs", "l3_memory_impl"),
+    ("nt_core_self/affective_interface.rs", "nt_memory_kb"),
+    ("nt_core_self/affective_interface.rs", "l1_body_impl::nt_io_digital_human"),
     // documented 受控边界 (engine / codegraph / provider)
     ("nt_core_task_dispatcher.rs", "l8_autonomic_impl"),
     ("nt_core_retrieval.rs", "l8_autonomic_impl"),

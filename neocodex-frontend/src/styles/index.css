@@ -1734,6 +1734,12 @@
   }
 }
 
+/* Harness 报告面板运行中脉冲（轻量，不抢注意力） */
+@keyframes harnessPulse {
+  0%, 100% { transform: translateX(0); opacity: 0.6; }
+  50% { transform: translateX(180%); opacity: 1; }
+}
+
 /* —— 动效克制：设置内「减弱动效」偏好（data-motion=reduced） —— */
 [data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
   animation-duration: 0.01ms !important;

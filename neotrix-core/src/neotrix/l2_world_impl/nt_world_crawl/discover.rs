@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_default_extractor_creation() {
-        let mut extractor = DiscoveryExtractor::new();
+        let extractor = DiscoveryExtractor::new();
         assert!(!extractor.rules.is_empty(), "should have default rules");
         assert!(extractor.stats.total_rules > 0, "should have rules");
     }

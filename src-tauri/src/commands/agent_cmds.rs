@@ -1,8 +1,8 @@
 use std::sync::Mutex;
-use tauri::{command, Emitter};
+use tauri::command;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
-use neotrix::neotrix::nt_io_provider::{ProviderConfig, LlmProviderType, create_provider, LlmRequest};
-use super::{AgentStatus, ProviderConfigPayload, ReasonRequest, ReasonResponse};
+use neotrix::neotrix::nt_io_provider::{ProviderConfig, LlmProviderType};
+use super::{AgentStatus, ProviderConfigPayload};
 
 // ===== Agent state statics =====
 
@@ -15,16 +15,7 @@ static AGENT_START_TIME: std::sync::LazyLock<Mutex<Option<std::time::Instant>>> 
 
 // ===== Provider config helpers (pub, used by mcp_cmds) =====
 
-pub fn read_provider_config() -> Result<ProviderConfigPayload, NeoTrixError> {
-    let path = dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("neotrix")
-        .join("provider.json");
-    let content = std::fs::read_to_string(&path).map_err(|e| NeoTrixError::Config(format!("无法读取 Provider 配置: {}", e)))?;
-    let payload: ProviderConfigPayload = serde_json::from_str(&content).map_err(|e| NeoTrixError::Config(format!("解析 Provider 配置失败: {}", e)))?;
-    Ok(payload)
-}
-
+#[allow(dead_code)]
 pub fn payload_to_provider_config(payload: &ProviderConfigPayload) -> ProviderConfig {
     let provider_type = match payload.id.to_lowercase().as_str() {
         "openai" => LlmProviderType::OpenAI,

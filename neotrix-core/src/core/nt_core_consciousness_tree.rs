@@ -13,6 +13,73 @@ pub use nodes::*;
 pub use contract::*;
 pub use kb_integration::*;
 
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
+
+/// T3 SelfTest 接线 (NT-CORE ConsciousnessTree): 校验 11 分支健康注入 +
+/// 真实 SelfTest 数据推导成熟度/果实/引导的生产路径 (B2/B4 修复的运行时不变量)。
+pub struct ConsciousnessTreeSelfTest;
+
+impl SelfTest for ConsciousnessTreeSelfTest {
+    fn name(&self) -> &str {
+        "consciousness_tree"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut tree = ConsciousnessTree::new();
+        if tree.branches.len() != 11 {
+            failures.push(format!(
+                "consciousness_tree: expected 11 branches, got {}",
+                tree.branches.len()
+            ));
+            return Err(failures);
+        }
+        let results: Vec<SelfTestResult> = (0..6)
+            .map(|i| SelfTestResult::pass(&format!("nt_core_self_test_{i}")))
+            .collect();
+        tree.set_branch_health_from_self_tests(&results);
+        let core = match tree.branches.get(&BranchKind::Core) {
+            Some(b) => b,
+            None => {
+                failures.push("consciousness_tree: missing Core branch".into());
+                return Err(failures);
+            }
+        };
+        if core.self_test_count < 6 {
+            failures.push(format!(
+                "consciousness_tree: self_test_count not wired from results: {}",
+                core.self_test_count
+            ));
+        }
+        if core.maturity_score() <= 0.0 {
+            failures.push("consciousness_tree: maturity not derived from self-tests".into());
+        }
+        if tree.leaves.is_empty() {
+            failures.push("consciousness_tree: no ModuleLeaf registered from self-tests".into());
+        }
+        tree.trunk.gwt_resonance_active = true;
+        for b in tree.branches.values_mut() {
+            b.health = 0.9;
+        }
+        let report = tree.run_growth_cycle();
+        if report.phase2_phi <= 0.0 {
+            failures.push("consciousness_tree: growth cycle produced no Phi".into());
+        }
+        if tree.core.last_cycle_guidance.is_empty() {
+            failures.push("consciousness_tree: no guidance after growth cycle".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+pub fn register_consciousness_tree_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(ConsciousnessTreeSelfTest));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1269,6 +1336,21 @@ mod tests {
         assert_eq!(
             quiet.trunk.governance_compliance, before,
             "compliance must hold current value when no audit targets",
+        );
+    }
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_consciousness_tree_self_test_passes() {
+        let t = super::ConsciousnessTreeSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "ConsciousnessTreeSelfTest failed: {:?}",
+            t.self_test().err()
         );
     }
 }

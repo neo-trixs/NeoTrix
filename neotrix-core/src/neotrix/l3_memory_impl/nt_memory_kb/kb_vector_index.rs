@@ -15,6 +15,7 @@
 
 use rusqlite::Connection;
 
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use crate::neotrix::nt_memory_kb::nt_memory_embed::{cosine_similarity, load_all_embeddings, load_embeddings_page};
 
 /// In-memory vector index over KB node embeddings.
@@ -253,5 +254,67 @@ mod tests {
         let hits = idx.search(&q, 3);
         assert_eq!(hits[0].0, "anchor");
         assert!((hits[0].1 - 1.0).abs() < 1e-4);
+    }
+}
+
+/// T3 SelfTest 接线 (NT-MEMORY kb_vector_index): 校验 ANN/LSH 检索对精确匹配向量
+/// 的召回 (top-1 命中且相似度 ~1.0) — 核心不变量: 物化/近似索引不能丢失最近邻。
+pub struct KbVectorIndexSelfTest;
+
+impl SelfTest for KbVectorIndexSelfTest {
+    fn name(&self) -> &str {
+        "kb_vector_index"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut idx = VectorIndex::empty();
+        let v = vec![1.0f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        idx.add("a", v.clone());
+        idx.add("b", vec![0.0f32, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        idx.add("c", vec![0.0f32, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let idx = match idx.with_lsh(8, 1) {
+            Ok(i) => i,
+            Err(e) => {
+                failures.push(format!("kb_vector_index: lsh build failed: {e}"));
+                return Err(failures);
+            }
+        };
+        if idx.dimension() != 8 {
+            failures.push(format!("kb_vector_index: dimension {} != 8", idx.dimension()));
+        }
+        let hits = idx.search(&v, 3);
+        if hits.is_empty() {
+            failures.push("kb_vector_index: ANN search returned no candidates".into());
+        } else if hits[0].0 != "a" || (hits[0].1 - 1.0).abs() > 1e-4 {
+            failures.push(format!(
+                "kb_vector_index: exact-match nearest not recalled (top={:?})",
+                hits.first()
+            ));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+pub fn register_kb_vector_index_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(KbVectorIndexSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_kb_vector_index_self_test_passes() {
+        let t = super::KbVectorIndexSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "KbVectorIndexSelfTest failed: {:?}",
+            t.self_test().err()
+        );
     }
 }

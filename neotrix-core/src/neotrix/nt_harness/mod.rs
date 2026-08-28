@@ -11,6 +11,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::core::nt_core_consciousness_core::TaskLoopReport;
+
 pub mod app_server;
 pub mod router;
 pub mod sandbox;
@@ -137,6 +139,8 @@ pub struct HarnessExecuteResponse {
     pub allocations: Vec<String>,
     pub internal_count: usize,
     pub external_gap_count: usize,
+    pub strengthening_actions: usize,
+    pub external_gaps: Vec<String>,
     pub message: String,
 }
 
@@ -191,7 +195,7 @@ impl HarnessGateway {
         self.lookup_by_tag("orchestration").cloned()
     }
 
-    /// 执行（轻量，不触网；重路径走 ConsciousnessCoreHandle::execute_task_loop）
+    /// 执行（轻量路由，仅计算展示用 tag；真实计数见 `execute_real`）
     pub fn execute(&self, req: HarnessExecuteRequest) -> HarnessExecuteResponse {
         let entry = req
             .capability_tag
@@ -209,7 +213,50 @@ impl HarnessGateway {
             allocations: vec![format!("{} → {} ({})", entry.capability_tag, entry.domain, entry.specialist)],
             internal_count: 1,
             external_gap_count: 0,
+            strengthening_actions: 0,
+            external_gaps: vec![],
             message: format!("已路由: {} [{}] via {}", entry.capability_tag, entry.domain, entry.harness_tool.as_str()),
+        }
+    }
+
+    /// 真实执行链路 — 复用意识核心单例 `process_instruction`（拆解→分配→反思补齐→能力网持久化），
+    /// 不触网；重路径（真正试错求解）走 `ConsciousnessCoreHandle::execute_task_loop`。
+    /// 展示 tag 仍取 api_map 命中，计数/缺口/补齐动作取真实报告，全过程透明。
+    pub fn execute_real(&self, req: HarnessExecuteRequest, report: &TaskLoopReport) -> HarnessExecuteResponse {
+        let entry = req
+            .capability_tag
+            .as_deref()
+            .and_then(|t| self.lookup_by_tag(t))
+            .cloned()
+            .or_else(|| self.resolve_instruction(&req.instruction))
+            .unwrap_or_else(|| self.lookup_by_tag("orchestration").unwrap().clone());
+        let allocations: Vec<String> = report
+            .allocations
+            .iter()
+            .map(|a| format!("{} → {} ({})", a.task.capability_tag, a.task.domain, a.task.specialist))
+            .collect();
+        let total = report.allocations.len();
+        HarnessExecuteResponse {
+            instruction: req.instruction.clone(),
+            capability_tag: entry.capability_tag.clone(),
+            domain: entry.domain.clone(),
+            specialist: entry.specialist.clone(),
+            harness_tool: entry.harness_tool.clone(),
+            allocations,
+            internal_count: report.internal_count,
+            external_gap_count: report.external_gap_count,
+            strengthening_actions: report.strengthening_actions,
+            external_gaps: report.external_gaps.clone(),
+            message: format!(
+                "已路由: {} [{}] via {}; 拆解 {} 子任务, 内置 {}, 外部缺口 {}, 反思补齐 {}",
+                entry.capability_tag,
+                entry.domain,
+                entry.harness_tool.as_str(),
+                total,
+                report.internal_count,
+                report.external_gap_count,
+                report.strengthening_actions
+            ),
         }
     }
 

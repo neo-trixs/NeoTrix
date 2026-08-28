@@ -343,7 +343,16 @@ impl GatewayV2 {
 
     /// 池子偏薄时按需补充 (需求驱动自愈): 仅当可用免费 provider 低于 `min_free` 时触发,
     /// 且受 `reconcile_pool_from_catalog` 内置 cooldown 节流。T3 生产接线点 — 每次请求入口调用。
+    ///
+    /// 必须经 `self_heal_reconcile` 开关门禁: 默认 (单测) 关, 避免每个请求入口触发阻塞式
+    /// catalog 网络刷新 (破坏测试确定性 + 生产误触发); 仅 `create_gateway_async` 置 true。
     pub async fn ensure_pool_sufficient(&self, min_free: usize, cooldown_secs: u64) {
+        if !self
+            .self_heal_reconcile
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return;
+        }
         if !self.is_pool_sufficient(min_free) {
             log::warn!(
                 "[gateway] pool insufficient (min_free={}): triggering reconcile_pool_from_catalog",

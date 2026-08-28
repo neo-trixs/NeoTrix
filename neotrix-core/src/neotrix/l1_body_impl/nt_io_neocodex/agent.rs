@@ -1517,7 +1517,6 @@ impl NeoCodexAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_io_provider::types::LlmProvider;
 
     use super::super::provider::ProviderInfo;
     use super::super::wire::NeoCodexAttachment;

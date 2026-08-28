@@ -1708,7 +1708,6 @@ mod schema_tests {
     #[test]
     fn test_collection_merge_dispatch_routes() {
         // 分发: 全部 pdf → merge_pdfs; 全部 docx → merge_docx; 混合 → L0 文本
-        use std::io::Write;
         fn pdf_bytes() -> Vec<u8> {
             // 最小单页 PDF (lopdf 构造)
             use lopdf::content::{Content, Operation};

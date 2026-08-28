@@ -66,21 +66,6 @@ fn row_to_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionInfo> {
     Ok(SessionInfo { id, name, message_count, created })
 }
 
-/// 读取单条会话的 (id, name, created_at, messages)
-fn get_session_row(conn: &Connection, id: &str) -> Result<(String, String, i64, String), NeoTrixError> {
-    conn.query_row(
-        "SELECT id, name, created_at, updated_at, messages FROM sessions WHERE id = ?1",
-        rusqlite::params![id],
-        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(4)?)),
-    )
-    .map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => {
-            NeoTrixError::Memory(format!("Session not found: {}", id))
-        }
-        other => NeoTrixError::Memory(format!("查询会话失败: {}", other)),
-    })
-}
-
 #[command]
 pub fn session_list() -> Vec<SessionInfo> {
     vec![SessionInfo {
@@ -166,6 +151,7 @@ pub fn cmd_session_list() -> Result<Vec<SessionInfo>, NeoTrixError> {
     Ok(out)
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};

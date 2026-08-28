@@ -1055,7 +1055,8 @@ mod tests {
             base_url: None,
             created_ts: 0,
         });
-        let mut gateway = GatewayV2::new();
+    let mut gateway = GatewayV2::new();
+    // 注: 需求驱动自愈 (T3) 接线点 enable_pool_self_heal 尚未实现; 此处仅验证 register_into_gateway 契约。
         let n = pool.register_into_gateway(&mut gateway);
         assert_eq!(n, 1);
         // 契约 (provider_pool.rs register_into_gateway): 以 `{provider}/{model}` 为 gateway 名注册

@@ -2,6 +2,7 @@ use tauri::command;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use super::DiffBlock;
 
+#[allow(dead_code)]
 pub(crate) fn parse_git_diff(diff_str: &str) -> Vec<DiffBlock> {
     let mut blocks = Vec::new();
     for line in diff_str.lines() {
@@ -42,6 +43,7 @@ fn run_git_cmd(args: &[&str]) -> Result<String, NeoTrixError> {
 /// review file tree was hidden behind a button). Returns porcelain entries
 /// with their two-letter status + path, split into staged/unstaged buckets.
 /// Parse `git status --porcelain` output into bare file paths.
+#[allow(dead_code)]
 pub(crate) fn parse_porcelain_paths(out: &str) -> Vec<String> {
     out.lines()
         .filter_map(|l| {
@@ -54,6 +56,7 @@ pub(crate) fn parse_porcelain_paths(out: &str) -> Vec<String> {
 
 /// Parse `git status --porcelain` output into a structured {staged,
 /// unstaged, untracked} file list for the diff review UI.
+#[allow(dead_code)]
 pub(crate) fn parse_porcelain_changed(out: &str) -> serde_json::Value {
     let mut staged = Vec::new();
     let mut unstaged = Vec::new();
@@ -80,6 +83,7 @@ pub(crate) fn parse_porcelain_changed(out: &str) -> serde_json::Value {
 
 /// Parse `git diff --name-status` output into porcelain-style {staged} entries
 /// (status letter + path). Shared by base-branch review; testable in isolation.
+#[allow(dead_code)]
 pub(crate) fn parse_name_status(out: &str, base: &str) -> serde_json::Value {
     let mut staged = Vec::new();
     for line in out.lines() {

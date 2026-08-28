@@ -48,6 +48,65 @@ impl FreeModelCatalog {
         Self { entries: Vec::new() }
     }
 
+    /// 纯过滤: 返回 base_url 主机名命中 `hosts` 的条目 (供测试/白名单复用, 无网络)。
+    /// 白名单按主机+子域匹配: `groq.com` 同时命中 `groq.com` 与 `api.groq.com`。
+    pub fn entries_by_host(&self, hosts: &[&str]) -> Vec<FreeModelEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                let host = e
+                    .base_url
+                    .split("://")
+                    .nth(1)
+                    .and_then(|r| r.split('/').next())
+                    .unwrap_or("");
+                hosts.iter().any(|h| *h == host || host.ends_with(&format!(".{}", h)))
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// 可达性探测 (R-P79: 仅上线已验证可达的 keyless 端点)。
+    ///
+    /// 对每个条目的 `base_url` 发轻量 GET (5s 超时), 仅当**网络层可达** (任何 HTTP 响应,
+    /// 含 404/405 — 这些端点实际以 POST 提供服务) 才保留; 连接拒绝/DNS 失败/超时 → 剔除。
+    /// 并发上限 8, 避免一次性打爆网络。返回可达条目子集。
+    pub async fn reachable_subset(&self) -> Vec<FreeModelEntry> {
+        use std::sync::Arc;
+        use tokio::sync::Semaphore;
+
+        let sem = Arc::new(Semaphore::new(8));
+        let mut tasks = Vec::new();
+        for e in self.entries.clone() {
+            let permit = sem.clone().acquire_owned().await.ok();
+            tasks.push(tokio::spawn(async move {
+                let _permit = permit; // 持有 permit 直至探测结束, 限制并发
+                let url = e.base_url.clone();
+                let ok = tokio::task::spawn_blocking(move || {
+                    let client = reqwest::blocking::Client::builder()
+                        .timeout(std::time::Duration::from_secs(5))
+                        .build();
+                    match client {
+                        Ok(c) => c.get(&url).send().is_ok(), // 任何 HTTP 响应即视为可达
+                        Err(_) => false,
+                    }
+                })
+                .await
+                .unwrap_or(false);
+                (e, ok)
+            }));
+        }
+        let mut reachable = Vec::new();
+        for t in tasks {
+            if let Ok((e, ok)) = t.await {
+                if ok {
+                    reachable.push(e);
+                }
+            }
+        }
+        reachable
+    }
+
     /// 从 OpenRouter API 获取免费模型
     pub fn discover_openrouter_free() -> Vec<FreeModelEntry> {
         // 带超时保护: 启动期 create_gateway 会在主线程同步 block_on,
@@ -571,5 +630,58 @@ impl FreeModelCatalog {
             return "t0-cheap".into();
         }
         "t1-standard".into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::neotrix::l1_body_impl::nt_io_provider::factory::LlmProviderType;
+
+    fn entry(provider: &str, base_url: &str) -> FreeModelEntry {
+        FreeModelEntry {
+            provider: provider.into(),
+            model_id: "m".into(),
+            display_name: "x".into(),
+            base_url: base_url.into(),
+            tier: "t1-standard".into(),
+            is_free: true,
+            requires_api_key: false,
+            api_key_env: None,
+            provider_type: LlmProviderType::OpenAI,
+        }
+    }
+
+    #[test]
+    fn test_entries_by_host_filters() {
+        let mut cat = FreeModelCatalog::new();
+        cat.entries.push(entry("a", "https://openrouter.ai/api/v1"));
+        cat.entries.push(entry("b", "https://api.groq.com/openai/v1"));
+        cat.entries.push(entry("c", "https://example.com/v1"));
+        let got = cat.entries_by_host(&["openrouter.ai", "groq.com"]);
+        assert_eq!(got.len(), 2);
+        let providers: Vec<&str> = got.iter().map(|e| e.provider.as_str()).collect();
+        assert!(providers.contains(&"a"));
+        assert!(providers.contains(&"b"));
+        assert!(!providers.contains(&"c"));
+    }
+
+    // 网络可达性探测 (R-P79 数据层验证) — 需联网, 默认忽略, 手动 `cargo test -- --ignored` 运行。
+    #[tokio::test]
+    #[ignore]
+    async fn test_reachable_subset_network() {
+        let mut cat = FreeModelCatalog::new();
+        cat.entries.push(entry("a", "https://openrouter.ai/api/v1"));
+        cat.entries.push(entry("b", "https://nonexistent.invalid.example.test/v1"));
+        let reachable = cat.reachable_subset().await;
+        // 真实可达端点应保留, 无效主机应剔除。
+        assert!(
+            reachable.iter().any(|e| e.provider == "a"),
+            "openrouter 应可达并保留"
+        );
+        assert!(
+            !reachable.iter().any(|e| e.provider == "b"),
+            "无效主机应被剔除"
+        );
     }
 }

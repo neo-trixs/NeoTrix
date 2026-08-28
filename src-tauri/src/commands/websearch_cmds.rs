@@ -1,5 +1,4 @@
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::command;
 
 // ============================================================================
@@ -104,82 +103,19 @@ fn fallback_search(query: &str, max_results: usize) -> Vec<WebSearchResult> {
     }).collect()
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum SdkAgentStatus {
-    #[serde(rename = "idle")]
-    Idle,
-    #[serde(rename = "running")]
-    Running,
-    #[serde(rename = "completed")]
-    Completed,
-    #[serde(rename = "failed")]
-    Failed,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct AgentSdkBlueprint {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub tools_allowed: Vec<String>,
-    pub max_steps: u32,
-    pub model: String,
-    pub system_prompt: String,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct AgentSdkInstance {
-    pub id: String,
-    pub blueprint_id: String,
-    pub status: SdkAgentStatus,
-    pub progress_pct: f64,
-    pub current_step: String,
-    pub started_at: u64,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct AgentSdkResult {
-    pub instance_id: String,
-    pub status: SdkAgentStatus,
-    pub output: String,
-    pub steps_taken: u32,
-    pub duration_ms: u64,
-    pub error: Option<String>,
-}
-
 struct AgentSdkState {
-    blueprints: Vec<AgentSdkBlueprint>,
-    instances: Vec<AgentSdkInstance>,
-    results: Vec<AgentSdkResult>,
     search_config: SearchConfig,
-    blueprint_counter: u64,
-    instance_counter: u64,
 }
 
 impl AgentSdkState {
     fn new() -> Self {
         Self {
-            blueprints: Vec::new(),
-            instances: Vec::new(),
-            results: Vec::new(),
             search_config: SearchConfig {
                 max_results: 8,
                 timeout_secs: 30,
                 safe_search: true,
             },
-            blueprint_counter: 0,
-            instance_counter: 0,
         }
-    }
-
-    fn next_bp_id(&mut self) -> String {
-        self.blueprint_counter += 1;
-        format!("bp-{}", self.blueprint_counter)
-    }
-
-    fn next_instance_id(&mut self) -> String {
-        self.instance_counter += 1;
-        format!("inst-{}", self.instance_counter)
     }
 }
 
@@ -200,10 +136,6 @@ fn run_search(query: &str, max_results: usize) -> Vec<WebSearchResult> {
         }
     }
     search_duckduckgo(query, max_results)
-}
-
-fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
 }
 
 // ---------------------------------------------------------------------------

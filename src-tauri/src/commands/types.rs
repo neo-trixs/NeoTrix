@@ -53,17 +53,6 @@ pub struct DiffBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasonRequest {
-    pub prompt: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasonResponse {
-    pub output: String,
-    pub success: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfigPayload {
     pub id: String,
     pub name: String,
@@ -89,62 +78,6 @@ pub struct PermissionRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainStats {
-    pub total_entries: usize,
-    pub outbound_count: usize,
-    pub inbound_count: usize,
-    pub genesis_hash: String,
-    pub chain_valid: bool,
-    pub identity_name: String,
-    pub identity_edition: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProxySourceStatus {
-    pub name: String,
-    pub total_successes: u64,
-    pub total_failures: u64,
-    pub consecutive_failures: u64,
-    pub on_cooldown: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProxyConnectivityResult {
-    pub active_mode: String,
-    pub direct_reachable: bool,
-    pub direct_latency_ms: Option<f64>,
-    pub proxy_healthy_count: usize,
-    pub proxy_total_count: usize,
-    pub proxy_avg_latency_ms: Option<f64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProxyNodeInfo {
-    pub url: String,
-    pub tag: String,
-    pub latency_ms: Option<f64>,
-    pub fail_count: u64,
-    pub success_count: u64,
-    pub from_subscription: bool,
-    pub geo_tag: Option<String>,
-    pub ip_addr: Option<String>,
-    pub speed_tier: String,
-    pub score: f64,
-    pub healthy: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProxyConfigData {
-    pub local_port: u16,
-    pub socks_port: u16,
-    pub min_nodes: u32,
-    pub health_check_interval_secs: u64,
-    pub selection_strategy: String,
-    pub system_proxy_enabled: bool,
-    pub direct_timeout_secs: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
     pub id: String,
     pub name: String,
@@ -157,41 +90,6 @@ pub struct Project {
     pub archived: bool,
     pub color: Option<String>,
     pub icon: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectChat {
-    pub id: String,
-    pub project_id: String,
-    pub name: String,
-    pub session_id: Option<String>,
-    pub message_count: usize,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub pinned: bool,
-    pub archived: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectSource {
-    pub id: String,
-    pub project_id: String,
-    pub source_type: String,
-    pub path: Option<String>,
-    pub url: Option<String>,
-    pub name: String,
-    pub enabled: bool,
-    pub created_at: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectInstruction {
-    pub id: String,
-    pub project_id: String,
-    pub content: String,
-    pub enabled: bool,
-    pub created_at: i64,
-    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

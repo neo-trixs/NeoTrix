@@ -758,19 +758,14 @@ mod tests {
     #[test]
     fn test_capability_provides_consumed_in_production() {
         // 生产消费点验证: 声明的能力必须被非测试代码消费 (R-P79 接线闭环)
-        // 消费点: contract_cmds.rs define 分支 (atomic_decomposition/output_contract)
+        // 消费点: seal_loop.rs decompose 分支 (atomic_decomposition/output_contract)
         //         seal_loop.rs 意图隔离观测点 (intent_isolation/need_to_know)
-        let src = std::fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/src/cli/commands/contract_cmds.rs"),
-        )
-        .unwrap();
-        assert!(src.contains("AtomicDecomposer"), "contract_cmds 必须消费 atomic_decomposition");
-        assert!(src.contains("all_units"), "contract_cmds 必须消费 output_contract (经 plan.all_units)");
-
         let seal = std::fs::read_to_string(
             concat!(env!("CARGO_MANIFEST_DIR"), "/src/neotrix/l8_autonomic_impl/nt_mind/seal_core/self_iterating/loop_impl/seal_loop.rs"),
         )
         .unwrap();
+        assert!(seal.contains("AtomicDecomposer"), "seal_loop 必须消费 atomic_decomposition");
+        assert!(seal.contains("parallel"), "seal_loop 必须消费 output_contract (经 plan.parallel/sequential)");
         assert!(seal.contains("IntentIsolator"), "seal_loop 必须消费 intent_isolation");
         assert!(seal.contains("exposure_ratio"), "seal_loop 必须观测 need_to_know 暴露面");
     }

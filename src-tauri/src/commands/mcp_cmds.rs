@@ -1,9 +1,7 @@
 use tauri::{command, Emitter};
 use tauri_plugin_notification::NotificationExt;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
-use neotrix::neotrix::nt_io_provider::{create_provider, LlmRequest};
 use super::ProviderConfigPayload;
-use super::agent_cmds::payload_to_provider_config;
 
 #[command]
 pub fn save_provider_config(config: ProviderConfigPayload) -> Result<String, NeoTrixError> {
