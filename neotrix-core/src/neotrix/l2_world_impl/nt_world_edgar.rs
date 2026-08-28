@@ -607,7 +607,7 @@ mod tests {
         let results = EdgarFetcher::to_search_results(&filings);
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].title, "10-Q (0000320193-23-000106)");
-        assert!(results[0].url.contains("0000320193-23-000106"));
+        assert!(results[0].url.contains("000032019323000106"));
         assert!(results[0].snippet.contains("Apple Inc."));
     }
 

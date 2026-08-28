@@ -310,7 +310,7 @@ impl GatewayV2 {
     /// `complete_with_selection` 在池子偏薄时按需自愈 (T3 生产接线), 或由后台循环周期调用,
     /// 使自有 LLM 池始终维持充足模型, 而非启动一次性注册后静止。
     /// `cooldown_secs` 防止单次请求链内重复全量刷新 (刷新本身有 I/O 成本)。
-    pub fn reconcile_pool_from_catalog(&self, cooldown_secs: u64) {
+    pub async fn reconcile_pool_from_catalog(&self, cooldown_secs: u64) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -322,8 +322,12 @@ impl GatewayV2 {
             }
             *last = now;
         }
+        // catalog.refresh() 为阻塞网络 I/O, 必须在 spawn_blocking 中执行,
+        // 否则在 async 运行时内直接调用会触发 tokio 1.52+ 的 "blocking in async" panic。
         let mut catalog = FreeModelCatalog::new();
-        let discovered = catalog.refresh();
+        let discovered = tokio::task::spawn_blocking(move || catalog.refresh())
+            .await
+            .unwrap_or_default();
         let before = self.providers().len();
         self.register_from_catalog(&discovered);
         let after = self.providers().len();
@@ -339,10 +343,35 @@ impl GatewayV2 {
 
     /// 池子偏薄时按需补充 (需求驱动自愈): 仅当可用免费 provider 低于 `min_free` 时触发,
     /// 且受 `reconcile_pool_from_catalog` 内置 cooldown 节流。T3 生产接线点 — 每次请求入口调用。
-    pub fn ensure_pool_sufficient(&self, min_free: usize, cooldown_secs: u64) {
+    pub async fn ensure_pool_sufficient(&self, min_free: usize, cooldown_secs: u64) {
         if !self.is_pool_sufficient(min_free) {
-            self.reconcile_pool_from_catalog(cooldown_secs);
+            log::warn!(
+                "[gateway] pool insufficient (min_free={}): triggering reconcile_pool_from_catalog",
+                min_free
+            );
+            self.reconcile_pool_from_catalog(cooldown_secs).await;
+            log::info!(
+                "[gateway] {}",
+                super::pool_health::LlmPoolHealth::summarize(self, min_free)
+            );
         }
+    }
+    /// 当前被 L3 模型级熔断锁定的 (provider, model) 数量 — 池健康度指标。
+    pub fn model_locked_count(&self) -> usize {
+        self.states
+            .read()
+            .unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            })
+            .values()
+            .map(|s| {
+                s.model_locks
+                    .iter()
+                    .filter(|(_, &until)| Instant::now() < until)
+                    .count()
+            })
+            .sum()
     }
 
     /// 已注册 provider 名称列表

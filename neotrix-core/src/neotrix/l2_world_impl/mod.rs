@@ -47,3 +47,5 @@ pub mod nt_world_ods;
 pub mod nt_world_monitor;
 pub mod nt_world_osint_arsenal;
 pub mod nt_world_myip;
+pub mod nt_world_dsh_explore;
+pub mod nt_world_agent_reach;

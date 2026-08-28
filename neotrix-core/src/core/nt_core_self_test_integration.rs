@@ -33,6 +33,12 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     crate::neotrix::l2_world_impl::cad_generator::register_cad_generator_self_tests(&mut registry);
     // LLM 核心 (NT-CORE): 统一错误域接入 + token 预算引擎自测 (卫生层 P0)
     crate::core::nt_core_llm::register_llm_self_tests(&mut registry);
+    // 缓存核心 (NT-CORE): 精确层往返 + 容量计数自测
+    crate::core::nt_core_cache::register_cache_self_tests(&mut registry);
+    // VSA/HyperCube 核心 (NT-CORE): 卦象嵌入自相似 + 异卦分离 + bind 自相似
+    crate::core::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
+    // KB 类型核心 (NT-CORE): NodeType 枚举全变体往返
+    crate::core::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
     ));

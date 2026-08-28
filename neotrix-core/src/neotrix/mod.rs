@@ -183,6 +183,9 @@ pub use l1_body_impl::nt_agent_orchestrator;
 // Shanhai Geography — 山海世界双坐标系统
 pub mod nt_shanhai_geo;
 
+// Unified Harness — 统一熔炼网关 (L1 Body, 对标 harness/mcp-server + codex app-server)
+pub mod nt_harness;
+
 // Infrastructure — 核心基础设施
 pub mod nt_core_error;
 pub mod nt_core_event_bus;

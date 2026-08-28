@@ -14748,6 +14748,209 @@
           "timestamp": "2026-08-28T03:30:43Z"
         }
       ]
+    },
+    {
+      "id": "nt_io::pi_agent_desktop",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "agent_desktop_client",
+        "session_tree",
+        "dual_track_branch",
+        "codegraph_mcp"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::pi_agent_desktop",
+          "note": "外部吸收: Chasen-Liao/pi-agent-desktop — 编程智能体桌面客户端 (Electron + 会话树/双轨分支/CodeGraph MCP). C1 stub: 会话树校验 + CodeGraph 查询规格 + 双轨合并校验",
+          "timestamp": "2026-08-28T11:30:00Z"
+        }
+      ],
+      "metadata": {
+        "input_schema": "SessionNode { id, parent_id?, label } / DualTrack { main, track } / symbol: &str",
+        "output_schema": "is_valid_tree: bool / codegraph_query: Option<String> / can_merge_track: bool",
+        "wiring_evidence": "C1 T1 SelfTest + 3 unit tests (l7_capability_impl/nt_io_pi_agent_desktop.rs)",
+        "fallback_chain": [
+          "validate session tree",
+          "codegraph query spec",
+          "dual-track merge guard"
+        ],
+        "evidence_gated": "passed"
+      },
+      "created_at": "2026-08-28T11:30:00Z",
+      "updated_at": "2026-08-28T11:30:00Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io::video_shotcraft",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "generative_video",
+        "shot_card_selection",
+        "remotion_render"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::video_shotcraft",
+          "note": "外部吸收: Vincentwei1021/video-shotcraft — 生成式视频技能 (Remotion 152 shot cards, 电影级产品视频). C1 stub: shot card 选取校验 + Remotion 渲染规格",
+          "timestamp": "2026-08-28T11:30:00Z"
+        }
+      ],
+      "metadata": {
+        "input_schema": "ShotCard { index, duration_sec, label } / total_duration_sec: f64",
+        "output_schema": "select_cards: Option<usize> / remotion_render: Option<String>",
+        "wiring_evidence": "C1 T1 SelfTest + 3 unit tests (l7_capability_impl/nt_io_video_shotcraft.rs)",
+        "fallback_chain": [
+          "select valid shot cards",
+          "remotion render spec",
+          "reject zero-duration"
+        ],
+        "evidence_gated": "passed"
+      },
+      "created_at": "2026-08-28T11:30:00Z",
+      "updated_at": "2026-08-28T11:30:00Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io::cozyclay",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "3d_previz",
+        "scene_staging",
+        "camera_control",
+        "ai_director"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::cozyclay",
+          "note": "外部吸收: NomaDamas/CozyClay — 浏览器 3D 预可视化 (Three.js 镜头控制/角色摆位). C1 stub: 场景摆位校验 + 镜头控制规格",
+          "timestamp": "2026-08-28T11:30:00Z"
+        }
+      ],
+      "metadata": {
+        "input_schema": "StagePlacement { name, x, y, z } / CameraShot { cam_*, look_* }",
+        "output_schema": "validate_placement: Option<usize> / camera_control: Option<String>",
+        "wiring_evidence": "C1 T1 SelfTest + 3 unit tests (l7_capability_impl/nt_io_cozyclay.rs)",
+        "fallback_chain": [
+          "validate finite placements",
+          "camera control spec",
+          "reject NaN/Inf"
+        ],
+        "evidence_gated": "passed"
+      },
+      "created_at": "2026-08-28T11:30:00Z",
+      "updated_at": "2026-08-28T11:30:00Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io::generative_media_skills",
+      "domain": "io",
+      "layer": "l7capability",
+      "constellation": "c1unittest",
+      "provides": [
+        "multimodal_gen",
+        "image_gen",
+        "video_gen",
+        "audio_gen"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io::generative_media_skills",
+          "note": "外部吸收: SamurAIGPT/Generative-Media-Skills — 多模态生成媒体技能 (muapi.ai 图/视频/音频). C1 stub: 生成请求校验 + 网关规格",
+          "timestamp": "2026-08-28T11:30:00Z"
+        }
+      ],
+      "metadata": {
+        "input_schema": "GenRequest { modality: Image|Video|Audio, prompt, duration_sec }",
+        "output_schema": "is_submittable: bool / gateway_spec: Option<String>",
+        "wiring_evidence": "C1 T1 SelfTest + 3 unit tests (l7_capability_impl/nt_io_generative_media_skills.rs)",
+        "fallback_chain": [
+          "validate prompt",
+          "gated by modality duration",
+          "muapi gateway spec"
+        ],
+        "evidence_gated": "passed"
+      },
+      "created_at": "2026-08-28T11:30:00Z",
+      "updated_at": "2026-08-28T11:30:00Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world::dsh_explore",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "research_corpus_explore",
+        "cordis_search"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::dsh_explore",
+          "note": "外部吸收: dive.antinomie.org/dsh-explore (cordis-from-dsh) 研究语料探索 (CORDIS EU 研究数据)",
+          "timestamp": "2026-08-28T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "nt_world::agent_reach",
+      "domain": "world",
+      "layer": "l2world",
+      "constellation": "c1unittest",
+      "provides": [
+        "agent_internet_access",
+        "zero_api_fee_reach"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "evolution_log": [
+        {
+          "cycle": "absorb-20260828-batch3",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world::agent_reach",
+          "note": "外部吸收: Panniantong/Agent-Reach 智能体互联网访问 (Twitter/Reddit/YT/GitHub/B站/小红书, 零API费)",
+          "timestamp": "2026-08-28T00:00:00Z"
+        }
+      ]
     }
   ],
   "edges": [

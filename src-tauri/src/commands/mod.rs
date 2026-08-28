@@ -118,6 +118,9 @@ pub use unified_cmds::*;
 pub mod unified_invoke_cmds;
 pub use unified_invoke_cmds::*;
 
+pub mod harness_cmds;
+pub use harness_cmds::*;
+
 // ========== Tests ==========
 
 #[cfg(test)]

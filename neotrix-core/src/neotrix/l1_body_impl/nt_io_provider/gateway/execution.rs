@@ -263,6 +263,11 @@ impl GatewayV2 {
         &self,
         request: &LlmRequest,
     ) -> Result<LlmResponse, LlmError> {
+        // 需求驱动自愈 (T3): 每次请求入口检查自有 LLM 池是否仍有充足免费模型,
+        // 偏薄时按需从 FreeModelCatalog 补充 (reconcile 内置 cooldown 节流)。
+        // 对齐 OmniRoute Radar 刷新 + NeoTrix NT-REPAIR 自愈节点 — 池子始终"活着"。
+        self.ensure_pool_sufficient(3, 60).await;
+
         // Build hardened prompt key for cache lookup (含请求指纹, 见 prompt_cache_key)
         let prompt_key: String = self.prompt_cache_key(request);
 
@@ -767,6 +772,9 @@ impl GatewayV2 {
         &self,
         request: &LlmRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+        // 需求驱动自愈 (T3): 同 complete_with_selection, 偏薄时按需补充自有 LLM 池。
+        self.ensure_pool_sufficient(3, 60).await;
+
         // Phase 1: Normal retry loop (up to 3 providers, best-first)
         let mut used_names: Vec<String> = Vec::new();
 

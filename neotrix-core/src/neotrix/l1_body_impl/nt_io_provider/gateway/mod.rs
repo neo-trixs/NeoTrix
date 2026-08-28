@@ -20,6 +20,7 @@ mod challenge;
 mod coordinator;
 mod execution;
 mod market_router;
+mod pool_health;
 mod registry;
 mod reliability;
 mod response_cache;

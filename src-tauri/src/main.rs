@@ -637,6 +637,18 @@ commands::workflow_schedule_delete,
                     commands::unified_tauri_full_catalog,
                     // Unified Invoke — 极简统一 API 门面
                     commands::unified_invoke,
+                    // Harness 统一网关 — 11工具 + 线程/审批 (L1 Body)
+                    commands::harness_execute,
+                    commands::harness_api_map,
+                    commands::harness_tool_catalog,
+                    commands::harness_resolve,
+                    commands::harness_router_status,
+                    commands::harness_router_set_provider,
+                    commands::harness_sandbox_status,
+                    commands::harness_thread_create,
+                    commands::harness_thread_list,
+                    commands::harness_turn_start,
+                    commands::harness_approval_list,
                                     ])
                 .setup(move |app| {
                     if let Err(e) = neotrix_tauri::setup_tray(app) {

@@ -265,3 +265,62 @@ mod tests {
         }
     }
 }
+
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
+/// NT-CORE VSA/HyperCube 核心自测: 卦象嵌入自相似 ~1 + 异卦分离 + bind 自相似 (卫生层 P0)。
+pub struct E8VsaSelfTest;
+
+impl SelfTest for E8VsaSelfTest {
+    fn name(&self) -> &str {
+        "e8_vsa_core"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let emb = E8VsaEmbedding::new(256);
+        let a = emb.embed(0).to_vec();
+        let a2 = emb.embed(0).to_vec();
+        let b = emb.embed(63).to_vec();
+        let sim_aa = emb.similarity(&a, &a2);
+        if !sim_aa.is_finite() || sim_aa < 0.99 {
+            failures.push(format!("e8_vsa_core: 同态自相似过低/NaN {sim_aa}"));
+        }
+        let sim_ab = emb.similarity(&a, &b);
+        if sim_ab >= sim_aa {
+            failures.push(format!(
+                "e8_vsa_core: 不同卦象相似度未低于同态 ({sim_ab} >= {sim_aa})"
+            ));
+        }
+        let bound = emb.bind(&a, &b);
+        let sim_bb = emb.similarity(&bound, &bound);
+        if !sim_bb.is_finite() || sim_bb < 0.99 {
+            failures.push(format!("e8_vsa_core: bind 自相似过低/NaN {sim_bb}"));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册 VSA 核心 SelfTest 到全局注册表 (T2)。
+pub fn register_e8_vsa_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(E8VsaSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_e8_vsa_self_test_passes() {
+        let t = super::E8VsaSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "E8VsaSelfTest failed: {:?}",
+            t.self_test().err()
+        );
+    }
+}

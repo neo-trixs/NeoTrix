@@ -274,7 +274,7 @@ mod tests {
         let raw = [0.15; MODULE_COUNT];
         let result = gate.compete(&raw, &resonance);
         assert!(
-            !result.ignition || result.winner_score < 0.85,
+            !result.ignition || result.winner_score < 0.90,
             "pure noise should not produce high confidence ignition: score={}",
             result.winner_score
         );

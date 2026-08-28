@@ -439,3 +439,55 @@ mod tests {
         cache.set_eviction_policy(EvictionPolicy::Lru);
     }
 }
+
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
+/// NT-CORE 缓存核心自测: 精确层写入/读取往返 + 容量计数 (卫生层 P0: 核心必须可自测)。
+pub struct CacheSelfTest;
+
+impl SelfTest for CacheSelfTest {
+    fn name(&self) -> &str {
+        "cache_core"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut cache = SemanticCache::new(CacheConfig::default());
+        cache.set_exact("selftest", "k", "v".to_string());
+        match cache.get_exact("selftest", "k") {
+            Some(v) if v == "v" => {}
+            other => failures.push(format!("cache_core: exact roundtrip failed, got {:?}", other)),
+        }
+        if cache.is_empty() {
+            failures.push("cache_core: cache reported empty after insert".into());
+        }
+        if cache.len() < 1 {
+            failures.push(format!("cache_core: len {} < 1 after insert", cache.len()));
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
+/// 注册缓存核心 SelfTest 到全局注册表 (T2)。
+pub fn register_cache_self_tests(registry: &mut SelfTestRegistry) {
+    registry.register(Box::new(CacheSelfTest));
+}
+
+#[cfg(test)]
+mod selftest_tests {
+    use super::*;
+
+    #[test]
+    fn test_cache_self_test_passes() {
+        let t = super::CacheSelfTest;
+        assert!(
+            t.self_test().is_ok(),
+            "CacheSelfTest failed: {:?}",
+            t.self_test().err()
+        );
+    }
+}
