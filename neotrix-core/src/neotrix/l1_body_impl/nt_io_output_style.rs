@@ -1040,9 +1040,6 @@ mod tests_output_governor_selftest {
     fn test_output_governor_selftest() {
         let t = OutputGovernorSelfTest;
         let res = t.self_test();
-        if let Err(ref f) = res {
-            eprintln!("OUTPUT_GOV SELFTEST FAILURES: {f:?}");
-        }
         assert!(res.is_ok());
     }
 }
