@@ -700,6 +700,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     struct UntrustedProbe;
+    #[async_trait::async_trait]
     impl LlmProvider for UntrustedProbe {
         async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
             Ok(LlmResponse::plain("leak".into(), "m".into(), Usage::default(), FinishReason::Stop))
@@ -716,6 +717,7 @@ mod tests {
     }
 
     struct TrustedProbe;
+    #[async_trait::async_trait]
     impl LlmProvider for TrustedProbe {
         async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
             Ok(LlmResponse::plain("ok".into(), "m".into(), Usage::default(), FinishReason::Stop))
@@ -734,6 +736,7 @@ mod tests {
     struct ContractedProbe {
         captured: Arc<Mutex<Option<String>>>,
     }
+    #[async_trait::async_trait]
     impl LlmProvider for ContractedProbe {
         async fn complete_raw(&self, req: &LlmRequest) -> Result<LlmResponse, LlmError> {
             let joined = req.messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("|");
@@ -755,7 +758,7 @@ mod tests {
     fn complete_gate_blocks_untrusted_internal_at_trait_level() {
         let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
         r.messages.clear();
-        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs".to_string()));
+        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs"));
         let p = UntrustedProbe;
         let res = tokio::runtime::Runtime::new().unwrap().block_on(p.complete(&r));
         assert!(res.is_err(), "trait 默认 complete() 必须拦截 untrusted + 内部指纹");
@@ -765,7 +768,7 @@ mod tests {
     fn complete_gate_allows_trusted_internal_at_trait_level() {
         let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
         r.messages.clear();
-        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs".to_string()));
+        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs"));
         let p = TrustedProbe;
         let res = tokio::runtime::Runtime::new().unwrap().block_on(p.complete(&r));
         assert!(res.is_ok(), "trait 默认 complete() 必须放行 trusted");
@@ -775,7 +778,7 @@ mod tests {
     fn complete_gate_scrubs_secret_for_contracted_at_trait_level() {
         let mut r = LlmRequest::new("m", "key sk-abcdEFGH1234567890abcdef");
         r.messages.clear();
-        r.messages.push(Message::new(Role::User, "key sk-abcdEFGH1234567890abcdef".to_string()));
+        r.messages.push(Message::new(Role::User, "key sk-abcdEFGH1234567890abcdef"));
         let cap = Arc::new(Mutex::new(None));
         let p = ContractedProbe { captured: cap.clone() };
         let res = tokio::runtime::Runtime::new().unwrap().block_on(p.complete(&r));
