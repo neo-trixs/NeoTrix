@@ -46,7 +46,7 @@ export const [treeStatus, setTreeStatus] = createSignal<{
  *   - 用户自定义且 0 使用 → Dark Forest 回收 (deprecated)
  * 使 SEAL / ConsciousnessTree 能通过同一棵能力树蒸馏 / 优化画板能力网。
  */
-async function syncToCapabilityTree(): Promise<void> {
+export async function syncToCapabilityTree(): Promise<void> {
   try {
     const route = evolutionRoute()
     const payload = route.map((c) => ({

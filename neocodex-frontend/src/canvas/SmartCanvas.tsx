@@ -6,7 +6,7 @@ import { createSignal, createMemo, onMount, onCleanup, Show, For, type JSX } fro
 import type { CanvasNode, CollapsePolicy, Viewport } from './types'
 import { getRenderer, listCapabilities } from './nodeRegistry'
 import { computeCollapse, DEFAULT_POLICY } from './smartCollapse'
-import { evolutionRoute, pruneCandidates, treeStatus, pruneNode } from './evolution'
+import { evolutionRoute, pruneCandidates, treeStatus, pruneNode, syncToCapabilityTree } from './evolution'
 
 /** 搜索添加时用的示例载荷，保证节点可渲染。 */
 function sampleData(kind: string): unknown {
@@ -298,8 +298,14 @@ export function SmartCanvas(props: SmartCanvasProps) {
               )}
             </Show>
             <Show when={pruneCandidates().length}>
-              <div class="sc-evo-prune">Dark Forest 回收候选：{pruneCandidates().join('，')}</div>
+              <div class="sc-evo-prune">
+                Dark Forest 回收候选：{pruneCandidates().join('，')}
+                <button class="sc-evo-prune-all" onClick={() => pruneCandidates().forEach((k) => pruneNode(k))}>
+                  回收全部死节点
+                </button>
+              </div>
             </Show>
+            <button class="sc-evo-resync" onClick={() => syncToCapabilityTree()}>↻ 重新同步能力树</button>
           </div>
         </Show>
       </div>

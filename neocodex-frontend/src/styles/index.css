@@ -1972,6 +1972,18 @@
   background: transparent; cursor: pointer;
 }
 .sc-evo-prune-btn:hover { background: var(--nt-color-danger, #dc2626); color: #fff; }
+.sc-evo-prune-all {
+  margin-left: 6px; font: 600 9px ui-monospace, monospace; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--nt-color-danger, #dc2626); color: var(--nt-color-danger, #dc2626);
+  background: transparent; cursor: pointer;
+}
+.sc-evo-prune-all:hover { background: var(--nt-color-danger, #dc2626); color: #fff; }
+.sc-evo-resync {
+  margin: 6px 10px; font: 600 10px ui-monospace, monospace; padding: 3px 8px; border-radius: 4px;
+  border: 1px solid var(--nt-color-gold-600, #d9a441); color: var(--nt-color-gold-800, #a3501c);
+  background: var(--nt-color-gold-100, #fef3e2); cursor: pointer;
+}
+.sc-evo-resync:hover { background: var(--nt-color-gold-200, #fbe6c8); }
 .sc-evo-plans { border-top: 1px solid rgba(0,0,0,0.06); max-height: 140px; overflow: auto; }
 .sc-evo-plan { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px; font-size: 10px; }
 .sc-evo-plan-act { font-weight: 700; color: var(--nt-color-teal-700, #0f766e); min-width: 56px; }
