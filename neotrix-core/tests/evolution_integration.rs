@@ -17,14 +17,14 @@
 use std::path::PathBuf;
 
 use neotrix::core::nt_core_event::CoreEvent;
-use neotrix::l1_body_impl::nt_shield_sandbox::{storm_breaker_tcp_probe, StormBreakerProbe};
-use neotrix::l3_memory_impl::nt_memory_kb::nt_memory_dual_brain::{
+use neotrix::neotrix::l1_body_impl::nt_shield_sandbox::{storm_breaker_tcp_probe, StormBreakerProbe};
+use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_dual_brain::{
     DualBrainWorkingMemory, ExperienceAnchor,
 };
-use neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge;
-use neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::loop_impl::core::SelfIteratingBrain;
-use neotrix::l8_autonomic_impl::nt_mind_skill_engine::{evomal_poison_scan, SkillEntry};
-use neotrix::nt_core_event_bus::EventBus;
+use neotrix::neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge;
+use neotrix::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::loop_impl::core::SelfIteratingBrain;
+use neotrix::neotrix::l8_autonomic_impl::nt_mind_skill_engine::{evomal_poison_scan, SkillEntry};
+use neotrix::neotrix::nt_core_event_bus::EventBus;
 
 /// (1) FEP/IIT output → EventBus.
 ///
@@ -150,7 +150,7 @@ fn test_shield_storm_breaker_tcp_probe_offline() {
         "offline probe of a non-listening loopback port must not report Open"
     );
     // Exercising the recon helper too (default 443/80 list).
-    let recon = neotrix::l1_body_impl::nt_shield_sandbox::storm_breaker_recon("127.0.0.1");
+    let recon = neotrix::neotrix::l1_body_impl::nt_shield_sandbox::storm_breaker_recon("127.0.0.1");
     assert!(!recon.host.is_empty());
 }
 
