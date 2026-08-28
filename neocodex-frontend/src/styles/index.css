@@ -1960,12 +1960,18 @@
 .sc-evo-label { font-weight: 500; color: #222; }
 .sc-evo-kind { margin-left: auto; font-size: 9px; color: #aaa; font-family: ui-monospace, monospace; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-evo-count { font-size: 10px; color: #999; min-width: 28px; text-align: right; }
+.sc-evo-prune { padding: 8px 10px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 10px; color: var(--nt-color-orange-600, #ea580c); }
 .sc-evo-canon {
   margin-left: 4px; font: 600 9px ui-monospace, monospace; padding: 1px 4px; border-radius: 4px;
   background: var(--nt-color-gold-100, #fef3e2); color: var(--nt-color-gold-800, #a3501c);
 }
 .sc-evo-canon.dead { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
-.sc-evo-prune { padding: 8px 10px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 10px; color: var(--nt-color-orange-600, #ea580c); }
+.sc-evo-prune-btn {
+  margin-left: 4px; font: 600 9px ui-monospace, monospace; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--nt-color-danger, #dc2626); color: var(--nt-color-danger, #dc2626);
+  background: transparent; cursor: pointer;
+}
+.sc-evo-prune-btn:hover { background: var(--nt-color-danger, #dc2626); color: #fff; }
 .sc-evo-plans { border-top: 1px solid rgba(0,0,0,0.06); max-height: 140px; overflow: auto; }
 .sc-evo-plan { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px; font-size: 10px; }
 .sc-evo-plan-act { font-weight: 700; color: var(--nt-color-teal-700, #0f766e); min-width: 56px; }

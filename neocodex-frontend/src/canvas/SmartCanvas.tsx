@@ -6,7 +6,7 @@ import { createSignal, createMemo, onMount, onCleanup, Show, For, type JSX } fro
 import type { CanvasNode, CollapsePolicy, Viewport } from './types'
 import { getRenderer, listCapabilities } from './nodeRegistry'
 import { computeCollapse, DEFAULT_POLICY } from './smartCollapse'
-import { evolutionRoute, pruneCandidates, treeStatus } from './evolution'
+import { evolutionRoute, pruneCandidates, treeStatus, pruneNode } from './evolution'
 
 /** 搜索添加时用的示例载荷，保证节点可渲染。 */
 function sampleData(kind: string): unknown {
@@ -265,6 +265,9 @@ export function SmartCanvas(props: SmartCanvasProps) {
                           title="NeoTrix 能力树 canonical 成熟度 (SEAL 实算)"
                         >NeoTrix {cn().constellation}</span>
                       )}
+                    </Show>
+                    <Show when={c.count === 0 && c.userAdded}>
+                      <button class="sc-evo-prune-btn" onClick={() => pruneNode(c.kind)}>回收</button>
                     </Show>
                   </div>
                 )}

@@ -57,6 +57,11 @@ export function canvasSyncCapabilities(caps: CanvasCapabilityInput[]): Promise<C
   return call('canvas_sync_capabilities', { caps })
 }
 
+/** 画板覆盖层手动触发 Dark Forest 回收：把 canvas::<kind> 标记废弃 (画板 → 树 写回)。 */
+export function canvasPruneCapability(kind: string): Promise<{ kind: string; pruned: boolean; constellation: string }> {
+  return call('canvas_prune_capability', { kind })
+}
+
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {
   return call('neocodex_create_session', { name: name ?? null })
 }

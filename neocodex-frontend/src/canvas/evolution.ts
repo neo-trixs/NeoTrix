@@ -5,7 +5,7 @@
 //  → 落盘 KB kv_store，使 SEAL / ConsciousnessTree 可读取此进化轨迹。
 // ══════════════════════════════════════════════════════════════════════════
 import { createSignal, createRoot, createEffect } from 'solid-js'
-import { kbKvGet, kbKvSet, canvasSyncCapabilities } from '../api/neocodex'
+import { kbKvGet, kbKvSet, canvasSyncCapabilities, canvasPruneCapability } from '../api/neocodex'
 import { listCapabilities } from './nodeRegistry'
 
 const NS = 'canvas_evo'
@@ -69,6 +69,22 @@ async function syncToCapabilityTree(): Promise<void> {
     })
   } catch (e) {
     console.warn('[evo] sync to capability tree failed:', e)
+  }
+}
+
+/** 画板覆盖层手动触发 Dark Forest 回收：写回 NeoTrix 能力树并乐观回读 canonical。 */
+export async function pruneNode(kind: string): Promise<void> {
+  try {
+    const res = await canvasPruneCapability(kind)
+    if (res.pruned) {
+      setTreeStatus((prev) =>
+        prev
+          ? { ...prev, canonical: { ...prev.canonical, [kind]: { constellation: res.constellation, deprecated: true } } }
+          : prev,
+      )
+    }
+  } catch (e) {
+    console.warn('[evo] prune capability failed:', e)
   }
 }
 
