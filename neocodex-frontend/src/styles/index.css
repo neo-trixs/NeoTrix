@@ -2257,3 +2257,93 @@
 .sb-resize:active {
   background: var(--nt-color-io-500, #3b82f6);
 }
+
+/* ===== GenUIView：工具结果富渲染（JSON / 表格 / 代码 / 文本） ===== */
+.gen-ui {
+  font-size: 11px;
+  line-height: 1.5;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  overflow: auto;
+  max-height: 320px;
+}
+.gen-ui__json,
+.gen-ui__text {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #334155;
+}
+.gen-ui__code {
+  background: rgba(15, 23, 42, 0.04);
+}
+.gen-ui__table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+}
+.gen-ui__table th,
+.gen-ui__table td {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  text-align: left;
+}
+.gen-ui__table th {
+  background: rgba(59, 130, 246, 0.08);
+  font-weight: 600;
+}
+/* JSON 语法高亮（对标 2026 可读性） */
+.json-key { color: #7c3aed; }
+.json-str { color: #16a34a; }
+.json-num { color: #ea580c; }
+.json-bool { color: #0891b2; }
+.json-null { color: #9ca3af; }
+
+/* ===== AutonomyMeter：渐进授权可视层 ===== */
+.autonomy-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  font-size: 11px;
+  color: #1e40af;
+}
+.autonomy-meter__label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.autonomy-meter__bars {
+  display: inline-flex;
+  gap: 2px;
+}
+.autonomy-meter__seg {
+  width: 10px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(30, 64, 175, 0.18);
+}
+.autonomy-meter__seg--on {
+  background: #3b82f6;
+}
+.autonomy-meter__rate {
+  font-variant-numeric: tabular-nums;
+  color: #1e40af;
+}
+
+/* ===== 无障碍：尊重系统「减弱动画」偏好 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

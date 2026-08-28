@@ -2,6 +2,7 @@ import { createSignal, onCleanup, Show } from 'solid-js'
 import { ChevronDown, ChevronRight, Check, X, Wrench, Copy, Loader2 } from 'lucide-solid'
 import type { ToolCallRecord } from '../stores/chat'
 import { clsx } from 'clsx'
+import { GenUIView } from './GenUIView'
 
 /**
  * ToolCallCard — 紧凑内联工具调用块（对标 Claude Code 内联）。
@@ -142,9 +143,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
                   </Show>
                 </button>
               </div>
-              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
-                {props.call.result}
-              </pre>
+              <GenUIView content={() => props.call.result ?? ''} />
             </div>
           </Show>
         </div>

@@ -16,6 +16,21 @@ function tryJson(s: string): unknown | null {
   }
 }
 
+function highlightJson(value: unknown): string {
+  const str = JSON.stringify(value, null, 2) ?? ''
+  const escaped = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    (m) => {
+      let cls = 'json-num'
+      if (/^"/.test(m)) cls = /:$/.test(m) ? 'json-key' : 'json-str'
+      else if (/true|false/.test(m)) cls = 'json-bool'
+      else if (/null/.test(m)) cls = 'json-null'
+      return `<span class="${cls}">${m}</span>`
+    }
+  )
+}
+
 function isMarkdownTable(s: string): boolean {
   const lines = s.split('\n').map((l) => l.trim()).filter(Boolean)
   if (lines.length < 2) return false
@@ -44,7 +59,7 @@ export function GenUIView(props: GenUIViewProps): JSX.Element {
         const j = json()
         if (j !== null) {
           return (
-            <pre class="gen-ui__json">{JSON.stringify(j, null, 2)}</pre>
+            <pre class="gen-ui__json" innerHTML={highlightJson(j)} />
           )
         }
         const t = table()

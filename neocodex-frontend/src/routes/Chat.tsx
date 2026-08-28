@@ -4,7 +4,9 @@ import {
   FolderTree, Bug, FlaskConical,
   Search, Cpu, Zap, FileText, AtSign,
 } from 'lucide-solid'
-import { NeoSend } from '../components/neo-icons'
+import { NeoSend, NeoChevronRight } from '../components/neo-icons'
+import { AutonomyMeter } from '../components/AutonomyMeter'
+import { rootCause } from '../lib/errorRootCause'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { Sidebar } from '../components/Sidebar'
 import { SettingsModal } from '../components/SettingsModal'
@@ -294,12 +296,14 @@ export function Chat() {
       ? `已批准以下计划，请按计划执行：\n\n${planText}`
       : '已批准计划，请执行。'
     await sendMessage(body, { userMessageAdded: false })
+    setApprovalAccepted(approvalAccepted() + 1)
   }
 
   const rejectPlan = () => {
     const pending = planPending()
     if (!pending) return
     setPlanPending(null)
+    setApprovalRejected(approvalRejected() + 1)
     showInfo('计划已拒绝，可继续规划或补充需求', 3000)
   }
 
@@ -534,11 +538,12 @@ export function Chat() {
         setCurrentAssistantMsgId(null)
         setStreamError(payload.message || '生成失败')
         setTimeout(() => setStreamError(null), 5000)
-        // 结构化错误三段式（后端可选填充，缺失则推导）
+        // 结构化错误三段式（后端可选填充，缺失则按根因规则推导 WHY/NEXT）
+        const rc = rootCause(payload.message || payload.what || '生成失败')
         setStreamErrorDetail({
           what: payload.what ?? payload.message ?? '生成失败',
-          why: payload.why ?? 'provider/流式阶段错误（F1），回复未落盘',
-          next: payload.next ?? '可重试；若持续出现，检查网络连通性或 API key',
+          why: payload.why ?? rc.why,
+          next: payload.next ?? rc.next,
         })
         setTimeout(() => setStreamErrorDetail(null), 6000)
         // OS 活动：错误阶段 + 最近活动描述
@@ -650,6 +655,44 @@ export function Chat() {
     }
   })
 
+  // 流式滚动锁：用户上滚则暂停自动跟随，显示「回到底部」
+  const [stickToBottom, setStickToBottom] = createSignal(true)
+  // 渐进授权可视层：bot 计划审批计数（对标 2026 自治度可见性）
+  const [approvalAccepted, setApprovalAccepted] = createSignal(0)
+  const [approvalRejected, setApprovalRejected] = createSignal(0)
+  const autonomyLevel = () => {
+    const total = approvalAccepted() + approvalRejected()
+    if (total === 0) return '待校准' as const
+    const rate = approvalAccepted() / total
+    if (rate >= 0.8) return '高信任' as const
+    if (rate >= 0.5) return '协作' as const
+    return '审慎' as const
+  }
+  const autonomyRate = () => {
+    const total = approvalAccepted() + approvalRejected()
+    return total === 0 ? 0 : approvalAccepted() / total
+  }
+  const autonomyLevelNum = () => {
+    const m = permissionMode()
+    if (m === 'manual') return 0
+    if (m === 'plan') return 1
+    if (m === 'auto') return 2
+    if (m === 'accept_edits') return 3
+    return 1
+  }
+  const onScrollMsg = () => {
+    const el = scrollRef
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    setStickToBottom(nearBottom)
+  }
+  const scrollToBottom = () => {
+    const el = scrollRef
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    setStickToBottom(true)
+  }
+
   // 消息区自动滚动：新消息/会话切换强制到底，流式期间若在底部则跟随
   createEffect(() => {
     const sid = currentSession()?.id ?? null
@@ -664,8 +707,7 @@ export function Chat() {
     isGenerating()
     const el = scrollRef
     if (!el) return
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 240
-    if (sessionChanged || nearBottom) {
+    if (sessionChanged || stickToBottom()) {
       requestAnimationFrame(() => {
         el.scrollTop = el.scrollHeight
       })
@@ -1217,6 +1259,12 @@ export function Chat() {
                 toolCount={agentToolCount}
                 lastActivity={agentLastActivity}
               />
+              {/* 渐进授权可视层：自治等级 + 审批通过率（对标 2026 自治度可见性） */}
+              <AutonomyMeter
+                level={autonomyLevelNum}
+                mode={permissionMode}
+                rate={() => Math.round(autonomyRate() * 100)}
+              />
               {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
               <span class="relative flex-shrink-0">
                 <button
@@ -1320,7 +1368,7 @@ export function Chat() {
 
         {/* ===== 消息流：气泡式 msg.r / msg.l（chat 视图） ===== */}
         <Show when={activeView() === 'chat'}>
-        <div ref={scrollRef} class="flex-1 overflow-y-auto" role="log" aria-live="polite">
+        <div ref={scrollRef} class="flex-1 overflow-y-auto" role="log" aria-live="polite" onScroll={onScrollMsg}>
           <Show
             when={messages().length > 0}
             fallback={
@@ -1820,6 +1868,18 @@ export function Chat() {
                 </div>
               </div>
             </div>
+          </Show>
+
+          {/* 回到底部按钮（流式滚动锁：用户上滚暂停跟随后出现） */}
+          <Show when={!stickToBottom()}>
+            <button
+              class="sb-tobottom"
+              onClick={scrollToBottom}
+              title="回到底部"
+            >
+              <NeoChevronRight class="w-4 h-4 rotate-90" />
+              回到底部
+            </button>
           </Show>
 
           <div class="flex-shrink-0 border-t border-border-primary/40 bg-white/10 backdrop-blur-xl">
