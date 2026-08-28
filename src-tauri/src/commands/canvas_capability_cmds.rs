@@ -451,8 +451,8 @@ pub fn canvas_apply_evolution_route() -> Result<CanvasRouteApplyResult, String> 
     kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
 
     Ok(CanvasRouteApplyResult {
-        matured: m,
-        pruned: p,
+        matured,
+        pruned,
         applied,
     })
 }
