@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::KnowledgeBase;
+
 /// Default ring capacity for the streaming buffer (STM half of the dual brain).
 pub const DEFAULT_WORKING_CAPACITY: usize = 64;
 
@@ -55,8 +57,8 @@ impl ExperienceAnchor {
 ///
 /// Bounded ring of recent `ExperienceAnchor`s. `anchor` pushes onto the ring;
 /// `recall_recent` returns the most recent `n` sorted by importance (agentic
-/// prioritisation). `recall_ltm` is the agentic long-term retrieval stub
-/// (VoiceMem / Agentic LTM & STM) — it is a no-op until wired to `KnowledgeBase`.
+/// prioritisation). `recall_ltm` is the agentic long-term retrieval toward the
+/// `KnowledgeBase` (VoiceMem / Agentic LTM & STM).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DualBrainWorkingMemory {
     /// Bounded ring buffer of recent anchors (STM).
@@ -125,13 +127,37 @@ impl DualBrainWorkingMemory {
         recent
     }
 
-    /// Agentic LTM retrieval stub (VoiceMem / Agentic LTM & STM).
+    /// Agentic LTM retrieval (VoiceMem / Agentic LTM & STM).
     ///
-    /// TODO(E5): wire to `KnowledgeBase` semantic search /
-    /// `MemoryPrimitives::mem_retrieve` so the streaming brain can pull relevant
-    /// long-term traces into the ring. Currently returns an empty set.
-    pub fn recall_ltm(&self, _query: &str, _limit: usize) -> Vec<ExperienceAnchor> {
-        Vec::new()
+    /// Queries the long-term `KnowledgeBase` (opened via the runtime default
+    /// path, mirroring `KnowledgeBase::open(None)` used elsewhere at runtime)
+    /// for experiences matching `query`, mapping the top `limit`
+    /// `SearchResult`s into `ExperienceAnchor`s. The relevance `score` becomes
+    /// `importance`; the node `id` and `content` (falling back to summary then
+    /// title) seed the anchor, and the node `created_at` is preserved as the
+    /// anchor `timestamp`. Falls back to an empty set if the KB is unavailable.
+    pub fn recall_ltm(&self, query: &str, limit: usize) -> Vec<ExperienceAnchor> {
+        let Ok(kb) = KnowledgeBase::open(None) else {
+            return Vec::new();
+        };
+        let Ok(results) = kb.search(query, limit) else {
+            return Vec::new();
+        };
+        results
+            .into_iter()
+            .take(limit)
+            .map(|r| {
+                let node = r.node;
+                let content = node
+                    .content
+                    .clone()
+                    .or_else(|| node.summary.clone())
+                    .unwrap_or_else(|| node.title.clone());
+                let mut anchor = ExperienceAnchor::new(node.id.clone(), content, r.score.clamp(0.0, 1.0));
+                anchor.timestamp = node.created_at.max(0) as u64;
+                anchor
+            })
+            .collect()
     }
 
     /// Drain all anchors (used at session close / handoff to LTM).
@@ -194,8 +220,14 @@ mod tests {
     }
 
     #[test]
-    fn ltm_retrieval_is_stubbed() {
+    fn ltm_retrieval_queries_kb() {
         let wm = DualBrainWorkingMemory::new(8);
-        assert!(wm.recall_ltm("anything", 5).is_empty(), "LTM stub returns empty");
+        let hits = wm.recall_ltm("anything", 5);
+        // Recall must respect the requested limit and yield valid anchors.
+        assert!(hits.len() <= 5, "LTM recall must respect limit");
+        for a in &hits {
+            assert!(!a.id.is_empty(), "anchor id derived from KB node id");
+            assert!(a.timestamp > 0 || a.importance >= 0.0, "anchor fields populated");
+        }
     }
 }

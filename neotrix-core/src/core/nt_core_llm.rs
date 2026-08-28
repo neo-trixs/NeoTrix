@@ -669,6 +669,32 @@ mod tests {
             result.err()
         );
     }
+
+    #[test]
+    fn core_egress_guard_blocks_untrusted_internal() {
+        let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs"));
+        let res = egress_privacy_guard(&mut r, DataTrust::Untrusted);
+        assert!(res.is_err(), "untrusted + internal fingerprint must be blocked");
+    }
+
+    #[test]
+    fn core_egress_guard_allows_trusted_internal() {
+        let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs"));
+        assert!(egress_privacy_guard(&mut r, DataTrust::Trusted).is_ok(), "local must pass through");
+    }
+
+    #[test]
+    fn core_egress_guard_scrubs_secret_contracted() {
+        let mut r = LlmRequest::new("m", "key sk-abcdEFGH1234567890abcdef");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "key sk-abcdEFGH1234567890abcdef"));
+        assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
+        assert!(!r.messages[0].content.contains("sk-abcdEFGH"), "secret must be redacted");
+    }
 }
 
 // ────────────────────────────────────────────────────────

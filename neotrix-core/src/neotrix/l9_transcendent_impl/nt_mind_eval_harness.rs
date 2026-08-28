@@ -1613,8 +1613,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for DummyProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {

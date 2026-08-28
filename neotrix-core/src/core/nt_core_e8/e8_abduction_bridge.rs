@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use super::abduction::{AbductiveHypothesis, AbductiveReasoningEngine};
 use super::domain_transition::{CoTLength, E8DomainTransitionModel, E8TaskType};
@@ -23,9 +24,19 @@ pub struct AbductiveTransitionReport {
 
 impl E8AbductionBridge {
     pub fn new(blend_weight: f64) -> Self {
+        let mut abductive_engine = AbductiveReasoningEngine::new();
+        // Wire the external Cortex-Brain causal graph (medical remedies etc.) into
+        // the abduction engine when the peripheral brain is mounted. Missing file
+        // is non-fatal — the engine degrades to its built-in graph only.
+        let cortex_path = Path::new("/Volumes/NeoTrixBrain/working/causal_graph.json");
+        if cortex_path.exists() {
+            if let Err(e) = abductive_engine.load_cortex_causal_graph(cortex_path) {
+                eprintln!("[e8-abduction-bridge] cortex causal graph load skipped: {}", e);
+            }
+        }
         Self {
             transition_model: E8DomainTransitionModel::new(blend_weight),
-            abductive_engine: AbductiveReasoningEngine::new(),
+            abductive_engine,
             active_hypotheses: Vec::new(),
         }
     }

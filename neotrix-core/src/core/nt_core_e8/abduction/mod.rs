@@ -9,6 +9,7 @@ pub use directed_search::{DirectedSearch, SearchStrategy};
 pub use state_machine::{AbductiveState, AbductiveStateMachine};
 
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbductiveHypothesis {
@@ -53,6 +54,30 @@ impl AbductiveReasoningEngine {
             convergence_threshold: 0.8,
             next_hypothesis_id: 0,
         }
+    }
+
+    /// Merge an external-brain Cortex causal graph (e.g. the medical remedies
+    /// graph at `/Volumes/NeoTrixBrain/working/causal_graph.json`) into this
+    /// engine's reasoning graph. Node/edge indices are remapped to avoid clobbering
+    /// existing inference state. Returns the number of edges merged.
+    ///
+    /// Guarded: a missing/unreadable file yields `Err` (caller decides whether to
+    /// warn) — never crashes the engine when the peripheral brain is unmounted.
+    pub fn load_cortex_causal_graph(&mut self, path: &Path) -> Result<usize, String> {
+        let external = CausalGraph::from_cortex_json(path)?;
+        let offset = self.graph.nodes.len();
+        let mut remap: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+        for (i, n) in external.nodes.iter().enumerate() {
+            let idx = self.graph.add_node(n.description.clone(), n.confidence);
+            remap.insert(i, idx);
+        }
+        for e in &external.edges {
+            if let (Some(&a), Some(&b)) = (remap.get(&e.from), remap.get(&e.to)) {
+                self.graph.add_edge(a, b, e.relation.clone(), e.strength);
+            }
+        }
+        let _ = offset;
+        Ok(external.edges.len())
     }
 
     pub fn add_observation(&mut self, desc: String) {

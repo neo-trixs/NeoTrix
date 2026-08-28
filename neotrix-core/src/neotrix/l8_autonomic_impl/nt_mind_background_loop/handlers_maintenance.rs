@@ -193,6 +193,16 @@ impl BackgroundLoopHandle {
             }
         }
         registry.experience_targets = export.experience_targets;
+        // Durable 覆盖层: 合并提交的 overlay, 使手动写入在后台重新生成后仍生效。
+        let overlay_path = path
+            .parent()
+            .map(|p| p.join("capability_overrides.json"))
+            .unwrap_or_else(|| PathBuf::from("capability_overrides.json"));
+        if let Some(ov) =
+            nt_core_capability_tree::registry::CapabilityRegistry::load_overlay_file(&overlay_path)
+        {
+            registry.merge_overlay(&ov);
+        }
         let mut plans = Vec::new();
 
         // 2. 缺陷补齐 — auto_scan (孤儿/过期/晋升/重复)

@@ -1,4 +1,3 @@
-use crate::core::nt_core_llm::DataTrust;
 use async_trait::async_trait;
 
 use super::context_budget::estimate_tokens;
@@ -70,8 +69,8 @@ fn serialize_system(s: &str, cache: bool) -> serde_json::Value {
 
 #[async_trait]
 impl LlmProvider for AnthropicProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Contracted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Contracted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {

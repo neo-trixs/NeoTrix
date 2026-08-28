@@ -744,6 +744,16 @@ pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::C
     registry.experience_targets = export.experience_targets;
     // CAD 能力节点 (GenCAD 四步框架) — 幂等: 若导出已含同名节点则忽略
     let _ = nt_core_capability_tree::cad_node::register_cad_capability(&mut registry);
+    // Durable 覆盖层合并 (提交的 overlay 优先), 使手动写入在基础重新生成后仍生效。
+    let overlay_path = capability_registry_path()
+        .parent()
+        .map(|p| p.join("capability_overrides.json"))
+        .unwrap_or_else(|| std::path::PathBuf::from("capability_overrides.json"));
+    if let Some(ov) =
+        nt_core_capability_tree::registry::CapabilityRegistry::load_overlay_file(&overlay_path)
+    {
+        registry.merge_overlay(&ov);
+    }
     Some(registry)
 }
 

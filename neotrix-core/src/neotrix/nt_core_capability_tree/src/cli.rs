@@ -344,7 +344,7 @@ impl CapabilityCli {
             fs::create_dir_all(parent)?;
         }
         let content = serde_json::to_string_pretty(&registry.export())?;
-        fs::write(&self.registry, content)?;
+        fs::write(&self.registry, &content)?;
         // Durable 层: 把完整注册表镜像写入提交的 overlay (capability_overrides.json),
         // 使手动 durable 写入在基础被重新生成后仍生效。overlay 与基础文件同步,
         // 加载时 overlay 节点优先合并 (merge_overlay), 故手动变更永不被覆盖丢弃。

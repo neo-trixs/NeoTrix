@@ -5,7 +5,7 @@
 //  → 落盘 KB kv_store，使 SEAL / ConsciousnessTree 可读取此进化轨迹。
 // ══════════════════════════════════════════════════════════════════════════
 import { createSignal, createRoot, createEffect } from 'solid-js'
-import { kbKvGet, kbKvSet } from '../api/neocodex'
+import { kbKvGet, kbKvSet, canvasSyncCapabilities } from '../api/neocodex'
 import { listCapabilities } from './nodeRegistry'
 
 const NS = 'canvas_evo'
@@ -23,6 +23,50 @@ export interface CapabilityTelemetry {
 
 /** NeoTrix Constellations 对齐的成熟度阶梯 */
 export type Stage = 'C0' | 'C1' | 'C2' | 'C3' | 'C4' | 'C5'
+
+function stageNumber(s: Stage): number {
+  return { C0: 0, C1: 1, C2: 2, C3: 3, C4: 4, C5: 5 }[s]
+}
+
+/** 已并入 NeoTrix 能力树的同步状态（进化路线覆盖层展示）。 */
+export const [treeStatus, setTreeStatus] = createSignal<{
+  canvasNodes: number
+  deprecated: number
+  cycle: string
+  matured: number
+  plans: { action: string; nodeId: string; rationale: string }[]
+} | null>(null)
+
+/**
+ * 把画板能力网并入 NeoTrix 能力树 (KB kv_store `capability_tree`)。
+ * 每个能力 → `canvas::<kind>` 能力节点 (Domain::Io)：
+ *   - 新发现 → Budding (C0 起步)
+ *   - 已存在 → Strengthen (按使用量晋升 C0–C5)
+ *   - 用户自定义且 0 使用 → Dark Forest 回收 (deprecated)
+ * 使 SEAL / ConsciousnessTree 能通过同一棵能力树蒸馏 / 优化画板能力网。
+ */
+async function syncToCapabilityTree(): Promise<void> {
+  try {
+    const route = evolutionRoute()
+    const payload = route.map((c) => ({
+      kind: c.kind,
+      label: c.label,
+      stage: stageNumber(c.stage),
+      usage: c.count,
+      user_added: c.userAdded,
+    }))
+    const res = await canvasSyncCapabilities(payload)
+    setTreeStatus({
+      canvasNodes: res.nodes_synced,
+      deprecated: res.deprecated,
+      cycle: res.tree_cycle,
+      matured: res.matured,
+      plans: res.plans.map((p) => ({ action: p.action, nodeId: p.node_id, rationale: p.rationale })),
+    })
+  } catch (e) {
+    console.warn('[evo] sync to capability tree failed:', e)
+  }
+}
 
 export function stageOf(count: number): { stage: Stage; label: string } {
   if (count <= 0) return { stage: 'C0', label: 'C0 注册' }
@@ -102,6 +146,7 @@ export function initCanvasEvolution(): void {
       if (saveTimer) clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {
         kbKvSet(NS, KEY, snap).catch(() => {})
+        syncToCapabilityTree()
       }, 1000)
     })
   })

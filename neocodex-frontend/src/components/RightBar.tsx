@@ -4,7 +4,7 @@ import type { ProjectTreeItem } from '../api/types'
 import { clsx } from 'clsx'
 import { GlobeView } from './GlobeView'
 import { ProjectView as ProjectViewPanel } from './ProjectView'
-import { SmartCanvas, startCanvasBridge } from '../canvas'
+import { SmartCanvas, startCanvasBridge, initCanvasEvolution } from '../canvas'
 import { canvasStore, initCanvasPersistence } from '../stores/canvas'
 
 /* ════════════════════════════════════════════
@@ -242,6 +242,8 @@ export function RightBar() {
   startCanvasBridge()
   // 启动画板持久化：节点落盘 KB kv_store，重载恢复
   initCanvasPersistence()
+  // 启动能力网自进化路线：遥测 + 成熟度阶梯 + 落盘
+  initCanvasEvolution()
 
   const toggleRb = () => {
     if (autoHide()) {

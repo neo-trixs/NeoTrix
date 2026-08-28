@@ -1,4 +1,3 @@
-use crate::core::nt_core_llm::DataTrust;
 use async_trait::async_trait;
 
 use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
@@ -90,8 +89,8 @@ impl OpenAiProvider {
 
 #[async_trait]
 impl LlmProvider for OpenAiProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Contracted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Contracted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {

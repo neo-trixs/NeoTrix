@@ -36,6 +36,26 @@ export function kbKvList(namespace: string): Promise<[string, string][]> {
   return call('kb_kv_list', { namespace })
 }
 
+/* ── 画板能力网 → NeoTrix 能力树（自进化路线融合） ── */
+export interface CanvasCapabilityInput {
+  kind: string
+  label: string
+  stage: number // 0..=5 → C0..C5 (NeoTrix Constellations)
+  usage: number
+  user_added: boolean
+}
+export interface CanvasCapabilitySyncResult {
+  nodes_synced: number
+  tree_cycle: string
+  deprecated: number
+  matured: number
+  plans: { action: string; node_id: string; rationale: string }[]
+}
+/** 把画板能力网快照并入 NeoTrix 能力树 (KB kv_store capability_tree)，执行 Budding/Strengthen/Dark-Forest 回收。 */
+export function canvasSyncCapabilities(caps: CanvasCapabilityInput[]): Promise<CanvasCapabilitySyncResult> {
+  return call('canvas_sync_capabilities', { caps })
+}
+
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {
   return call('neocodex_create_session', { name: name ?? null })
 }

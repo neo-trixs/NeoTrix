@@ -1,4 +1,3 @@
-use crate::core::nt_core_llm::DataTrust;
 use super::types::*;
 use crate::neotrix::nt_io_http_factory::global_client;
 
@@ -81,8 +80,8 @@ impl GroqProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for GroqProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Contracted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Contracted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
@@ -216,8 +215,8 @@ impl OpenRouterProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for OpenRouterProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Contracted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Contracted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
@@ -382,8 +381,8 @@ impl PollinationsProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for PollinationsProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Untrusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Untrusted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {
@@ -538,8 +537,8 @@ impl CerebrasProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for CerebrasProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Contracted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Contracted
     }
 
     fn set_proxy(&mut self, proxy_url: &str) {

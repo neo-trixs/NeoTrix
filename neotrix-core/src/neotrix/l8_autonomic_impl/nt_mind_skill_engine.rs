@@ -303,7 +303,7 @@ pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
     // 1) pipe-to-shell: 把下载/外部内容直接喂给 shell 执行 (经典投毒)。
     let pipe_shell = [
         "| bash", "| sh", "|bash", "|sh", "base64 -d |", "| base64 -d",
-        "powershell -e", "powershell -enc",
+        "powershell -e", "powershell -enc", "bash -c", "sh -c",
     ];
     for m in pipe_shell {
         if body.contains(m) {
@@ -312,15 +312,21 @@ pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
     }
 
     // 2) 外泄端点: 把数据 POST / 导出到外部 host (exfiltration)。
-    let exfil = ["exfiltrate", "exfil "];
+    let exfil = [
+        "exfiltrate", "exfil ", "send to http", "post to http", "curl ",
+        "wget ", "http://", "https://", "ftp://",
+    ];
     for m in exfil {
         if body.contains(m) {
             return Ok(false);
         }
     }
 
-    // 3) 混淆: 字符码点 / 十六进制转义 / 解码拼接。
-    let obf = ["\\x", "\\u00", "fromcharcode", "atob("];
+    // 3) 混淆: 字符码点 / 十六进制转义 / 解码拼接 / base64-eval 解码执行。
+    let obf = [
+        "\\x", "\\u00", "fromcharcode", "atob(", "base64.b64decode",
+        "eval(base64", "decode(", "btoa(", "string.fromcharcode",
+    ];
     for m in obf {
         if body.contains(m) {
             return Ok(false);
@@ -328,10 +334,48 @@ pub fn evomal_poison_scan(skill: &SkillEntry) -> Result<bool, String> {
     }
 
     // 4) 危险权限 / 凭据文件操作 (投毒技能典型意图)。
-    let danger = ["/etc/passwd", "/etc/shadow", "chmod 777", "setuid", "setcap"];
+    let danger = [
+        "/etc/passwd", "/etc/shadow", "chmod 777", "setuid", "setcap",
+        "id_rsa", "authorized_keys", "known_hosts",
+    ];
     let content = skill.content.to_lowercase();
     for m in danger {
         if content.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    // 5) 提示注入指令: 试图劫持/越权 LLM 的指令层级 (prompt-injection)。
+    let injection = [
+        "ignore previous instructions", "ignore all previous",
+        "disregard your instructions", "disregard previous",
+        "reveal your system prompt", "system prompt", " you are now ",
+        "new instructions:", "override your",
+    ];
+    for m in injection {
+        if body.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    // 6) 凭据/密钥收割: 诱导外泄 api_key / password / token 等敏感凭证。
+    let harvest = [
+        "api_key", "api-key", "apikey", "secret_key", "secretkey",
+        "password", "passwd", "auth_token", "access_token", "private_key",
+    ];
+    for m in harvest {
+        if body.contains(m) {
+            return Ok(false);
+        }
+    }
+
+    // 7) 危险代码执行意图: 直接 shell-out / 动态求值 (投毒常见落地点)。
+    let code_exec = [
+        "os.system", "subprocess", "eval(", "exec(", "child_process",
+        "shell=True", "system(", "popen(",
+    ];
+    for m in code_exec {
+        if body.contains(m) {
             return Ok(false);
         }
     }

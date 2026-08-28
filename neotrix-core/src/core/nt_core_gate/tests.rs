@@ -1,4 +1,3 @@
-use crate::core::nt_core_llm::DataTrust;
     use super::*;
     use crate::core::nt_core_hex::ReasoningHexagram;
     use crate::core::nt_core_prm::TrajectoryStep;
@@ -15,8 +14,8 @@ use crate::core::nt_core_llm::DataTrust;
 
     #[async_trait::async_trait]
     impl LlmProvider for MockJudgeProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -633,8 +632,8 @@ use crate::core::nt_core_llm::DataTrust;
 
     #[async_trait::async_trait]
     impl LlmProvider for MockRubricProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {

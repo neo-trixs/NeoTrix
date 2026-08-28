@@ -1,4 +1,3 @@
-use crate::core::nt_core_llm::DataTrust;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
@@ -159,8 +158,8 @@ impl Default for GatewayV2 {
 
 #[async_trait::async_trait]
 impl LlmProvider for GatewayV2 {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -454,8 +453,8 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for ConditionalFail {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
             async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -522,8 +521,8 @@ mod tests {
         }
         #[async_trait::async_trait]
         impl LlmProvider for StreamConditionalFail {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
             async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -1157,8 +1156,8 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for MockProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Trusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Trusted
     }
 
         async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {

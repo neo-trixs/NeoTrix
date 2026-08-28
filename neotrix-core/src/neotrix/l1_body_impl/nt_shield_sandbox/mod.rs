@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::net::TcpStream;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -204,7 +205,7 @@ impl EgressPolicy {
 // Rust-native socket 探测, 但保持零依赖、零 shell (R-P48)。
 // ────────────────────────────────────────────────────────────────
 
-/// Storm-Breaker recon 结果 (静态占位, 无网络 / 无 shell)。
+/// Storm-Breaker recon 结果 (Rust-native TCP 探测, 无 shell / 无第三方 crate)。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StormBreakerRecon {
     pub host: String,
@@ -212,15 +213,45 @@ pub struct StormBreakerRecon {
     pub note: &'static str,
 }
 
-/// Rust-native Storm-Breaker 探测: 纯静态, 无外部进程、无网络调用 (R-P48)。
-/// 真实 recon 应在此扩展为 Rust 原生 TCP 探测, 但保持零第三方 crate、零 shell。
+/// Rust-native TCP 探测结果 (R-P48: 零第三方 crate、零 shell-out)。
+/// `Open`=端口可达/开放; `Closed`=连接被拒 (端口关闭); `Unreachable`=超时 /
+/// 网络不可达 / 被 egress policy 阻断。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StormBreakerProbe {
+    Open,
+    Closed,
+    Unreachable,
+}
+
+/// Rust-native Storm-Breaker TCP 可达性探测 (R-P48)。
+/// 仅使用 `std::net::TcpStream::connect_timeout`, 不 shell out 到 nmap/dig 等
+/// 外部工具, 不引入任何第三方网络 crate。给定 host + port, 返回 `ProbeResult`
+/// 枚举 (Open/Closed/Unreachable), 函数本身不抛错。
+pub fn storm_breaker_tcp_probe(host: &str, port: u16) -> StormBreakerProbe {
+    let addr: std::net::SocketAddr = match format!("{host}:{port}").parse() {
+        Ok(a) => a,
+        Err(_) => return StormBreakerProbe::Unreachable,
+    };
+    match TcpStream::connect_timeout(&addr, Duration::from_secs(3)) {
+        Ok(_) => StormBreakerProbe::Open,
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::ConnectionRefused => StormBreakerProbe::Closed,
+            _ => StormBreakerProbe::Unreachable,
+        },
+    }
+}
+
+/// Rust-native Storm-Breaker recon (R-P48): 对默认探测端口列表
+/// (443 / 80) 做 Rust 原生 TCP 探测, 任一端口 Open 即视为 reachable。
+/// 纯 std 实现, 无外部进程、无网络库。
 pub fn storm_breaker_recon(host: &str) -> StormBreakerRecon {
-    // TODO(R-P48): 接 Rust-native 网络探测 (如 `std::net::TcpStream::connect`,
-    // 无第三方 crate); 当前为占位 stub, 不 shell out 到 nmap/dig 等外部工具。
+    let reachable = [443u16, 80]
+        .iter()
+        .any(|&p| storm_breaker_tcp_probe(host, p) == StormBreakerProbe::Open);
     StormBreakerRecon {
         host: host.to_string(),
-        reachable: false,
-        note: "stub: rust-native recon path (no external tool, R-P48)",
+        reachable,
+        note: "rust-native tcp probe (R-P48, no external tool)",
     }
 }
 

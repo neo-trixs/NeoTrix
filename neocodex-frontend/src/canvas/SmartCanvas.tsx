@@ -6,7 +6,7 @@ import { createSignal, createMemo, onMount, onCleanup, Show, For, type JSX } fro
 import type { CanvasNode, CollapsePolicy, Viewport } from './types'
 import { getRenderer, listCapabilities } from './nodeRegistry'
 import { computeCollapse, DEFAULT_POLICY } from './smartCollapse'
-import { evolutionRoute, pruneCandidates } from './evolution'
+import { evolutionRoute, pruneCandidates, treeStatus } from './evolution'
 
 /** 搜索添加时用的示例载荷，保证节点可渲染。 */
 function sampleData(kind: string): unknown {
@@ -261,6 +261,30 @@ export function SmartCanvas(props: SmartCanvasProps) {
                 )}
               </For>
             </div>
+            <Show when={treeStatus()}>
+              {(st) => (
+                <>
+                  <div class="sc-evo-prune">
+                    已并入 NeoTrix 能力树 · {st().canvasNodes} 节点 (cycle {st().cycle})
+                    {st().matured > 0 ? ` · SEAL 晋升 ${st().matured}` : ''}
+                    {st().deprecated > 0 ? ` · Dark Forest 回收 ${st().deprecated}` : ''}
+                  </div>
+                  <Show when={st().plans.length > 0}>
+                    <div class="sc-evo-plans">
+                      <For each={st().plans}>
+                        {(p) => (
+                          <div class="sc-evo-plan">
+                            <span class="sc-evo-plan-act">{p.action}</span>
+                            <span class="sc-evo-plan-node">{p.nodeId.replace('canvas::', '')}</span>
+                            <span class="sc-evo-plan-why">{p.rationale}</span>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </>
+              )}
+            </Show>
             <Show when={pruneCandidates().length}>
               <div class="sc-evo-prune">Dark Forest 回收候选：{pruneCandidates().join('，')}</div>
             </Show>

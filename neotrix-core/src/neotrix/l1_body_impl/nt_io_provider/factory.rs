@@ -200,13 +200,13 @@ impl LlmProviderType {
     /// - `Untrusted`: 免费/代理端点 (xiaohuxing/llm7/pollinations/opencode-zen 等),
     ///                靠日志/数据回灌维持免费, 是"拿去喂模型训练"的真实载体 —
     ///                检测到 NeoTrix 内部指纹时必须阻断 (fail-closed) 或脱敏。
-    pub fn data_trust(self) -> DataTrust {
+    pub fn data_trust(self) -> crate::core::nt_core_llm::DataTrust {
         if self.is_local() {
-            DataTrust::Trusted
+            crate::core::nt_core_llm::DataTrust::Trusted
         } else if self.is_free() || self.category() == ProviderCategory::Proxy {
-            DataTrust::Untrusted
+            crate::core::nt_core_llm::DataTrust::Untrusted
         } else {
-            DataTrust::Contracted
+            crate::core::nt_core_llm::DataTrust::Contracted
         }
     }
 }
@@ -303,8 +303,8 @@ pub struct DeniedProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for DeniedProvider {
-    fn data_trust(&self) -> DataTrust {
-        DataTrust::Untrusted
+    fn data_trust(&self) -> crate::core::nt_core_llm::DataTrust {
+        crate::core::nt_core_llm::DataTrust::Untrusted
     }
 
     async fn complete_raw(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {

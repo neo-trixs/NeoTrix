@@ -138,7 +138,7 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Crypto,
         "goal" | "plan" | "schedule"
             => CommandCategory::Goal,
-        "evidence" | "hypothesis" | "search" | "board" | "kb" | "knowledge" | "knowledge-base" | "memory" | "mem-aggr"
+        "evidence" | "hypothesis" | "search" | "board" | "kb" | "knowledge" | "knowledge-base" | "memory" | "mem-aggr" | "cortex" | "brain-external" | "neotrix-brain"
             => CommandCategory::Memory,
         "background" | "side" | "router" | "route" | "vim" | "workspace" | "theme" | "layout" | "display"
             => CommandCategory::Ui,
