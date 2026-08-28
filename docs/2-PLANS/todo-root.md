@@ -186,11 +186,11 @@ S59.8 ── Harness Evolution 论文分析 ────────────
   └─  TODO 全同步                         ✅ 本文件
         ↓
 S59.9 ── 论文驱动进化实施 ──────────────
-  ├─  SEAL HarnessAdapt → 独立 evolver    ⬜ P0
-  ├─  ActivationAuditStage (SLR+HFR)      ⬜ P1
-  ├─  GWT InstructionFollowSpecialist     ⬜ P1
-  ├─  E8 mode agent/evolver 分离          ⬜ P2
-  └─  Roadmap 论文引用更新                ⬜ P2
+   ├─  SEAL HarnessAdapt → 独立 evolver    ✅ P0 (EvolverBackend trait 隔离, 31b2f145)
+   ├─  ActivationAuditStage (SLR+HFR)      ✅ P1 (70f426ff + 5f58a203)
+   ├─  GWT InstructionFollowSpecialist     ✅ P1 (f8cfd624)
+   ├─  E8 mode agent/evolver 分离          ⬜ P2 (接口已留, 待分配)
+   └─  Roadmap 论文引用更新                ⬜ P2
         ↓
 v0.19.0-rc1 ── 最小安全发布 (待签名)
        ↓
@@ -210,7 +210,7 @@ v0.21.0    ── 生产可用 + 多 provider + 异步任务
 | ID | 问题 | 影响层 | 状态 | 说明 |
 |----|------|--------|------|------|
 | EA3-P0-01 | **MCP v3 传输迁移** | L1/L7 | ⬜ | 无状态HTTP取代会话; subscriptions/listen; JSON Schema 2020-12; Tasks扩展 |
-| EA3-P0-02 | **TTC引擎收尾** — nt_core_ttc.rs 2 test failures | L4 | 🔶 25/27 | Lagrangian allocator + early exit detector 修复 |
+| EA3-P0-02 | **TTC引擎收尾** — nt_core_ttc.rs | L4 | ✅ 36/36 (计划原记"25/27 两失败"已陈旧, 实测全绿, 见 2026-08-28 会话) | Lagrangian allocator + early exit detector 经 consolidation 会话修复 |
 | EA3-P0-03 | **ECHO终端信号管线设计** | L2/L4 | ⬜ | CLI终端输出→密集监督信号的架构方案设计 |
 
 ### 🟧 P1 — 重要 (2周内)
