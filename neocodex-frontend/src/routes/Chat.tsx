@@ -37,6 +37,9 @@ import { ApprovalPanel } from '../components/ApprovalPanel'
 import { FileEditorPanel } from '../components/FileEditorPanel'
 import { AgentActivityBar, type AgentPhase } from '../components/AgentActivityBar'
 import { AgentActivityLog, type ActivityStep } from '../components/AgentActivityLog'
+import { AutonomyMeter } from '../components/AutonomyMeter'
+import { GenUIView } from '../components/GenUIView'
+import { rootCause } from '../lib/errorRootCause'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -91,6 +94,17 @@ export function Chat() {
   const [logOpen, setLogOpen] = createSignal(false)
   // 结构化错误三段式（what/why/next）：后端可选填充，前端缺失时推导
   const [streamErrorDetail, setStreamErrorDetail] = createSignal<{ what: string; why: string; next: string } | null>(null)
+  // 渐进授权：审批通过/拒绝计数 → 通过率（自治可信度可视化，对标 2026 Agent UX）
+  const [approvalAccepted, setApprovalAccepted] = createSignal(0)
+  const [approvalRejected, setApprovalRejected] = createSignal(0)
+  const autonomyRate = () => {
+    const a = approvalAccepted()
+    const r = approvalRejected()
+    const total = a + r
+    return total === 0 ? 100 : Math.round((a / total) * 100)
+  }
+  const AUTONOMY_LEVEL: Record<PermissionMode, number> = { manual: 0, plan: 1, auto: 2, accept_edits: 3 }
+  const autonomyLevel = () => AUTONOMY_LEVEL[permissionMode()] ?? 2
   const pushLog = (step: Omit<ActivityStep, 'ts'>) => {
     setAgentLog((prev) => {
       const next = [...prev, { ...step, ts: Date.now() }]
@@ -268,6 +282,7 @@ export function Chat() {
     if (!pending) return
     const planText = chatStore.messageContent(pending.msgId) ?? ''
     setPlanPending(null)
+    setApprovalAccepted((n) => n + 1)
     const targetMode: PermissionMode = 'accept_edits'
     setPermissionMode(targetMode)
     showInfo(`计划已批准，切换至「${PERMISSION_MODES.find(m => m.value === targetMode)?.label}」执行`, 3000)
@@ -282,6 +297,7 @@ export function Chat() {
     const pending = planPending()
     if (!pending) return
     setPlanPending(null)
+    setApprovalRejected((n) => n + 1)
     showInfo('计划已拒绝，可继续规划或补充需求', 3000)
   }
 
@@ -516,11 +532,12 @@ export function Chat() {
         setCurrentAssistantMsgId(null)
         setStreamError(payload.message || '生成失败')
         setTimeout(() => setStreamError(null), 5000)
-        // 结构化错误三段式（后端可选填充，缺失则推导）
+        // 结构化错误三段式（后端可选填充，缺失则按根因模式推导）
+        const rc = rootCause(payload.message ?? '')
         setStreamErrorDetail({
           what: payload.what ?? payload.message ?? '生成失败',
-          why: payload.why ?? 'provider/流式阶段错误（F1），回复未落盘',
-          next: payload.next ?? '可重试；若持续出现，检查网络连通性或 API key',
+          why: payload.why ?? rc.why,
+          next: payload.next ?? rc.next,
         })
         setTimeout(() => setStreamErrorDetail(null), 6000)
         // OS 活动：错误阶段 + 最近活动描述
@@ -1198,6 +1215,12 @@ export function Chat() {
                   </div>
                 </Show>
               </span>
+              {/* 渐进授权：自治等级 + 审批通过率（随时可见 OS 自主权） */}
+              <AutonomyMeter
+                level={autonomyLevel}
+                mode={() => permissionModeInfo().shortLabel}
+                rate={autonomyRate}
+              />
             </div>
             <Show when={harnessRoute()}>
               <span
