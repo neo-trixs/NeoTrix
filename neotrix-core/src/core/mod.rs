@@ -103,6 +103,7 @@ pub mod nt_core_echo_terminal;
 pub mod l6_self;
 pub mod nt_core_aware;
 pub mod nt_core_self;
+pub mod nt_core_self_model;
 pub mod nt_core_self_constitution;
 pub mod nt_core_guard_chain;
 pub mod nt_core_kb_primitives;

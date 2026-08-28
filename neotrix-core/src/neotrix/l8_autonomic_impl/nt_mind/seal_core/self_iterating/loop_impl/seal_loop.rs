@@ -647,6 +647,20 @@ impl SelfIteratingBrain {
         let mut regression_failed = false;
         let mut failure_reasons: Vec<String> = Vec::new();
 
+        // ── NT-CORE 自我模型钩子 (T6): 候选行为变更产出后, 若 SelfModel 可用,
+        //    评估其价值并回写自我状态。默认 feature 关闭 → 编译掉, 不影响既有逻辑;
+        //    开启 `self_model` feature 后自动接线 (无需修改 brain 结构字段)。
+        //    真实启发式见 `nt_core_self_model::SelfModel::value_function` TODO(T6)。
+        #[cfg(feature = "self_model")]
+        {
+            let mut model = crate::core::nt_core_self_model::SelfModel::new();
+            let v = model.value_function(candidate);
+            log::debug!("[seal][self-model] candidate value={:.4}", v);
+            if let Err(e) = model.update(candidate) {
+                log::warn!("[seal][self-model] update failed: {}", e);
+            }
+        }
+
         // ── (a) 自动生成并运行回归/对抗测试 ──
         // E3 (T11): EvalHarness 现暴露真实 `generate_regression_test` + `run_regression_test`
         // (确定性, 无 provider 依赖): 从候选合成回归用例 (禁止反模式 + 覆盖既有评测

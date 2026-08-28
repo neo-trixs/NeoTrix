@@ -14491,7 +14491,7 @@
       "id": "nt_governance::human_oversight",
       "domain": "governance",
       "layer": "l5conscious",
-      "constellation": "c0compile",
+      "constellation": "c2integrationtest",
       "provides": [
         "human_oversight",
         "skill_atrophy_counteract"
@@ -14517,7 +14517,9 @@
           "timestamp": "2026-08-28T05:57:24.222319Z"
         }
       ],
-      "metadata": {},
+      "metadata": {
+        "wiring_evidence": "neotrix-core/src/core/nt_core_self_test_integration.rs:165 (register_human_oversight_self_tests) -> global SelfTestRegistry"
+      },
       "created_at": "1970-01-01T00:00:00Z",
       "updated_at": "2026-08-28T05:57:24.222320Z",
       "deprecated": false,
@@ -14583,7 +14585,7 @@
       "id": "nt_mind::yoyo_gasp",
       "domain": "mind",
       "layer": "l4cognition",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "self_evolution",
         "gasp_runtime",
@@ -14623,7 +14625,7 @@
       "id": "nt_mind::yoyo_evolve",
       "domain": "mind",
       "layer": "l4cognition",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "stage_machine",
         "evolution_loop",
@@ -14661,7 +14663,7 @@
       "id": "nt_mind::gasp",
       "domain": "mind",
       "layer": "l4cognition",
-      "constellation": "c2integrationtest",
+      "constellation": "c1unittest",
       "provides": [
         "gasp_schema",
         "self_evolution_schema",

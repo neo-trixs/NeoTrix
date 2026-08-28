@@ -30,7 +30,7 @@ import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '..
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { clsx } from 'clsx'
 import { neocodex, system, unified, errText, harness } from '../api'
-import type { HarnessRunResponse, HarnessProgressEvent, HarnessApproval } from '../api/harness'
+import type { HarnessRunResponse, HarnessProgressEvent, HarnessStep, HarnessApproval } from '../api/harness'
 import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
 import { ApprovalPanel } from '../components/ApprovalPanel'
@@ -98,6 +98,7 @@ export function Chat() {
   const [harnessRoute, setHarnessRoute] = createSignal<{ tag: string; domain: string; specialist: string } | null>(null)
   const [harnessReport, setHarnessReport] = createSignal<HarnessRunResponse | null>(null)
   const [harnessRunning, setHarnessRunning] = createSignal(false)
+  const [harnessSteps, setHarnessSteps] = createSignal<HarnessStep[]>([])
   // 左栏 bot 审批流可见性：挂载时拉取待审批队列（可 approve/reject 交互）
   const [approvals, setApprovals] = createSignal<HarnessApproval[]>([])
   const refreshApprovals = () => {
@@ -847,6 +848,7 @@ export function Chat() {
     const runId = (globalThis.crypto?.randomUUID?.() ?? `run-${Date.now()}`)
     setHarnessRunning(true)
     setHarnessReport(null)
+    setHarnessSteps([])
     let unlisten: (() => void) | undefined
     try {
       unlisten = await listen<HarnessProgressEvent>('harness-progress', (e) => {
@@ -854,10 +856,18 @@ export function Chat() {
         if (p.run_id && p.run_id !== runId) return
         if (p.phase === 'allocated') {
           // 阶段1: 拆解+分配已就绪 → 即时渲染 (执行中)
-          setHarnessReport(p.report)
+          setHarnessReport(p.report ?? null)
+        } else if (p.phase === 'step' && p.step) {
+          // 阶段2: 子任务级实时进度 → 追加/覆写该 index 的步骤
+          const s = p.step
+          setHarnessSteps((prev) => {
+            const next = prev.slice()
+            next[s.index] = s
+            return next
+          })
         } else if (p.phase === 'done') {
-          // 阶段2: 完整闭环报告 → 落盘并停止脉冲
-          setHarnessReport(p.report)
+          // 阶段3: 完整闭环报告 → 落盘并停止脉冲
+          setHarnessReport(p.report ?? null)
           setHarnessRunning(false)
           unlisten?.()
         }
@@ -1197,7 +1207,7 @@ export function Chat() {
                 {/* Harness 执行报告面板（/run 或 ⌘K 运行后展示，不污染会话历史） */}
                 <Show when={harnessRunning() || harnessReport()}>
                   <div class="px-2 pb-2">
-                    <HarnessReportCard running={harnessRunning()} report={harnessReport()} onClose={() => setHarnessReport(null)} />
+                    <HarnessReportCard running={harnessRunning()} report={harnessReport()} steps={harnessSteps()} onClose={() => setHarnessReport(null)} />
                   </div>
                 </Show>
 
@@ -1667,7 +1677,7 @@ export function Chat() {
               {/* Harness 执行报告面板（/run 或 ⌘K 运行后展示，不污染会话历史） */}
               <Show when={harnessRunning() || harnessReport()}>
                 <div class="pb-2">
-                  <HarnessReportCard running={harnessRunning()} report={harnessReport()} onClose={() => setHarnessReport(null)} />
+                  <HarnessReportCard running={harnessRunning()} report={harnessReport()} steps={harnessSteps()} onClose={() => setHarnessReport(null)} />
                 </div>
               </Show>
 

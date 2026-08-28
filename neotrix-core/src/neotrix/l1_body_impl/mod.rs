@@ -45,6 +45,7 @@ pub mod nt_shield_stealth_net;
 pub mod nt_shield_traffic;
 pub mod nt_shield_agentic_scan;
 pub mod nt_shield_comm;
+pub mod nt_shield_recon;
 
 // Act
 pub mod nt_act_autonomy;
@@ -56,6 +57,8 @@ pub mod nt_act_sandbox;
 pub mod nt_act_disk_guard;
 pub mod nt_act_action_cache;
 pub mod nt_act_voice;
+pub mod nt_act_media;
+pub mod nt_act_seo;
 pub mod nt_agent_agent_team;
 
 // Misc

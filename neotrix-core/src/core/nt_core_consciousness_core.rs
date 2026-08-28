@@ -640,6 +640,26 @@ pub struct TaskLoopReport {
     pub internal_results: Vec<InternalExecutionResult>,
 }
 
+/// Harness 子任务级进度 — [`execute_task_loop_with_progress`] 每完成一个子任务前/后回调,
+/// 后端据此经 Tauri `harness-progress`(phase=step) 实时推前端, 取代整体轮询。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HarnessStepProgress {
+    /// 当前子任务在总分配中的序号 (0-based)。
+    pub index: usize,
+    /// 子任务总数 (等于 allocations.len())。
+    pub total: usize,
+    /// 子任务类型: "internal" (能力网命中) / "external" (外部缺口求解)。
+    pub kind: String,
+    /// 命中的能力标签。
+    pub capability_tag: String,
+    /// 子任务摘要。
+    pub summary: String,
+    /// 步状态: "running" | "done" | "failed"。
+    pub status: String,
+    /// 执行输出/解决方案 (running 时为空)。
+    pub output: String,
+}
+
 /// 内置子任务执行结果 — 能力网命中后的执行反馈。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct InternalExecutionResult {
@@ -911,13 +931,45 @@ impl ConsciousnessCoreHandle {
         executor: &dyn SolutionExecutor,
         config: &ExternalClosureConfig,
     ) -> TaskLoopReport {
+        self.execute_task_loop_with_progress(instruction, executor, config, &|_: HarnessStepProgress| {})
+    }
+
+    /// [`execute_task_loop`] 的进度回调变体: 每个子任务执行前 (running) 与执行后
+    /// (done/failed) 调用 `on_step`, 便于后端 (Tauri `harness_run`) 实时推送
+    /// `harness-progress`(phase=step) 事件, 取代前端对 running 状态的整段轮询。
+    pub fn execute_task_loop_with_progress(
+        &mut self,
+        instruction: &str,
+        executor: &dyn SolutionExecutor,
+        config: &ExternalClosureConfig,
+        on_step: &dyn Fn(HarnessStepProgress),
+    ) -> TaskLoopReport {
         let mut report = self.process_instruction(instruction);
+        let total = report.allocations.len();
 
         // 内置子任务执行: 能力网命中 → 真实调用能力 (标记执行 + 实际结果)。
         let mut internal_results = Vec::new();
-        for alloc in &report.allocations {
+        for (idx, alloc) in report.allocations.iter().enumerate() {
             if let AllocationProvider::Internal { node_id, path, .. } = &alloc.provider {
+                on_step(HarnessStepProgress {
+                    index: idx,
+                    total,
+                    kind: "internal".to_string(),
+                    capability_tag: alloc.task.capability_tag.clone(),
+                    summary: alloc.task.summary.clone(),
+                    status: "running".to_string(),
+                    output: String::new(),
+                });
                 let (executed, output) = dispatch_internal_capability(&alloc.task);
+                on_step(HarnessStepProgress {
+                    index: idx,
+                    total,
+                    kind: "internal".to_string(),
+                    capability_tag: alloc.task.capability_tag.clone(),
+                    summary: alloc.task.summary.clone(),
+                    status: if executed { "done".to_string() } else { "failed".to_string() },
+                    output: output.clone(),
+                });
                 internal_results.push(InternalExecutionResult {
                     task_id: alloc.task.id.clone(),
                     summary: alloc.task.summary.clone(),
@@ -939,8 +991,17 @@ impl ConsciousnessCoreHandle {
         // 最短路径: 读端 serve_core 接地 (GWT 路由), 写端 absorb_core 吸收经验
         let kb = KnowledgeBase::open(None).ok();
         let mut closures = Vec::new();
-        for alloc in &report.allocations {
+        for (idx, alloc) in report.allocations.iter().enumerate() {
             if let AllocationProvider::External { .. } = &alloc.provider {
+                on_step(HarnessStepProgress {
+                    index: idx,
+                    total,
+                    kind: "external".to_string(),
+                    capability_tag: alloc.task.capability_tag.clone(),
+                    summary: alloc.task.summary.clone(),
+                    status: "running".to_string(),
+                    output: String::new(),
+                });
                 let result = match &kb {
                     Some(kb) => close_external_gap(kb, &alloc.task, executor, config),
                     None => {
@@ -948,6 +1009,15 @@ impl ConsciousnessCoreHandle {
                         run_external_closure(&alloc.task, executor, config, &[])
                     }
                 };
+                on_step(HarnessStepProgress {
+                    index: idx,
+                    total,
+                    kind: "external".to_string(),
+                    capability_tag: alloc.task.capability_tag.clone(),
+                    summary: alloc.task.summary.clone(),
+                    status: if result.solved { "done".to_string() } else { "failed".to_string() },
+                    output: result.solution.clone(),
+                });
                 // 写端吸收: solved 子任务的解决方案 → 经验节点落 KB (最短路径, 幂等按 title+type)
                 if result.solved && !result.solution.is_empty() {
                     if let Some(kb) = &kb {
@@ -1349,8 +1419,18 @@ pub fn execute_task_loop(
     executor: &dyn SolutionExecutor,
     config: &ExternalClosureConfig,
 ) -> TaskLoopReport {
+    execute_task_loop_with_progress(instruction, executor, config, &|_: HarnessStepProgress| {})
+}
+
+/// 进程内单例完整闭环入口 (带步骤进度回调) — 见 [`execute_task_loop_with_progress`]。
+pub fn execute_task_loop_with_progress(
+    instruction: &str,
+    executor: &dyn SolutionExecutor,
+    config: &ExternalClosureConfig,
+    on_step: &dyn Fn(HarnessStepProgress),
+) -> TaskLoopReport {
     CORE.write()
-        .map(|mut h| h.execute_task_loop(instruction, executor, config))
+        .map(|mut h| h.execute_task_loop_with_progress(instruction, executor, config, on_step))
         .unwrap_or_else(|_| TaskLoopReport {
             instruction: instruction.to_string(),
             ..Default::default()

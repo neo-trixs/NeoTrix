@@ -14,11 +14,27 @@ export interface HarnessExecuteRequest {
   run_id?: string
 }
 
-/** harness_run 真·流式进度事件载荷 */
+/** harness_run 真·流式进度的单步载荷 (phase=step 时携带) */
+export interface HarnessStep {
+  index: number
+  total: number
+  /** "internal" (能力网命中) | "external" (外部缺口求解) */
+  kind: string
+  capability_tag: string
+  summary: string
+  /** "running" | "done" | "failed" */
+  status: string
+  output: string
+}
+
+/** harness_run 真·流式进度事件载荷 (后端经 Tauri `harness-progress` 推送) */
 export interface HarnessProgressEvent {
   run_id?: string
-  phase: 'allocated' | 'done'
-  report: HarnessRunResponse
+  phase: 'allocated' | 'step' | 'done'
+  /** 阶段1(allocated)/阶段3(done) 携带全量报告；step 阶段为空 */
+  report?: HarnessRunResponse
+  /** 阶段2(step) 携带单步进度；allocated/done 阶段为空 */
+  step?: HarnessStep
 }
 
 export interface HarnessExecuteResponse {

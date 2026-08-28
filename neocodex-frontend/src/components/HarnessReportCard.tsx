@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
-import type { HarnessRunResponse } from '../api/harness'
+import type { HarnessRunResponse, HarnessStep } from '../api/harness'
 
 /* ════════════════════════════════════════════
    HarnessReportCard — Harness 重路径执行结果报告面板
@@ -11,6 +11,8 @@ import type { HarnessRunResponse } from '../api/harness'
 interface Props {
   running: boolean
   report: HarnessRunResponse | null
+  /** 实时子任务级进度 (后端 harness-progress(step) 推送); 无则隐藏 */
+  steps?: HarnessStep[]
   onClose: () => void
 }
 
@@ -60,6 +62,31 @@ export function HarnessReportCard(props: Props) {
           <div class="h-2 rounded-full bg-nt-io-500/10 overflow-hidden">
             <div class="h-full w-1/3 bg-nt-io-500/60 rounded-full animate-[harnessPulse_1.1s_ease-in-out_infinite]" />
           </div>
+        </div>
+      </Show>
+
+      {/* 实时子任务进度 (running 期间随 harness-progress(step) 逐条点亮) */}
+      <Show when={props.steps && props.steps.length > 0}>
+        <div class="px-3 pb-2 space-y-1 text-11px">
+          <For each={props.steps}>
+            {(s) => (
+              <div class="flex items-center gap-1.5 text-text-secondary">
+                <span
+                  class={clsx(
+                    'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                    s.status === 'done' && 'bg-emerald-500',
+                    s.status === 'failed' && 'bg-red-500',
+                    s.status === 'running' && 'bg-nt-io-500 animate-pulse',
+                  )}
+                />
+                <span class="font-mono text-nt-io-700 flex-shrink-0">{s.capability_tag}</span>
+                <span class="text-text-muted truncate">{s.summary}</span>
+                <Show when={s.output}>
+                  <span class="ml-auto text-10px text-text-muted flex-shrink-0">{s.status === 'done' ? '✓' : '✗'}</span>
+                </Show>
+              </div>
+            )}
+          </For>
         </div>
       </Show>
 

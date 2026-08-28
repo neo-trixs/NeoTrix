@@ -4,7 +4,7 @@
 //! 单入口 `harness_execute` 复用 ConsciousnessCore 的 CAPABILITY_ROUTES，
 //! 前端仅调对话，其余隐藏。线程/审批为高级能力，前端按需调用。
 
-use neotrix::core::nt_core_consciousness_core::{execute_task_loop, process_instruction, ExternalClosureConfig, LlmSolutionExecutor};
+use neotrix::core::nt_core_consciousness_core::{execute_task_loop_with_progress, process_instruction, ExternalClosureConfig, HarnessStepProgress, LlmSolutionExecutor};
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_harness::app_server::ApprovalState;
 use neotrix::neotrix::nt_harness::{HarnessExecuteRequest, HarnessGateway};
@@ -44,8 +44,19 @@ pub async fn harness_run(
         "harness-progress",
         json!({ "run_id": run_id, "phase": "allocated", "report": &alloc_report }),
     );
-    // 阶段2: 完整闭环 (内置能力网执行 + 外部缺口 LLM 试错求解) — 完成后推送全量报告
-    let report = execute_task_loop(&instruction, &LlmSolutionExecutor, &ExternalClosureConfig::frugal());
+    // 阶段2: 完整闭环 (内置能力网执行 + 外部缺口 LLM 试错求解) —
+    // 每个子任务执行前/后实时推送 harness-progress(step), 全量完成再推 done
+    let report = execute_task_loop_with_progress(
+        &instruction,
+        &LlmSolutionExecutor,
+        &ExternalClosureConfig::frugal(),
+        &|step: HarnessStepProgress| {
+            let _ = app.emit(
+                "harness-progress",
+                json!({ "run_id": run_id, "phase": "step", "step": &step }),
+            );
+        },
+    );
     let _ = app.emit(
         "harness-progress",
         json!({ "run_id": run_id, "phase": "done", "report": &report }),
