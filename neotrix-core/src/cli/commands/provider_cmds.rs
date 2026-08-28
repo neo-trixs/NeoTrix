@@ -13,6 +13,7 @@ use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::neotrix::nt_io_provider::provider_catalog::{
     ProviderCategory, lookup_provider, providers_by_category,
 };
+use crate::core::nt_core_llm::LlmRequest;
 
 pub struct ProviderCmd;
 
@@ -45,6 +46,7 @@ impl CliCommand for ProviderCmd {
                 let task_type = args.get(2).map(|s| s.as_str()).unwrap_or("arithmetic");
                 self.cmd_challenge(name, task_type)
             }
+            "free" => self.cmd_free(&args[1..]),
             _ => CommandOutput::err("Usage:\n  /provider list                  列出所有支持的 provider\n  /provider info <name>           查看 provider 详情\n  /provider pool <sub>             管理 LLM 代理池 (add|list|remove|reload)\n  /provider challenge <name> [task]  运行 LLM Challenge 基准 (arithmetic|extract|boolean)"),
         }
     }
@@ -145,6 +147,26 @@ impl ProviderCmd {
                 ))
             }
             Err(e) => CommandOutput::err(&format!("LLM Challenge 失败: {}", e)),
+        }
+    }
+
+    /// 匿名免费模型直调: 不配 key, 经 `route_keyless` 跨候选路由 + 429 退避重试。
+    fn cmd_free(&self, args: &[String]) -> CommandOutput {
+        let prompt: String = args.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
+        if prompt.is_empty() {
+            return CommandOutput::err(
+                "Usage: /provider free <prompt>\n调用匿名免费模型 (无需 API key), 自动跨候选路由 + 429 退避重试。",
+            );
+        }
+        let gateway = crate::neotrix::nt_io_provider::create_gateway();
+        let request = LlmRequest::new("", &prompt);
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => return CommandOutput::err(&format!("tokio runtime init failed: {e}")),
+        };
+        match rt.block_on(gateway.route_keyless(&request)) {
+            Ok(resp) => CommandOutput::ok(&format!("🔓 Keyless free response:\n{}", resp.content)),
+            Err(e) => CommandOutput::err(&format!("Keyless 调用失败: {}", e)),
         }
     }
 

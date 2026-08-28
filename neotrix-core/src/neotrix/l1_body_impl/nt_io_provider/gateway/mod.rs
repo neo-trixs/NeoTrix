@@ -17,6 +17,7 @@ use super::agent_routing::AgentRoutingTable;
 use super::provider_swap::ProviderSwapManager;
 
 mod challenge;
+mod keyless;
 mod coordinator;
 mod execution;
 mod market_router;

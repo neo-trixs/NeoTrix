@@ -30,7 +30,7 @@ impl GatewayV2 {
                 &task.prompt,
             );
             let start = Instant::now();
-            let resp = self.call_provider(provider_name, &request).await?;
+            let resp = self.call_provider_backoff(provider_name, &request).await?;
             total_latency_ms += start.elapsed().as_millis() as u64;
             total_cost += (resp.usage.total_tokens as f64 / 1000.0) * 0.002;
             if task.check(&resp.content) {
