@@ -16,7 +16,6 @@
 //! 调用点: `gateway/execution.rs::call_provider` / `call_provider_stream`,
 //! 每一条出网请求必经此门。
 
-use crate::neotrix::l1_body_impl::nt_shield::redaction::Redactor;
 use crate::neotrix::l1_body_impl::nt_io_provider::factory::{DataTrust, LlmProviderType};
 use crate::neotrix::l1_body_impl::nt_io_provider::types::LlmRequest;
 
@@ -124,16 +123,6 @@ pub fn redact_internals(content: &str) -> String {
         }
     }
     out
-}
-
-/// 仅脱密钥 (保留原 `scrub_egress_secrets` 行为, 既有测试继续通过)。
-pub fn scrub_egress_secrets(req: &mut LlmRequest) {
-    let redactor = Redactor::new();
-    for msg in req.messages.iter_mut() {
-        if !redactor.find_secrets(&msg.content).is_empty() {
-            msg.content = redactor.redact_secrets_only(&msg.content);
-        }
-    }
 }
 
 /// 出网隐私守卫主入口 — 每条出站请求必经。
@@ -290,5 +279,24 @@ mod tests {
         assert!(res.is_ok());
         assert!(!r.messages[0].content.contains("sk-abcdEFGH"));
         assert!(!r.messages[0].content.contains("AKIA1234567890ABCDEF"));
+    }
+
+    #[test]
+    fn test_trust_from_name_maps_provider_trust() {
+        let _g = PRIVACY_TEST_LOCK.lock().unwrap();
+        // 本地推理 → Trusted (含 `provider/model` 目录名)
+        assert_eq!(trust_from_name("ollama"), DataTrust::Trusted);
+        assert_eq!(trust_from_name("ollama/codellama"), DataTrust::Trusted);
+        // 付费云 → Contracted
+        assert_eq!(trust_from_name("openai"), DataTrust::Contracted);
+        assert_eq!(trust_from_name("anthropic/claude-3"), DataTrust::Contracted);
+        // 免费/代理 → Untrusted
+        assert_eq!(trust_from_name("pollinations"), DataTrust::Untrusted);
+        assert_eq!(trust_from_name("llm7"), DataTrust::Untrusted);
+        // 未知端点保守视为 Untrusted
+        assert_eq!(
+            trust_from_name("totally-unknown-provider-xyz"),
+            DataTrust::Untrusted
+        );
     }
 }

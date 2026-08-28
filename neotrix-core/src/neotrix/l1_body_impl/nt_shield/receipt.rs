@@ -7,10 +7,11 @@
 //!
 //! 与 `self_poison` 协同: 被 Blocked 的吸收不产出收据 (拒绝即无痕)。
 
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// 一张 agent 运行 / 吸收动作的回放收据。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentReceipt {
     pub run_id: String,
     pub input_hash: String,

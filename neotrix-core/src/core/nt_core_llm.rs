@@ -790,6 +790,22 @@ mod tests {
         let got = cap.lock().unwrap().clone().unwrap();
         assert!(!got.contains("sk-abcdEFGH"), "Contracted 经 trait 默认必须脱敏密钥");
     }
+
+    #[test]
+    fn stream_gate_blocks_untrusted_internal_at_trait_level() {
+        let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
+        r.messages.clear();
+        r.messages
+            .push(Message::new(Role::User, "read nt_core_consciousness_core.rs"));
+        let p = UntrustedProbe;
+        let res = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(p.stream_complete(&r));
+        assert!(
+            res.is_err(),
+            "trait 默认 stream_complete() 必须拦截 untrusted + 内部指纹"
+        );
+    }
 }
 
 // ────────────────────────────────────────────────────────
