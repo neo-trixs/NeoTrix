@@ -101,6 +101,7 @@ export function Chat() {
   }
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [streamError, setStreamError] = createSignal<string | null>(null)
+  const [showErrRaw, setShowErrRaw] = createSignal(false)
   // OS 活动透明度层（对标 2026 Agent UX：agent 操作必须可观测，anti black-box）
   // 纯前端聚合既有流式事件，后端无需改动
   const [agentPhase, setAgentPhase] = createSignal<AgentPhase>('idle')
@@ -722,6 +723,12 @@ export function Chat() {
     if (!el) return
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
     setStickToBottom(nearBottom)
+  }
+  // 流式 token 实时估算（后端未推 usage，按字符/4 近似；对标 2026 用量可见性）
+  const liveGenTokens = () => {
+    const ms = messages()
+    const last = ms[ms.length - 1]
+    return last && last.role === 'assistant' ? Math.ceil(last.content.length / 4) : 0
   }
   const scrollToBottom = () => {
     const el = scrollRef
@@ -1829,12 +1836,25 @@ export function Chat() {
               </Show>
             </div>
             <button
+              class="ml-2 p-1 text-[11px] text-red-600/80 hover:text-red-800 flex-shrink-0 underline underline-offset-2"
+              onClick={() => setShowErrRaw((v) => !v)}
+              aria-label="查看原始错误"
+            >
+              {showErrRaw() ? '收起' : '原始'}
+            </button>
+            <button
               class="ml-auto p-1 text-red-600 hover:text-red-800 flex-shrink-0"
-              onClick={() => { setStreamError(null); setStreamErrorDetail(null) }}
+              onClick={() => { setStreamError(null); setStreamErrorDetail(null); setShowErrRaw(false) }}
               aria-label="关闭错误提示"
             >
               <Square class="w-4 h-4" />
             </button>
+            <Show when={showErrRaw()}>
+              <pre class="agent-err-raw mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all text-[11px] text-red-700/90 bg-red-500/5 rounded p-2">
+{streamError()}
+{'why: ' + (streamErrorDetail()?.why ?? '') + '\nnext: ' + (streamErrorDetail()?.next ?? '')}
+</pre>
+            </Show>
           </div>
         </Show>
 
@@ -2114,6 +2134,9 @@ export function Chat() {
                   </button>
                   <Show when={activeModel()}>
                     <span class="font-mono text-nt-io-700">{activeModel()}</span>
+                  </Show>
+                  <Show when={isGenerating()}>
+                    <span class="font-mono text-nt-io-700">≈{liveGenTokens()} tok 生成中</span>
                   </Show>
                   <span>NeoTrix v{appVersion() ?? '0.18.0'}</span>
                   <span class="hidden md:inline">Enter 发送 · Shift+Enter 换行</span>
