@@ -510,6 +510,22 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
             leaks.extend(scan_internals(&s));
         }
     }
+    // 扩展出站载荷: tool schema / structured_output / provider_params 也可能夹带内部指纹
+    if let Some(ref so) = req.structured_output {
+        if let Ok(s) = serde_json::to_string(&*so) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    for (_, v) in &req.provider_params {
+        if let Ok(s) = serde_json::to_string(v) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
+    for tool in &req.tools {
+        if let Ok(s) = serde_json::to_string(tool) {
+            leaks.extend(scan_internals(&s));
+        }
+    }
     leaks.sort_unstable();
     leaks.dedup();
 
@@ -527,6 +543,37 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
             }
             if let Some(ref mut img) = req.image_data {
                 *img = redact_internals(img);
+            }
+            // 扩展载荷脱敏
+            for tool in req.tools.iter_mut() {
+                if let Ok(s) = serde_json::to_string(&*tool) {
+                    let red = redact_internals(&s);
+                    if red != s {
+                        if let Ok(t) = serde_json::from_str(&red) {
+                            *tool = t;
+                        }
+                    }
+                }
+            }
+            if let Some(ref mut so) = req.structured_output {
+                if let Ok(s) = serde_json::to_string(&*so) {
+                    let red = redact_internals(&s);
+                    if red != s {
+                        if let Ok(parsed) = serde_json::from_str(&red) {
+                            *so = parsed;
+                        }
+                    }
+                }
+            }
+            for (_, v) in req.provider_params.iter_mut() {
+                if let Ok(s) = serde_json::to_string(&*v) {
+                    let red = redact_internals(&s);
+                    if red != s {
+                        if let Ok(parsed) = serde_json::from_str(&red) {
+                            *v = parsed;
+                        }
+                    }
+                }
             }
             Ok(())
         }
@@ -701,6 +748,37 @@ mod tests {
         r.messages.push(Message::new(Role::User, "key sk-abcdEFGH1234567890abcdef"));
         assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
         assert!(!r.messages[0].content.contains("sk-abcdEFGH"), "secret must be redacted");
+    }
+
+    #[test]
+    fn egress_guard_blocks_untrusted_tool_schema_leak() {
+        let tool = Tool {
+            name: "fs".into(),
+            description: "read file".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": { "path": { "description": "read neotrix-core/src/core/nt_core_harness.rs" } }
+            }),
+        };
+        let mut r = LlmRequest::new("m", "hi").with_tools(vec![tool]);
+        let res = egress_privacy_guard(&mut r, DataTrust::Untrusted);
+        assert!(res.is_err(), "untrusted + internal fingerprint in tool schema must be blocked");
+    }
+
+    #[test]
+    fn egress_guard_redacts_contracted_tool_schema_leak() {
+        let tool = Tool {
+            name: "fs".into(),
+            description: "read file".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": { "path": { "description": "read neotrix-core/src/core/nt_core_harness.rs" } }
+            }),
+        };
+        let mut r = LlmRequest::new("m", "hi").with_tools(vec![tool]);
+        assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
+        let s = serde_json::to_string(&r.tools[0]).unwrap();
+        assert!(!s.contains("nt_core_harness"), "tool schema fingerprint must be redacted under Contracted");
     }
 
     // ---- 集成级测试: 验证 trait 默认方法 complete()/stream_complete() 真的执行 egress 闸门 (T3 生产接线) ----
