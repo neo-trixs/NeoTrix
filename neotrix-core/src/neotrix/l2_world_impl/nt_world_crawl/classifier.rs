@@ -494,7 +494,7 @@ mod tests {
                 usage: crate::neotrix::nt_io_provider::Usage::default(),
                 finish_reason: crate::neotrix::nt_io_provider::FinishReason::Stop,
                 tool_calls: None,
-            })
+             reasoning: None,})
         }
 
         async fn stream_complete_raw(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError>>, crate::neotrix::nt_io_provider::LlmError> {

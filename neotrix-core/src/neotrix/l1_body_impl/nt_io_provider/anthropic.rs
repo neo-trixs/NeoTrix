@@ -167,7 +167,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     completion_tokens: resp["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32,
                     total_tokens: (resp["usage"]["input_tokens"].as_u64().unwrap_or(0) + resp["usage"]["output_tokens"].as_u64().unwrap_or(0)) as u32,
                 };
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop, tool_calls: None })
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop, tool_calls: None , reasoning: None})
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -268,7 +268,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                                 usage: Usage::default(),
                                                 finish_reason: FinishReason::Unknown,
                                             tool_calls: None,
-                                            })).await;
+                                             reasoning: None,})).await;
                                         }
                                     }
                                     Some("message_stop") => {
@@ -278,7 +278,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                             usage: Usage::default(),
                                             finish_reason: FinishReason::Stop,
                                         tool_calls: None,
-                                        })).await;
+                                         reasoning: None,})).await;
                                     }
                                     _ => {}
                                 }

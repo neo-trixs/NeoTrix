@@ -168,7 +168,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                             }
                         }).collect()
                     });
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: finish, tool_calls })
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: finish, tool_calls , reasoning: None})
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -228,7 +228,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
                                     tool_calls: None,
-                                    })).await;
+                                     reasoning: None,})).await;
                                 }
                             }
                         }

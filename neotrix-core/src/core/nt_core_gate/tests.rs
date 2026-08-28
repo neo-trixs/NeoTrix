@@ -29,7 +29,7 @@
                 usage: Usage::default(),
                 finish_reason: FinishReason::Stop,
                 tool_calls: None,
-            })
+             reasoning: None,})
         }
 
         async fn stream_complete_raw(
@@ -654,7 +654,7 @@
                 usage: Usage::default(),
                 finish_reason: FinishReason::Stop,
                 tool_calls: None,
-            })
+             reasoning: None,})
         }
 
         async fn stream_complete_raw(

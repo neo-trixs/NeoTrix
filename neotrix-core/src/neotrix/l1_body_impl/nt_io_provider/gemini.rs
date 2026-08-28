@@ -79,7 +79,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     .map_err(|e| LlmError::InvalidRequest(e.to_string()))?;
                 let content = resp["candidates"][0]["content"]["parts"][0]["text"]
                     .as_str().unwrap_or("").to_string();
-                Ok(LlmResponse { content, model: request.model.clone(), usage: Usage::default(), finish_reason: FinishReason::Stop, tool_calls: None })
+                Ok(LlmResponse { content, model: request.model.clone(), usage: Usage::default(), finish_reason: FinishReason::Stop, tool_calls: None , reasoning: None})
             }
             400 => {
                 let msg = serde_json::from_str::<serde_json::Value>(&text)
@@ -146,7 +146,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
                                     tool_calls: None,
-                                    })).await;
+                                     reasoning: None,})).await;
                                 }
                             }
                         }

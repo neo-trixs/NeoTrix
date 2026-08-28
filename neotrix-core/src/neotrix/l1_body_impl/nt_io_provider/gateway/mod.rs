@@ -475,7 +475,7 @@ mod tests {
                         },
                         finish_reason: FinishReason::Stop,
                         tool_calls: None,
-                    })
+                     reasoning: None,})
                 }
             }
             async fn stream_complete_raw(
@@ -555,7 +555,7 @@ mod tests {
                                 },
                                 finish_reason: FinishReason::Stop,
                                 tool_calls: None,
-                            }))
+                             reasoning: None,}))
                             .await;
                     });
                     Ok(rx)
@@ -1179,7 +1179,7 @@ mod tests {
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
                     tool_calls: None,
-                })
+                 reasoning: None,})
             }
         }
 
@@ -1202,7 +1202,7 @@ mod tests {
                         usage: Usage::default(),
                         finish_reason: FinishReason::Stop,
                         tool_calls: None,
-                    }))
+                     reasoning: None,}))
                     .await;
             });
             Ok(rx)

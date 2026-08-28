@@ -471,7 +471,7 @@ mod tests {
             },
             model: "claude-sonnet-4-6".into(),
             tool_calls: None,
-        };
+         reasoning: None,};
         let anthropic = to_anthropic_response(&resp, "claude-sonnet-4-6");
         assert_eq!(anthropic.role, "assistant");
         assert_eq!(anthropic.stop_reason.as_deref(), Some("end_turn"));

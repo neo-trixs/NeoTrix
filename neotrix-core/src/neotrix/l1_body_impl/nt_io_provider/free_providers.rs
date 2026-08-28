@@ -74,7 +74,7 @@ impl GroqProvider {
             _ => FinishReason::Unknown,
         };
 
-        Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None })
+        Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None , reasoning: None})
     }
 }
 
@@ -172,7 +172,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
                                     tool_calls: None,
-                                    })).await;
+                                     reasoning: None,})).await;
                                 }
                             }
                         }
@@ -266,7 +266,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     Some("length") => FinishReason::Length,
                     _ => FinishReason::Unknown,
                 };
-                Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None })
+                Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None , reasoning: None})
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -335,7 +335,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
                                     tool_calls: None,
-                                    })).await;
+                                     reasoning: None,})).await;
                                 }
                             }
                         }
@@ -424,7 +424,7 @@ impl LlmProvider for PollinationsProvider {
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
                 tool_calls: None,
-                })
+                 reasoning: None,})
             }
             429 => Err(LlmError::RateLimit(text)),
             500..=599 => Err(LlmError::Server(text)),
@@ -502,7 +502,7 @@ impl LlmProvider for PollinationsProvider {
                                 usage: Usage::default(),
                                 finish_reason: FinishReason::Unknown,
                             tool_calls: None,
-                            })).await;
+                             reasoning: None,})).await;
                         }
                     }
                 }
@@ -576,7 +576,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                     }).unwrap_or_default(),
                     finish_reason: FinishReason::Stop,
                 tool_calls: None,
-                })
+                 reasoning: None,})
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -643,7 +643,7 @@ fn set_proxy(&mut self, proxy_url: &str) {
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
                                     tool_calls: None,
-                                    })).await;
+                                     reasoning: None,})).await;
                                 }
                             }
                         }

@@ -5,6 +5,7 @@
 //
 #![deny(clippy::unwrap_used)]
 
+pub mod activation_audit;
 pub mod core;
 pub mod embedding;
 pub mod model_router;

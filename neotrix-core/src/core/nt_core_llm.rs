@@ -291,12 +291,15 @@ pub struct LlmResponse {
     /// Populated by providers that parse `tool_calls` from the raw response.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCallInfo>>,
+    /// Model's chain-of-thought / extended-thinking reasoning text, when surfaced.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
 }
 
 impl LlmResponse {
     /// Convenience constructor for providers that do not surface tool calls.
     pub fn plain(content: String, model: String, usage: Usage, finish_reason: FinishReason) -> Self {
-        Self { content, model, usage, finish_reason, tool_calls: None }
+        Self { content, model, usage, finish_reason, tool_calls: None, reasoning: None }
     }
 }
 

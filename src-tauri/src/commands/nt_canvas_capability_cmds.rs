@@ -553,8 +553,85 @@ mod fusion_tests {
         //    二者均由 nt_core_capability_tree 的同源进化引擎完成, 证明画板节点已进入全域进化路线。
         assert!(
             res.matured >= 1,
-            "global SEAL engine should have matured a canvas node (res.matured={})",
+            "global SEAL auto_scan should have matured a canvas node (res.matured={})",
             res.matured
         );
+    }
+
+    // ===== A: 真实落盘现场确认 (default #[ignore], 需 --ignored 显式触发) =====
+    // 在真实 ~/.neotrix/capability_registry.json 播种 canvas::* 节点, 验证后台自治循环同源的
+    // load_capability_registry + EvolutionEngine::auto_scan 能接管并演进它们。
+    // 运行前备份真实注册表, Drop 时整体还原, 绝不污染用户真实能力树。
+    struct RealRegGuard {
+        path: std::path::PathBuf,
+        bak: std::path::PathBuf,
+    }
+    impl Drop for RealRegGuard {
+        fn drop(&mut self) {
+            if self.bak.exists() {
+                let _ = std::fs::copy(&self.bak, &self.path);
+                let _ = std::fs::remove_file(&self.bak);
+            } else if self.path.exists() {
+                let _ = std::fs::remove_file(&self.path);
+            }
+        }
+    }
+
+    fn real_registry_path() -> std::path::PathBuf {
+        dirs::home_dir()
+            .expect("HOME must be set")
+            .join(".neotrix")
+            .join("capability_registry.json")
+    }
+
+    #[ignore]
+    #[test]
+    fn real_flow_probe_seeds_and_background_loop_evolves() {
+        let path = real_registry_path();
+        let bak = path.with_extension("json.bak_probe");
+        if path.exists() {
+            std::fs::copy(&path, &bak).expect("backup real registry before probe");
+        }
+        let _guard = RealRegGuard { path: path.clone(), bak: bak.clone() };
+
+        // fusion 命令在 load 返回 None 时早返不写盘, 故真实注册表缺失时预置空文件
+        if load_capability_registry().is_none() {
+            persist_capability_registry(&CapabilityRegistry::new()).unwrap();
+        }
+
+        let inputs = vec![
+            CanvasCapabilityInput {
+                kind: "real_probe_a".into(),
+                label: "Real Probe A".into(),
+                stage: 1,
+                usage: 40,
+                user_added: false,
+            },
+            CanvasCapabilityInput {
+                kind: "real_probe_b".into(),
+                label: "Real Probe B".into(),
+                stage: 0,
+                usage: 0,
+                user_added: true,
+            },
+        ];
+        let res = canvas_sync_capabilities(inputs).expect("sync ok on real registry");
+
+        // 1) 真实落盘: 全局注册表确实含 canvas::* 节点 (融合进全域能力树)
+        let reg = load_capability_registry().expect("registry present on real path");
+        assert!(
+            reg.get("canvas::real_probe_a").is_some(),
+            "real_probe_a must land in the REAL global capability registry"
+        );
+
+        // 2) 全域进化路线验证: 与后台自治循环同款 EvolutionEngine::auto_scan 实算驱动了画板节点
+        //    (res.matured>=1 证明 SEAL 在同款引擎上晋升了画板节点)
+        assert!(
+            res.matured >= 1,
+            "global SEAL auto_scan should mature a canvas node on the real registry (matured={})",
+            res.matured
+        );
+
+        // _guard Drop: 还原真实注册表, 绝不污染
     }
 }

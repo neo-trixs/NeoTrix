@@ -1164,7 +1164,7 @@ mod tests {
                 usage: Default::default(),
                 finish_reason: fr,
                 tool_calls: Some(calls),
-            })
+             reasoning: None,})
         }
 
         async fn stream_complete_raw(
@@ -1196,7 +1196,7 @@ mod tests {
                     usage: Default::default(),
                     finish_reason: FinishReason::Stop,
                     tool_calls: None,
-                };
+                 reasoning: None,};
                 if tx.try_send(Ok(resp)).is_err() {
                     break;
                 }
@@ -1207,7 +1207,7 @@ mod tests {
                 usage: Default::default(),
                 finish_reason: fr,
                 tool_calls: Some(calls),
-            };
+             reasoning: None,};
             let _ = tx.try_send(Ok(final_resp));
             Ok(rx)
         }
