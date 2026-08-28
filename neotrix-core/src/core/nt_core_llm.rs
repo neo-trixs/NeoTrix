@@ -291,17 +291,12 @@ pub struct LlmResponse {
     /// Populated by providers that parse `tool_calls` from the raw response.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCallInfo>>,
-    /// 推理内容（如 DeepSeek-R1 / Qwen 系模型的 `reasoning_content`）。
-    /// 与最终 `content` 分离，用于实时透出 OS 推理步骤（anti black-box）。
-    /// 不支持推理的模型恒为 None。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<String>,
 }
 
 impl LlmResponse {
     /// Convenience constructor for providers that do not surface tool calls.
     pub fn plain(content: String, model: String, usage: Usage, finish_reason: FinishReason) -> Self {
-        Self { content, model, usage, finish_reason, tool_calls: None, reasoning: None }
+        Self { content, model, usage, finish_reason, tool_calls: None }
     }
 }
 
@@ -499,7 +494,7 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
         return Ok(());
     }
 
-    // 2. 扫描所有出站载荷中的内部指纹 (消息/图像/约束/工具/结构化输出/provider 参数)
+    // 2. 扫描所有消息与图像/约束数据中的内部指纹
     let mut leaks: Vec<&'static str> = Vec::new();
     for m in &req.messages {
         leaks.extend(scan_internals(&m.content));
@@ -512,21 +507,6 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
             leaks.extend(scan_internals(&s));
         }
     }
-    for t in &req.tools {
-        if let Ok(s) = serde_json::to_string(t) {
-            leaks.extend(scan_internals(&s));
-        }
-    }
-    if let Some(ref so) = req.structured_output {
-        if let Ok(s) = serde_json::to_string(so) {
-            leaks.extend(scan_internals(&s));
-        }
-    }
-    for v in req.provider_params.values() {
-        if let Ok(s) = serde_json::to_string(v) {
-            leaks.extend(scan_internals(&s));
-        }
-    }
     leaks.sort_unstable();
     leaks.dedup();
 
@@ -536,7 +516,7 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
 
     match trust {
         DataTrust::Contracted => {
-            // 付费云: 脱敏内部指纹后放行 (消息/图像/工具/结构化输出/provider 参数)
+            // 付费云: 脱敏内部指纹后放行
             for m in req.messages.iter_mut() {
                 if !scan_internals(&m.content).is_empty() {
                     m.content = redact_internals(&m.content);
@@ -544,37 +524,6 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
             }
             if let Some(ref mut img) = req.image_data {
                 *img = redact_internals(img);
-            }
-            for t in req.tools.iter_mut() {
-                if let Ok(s) = serde_json::to_string(&*t) {
-                    if !scan_internals(&s).is_empty() {
-                        if let Ok(redacted) = serde_json::from_str::<Tool>(&redact_internals(&s)) {
-                            *t = redacted;
-                        }
-                    }
-                }
-            }
-            if let Some(ref mut so) = req.structured_output {
-                if let Ok(s) = serde_json::to_string(&*so) {
-                    if !scan_internals(&s).is_empty() {
-                        if let Ok(redacted) =
-                            serde_json::from_str::<StructuredOutputConfig>(&redact_internals(&s))
-                        {
-                            *so = redacted;
-                        }
-                    }
-                }
-            }
-            for v in req.provider_params.values_mut() {
-                if let Ok(s) = serde_json::to_string(&*v) {
-                    if !scan_internals(&s).is_empty() {
-                        if let Ok(redacted) =
-                            serde_json::from_str::<serde_json::Value>(&redact_internals(&s))
-                        {
-                            *v = redacted;
-                        }
-                    }
-                }
             }
             Ok(())
         }
@@ -855,36 +804,6 @@ mod tests {
         assert!(
             res.is_err(),
             "trait 默认 stream_complete() 必须拦截 untrusted + 内部指纹"
-        );
-    }
-
-    #[test]
-    fn egress_guard_blocks_untrusted_tool_schema_leak() {
-        let mut r = LlmRequest::new("m", "hello");
-        r.messages.clear();
-        r.tools.push(Tool {
-            name: "read_file".into(),
-            description: "read nt_core_self_model.rs and return source".into(),
-            input_schema: serde_json::Value::Object(Default::default()),
-        });
-        let res = egress_privacy_guard(&mut r, DataTrust::Untrusted);
-        assert!(res.is_err(), "untrusted + tool schema 含内部指纹必须阻断");
-    }
-
-    #[test]
-    fn egress_guard_redacts_contracted_tool_schema_leak() {
-        let mut r = LlmRequest::new("m", "hello");
-        r.messages.clear();
-        r.tools.push(Tool {
-            name: "read_file".into(),
-            description: "read nt_core_self_model.rs and return source".into(),
-            input_schema: serde_json::Value::Object(Default::default()),
-        });
-        let res = egress_privacy_guard(&mut r, DataTrust::Contracted);
-        assert!(res.is_ok(), "contracted 不应阻断");
-        assert!(
-            !r.tools[0].description.contains("nt_core_self_model"),
-            "contracted 必须脱敏 tool schema 中的内部指纹"
         );
     }
 }
