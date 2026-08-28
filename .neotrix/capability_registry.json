@@ -15827,6 +15827,14 @@
       "promoted_at": 1787277962,
       "rationale": "经验 '[蒸馏-NT-WORLD] 聚合 3 条经验的模式: [蒸馏-NT-WORLD] 聚合 3 条经验的模式: [蒸馏-NT-WORLD] 聚合 2 条经验的模式: Python 脚本整合盘点法: nt-world 委托盘点 scripts/ 全量脚本, 逐一定性 (Rust port 存在性/生产引用/launchd/数据上游), 产出 4 类分类 (退役/保留 prep/独立保留/半迁移)。关键证据链: ①Ru [关键词: world, 关键词, 条经验的模式, 聚合, 蒸馏]' 命中能力标签 'schema_migration' 于域 World, 应强化对应能力节点",
       "signal": 0.76
+    },
+    {
+      "domain": "NT-META",
+      "capability": "build_hygiene",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-META] 聚合 4 条经验的模式: neotrix-tauri 全量 cargo check 需数分钟(neotrix-core 体量大). 被 timeout 打断的构建会留下陈旧增量假错(如 CortexCmd/self_poison 模块缺失), 干净完整复跑一次(必要时 cargo clean -p neotrix-core)即消失. 金标准: 以一次完整跑完的 cargo check [关键词: cargo, neotrix, 全量, 如, build, core, test]' 命中能力标签 'build_hygiene' 于域 Meta, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1787929168
     }
   ]
 }
