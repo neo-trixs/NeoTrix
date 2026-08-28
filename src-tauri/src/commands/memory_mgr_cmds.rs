@@ -435,6 +435,7 @@ pub fn memory_import(content: String, format: Option<String>) -> Result<usize, S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     static DB_TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 

@@ -443,3 +443,118 @@ pub fn canvas_apply_evolution_route() -> Result<CanvasRouteApplyResult, String> 
         applied,
     })
 }
+
+#[cfg(test)]
+mod fusion_tests {
+    use super::*;
+    use neotrix::core::nt_core_consciousness_core::capability_registry_path;
+    use nt_core_capability_tree::registry::CapabilityRegistry;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TMP_SEQ: AtomicUsize = AtomicUsize::new(0);
+
+    /// 把 HOME 与 CWD 都重定向到 temp 目录, 使画板融合读写落在隔离注册表,
+    /// 绝不污染真实 ~/.neotrix 或仓库 src-tauri/.neotrix。
+    /// Drop 时还原 HOME / CWD 并清理 temp 目录。
+    struct HomeGuard {
+        orig_home: String,
+        orig_cwd: std::path::PathBuf,
+        tmp: std::path::PathBuf,
+    }
+    impl Drop for HomeGuard {
+        fn drop(&mut self) {
+            std::env::set_var("HOME", &self.orig_home);
+            let _ = std::env::set_current_dir(&self.orig_cwd);
+            let _ = std::fs::remove_dir_all(&self.tmp);
+        }
+    }
+
+    fn isolate_home() -> HomeGuard {
+        let seq = TMP_SEQ.fetch_add(1, Ordering::SeqCst);
+        let tmp = std::env::temp_dir().join(format!(
+            "nt_canvas_fuse_{}_{}",
+            std::process::id(),
+            seq
+        ));
+        let _ = std::fs::create_dir_all(tmp.join(".neotrix"));
+        let orig_home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let orig_cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        std::env::set_var("HOME", &tmp);
+        let _ = std::env::set_current_dir(&tmp);
+        HomeGuard {
+            orig_home,
+            orig_cwd,
+            tmp,
+        }
+    }
+
+    #[test]
+    fn fusion_writes_canvas_nodes_and_global_loop_evolves_them() {
+        let _guard = isolate_home();
+        // 安全断言: 注册表路径必须解析到 temp 区, 否则本测试会污染真实能力树。
+        // macOS 上 /var ↔ /private/var 符号链接会使 temp_dir() 与 current_dir() 前缀不一致,
+        // 故统一以 current_dir() 作基准 (isolate_home 已将 cwd 指向 temp)。
+        let p = capability_registry_path();
+        let cwd = std::env::current_dir().unwrap();
+        let abs = cwd.join(&p);
+        assert!(
+            abs.starts_with(&cwd),
+            "registry path not isolated: {:?} (abs {:?})",
+            p,
+            abs
+        );
+
+        // fusion 命令在 load 返回 None 时早返不写盘, 故先预置空注册表文件
+        persist_capability_registry(&CapabilityRegistry::new()).unwrap();
+
+        let inputs = vec![
+            CanvasCapabilityInput {
+                kind: "fusion_probe_a".into(),
+                label: "Fusion Probe A".into(),
+                stage: 1,
+                usage: 40, // >=20 → evidence_gated=passed, 可越级晋升
+                user_added: false,
+            },
+            CanvasCapabilityInput {
+                kind: "fusion_probe_b".into(),
+                label: "Fusion Probe B".into(),
+                stage: 0,
+                usage: 0,
+                user_added: true, // Dark Forest: 用户自定义 + 0 使用 → 回收
+            },
+        ];
+
+        let res = canvas_sync_capabilities(inputs).expect("sync ok");
+
+        // 1) 落盘验证: 全局注册表确实含 canvas::* 节点 (融合进全域能力树)
+        let reg = load_capability_registry().expect("registry present after sync");
+        let a = reg
+            .get("canvas::fusion_probe_a")
+            .expect("probe_a present in global registry");
+        assert!(
+            a.constellation as u8 >= 1,
+            "probe_a should reach >= C1, got C{}",
+            a.constellation as u8
+        );
+
+        // 2) Dark Forest 回写验证: 用户自定义且 0 使用的画板节点被回收
+        assert!(
+            res.deprecated >= 1,
+            "Dark Forest should prune unused user-added canvas node"
+        );
+        // Dark Forest 回收会移除节点 (标记废弃并移除), 故全局注册表不再含该节点
+        assert!(
+            reg.get("canvas::fusion_probe_b").is_none(),
+            "Dark Forest should remove unused user-added canvas node from global registry"
+        );
+
+        // 3) 全域进化路线验证: 与后台自治循环同款的全局 EvolutionEngine 实算驱动了画板节点 —
+        //    probe_a 被 SEAL 晋升 (matured>=1), probe_b 被 Dark Forest 回收 (deprecated>=1)。
+        //    二者均由 nt_core_capability_tree 的同源进化引擎完成, 证明画板节点已进入全域进化路线。
+        assert!(
+            res.matured >= 1,
+            "global SEAL engine should have matured a canvas node (res.matured={})",
+            res.matured
+        );
+    }
+}
