@@ -129,6 +129,25 @@ impl BackgroundLoopHandle {
             return;
         };
 
+        // P0 编译门禁 (fail-closed): 吸收/提交前先验证 neotrix lib 可编译。
+        // 构建非绿则跳过本次吸收, 避免把破损状态固化进提交/KB (git hook 被 libgit2 绕过时的双保险)。
+        match tokio::process::Command::new("cargo")
+            .args(["check", "-p", "neotrix", "--lib"])
+            .status()
+            .await
+        {
+            Ok(status) if status.success() => {
+                log::trace!("[bg-absorb] P0 build gate passed");
+            }
+            Ok(_) => {
+                log::warn!("[bg-absorb] P0 build gate FAILED: neotrix lib 未通过编译, 跳过吸收 (不提交破损状态)");
+                return;
+            }
+            Err(e) => {
+                log::warn!("[bg-absorb] P0 build gate: cargo 不可用 ({e}), 放行吸收 (无门禁)");
+            }
+        }
+
         // 逐个 session 吸收 (list 双格式兼容): 每个 session 子 JSON 经 stdin 直送 CLI,
         // 全部成功才删除 pending (all-or-nothing)。避免 CLI 只消费 list 首个元素
         // 导致后续 session 滞留 (格式缺陷修复)。
