@@ -2258,6 +2258,20 @@
   background: var(--nt-color-io-500, #3b82f6);
 }
 
+/* ===== CommandPalette：分组标题（最近使用 / 全部命令） ===== */
+.cmd-palette-section {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
+}
+
 /* ===== GenUIView：工具结果富渲染（JSON / 表格 / 代码 / 文本） ===== */
 .gen-ui {
   font-size: 11px;

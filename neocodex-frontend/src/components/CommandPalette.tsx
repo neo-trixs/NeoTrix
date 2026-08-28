@@ -13,11 +13,15 @@ export interface PaletteCommand {
   desc: string
   keywords: string[]
   run: () => void
+  /** 分组标题（对标 Raycast 分段）；缺省归为「全部命令」 */
+  section?: string
 }
 
 interface Props {
   open: boolean
   commands: PaletteCommand[]
+  /** 最近使用（空查询时置顶，分组为「最近使用」） */
+  recent?: PaletteCommand[]
   onClose: () => void
 }
 
@@ -28,9 +32,16 @@ export function CommandPalette(props: Props) {
   let cardRef: HTMLDivElement | undefined
   let restoreFocusEl: HTMLElement | null = null
 
+  // 空查询：最近使用置顶（分组「最近使用」）+ 全量（分组「全部命令」）
+  const grouped = () => {
+    const recent = (props.recent ?? []).map((c) => ({ ...c, section: '最近使用' }))
+    const all = props.commands.map((c) => ({ ...c, section: c.section ?? '全部命令' }))
+    return [...recent, ...all]
+  }
+
   const filtered = () => {
     const q = query().trim().toLowerCase()
-    if (!q) return props.commands
+    if (!q) return grouped()
     return props.commands.filter(
       (c) => c.keywords.some((k) => k.toLowerCase().includes(q)) || c.label.toLowerCase().includes(q),
     )
@@ -114,17 +125,22 @@ export function CommandPalette(props: Props) {
           <div class="cmd-palette-list" role="listbox">
             <For each={filtered()}>
               {(cmd, i) => (
-                <button
-                  class={clsx('slash-item', i() === selectedIdx() && 'on')}
-                  role="option"
-                  aria-selected={i() === selectedIdx()}
-                  onClick={() => run(cmd)}
-                  onMouseEnter={() => setSelectedIdx(i())}
-                >
-                  <span class="slash-kbd">›</span>
-                  <span class="slash-label">{cmd.label}</span>
-                  <span class="slash-desc">{cmd.desc}</span>
-                </button>
+                <>
+                  <Show when={i() === 0 || filtered()[i() - 1]?.section !== cmd.section}>
+                    <div class="cmd-palette-section">{cmd.section}</div>
+                  </Show>
+                  <button
+                    class={clsx('slash-item', i() === selectedIdx() && 'on')}
+                    role="option"
+                    aria-selected={i() === selectedIdx()}
+                    onClick={() => run(cmd)}
+                    onMouseEnter={() => setSelectedIdx(i())}
+                  >
+                    <span class="slash-kbd">›</span>
+                    <span class="slash-label">{cmd.label}</span>
+                    <span class="slash-desc">{cmd.desc}</span>
+                  </button>
+                </>
               )}
             </For>
             <Show when={filtered().length === 0}>

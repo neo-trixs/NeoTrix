@@ -168,6 +168,10 @@ export function Chat() {
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
   // ⌘K 命令面板（对标 Claude Code / Osaurus 命令菜单）：全局唤起，动作复用既有 handler
   const [paletteOpen, setPaletteOpen] = createSignal(false)
+  // ⌘K 最近使用（对标 Raycast：置顶高频命令）
+  const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
+  const pushRecentCmd = (id: string) =>
+    setRecentPaletteIds((ids) => [id, ...ids.filter((x) => x !== id)].slice(0, 5))
   // 统一命令桥：CLI 命令目录（懒加载，供 ⌘K 面板执行 /help /config /stats 等）
   const [unifiedCliCmds, setUnifiedCliCmds] = createSignal<PaletteCommand[]>([])
   const execUnifiedCli = async (input: string) => {
@@ -2008,7 +2012,15 @@ export function Chat() {
       <SettingsModal open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
 
       {/* ===== ⌘K 命令面板（根级渲染） ===== */}
-      <CommandPalette open={paletteOpen()} commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
+      <CommandPalette
+        open={paletteOpen()}
+        commands={paletteCommands.map((c) => ({ ...c, run: () => { pushRecentCmd(c.id); c.run() } }))}
+        recent={recentPaletteIds()
+          .map((id) => paletteCommands.find((c) => c.id === id))
+          .filter(Boolean)
+          .map((c) => ({ ...c!, run: () => { pushRecentCmd(c!.id); c!.run() } })) as PaletteCommand[]}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   )
 }
