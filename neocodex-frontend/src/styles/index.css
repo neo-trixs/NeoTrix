@@ -2457,3 +2457,54 @@
   background: var(--nt-color-gold-500);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
+
+/* ===== 快捷键帮助面板 ===== */
+.shortcut-help-card {
+  width: min(420px, 92vw);
+}
+.shortcut-help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nt-color-gold-800);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.shortcut-help-close {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted, #6b7280);
+  cursor: pointer;
+}
+.shortcut-help-list {
+  padding: 6px 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.shortcut-help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+.shortcut-help-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.shortcut-help-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #475569);
+}
+.shortcut-help-kbd {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--nt-color-gold-800);
+}

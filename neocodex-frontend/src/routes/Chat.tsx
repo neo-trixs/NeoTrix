@@ -30,6 +30,7 @@ import { runSlashDispatch, parseRunCommand, type SlashContext } from './chat/sla
 import { HeroMark, UserIcon, BotIcon } from './chat/avatars'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
+import { ShortcutHelp } from '../components/ShortcutHelp'
 import { clsx } from 'clsx'
 import { neocodex, system, unified, errText, harness } from '../api'
 import type { HarnessRunResponse, HarnessProgressEvent, HarnessStep, HarnessApproval } from '../api/harness'
@@ -168,6 +169,7 @@ export function Chat() {
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
   // ⌘K 命令面板（对标 Claude Code / Osaurus 命令菜单）：全局唤起，动作复用既有 handler
   const [paletteOpen, setPaletteOpen] = createSignal(false)
+  const [shortcutHelpOpen, setShortcutHelpOpen] = createSignal(false)
   // ⌘K 最近使用（对标 Raycast：置顶高频命令）
   const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
   const pushRecentCmd = (id: string) =>
@@ -624,7 +626,17 @@ export function Chat() {
         setPaletteOpen((open) => !open)
         return
       }
+      // ⌘?（⌘/）：打开快捷键帮助
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        setShortcutHelpOpen((open) => !open)
+        return
+      }
       if (e.key !== 'Escape') return
+      if (shortcutHelpOpen()) {
+        setShortcutHelpOpen(false)
+        return
+      }
       if (paletteOpen()) {
         setPaletteOpen(false)
         return
@@ -1160,6 +1172,20 @@ export function Chat() {
     }
   }
 
+  // 会话导出：当前会话复制为 Markdown（对标 2026 agent UX：可携带上下文）
+  const exportConversation = async () => {
+    const md = chatStore.currentMessages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => `### ${m.role === 'user' ? '用户' : 'NeoTrix'}\n\n${m.content}`)
+      .join('\n\n')
+    try {
+      await navigator.clipboard.writeText(md)
+      showInfo('会话已复制为 Markdown', 2000)
+    } catch {
+      showInfo('复制失败（剪贴板不可用）', 2000)
+    }
+  }
+
   const handleSaveEdit = () => {
     // 流式进行中禁止编辑重发（审计 F2：本地截断 + 重发被守卫吞 → 会话截断无响应）
     if (isGenerating()) return
@@ -1305,6 +1331,24 @@ export function Chat() {
               >
                 <span class="theme-toggle__swatch" />
                 <span>{THEME_LABEL[theme()]}</span>
+              </button>
+              {/* 快捷键帮助（⌘?） */}
+              <button
+                class="theme-toggle"
+                onClick={() => setShortcutHelpOpen(true)}
+                title="快捷键帮助（⌘?）"
+                aria-label="快捷键帮助"
+              >
+                <span>?</span>
+              </button>
+              {/* 会话导出为 Markdown */}
+              <button
+                class="theme-toggle"
+                onClick={exportConversation}
+                title="复制会话为 Markdown"
+                aria-label="导出会话"
+              >
+                <span>导出</span>
               </button>
               {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
               <span class="relative flex-shrink-0">
@@ -2082,6 +2126,7 @@ export function Chat() {
           .map((c) => ({ ...c!, run: () => { pushRecentCmd(c!.id); c!.run() } })) as PaletteCommand[]}
         onClose={() => setPaletteOpen(false)}
       />
+      <ShortcutHelp open={shortcutHelpOpen()} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   )
 }
