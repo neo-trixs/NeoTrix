@@ -6,6 +6,7 @@
 
 use crate::core::nt_core_reasoning::ReasoningTrace;
 use crate::core::nt_core_llm::{LlmError, LlmProvider, LlmRequest, Message, Role};
+use crate::core::nt_core_error::NeoTrixError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -146,6 +147,33 @@ pub enum CoTError {
     InvalidFormat(String),
     #[error("Empty response")]
     EmptyResponse,
+}
+
+/// 统一错误域接入 (卫生层 P0): CoT 推理错误汇入核心 NeoTrixError, 支持 `?` 传播。
+impl From<CoTError> for NeoTrixError {
+    fn from(e: CoTError) -> Self {
+        match e {
+            CoTError::Provider(s) => NeoTrixError::from(s),
+            CoTError::JsonParse(s) => NeoTrixError::Serde(s.to_string()),
+            CoTError::InvalidFormat(s) => NeoTrixError::InvalidInput(s),
+            CoTError::EmptyResponse => NeoTrixError::InvalidState("CoT empty response".into()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod error_domain_tests {
+    use super::*;
+
+    #[test]
+    fn test_cot_error_into_neotrix() {
+        let e = CoTError::InvalidFormat("bad".into());
+        let n: NeoTrixError = e.into();
+        assert!(matches!(n, NeoTrixError::InvalidInput(_)));
+        let p = CoTError::Provider(LlmError::Unknown("x".into()));
+        let n2: NeoTrixError = p.into();
+        assert!(matches!(n2, NeoTrixError::Brain(_)));
+    }
 }
 
 /// 默认实现：基于 NT-IO LLM Provider

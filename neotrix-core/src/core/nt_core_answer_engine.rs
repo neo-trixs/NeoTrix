@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+use crate::core::nt_core_error::NeoTrixError;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AnswerMode {
@@ -324,6 +325,36 @@ pub enum AnswerEngineError {
     ContextTooLarge(usize, usize),
     #[error("Widget detection failed")]
     WidgetDetectionFailed,
+}
+
+/// 统一错误域接入 (卫生层 P0): 回答引擎错误汇入核心 NeoTrixError, 支持 `?` 传播。
+impl From<AnswerEngineError> for NeoTrixError {
+    fn from(e: AnswerEngineError) -> Self {
+        match e {
+            AnswerEngineError::NoSources(s) => NeoTrixError::NotFound(s),
+            AnswerEngineError::ContextTooLarge(a, b) => {
+                NeoTrixError::InvalidInput(format!("context too large: {a} > {b}"))
+            }
+            AnswerEngineError::WidgetDetectionFailed => {
+                NeoTrixError::OperationFailed("widget detection failed".into())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod error_domain_tests {
+    use super::*;
+
+    #[test]
+    fn test_answer_engine_error_into_neotrix() {
+        let e = AnswerEngineError::NoSources("q".into());
+        let n: NeoTrixError = e.into();
+        assert!(matches!(n, NeoTrixError::NotFound(_)));
+        let e2 = AnswerEngineError::ContextTooLarge(120, 100);
+        let n2: NeoTrixError = e2.into();
+        assert!(matches!(n2, NeoTrixError::InvalidInput(_)));
+    }
 }
 
 #[cfg(test)]
