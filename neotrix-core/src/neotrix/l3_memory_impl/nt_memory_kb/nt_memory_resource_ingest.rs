@@ -447,7 +447,7 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
     // Local 68 GB corpus (knowledge-archive-corpus-20260825.db) is a SUPERSET snapshot of
     // the live KB — catalog it as a cold archive (do NOT merge its 22M nodes into the warm
     // live KB, per Dark Forest: connect, don't bloat). Registered as discoverable.
-    if let Some(corpus) = local_corpus_path() {
+    if let Some(corpus) = corpus_archive_path() {
         let sz = std::fs::metadata(&corpus).map(|m| m.len()).unwrap_or(0);
         let payload = serde_json::json!({
             "kind": "corpus_cold_archive",
@@ -467,14 +467,142 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
     Ok(count)
 }
 
-/// Path to the local 68 GB corpus DB (`~/.neotrix/knowledge-archive-corpus-20260825.db`),
-/// if present. Returns None when absent (so registration stays a no-op).
-fn local_corpus_path() -> Option<std::path::PathBuf> {
+/// Path to the 68 GB corpus DB, preferring the cold copy on the external brain volume and
+/// falling back to the local `~/.neotrix` copy. Returns None when absent.
+fn corpus_archive_path() -> Option<std::path::PathBuf> {
+    let ext = std::path::Path::new(CORTEX_ROOT).join("knowledge-archive-corpus-20260825.db");
+    if ext.exists() {
+        return Some(ext);
+    }
+    let home = std::env::var("HOME").unwrap_or_default();
+    let local = std::path::Path::new(&home)
+        .join(".neotrix")
+        .join("knowledge-archive-corpus-20260825.db");
+    if local.exists() {
+        Some(local)
+    } else {
+        None
+    }
+}
+
+/// Local (original) corpus DB path — the source for `migrate_cortex_archive`.
+fn local_corpus_source() -> Option<std::path::PathBuf> {
     let home = std::env::var("HOME").unwrap_or_default();
     let p = std::path::Path::new(&home)
         .join(".neotrix")
         .join("knowledge-archive-corpus-20260825.db");
     if p.exists() { Some(p) } else { None }
+}
+
+/// Copy the local 68 GB corpus DB onto the external brain volume as cold storage.
+/// Idempotent: no-op if the destination already exists. Refuses unless the volume is mounted
+/// and has enough free space. `dry_run` reports the plan without copying. The source file is
+/// preserved (a second copy is kept per the cold-archive redundancy guideline).
+pub fn migrate_cortex_corpus(
+    conn: &Connection,
+    root: &std::path::Path,
+    dry_run: bool,
+) -> Result<String, String> {
+    let src = local_corpus_source()
+        .ok_or_else(|| "本地未找到 68GB corpus (knowledge-archive-corpus-20260825.db)".to_string())?;
+    let dest = root.join("knowledge-archive-corpus-20260825.db");
+    if dest.exists() {
+        return Ok("外置大脑上已存在 corpus 副本，迁移幂等跳过。".into());
+    }
+    let size = std::fs::metadata(&src).map(|m| m.len()).map_err(|e| e.to_string())?;
+    let avail = free_space_bytes(root)?;
+    if avail < size * 11 / 10 {
+        return Err(format!(
+            "外置大脑剩余空间不足: 需 {} 字节, 可用 {} 字节",
+            size, avail
+        ));
+    }
+    if dry_run {
+        return Ok(format!(
+            "[dry-run] 将拷贝 {} → {}\n  大小 {:.1} GB, 外置盘可用 {:.1} GB (保留本地源副本)",
+            src.display(),
+            dest.display(),
+            size as f64 / 1e9,
+            avail as f64 / 1e9
+        ));
+    }
+    // copy (buffered, reports progress to stderr)
+    copy_with_progress(&src, &dest)?;
+    let dest_size = std::fs::metadata(&dest).map(|m| m.len()).map_err(|e| e.to_string())?;
+    if dest_size != size {
+        let _ = std::fs::remove_file(&dest);
+        return Err(format!(
+            "拷贝校验失败: 源 {} 字节, 目标 {} 字节 (已删除不完整副本)",
+            size, dest_size
+        ));
+    }
+    // update catalog node to point at the external-brain copy
+    let payload = serde_json::json!({
+        "kind": "corpus_cold_archive",
+        "path": dest.to_string_lossy(),
+        "bytes": dest_size,
+        "note": "superset snapshot of live KB; cold storage on external brain",
+        "migrated_from": src.to_string_lossy(),
+    });
+    upsert_cortex_node(
+        conn,
+        "cortex_source://corpus-archive",
+        "Corpus (cold archive, on external brain)",
+        &payload.to_string(),
+        &payload,
+    )?;
+    Ok(format!(
+        "已迁移 corpus 到外置大脑: {}\n  大小 {:.1} GB, 本地源副本已保留。",
+        dest.display(),
+        dest_size as f64 / 1e9
+    ))
+}
+
+/// Copy `src`→`dest` in buffered chunks, logging progress to stderr every ~1 GB.
+fn copy_with_progress(src: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+    use std::io::{BufReader, BufWriter, Read, Write};
+    let in_f = std::fs::File::open(src).map_err(|e| e.to_string())?;
+    let out_f = std::fs::File::create(dest).map_err(|e| e.to_string())?;
+    let mut reader = BufReader::with_capacity(1 << 20, in_f);
+    let mut writer = BufWriter::with_capacity(1 << 20, out_f);
+    let mut buf = [0u8; 1 << 20];
+    let mut total = 0u64;
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        writer.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        total += n as u64;
+        if total % (1u64 << 30) < (1u64 << 20) {
+            eprintln!("[corpus migrate] {:.1} GB copied", total as f64 / 1e9);
+        }
+    }
+    writer.flush().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Available free space (bytes) on the filesystem hosting `path`, via `df`.
+fn free_space_bytes(path: &std::path::Path) -> Result<u64, String> {
+    let out = Command::new("df")
+        .arg("-k")
+        .arg(path.to_string_lossy().to_string())
+        .output()
+        .map_err(|e| format!("df failed: {e}"))?;
+    if !out.status.success() {
+        return Err("df 查询失败".into());
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    // second line: filesystem ... used avail capacity ...
+    let line = text.lines().nth(1).ok_or("df 输出无法解析")?;
+    let cols: Vec<&str> = line.split_whitespace().collect();
+    // avail is the 4th column (1K-blocks)
+    let avail_kib: u64 = cols
+        .get(3)
+        .ok_or("df 输出无法解析")?
+        .parse()
+        .map_err(|_| "df avail 解析失败")?;
+    Ok(avail_kib * 1024)
 }
 
 /// Reclaim KB nodes whose backing ZIM archive is no longer on the external brain volume.

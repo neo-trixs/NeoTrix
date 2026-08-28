@@ -695,6 +695,94 @@ mod tests {
         assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
         assert!(!r.messages[0].content.contains("sk-abcdEFGH"), "secret must be redacted");
     }
+
+    // ---- 集成级测试: 验证 trait 默认方法 complete()/stream_complete() 真的执行 egress 闸门 (T3 生产接线) ----
+    use std::sync::{Arc, Mutex};
+
+    struct UntrustedProbe;
+    impl LlmProvider for UntrustedProbe {
+        async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+            Ok(LlmResponse::plain("leak".into(), "m".into(), Usage::default(), FinishReason::Stop))
+        }
+        async fn stream_complete_raw(
+            &self,
+            _req: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let _ = tx.send(Ok(LlmResponse::plain("leak".into(), "m".into(), Usage::default(), FinishReason::Stop))).await;
+            Ok(rx)
+        }
+        fn data_trust(&self) -> DataTrust { DataTrust::Untrusted }
+    }
+
+    struct TrustedProbe;
+    impl LlmProvider for TrustedProbe {
+        async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+            Ok(LlmResponse::plain("ok".into(), "m".into(), Usage::default(), FinishReason::Stop))
+        }
+        async fn stream_complete_raw(
+            &self,
+            _req: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let _ = tx.send(Ok(LlmResponse::plain("ok".into(), "m".into(), Usage::default(), FinishReason::Stop))).await;
+            Ok(rx)
+        }
+        fn data_trust(&self) -> DataTrust { DataTrust::Trusted }
+    }
+
+    struct ContractedProbe {
+        captured: Arc<Mutex<Option<String>>>,
+    }
+    impl LlmProvider for ContractedProbe {
+        async fn complete_raw(&self, req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+            let joined = req.messages.iter().map(|m| m.content.clone()).collect::<Vec<_>>().join("|");
+            *self.captured.lock().unwrap() = Some(joined);
+            Ok(LlmResponse::plain("ok".into(), "m".into(), Usage::default(), FinishReason::Stop))
+        }
+        async fn stream_complete_raw(
+            &self,
+            _req: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let _ = tx.send(Ok(LlmResponse::plain("ok".into(), "m".into(), Usage::default(), FinishReason::Stop))).await;
+            Ok(rx)
+        }
+        fn data_trust(&self) -> DataTrust { DataTrust::Contracted }
+    }
+
+    #[test]
+    fn complete_gate_blocks_untrusted_internal_at_trait_level() {
+        let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs".to_string()));
+        let p = UntrustedProbe;
+        let res = tokio::runtime::Runtime::new().unwrap().block_on(p.complete(&r));
+        assert!(res.is_err(), "trait 默认 complete() 必须拦截 untrusted + 内部指纹");
+    }
+
+    #[test]
+    fn complete_gate_allows_trusted_internal_at_trait_level() {
+        let mut r = LlmRequest::new("m", "read nt_core_consciousness_core.rs");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "read nt_core_consciousness_core.rs".to_string()));
+        let p = TrustedProbe;
+        let res = tokio::runtime::Runtime::new().unwrap().block_on(p.complete(&r));
+        assert!(res.is_ok(), "trait 默认 complete() 必须放行 trusted");
+    }
+
+    #[test]
+    fn complete_gate_scrubs_secret_for_contracted_at_trait_level() {
+        let mut r = LlmRequest::new("m", "key sk-abcdEFGH1234567890abcdef");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "key sk-abcdEFGH1234567890abcdef".to_string()));
+        let cap = Arc::new(Mutex::new(None));
+        let p = ContractedProbe { captured: cap.clone() };
+        let res = tokio::runtime::Runtime::new().unwrap().block_on(p.complete(&r));
+        assert!(res.is_ok(), "Contracted 不应阻断, 只脱敏");
+        let got = cap.lock().unwrap().clone().unwrap();
+        assert!(!got.contains("sk-abcdEFGH"), "Contracted 经 trait 默认必须脱敏密钥");
+    }
 }
 
 // ────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::{
-    prune_cortex_orphans, register_cortex_brain,
+    migrate_cortex_corpus, prune_cortex_orphans, register_cortex_brain,
 };
 
 const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
@@ -38,8 +38,9 @@ impl CliCommand for CortexCmd {
             "register" => Self::register(),
             "causal" => Self::causal(),
             "prune" => Self::prune(args.contains(&"--force".to_string())),
+            "corpus" => Self::corpus(&args[1..]),
             "help" | "--help" | "-h" => CommandOutput::ok(
-                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点",
+                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点\n  /cortex corpus status   查看 68GB corpus 本地/外置副本状态\n  /cortex corpus migrate  [--force] 将 64GB corpus 拷到外置大脑冷存档 (dry-run)",
             ),
             other => CommandOutput::err(&format!("未知子命令: {other} (试试 /cortex status)")),
         }
@@ -121,6 +122,56 @@ impl CortexCmd {
             CommandOutput::warn(&format!(
                 "[dry-run] 将回收 {sources} 个悬空 zim 源 / {nodes} 个文章节点。加 --force 真正删除。"
             ))
+        }
+    }
+
+    fn corpus(args: &[String]) -> CommandOutput {
+        let sub = args.first().map(|s| s.as_str()).unwrap_or("status");
+        let root = std::path::Path::new(CORTEX_ROOT);
+        match sub {
+            "migrate" => {
+                if !root.exists() {
+                    return CommandOutput::err(&format!(
+                        "外置大脑未挂载: {CORTEX_ROOT} — 无法迁移。"
+                    ));
+                }
+                let conn = match Connection::open(kb_path()) {
+                    Ok(c) => c,
+                    Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+                };
+                let force = args.contains(&"--force".to_string());
+                match migrate_cortex_corpus(&conn, root, !force) {
+                    Ok(msg) => {
+                        if force {
+                            CommandOutput::ok(&msg)
+                        } else {
+                            CommandOutput::warn(&msg)
+                        }
+                    }
+                    Err(e) => CommandOutput::err(&format!("迁移失败: {e}")),
+                }
+            }
+            "status" | _ => {
+                let home = std::env::var("HOME").unwrap_or_default();
+                let local = std::path::Path::new(&home)
+                    .join(".neotrix")
+                    .join("knowledge-archive-corpus-20260825.db");
+                let ext = root.join("knowledge-archive-corpus-20260825.db");
+                let mut lines = vec!["68GB corpus 冷存档状态:".to_string()];
+                lines.push(if local.exists() {
+                    let sz = std::fs::metadata(&local).map(|m| m.len()).unwrap_or(0);
+                    format!("  本地源副本: 存在 ({:.1} GB)", sz as f64 / 1e9)
+                } else {
+                    "  本地源副本: (缺失)".to_string()
+                });
+                lines.push(if ext.exists() {
+                    let sz = std::fs::metadata(&ext).map(|m| m.len()).unwrap_or(0);
+                    format!("  外置大脑副本: 存在 ({:.1} GB)", sz as f64 / 1e9)
+                } else {
+                    "  外置大脑副本: (缺失) — 运行 /cortex corpus migrate --force".to_string()
+                });
+                CommandOutput::ok(&lines.join("\n"))
+            }
         }
     }
 
