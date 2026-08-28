@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::core::nt_core_consciousness_core::TaskLoopReport;
+use crate::neotrix::l1_body_impl::nt_shield::receipt::AgentReceipt;
 
 pub mod app_server;
 pub mod router;
@@ -142,6 +143,9 @@ pub struct HarnessExecuteResponse {
     pub strengthening_actions: usize,
     pub external_gaps: Vec<String>,
     pub message: String,
+    /// 可验证回放收据 — agent 运行完成边界 (execute_real) 成功时产出,
+    /// 绑定 instruction(输入)+message(输出), 供事后审计回放校验。
+    pub receipt: Option<AgentReceipt>,
 }
 
 /// 统一网关（L1 Body 轻封装，不建平行能力）
@@ -216,6 +220,7 @@ impl HarnessGateway {
             strengthening_actions: 0,
             external_gaps: vec![],
             message: format!("已路由: {} [{}] via {}", entry.capability_tag, entry.domain, entry.harness_tool.as_str()),
+            receipt: None,
         }
     }
 
@@ -236,6 +241,20 @@ impl HarnessGateway {
             .map(|a| format!("{} → {} ({})", a.task.capability_tag, a.task.domain, a.task.specialist))
             .collect();
         let total = report.allocations.len();
+        let message = format!(
+            "已路由: {} [{}] via {}; 拆解 {} 子任务, 内置 {}, 外部缺口 {}, 反思补齐 {}",
+            entry.capability_tag,
+            entry.domain,
+            entry.harness_tool.as_str(),
+            total,
+            report.internal_count,
+            report.external_gap_count,
+            report.strengthening_actions
+        );
+        // 可验证回放收据: agent 运行完成边界, 绑定 instruction(输入)+message(输出)。
+        // run_id 用 instruction 的哈希, 保证同一指令可审计回放。
+        let run_id = crate::neotrix::l1_body_impl::nt_shield::receipt::hash_content(&req.instruction);
+        let receipt = AgentReceipt::emit(&run_id, &req.instruction, &message);
         HarnessExecuteResponse {
             instruction: req.instruction.clone(),
             capability_tag: entry.capability_tag.clone(),
@@ -247,16 +266,8 @@ impl HarnessGateway {
             external_gap_count: report.external_gap_count,
             strengthening_actions: report.strengthening_actions,
             external_gaps: report.external_gaps.clone(),
-            message: format!(
-                "已路由: {} [{}] via {}; 拆解 {} 子任务, 内置 {}, 外部缺口 {}, 反思补齐 {}",
-                entry.capability_tag,
-                entry.domain,
-                entry.harness_tool.as_str(),
-                total,
-                report.internal_count,
-                report.external_gap_count,
-                report.strengthening_actions
-            ),
+            message,
+            receipt: Some(receipt),
         }
     }
 
@@ -420,5 +431,24 @@ mod tests {
         assert!(resp2.allocations.is_empty());
         assert_eq!(resp2.internal_count, 0);
         assert_eq!(resp2.external_gap_count, 0);
+    }
+
+    #[test]
+    fn execute_real_emits_verifiable_receipt() {
+        // agent 运行完成边界: execute_real 成功时应产出可验证回放收据。
+        let g = HarnessGateway::new();
+        let req = HarnessExecuteRequest {
+            instruction: "审查这段代码".into(),
+            capability_tag: None,
+            project: None,
+            permission_mode: None,
+        };
+        let report = TaskLoopReport::default();
+        let resp = g.execute_real(req.clone(), &report);
+        let receipt = resp.receipt.expect("execute_real 应产出收据");
+        assert!(receipt.verify(), "agent 运行收据应能通过签名完整性校验");
+        // 输入应绑定 instruction, 输出应绑定 message
+        assert!(receipt.input_hash.len() == 64, "input 为 instruction 的 SHA-256");
+        assert_eq!(receipt.output_hash, crate::neotrix::l1_body_impl::nt_shield::receipt::hash_content(&resp.message));
     }
 }

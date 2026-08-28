@@ -101,4 +101,20 @@ mod tests {
         assert_ne!(a.input_hash, b.input_hash);
         assert_ne!(a.signature, b.signature);
     }
+
+    #[test]
+    fn test_absorb_action_emits_verifiable_receipt() {
+        // 模拟一次知识吸收动作: run_id = 节点 id, input = 正文, output = 节点摘要。
+        // 成功写入后应产出发票, 且 verify() 通过; 被 Blocked 的吸收不在此处 (拒绝即无痕)。
+        let run_id = "node-abc-123";
+        let input = "E8 推理引擎影响 GWT 注意力路由";
+        let output = "E8→GWT 因果链已 crystallized";
+        let r = AgentReceipt::emit(run_id, input, output);
+        assert!(r.verify(), "吸收收据应能通过签名完整性校验");
+        assert_eq!(r.run_id, run_id);
+        // 回放: 输入被篡改后 verify 必须失败
+        let mut tampered = r.clone();
+        tampered.input_hash = sha256_hex("tampered input");
+        assert!(!tampered.verify(), "输入哈希被篡改后 verify 必须失败");
+    }
 }

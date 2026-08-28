@@ -20,6 +20,7 @@ use super::KnowledgeBase;
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
 use crate::neotrix::l1_body_impl::nt_shield::evomal_guard::scan_absorb_text;
+use crate::neotrix::l1_body_impl::nt_shield::receipt::AgentReceipt;
 
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +58,9 @@ pub struct AbsorbReport {
     pub hub_linked: bool,
     pub fts_synced: bool,
     pub edges_added: usize,
+    /// 可验证回放收据签名 — 仅成功写入 (新建) 节点时产出;
+    /// 被 Blocked 的吸收已在边界前置返回, 不产生收据 (拒绝即无痕)。
+    pub receipt_signature: Option<String>,
 }
 
 /// 读端输出 — 一次完整服务结果 (意图 + 检索 + 图溯源)
@@ -201,7 +205,7 @@ impl KnowledgeBase {
                 .map_err(|e| e.to_string())?
         };
 
-        let (node_id, created, _hub_id) = if let Some(existing) = existing {
+        let (node_id, created, receipt_sig) = if let Some(existing) = existing {
             (existing.id, false, None::<String>)
         } else {
             // 2. 构造完整节点 (含 content, 非 summary 占位)
@@ -234,7 +238,14 @@ impl KnowledgeBase {
             nt_memory_store::insert_node_rows(&tx, &node).map_err(|e| e.to_string())?;
             sync_fts(&tx, &node).map_err(|e| e.to_string())?;
             tx.commit().map_err(|e| e.to_string())?;
-            (node.id.clone(), true, None)
+            // 4. 可验证回放收据: 成功写节点后, 以节点 id 为 run_id,
+            //    正文为 input, 摘要为 output 签发票 (事后可回放校验不可篡改)。
+            let receipt = AgentReceipt::emit(
+                &node.id,
+                node.content.as_deref().unwrap_or(""),
+                node.summary.as_deref().unwrap_or(""),
+            );
+            (node.id.clone(), true, Some(receipt.signature))
         };
 
         // 4. 域枢纽 BelongsTo 边 (幂等 upsert)
@@ -291,6 +302,7 @@ impl KnowledgeBase {
             hub_linked,
             fts_synced: true,
             edges_added,
+            receipt_signature: receipt_sig,
         })
     }
 
