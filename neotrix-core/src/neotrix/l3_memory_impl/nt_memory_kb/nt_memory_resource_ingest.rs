@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
@@ -425,7 +427,116 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
         .map_err(|e| e.to_string())?;
         count += 1;
     }
+    // Local 68 GB corpus (knowledge-archive-corpus-20260825.db) is a SUPERSET snapshot of
+    // the live KB — catalog it as a cold archive (do NOT merge its 22M nodes into the warm
+    // live KB, per Dark Forest: connect, don't bloat). Registered as discoverable.
+    if let Some(corpus) = local_corpus_path() {
+        let sz = std::fs::metadata(&corpus).map(|m| m.len()).unwrap_or(0);
+        let payload = serde_json::json!({
+            "kind": "corpus_cold_archive",
+            "path": corpus.to_string_lossy(),
+            "bytes": sz,
+            "note": "superset snapshot of live KB; cold storage",
+        });
+        conn.execute(
+            "INSERT OR REPLACE INTO nodes (url, title, content, kind, node_type, created_at) \
+             VALUES (?1,?2,?3,'resource','cortex_brain',?4)",
+            rusqlite::params![
+                "cortex_source://corpus-archive",
+                "Local 68GB corpus (cold archive, superset of live KB)",
+                payload.to_string(),
+                now()
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        count += 1;
+    }
     Ok(count)
+}
+
+/// Path to the local 68 GB corpus DB (`~/.neotrix/knowledge-archive-corpus-20260825.db`),
+/// if present. Returns None when absent (so registration stays a no-op).
+fn local_corpus_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let p = std::path::Path::new(&home)
+        .join(".neotrix")
+        .join("knowledge-archive-corpus-20260825.db");
+    if p.exists() { Some(p) } else { None }
+}
+
+/// Reclaim KB nodes whose backing ZIM archive is no longer on the external brain volume.
+/// Matches the KB's distinct `zimid://<uuid>` source set against the on-disk ZIM file uuids
+/// (read via libzim). Returns (orphan_sources, orphan_article_nodes).
+///
+/// Refuses unless the volume is mounted AND libzim is available. When `dry_run` is true no
+/// rows are deleted; pass `dry_run=false` (i.e. an explicit force flag) to actually delete.
+pub fn prune_cortex_orphans(
+    conn: &Connection,
+    root: &std::path::Path,
+    dry_run: bool,
+) -> Result<(usize, usize), String> {
+    if !root.exists() {
+        return Err("external brain not mounted — refuse to prune (would orphan everything)".into());
+    }
+    let disk_uuids = disk_zim_uuids(root)?;
+    if disk_uuids.is_empty() {
+        return Err("no ZIM files found on volume — abort prune".into());
+    }
+    let mut stmt = conn
+        .prepare("SELECT DISTINCT substr(url,10,36) FROM nodes WHERE url LIKE 'zimid://%'")
+        .map_err(|e| e.to_string())?;
+    let kb_sources: Vec<String> = stmt
+        .query_map([], |r| r.get::<_, String>(0))
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    let mut orphan_nodes = 0usize;
+    let mut orphan_sources = 0usize;
+    for src in kb_sources {
+        if disk_uuids.contains(&src) {
+            continue;
+        }
+        orphan_sources += 1;
+        let like = format!("zimid://{src}/%");
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes WHERE url LIKE ?1", [&like], |r| r.get(0))
+            .unwrap_or(0);
+        orphan_nodes += n as usize;
+        if !dry_run {
+            // edges first (while node ids still resolvable), then nodes
+            conn.execute(
+                "DELETE FROM edges WHERE from_id IN (SELECT id FROM nodes WHERE url LIKE ?1) OR to_id IN (SELECT id FROM nodes WHERE url LIKE ?1)",
+                [&like],
+            ).map_err(|e| e.to_string())?;
+            conn.execute("DELETE FROM nodes WHERE url LIKE ?1", [&like])
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok((orphan_sources, orphan_nodes))
+}
+
+/// Enumerate on-disk ZIM uuids under `root` using libzim (python3). Returns the set of
+/// canonical uuid strings. Errors if python3/libzim is unavailable.
+fn disk_zim_uuids(root: &std::path::Path) -> Result<HashSet<String>, String> {
+    let script = "import sys,glob,os\n\
+        try:\n    from libzim.reader import Archive\n\
+        except Exception as e:\n    sys.stderr.write('NO_LIBZIM:%s'%e); sys.exit(2)\n\
+        root=sys.argv[1]\n\
+        paths=glob.glob(os.path.join(root,'cortex-archive','zim','*.zim'))\n\
+        paths+=glob.glob(os.path.join(root,'cortex-archive','wikipedia','*.zim'))\n\
+        for p in paths:\n    try: print(str(Archive(p).uuid))\n    except Exception: pass\n";
+    let out = Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(root.to_string_lossy().to_string())
+        .output()
+        .map_err(|e| format!("failed to spawn python3: {e}"))?;
+    if !out.status.success() {
+        let msg = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("libzim/uuid scan failed: {msg}"));
+    }
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    Ok(stdout.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
 }
 
 /// Scan one directory and upsert a `cortex_source://<sub>` registry node per populated
@@ -1067,5 +1178,15 @@ mod tests {
             )
             .unwrap();
         assert_eq!(cnt, 0);
+    }
+
+    #[test]
+    fn test_prune_cortex_orphans_no_zim_errors() {
+        let conn = test_conn();
+        let dir = std::env::temp_dir().join(format!("cortex_prune_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let r = prune_cortex_orphans(&conn, &dir, true);
+        assert!(r.is_err(), "should error when no ZIM files on volume");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -10,7 +10,9 @@ use rusqlite::Connection;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::register_cortex_brain;
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::{
+    prune_cortex_orphans, register_cortex_brain,
+};
 
 const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
 const CORTEX_CAUSAL: &str = "/Volumes/NeoTrixBrain/working/causal_graph.json";
@@ -35,8 +37,9 @@ impl CliCommand for CortexCmd {
             "status" => Self::status(),
             "register" => Self::register(),
             "causal" => Self::causal(),
+            "prune" => Self::prune(args.contains(&"--force".to_string())),
             "help" | "--help" | "-h" => CommandOutput::ok(
-                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要",
+                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点",
             ),
             other => CommandOutput::err(&format!("未知子命令: {other} (试试 /cortex status)")),
         }
@@ -67,6 +70,20 @@ impl CortexCmd {
         } else {
             "  causal_graph.json: (缺失)".to_string()
         });
+        // local 68GB corpus cold archive
+        let home = std::env::var("HOME").unwrap_or_default();
+        let corpus = std::path::Path::new(&home)
+            .join(".neotrix")
+            .join("knowledge-archive-corpus-20260825.db");
+        lines.push(if corpus.exists() {
+            let sz = std::fs::metadata(&corpus).map(|m| m.len()).unwrap_or(0);
+            format!(
+                "  本地 68GB corpus: 存在 ({:.1} GB) — 冷存档 (live KB 的超集，不合并)",
+                sz as f64 / 1e9
+            )
+        } else {
+            "  本地 68GB corpus: (缺失)".to_string()
+        });
         // live KB 中的 cortex_brain 注册节点数
         if let Ok(conn) = Connection::open(kb_path()) {
             if let Ok(cnt) = conn.query_row(
@@ -78,6 +95,33 @@ impl CortexCmd {
             }
         }
         CommandOutput::ok(&lines.join("\n"))
+    }
+
+    fn prune(force: bool) -> CommandOutput {
+        let root = std::path::Path::new(CORTEX_ROOT);
+        if !root.exists() {
+            return CommandOutput::err(&format!("外置大脑未挂载: {CORTEX_ROOT} — 拒绝 prune (否则会误删全部 zim 节点)。"));
+        }
+        let conn = match Connection::open(kb_path()) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+        };
+        let (sources, nodes) = match prune_cortex_orphans(&conn, root, !force) {
+            Ok(v) => v,
+            Err(e) => return CommandOutput::err(&format!("prune 失败: {e}")),
+        };
+        if sources == 0 {
+            return CommandOutput::ok("无悬空 zim 源 — KB 中所有 zimid 节点在盘上均有对应归档，无需回收。");
+        }
+        if force {
+            CommandOutput::ok(&format!(
+                "已回收 {sources} 个悬空 zim 源 / {nodes} 个文章节点 (含其边)。"
+            ))
+        } else {
+            CommandOutput::warn(&format!(
+                "[dry-run] 将回收 {sources} 个悬空 zim 源 / {nodes} 个文章节点。加 --force 真正删除。"
+            ))
+        }
     }
 
     fn register() -> CommandOutput {
