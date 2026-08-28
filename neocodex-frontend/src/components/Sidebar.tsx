@@ -624,10 +624,12 @@ export function Sidebar(props: SidebarProps) {
                               draggable={true}
                               onDragStart={(e) => {
                                 dragSessionId = session.id
-                                e.dataTransfer.effectAllowed = 'move'
-                                try { e.dataTransfer.setData('text/plain', session.id) } catch { /* 旧浏览器兼容 */ }
+                                if (e.dataTransfer) {
+                                  e.dataTransfer.effectAllowed = 'move'
+                                  try { e.dataTransfer.setData('text/plain', session.id) } catch { /* 旧浏览器兼容 */ }
+                                }
                               }}
-                              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                              onDragOver={(e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move' }}
                               onDrop={(e) => { e.preventDefault(); reorderSession(session.id) }}
                             >
                               <div class={clsx(

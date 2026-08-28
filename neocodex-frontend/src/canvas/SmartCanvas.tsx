@@ -124,6 +124,7 @@ export function SmartCanvas(props: SmartCanvasProps) {
 
   // ── 能力网搜索 / 进化路线 ──
   const [search, setSearch] = createSignal('')
+  const [paletteOpen, setPaletteOpen] = createSignal(false)
   // 能力地图维度筛选（按 kind 维度过滤可见节点，对标 2026 标签筛选）
   const [kindFilter, setKindFilter] = createSignal<Set<string>>(new Set())
   const toggleKind = (kind: string) =>
