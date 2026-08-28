@@ -35,6 +35,7 @@ import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
 import { ApprovalPanel } from '../components/ApprovalPanel'
 import { FileEditorPanel } from '../components/FileEditorPanel'
+import { AgentActivityBar, type AgentPhase } from '../components/AgentActivityBar'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -78,6 +79,12 @@ export function Chat() {
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
   const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [streamError, setStreamError] = createSignal<string | null>(null)
+  // OS 活动透明度层（对标 2026 Agent UX：agent 操作必须可观测，anti black-box）
+  // 纯前端聚合既有流式事件，后端无需改动
+  const [agentPhase, setAgentPhase] = createSignal<AgentPhase>('idle')
+  const [agentDomain, setAgentDomain] = createSignal<string | null>(null)
+  const [agentToolCount, setAgentToolCount] = createSignal(0)
+  const [agentLastActivity, setAgentLastActivity] = createSignal<string | null>(null)
   // 信息通知（区别于 streamError 错误通道：中性色 / InfoIcon，非故障）
   const [infoNotice, setInfoNotice] = createSignal<string | null>(null)
   // 信息通知计时器：新通知接管旧计时器，避免快速触发（如连按 Shift+Tab）时旧计时器误清新通知
@@ -334,6 +341,11 @@ export function Chat() {
     const p = contextPct()
     if (p !== null && p < 80) setCompactHintDismissed(false)
   })
+  // OS 活动透明度层：能力路由命中域同步到活动条（让「OS 在想什么域」实时可见）
+  createEffect(() => {
+    const r = harnessRoute()
+    setAgentDomain(r?.domain ?? null)
+  })
 
   // 统一命令桥懒加载：⌘K 面板注入 CLI 命令 (单一真源 unified_cli_list)
   createEffect(() => {
@@ -399,6 +411,10 @@ export function Chat() {
       onStart: () => {
         // 记录代次：每次后端真正起流开启一个新代次，token/done/tool 仅接受同代次事件
         activeGen = ++generation
+        // OS 活动：进入思考阶段，重置工具计数
+        setAgentPhase('thinking')
+        setAgentToolCount(0)
+        setAgentLastActivity(null)
       },
       onToken: (delta) => {
         if (activeGen !== generation) return
@@ -406,6 +422,8 @@ export function Chat() {
         if (msgId) {
           chatStore.appendMessageContent(msgId, delta)
         }
+        // OS 活动：首个 token 起由「思考」转入「生成」
+        if (agentPhase() === 'thinking') setAgentPhase('generating')
       },
       onEnd: (content) => {
         if (activeGen !== generation) return
@@ -437,6 +455,9 @@ export function Chat() {
 
         chatStore.setGenerating(false)
         setCurrentAssistantMsgId(null)
+        // OS 活动：完成阶段，1.5s 后回落空闲（短暂可见成功态）
+        setAgentPhase('done')
+        setTimeout(() => setAgentPhase('idle'), 1500)
         if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
       },
       onTool: (payload) => {
@@ -453,6 +474,10 @@ export function Chat() {
           }
           chatStore.appendToolCall(msgId, toolCall)
         }
+        // OS 活动：工具调用阶段 + 计数 + 最近活动描述
+        setAgentPhase('tooling')
+        setAgentToolCount((c) => c + 1)
+        setAgentLastActivity(`工具调用：${payload.name}${payload.success ? '' : '（失败）'}`)
       },
       onError: (payload) => {
         // F1: provider 阶段错误——保留已累积 partial，标记消息完成并提示
@@ -466,6 +491,9 @@ export function Chat() {
         setCurrentAssistantMsgId(null)
         setStreamError(payload.message || '生成失败')
         setTimeout(() => setStreamError(null), 5000)
+        // OS 活动：错误阶段 + 最近活动描述
+        setAgentPhase('error')
+        setAgentLastActivity(payload.message || '生成失败')
         // 作废旧代次：错误后迟到的 token/done 一律丢弃
         generation++
         if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
@@ -1105,7 +1133,14 @@ export function Chat() {
         {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅作窗口拖拽区） ===== */}
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>
-            <div class="flex items-center gap-2 flex-shrink-0 min-w-0" data-tauri-drag-region />
+            <div class="flex items-center gap-2 flex-shrink-0 min-w-0" data-tauri-drag-region>
+              <AgentActivityBar
+                phase={agentPhase}
+                activeDomain={agentDomain}
+                toolCount={agentToolCount}
+                lastActivity={agentLastActivity}
+              />
+            </div>
             <Show when={harnessRoute()}>
               <span
                 class="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-nt-io-500/10 text-nt-io-600 border border-nt-io-500/20 flex-shrink-0"
