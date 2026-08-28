@@ -1,43 +1,55 @@
 #!/bin/bash
-# AGENTS.md pointer-conservation gate — rejects commits that bloat AGENTS.md.
-# Installed via .githooks/pre-commit (git config core.hooksPath .githooks).
-# Compliments .opencode/plugins/agents-guard.js (session.idle check).
+# NeoTrix pre-commit hook (激活于 core.hooksPath=.githooks)。
+# 两层门禁:
+#   1) AGENTS.md 指针守恒 — 拒绝把 cycle 正文/增长区写回 AGENTS.md。
+#   2) P0 编译卡点 — 拒绝把红构建(comlib 或测试编译失败)提交入库。
+#
+# 注意: 本 hook 仅拦"走 hook"的提交。openhands 等绕过 --no-verify / libgit2 的提交
+# 仍会绕过此处 —— 权威门禁是 CI (.github/workflows/ci.yml, push/PR 跑 cargo check+test)
+# 配合 main 分支的 branch protection + required status checks。pre-push (.githooks/pre-push)
+# 为推送级二次防线。
+set -uo pipefail
 
+# ---------- 1) AGENTS.md 指针守恒门禁 ----------
 MAX_LINES=130
 MAX_BYTES=22000
 AGENTS="AGENTS.md"
 
-if [ ! -f "$AGENTS" ]; then
-  exit 0
+if [ -f "$AGENTS" ] && git diff --cached --name-only | grep -qx "$AGENTS"; then
+  LINES=$(git show ":$AGENTS" 2>/dev/null | wc -l | tr -d ' ')
+  BYTES=$(git show ":$AGENTS" 2>/dev/null | wc -c | tr -d ' ')
+  FAIL=0
+  if [ "$LINES" -gt "$MAX_LINES" ]; then
+    echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_LINES lines ($LINES). Cycle bodies belong in KB, not here."
+    FAIL=1
+  fi
+  if [ "$BYTES" -gt "$MAX_BYTES" ]; then
+    echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_BYTES bytes ($BYTES). Violation of pointer-conservation HARD RULE."
+    FAIL=1
+  fi
+  if git show ":$AGENTS" 2>/dev/null | grep -q "^## .*Cycle.*"; then
+    echo "✗ [AGENTS-GUARD] AGENTS.md contains cycle-body sections. Must be moved to KB via experience-tree."
+    FAIL=1
+  fi
+  if [ "$FAIL" -ne 0 ]; then
+    echo "  Pointers live in KB: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py hub"
+    echo "  Then revert AGENTS.md to HEAD and commit only pointer/rule changes."
+    exit 1
+  fi
 fi
 
-# Only enforce when AGENTS.md is part of this commit
-if ! git diff --cached --name-only | grep -qx "$AGENTS"; then
-  exit 0
-fi
-
-LINES=$(git show ":$AGENTS" 2>/dev/null | wc -l | tr -d ' ')
-BYTES=$(git show ":$AGENTS" 2>/dev/null | wc -c | tr -d ' ')
-
-FAIL=0
-if [ "$LINES" -gt "$MAX_LINES" ]; then
-  echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_LINES lines ($LINES). Cycle bodies belong in KB, not here."
-  FAIL=1
-fi
-if [ "$BYTES" -gt "$MAX_BYTES" ]; then
-  echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_BYTES bytes ($BYTES). Violation of pointer-conservation HARD RULE."
-  FAIL=1
-fi
-
-if git show ":$AGENTS" 2>/dev/null | grep -q "^## .*Cycle.*"; then
-  echo "✗ [AGENTS-GUARD] AGENTS.md contains cycle-body sections. Must be moved to KB via experience-tree."
-  FAIL=1
-fi
-
-if [ "$FAIL" -ne 0 ]; then
-  echo "  Pointers live in KB: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py hub"
-  echo "  Then revert AGENTS.md to HEAD and commit only pointer/rule changes."
-  exit 1
+# ---------- 2) P0 编译卡点 ----------
+# 仅当本次提交触及 Rust 源码时才跑, 避免纯文档/脚本提交被当前红构建卡死。
+# --tests 覆盖 lib + 测试目标, 能拦住 "lib 绿但测试编译红" 的回归
+# (本仓库曾出现 LlmResponse 字面量漏字段导致测试编译失败却入库的情况)。
+if git diff --cached --name-only | grep -qE '\.rs$'; then
+  echo -e "\033[1;33m🔨 P0 pre-commit gate: cargo check --tests -p neotrix ...\033[0m"
+  if ! cargo check --tests -p neotrix >/tmp/precommit-cargo-check.log 2>&1; then
+    echo -e "\033[0;31m❌ BUILD GATE FAILED: neotrix 未通过编译(test), 拒绝提交\033[0m"
+    echo -e "\033[1;33m   详见 /tmp/precommit-cargo-check.log; 加 --no-verify 可绕过 (不推荐, 会破坏 P0)\033[0m"
+    exit 1
+  fi
+  echo -e "\033[0;32m✅ Build gate passed\033[0m"
 fi
 
 exit 0
