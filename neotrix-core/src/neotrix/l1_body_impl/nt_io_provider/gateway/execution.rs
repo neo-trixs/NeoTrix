@@ -65,7 +65,10 @@ impl GatewayV2 {
     ) -> Result<LlmResponse, LlmError> {
         let provider = self
             .providers
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
             .get(name)
+            .cloned()
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
         // 兼容两种注册名: 裸 provider 名 (`llm7`) 与完整目录名 (`llm7/codestral-latest`)。
@@ -515,7 +518,13 @@ impl GatewayV2 {
                         attempt: used_names.len(),
                         max_retries: 3,
                         model: request.model.clone(),
-                        available_models: self.providers.keys().cloned().collect(),
+                        available_models: self
+                            .providers
+                            .read()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .keys()
+                            .cloned()
+                            .collect(),
                         prompt: request
                             .messages
                             .iter()
@@ -852,7 +861,10 @@ impl GatewayV2 {
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let provider = self
             .providers
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
             .get(name)
+            .cloned()
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀: 请求模型 `llm7/codestral-latest` 传给 provider 时
         // 只传 `codestral-latest` (上游不认识 `llm7/` 前缀, 返回 model_unavailable)。

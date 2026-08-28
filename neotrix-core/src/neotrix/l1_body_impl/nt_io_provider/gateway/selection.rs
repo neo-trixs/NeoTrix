@@ -1,4 +1,4 @@
-use crate::neotrix::l1_body_impl::nt_io_http_factory::proxy_from_env;
+use crate::neotrix::nt_io_http_factory::proxy_from_env;
 use std::time::Instant;
 
 use super::super::factory::{create_provider, ProviderConfig};
@@ -37,18 +37,24 @@ impl GatewayV2 {
         }
     }
 
-    pub fn register_provider(&mut self, name: &str, provider: Box<dyn LlmProvider>, is_free: bool) {
+    pub fn register_provider(&self, name: &str, provider: Arc<dyn LlmProvider>, is_free: bool) {
         self.register_provider_with_category(name, provider, is_free, ProviderCategory::Cloud)
     }
 
     pub fn register_provider_with_category(
-        &mut self,
+        &self,
         name: &str,
-        provider: Box<dyn LlmProvider>,
+        provider: Arc<dyn LlmProvider>,
         is_free: bool,
         category: ProviderCategory,
     ) {
-        self.providers.insert(name.to_string(), provider);
+        {
+            let mut providers = self.providers.write().unwrap_or_else(|e| {
+                log::warn!("[gateway] providers RwLock poisoned: {}", e);
+                e.into_inner()
+            });
+            providers.insert(name.to_string(), provider);
+        }
         self.states_write(|states| {
             let mut state = ProviderState::new(is_free, category);
             // Apply provider-specific rate limits
@@ -192,10 +198,10 @@ impl GatewayV2 {
     /// Register providers from FreeModelCatalog discovered entries.
     /// For each entry where the required API key env var is set (or keyless),
     /// create a provider and register it.
-    pub fn register_from_catalog(&mut self, entries: &[FreeModelEntry]) {
+    pub fn register_from_catalog(&self, entries: &[FreeModelEntry]) {
         for entry in entries {
             let name = format!("{}/{}", entry.provider, entry.model_id);
-            if self.providers.contains_key(&name) {
+            if self.providers.read().unwrap_or_else(|e| e.into_inner()).contains_key(&name) {
                 continue; // already registered
             }
             // Check if we have the required API key
@@ -211,21 +217,17 @@ impl GatewayV2 {
             } else {
                 None
             };
-            let mut provider = create_provider(ProviderConfig {
+            let provider = create_provider(ProviderConfig {
                 provider_type: entry.provider_type,
                 api_key,
                 base_url: Some(entry.base_url.clone()),
                 model: Some(entry.model_id.clone()),
                 timeout_secs: 60,
-                proxy: None,
+                proxy: proxy_from_env(),
             });
-            // 代理注入: 与手工 keyless 注册一致, 本机 fake-ip 分流网络下直连会全部超时
-            if let Some(proxy_url) = proxy_from_env() {
-                provider.set_proxy(&proxy_url);
-            }
             self.register_provider_with_category(
                 &name,
-                provider,
+                provider.into(),
                 entry.is_free,
                 ProviderCategory::Cloud,
             );
@@ -304,9 +306,22 @@ impl GatewayV2 {
     }
 
     /// 从 FreeModelCatalog 重新发现并补充可用 keyless 源 (对齐 OmniRoute Radar 刷新)。
-    /// 幂等: 已注册名跳过。当 `is_pool_sufficient(min)` 为 false 时由调用方 (CLI 初始化 /
-    /// 后台循环) 周期调用, 使自有 LLM 池始终维持充足模型, 而非启动一次性注册后静止。
-    pub fn reconcile_pool_from_catalog(&mut self) {
+    /// 幂等: 已注册名跳过。`&self` 即可调用 (providers 内部可变性) — 故可由
+    /// `complete_with_selection` 在池子偏薄时按需自愈 (T3 生产接线), 或由后台循环周期调用,
+    /// 使自有 LLM 池始终维持充足模型, 而非启动一次性注册后静止。
+    /// `cooldown_secs` 防止单次请求链内重复全量刷新 (刷新本身有 I/O 成本)。
+    pub fn reconcile_pool_from_catalog(&self, cooldown_secs: u64) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        {
+            let mut last = self.last_reconcile_ts.lock().unwrap_or_else(|e| e.into_inner());
+            if now.saturating_sub(*last) < cooldown_secs {
+                return;
+            }
+            *last = now;
+        }
         let mut catalog = FreeModelCatalog::new();
         let discovered = catalog.refresh();
         let before = self.providers().len();
@@ -319,6 +334,14 @@ impl GatewayV2 {
                 before,
                 after
             );
+        }
+    }
+
+    /// 池子偏薄时按需补充 (需求驱动自愈): 仅当可用免费 provider 低于 `min_free` 时触发,
+    /// 且受 `reconcile_pool_from_catalog` 内置 cooldown 节流。T3 生产接线点 — 每次请求入口调用。
+    pub fn ensure_pool_sufficient(&self, min_free: usize, cooldown_secs: u64) {
+        if !self.is_pool_sufficient(min_free) {
+            self.reconcile_pool_from_catalog(cooldown_secs);
         }
     }
 

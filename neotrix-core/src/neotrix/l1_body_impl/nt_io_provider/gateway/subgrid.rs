@@ -161,7 +161,12 @@ impl GatewayV2 {
             .split('/')
             .next()
             .filter(|p| !p.is_empty())
-            .filter(|p| self.providers.contains_key(*p))
+            .filter(|p| {
+                self.providers
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .contains_key(*p)
+            })
             .map(|p| p.to_string());
         // 前缀 provider 的安全画像满足要求才锁定 (如 Open 画像可用所有 provider)
         let prefix_meets = |p: &str| {

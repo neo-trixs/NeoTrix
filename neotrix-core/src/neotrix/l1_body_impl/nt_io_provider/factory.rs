@@ -18,6 +18,7 @@ use super::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvid
 use super::gateway::GatewayV2;
 use super::provider_catalog::{ProviderCategory, CommunicationProfile};
 use crate::core::nt_core_span::CostTracker;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
@@ -366,7 +367,7 @@ pub fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&
     }
 }
 
-pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
+pub fn create_provider(config: ProviderConfig) -> Arc<dyn LlmProvider> {
     // 网络隔离 (默认阻断): 非白名单/非本地端点 → DeniedProvider (显式逃生门见 network_access_allowed)
     if !network_access_allowed(config.provider_type, config.base_url.as_deref()) {
         let host = config
@@ -380,9 +381,9 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
              Add to allowlist or set NEOTRIX_NETWORK_UNBLOCK=1 to allow.",
             config.provider_type, host
         );
-        return Box::new(DeniedProvider { host });
+        return Arc::new(DeniedProvider { host });
     }
-    let mut provider: Box<dyn LlmProvider> = match config.provider_type {
+    let mut provider: Arc<dyn LlmProvider> = match config.provider_type {
         LlmProviderType::OpenAI => {
             let api_key = config.api_key.unwrap_or_else(|| {
                 std::env::var("OPENAI_API_KEY").unwrap_or_default()
@@ -391,20 +392,20 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             if let Some(url) = config.base_url {
                 provider = provider.with_base_url(&url);
             }
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Anthropic => {
             let api_key = config.api_key.unwrap_or_else(|| {
                 std::env::var("ANTHROPIC_API_KEY").unwrap_or_default()
             });
-            Box::new(AnthropicProvider::new(api_key))
+            Arc::new(AnthropicProvider::new(api_key))
         }
         LlmProviderType::Ollama => {
             let mut provider = OllamaProvider::new();
             if let Some(url) = config.base_url {
                 provider = provider.with_base_url(&url);
             }
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Vllm => {
             // vLLM serves an OpenAI-compatible API. Self-hosted: base URL defaults
@@ -417,7 +418,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             });
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Sglang => {
             // SGLang serves an OpenAI-compatible API. Self-hosted: base URL defaults
@@ -430,13 +431,13 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             });
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Gemini => {
             let api_key = config.api_key.unwrap_or_else(|| {
                 std::env::var("GOOGLE_API_KEY").unwrap_or_default()
             });
-            Box::new(GeminiProvider::new(api_key))
+            Arc::new(GeminiProvider::new(api_key))
         }
         LlmProviderType::Groq => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -446,7 +447,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             if let Some(url) = config.base_url {
                 provider = provider.with_base_url(&url);
             }
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::OpenRouter => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -456,16 +457,16 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             if let Some(url) = config.base_url {
                 provider = provider.with_base_url(&url);
             }
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Cerebras => {
             let api_key = config.api_key.unwrap_or_else(|| {
                 std::env::var("CEREBRAS_API_KEY").unwrap_or_default()
             });
-            Box::new(CerebrasProvider::new(api_key))
+            Arc::new(CerebrasProvider::new(api_key))
         }
         LlmProviderType::Pollinations | LlmProviderType::FreeApi => {
-            Box::new(PollinationsProvider::new())
+            Arc::new(PollinationsProvider::new())
         }
         LlmProviderType::BazaarLink => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -473,13 +474,13 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             });
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url("https://api.bazaarlink.ai/v1");
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::FreeTheAi => {
             // Keyless — uses community API, OpenAI-compatible
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url("https://api.freetheai.com/v1");
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::ZeroLimit => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -487,7 +488,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             });
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url("https://api.zerolimit.ai/v1");
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::SambaNova => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -496,7 +497,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.sambanova.ai/v1".to_string());
             let mut provider = GroqProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::CustomProxy => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -507,7 +508,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
                 std::env::var("NEOTRIX_PROXY_BASE_URL").unwrap_or_else(|_| "http://localhost:3000/v1".to_string())
             });
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
 
         // ── Free cloud providers ──
@@ -518,7 +519,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.cloudflare.com/client/v4/ai".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Nvidia => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -527,7 +528,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://integrate.api.nvidia.com/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::GitHubModels => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -536,7 +537,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://models.inference.ai.azure.com/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::HuggingFace => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -545,7 +546,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api-inference.huggingface.co/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Cohere => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -554,7 +555,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.cohere.ai/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::TogetherFree => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -563,7 +564,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.together.xyz/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Llm7 => {
             // .ai 域名已死（HTTP 000）；.io 是当前匿名可用端点（2026-08 实测 200）
@@ -572,13 +573,13 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.llm7.io/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Kilo => {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.kilocode.ai/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::SiliconFlow => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -587,49 +588,49 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.siliconflow.cn/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Xai => {
             let api_key = config.api_key.unwrap_or_else(|| std::env::var("XAI_API_KEY").unwrap_or_default());
             let base_url = config.base_url.unwrap_or_else(|| "https://api.x.ai/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Moonshot => {
             let api_key = config.api_key.unwrap_or_else(|| std::env::var("MOONSHOT_API_KEY").unwrap_or_default());
             let base_url = config.base_url.unwrap_or_else(|| "https://api.moonshot.cn/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Qwen => {
             let api_key = config.api_key.unwrap_or_else(|| std::env::var("QWEN_API_KEY").unwrap_or_default());
             let base_url = config.base_url.unwrap_or_else(|| "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Doubao => {
             let api_key = config.api_key.unwrap_or_else(|| std::env::var("DOUBAO_API_KEY").unwrap_or_default());
             let base_url = config.base_url.unwrap_or_else(|| "https://ark.cn-beijing.volces.com/api/v3".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::MiniMax => {
             let api_key = config.api_key.unwrap_or_else(|| std::env::var("MINIMAX_API_KEY").unwrap_or_default());
             let base_url = config.base_url.unwrap_or_else(|| "https://api.minimax.chat/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Perplexity => {
             let api_key = config.api_key.unwrap_or_else(|| std::env::var("PERPLEXITY_API_KEY").unwrap_or_default());
             let base_url = config.base_url.unwrap_or_else(|| "https://api.perplexity.ai".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::ZAI => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -638,7 +639,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://open.bigmodel.cn/api/paas/v4".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::OpenCodeZen => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -649,13 +650,13 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             });
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Ovh => {
             let base_url = config.base_url.unwrap_or_else(|| "https://ai-endpoints.ovh.net/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::DeepSeekFree => {
             let api_key = config.api_key.unwrap_or_else(|| {
@@ -664,13 +665,13 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.deepseek.com/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::ModelScope => {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.modelscope.cn/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::ApiAirforce => {
             // Truly keyless — accepts any Bearer token, even empty/not-needed
@@ -679,7 +680,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let api_key = config.api_key.unwrap_or_default();
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Aihub => {
             // Aihub (aihub.humorously.cn) — OpenAI-compatible, requires API key
@@ -690,7 +691,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://aihub.humorously.cn/v1".to_string());
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
         LlmProviderType::Empero => {
             // free.empero.org — keyless OpenAI 兼容免费端点, key 随便填 "free" 即可。
@@ -699,19 +700,21 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             let base_url = config.base_url.unwrap_or_else(|| "https://free.empero.org/v1".to_string());
             let mut provider = OpenAiProvider::new("free".to_string());
             provider = provider.with_base_url(&base_url);
-            Box::new(provider)
+            Arc::new(provider)
         }
     };
 
     // 代理注入: 若配置了代理 (子母阵 Proxied/Tor 画像), 将 provider 客户端切换到代理路由
     if let Some(proxy_url) = &config.proxy {
-        provider.set_proxy(proxy_url);
+        if let Some(inner) = Arc::get_mut(&mut provider) {
+            inner.set_proxy(proxy_url);
+        }
         log::info!("[factory] provider {:?} routed through proxy {}", config.provider_type, proxy_url);
     }
-    provider
+    Arc::from(provider)
 }
 
-pub fn create_provider_from_type(provider_type: LlmProviderType, api_key: Option<String>) -> Box<dyn LlmProvider> {
+pub fn create_provider_from_type(provider_type: LlmProviderType, api_key: Option<String>) -> Arc<dyn LlmProvider> {
     create_provider(ProviderConfig {
         provider_type,
         api_key,
@@ -833,20 +836,19 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // 因此统一把 NEOTRIX_PROXY_URL / NEOTRIX_TOR_PROXY 注入每个 keyless provider 客户端。
     let proxy = super::super::nt_io_http_factory::proxy_from_env();
     let keyless_provider = |ptype: LlmProviderType| {
-        let mut p = create_provider_from_type(ptype, None);
-        if let Some(proxy_url) = &proxy {
-            p.set_proxy(proxy_url);
-            log::debug!("[gateway] keyless provider {:?} routed through proxy {}", ptype, proxy_url);
-        }
-        p
+        create_provider(ProviderConfig {
+            provider_type: ptype,
+            api_key: None,
+            proxy: proxy.clone(),
+            ..Default::default()
+        })
     };
 
-    let pollinations = PollinationsProvider::new();
-    let mut pollinations: Box<dyn LlmProvider> = Box::new(pollinations);
+    let mut pollinations: Box<dyn LlmProvider> = Box::new(PollinationsProvider::new());
     if let Some(proxy_url) = &proxy {
         pollinations.set_proxy(proxy_url);
     }
-    gateway.register_provider_with_category("pollinations", pollinations, true, ProviderCategory::Cloud);
+    gateway.register_provider_with_category("pollinations", Arc::from(pollinations), true, ProviderCategory::Cloud);
     log::info!("[gateway] Registered keyless: pollinations");
 
     // LLM7 — 匿名 keyless（Bearer unused 即可），turbo 层模型（gpt-oss:20b 等），~30 RPM。
@@ -1045,23 +1047,23 @@ mod tests {
         // 池条目按 label 注册为 gateway provider (可被 providers() 发现)。
         let mut pool = crate::neotrix::nt_io_provider::provider_pool::ProviderPool::default();
         pool.entries.push(crate::neotrix::nt_io_provider::provider_pool::PoolEntry {
-            label: "t-pool-gw".into(),
-            provider: "openai".into(),
-            api_key: "sk-test-pool".into(),
-            model: "gpt-4o-mini".into(),
-            tags: vec!["test".into()],
+            label: "t-pool-gw".to_string(),
+            provider: "openai".to_string(),
+            api_key: "sk-test-pool".to_string(),
+            model: "gpt-4o-mini".to_string(),
+            tags: vec!["test".to_string()],
             base_url: None,
             created_ts: 0,
         });
         let mut gateway = GatewayV2::new();
         let n = pool.register_into_gateway(&mut gateway);
         assert_eq!(n, 1);
-        // 契约 (provider_pool.rs register_into_gateway): 注册名为 "{provider}/{model}",
-        // 使 provider_model() 可直接抽取模型; label 走 AccountPool 映射而非 gateway 名。
+        // 契约 (provider_pool.rs register_into_gateway): 以 `{label}` 为 provider 名注册
+        // (统一路由/健康); 模型信息走 AccountPool 映射而非 gateway 名。
         let names = gateway.providers();
         assert!(
-            names.iter().any(|p| p == "openai/gpt-4o-mini"),
-            "provider/model 应注册为 gateway provider, got {names:?}"
+            names.iter().any(|p| p == "t-pool-gw"),
+            "pool 条目应以其 label 注册为 gateway provider, got {names:?}"
         );
         // AccountPool 也应登记
         let acc_pool = gateway.account_pool.lock().expect("lock");
@@ -1095,7 +1097,7 @@ mod tests {
             provider_type: LlmProviderType::Empero,
             api_key: None,
             base_url: None,
-            model: Some("glm-5.3-flash".into()),
+            model: Some("glm-5.3-flash".to_string()),
             timeout_secs: 10,
             proxy: None,
         });

@@ -170,9 +170,14 @@ impl ProviderPool {
             let is_free = LlmProviderType::from_name(&entry.provider)
                 .map(|t| t.is_free())
                 .unwrap_or(false);
+            // 契约 (provider_pool.rs + factory::tests::test_pool_entry_registers_into_gateway):
+            // gateway 注册名必须为 `{provider}/{model}`, 使 provider_model() 的 '/' 拆分
+            // 与候选链前缀路由直接可用; label 仅作为 AccountPool 账户键 (多账户租约/检疫),
+            // 不再兼任 gateway provider 名 (否则 t-pool-gw 无法被模型前缀路由命中)。
+            let gateway_name = format!("{}/{}", entry.provider, entry.model);
             gateway.register_provider_with_category(
-                &entry.label,
-                provider,
+                &gateway_name,
+                provider.into(),
                 is_free,
                 super::provider_catalog::ProviderCategory::Cloud,
             );

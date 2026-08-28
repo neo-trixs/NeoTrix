@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use super::account_pool::{AccountPool, AccountPoolConfig};
@@ -11,8 +11,6 @@ use crate::core::nt_core_error_recovery::{RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_core_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_core_span::{ConsoleTracer, CostTracker};
 
-#[cfg(test)]
-use std::sync::Arc;
 #[cfg(test)]
 use super::agent_routing::AgentRoutingTable;
 #[cfg(test)]
@@ -54,8 +52,12 @@ fn is_quota_exhaustion(msg: &str) -> bool {
 }
 
 pub struct GatewayV2 {
-    providers: HashMap<String, Box<dyn LlmProvider>>,
+    // Arc<dyn LlmProvider> + RwLock 内部可变性: 使 provider 可在 async 调用中安全克隆
+    // (不跨 await 持有 guard), 并允许 reconcile_pool_from_catalog 以 &self 注册新源 (自愈接线)。
+    providers: RwLock<HashMap<String, Arc<dyn LlmProvider>>>,
     states: RwLock<HashMap<String, ProviderState>>,
+    /// 上次 catalog 补充时间戳 (UNIX 秒) — 节流 reconcile 的 I/O 成本。
+    last_reconcile_ts: Mutex<u64>,
     default_name: RwLock<String>,
     prefer_free: bool,
     observer: RwLock<Option<CallObserver>>,
@@ -95,8 +97,9 @@ pub struct GatewayV2 {
 impl GatewayV2 {
     pub fn new() -> Self {
         Self {
-            providers: HashMap::new(),
+            providers: RwLock::new(HashMap::new()),
             states: RwLock::new(HashMap::new()),
+            last_reconcile_ts: Mutex::new(0),
             default_name: RwLock::new(String::new()),
             prefer_free: false,
             observer: RwLock::new(None),
@@ -169,8 +172,8 @@ mod tests {
     #[tokio::test]
     async fn test_gateway_selects_free_provider() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("paid", Box::new(MockProvider::new("paid response")), false);
-        gw.register_provider("free", Box::new(MockProvider::new("free response")), true);
+        gw.register_provider("paid", Arc::new(MockProvider::new("paid response")), false);
+        gw.register_provider("free", Arc::new(MockProvider::new("free response")), true);
 
         let selected = gw.select_best().await;
         assert_eq!(selected, Some("free".to_string()));
@@ -203,9 +206,9 @@ mod tests {
     #[tokio::test]
     async fn test_candidate_chain_prefix_first() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("pollinations", Box::new(MockProvider::new("p")), true);
-        gw.register_provider("llm7", Box::new(MockProvider::new("l")), true);
-        gw.register_provider("api-airforce", Box::new(MockProvider::new("a")), true);
+        gw.register_provider("pollinations", Arc::new(MockProvider::new("p")), true);
+        gw.register_provider("llm7", Arc::new(MockProvider::new("l")), true);
+        gw.register_provider("api-airforce", Arc::new(MockProvider::new("a")), true);
 
         // 显式前缀 → 前缀 provider 第一候选
         let chain = gw.build_candidate_chain("llm7/codestral-latest", 8);
@@ -217,10 +220,10 @@ mod tests {
     #[tokio::test]
     async fn test_candidate_chain_prefix_catalog_full_name() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("pollinations", Box::new(MockProvider::new("p")), true);
+        gw.register_provider("pollinations", Arc::new(MockProvider::new("p")), true);
         gw.register_provider(
             "llm7/codestral-latest",
-            Box::new(MockProvider::new("l")),
+            Arc::new(MockProvider::new("l")),
             true,
         );
 
@@ -236,9 +239,9 @@ mod tests {
     #[tokio::test]
     async fn test_candidate_chain_free_first_and_dedup() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("paid-a", Box::new(MockProvider::new("x")), false);
-        gw.register_provider("free-b", Box::new(MockProvider::new("y")), true);
-        gw.register_provider("free-c", Box::new(MockProvider::new("z")), true);
+        gw.register_provider("paid-a", Arc::new(MockProvider::new("x")), false);
+        gw.register_provider("free-b", Arc::new(MockProvider::new("y")), true);
+        gw.register_provider("free-c", Arc::new(MockProvider::new("z")), true);
 
         // 无前缀 → free 优先
         let chain = gw.build_candidate_chain("", 8);
@@ -256,9 +259,9 @@ mod tests {
     #[tokio::test]
     async fn test_candidate_chain_limit_and_resolve_default() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("a", Box::new(MockProvider::new("x")), true);
-        gw.register_provider("b", Box::new(MockProvider::new("y")), false);
-        gw.register_provider("c", Box::new(MockProvider::new("z")), true);
+        gw.register_provider("a", Arc::new(MockProvider::new("x")), true);
+        gw.register_provider("b", Arc::new(MockProvider::new("y")), false);
+        gw.register_provider("c", Arc::new(MockProvider::new("z")), true);
 
         // limit 上限控制
         let chain = gw.build_candidate_chain("", 2);
@@ -272,8 +275,8 @@ mod tests {
     #[tokio::test]
     async fn test_gateway_fallback_on_failure() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("failing", Box::new(MockProvider::failing()), false);
-        gw.register_provider("working", Box::new(MockProvider::new("ok")), true);
+        gw.register_provider("failing", Arc::new(MockProvider::failing()), false);
+        gw.register_provider("working", Arc::new(MockProvider::new("ok")), true);
 
         let mut states = gw.states.write().unwrap();
         let f = states.get_mut("failing").unwrap();
@@ -290,7 +293,7 @@ mod tests {
     #[tokio::test]
     async fn test_gateway_rate_limit() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("limited", Box::new(MockProvider::new("ok")), true);
+        gw.register_provider("limited", Arc::new(MockProvider::new("ok")), true);
 
         let req = LlmRequest::new("test", "hello");
         let result = gw.complete_with_selection(&req).await;
@@ -306,10 +309,10 @@ mod tests {
         // 2. free_b: free + available, total_calls=50  (should be preferred - lower total_calls)
         // 3. paid_c: paid + available, total_calls=10
         // 4. paid_d: paid + available, total_calls=5
-        gw.register_provider("free_a", Box::new(MockProvider::new("a")), true);
-        gw.register_provider("free_b", Box::new(MockProvider::new("b")), true);
-        gw.register_provider("paid_c", Box::new(MockProvider::new("c")), false);
-        gw.register_provider("paid_d", Box::new(MockProvider::new("d")), false);
+        gw.register_provider("free_a", Arc::new(MockProvider::new("a")), true);
+        gw.register_provider("free_b", Arc::new(MockProvider::new("b")), true);
+        gw.register_provider("paid_c", Arc::new(MockProvider::new("c")), false);
+        gw.register_provider("paid_d", Arc::new(MockProvider::new("d")), false);
 
         // Set total_calls and is_free directly on states
         {
@@ -398,8 +401,8 @@ mod tests {
     async fn test_aggressive_retry_recovers_after_all_fail() {
         let mut gw = GatewayV2::new();
         // Register 2 failing providers — normal retry will exhaust both
-        gw.register_provider("fail1", Box::new(MockProvider::failing()), false);
-        gw.register_provider("fail2", Box::new(MockProvider::failing()), false);
+        gw.register_provider("fail1", Arc::new(MockProvider::failing()), false);
+        gw.register_provider("fail2", Arc::new(MockProvider::failing()), false);
 
         // Drive both to Open state
         {
@@ -471,7 +474,7 @@ mod tests {
 
         gw.register_provider(
             "transient",
-            Box::new(ConditionalFail {
+            Arc::new(ConditionalFail {
                 fail_count: fc,
                 threshold: 1,
             }),
@@ -540,7 +543,7 @@ mod tests {
 
         gw.register_provider(
             "stream-transient",
-            Box::new(StreamConditionalFail {
+            Arc::new(StreamConditionalFail {
                 fail_count: fc,
                 threshold: 1,
             }),
@@ -566,13 +569,13 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
-            Box::new(MockProvider::new("ok")),
+            Arc::new(MockProvider::new("ok")),
             false,
             ProviderCategory::Cloud,
         );
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -598,13 +601,13 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
-            Box::new(MockProvider::new("ok")),
+            Arc::new(MockProvider::new("ok")),
             false,
             ProviderCategory::Cloud,
         );
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -636,13 +639,13 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
-            Box::new(MockProvider::new("ok")),
+            Arc::new(MockProvider::new("ok")),
             false,
             ProviderCategory::Cloud,
         );
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -666,7 +669,7 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
-            Box::new(MockProvider::new("ok")),
+            Arc::new(MockProvider::new("ok")),
             false,
             ProviderCategory::Cloud,
         );
@@ -685,7 +688,7 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -729,7 +732,7 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -746,13 +749,13 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
-            Box::new(MockProvider::new("ok")),
+            Arc::new(MockProvider::new("ok")),
             false,
             ProviderCategory::Cloud,
         );
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -781,13 +784,13 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "local-fail",
-            Box::new(MockProvider::failing()),
+            Arc::new(MockProvider::failing()),
             false,
             ProviderCategory::Local,
         );
         gw.register_provider_with_category(
             "cloud-ok",
-            Box::new(MockProvider::new("cloud")),
+            Arc::new(MockProvider::new("cloud")),
             true,
             ProviderCategory::Cloud,
         );
@@ -853,7 +856,7 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "ollama",
-            Box::new(MockProvider::new("local")),
+            Arc::new(MockProvider::new("local")),
             true,
             ProviderCategory::Local,
         );
@@ -876,7 +879,7 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
-            Box::new(MockProvider::new("ok")),
+            Arc::new(MockProvider::new("ok")),
             false,
             ProviderCategory::Cloud,
         );
@@ -897,13 +900,13 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider_with_category(
             "local-fail",
-            Box::new(MockProvider::failing()),
+            Arc::new(MockProvider::failing()),
             false,
             ProviderCategory::Local,
         );
         gw.register_provider_with_category(
             "cloud-ok",
-            Box::new(MockProvider::new("cloud")),
+            Arc::new(MockProvider::new("cloud")),
             true,
             ProviderCategory::Cloud,
         );
@@ -932,7 +935,7 @@ mod tests {
         // tokens, and a small request must pass even after the tracker has
         // accumulated a large cumulative balance.
         let mut gw = GatewayV2::new();
-        gw.register_provider("free", Box::new(MockProvider::new("ok")), true);
+        gw.register_provider("free", Arc::new(MockProvider::new("ok")), true);
         gw.set_cost_budget(0.02);
 
         // Seed a large cumulative balance in the tracker — as if the process
@@ -965,10 +968,10 @@ mod tests {
         let mut gw = GatewayV2::new();
         gw.register_provider(
             "quota-exhausted",
-            Box::new(MockProvider::quota_failing()),
+            Arc::new(MockProvider::quota_failing()),
             false,
         );
-        gw.register_provider("working", Box::new(MockProvider::new("ok")), true);
+        gw.register_provider("working", Arc::new(MockProvider::new("ok")), true);
 
         // 直接触发 quota 路径的熔断 (与 complete 内错误分类同语义)
         {
@@ -1027,9 +1030,9 @@ mod tests {
         // L3 模型级锁 (对齐 OmniRoute model lockout): 单模型 404 只锁定该模型,
         // 不熔断整个 provider, 且自动 failover 到其它可用 provider → 池子不缩水。
         let mut gw = GatewayV2::new();
-        gw.register_provider("model-dead", Box::new(MockProvider::model_failing()), true);
+        gw.register_provider("model-dead", Arc::new(MockProvider::model_failing()), true);
         // working 注册为付费, 确保 free-first 链确定性先试 model-dead (free) 再 failover 到 working
-        gw.register_provider("working", Box::new(MockProvider::new("ok")), false);
+        gw.register_provider("working", Arc::new(MockProvider::new("ok")), false);
 
         let req = LlmRequest::new("badmodel", "hi");
         let result = gw.complete_with_selection(&req).await;
@@ -1051,8 +1054,8 @@ mod tests {
     #[tokio::test]
     async fn test_candidate_chain_skips_model_locked() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("a", Box::new(MockProvider::new("a")), true);
-        gw.register_provider("b", Box::new(MockProvider::new("b")), true);
+        gw.register_provider("a", Arc::new(MockProvider::new("a")), true);
+        gw.register_provider("b", Arc::new(MockProvider::new("b")), true);
         {
             let mut states = gw.states.write().unwrap();
             states.get_mut("a").unwrap().lock_model("x/m", 1800);
@@ -1069,8 +1072,8 @@ mod tests {
     #[tokio::test]
     async fn test_pool_sufficiency_report() {
         let mut gw = GatewayV2::new();
-        gw.register_provider("f1", Box::new(MockProvider::new("a")), true);
-        gw.register_provider("f2", Box::new(MockProvider::new("b")), true);
+        gw.register_provider("f1", Arc::new(MockProvider::new("a")), true);
+        gw.register_provider("f2", Arc::new(MockProvider::new("b")), true);
         assert!(
             gw.is_pool_sufficient(2),
             "2 free available → sufficient at min=2"

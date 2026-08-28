@@ -1,5 +1,7 @@
 // ── Mode System (from Kimi Code: Agent + Shell dual-mode) ──
 
+use std::sync::Arc;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum NeoCodexMode {
     #[default]
@@ -258,7 +260,7 @@ impl ProviderCatalog {
     }
 
     /// Create a LlmProvider from real layer (if matching provider type)
-    pub fn to_llm_provider(&self) -> Option<Box<dyn crate::neotrix::nt_io_provider::LlmProvider>> {
+    pub fn to_llm_provider(&self) -> Option<Arc<dyn crate::neotrix::nt_io_provider::LlmProvider>> {
         let info = self.providers.get(self.active)?;
         let provider_type = Self::provider_type_of(&info.name)?;
         let mut config = crate::neotrix::nt_io_provider::ProviderConfig::from_env();
