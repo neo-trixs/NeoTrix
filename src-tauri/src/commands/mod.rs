@@ -121,8 +121,8 @@ pub use unified_invoke_cmds::*;
 pub mod harness_cmds;
 pub use harness_cmds::*;
 
-pub mod canvas_capability_cmds;
-pub use canvas_capability_cmds::*;
+pub mod nt_canvas_capability_cmds;
+pub use nt_canvas_capability_cmds::*;
 
 // ========== Tests ==========
 
