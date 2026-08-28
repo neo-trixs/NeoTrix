@@ -2223,3 +2223,54 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: #dc2626;
 }
+
+/* ===== App Bot 打磨：渐进授权可视层（AutonomyMeter） ===== */
+.autonomy-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.12));
+  font-size: 11px;
+  color: var(--nt-color-text-muted, #6b7280);
+}
+.autonomy-meter__label { font-weight: 600; color: var(--nt-color-text-primary, #1f2937); }
+.autonomy-meter__bars { display: inline-flex; gap: 2px; }
+.autonomy-meter__seg {
+  width: 10px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(15, 23, 42, 0.14);
+  transition: background 0.2s ease;
+}
+.autonomy-meter__seg--on { background: var(--nt-color-gold-600, #f0913a); }
+.autonomy-meter__rate { font-variant-numeric: tabular-nums; color: var(--nt-color-io-600, #2563eb); }
+
+/* ===== App Bot 打磨：GenUI 工具结果富渲染 ===== */
+.gen-ui { width: 100%; }
+.gen-ui__json,
+.gen-ui__text {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--nt-color-text-secondary, #475569);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gen-ui__code { background: rgba(15, 23, 42, 0.04); border-radius: 6px; padding: 6px; }
+.gen-ui__table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.gen-ui__table th,
+.gen-ui__table td {
+  border: 1px solid var(--nt-color-border-primary, rgba(15, 23, 42, 0.14));
+  padding: 3px 8px;
+  text-align: left;
+}
+.gen-ui__table th { background: rgba(15, 23, 42, 0.05); color: var(--nt-color-text-primary, #1f2937); }

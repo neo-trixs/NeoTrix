@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, Show } from 'solid-js'
 import { ChevronDown, ChevronRight, Check, X, Wrench, Copy, Loader2 } from 'lucide-solid'
 import type { ToolCallRecord } from '../stores/chat'
+import { GenUIView } from './GenUIView'
 import { clsx } from 'clsx'
 
 /**
@@ -135,9 +136,9 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
                   </Show>
                 </button>
               </div>
-              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
-                {props.call.result}
-              </pre>
+                <div class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
+                  <GenUIView content={() => props.call.result} />
+                </div>
             </div>
           </Show>
         </div>
