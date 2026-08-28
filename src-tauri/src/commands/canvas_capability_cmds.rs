@@ -72,6 +72,16 @@ pub struct CanvasCapabilitySyncResult {
     pub canonical: Vec<CanvasNodeStatus>,
 }
 
+/// 画板手动触发 Dark Forest 回收的回执
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanvasPruneResult {
+    pub kind: String,
+    /// 是否真的发生了回收 (节点存在且被标记废弃)
+    pub pruned: bool,
+    /// 回收后该节点在树中的成熟度
+    pub constellation: String,
+}
+
 fn stage_to_constellation(stage: u8) -> ConstellationLevel {
     match stage {
         0 => ConstellationLevel::C0Compile,
@@ -285,5 +295,40 @@ pub fn canvas_sync_capabilities(
         matured,
         plans,
         canonical,
+    })
+}
+
+/// 画板覆盖层手动触发 Dark Forest 回收：把 `canvas::<kind>` 标记为废弃。
+/// 这是闭环中「画板 → 树」的写回动作（用户显式决策，而非仅 SEAL 自动 prune）。
+#[tauri::command]
+pub fn canvas_prune_capability(kind: String) -> Result<CanvasPruneResult, String> {
+    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
+
+    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
+        Some(json) => {
+            let kb: KBCapabilityTree =
+                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
+            kb.to_registry()
+        }
+        None => CapabilityRegistry::new(),
+    };
+
+    let id = format!("canvas::{}", kind);
+    let (pruned, constellation) = match registry.get_mut(&id) {
+        Some(node) => {
+            node.deprecated = true;
+            (true, node.constellation.as_str().to_string())
+        }
+        None => (false, "C0".to_string()),
+    };
+
+    let kb = KBCapabilityTree::from_registry(&registry);
+    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
+    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+
+    Ok(CanvasPruneResult {
+        kind,
+        pruned,
+        constellation,
     })
 }
