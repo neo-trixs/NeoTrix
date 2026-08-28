@@ -517,7 +517,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         name: "opencode-zen",
         display_name: "OpenCode Zen",
         category: ProviderCategory::Cloud,
-        base_url: "https://api.opencode.ai/zen/v1",
+        base_url: "https://opencode.ai/zen/v1",
         default_model: "deepseek-v4-flash-free",
         api_key_env: None,
         is_free: true,

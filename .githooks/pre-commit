@@ -1,43 +1,101 @@
-#!/bin/bash
-# AGENTS.md pointer-conservation gate — rejects commits that bloat AGENTS.md.
-# Installed via .githooks/pre-commit (git config core.hooksPath .githooks).
-# Compliments .opencode/plugins/agents-guard.js (session.idle check).
+#!/usr/bin/env bash
+# Pre-commit naming convention check
+# Usage: scripts/pre-commit-naming-check.sh
+# Install: ln -sf ../../scripts/pre-commit-naming-check.sh .git/hooks/pre-commit
+set -euo pipefail
 
-MAX_LINES=130
-MAX_BYTES=22000
-AGENTS="AGENTS.md"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-if [ ! -f "$AGENTS" ]; then
-  exit 0
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Check staged .rs files for nt_ prefix compliance
+violations=0
+while IFS= read -r file; do
+    fname=$(basename "$file")
+    # Skip mod.rs, lib.rs, main.rs
+    case "$fname" in
+        mod.rs|lib.rs|main.rs) continue ;;
+    esac
+    if [[ ! "$fname" =~ ^nt_ ]]; then
+        echo -e "${RED}❌ NAMING: $file does not follow nt_{domain}_{subsystem} pattern${NC}"
+        violations=$((violations + 1))
+    fi
+done < <(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$')
+
+if [ "$violations" -gt 0 ]; then
+    echo -e "${YELLOW}⚠️  $violations naming violation(s) found. Add --no-verify to bypass.${NC}"
+    exit 1
 fi
 
-# Only enforce when AGENTS.md is part of this commit
-if ! git diff --cached --name-only | grep -qx "$AGENTS"; then
-  exit 0
+# Check for .clamp() in staged files
+clamp_count=0
+while IFS= read -r file; do
+    if git diff --cached "$file" | grep -q '\.clamp('; then
+        echo -e "${YELLOW}⚠️  CLAMP: $file contains .clamp() — use .max(0.0).min(1.0) instead${NC}"
+        clamp_count=$((clamp_count + 1))
+    fi
+done < <(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$')
+
+if [ "$clamp_count" -gt 0 ]; then
+    echo -e "${YELLOW}⚠️  $clamp_count .clamp() usage(s) found in staged changes.${NC}"
 fi
 
-LINES=$(git show ":$AGENTS" 2>/dev/null | wc -l | tr -d ' ')
-BYTES=$(git show ":$AGENTS" 2>/dev/null | wc -c | tr -d ' ')
+# AGENTS.md pointer-conservation gate (sole mechanism since .opencode/ removal).
+# Fails the commit when AGENTS.md exceeds the guidance-only ceilings or contains a
+# per-cycle growth area (Experience Index section/table). Cycle pointers live only
+# in KB, never in AGENTS.md.
+# UCN Phase 4.2: inline Node.js → Rust-native `neotrix guard` (single source of truth).
+if git diff --cached --quiet -- AGENTS.md; then
+    :
+else
+    if command -v neotrix >/dev/null 2>&1; then
+        if ! neotrix guard --strict >/dev/null 2>&1; then
+            echo -e "${RED}❌ AGENTS.md pointer-conservation check FAILED (neotrix guard)${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✅ AGENTS.md pointer-conservation check passed${NC}"
+    else
+        # Fallback: neotrix 二进制未安装时回退到内置自检 (保持门禁不失效)
+        if command -v node >/dev/null 2>&1; then
+            if ! node -e '
+const { readFileSync } = require("fs");
+const c = readFileSync("AGENTS.md", "utf8");
+const lines = c.replace(/\n$/, "").split("\n");
+const h2 = lines.filter((l) => l.startsWith("## ")).map((l) => l.replace(/^##\s+/, "").trim());
+const allowed = ["Skill Routing","Architecture","Always-On Core Rules","Shared Language","Build","Test","Key Locations"];
+const bad = [];
+if (lines.length > 130) bad.push(`total ${lines.length}>130 lines`);
+if (Buffer.byteLength(c, "utf8") > 22000) bad.push(`total ${Buffer.byteLength(c, "utf8")}>22000 bytes`);
+const unknown = h2.filter((s) => !allowed.includes(s));
+if (unknown.length) bad.push(`non-whitelisted sections: ${unknown.join(", ")}`);
+if (c.includes("## Experience Index") || c.includes("| Cycle | Domain | Summary |") || c.includes("| Cycle | Date |") || c.includes("| Cycle | Session |")) bad.push("inline Experience Index table (pointers live in KB only)");
+if (bad.length) { console.log("❌ AGENTS.md pointer-conservation: " + bad.join("; ")); process.exit(1); }
+'; then
+                exit 1
+            fi
+            echo -e "${GREEN}✅ AGENTS.md pointer-conservation check passed${NC}"
+        else
+            echo -e "${YELLOW}⚠️  neotrix guard unavailable; AGENTS.md gate skipped${NC}"
+        fi
+    fi
+fi
 
-FAIL=0
-if [ "$LINES" -gt "$MAX_LINES" ]; then
-  echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_LINES lines ($LINES). Cycle bodies belong in KB, not here."
-  FAIL=1
-fi
-if [ "$BYTES" -gt "$MAX_BYTES" ]; then
-  echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_BYTES bytes ($BYTES). Violation of pointer-conservation HARD RULE."
-  FAIL=1
-fi
+echo -e "${GREEN}✅ Naming check passed${NC}"
 
-if git show ":$AGENTS" 2>/dev/null | grep -q "^## .*Cycle.*"; then
-  echo "✗ [AGENTS-GUARD] AGENTS.md contains cycle-body sections. Must be moved to KB via experience-tree."
-  FAIL=1
+# ---- P0: 编译门禁 (fail-closed) ----
+# 任何提交 (含自治循环经 git-shell 的 WIP 提交) 必须先过 neotrix lib 编译。
+# 若循环经 libgit2 直写而绕过本 hook, 真正闸门在 nt_mind_background_loop::handlers_absorption
+# (其 absorb 前也会跑 cargo check)。加 `git commit --no-verify` 可绕过 (不推荐)。
+echo -e "${YELLOW}🔨 P0 gate: cargo check -p neotrix --lib ...${NC}"
+if ! cargo check -p neotrix --lib >/tmp/precommit-cargo-check.log 2>&1; then
+    echo -e "${RED}❌ BUILD GATE FAILED: neotrix lib 未通过编译, 拒绝提交${NC}"
+    echo -e "${YELLOW}   详见 /tmp/precommit-cargo-check.log; 加 --no-verify 可绕过 (不推荐)${NC}"
+    exit 1
 fi
-
-if [ "$FAIL" -ne 0 ]; then
-  echo "  Pointers live in KB: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py hub"
-  echo "  Then revert AGENTS.md to HEAD and commit only pointer/rule changes."
-  exit 1
-fi
+echo -e "${GREEN}✅ Build gate passed${NC}"
 
 exit 0

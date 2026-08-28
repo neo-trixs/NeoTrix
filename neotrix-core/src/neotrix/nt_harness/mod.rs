@@ -14,6 +14,18 @@ use std::collections::HashMap;
 use crate::core::nt_core_consciousness_core::TaskLoopReport;
 use crate::neotrix::l1_body_impl::nt_shield::receipt::AgentReceipt;
 
+/// `AgentReceipt` 的可序列化镜像 — 与 `HarnessExecuteResponse` 共用同一 serde 实例,
+/// 避免跨 crate 的 serde 实例不匹配 (test build 下 `config::_serde` 与 workspace `serde` 冲突)。
+/// 字段与 `AgentReceipt` 一一对应, 回放时可由其重建 `AgentReceipt` 再 `verify()`。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRunReceipt {
+    pub run_id: String,
+    pub input_hash: String,
+    pub output_hash: String,
+    pub timestamp: i64,
+    pub signature: String,
+}
+
 pub mod app_server;
 pub mod router;
 pub mod sandbox;
@@ -145,7 +157,8 @@ pub struct HarnessExecuteResponse {
     pub message: String,
     /// 可验证回放收据 — agent 运行完成边界 (execute_real) 成功时产出,
     /// 绑定 instruction(输入)+message(输出), 供事后审计回放校验。
-    pub receipt: Option<AgentReceipt>,
+    /// 镜像 `AgentReceipt` 的字段 (见 `AgentRunReceipt`), 可由其重建并 `verify()`。
+    pub receipt: Option<AgentRunReceipt>,
 }
 
 /// 统一网关（L1 Body 轻封装，不建平行能力）
@@ -255,6 +268,14 @@ impl HarnessGateway {
         // run_id 用 instruction 的哈希, 保证同一指令可审计回放。
         let run_id = crate::neotrix::l1_body_impl::nt_shield::receipt::hash_content(&req.instruction);
         let receipt = AgentReceipt::emit(&run_id, &req.instruction, &message);
+        // 镜像为可序列化结构 (与 HarnessExecuteResponse 同 serde 实例), 字段 1:1 对应。
+        let receipt = AgentRunReceipt {
+            run_id: receipt.run_id,
+            input_hash: receipt.input_hash,
+            output_hash: receipt.output_hash,
+            timestamp: receipt.timestamp,
+            signature: receipt.signature,
+        };
         HarnessExecuteResponse {
             instruction: req.instruction.clone(),
             capability_tag: entry.capability_tag.clone(),
@@ -445,7 +466,15 @@ mod tests {
         };
         let report = TaskLoopReport::default();
         let resp = g.execute_real(req.clone(), &report);
-        let receipt = resp.receipt.expect("execute_real 应产出收据");
+        let r = resp.receipt.expect("execute_real 应产出收据");
+        // 镜像字段重建为 AgentReceipt 后可 verify()
+        let receipt = AgentReceipt {
+            run_id: r.run_id,
+            input_hash: r.input_hash,
+            output_hash: r.output_hash,
+            timestamp: r.timestamp,
+            signature: r.signature,
+        };
         assert!(receipt.verify(), "agent 运行收据应能通过签名完整性校验");
         // 输入应绑定 instruction, 输出应绑定 message
         assert!(receipt.input_hash.len() == 64, "input 为 instruction 的 SHA-256");
