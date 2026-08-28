@@ -172,6 +172,24 @@ export function Chat() {
   const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
   const pushRecentCmd = (id: string) =>
     setRecentPaletteIds((ids) => [id, ...ids.filter((x) => x !== id)].slice(0, 5))
+
+  // 主题切换（浅金 / 浅紫 / 浅青，均为浅色主题）
+  const THEMES = ['gold', 'lilac', 'mint'] as const
+  type Theme = (typeof THEMES)[number]
+  const THEME_LABEL: Record<Theme, string> = { gold: '浅金', lilac: '浅紫', mint: '浅青' }
+  const [theme, setTheme] = createSignal<Theme>(
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt-theme') as Theme)) || 'gold',
+  )
+  createEffect(() => {
+    document.documentElement.dataset.theme = theme()
+    try {
+      localStorage.setItem('nt-theme', theme())
+    } catch {
+      /* 隐私模式忽略 */
+    }
+  })
+  const cycleTheme = () =>
+    setTheme((t) => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length])
   // 统一命令桥：CLI 命令目录（懒加载，供 ⌘K 面板执行 /help /config /stats 等）
   const [unifiedCliCmds, setUnifiedCliCmds] = createSignal<PaletteCommand[]>([])
   const execUnifiedCli = async (input: string) => {
@@ -1269,6 +1287,16 @@ export function Chat() {
                 mode={permissionMode}
                 rate={() => Math.round(autonomyRate() * 100)}
               />
+              {/* 主题切换（浅金 / 浅紫 / 浅青，均为浅色主题） */}
+              <button
+                class="theme-toggle"
+                onClick={cycleTheme}
+                title={`主题：${THEME_LABEL[theme()]}（点击切换）`}
+                aria-label="切换主题"
+              >
+                <span class="theme-toggle__swatch" />
+                <span>{THEME_LABEL[theme()]}</span>
+              </button>
               {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
               <span class="relative flex-shrink-0">
                 <button

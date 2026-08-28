@@ -15,8 +15,8 @@
     @apply text-text-primary antialiased;
     /* Snowfield White 雪域白 — 极致单主题。纯白为体，浅橙只露一丝（48°/8° 两束极淡暖橙光）。 */
     background:
-      radial-gradient(circle 46% 38% at 50% -6%, rgba(255, 179, 102, 0.07) 0%, transparent 62%),
-      radial-gradient(circle 30% 26% at 92% 16%, rgba(255, 168, 86, 0.055) 0%, transparent 60%),
+      radial-gradient(circle 46% 38% at 50% -6%, var(--nt-glow-1, rgba(255, 179, 102, 0.07)) 0%, transparent 62%),
+      radial-gradient(circle 30% 26% at 92% 16%, var(--nt-glow-2, rgba(255, 168, 86, 0.055)) 0%, transparent 60%),
       linear-gradient(168deg, #ffffff 0%, #fdfdfb 46%, #fbfaf7 100%);
     background-attachment: fixed;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -2360,4 +2360,69 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ===== 主题切换：浅金 / 浅紫 / 浅青（均为浅色主题，仅主色相切换） =====
+   所有 UI 的金色身份走 var(--nt-color-gold-*)（含页面底色 gold-50），
+   故在 [data-theme] 下重定义该组变量即可整体换肤。 */
+:root {
+  --nt-color-gold-50: #fef7ee;
+  --nt-color-gold-100: #fdf0dd;
+  --nt-color-gold-200: #fbe6c8;
+  --nt-color-gold-300: #f6d9a8;
+  --nt-color-gold-500: #f0913a;
+  --nt-color-gold-600: #d9a441;
+  --nt-color-gold-700: #c96823;
+  --nt-color-gold-800: #a3501c;
+  --nt-glow-1: rgba(255, 179, 102, 0.07);
+  --nt-glow-2: rgba(255, 168, 86, 0.055);
+}
+[data-theme='lilac'] {
+  --nt-color-gold-50: #f7f5ff;
+  --nt-color-gold-100: #efedff;
+  --nt-color-gold-200: #e4e0ff;
+  --nt-color-gold-300: #d6cfff;
+  --nt-color-gold-500: #8b6cf0;
+  --nt-color-gold-600: #7c5ce0;
+  --nt-color-gold-700: #6b4cc9;
+  --nt-color-gold-800: #553a9e;
+  --nt-glow-1: rgba(139, 108, 240, 0.07);
+  --nt-glow-2: rgba(124, 92, 224, 0.055);
+}
+[data-theme='mint'] {
+  --nt-color-gold-50: #f0fbf7;
+  --nt-color-gold-100: #e3f8f1;
+  --nt-color-gold-200: #c9f1e3;
+  --nt-color-gold-300: #a7e8d2;
+  --nt-color-gold-500: #14b8a6;
+  --nt-color-gold-600: #0d9488;
+  --nt-color-gold-700: #0f766e;
+  --nt-color-gold-800: #115e59;
+  --nt-glow-1: rgba(20, 184, 166, 0.07);
+  --nt-glow-2: rgba(13, 148, 136, 0.055);
+}
+
+/* 主题切换按钮（头部） */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  color: var(--nt-color-gold-800);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+.theme-toggle__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--nt-color-gold-500);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
