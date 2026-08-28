@@ -1,33 +1,25 @@
 //! 画板能力网 → NeoTrix 能力树 融合命令
 //!
 //! 把 Smart Canvas 的能力网 (open NodeKind 注册表) 同步进 NeoTrix 的
-//! `nt_core_capability_tree` (持久化于 KB kv_store `capability_tree`，通过
-//! `KBCapabilityTree` 序列化格式)，并让 SEAL 进化引擎 (EvolutionEngine) 实算
-//! 成熟度晋升与 Dark Forest 回收：
+//! `nt_core_capability_tree` (与 ConsciousnessTree / 后台自治循环共用同一棵
+//! file-based 能力注册表 `~/.neotrix/capability_registry.json` + overlay，经由
+//! `load_capability_registry` / `persist_capability_registry` 读写)，并让 SEAL
+//! 进化引擎 (EvolutionEngine) 实算成熟度晋升与 Dark Forest 回收：
 //!   - 新发现 → Budding (C0 起步)
 //!   - 使用遥测 → Strengthen (记录 usage)
 //!   - SEAL 晋升 → Mature: 经证据门禁 (C0→C1 需 provides, C1→C2 需 wiring_evidence,
 //!     ≥C2 需 evidence_gated='passed', 由真实 usage 代理) 逐级晋升 C0–C5
 //!   - 用户自定义且 0 使用 → Dark Forest 回收 (Prune: 标记废弃并移除)
-//! 使 SEAL / ConsciousnessTree 能透过同一棵能力树蒸馏与优化画板能力网。
+//! 融合进全局能力注册表后, 后台自治循环 (handlers_maintenance) 每小时 auto_scan 会自然
+//! 覆盖 `canvas::*` 节点, ConsciousnessTree 的 allocate_tasks / 健康链亦可见其成熟度。
 
 use chrono::Utc;
-use nt_core_capability_tree::serialize::KBCapabilityTree;
 use nt_core_capability_tree::{
     CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, EvolutionAction, EvolutionEngine,
     EvolutionLogEntry, EvolutionOp, NodeLayer,
 };
-use neotrix::core::nt_core_kb_primitives::{kv_get, kv_set};
+use neotrix::core::nt_core_consciousness_core::{load_capability_registry, persist_capability_registry};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
-const NS: &str = "capability_tree";
-const KEY: &str = "tree";
-
-fn kb_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".neotrix").join("knowledge.db")
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanvasCapabilityInput {
@@ -122,15 +114,18 @@ fn action_name(a: &EvolutionAction) -> String {
 pub fn canvas_sync_capabilities(
     caps: Vec<CanvasCapabilityInput>,
 ) -> Result<CanvasCapabilitySyncResult, String> {
-    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
-
-    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
-        Some(json) => {
-            let kb: KBCapabilityTree =
-                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
-            kb.to_registry()
+    let mut registry = match load_capability_registry() {
+        Some(r) => r,
+        None => {
+            return Ok(CanvasCapabilitySyncResult {
+                nodes_synced: caps.len(),
+                tree_cycle: format!("canvas-{}", Utc::now().format("%Y%m%d")),
+                deprecated: 0,
+                matured: 0,
+                plans: vec![],
+                canonical: vec![],
+            })
         }
-        None => CapabilityRegistry::new(),
     };
 
     let cycle = format!("canvas-{}", Utc::now().format("%Y%m%d"));
@@ -298,9 +293,7 @@ pub fn canvas_sync_capabilities(
         })
         .collect();
 
-    let kb = KBCapabilityTree::from_registry(&registry);
-    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
-    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+    persist_capability_registry(&registry).map_err(|e| e.to_string())?;
 
     Ok(CanvasCapabilitySyncResult {
         nodes_synced: caps.len(),
@@ -316,15 +309,15 @@ pub fn canvas_sync_capabilities(
 /// 这是闭环中「画板 → 树」的写回动作（用户显式决策，而非仅 SEAL 自动 prune）。
 #[tauri::command]
 pub fn canvas_prune_capability(kind: String) -> Result<CanvasPruneResult, String> {
-    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
-
-    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
-        Some(json) => {
-            let kb: KBCapabilityTree =
-                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
-            kb.to_registry()
+    let mut registry = match load_capability_registry() {
+        Some(r) => r,
+        None => {
+            return Ok(CanvasPruneResult {
+                kind,
+                pruned: false,
+                constellation: "C0".into(),
+            })
         }
-        None => CapabilityRegistry::new(),
     };
 
     let id = format!("canvas::{}", kind);
@@ -336,9 +329,7 @@ pub fn canvas_prune_capability(kind: String) -> Result<CanvasPruneResult, String
         None => (false, "C0".to_string()),
     };
 
-    let kb = KBCapabilityTree::from_registry(&registry);
-    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
-    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+    persist_capability_registry(&registry).map_err(|e| e.to_string())?;
 
     Ok(CanvasPruneResult {
         kind,
@@ -352,15 +343,15 @@ pub fn canvas_prune_capability(kind: String) -> Result<CanvasPruneResult, String
 /// `stage` 为 0..=5 (C0..C5)；传 None 则清除意图、回退到遥测驱动。
 #[tauri::command]
 pub fn canvas_set_desired(kind: String, stage: Option<u8>) -> Result<CanvasPruneResult, String> {
-    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
-
-    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
-        Some(json) => {
-            let kb: KBCapabilityTree =
-                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
-            kb.to_registry()
+    let mut registry = match load_capability_registry() {
+        Some(r) => r,
+        None => {
+            return Ok(CanvasPruneResult {
+                kind,
+                pruned: false,
+                constellation: "C0".into(),
+            })
         }
-        None => CapabilityRegistry::new(),
     };
 
     let id = format!("canvas::{}", kind);
@@ -380,9 +371,7 @@ pub fn canvas_set_desired(kind: String, stage: Option<u8>) -> Result<CanvasPrune
         None => (false, "C0".to_string()),
     };
 
-    let kb = KBCapabilityTree::from_registry(&registry);
-    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
-    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+    persist_capability_registry(&registry).map_err(|e| e.to_string())?;
 
     Ok(CanvasPruneResult {
         kind,
@@ -404,15 +393,15 @@ pub struct CanvasRouteApplyResult {
 
 #[tauri::command]
 pub fn canvas_apply_evolution_route() -> Result<CanvasRouteApplyResult, String> {
-    let conn = rusqlite::Connection::open(kb_path()).map_err(|e| e.to_string())?;
-
-    let mut registry = match kv_get(&conn, NS, KEY).map_err(|e| e.to_string())? {
-        Some(json) => {
-            let kb: KBCapabilityTree =
-                serde_json::from_str(&json).map_err(|e| format!("capability_tree parse: {e}"))?;
-            kb.to_registry()
+    let mut registry = match load_capability_registry() {
+        Some(r) => r,
+        None => {
+            return Ok(CanvasRouteApplyResult {
+                matured: 0,
+                pruned: 0,
+                applied: vec![],
+            })
         }
-        None => CapabilityRegistry::new(),
     };
 
     let cycle = format!("canvas-{}", Utc::now().format("%Y%m%d"));
@@ -446,9 +435,7 @@ pub fn canvas_apply_evolution_route() -> Result<CanvasRouteApplyResult, String> 
         (m, p, applied)
     };
 
-    let kb = KBCapabilityTree::from_registry(&registry);
-    let json = serde_json::to_string(&kb).map_err(|e| e.to_string())?;
-    kv_set(&conn, NS, KEY, &json).map_err(|e| e.to_string())?;
+    persist_capability_registry(&registry).map_err(|e| e.to_string())?;
 
     Ok(CanvasRouteApplyResult {
         matured,
