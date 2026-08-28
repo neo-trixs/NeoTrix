@@ -14,6 +14,7 @@ This document defines the precise meaning of domain terms used across NeoTrix. E
 | **SEAL Pipeline** | Self-Evolving Architecture Loop — the pipeline that runs exploration, distillation, self-test, and absorption cycles. Stages defined by `make_stage!` macro. | "the pipeline", "evolution loop" |
 | **KB** | Knowledge Base — SQLite-backed persistent store. Shared state layer for all 7 domains. Contains nodes (entities), edges (relations), embeddings, and BM25 index. | "the database", "storage" |
 | **total_calls ascending** | In gateway provider selection, lower total_calls takes priority for rotation, ensuring even distribution across available providers. Sorts ascending (least-used provider first). Related to NT-ACT load balancing. | "total_calls descending" |
+| **Egress Privacy Guard** | Outbound LLM request filter that prevents NeoTrix's own source code / KB / conversation from leaking to external models. Single logic source in `nt_core_llm::egress_privacy_guard` (neotrix layer delegates to it). Trust tiers: `Trusted` (local/Ollama — passthrough), `Contracted` (paid cloud — redact internal fingerprints, keep secrets scrubbed), `Untrusted` (free/proxy — fail-closed block on internal fingerprint). Secrets are always scrubbed regardless of trust. | "privacy filter", "the guard" |
 
 ## Faction System (7 Domains)
 
