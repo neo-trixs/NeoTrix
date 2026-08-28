@@ -329,7 +329,7 @@ export function Sidebar(props: SidebarProps) {
 
   return (
     <aside class={clsx(
-      'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative',
+      'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative max-w-[85vw]',
       collapsed() ? 'w-[64px] border-r border-black/5' : 'w-[280px]'
     )}>
       {/* Header: 三色灯占位（macOS 28px 拖拽区） */}
