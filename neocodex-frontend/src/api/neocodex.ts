@@ -50,7 +50,7 @@ export interface CanvasCapabilitySyncResult {
   deprecated: number
   matured: number
   plans: { action: string; node_id: string; rationale: string }[]
-  canonical: { kind: string; label: string; constellation: string; usage: number; deprecated: boolean }[]
+  canonical: { kind: string; label: string; constellation: string; usage: number; deprecated: boolean; desired?: number }[]
 }
 /** 把画板能力网快照并入 NeoTrix 能力树 (KB kv_store capability_tree)，执行 Budding/Strengthen/Dark-Forest 回收。 */
 export function canvasSyncCapabilities(caps: CanvasCapabilityInput[]): Promise<CanvasCapabilitySyncResult> {
@@ -60,6 +60,11 @@ export function canvasSyncCapabilities(caps: CanvasCapabilityInput[]): Promise<C
 /** 画板覆盖层手动触发 Dark Forest 回收：把 canvas::<kind> 标记废弃 (画板 → 树 写回)。 */
 export function canvasPruneCapability(kind: string): Promise<{ kind: string; pruned: boolean; constellation: string }> {
   return call('canvas_prune_capability', { kind })
+}
+
+/** 画板覆盖层把「期望成熟度」推回能力树：写入/清除 canvas::<kind> 的 canvas_desired 元数据。 */
+export function canvasSetDesired(kind: string, stage: number | null): Promise<{ kind: string; pruned: boolean; constellation: string }> {
+  return call('canvas_set_desired', { kind, stage })
 }
 
 export function createSession(name?: string): Promise<NeoCodexSessionInfo> {

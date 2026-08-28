@@ -6,7 +6,7 @@ import { createSignal, createMemo, onMount, onCleanup, Show, For, type JSX } fro
 import type { CanvasNode, CollapsePolicy, Viewport } from './types'
 import { getRenderer, listCapabilities } from './nodeRegistry'
 import { computeCollapse, DEFAULT_POLICY } from './smartCollapse'
-import { evolutionRoute, pruneCandidates, treeStatus, pruneNode, syncToCapabilityTree } from './evolution'
+import { evolutionRoute, pruneCandidates, treeStatus, pruneNode, setDesired, syncToCapabilityTree } from './evolution'
 
 /** 搜索添加时用的示例载荷，保证节点可渲染。 */
 function sampleData(kind: string): unknown {
@@ -259,11 +259,19 @@ export function SmartCanvas(props: SmartCanvasProps) {
                     <span class="sc-evo-count">×{c.count}</span>
                     <Show when={treeStatus()?.canonical[c.kind]}>
                       {(cn) => (
-                        <span
-                          class="sc-evo-canon"
-                          classList={{ dead: cn().deprecated }}
-                          title="NeoTrix 能力树 canonical 成熟度 (SEAL 实算)"
-                        >NeoTrix {cn().constellation}</span>
+                        <>
+                          <span
+                            class="sc-evo-canon"
+                            classList={{ dead: cn().deprecated }}
+                            title="NeoTrix 能力树 canonical 成熟度 (SEAL 实算)"
+                          >NeoTrix {cn().constellation}</span>
+                          <button
+                            class="sc-evo-star"
+                            classList={{ on: cn().desired !== undefined }}
+                            title={cn().desired !== undefined ? `期望成熟度 C${cn().desired} · 点按清除` : '设为基石目标 (C5)'}
+                            onClick={() => setDesired(c.kind, cn().desired !== undefined ? null : 5)}
+                          >{cn().desired !== undefined ? '★' : '☆'}</button>
+                        </>
                       )}
                     </Show>
                     <Show when={c.count === 0 && c.userAdded}>

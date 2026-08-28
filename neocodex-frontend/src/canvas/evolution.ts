@@ -5,7 +5,7 @@
 //  → 落盘 KB kv_store，使 SEAL / ConsciousnessTree 可读取此进化轨迹。
 // ══════════════════════════════════════════════════════════════════════════
 import { createSignal, createRoot, createEffect } from 'solid-js'
-import { kbKvGet, kbKvSet, canvasSyncCapabilities, canvasPruneCapability } from '../api/neocodex'
+import { kbKvGet, kbKvSet, canvasSyncCapabilities, canvasPruneCapability, canvasSetDesired } from '../api/neocodex'
 import { listCapabilities } from './nodeRegistry'
 
 const NS = 'canvas_evo'
@@ -35,7 +35,7 @@ export const [treeStatus, setTreeStatus] = createSignal<{
   cycle: string
   matured: number
   plans: { action: string; nodeId: string; rationale: string }[]
-  canonical: Record<string, { constellation: string; deprecated: boolean }>
+  canonical: Record<string, { constellation: string; deprecated: boolean; desired?: number }>
 } | null>(null)
 
 /**
@@ -57,8 +57,8 @@ export async function syncToCapabilityTree(): Promise<void> {
       user_added: c.userAdded,
     }))
     const res = await canvasSyncCapabilities(payload)
-    const canonical: Record<string, { constellation: string; deprecated: boolean }> = {}
-    for (const c of res.canonical) canonical[c.kind] = { constellation: c.constellation, deprecated: c.deprecated }
+    const canonical: Record<string, { constellation: string; deprecated: boolean; desired?: number }> = {}
+    for (const c of res.canonical) canonical[c.kind] = { constellation: c.constellation, deprecated: c.deprecated, desired: c.desired }
     setTreeStatus({
       canvasNodes: res.nodes_synced,
       deprecated: res.deprecated,
@@ -85,6 +85,28 @@ export async function pruneNode(kind: string): Promise<void> {
     }
   } catch (e) {
     console.warn('[evo] prune capability failed:', e)
+  }
+}
+
+/** 画板覆盖层把「期望成熟度」推回能力树：写入/清除 canvas_desired 并乐观回读。 */
+export async function setDesired(kind: string, stage: number | null): Promise<void> {
+  try {
+    const res = await canvasSetDesired(kind, stage)
+    if (res.pruned) {
+      setTreeStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              canonical: {
+                ...prev.canonical,
+                [kind]: { constellation: res.constellation, deprecated: false, desired: stage ?? undefined },
+              },
+            }
+          : prev,
+      )
+    }
+  } catch (e) {
+    console.warn('[evo] set desired failed:', e)
   }
 }
 
