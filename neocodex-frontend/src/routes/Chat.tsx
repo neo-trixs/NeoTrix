@@ -36,6 +36,7 @@ import { HarnessReportCard } from '../components/HarnessReportCard'
 import { ApprovalPanel } from '../components/ApprovalPanel'
 import { FileEditorPanel } from '../components/FileEditorPanel'
 import { AgentActivityBar, type AgentPhase } from '../components/AgentActivityBar'
+import { AgentActivityLog, type ActivityStep } from '../components/AgentActivityLog'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
 import { subscribeStream, subscribeMenuEvents, type UnlistenFn } from '../api/events'
@@ -85,6 +86,17 @@ export function Chat() {
   const [agentDomain, setAgentDomain] = createSignal<string | null>(null)
   const [agentToolCount, setAgentToolCount] = createSignal(0)
   const [agentLastActivity, setAgentLastActivity] = createSignal<string | null>(null)
+  // 活动日志（审计层）：滚动记录阶段/推理/工具/错误/完成，独立于对话线程
+  const [agentLog, setAgentLog] = createSignal<ActivityStep[]>([])
+  const [logOpen, setLogOpen] = createSignal(false)
+  // 结构化错误三段式（what/why/next）：后端可选填充，前端缺失时推导
+  const [streamErrorDetail, setStreamErrorDetail] = createSignal<{ what: string; why: string; next: string } | null>(null)
+  const pushLog = (step: Omit<ActivityStep, 'ts'>) => {
+    setAgentLog((prev) => {
+      const next = [...prev, { ...step, ts: Date.now() }]
+      return next.length > 24 ? next.slice(next.length - 24) : next
+    })
+  }
   // 信息通知（区别于 streamError 错误通道：中性色 / InfoIcon，非故障）
   const [infoNotice, setInfoNotice] = createSignal<string | null>(null)
   // 信息通知计时器：新通知接管旧计时器，避免快速触发（如连按 Shift+Tab）时旧计时器误清新通知
@@ -415,6 +427,7 @@ export function Chat() {
         setAgentPhase('thinking')
         setAgentToolCount(0)
         setAgentLastActivity(null)
+        pushLog({ kind: 'phase', label: '开始思考' })
       },
       onToken: (delta) => {
         if (activeGen !== generation) return
@@ -423,7 +436,10 @@ export function Chat() {
           chatStore.appendMessageContent(msgId, delta)
         }
         // OS 活动：首个 token 起由「思考」转入「生成」
-        if (agentPhase() === 'thinking') setAgentPhase('generating')
+        if (agentPhase() === 'thinking') {
+          setAgentPhase('generating')
+          pushLog({ kind: 'phase', label: '生成回复' })
+        }
       },
       onEnd: (content) => {
         if (activeGen !== generation) return
@@ -457,12 +473,14 @@ export function Chat() {
         setCurrentAssistantMsgId(null)
         // OS 活动：完成阶段，1.5s 后回落空闲（短暂可见成功态）
         setAgentPhase('done')
+        pushLog({ kind: wasCancelled ? 'error' : 'done', label: wasCancelled ? '生成已停止' : '完成' })
         setTimeout(() => setAgentPhase('idle'), 1500)
         if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
       },
       onTool: (payload) => {
         if (activeGen !== generation) return
         const msgId = currentAssistantMsgId()
+        const domain = harnessRoute()?.domain
         if (msgId) {
           const toolCall: ToolCallRecord = {
             id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -471,6 +489,7 @@ export function Chat() {
             result: payload.result,
             duration_ms: payload.duration_ms,
             success: payload.success,
+            domain,
           }
           chatStore.appendToolCall(msgId, toolCall)
         }
@@ -478,6 +497,12 @@ export function Chat() {
         setAgentPhase('tooling')
         setAgentToolCount((c) => c + 1)
         setAgentLastActivity(`工具调用：${payload.name}${payload.success ? '' : '（失败）'}`)
+        pushLog({
+          kind: 'tool',
+          label: payload.name,
+          detail: payload.success ? '成功' : '失败',
+          domain,
+        })
       },
       onError: (payload) => {
         // F1: provider 阶段错误——保留已累积 partial，标记消息完成并提示
@@ -491,12 +516,25 @@ export function Chat() {
         setCurrentAssistantMsgId(null)
         setStreamError(payload.message || '生成失败')
         setTimeout(() => setStreamError(null), 5000)
+        // 结构化错误三段式（后端可选填充，缺失则推导）
+        setStreamErrorDetail({
+          what: payload.what ?? payload.message ?? '生成失败',
+          why: payload.why ?? 'provider/流式阶段错误（F1），回复未落盘',
+          next: payload.next ?? '可重试；若持续出现，检查网络连通性或 API key',
+        })
+        setTimeout(() => setStreamErrorDetail(null), 6000)
         // OS 活动：错误阶段 + 最近活动描述
         setAgentPhase('error')
         setAgentLastActivity(payload.message || '生成失败')
+        pushLog({ kind: 'error', label: payload.message || '生成失败' })
         // 作废旧代次：错误后迟到的 token/done 一律丢弃
         generation++
         if (streamWatchdogTimer) { clearTimeout(streamWatchdogTimer); streamWatchdogTimer = undefined }
+      },
+      onReasoning: (payload) => {
+        // OS 推理流（后端可选 emit）：把意识核心推理步骤实时透出，对抗 black-box
+        if (activeGen !== generation) return
+        pushLog({ kind: 'reasoning', label: payload.text.slice(0, 80) })
       },
       onSubscribeError: (event) => {
         setStreamError(`流式事件 ${event} 订阅失败，回复可能不完整`)
@@ -1140,6 +1178,26 @@ export function Chat() {
                 toolCount={agentToolCount}
                 lastActivity={agentLastActivity}
               />
+              {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
+              <span class="relative flex-shrink-0">
+                <button
+                  class="agent-log-toggle"
+                  onClick={() => setLogOpen((o) => !o)}
+                  title="活动日志（审计层）"
+                  aria-expanded={logOpen()}
+                >
+                  活动 ⌄
+                </button>
+                <Show when={logOpen()}>
+                  <div class="agent-log-pop">
+                    <div class="agent-log-pop__head">
+                      <span>活动日志</span>
+                      <button class="agent-log-pop__close" onClick={() => setLogOpen(false)} aria-label="收起活动日志">×</button>
+                    </div>
+                    <AgentActivityLog steps={agentLog} />
+                  </div>
+                </Show>
+              </span>
             </div>
             <Show when={harnessRoute()}>
               <span
@@ -1514,14 +1572,25 @@ export function Chat() {
           </Show>
         </div>
 
-        {/* Stream Error Toast */}
+        {/* Stream Error Toast（结构化错误：what / why / next） */}
         <Show when={streamError()}>
-          <div role="alert" class="mx-4 mb-2 p-3 bg-red-50/80 border border-red-600/25 rounded-xl flex items-center gap-2 animate-in flex-shrink-0 shadow-sm backdrop-blur-md">
-            <AlertCircle class="w-5 h-5 text-red-600 flex-shrink-0" />
-            <span class="text-sm text-red-700">{streamError()}</span>
+          <div role="alert" class="mx-4 mb-2 p-3 bg-red-50/80 border border-red-600/25 rounded-xl flex items-start gap-2 animate-in flex-shrink-0 shadow-sm backdrop-blur-md">
+            <AlertCircle class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div class="min-w-0 flex-1">
+              <span class="text-sm text-red-700">{streamError()}</span>
+              <Show when={streamErrorDetail()}>
+                {(d) => (
+                  <div class="agent-err-steps mt-2 space-y-1">
+                    <div><span class="agent-err-k">WHAT</span>{d().what}</div>
+                    <div><span class="agent-err-k">WHY</span>{d().why}</div>
+                    <div><span class="agent-err-k">NEXT</span>{d().next}</div>
+                  </div>
+                )}
+              </Show>
+            </div>
             <button
-              class="ml-auto p-1 text-red-600 hover:text-red-800"
-              onClick={() => setStreamError(null)}
+              class="ml-auto p-1 text-red-600 hover:text-red-800 flex-shrink-0"
+              onClick={() => { setStreamError(null); setStreamErrorDetail(null) }}
               aria-label="关闭错误提示"
             >
               <Square class="w-4 h-4" />

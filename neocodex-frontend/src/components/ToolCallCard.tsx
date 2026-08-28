@@ -62,6 +62,17 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
         <Wrench class={clsx('w-3.5 h-3.5 flex-shrink-0', isRunning() ? 'text-text-muted' : props.call.success ? 'text-nt-io-600' : 'text-red-500')} />
         <span class="text-xs font-medium text-text-primary font-mono truncate">{props.call.name}</span>
 
+        {/* 多域可见性：标注触发该工具的 NT-* 能力域 */}
+        {props.call.domain && (
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-nt-io-500/10 text-nt-io-600 border border-nt-io-500/20 flex-shrink-0"
+            title={`由 ${props.call.domain} 能力域触发`}
+          >
+            <span class="w-1 h-1 rounded-full bg-nt-io-500" />
+            {props.call.domain}
+          </span>
+        )}
+
         {isRunning() ? (
           <span class="inline-flex items-center gap-1 text-nt-io-600 flex-shrink-0" role="status" aria-label="工具执行中">
             <Loader2 class="w-3.5 h-3.5 animate-spin" />

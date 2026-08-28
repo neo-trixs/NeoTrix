@@ -21,6 +21,15 @@ export interface StreamToolPayload {
 export interface StreamErrorPayload {
   message: string
   partial: string
+  // 结构化错误三段式（后端可选填充；前端缺失时按规则推导 what/why/next）
+  what?: string
+  why?: string
+  next?: string
+}
+
+// 推理/思考流（OS 正在推理，非最终回复）——后端可选 emit，前端就绪层
+export interface StreamReasoningPayload {
+  text: string
 }
 
 export interface StreamEventHandlers {
@@ -31,6 +40,8 @@ export interface StreamEventHandlers {
   onTool?: (payload: StreamToolPayload) => void
   /** F1: provider 阶段错误（不落盘，保留 partial） */
   onError?: (payload: StreamErrorPayload) => void
+  /** OS 推理流（可选）：把意识核心的推理步骤实时透出，对抗 black-box */
+  onReasoning?: (payload: StreamReasoningPayload) => void
   /** 单个事件订阅失败时回调（用于向用户暴露流式降级提示） */
   onSubscribeError?: (event: string, error: unknown) => void
 }
@@ -75,6 +86,11 @@ export async function subscribeStream(handlers: StreamEventHandlers): Promise<Un
   if (handlers.onError) {
     await subscribe('neocodex_stream_error', () =>
       listen<StreamErrorPayload>('neocodex_stream_error', (e) => handlers.onError?.(e.payload)),
+    )
+  }
+  if (handlers.onReasoning) {
+    await subscribe('neocodex_stream_reasoning', () =>
+      listen<StreamReasoningPayload>('neocodex_stream_reasoning', (e) => handlers.onReasoning?.(e.payload)),
     )
   }
   return () => {

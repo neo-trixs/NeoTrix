@@ -44,6 +44,8 @@ export interface ToolCallRecord {
   result: string
   duration_ms: number
   success: boolean
+  // 多域可见性：该工具调用由哪个 NT-* 域（能力路由）触发（前端从 harnessRoute 注入）
+  domain?: string
 }
 
 export interface NeoCodexSearchHit {
