@@ -5,6 +5,7 @@ pub mod compaction;
 pub mod competition_gate;
 pub mod ctm_verifier;
 pub mod independence;
+pub mod instruction_follow;
 pub mod inner_speech;
 pub mod meta_workspace;
 pub mod modality_router;
