@@ -628,7 +628,7 @@ pub fn prune_cortex_orphans(
     // store (it contains ~99% of live zim URLs). A KB source is only an ORPHAN if it is
     // absent from BOTH the mounted volume AND the corpus — otherwise pruning would wrongly
     // delete hundreds of thousands of valid article nodes.
-    if let Some(corpus) = local_corpus_path() {
+    if let Some(corpus) = corpus_archive_path() {
         if let Ok(cdb) = Connection::open(&corpus) {
             if let Ok(mut st) = cdb.prepare(
                 "SELECT DISTINCT substr(url,10,36) FROM nodes WHERE url LIKE 'zimid://%'",
