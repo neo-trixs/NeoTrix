@@ -224,6 +224,25 @@ impl CliCommand for CommitCmd {
             }
         };
 
+        // P0 编译闸门 (fail-closed): 提交前先过 neotrix lib 编译, 避免把破损状态固化进提交。
+        // 与 .githooks/pre-commit 同源逻辑; 即使 pre-commit hook 被 --no-verify 绕过也兜底。
+        let gate = std::process::Command::new("cargo")
+            .args(["check", "-p", "neotrix", "--lib"])
+            .output();
+        match gate {
+            Ok(out) if out.status.success() => {}
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                return CommandOutput::err(&format!(
+                    "🚫 P0 构建闸门失败: neotrix lib 未通过编译, 拒绝提交 (加 --no-verify 可绕过, 不推荐)\n{}",
+                    stderr.lines().last().unwrap_or("").trim()
+                ));
+            }
+            Err(e) => {
+                return CommandOutput::err(&format!("P0 构建闸门执行失败 (cargo 未安装?): {}", e));
+            }
+        }
+
         let commit = Command::new("git").args(["commit", "-m", &msg]).output();
         match commit {
             Ok(out) => {

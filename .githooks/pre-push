@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Pre-push compile gate (P0 defense-in-depth): 拒绝把红构建推送到远程。
+# 即使本地 WIP 提交绕过 pre-commit hook (--no-verify / libgit2), 也绝不离开本机。
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+echo -e "\033[1;33m🔨 P0 pre-push gate: cargo check -p neotrix --lib ...\033[0m"
+if ! cargo check -p neotrix --lib >/tmp/prepush-cargo-check.log 2>&1; then
+    echo -e "\033[0;31m❌ BUILD GATE FAILED: neotrix lib 未通过编译, 拒绝推送\033[0m"
+    echo -e "\033[1;33m   详见 /tmp/prepush-cargo-check.log; 加 --no-verify 可绕过 (不推荐)\033[0m"
+    exit 1
+fi
+echo -e "\033[0;32m✅ Build gate passed\033[0m"
+exit 0
