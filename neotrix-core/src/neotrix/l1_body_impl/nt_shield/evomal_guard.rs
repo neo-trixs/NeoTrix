@@ -111,6 +111,7 @@ fn scan_one(text: &str) -> (bool, Vec<String>) {
     let mut reasons = Vec::new();
     reasons.extend(inj.iter().cloned());
     reasons.extend(pay.iter().cloned());
+    reasons.extend(tmpl.iter().cloned());
 
     // 核心 EVOMAL 反模式: 检索内容想把自己固化为含 payload 的 skill 模板 → 阻断。
     let blocked = !tmpl.is_empty() && !pay.is_empty();
