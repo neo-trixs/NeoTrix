@@ -39,6 +39,8 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     crate::core::nt_core_e8_vsa::register_e8_vsa_self_tests(&mut registry);
     // KB 类型核心 (NT-CORE): NodeType 枚举全变体往返
     crate::core::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
+    // NT-MEMORY 四态记忆资产 (吸收 TencentDB-Agent-Memory): ChatMemory/Skill/LlmWiki/CodeGraph 分类
+    crate::core::nt_core_memory_asset::register_memory_asset_self_tests(&mut registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
     crate::core::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
@@ -261,6 +263,10 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(
         crate::neotrix::l3_memory_impl::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
+    ));
+    // NT-MEMORY 四态资产 (吸收 TencentDB-Agent-Memory): 纯内存分类自测, 轻量注册
+    registry.register(Box::new(
+        crate::core::nt_core_memory_asset::MemoryAssetSelfTest,
     ));
     registry.register(Box::new(
         crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
