@@ -598,6 +598,13 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
     match trust {
         DataTrust::Contracted => {
             // 付费云: 脱敏内部指纹后放行
+            if !leaks.is_empty() {
+                tracing::debug!(
+                    target: "egress_privacy",
+                    leaked = leaks.join(", ").as_str(),
+                    "internal fingerprint redacted for contracted provider"
+                );
+            }
             for m in req.messages.iter_mut() {
                 // Contracted 下始终脱敏: 内部指纹 + 密钥 + 绝对路径 (无条件, 防路径/密钥漏脱敏)
                 m.content = redact_outbound_str(&m.content);
@@ -644,6 +651,11 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
                 Ok(())
             } else {
                 let joined = leaks.join(", ");
+                tracing::warn!(
+                    target: "egress_privacy",
+                    leaked = joined.as_str(),
+                    "egress BLOCKED to untrusted provider (would leak NeoTrix internals)"
+                );
                 Err(format!(
                     "privacy guard: egress to untrusted provider would leak NeoTrix internal code/conversation ({}). \
                      Blocked. Use a local (Ollama/vLLM/SGLang) or paid contracted provider.",
