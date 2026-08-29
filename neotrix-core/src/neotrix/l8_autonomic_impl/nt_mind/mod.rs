@@ -105,6 +105,10 @@ pub mod lsp_client;
 
 // Domain grouping sub-modules (reorganize flat 62 modules into 6 domains)
 pub mod seal_core;
+pub mod nt_mind_seal_ecc;
+pub use nt_mind_seal_ecc::{
+    register_ecc_dimensions, SEAL_ECC_DIMENSIONS, select_ecc_dimensions, evolve_ecc_dimension,
+};
 pub mod reason;
 pub mod knowledge;
 pub mod consciousness;
