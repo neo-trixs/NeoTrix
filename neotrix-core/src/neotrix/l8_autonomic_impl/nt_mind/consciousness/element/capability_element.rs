@@ -19,8 +19,10 @@ impl Default for CapabilityElement {
 
 impl CapabilityElement {
     pub fn new() -> Self {
+        let mut capability = CapabilityVector::default();
+        crate::neotrix::nt_mind::nt_mind_seal_ecc::register_ecc_dimensions(&mut capability);
         Self {
-            capability: CapabilityVector::default(),
+            capability,
             init_called: false,
             started: false,
         }

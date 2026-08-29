@@ -47,6 +47,8 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     crate::neotrix::nt_file_ability::register_format_route_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (reverse-skill): NT-SHIELD 安全技能路由
     crate::neotrix::l1_body_impl::nt_shield::nt_shield_skill_router::register_skill_router_self_tests(&mut registry);
+    // 2026-08-29 外部吸收 (affaan-m/ECC): NT-MIND SEAL 进化维度 instincts/security
+    crate::neotrix::l8_autonomic_impl::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(&mut registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
     crate::core::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
