@@ -2007,6 +2007,19 @@
 .sc-dim-clear { color: #dc2626; border-color: rgba(220,38,38,0.3); }
 .sc-dimmed { opacity: 0.18; pointer-events: none; transition: opacity 0.15s ease; }
 
+/* Markdown 代码块行号 */
+.code-line { display: block; }
+.code-line .ln {
+  display: inline-block;
+  width: 2.2em;
+  margin-right: 0.8em;
+  text-align: right;
+  color: var(--text-muted, #aaa);
+  opacity: 0.5;
+  user-select: none;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
 .sc-palette-hint { padding: 2px 10px 4px; font-size: 10px; color: var(--text-muted, #999); }
 .sc-palette-item.on { background: var(--nt-color-gold-500, #f0913a); color: #fff; }
 .sc-palette-item.on .sc-palette-kind { color: rgba(255, 255, 255, 0.8); }

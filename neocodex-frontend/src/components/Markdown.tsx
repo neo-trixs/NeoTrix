@@ -221,7 +221,16 @@ function CodeBlock(props: { language: string; code: string }) {
         </button>
       </div>
       <pre class="code-block">
-        <code class={props.language ? `language-${props.language}` : ''}>{props.code}</code>
+        <code class={props.language ? `language-${props.language}` : ''}>
+          <For each={props.code.split('\n')}>
+            {(line, i) => (
+              <span class="code-line">
+                <span class="ln">{i() + 1}</span>
+                <span class="lc">{line || ' '}</span>
+              </span>
+            )}
+          </For>
+        </code>
       </pre>
     </div>
   )
