@@ -507,6 +507,82 @@ pub fn ingest_causal_graph(
     Ok(derived)
 }
 
+/// Phase 6 (G5 双向 prune): 反向修剪外置 corpus 中已被 live KB 遗弃且陈旧的条目。
+///
+/// 安全约束 (避免破坏 68GB 冷存档): 仅当外置条目 **带 `lineage`** (说明曾被激活进 live KB)
+/// 且当前 live KB 已无对应节点 (双向孤儿) 且 `last_synced_at` 超过 `stale_days` 时才候选。
+/// 纯冷存档条目 (无 lineage) 永不修剪。默认 `dry_run` 只计数, 需显式 `dry_run=false` 才删行。
+pub fn prune_external(
+    conn: &Connection,
+    corpus_db: &Path,
+    stale_days: i64,
+    dry_run: bool,
+) -> Result<usize, String> {
+    if !corpus_db.exists() {
+        return Err(format!(
+            "外置 corpus 未挂载/不存在: {} (G4: 挂载后才修剪)",
+            corpus_db.display()
+        ));
+    }
+    let cdb = Connection::open(corpus_db).map_err(|e| e.to_string())?;
+    let mut stmt = cdb
+        .prepare("SELECT id, url, metadata FROM nodes")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1).unwrap_or_default(),
+                r.get::<_, Option<String>>(2).unwrap_or_default(),
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let threshold = now() - stale_days * 86400;
+    let mut to_prune: Vec<String> = Vec::new();
+    for row in rows {
+        let (id, url, meta_str) = match row {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        // 仅带 lineage 的条目才可能成为双向修剪候选 (纯冷存档不碰)
+        let meta: serde_json::Value = meta_str
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or(serde_json::Value::Null);
+        let last = meta
+            .get("lineage")
+            .and_then(|l| l.get("last_synced_at"))
+            .and_then(|v| v.as_i64());
+        let Some(last) = last else {
+            continue;
+        };
+        // live KB 已无对应节点 → 双向孤儿
+        let live: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE url=?",
+                rusqlite::params![url.clone()],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        if live > 0 {
+            continue;
+        }
+        if last < threshold {
+            to_prune.push(id);
+        }
+    }
+    if dry_run {
+        return Ok(to_prune.len());
+    }
+    let tx = cdb.unchecked_transaction().map_err(|e| e.to_string())?;
+    for id in &to_prune {
+        tx.execute("DELETE FROM nodes WHERE id=?", rusqlite::params![id])
+            .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(to_prune.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -787,6 +863,56 @@ mod tests {
             v.get("lineage").and_then(|l| l.get("external_sha256")).is_some(),
             "伞节点应含 sha: {meta}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn prune_external_only_removes_stale_orphans_with_lineage() -> Result<(), String> {
+        let conn = Connection::open_in_memory().expect("mem");
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn)
+            .map_err(|e| e.to_string())?;
+        let cdir = tempfile::tempdir().expect("tmp");
+        let cpath = cdir.path().join("corpus.db");
+        let cdb = Connection::open(&cpath).map_err(|e| e.to_string())?;
+        cdb.execute(
+            "CREATE TABLE nodes (id TEXT, node_type TEXT, title TEXT, summary TEXT, content TEXT, url TEXT, domain TEXT, metadata TEXT)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        // 候选: 带 lineage + 陈旧 + live 无对应 → 应被删
+        cdb.execute(
+            "INSERT INTO nodes (id,node_type,title,summary,content,url,domain,metadata) \
+             VALUES ('a','article','t','s','c','zimid://stale/0','d',?)",
+            [serde_json::json!({"lineage": {"last_synced_at": 1}}).to_string()],
+        )
+        .map_err(|e| e.to_string())?;
+        // 纯冷存档 (无 lineage) → 永不被删
+        cdb.execute(
+            "INSERT INTO nodes (id,node_type,title,summary,content,url,domain,metadata) \
+             VALUES ('b','article','t2','s','c','zimid://cold/1','d','{}')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        // 带 lineage 但 live 仍有对应节点 → 保留
+        cdb.execute(
+            "INSERT INTO nodes (id,node_type,title,summary,content,url,domain,metadata) \
+             VALUES ('c','article','t3','s','c','zimid://live/2','d',?)",
+            [serde_json::json!({"lineage": {"last_synced_at": 1}}).to_string()],
+        )
+        .map_err(|e| e.to_string())?;
+        insert_or_get_node_rows(
+            &conn, "live", NodeType::from_str("article"), Some("s"), Some("zimid://live/2"), Some("d"),
+        )
+        .map_err(|e| e.to_string())?;
+        // dry-run 先计数
+        let dry = prune_external(&conn, &cpath, 0, true)?;
+        assert_eq!(dry, 1, "dry-run 应只数到 1 个候选 (a)");
+        let removed = prune_external(&conn, &cpath, 0, false)?;
+        assert_eq!(removed, 1);
+        let remain: i64 = cdb
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        assert_eq!(remain, 2, "b(冷存档) 与 c(live 仍引用) 应保留");
         Ok(())
     }
 }

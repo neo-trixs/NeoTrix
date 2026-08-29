@@ -44,11 +44,13 @@ impl CliCommand for CortexCmd {
             "sync" => Self::sync(&args[1..]),
             "digest" => Self::digest(&args[1..]),
             "causal-ingest" => Self::causal_ingest(args.get(1).map(|s| s.as_str())),
+            "prune-external" => Self::prune_external(&args[1..]),
             "prune" => Self::prune(args.contains(&"--force".to_string())),
             "corpus" => Self::corpus(&args[1..]),
             "help" | "--help" | "-h" => CommandOutput::ok(
                 "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点\n  /cortex corpus status   查看 68GB corpus 本地/外置副本状态\n  /cortex corpus migrate  [--force] 将 64GB corpus 拷到外置大脑冷存档 (dry-run)\n  /cortex lineage  查看外置大脑各节点的血缘 (sha256/上次同步/循环/方向)\n  /cortex sync [--dry-run]  把 live KB 的 SEAL 吸收增量回写外置大脑 (双向边界 G1)\n  /cortex digest [--top-k N] [--domain D] [path]  有界采样外置 corpus, 把冷节点激活进 live KB (Phase 1)
-  /cortex causal-ingest [path]  把外置因果图高信号节点蒸馏进 live KB (Phase 3)",
+  /cortex causal-ingest [path]  把外置因果图高信号节点蒸馏进 live KB (Phase 3)
+  /cortex prune-external [--stale-days N] [--force]  双向修剪外置 corpus 中已被 live 遗弃且陈旧的条目 (G5)",
             ),
             other => CommandOutput::err(&format!("未知子命令: {other} (试试 /cortex status)")),
         }
@@ -353,6 +355,49 @@ impl CortexCmd {
                 Err(e) => CommandOutput::err(&format!("causal-ingest 失败: {e}")),
             },
             Err(e) => CommandOutput::err(&format!("读取因果图失败: {e}")),
+        }
+    }
+
+    fn prune_external(args: &[String]) -> CommandOutput {
+        let mut stale_days = 30i64;
+        let mut force = false;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--stale-days" => {
+                    if let Some(v) = it.next() {
+                        stale_days = v.parse().unwrap_or(30);
+                    }
+                }
+                "--force" => force = true,
+                _ => {}
+            }
+        }
+        let corpus = match corpus_archive_path() {
+            Some(p) => p,
+            None => {
+                return CommandOutput::err(
+                    "外置 corpus 未挂载 (用法: /cortex prune-external [--stale-days N] --force)",
+                )
+            }
+        };
+        let conn = match Connection::open(kb_path()) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+        };
+        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::prune_external(
+            &conn,
+            &corpus,
+            stale_days,
+            !force,
+        ) {
+            Ok(n) if force => CommandOutput::ok(&format!(
+                "prune-external: 已移除 {n} 个双向孤儿条目 (stale_days={stale_days})"
+            )),
+            Ok(n) => CommandOutput::warn(&format!(
+                "[dry-run] 将移除 {n} 个双向孤儿条目 (stale_days={stale_days})。加 --force 真正删除。"
+            )),
+            Err(e) => CommandOutput::err(&format!("prune-external 失败: {e}")),
         }
     }
 }
