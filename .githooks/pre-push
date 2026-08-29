@@ -13,4 +13,12 @@ if ! cargo check -p neotrix --lib >/tmp/prepush-cargo-check.log 2>&1; then
     exit 1
 fi
 echo -e "\033[0;32m✅ Build gate passed\033[0m"
+
+echo -e "\033[1;33m🔨 P0 pre-push gate: egress privacy guard regression ...\033[0m"
+if ! cargo test -p neotrix --lib egress_guard >/tmp/prepush-egress-test.log 2>&1; then
+    echo -e "\033[0;31m❌ EGRESS GATE FAILED: egress_privacy_guard 测试未通过, 拒绝推送\033[0m"
+    echo -e "\033[1;33m   详见 /tmp/prepush-egress-test.log; 加 --no-verify 可绕过 (不推荐)\033[0m"
+    exit 1
+fi
+echo -e "\033[0;32m✅ Egress guard gate passed\033[0m"
 exit 0
