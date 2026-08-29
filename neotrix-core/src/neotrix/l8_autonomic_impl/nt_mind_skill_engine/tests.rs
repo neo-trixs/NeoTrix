@@ -1641,3 +1641,101 @@ category: general
         let rows = audit_residency(&HashMap::new());
         assert!(rows.is_empty(), "无技能时审计应为空");
     }
+
+    // ── Phase 4 库治理 (语义去重 / 零调用回收 / self-benchmark 校准) ──
+
+    #[test]
+    fn prune_semantic_duplicates_keeps_higher_priority() {
+        let mut eng = SkillEngine::new(std::env::temp_dir().join("__se_prune_test"));
+        let mut a = skill_entry("a", "testing", &["rg", "cargo"], &["test"]);
+        a.priority = 50;
+        let mut b = skill_entry("b", "testing", &["rg", "cargo", "rustc"], &["check"]);
+        b.priority = 40;
+        eng.skills.push(a);
+        eng.skills.push(b);
+        eng.build_index();
+        eng.prune_semantic_duplicates();
+        assert_eq!(eng.skills.len(), 1, "Substitute 应去重到 1 个");
+        assert_eq!(eng.skills[0].name, "a", "应保留 priority 更高的 a");
+    }
+
+    #[test]
+    fn retire_zero_call_removes_unused_but_keeps_protected() {
+        let mut eng = SkillEngine::new(std::env::temp_dir().join("__se_retire_test"));
+        eng.skills.push(skill_entry("orphan", "x", &["t"], &["u"]));
+        eng.build_index();
+        eng.retire_zero_call(&std::collections::HashSet::new());
+        assert_eq!(eng.skills.len(), 0, "零调用且无保护 → 回收");
+
+        eng.skills.push(skill_entry("keep", "x", &["t"], &["u"]));
+        eng.build_index();
+        let mut prot = std::collections::HashSet::new();
+        prot.insert("keep".to_string());
+        eng.retire_zero_call(&prot);
+        assert_eq!(eng.skills.len(), 1, "受保护技能不被回收");
+    }
+
+    #[test]
+    fn rebalance_flags_low_success_rate_and_demotes_zero_call() {
+        let mut eng = SkillEngine::new(std::env::temp_dir().join("__se_rebal_test"));
+        let mut s = skill_entry("s", "x", &["t"], &["u"]);
+        s.priority = 50;
+        eng.skills.push(s);
+        eng.build_index();
+        // 3 次激活但 0 成功 → 应标记 flagged
+        eng.attribution.insert(
+            "s".to_string(),
+            SkillAttribution {
+                name: "s".to_string(),
+                category: "x".to_string(),
+                activations: 3,
+                over_validation_score: 0,
+                procedure_heavy: false,
+                flagged: false,
+                success_count: 0,
+                last_used_at: 0,
+            },
+        );
+        eng.rebalance();
+        assert!(
+            eng.attribution.get("s").unwrap().flagged,
+            "低成功率 (0/3) 应被标记 flagged"
+        );
+
+        // 归因存在但零调用 → 降级 priority
+        let mut eng2 = SkillEngine::new(std::env::temp_dir().join("__se_rebal2_test"));
+        let mut s2 = skill_entry("s2", "x", &["t"], &["u"]);
+        s2.priority = 50;
+        eng2.skills.push(s2);
+        eng2.build_index();
+        eng2.attribution.insert(
+            "s2".to_string(),
+            SkillAttribution {
+                name: "s2".to_string(),
+                category: "x".to_string(),
+                activations: 0,
+                over_validation_score: 0,
+                procedure_heavy: false,
+                flagged: false,
+                success_count: 0,
+                last_used_at: 0,
+            },
+        );
+        eng2.rebalance();
+        assert_eq!(eng2.skills[0].priority, 49, "零调用应降优先级");
+    }
+
+    #[test]
+    fn record_activation_tracks_usage_evidence() {
+        let mut eng = SkillEngine::new(std::env::temp_dir().join("__se_act_test"));
+        eng.skills.push(skill_entry("s", "x", &["t"], &["u"]));
+        eng.build_index();
+        eng.record_activation("s");
+        eng.record_activation("s");
+        let attr = eng.attribution.get("s").expect("应有归因");
+        assert_eq!(attr.activations, 2, "应累计激活次数");
+        assert!(attr.last_used_at > 0, "应记录最后使用时间");
+        let mut attr2 = attr.clone();
+        attr2.record_outcome(true);
+        assert_eq!(attr2.success_count, 1, "成功结果应被计入");
+    }

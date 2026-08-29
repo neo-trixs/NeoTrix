@@ -938,6 +938,19 @@ pub struct SkillAttribution {
     pub over_validation_score: u32,
     pub procedure_heavy: bool,
     pub flagged: bool,
+    /// self-benchmark 钩子 (Phase 4): 真实成功/失败调用计数, 驱动 promote/demote 校准。
+    pub success_count: u32,
+    pub last_used_at: i64,
+}
+
+impl SkillAttribution {
+    /// 记录一次真实调用结果 (成功/失败), 供 `rebalance` 做 promote/demote 校准。
+    pub fn record_outcome(&mut self, success: bool) {
+        self.last_used_at = chrono::Utc::now().timestamp();
+        if success {
+            self.success_count += 1;
+        }
+    }
 }
 
 /// 技能树层级统计 (G6, AgentSkillOS 吸收): 巡检报告的数据载体。
@@ -1533,6 +1546,8 @@ impl SkillEngine {
 
         self.skills = loaded;
         self.build_index();
+        // Phase 4 库治理: load 时自动去重 (T3 生产接线, Dark Forest; retire/rebalance 见 maintain())
+        self.prune_semantic_duplicates();
         // UCN Phase 1 写通: 若挂接 KB, 扫描后自动把索引同步进 skills_index 表。
         if let Some(kb) = self.kb.clone() {
             if let Ok(conn) = kb.raw_conn() {
@@ -1707,11 +1722,121 @@ impl SkillEngine {
             over_validation_score: score,
             procedure_heavy,
             flagged: false,
+            success_count: 0,
+            last_used_at: chrono::Utc::now().timestamp(),
         });
         attr.activations += 1;
         attr.over_validation_score = score;
         attr.procedure_heavy = procedure_heavy;
         attr.flagged = procedure_heavy && attr.activations > 1;
+        attr.last_used_at = chrono::Utc::now().timestamp();
+    }
+
+    /// Phase 4 (库治理): 语义去重。复用 `SkillComposer::compose` 判定 `Substitute`
+    /// (同类别 + 工具重叠≥0.75 + 触发低重叠) 的技能对, 保留 priority 高、分值高的,
+    /// 移除冗余副本, 防止技能库膨胀 (Dark Forest: 连接而非堆积)。
+    pub fn prune_semantic_duplicates(&mut self) {
+        let n = self.skills.len();
+        let mut keep = vec![true; n];
+        for i in 0..n {
+            if !keep[i] {
+                continue;
+            }
+            for j in (i + 1)..n {
+                if !keep[j] {
+                    continue;
+                }
+                let rel = SkillComposer::compose(&self.skills[i], &self.skills[j]);
+                if !matches!(rel, SkillRelationship::Substitute) {
+                    continue;
+                }
+                // 保留 priority 高者; priority 相同则比较 quality.overall()
+                let worse = if self.skills[i].priority != self.skills[j].priority {
+                    if self.skills[i].priority > self.skills[j].priority {
+                        j
+                    } else {
+                        i
+                    }
+                } else {
+                    let qi = self
+                        .quality_stats
+                        .get(&self.skills[i].name)
+                        .map(|s| s.overall())
+                        .unwrap_or(0.0);
+                    let qj = self
+                        .quality_stats
+                        .get(&self.skills[j].name)
+                        .map(|s| s.overall())
+                        .unwrap_or(0.0);
+                    if qi >= qj {
+                        j
+                    } else {
+                        i
+                    }
+                };
+                keep[worse] = false;
+            }
+        }
+        if keep.iter().any(|k| !k) {
+            let mut kept = Vec::with_capacity(keep.iter().filter(|k| **k).count());
+            for (idx, k) in keep.iter().enumerate() {
+                if *k {
+                    kept.push(self.skills[idx].clone());
+                }
+            }
+            self.skills = kept;
+            self.build_index();
+        }
+    }
+
+    /// Phase 4 (库治理): 回收零调用技能。仅当该技能在当前会话/已知归因中 `activations==0`
+    /// 时移除 (Dark Forest: 不连接即无存在意义)。`protected` 名集合永不被回收。
+    pub fn retire_zero_call(&mut self, protected: &std::collections::HashSet<String>) {
+        let before = self.skills.len();
+        self.skills.retain(|s| {
+            if protected.contains(&s.name) {
+                return true;
+            }
+            match self.attribution.get(&s.name) {
+                Some(a) => a.activations > 0,
+                None => {
+                    // 从未记录过激活: 视为零调用, 回收 (除非被保护)
+                    false
+                }
+            }
+        });
+        if self.skills.len() != before {
+            self.build_index();
+        }
+    }
+
+    /// Phase 4 (self-benchmark 校准): 依据真实调用证据重新平衡技能库。
+    /// - activations==0 → 降优先级 (priority 降 1, 不低于 1);
+    /// - success_rate<0.5 且 activations>=3 → 标记 flagged (降级候选)。
+    pub fn rebalance(&mut self) {
+        for skill in self.skills.iter_mut() {
+            let Some(a) = self.attribution.get_mut(&skill.name) else {
+                continue;
+            };
+            if a.activations == 0 {
+                skill.priority = skill.priority.saturating_sub(1).max(1);
+                continue;
+            }
+            let success_rate = a.success_count as f64 / a.activations as f64;
+            if success_rate < 0.5 && a.activations >= 3 {
+                a.flagged = true;
+            }
+        }
+    }
+
+    /// Phase 4 维护入口 (T3): 周期性调用 — 去重 + 真实调用证据驱动的回收与校准。
+    /// 不放在 `load_all` 内, 避免每次加载即把无归因的新技能当零调用清掉。
+    pub fn maintain(&mut self) -> usize {
+        let before = self.skills.len();
+        self.prune_semantic_duplicates();
+        self.retire_zero_call(&std::collections::HashSet::new());
+        self.rebalance();
+        before.saturating_sub(self.skills.len())
     }
 
     pub fn over_validation_score(&self, name: &str) -> u32 {
@@ -1756,6 +1881,8 @@ impl SkillEngine {
                         over_validation_score: self.over_validation_score(&s.name),
                         procedure_heavy: false,
                         flagged: false,
+                        success_count: 0,
+                        last_used_at: 0,
                     })
             })
             .collect();

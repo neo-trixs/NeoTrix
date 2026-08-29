@@ -66,8 +66,9 @@ impl CliCommand for SkillCmd {
                 self.info(name)
             }
             "scan" | "reload" => self.scan_skills(),
-            "help" => CommandOutput::ok("Usage: /skills list | active | load <name> | unload <name> | install <source> | info <name> | scan"),
-            _ => CommandOutput::err("Usage: /skills list | active | load <name> | unload <name> | install <source> | info <name> | scan"),
+            "maintain" => self.maintain(),
+            "help" => CommandOutput::ok("Usage: /skills list | active | load <name> | unload <name> | install <source> | info <name> | scan | maintain"),
+            _ => CommandOutput::err("Usage: /skills list | active | load <name> | unload <name> | install <source> | info <name> | scan | maintain"),
         }
     }
 }
@@ -359,6 +360,15 @@ impl SkillCmd {
             lines
         };
         CommandOutput::ok(&format!("{}{}", msg, sync_note))
+    }
+
+    /// Phase 4 库治理入口: 去重 + 零调用回收 + self-benchmark 校准 (T3 生产接线)。
+    fn maintain(&self) -> CommandOutput {
+        let mut engine = self.engine();
+        let removed = engine.maintain();
+        CommandOutput::ok(&format!(
+            "技能库维护完成: 去重/回收/校准本次移除了 {removed} 个技能"
+        ))
     }
 }
 
