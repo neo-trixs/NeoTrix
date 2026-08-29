@@ -23,6 +23,7 @@ pub mod nt_memory_pack;
 pub mod nt_memory_pack_chunked;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
+pub mod nt_memory_cortex_sync;
 pub mod nt_memory_embed;
 pub mod nt_memory_distill;
 pub mod nt_memory_graph;

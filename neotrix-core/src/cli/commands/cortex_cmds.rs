@@ -13,6 +13,9 @@ use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::{
     migrate_cortex_corpus, prune_cortex_orphans, register_cortex_brain,
 };
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::{
+    export_delta, report_lineage,
+};
 
 const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
 const CORTEX_CAUSAL: &str = "/Volumes/NeoTrixBrain/working/causal_graph.json";
@@ -37,6 +40,8 @@ impl CliCommand for CortexCmd {
             "status" => Self::status(),
             "register" => Self::register(),
             "causal" => Self::causal(),
+            "lineage" => Self::lineage(),
+            "sync" => Self::sync(&args[1..]),
             "prune" => Self::prune(args.contains(&"--force".to_string())),
             "corpus" => Self::corpus(&args[1..]),
             "help" | "--help" | "-h" => CommandOutput::ok(
@@ -212,6 +217,64 @@ impl CortexCmd {
                 }))
             }
             Err(e) => CommandOutput::err(&format!("读取因果图失败: {e}")),
+        }
+    }
+
+    fn lineage() -> CommandOutput {
+        let conn = match Connection::open(kb_path()) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+        };
+        match report_lineage(&conn) {
+            Ok(reps) if reps.is_empty() => {
+                CommandOutput::warn("live KB 中无 cortex_brain 节点 — 先 /cortex register。")
+            }
+            Ok(reps) => {
+                let mut lines = vec!["外置大脑血缘 (lineage):".to_string()];
+                for r in reps {
+                    lines.push(format!(
+                        "  {} [{}] dir={} sha={} synced={:?} cycle={:?}",
+                        r.url,
+                        r.kind,
+                        r.direction,
+                        r.external_sha256.unwrap_or_else(|| "-".to_string()),
+                        r.last_synced_at,
+                        r.last_seal_cycle,
+                    ));
+                }
+                CommandOutput::ok(&lines.join("\n"))
+            }
+            Err(e) => CommandOutput::err(&format!("lineage 失败: {e}")),
+        }
+    }
+
+    fn sync(args: &[String]) -> CommandOutput {
+        let root = std::path::Path::new(CORTEX_ROOT);
+        if !root.exists() {
+            return CommandOutput::err(&format!("外置大脑未挂载: {CORTEX_ROOT} — 拒绝回写。"));
+        }
+        let dry = args.contains(&"--dry-run".to_string());
+        let conn = match Connection::open(kb_path()) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+        };
+        match export_delta(&conn, root, dry) {
+            Ok(r) => {
+                let msg = format!(
+                    "[{}] 回写 {} 条 experience 增量 → {}/working/nt_cortex_delta.jsonl (since={}, version_ok={})",
+                    if dry { "dry-run" } else { "sync" },
+                    r.entries,
+                    CORTEX_ROOT,
+                    r.since,
+                    r.version_ok
+                );
+                if dry {
+                    CommandOutput::warn(&msg)
+                } else {
+                    CommandOutput::ok(&msg)
+                }
+            }
+            Err(e) => CommandOutput::err(&format!("sync 失败: {e}")),
         }
     }
 }

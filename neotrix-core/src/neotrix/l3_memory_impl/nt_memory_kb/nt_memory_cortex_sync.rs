@@ -1,0 +1,483 @@
+//! nt_memory_cortex_sync — 外置大脑双向同步边界 (对应 data-flow map G1–G5)。
+//!
+//! 让外置大脑 (`/Volumes/NeoTrixBrain`) 从"只读冷存档"升级为进化伙伴:
+//! - 入向 (已存在): `register_cortex_brain` 注册 + `load_cortex_causal_graph` 消费因果图;
+//! - 出向 (本模块新增): `export_delta` 把 live KB 的 SEAL 吸收产物 (`kv_store` `experience`
+//!   namespace) 回写 volume 的 `working/nt_cortex_delta.jsonl`;
+//! - 血缘 (G3): 每个 `cortex_brain` 节点 metadata 带 `lineage` 块, 记录 sha256/上次同步/循环;
+//! - 版本门禁 (G2): 回写前比对因果图 sha256, 防止写入被替换/回滚的外置大脑;
+//! - 挂载后才同步 (G4): 未挂载则拒绝回写。
+//!
+//! 设计见 `docs/cortex-data-flow-map.md` §3。仅新增, 不改既有 schema (lineage 存 metadata JSON)。
+
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+
+const SCHEMA_VERSION: u32 = 1;
+/// 超过该体积的文件不计算 sha256 (避免 68GB corpus 卡死); 仅小文件 (因果图) 取指纹。
+const SHA_SIZE_CAP: u64 = 100 * 1024 * 1024;
+
+fn now() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+/// 外置大脑节点的血缘块 (存于 `nodes.metadata` 的 `lineage` 字段, 增量、无 schema 迁移)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Lineage {
+    pub schema_version: u32,
+    pub external_snapshot_ts: Option<i64>,
+    pub external_sha256: Option<String>,
+    pub last_synced_at: Option<i64>,
+    pub last_seal_cycle: Option<String>,
+    pub direction: String, // "in" = 已消费; "out" = 已回写
+    pub kb_nodes_derived: Option<usize>,
+}
+
+impl Default for Lineage {
+    fn default() -> Self {
+        Lineage {
+            schema_version: SCHEMA_VERSION,
+            external_snapshot_ts: None,
+            external_sha256: None,
+            last_synced_at: None,
+            last_seal_cycle: None,
+            direction: "in".to_string(),
+            kb_nodes_derived: None,
+        }
+    }
+}
+
+/// 计算文件 sha256 (小文件); 超过 `SHA_SIZE_CAP` 返回 None (避免大档案卡死)。
+fn maybe_sha256(path: &Path) -> Option<String> {
+    let len = std::fs::metadata(path).ok()?.len();
+    if len > SHA_SIZE_CAP {
+        return None;
+    }
+    let data = std::fs::read(path).ok()?;
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(&data);
+    Some(hex::encode(h.finalize()))
+}
+
+/// 把一个 `cortex_brain` 节点的 metadata 注入 `lineage` 块 (G3)。
+///
+/// `external_path` 指向实际外置文件时, 取其 sha256 与 json `ts` 作为血缘锚点; 大文件 (>100MB)
+/// 跳过 sha。幂等: 重复调用只在既有 lineage 上更新, 不丢历史。
+pub fn enrich_cortex_metadata(
+    payload: &mut serde_json::Value,
+    external_path: Option<&Path>,
+    direction: &str,
+) {
+    let mut lineage = payload
+        .get("lineage")
+        .and_then(|l| serde_json::from_value::<Lineage>(l.clone()).ok())
+        .unwrap_or_default();
+    lineage.schema_version = SCHEMA_VERSION;
+    lineage.direction = direction.to_string();
+    if let Some(p) = external_path {
+        if let Some(s) = maybe_sha256(p) {
+            lineage.external_sha256 = Some(s);
+        }
+        if let Ok(txt) = std::fs::read_to_string(p) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+                if let Some(ts) = v.get("ts").and_then(|t| t.as_i64()) {
+                    lineage.external_snapshot_ts = Some(ts);
+                }
+            }
+        }
+    }
+    lineage.last_synced_at = Some(now());
+    payload["lineage"] = serde_json::to_value(&lineage).expect("lineage serializes");
+}
+
+/// `/cortex lineage` 报告: 每个 cortex_brain 节点的血缘快照 (G3 可观测性, Phase 1)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LineageReport {
+    pub url: String,
+    pub kind: String,
+    pub external_sha256: Option<String>,
+    pub last_synced_at: Option<i64>,
+    pub last_seal_cycle: Option<String>,
+    pub direction: String,
+}
+
+pub fn report_lineage(conn: &Connection) -> Result<Vec<LineageReport>, String> {
+    let mut stmt = conn
+        .prepare("SELECT url, metadata FROM nodes WHERE node_type='cortex_brain'")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (url, meta_str) = row.map_err(|e| e.to_string())?;
+        let meta: serde_json::Value =
+            serde_json::from_str(&meta_str).unwrap_or(serde_json::Value::Null);
+        let kind = meta
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or("?")
+            .to_string();
+        let lineage = meta
+            .get("lineage")
+            .and_then(|l| serde_json::from_value::<Lineage>(l.clone()).ok());
+        out.push(LineageReport {
+            url,
+            kind,
+            external_sha256: lineage.as_ref().and_then(|l| l.external_sha256.clone()),
+            last_synced_at: lineage.as_ref().and_then(|l| l.last_synced_at),
+            last_seal_cycle: lineage.as_ref().and_then(|l| l.last_seal_cycle.clone()),
+            direction: lineage.map(|l| l.direction).unwrap_or_else(|| "in".to_string()),
+        });
+    }
+    Ok(out)
+}
+
+/// `export_delta` 结果 (G1 出向 + G2 版本门禁结果)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeltaReport {
+    pub entries: usize,
+    pub bytes: u64,
+    pub since: i64,
+    pub dry_run: bool,
+    pub version_ok: bool,
+}
+
+/// 出向回写 (G1): 把 live KB `experience` namespace 中 `updated_at > 上次同步` 的增量,
+/// 以 append-only JSONL 写入外置大脑的 `working/nt_cortex_delta.jsonl` (Dark Forest: 连接不膨胀)。
+///
+/// - G4: 外置大脑未挂载 → 拒绝。
+/// - G2 版本门禁: 若上次同步记录过因果图 sha256, 必须与当前文件一致, 否则拒绝 (防污染)。
+/// - 成功后更新 cortex_brain 节点 lineage (`last_synced_at`/`direction=out`/`last_seal_cycle`)。
+/// - `dry_run`: 仅统计增量条数, 不写盘 (沿用 `--force` 约定之外的 `--dry-run`)。
+pub fn export_delta(conn: &Connection, root: &Path, dry_run: bool) -> Result<DeltaReport, String> {
+    if !root.exists() {
+        return Err(format!(
+            "外置大脑未挂载: {} — 拒绝回写 (G4: 挂载后才同步)",
+            root.display()
+        ));
+    }
+
+    // 读取 causal_graph 节点的既有 lineage, 做 G2 版本门禁。
+    let mut last_synced_at = 0i64;
+    let mut last_sha: Option<String> = None;
+    if let Some(l) = read_cortex_lineage(conn, "cortex_source://causal_graph")? {
+        last_synced_at = l.last_synced_at.unwrap_or(0);
+        last_sha = l.external_sha256.clone();
+    }
+    if let Some(sha) = last_sha {
+        let causal = root.join("working").join("causal_graph.json");
+        if causal.exists() {
+            let cur = maybe_sha256(&causal)
+                .ok_or_else(|| "无法计算因果图 sha256 (文件过大或不可读)".to_string())?;
+            if cur != sha {
+                return Err(
+                    "版本门禁失败: 外置因果图 sha256 与上次同步记录不符 (可能被替换/回滚)。\
+                     拒绝回写以免污染外置大脑 (G2)。重新 /cortex register 后可继续。"
+                        .to_string(),
+                );
+            }
+        }
+    }
+
+    // 查询上次同步以来的 experience 增量。
+    let since = last_synced_at;
+    let mut stmt = conn
+        .prepare(
+            "SELECT key, value, updated_at FROM kv_store \
+             WHERE namespace='experience' AND updated_at > ?1 ORDER BY updated_at ASC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([since], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, Vec<u8>>(1)?,
+                r.get::<_, i64>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    if dry_run {
+        let mut count = 0usize;
+        for row in rows {
+            let _ = row.map_err(|e| e.to_string())?;
+            count += 1;
+        }
+        return Ok(DeltaReport {
+            entries: count,
+            bytes: 0,
+            since,
+            dry_run: true,
+            version_ok: true,
+        });
+    }
+
+    let working = root.join("working");
+    std::fs::create_dir_all(&working).map_err(|e| e.to_string())?;
+    let delta_path = working.join("nt_cortex_delta.jsonl");
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&delta_path)
+        .map_err(|e| e.to_string())?;
+
+    let mut count = 0usize;
+    let mut bytes = 0u64;
+    use base64::engine::Engine;
+    let engine = base64::engine::general_purpose::STANDARD;
+    for row in rows {
+        let (key, value, ts) = row.map_err(|e| e.to_string())?;
+        let line = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "exported_at": now(),
+            "experience_key": key,
+            "updated_at": ts,
+            "value_b64": engine.encode(&value),
+        });
+        let s = serde_json::to_string(&line).map_err(|e| e.to_string())?;
+        writeln!(file, "{s}").map_err(|e| e.to_string())?;
+        bytes += s.len() as u64 + 1;
+        count += 1;
+    }
+    file.flush().map_err(|e| e.to_string())?;
+
+    // 更新 causal_graph 节点 lineage: 标记已回写 + 记录最新循环。
+    let latest_cycle = latest_cycle_from_experience(conn)?;
+    update_cortex_lineage(conn, "cortex_source://causal_graph", |l| {
+        l.last_synced_at = Some(now());
+        l.direction = "out".to_string();
+        l.last_seal_cycle = latest_cycle;
+    })?;
+
+    Ok(DeltaReport {
+        entries: count,
+        bytes,
+        since,
+        dry_run: false,
+        version_ok: true,
+    })
+}
+
+// ── 内部 helper ──
+
+fn read_cortex_lineage(conn: &Connection, url: &str) -> Result<Option<Lineage>, String> {
+    let meta: Option<String> = conn
+        .query_row(
+            "SELECT metadata FROM nodes WHERE node_type='cortex_brain' AND url=?1",
+            [url],
+            |r| r.get::<_, String>(0),
+        )
+        .ok();
+    Ok(meta.and_then(|m| {
+        serde_json::from_str::<serde_json::Value>(&m)
+            .ok()
+            .and_then(|v| v.get("lineage").and_then(|l| serde_json::from_value::<Lineage>(l.clone()).ok()))
+    }))
+}
+
+fn update_cortex_lineage<F>(conn: &Connection, url: &str, f: F) -> Result<(), String>
+where
+    F: FnOnce(&mut Lineage),
+{
+    let meta_str: Option<String> = conn
+        .query_row(
+            "SELECT metadata FROM nodes WHERE node_type='cortex_brain' AND url=?1",
+            [url],
+            |r| r.get::<_, String>(0),
+        )
+        .ok();
+    let mut meta: serde_json::Value = match meta_str {
+        Some(s) => serde_json::from_str(&s).unwrap_or(serde_json::json!({})),
+        None => return Ok(()), // 节点不存在则无需更新
+    };
+    let mut lineage = meta
+        .get("lineage")
+        .and_then(|l| serde_json::from_value::<Lineage>(l.clone()).ok())
+        .unwrap_or_default();
+    f(&mut lineage);
+    lineage.schema_version = SCHEMA_VERSION;
+    meta["lineage"] = serde_json::to_value(&lineage).expect("lineage serializes");
+    conn.execute(
+        "UPDATE nodes SET metadata=?1, updated_at=?2 WHERE node_type='cortex_brain' AND url=?3",
+        rusqlite::params![meta.to_string(), now(), url],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 从 experience namespace 推断最新循环标识 (key 形如 `cycle_NNN/...` 取 `cycle_NNN`)。
+fn latest_cycle_from_experience(conn: &Connection) -> Result<Option<String>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT key FROM kv_store WHERE namespace='experience' AND key LIKE 'cycle_%' \
+             ORDER BY updated_at DESC LIMIT 1",
+        )
+        .map_err(|e| e.to_string())?;
+    let r = stmt.query_row([], |row| row.get::<_, String>(0)).ok();
+    Ok(r.map(|k| k.split('/').next().unwrap_or(&k).to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn fixture_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("mem db");
+        conn.execute_batch(
+            "CREATE TABLE nodes (id TEXT PRIMARY KEY, node_type TEXT, title TEXT, content TEXT, \
+             url TEXT, created_at INTEGER, updated_at INTEGER, metadata TEXT);
+             CREATE TABLE kv_store (namespace TEXT, key TEXT, value BLOB, updated_at INTEGER);",
+        )
+        .expect("schema");
+        // 一个模拟的 cortex_brain 因果图节点
+        conn.execute(
+            "INSERT INTO nodes (id, node_type, title, content, url, created_at, updated_at, metadata) \
+             VALUES ('c1', 'cortex_brain', 'g', 'g', 'cortex_source://causal_graph', 0, 0, '{}')",
+            [],
+        )
+        .expect("insert");
+        conn
+    }
+
+    #[test]
+    fn enrich_adds_lineage_with_sha() -> Result<(), String> {
+        let dir = tempfile::tempdir().expect("tmp");
+        let cg = dir.path().join("causal_graph.json");
+        std::fs::write(&cg, serde_json::json!({"ts": 1700000000, "nodes": []}).to_string())
+            .expect("write");
+        let mut payload = serde_json::json!({"kind": "cortex_causal_graph"});
+        enrich_cortex_metadata(&mut payload, Some(&cg), "in");
+        let lineage: Lineage = serde_json::from_value(payload["lineage"].clone()).expect("parse");
+        assert_eq!(lineage.schema_version, SCHEMA_VERSION);
+        assert_eq!(lineage.direction, "in");
+        assert_eq!(lineage.external_snapshot_ts, Some(1700000000));
+        assert!(lineage.external_sha256.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn enrich_skips_sha_on_huge_file() -> Result<(), String> {
+        let dir = tempfile::tempdir().expect("tmp");
+        let big = dir.path().join("corpus.db");
+        // 写一个 > cap 的占位文件 (内容无关, 只测大小跳过)
+        let f = std::fs::File::create(&big).expect("create");
+        f.set_len(SHA_SIZE_CAP + 1).expect("truncate");
+        let mut payload = serde_json::json!({"kind": "corpus_cold_archive"});
+        enrich_cortex_metadata(&mut payload, Some(&big), "in");
+        let lineage: Lineage = serde_json::from_value(payload["lineage"].clone()).expect("parse");
+        assert!(lineage.external_sha256.is_none()); // 大文件不取指纹
+        Ok(())
+    }
+
+    #[test]
+    fn report_lineage_reads_node() -> Result<(), String> {
+        let conn = fixture_db();
+        let dir = tempfile::tempdir().expect("tmp");
+        let cg = dir.path().join("causal_graph.json");
+        std::fs::write(&cg, serde_json::json!({"ts": 1700000000}).to_string()).expect("write");
+        let mut payload = serde_json::json!({"kind": "cortex_causal_graph"});
+        enrich_cortex_metadata(&mut payload, Some(&cg), "in");
+        conn.execute(
+            "UPDATE nodes SET metadata=?1 WHERE url='cortex_source://causal_graph'",
+            [payload.to_string()],
+        )
+        .expect("update");
+        let reps = report_lineage(&conn)?;
+        assert_eq!(reps.len(), 1);
+        assert_eq!(reps[0].kind, "cortex_causal_graph");
+        assert!(reps[0].external_sha256.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn export_delta_dry_run_counts_only() -> Result<(), String> {
+        let conn = fixture_db();
+        // 放两条 experience, 一条旧一条新
+        conn.execute(
+            "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES ('experience','cycle_001/a',X'01',100)",
+            [],
+        )
+        .expect("ins");
+        conn.execute(
+            "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES ('experience','cycle_002/b',X'02',200)",
+            [],
+        )
+        .expect("ins");
+        let dir = tempfile::tempdir().expect("tmp");
+        // 先给因果图节点写 lineage (last_synced_at=150), 避免版本门禁拦 (无 sha 记录时放行)
+        let mut payload = serde_json::json!({"kind": "cortex_causal_graph"});
+        enrich_cortex_metadata(&mut payload, None, "in");
+        // 设 last_synced_at=150 模拟上一次同步
+        update_cortex_lineage(&conn, "cortex_source://causal_graph", |l| {
+            l.last_synced_at = Some(150);
+        })?;
+        let r = export_delta(&conn, dir.path(), true)?;
+        assert!(r.dry_run);
+        assert_eq!(r.entries, 1); // updated_at>150 仅 cycle_002 (200) 算, cycle_001 (100) 不算
+        assert_eq!(r.since, 150);
+        // dry-run 不写盘
+        assert!(!dir.path().join("working").join("nt_cortex_delta.jsonl").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn export_delta_writes_jsonl_and_updates_lineage() -> Result<(), String> {
+        let conn = fixture_db();
+        conn.execute(
+            "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES ('experience','cycle_001/a',X'deadbeef',200)",
+            [],
+        )
+        .expect("ins");
+        let dir = tempfile::tempdir().expect("tmp");
+        update_cortex_lineage(&conn, "cortex_source://causal_graph", |l| {
+            l.last_synced_at = Some(150);
+        })?;
+        let r = export_delta(&conn, dir.path(), false)?;
+        assert!(!r.dry_run);
+        assert_eq!(r.entries, 1);
+        let jl = dir.path().join("working").join("nt_cortex_delta.jsonl");
+        assert!(jl.exists());
+        let txt = std::fs::read_to_string(&jl).expect("read");
+        assert!(txt.contains("cycle_001/a"));
+        assert!(txt.contains("value_b64"));
+        // lineage 应更新为 out + cycle
+        let reps = report_lineage(&conn)?;
+        assert_eq!(reps[0].direction, "out");
+        assert_eq!(reps[0].last_seal_cycle.as_deref(), Some("cycle_001"));
+        Ok(())
+    }
+
+    #[test]
+    fn export_delta_refuses_when_version_mismatch() -> Result<(), String> {
+        let conn = fixture_db();
+        let dir = tempfile::tempdir().expect("tmp");
+        let cg = dir.path().join("working").join("causal_graph.json");
+        std::fs::create_dir_all(cg.parent().expect("p")).expect("mkdir");
+        std::fs::write(&cg, serde_json::json!({"ts": 1}).to_string()).expect("write");
+        // 既有 lineage 记录了一个旧 sha, 与实际文件不符 → 应被门禁拒绝
+        update_cortex_lineage(&conn, "cortex_source://causal_graph", |l| {
+            l.external_sha256 = Some("deadbeef".to_string());
+            l.last_synced_at = Some(150);
+        })?;
+        let err = export_delta(&conn, dir.path(), false);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().contains("版本门禁"));
+        Ok(())
+    }
+
+    #[test]
+    fn export_delta_refuses_when_unmounted() -> Result<(), String> {
+        let conn = fixture_db();
+        let missing = PathBuf::from("/Volumes/NeoTrixBrain__definitely_not_mounted");
+        let err = export_delta(&conn, &missing, false);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().contains("未挂载"));
+        Ok(())
+    }
+}

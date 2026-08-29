@@ -9,6 +9,8 @@ use uuid::Uuid;
 use super::nt_memory_store::*;
 use super::nt_memory_types::*;
 
+use super::nt_memory_cortex_sync::enrich_cortex_metadata;
+
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -430,11 +432,12 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
     let mut count = register_archive_dir(conn, &root.join("cortex-archive"))?;
     let causal = root.join("working").join("causal_graph.json");
     if causal.exists() {
-        let payload = serde_json::json!({
+        let mut payload = serde_json::json!({
             "kind": "cortex_causal_graph",
             "path": causal.to_string_lossy(),
             "loaded_by": "E8AbductionBridge",
         });
+        enrich_cortex_metadata(&mut payload, Some(causal.as_path()), "in");
         upsert_cortex_node(
             conn,
             "cortex_source://causal_graph",
@@ -449,12 +452,13 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
     // live KB, per Dark Forest: connect, don't bloat). Registered as discoverable.
     if let Some(corpus) = corpus_archive_path() {
         let sz = std::fs::metadata(&corpus).map(|m| m.len()).unwrap_or(0);
-        let payload = serde_json::json!({
+        let mut payload = serde_json::json!({
             "kind": "corpus_cold_archive",
             "path": corpus.to_string_lossy(),
             "bytes": sz,
             "note": "superset snapshot of live KB; cold storage",
         });
+        enrich_cortex_metadata(&mut payload, Some(corpus.as_path()), "in");
         upsert_cortex_node(
             conn,
             "cortex_source://corpus-archive",
