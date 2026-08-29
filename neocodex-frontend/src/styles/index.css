@@ -2051,14 +2051,28 @@
   max-height: 160px;
   overflow: auto;
 }
-.app-error__btn {
-  padding: 6px 18px;
-  border-radius: 9999px;
-  background: var(--nt-color-gold-500, #f0913a);
-  color: #fff;
-  font-size: 13px;
-  cursor: pointer;
-}
+  .app-error__btn {
+    padding: 6px 18px;
+    border-radius: 9999px;
+    background: var(--nt-color-gold-500, #f0913a);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .glass-edit-orig {
+    max-height: 140px;
+    overflow: auto;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px dashed rgba(0, 0, 0, 0.12);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-secondary, #374151);
+  }
 
 /* 导出菜单 */
 .export-menu {

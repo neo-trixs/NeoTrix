@@ -112,6 +112,7 @@ export function Chat() {
   const [textareaRef, setTextareaRef] = createSignal<HTMLTextAreaElement | null>(null)
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null)
   const [editContent, setEditContent] = createSignal('')
+  const [showEditOrig, setShowEditOrig] = createSignal(false)
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
   // 左栏可拖拽宽度（毫米级 UI 打磨，对标灵活布局）
   const [sidebarWidth, setSidebarWidth] = createSignal(280)
@@ -1820,6 +1821,16 @@ export function Chat() {
                       <div class="flex-1 min-w-0">
                         {isEditing ? (
                           <div class="p-2 rounded-xl bg-white/40 border border-nt-io-500/40 backdrop-blur-sm glass-edit">
+                            <div class="flex items-center justify-between mb-1">
+                              <span class="text-10px text-text-muted">编辑消息</span>
+                              <button
+                                class="text-10px text-nt-io-600 underline underline-offset-2"
+                                onClick={() => setShowEditOrig((o) => !o)}
+                              >{showEditOrig() ? '隐藏原文' : '查看原文'}</button>
+                            </div>
+                            <Show when={showEditOrig()}>
+                              <pre class="glass-edit-orig">{message.content}</pre>
+                            </Show>
                             <textarea
                               class="glass-edit-area w-full min-h-[90px] px-3 py-2 bg-white/50 border border-white/40 rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-io-500 font-mono text-[13px] resize-y"
                               value={editContent()}
