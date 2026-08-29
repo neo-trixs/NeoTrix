@@ -145,6 +145,77 @@ impl SkillEntry {
     }
 }
 
+/// Agent Skills 标准校验 (吸收 `anthropics/skills`): 解析 SKILL.md frontmatter,
+/// 校验 Agent Skills 标准**必需**字段 (`name` + `description`)。缺则 `Err`(违规列表)。
+/// R-P42 强化现有 SkillEntry 解析路径, 不新建平行解析器 (复用同一 frontmatter 切片逻辑)。
+pub fn validate_agent_skills_standard(content: &str) -> Result<(), Vec<String>> {
+    let stripped = content.trim_start();
+    let mut violations = Vec::new();
+    let (mut has_name, mut has_desc) = (false, false);
+    if let Some(rest) = stripped.strip_prefix("---") {
+        if let Some(end) = rest.find("---") {
+            let fm = &rest[..end];
+            for line in fm.lines() {
+                let line = line.trim();
+                if let Some(v) = line.strip_prefix("name:") {
+                    has_name = !v.trim().is_empty();
+                } else if let Some(v) = line.strip_prefix("description:") {
+                    has_desc = !v.trim().is_empty();
+                }
+            }
+        } else {
+            violations.push("Agent Skills standard: unterminated YAML frontmatter".into());
+        }
+    } else {
+        violations.push("Agent Skills standard: missing YAML frontmatter (---)".into());
+    }
+    if !has_name {
+        violations.push("Agent Skills standard: missing required `name`".into());
+    }
+    if !has_desc {
+        violations.push("Agent Skills standard: missing required `description`".into());
+    }
+    if violations.is_empty() {
+        Ok(())
+    } else {
+        Err(violations)
+    }
+}
+
+/// Agent Skills 标准校验 SelfTest (卫生层 P0: 技能结晶格式必须可自测)。
+pub struct AgentSkillsStandardSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for AgentSkillsStandardSelfTest {
+    fn name(&self) -> &str {
+        "agent_skills_standard"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        // 合规: 含 name + description → 通过
+        let good = "---\nname: foo\ndescription: does foo when bar\nlicense: Apache-2.0\nallowed-tools: Read, Edit\n---\nbody";
+        if validate_agent_skills_standard(good).is_err() {
+            return Err(vec!["agent_skills_standard: compliant skill wrongly rejected".into()]);
+        }
+        // 违规: 缺 name → 必须拒绝
+        let bad = "---\ndescription: no name field\n---\nbody";
+        if validate_agent_skills_standard(bad).is_ok() {
+            return Err(vec!["agent_skills_standard: missing-name skill wrongly accepted".into()]);
+        }
+        // 违规: 无 frontmatter → 必须拒绝
+        let no_fm = "# just markdown\nno frontmatter";
+        if validate_agent_skills_standard(no_fm).is_ok() {
+            return Err(vec!["agent_skills_standard: frontmatter-less skill wrongly accepted".into()]);
+        }
+        Ok(())
+    }
+}
+
+/// 注册 Agent Skills 标准 SelfTest 到全局注册表 (T2)。
+pub fn register_skill_standard_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+    registry.register(Box::new(AgentSkillsStandardSelfTest));
+}
+
+
 // ────────────────────────────────────────────────────────────────
 // A5 吸收 (SkillNet, zjunlp/SkillNet): 技能五维质量评估。
 // SkillNet 把技能当软件资产, 五维评估 = Safety / Completeness /
