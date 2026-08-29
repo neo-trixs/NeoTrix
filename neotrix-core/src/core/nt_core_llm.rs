@@ -502,6 +502,8 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
     for m in &req.messages {
         leaks.extend(scan_internals(&m.content));
     }
+    // model 字段同样可能夹带内部路由名(如 nt_core_* 代理标识), 防御性扫描
+    leaks.extend(scan_internals(&req.model));
     if let Some(ref img) = req.image_data {
         leaks.extend(scan_internals(img));
     }
@@ -779,6 +781,13 @@ mod tests {
         assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
         let s = serde_json::to_string(&r.tools[0]).unwrap();
         assert!(!s.contains("nt_core_harness"), "tool schema fingerprint must be redacted under Contracted");
+    }
+
+    #[test]
+    fn egress_guard_blocks_untrusted_model_field_leak() {
+        let mut r = LlmRequest::new("nt_core_consciousness_core-proxy", "hi");
+        let res = egress_privacy_guard(&mut r, DataTrust::Untrusted);
+        assert!(res.is_err(), "untrusted + internal fingerprint in model field must be blocked");
     }
 
     // ---- 集成级测试: 验证 trait 默认方法 complete()/stream_complete() 真的执行 egress 闸门 (T3 生产接线) ----
