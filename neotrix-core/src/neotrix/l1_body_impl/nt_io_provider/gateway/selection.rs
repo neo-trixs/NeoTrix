@@ -195,6 +195,25 @@ impl GatewayV2 {
         chain
     }
 
+    /// quota-aware 回退链 — 吸收 `diegosouzapw/OmniRoute`: 当某 provider 触发配额/限流,
+    /// 返回**排除已耗尽 provider** 的候选链, 交由执行器自动降级到下一流 (R-P42 强化现有
+    /// `build_candidate_chain` 排序逻辑, 仅叠加 exclude 过滤, 不新建平行路由)。
+    ///
+    /// 等价于 OmniRoute 的 "quota-aware auto-fallback": 主选耗尽 → 自动跳到次优可用 provider。
+    pub fn quota_aware_fallback_chain(
+        &self,
+        model: &str,
+        exhausted: &[String],
+        limit: usize,
+    ) -> Vec<String> {
+        let chain = self.build_candidate_chain(model, limit + exhausted.len());
+        chain
+            .into_iter()
+            .filter(|name| !exhausted.iter().any(|e| e == name))
+            .take(limit)
+            .collect()
+    }
+
     /// Register providers from FreeModelCatalog discovered entries.
     /// For each entry where the required API key env var is set (or keyless),
     /// create a provider and register it.

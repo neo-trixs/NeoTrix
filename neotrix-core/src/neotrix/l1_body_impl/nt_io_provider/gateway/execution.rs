@@ -343,7 +343,8 @@ impl GatewayV2 {
 
         // 候选链: 从池子实际注册名动态构建 (前缀优先 + free/available/score 排序)
         // P2-A4: 8→3 — 失败放大收敛 (每次重试同量输入 token 全付, 3 次封顶)。
-        let chain = self.build_candidate_chain(&request.model, 3);
+        // quota-aware 回退 (吸收 OmniRoute): 排除已耗尽 (used_names) provider, 自动跳到次优可用。
+        let chain = self.quota_aware_fallback_chain(&request.model, &used_names, 3);
         // P2-A4: 4xx (认证/非法请求) 非瞬时错误 — 同凭据换 provider 亦失败, 直接熔断整链。
         let mut fatal_error: Option<LlmError> = None;
 
@@ -777,7 +778,8 @@ impl GatewayV2 {
 
         // 候选链: 从池子实际注册名动态构建 (前缀优先 + free/available/score 排序)
         // P2-A4: 8→3 — 失败放大收敛。
-        let chain = self.build_candidate_chain(&request.model, 3);
+        // quota-aware 回退 (吸收 OmniRoute): 排除已耗尽 (used_names) provider, 自动跳到次优可用。
+        let chain = self.quota_aware_fallback_chain(&request.model, &used_names, 3);
 
         for name in chain {
             if used_names.contains(&name) {
