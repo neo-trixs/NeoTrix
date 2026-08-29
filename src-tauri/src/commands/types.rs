@@ -32,6 +32,8 @@ pub struct SessionInfo {
     pub name: String,
     pub message_count: usize,
     pub created: i64,
+    pub project: String,
+    pub sort_order: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

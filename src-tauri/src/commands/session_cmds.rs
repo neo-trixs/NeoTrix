@@ -43,7 +43,9 @@ fn open_db() -> Result<Connection, NeoTrixError> {
             name TEXT NOT NULL,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
-            messages TEXT NOT NULL DEFAULT '[]'  -- JSON 数组
+            messages TEXT NOT NULL DEFAULT '[]',  -- JSON 数组
+            project TEXT NOT NULL DEFAULT '',     -- 跨项目拖拽：会话所属项目
+            sort_order INTEGER NOT NULL DEFAULT 0 -- 手动拖拽排序权重
         );
         CREATE TABLE IF NOT EXISTS app_state (
             key TEXT PRIMARY KEY,
@@ -51,6 +53,9 @@ fn open_db() -> Result<Connection, NeoTrixError> {
         );",
     )
     .map_err(|e| NeoTrixError::Memory(format!("初始化会话表失败: {}", e)))?;
+    // 向后兼容：旧库补列（幂等，列已存在则忽略）
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN project TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0", []);
     Ok(conn)
 }
 
@@ -60,10 +65,12 @@ fn row_to_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionInfo> {
     let name: String = row.get(1)?;
     let created: i64 = row.get(2)?;
     let messages: String = row.get(4)?;
+    let project: String = row.get(5)?;
+    let sort_order: i64 = row.get(6)?;
     let message_count = serde_json::from_str::<serde_json::Value>(&messages)
         .map(|v| v.as_array().map(|a| a.len()).unwrap_or(0))
         .unwrap_or(0);
-    Ok(SessionInfo { id, name, message_count, created })
+    Ok(SessionInfo { id, name, message_count, created, project, sort_order })
 }
 
 #[command]
@@ -73,6 +80,8 @@ pub fn session_list() -> Vec<SessionInfo> {
         name: "默认会话".into(),
         message_count: 0,
         created: 0,
+        project: "".into(),
+        sort_order: 0,
     }]
 }
 
@@ -83,6 +92,8 @@ pub fn session_create(name: String) -> SessionInfo {
         name,
         message_count: 0,
         created: chrono::Utc::now().timestamp(),
+        project: "".into(),
+        sort_order: 0,
     }
 }
 
@@ -139,7 +150,7 @@ pub fn cmd_session_delete(id: String) -> Result<(), NeoTrixError> {
 pub fn cmd_session_list() -> Result<Vec<SessionInfo>, NeoTrixError> {
     let conn = open_db()?;
     let mut stmt = conn
-        .prepare("SELECT id, name, created_at, updated_at, messages FROM sessions ORDER BY updated_at DESC")
+        .prepare("SELECT id, name, created_at, updated_at, messages, project, sort_order FROM sessions ORDER BY sort_order ASC, updated_at DESC")
         .map_err(|e| NeoTrixError::Memory(format!("准备查询失败: {}", e)))?;
     let rows = stmt
         .query_map([], row_to_session)
@@ -149,6 +160,69 @@ pub fn cmd_session_list() -> Result<Vec<SessionInfo>, NeoTrixError> {
         out.push(r.map_err(|e| NeoTrixError::Memory(format!("解析会话失败: {}", e)))?);
     }
     Ok(out)
+}
+
+/// 拖拽排序：按传入 id 顺序写入 sort_order（对标 2026 会话列表拖拽持久化）
+#[command]
+pub fn cmd_reorder_sessions(ids: Vec<String>) -> Result<(), NeoTrixError> {
+    let conn = open_db()?;
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| NeoTrixError::Brain(e.to_string()))?;
+    for (i, id) in ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE sessions SET sort_order = ?1 WHERE id = ?2",
+            rusqlite::params![i as i64, id],
+        )
+        .map_err(|e| NeoTrixError::Brain(e.to_string()))?;
+    }
+    tx.commit().map_err(|e| NeoTrixError::Brain(e.to_string()))?;
+    Ok(())
+}
+
+/// 跨项目拖拽：重设会话所属项目（持久化）
+#[command]
+pub fn cmd_set_session_project(id: String, project: String) -> Result<(), NeoTrixError> {
+    let conn = open_db()?;
+    let n = conn.execute(
+        "UPDATE sessions SET project = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![project, chrono::Utc::now().timestamp(), id],
+    )
+    .map_err(|e| NeoTrixError::Brain(e.to_string()))?;
+    if n == 0 {
+        return Err(NeoTrixError::Memory(format!("Session not found: {}", id)));
+    }
+    Ok(())
+}
+
+/// 分支新话题：复制 from 会话的消息前缀（up_to 条，默认全部）为新会话，返回新 id
+#[command]
+pub fn cmd_fork_session(from_id: String, up_to: Option<usize>) -> Result<String, NeoTrixError> {
+    let conn = open_db()?;
+    let messages: String = conn
+        .query_row(
+            "SELECT messages FROM sessions WHERE id = ?1",
+            rusqlite::params![from_id],
+            |r| r.get::<_, String>(0),
+        )
+        .map_err(|e| NeoTrixError::Memory(format!("读取源会话失败: {} ({})", from_id, e)))?;
+    let sliced: String = up_to
+        .and_then(|n| {
+            serde_json::from_str::<serde_json::Value>(&messages)
+                .ok()
+                .and_then(|v| v.as_array().map(|a| a.iter().take(n).cloned().collect::<Vec<_>>()))
+                .and_then(|a| serde_json::to_string(&a).ok())
+        })
+        .unwrap_or(messages);
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().timestamp();
+    conn.execute(
+        "INSERT INTO sessions (id, name, created_at, updated_at, messages, project, sort_order)
+         VALUES (?1, ?2, ?3, ?3, ?4, '', 0)",
+        rusqlite::params![new_id, "分支会话".to_string(), now, sliced],
+    )
+    .map_err(|e| NeoTrixError::Brain(e.to_string()))?;
+    Ok(new_id)
 }
 
 #[cfg(test)]
