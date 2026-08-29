@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createEffect, onMount, onCleanup, For, Show, ErrorBoundary } from 'solid-js'
 import {
   Square, RotateCcw, Edit2, Copy, Check, AlertCircle, AlertTriangle, Highlighter, X, Info,
   FolderTree, Bug, FlaskConical,
@@ -211,6 +211,7 @@ export function Chat() {
   // 会话内消息搜索（高亮/聚焦匹配，对标 2026 agent UX 检索）
   const [msgSearch, setMsgSearch] = createSignal('')
   const [msgSearchOpen, setMsgSearchOpen] = createSignal(false)
+  const [msgSearchInput, setMsgSearchInput] = createSignal<HTMLInputElement | null>(null)
   const matchCount = () => {
     const q = msgSearch().trim().toLowerCase()
     if (!q) return 0
@@ -697,6 +698,14 @@ export function Chat() {
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault()
         setShortcutHelpOpen((open) => !open)
+        return
+      }
+      // ⌘F：聚焦会话内搜索（对标 2026 查找）
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setMsgSearchOpen(true)
+        setMsgSearch('')
+        requestAnimationFrame(() => msgSearchInput()?.focus())
         return
       }
       if (e.key !== 'Escape') return
@@ -1389,6 +1398,17 @@ export function Chat() {
   ]
 
   return (
+    <ErrorBoundary
+      fallback={(err, reset) => (
+        <div class="app-error">
+          <div class="app-error__card">
+            <h2>界面渲染出错</h2>
+            <p class="app-error__msg">{String(err?.message ?? err)}</p>
+            <button class="app-error__btn" onClick={reset}>重试</button>
+          </div>
+        </div>
+      )}
+    >
     <div class="flex h-screen bg-transparent overflow-hidden">
         <Sidebar
           collapsed={sidebarCollapsed()}
@@ -1486,6 +1506,7 @@ export function Chat() {
               </button>
               <Show when={msgSearchOpen()}>
                 <input
+                  ref={setMsgSearchInput}
                   class="msg-search-input"
                   placeholder="搜索本会话…"
                   value={msgSearch()}
@@ -2324,5 +2345,6 @@ export function Chat() {
       />
       <ShortcutHelp open={shortcutHelpOpen()} onClose={() => setShortcutHelpOpen(false)} />
     </div>
+    </ErrorBoundary>
   )
 }
