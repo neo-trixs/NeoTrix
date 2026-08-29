@@ -15,9 +15,10 @@ use std::path::Path;
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use super::nt_memory_store::insert_or_get_node_rows;
+use super::nt_memory_store::{get_node, insert_or_get_node_rows, update_node_metadata};
 use super::nt_memory_types::NodeType;
 use super::nt_normalizer::validate_node_type;
+use crate::core::nt_core_e8::abduction::causal_graph::CausalGraph;
 
 const SCHEMA_VERSION: u32 = 1;
 /// 超过该体积的文件不计算 sha256 (避免 68GB corpus 卡死); 仅小文件 (因果图) 取指纹。
@@ -440,6 +441,72 @@ pub fn digest_sample(
     Ok(rep)
 }
 
+/// Phase 3 (G1+G3+G4): 把外置因果图的高信号节点蒸馏进 live KB。
+///
+/// 筛选高信号: confidence ≥ 0.8 或 关联边(入+出)数 ≥ 2。每个节点经既有
+/// `insert_or_get_node_rows` 落盘 (url = `cortex_source://causal_graph#<id>`, 不平行造插入器, R-P42),
+/// 并写 `lineage` 块 (G3)。同时更新伞节点 `cortex_source://causal_graph` 的 lineage sha,
+/// 供 `export_delta` 的 G2 版本门禁做指纹比对。挂载门禁 (G4) 由 CLI 层保证。
+pub fn ingest_causal_graph(
+    conn: &Connection,
+    graph: &CausalGraph,
+    source_path: Option<&Path>,
+) -> Result<usize, String> {
+    let mut derived = 0usize;
+    for node in &graph.nodes {
+        let degree = graph
+            .edges
+            .iter()
+            .filter(|e| e.from == node.id || e.to == node.id)
+            .count();
+        if node.confidence < 0.8 && degree < 2 {
+            continue; // 低信号跳过, 防止噪音灌入 live KB
+        }
+        let url = format!("cortex_source://causal_graph#{}", node.id);
+        let id = insert_or_get_node_rows(
+            conn,
+            &node.description,
+            NodeType::Concept,
+            Some(&node.description),
+            Some(&url),
+            Some("NT-CORE"),
+        )
+        .map_err(|e| e.to_string())?;
+        // 写 lineage (G3): 用既有 metadata 增量更新, 不平行造写入器
+        if let Ok(Some(existing)) = get_node(conn, &id) {
+            let mut payload: serde_json::Value = existing
+                .metadata
+                .clone()
+                .unwrap_or(serde_json::Value::Null);
+            if !payload.is_object() {
+                payload = serde_json::json!({});
+            }
+            enrich_cortex_metadata(&mut payload, source_path, "in");
+            update_node_metadata(conn, &id, &payload).map_err(|e| e.to_string())?;
+        }
+        derived += 1;
+    }
+    // 伞节点 lineage (G2 版本门禁锚点): 复用既有插入器取 id 后写 sha
+    let umbrella_id = insert_or_get_node_rows(
+        conn,
+        "causal_graph",
+        NodeType::Concept,
+        Some("外置大脑因果图蒸馏锚点"),
+        Some("cortex_source://causal_graph"),
+        Some("NT-CORE"),
+    )
+    .map_err(|e| e.to_string())?;
+    if let Ok(Some(existing)) = get_node(conn, &umbrella_id) {
+        let mut payload: serde_json::Value = existing
+            .metadata
+            .clone()
+            .unwrap_or(serde_json::json!({}));
+        enrich_cortex_metadata(&mut payload, source_path, "in");
+        update_node_metadata(conn, &umbrella_id, &payload).map_err(|e| e.to_string())?;
+    }
+    Ok(derived)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -677,6 +744,49 @@ mod tests {
         assert_eq!(r.sampled, 1);
         assert_eq!(r.activated, 0);
         assert_eq!(r.already_live, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn ingest_causal_graph_distills_high_signal_only() -> Result<(), String> {
+        use crate::core::nt_core_e8::abduction::causal_graph::CausalGraph;
+        let conn = Connection::open_in_memory().expect("mem");
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn)
+            .map_err(|e| e.to_string())?;
+        let dir = tempfile::tempdir().expect("tmp");
+        let cg = dir.path().join("causal_graph.json");
+        std::fs::write(&cg, serde_json::json!({"ts": 1700000000, "nodes": []}).to_string())
+            .expect("write");
+        // 构造因果图: a(高置信) → c, b(低置信) → c; c 度数=2 (高信号), b 度数=1 且低置信 (应被跳过)
+        let mut g = CausalGraph::new();
+        let a = g.add_node("原则: 模块化降低耦合".to_string(), 0.9);
+        let b = g.add_node("噪声节点".to_string(), 0.1);
+        let c = g.add_node("被多条边指向的核心概念".to_string(), 0.5);
+        g.add_edge(a, c, "causal".to_string(), 0.9);
+        g.add_edge(b, c, "causal".to_string(), 0.7);
+        let derived = ingest_causal_graph(&conn, &g, Some(&cg))?;
+        assert_eq!(derived, 2, "a(高置信)+c(高度数) 应被蒸馏, b 跳过");
+        let rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE url LIKE 'cortex_source://causal_graph#%'",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        assert_eq!(rows, 2);
+        // 伞节点应带 sha (G2 锚点)
+        let meta: String = conn
+            .query_row(
+                "SELECT metadata FROM nodes WHERE url='cortex_source://causal_graph'",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        let v: serde_json::Value = serde_json::from_str(&meta).map_err(|e| e.to_string())?;
+        assert!(
+            v.get("lineage").and_then(|l| l.get("external_sha256")).is_some(),
+            "伞节点应含 sha: {meta}"
+        );
         Ok(())
     }
 }

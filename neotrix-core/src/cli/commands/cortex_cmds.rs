@@ -14,7 +14,7 @@ use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::{
     corpus_archive_path, migrate_cortex_corpus, prune_cortex_orphans, register_cortex_brain,
 };
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::{
-    digest_sample, export_delta, report_lineage,
+    digest_sample, export_delta, ingest_causal_graph, report_lineage,
 };
 
 const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
@@ -43,10 +43,12 @@ impl CliCommand for CortexCmd {
             "lineage" => Self::lineage(),
             "sync" => Self::sync(&args[1..]),
             "digest" => Self::digest(&args[1..]),
+            "causal-ingest" => Self::causal_ingest(args.get(1).map(|s| s.as_str())),
             "prune" => Self::prune(args.contains(&"--force".to_string())),
             "corpus" => Self::corpus(&args[1..]),
             "help" | "--help" | "-h" => CommandOutput::ok(
-                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点\n  /cortex corpus status   查看 68GB corpus 本地/外置副本状态\n  /cortex corpus migrate  [--force] 将 64GB corpus 拷到外置大脑冷存档 (dry-run)\n  /cortex lineage  查看外置大脑各节点的血缘 (sha256/上次同步/循环/方向)\n  /cortex sync [--dry-run]  把 live KB 的 SEAL 吸收增量回写外置大脑 (双向边界 G1)\n  /cortex digest [--top-k N] [--domain D] [path]  有界采样外置 corpus, 把冷节点激活进 live KB (Phase 1)",
+                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点\n  /cortex corpus status   查看 68GB corpus 本地/外置副本状态\n  /cortex corpus migrate  [--force] 将 64GB corpus 拷到外置大脑冷存档 (dry-run)\n  /cortex lineage  查看外置大脑各节点的血缘 (sha256/上次同步/循环/方向)\n  /cortex sync [--dry-run]  把 live KB 的 SEAL 吸收增量回写外置大脑 (双向边界 G1)\n  /cortex digest [--top-k N] [--domain D] [path]  有界采样外置 corpus, 把冷节点激活进 live KB (Phase 1)
+  /cortex causal-ingest [path]  把外置因果图高信号节点蒸馏进 live KB (Phase 3)",
             ),
             other => CommandOutput::err(&format!("未知子命令: {other} (试试 /cortex status)")),
         }
@@ -321,6 +323,36 @@ impl CortexCmd {
                 r.sampled, r.activated, r.already_live, r.bytes, r.node_types
             )),
             Err(e) => CommandOutput::err(&format!("digest 失败: {e}")),
+        }
+    }
+
+    fn causal_ingest(path_arg: Option<&str>) -> CommandOutput {
+        let causal = match path_arg {
+            Some(p) => std::path::PathBuf::from(p),
+            None => std::path::PathBuf::from(CORTEX_CAUSAL),
+        };
+        if !causal.exists() {
+            return CommandOutput::err(&format!(
+                "外置因果图缺失: {} (挂载外置大脑后重试, 或传入路径)",
+                causal.display()
+            ));
+        }
+        let conn = match Connection::open(kb_path()) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+        };
+        match crate::core::nt_core_e8::abduction::causal_graph::CausalGraph::from_cortex_json(&causal) {
+            Ok(g) => match ingest_causal_graph(&conn, &g, Some(&causal)) {
+                Ok(n) => CommandOutput::ok(&format!(
+                    "causal-ingest: 从 {} 蒸馏 {} 个高信号节点进 live KB (共 {} 节点/{} 边)",
+                    CORTEX_CAUSAL,
+                    n,
+                    g.nodes.len(),
+                    g.edges.len()
+                )),
+                Err(e) => CommandOutput::err(&format!("causal-ingest 失败: {e}")),
+            },
+            Err(e) => CommandOutput::err(&format!("读取因果图失败: {e}")),
         }
     }
 }
