@@ -473,7 +473,7 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
 
 /// Path to the 68 GB corpus DB, preferring the cold copy on the external brain volume and
 /// falling back to the local `~/.neotrix` copy. Returns None when absent.
-fn corpus_archive_path() -> Option<std::path::PathBuf> {
+pub fn corpus_archive_path() -> Option<std::path::PathBuf> {
     let ext = std::path::Path::new(CORTEX_ROOT).join("knowledge-archive-corpus-20260825.db");
     if ext.exists() {
         return Some(ext);

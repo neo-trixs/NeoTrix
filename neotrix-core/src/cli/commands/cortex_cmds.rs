@@ -11,10 +11,10 @@ use rusqlite::Connection;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::{
-    migrate_cortex_corpus, prune_cortex_orphans, register_cortex_brain,
+    corpus_archive_path, migrate_cortex_corpus, prune_cortex_orphans, register_cortex_brain,
 };
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::{
-    export_delta, report_lineage,
+    digest_sample, export_delta, report_lineage,
 };
 
 const CORTEX_ROOT: &str = "/Volumes/NeoTrixBrain";
@@ -42,10 +42,11 @@ impl CliCommand for CortexCmd {
             "causal" => Self::causal(),
             "lineage" => Self::lineage(),
             "sync" => Self::sync(&args[1..]),
+            "digest" => Self::digest(&args[1..]),
             "prune" => Self::prune(args.contains(&"--force".to_string())),
             "corpus" => Self::corpus(&args[1..]),
             "help" | "--help" | "-h" => CommandOutput::ok(
-                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点\n  /cortex corpus status   查看 68GB corpus 本地/外置副本状态\n  /cortex corpus migrate  [--force] 将 64GB corpus 拷到外置大脑冷存档 (dry-run)",
+                "用法:\n  /cortex status    查看外置大脑挂载与档案概览\n  /cortex register  将外置大脑注册进 live KB (已挂载时)\n  /cortex causal    显示 E8 因果图 (causal_graph.json) 摘要\n  /cortex prune     回收盘上已消失归档对应的悬空 KB 节点 (dry-run)\n  /cortex prune --force  真正删除上述悬空节点\n  /cortex corpus status   查看 68GB corpus 本地/外置副本状态\n  /cortex corpus migrate  [--force] 将 64GB corpus 拷到外置大脑冷存档 (dry-run)\n  /cortex lineage  查看外置大脑各节点的血缘 (sha256/上次同步/循环/方向)\n  /cortex sync [--dry-run]  把 live KB 的 SEAL 吸收增量回写外置大脑 (双向边界 G1)\n  /cortex digest [--top-k N] [--domain D] [path]  有界采样外置 corpus, 把冷节点激活进 live KB (Phase 1)",
             ),
             other => CommandOutput::err(&format!("未知子命令: {other} (试试 /cortex status)")),
         }
@@ -275,6 +276,51 @@ impl CortexCmd {
                 }
             }
             Err(e) => CommandOutput::err(&format!("sync 失败: {e}")),
+        }
+    }
+
+    fn digest(args: &[String]) -> CommandOutput {
+        let mut top_k = 50usize;
+        let mut domain: Option<String> = None;
+        let mut path_arg: Option<String> = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--top-k" => {
+                    if let Some(v) = it.next() {
+                        top_k = v.parse().unwrap_or(50);
+                    }
+                }
+                "--domain" => {
+                    if let Some(v) = it.next() {
+                        domain = Some(v.clone());
+                    }
+                }
+                other if !other.starts_with('-') => path_arg = Some(other.to_string()),
+                _ => {}
+            }
+        }
+        let corpus = match path_arg {
+            Some(p) => std::path::PathBuf::from(p),
+            None => match corpus_archive_path() {
+                Some(p) => p,
+                None => {
+                    return CommandOutput::err(
+                        "外置大脑 corpus 未挂载, 且无位置参数路径 (用法: /cortex digest [path])",
+                    )
+                }
+            },
+        };
+        let conn = match Connection::open(kb_path()) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
+        };
+        match digest_sample(&conn, &corpus, top_k, domain.as_deref()) {
+            Ok(r) => CommandOutput::ok(&format!(
+                "digest: 取样 {} 个冷节点 → 激活 {} 个进 live KB (已 live 跳过 {} 个), {} bytes, 覆盖类型 {:?}",
+                r.sampled, r.activated, r.already_live, r.bytes, r.node_types
+            )),
+            Err(e) => CommandOutput::err(&format!("digest 失败: {e}")),
         }
     }
 }

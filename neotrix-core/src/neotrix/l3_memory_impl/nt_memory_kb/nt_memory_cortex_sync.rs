@@ -11,10 +11,13 @@
 //! 设计见 `docs/cortex-data-flow-map.md` §3。仅新增, 不改既有 schema (lineage 存 metadata JSON)。
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use super::nt_memory_store::insert_or_get_node_rows;
+use super::nt_memory_types::NodeType;
+use super::nt_normalizer::validate_node_type;
 
 const SCHEMA_VERSION: u32 = 1;
 /// 超过该体积的文件不计算 sha256 (避免 68GB corpus 卡死); 仅小文件 (因果图) 取指纹。
@@ -322,6 +325,121 @@ fn latest_cycle_from_experience(conn: &Connection) -> Result<Option<String>, Str
     Ok(r.map(|k| k.split('/').next().unwrap_or(&k).to_string()))
 }
 
+/// Phase 1 有界采样摄取报告: 从外置大脑 corpus (SQLite 超集快照) 取样的结果。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigestReport {
+    pub sampled: usize,
+    pub activated: usize,
+    pub already_live: usize,
+    pub bytes: u64,
+    pub node_types: Vec<String>,
+}
+
+/// Phase 1 有界采样摄取 (G1 入向 + G3 血缘 + G4 挂载检查)。
+///
+/// 外置大脑 corpus (`knowledge-archive-corpus-20260825.db`) 是 live KB `nodes` 的**超集快照**。
+/// 本函数取样 `top_k` 个冷节点, 把 live KB 中尚缺的节点"激活"进 live KB (Dark Forest: 连接不膨胀),
+/// 并写入 `lineage` (G3) + 原始 content/metadata。只读采样, 不改权重 — 把冷库变"可寻址/可检索"的活知识。
+///
+/// - G4: corpus 未挂载 → 拒绝。
+/// - 复用既有 `insert_or_get_node_rows` (R-P42, 不平行造插入器), 仅以 UPDATE 补 content/lineage。
+pub fn digest_sample(
+    conn: &Connection,
+    corpus_db: &Path,
+    top_k: usize,
+    domain_filter: Option<&str>,
+) -> Result<DigestReport, String> {
+    if !corpus_db.exists() {
+        return Err(format!(
+            "外置大脑 corpus 未挂载/不存在: {} (G4: 挂载后才摄取)",
+            corpus_db.display()
+        ));
+    }
+    let cdb = Connection::open(corpus_db).map_err(|e| e.to_string())?;
+    let mut stmt = cdb
+        .prepare(
+            "SELECT id, node_type, title, summary, content, url, domain, metadata \
+             FROM nodes ORDER BY rowid LIMIT ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([top_k as i64], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1).unwrap_or_default(),
+                r.get::<_, String>(2).unwrap_or_default(),
+                r.get::<_, Option<String>>(3).unwrap_or_default(),
+                r.get::<_, Option<String>>(4).unwrap_or_default(),
+                r.get::<_, String>(5).unwrap_or_default(),
+                r.get::<_, Option<String>>(6).unwrap_or_default(),
+                r.get::<_, Option<String>>(7).unwrap_or_default(),
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut rep = DigestReport {
+        sampled: 0,
+        activated: 0,
+        already_live: 0,
+        bytes: 0,
+        node_types: Vec::new(),
+    };
+
+    for row in rows {
+        let (cid, ntype, title, summary, content, url, domain, meta_str) = match row {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        rep.sampled += 1;
+        if let Some(f) = domain_filter {
+            let hay = format!("{url} {domain:?} {ntype}").to_ascii_lowercase();
+            if !hay.contains(&f.to_ascii_lowercase()) {
+                continue;
+            }
+        }
+        // 已 live 则跳过 (避免重复激活)
+        let live: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes WHERE url=?", rusqlite::params![url.clone()], |r| r.get(0))
+            .unwrap_or(0);
+        if live > 0 {
+            rep.already_live += 1;
+            continue;
+        }
+        let ntype_enum = NodeType::from_str(validate_node_type(&ntype));
+        let _id = insert_or_get_node_rows(
+            conn,
+            &title,
+            ntype_enum,
+            summary.as_deref(),
+            Some(&url),
+            domain.as_deref(),
+        )
+        .map_err(|e| e.to_string())?;
+        // 写入 lineage + 原始 content/metadata (G3)
+        let mut meta = match meta_str {
+            Some(s) => serde_json::from_str::<serde_json::Value>(&s).unwrap_or(serde_json::Value::Null),
+            None => serde_json::Value::Null,
+        };
+        if !meta.is_object() {
+            meta = serde_json::json!({});
+        }
+        enrich_cortex_metadata(&mut meta, Some(corpus_db), "in");
+        let content_str = content.clone().unwrap_or_default();
+        conn.execute(
+            "UPDATE nodes SET content=?, metadata=?, updated_at=? WHERE url=?",
+            rusqlite::params![content_str, meta.to_string(), now(), url.clone()],
+        )
+        .map_err(|e| e.to_string())?;
+        rep.activated += 1;
+        rep.bytes += content_str.len() as u64;
+        if !rep.node_types.contains(&ntype) {
+            rep.node_types.push(ntype);
+        }
+        let _ = cid;
+    }
+    Ok(rep)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,10 +592,91 @@ mod tests {
     #[test]
     fn export_delta_refuses_when_unmounted() -> Result<(), String> {
         let conn = fixture_db();
-        let missing = PathBuf::from("/Volumes/NeoTrixBrain__definitely_not_mounted");
+        let missing = std::path::PathBuf::from("/Volumes/NeoTrixBrain__definitely_not_mounted");
         let err = export_delta(&conn, &missing, false);
         assert!(err.is_err());
         assert!(err.unwrap_err().contains("未挂载"));
+        Ok(())
+    }
+
+    #[test]
+    fn digest_sample_activates_cold_nodes() -> Result<(), String> {
+        let conn = Connection::open_in_memory().expect("mem");
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn)
+            .map_err(|e| e.to_string())?;
+        // 造一个 temp corpus SQLite (live KB 的超集快照)
+        let cdir = tempfile::tempdir().expect("tmp");
+        let cpath = cdir.path().join("corpus.db");
+        let cdb = Connection::open(&cpath).map_err(|e| e.to_string())?;
+        cdb.execute(
+            "CREATE TABLE nodes (id TEXT, node_type TEXT, title TEXT, summary TEXT, content TEXT, url TEXT, domain TEXT, metadata TEXT)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        for i in 0..3u32 {
+            cdb.execute(
+                "INSERT INTO nodes (id,node_type,title,summary,content,url,domain,metadata) \
+                 VALUES (?1,'article',?2,'s',?3,?4,'example.com','{}')",
+                [
+                    format!("c{i}"),
+                    format!("t{i}"),
+                    format!("content {i}"),
+                    format!("zimid://cold/{i}"),
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        let r = digest_sample(&conn, &cpath, 10, None)?;
+        assert_eq!(r.sampled, 3);
+        assert_eq!(r.activated, 3);
+        assert_eq!(r.already_live, 0);
+        // lineage 应写入激活节点的 metadata
+        let meta: String = conn
+            .query_row(
+                "SELECT metadata FROM nodes WHERE url='zimid://cold/0'",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        let v: serde_json::Value = serde_json::from_str(&meta).map_err(|e| e.to_string())?;
+        assert!(v.get("lineage").is_some(), "lineage 应存在: {meta}");
+        Ok(())
+    }
+
+    #[test]
+    fn digest_sample_skips_already_live() -> Result<(), String> {
+        let conn = Connection::open_in_memory().expect("mem");
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn)
+            .map_err(|e| e.to_string())?;
+        // 先在 live KB 放一个已存在的节点 (复用既有插入器, R-P42)
+        insert_or_get_node_rows(
+            &conn,
+            "causal",
+            NodeType::from_str("cortex_brain"),
+            Some("s"),
+            Some("cortex_source://causal_graph"),
+            Some("example.com"),
+        )
+        .map_err(|e| e.to_string())?;
+        let cdir = tempfile::tempdir().expect("tmp");
+        let cpath = cdir.path().join("corpus.db");
+        let cdb = Connection::open(&cpath).map_err(|e| e.to_string())?;
+        cdb.execute(
+            "CREATE TABLE nodes (id TEXT, node_type TEXT, title TEXT, summary TEXT, content TEXT, url TEXT, domain TEXT, metadata TEXT)",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        // url 已在 live KB (fixture 自带 cortex_source://causal_graph) → 应跳过
+        cdb.execute(
+            "INSERT INTO nodes (id,node_type,title,summary,content,url,domain,metadata) \
+             VALUES ('x','cortex_brain','causal','s','c','cortex_source://causal_graph','example.com','{}')",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        let r = digest_sample(&conn, &cpath, 10, None)?;
+        assert_eq!(r.sampled, 1);
+        assert_eq!(r.activated, 0);
+        assert_eq!(r.already_live, 1);
         Ok(())
     }
 }
