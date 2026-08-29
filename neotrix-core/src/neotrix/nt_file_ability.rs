@@ -35,6 +35,7 @@ mod structured;
 mod tables;
 mod types;
 mod visual;
+mod format_route;
 
 pub use core::*;
 pub use e8::*;
@@ -51,6 +52,7 @@ pub use structured::*;
 pub use tables::*;
 pub use types::*;
 pub use visual::*;
+pub use format_route::*;
 
 /// 构造最小 DOCX (zip 包: [Content_Types].xml + _rels/.rels + word/document.xml)。
 /// 测试辅助: 模块内 + 意识核心 dispatch 测试复用 (R-P42 复用, 不平行重造)。

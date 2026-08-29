@@ -31,6 +31,7 @@ pub mod poc_engine;
 pub mod browser_security;
 pub mod redaction;
 pub mod nt_shield_secret_collector;
+pub mod nt_shield_skill_router;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

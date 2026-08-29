@@ -41,6 +41,12 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     crate::core::nt_core_kb_types::register_kb_types_self_tests(&mut registry);
     // NT-MEMORY 四态记忆资产 (吸收 TencentDB-Agent-Memory): ChatMemory/Skill/LlmWiki/CodeGraph 分类
     crate::core::nt_core_memory_asset::register_memory_asset_self_tests(&mut registry);
+    // 2026-08-29 外部吸收 (archify/diagram-design): NT-CORE 可验证架构图原语
+    crate::core::nt_core_arch_diagram::register_arch_diagram_self_tests(&mut registry);
+    // 2026-08-29 外部吸收 (firecrawl/anydoc): NT-WORLD 文档格式路由
+    crate::neotrix::nt_file_ability::register_format_route_self_tests(&mut registry);
+    // 2026-08-29 外部吸收 (reverse-skill): NT-SHIELD 安全技能路由
+    crate::neotrix::l1_body_impl::nt_shield::nt_shield_skill_router::register_skill_router_self_tests(&mut registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
     crate::core::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度

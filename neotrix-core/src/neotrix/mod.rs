@@ -211,7 +211,7 @@ pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
     GoldStandardReport,
 };
 
-mod nt_file_ability;
+pub mod nt_file_ability;
 pub mod proxy_daemon_wrapper;
 
 #[cfg(test)]
