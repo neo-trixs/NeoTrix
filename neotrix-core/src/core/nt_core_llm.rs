@@ -39,7 +39,12 @@ pub trait LlmProvider: Send + Sync {
         if let Err(reason) = egress_privacy_guard(&mut req, self.data_trust()) {
             return Err(LlmError::InvalidRequest(reason));
         }
-        self.complete_raw(&req).await
+        let mut resp = self.complete_raw(&req).await?;
+        resp.content = ingress_privacy_guard(&resp.content);
+        if let Some(r) = resp.reasoning.as_mut() {
+            *r = ingress_privacy_guard(r);
+        }
+        Ok(resp)
     }
 
     async fn stream_complete(
@@ -50,7 +55,23 @@ pub trait LlmProvider: Send + Sync {
         if let Err(reason) = egress_privacy_guard(&mut req, self.data_trust()) {
             return Err(LlmError::InvalidRequest(reason));
         }
-        self.stream_complete_raw(&req).await
+        let mut rx = self.stream_complete_raw(&req).await?;
+        let (tx, rx_out) = tokio::sync::mpsc::channel(64);
+        tokio::spawn(async move {
+            while let Some(item) = rx.recv().await {
+                let item = item.map(|mut r| {
+                    r.content = ingress_privacy_guard(&r.content);
+                    if let Some(rr) = r.reasoning.as_mut() {
+                        *rr = ingress_privacy_guard(rr);
+                    }
+                    r
+                });
+                if tx.send(item).await.is_err() {
+                    break;
+                }
+            }
+        });
+        Ok(rx_out)
     }
 
     /// 实际出网实现 (守卫已先行处理 request)。
@@ -504,6 +525,15 @@ fn redact_outbound_str(s: &str) -> String {
     redact_paths_str(&s)
 }
 
+/// 入站隐私守卫 — 模型回包后处理, 剥离任何被回显的 NeoTrix 内部指纹 / 密钥 / 绝对路径,
+/// 防止泄露进上下文的机密经模型回写被放大存储 (defense-in-depth: egress 已脱敏请求侧,
+/// ingress 再兜底回包侧). 由 `LlmProvider::{complete,stream_complete}` 默认方法调用。
+pub fn ingress_privacy_guard(text: &str) -> String {
+    let s = redact_internals(text);
+    let s = redact_secrets_str(&s);
+    redact_paths_str(&s)
+}
+
 /// 脱密钥 (保留原 `scrub_egress_secrets` 行为) — 覆盖所有出站字段, 密钥绝不外泄。
 fn scrub_secrets_core(req: &mut LlmRequest) {
     for m in req.messages.iter_mut() {
@@ -899,6 +929,33 @@ mod tests {
         assert!(!r.messages[0].content.contains("/Users/neo"), "raw path must not leak");
     }
 
+    #[test]
+    fn ingress_strips_echoed_secret() {
+        let out = ingress_privacy_guard("here is your key sk-abcdEFGH1234567890abcdef back");
+        assert!(!out.contains("sk-abcdEFGH"), "回包中回显的密钥必须被脱敏");
+        assert!(out.contains("[REDACTED:secret]"), "密钥应替换为占位符");
+    }
+
+    #[test]
+    fn ingress_strips_internal_token() {
+        let out = ingress_privacy_guard("you referenced nt_core_consciousness_core.rs");
+        assert!(!out.contains("nt_core_consciousness_core"), "回包中内部指纹必须被脱敏");
+        assert!(out.contains("[REDACTED:neotrix-internal]"), "内部指纹应替换为占位符");
+    }
+
+    #[test]
+    fn ingress_strips_absolute_path() {
+        let out = ingress_privacy_guard("the file is at /Users/neo/secret/keys.txt");
+        assert!(!out.contains("/Users/neo"), "回包中绝对路径必须被脱敏");
+        assert!(out.contains("[REDACTED:path]"));
+    }
+
+    #[test]
+    fn ingress_passthrough_clean() {
+        let out = ingress_privacy_guard("the capital of France is Paris");
+        assert_eq!(out, "the capital of France is Paris", "良性内容不应被改动");
+    }
+
     // ---- 集成级测试: 验证 trait 默认方法 complete()/stream_complete() 真的执行 egress 闸门 (T3 生产接线) ----
     use std::sync::{Arc, Mutex};
 
@@ -1004,6 +1061,60 @@ mod tests {
             res.is_err(),
             "trait 默认 stream_complete() 必须拦截 untrusted + 内部指纹"
         );
+    }
+
+    // ---- A5: 验证 ingress 守卫经 trait 默认 complete()/stream_complete() 真正接线 (T3) ----
+    struct IngressProbe;
+    #[async_trait::async_trait]
+    impl LlmProvider for IngressProbe {
+        async fn complete_raw(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
+            // 模拟外部模型把上下文里泄露的密钥又回写进回包
+            Ok(LlmResponse::plain(
+                "your key sk-abcdEFGH1234567890abcdef is compromised".into(),
+                "m".into(),
+                Usage::default(),
+                FinishReason::Stop,
+            ))
+        }
+        async fn stream_complete_raw(
+            &self,
+            _req: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            let (tx, rx) = tokio::sync::mpsc::channel(1);
+            let _ = tx
+                .send(Ok(LlmResponse::plain(
+                    "your key sk-abcdEFGH1234567890abcdef is compromised".into(),
+                    "m".into(),
+                    Usage::default(),
+                    FinishReason::Stop,
+                )))
+                .await;
+            Ok(rx)
+        }
+    }
+
+    #[test]
+    fn complete_applies_ingress_guard_to_response() {
+        let p = IngressProbe;
+        let r = LlmRequest::new("m", "hi");
+        let resp = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(p.complete(&r))
+            .expect("complete must succeed");
+        assert!(!resp.content.contains("sk-abcdEFGH"), "回包密钥必须经 ingress 守卫脱敏");
+    }
+
+    #[test]
+    fn stream_complete_applies_ingress_guard_to_response() {
+        let p = IngressProbe;
+        let r = LlmRequest::new("m", "hi");
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let content = rt.block_on(async move {
+            let mut rx = p.stream_complete(&r).await.expect("stream_complete must succeed");
+            let item = rx.recv().await.expect("must yield a chunk");
+            item.expect("chunk must be ok").content
+        });
+        assert!(!content.contains("sk-abcdEFGH"), "流式回包密钥必须经 ingress 守卫脱敏");
     }
 }
 
