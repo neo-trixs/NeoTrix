@@ -35,6 +35,9 @@ type ViewKey = (typeof VIEW_ORDER)[number]
 
 export function Sidebar(props: SidebarProps) {
   const collapsed = () => props.collapsed ?? false
+  // 折叠态 hover 预览：收起为图标栏时，悬停临时展开为完整侧栏
+  const [peek, setPeek] = createSignal(false)
+  const visible = () => !collapsed() || peek()
   const view = () => 'chat' as const
   const viewIdx = () => 0
 
@@ -379,14 +382,17 @@ export function Sidebar(props: SidebarProps) {
     <aside
       class={clsx(
         'flex-shrink-0 glass-side overflow-hidden flex flex-col relative max-w-[85vw]',
-        collapsed() ? 'w-[64px] border-r border-black/5' : 'border-r border-border-primary/40'
+        collapsed() ? 'w-[64px] border-r border-black/5' : 'border-r border-border-primary/40',
+        collapsed() && peek() && 'sidebar-peek'
       )}
-      style={collapsed() ? undefined : { width: `${props.width ?? 280}px` }}
+      style={collapsed() && peek() ? { width: `${props.width ?? 280}px`, zIndex: 50 } : collapsed() ? undefined : { width: `${props.width ?? 280}px` }}
+      onMouseEnter={() => collapsed() && setPeek(true)}
+      onMouseLeave={() => setPeek(false)}
     >
       {/* Header: 三色灯占位（macOS 28px 拖拽区） */}
       <div class="h-7 shrink-0" data-tauri-drag-region />
       {/* 折叠标签：仅保留图标（对标 Claude Code 侧栏手柄） */}
-      <div class={clsx('pt-2', collapsed() ? 'flex justify-center px-0' : 'px-3')}>
+      <div class={clsx('pt-2', visible() ? 'px-3' : 'flex justify-center px-0')}>
         <button
           class="p-1.5 rounded-md text-zinc-400 hover:text-orange-600 hover:bg-orange-50/60 transition-colors focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:outline-none"
           onClick={props.onToggleCollapse}
@@ -397,7 +403,7 @@ export function Sidebar(props: SidebarProps) {
         </button>
       </div>
 
-      {!collapsed() && (
+      {visible() && (
         <>
           {/* 标题：单态对话（极简，无分段切换） */}
 
@@ -782,7 +788,7 @@ export function Sidebar(props: SidebarProps) {
         </>
       )}
 
-      {collapsed() && (
+      {collapsed() && !peek() && (
         <div class="flex-1 flex flex-col items-center gap-1 py-2">
           <button
             class="p-2 rounded-lg bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors"
@@ -795,7 +801,7 @@ export function Sidebar(props: SidebarProps) {
         </div>
       )}
 
-      {collapsed() && (
+      {collapsed() && !peek() && (
         <button
           class="flex items-center justify-center py-3 border-t border-border-primary/40 hover:bg-white/40 transition-colors"
           onClick={openSettings}

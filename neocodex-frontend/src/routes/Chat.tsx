@@ -185,6 +185,11 @@ export function Chat() {
   // 会话内消息搜索（高亮/聚焦匹配，对标 2026 agent UX 检索）
   const [msgSearch, setMsgSearch] = createSignal('')
   const [msgSearchOpen, setMsgSearchOpen] = createSignal(false)
+  const matchCount = () => {
+    const q = msgSearch().trim().toLowerCase()
+    if (!q) return 0
+    return messages().filter((m) => m.content.toLowerCase().includes(q)).length
+  }
   // ⌘K 最近使用（对标 Raycast：置顶高频命令）
   const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
   const pushRecentCmd = (id: string) =>
@@ -1402,6 +1407,9 @@ export function Chat() {
                   onInput={(e) => setMsgSearch(e.currentTarget.value)}
                   aria-label="搜索本会话"
                 />
+                <Show when={msgSearch().trim()}>
+                  <span class="msg-search-count">{matchCount()} 命中</span>
+                </Show>
               </Show>
               {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
               <span class="relative flex-shrink-0">

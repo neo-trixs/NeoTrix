@@ -484,6 +484,12 @@
   .msg-search-input:focus {
     border-color: var(--nt-color-gold-500, #f0913a);
   }
+  .msg-search-count {
+    font-size: 10px;
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+    align-self: center;
+  }
 
   .msg.r {
     align-self: flex-end;
@@ -2007,6 +2013,12 @@
 .sc-dim-clear { color: #dc2626; border-color: rgba(220,38,38,0.3); }
 .sc-dimmed { opacity: 0.18; pointer-events: none; transition: opacity 0.15s ease; }
 
+/* 折叠态 hover 预览：临时展开为完整侧栏 */
+.sidebar-peek {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.18);
+  background: var(--bg, #faf8f4);
+}
+
 /* Markdown 代码块行号 */
 .code-line { display: block; }
 .code-line .ln {
@@ -2497,7 +2509,7 @@
 /* ===== 主题切换：浅金 / 浅紫 / 浅青（均为浅色主题，仅主色相切换） =====
    所有 UI 的金色身份走 var(--nt-color-gold-*)（含页面底色 gold-50），
    故在 [data-theme] 下重定义该组变量即可整体换肤。 */
-:root {
+ :root {
   --nt-color-gold-50: #fef7ee;
   --nt-color-gold-100: #fdf0dd;
   --nt-color-gold-200: #fbe6c8;
@@ -2508,6 +2520,10 @@
   --nt-color-gold-800: #a3501c;
   --nt-glow-1: rgba(255, 179, 102, 0.07);
   --nt-glow-2: rgba(255, 168, 86, 0.055);
+  /* a11y：浅色主题文本对比度（≥4.5:1 WCAG AA） */
+  --text-primary: #1f2937;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
 }
 [data-theme='lilac'] {
   --nt-color-gold-50: #f7f5ff;
