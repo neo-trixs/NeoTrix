@@ -223,6 +223,7 @@ record BranchState {
     maturity: u8; // C0-C6
     last_activity: i64;
     metrics: map<string, f32>;
+    capability_profile: sequence<f32>; // Phase 5 D 维能力画像: [成功率, ECE, Brier]
 };
 
 record ConsciousnessState {

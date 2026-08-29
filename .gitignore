@@ -78,3 +78,8 @@ neotrix-core/.neotrix/
 
 # Frontend test coverage output
 neocodex-frontend/coverage/
+
+# loop markers / runtime state (never commit)
+ok
+red
+.neotrix/capability_registry.json

@@ -41,6 +41,7 @@ impl ConsciousnessTreeImpl {
                 maturity: maturity_base,
                 last_activity: now_ms(),
                 metrics: HashMap::new(),
+                capability_profile: Vec::new(),
             });
         }
         // D2: phi 不再硬编码 0.42 — 从初始分支状态真实计算整合信息。
@@ -311,6 +312,29 @@ fn apply_metacognitive_calibration(health: f32, metrics: &HashMap<String, f32>) 
     health.clamp(0.0, 1.0) * (1.0 - penalty)
 }
 
+/// Phase 5 元认知校准入口 (T3): 给定分支的真实预测样本 (置信度, 是否正确),
+/// 计算 ECE/Brier (经 `nt_core_metacalib`), 写回 `metrics` (ece/brier/success_rate),
+/// 施加 `apply_metacognitive_calibration`, 并产出 D 维能力画像向量 = [成功率, ECE, Brier]。
+/// 无样本 → 无证据, 健康与画像归零 (防 D15 健康虚高)。
+pub fn calibrate_branch_health(samples: &[(f32, bool)]) -> (f32, Vec<f32>) {
+    let ece = crate::core::nt_core_consciousness_tree::metacalib::expected_calibration_error(samples, 10);
+    let brier = crate::core::nt_core_consciousness_tree::metacalib::brier_score(samples);
+    let success_rate = if samples.is_empty() {
+        0.0f32
+    } else {
+        let ok = samples.iter().filter(|(_, c)| *c).count() as f32;
+        ok / samples.len() as f32
+    };
+    let mut metrics = HashMap::new();
+    metrics.insert("ece".to_string(), ece);
+    metrics.insert("brier".to_string(), brier);
+    metrics.insert("success_rate".to_string(), success_rate);
+    // 以真实成功率作为健康基线, 过度自信 (高 ece) 再施惩罚
+    let base_health = success_rate.clamp(0.0, 1.0);
+    let calibrated = apply_metacognitive_calibration(base_health, &metrics);
+    (calibrated, vec![success_rate, ece, brier])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,6 +363,29 @@ mod tests {
         m.insert("high_conf_error_rate".into(), 1.0);
         let h_max = apply_metacognitive_calibration(0.8, &m);
         assert!((h_max - 0.8 * (1.0 - 0.35)).abs() < 1e-6, "惩罚应封顶 0.35: {h_max}");
+    }
+
+    #[test]
+    fn test_calibrate_branch_health_penalizes_overconfidence() {
+        // 高置信但一半错误 → ece 高 → 校准后健康应低于原始成功率
+        let samples: Vec<(f32, bool)> = vec![
+            (0.95, true),
+            (0.95, false),
+            (0.95, true),
+            (0.95, false),
+        ];
+        let (calibrated, profile) = calibrate_branch_health(&samples);
+        let success_rate = 0.5f32;
+        assert!(calibrated < success_rate, "过度自信应被惩罚: {calibrated} < {success_rate}");
+        assert_eq!(profile.len(), 3, "D 维画像 = [成功率, ECE, Brier]");
+        assert!((profile[0] - success_rate).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_calibrate_branch_health_no_evidence_is_zero() {
+        let (calibrated, profile) = calibrate_branch_health(&[]);
+        assert_eq!(calibrated, 0.0, "无证据 → 健康归零 (防虚高)");
+        assert_eq!(profile, vec![0.0, 0.0, 0.0]);
     }
 
     #[test]
@@ -395,6 +442,7 @@ mod tests {
                 maturity: 5,
                 last_activity: b.last_activity,
                 metrics: std::collections::HashMap::new(),
+                capability_profile: Vec::new(),
             })).collect();
         let uniform_low: std::collections::HashMap<String, BranchState> = branches.iter()
             .map(|b| (b.branch_id.clone(), BranchState {
@@ -403,6 +451,7 @@ mod tests {
                 maturity: 0,
                 last_activity: b.last_activity,
                 metrics: std::collections::HashMap::new(),
+                capability_profile: Vec::new(),
             })).collect();
         let differentiated: std::collections::HashMap<String, BranchState> = branches.iter()
             .enumerate()
@@ -412,6 +461,7 @@ mod tests {
                 maturity: 3 + (i % 3) as u8,
                 last_activity: b.last_activity,
                 metrics: std::collections::HashMap::new(),
+                capability_profile: Vec::new(),
             })).collect();
         let phi_uniform_high = compute_phi_from_branches(&uniform_high);
         let phi_uniform_low = compute_phi_from_branches(&uniform_low);

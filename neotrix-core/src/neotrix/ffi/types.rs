@@ -208,6 +208,8 @@ pub struct BranchState {
     pub maturity: u8,
     pub last_activity: i64,
     pub metrics: HashMap<String, f32>,
+    /// Phase 5 D 维能力画像向量: 历史成功率 + 校准误差 (ECE/Brier), 防 D15 虚高。
+    pub capability_profile: Vec<f32>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]

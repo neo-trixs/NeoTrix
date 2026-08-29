@@ -6,6 +6,7 @@ mod contract;
 mod lifecycle;
 mod ops;
 mod selftest;
+pub mod metacalib;
 
 pub use types::*;
 pub use nodes::*;
