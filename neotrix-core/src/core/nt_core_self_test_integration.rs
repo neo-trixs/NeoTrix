@@ -60,6 +60,8 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
     ));
+    // 2026-08-29 外部吸收 (anthropics/skills Agent Skills 标准): SKILL.md 必需字段校验
+    crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::register_skill_standard_self_tests(&mut registry);
     // 2026-08-16 T2 补齐: 小规模方法评估 (sweep absorption 声明 Phase B 但未注册)
     registry.register(Box::new(
         crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
@@ -292,6 +294,10 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     ));
     registry.register(Box::new(
         crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
+    ));
+    // 2026-08-29 外部吸收 (Agent Skills 标准): 轻量注册 (纯内存校验)
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::AgentSkillsStandardSelfTest,
     ));
     // NT-REPAIR / NT-META / NT-GOVERNANCE / NT-NEXUS (4 分支迷雾治理, 每分支 ≥1)
     registry.register(Box::new(
