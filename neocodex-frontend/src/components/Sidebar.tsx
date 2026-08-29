@@ -1,4 +1,5 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
+import { invoke } from '@tauri-apps/api/core'
 import { Settings, Archive, RotateCcw, ChevronRight } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 import type { Session } from '../stores/chat'
@@ -142,6 +143,8 @@ export function Sidebar(props: SidebarProps) {
     valid.splice(to === -1 ? valid.length : to, 0, dragSessionId)
     setManualOrder(valid)
     persistOrder()
+    // 接线工作树后端：真实持久化（running backend 无该命令时静默降级到本地序）
+    void invoke('cmd_reorder_sessions', { ids: valid }).catch(() => {})
     dragSessionId = null
   }
   // 跨项目拖拽：前端本地覆盖会话所属项目（后端固化待并发会话释放）
@@ -156,6 +159,8 @@ export function Sidebar(props: SidebarProps) {
       localStorage.setItem(PROJ_OVR_KEY, JSON.stringify(n))
       return n
     })
+    // 接线工作树后端：真实持久化（无命令时静默降级到本地覆盖）
+    void invoke('cmd_set_session_project', { id, project }).catch(() => {})
     dragSessionId = null
   }
   const pinnedSessions = () =>
