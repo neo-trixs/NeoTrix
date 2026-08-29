@@ -173,7 +173,12 @@ export function Chat() {
   }
   onMount(() => { void loadHarnessCaps() })
   const [copiedId, setCopiedId] = createSignal<string | null>(null)
-  const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
+  const [permissionMode, setPermissionMode] = createSignal<PermissionMode>(
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt_perm_mode') as PermissionMode)) || 'auto',
+  )
+  const persistPermissionMode = (m: PermissionMode) => {
+    try { localStorage.setItem('nt_perm_mode', m) } catch { /* 隐私模式忽略 */ }
+  }
   const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
   // 批次1：Plan Mode 批准流 — plan 权限模式下完成的助理回复列为待批准规划（对标 Claude Code plan 审阅）
   const [planPending, setPlanPending] = createSignal<{ msgId: string } | null>(null)
@@ -413,6 +418,7 @@ export function Chat() {
     const idx = PERMISSION_MODES.findIndex((m) => m.value === permissionMode())
     const next = PERMISSION_MODES[(idx + 1) % PERMISSION_MODES.length]
     setPermissionMode(next.value)
+    persistPermissionMode(next.value)
     showInfo(`权限模式：${next.label}`, 2500)
   }
 
