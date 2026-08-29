@@ -144,6 +144,20 @@ export function Sidebar(props: SidebarProps) {
     persistOrder()
     dragSessionId = null
   }
+  // 跨项目拖拽：前端本地覆盖会话所属项目（后端固化待并发会话释放）
+  const PROJ_OVR_KEY = 'nt_project_override'
+  const loadProjOverride = (): Record<string, string> => {
+    try { return JSON.parse(localStorage.getItem(PROJ_OVR_KEY) || '{}') } catch { return {} }
+  }
+  const [projectOverride, setProjectOverride] = createSignal<Record<string, string>>(loadProjOverride())
+  const setSessionProject = (id: string, project: string) => {
+    setProjectOverride((o) => {
+      const n = { ...o, [id]: project }
+      localStorage.setItem(PROJ_OVR_KEY, JSON.stringify(n))
+      return n
+    })
+    dragSessionId = null
+  }
   const pinnedSessions = () =>
     pinnedIds()
       .map((id) => chatStore.state.sessions.find((s) => s.id === id))
@@ -170,7 +184,7 @@ export function Sidebar(props: SidebarProps) {
     // 项目制对话机制（对标 Claude Code / OpenWebUI：按项目分组，项目名取会话工作目录）
     const groups = new Map<string, typeof filtered>()
     for (const s of filtered) {
-      const key = s.project || '未分类'
+      const key = projectOverride()[s.id] ?? s.project ?? '未分类'
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(s)
     }
@@ -197,12 +211,17 @@ export function Sidebar(props: SidebarProps) {
     return arr
   }
 
-  // 项目分组折叠态（参考成熟产品：项目可折叠，默认展开）
-  const [collapsedProjects, setCollapsedProjects] = createSignal<Set<string>>(new Set())
+  // 项目分组折叠态（参考成熟产品：项目可折叠，默认展开，持久化）
+  const PROJ_KEY = 'nt_collapsed_projects'
+  const loadCollapsed = (): Set<string> => {
+    try { return new Set(JSON.parse(localStorage.getItem(PROJ_KEY) || '[]')) } catch { return new Set() }
+  }
+  const [collapsedProjects, setCollapsedProjects] = createSignal<Set<string>>(loadCollapsed())
   const toggleProject = (key: string) => {
     const next = new Set(collapsedProjects())
     if (next.has(key)) next.delete(key); else next.add(key)
     setCollapsedProjects(next)
+    localStorage.setItem(PROJ_KEY, JSON.stringify([...next]))
   }
 
   const handleNewChat = async () => {
@@ -606,10 +625,13 @@ export function Sidebar(props: SidebarProps) {
               <For each={groupedSessions().map((g) => ({ ...g, items: g.items.filter((s) => !pinnedIds().includes(s.id)) }))}>
                 {(group) => (
                   <div class="mb-4 last:mb-0">
-                    {/* 项目分组头（对标 Claude Code / OpenWebUI：项目可折叠） */}
+                    {/* 项目分组头（对标 Claude Code / OpenWebUI：项目可折叠；拖拽会话到此重设项目） */}
                     <button
                       class="w-full flex items-center gap-1.5 px-2 pb-2 pt-2 text-left group/ph focus-visible:outline-none"
+                      classList={{ 'sc-drop-target': dragSessionId !== null }}
                       onClick={() => toggleProject(group.key)}
+                      onDragOver={(e) => { if (dragSessionId) e.preventDefault() }}
+                      onDrop={(e) => { e.preventDefault(); if (dragSessionId) setSessionProject(dragSessionId, group.key) }}
                       aria-expanded={!collapsedProjects().has(group.key)}
                       aria-label={collapsedProjects().has(group.key) ? `展开 ${group.key}` : `折叠 ${group.key}`}
                     >
@@ -636,7 +658,7 @@ export function Sidebar(props: SidebarProps) {
                                 }
                               }}
                               onDragOver={(e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move' }}
-                              onDrop={(e) => { e.preventDefault(); reorderSession(session.id) }}
+                              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); reorderSession(session.id) }}
                             >
                               <div class={clsx(
                                 'rounded-lg transition-colors',

@@ -490,6 +490,16 @@
     white-space: nowrap;
     align-self: center;
   }
+  .msg-search-nav {
+    font-size: 12px;
+    line-height: 1;
+    padding: 1px 5px;
+    border-radius: 6px;
+    color: var(--nt-color-gold-700);
+    background: rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+  }
+  .msg-search-nav:hover { background: var(--nt-color-gold-500, #f0913a); color: #fff; }
 
   .msg.r {
     align-self: flex-end;
@@ -2012,6 +2022,13 @@
 .sc-dim.on { background: var(--nt-color-gold-500, #f0913a); color: #fff; border-color: transparent; }
 .sc-dim-clear { color: #dc2626; border-color: rgba(220,38,38,0.3); }
 .sc-dimmed { opacity: 0.18; pointer-events: none; transition: opacity 0.15s ease; }
+
+/* 跨项目拖拽：分组头作为放置目标高亮 */
+.sc-drop-target {
+  outline: 2px dashed var(--nt-color-gold-500, #f0913a);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
 
 /* 折叠态 hover 预览：临时展开为完整侧栏 */
 .sidebar-peek {

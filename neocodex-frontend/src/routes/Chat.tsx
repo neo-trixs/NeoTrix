@@ -190,6 +190,21 @@ export function Chat() {
     if (!q) return 0
     return messages().filter((m) => m.content.toLowerCase().includes(q)).length
   }
+  // 搜索结果跳转滚动：在命中消息间前后跳转并滚动到视图中央
+  const messageEls = new Map<string, HTMLElement>()
+  const [matchCursor, setMatchCursor] = createSignal(0)
+  const matchedIds = () => {
+    const q = msgSearch().trim().toLowerCase()
+    if (!q) return []
+    return messages().filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.id)
+  }
+  const jumpMatch = (dir: 1 | -1) => {
+    const ids = matchedIds()
+    if (!ids.length) return
+    const i = (matchCursor() + dir + ids.length) % ids.length
+    setMatchCursor(i)
+    messageEls.get(ids[i])?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
   // ⌘K 最近使用（对标 Raycast：置顶高频命令）
   const [recentPaletteIds, setRecentPaletteIds] = createSignal<string[]>([])
   const pushRecentCmd = (id: string) =>
@@ -1200,6 +1215,15 @@ export function Chat() {
     setMsgSearch('')
   }
 
+  // 消息引用回复：把该消息摘要引用进输入框（对标 2026 引用回复 UX）
+  const handleQuote = (message: Message) => {
+    const snippet = message.content.replace(/\n+/g, ' ').trim().slice(0, 160)
+    const who = message.role === 'user' ? '用户' : '助手'
+    const quote = `> ${who}：${snippet}${message.content.length > 160 ? '…' : ''}\n\n`
+    setInputValue(quote + inputValue())
+    requestAnimationFrame(() => textareaRef()?.focus())
+  }
+
   const copyMessage = async (m: Message) => {
     try {
       await navigator.clipboard.writeText(m.content)
@@ -1404,11 +1428,13 @@ export function Chat() {
                   class="msg-search-input"
                   placeholder="搜索本会话…"
                   value={msgSearch()}
-                  onInput={(e) => setMsgSearch(e.currentTarget.value)}
+                  onInput={(e) => { setMsgSearch(e.currentTarget.value); setMatchCursor(0) }}
                   aria-label="搜索本会话"
                 />
                 <Show when={msgSearch().trim()}>
                   <span class="msg-search-count">{matchCount()} 命中</span>
+                  <button class="msg-search-nav" onClick={() => jumpMatch(-1)} aria-label="上一个匹配" title="上一个匹配">↑</button>
+                  <button class="msg-search-nav" onClick={() => jumpMatch(1)} aria-label="下一个匹配" title="下一个匹配">↓</button>
                 </Show>
               </Show>
               {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
@@ -1658,21 +1684,32 @@ export function Chat() {
                       <Show when={showDaySep()}>
                         <div class="msg-date-sep"><span class="msg-date-pill">{dayLabel(message.timestamp)}</span></div>
                       </Show>
-                    <div class={clsx('group msg', isUser ? 'r' : 'l', msgSearch() && !message.content.toLowerCase().includes(msgSearch().toLowerCase()) && 'msg-dim')}>
+                    <div
+                      ref={(el) => { if (el) messageEls.set(message.id, el) }}
+                      class={clsx('group msg', isUser ? 'r' : 'l', msgSearch() && !message.content.toLowerCase().includes(msgSearch().toLowerCase()) && 'msg-dim')}
+                    >
                       {/* 头像 */}
                       <div class="ma2">
                         {isUser ? <UserIcon /> : <BotIcon />}
                       </div>
 
                       {/* 消息 hover 操作条：复制 / 重新生成（对标 2026 agent UX） */}
-                      <Show when={!isEditing}>
-                        <div class="msg-action">
-                          <button
-                            class="msg-action__btn"
-                            onClick={() => copyMessage(message)}
-                            title="复制消息"
-                            aria-label="复制消息"
-                          >
+                       <Show when={!isEditing}>
+                         <div class="msg-action">
+                           <button
+                             class="msg-action__btn"
+                             onClick={() => handleQuote(message)}
+                             title="引用回复"
+                             aria-label="引用回复"
+                           >
+                             引用
+                           </button>
+                           <button
+                             class="msg-action__btn"
+                             onClick={() => copyMessage(message)}
+                             title="复制消息"
+                             aria-label="复制消息"
+                           >
                             复制
                           </button>
                           <Show when={!isUser && !message.isStreaming && !isGenerating()}>
