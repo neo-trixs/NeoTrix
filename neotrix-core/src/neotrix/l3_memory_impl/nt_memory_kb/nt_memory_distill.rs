@@ -156,10 +156,114 @@ pub fn sample_training_pairs(
         let teacher = cosine_similarity(va, vb);
         samples.push((va.clone(), vb.clone(), teacher));
     }
-    (samples, dim)
-}
+        (samples, dim)
+    }
 
-#[cfg(test)]
+    /// 对比/列表式训练的目标间隔 (E5/BGE 范式: listwise + contrastive, 轻量权重)。
+    /// 与点级 DistilVDR 不同, 这里引入 hard-negative, 让学生学会"正例分高、难负例分低"。
+    pub const CONTRASTIVE_MARGIN: f64 = 0.3;
+
+    /// 采样对比训练样本: 每样本 = `(query_vec, positive_vec, [negative_vec; neg_k])`。
+    /// 负例从同一向量池随机抽取 (排除正例); 真实 BM25/向量硬负例挖掘可后续挂到 `nt_memory_search`
+    /// (R-P42, 不平行造模块)。该向量池包含 Phase1 激活的外置大脑节点 (一旦经既有 embedder 生成向量)。
+    pub fn sample_contrastive_pairs(
+        embeddings: &[(String, Vec<f32>)],
+        pairs: usize,
+        neg_k: usize,
+        seed: u64,
+    ) -> Vec<(Vec<f32>, Vec<f32>, Vec<Vec<f32>>)> {
+        if embeddings.len() < 2 {
+            return Vec::new();
+        }
+        let mut rng = {
+            let mut state = seed;
+            move || {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                (state >> 33) as usize
+            }
+        };
+        let neg_k = neg_k.min(embeddings.len() - 1);
+        let mut out = Vec::with_capacity(pairs);
+        for _ in 0..pairs {
+            let a = rng() % embeddings.len();
+            let mut b = rng() % embeddings.len();
+            while b == a {
+                b = rng() % embeddings.len();
+            }
+            let (_, va) = &embeddings[a];
+            let (_, vb) = &embeddings[b];
+            let mut negs = Vec::with_capacity(neg_k);
+            let mut used = std::collections::HashSet::new();
+            used.insert(a);
+            used.insert(b);
+            for _ in 0..neg_k {
+                let mut n = rng() % embeddings.len();
+                while used.contains(&n) {
+                    n = rng() % embeddings.len();
+                }
+                used.insert(n);
+                negs.push(embeddings[n].1.clone());
+            }
+            out.push((va.clone(), vb.clone(), negs));
+        }
+        out
+    }
+
+    /// 对比蒸馏训练 (hinge + margin): 目标 `score(q,pos) - score(q,neg) >= MARGIN`。
+    /// 手写 SGD + momentum, 复用两塔对角学生结构 (无额外训练栈依赖)。
+    pub fn train_contrastive(
+        samples: &[(Vec<f32>, Vec<f32>, Vec<Vec<f32>>)],
+        dim: usize,
+        epochs: usize,
+        lr: f64,
+        momentum: f64,
+    ) -> PointwiseDistillStudent {
+        let mut student = PointwiseDistillStudent::identity(dim);
+        if samples.is_empty() {
+            return student;
+        }
+        let mut vel_wq = vec![0.0; dim];
+        let mut vel_wd = vec![0.0; dim];
+        let mut vel_b = 0.0;
+        for _ in 0..epochs {
+            for (q, pos, negs) in samples {
+                let n = dim.min(q.len()).min(pos.len());
+                let s_pos = student.score(q, pos);
+                let mut g_wq = vec![0.0; dim];
+                let mut g_wd = vec![0.0; dim];
+                let mut g_b = 0.0;
+                for dneg in negs {
+                    let s_neg = student.score(q, dneg);
+                    let gap = s_pos - s_neg;
+                    if gap < CONTRASTIVE_MARGIN {
+                        let d = 2.0 * (CONTRASTIVE_MARGIN - gap); // dLoss/d(gap) > 0; 故 dLoss/d(score_pos) = -d, dLoss/d(score_neg) = +d
+                        for i in 0..n {
+                            g_wq[i] += (-d) * student.wd[i] as f64 * q[i] as f64 * pos[i] as f64;
+                            g_wd[i] += (-d) * student.wq[i] as f64 * q[i] as f64 * pos[i] as f64;
+                        }
+                        g_b += -d;
+                        let dn = dim.min(q.len()).min(dneg.len());
+                        for i in 0..dn {
+                            g_wq[i] += d * student.wd[i] as f64 * q[i] as f64 * dneg[i] as f64;
+                            g_wd[i] += d * student.wq[i] as f64 * q[i] as f64 * dneg[i] as f64;
+                        }
+                    }
+                }
+                for i in 0..dim {
+                    vel_wq[i] = momentum * vel_wq[i] + lr * g_wq[i];
+                    vel_wd[i] = momentum * vel_wd[i] + lr * g_wd[i];
+                    student.wq[i] = (student.wq[i] - vel_wq[i] as f32).clamp(-5.0, 5.0);
+                    student.wd[i] = (student.wd[i] - vel_wd[i] as f32).clamp(-5.0, 5.0);
+                }
+                vel_b = momentum * vel_b + lr * g_b;
+                student.bias = (student.bias - vel_b as f32).clamp(-5.0, 5.0);
+            }
+        }
+        student.trained_on = samples.len();
+        student
+    }
+
+    #[cfg(test)]
 mod tests {
     use super::*;
 
@@ -238,5 +342,70 @@ mod tests {
         assert_eq!(loaded, student);
         let _ = std::fs::remove_file(&path);
         std::env::remove_var("NEOTRIX_DISTILL_PATH");
+    }
+
+    #[test]
+    fn test_sample_contrastive_pairs_shape() {
+        let embeddings: Vec<(String, Vec<f32>)> = (0..10)
+            .map(|i| (format!("n{i}"), make_vec(4, i + 50)))
+            .collect();
+        let samples = sample_contrastive_pairs(&embeddings, 20, 3, 7);
+        assert_eq!(samples.len(), 20);
+        assert!(samples.iter().all(|(_, _, negs)| negs.len() == 3));
+    }
+
+    #[test]
+    fn test_train_contrastive_improves_margin() {
+        let dim = 8;
+        // 正例 = q 的部分维度取反 (初始与 q 弱相关); 负例 = 与 q 无关随机向量。
+        // 对比训练应学会放大 (q,pos) 相对 (q,neg) 的间隔 → 平均间隔上升。
+        let mut rng_state = 12345u64;
+        let mut rnd = || {
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (rng_state >> 33) as f64
+        };
+        let make_q = |seed: u64| make_vec(dim, seed);
+        let mut make_neg = |_| {
+            let mut v = vec![0.0f32; dim];
+            for i in 0..dim {
+                v[i] = ((rnd() * 100.0).sin()) as f32;
+            }
+            v
+        };
+        let mut samples = Vec::new();
+        for i in 0..40u64 {
+            let q = make_q(i + 1);
+            let mut pos = q.clone();
+            for k in 0..dim / 2 {
+                pos[k] = -pos[k]; // 半维取反
+            }
+            let negs: Vec<Vec<f32>> = (0..4).map(|_| make_neg(i)).collect();
+            samples.push((q, pos, negs));
+        }
+        let before = PointwiseDistillStudent::identity(dim);
+        let gap_before = samples
+            .iter()
+            .map(|(q, p, ns)| {
+                let sp = before.score(q, p);
+                let sn = ns.iter().map(|n| before.score(q, n)).sum::<f64>() / ns.len() as f64;
+                sp - sn
+            })
+            .sum::<f64>()
+            / samples.len() as f64;
+        let after = train_contrastive(&samples, dim, 60, 0.05, 0.9);
+        let gap_after = samples
+            .iter()
+            .map(|(q, p, ns)| {
+                let sp = after.score(q, p);
+                let sn = ns.iter().map(|n| after.score(q, n)).sum::<f64>() / ns.len() as f64;
+                sp - sn
+            })
+            .sum::<f64>()
+            / samples.len() as f64;
+        assert!(
+            gap_after > gap_before,
+            "对比训练应拉大 (正-负) 间隔: {gap_after} vs {gap_before}"
+        );
+        assert_eq!(after.trained_on, samples.len());
     }
 }

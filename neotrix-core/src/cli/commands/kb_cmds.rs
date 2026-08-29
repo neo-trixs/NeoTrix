@@ -338,7 +338,8 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
 fn cmd_distill(args: &[String]) -> CommandOutput {
     use crate::neotrix::nt_memory_kb::nt_memory_embed::load_all_embeddings;
     use crate::neotrix::nt_memory_kb::nt_memory_distill::{
-        load_student, sample_training_pairs, save_student, PointwiseDistillStudent,
+        load_student, sample_contrastive_pairs, sample_training_pairs, save_student,
+        train_contrastive, CONTRASTIVE_MARGIN, PointwiseDistillStudent,
     };
     let conn = match open_raw_conn() {
         Some(c) => c,
@@ -356,6 +357,72 @@ fn cmd_distill(args: &[String]) -> CommandOutput {
     }
     let pairs = parse_usize(args, "--pairs", 400).min(embeddings.len().saturating_mul(8));
     let epochs = parse_usize(args, "--epochs", 12).min(200);
+
+    // 对比/列表式模式 (E5/BGE: listwise + contrastive + hard-negative)
+    let contrastive = {
+        let mut c = false;
+        let mut i = 0;
+        while i < args.len() {
+            if args[i] == "--mode" {
+                if args.get(i + 1).map(|v| v.as_str()) == Some("contrastive") {
+                    c = true;
+                }
+                i += 2;
+            } else if args[i] == "--contrastive" {
+                c = true;
+                i += 1;
+            } else if args[i] == "--neg-k" {
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+        c
+    };
+    let neg_k = parse_usize(args, "--neg-k", 4);
+
+    if contrastive {
+        let samples = sample_contrastive_pairs(&embeddings, pairs, neg_k, 0x9E37_79B9);
+        let dim = embeddings[0].1.len();
+        if samples.is_empty() {
+            return CommandOutput::err("无法构造对比样本 (向量不足)");
+        }
+        let before = load_student();
+        let student = train_contrastive(&samples, dim, epochs, 0.05, 0.9);
+        return match save_student(&student) {
+            Ok(()) => {
+                let rate = |s: &PointwiseDistillStudent| {
+                    let sat = samples
+                        .iter()
+                        .filter(|(q, p, ns)| {
+                            let sp = s.score(q, p);
+                            let sn =
+                                ns.iter().map(|n| s.score(q, n)).sum::<f64>() / ns.len() as f64;
+                            sp - sn >= CONTRASTIVE_MARGIN
+                        })
+                        .count();
+                    sat as f64 / samples.len() as f64
+                };
+                let before_rate = before.as_ref().map(rate).unwrap_or(0.0);
+                let after_rate = rate(&student);
+                CommandOutput::ok(&format!(
+                    "DistilVDR 对比蒸馏完成: 样本 {} 对 (neg_k={}), 维度 {}, 迭代 {} epoch\n\
+                     间隔满足率 (gap>=margin {:.2}): 训练前 {:.3} → 训练后 {:.3}\n\
+                     已落盘 ~/.neotrix/distill_student.json\n\
+                     hybrid_search Tier 3 将自动消费蒸馏分数。",
+                    samples.len(),
+                    neg_k,
+                    dim,
+                    epochs,
+                    CONTRASTIVE_MARGIN,
+                    before_rate,
+                    after_rate
+                ))
+            }
+            Err(e) => CommandOutput::err(&format!("蒸馏落盘失败: {}", e)),
+        };
+    }
+
     let (samples, dim) = sample_training_pairs(&embeddings, pairs, 0x9E37_79B9);
     let before = load_student();
     let student = PointwiseDistillStudent::train(&samples, dim, epochs, 0.05, 0.9);
