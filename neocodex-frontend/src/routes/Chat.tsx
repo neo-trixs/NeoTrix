@@ -235,6 +235,8 @@ export function Chat() {
   })
   const cycleTheme = () =>
     setTheme((t) => THEMES[(THEMES.indexOf(t) + 1) % THEMES.length])
+  // 导出菜单开关
+  const [exportMenuOpen, setExportMenuOpen] = createSignal(false)
   // 统一命令桥：CLI 命令目录（懒加载，供 ⌘K 面板执行 /help /config /stats 等）
   const [unifiedCliCmds, setUnifiedCliCmds] = createSignal<PaletteCommand[]>([])
   const execUnifiedCli = async (input: string) => {
@@ -1239,17 +1241,36 @@ export function Chat() {
   }
 
   // 会话导出：当前会话复制为 Markdown（对标 2026 agent UX：可携带上下文）
-  const exportConversation = async () => {
-    const md = chatStore.currentMessages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => `### ${m.role === 'user' ? '用户' : 'NeoTrix'}\n\n${m.content}`)
-      .join('\n\n')
+  // 会话导出多格式（对标 2026 导出能力）：Markdown / JSON / HTML 复制 + 下载 .md
+  const exportConversation = () => exportMenuOpen() ? setExportMenuOpen(false) : setExportMenuOpen(true)
+  const buildExport = (fmt: 'md' | 'json' | 'html'): string => {
+    const msgs = chatStore.currentMessages.filter((m) => m.role === 'user' || m.role === 'assistant')
+    if (fmt === 'json') return JSON.stringify(msgs.map((m) => ({ role: m.role, content: m.content })), null, 2)
+    const md = msgs.map((m) => `### ${m.role === 'user' ? '用户' : 'NeoTrix'}\n\n${m.content}`).join('\n\n')
+    if (fmt === 'md') return md
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>NeoTrix 会话导出</title></head><body>${msgs
+      .map((m) => `<h3>${m.role === 'user' ? '用户' : 'NeoTrix'}</h3><pre>${esc(m.content)}</pre>`)
+      .join('\n')}</body></html>`
+  }
+  const copyExport = async (fmt: 'md' | 'json' | 'html') => {
     try {
-      await navigator.clipboard.writeText(md)
-      showInfo('会话已复制为 Markdown', 2000)
+      await navigator.clipboard.writeText(buildExport(fmt))
+      showInfo(`会话已复制为 ${fmt.toUpperCase()}`, 2000)
     } catch {
       showInfo('复制失败（剪贴板不可用）', 2000)
     }
+    setExportMenuOpen(false)
+  }
+  const downloadMd = () => {
+    const blob = new Blob([buildExport('md')], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `neotrix-session-${chatStore.state.currentSessionId ?? 'export'}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExportMenuOpen(false)
   }
 
   const handleSaveEdit = () => {
@@ -1407,15 +1428,27 @@ export function Chat() {
               >
                 <span>?</span>
               </button>
-              {/* 会话导出为 Markdown */}
-              <button
-                class="theme-toggle"
-                onClick={exportConversation}
-                title="复制会话为 Markdown"
-                aria-label="导出会话"
-              >
-                <span>导出</span>
-              </button>
+              {/* 会话导出（Markdown / JSON / HTML / 下载） */}
+              <div class="relative flex-shrink-0">
+                <button
+                  class="theme-toggle"
+                  classList={{ on: exportMenuOpen() }}
+                  onClick={exportConversation}
+                  title="导出会话"
+                  aria-label="导出会话"
+                  aria-haspopup="menu"
+                >
+                  <span>导出</span>
+                </button>
+                <Show when={exportMenuOpen()}>
+                  <div class="export-menu" role="menu">
+                    <button role="menuitem" onClick={() => copyExport('md')}>复制 Markdown</button>
+                    <button role="menuitem" onClick={() => copyExport('json')}>复制 JSON</button>
+                    <button role="menuitem" onClick={() => copyExport('html')}>复制 HTML</button>
+                    <button role="menuitem" onClick={downloadMd}>下载 .md 文件</button>
+                  </div>
+                </Show>
+              </div>
               {/* 会话内消息搜索 */}
               <button
                 class="theme-toggle"
