@@ -134,6 +134,27 @@ export function SmartCanvas(props: SmartCanvasProps) {
       else n.add(kind)
       return n
     })
+  // 节点可拖拽移动（画布内重定位，前端本地覆盖；对标 2026 无限画布）
+  const [nodePos, setNodePos] = createSignal<Record<string, { x: number; y: number }>>({})
+  const dragNode = (id: string, e: PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return // 按钮不触发拖拽
+    e.stopPropagation()
+    const ox = e.clientX
+    const oy = e.clientY
+    const base = (() => {
+      const n = props.nodes().find((x) => x.id === id)
+      return n ? { x: n.x, y: n.y } : { x: 0, y: 0 }
+    })()
+    const move = (ev: PointerEvent) => {
+      setNodePos((p) => ({ ...p, [id]: { x: base.x + (ev.clientX - ox), y: base.y + (ev.clientY - oy) } }))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
   const [evoOpen, setEvoOpen] = createSignal(false)
   const [routeResult, setRouteResult] = createSignal<{ matured: number; pruned: number; applied: string[] } | null>(null)
   const matched = createMemo(() => {
@@ -255,12 +276,15 @@ export function SmartCanvas(props: SmartCanvasProps) {
                     'sc-dimmed': kindFilter().size > 0 && !kindFilter().has(node.kind),
                   }}
                   style={{
-                    left: `${node.x}px`,
-                    top: `${node.y}px`,
+                    left: `${nodePos()[node.id]?.x ?? node.x}px`,
+                    top: `${nodePos()[node.id]?.y ?? node.y}px`,
                     width: `${size().w}px`,
                   }}
                 >
-                  <div class="sc-node-head">
+                  <div
+                    class="sc-node-head"
+                    onPointerDown={(e) => dragNode(node.id, e)}
+                  >
                     <span class="sc-kind">{r.label}</span>
                     <span class="sc-title">{node.title ?? node.kind}</span>
                     <Show when={node.source}><span class="sc-src" title={node.source}>◆</span></Show>
