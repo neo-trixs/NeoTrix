@@ -385,7 +385,7 @@ export function Sidebar(props: SidebarProps) {
         collapsed() ? 'w-[64px] border-r border-black/5' : 'border-r border-border-primary/40',
         collapsed() && peek() && 'sidebar-peek'
       )}
-      style={collapsed() && peek() ? { width: `${props.width ?? 280}px`, zIndex: 50 } : collapsed() ? undefined : { width: `${props.width ?? 280}px` }}
+      style={collapsed() && peek() ? { width: `${props.width ?? 280}px`, 'z-index': '50' } : collapsed() ? undefined : { width: `${props.width ?? 280}px` }}
       onMouseEnter={() => collapsed() && setPeek(true)}
       onMouseLeave={() => setPeek(false)}
     >
