@@ -88,6 +88,27 @@ function dayLabel(d: Date): string {
 
 export function Chat() {
   const [inputValue, setInputValue] = createSignal('')
+  // 会话草稿跨切换暂存与自动恢复：per-session 存 localStorage，切回还原（对标 2026 草稿持久化）
+  const DRAFT_KEY = 'nt_session_drafts'
+  const readDrafts = (): Record<string, string> => {
+    try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') } catch { return {} }
+  }
+  const saveDraft = (id: string, text: string) => {
+    const d = readDrafts()
+    if (text) d[id] = text
+    else delete d[id]
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* 忽略 */ }
+  }
+  // 切换会话时恢复该会话草稿
+  createEffect(() => {
+    const id = chatStore.state.currentSessionId
+    setInputValue(id ? (readDrafts()[id] ?? '') : '')
+  })
+  // 输入变化即暂存当前会话草稿
+  createEffect(() => {
+    const id = chatStore.state.currentSessionId
+    if (id) saveDraft(id, inputValue())
+  })
   const [textareaRef, setTextareaRef] = createSignal<HTMLTextAreaElement | null>(null)
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null)
   const [editContent, setEditContent] = createSignal('')
@@ -1217,9 +1238,10 @@ export function Chat() {
 
   // 消息 hover 操作条：复制
   // 消息级「分支新话题」：以该消息为种子开全新会话（前端 fork；后端 history 固化待并发会话释放）
-  const handleBranch = (message: Message) => {
-    chatStore.addSession()
+  const handleBranch = async (message: Message) => {
+    const newId = await chatStore.addSession()
     setInputValue(message.content)
+    saveDraft(newId, message.content)
     setMsgSearch('')
   }
 
