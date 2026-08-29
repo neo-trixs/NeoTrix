@@ -33,6 +33,14 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
     return `${(ms / 1000).toFixed(1)}s`
   }
 
+  // 子代理委派指示：工具调用名 / 参数 / 结果含 delegate / sub-agent 语义时标「↳ 委派」
+  // 纯视觉，基于既有 ToolCallRecord 数据，不接后端
+  const DELEGATION_RE = /delegate|sub[-_]?agent/i
+  const isDelegation = () => {
+    const c = props.call
+    return DELEGATION_RE.test([c.name, c.args, c.result].filter(Boolean).join('\n'))
+  }
+
   const copyText = async (key: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -73,6 +81,16 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
             {props.call.domain}
           </span>
         )}
+
+        {/* 子代理委派指示：含 delegate / sub-agent 语义时显示「↳ 委派」徽标（纯视觉） */}
+        <Show when={isDelegation()}>
+          <span
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-nt-core-500/10 text-nt-core-600 border border-nt-core-500/20 flex-shrink-0"
+            title="该工具调用含子代理委派语义"
+          >
+            ↳ 委派
+          </span>
+        </Show>
 
         {isRunning() ? (
           <span class="inline-flex items-center gap-1 text-nt-io-600 flex-shrink-0" role="status" aria-label="工具执行中">

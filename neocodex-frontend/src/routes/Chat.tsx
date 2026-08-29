@@ -206,6 +206,16 @@ export function Chat() {
   const [planPending, setPlanPending] = createSignal<{ msgId: string } | null>(null)
   const [activeModel, setActiveModel] = createSignal<string | null>(null)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
+  // 「对话即操作系统」App Bot 形态：UI 层模型/Provider 切换 chip（cc-switch 风格）
+  // 纯本地视觉状态，不接后端；可选值对齐 2026 grok-bot / Harness 桌面范式
+  const PROVIDERS = ['Built-in', 'Grok', 'DeepSeek-Harness', 'OpenClaw'] as const
+  type ProviderId = (typeof PROVIDERS)[number]
+  const [activeProvider, setActiveProvider] = createSignal<ProviderId>(
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt_provider') as ProviderId)) || 'Built-in',
+  )
+  createEffect(() => {
+    try { localStorage.setItem('nt_provider', activeProvider()) } catch { /* 隐私模式忽略 */ }
+  })
   // ⌘K 命令面板（对标 Claude Code / Osaurus 命令菜单）：全局唤起，动作复用既有 handler
   const [paletteOpen, setPaletteOpen] = createSignal(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = createSignal(false)
@@ -1452,6 +1462,29 @@ export function Chat() {
                 mode={permissionMode}
                 rate={() => Math.round(autonomyRate() * 100)}
               />
+              {/* 模型/Provider 切换 chip（cc-switch 风格）：纯本地视觉状态，不接后端 */}
+              <div
+                class="flex items-center gap-0.5 p-0.5 rounded-full bg-white/50 border border-border-primary/40 flex-shrink-0"
+                role="group"
+                aria-label="切换模型提供商（仅本地 UI 状态）"
+              >
+                <For each={PROVIDERS}>
+                  {(p) => (
+                    <button
+                      class="px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+                      classList={{
+                        'bg-nt-io-500 text-white': activeProvider() === p,
+                        'text-text-muted hover:text-text-primary hover:bg-white/60': activeProvider() !== p,
+                      }}
+                      onClick={() => setActiveProvider(p)}
+                      aria-pressed={activeProvider() === p}
+                      title={`UI 提供商：${p}（纯本地视觉，不接后端）`}
+                    >
+                      {p}
+                    </button>
+                  )}
+                </For>
+              </div>
               {/* 主题切换（浅金 / 浅紫 / 浅青，均为浅色主题） */}
               <button
                 class="theme-toggle"
