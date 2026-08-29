@@ -413,11 +413,15 @@ const INTERNAL_TOKENS: &[&str] = &[
     "GatewayProvider",
     "Redactor",
     "CONTEXT.md",
+    "AGENTS.md",
+    "neotrix-experience",
+    "neotrix-tauri",
+    "experience.db",
 ];
 
 /// 常见密钥/凭据前缀 — 出站前必脱 (与 neotrix 层 Redactor 行为一致)。
 const SECRET_PREFIXES: &[&str] = &[
-    "sk-", "AKIA", "eyJ", "ghp_", "gho_", "ghu_", "ghs_", "xoxb-", "xoxp-", "-----BEGIN",
+    "sk-", "AKIA", "eyJ", "ghp_", "gho_", "ghu_", "ghs_", "xoxb-", "xoxp-", "-----BEGIN", "AIza", "pk_live", "pk_test",
     "Bearer ", "api_key=", "apikey=", "secret=", "client_secret=", "password=", "token=",
 ];
 
@@ -466,20 +470,80 @@ fn redact_secrets_str(s: &str) -> String {
     out
 }
 
-/// 脱密钥 (保留原 `scrub_egress_secrets` 行为)。
+/// 文本是否含已知密钥前缀。
+fn has_secret(s: &str) -> bool {
+    SECRET_PREFIXES.iter().any(|p| s.contains(p))
+}
+
+/// 脱敏绝对文件系统路径 (暴露本地环境), 仅命中明确的家目录/私有路径前缀, 避免误伤 URL。
+fn redact_paths_str(s: &str) -> String {
+    const PREFIXES: &[&str] = &["/Users/", "/home/", "/private/", "C:\\"];
+    let mut out = s.to_string();
+    for p in PREFIXES {
+        let mut scan = 0;
+        while let Some(rel) = out[scan..].find(p) {
+            let idx = scan + rel;
+            let rest = &out[idx..];
+            let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
+            if end == 0 {
+                scan = idx + 1;
+                continue;
+            }
+            let path = &out[idx..idx + end];
+            out = out.replace(path, "[REDACTED:path]");
+            scan = idx + "[REDACTED:path]".len();
+        }
+    }
+    out
+}
+
+/// 出站脱敏组合: 内部指纹 + 密钥 + 绝对路径。
+fn redact_outbound_str(s: &str) -> String {
+    let s = redact_internals(s);
+    let s = redact_secrets_str(&s);
+    redact_paths_str(&s)
+}
+
+/// 脱密钥 (保留原 `scrub_egress_secrets` 行为) — 覆盖所有出站字段, 密钥绝不外泄。
 fn scrub_secrets_core(req: &mut LlmRequest) {
     for m in req.messages.iter_mut() {
-        if m.content.contains("sk-")
-            || m.content.contains("AKIA")
-            || m.content.contains("eyJ")
-            || m.content.contains("Bearer ")
-            || m.content.contains("-----BEGIN")
-            || m.content.contains("password=")
-            || m.content.contains("secret=")
-            || m.content.contains("api_key=")
-            || m.content.contains("token=")
-        {
+        if has_secret(&m.content) {
             m.content = redact_secrets_str(&m.content);
+        }
+    }
+    if let Some(ref mut img) = req.image_data {
+        if has_secret(img) {
+            *img = redact_secrets_str(img);
+        }
+    }
+    for tool in req.tools.iter_mut() {
+        if let Ok(s) = serde_json::to_string(&*tool) {
+            let red = redact_secrets_str(&s);
+            if red != s {
+                if let Ok(t) = serde_json::from_str(&red) {
+                    *tool = t;
+                }
+            }
+        }
+    }
+    if let Some(ref mut so) = req.structured_output {
+        if let Ok(s) = serde_json::to_string(&*so) {
+            let red = redact_secrets_str(&s);
+            if red != s {
+                if let Ok(parsed) = serde_json::from_str(&red) {
+                    *so = parsed;
+                }
+            }
+        }
+    }
+    for (_, v) in req.provider_params.iter_mut() {
+        if let Ok(s) = serde_json::to_string(&*v) {
+            let red = redact_secrets_str(&s);
+            if red != s {
+                if let Ok(parsed) = serde_json::from_str(&red) {
+                    *v = parsed;
+                }
+            }
         }
     }
 }
@@ -531,25 +595,20 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
     leaks.sort_unstable();
     leaks.dedup();
 
-    if leaks.is_empty() {
-        return Ok(());
-    }
-
     match trust {
         DataTrust::Contracted => {
             // 付费云: 脱敏内部指纹后放行
             for m in req.messages.iter_mut() {
-                if !scan_internals(&m.content).is_empty() {
-                    m.content = redact_internals(&m.content);
-                }
+                // Contracted 下始终脱敏: 内部指纹 + 密钥 + 绝对路径 (无条件, 防路径/密钥漏脱敏)
+                m.content = redact_outbound_str(&m.content);
             }
             if let Some(ref mut img) = req.image_data {
-                *img = redact_internals(img);
+                *img = redact_outbound_str(img);
             }
             // 扩展载荷脱敏
             for tool in req.tools.iter_mut() {
                 if let Ok(s) = serde_json::to_string(&*tool) {
-                    let red = redact_internals(&s);
+                    let red = redact_outbound_str(&s);
                     if red != s {
                         if let Ok(t) = serde_json::from_str(&red) {
                             *tool = t;
@@ -559,7 +618,7 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
             }
             if let Some(ref mut so) = req.structured_output {
                 if let Ok(s) = serde_json::to_string(&*so) {
-                    let red = redact_internals(&s);
+                    let red = redact_outbound_str(&s);
                     if red != s {
                         if let Ok(parsed) = serde_json::from_str(&red) {
                             *so = parsed;
@@ -569,7 +628,7 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
             }
             for (_, v) in req.provider_params.iter_mut() {
                 if let Ok(s) = serde_json::to_string(&*v) {
-                    let red = redact_internals(&s);
+                    let red = redact_outbound_str(&s);
                     if red != s {
                         if let Ok(parsed) = serde_json::from_str(&red) {
                             *v = parsed;
@@ -581,12 +640,16 @@ pub fn egress_privacy_guard(req: &mut LlmRequest, trust: DataTrust) -> Result<()
         }
         DataTrust::Untrusted => {
             // fail-closed: 免费/代理端点绝不放行 NeoTrix 内部代码/对话
-            let joined = leaks.join(", ");
-            Err(format!(
-                "privacy guard: egress to untrusted provider would leak NeoTrix internal code/conversation ({}). \
-                 Blocked. Use a local (Ollama/vLLM/SGLang) or paid contracted provider.",
-                joined
-            ))
+            if leaks.is_empty() {
+                Ok(())
+            } else {
+                let joined = leaks.join(", ");
+                Err(format!(
+                    "privacy guard: egress to untrusted provider would leak NeoTrix internal code/conversation ({}). \
+                     Blocked. Use a local (Ollama/vLLM/SGLang) or paid contracted provider.",
+                    joined
+                ))
+            }
         }
         DataTrust::Trusted => Ok(()),
     }
@@ -788,6 +851,40 @@ mod tests {
         let mut r = LlmRequest::new("nt_core_consciousness_core-proxy", "hi");
         let res = egress_privacy_guard(&mut r, DataTrust::Untrusted);
         assert!(res.is_err(), "untrusted + internal fingerprint in model field must be blocked");
+    }
+
+    #[test]
+    fn egress_guard_blocks_untrusted_new_internal_token() {
+        // 扩展指纹: neotrix-experience 命中即阻断 (Untrusted)
+        let mut r = LlmRequest::new("m", "run neotrix-experience query --kw test");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "run neotrix-experience query --kw test"));
+        assert!(egress_privacy_guard(&mut r, DataTrust::Untrusted).is_err());
+    }
+
+    #[test]
+    fn egress_guard_redacts_contracted_tool_secret() {
+        // 密钥藏在 tool schema 描述中, Contracted 下必须被脱敏 (修复仅 messages 脱密钥的缺口)
+        let tool = Tool {
+            name: "fs".into(),
+            description: "use sk-ABCD1234secretkey here".into(),
+            input_schema: serde_json::json!({ "type": "object" }),
+        };
+        let mut r = LlmRequest::new("m", "hi").with_tools(vec![tool]);
+        assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
+        let s = serde_json::to_string(&r.tools[0]).unwrap();
+        assert!(!s.contains("sk-ABCD1234"), "tool schema secret must be redacted under Contracted");
+    }
+
+    #[test]
+    fn egress_guard_redacts_contracted_absolute_path() {
+        // 绝对路径泄露本地环境, Contracted 下必须脱敏
+        let mut r = LlmRequest::new("m", "read /Users/neo/secret-project/keys.txt");
+        r.messages.clear();
+        r.messages.push(Message::new(Role::User, "read /Users/neo/secret-project/keys.txt"));
+        assert!(egress_privacy_guard(&mut r, DataTrust::Contracted).is_ok());
+        assert!(r.messages[0].content.contains("[REDACTED:path]"), "absolute path must be redacted under Contracted");
+        assert!(!r.messages[0].content.contains("/Users/neo"), "raw path must not leak");
     }
 
     // ---- 集成级测试: 验证 trait 默认方法 complete()/stream_complete() 真的执行 egress 闸门 (T3 生产接线) ----
