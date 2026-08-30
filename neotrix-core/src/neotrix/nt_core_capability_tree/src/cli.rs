@@ -423,8 +423,10 @@ impl CapabilityCli {
         for n in nodes {
             let shape = match n.layer {
                 NodeLayer::L0Primitive => "(()",
-                NodeLayer::L1Composite | NodeLayer::L2Orchestrator => "(())",
-                NodeLayer::L3DomainService | NodeLayer::L4Application => "((()))",
+                NodeLayer::L1Composite | NodeLayer::L2Orchestrator | NodeLayer::L2World => "(())",
+                NodeLayer::L3DomainService | NodeLayer::L3Memory | NodeLayer::L4Application
+                | NodeLayer::L4Cognition | NodeLayer::L5Conscious | NodeLayer::L6Self
+                | NodeLayer::L7Capability | NodeLayer::L8Autonomic => "((()))",
             };
             let color = match n.constellation as u8 {
                 0 => "fill:#ffcccc",

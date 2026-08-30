@@ -151,8 +151,10 @@ fn load_from_registry_path(path: &std::path::Path) -> Option<Vec<SkillNode>> {
             .collect();
         let tier = match node.layer {
             NodeLayer::L0Primitive | NodeLayer::L1Composite => "Small Passive",
-            NodeLayer::L2Orchestrator => "Notable Passive",
-            NodeLayer::L3DomainService | NodeLayer::L4Application => "Keystone",
+            NodeLayer::L2Orchestrator | NodeLayer::L2World => "Notable Passive",
+            NodeLayer::L3DomainService | NodeLayer::L3Memory | NodeLayer::L4Application
+            | NodeLayer::L4Cognition | NodeLayer::L5Conscious | NodeLayer::L6Self
+            | NodeLayer::L7Capability | NodeLayer::L8Autonomic => "Keystone",
         };
         let effects = node
             .provides

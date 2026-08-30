@@ -69,8 +69,15 @@ pub enum NodeLayer {
     L0Primitive,
     L1Composite,
     L2Orchestrator,
+    L2World,
     L3DomainService,
+    L3Memory,
     L4Application,
+    L4Cognition,
+    L5Conscious,
+    L6Self,
+    L7Capability,
+    L8Autonomic,
 }
 
 impl NodeLayer {
@@ -79,8 +86,15 @@ impl NodeLayer {
             NodeLayer::L0Primitive => "L0",
             NodeLayer::L1Composite => "L1",
             NodeLayer::L2Orchestrator => "L2",
+            NodeLayer::L2World => "L2",
             NodeLayer::L3DomainService => "L3",
+            NodeLayer::L3Memory => "L3",
             NodeLayer::L4Application => "L4",
+            NodeLayer::L4Cognition => "L4",
+            NodeLayer::L5Conscious => "L5",
+            NodeLayer::L6Self => "L6",
+            NodeLayer::L7Capability => "L7",
+            NodeLayer::L8Autonomic => "L8",
         }
     }
 }
