@@ -215,6 +215,92 @@ impl LlmProviderType {
 /// 避免 core/neotrix 双定义 (core 不得依赖 neotrix, 故单一事实源在 core)。
 pub use crate::core::nt_core_llm::DataTrust;
 
+/// 出口路由 — 吸收 personal-edge-proxy: ingress≠egress, 按域选不同出口。
+/// 进入 VPS 的入口 (ingress) 与流量离开 VPS 的出口 (egress) 必须解耦。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EgressRoute {
+    /// 直连 (无代理) — 默认兜底; 在 fail-closed 策略下不允许作为"被钉死出口"的回退。
+    #[default]
+    Direct,
+    /// WARP 出口 (OpenAI/Gemini 类云端)
+    Warp,
+    /// 固定 SOCKS5 出口 (Claude/Anthropic 类)
+    FixedSocks5,
+}
+
+impl EgressRoute {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "direct" => Some(Self::Direct),
+            "warp" => Some(Self::Warp),
+            "fixed_socks5" | "fixed-socks5" | "socks5" => Some(Self::FixedSocks5),
+            _ => None,
+        }
+    }
+}
+
+/// 出口策略 — 强化 Egress Privacy Guard (吸收 personal-edge-proxy):
+/// 被钉死的出口不可用时请求必须失败, 绝不静默回退到直连 (避免出口身份被无声改变)。
+#[derive(Debug, Clone, Default)]
+pub struct EgressPolicy {
+    /// 钉死的出口路由; Some 表示所有出站流量必须走此路由。
+    pub pinned: Option<EgressRoute>,
+    /// 失败闭环: 钉死出口不可用时拒绝请求 (true) 还是允许回退 (false)。
+    pub fail_closed: bool,
+}
+
+impl EgressPolicy {
+    /// 校验所选出口是否满足策略; 失败闭环时钉死出口与实际路由不符 → Err (fail-closed)。
+    pub fn enforce(&self, selected: EgressRoute) -> Result<(), String> {
+        match self.pinned {
+            None => Ok(()),
+            Some(pinned) => {
+                if pinned == selected {
+                    Ok(())
+                } else if self.fail_closed {
+                    Err(format!(
+                        "egress policy fail-closed: pinned route {pinned:?} unavailable, request blocked (no silent fallback to {selected:?})"
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    /// 从环境变量构造域级出口策略 (personal-edge-proxy: AI-first 配置域隔离):
+    /// `NEOTRIX_EGRESS_ROUTE` = warp|fixed_socks5|direct, `NEOTRIX_EGRESS_FAIL_CLOSED` = 1|true。
+    /// 未设置时返回无约束策略 (pinned=None), 不影响既有行为。
+    pub fn from_env() -> Self {
+        let route = std::env::var("NEOTRIX_EGRESS_ROUTE")
+            .ok()
+            .and_then(|v| EgressRoute::from_str(&v));
+        let fail_closed = matches!(
+            std::env::var("NEOTRIX_EGRESS_FAIL_CLOSED").as_deref(),
+            Ok("1") | Ok("true") | Ok("TRUE")
+        );
+        Self { pinned: route, fail_closed }
+    }
+}
+
+impl LlmProviderType {
+    /// 域感知出口路由 — 吸收 personal-edge-proxy: OpenAI/Gemini → WARP, Anthropic → 固定 SOCKS5。
+    /// 本地推理无需出口代理 → Direct。
+    pub fn domain_egress_route(self) -> EgressRoute {
+        match self {
+            Self::OpenAI | Self::Gemini => EgressRoute::Warp,
+            Self::Anthropic => EgressRoute::FixedSocks5,
+            _ => {
+                if self.is_local() {
+                    EgressRoute::Direct
+                } else {
+                    EgressRoute::Warp
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProviderConfig {
     pub provider_type: LlmProviderType,
@@ -292,6 +378,21 @@ impl ProviderConfig {
                 .unwrap_or(120),
             proxy: super::super::nt_io_http_factory::proxy_from_env(),
         }
+    }
+
+    /// 解析本 provider 的出口策略 (域级, 从环境变量读取 personal-edge-proxy 式配置)。
+    pub fn egress_policy(&self) -> EgressPolicy {
+        EgressPolicy::from_env()
+    }
+
+    /// 解析本 provider 的出口路由 (域感知: OpenAI/Gemini→WARP, Anthropic→SOCKS5)。
+    pub fn egress_route(&self) -> EgressRoute {
+        self.provider_type.domain_egress_route()
+    }
+
+    /// 出口策略失败闭环校验 — 钉死出口不可用时拒绝 (R-P79 消费者: create_provider)。
+    pub fn enforce_egress(&self) -> Result<(), String> {
+        self.egress_policy().enforce(self.egress_route())
     }
 }
 
@@ -458,6 +559,14 @@ pub fn create_provider(config: ProviderConfig) -> Arc<dyn LlmProvider> {
             config.provider_type, host
         );
         return Arc::new(DeniedProvider { host });
+    }
+    // 出口策略失败闭环 (吸收 personal-edge-proxy): 钉死出口不可用时拒绝, 不静默回退直连。
+    if let Err(reason) = config.enforce_egress() {
+        log::warn!(
+            "[factory] egress policy BLOCKED provider {:?}: {reason}",
+            config.provider_type
+        );
+        return Arc::new(DeniedProvider { host: "egress-policy".into() });
     }
     let mut provider: Arc<dyn LlmProvider> = match config.provider_type {
         LlmProviderType::OpenAI => {
@@ -1070,6 +1179,30 @@ mod tests {
         assert_eq!(host_of("https://[::1]:8080/v1"), "[::1]");
         assert_eq!(host_of("https://opencode.ai"), "opencode.ai");
         assert_eq!(host_of("api.deepseek.com"), "api.deepseek.com");
+    }
+
+    #[test]
+    fn domain_egress_route_partitions_by_provider() {
+        assert_eq!(LlmProviderType::OpenAI.domain_egress_route(), EgressRoute::Warp);
+        assert_eq!(LlmProviderType::Gemini.domain_egress_route(), EgressRoute::Warp);
+        assert_eq!(LlmProviderType::Anthropic.domain_egress_route(), EgressRoute::FixedSocks5);
+        assert_eq!(LlmProviderType::Ollama.domain_egress_route(), EgressRoute::Direct);
+    }
+
+    #[test]
+    fn egress_policy_fail_closed_rejects_silent_fallback() {
+        let policy = EgressPolicy { pinned: Some(EgressRoute::Warp), fail_closed: true };
+        assert!(policy.enforce(EgressRoute::Warp).is_ok());
+        assert!(policy.enforce(EgressRoute::Direct).is_err(), "fail-closed must block silent fallback to Direct");
+        let lax = EgressPolicy { pinned: Some(EgressRoute::Warp), fail_closed: false };
+        assert!(lax.enforce(EgressRoute::Direct).is_ok(), "non-fail-closed permits fallback");
+    }
+
+    #[test]
+    fn provider_config_enforce_egress_default_is_open() {
+        let cfg = ProviderConfig::default();
+        // 默认无钉死出口 → 不约束
+        assert!(cfg.enforce_egress().is_ok());
     }
 
     #[test]

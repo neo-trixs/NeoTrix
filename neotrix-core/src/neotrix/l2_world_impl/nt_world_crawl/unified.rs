@@ -16,6 +16,8 @@ use crate::neotrix::nt_world_scrape::ScraperConfig;
 
 pub struct UnifiedCrawler {
     pub config: CrawlerConfig,
+    /// 抓取传输协议 — 吸收 robin: Tor 传输支持暗网/匿名检索 (默认 Http)。
+    transport: FetcherProtocol,
     frontier: DualQueueFrontier,
     fetcher: FetcherPool,
     classifier: ContentClassifier,
@@ -91,6 +93,7 @@ impl UnifiedCrawler {
 
         UnifiedCrawler {
             frontier,
+            transport: config.transport,
             fetcher: FetcherPool::new(&nt_world_scrape_config, config.strategy),
             classifier: ContentClassifier::new(),
             mapper: KnowledgeMapper::new(),
@@ -126,6 +129,16 @@ impl UnifiedCrawler {
     /// 挂接两阶段抓取器 — 链接发现后先 BM25 过滤 (nt_world_prefetch 接线)。
     pub fn attach_prefetch(&mut self, crawler: crate::neotrix::l2_world_impl::nt_world_prefetch::TwoPhaseCrawler) {
         self.prefetch = Some(crawler);
+    }
+
+    /// 切换抓取传输协议 (吸收 robin: Tor 传输用于暗网/匿名检索)。
+    pub fn set_transport(&mut self, protocol: FetcherProtocol) {
+        self.transport = protocol;
+    }
+
+    /// 当前抓取传输协议。
+    pub fn transport(&self) -> FetcherProtocol {
+        self.transport
     }
 
     /// prefetch 过滤后丢弃的链接数 (telemetry) — 从 filter_relevant 输入输出差计算。
@@ -184,7 +197,10 @@ impl UnifiedCrawler {
                 };
             }
 
-            let result = self.fetcher.fetch_with_retry(&url_entry.url, self.config.max_retries);
+            let result = match self.transport {
+                FetcherProtocol::Tor => self.fetcher.fetch_tor_safe(&url_entry.url),
+                _ => self.fetcher.fetch_with_retry(&url_entry.url, self.config.max_retries),
+            };
             self.total_fetched += 1;
 
             if let Some(ref err) = result.error {
@@ -759,5 +775,14 @@ mod tests {
         let kept: Vec<&str> = relevant.iter().map(|r| r.url.as_str()).collect();
         assert!(kept.contains(&"https://a.com/ai-paper"));
         assert!(!kept.contains(&"https://b.com/cooking"));
+    }
+
+    #[test]
+    fn transport_defaults_http_and_switches_to_tor() {
+        // 吸收 robin: 默认 Http, 可切换 Tor 传输 (暗网/匿名检索)
+        let mut crawler = test_nt_world_crawl();
+        assert_eq!(crawler.transport(), FetcherProtocol::Http);
+        crawler.set_transport(FetcherProtocol::Tor);
+        assert_eq!(crawler.transport(), FetcherProtocol::Tor);
     }
 }

@@ -19,6 +19,35 @@ pub struct GradedDocument {
     pub confidence: f64,
 }
 
+/// 接地引用 — 吸收 robin: 从本次检索持久化的调查上下文生成接地对话引用,
+/// 回答基于已检索证据 (不再重新搜索), 即 robin 的 "answered from that investigation's own data"。
+#[derive(Debug, Clone)]
+pub struct GroundingCitation {
+    pub node_id: String,
+    pub title: String,
+    pub score: f64,
+}
+
+impl GroundingCitation {
+    /// 从分级文档 + 检索结果生成接地引用 (仅保留相关/部分相关, 过滤无关)。
+    pub fn from_retrieval(graded: &[GradedDocument], results: &[SearchResult]) -> Vec<Self> {
+        let mut cites = Vec::new();
+        for g in graded {
+            if g.relevance == RelevanceGrade::Irrelevant {
+                continue;
+            }
+            if let Some(r) = results.iter().find(|r| r.node.id == g.node_id) {
+                cites.push(GroundingCitation {
+                    node_id: g.node_id.clone(),
+                    title: r.node.title.clone(),
+                    score: r.score,
+                });
+            }
+        }
+        cites
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RelevanceGrade {
     Relevant,
@@ -253,6 +282,7 @@ impl AdaptiveRetrieval {
             iteration += 1;
         }
 
+        let grounding = GroundingCitation::from_retrieval(&graded, &all_results);
         AdaptiveRagResult {
             query: query.to_string(),
             rewritten_query: rewritten,
@@ -260,6 +290,7 @@ impl AdaptiveRetrieval {
             action,
             graded,
             results: all_results,
+            grounding,
             iteration_count: iteration,
         }
     }
@@ -306,6 +337,8 @@ pub struct AdaptiveRagResult {
     pub action: RetrievalAction,
     pub graded: Vec<GradedDocument>,
     pub results: Vec<SearchResult>,
+    /// 接地引用 — 从持久化调查上下文生成的证据引用 (吸收 robin 接地对话检索)。
+    pub grounding: Vec<GroundingCitation>,
     pub iteration_count: usize,
 }
 
@@ -478,5 +511,71 @@ mod tests {
         ];
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
         assert_eq!(ar.route_decision(&graded), RetrievalAction::Refine);
+    }
+
+    #[test]
+    fn grounding_cites_relevant_and_skips_irrelevant() {
+        // 吸收 robin: 接地引用从持久化调查上下文生成, 仅保留相关/部分相关证据
+        let results = vec![
+            SearchResult {
+                node: KnowledgeNode {
+                    id: "1".into(),
+                    node_type: NodeType::Concept,
+                    title: "E8 Reasoning Engine".into(),
+                    summary: None,
+                    content: None,
+                    url: None,
+                    domain: None,
+                    language: "en".into(),
+                    confidence: 1.0,
+                    importance: 0.5,
+                    created_at: 0,
+                    updated_at: 0,
+                    access_count: 0,
+                    metadata: None,
+                    temporal: None,
+                    supersedes: None,
+                    source_episode: None,
+                    recall_weight: 1.0,
+                },
+                score: 0.9,
+                matched_on: vec![],
+                signals: None,
+            },
+            SearchResult {
+                node: KnowledgeNode {
+                    id: "2".into(),
+                    node_type: NodeType::Concept,
+                    title: "Unrelated Cooking".into(),
+                    summary: None,
+                    content: None,
+                    url: None,
+                    domain: None,
+                    language: "en".into(),
+                    confidence: 1.0,
+                    importance: 0.5,
+                    created_at: 0,
+                    updated_at: 0,
+                    access_count: 0,
+                    metadata: None,
+                    temporal: None,
+                    supersedes: None,
+                    source_episode: None,
+                    recall_weight: 1.0,
+                },
+                score: 0.3,
+                matched_on: vec![],
+                signals: None,
+            },
+        ];
+        let graded = vec![
+            GradedDocument { node_id: "1".into(), relevance: RelevanceGrade::Relevant, confidence: 0.9 },
+            GradedDocument { node_id: "2".into(), relevance: RelevanceGrade::Irrelevant, confidence: 0.1 },
+        ];
+        let cites = GroundingCitation::from_retrieval(&graded, &results);
+        assert_eq!(cites.len(), 1, "irrelevant doc must not be grounded");
+        assert_eq!(cites[0].node_id, "1");
+        assert_eq!(cites[0].title, "E8 Reasoning Engine");
+        assert_eq!(cites[0].score, 0.9);
     }
 }

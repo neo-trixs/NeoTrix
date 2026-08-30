@@ -16,7 +16,7 @@
 //! 调用点: `gateway/execution.rs::call_provider` / `call_provider_stream`,
 //! 每一条出网请求必经此门。
 
-use crate::neotrix::l1_body_impl::nt_io_provider::factory::{DataTrust, LlmProviderType};
+use crate::neotrix::l1_body_impl::nt_io_provider::factory::{DataTrust, EgressPolicy, EgressRoute, LlmProviderType};
 use crate::neotrix::l1_body_impl::nt_io_provider::types::LlmRequest;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -179,6 +179,16 @@ pub fn trust_from_name(registered_name: &str) -> DataTrust {
         .unwrap_or(DataTrust::Untrusted) // 未知端点保守视为不可信
 }
 
+/// 域感知出口路由 (吸收 personal-edge-proxy) — 委托 factory 单一事实源, 不复制逻辑。
+pub fn domain_egress_route(provider: LlmProviderType) -> EgressRoute {
+    provider.domain_egress_route()
+}
+
+/// 出口策略失败闭环校验 — 委托 factory `EgressPolicy::enforce` (R-P42 单一逻辑源)。
+pub fn enforce_egress_policy(policy: &EgressPolicy, selected: EgressRoute) -> Result<(), String> {
+    policy.enforce(selected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,5 +308,25 @@ mod tests {
             trust_from_name("totally-unknown-provider-xyz"),
             DataTrust::Untrusted
         );
+    }
+
+    #[test]
+    fn domain_egress_routes_openai_gemini_to_warp_anthropic_to_socks5() {
+        assert_eq!(domain_egress_route(LlmProviderType::OpenAI), EgressRoute::Warp);
+        assert_eq!(domain_egress_route(LlmProviderType::Gemini), EgressRoute::Warp);
+        assert_eq!(domain_egress_route(LlmProviderType::Anthropic), EgressRoute::FixedSocks5);
+        assert_eq!(domain_egress_route(LlmProviderType::Ollama), EgressRoute::Direct);
+    }
+
+    #[test]
+    fn egress_policy_fail_closed_blocks_when_pinned_route_unavailable() {
+        // 钉死 WARP, 实际只能直连 → fail-closed 拒绝 (不静默回退)
+        let policy = EgressPolicy { pinned: Some(EgressRoute::Warp), fail_closed: true };
+        assert!(enforce_egress_policy(&policy, EgressRoute::Direct).is_err());
+        // pinned 与实际一致 → 放行
+        assert!(enforce_egress_policy(&policy, EgressRoute::Warp).is_ok());
+        // 非 fail-closed → 允许回退
+        let lax = EgressPolicy { pinned: Some(EgressRoute::Warp), fail_closed: false };
+        assert!(enforce_egress_policy(&lax, EgressRoute::Direct).is_ok());
     }
 }

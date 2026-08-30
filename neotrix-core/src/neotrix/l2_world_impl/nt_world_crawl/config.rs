@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use super::fetcher::FetcherProtocol;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CrawlTopic {
     LawAndGovernance,
@@ -125,6 +127,8 @@ pub struct CrawlerConfig {
     pub self_heal_interval: u32,
     pub fetch_timeout_secs: u64,
     pub max_retries: u32,
+    /// 抓取传输协议 — 吸收 robin: Tor 传输用于暗网/匿名检索 (FetcherProtocol::Tor 已存在)。
+    pub transport: FetcherProtocol,
     pub topic_weights: HashMap<CrawlTopic, f64>,
 }
 
@@ -157,6 +161,7 @@ impl Default for CrawlerConfig {
             self_heal_interval: 50,
             fetch_timeout_secs: 30,
             max_retries: 3,
+            transport: FetcherProtocol::Http,
             topic_weights,
         }
     }

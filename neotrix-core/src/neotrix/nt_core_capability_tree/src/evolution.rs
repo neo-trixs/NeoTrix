@@ -36,6 +36,23 @@ pub enum EvolutionAction {
         node_id: String,
         note: String,
     },
+    /// JIT harness 合成: 为特定任务签名即时合成 agent harness (吸收 arXiv:2608.25593 JIT-Agent)。
+    /// 强化既有进化闭环 — 将"任务自适应 harness"作为可复利归档的能力信号。
+    HarnessSynthesize {
+        node_id: String,
+        task_signature: String,
+        note: String,
+    },
+    /// 修复稳执行: 对不稳定/失败的 harness 执行修复, 提升可靠执行率 (JIT-Agent repair-for-stable)。
+    RepairStable {
+        node_id: String,
+        note: String,
+    },
+    /// 性能档案复利: 将本次 harness 性能信号归档到节点 metadata, 复利驱动自进化。
+    CompoundArchive {
+        node_id: String,
+        perf: serde_json::Value,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +163,37 @@ impl<'a> EvolutionEngine<'a> {
         }
     }
 
+    /// JIT harness 合成规划 (吸收 arXiv:2608.25593 JIT-Agent)。
+    /// 为给定节点规划一次"任务自适应 harness 即时合成", 强化既有进化闭环而非新建模块。
+    pub fn plan_harness_synthesize(&self, node_id: String, task_signature: String, note: String) -> EvolutionPlan {
+        let rationale = format!("JIT harness synthesis for {}: {}", node_id, note);
+        EvolutionPlan {
+            cycle: "pending".into(),
+            actions: vec![EvolutionAction::HarnessSynthesize { node_id, task_signature, note }],
+            rationale,
+        }
+    }
+
+    /// JIT harness 修复稳执行规划 (JIT-Agent repair-for-stable-execution)。
+    pub fn plan_harness_repair(&self, node_id: String, note: String) -> EvolutionPlan {
+        let rationale = format!("JIT harness repair-stable for {}: {}", node_id, note);
+        EvolutionPlan {
+            cycle: "pending".into(),
+            actions: vec![EvolutionAction::RepairStable { node_id, note }],
+            rationale,
+        }
+    }
+
+    /// 性能档案复利归档规划 — 将 harness 性能信号写入节点 metadata 复利驱动自进化。
+    pub fn plan_compound_archive(&self, node_id: String, perf: serde_json::Value) -> EvolutionPlan {
+        let rationale = format!("Compound performance archive for {}", node_id);
+        EvolutionPlan {
+            cycle: "pending".into(),
+            actions: vec![EvolutionAction::CompoundArchive { node_id, perf }],
+            rationale,
+        }
+    }
+
     /// 执行计划
     pub fn execute(&mut self, mut plan: EvolutionPlan) -> Result<(), RegistryError> {
         for action in plan.actions.drain(..) {
@@ -249,6 +297,62 @@ impl<'a> EvolutionEngine<'a> {
                         });
                     }
                 }
+                EvolutionAction::HarnessSynthesize { node_id, task_signature, note } => {
+                    if let Some(node) = self.registry.get_mut(&node_id) {
+                        node.record_evolution(EvolutionLogEntry {
+                            cycle: plan.cycle.clone(),
+                            op: EvolutionOp::Strengthen,
+                            from_nodes: vec![],
+                            to_node: Some(node_id.clone()),
+                            note: format!("jit_harness_synthesize({}): {}", task_signature, note),
+                            timestamp: chrono::Utc::now(),
+                        });
+                        let entry = serde_json::json!({ "task_signature": task_signature, "note": note });
+                        let mut sig = serde_json::json!([entry]);
+                        if let Some(existing) = node.metadata.get("harness_syntheses") {
+                            if let Some(arr) = existing.as_array() {
+                                let mut v = arr.clone();
+                                v.push(entry);
+                                sig = serde_json::Value::Array(v);
+                            }
+                        }
+                        node.metadata.insert("harness_syntheses".into(), sig);
+                    }
+                }
+                EvolutionAction::RepairStable { node_id, note } => {
+                    if let Some(node) = self.registry.get_mut(&node_id) {
+                        node.record_evolution(EvolutionLogEntry {
+                            cycle: plan.cycle.clone(),
+                            op: EvolutionOp::Strengthen,
+                            from_nodes: vec![],
+                            to_node: Some(node_id.clone()),
+                            note: format!("jit_harness_repair: {}", note),
+                            timestamp: chrono::Utc::now(),
+                        });
+                        node.metadata.insert("harness_repaired".into(), serde_json::Value::Bool(true));
+                    }
+                }
+                EvolutionAction::CompoundArchive { node_id, perf } => {
+                    if let Some(node) = self.registry.get_mut(&node_id) {
+                        node.record_evolution(EvolutionLogEntry {
+                            cycle: plan.cycle.clone(),
+                            op: EvolutionOp::Strengthen,
+                            from_nodes: vec![],
+                            to_node: Some(node_id.clone()),
+                            note: "compounding_archive: record harness performance signal".into(),
+                            timestamp: chrono::Utc::now(),
+                        });
+                        let mut archive = serde_json::json!([&perf]);
+                        if let Some(existing) = node.metadata.get("compounding_archive") {
+                            if let Some(arr) = existing.as_array() {
+                                let mut v = arr.clone();
+                                v.push(perf);
+                                archive = serde_json::Value::Array(v);
+                            }
+                        }
+                        node.metadata.insert("compounding_archive".into(), archive);
+                    }
+                }
             }
         }
         Ok(())
@@ -341,5 +445,84 @@ impl<'a> EvolutionEngine<'a> {
         }
 
         plans
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::CapabilityRegistry;
+
+    fn seeded_registry() -> (CapabilityRegistry, String) {
+        let mut reg = CapabilityRegistry::new();
+        let id = "mind::harness::synthesizer".to_string();
+        let node = CapabilityNode::new_primitive(id.clone(), Domain::Mind, vec!["agent_harness".into()]);
+        reg.register(node).unwrap();
+        (reg, id)
+    }
+
+    #[test]
+    fn plan_harness_synthesize_carries_task_signature() {
+        let mut reg = CapabilityRegistry::new();
+        let engine = EvolutionEngine::new(&mut reg);
+        let plan = engine.plan_harness_synthesize(
+            "mind::harness::s".into(),
+            "web_audit".into(),
+            "task-adaptive harness".into(),
+        );
+        assert!(matches!(
+            plan.actions[0],
+            EvolutionAction::HarnessSynthesize { .. }
+        ));
+        if let EvolutionAction::HarnessSynthesize { task_signature, .. } = &plan.actions[0] {
+            assert_eq!(task_signature, "web_audit");
+        }
+    }
+
+    #[test]
+    fn execute_synthesize_appends_to_harness_syntheses() {
+        let (mut reg, id) = seeded_registry();
+        {
+            let mut engine = EvolutionEngine::new(&mut reg);
+            let plan = engine.plan_harness_synthesize(
+                id.clone(),
+                "dark_web_osint".into(),
+                "modular search/scrape/llm".into(),
+            );
+            engine.execute(plan).unwrap();
+        }
+        let node = reg.get(&id).unwrap();
+        let arr = node.metadata.get("harness_syntheses").unwrap().as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["task_signature"].as_str().unwrap(), "dark_web_osint");
+    }
+
+    #[test]
+    fn execute_compound_archive_aggregates_perf_signals() {
+        let (mut reg, id) = seeded_registry();
+        {
+            let mut engine = EvolutionEngine::new(&mut reg);
+            let p1 = serde_json::json!({ "reliability": 0.82 });
+            let p2 = serde_json::json!({ "reliability": 0.91 });
+            let plan1 = engine.plan_compound_archive(id.clone(), p1);
+            engine.execute(plan1).unwrap();
+            let plan2 = engine.plan_compound_archive(id.clone(), p2);
+            engine.execute(plan2).unwrap();
+        }
+        let node = reg.get(&id).unwrap();
+        let arr = node.metadata.get("compounding_archive").unwrap().as_array().unwrap();
+        assert_eq!(arr.len(), 2, "compounding archive should aggregate perf signals");
+    }
+
+    #[test]
+    fn execute_repair_marks_node_repaired() {
+        let (mut reg, id) = seeded_registry();
+        {
+            let mut engine = EvolutionEngine::new(&mut reg);
+            let plan = engine.plan_harness_repair(id.clone(), "stabilize deauth loop".into());
+            engine.execute(plan).unwrap();
+        }
+        let node = reg.get(&id).unwrap();
+        assert_eq!(node.metadata.get("harness_repaired"), Some(&serde_json::Value::Bool(true)));
     }
 }
