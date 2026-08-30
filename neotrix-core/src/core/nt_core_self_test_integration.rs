@@ -206,6 +206,10 @@ pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::neotrix::l1_body_impl::nt_io_provider::account_pool::AccountPoolHealer,
     ));
+    // 2026-08-28 Phase3 免疫: 自愈闭环 C5 — 消费 SelfTest 失败产出 (检测→诊断→自愈→复测)
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_repair_self_heal::SelfHealLoop::new(),
+    ));
 }
 
 /// 轻量 SelfTest 注册表 (纯内存检测件, 无网络/无 cargo check/无全仓扫描) —
