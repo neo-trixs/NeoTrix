@@ -13,16 +13,29 @@ fn now() -> i64 {
         .as_secs() as i64
 }
 
+/// 归一化标题: 小写 + 去标点/空白, 用于跨阶段去重 (digest_sample 与 ingest_causal_graph
+/// 对同一外部概念可能因 url/标题不同而双写 Concept 节点, 归一化后可识别近似重复)。
+pub fn normalize_title(title: &str) -> String {
+    title
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// 无事务的 nodes+nodes_fts 双写核心。调用方必须自管事务 (批量路径复用)。
 pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     let temporal_json = node.temporal.as_ref().map(|t| {
         serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
     });
+    let norm_title = normalize_title(&node.title);
     conn.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            data_tier, temporal, supersedes, source_episode, tier)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            data_tier, temporal, supersedes, source_episode, tier, norm_title)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
         params![
             node.id,
             node.node_type.as_str(),
@@ -44,6 +57,7 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
             node.supersedes,
             node.source_episode,
             "warm",
+            norm_title,
         ],
     )?;
 
@@ -67,6 +81,12 @@ pub fn insert_or_get_node_rows(
     url: Option<&str>,
     domain: Option<&str>,
 ) -> rusqlite::Result<String> {
+    // 跨阶段去重: 归一化标题匹配优先于 url/原始标题, 以捕获 digest_sample 与
+    // ingest_causal_graph 对同一外部概念双写的不同 url/标题节点。
+    let norm = normalize_title(title);
+    if let Some(existing) = find_node_by_norm_title_and_type(conn, &norm, &node_type)? {
+        return Ok(existing.id);
+    }
     if let Some(url) = url {
         if let Some(existing) = find_node_by_url(conn, url)? {
             return Ok(existing.id);
@@ -222,7 +242,42 @@ pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &N
     }
 }
 
-/// 合并相同标题的重复节点 (将指定节点的边迁移到保留节点)
+pub fn find_node_by_norm_title_and_type(
+    conn: &Connection,
+    norm_title: &str,
+    node_type: &NodeType,
+) -> rusqlite::Result<Option<KnowledgeNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain, language,
+            confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
+            supersedes
+         FROM nodes WHERE norm_title=?1 AND node_type=?2 LIMIT 1",
+    )?;
+    let mut rows = stmt.query(params![norm_title, node_type.as_str()])?;
+    match rows.next()? {
+        Some(row) => Ok(Some(KnowledgeNode {
+            id: row.get(0)?,
+            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            language: row.get(7)?,
+            confidence: row.get(8)?,
+            importance: row.get(9)?,
+            recall_weight: row.get(10)?,
+            created_at: row.get(11)?,
+            updated_at: row.get(12)?,
+            access_count: row.get(13)?,
+            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
+            temporal: None,
+            supersedes: row.get(15)?,
+            source_episode: None,
+        })),
+        None => Ok(None),
+    }
+}
 pub fn merge_duplicate_nodes(conn: &Connection, keep_id: &str, remove_id: &str) -> rusqlite::Result<()> {
     // 事务：边重映射 + 节点删除必须原子，否则残留指向已删节点的边
     let tx = conn.unchecked_transaction()?;
@@ -469,6 +524,11 @@ pub fn insert_or_get_node(
     url: Option<&str>,
     domain: Option<&str>,
 ) -> rusqlite::Result<String> {
+    // 跨阶段去重: 归一化标题匹配优先于 url/原始标题, 防止同义标题双写 Concept 节点。
+    let norm = normalize_title(title);
+    if let Some(existing) = find_node_by_norm_title_and_type(conn, &norm, &node_type)? {
+        return Ok(existing.id);
+    }
     if let Some(url) = url {
         if let Some(existing) = find_node_by_url(conn, url)? {
             return Ok(existing.id);
@@ -864,8 +924,30 @@ pub fn find_matching_skills(conn: &Connection, e8_state: u8) -> rusqlite::Result
 #[cfg(test)]
 mod tests {
 
+    use super::*;
+    use crate::core::nt_core_kb_primitives::schema_initialize;
+
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_normalize_title_collapses_punctuation() {
+        assert_eq!(normalize_title("Attention Is All You Need!"), "attention is all you need");
+        assert_eq!(normalize_title("  Transformer-Attention  "), "transformer attention");
+    }
+
+    #[test]
+    fn test_insert_or_get_dedup_by_norm_title_across_phases() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
+        // 模拟 Phase 1 (digest_sample) 写入带真实 url 的节点
+        let a = insert_or_get_node_rows(&conn, "Attention Is All You Need!", NodeType::Concept, None, Some("https://arxiv.org/abs/123"), Some("NT-CORE")).unwrap();
+        // 模拟 Phase 3 (ingest_causal_graph) 用合成 url + 不同标题但同义 → 应命中归一化标题去重
+        let b = insert_or_get_node_rows(&conn, "attention is all you need", NodeType::Concept, None, Some("cortex_source://causal_graph#42"), Some("NT-CORE")).unwrap();
+        assert_eq!(a, b, "跨阶段同义标题应被归一化去重为同一节点");
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0)).unwrap();
+        assert_eq!(count, 1, "不应产生重复 Concept 节点");
     }
 }

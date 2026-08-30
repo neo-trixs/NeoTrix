@@ -183,7 +183,8 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
             temporal TEXT,
             supersedes TEXT,
             source_episode TEXT,
-            tier TEXT NOT NULL DEFAULT 'warm'
+            tier TEXT NOT NULL DEFAULT 'warm',
+            norm_title TEXT
         );
 
         CREATE TABLE IF NOT EXISTS edges (
@@ -498,6 +499,15 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
             [SCHEMA_VERSION],
+        )?;
+    }
+
+    // 跨阶段去重 (ExternalBrainDigest): nodes.norm_title 归一化标题列, 兼容旧库。
+    // 旧库表无该列 → 一次性 ALTER (新库由上方 CREATE TABLE 直接建列, 此处跳过)。
+    if !table_column_exists(conn, "nodes", "norm_title")? {
+        conn.execute_batch("ALTER TABLE nodes ADD COLUMN norm_title TEXT")?;
+        conn.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_nodes_norm_title ON nodes(norm_title)",
         )?;
     }
 
