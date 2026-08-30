@@ -201,12 +201,10 @@ impl<'a> EvolutionEngine<'a> {
                 EvolutionAction::Budding { new_node_id, domain, provides, layer, note } => {
                     let mut node = match layer {
                         NodeLayer::L0Primitive => CapabilityNode::new_primitive(new_node_id.clone(), domain, provides),
-                        NodeLayer::L1Composite | NodeLayer::L2Orchestrator | NodeLayer::L2World => {
+                        NodeLayer::L1Composite | NodeLayer::L2Orchestrator => {
                             CapabilityNode::new_composite(new_node_id.clone(), domain, layer, provides, vec![])
                         }
-                        NodeLayer::L3DomainService | NodeLayer::L3Memory | NodeLayer::L4Application
-                        | NodeLayer::L4Cognition | NodeLayer::L5Conscious | NodeLayer::L6Self
-                        | NodeLayer::L7Capability | NodeLayer::L8Autonomic => {
+                        NodeLayer::L3DomainService | NodeLayer::L4Application => {
                             CapabilityNode::new_constellation(new_node_id.clone(), domain, layer, provides, vec![])
                         }
                         _ => {

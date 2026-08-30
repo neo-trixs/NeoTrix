@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
-use crate::neotrix::l1_body_impl::nt_io_provider::gateway::GatewayV2;
-
 // Re-export our types
 pub use api::*;
 
