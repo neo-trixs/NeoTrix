@@ -53,9 +53,9 @@ impl ConsciousnessTree {
         for (kind, branch_results) in &domain_results {
             if let Some(branch) = self.branches.get_mut(kind) {
                 if branch_results.is_empty() {
-                    // No SelfTest for this domain → neutral (校准分同步回退, 避免虚高)
+                    // No SelfTest for this domain → neutral (calibrated_health 保持 0 哨兵,
+                    // 由 branch_weakness 回退到 health, 避免未校准分支被误判。
                     branch.health = self.config.neutral_health;
-                    branch.calibrated_health = self.config.neutral_health;
                 } else {
                     let passed = branch_results.iter().filter(|r| r.passed).count();
                     let total = branch_results.len();
@@ -118,8 +118,7 @@ impl ConsciousnessTree {
             if let Some(branch) = self.branches.get_mut(&kind) {
                 if !domain_results.contains_key(&kind) {
                     branch.health = branch.health.max(self.config.neutral_health);
-                    branch.calibrated_health =
-                        branch.calibrated_health.max(self.config.neutral_health);
+                    // 未校准分支保持 calibrated_health=0 哨兵, 由 branch_weakness 回退 health
                     // Don't override if already set
                 }
             }
