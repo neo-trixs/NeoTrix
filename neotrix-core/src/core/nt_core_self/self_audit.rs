@@ -241,14 +241,50 @@ pub fn verify_prior_session_claims(claimed_modules: &[(&str, &str)]) -> Vec<Audi
     findings
 }
 
+/// 磁盘容量压力阈值: 系统卷可用空间低于此值即告警 (10 GiB)。
+const DISK_PRESSURE_THRESHOLD_BYTES: u64 = 10 * 1024 * 1024 * 1024;
+
+/// 查询某路径所在文件系统的可用字节数 (macOS/Linux `df -k` 第 4 列 Available)。
+fn fs_free_bytes(path: &Path) -> Option<u64> {
+    let out = std::process::Command::new("df").arg("-k").arg(path).output().ok()?;
+    let text = String::from_utf8(out.stdout).ok()?;
+    let line = text.lines().nth(1)?;
+    let kb: u64 = line.split_whitespace().nth(3)?.parse().ok()?;
+    Some(kb * 1024)
+}
+
+/// 磁盘容量维度 (健康链新增): 系统卷可用空间低于阈值时产出 Warning 发现,
+/// 经 converge_check → handlers_consciousness 汇入 MetaAuditor (T3 已接地)。
+pub fn scan_disk_pressure<P: AsRef<Path>>(root: P, threshold_bytes: u64) -> Vec<AuditFinding> {
+    let mut findings = Vec::new();
+    if let Some(free) = fs_free_bytes(root.as_ref()) {
+        if free < threshold_bytes {
+            findings.push(AuditFinding {
+                category: "disk-pressure",
+                severity: AuditSeverity::Warning,
+                file: root.as_ref().to_string_lossy().to_string(),
+                line: None,
+                message: format!(
+                    "磁盘容量压力: 可用 {:.1} GiB < 阈值 {:.1} GiB — 建议清理构建缓存 (cargo clean / /private/tmp/nt-target-* 孤儿)",
+                    free as f64 / 1024.0 / 1024.0 / 1024.0,
+                    threshold_bytes as f64 / 1024.0 / 1024.0 / 1024.0,
+                ),
+            });
+        }
+    }
+    findings
+}
+
 pub fn converge_check<P: AsRef<Path>>(root: P) -> AuditReport {
     let ghost = scan_ghost_modules(root.as_ref());
     let ghost_count = ghost.len();
     let stale = scan_orphan_files(root.as_ref());
     let stale_count = stale.len();
+    let disk = scan_disk_pressure(root.as_ref(), DISK_PRESSURE_THRESHOLD_BYTES);
     let mut all = Vec::new();
     all.extend(ghost);
     all.extend(stale);
+    all.extend(disk);
     AuditReport {
         findings: all,
         ghost_count,
@@ -584,6 +620,22 @@ mod tests {
             ghost_modules.is_empty(),
             "Ghost modules found: {:?}",
             ghost_modules
+        );
+    }
+
+    #[test]
+    fn test_scan_disk_pressure_threshold() {
+        // 阈值设为极大 → 系统盘可用空间必然低于阈值 → 必产生 disk-pressure 发现
+        let hot = scan_disk_pressure("/", u64::MAX);
+        assert!(
+            hot.iter().any(|f| f.category == "disk-pressure"),
+            "高阈值应触发 disk-pressure 发现"
+        );
+        // 阈值设为 0 → 可用空间永不 < 0 → 不产生发现
+        let cold = scan_disk_pressure("/", 0);
+        assert!(
+            cold.iter().all(|f| f.category != "disk-pressure"),
+            "阈值 0 不应触发 disk-pressure"
         );
     }
 

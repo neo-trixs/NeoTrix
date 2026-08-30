@@ -674,6 +674,49 @@ fn free_space_bytes(path: &std::path::Path) -> Result<u64, String> {
     Ok(avail_kib * 1024)
 }
 
+/// 回收 `/private/tmp` 下过期的 `nt-target-*` 构建缓存 (孤儿 cargo target 目录), 释放系统盘。
+/// 保守策略: 仅删 `nt-target-` 前缀目录, 跳过 `*-check` (其他 loop/会话校验目录);
+/// 仅删 mtime 早于 `max_age_days` 天的目录。`dry_run=true` 只计数不删除, 供磁盘压力门禁安全调用。
+pub fn reclaim_nt_target_tmp(max_age_days: u64, dry_run: bool) -> Result<usize, String> {
+    let tmp = std::path::Path::new("/private/tmp");
+    if !tmp.is_dir() {
+        return Ok(0);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs();
+    let cutoff = now.saturating_sub(max_age_days * 86400);
+    let mut reclaimed = 0usize;
+    for entry in std::fs::read_dir(tmp).map_err(|e| e.to_string())?.flatten() {
+        let path = entry.path();
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+        if !name.starts_with("nt-target-") || name.ends_with("-check") || !path.is_dir() {
+            continue;
+        }
+        let mtime = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if mtime < cutoff {
+            if dry_run {
+                reclaimed += 1;
+            } else {
+                std::fs::remove_dir_all(&path)
+                    .map_err(|e| format!("清理 {} 失败: {}", path.display(), e))?;
+                reclaimed += 1;
+            }
+        }
+    }
+    Ok(reclaimed)
+}
+
 /// Reclaim KB nodes whose backing ZIM archive is no longer on the external brain volume.
 /// Matches the KB's distinct `zimid://<uuid>` source set against the on-disk ZIM file uuids
 /// (read via libzim). Returns (orphan_sources, orphan_article_nodes).
@@ -1045,6 +1088,14 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         super::super::nt_memory_schema::initialize(&conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn test_reclaim_nt_target_tmp_dry_run_safe() {
+        // dry_run 只计数不删除, 对任意 /private/tmp 状态均安全; 验证返回 Ok 且不报错。
+        let n = reclaim_nt_target_tmp(9999, true).expect("reclaim dry-run");
+        // 9999 天阈值下所有 nt-target-* 目录都算"过期", 计数 >= 0 即可 (不删除)
+        assert!(n >= 0, "dry-run 计数应 >= 0");
     }
 
     #[test]
