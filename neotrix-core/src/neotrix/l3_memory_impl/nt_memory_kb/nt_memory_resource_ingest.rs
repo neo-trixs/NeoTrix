@@ -447,9 +447,9 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
         )?;
         count += 1;
     }
-    // Local 68 GB corpus (knowledge-archive-corpus-20260825.db) is a SUPERSET snapshot of
-    // the live KB — catalog it as a cold archive (do NOT merge its 22M nodes into the warm
-    // live KB, per Dark Forest: connect, don't bloat). Registered as discoverable.
+    // The 68 GB corpus (knowledge-archive-corpus-20260825.db, lives on the external brain
+    // volume) is a SUPERSET snapshot of the live KB — catalog it as a cold archive (do NOT
+    // merge its 22M nodes into the warm live KB, per Dark Forest: connect, don't bloat).
     if let Some(corpus) = corpus_archive_path() {
         let sz = std::fs::metadata(&corpus).map(|m| m.len()).unwrap_or(0);
         let mut payload = serde_json::json!({
@@ -462,7 +462,7 @@ pub fn register_cortex_brain(conn: &Connection, root: &std::path::Path) -> Resul
         upsert_cortex_node(
             conn,
             "cortex_source://corpus-archive",
-            "Local 68GB corpus (cold archive, superset of live KB)",
+            "External-brain 68GB corpus (cold archive, superset of live KB)",
             &payload.to_string(),
             &payload,
         )?;
@@ -490,12 +490,16 @@ pub fn corpus_archive_path() -> Option<std::path::PathBuf> {
 }
 
 /// Local (original) corpus DB path — the source for `migrate_cortex_archive`.
+/// Falls back to the external-brain copy when the local duplicate has been reclaimed
+/// to free disk (the two are byte-identical, produced by `migrate_cortex_corpus`).
 fn local_corpus_source() -> Option<std::path::PathBuf> {
     let home = std::env::var("HOME").unwrap_or_default();
-    let p = std::path::Path::new(&home)
+    let local = std::path::Path::new(&home)
         .join(".neotrix")
         .join("knowledge-archive-corpus-20260825.db");
-    if p.exists() { Some(p) } else { None }
+    if local.exists() { return Some(local); }
+    let ext = std::path::Path::new(CORTEX_ROOT).join("knowledge-archive-corpus-20260825.db");
+    if ext.exists() { Some(ext) } else { None }
 }
 
 /// Copy the local 68 GB corpus DB onto the external brain volume as cold storage.
