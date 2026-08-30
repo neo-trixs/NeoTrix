@@ -1470,16 +1470,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_tmp_migrate_real() {
-        let conn = test_conn();
-        let root = std::path::Path::new("/Volumes/NeoTrixBrain");
-        let r = migrate_cortex_corpus(&conn, root, false);
-        println!("MIGRATE_RESULT: {r:?}");
-        assert!(r.is_ok(), "migrate failed: {r:?}");
-    }
-
-    #[test]
     fn test_prune_cortex_orphans_no_zim_errors() {
         let conn = test_conn();
         let dir = std::env::temp_dir().join(format!("cortex_prune_{}", uuid::Uuid::new_v4()));
