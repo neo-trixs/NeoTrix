@@ -1,25 +1,24 @@
 //! ACP (Agent Communication Protocol) Client
 
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
-use tokio::net::TcpStream;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
-use tokio::net::UnixStream;
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 
 use super::{AcpConfig, AcpMessage, AcpResponse};
 
-/// ACP Client
+/// ACP Client - simplified version
 pub struct AcpClient {
-    config: crate::nt_act::AcpConfig,
-    stream: Option<Arc<Mutex<tokio::io::BufReader<tokio::io::BufWriter<tokio::net::TcpStream>>>>>,
+    config: AcpConfig,
+    stream: Option<Arc<Mutex<TcpStream>>>,
     request_id: Arc<std::sync::atomic::AtomicU64>,
     pending: Arc<tokio::sync::Mutex<HashMap<u64, tokio::sync::oneshot::Sender<AcpResponse>>>>,
 }
 
 impl AcpClient {
-    pub async fn new(config: crate::nt_act::AcpConfig) -> Result<Self, String> {
+    pub async fn new(config: AcpConfig) -> Result<Self, String> {
         let mut client = Self {
             config,
             stream: None,
@@ -38,12 +37,7 @@ impl AcpClient {
         let stream = TcpStream::connect(&addr).await
             .map_err(|e| format!("Failed to connect to ACP server: {}", e))?;
         
-        let (reader, writer) = tokio::io::split(stream);
-        let reader = BufReader::new(reader);
-        let writer = BufWriter::new(writer);
-        let stream = Arc::new(Mutex::new(BufWriter::new(BufReader::new(writer))));
-        
-        self.stream = Some(stream);
+        self.stream = Some(Arc::new(Mutex::new(stream)));
         
         // Start reading responses
         self.spawn_reader().await;
@@ -73,7 +67,7 @@ impl AcpClient {
             })),
         };
         
-        let response = self.send_request(request).await?;
+        let _response = self.send_request(request).await?;
         // Process initialize response
         Ok(())
     }
@@ -84,7 +78,7 @@ impl AcpClient {
     }
 
     async fn send_request(&self, request: AcpRequest) -> Result<AcpResponse, String> {
-        let id = request.id;
+        let _id = request.id;
         let (tx, rx) = tokio::sync::oneshot::channel();
         
         {
@@ -97,17 +91,27 @@ impl AcpClient {
             .map_err(|e| format!("Serialization failed: {}", e))?;
         
         // Send via stream
-        // This is simplified - actual implementation would use the stream
+        if let Some(stream) = &self.stream {
+            let mut stream = stream.lock().await;
+            stream.write_all(request_json.as_bytes()).await
+                .map_err(|e| format!("Write failed: {}", e))?;
+            stream.write_all(b"\n").await
+                .map_err(|e| format!("Write newline failed: {}", e))?;
+            stream.flush().await
+                .map_err(|e| format!("Flush failed: {}", e))?;
+        } else {
+            return Err("Not connected".to_string());
+        }
         
-        // Wait for response
-        tokio::time::timeout(std::time::Duration::from_secs(30), async {
-            // Wait for response
-        }).await
-        .map_err(|_| "Request timeout".to_string())?
+        // Wait for response with timeout
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| "Request timeout".to_string())?
+            .map_err(|_| "Channel closed".to_string())
     }
 
     pub async fn send_message(&self, message: AcpMessage) -> Result<AcpResponse, String> {
-        let request = AcpRequest {
+        let _request = AcpRequest {
             id: Self::next_id_static(),
             method: "message/send".to_string(),
             params: Some(serde_json::to_value(message).map_err(|e| format!("Serialize failed: {}", e))?),
@@ -119,11 +123,6 @@ impl AcpClient {
             data: None,
             error: None,
         })
-    }
-
-    fn next_id(&self) -> u64 {
-        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-        COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
     fn next_id_static() -> u64 {
@@ -141,22 +140,13 @@ struct AcpRequest {
 }
 
 #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_acp_config_default() {
-        let config = crate::nt_act::AcpConfig::default();
+        let config = AcpConfig::default();
         assert_eq!(config.timeout_secs, 60);
     }
 }
-
-
-#[derive(Debug, Clone)]
-pub struct AcpServer { pub endpoint: String }
-
-#[derive(Debug, Clone)]
-pub struct AcpConfig { pub server_url: String }
-
-#[derive(Debug, Clone)]
-pub struct AcpSession { pub id: String }

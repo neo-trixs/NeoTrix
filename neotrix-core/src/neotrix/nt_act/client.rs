@@ -1,63 +1,15 @@
 //! HTTP Client with retry, circuit breaker, rate limiting
 
-use std::sync::Arc;
-
-use std::sync::Arc;
-
-#[derive(Debug, Clone)]
-pub struct HttpClientConfig {
-    pub base_url: String,
-    pub timeout_secs: u64,
-    pub max_retries: u32,
-}
-
-impl Default for HttpClientConfig {
-    fn default() -> Self {
-        Self { base_url: "http://localhost".to_string(), timeout_secs: 30, max_retries: 3 }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct HttpRequest {
-    pub method: String,
-    pub url: String,
-    pub headers: HashMap<String, String>,
-    pub body: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct HttpResponse {
-    pub status: u16,
-    pub headers: HashMap<String, String>,
-    pub body: String,
-}
-
-impl HttpClientBuilder {
-    pub fn new() -> Self { Self { config: HttpClientConfig::default() } }
-    pub fn build(self) -> HttpClient { HttpClient::new(self.config) }
-}
-
-#[derive(Debug, Clone)]
-pub struct DeliveryOutcome {
-    pub success: bool,
-    pub detail: String,
-}
-
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
-use reqwest::{Client, ClientBuilder, RequestBuilder, Method, header::HeaderMap};
+
+use reqwest::{Client, ClientBuilder, RequestBuilder, Method};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use super::{DeliveryOutcome, HttpClientConfig, HttpRequest, HttpResponse};
-
-/// HTTP Client with retry, circuit breaker, rate limiting
-pub struct HttpClient {
-    client: Client,
-    config: crate::nt_act::HttpClientConfig,
-    rate_limiter: Arc<Mutex<HashMap<String, Vec<std::time::Instant>>>>,
-    circuit_breaker: Arc<Mutex<HashMap<String, CircuitBreakerState>>>,
-}
+use super::{HttpClientConfig, HttpRequest, HttpResponse, DeliveryOutcome, TransportCause, classify_failure, classify_status, transport_cause};
 
 #[derive(Debug, Clone, Default)]
 struct CircuitBreakerState {
@@ -66,8 +18,9 @@ struct CircuitBreakerState {
     state: CircuitState,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum CircuitState {
+    #[default]
     Closed,
     Open,
     HalfOpen,
@@ -88,51 +41,16 @@ impl RequestFailure {
     }
 }
 
-/// Which phase a transport error occurred in (extracted from reqwest for pure testing).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct TransportCause {
-    /// Deadline hit; request may or may not have been sent.
-    pub timeout: bool,
-    /// Connection/DNS/TLS failure; nothing was sent.
-    pub connect: bool,
-    /// Response-phase failure (body read/decode); peer already processed the request.
-    pub response_phase: bool,
-}
-
-fn transport_cause(err: &reqwest::Error) -> TransportCause {
-    TransportCause {
-        timeout: err.is_timeout(),
-        connect: err.is_connect(),
-        response_phase: err.is_body() || err.is_decode(),
-    }
-}
-
-/// Pure classifier: map a transport cause to its delivery outcome.
-///
-/// Conservative per dsh-im: timeouts map to `Unknown` even when they might be
-/// connect timeouts — preventing duplicate sends outranks recovering a retry.
-pub(crate) fn classify_failure(cause: TransportCause) -> DeliveryOutcome {
-    if cause.response_phase || cause.timeout {
-        DeliveryOutcome::Unknown
-    } else {
-        DeliveryOutcome::Failed
-    }
-}
-
-/// Pure classifier: map an HTTP status to its delivery outcome.
-/// 5xx = peer may have processed side effects (`Unknown`); 4xx = definitive rejection.
-pub(crate) fn classify_status(status: u16) -> DeliveryOutcome {
-    if status >= 500 {
-        DeliveryOutcome::Unknown
-    } else if status >= 400 {
-        DeliveryOutcome::Failed
-    } else {
-        DeliveryOutcome::Delivered
-    }
+/// HTTP Client with retry, circuit breaker, rate limiting
+pub struct HttpClient {
+    client: Client,
+    config: HttpClientConfig,
+    rate_limiter: Arc<Mutex<HashMap<String, Vec<std::time::Instant>>>>,
+    circuit_breaker: Arc<Mutex<HashMap<String, CircuitBreakerState>>>,
 }
 
 impl HttpClient {
-    pub fn new(config: crate::nt_act::HttpClientConfig) -> Self {
+    pub fn new(config: HttpClientConfig) -> Self {
         let mut builder = ClientBuilder::new()
             .timeout(Duration::from_secs(config.timeout_secs))
             .redirect(reqwest::redirect::Policy::limited(10));
@@ -223,17 +141,19 @@ impl HttpClient {
         // Add headers
         let mut headers = HeaderMap::new();
         for (k, v) in &request.headers {
-            headers.insert(
-                k.parse()
-                    .map_err(|e| RequestFailure::pre_send(format!("Invalid header key: {}", e)))?,
-                v.parse().map_err(|e| {
-                    RequestFailure::pre_send(format!("Invalid header value: {}", e))
-                })?,
-            );
+            if let Ok(header_name) = HeaderName::from_bytes(k.as_bytes()) {
+                if let Ok(header_val) = HeaderValue::from_str(v) {
+                    headers.insert(header_name, header_val);
+                }
+            }
         }
         // Add default headers
         for (k, v) in &self.config.headers {
-            headers.insert(k.parse().unwrap(), v.parse().unwrap());
+            if let Ok(header_name) = HeaderName::from_bytes(k.as_bytes()) {
+                if let Ok(header_val) = HeaderValue::from_str(v) {
+                    headers.insert(header_name, header_val);
+                }
+            }
         }
         req = req.headers(headers);
 
@@ -262,7 +182,9 @@ impl HttpClient {
         Ok(HttpResponse {
             status,
             headers: headers.into_iter()
-                .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+                .filter_map(|(k, v): (Option<HeaderName>, HeaderValue)| {
+                    k.map(|kn| (kn.as_str().to_owned(), v.to_str().unwrap_or("").to_owned()))
+                })
                 .collect(),
             body: body.to_vec(),
         })
@@ -282,10 +204,10 @@ impl HttpClient {
         let mut limiter = self.rate_limiter.lock().await;
         let now = std::time::Instant::now();
         let requests = limiter.entry(host.to_string()).or_insert_with(Vec::new);
-        
+
         // Clean old entries (older than 1 second)
         requests.retain(|&t| now.duration_since(t) < Duration::from_secs(1));
-        
+
         // Simple rate limit: 100 requests per second per host
         if requests.len() >= 100 {
             let oldest = requests[0];
@@ -299,7 +221,7 @@ impl HttpClient {
         let host = url.split('/').nth(2).unwrap_or("default");
         let mut cb = self.circuit_breaker.lock().await;
         let state = cb.entry(host.to_string()).or_default();
-        
+
         match state.state {
             CircuitState::Open => {
                 if let Some(last) = state.last_failure {
@@ -345,8 +267,8 @@ mod tests {
 
     #[test]
     fn test_client_creation() {
-        let config = crate::nt_act::HttpClientConfig::default();
-        let _client = HttpClient::new(config);
+        let config = HttpClientConfig::default();
+        let _ = HttpClient::new(config);
     }
 
     #[test]
@@ -392,7 +314,7 @@ mod tests {
     #[tokio::test]
     async fn connect_refused_classifies_failed_and_retries_then_fails() {
         // Port 1 on loopback: connection refused, nothing ever sent -> Failed.
-        let config = crate::nt_act::HttpClientConfig {
+        let config = HttpClientConfig {
             base_url: Some("http://127.0.0.1:1".to_string()),
             max_retries: 1,
             retry_delay_ms: 1,

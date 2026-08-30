@@ -35,9 +35,11 @@ mod structured;
 mod tables;
 mod types;
 mod visual;
+mod doc_parse;
 mod format_route;
 
 pub use core::*;
+pub use doc_parse::*;
 pub use e8::*;
 pub use embedding::*;
 pub use encoding::*;

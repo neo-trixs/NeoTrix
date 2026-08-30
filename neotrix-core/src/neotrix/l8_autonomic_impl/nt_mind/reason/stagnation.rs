@@ -116,12 +116,10 @@ mod tests {
     }
 
     /// 端到端集成测试: StagnationDetector → SelfIteratingBrain 全链路
-    /// 离线运行, 不依赖网络
+    /// 离线运行, 使用轻量构造避免打开生产 KB
     #[test]
     fn test_stagnation_integration_with_brain() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut brain = super::super::SelfIteratingBrain::new();
+        let mut brain = super::super::SelfIteratingBrain::new_lightweight();
         brain.stagnation = StagnationDetector {
             pause_duration_secs: 0,
             ..Default::default()

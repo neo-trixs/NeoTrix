@@ -5,25 +5,25 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use super::{DecisionConfig, CommunicationIntent, CommunicationDecision, CommunicationMethod, CommunicationCapabilities};
+use super::{DecisionConfig, CommunicationIntent, CommunicationDecision, CommunicationMethod, CommunicationCapabilities, Priority, SearchOptions, HttpRequest, AcpMessage, HttpResponse, McpResult, AcpResponse, SearchResult, ToolResult};
 
 /// Decision Maker for Autonomous Communication
 pub struct DecisionMaker {
-    config: crate::nt_act::DecisionConfig,
+    config: DecisionConfig,
     history: Arc<Mutex<Vec<DecisionRecord>>>,
     learning_model: Arc<Mutex<Option<DecisionModel>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DecisionRecord {
-    intent: crate::nt_act::CommunicationIntent,
+    intent: CommunicationIntent,
     decision: CommunicationDecision,
     outcome: DecisionOutcome,
     timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-enum DecisionOutcome {
+pub enum DecisionOutcome {
     Success,
     Failure,
     Partial,
@@ -38,7 +38,7 @@ struct DecisionModel {
 }
 
 impl DecisionMaker {
-    pub fn new(config: crate::nt_act::DecisionConfig) -> Self {
+    pub fn new(config: DecisionConfig) -> Self {
         Self {
             config,
             history: Arc::new(Mutex::new(Vec::new())),
@@ -46,7 +46,7 @@ impl DecisionMaker {
         }
     }
 
-    pub async fn decide(&self, intent: &crate::nt_act::CommunicationIntent, capabilities: &CommunicationCapabilities) -> Result<crate::nt_act::CommunicationDecision, String> {
+    pub async fn decide(&self, intent: &CommunicationIntent, capabilities: &CommunicationCapabilities) -> Result<CommunicationDecision, String> {
         // Score each available method
         let mut scores = HashMap::new();
         
@@ -97,8 +97,8 @@ impl DecisionMaker {
         Ok(decision)
     }
 
-    async fn score_http(&self, intent: &crate::nt_act::CommunicationIntent) -> f64 {
-        let mut score = 0.5;
+    async fn score_http(&self, intent: &CommunicationIntent) -> f64 {
+        let mut score: f64 = 0.5;
         
         // HTTP is universal
         score += 0.2;
@@ -113,11 +113,11 @@ impl DecisionMaker {
             score += 0.2;
         }
         
-        score.min(1.0)
+        score.min(1.0_f64)
     }
 
-    async fn score_mcp(&self, intent: &crate::nt_act::CommunicationIntent) -> f64 {
-        let mut score = 0.0;
+    async fn score_mcp(&self, intent: &CommunicationIntent) -> f64 {
+        let mut score: f64 = 0.0;
         
         if !self.config.prefer_mcp {
             return 0.0;
@@ -138,11 +138,11 @@ impl DecisionMaker {
             score += 0.3;
         }
         
-        score.min(1.0)
+        score.min(1.0_f64)
     }
 
-    async fn score_acp(&self, intent: &crate::nt_act::CommunicationIntent) -> f64 {
-        let mut score = 0.0;
+    async fn score_acp(&self, intent: &CommunicationIntent) -> f64 {
+        let mut score: f64 = 0.0;
         
         // ACP for agent-to-agent communication
         if intent.action.contains("agent") || intent.action.contains("message") || intent.action.contains("communicate") {
@@ -154,11 +154,11 @@ impl DecisionMaker {
             score += 0.3;
         }
         
-        score.min(1.0)
+        score.min(1.0_f64)
     }
 
-    async fn score_search(&self, intent: &crate::nt_act::CommunicationIntent) -> f64 {
-        let mut score = 0.0;
+    async fn score_search(&self, intent: &CommunicationIntent) -> f64 {
+        let mut score: f64 = 0.0;
         
         if !self.config.prefer_search {
             return 0.0;
@@ -179,11 +179,11 @@ impl DecisionMaker {
             score += 0.2;
         }
         
-        score.min(1.0)
+        score.min(1.0_f64)
     }
 
-    async fn score_tool(&self, intent: &crate::nt_act::CommunicationIntent) -> f64 {
-        let mut score = 0.0;
+    async fn score_tool(&self, intent: &CommunicationIntent) -> f64 {
+        let mut score: f64 = 0.0;
         
         // Tool execution for specific operations
         let tool_keywords = ["file", "shell", "code", "json", "http", "search", "calculate", "process", "transform", "execute", "run"];
@@ -199,10 +199,10 @@ impl DecisionMaker {
             score += 0.4;
         }
         
-        score.min(1.0)
+        score.min(1.0_f64)
     }
 
-    fn fallback_decision(&self, intent: &crate::nt_act::CommunicationIntent, capabilities: &CommunicationCapabilities) -> crate::nt_act::CommunicationDecision {
+    fn fallback_decision(&self, intent: &CommunicationIntent, capabilities: &CommunicationCapabilities) -> CommunicationDecision {
         // Priority: MCP > HTTP > Search > Tool > ACP
         if capabilities.mcp {
             self.build_decision_sync(CommunicationMethod::Mcp, intent)
@@ -215,7 +215,7 @@ impl DecisionMaker {
         } else if capabilities.acp {
             self.build_decision_sync(CommunicationMethod::Acp, intent)
         } else {
-            crate::nt_act::CommunicationDecision {
+            CommunicationDecision {
                 method: CommunicationMethod::Http,
                 confidence: 0.1,
                 reasoning: "No suitable method found, defaulting to HTTP".to_string(),
@@ -231,8 +231,8 @@ impl DecisionMaker {
         }
     }
 
-    fn build_decision_sync(&self, method: CommunicationMethod, intent: &crate::nt_act::CommunicationIntent) -> crate::nt_act::CommunicationDecision {
-        let mut decision = crate::nt_act::CommunicationDecision {
+    fn build_decision_sync(&self, method: CommunicationMethod, intent: &CommunicationIntent) -> CommunicationDecision {
+        let mut decision = CommunicationDecision {
             method,
             confidence: 0.5,
             reasoning: format!("Selected {} as fallback", method as u8),
@@ -247,8 +247,8 @@ impl DecisionMaker {
         };
 
         match method {
-            crate::nt_act::CommunicationMethod::Http => {
-                decision.http_request = Some(crate::nt_act::client::HttpRequest {
+            CommunicationMethod::Http => {
+                decision.http_request = Some(HttpRequest {
                     method: "POST".to_string(),
                     url: intent.target.clone(),
                     headers: HashMap::new(),
@@ -257,17 +257,17 @@ impl DecisionMaker {
                 });
                 decision.reasoning = "Using HTTP for general communication".to_string();
             }
-            crate::nt_act::CommunicationMethod::Mcp => {
+            CommunicationMethod::Mcp => {
                 decision.mcp_tool = Some(intent.action.clone());
                 decision.mcp_args = Some(intent.payload.clone());
                 decision.reasoning = "Using MCP for structured tool calls".to_string();
             }
-            crate::nt_act::CommunicationMethod::Search => {
+            CommunicationMethod::Search => {
                 decision.search_query = Some(format!("{} {}", intent.action, intent.target));
-                decision.search_options = Some(crate::nt_act::search::SearchOptions::default());
+                decision.search_options = Some(SearchOptions::default());
                 decision.reasoning = "Using search for information retrieval".to_string();
             }
-            crate::nt_act::CommunicationMethod::Tool => {
+            CommunicationMethod::Tool => {
                 decision.tool_name = Some("shell_command".to_string());
                 decision.tool_args = Some(serde_json::json!({
                     "command": "echo",
@@ -275,8 +275,8 @@ impl DecisionMaker {
                 }));
                 decision.reasoning = "Using local tool execution".to_string();
             }
-            crate::nt_act::CommunicationMethod::Acp => {
-                decision.acp_message = Some(crate::nt_act::acp::AcpMessage {
+            CommunicationMethod::Acp => {
+                decision.acp_message = Some(AcpMessage {
                     from: "neotrix".to_string(),
                     to: intent.target.clone(),
                     content: intent.payload.to_string(),
@@ -289,8 +289,8 @@ impl DecisionMaker {
         decision
     }
 
-    async fn build_decision(&self, method: &CommunicationMethod, intent: &crate::nt_act::CommunicationIntent) -> Result<crate::nt_act::CommunicationDecision, String> {
-        let mut decision = crate::nt_act::CommunicationDecision {
+    async fn build_decision(&self, method: &CommunicationMethod, intent: &CommunicationIntent) -> Result<CommunicationDecision, String> {
+        let mut decision = CommunicationDecision {
             method: *method,
             confidence: 0.7,
             reasoning: String::new(),
@@ -315,7 +315,7 @@ impl DecisionMaker {
                 decision.reasoning = format!("Using MCP to call tool {}", intent.action);
             }
             CommunicationMethod::Acp => {
-                decision.acp_message = Some(crate::nt_act::acp::AcpMessage {
+                decision.acp_message = Some(AcpMessage {
                     from: "neotrix".to_string(),
                     to: intent.target.clone(),
                     content: serde_json::to_string(&intent.payload).unwrap_or_default(),
@@ -325,7 +325,7 @@ impl DecisionMaker {
             }
             CommunicationMethod::Search => {
                 decision.search_query = Some(format!("{} {}", intent.action, intent.target));
-                decision.search_options = Some(crate::nt_act::search::SearchOptions::default());
+                decision.search_options = Some(SearchOptions::default());
                 decision.reasoning = format!("Searching for information about {}", intent.target);
             }
             CommunicationMethod::Tool => {
@@ -338,8 +338,8 @@ impl DecisionMaker {
         Ok(decision)
     }
 
-    fn build_http_request(&self, intent: &crate::nt_act::CommunicationIntent) -> Result<crate::nt_act::client::HttpRequest, String> {
-        Ok(crate::nt_act::client::HttpRequest {
+    fn build_http_request(&self, intent: &CommunicationIntent) -> Result<HttpRequest, String> {
+        Ok(HttpRequest {
             method: "POST".to_string(),
             url: intent.target.clone(),
             headers: HashMap::new(),
@@ -348,7 +348,7 @@ impl DecisionMaker {
         })
     }
 
-    fn select_tool(&self, intent: &crate::nt_act::CommunicationIntent) -> Result<String, String> {
+    fn select_tool(&self, intent: &CommunicationIntent) -> Result<String, String> {
         // Select best tool based on intent
         if intent.action.contains("file") || intent.payload.get("path").is_some() {
             Ok("file_operation".to_string())
@@ -367,7 +367,7 @@ impl DecisionMaker {
         }
     }
 
-    async fn record_decision(&self, intent: &crate::nt_act::CommunicationIntent, decision: &crate::nt_act::CommunicationDecision) {
+    async fn record_decision(&self, intent: &CommunicationIntent, decision: &CommunicationDecision) {
         let mut history = self.history.lock().await;
         history.push(DecisionRecord {
             intent: intent.clone(),
@@ -377,16 +377,20 @@ impl DecisionMaker {
         });
         
         // Keep last 1000 decisions
-        if history.len() > 1000 {
-            history.drain(0..history.len() - 1000);
+        let len = history.len();
+        if len > 1000 {
+            history.drain(0..len - 1000);
         }
     }
 
-    pub async fn record_outcome(&self, intent: &crate::nt_act::CommunicationIntent, outcome: DecisionOutcome) {
+    pub async fn record_outcome(&self, intent: &CommunicationIntent, outcome: DecisionOutcome) {
         let mut history = self.history.lock().await;
-        if let Some(record) = history.iter_mut().rev().find(|r| r.intent.target == intent.target && r.intent.action == intent.action) {
+        let target = intent.target.clone();
+        let action = intent.action.clone();
+        if let Some(record) = history.iter_mut().rev().find(|r| r.intent.target == target && r.intent.action == action) {
             record.outcome = outcome;
         }
+        drop(history); // Release lock before calling update_learning_model
         
         // Update learning model if enabled
         if self.config.enable_learning {
@@ -398,7 +402,7 @@ impl DecisionMaker {
         let history = self.history.lock().await;
         let mut model = self.learning_model.lock().await;
         
-        let mut model = model.get_or_insert_with(|| DecisionModel {
+        let model = model.get_or_insert_with(|| DecisionModel {
             weights: HashMap::new(),
             performance: HashMap::new(),
             last_updated: chrono::Utc::now(),
@@ -447,19 +451,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_decision_maker() {
-        let config = crate::nt_act::DecisionConfig::default();
+        let config = DecisionConfig::default();
         let maker = DecisionMaker::new(config);
         
-        let intent = crate::nt_act::CommunicationIntent {
+        let intent = CommunicationIntent {
             target: "https://api.example.com".to_string(),
             action: "get_data".to_string(),
             payload: serde_json::json!({}),
             metadata: HashMap::new(),
-            priority: crate::nt_act::Priority::Normal,
+            priority: Priority::Normal,
             timeout_secs: None,
         };
         
-        let capabilities = crate::nt_act::CommunicationCapabilities {
+        let capabilities = CommunicationCapabilities {
             http: true,
             mcp: false,
             acp: false,
@@ -468,16 +472,6 @@ mod tests {
         };
         
         let decision = maker.decide(&intent, &capabilities).await.unwrap();
-        assert_eq!(decision.method, crate::nt_act::CommunicationMethod::Http);
+        assert_eq!(decision.method, CommunicationMethod::Http);
     }
-}
-
-
-#[derive(Debug, Clone)]
-pub struct DecisionContext { pub target: String }
-
-#[derive(Debug, Clone)]
-pub struct CommunicationDecision {
-    pub method: crate::neotrix::nt_act::types::CommunicationMethod,
-    pub confidence: f32,
 }

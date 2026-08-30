@@ -9,13 +9,13 @@ use super::{SearchConfig, SearchEngine, SearchOptions, SearchResult};
 
 /// Web Search Engine
 pub struct WebSearch {
-    config: crate::nt_act::SearchConfig,
+    config: SearchConfig,
     client: Client,
     cache: Arc<tokio::sync::Mutex<HashMap<String, Vec<SearchResult>>>>,
 }
 
 impl WebSearch {
-    pub fn new(config: crate::nt_act::SearchConfig) -> Self {
+    pub fn new(config: SearchConfig) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_secs))
             .build()
@@ -42,13 +42,13 @@ impl WebSearch {
 
         let engine = opts.engine.unwrap_or(self.config.default_engine);
         let results = match engine {
-            crate::nt_act::SearchEngine::Unified => self.search_unified(query, &opts).await?,
-            crate::nt_act::SearchEngine::Google => self.search_google(query, &opts).await?,
-            crate::nt_act::SearchEngine::Bing => self.search_bing(query, &opts).await?,
-            crate::nt_act::SearchEngine::DuckDuckGo => self.search_duckduckgo(query, &opts).await?,
-            crate::nt_act::SearchEngine::Arxiv => self.search_arxiv(query, &opts).await?,
-            crate::nt_act::SearchEngine::Wikipedia => self.search_wikipedia(query, &opts).await?,
-            crate::nt_act::SearchEngine::GitHub => self.search_github(query, &opts).await?,
+            SearchEngine::Unified => self.search_unified(query, &opts).await?,
+            SearchEngine::Google => self.search_google(query, &opts).await?,
+            SearchEngine::Bing => self.search_bing(query, &opts).await?,
+            SearchEngine::DuckDuckGo => self.search_duckduckgo(query, &opts).await?,
+            SearchEngine::Arxiv => self.search_arxiv(query, &opts).await?,
+            SearchEngine::Wikipedia => self.search_wikipedia(query, &opts).await?,
+            SearchEngine::GitHub => self.search_github(query, &opts).await?,
             _ => self.search_unified(query, &opts).await?,
         };
 
@@ -61,29 +61,52 @@ impl WebSearch {
         Ok(results)
     }
 
+    /// Dispatch to engine-specific search method
+    async fn search_engine(&self, query: &str, engine: SearchEngine, max_results: usize) -> Result<Vec<SearchResult>, String> {
+        let opts = SearchOptions { max_results: Some(max_results), engine: Some(engine), ..Default::default() };
+        match engine {
+            SearchEngine::Google => self.search_google(query, &opts).await,
+            SearchEngine::Bing => self.search_bing(query, &opts).await,
+            SearchEngine::DuckDuckGo => self.search_duckduckgo(query, &opts).await,
+            SearchEngine::Arxiv => self.search_arxiv(query, &opts).await,
+            SearchEngine::Wikipedia => self.search_wikipedia(query, &opts).await,
+            SearchEngine::GitHub => self.search_github(query, &opts).await,
+            SearchEngine::Unified => self.search_unified(query, &opts).await,
+            _ => self.search_unified(query, &opts).await,
+        }
+    }
+
     async fn search_unified(&self, query: &str, opts: &SearchOptions) -> Result<Vec<SearchResult>, String> {
         // Try multiple engines in parallel, merge and deduplicate
-        let engines = [
-            SearchEngine::Google,
-            SearchEngine::Bing,
-            SearchEngine::DuckDuckGo,
-        ];
-        
         let mut all_results = Vec::new();
-        for engine in &engines {
-            if let Ok(results) = self.search_engine(query, *engine, 5).await {
-                for r in results {
-                    if !new_results.contains(&r) {
-                        new_results.push(r);
-                    }
+        
+        // Call individual engines directly to avoid recursion
+        if let Ok(results) = self.search_google(query, opts).await {
+            for r in results {
+                if !all_results.contains(&r) {
+                    all_results.push(r);
+                }
+            }
+        }
+        if let Ok(results) = self.search_bing(query, opts).await {
+            for r in results {
+                if !all_results.contains(&r) {
+                    all_results.push(r);
+                }
+            }
+        }
+        if let Ok(results) = self.search_duckduckgo(query, opts).await {
+            for r in results {
+                if !all_results.contains(&r) {
+                    all_results.push(r);
                 }
             }
         }
         
-        new_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-        new_results.truncate(opts.max_results.unwrap_or(10));
+        all_results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        all_results.truncate(opts.max_results.unwrap_or(10));
         
-        Ok(new_results)
+        Ok(all_results)
     }
 
     async fn search_google(&self, query: &str, opts: &SearchOptions) -> Result<Vec<SearchResult>, String> {
@@ -188,7 +211,7 @@ impl WebSearch {
                         in_entry = false;
                     }
                 }
-                Ok(quick_xml::events::Event::Text(ref e)) => {
+                Ok(quick_xml::events::Event::Text(ref _e)) => {
                     if in_entry {
                         // Would need parent element name to distinguish
                     }
@@ -274,15 +297,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_creation() {
-        let config = crate::nt_act::SearchConfig::default();
-        let search = WebSearch::new(config);
+        let config = SearchConfig::default();
+        let _search = WebSearch::new(config);
         assert!(true);
     }
 }
-
-
-#[derive(Debug, Clone)]
-pub struct SearchConfig { pub engine: String }
-
-#[derive(Debug, Clone)]
-pub struct SearchEngine { pub config: SearchConfig }

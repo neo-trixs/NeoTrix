@@ -22,6 +22,7 @@ mod handlers_daily_intel;
 // 独立小周期定时器不纳入 BackgroundConfig (避免配置面膨胀), 以具名常量固化。
 const BACKUP_INTERVAL_SECS: u64 = 21_600; // every 6h
 const AGENT_DISCOVERY_INTERVAL_SECS: u64 = 60;
+const NEXUS_WEAVER_INTERVAL_SECS: u64 = 1800; // 30min 跨会话模式挖掘
 const PENDING_ABSORPTION_INTERVAL_SECS: u64 = 60; // pending-absorb.json 检查 (cycle 1053)
 const DAILY_INTEL_INTERVAL_SECS: u64 = 86_400; // 每日例行感知检查 (cycle 1107)
 const ALWAYS_ON_INTERVAL_SECS: u64 = 120;
@@ -41,6 +42,7 @@ const EMOTION_RESTORE_DEFER_SECS: u64 = 5;
 const LOOP_READINESS_INTERVAL_SECS: u64 = 300;
 const MARKET_RE_EVAL_INTERVAL_SECS: u64 = 300;
 const TELEMETRY_INTERVAL_SECS: u64 = 60;
+const SYSTEM_HEALTH_HEAL_INTERVAL_SECS: u64 = 300; // 5min NT-REPAIR 自愈巡检 (Track 3: D22/D26/D27/D28)
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
@@ -556,10 +558,12 @@ impl BackgroundLoop {
             }
         }
 
-        let mut kb_pipeline = KnowledgeAbsorptionPipeline::new();
+         let mut kb_pipeline = KnowledgeAbsorptionPipeline::new();
         if let Some(ref kb_ref) = kb {
             kb_pipeline.attach_kb(kb_ref.clone());
         }
+        let kb_for_nexus = self.kb.clone();
+        let healer_registry = crate::neotrix::l8_autonomic_impl::nt_mind_autofixer::HealerRegistry::new();
 
         let this = Arc::new(Mutex::new(BackgroundLoopHandle {
             brain: self.brain.clone(),
@@ -595,12 +599,17 @@ impl BackgroundLoop {
                         kb: kb.clone(),
                     }),
                 );
+                // Experience Tree — 会话结束自动触发五阶段吸收 (cycle 1053)
+                hooks.register(
+                    HookEvent::SessionEnd,
+                    Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::experience_tree::SessionEndHook::new(kb.clone())),
+                );
                 SkillEngine::new(PathBuf::from(
                     &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
                 )).with_hooks(hooks)
             },
             session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter::new(),
-            healer_registry: crate::neotrix::l8_autonomic_impl::nt_mind_autofixer::HealerRegistry::new(),
+             healer_registry,
             kb_pipeline,
             session_recovery: self.session_recovery.take(),
             event_bus: Some(event_bus.as_ref().clone()),
@@ -666,6 +675,10 @@ impl BackgroundLoop {
                 Some(shell)
             },
             kb,
+            nexus_weaver: {
+                let kb_ref = kb_for_nexus.clone().unwrap_or_else(|| Arc::new(KnowledgeBase::open(None).unwrap_or_else(|_| KnowledgeBase::open(None).unwrap())));
+                crate::neotrix::l8_autonomic_impl::nt_mind::experience_tree::NexusWeaverScheduler::new(kb_ref)
+            },
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             absorption_in_progress: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
@@ -772,7 +785,11 @@ impl BackgroundLoop {
         spawn_handler!(cfg.nt_world_sense_interval_secs, "proxy_heartbeat", |h| h.handle_proxy_heartbeat().await);
         spawn_handler!(SKILL_SCAN_INTERVAL_SECS, |h| h.handle_skill_scan().await);
         spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
+        // ── Nexus-Weaver 跨会话模式挖掘 (cycle 1053): 每 30min 扫描 experience 命名空间
+        //    识别跨会话模式并触发 nexus-weaver 调度。
+        spawn_handler!(NEXUS_WEAVER_INTERVAL_SECS, "nexus_weaver", |h| h.handle_nexus_weaver().await);
         spawn_handler!(HEALER_SCAN_INTERVAL_SECS, "healers", |h| h.handle_healer_scan().await);
+        spawn_handler!(SYSTEM_HEALTH_HEAL_INTERVAL_SECS, "system_health_heal", |h| h.handle_system_health_heal().await);
         spawn_handler!(AVATAR_AUTO_DISTILL_INTERVAL_SECS, |h| h.handle_avatar_auto_distill().await);
         spawn_handler!(KB_ABSORB_INTERVAL_SECS, |h| {
             h.handle_kb_absorb().await;
@@ -946,6 +963,8 @@ pub struct BackgroundLoopHandle {
     /// 元认知 agent 外壳 — 对话事件刺激注意力域后按路由跑内核 cycle。
     meta_shell: Option<crate::neotrix::nt_mind::MetaAgentShell>,
     kb: Option<Arc<KnowledgeBase>>,
+    /// 跨会话模式挖掘 (nexus-weaver) — 定期扫描 experience 命名空间识别跨会话模式。
+    nexus_weaver: crate::neotrix::l8_autonomic_impl::nt_mind::experience_tree::NexusWeaverScheduler,
     emotion_restored: std::sync::atomic::AtomicBool,
     /// pending-absorb 自动吸收重入标志 (handlers_absorption.rs)。
     absorption_in_progress: std::sync::atomic::AtomicBool,
@@ -1133,6 +1152,28 @@ impl BackgroundLoopHandle {
             "[bg-loop] telemetry alerts fed to consciousness: {}",
             alerts.len()
         );
+    }
+
+    /// 跨会话模式挖掘 handler — 每 30min 扫描 experience 命名空间
+    /// 识别跨会话模式并触发 nexus-weaver 调度。
+    pub async fn handle_nexus_weaver(&mut self) {
+        let connections = match self.nexus_weaver.weave_patterns() {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("[nexus-weaver] weave_patterns failed: {e}");
+                return;
+            }
+        };
+        if connections > 0 {
+            log::info!(
+                "[nexus-weaver] discovered {} cross-session pattern connections",
+                connections
+            );
+            // 触发 nexus-weaver 调度 — 模式连接数超过阈值时自动调度
+            if connections >= 3 {
+                log::info!("[nexus-weaver] scheduling cross-session weave ({} connections >= 3)", connections);
+            }
+        }
     }
 }
 

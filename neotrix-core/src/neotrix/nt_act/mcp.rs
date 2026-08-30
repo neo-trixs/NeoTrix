@@ -12,7 +12,7 @@ use super::{McpConfig, McpTransport, McpTool, McpResource, McpPrompt, McpResult}
 
 /// MCP Client
 pub struct McpClient {
-    config: crate::nt_act::McpConfig,
+    config: McpConfig,
     process: Option<tokio::process::Child>,
     stdin: Option<Arc<tokio::sync::Mutex<BufWriter<tokio::process::ChildStdin>>>>,
     stdout: Option<Arc<Mutex<BufReader<tokio::process::ChildStdout>>>>,
@@ -21,7 +21,7 @@ pub struct McpClient {
 }
 
 impl McpClient {
-    pub async fn new(config: crate::nt_act::McpConfig) -> Result<Self, String> {
+    pub async fn new(config: McpConfig) -> Result<Self, String> {
         let mut client = Self {
             config,
             process: None,
@@ -37,10 +37,10 @@ impl McpClient {
 
     async fn connect(&mut self) -> Result<(), String> {
         match self.config.transport {
-            crate::nt_act::McpTransport::Stdio => self.connect_stdio().await,
-            crate::nt_act::McpTransport::Http => self.connect_http().await,
-            crate::nt_act::McpTransport::WebSocket => self.connect_ws().await,
-            crate::nt_act::McpTransport::Sse => self.connect_sse().await,
+            McpTransport::Stdio => self.connect_stdio().await,
+            McpTransport::Http => self.connect_http().await,
+            McpTransport::WebSocket => self.connect_ws().await,
+            McpTransport::Sse => self.connect_sse().await,
         }
     }
 
@@ -59,14 +59,15 @@ impl McpClient {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         
-        let mut child = Command::spawn(cmd)
+        let mut child = cmd.spawn()
             .map_err(|e| format!("Failed to spawn MCP server: {}", e))?;
         
         let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
+        let _stderr = child.stderr.take().ok_or("Failed to get stderr")?; // consume stderr
         
         let stdin = Arc::new(Mutex::new(BufWriter::new(stdin)));
-        let stdout = Arc::new(Mutex::new(BufReader::new(child.stdout.take().unwrap())));
+        let stdout = Arc::new(Mutex::new(BufReader::new(stdout)));
         
         self.process = Some(child);
         self.stdin = Some(stdin);
@@ -138,7 +139,7 @@ impl McpClient {
             })),
         };
         
-        let response = self.send_request(request).await?;
+        let _response = self.send_request(request).await?;
         // Process initialize response
         Ok(())
     }
@@ -148,7 +149,7 @@ impl McpClient {
     }
 
     async fn send_request(&self, request: McpRequest) -> Result<serde_json::Value, String> {
-        let id = request.id;
+        let _id = request.id;
         let (tx, rx) = tokio::sync::oneshot::channel();
         
         {
@@ -257,18 +258,7 @@ mod tests {
 
     #[test]
     fn test_mcp_config_default() {
-        let config = crate::nt_act::McpConfig::default();
-        assert_eq!(config.transport, crate::nt_act::McpTransport::Stdio);
+        let config = McpConfig::default();
+        assert_eq!(config.transport, McpTransport::Stdio);
     }
-}
-
-
-#[derive(Debug, Clone)]
-pub struct McpServer {
-    pub name: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct McpConfig {
-    pub server_url: String,
 }

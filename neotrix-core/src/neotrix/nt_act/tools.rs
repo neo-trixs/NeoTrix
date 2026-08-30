@@ -1,13 +1,13 @@
 //! Tool System for Autonomous Communication
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::collections::HashMap;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use tokio::sync::Mutex as TokioMutex;
 use tokio::time::timeout;
 
-use super::{DeliveryOutcome, ToolsConfig, ToolSpec, ToolResult, ToolExecutor};
+use super::{DeliveryOutcome, ToolsConfig, ToolSpec, ToolResult, classify_failure, classify_status, transport_cause, TransportCause};
 
 /// Tool trait
 #[async_trait::async_trait]
@@ -16,41 +16,19 @@ pub trait Tool: Send + Sync {
     async fn execute(&self, args: serde_json::Value) -> Result<ToolResult, String>;
 }
 
-/// Tool specification
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolSpec {
-    pub name: String,
-    pub description: String,
-    pub parameters: serde_json::Value, // JSON Schema
-    pub returns: serde_json::Value,    // JSON Schema
-    pub tags: Vec<String>,
-    pub version: String,
-    pub author: String,
-}
-
-/// Tool execution result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolResult {
-    pub success: bool,
-    pub output: serde_json::Value,
-    pub error: Option<String>,
-    pub duration_ms: u64,
-    pub metadata: HashMap<String, String>,
-}
-
 /// Tool registry
 pub struct ToolRegistry {
-    config: crate::nt_act::ToolsConfig,
-    tools: Arc<Mutex<HashMap<String, Box<dyn Tool>>>>,
-    builtin_tools: Arc<Mutex<HashMap<String, Box<dyn Tool>>>>,
+    config: ToolsConfig,
+    tools: Arc<TokioMutex<HashMap<String, Arc<dyn Tool>>>>,
+    builtin_tools: Arc<StdMutex<HashMap<String, Arc<dyn Tool>>>>,
 }
 
 impl ToolRegistry {
-    pub fn new(config: crate::nt_act::ToolsConfig) -> Self {
+    pub fn new(config: ToolsConfig) -> Self {
         let mut registry = Self {
             config,
-            tools: Arc::new(Mutex::new(HashMap::new())),
-            builtin_tools: Arc::new(Mutex::new(HashMap::new())),
+            tools: Arc::new(TokioMutex::new(HashMap::new())),
+            builtin_tools: Arc::new(StdMutex::new(HashMap::new())),
         };
         
         if registry.config.builtin_tools {
@@ -62,61 +40,61 @@ impl ToolRegistry {
 
     fn register_builtin_tools(&mut self) {
         // HTTP request tool
-        self.register(Box::new(HttpRequestTool));
+        self.register(Arc::new(HttpRequestTool));
         
         // File operations tool
-        self.register(Box::new(FileOperationTool));
+        self.register(Arc::new(FileOperationTool));
         
         // Shell command tool
-        self.register(Box::new(ShellCommandTool));
+        self.register(Arc::new(ShellCommandTool));
         
         // JSON processing tool
-        self.register(Box::new(JsonProcessingTool));
+        self.register(Arc::new(JsonProcessingTool));
         
         // Code execution tool
-        self.register(Box::new(CodeExecutionTool));
+        self.register(Arc::new(CodeExecutionTool));
         
         // Knowledge query tool
-        self.register(Box::new(KnowledgeQueryTool));
+        self.register(Arc::new(KnowledgeQueryTool));
     }
 
-    pub fn register(&mut self, tool: Box<dyn Tool>) {
+    pub fn register(&mut self, tool: Arc<dyn Tool>) {
         let spec = tool.spec();
         let name = spec.name.clone();
         
         // Check for conflicts
-        if self.builtin_tools.lock().blocking_lock().contains_key(&name) {
+        if self.builtin_tools.lock().unwrap().contains_key(&name) {
             eprintln!("Warning: Tool '{}' already registered, overwriting", name);
         }
         
-        self.builtin_tools.lock().blocking_lock().insert(name, tool);
+        self.builtin_tools.lock().unwrap().insert(name, tool);
     }
 
-    pub fn register_custom(&mut self, tool: Box<dyn Tool>) {
+pub fn register_custom(&mut self, tool: Arc<dyn Tool>) {
         self.register(tool);
     }
 
     pub fn unregister(&mut self, name: &str) -> bool {
-        self.builtin_tools.lock().blocking_lock().remove(name).is_some()
+        self.builtin_tools.lock().unwrap().remove(name).is_some()
     }
 
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
-        self.builtin_tools.lock().blocking_lock()
+        self.builtin_tools.lock().unwrap()
             .get(name)
             .map(|t| Arc::clone(t) as Arc<dyn Tool>)
     }
 
     pub fn list_tools(&self) -> Vec<String> {
-        self.builtin_tools.lock().blocking_lock().keys().cloned().collect()
+        self.builtin_tools.lock().unwrap().keys().cloned().collect()
     }
 
     pub async fn execute(&self, name: &str, args: serde_json::Value) -> Result<ToolResult, String> {
         let tool = {
-            let tools = self.builtin_tools.lock().await;
+            let tools = self.builtin_tools.lock().unwrap();
             tools.get(name).cloned()
         }.ok_or_else(|| format!("Tool '{}' not found", name))?;
 
-        let start = std::time::Instant::now();
+        let _start = std::time::Instant::now();
         
         // Apply timeout
         let result = match timeout(Duration::from_secs(self.config.max_execution_time_secs), tool.execute(args)).await {
@@ -145,10 +123,6 @@ impl ToolRegistry {
                 metadata: HashMap::new(),
             }),
         }
-    }
-
-    pub fn list_tools(&self) -> Vec<String> {
-        self.builtin_tools.lock().blocking_lock().keys().cloned().collect()
     }
 }
 
@@ -182,7 +156,7 @@ impl Tool for HttpRequestTool {
                     "body": {"type": "string"}
                 }
             }),
-            tags: vec!["http", "network", "api"],
+            tags: vec!["http".to_string(), "network".to_string(), "api".to_string()],
             version: "1.0.0".to_string(),
             author: "neotrix".to_string(),
         }
@@ -193,14 +167,14 @@ impl Tool for HttpRequestTool {
         let url = args.get("url").and_then(|v| v.as_str()).ok_or("Missing url")?;
         let headers = args.get("headers").and_then(|v| v.as_object()).cloned().unwrap_or_default();
         let body = args.get("body").cloned();
-        let timeout = args.get("timeout_secs").and_then(|v| v.as_u64()).unwrap_or(30);
+let timeout_secs = args.get("timeout_secs").and_then(|v| v.as_u64()).unwrap_or(30);
 
         let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(timeout))
+            .timeout(std::time::Duration::from_secs(timeout_secs))
             .build()
             .map_err(|e| format!("Client creation failed: {}", e))?;
 
-        let mut request = reqwest::Client::new()
+        let mut request = client
             .request(method.parse().map_err(|e| format!("Invalid method: {}", e))?, url);
 
         for (key, value) in headers {
@@ -213,12 +187,12 @@ impl Tool for HttpRequestTool {
             request = request.body(body.to_string());
         }
 
-        let send_result = timeout(std::time::Duration::from_secs(30), request.send()).await;
+        let send_result = tokio::time::timeout(std::time::Duration::from_secs(30), request.send()).await;
 
         // dsh-im three-state delivery semantics: structured failure results carry a
         // `delivery_outcome` so callers can distinguish "definitively not executed"
         // (retryable) from "may have been executed" (never auto-retry).
-        let response = match send_result {
+        let response: reqwest::Response = match send_result {
             Err(_) => {
                 return Ok(ToolResult {
                     success: false,
@@ -229,8 +203,8 @@ impl Tool for HttpRequestTool {
                 });
             }
             Ok(Err(e)) => {
-                let outcome = crate::nt_act::client::classify_failure(
-                    crate::nt_act::client::transport_cause(&e),
+                let outcome = classify_failure(
+                    transport_cause(&e),
                 );
                 return Ok(ToolResult {
                     success: false,
@@ -244,11 +218,11 @@ impl Tool for HttpRequestTool {
         };
 
         let status = response.status().as_u16();
-        let headers = response.headers().iter()
-            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        let headers: std::collections::HashMap<String, String> = response.headers().iter()
+            .map(|(k, v): (&reqwest::header::HeaderName, &reqwest::header::HeaderValue)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect();
 
-        let body = match response.text().await {
+        let body: String = match response.text().await {
             Ok(text) => text,
             Err(e) => {
                 return Ok(ToolResult {
@@ -261,7 +235,7 @@ impl Tool for HttpRequestTool {
             }
         };
 
-        let outcome = crate::nt_act::client::classify_status(status);
+        let outcome = classify_status(status);
         Ok(ToolResult {
             success: status < 400,
             output: serde_json::json!({
@@ -311,7 +285,7 @@ impl Tool for FileOperationTool {
                     "metadata": {"type": "object"}
                 }
             }),
-            tags: vec!["file", "filesystem", "io"],
+            tags: vec!["file".to_string(), "filesystem".to_string(), "io".to_string()],
             version: "1.0.0".to_string(),
             author: "neotrix".to_string(),
         }
@@ -463,7 +437,7 @@ impl Tool for ShellCommandTool {
                     "success": {"type": "boolean"}
                 }
             }),
-            tags: vec!["shell", "command", "system"],
+            tags: vec!["shell".to_string(), "command".to_string(), "system".to_string()],
             version: "1.0.0".to_string(),
             author: "neotrix".to_string(),
         }
@@ -494,7 +468,7 @@ impl Tool for ShellCommandTool {
             }
         }
 
-        let mut child = Command::spawn(&mut command)
+        let child = cmd.spawn()
             .map_err(|e| format!("Failed to spawn command: {}", e))?;
 
         let output = tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait_with_output())
@@ -502,8 +476,8 @@ impl Tool for ShellCommandTool {
             .map_err(|_| "Command timeout".to_string())?
             .map_err(|e| format!("Command execution failed: {}", e))?;
 
-        let stdout = String::from_utf8_lossy(&stdout).to_string();
-        let stderr = String::from_utf8_lossy(&stderr).to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let exit_code = output.status.code().unwrap_or(-1);
 
         Ok(ToolResult {
@@ -547,7 +521,7 @@ impl Tool for JsonProcessingTool {
                     "result": {}
                 }
             }),
-            tags: vec!["json", "data", "processing"],
+            tags: vec!["json".to_string(), "data".to_string(), "processing".to_string()],
             version: "1.0.0".to_string(),
             author: "neotrix".to_string(),
         }
@@ -583,7 +557,7 @@ impl Tool for JsonProcessingTool {
                 })
             }
             "validate" => {
-                let schema = args.get("schema").ok_or("Missing schema")?;
+                let _schema = args.get("schema").ok_or("Missing schema")?;
                 // JSON Schema validation (simplified)
                 Ok(ToolResult {
                     success: true,
@@ -649,7 +623,7 @@ impl Tool for CodeExecutionTool {
                     "success": {"type": "boolean"}
                 }
             }),
-            tags: vec!["code", "execution", "programming"],
+            tags: vec!["code".to_string(), "execution".to_string(), "programming".to_string()],
             version: "1.0.0".to_string(),
             author: "neotrix".to_string(),
         }
@@ -658,12 +632,12 @@ impl Tool for CodeExecutionTool {
     async fn execute(&self, args: serde_json::Value) -> Result<ToolResult, String> {
         let language = args.get("language").and_then(|v| v.as_str()).ok_or("Missing language")?;
         let code = args.get("code").and_then(|v| v.as_str()).ok_or("Missing code")?;
-        let args_list = args.get("args").and_then(|v| v.as_array())
+        let _args_list = args.get("args").and_then(|v| v.as_array())
             .map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
             .unwrap_or_default();
         let timeout_secs = args.get("timeout_secs").and_then(|v| v.as_u64()).unwrap_or(30);
 
-        let (cmd, args_list) = match language {
+        let (cmd, args_list): (&str, Vec<&str>) = match language {
             "python" => ("python3", vec!["-c", code]),
             "javascript" => ("node", vec!["-e", code]),
             "rust" => {
@@ -683,7 +657,9 @@ impl Tool for CodeExecutionTool {
                         metadata: HashMap::new(),
                     });
                 }
-                (format!("{}.out", temp_file), vec![])
+                // Leak the string to get a static reference (for demo purposes)
+                let exe_path = format!("{}.out", temp_file);
+                (Box::leak(exe_path.into_boxed_str()), vec![])
             },
             "bash" => ("bash", vec!["-c", code]),
             "lua" => ("lua", vec!["-e", code]),
@@ -697,7 +673,7 @@ impl Tool for CodeExecutionTool {
         let mut cmd = tokio::process::Command::new(cmd);
         cmd.args(&args_list);
         
-        let mut child = Command::spawn(cmd)
+        let child = cmd.spawn()
             .map_err(|e| format!("Failed to spawn: {}", e))?;
 
         let output = match timeout(Duration::from_secs(timeout_secs), child.wait_with_output()).await {
@@ -708,14 +684,14 @@ impl Tool for CodeExecutionTool {
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let exit_code = output.status.code().unwrap_or(-1);
+        let _exit_code = output.status.code().unwrap_or(-1);
 
         Ok(ToolResult {
             success: output.status.success(),
             output: serde_json::json!({
                 "stdout": stdout,
                 "stderr": stderr,
-                "exit_code": output.status.code().unwrap_or(-1)
+                "exit_code": _exit_code
             }),
             error: if output.status.success() { None } else { Some(stderr) },
             duration_ms: 0,
@@ -749,7 +725,7 @@ impl Tool for KnowledgeQueryTool {
                     "count": {"type": "integer"}
                 }
             }),
-            tags: vec!["knowledge", "query", "database"],
+            tags: vec!["knowledge".to_string(), "query".to_string(), "database".to_string()],
             version: "1.0.0".to_string(),
             author: "neotrix".to_string(),
         }
@@ -761,7 +737,7 @@ impl Tool for KnowledgeQueryTool {
         let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
         // Try to access knowledge base
-        if let Ok(kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+        if let Ok(kb) = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(None) {
             let conn = kb.conn.lock().map_err(|e| format!("KB lock failed: {}", e))?;
             
             // Simple keyword search in kb_store
@@ -770,7 +746,7 @@ impl Tool for KnowledgeQueryTool {
             );
             
             let mut stmt = conn.prepare(&query_sql).map_err(|e| e.to_string())?;
-            let search_term = format!("%{}%", args.get("query").and_then(|v| v.as_str()).unwrap_or(""));
+            let search_term = format!("%{}%", query);
             let mut rows = stmt.query(rusqlite::params![namespace, &search_term, &search_term, limit as i64])
                 .map_err(|e| e.to_string())?;
             
@@ -827,7 +803,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_registry() {
-        let config = crate::nt_act::ToolsConfig::default();
+        let config = ToolsConfig::default();
         let registry = ToolRegistry::new(config);
         
         let tools = registry.list_tools();
@@ -835,11 +811,4 @@ mod tests {
         assert!(tools.contains(&"file_operation".to_string()));
         assert!(tools.contains(&"shell_command".to_string()));
     }
-}
-
-
-pub struct ToolExecutor;
-
-impl ToolExecutor {
-    pub fn new() -> Self { Self }
 }

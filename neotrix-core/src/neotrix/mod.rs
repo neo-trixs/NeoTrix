@@ -214,7 +214,7 @@ pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
 
 pub mod nt_file_ability;
 pub mod proxy_daemon_wrapper;
-// pub mod nt_act; // fix-final-gaps: 行动域子模块存在但针对旧 API, 164 错误待移植; 暂禁用保绿 (待 API 对齐后启用)
+pub mod nt_act;
 
 #[cfg(test)]
 pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};

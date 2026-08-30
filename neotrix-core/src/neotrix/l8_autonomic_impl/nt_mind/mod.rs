@@ -96,12 +96,24 @@ pub use infrastructure::kronecker_cleanup;       // L-02: Kronecker-structured O
 pub use infrastructure::open_source_benchmark;
 #[cfg(test)]
 pub use infrastructure::context_integration_test;
+#[cfg(test)]
 pub use infrastructure::tests;                   // 所有测试
 
 // ============================================================================
 // Domain 6: 开发者工具（Developer Tools）
 // ============================================================================
 pub mod lsp_client;
+
+// ============================================================================
+// Domain 8: 经验树 (Experience Tree) — 五阶段吸收协议
+// ============================================================================
+pub mod experience_tree;
+pub use experience_tree::{
+    ExperienceEngine, ExperienceEntry, ExperienceQuery, EntryType, Domain, Source,
+    Snapshot, DistillResult, ClassifyResult, ClassifiedEntry, AbsorptionResult,
+    SessionEndHook, NexusWeaverScheduler,
+    snapshot, distill, classify, persist, feedback,
+};
 
 // Domain grouping sub-modules (reorganize flat 62 modules into 6 domains)
 pub mod seal_core;
@@ -172,3 +184,14 @@ pub use open_source_benchmark::{OpenSourceBenchmarker, BenchmarkReport};
 pub use meta_panel::{MetaPanelEngine, AnalysisDepth, MetaPanelResult, Viewpoint, FusionResult};
 pub use react_doctor::{ReactDoctorEngine, ReactHealthReport, ReactDiagnostic, ReactRuleCategory, RuleSeverity, SuppressionAnalysis};
 pub use goal_loop::{GoalLoop, GoalState, GoalConfig, GoalTracker, GoalIterationRecord};
+
+// ============================================================================
+// Domain 7: 技能树 (Skill Tree)
+// ============================================================================
+pub mod skill_tree;
+pub use skill_tree::{
+    SkillNode, SkillTreeRegistry, Tier, UpgradeCondition, NodeEffect,
+    RuneColor, RuneSlot, Rune, Runeword, ModuleRunes, RuneSystem,
+    AscendancyRouter, WeaponSetKind, SwitchRecord,
+    SkillTreeConfig,
+};

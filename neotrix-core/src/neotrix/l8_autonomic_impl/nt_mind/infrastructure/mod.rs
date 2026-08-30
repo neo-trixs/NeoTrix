@@ -17,6 +17,7 @@ pub mod kronecker_cleanup;
 pub mod open_source_benchmark;
 pub mod react_doctor;
 pub mod stakeholder_comm;
+#[cfg(test)]
 pub mod tests;
 pub mod ux_review;
 

@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use reqwest;
 
 /// HTTP Request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +45,47 @@ impl DeliveryOutcome {
             DeliveryOutcome::Unknown => "unknown",
             DeliveryOutcome::Failed => "failed",
         }
+    }
+}
+
+/// Transport cause for failure classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TransportCause {
+    /// Deadline hit; request may or may not have been sent.
+    pub timeout: bool,
+    /// Connection/DNS/TLS failure; nothing was sent.
+    pub connect: bool,
+    /// Response-phase failure (body read/decode); peer already processed the request.
+    pub response_phase: bool,
+}
+
+/// Classify a transport failure into a delivery outcome.
+pub fn classify_failure(cause: TransportCause) -> DeliveryOutcome {
+    if cause.response_phase || cause.timeout {
+        DeliveryOutcome::Unknown
+    } else {
+        DeliveryOutcome::Failed
+    }
+}
+
+/// Classify an HTTP status into a delivery outcome.
+/// 5xx = peer may have processed side effects (`Unknown`); 4xx = definitive rejection.
+pub fn classify_status(status: u16) -> DeliveryOutcome {
+    if status >= 500 {
+        DeliveryOutcome::Unknown
+    } else if status >= 400 {
+        DeliveryOutcome::Failed
+    } else {
+        DeliveryOutcome::Delivered
+    }
+}
+
+/// Extract transport cause from a reqwest error.
+pub fn transport_cause(err: &reqwest::Error) -> TransportCause {
+    TransportCause {
+        timeout: err.is_timeout(),
+        connect: err.is_connect(),
+        response_phase: err.is_body() || err.is_decode(),
     }
 }
 
@@ -108,7 +150,7 @@ pub struct AcpResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SearchOptions {
     pub max_results: Option<usize>,
-    pub engine: Option<crate::nt_act::SearchEngine>,
+    pub engine: Option<SearchEngine>,
     pub safe_search: Option<bool>,
     pub language: Option<String>,
     pub region: Option<String>,
@@ -116,13 +158,13 @@ pub struct SearchOptions {
 }
 
 /// Search Result
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SearchResult {
     pub title: String,
     pub url: String,
     pub snippet: String,
     pub score: f64,
-    pub engine: crate::nt_act::SearchEngine,
+    pub engine: SearchEngine,
 }
 
 /// Tool Specification
@@ -168,7 +210,7 @@ pub enum Priority {
 }
 
 /// Communication Method
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CommunicationMethod {
     Http,
     Mcp,
@@ -183,12 +225,12 @@ pub struct CommunicationDecision {
     pub method: CommunicationMethod,
     pub confidence: f64,
     pub reasoning: String,
-    pub http_request: Option<crate::nt_act::client::HttpRequest>,
+    pub http_request: Option<HttpRequest>,
     pub mcp_tool: Option<String>,
     pub mcp_args: Option<serde_json::Value>,
-    pub acp_message: Option<crate::nt_act::acp::AcpMessage>,
+    pub acp_message: Option<AcpMessage>,
     pub search_query: Option<String>,
-    pub search_options: Option<crate::nt_act::search::SearchOptions>,
+    pub search_options: Option<SearchOptions>,
     pub tool_name: Option<String>,
     pub tool_args: Option<serde_json::Value>,
 }
@@ -196,11 +238,11 @@ pub struct CommunicationDecision {
 /// Communication Result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CommunicationResult {
-    Http(crate::nt_act::client::HttpResponse),
-    Mcp(crate::nt_act::mcp::McpResult),
-    Acp(crate::nt_act::acp::AcpResponse),
+    Http(HttpResponse),
+    Mcp(McpResult),
+    Acp(AcpResponse),
     Search(Vec<SearchResult>),
-    Tool(crate::nt_act::tools::ToolResult),
+    Tool(ToolResult),
 }
 
 /// Communication Capabilities
@@ -392,4 +434,11 @@ impl Default for CommunicationConfig {
             circuit_breaker_threshold: 5,
         }
     }
+}
+
+/// Tool Executor
+pub struct ToolExecutor;
+
+impl ToolExecutor {
+    pub fn new() -> Self { Self }
 }

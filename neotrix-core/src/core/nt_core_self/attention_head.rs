@@ -278,6 +278,7 @@ impl WeaponSet {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct AttentionManager {
     pub heads: Vec<AttentionHead>,
     pub global_threshold: f64,

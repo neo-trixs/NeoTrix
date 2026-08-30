@@ -76,6 +76,7 @@ tokio = { workspace = true }
 tokio-stream = "0.1"
 chrono = { workspace = true }
 uuid = { workspace = true }
+tempfile = "3"
 dirs = { workspace = true }
 log = "0.4"
 hmac = "0.12"
