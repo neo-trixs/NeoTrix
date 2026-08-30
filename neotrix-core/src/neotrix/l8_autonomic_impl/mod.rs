@@ -27,6 +27,7 @@ pub mod nt_mind_memory;
 pub mod nt_mind_skill_engine;
 pub mod nt_repair_causal_trace;
 pub mod nt_repair_hanzi_video;
+pub mod nt_repair_self_heal;
 pub mod nt_shield_skill_doctor;
 pub mod nt_shield_cybersec_projects;
 pub mod nt_shield_openrung;

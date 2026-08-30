@@ -58,6 +58,7 @@ pub use l8_autonomic_impl::nt_mind_memory;
 pub use l8_autonomic_impl::nt_mind_self_diagnose;
 pub use l8_autonomic_impl::nt_mind_skill_engine;
 pub use l8_autonomic_impl::nt_repair_causal_trace;
+pub use l8_autonomic_impl::nt_repair_self_heal;
 
 // L7 — Capability (能力层) — 统一路由
 pub use l7_capability_impl::BoundedEdit;
