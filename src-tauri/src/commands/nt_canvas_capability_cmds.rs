@@ -95,6 +95,9 @@ fn action_node_id(a: &EvolutionAction) -> String {
         EvolutionAction::CrossPollinate { shared_node_id, .. } => shared_node_id.clone(),
         EvolutionAction::Mature { node_id } => node_id.clone(),
         EvolutionAction::Strengthen { node_id, .. } => node_id.clone(),
+        EvolutionAction::HarnessSynthesize { node_id, .. } => node_id.clone(),
+        EvolutionAction::RepairStable { node_id, .. } => node_id.clone(),
+        EvolutionAction::CompoundArchive { node_id, .. } => node_id.clone(),
     }
 }
 
@@ -106,6 +109,9 @@ fn action_name(a: &EvolutionAction) -> String {
         EvolutionAction::CrossPollinate { .. } => "CrossPollinate",
         EvolutionAction::Mature { .. } => "Mature",
         EvolutionAction::Strengthen { .. } => "Strengthen",
+        EvolutionAction::HarnessSynthesize { .. } => "HarnessSynthesize",
+        EvolutionAction::RepairStable { .. } => "RepairStable",
+        EvolutionAction::CompoundArchive { .. } => "CompoundArchive",
     }
     .to_string()
 }
