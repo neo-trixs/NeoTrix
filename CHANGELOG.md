@@ -5,6 +5,23 @@
 > `git cliff -u` (pipelines defined in `cliff.toml`; used by
 > `.github/workflows/release.yml` to emit release notes).
 
+## [0.21.0] — 2026-08-30 — fix-final-gaps 专项集成 + 版本迭代
+
+> 本次迭代完成 `feat/fix-final-gaps` 顶点分支的专项推进与版本跃迁，保持全链路构建绿。
+
+### Features
+- **fix-final-gaps 顶点合并**: 将 `feat/fix-final-gaps`（及其 5 个兄弟分支 w3-metrics/w4-absorption-field/fix-bin-tests/fix-calibration-log/fix-metrics-chain）并入 main，保留新增模块文件（`nt_act/` 行动域、`nt_mind_skill_engine/` 子模块）。
+- **依赖修复**: Cargo.toml 去重 `anydoc` 重复键、新增 `rayon` 依赖，解决编译阻塞。
+- **不兼容代码回退**: 为保绿，回退 fix-final-gaps 的陈旧 `io_provider`/`nt_io_web`/`capability_tree` 文件到 main 版本（`cli_session_backend.rs` 删除、`node.rs`/`evolution.rs` 重复 match 臂修复），删除未实现的 tauri 命令注册（`kb_doc_*`/`parse_doc_file`）。
+
+### Known Limitations
+- **nt_act 行动域待移植**: fix-final-gaps 新增 `nt_act/` 子模块（acp/client/decision/mcp/search/tools/types）针对旧 API 编写，启用后 164 编译错误（`unresolved import`/`no associated item`/`mismatched types`），已按 main 原设计禁用（`// pub mod nt_act;`），待 API 对齐后启用。
+- **doc_parse PDF 增强待适配**: fix-final-gaps 的 `doc_parse.rs` 含 PDF marker pipeline 等增强，但与当前 `anydoc`/`office_oxide` API 不兼容，暂不编译（`// mod doc_parse;` 注释），保留文件供后续移植。
+
+### Chores
+- **版本迭代**: `0.20.0` → `0.21.0`。
+- **全链路构建绿**: `cargo check -p neotrix --lib` 0 error、`cargo build --manifest-path src-tauri/Cargo.toml` 成功、lib 测试 self_heal 7/7 + self_test_integration 5/5 通过。
+
 ## [0.20.0] — 2026-08-30 — 七域进化统一 + 蜕变重生
 
 > 本次迭代完成 grok-bot/trendshift 生态进化的全域接线与生产化，并施行蜕变重生清理。

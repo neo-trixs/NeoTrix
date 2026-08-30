@@ -139,7 +139,7 @@ opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true
 opentelemetry-otlp = { version = "0.27", optional = true }
 tracing-opentelemetry = { version = "0.28", optional = true }
 anyhow = { version = "1", optional = true }
-anydoc = { version = "0.2", optional = true }
+rayon = "1"
 rcgen = { version = "0.13", features = ["x509-parser"] }
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 tokio-rustls = "0.24"
