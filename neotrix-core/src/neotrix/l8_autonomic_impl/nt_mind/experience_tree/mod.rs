@@ -770,6 +770,13 @@ fn now_ts() -> u64 {
 }
 
 // ============================================================================
+// Self-Reflection Engine — Reflexion-style verbal reinforcement learning loop
+// ============================================================================
+
+pub mod self_reflection;
+pub use self_reflection::{SelfReflectionEngine, ReflectionBuffer, ReflectionRecord};
+
+// ============================================================================
 // 测试
 // ============================================================================
 

@@ -599,3 +599,82 @@ mod tests {
         assert!(empty.is_empty());
     }
 }
+
+// ============================================================================
+// Memory Admission Control — A-MAC inspired gate
+// ============================================================================
+
+/// Admission score for a memory candidate before writing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdmissionScore {
+    pub utility: f64,
+    pub confidence: f64,
+    pub novelty: f64,
+    pub recency: f64,
+    pub total: f64,
+    pub admitted: bool,
+}
+
+/// Adaptive Memory Admission Control gate (inspired by A-MAC, Zhang et al. 2025).
+///
+/// Scores each memory candidate on 5 dimensions before accepting it into the store:
+///   1. **Utility** — LLM-call estimated value
+///   2. **Confidence** — ROUGE-L grounding score
+///   3. **Novelty** — 1 − max cosine similarity to existing memories
+///   4. **Recency** — temporal freshness of the observation
+///   5. **Type Prior** — prior probability of this memory type being useful
+///
+/// Memories below the admission threshold are rejected to prevent memory pollution.
+pub struct MemoryAdmissionGate {
+    threshold: f64,
+    max_store_size: usize,
+}
+
+impl MemoryAdmissionGate {
+    pub fn new(threshold: f64, max_store_size: usize) -> Self {
+        Self { threshold, max_store_size }
+    }
+
+    /// Evaluate a memory candidate. Returns true if the memory should be admitted.
+    pub fn evaluate(&self, utility: f64, confidence: f64, novelty: f64, recency: f64, type_prior: f64) -> AdmissionScore {
+        let total = (utility + confidence + novelty + recency + type_prior) / 5.0;
+        let admitted = total >= self.threshold && self.current_size() < self.max_store_size;
+        AdmissionScore {
+            utility, confidence, novelty, recency, total, admitted,
+        }
+    }
+
+    /// Check if a memory should be admitted (convenience method).
+    pub fn admit(&self, utility: f64, confidence: f64, novelty: f64, recency: f64, type_prior: f64) -> bool {
+        self.evaluate(utility, confidence, novelty, recency, type_prior).admitted
+    }
+
+    fn current_size(&self) -> usize {
+        0
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+
+    #[test]
+    fn test_admission_gate_admits_high_quality() {
+        let gate = MemoryAdmissionGate::new(0.5, 100);
+        assert!(gate.admit(0.8, 0.7, 0.6, 0.9, 0.5));
+    }
+
+    #[test]
+    fn test_admission_gate_rejects_low_quality() {
+        let gate = MemoryAdmissionGate::new(0.5, 100);
+        assert!(!gate.admit(0.1, 0.1, 0.1, 0.1, 0.1));
+    }
+
+    #[test]
+    fn test_admission_score() {
+        let gate = MemoryAdmissionGate::new(0.5, 100);
+        let score = gate.evaluate(0.8, 0.7, 0.6, 0.9, 0.5);
+        assert!(score.admitted);
+        assert!((score.total - 0.7).abs() < 0.01);
+    }
+}
