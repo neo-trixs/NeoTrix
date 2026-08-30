@@ -218,7 +218,7 @@ def fetch_github_html(url, owner, repo):
     }
 
 
-def fetch_arxiv(url):
+def fetch_arxiv(url, mirror_source=None):
     m = re.search(r'arxiv\.org/(?:abs|pdf)/([0-9]+(?:\.[0-9]+)?)', url)
     if not m:
         return None
@@ -237,14 +237,40 @@ def fetch_arxiv(url):
     abstract = tag('summary')
     if not title or not abstract:
         return None
+    meta = {'arxiv_id': aid, 'enriched_at': int(time.time())}
+    if mirror_source:
+        # W0.2: 镜像源 (paperswithcode.co / alphaxiv.org) 归并到 canonical arxiv URL,
+        # 记录来源防信息丢失 (Cycle 232 redirected_from 先例)
+        meta['mirror_source'] = mirror_source
+        meta['redirected_from'] = url
     return {
         'node_type': 'paper', 'title': title, 'language': 'en',
         'summary': f'arXiv paper {aid}: {title}',
         'content': f'Abstract: {abstract}',
         'url': f'https://arxiv.org/abs/{aid}', 'domain': 'arxiv.org',
         'importance': 0.8,
-        'meta': json.dumps({'arxiv_id': aid, 'enriched_at': int(time.time())}, ensure_ascii=False),
+        'meta': json.dumps(meta, ensure_ascii=False),
     }
+
+
+# W0.2: arxiv 论文镜像域 — 同 ID 论文经这些域名发布, 必须归并到 canonical
+# arxiv.org/abs/<id> 否则产生平行节点 (batch3 2026-08-26: 2608.23552 双节点教训)
+ARXIV_MIRROR_DOMAINS = ('paperswithcode.co', 'alphaxiv.org', 'paperswithcode.com',
+                        'huggingface.co', 'openreview.net')
+
+
+def extract_arxiv_id(url):
+    """从 arxiv.org 或其镜像 URL 提取 arxiv ID; 非论文 URL 返回 None。"""
+    m = re.search(r'arxiv\.org/(?:abs|pdf)/([0-9]+(?:\.[0-9]+)?)', url)
+    if m:
+        return m.group(1)
+    host = urllib.parse.urlparse(url).netloc.replace('www.', '').lower()
+    if any(host == d or host.endswith('.' + d) for d in ARXIV_MIRROR_DOMAINS):
+        # 镜像路径形态: /paper/<id> /abs/<id> /papers/<id>
+        m = re.search(r'(?:/paper/|/abs/|/papers/)([0-9]{4}\.[0-9]{4,5})(?:v[0-9]+)?', url)
+        if m:
+            return m.group(1)
+    return None
 
 
 def fetch_article(url):
@@ -285,6 +311,11 @@ def fetch_one(url, skip_prefilter=False):
         return fetch_github_repo(url)
     if 'arxiv.org' in url:
         return fetch_arxiv(url)
+    # W0.2: 镜像域论文 → canonical arxiv 节点 (Rust CLI URL 去重据此判重)
+    aid = extract_arxiv_id(url)
+    if aid:
+        host = urllib.parse.urlparse(url).netloc.replace('www.', '')
+        return fetch_arxiv(f'https://arxiv.org/abs/{aid}', mirror_source=host)
     return fetch_article(url)
 
 
@@ -315,8 +346,12 @@ def main():
         urls = pre_filtered
         print(f'[batch] {len(urls)} URLs after pre-filter (-{pre_failed} dead/404)', flush=True)
 
-    stats = {'inserted': 0, 'duplicate': 0, 'failed': 0, 'would_insert': 0}
+    # W0.1 (batch3-2026-08-26): inserted/duplicate 唯一来源 = Rust CLI 真实写回计数。
+    # 旧 bug: fetch 成功时即计 'inserted', flush 时又累加 CLI 计数 → 双计 (47 源报 94)。
+    stats = {'url_total': len(urls), 'fetched': 0, 'inserted': 0,
+             'duplicate': 0, 'in_batch_dup': 0, 'failed': 0}
     pending: list = []
+    seen_urls: set = set()
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as ex:
         futs = {ex.submit(fetch_one, u, args.skip_prefilter): u for u in urls}
@@ -329,10 +364,16 @@ def main():
                 node = None
                 print(f'  ✗ {u[:70]}  (exception {e})', flush=True)
             if node:
+                # W0.2: 批内 canonical URL 去重 — 多镜像归并后同批只保留首个
+                if node['url'] in seen_urls:
+                    stats['in_batch_dup'] += 1
+                    print(f'  = [in-batch dup] {node["title"][:60]} → {node["url"][:60]}', flush=True)
+                    continue
+                seen_urls.add(node['url'])
                 pending.append(node)
                 tag = '◇' if args.dry_run else '≈'
                 print(f'  {tag} [{node["domain"]}] {node["title"][:60]}', flush=True)
-                stats['would_insert' if args.dry_run else 'inserted'] += 1
+                stats['fetched'] += 1
             else:
                 stats['failed'] += 1
                 print(f'  ✗ {u[:70]}', flush=True)
@@ -349,7 +390,14 @@ def main():
         stats['inserted'] += ins
         stats['duplicate'] += dup
 
-    print(f'\n[batch] done: {stats}', flush=True)
+    mode = ' (dry-run)' if args.dry_run else ''
+    print(f'\n[batch] done{mode}: urls={stats["url_total"]} fetched={stats["fetched"]} '
+          f'inserted={stats["inserted"]} duplicate={stats["duplicate"]} '
+          f'in_batch_dup={stats["in_batch_dup"]} failed={stats["failed"]}', flush=True)
+    # 对账不变量: fetched == inserted + duplicate + (CLI 未返回部分应为 0)
+    mismatch = stats['fetched'] - stats['inserted'] - stats['duplicate']
+    if mismatch != 0 and not args.dry_run:
+        print(f'[batch] ⚠ 对账差额 {mismatch} — 检查 Rust CLI 输出解析 (R-P16)', flush=True)
 
 
 if __name__ == '__main__':

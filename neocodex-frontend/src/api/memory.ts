@@ -4,9 +4,35 @@ import type { MemoryStats } from './types'
 /* ════════════════════════════════════════════
    api/memory.ts — KB 记忆（stats/export/clear）+ API Key
    对应 memory_mgr_cmds.rs / chat_cmds.rs
+   B6 强化 (2026-08-25): MemoryEntry/MemoryTimelineEntry 类型化
+   （镜像 memory_mgr_cmds.rs:12/45），unknown[] → 强类型返回
    ════════════════════════════════════════════ */
 
 /* ── KB 记忆 ── */
+
+/** 镜像 memory_mgr_cmds.rs:12 MemoryEntry */
+export interface MemoryEntry {
+  id: string
+  kind: string
+  content: string
+  summary: string
+  source: string
+  confidence: number
+  created_at: number
+  last_accessed_at: number
+  access_count: number
+  tags: string[]
+  is_pinned: boolean
+}
+
+/** 镜像 memory_mgr_cmds.rs:45 MemoryTimelineEntry */
+export interface MemoryTimelineEntry {
+  date: string
+  entries_created: number
+  entries_accessed: number
+  top_topic: string
+}
+
 export function memoryStats(): Promise<MemoryStats> {
   return call('memory_stats', {})
 }
@@ -23,15 +49,15 @@ export function memoryClear(kind?: string | null): Promise<number> {
   return call('memory_clear', { kind: kind ?? null })
 }
 
-export function memoryList(category?: string): Promise<unknown[]> {
+export function memoryList(category?: string): Promise<MemoryEntry[]> {
   return call('memory_list', { category: category ?? null })
 }
 
-export function memorySearch(query: string): Promise<unknown[]> {
-  return call('memory_search', { query })
+export function memorySearch(query: string, kind?: string | null): Promise<MemoryEntry[]> {
+  return call('memory_search', { query, kind: kind ?? null })
 }
 
-export function memoryTimeline(days?: number): Promise<unknown[]> {
+export function memoryTimeline(days?: number): Promise<MemoryTimelineEntry[]> {
   return call('memory_timeline', { days: days ?? null })
 }
 

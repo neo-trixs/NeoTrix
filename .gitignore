@@ -14,8 +14,10 @@ _archive/opencode/plugins/*.lock
 *.rs.bak.DS_Store
 models/
 
-# Generated nt-test files
+# Generated nt-test files (tracked integration tests are force-added explicitly;
+# keep the ignore for generated scratch, but never hide real test sources)
 neotrix-core/tests/*.rs
+!neotrix-core/tests/g3_metrics.rs
 
 # Prevent opencode CLI from re-creating project-level config
 # NeoTrix manages MCP via its own /mcp publish mechanism (nt_agent_mcp_*)

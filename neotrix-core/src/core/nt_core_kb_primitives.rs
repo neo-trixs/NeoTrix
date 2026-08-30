@@ -153,6 +153,16 @@ pub fn kv_purge_namespace(conn: &Connection, namespace: &str) -> Result<usize, S
 
 pub const SCHEMA_VERSION: i32 = 8;
 
+/// 打开默认生产 KB 原生连接 (~/.neotrix/knowledge.db) 并初始化 schema。
+/// 失败返回 None (调用方自行降级, 如内存库)。
+pub fn open_raw_conn() -> Option<Connection> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let db_path = std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db");
+    let conn = Connection::open(&db_path).ok()?;
+    schema_initialize(&conn).ok()?;
+    Some(conn)
+}
+
 /// 初始化 KB schema (全部表 + FTS + 索引 + kv_store + config 等)。
 /// 与 NT-MEMORY 原 `nt_memory_schema::initialize` 逐字一致 (D3 下沉)。
 pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {

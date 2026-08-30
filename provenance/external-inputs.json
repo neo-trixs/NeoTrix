@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "description": "External build inputs provenance manifest (absorbed: grok-bot-0.18-reconstructed checksum-pinned build input pattern). Every third-party input consumed at build/CI time is anchored here and verified by scripts/provenance_check.sh before builds ship.",
+  "updated": "2026-08-25",
+  "inputs": [
+    {
+      "name": "actions/checkout",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "unpinned:tag-ref",
+      "purpose": "Source checkout in all release workflow jobs (.github/workflows/release.yml)"
+    },
+    {
+      "name": "orhun/git-cliff-action",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "unpinned:tag-ref",
+      "purpose": "Changelog generation for releases"
+    },
+    {
+      "name": "taiki-e/upload-rust-binary-action",
+      "kind": "github-action",
+      "version": "v1",
+      "sha256": "unpinned:tag-ref",
+      "purpose": "CLI binary build+upload for GitHub Releases"
+    },
+    {
+      "name": "dtolnay/rust-toolchain",
+      "kind": "github-action",
+      "version": "stable",
+      "sha256": "unpinned:channel-only",
+      "purpose": "Rust toolchain install for desktop (Tauri) build job"
+    },
+    {
+      "name": "tauri-apps/tauri-action",
+      "kind": "github-action",
+      "version": "v2",
+      "sha256": "unpinned:tag-ref",
+      "purpose": "Desktop app bundle build+sign+release"
+    },
+    {
+      "name": "softprops/action-gh-release",
+      "kind": "github-action",
+      "version": "v2",
+      "sha256": "unpinned:tag-ref",
+      "purpose": "Release artifact publishing"
+    },
+    {
+      "name": "actions/download-artifact",
+      "kind": "github-action",
+      "version": "v4",
+      "sha256": "unpinned:tag-ref",
+      "purpose": "Cross-job artifact aggregation into publish job"
+    }
+  ],
+  "notes": "Tag refs are mutable by design of the providers; `unpinned:*` markers make that honesty explicit instead of faking immutability. Promotion path: replace tag refs with commit-SHA pins and fill real sha256 values — the checker verifies them automatically once present."
+}

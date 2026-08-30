@@ -573,6 +573,13 @@ KNOWN_REPOS = {
     "gastownhall/beads": ("NT-MEMORY", "recall"),     # D11: agent 分布式图记忆 (Dolt)
     "kenforthewin/atomic": ("NT-MEMORY", "recall"),   # D11: 语义连接个人知识库 (PKM)
     "harry0703/MangoDisk": ("NT-ACT", "execute"),     # D10/D11: 磁盘清理工具类
+    # Batch3 2026-08-26 (47 源吸收, 校正门 32 条提炼) — 专家判定 (W0.3)
+    "NVIDIA/SkillSpector": ("NT-SHIELD", "audit"),    # skill 静态安全审计器 (P6 vetting gate 同类)
+    "1N3/Sn1per": ("NT-SHIELD", "audit"),             # 渗透测试自动化框架
+    "tashfeenahmed/freellmapi": ("NT-IO", "delegate"), # 34 免费 LLM provider 聚合路由 failover
+    "microsoft/agent-lightning": ("NT-IO", "delegate"), # agent RL 训练框架
+    "tickernelz/opencode-mem": ("NT-MEMORY", "recall"), # opencode 会话记忆插件
+    "agentforce314/clawcodex": ("NT-ACT", "execute"), # Claude Code Python 重建 (codex 先例)
 }
 
 
@@ -681,6 +688,8 @@ def map_node(node_type, title, content, url):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--apply', action='store_true', help='写入 KB (absorbed_capabilities 字段)')
+    ap.add_argument('--force', action='store_true',
+                    help='覆盖 manual_correction 人工校正映射 (默认尊重人工校正, 防 keyword 重刷回退)')
     ap.add_argument('--report', action='store_true', help='只输出覆盖率报告')
     args = ap.parse_args()
 
@@ -727,8 +736,11 @@ def main():
     if args.apply:
         # R-P97: 写回委托 Rust CLI (update-node-metadata) — 单一事实源。
         # Python 仅算映射结果 (286 专家键 + 规则 + 本源溯源), 写回交 Rust merge。
+        # 防护门 (batch3 W0.3): evidence 为 manual_correction:* 的节点是人工校正门产物
+        # (Cycle 1192/1201 纪律), 默认跳过防 keyword 重刷回退; --force 显式覆盖。
         now = int(time.time())
         updates = []
+        skipped_manual = 0
         for nid, m in mapped.items():
             patch = {
                 'absorbed_capability': {
@@ -746,6 +758,22 @@ def main():
                     'mapped_at': now,
                 }
             updates.append({'node_id': nid, 'patch': patch})
+        if not args.force:
+            protected = []
+            for nid, node_type, title, content, url, meta_json in rows:
+                try:
+                    md = json.loads(meta_json) if meta_json else {}
+                except json.JSONDecodeError:
+                    continue
+                ev = (md.get('absorbed_capability') or {}).get('evidence', '')
+                if ev.startswith('manual_correction'):
+                    protected.append(nid)
+            if protected:
+                before = len(updates)
+                updates = [u for u in updates if u['node_id'] not in set(protected)]
+                skipped_manual = before - len(updates)
+                print(f'[mapping] 防护门: 跳过 {skipped_manual} 个人工校正节点 (--force 可覆盖)',
+                      flush=True)
         ins, missing = rust_update_node_metadata(updates)
         print(f'[mapping] wrote {ins} capability mappings to KB (missing={missing})', flush=True)
 

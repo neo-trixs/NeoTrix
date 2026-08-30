@@ -214,6 +214,7 @@ pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
 
 pub mod nt_file_ability;
 pub mod proxy_daemon_wrapper;
+// pub mod nt_act; // 并发session未完成，暂时禁用
 
 #[cfg(test)]
 pub(crate) use nt_file_ability::{make_min_docx, make_min_pptx};
@@ -231,6 +232,7 @@ pub use nt_file_ability::{
      load_snapshot,
      merge_tables_with, merge_tables_with_mode,
      normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
+     FileModel,
      replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
      suggest_schema, to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport,
      ContentSnapshot, FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation,

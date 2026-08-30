@@ -10,10 +10,16 @@ use neotrix::neotrix::nt_memory_kb::nt_memory_store::{get_all_nodes, get_all_edg
 use neotrix::core::nt_core_kb_primitives::{kv_set, kv_get, kv_list};
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeNode, KnowledgeEdge};
 use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{self, PackDecoder};
+use neotrix::neotrix::nt_memory_kb::nt_memory_store as kbs;
 
 fn kb_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(home).join(".neotrix").join("knowledge.db")
+}
+
+fn open_kb_conn() -> Result<rusqlite::Connection, NeoTrixError> {
+    rusqlite::Connection::open(kb_path())
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

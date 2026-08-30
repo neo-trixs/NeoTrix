@@ -146,6 +146,22 @@ impl ConsciousnessTree {
                 }
             }
         }
+
+        // D2: 尾部强制未验证地板 — 无检测数据的域不再沿用历史假清晰
+        self.enforce_unverified_fog_floor();
+    }
+
+    /// D2 (cycle9): 未验证雾地板 — 从未有 SelfTest 数据流入的分支 (self_test_count=0),
+    /// 雾浓度抬升到 config.unverified_fog_floor。单一机制, 由
+    /// set_branch_health_from_self_tests 与 run_growth_cycle 尾部共同调用,
+    /// 消灭快照恢复的历史均匀 0.05 假清晰。
+    pub fn enforce_unverified_fog_floor(&mut self) {
+        let floor = self.config.unverified_fog_floor;
+        for b in self.branches.values_mut() {
+            if b.self_test_count == 0 {
+                b.fog.level = b.fog.level.max(floor);
+            }
+        }
     }
 
     /// Scan for architecture vulnerabilities across all modules

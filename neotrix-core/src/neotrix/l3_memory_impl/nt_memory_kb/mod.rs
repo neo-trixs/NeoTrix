@@ -12,6 +12,7 @@ pub mod nt_memory_gwt_router;
 pub mod nt_memory_e8_agent;
 pub mod nt_memory_vsa_expand;
 pub mod nt_memory_decompose;
+pub mod nt_memory_domain_adapter;
 pub mod nt_memory_agent_driven;
 pub mod nt_memory_agent_session;
 pub mod nt_memory_api;
@@ -25,6 +26,8 @@ pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_cortex_sync;
 pub mod nt_memory_embed;
+pub mod kb_cognition;
+pub mod kb_vector_index;
 pub mod nt_memory_distill;
 pub mod nt_memory_graph;
 pub mod nt_memory_pipeline;
@@ -51,6 +54,7 @@ pub mod nt_memory_store;
 pub mod nt_memory_svaf_gate;
 pub mod nt_memory_types;
 pub mod nt_memory_unify;
+pub mod nt_field_ledger;
 pub mod nt_memory_panorama;
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
@@ -2416,6 +2420,50 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
     /// 读取 experience-tree 吸收的经验条目, 供门控校准 (CalibrationSet::from_kb_experience)。
     pub fn experience_entries(&self) -> Result<Vec<(String, String)>, String> {
         self.kv_list("experience")
+    }
+
+    // ── G1 场化地基: 版本化场写入 (灵境协议6 转译, 2026-08-26 吸收, R-P79) ──
+
+    /// 投递一条 ΔJ 到场暂存区 (不立即改变正式状态)。
+    pub fn field_stage(
+        &self,
+        ns: &str,
+        key: &str,
+        value: &str,
+        writer: &str,
+    ) -> Result<i64, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::field_stage(&conn, ns, key, value, writer)
+    }
+
+    /// 统一求解下一版本 (任何写者可调用; 空集幂等返回 None)。
+    pub fn field_tick(&self) -> Result<Option<nt_field_ledger::FieldReceipt>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::field_tick(&conn)
+    }
+
+    /// 当前场版本号。
+    pub fn field_version(&self) -> Result<u64, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::field_version(&conn)
+    }
+
+    /// 整链回放校验 (审计: 任何篡改返回 false)。
+    pub fn field_verify_chain(&self) -> Result<bool, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::field_verify_chain(&conn)
+    }
+
+    /// G4: 各写者已参与求解的最高版本游标 (未入链的写者不出现)。
+    pub fn field_writer_cursors(&self) -> Result<Vec<(String, u64)>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::field_writer_cursors(&conn)
+    }
+
+    /// G4: 多锚点共识帧 (head / quorum / 各写者滞后量)。
+    pub fn field_consensus_frame(&self) -> Result<nt_field_ledger::ConsensusFrame, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_field_ledger::consensus_frame(&conn)
     }
 
     /// 星系卫生代码强制 (T3 生产接线): 跨 namespace 校验真实 hub 的

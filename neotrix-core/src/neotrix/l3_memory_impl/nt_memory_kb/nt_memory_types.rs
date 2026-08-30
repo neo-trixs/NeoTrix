@@ -84,6 +84,8 @@ pub enum SearchMatchType {
     VectorSimilarity,
     TagExact,
     Bm25,
+    /// W1.4: 摄取时编译的概念索引命中 (metadata.ingest_index.concepts)
+    IngestConcept,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

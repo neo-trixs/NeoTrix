@@ -335,3 +335,31 @@ pub struct DirExtractReport {
     /// 总文本字符数
     pub total_chars: usize,
 }
+
+/// 统一解析结果
+#[allow(dead_code)]
+pub type ParseResult<T> = std::result::Result<T, crate::neotrix::nt_file_ability::types::ParseError>;
+
+/// 统一解析错误
+#[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
+pub enum ParseError {
+    #[error("不支持的格式")]
+    UnsupportedFormat,
+    #[error("anydoc 解析失败: {0}")]
+    AnyDoc(String),
+    #[error("IO 错误: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+/// 统一文件模型 (anydoc 吸收产物)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct FileModel {
+    pub format: String,
+    pub title: Option<String>,
+    pub content: String,
+    pub tables: Option<Vec<serde_json::Value>>,
+    pub metadata: Option<serde_json::Value>,
+    pub images: Option<Vec<String>>,
+}

@@ -1,7 +1,7 @@
 use super::{FileParser, SpatialBlock, BlockType};
 use lopdf::dictionary;
-#[cfg(test)]
-use lopdf::Stream;
+
+
 
 /// 判断字符串是否为可读 PDF 文本 (而非 FlateDecode 压缩数据的伪匹配)。
 /// 压缩流乱码特征: 高控制字符密度 / 低可打印比例 / 无词边界。
@@ -1150,10 +1150,235 @@ impl FileParser {
     }
 }
 
+// ── W2.3 (batch3 2026-08-26, 源: crunz-ai/nativePDF-structurer 吸收) ──
+// 零 OCR 零模型依赖的数字原生 PDF 结构化: 页眉尾去重 + 编号章节切分 + 表格直通。
+// 强化既有 FileParser 抽取原语 (R-P42), 与 marker 类扫描件 OCR 路径互补成 dual-path。
+
+/// 结构化章节
+#[derive(Debug, Clone, PartialEq)]
+pub struct PdfSection {
+    /// 层级: 1=章 (第X章/单个编号), 2=节 (x.y), 3=其他可辨识标题
+    pub level: u8,
+    pub title: String,
+    pub body_lines: Vec<String>,
+}
+
+/// 结构化结果
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StructuredPdfDoc {
+    pub pages: usize,
+    pub sections: Vec<PdfSection>,
+    /// 识别出的表格 (Markdown 形态, 与正文分离)
+    pub tables_markdown: Vec<String>,
+    /// 被判定为页眉/页脚并丢弃的行数
+    pub dropped_header_footer_lines: usize,
+}
+
+/// 标题启发式: 返回 Some(level) 表示该行是章节标题。
+fn pdf_heading_level(line: &str) -> Option<u8> {
+    let t = line.trim();
+    if t.is_empty() || t.chars().count() > 80 {
+        return None;
+    }
+    // 以句号/句读结尾的不是标题
+    if t.ends_with('。') || t.ends_with('.') || t.ends_with('；') || t.ends_with(';') {
+        return None;
+    }
+    // 中文篇章: 第X章/节/篇/部分
+    let cjk_chapter = t.starts_with('第')
+        && t.contains("章") || t.contains("节") || t.contains("篇") || t.contains("部分")
+        && t.chars().count() <= 30;
+    // 数字编号: "1 标题" / "1.2 标题" / "3.4.1 标题"
+    let numbered = {
+        let mut chars = t.chars();
+        let first_is_digit = chars.next().map(|c| c.is_ascii_digit()).unwrap_or(false);
+        first_is_digit
+            && t.find(|c: char| !c.is_ascii_digit() && c != '.')
+                .map(|i| i <= 8 && t.as_bytes()[i.saturating_sub(1)] as char != '.')
+                .unwrap_or(false)
+    };
+    if cjk_chapter {
+        return Some(if t.contains('章') || t.contains('篇') { 1 } else { 2 });
+    }
+    if numbered {
+        // 数字段数定层级: 单段(1 标题)=章 L1; 两段(x.y)=节 L2; 更多=L3
+        let leading_digits_dots = t.chars().take_while(|c| c.is_ascii_digit() || *c == '.').count();
+        let segments = t[..leading_digits_dots].matches('.').count() + 1;
+        return Some(segments.min(3) as u8);
+    }
+    // 全大写短行 (英文手册风格)
+    let ascii_letters: String = t.chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    if ascii_letters.len() >= 4
+        && ascii_letters.chars().all(|c| c.is_ascii_uppercase())
+        && t.chars().all(|c| c.is_ascii_uppercase() || c.is_whitespace() || !c.is_alphabetic())
+    {
+        return Some(3);
+    }
+    None
+}
+
+impl FileParser {
+    /// W2.3: 数字原生 PDF 零 OCR 结构化 — 服务大体量技术文档
+    /// (设备手册/维修手册类)。基于 spatial 布局块按 y 轴重建视觉行:
+    /// 顶/底行跨页重复 (归一化后 >=60% 页数) 判为页眉尾丢弃;
+    /// 其余行按编号/篇章标题启发式切分章节; 表格独立提取为 Markdown。
+    /// 零模型依赖; 扫描件请走 OCR 路径 (dual-path)。
+    pub fn structure_native_pdf(data: &[u8]) -> StructuredPdfDoc {
+        let pages_n = Self::extract_pdf_pages(data).len();
+        let mut doc = StructuredPdfDoc {
+            pages: pages_n,
+            ..Default::default()
+        };
+        if pages_n == 0 {
+            return doc;
+        }
+        let mut blocks = Self::extract_pdf_spatial(data);
+        blocks.sort_by(|a, b| {
+            b.y.partial_cmp(&a.y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
+        });
+
+        // 逐页收集带坐标 run (与 extract_pdf_tables 共用 collect_text_runs 原语),
+        // 页内按 y (0.5pt 容差) 聚成视觉行 — 真页序, 无跨页合并问题。
+        let Ok(pdf_doc) = lopdf::Document::load_mem(data) else {
+            return doc;
+        };
+        let mut page_rows: Vec<Vec<String>> = Vec::new();
+        for (_page_num, page_id) in pdf_doc.get_pages().iter().map(|(n, id)| (*n, *id)) {
+            let (Ok(fonts), Ok(content_data)) =
+                (pdf_doc.get_page_fonts(page_id), pdf_doc.get_page_content(page_id))
+            else {
+                continue;
+            };
+            let encodings: std::collections::BTreeMap<Vec<u8>, lopdf::Encoding<'_>> =
+                match fonts
+                    .iter()
+                    .map(|(name, font)| font.get_font_encoding(&pdf_doc).map(|e| (name.clone(), e)))
+                    .collect::<Result<_, lopdf::Error>>()
+                {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+            let Ok(content) = lopdf::content::Content::decode(&content_data) else {
+                continue;
+            };
+            let Ok(runs) = collect_text_runs(&content.operations, &encodings) else {
+                continue;
+            };
+            if runs.is_empty() {
+                continue;
+            }
+            let mut sorted: Vec<&TextRun> = runs.iter().collect();
+            sorted.sort_by(|a, b| {
+                b.y.partial_cmp(&a.y)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
+            });
+            let mut rows: Vec<String> = Vec::new();
+            let mut cur_key: Option<i32> = None;
+            for r in sorted {
+                let k = (r.y * 2.0).round() as i32;
+                if Some(k) != cur_key {
+                    cur_key = Some(k);
+                    rows.push(String::new());
+                }
+                for (_, seg) in &r.ops {
+                    let t = seg.trim();
+                    if t.is_empty() {
+                        continue;
+                    }
+                    let last = rows.last_mut().unwrap();
+                    if last.is_empty() {
+                        last.push_str(t);
+                    } else {
+                        last.push(' ');
+                        last.push_str(t);
+                    }
+                }
+            }
+            rows.retain(|r| !r.is_empty());
+            if !rows.is_empty() {
+                page_rows.push(rows);
+            }
+        }
+
+        // 跨页页眉尾判定: 归一化行文本出现在 >= ceil(0.6*pages) 个页面的
+        // 顶/底 2 行位置即判重 (页码数字已归一化剥离)
+        let normalize_row = |s: &str| -> String {
+            s.chars()
+                .filter(|c| !c.is_ascii_digit() && !c.is_whitespace())
+                .collect::<String>()
+                .trim_matches(|c: char| "-\u{2013}\u{2014}\u{b7}.*".contains(c))
+                .to_lowercase()
+        };
+        let threshold = (((pages_n as f64) * 0.6).ceil() as usize).max(2);
+        let is_extreme = |rows: &[String], i: usize| i < 2 || i + 1 > rows.len().saturating_sub(2);
+        let mut hf_keys: Vec<String> = Vec::new();
+        for rows in &page_rows {
+            for (i, r) in rows.iter().enumerate() {
+                if !is_extreme(rows, i) || r.chars().count() > 120 {
+                    continue;
+                }
+                let key = normalize_row(r);
+                if key.chars().count() < 2 {
+                    continue;
+                }
+                let pages_with = page_rows
+                    .iter()
+                    .filter(|rs| {
+                        rs.iter()
+                            .enumerate()
+                            .any(|(j, rr)| is_extreme(rs, j) && normalize_row(rr) == key)
+                    })
+                    .count();
+                if pages_with >= threshold && !hf_keys.contains(&key) {
+                    hf_keys.push(key);
+                }
+            }
+        }
+
+        // 章节切分 (逐页跳过页眉尾行)
+        let mut sections: Vec<PdfSection> = Vec::new();
+        for rows in &page_rows {
+            for (i, text) in rows.iter().enumerate() {
+                let key = normalize_row(text);
+                if is_extreme(rows, i) && hf_keys.contains(&key) {
+                    doc.dropped_header_footer_lines += 1;
+                    continue;
+                }
+                match pdf_heading_level(text) {
+                    Some(level) => sections.push(PdfSection {
+                        level,
+                        title: text.clone(),
+                        body_lines: Vec::new(),
+                    }),
+                    None => match sections.last_mut() {
+                        // 正文挂到最近章节 (或文档开头隐式导语节)
+                        Some(last) => last.body_lines.push(text.clone()),
+                        None => sections.push(PdfSection {
+                            level: 3,
+                            title: "\u{0}preamble".into(),
+                            body_lines: vec![text.clone()],
+                        }),
+                    },
+                }
+            }
+        }
+        doc.sections = sections;
+        doc.tables_markdown = Self::extract_pdf_tables(data)
+            .iter()
+            .map(|t| t.to_markdown())
+            .collect();
+        doc
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use lopdf::content::{Content, Operation};
+    use lopdf::Stream;
 
     #[test]
     fn find_system_font_covers_cyrillic_and_cjk() {
@@ -1784,5 +2009,134 @@ mod tests {
             format!("{err}").contains("无页面"),
             "错误信息应指明无页面: {err}"
         );
+    }
+}
+
+/// W2.3 (batch3 2026-08-26) 验收测试。
+#[cfg(test)]
+mod native_structurer_tests {
+    use super::*;
+    use lopdf::content::Operation;
+    use lopdf::dictionary;
+    use lopdf::Stream;
+
+    /// 多页 PDF: 每页给定文本行, 页首/页尾自动加重复页眉尾。
+    fn manual_pdf_bytes(pages: &[&[&str]], header: &str, footer: &str) -> Vec<u8> {
+        let mut doc = lopdf::Document::with_version("1.4");
+        let pages_id = doc.new_object_id();
+        let font_id = doc.add_object(dictionary! {
+            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Courier",
+        });
+        let resources_id = doc.add_object(dictionary! {
+            "Font" => dictionary! { "F1" => font_id },
+        });
+        let mut kids: Vec<lopdf::Object> = Vec::new();
+        for lines in pages.iter() {
+            let mut ops: Vec<Operation> = Vec::new();
+            let mut y = 780.0f32;
+            for line in std::iter::once(header).chain(lines.iter().copied()).chain(std::iter::once(footer)) {
+                ops.push(Operation::new("BT", vec![]));
+                ops.push(Operation::new("Tf", vec!["F1".into(), 11.into()]));
+                ops.push(Operation::new(
+                    "Tm",
+                    vec![1.into(), 0.into(), 0.into(), 1.into(), 60.into(), y.into()],
+                ));
+                ops.push(Operation::new(
+                    "Tj",
+                    vec![lopdf::Object::string_literal(line.to_string())],
+                ));
+                ops.push(Operation::new("ET", vec![]));
+                y -= 30.0;
+            }
+            let content_id = doc.add_object(Stream::new(
+                dictionary! {},
+                lopdf::content::Content { operations: ops }.encode().unwrap(),
+            ));
+            let page = doc.add_object(dictionary! {
+                "Type" => "Page",
+                "Parent" => pages_id,
+                "Contents" => content_id,
+                "Resources" => resources_id,
+                "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+            });
+            kids.push(page.into());
+        }
+        doc.objects.insert(
+            pages_id,
+            lopdf::Object::Dictionary(dictionary! {
+                "Type" => "Pages", "Kids" => kids, "Count" => pages.len() as i64,
+            }),
+        );
+        let catalog_id = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+        doc.trailer.set("Root", catalog_id);
+        let mut buf = Vec::new();
+        doc.save_to(&mut buf).expect("save multipage pdf");
+        buf
+    }
+
+    #[test]
+    fn drops_repeated_header_footer_and_splits_sections() {
+        // 注: 合成 PDF 用标准 Courier 字体无 CJK ToUnicode 映射, 测试内容用
+        // 英文; 中文篇章切分分支由 heading_level_heuristics 纯单测覆盖,
+        // 真实中文 PDF 走 ToUnicode 编码路径。
+        let header = "ACME Device Manual Rev 3";
+        let footer = "Page 1 - Confidential";
+        let pdf = manual_pdf_bytes(
+            &[
+                &["1 Installation Requirements", "Check grounding before install.", "Use approved tools only."],
+                &["1.1 Electrical Specifications", "Voltage range 220V to 240V AC."],
+                &["2 Maintenance Procedure", "Clean filters quarterly."],
+            ],
+            header,
+            footer,
+        );
+        let doc = FileParser::structure_native_pdf(&pdf);
+        assert_eq!(doc.pages, 3);
+        // 逐页计数: 3 页 × (1 页眉行 + 1 页脚行) = 6
+        assert_eq!(
+            doc.dropped_header_footer_lines, 6,
+            "per-page hdr+footer rows, got {}",
+            doc.dropped_header_footer_lines
+        );
+        assert!(!doc.sections.iter().any(|s| s.title.contains("Manual")));
+        assert!(!doc.sections.iter().any(|s| s.title.contains("Confidential")));
+        // 章节切分: 1 (L1) + 1.1 (L2) + 2 (L1)
+        let titles: Vec<&str> = doc.sections.iter().map(|s| s.title.as_str()).collect();
+        assert!(titles.iter().any(|t| t.starts_with("1 Installation")), "{titles:?}");
+        assert!(titles.iter().any(|t| t.starts_with("1.1 Electrical")), "{titles:?}");
+        assert!(titles.iter().any(|t| t.starts_with("2 Maintenance")), "{titles:?}");
+        let lvl = |prefix: &str| {
+            doc.sections
+                .iter()
+                .find(|s| s.title.starts_with(prefix))
+                .map(|s| s.level)
+                .unwrap_or(0)
+        };
+        assert_eq!(lvl("1 Installation"), 1);
+        assert_eq!(lvl("1.1 Electrical"), 2);
+        assert_eq!(lvl("2 Maintenance"), 1);
+        let ch1 = doc
+            .sections
+            .iter()
+            .find(|s| s.title.starts_with("1 Installation"))
+            .unwrap();
+        println!("DEBUG sections: {:?}", doc.sections);
+        assert!(ch1.body_lines.iter().any(|l| l.contains("grounding")));
+    }
+
+    #[test]
+    fn heading_level_heuristics() {
+        assert_eq!(pdf_heading_level("第3章 故障排查"), Some(1));
+        assert_eq!(pdf_heading_level("2.10 校准"), Some(2));
+        assert_eq!(pdf_heading_level("SAFETY WARNINGS"), Some(3));
+        assert_eq!(pdf_heading_level("这是一句普通的陈述句。"), None);
+        assert_eq!(pdf_heading_level(""), None);
+    }
+
+    #[test]
+    fn empty_input_returns_empty_doc() {
+        let doc = FileParser::structure_native_pdf(b"not a pdf");
+        assert_eq!(doc.pages, 0);
+        assert!(doc.sections.is_empty());
     }
 }

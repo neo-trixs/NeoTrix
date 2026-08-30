@@ -86,6 +86,9 @@ aes = "0.8"
 num-bigint = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "socks", "rustls-tls"] }
 url = "2"
+urlencoding = "2.1"
+instant-distance = "0.6"
+scraper = "0.19"
 rand = "0.8"
 async-trait = "0.1"
 rmcp = { version = "1.4", features = ["server", "macros"] }
@@ -105,6 +108,7 @@ uniffi = { version = "0.28", features = ["cli", "scaffolding-ffi-buffer-fns"], o
 unicode-normalization = "0.1"
 flate2 = "1"
 tar = "0.4"
+anydoc = { version = "0.2", optional = true }
 zstd = "0.13"
 crc32fast = "1"
 syn = { version = "2", features = ["full", "visit"] }
@@ -157,6 +161,7 @@ encoding_rs = "0.8"
 calamine = { version = "0.36.1", features = ["chrono"] }
 zim = "0.5"
 pmtiles = { version = "0.24", default-features = false, features = ["write", "tilejson", "zstd", "brotli", "http-async"] }
+num_cpus = "1.17.0"
 
 [dev-dependencies]
 tempfile = "3"

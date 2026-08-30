@@ -354,6 +354,8 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(AgingDiagnosisStage::new()),
             Box::new(SelfReviewStage::new()),
             Box::new(CreditAssignmentStage::new()),
+            // W3.6 (batch3): 步级信用分歧审计 — 紧随 credit_assignment 消费同一信号面
+            Box::new(StepCreditAuditStage::new()),
             Box::new(OracleGateStage::new()),
             Box::new(ArchitectureOptimizerStage::new()),
             Box::new(TrendAnalysisStage::new()),
@@ -1635,9 +1637,16 @@ impl BrainStage for GwtAbsorbStage {
             caps.iter().sum::<f64>() / caps.len() as f64
         };
         if let Some(ref kb) = brain._nt_memory_kb {
+            // ── FirstPersonRef 生产读点 (F4 收尾): 自我-当前流一致性进快照摘要,
+            // 让 first_person 字段从"出生写一次"变为每 cycle 可观测。
+            let fp_coherence = brain
+                ._consciousness_stream
+                .current()
+                .map(|c| brain.first_person.coherence_with(&c.vector))
+                .unwrap_or(0.0);
             let summary = format!(
-                "gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?}",
-                iteration, reward, avg_cap, brain.autonomy
+                "gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?} fp_coh={:.3}",
+                iteration, reward, avg_cap, brain.autonomy, fp_coherence
             );
             let _ = kb.kv_set("gwt_absorb", &format!("snapshot_{}", iteration), &summary);
             // is_conscious derived from the real InnerCritic quality score
@@ -2422,6 +2431,164 @@ impl BrainStage for CreditAssignmentStage {
     }
 }
 
+/// W3.6 (batch3 2026-08-26, 源: arxiv 2608.19760 *Credit Without Ground Truth*)
+/// 步级信用审计 — 无真值下交叉比对两条独立信用信号:
+///   A. 折扣回传累积信用 (与 CreditAssignmentStage 同口径, discount=0.95)
+///   B. PRM 即时奖励 (raw reward)
+/// 分歧步 = 可解释审计发现: 低即时高回传 = unsung_hero (铺垫步);
+/// 高即时负回传 = lucky_start (透支未来); 附结构性发现 (e8_state 合成值)。
+/// 输出持久化 KB `credit_audit/{latest,iter_N}` — 消费者: 自改进循环判定面。
+pub struct StepCreditAuditStage;
+impl Default for StepCreditAuditStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl StepCreditAuditStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
+impl BrainStage for StepCreditAuditStage {
+    fn name(&self) -> &str {
+        "step_credit_audit"
+    }
+    fn frequency(&self) -> usize {
+        20
+    }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if brain._prm_step_rewards.is_empty() {
+            return Ok(StageDecision::Continue);
+        }
+        let rewards: Vec<(usize, f64)> = brain._prm_step_rewards.clone();
+        let report = compute_credit_divergence(&rewards, 0.95);
+
+        // 结构性发现: CreditAssignmentStage 的 e8_state=(step%64) 为合成值
+        // (非真实 E8 转移), 信用图的 E8 维度不可解释 — 审计首靶点留痕。
+        let mut findings = vec![
+            "e8_state=(step%64) 为合成值非真实转移 — E8 维度信用归因不可解释".to_string(),
+        ];
+        for d in &report.divergent_steps {
+            findings.push(format!(
+                "step_{} {} divergence={:.3} (backprop_z={:.2}, raw_z={:.2})",
+                d.step_idx, d.label, d.divergence, d.backprop_z, d.raw_z
+            ));
+        }
+
+        let summary = format!(
+            "step_credit_audit: {} steps audited, {} divergent (>{:.2}), max_divergence={:.3}",
+            report.steps_audited,
+            report.divergent_steps.len(),
+            DIVERGENCE_THRESHOLD,
+            report.max_divergence
+        );
+        log::info!("[{}] {}", self.name(), summary);
+        if let Some(ref kb) = brain._nt_memory_kb {
+            let json = serde_json::json!({
+                "steps_audited": report.steps_audited,
+                "max_divergence": report.max_divergence,
+                "divergent_steps": report.divergent_steps.iter().map(|d| serde_json::json!({
+                    "step_idx": d.step_idx,
+                    "label": d.label,
+                    "divergence": d.divergence,
+                    "backprop_z": d.backprop_z,
+                    "raw_z": d.raw_z,
+                })).collect::<Vec<_>>(),
+                "structural_findings": findings,
+                "audited_at": std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64,
+            });
+            let _ = kb.kv_set("credit_audit", "latest", json.to_string().as_str());
+            let _ = kb.kv_set(
+                "credit_audit",
+                &format!("iter_{}", brain.iteration),
+                json.to_string().as_str(),
+            );
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+/// 分歧判定阈值 (z 分数差)
+pub const DIVERGENCE_THRESHOLD: f64 = 1.0;
+
+/// 单步分歧发现
+#[derive(Debug, Clone, PartialEq)]
+pub struct StepDivergence {
+    pub step_idx: usize,
+    /// unsung_hero = 低即时/高回传; lucky_start = 高即时/低或负回传
+    pub label: &'static str,
+    pub divergence: f64,
+    pub backprop_z: f64,
+    pub raw_z: f64,
+}
+
+/// 步级信用分歧审计报告
+#[derive(Debug, Clone, PartialEq)]
+pub struct CreditAuditReport {
+    pub steps_audited: usize,
+    pub max_divergence: f64,
+    pub divergent_steps: Vec<StepDivergence>,
+}
+
+/// 纯计算: 折扣回传信用 vs 即时奖励的 z 分数分歧 (无真值审计核心)。
+pub fn compute_credit_divergence(
+    rewards: &[(usize, f64)],
+    discount: f64,
+) -> CreditAuditReport {
+    let n = rewards.len();
+    // 常值奖励 ⇒ 无信用分歧可言: raw z 分母退化归零, 几何回传坡度纯属折现伪影
+    if rewards.windows(2).all(|w| (w[0].1 - w[1].1).abs() < 1e-12) {
+        return CreditAuditReport {
+            steps_audited: n,
+            max_divergence: 0.0,
+            divergent_steps: Vec::new(),
+        };
+    }
+    let mut backprop = vec![0.0f64; n];
+    // 回传: credit[i] = r[i] + discount * credit[i+1]
+    for i in (0..n).rev() {
+        backprop[i] = rewards[i].1 + discount * backprop.get(i + 1).copied().unwrap_or(0.0);
+    }
+    let z = |v: &[f64]| -> Vec<f64> {
+        let mean = v.iter().sum::<f64>() / n as f64;
+        let var = v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
+        let sd = var.sqrt().max(1e-9);
+        v.iter().map(|x| (x - mean) / sd).collect()
+    };
+    let bz = z(&backprop);
+    let rz: Vec<f64> = rewards.iter().map(|(_, r)| *r).collect::<Vec<_>>();
+    let rz = z(&rz);
+    let mut out = CreditAuditReport {
+        steps_audited: n,
+        max_divergence: 0.0,
+        divergent_steps: Vec::new(),
+    };
+    for i in 0..n {
+        let div = bz[i] - rz[i];
+        out.max_divergence = out.max_divergence.max(div.abs());
+        if div.abs() > DIVERGENCE_THRESHOLD {
+            let label = if div > 0.0 { "unsung_hero" } else { "lucky_start" };
+            out.divergent_steps.push(StepDivergence {
+                step_idx: rewards[i].0,
+                label,
+                divergence: div,
+                backprop_z: bz[i],
+                raw_z: rz[i],
+            });
+        }
+    }
+    out.divergent_steps.sort_by(|a, b| {
+        b.divergence
+            .abs()
+            .partial_cmp(&a.divergence.abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    out
+}
+
 /// OracleGate stage: evaluates pipeline health to decide if external human
 /// oracle intervention is needed. Frequency 10 — low overhead gate that
 /// only triggers under critical conditions (high entropy, low reward).
@@ -2879,6 +3046,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(BMonitor::default()));
         registry.register(Box::new(InnerCritic::new()));
         registry.register(Box::new(ConsciousnessRuntime::new()));
+        registry.register(Box::new(crate::core::nt_core_consciousness::ConsciousnessAwakening));
         registry.register(Box::new(SelfReviewGate::new(false)));
         registry.register(Box::new(ConsciousnessTree::new()));
         registry.register(Box::new(MetaAuditor::new()));

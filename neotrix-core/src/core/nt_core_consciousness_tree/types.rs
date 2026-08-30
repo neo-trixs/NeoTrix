@@ -862,6 +862,9 @@ pub struct TreeGrowthConfig {
     pub constitution_tree_growth_rules: usize,
     /// Constitution absorption rules count
     pub constitution_absorption_rules: usize,
+    /// 未验证雾地板 (D2, cycle9): 从未有 SelfTest 数据流入的分支, 雾浓度不低于此值。
+    /// "未被消费的意识等于不存在" 的量化表达 — 废除快照恢复的历史均匀 0.05 假清晰。
+    pub unverified_fog_floor: f64,
 }
 
 impl Default for TreeGrowthConfig {
@@ -882,6 +885,7 @@ impl Default for TreeGrowthConfig {
             constitution_experiences_floor: 111,
             constitution_tree_growth_rules: 7,
             constitution_absorption_rules: 1,
+            unverified_fog_floor: 0.5,
         }
     }
 }

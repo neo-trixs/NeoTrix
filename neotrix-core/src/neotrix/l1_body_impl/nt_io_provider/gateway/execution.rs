@@ -157,6 +157,12 @@ impl GatewayV2 {
             return Err(LlmError::InvalidRequest(reason));
         }
         let result = provider.complete(&req).await;
+        // Per-provider 用量账本接线 (R-P79): 仅在真实请求完成后记录 provider
+        // 自报 usage。活动记录，非权威账单数据 (诚实标注见 ProviderUsageLedger)。
+        if let Ok(response) = result.as_ref() {
+            crate::core::nt_core_telemetry::global_provider_usage_ledger()
+                .record_provider_usage(name, &response.usage);
+        }
         {
             self.tiered_semaphore
                 .lock()

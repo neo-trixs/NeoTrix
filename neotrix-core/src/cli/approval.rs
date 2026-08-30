@@ -37,7 +37,73 @@ pub struct PendingAction {
     pub id: String,
     pub action_type: ActionType,
     pub description: String,
+    /// W2.1 poka-yoke 披露门 (batch3 2026-08-26, 源: rainmanjam/poka-yoke):
+    /// 此动作将关闭的可能性。审批 UI/回调可见; 空表 = 未披露 (Detection 级)。
+    pub forecloses: Vec<String>,
     pub created_at: Instant,
+}
+
+/// Andon 严重度梯子 (poka-yoke 三级信号塔)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisclosureSeverity {
+    /// 错误不可能发生 = 硬拒绝层 (SecurityInspector Deny 层负责)
+    Control,
+    /// 随发生即宣告 = 审批请求携带 forecloses 披露
+    Warning,
+    /// 事后才被发现 = 高影响动作但无披露
+    Detection,
+}
+
+impl PendingAction {
+    pub fn disclosure_severity(&self) -> DisclosureSeverity {
+        if self.forecloses.is_empty() {
+            DisclosureSeverity::Detection
+        } else {
+            DisclosureSeverity::Warning
+        }
+    }
+}
+
+/// W2.1 核心: 从动作推断其关闭的可能性 — 把 "agent 很少主动说出 fix 关闭了什么"
+/// 机械化到审批门本身。确定性模式匹配, 无 LLM。
+pub fn infer_foreclosures(action: &ActionType) -> Vec<String> {
+    let mut out = Vec::new();
+    match action {
+        ActionType::ShellCommand { command } => {
+            let c = command.to_lowercase();
+            if c.contains("rm -rf") || c.contains("rm -fr") || c.contains("rmdir") {
+                out.push("目标路径数据不可恢复".into());
+            }
+            if c.contains("git push") && (c.contains("--force") || c.contains("-f")) {
+                out.push("远端历史被覆盖, 协作者本地分叉失效".into());
+            }
+            if c.contains("drop table") || c.contains("drop database") || c.contains("truncate table") {
+                out.push("数据库结构/数据即刻丢失".into());
+            }
+            if c.contains("dd ") && (c.contains("of=/dev/") || c.contains("oflag")) || c.contains("mkfs") {
+                out.push("目标块设备全盘覆写".into());
+            }
+            if c.contains("chmod -r 777") || c.contains("chmod 777 /") {
+                out.push("权限边界永久放开, 审计链失效".into());
+            }
+            if c.contains("systemctl stop") || c.contains("service stop") || c.contains("reboot")
+                || c.contains("shutdown") || c.contains("pkill") || c.contains("killall")
+            {
+                out.push("运行中服务/进程即时中断".into());
+            }
+        }
+        ActionType::GitOperation { description } => {
+            let d = description.to_lowercase();
+            if d.contains("--force") || d.contains("push -f") {
+                out.push("远端历史被覆盖, 协作者本地分叉失效".into());
+            }
+            if d.contains("reset --hard") || d.contains("checkout -- .") || d.contains("clean -fd") {
+                out.push("未提交工作区改动不可恢复".into());
+            }
+        }
+        _ => {}
+    }
+    out
 }
 
 pub struct ApprovalEngine {
@@ -91,10 +157,24 @@ impl ApprovalEngine {
         let id = format!("a{:04}", self.next_id);
         self.next_id += 1;
         let description = describe_action(&action);
+        // W2.1 披露门: 审批门替 agent 说出 fix 关闭了什么 (Warning 级 andon)
+        let forecloses = infer_foreclosures(&action);
+        let description = if forecloses.is_empty() {
+            description
+        } else {
+            format!("{}\n⚠ 此操作将关闭: {}", description, forecloses.join("; "))
+        };
+        if !forecloses.is_empty() {
+            log::warn!(
+                "poka-yoke disclosure: {} → forecloses {:?}",
+                id, forecloses
+            );
+        }
         let pa = PendingAction {
             id,
             action_type: action,
             description,
+            forecloses,
             created_at: Instant::now(),
         };
         self.pending.push(pa.clone());
@@ -295,5 +375,46 @@ mod tests {
         let pa = ApprovalEngine::new(ApprovalMode::Suggest)
             .submit(ActionType::Other { tool: "web_search".into(), args: "q=rust".into() });
         assert!(pa.description.contains("web_search"));
+    }
+
+    // ── W2.1 (batch3 2026-08-26, rainmanjam/poka-yoke 吸收) 披露门验收 ──
+
+    #[test]
+    fn test_infer_foreclosures_destructive_shell() {
+        let f = infer_foreclosures(&ActionType::ShellCommand {
+            command: "rm -rf ./build && echo done".into(),
+        });
+        assert!(f.iter().any(|s| s.contains("不可恢复")), "{f:?}");
+
+        let f = infer_foreclosures(&ActionType::ShellCommand {
+            command: "git push --force origin main".into(),
+        });
+        assert!(f.iter().any(|s| s.contains("远端历史")), "{f:?}");
+    }
+
+    #[test]
+    fn test_infer_foreclosures_git_reset_hard() {
+        let f = infer_foreclosures(&ActionType::GitOperation {
+            description: "reset --hard to v1".into(),
+        });
+        assert!(f.iter().any(|s| s.contains("工作区改动")), "{f:?}");
+    }
+
+    #[test]
+    fn test_benign_action_no_disclosure() {
+        assert!(infer_foreclosures(&ActionType::ShellCommand { command: "ls -la".into() }).is_empty());
+        assert!(infer_foreclosures(&ActionType::FileEdit { path: "a.rs".into(), diff: "-old\n+new".into() }).is_empty());
+    }
+
+    #[test]
+    fn test_submit_attaches_disclosure_and_severity() {
+        let mut engine = ApprovalEngine::new(ApprovalMode::Suggest);
+        let pa = engine.submit(ActionType::ShellCommand { command: "rm -rf /tmp/x".into() });
+        assert_eq!(pa.disclosure_severity(), DisclosureSeverity::Warning);
+        assert!(!pa.forecloses.is_empty());
+        assert!(pa.description.contains("此操作将关闭"), "{}", pa.description);
+
+        let benign = engine.submit(ActionType::ShellCommand { command: "ls".into() });
+        assert_eq!(benign.disclosure_severity(), DisclosureSeverity::Detection);
     }
 }

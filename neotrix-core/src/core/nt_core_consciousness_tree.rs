@@ -1026,6 +1026,34 @@ mod tests {
     }
 
     #[test]
+    fn test_unverified_fog_floor_raises_thin_domains() {
+        // D2 (cycle9): 无 SelfTest 数据流入的域, 雾浓度不低于 unverified_fog_floor;
+        // 有数据的域经生长周期真值派生保持 Clear — 废除均匀 0.05 假清晰。
+        // 此前 NEXUS/GOVERNANCE 等零检测域沿用快照恢复的历史 0.05, 与全清晰域
+        // 不可区分 (cycle9 审计缺陷②)。
+        let mut tree = ConsciousnessTree::new();
+        let results = vec![
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_detect"),
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_persist"),
+        ];
+        tree.set_branch_health_from_self_tests(&results);
+        tree.run_growth_cycle();
+        let core_fog = tree.branches[&BranchKind::Core].fog.level;
+        let nexus_fog = tree.branches[&BranchKind::Nexus].fog.level;
+        assert!(
+            core_fog <= 0.15,
+            "有检测数据的 Core 应近清晰, got {}",
+            core_fog
+        );
+        assert!(
+            nexus_fog >= tree.config.unverified_fog_floor,
+            "无检测数据的 Nexus 应抬升到未验证地板 {:.2}, got {}",
+            tree.config.unverified_fog_floor,
+            nexus_fog
+        );
+    }
+
+    #[test]
     fn test_node_snapshot_json_roundtrip_with_fog() {
         let mut branch = CapabilityBranch::new(BranchKind::Shield);
         branch.evaluate_fog(false, 0, false);

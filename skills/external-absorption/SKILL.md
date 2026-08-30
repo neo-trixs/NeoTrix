@@ -120,6 +120,10 @@ extract → dedup → categorize → capability map → insert + 显式 FTS → 
 | **session-batch cycle 冲突检查 (Cycle 1201)** | `absorb-session-batch.sh` 按 `branch_<cycle>_%` 前缀判幂等; 若 cycle 号已被当日其他会话占用 → 静默 SKIP, 新会话经验不落盘。写 pending JSON 前查 `SELECT DISTINCT substr(key,8,4) FROM kv_store WHERE key LIKE 'branch_%' ORDER BY CAST(...) DESC LIMIT 1` 取未占用 cycle | 首次吸收误 SKIP (cycle 1193 已占用) → 改 1201 成功 |
 | **并发 workers 漏源核对 (Cycle 1208)** | 38 源 dry-run 全显示 would_insert, 正式运行 (8 workers) 后 2 源 (mdflux/apache-maka) 无节点 — 并发临时文件竞态。**必须**用正式运行后 `SELECT COUNT(*) FROM nodes WHERE id LIKE 'batch_%'` 与 dry-run would_insert 数核对, 差额源单独重跑 (`printf ... | kb_batch_absorb.py --workers 4`) | 漏 2 → 补插成功 |
 | **文档转换/上下文压缩类仓库 keyword 误映射 (Cycle 1208)** | mdflux (文档→Markdown 转换, README 含 "clean") 与 openwolf (上下文压缩, README 含 "sharper context/fewer tokens") 被 keyword 规则误映射到 NT-SHIELD/audit。校正门判定: 文档转换→NT-MIND/transform; 上下文/语境管理→NT-MEMORY/transform。校正走 `update-node-metadata` merge 路径 (读原 metadata → patch absorbed_capability → 写回) | 2 误映射 → 校正 |
+| **镜像源 arxiv ID 二次归并 (batch3 2026-08-26)** | paperswithcode.co / alphaxiv.org 等镜像域与 arxiv.org 同 ID 论文产生平行节点 — extract 阶段按 `(abs|pdf|paper)/(\d{4}\.\d{4,5})` 提取 ID 归并到 canonical arxiv.org/abs URL, meta 记录 mirror_source+redirected_from; 批内 seen_urls 二次去重; 存量平行节点清理 = 先 update-node-metadata 迁移人工校正到 canonical 再 nodes_fts+nodes 双删 | 2608.23552 三重平行清零 |
+| **未知小仓库批次必须全量人工校正 (batch3 2026-08-26)** | keyword 自动映射对知名大仓准确、对无名仓库误映射率高达 68% (32/47) vs 大仓批次的 ~16% — 无名 README 缺强信号词时 security/audit 词几乎必误伤 SHIELD/audit。此类批次校正门禁止抽查, 必须逐源接地 (README/API desc/arxiv 标题) 全量复核 | 32 条校正全部持久化验证 |
+| **--apply 必须尊重 manual_correction 权威 (batch3 2026-08-26)** | absorb_to_capability.py 重跑会无差别重刷全部 batch_% 节点覆盖人工校正结果 — 已加防护门: evidence 以 manual_correction 开头的节点默认跳过 (--force 显式覆盖)。通用原则: 自动映射工具重跑必须尊重人工校正权威 | 实测跳过 31 校正节点零回退 |
+| **批摘要计数器不可信, SQL 对账为准 (batch3 2026-08-26)** | kb_batch_absorb.py 批汇总 inserted=94 与逐条日志 47 不符 (fetch 时计数 + flush 再累加 CLI 计数双计)。已修复为 CLI 写回计数唯一来源 + fetched/in_batch_dup 字段 + 对账不变量告警; 对账唯一可信路径 = SQL COUNT(url IN batch) + title↔URL 配对抽查 | urls=3 fetched=2 inserted=1 duplicate=1 零差额 |
 
 #### absorbed_capability 数据层追踪 (R-P79 闭环)
 

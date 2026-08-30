@@ -21,6 +21,27 @@ pub struct CodeGraph {
     pub(crate) file_nodes: HashMap<PathBuf, String>,
     pub(crate) communities: HashMap<String, usize>,
     pub(crate) project_id: Option<String>,
+    /// W2.5 (batch3 2026-08-26, 源: ix-infrastructure/Ix "virtual cartographer"):
+    /// 构建时文件 mtime 快照 — 持续文档化模型的 staleness 信号源。
+    /// 过期子图可观测并在检索时降权依据。
+    pub(crate) build_mtimes: HashMap<PathBuf, std::time::SystemTime>,
+}
+
+/// 图谱过期报告 (W2.5): stale = mtime 晚于构建快照; missing = 已删除。
+#[derive(Debug, Clone, Default)]
+pub struct StalenessReport {
+    pub scanned: usize,
+    pub stale_files: Vec<PathBuf>,
+    pub missing_files: Vec<PathBuf>,
+    /// 过期率万分比 = (stale + missing) / scanned
+    pub stale_ratio_bp: u32,
+}
+
+impl StalenessReport {
+    /// 新鲜判定: 过期率 ≤5% 视为图谱仍可信, 否则建议重建。
+    pub fn is_fresh(&self) -> bool {
+        self.stale_ratio_bp <= 500
+    }
 }
 
 impl Default for CodeGraph {
@@ -37,6 +58,7 @@ impl CodeGraph {
             file_nodes: HashMap::new(),
             communities: HashMap::new(),
             project_id: None,
+            build_mtimes: HashMap::new(),
         }
     }
 
@@ -68,6 +90,10 @@ impl CodeGraph {
 
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
             let items = parse_rust_file(&content);
+            // W2.5: 记录构建时 mtime 快照 (staleness 基准)
+            if let Ok(meta) = std::fs::metadata(&path).and_then(|m| m.modified()) {
+                self.build_mtimes.insert(path.clone(), meta);
+            }
             let _node_id = self.add_file_node(&path, &items);
             file_items.push((path.clone(), items));
         }
@@ -168,6 +194,31 @@ impl CodeGraph {
     }
 
     pub fn get_node(&self, id: &str) -> Option<&GraphNode> { self.nodes.get(id) }
+
+    /// W2.5 staleness 报告: 对比构建快照与当前文件系统 mtime。
+    /// Ix 语义 — 图谱是"持续维护的模型", 过期必须可观测。
+    pub fn staleness_report<P: AsRef<Path>>(&self, root: P) -> StalenessReport {
+        let mut report = StalenessReport::default();
+        report.scanned = self.build_mtimes.len();
+        for (path, built_at) in &self.build_mtimes {
+            match std::fs::metadata(path).and_then(|m| m.modified()) {
+                Ok(current) => {
+                    if current > *built_at {
+                        report.stale_files.push(path.clone());
+                    }
+                }
+                Err(_) => report.missing_files.push(path.clone()),
+            }
+        }
+        let _ = root.as_ref(); // 预留: 未来支持增量扫描根外文件的边界检查
+        let drifted = report.stale_files.len() + report.missing_files.len();
+        report.stale_ratio_bp = if report.scanned > 0 {
+            ((drifted as u64 * 10_000) / report.scanned as u64) as u32
+        } else {
+            0
+        };
+        report
+    }
     pub fn nodes(&self) -> &HashMap<String, GraphNode> { &self.nodes }
     pub fn edges(&self) -> &[GraphEdge] { &self.edges }
     pub fn communities(&self) -> &HashMap<String, usize> { &self.communities }
@@ -287,5 +338,41 @@ mod tests {
         assert!(stats.community_count >= 1);
         assert!(stats.type_counts.contains_key("file"));
         assert!(stats.type_counts.contains_key("function") || stats.type_counts.contains_key("struct"));
+    }
+
+    // ── W2.5 (batch3 2026-08-26, ix-infrastructure/Ix 吸收) staleness 验收 ──
+
+    #[test]
+    fn test_staleness_detects_drift_and_missing() {
+        use std::fs;
+        let dir = std::env::temp_dir().join(format!("cg_stale_{}_{}", std::process::id(), line!()));
+        fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("alpha.rs");
+        let b = dir.join("beta.rs");
+        fs::write(&a, "pub fn alpha() -> i32 { 1 }\n").unwrap();
+        fs::write(&b, "pub struct Beta;\n").unwrap();
+
+        let mut g = CodeGraph::new();
+        let n = g.build(&dir).expect("build");
+        assert!(n > 0);
+
+        // 刚构建 → 新鲜
+        let r0 = g.staleness_report(&dir);
+        assert!(r0.is_fresh(), "{r0:?}");
+        assert_eq!(r0.scanned, 2);
+
+        // 等待 mtime 前进 + 修改一个 + 删除一个
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        fs::write(&a, "pub fn alpha() -> i32 { 2 }\n").unwrap();
+        let _ = filetime::set_file_mtime(&a, filetime::FileTime::now());
+        fs::remove_file(&b).unwrap();
+
+        let r1 = g.staleness_report(&dir);
+        assert_eq!(r1.stale_files.len(), 1, "{r1:?}");
+        assert_eq!(r1.missing_files.len(), 1, "{r1:?}");
+        assert_eq!(r1.stale_ratio_bp, 10_000);
+        assert!(!r1.is_fresh());
+
+        fs::remove_dir_all(&dir).ok();
     }
 }

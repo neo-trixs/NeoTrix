@@ -18,7 +18,7 @@ use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, MindHookRegistry, HookContext, HookResult};
 
 /// A single skill entry parsed from a markdown file with YAML frontmatter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillEntry {
     pub name: String,
     pub description: String,
@@ -2622,6 +2622,9 @@ pub mod skill_hooks {
         }
     }
 }
+
+pub mod true_replay;
+pub mod skill_retrieval;
 
 #[cfg(test)]
 mod tests;

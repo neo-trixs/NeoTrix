@@ -59,6 +59,10 @@ pub mod nt_core_hcube;
 // L4 — 认知层 (Cognition)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l4_cognition;
+pub mod nt_core_rule_memory;
+pub mod nt_core_dao_engine;
+pub mod nt_core_meaning;
+pub mod nt_core_paradigm;
 pub mod nt_core_aura;
 pub mod nt_core_cot_generator;
 pub mod nt_core_credit;
@@ -171,6 +175,7 @@ pub mod nt_core_schema_watchdog;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_second_brain;
 pub mod nt_core_self_test;
+pub mod nt_core_orchestration_failure_taxonomy;
 pub mod nt_core_self_test_integration;
 pub mod nt_core_cad_consciousness;
 pub mod nt_core_simulate_engine;

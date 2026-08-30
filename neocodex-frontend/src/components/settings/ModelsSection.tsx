@@ -62,6 +62,21 @@ export function ModelsSection(props: Props) {
     if (p.model === props.config()?.active_model) return
     props.onSwitchProvider(p.name)
   }
+  // ── 连通性测试（B3, 吸收 LM Studio endpoint health 模式）──
+  // P3-M3 已接线: invoke('provider_test', { base_url }) 真实探测。
+  const [testState, setTestState] = createSignal<Record<string, { testing: boolean; latencyMs?: number; failed?: boolean }>>({})
+  async function runConnectivityTest(name: string) {
+    setTestState((m) => ({ ...m, [name]: { testing: true } }))
+    try {
+      const cfgp = props.config()?.providers.find((x) => x.name === name)
+      if (!cfgp?.base_url || !cfgp.base_url.startsWith('http')) throw new Error('no endpoint')
+      const r = await providerTest(cfgp.base_url)
+      setTestState((m) => ({ ...m, [name]: { testing: false, latencyMs: r.latency_ms } }))
+    } catch {
+      setTestState((m) => ({ ...m, [name]: { testing: false, failed: true } }))
+    }
+  }
+
   // 双栏：自定义配置 vs 代理池（参考同类产品模型广场）
   const [subTab, setSubTab] = createSignal<'custom' | 'pool'>('pool')
   // 连接测试状态来自父组件（SettingsModal 统一管理异步测试）

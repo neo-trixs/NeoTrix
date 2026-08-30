@@ -354,6 +354,7 @@ fn test_approval_esc_cancels() {
         id: "t".into(),
         action_type: ActionType::ShellCommand { command: "ls".into() },
         description: "运行 ls".into(),
+        forecloses: vec![],
         created_at: std::time::Instant::now(),
     });
     let a = app.handle_key(KeyCode::Esc, KeyModifiers::NONE);

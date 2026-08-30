@@ -60,6 +60,17 @@ fn pty_close(state: State<'_, Arc<commands::pty::PtyManager>>, session_id: Strin
     Ok(())
 }
 
+/// 打包边界更新器门 (absorbed: grok-bot-0.18-reconstructed): updater 默认随
+/// 打包模式 — release 构建启用, debug/ad-hoc 构建默认关闭 (不得拉取 release
+/// 通道覆盖本地构建); `NEOTRIX_UPDATER=0/1` 显式 env 双向覆盖且最优先。
+fn updater_enabled() -> bool {
+    match std::env::var("NEOTRIX_UPDATER").as_deref() {
+        Ok("0") => false,
+        Ok("1") => true,
+        _ => cfg!(not(debug_assertions)),
+    }
+}
+
 fn main() {
     // MCP stdio 子进程入口: 父进程 mcp_host_start 以 NEOTRIX_MCP_STDIO=1 拉起本进程,
     // 必须最先拦截, 避免 clap 解析 / GUI 启动。
@@ -93,14 +104,21 @@ fn main() {
             // LLM 提供者统一网关
             let _gateway = commands::provider_cmds::init_gateway();
 
-            tauri::Builder::default()
+            let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_dialog::init())
                 .plugin(tauri_plugin_deep_link::init())
                 .plugin(tauri_plugin_notification::init())
                 .plugin(tauri_plugin_http::init())
-                .plugin(tauri_plugin_fs::init())
-                .plugin(tauri_plugin_updater::Builder::new().build::<tauri::Wry>())
+                .plugin(tauri_plugin_fs::init());
+            // 更新器按打包边界门注册: 默认 release-only, env 可双向覆盖。
+            let builder = if updater_enabled() {
+                builder.plugin(tauri_plugin_updater::Builder::new().build::<tauri::Wry>())
+            } else {
+                log::info!("[boundary] updater disabled (NEOTRIX_UPDATER unset + debug build)");
+                builder
+            };
+            builder
                 .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.set_focus();
@@ -130,6 +148,7 @@ fn main() {
                     commands::get_brain_stats, commands::absorb_source,
                     commands::session_list, commands::session_create,
                                         commands::read_dir_recursive, commands::read_file, commands::write_file, commands::detect_project,
+                    commands::parse_doc_file,
                                         pty_spawn, pty_write, pty_resize, pty_close,
                     permission_dialog::request_permission,
                     permission_dialog::respond_permission,
@@ -156,6 +175,12 @@ fn main() {
                     commands::get_knowledge_stats,
                     commands::kb_search,
                     commands::kb_get_node,
+                    commands::kb_doc_ingest,
+                    commands::kb_doc_list,
+                    commands::kb_doc_delete,
+                    commands::kb_doc_reindex,
+                    commands::provider_usage_snapshot,
+                    commands::provider_test,
                     commands::kb_get_related,
                                         commands::kb_geo_points,
                     commands::kb_geo_stats,
@@ -660,6 +685,28 @@ commands::workflow_schedule_delete,
                 .setup(move |app| {
                     if let Err(e) = neotrix_tauri::setup_tray(app) {
                         log::warn!("failed to setup tray: {}", e);
+                    }
+                    // Phase4 deep link: neotrix://page/<name> → 转发事件给前端路由
+                    {
+                        use tauri::Manager;
+                        use tauri_plugin_deep_link::DeepLinkExt;
+                        let handle = app.handle().clone();
+                        app.deep_link().on_open_url(move |event| {
+                            let paths: Vec<String> = event
+                                .urls()
+                                .iter()
+                                .filter_map(|u| {
+                                    u.as_str().split("://").nth(1).map(|rest| {
+                                        format!("/{}", rest.trim_start_matches("page/").trim_start_matches('/'))
+                                    })
+                                })
+                                .collect();
+                            if let Some(first) = paths.first() {
+                                if let Some(w) = handle.get_webview_window("main") {
+                                    let _ = w.emit("neotrix-navigate", first.clone());
+                                }
+                            }
+                        });
                     }
                     let _ = neotrix_tauri::setup_menu(app);
 

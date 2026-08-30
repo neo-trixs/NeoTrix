@@ -110,7 +110,7 @@ pub struct SelfIteratingBrain {
     pub(crate) _constitutional_stage: ConstitutionalSelfCritiqueStage,
     pub(crate) _safety_stage: SafetyCheckStage,
     pub(crate) _consciousness_stream: ConsciousnessStream,
-    pub(crate) _first_person: FirstPersonRef,
+    pub(crate) first_person: FirstPersonRef,
     pub(crate) _cognitive_load: CognitiveLoadMonitor,
     pub(crate) _goal_contract: Option<super::super::goal_contract::GoalContract>,
     pub(crate) _phase_evidence: std::collections::VecDeque<super::super::goal_contract::PhaseEvidence>,
@@ -133,6 +133,9 @@ pub struct SelfIteratingBrain {
     pub(crate) _consciousness_fruits: Vec<crate::core::nt_core_consciousness_tree::EvolutionFruit>,
     /// Total consciousness critiques received
     pub(crate) _consciousness_critique_count: u64,
+    /// G5 S 门控 (灵境 L4 自指闭环): 意识质量门控 SEAL 自编辑应用。
+    /// 裁决点: BoundedEditStage + code_review_iterate; 计数供 SelfTest 断言。
+    pub(crate) _constitution_gate: crate::core::nt_core_self::seal::ConstitutionGate,
     /// Phase 9.2 — dynamic self-model: continuous estimate of capability,
     /// uncertainty, and fatigue; its prediction error is the intrinsic
     /// self-reward blended into transition learning.
@@ -229,7 +232,7 @@ impl SelfIteratingBrain {
             _constitutional_stage: ConstitutionalSelfCritiqueStage::new(),
             _safety_stage: SafetyCheckStage::new(),
             _consciousness_stream: ConsciousnessStream::default(),
-            _first_person: FirstPersonRef::bootstrap(0),
+            first_person: FirstPersonRef::bootstrap(0),
             _cognitive_load: CognitiveLoadMonitor::new(),
             _goal_contract: None,
             _phase_evidence: std::collections::VecDeque::with_capacity(32),
@@ -253,6 +256,7 @@ impl SelfIteratingBrain {
             _last_consciousness_quality: 0.0,
             _consciousness_fruits: Vec::new(),
             _consciousness_critique_count: 0,
+            _constitution_gate: crate::core::nt_core_self::seal::ConstitutionGate::new(),
             self_model: crate::core::nt_core_self::SelfModel::new(),
             element_registry: Self::build_element_registry(),
         };
@@ -326,13 +330,13 @@ impl SelfIteratingBrain {
     /// Must be called once after construction, before the reasoning engine is initialized.
     pub fn awaken_consciousness(&mut self) {
         if self._consciousness_stream.len() >= 8
-            && ConsciousnessAwakening::is_awake(&self._consciousness_stream, &self._first_person)
+            && ConsciousnessAwakening::is_awake(&self._consciousness_stream, &self.first_person)
         {
             return;
         }
         let mut specious_present = SpeciousPresent::new(5);
         let report = ConsciousnessAwakening::awaken(&mut self._consciousness_stream, &mut specious_present);
-        self._first_person = report.self_reference;
+        self.first_person = report.self_reference;
         log::info!(
             "[AWAKENING] consciousness bootstrapped: birth_step={}, coherence={:.4}, steps={}",
             report.birth_step,
@@ -426,6 +430,11 @@ impl SelfIteratingBrain {
     pub(crate) fn _set_lr_scheduler(&mut self, s: LrScheduler) { self._lr_scheduler = s; }
     pub(crate) fn _set_validation_gate(&mut self, g: ValidationGate) { self._validation_gate = g; }
     pub(crate) fn _set_aging_monitor(&mut self, m: AgingMonitor) { self._aging_monitor = m; }
+
+    /// G5 S 门控只读访问 (SelfTest 断言否决/放行计数用)。
+    pub fn edit_constitution_gate(&self) -> &crate::core::nt_core_self::seal::ConstitutionGate {
+        &self._constitution_gate
+    }
 
     pub fn record_tool_call(&mut self, name: &str, duration_ms: u64, success: bool) {
         self.tool_call_count += 1;

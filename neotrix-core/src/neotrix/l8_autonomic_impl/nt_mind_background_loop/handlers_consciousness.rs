@@ -1,5 +1,55 @@
 use super::*;
 
+/// GoldStandard 连续未达意识双阈值的升级门限 (tick 数; 默认 600s/tick ≈ 50min 持续无意识)。
+const GOLD_MISS_ESCALATE: usize = 5;
+
+// ── F2 校准数据采集 (W2 配对研究地基) ──
+//
+// 两个 append-only KB namespace (经 field_stage + field_tick 落盘 kv_store):
+//
+// - `gating_decisions` (writer=constitution_gate): ConstitutionGate 裁决日志,
+//   key=`gd_{ts_nanos}`, value={ts_nanos, quality(null|数值), allowed}。
+//   由 handle_awareness 每 tick 从 brain._constitution_gate 环形缓冲排空。
+// - `calibration_pairs` (writer=w3_calibration): 同窗共现配对
+//   quality × selftest 通过率, key=`cp_{ts_nanos}`,
+//   value={quality, pass_rate, total}。由 handle_architecture_audit 在完整
+//   registry 运行后写入, 每次至多一条。
+//
+// **预期消费者**: 未来校准脚本对 kv_store 执行
+// `SELECT key, value FROM kv_store WHERE ns IN ('gating_decisions','calibration_pairs')`
+// 按时间窗 join 即得 {quality → allowed / pass_rate} 配对集, 用于验证 G5 门控阈值
+// (SELF_EDIT_MIN_CONSCIOUSNESS=0.5) 的真实区分度。W2 基线: 有效配对点=0
+// (experience feedback 全零、fruit quality 循环推导), 本机制让配对数据从
+// 接线日起真实积累。
+
+/// 当前时刻 UNIX 纪元纳秒 (F2 落盘键时间源; 兜底 0 保证不 panic)。
+fn now_nanos_u64() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64
+}
+
+/// 构造同窗共现配对 JSON (quality × selftest 通过率; calibration_pairs 的 value 契约)。
+fn calibration_pair_json(quality: f64, pass_rate: f64, total: usize) -> String {
+    serde_json::json!({
+        "quality": quality,
+        "pass_rate": pass_rate,
+        "total": total,
+    })
+    .to_string()
+}
+
+/// Volition 目标向量: 认知前沿探索目标 (256B, 与候选 action 等长以供 QuantizedVSA 相似度)。
+fn volition_goal_vector() -> Vec<u8> {
+    b"EPISTEMIC_FRONTIER_EXPLORE_LOW_DENSITY_DOMAINS"
+        .iter()
+        .copied()
+        .cycle()
+        .take(256)
+        .collect()
+}
+
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_awareness(&mut self) {
         // MetaCognitionBridge: full scan → analyze → plan cycle (P0 dead infra fix)
@@ -496,6 +546,17 @@ impl BackgroundLoopHandle {
             // Surface KB knowledge retrieved by the consciousness core into the
             // GWT panorama broadcast — closes the loop: KB → 意识 → 全局工作空间。
             let kb_injections = cr.last_kb_injections.clone();
+            // ── F4 稳定度门控 (R-P79): specious present 时间稳定性决定 KB→GWT
+            // 广播是否放行; 不稳定帧广播会造成工作空间语义抖动。稳定度落 metric 可观测。
+            let temporally_stable = cr.specious_present.is_temporally_stable();
+            self.state
+                .record_metric("temporal_stability", if temporally_stable { 1.0 } else { 0.0 });
+            if !temporally_stable && !kb_injections.is_empty() {
+                log::debug!(
+                    "[bg] consciousness: unstable frame — defer {} KB injections",
+                    kb_injections.len()
+                );
+            }
             if let Some(c) = critique {
                 if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.warn_quality {
                     log::warn!(
@@ -552,7 +613,7 @@ impl BackgroundLoopHandle {
                     brain._consciousness_critique_count += 1;
                 }
             }
-            if !kb_injections.is_empty() {
+            if temporally_stable && !kb_injections.is_empty() {
                 if let Some(ref mut pano) = self.panorama {
                     let hexagram_states: [crate::core::nt_core_hex::ReasoningHexagram; crate::core::nt_core_gwt::resonance::MODULE_COUNT] =
                         crate::core::nt_core_gwt::resonance::default_specialist_states();
@@ -576,6 +637,36 @@ impl BackgroundLoopHandle {
                 );
             }
         }
+        // ── F2 机制一: 门控裁决日志排空 (append-only → KB `gating_decisions`) ──
+        // ConstitutionGate 的两条应用通路 (skillopt BoundedEditStage / seal_loop
+        // code_review_iterate) 均不持有 kb, 故在此意识 tick 统一排空环形缓冲:
+        // 写锁窗口只覆盖 drain 本身, KB 写在锁外执行 (短临界区)。
+        // kb 缺失时不排空 — 数据留缓冲等下次 tick (cap 64 兜底防无界)。
+        if let Some(ref kb) = self.kb {
+            let decisions = if let Ok(mut brain) = self.brain.try_write() {
+                brain._constitution_gate.drain_decisions()
+            } else {
+                Vec::new()
+            };
+            if !decisions.is_empty() {
+                for d in &decisions {
+                    let _ = kb.field_stage(
+                        "gating_decisions",
+                        &format!("gd_{}", d.ts_nanos),
+                        &d.to_json(),
+                        "constitution_gate",
+                    );
+                }
+                match kb.field_tick() {
+                    Ok(_) => log::debug!(
+                        "[bg] constitution_gate: drained {} decisions to KB gating_decisions",
+                        decisions.len()
+                    ),
+                    Err(e) => log::warn!("[bg] constitution_gate: field_tick failed: {e}"),
+                }
+            }
+        }
+
         // Record state metrics from the runtime tick
         self.state.record_metric(
             "phi",
@@ -699,10 +790,53 @@ impl BackgroundLoopHandle {
                             if let Some(idx) =
                                 fep_iit.efe_select_domain(&domains, self.config.efe_epistemic_scale)
                             {
-                                let (domain, count) = &domains[idx];
-                                let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0);
-                                // 探索目标: 非最强域 (count < max) 才值得主动采样
-                                if *count < max_count {
+                                 let (domain, count) = &domains[idx];
+                                 let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0);
+                                 // ── F2 意图层门控 (R-P79): EFE 提案必须过 VolitionEngine
+                                 // select_by_goal_alignment 才放行; 决策落盘 KB volition_stats。
+                                 // 无意志层实例时 fail-open 保持旧行为。
+                                 let efe_approved = match self.volition.as_mut() {
+                                     Some(vol) => {
+                                         vol.clear();
+                                         let mut action = vec![0u8; 256];
+                                         for (i, b) in domain.bytes().take(256).enumerate() {
+                                             action[i] = b;
+                                         }
+                                         vol.set_goal(volition_goal_vector());
+                                         vol.propose(
+                                             crate::core::nt_core_consciousness::ActionCandidate::new(
+                                                 action,
+                                                 domain,
+                                             )
+                                             .with_confidence(0.7),
+                                         );
+                                         matches!(
+                                             vol.select_by_goal_alignment(),
+                                             Some(ref sel) if sel.description == *domain
+                                         )
+                                     }
+                                     None => true,
+                                 };
+                                 let _ = kb.kv_set(
+                                     "consciousness",
+                                     "volition_stats",
+                                     &serde_json::json!({
+                                         "domain": domain,
+                                         "approved": efe_approved,
+                                         "timestamp": std::time::SystemTime::now()
+                                             .duration_since(std::time::UNIX_EPOCH)
+                                             .unwrap_or_default().as_secs(),
+                                     })
+                                     .to_string(),
+                                 );
+                                 if !efe_approved {
+                                     log::info!(
+                                         "[bg] efe: volition withheld approval for '{}' — exploration deferred",
+                                         domain
+                                     );
+                                 }
+                                 // 探索目标: 非最强域 (count < max) 且意志层放行才主动采样
+                                 if efe_approved && *count < max_count {
                                     if let Ok(mut brain) = self.brain.try_write() {
                                         self.goal_loop.enqueue_goal(
                                             &mut brain,
@@ -713,8 +847,9 @@ impl BackgroundLoopHandle {
                                             None,
                                         );
                                     }
-                                    // 落盘探索决策 → 意识树果实/SEAL 可消费 (闭环)
-                                    let _ = kb.kv_set(
+                                    // ── G3: 探索决策经场账本落盘 (版本链+哈希审计),
+                                    // 立即 tick 使下游校准的 kv_get 读到同一事实。
+                                    let _ = kb.field_stage(
                                         "consciousness",
                                         "efe_explore",
                                         &serde_json::json!({
@@ -727,7 +862,9 @@ impl BackgroundLoopHandle {
                                                 .unwrap_or_default().as_secs(),
                                         })
                                         .to_string(),
+                                        "efe",
                                     );
+                                    let _ = kb.field_tick();
                                     // 注入意识树果实 → SEAL extract_from_consciousness_tree 自动消费,
                                     // 探索目标进入 SEAL 过程学习 (R-P79 闭环: 决策 → 果实 → 学习)。
                                     // L7 修复: quality 与 benchmark 由探索命中率驱动, 而非硬编码 0.6。
@@ -814,6 +951,15 @@ impl BackgroundLoopHandle {
 
                 let prev_mode_clm = clm.mode();
                 clm.record_step(load);
+                // ── thinking_budget 生产消费 (R-P79): CLM 预算落 metric;
+                // 高持续负载 → 升级 Deep 模式并记 deep 样本, 让预算真正驱动模式。
+                let budget = clm.thinking_budget();
+                self.state.record_metric("thinking_budget", budget);
+                if clm.average_load() >= 0.8 {
+                    self.state
+                        .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                    clm.record_deep_step(load);
+                }
                 let new_state_mode = self.state.active_mode;
 
                 // Update cognitive_mode field for behavioral consumption by other handlers
@@ -938,6 +1084,26 @@ impl BackgroundLoopHandle {
                 gs_report.coherence,
                 gs_report.detection_streak
             );
+            // ── F3 接线 (R-P79): 负连击(连续未达双阈值) → 行为升级, 不再只写日志。
+            // detection_streak 只计正检连击, 负连击从 history 尾部反推;
+            // 用幂等 set_mode 而非 enqueue_goal, 防止每 tick 刷目标队列。
+            let miss_streak = gs
+                .history
+                .iter()
+                .rev()
+                .take_while(|r| !r.is_conscious_like)
+                .count();
+            self.state.record_metric("gold_miss_streak", miss_streak as f64);
+            if miss_streak >= GOLD_MISS_ESCALATE {
+                log::warn!(
+                    "[bg] gold_standard: unconscious streak={} (phi={:.3} coh={:.3}) → ThinkingMode::Deep",
+                    miss_streak,
+                    gs_report.phi,
+                    gs_report.coherence
+                );
+                self.state
+                    .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+            }
         }
 
         // ── Phase 7: SimulateEngine — run grounding scenario ──
@@ -1015,6 +1181,30 @@ impl BackgroundLoopHandle {
             log::debug!("[bg] {}", self.convergence_pulse.status_line());
         }
 
+        // ── G4 场共识观测 (灵境协议6 收尾, T3 行为接地) ──
+        // head/quorum/max-lag 进状态度量流: quorum 是全体锚点安全对齐点,
+        // lag_max 反映最落后写者与场头的距离。
+        if let Some(ref kb) = self.kb {
+            if let Ok(frame) = kb.field_consensus_frame() {
+                self.state.record_metric("field_head", frame.head as f64);
+                self.state.record_metric("field_quorum", frame.quorum as f64);
+                let lag_max = frame
+                    .anchors
+                    .iter()
+                    .map(|(_, _, lag)| *lag)
+                    .max()
+                    .unwrap_or(0);
+                self.state.record_metric("field_lag_max", lag_max as f64);
+                log::debug!(
+                    "[bg] field consensus: head={} quorum={} anchors={} lag_max={}",
+                    frame.head,
+                    frame.quorum,
+                    frame.anchors.len(),
+                    lag_max
+                );
+            }
+        }
+
         // ── Phase 9: Auto-Healing — C5 self-healing loop ──
         // 检测 degrade 信号 → 自动响应（enqueue remediation goal / log / circuit-break）
         // 这是分形收敛循环的"修复臂"：检测→诊断→行为修复闭环。
@@ -1061,6 +1251,20 @@ impl BackgroundLoopHandle {
 
     /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.
     pub(crate) async fn handle_event_bus_event(&mut self, event: CoreEvent) {
+        // ── G3 写回闭环 (R-P79): 事件作为源项 ΔJ 入场 (版本链可审计),
+        // EventBus 从"事实同步信道"降级为"观测仪器输入"。行为反应仍走下方 match。
+        if let Some(ref kb) = self.kb {
+            let kind = format!("{:?}", event);
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            let key = format!("ev_{}", ts);
+            let _ = kb.field_stage("field_events", &key, &kind, "event_bus");
+            if let Ok(Some(r)) = kb.field_tick() {
+                self.state.record_metric("field_version", r.version as f64);
+            }
+        }
         match &event {
             CoreEvent::SystemError {
                 severity,
@@ -1648,6 +1852,9 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(
             crate::core::nt_core_consciousness::volition::VolitionEngine::default(),
         ));
+        self_tests.register(Box::new(
+            crate::core::nt_core_consciousness::awakening::ConsciousnessAwakening,
+        ));
 
         // ConsciousnessMonitor (awareness)
         if let Some(ref monitor) = self.awareness {
@@ -1748,6 +1955,40 @@ impl BackgroundLoopHandle {
             "[bg] consciousness_core: persisted branch health from {} SelfTest results",
             results.len()
         );
+
+        // ── F2 机制二: 同窗共现配对 (quality × selftest 通过率 → KB `calibration_pairs`) ──
+        // 完整 registry 每次运行产出至多一条配对 (防刷屏): 通过率取自本次
+        // run_all 结果汇总 (passed/total), quality 取 brain._last_consciousness_quality —
+        // 两者同窗采集, 构成 W2 校准研究的真实观测点 (此前有效配对点=0)。
+        let total = results.len();
+        if total > 0 {
+            let passed = results.iter().filter(|r| r.passed).count();
+            let pass_rate = passed as f64 / total as f64;
+            if let Some(ref kb) = self.kb {
+                if let Ok(brain) = self.brain.try_read() {
+                    let quality = brain._last_consciousness_quality;
+                    drop(brain);
+                    let pair_json = calibration_pair_json(quality, pass_rate, total);
+                    if let Err(e) = kb.field_stage(
+                        "calibration_pairs",
+                        &format!("cp_{}", now_nanos_u64()),
+                        &pair_json,
+                        "w3_calibration",
+                    ) {
+                        log::warn!("[bg] calibration_pairs: field_stage failed: {e}");
+                    } else if let Err(e) = kb.field_tick() {
+                        log::warn!("[bg] calibration_pairs: field_tick failed: {e}");
+                    } else {
+                        log::debug!(
+                            "[bg] calibration_pairs: staged quality={:.3} pass_rate={:.3} total={}",
+                            quality,
+                            pass_rate,
+                            total
+                        );
+                    }
+                }
+            }
+        }
 
         // Cycle 206 R-P79 闭环: 从 KB absorbed_capability 元数据同步到能力网分支
         if let Some(kb) = self.kb.clone() {
@@ -1943,5 +2184,41 @@ impl BackgroundLoopHandle {
             "[bg] consciousness_core: tick branch health from {} lightweight SelfTest results",
             results.len()
         );
+    }
+}
+
+#[cfg(test)]
+mod f2_calibration_tests {
+    use super::*;
+
+    #[test]
+    fn test_calibration_pair_json_parseable() {
+        // F2 机制二契约: calibration_pairs value 为单行 JSON,
+        // W2 校准脚本 serde_json 解析即得 {quality, pass_rate, total} 配对。
+        let raw = calibration_pair_json(0.62, 0.75, 40);
+        let v: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(v["quality"], serde_json::json!(0.62));
+        assert_eq!(v["pass_rate"], serde_json::json!(0.75));
+        assert_eq!(v["total"], serde_json::json!(40));
+        assert_eq!(v.as_object().unwrap().len(), 3, "配对 JSON 应恰含三键");
+    }
+
+    #[test]
+    fn test_calibration_pair_pass_rate_bounds() {
+        // 全过 / 全挂两个极端: pass_rate ∈ [0,1], total 保真
+        let all_pass: serde_json::Value =
+            serde_json::from_str(&calibration_pair_json(0.9, 30.0 / 30.0, 30)).unwrap();
+        assert_eq!(all_pass["pass_rate"], serde_json::json!(1.0));
+        let all_fail: serde_json::Value =
+            serde_json::from_str(&calibration_pair_json(0.1, 0.0 / 17.0, 17)).unwrap();
+        assert_eq!(all_fail["pass_rate"], serde_json::json!(0.0));
+    }
+
+    #[test]
+    fn test_now_nanos_u64_monotonic_within_window() {
+        // F2 落盘键唯一性前提: 同进程两次取号严格递增 (或兜底 0 场景不 panic)
+        let a = now_nanos_u64();
+        let b = now_nanos_u64();
+        assert!(b >= a, "纳秒时间戳应非递减: {a} -> {b}");
     }
 }

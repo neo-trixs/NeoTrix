@@ -8,6 +8,7 @@ import { NeoSend, NeoChevronRight } from '../components/neo-icons'
 import { AutonomyMeter } from '../components/AutonomyMeter'
 import { rootCause } from '../lib/errorRootCause'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
+import { tagsStore } from '../stores/tags'
 import { Sidebar } from '../components/Sidebar'
 import { SettingsModal } from '../components/SettingsModal'
 import { RightBar } from '../components/RightBar'
@@ -19,12 +20,11 @@ import { FilePreview } from '../components/FilePreview'
 import { Markdown } from '../components/Markdown'
 import { GitPanel } from '../components/GitPanel'
 import { ScheduledTasks } from '../components/ScheduledTasks'
-import { CostDashboard } from '../components/CostDashboard'
 import { CheckpointTimeline } from '../components/CheckpointTimeline'
 import { SideChat } from '../components/SideChat'
-import { ComputerUse } from '../components/ComputerUse'
 import { TaskList } from '../components/TaskList'
 import { LivePreview } from '../components/LivePreview'
+import { TerminalPanel } from '../components/TerminalPanel'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { runSlashDispatch, parseRunCommand, type SlashContext } from './chat/slashCommands'
 import { HeroMark, UserIcon, BotIcon } from './chat/avatars'
@@ -417,7 +417,8 @@ export function Chat() {
   }
 
   // 视图切换：chat / cowork / computer（对应侧栏 segmented tabs）
-  const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
+  // 单态对话: 视图切换已移除, activeView 仅存兼容签名
+  const [activeView, setActiveView] = createSignal<'chat'>('chat')
 
   // 标签筛选（对标 Obsidian Tag Pane 多选过滤）
   const [activeTags, setActiveTags] = createSignal<string[]>([])
@@ -429,9 +430,14 @@ export function Chat() {
   const clearTags = () => setActiveTags([])
 
   // 顶部工具栏面板：一次只开一个
-  type PanelId = 'git' | 'tasks' | 'cost' | 'timeline' | 'sidechat' | 'preview'
+  // 成本面板已收敛至 /insights 页 (Phase2 B1) — 旧入口自动重定向
+  createEffect(() => {
+    if (activePanel() === 'cost') {
+      setActivePanel(null)
+      navigate('/insights')
+    }
+  })
   // 面板快捷键顺序（⌘1-⌘6）与侧栏入口一一对齐
-  const PANEL_ORDER: PanelId[] = ['git', 'cost', 'tasks', 'timeline', 'sidechat', 'preview']
   const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
   const togglePanel = (id: PanelId) => {
     setActivePanel(activePanel() === id ? null : id)
@@ -951,19 +957,9 @@ export function Chat() {
     // 面板快捷键：⌘1-⌘6 切换 6 个功能面板（顺序对齐侧栏），⌘7 切换电脑控制视图；
     // 面板仅 chat 视图可渲染，非 chat 视图按下自动先切回 chat
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '7') {
-      const idx = Number(e.key) - 1
-      if (idx === 6) {
-        // ⌘7：电脑控制 → 侧栏内嵌视图
-        e.preventDefault()
-        if (activeView() === 'chat') setActivePanel(null)
-        setActiveView(activeView() === 'computer' ? 'chat' : 'computer')
-        return
-      }
-      const target: PanelId = PANEL_ORDER[idx]
+      const target = resolvePanelShortcut(e.key)
       if (target) {
         e.preventDefault()
-        // 非 chat 视图点按面板：先回 chat 再开面板（面板区被 activeView 门禁，避免无响应）
-        if (activeView() !== 'chat') setActiveView('chat')
         togglePanel(target)
       }
       return
@@ -998,6 +994,9 @@ export function Chat() {
     let userMsgId: string | null = null
     if (!opts?.userMessageAdded) {
       userMsgId = chatStore.addMessage({ role: 'user', content })
+      // 自动打标：会话首条消息触发关键词匹配（每次会话至多一次，已有标签则跳过）
+      const sid = chatStore.state.currentSessionId
+      if (sid) tagsStore.autoTagFromText(sid, content)
     }
     const atts = pendingAttachments()
     setInputValue('')
@@ -1627,8 +1626,9 @@ export function Chat() {
           <Show when={activePanel() === 'tasks'}>
             <ScheduledTasks open onClose={() => setActivePanel(null)} />
           </Show>
-          <Show when={activePanel() === 'cost'}>
-            <CostDashboard open onClose={() => setActivePanel(null)} />
+
+          <Show when={activePanel() === 'terminal'}>
+            <TerminalPanel />
           </Show>
           <Show when={activePanel() === 'timeline'}>
             <CheckpointTimeline
@@ -2360,15 +2360,6 @@ export function Chat() {
         </Show>
         </Show>
 
-        {/* ===== 协同视图（cowork） ===== */}
-        <Show when={activeView() === 'cowork'}>
-          <CoworkView />
-        </Show>
-
-        {/* ===== 电脑控制：侧栏内嵌标签页（对标 Claude 侧栏） ===== */}
-        <Show when={activeView() === 'computer'}>
-          <ComputerUse embedded open onClose={() => setActiveView('chat')} />
-        </Show>
       </main>
 
       {/* ===== 右栏：Artifact Pane + 文件树（设计 v2） ===== */}

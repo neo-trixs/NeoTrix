@@ -5,6 +5,7 @@ import {
   tagDepth,
   TAG_PALETTE,
   RECOMMENDED_TAGS,
+  autoTagCandidates,
   tagsStore,
 } from './tags'
 
@@ -155,6 +156,31 @@ describe('tags store', () => {
     expect(store.tagsForSession('s1')).toEqual([]) // 不绑定任何会话
     expect(store.registerTag('   ')).toBeNull()
     expect(store.registerTag('///')).toBeNull()
+  })
+
+  it('autoTagCandidates：关键词命中降序取前2', () => {
+    // 单域命中
+    expect(autoTagCandidates('这个 bug 报错了')).toContain('工作/修复')
+    // 双域命中按 hits 排序，最多 2 个
+    const mixed = autoTagCandidates('前端组件报错了，修复 css 样式')
+    expect(mixed.length).toBeLessThanOrEqual(2)
+    expect(mixed).toContain('领域/前端')
+    expect(mixed).toContain('工作/修复')
+    // 无命中 → 空
+    expect(autoTagCandidates('今天天气不错')).toEqual([])
+  })
+
+  it('autoTagFromText：仅无标签会话触发一次；已有标签跳过', () => {
+    const store = freshStore()
+    store.seedRecommendedTags()
+    const applied = store.autoTagFromText('sess-a', '修复登录 bug')
+    expect(applied).toContain('工作/修复')
+    expect(store.state.sessionTags['sess-a']).toContain('工作/修复')
+
+    // 第二次调用（已有标签）不再追加
+    const again = store.autoTagFromText('sess-a', '写个测试用例')
+    expect(again).toEqual([])
+    expect(store.state.sessionTags['sess-a']).not.toContain('工作/测试')
   })
 
   it('seedRecommendedTags 幂等 + 预置色覆盖 hash', () => {

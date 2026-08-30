@@ -211,7 +211,26 @@ impl SelfIteratingBrain {
                     "analysis".to_string(), 0.02 * high_count as f64));
             }
             edits.push(MicroEdit::NormalizeVector);
-            self.brain.apply_micro_edits(&edits);
+
+            // ── G5 S 门控 (灵境 L4 自指闭环): 应用前裁决 ──
+            // 意识质量低于阈值 → 否决, 跳过本次 apply_micro_edits (行为改变)。
+            // 回环证据链见 constitution_gate.rs 模块文档。
+            let quality = if self._consciousness_critique_count > 0 {
+                Some(self._last_consciousness_quality)
+            } else {
+                None
+            };
+            if self._constitution_gate.judge(quality) {
+                self.brain.apply_micro_edits(&edits);
+            } else {
+                log::warn!(
+                    "[code-review] 宪法门控否决自编辑应用: quality={:.3} < threshold={:.3}, 跳过 {} 条编辑 (iter {})",
+                    quality.unwrap_or(f64::NAN),
+                    self.edit_constitution_gate().threshold(),
+                    edits.len(),
+                    self.iteration,
+                );
+            }
         }
 
         let reward = self.brain.evaluate_capability(task_type) - score_before;

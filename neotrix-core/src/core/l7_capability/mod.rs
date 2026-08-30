@@ -21,6 +21,9 @@ pub mod registry;
 pub mod skill_acquire;
 
 pub mod cluster_self_test;
+pub mod consciousness_bridge;
+pub mod native_bus;
+pub mod wisdom_bridge;
 pub mod nt_cap_geo;
 pub mod nt_cap_media;
 pub mod nt_core_grounded_gate;

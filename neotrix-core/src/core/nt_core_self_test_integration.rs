@@ -61,6 +61,13 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
             crate::neotrix::l1_body_impl::nt_shield_sandbox::SandboxSpec::default(),
         ),
     ));
+    // W2.4 (batch3 2026-08-26): 有状态 egress 基准 + W3.5 编排失败类分类法
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_shield_sandbox::stateful_bench::StatefulEgressBench,
+    ));
+    registry.register(Box::new(
+        crate::core::nt_core_orchestration_failure_taxonomy::OrchestrationFailureTaxonomyTest,
+    ));
     // 2026-08-15 sweep absorption batch (Phase B): HDA 归因 / 自验证奖励 / 元 harness 优化 / 提示词库
     registry.register(Box::new(
         crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),

@@ -2,6 +2,10 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use serde::{Deserialize, Serialize};
+
+use crate::core::nt_core_llm::Usage;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TelemetryEvent {
     AgentSpawned {
@@ -764,6 +768,107 @@ impl std::fmt::Debug for AgentBehaviorMap {
     }
 }
 
+/// 上限保护: 单个账本最多追踪的 provider 数 — 防键爆炸
+/// (对抗性注册无限 provider 名撑爆内存), 模仿 max_events 的 bounded 模式。
+pub const MAX_TRACKED_PROVIDERS: usize = 64;
+
+/// Per-provider 用量聚合快照记录 (可序列化)。
+///
+/// **诚实标注 (honest labeling)**: 这是*活动记录*，**非权威账单数据**
+/// ("activity_record": true 随序列化输出携带)。token 数来自各 provider 在
+/// `LlmResponse.usage` 中的自报值 — 上游可能少报/多报，缓存命中与流式路径
+/// 可能缺席。仅用于路由分析与容量观察，禁止用于计费/开票。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderUsageRecord {
+    pub provider: String,
+    pub request_count: u64,
+    pub prompt_tokens: u64,
+    pub completion_tokens: u64,
+    /// 恒为 `true`: 活动记录，非权威计费数据。
+    pub activity_record: bool,
+}
+
+/// Per-provider token/request 聚合账本 — 遥测节点的扩展子结构，
+/// 非平行计费模块 (R-P42)。线程安全，复用 [`TelemetryStore`] 的
+/// Mutex + 快照模式。只存标量聚合，原始 payload 永不入账本 (隐私)。
+pub struct ProviderUsageLedger {
+    entries: Mutex<HashMap<String, ProviderUsageRecord>>,
+    max_providers: usize,
+}
+
+impl Default for ProviderUsageLedger {
+    fn default() -> Self {
+        Self::new(MAX_TRACKED_PROVIDERS)
+    }
+}
+
+impl ProviderUsageLedger {
+    pub fn new(max_providers: usize) -> Self {
+        Self {
+            entries: Mutex::new(HashMap::new()),
+            max_providers: max_providers.max(1),
+        }
+    }
+
+    /// 记录一次真实完成请求的用量。返回 `false` = 新 provider 超出上限被拒
+    /// (有界拒绝，带 log::warn) 或锁中毒；已有 provider 始终继续聚合。
+    pub fn record_provider_usage(&self, provider: &str, usage: &Usage) -> bool {
+        let mut entries = match self.entries.lock() {
+            Ok(e) => e,
+            Err(_) => return false,
+        };
+        if let Some(entry) = entries.get_mut(provider) {
+            entry.request_count += 1;
+            entry.prompt_tokens += usage.prompt_tokens as u64;
+            entry.completion_tokens += usage.completion_tokens as u64;
+            return true;
+        }
+        if entries.len() >= self.max_providers {
+            log::warn!(
+                "[telemetry] provider usage ledger full ({}/{}), dropping activity record for new provider '{}'",
+                entries.len(),
+                self.max_providers,
+                provider
+            );
+            return false;
+        }
+        entries.insert(
+            provider.to_string(),
+            ProviderUsageRecord {
+                provider: provider.to_string(),
+                request_count: 1,
+                prompt_tokens: usage.prompt_tokens as u64,
+                completion_tokens: usage.completion_tokens as u64,
+                activity_record: true,
+            },
+        );
+        true
+    }
+
+    /// 可序列化快照 (按 request_count 降序)。仅标量聚合 + provider 名。
+    pub fn snapshot(&self) -> Vec<ProviderUsageRecord> {
+        match self.entries.lock() {
+            Ok(entries) => {
+                let mut records: Vec<ProviderUsageRecord> = entries.values().cloned().collect();
+                records.sort_by(|a, b| b.request_count.cmp(&a.request_count));
+                records
+            }
+            Err(_) => vec![],
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self.entries.lock() {
+            Ok(entries) => entries.len(),
+            Err(_) => 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
 static GLOBAL_TELEMETRY_STORE: std::sync::LazyLock<TelemetryStore> =
     std::sync::LazyLock::new(|| TelemetryStore::new(10_000));
 
@@ -776,6 +881,15 @@ pub fn global_telemetry() -> &'static TelemetryStore {
 
 pub fn global_agent_map() -> &'static AgentBehaviorMap {
     &GLOBAL_AGENT_MAP
+}
+
+static GLOBAL_PROVIDER_USAGE_LEDGER: std::sync::LazyLock<ProviderUsageLedger> =
+    std::sync::LazyLock::new(ProviderUsageLedger::default);
+
+/// 进程级 per-provider 用量账本 (活动记录，非权威账单)。
+/// 网关真实完成请求后在 `call_provider` 成功分支调用记录 (R-P79 接线)。
+pub fn global_provider_usage_ledger() -> &'static ProviderUsageLedger {
+    &GLOBAL_PROVIDER_USAGE_LEDGER
 }
 
 impl crate::core::nt_core_self_test::SelfTest for TelemetryStore {
@@ -1348,5 +1462,109 @@ mod tests {
                 assert!(text.contains("no next action"), "{text}");
             }
         }
+    }
+
+    // ── ProviderUsageLedger (per-provider 活动记录账本) ────────────────
+
+    fn usage(p: u32, c: u32) -> Usage {
+        Usage {
+            prompt_tokens: p,
+            completion_tokens: c,
+            total_tokens: p + c,
+        }
+    }
+
+    #[test]
+    fn test_provider_usage_ledger_aggregates_per_provider() {
+        let ledger = ProviderUsageLedger::new(8);
+        assert!(ledger.record_provider_usage("llm7", &usage(100, 20)));
+        assert!(ledger.record_provider_usage("llm7", &usage(50, 30)));
+        assert!(ledger.record_provider_usage("openai", &usage(10, 5)));
+        let snap = ledger.snapshot();
+        assert_eq!(snap.len(), 2);
+        let llm7 = snap.iter().find(|r| r.provider == "llm7").expect("llm7 present");
+        assert_eq!(llm7.request_count, 2);
+        assert_eq!(llm7.prompt_tokens, 150);
+        assert_eq!(llm7.completion_tokens, 50);
+        let openai = snap
+            .iter()
+            .find(|r| r.provider == "openai")
+            .expect("openai present");
+        assert_eq!(openai.request_count, 1);
+        assert_eq!(openai.prompt_tokens, 10);
+    }
+
+    #[test]
+    fn test_provider_usage_ledger_bounded_rejection() {
+        let ledger = ProviderUsageLedger::new(2);
+        assert!(ledger.record_provider_usage("a", &usage(1, 1)));
+        assert!(ledger.record_provider_usage("b", &usage(1, 1)));
+        // 上限到达: 新 provider 被拒，已有聚合不受污染。
+        assert!(!ledger.record_provider_usage("c", &usage(999, 999)));
+        let snap = ledger.snapshot();
+        assert_eq!(snap.len(), 2);
+        assert!(!snap.iter().any(|r| r.provider == "c"));
+        // 已有 provider 超上限后仍继续聚合。
+        assert!(ledger.record_provider_usage("a", &usage(2, 2)));
+        let a = ledger
+            .snapshot()
+            .into_iter()
+            .find(|r| r.provider == "a")
+            .unwrap();
+        assert_eq!(a.prompt_tokens, 3);
+        assert_eq!(a.request_count, 2);
+    }
+
+    #[test]
+    fn test_provider_usage_ledger_default_cap_is_64() {
+        let ledger = ProviderUsageLedger::default();
+        for i in 0..MAX_TRACKED_PROVIDERS {
+            assert!(
+                ledger.record_provider_usage(&format!("p{i}"), &usage(1, 0)),
+                "第 {i} 个 provider 不应被拒"
+            );
+        }
+        assert!(!ledger.record_provider_usage("overflow", &usage(1, 0)));
+        assert_eq!(ledger.len(), MAX_TRACKED_PROVIDERS);
+    }
+
+    #[test]
+    fn test_provider_usage_ledger_privacy_no_payload_fields() {
+        let ledger = ProviderUsageLedger::new(4);
+        ledger.record_provider_usage("secret-provider", &usage(7, 3));
+        let json = serde_json::to_string(&ledger.snapshot()).unwrap();
+        // 隐私: 快照只含标量聚合 + provider 名 — 不存在 payload/message/content 通道。
+        assert!(!json.contains("content"), "{json}");
+        assert!(!json.contains("message"), "{json}");
+        assert!(!json.contains("payload"), "{json}");
+        assert!(!json.contains("prompt_text"), "{json}");
+    }
+
+    #[test]
+    fn test_provider_usage_ledger_serialization_marks_activity_record() {
+        let ledger = ProviderUsageLedger::new(4);
+        ledger.record_provider_usage("p", &usage(1, 1));
+        let json = serde_json::to_string(&ledger.snapshot()).unwrap();
+        // 诚实标注: 序列化输出必须携带 activity_record: true。
+        assert!(json.contains("\"activity_record\":true"), "{json}");
+        // 往返序列化保持诚实标注。
+        let back: Vec<ProviderUsageRecord> = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.len(), 1);
+        assert!(back[0].activity_record);
+    }
+
+    #[test]
+    fn test_global_provider_usage_ledger_accessible_and_recording() {
+        let g = global_provider_usage_ledger();
+        assert!(g.record_provider_usage("global-ledger-probe", &usage(11, 7)));
+        assert!(g.record_provider_usage("global-ledger-probe", &usage(3, 2)));
+        let rec = g
+            .snapshot()
+            .into_iter()
+            .find(|r| r.provider == "global-ledger-probe")
+            .expect("global probe recorded");
+        assert!(rec.request_count >= 2);
+        assert!(rec.prompt_tokens >= 14);
+        assert!(rec.activity_record);
     }
 }

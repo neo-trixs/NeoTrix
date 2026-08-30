@@ -41,6 +41,8 @@ mod builder;
 mod run;
 mod handlers;
 pub mod always_on;
+pub mod consciousness_orchestrator;
+pub mod handlers_wisdom;
 
 pub use run::BackgroundLoopHandle;
 pub use run::CONSCIOUSNESS_THRESHOLDS;
@@ -107,6 +109,8 @@ pub struct BackgroundLoop {
     pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     pub fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
     pub cognitive_load: Option<CognitiveLoadMonitor>,
+    /// 意图引擎 (F2 接线): EFE 域探索提案经 VolitionEngine 门控后执行。
+    pub volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
     pub second_brain: Option<SecondBrain>,
     pub kb: Option<Arc<KnowledgeBase>>,
     /// 统一的 GlobalWorkspace 单例 —— 被 engine、panorama、consciousness_bridge 共享。
@@ -176,6 +180,7 @@ impl BackgroundLoop {
             consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
             fep_iit_bridge: Some(crate::neotrix::nt_core_fep_iit::FEPIITBridge::new()),
             cognitive_load: Some(CognitiveLoadMonitor::new()),
+            volition: Some(crate::core::nt_core_consciousness::VolitionEngine::new()),
             second_brain: Some(SecondBrain::new()),
             kb: None,
             gwt: Some(shared_gwt),

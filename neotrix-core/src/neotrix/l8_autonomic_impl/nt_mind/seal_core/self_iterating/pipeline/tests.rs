@@ -126,3 +126,50 @@
         stage.process(&mut brain).expect("reward calc ok");
         assert!((brain._reward() - 0.5).abs() < 1e-9, "应原样透传, got {}", brain._reward());
     }
+
+// ── W3.6 (batch3 2026-08-26) 步级信用分歧审计验收 ──
+
+#[test]
+fn constant_rewards_yield_zero_divergence() {
+    let rewards: Vec<(usize, f64)> = (0..10).map(|i| (i, 0.5)).collect();
+    let r = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::pipeline::compute_credit_divergence(&rewards, 0.95);
+    assert!(r.divergent_steps.is_empty(), "{:?}", r.divergent_steps);
+    assert!(r.max_divergence < 1e-9);
+}
+
+#[test]
+fn late_spike_flagged_as_unsung_hero() {
+    // 前 8 步低奖励, 最后一步高奖励 → 回传信用把前期步抬为铺垫 (unsung_hero)
+    let mut rewards: Vec<(usize, f64)> = (0..9).map(|i| (i, 0.1)).collect();
+    rewards.push((9, 1.0));
+    let r = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::pipeline::compute_credit_divergence(&rewards, 0.95);
+    assert!(!r.divergent_steps.is_empty());
+    assert!(
+        r.divergent_steps.iter().any(|d| d.label == "unsung_hero"),
+        "{:?}",
+        r.divergent_steps
+    );
+}
+
+#[test]
+fn early_spike_only_flags_lucky_start_on_itself() {
+    // 仅首步高奖励且后续为负 → 首步 raw_z 高但 backprop 被负未来拖低
+    let mut rewards: Vec<(usize, f64)> = vec![(0, 1.0)];
+    rewards.extend((1..10).map(|i| (i, -0.2)));
+    let r = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::pipeline::compute_credit_divergence(&rewards, 0.95);
+    assert!(
+        r.divergent_steps.iter().any(|d| d.step_idx == 0 && d.label == "lucky_start"),
+        "{:?}",
+        r.divergent_steps
+    );
+}
+
+#[test]
+fn step_credit_audit_stage_runs_and_persists() {
+    let mut brain = SelfIteratingBrain::new();
+    brain._prm_step_rewards = (0..12).map(|i| (i, if i == 11 { 1.0 } else { 0.1 })).collect();
+    let stage = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::pipeline::StepCreditAuditStage::new();
+    assert_eq!(stage.name(), "step_credit_audit");
+    let out = stage.process(&mut brain).expect("stage runs");
+    assert!(matches!(out, crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::pipeline::StageDecision::Continue));
+}

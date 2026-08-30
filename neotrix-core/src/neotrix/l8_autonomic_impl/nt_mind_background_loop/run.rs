@@ -624,7 +624,8 @@ impl BackgroundLoop {
             },
             consciousness_tree: self.consciousness_tree.take(),
             fep_iit_bridge: self.fep_iit_bridge.take(),
-cognitive_load: self.cognitive_load.take(),
+            cognitive_load: self.cognitive_load.take(),
+            volition: self.volition.take(),
             bbrain: std::mem::take(&mut self.bbrain),
             cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
             second_brain: {
@@ -697,7 +698,9 @@ cognitive_load: self.cognitive_load.take(),
                         tokio::select! {
                             biased;
                             _ = ticker.tick() => {
+                                eprintln!("[bg-tick] {} fired", $name); // TODO(temp diagnostics, remove)
                                 let mut $lock = h.lock().await;
+                                eprintln!("[bg-tick] {} acquired lock", $name); // TODO(temp diagnostics, remove)
                                 // G12 denylist gate — 机械执行, 每个 handler tick 前置 fail-closed
                                 if let Err(e) = $lock.denylist.check($name) {
                                     log::warn!("[bg-loop] handler '{}' 被 denylist gate 拦截: {}", $name, e);
@@ -830,6 +833,11 @@ cognitive_load: self.cognitive_load.take(),
         // ── G29 隐私聚合遥测 (R-P79): 60s 周期把全局 TelemetryStore 数值指标喂
         //    AnomalyDetector 做 spike/drop 检测, 告警经 EventBus 注入意识监控 ──
         spawn_handler!(TELEMETRY_INTERVAL_SECS, "telemetry", |h| h.handle_telemetry().await);
+        // 意识体智慧周期 — 价值观学习 + 叙事整合 + 规则结晶 + GC (E1)
+        {
+            const WISDOM_TICK_INTERVAL_SECS: u64 = 300; // 5 min
+            spawn_handler!(WISDOM_TICK_INTERVAL_SECS, "wisdom", |h| h.handle_wisdom_tick().await);
+        }
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {
@@ -920,6 +928,8 @@ pub struct BackgroundLoopHandle {
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
+    /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
+    volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
     second_brain: Option<SecondBrain>,
     /// 梦境巩固器 — VSA 记忆重组/提纯/巩固 (skales Dreaming 模式, P0-3 接线)。
     /// 低负载周期触发 run_consolidation_cycle + prune_low_coherence。

@@ -382,6 +382,90 @@ impl AttentionManager {
             head.focus.clear();
         }
     }
+
+    // ── W2.2 (batch3 2026-08-26, 源: arxiv 2608.20256 *Learning When to Think*) ──
+    // 测试时算力自适应分配: 简单任务 System1 直通, 复杂任务触发 System2 深思。
+    // 对齐 mars_system1_activations / mars_system2_iterations 计数语义。
+
+    /// 任务文本 → 难度信号 ∈ [0,1]。确定性关键词+结构启发式 (无 LLM):
+    /// 架构/重写类 +0.25, 实现/修复类基线 0.4, 探索/只读类 -0.2;
+    /// 多步骤连接词每步 +0.08 (封顶 +0.24)。
+    pub fn estimate_task_difficulty(task: &str) -> f64 {
+        let t = task.to_lowercase();
+        let mut d = 0.4f64;
+        if ["architect", "design", "rewrite", "架构", "重构", "设计"].iter().any(|k| t.contains(k)) {
+            d += 0.25;
+        }
+        if ["explore", "read", "search", "lookup", "探索", "查找"].iter().any(|k| t.contains(k)) {
+            d -= 0.2;
+        }
+        let steps = ["then", "之后", "再", "然后", ";", "&&"]
+            .iter()
+            .map(|k| t.matches(k).count())
+            .sum::<usize>();
+        d += (steps as f64 * 0.08).min(0.24);
+        d.clamp(0.0, 1.0)
+    }
+
+    /// 难度 → 思考模式路由。低难度直通省算力, 高难度强制深思,
+    /// 中间带由 RuleIntensity 折中 (Lite 偏直通 / Ultra 偏深思)。
+    pub fn allocate_compute(&self, difficulty: f64) -> ComputeAllocation {
+        if difficulty < 0.35 {
+            ComputeAllocation {
+                mode: ThinkingMode::System1Direct,
+                budget_share: 0.25,
+                difficulty,
+                reason: "difficulty below deliberation threshold",
+            }
+        } else if difficulty > 0.65 || self.rule_intensity == RuleIntensity::Ultra {
+            ComputeAllocation {
+                mode: ThinkingMode::System2Deliberate,
+                budget_share: 1.0_f64.max(difficulty),
+                difficulty,
+                reason: "high complexity or ultra intensity demands deliberation",
+            }
+        } else {
+            match self.rule_intensity {
+                RuleIntensity::Lite => ComputeAllocation {
+                    mode: ThinkingMode::System1Direct,
+                    budget_share: 0.4,
+                    difficulty,
+                    reason: "lite intensity favors fast path in mid band",
+                },
+                _ => ComputeAllocation {
+                    mode: ThinkingMode::System2Deliberate,
+                    budget_share: 0.7,
+                    difficulty,
+                    reason: "full intensity deliberates mid-band tasks",
+                },
+            }
+        }
+    }
+
+    /// 任务文本一步到位: 难度估计 → 分配决策
+    pub fn allocate_for_task(&self, task: &str) -> ComputeAllocation {
+        let d = Self::estimate_task_difficulty(task);
+        self.allocate_compute(d)
+    }
+}
+
+/// W2.2 思考模式: System1 直通 vs System2 深思
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThinkingMode {
+    /// 直通 — 单轮快路径
+    System1Direct,
+    /// 深思 — 多轮迭代路径
+    System2Deliberate,
+}
+
+/// W2.2 算力分配决策 (可观测: reason 说明路由依据)
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComputeAllocation {
+    pub mode: ThinkingMode,
+    /// 本任务思考预算份额 ∈ (0,1]
+    pub budget_share: f64,
+    pub difficulty: f64,
+    pub reason: &'static str,
 }
 
 #[cfg(test)]
@@ -642,5 +726,40 @@ mod tests {
         let mut mgr = AttentionManager::new(0.5);
         mgr.set_intensity(RuleIntensity::Ultra);
         assert_eq!(mgr.global_threshold, 0.6);
+    }
+}
+
+/// W2.2 (batch3 2026-08-26) 验收测试: 分级任务集上 System2 触发率与难度正相关。
+#[cfg(test)]
+mod when_to_think_tests {
+    use super::*;
+
+    #[test]
+    fn difficulty_orders_task_classes() {
+        let easy = AttentionManager::estimate_task_difficulty("explore the kb and read notes");
+        let mid = AttentionManager::estimate_task_difficulty("fix the parser bug");
+        let hard = AttentionManager::estimate_task_difficulty("architect rewrite of core engine");
+        assert!(easy < mid, "easy={easy} mid={mid}");
+        assert!(mid < hard, "mid={mid} hard={hard}");
+        assert!((0.0..=1.0).contains(&easy) && (0.0..=1.0).contains(&hard));
+    }
+
+    #[test]
+    fn system1_for_simple_system2_for_complex() {
+        let mgr = AttentionManager::with_intensity(0.4, RuleIntensity::Full);
+        let simple = mgr.allocate_for_task("search old tickets");
+        assert_eq!(simple.mode, ThinkingMode::System1Direct);
+        let complex = mgr.allocate_for_task("architect and design then rewrite module; then validate");
+        assert_eq!(complex.mode, ThinkingMode::System2Deliberate);
+        assert!(complex.budget_share > simple.budget_share);
+    }
+
+    #[test]
+    fn intensity_breaks_ties_in_mid_band() {
+        let lite = AttentionManager::with_intensity(0.4, RuleIntensity::Lite);
+        let ultra = AttentionManager::with_intensity(0.4, RuleIntensity::Ultra);
+        let d = 0.5; // 中间带
+        assert_eq!(lite.allocate_compute(d).mode, ThinkingMode::System1Direct);
+        assert_eq!(ultra.allocate_compute(d).mode, ThinkingMode::System2Deliberate);
     }
 }

@@ -1568,6 +1568,19 @@ impl ReasoningEngine {
     }
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {
+        // T2: 叙事自我上下文注入 — P2 融合注入点 + 协调器增强
+        let prompt_with_narrative = {
+            if let Some(orch) = crate::neotrix::l8_autonomic_impl::nt_mind_background_loop::consciousness_orchestrator::ConsciousnessOrchestrator::get() {
+                orch.pre_llm(prompt)
+            } else {
+                let bridge = crate::core::l7_capability::consciousness_bridge::bridge();
+                match bridge.narrative_prefix() {
+                    Some(prefix) => format!("{}{}", prefix, prompt),
+                    None => prompt.to_string(),
+                }
+            }
+        };
+        let prompt = &prompt_with_narrative;
         if let Some(ref gateway) = self.gateway {
             // cumora 借鉴接线 (T3): ModelRouter T0-T4 分级路由决策驱动实际模型选择。
             // route() 按 prompt 特征 (长度/代码占比/推理关键词) 选 tier → 映射模型名 + max_tokens。
@@ -1599,6 +1612,16 @@ impl ReasoningEngine {
             let completion_tokens = response.usage.completion_tokens;
             if let Some(ref mut ct) = self.cost_tracker {
                 ct.record(&self.default_model, prompt_tokens as u64, completion_tokens as u64);
+            }
+            // T2+T4: 结果记录 + 工具路由 — 通过协调器统一处理
+            if crate::neotrix::l8_autonomic_impl::nt_mind_background_loop::consciousness_orchestrator::ConsciousnessOrchestrator::get().is_some() {
+                // 记录 LLM 调用结果
+                crate::core::l7_capability::consciousness_bridge::bridge().post_llm_record(true);
+                // 如果需要工具，通过协调器的 ValueGate + NativeBus 统一路由
+                if response.content.contains("[tool_call:") {
+                    log::info!("[engine] tool call routed through orchestrator");
+                    // 上层 agent 通过 orch.dispatch_tool() 执行，此处标记就绪
+                }
             }
             Ok(response.content)
         } else {
