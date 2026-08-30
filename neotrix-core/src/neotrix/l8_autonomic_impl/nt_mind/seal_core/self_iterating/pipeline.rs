@@ -361,6 +361,8 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(MemoryConsolidationStage::new()),
             Box::new(CacheCleanupStage::new()),
             Box::new(ExternalKnowledgeAbsorbStage::new()),
+            // 外置大脑消化闭环: SEAL 调度自主把冷 corpus 转化为 live 能力 (R-P79)
+            Box::new(ExternalBrainDigestStage::new()),
             Box::new(ConvergenceCheckStage::new()),
             Box::new(SelfTestStage::new()),
             Box::new(
@@ -2232,6 +2234,103 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
     }
 }
 
+// ── External Brain Digest Stage (外置大脑消化闭环) ───────────────────────
+// 把外置大脑 corpus (`knowledge-archive-corpus-*.db`) 经能力消化环持续接入 live KB,
+// 使 SEAL 调度闭环能自主把冷存档转化为活能力, 无需人工触发 (R-P79 / Dark Forest: 连接不膨胀)。
+//   Phase 1  digest_sample  → 有界激活冷节点进 live KB
+//   Phase 6  prune_external  → 反向修剪孤儿外置条目 (dry-run 安全, 不破坏冷存档)
+//   Skill    SkillEngine::maintain → 技能索引维护 (UCN Phase 1 写通)
+pub struct ExternalBrainDigestStage;
+impl Default for ExternalBrainDigestStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl ExternalBrainDigestStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
+impl BrainStage for ExternalBrainDigestStage {
+    fn name(&self) -> &str {
+        "external_brain_digest"
+    }
+    fn frequency(&self) -> usize {
+        20
+    }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if brain.iteration == 0 || !brain.iteration.is_multiple_of(20) {
+            return Ok(StageDecision::Continue);
+        }
+        let tick = brain.iteration;
+        let corpus = match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::corpus_archive_path() {
+            Some(p) => p,
+            None => {
+                log::debug!("[external_brain_digest] tick={}, 外置大脑未挂载, 跳过", tick);
+                return Ok(StageDecision::Continue);
+            }
+        };
+        if !corpus.exists() {
+            log::debug!("[external_brain_digest] tick={}, corpus 不存在, 跳过", tick);
+            return Ok(StageDecision::Continue);
+        }
+        let kb = match crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(None) {
+            Ok(kb) => std::sync::Arc::new(kb),
+            Err(e) => {
+                log::warn!("[external_brain_digest] tick={}, 打开 KB 失败: {}", tick, e);
+                return Ok(StageDecision::Continue);
+            }
+        };
+        let conn_guard = match kb.conn.lock() {
+            Ok(g) => g,
+            Err(_) => {
+                log::warn!("[external_brain_digest] tick={}, KB 锁中毒", tick);
+                return Ok(StageDecision::Continue);
+            }
+        };
+        let conn: &rusqlite::Connection = &conn_guard;
+
+        // Phase 1: 有界激活冷节点进 live KB
+        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::digest_sample(
+            conn, &corpus, 200, None,
+        ) {
+            Ok(rep) => log::info!(
+                "[external_brain_digest] tick={}, digest: sampled={}, activated={}, already_live={}, bytes={}",
+                tick, rep.sampled, rep.activated, rep.already_live, rep.bytes
+            ),
+            Err(e) => log::warn!("[external_brain_digest] tick={}, digest 失败: {}", tick, e),
+        }
+
+        // Phase 6: 反向修剪 (dry-run 安全, 不破坏冷存档)
+        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::prune_external(
+            conn, &corpus, 30, true,
+        ) {
+            Ok(n) => log::info!(
+                "[external_brain_digest] tick={}, prune(dry-run) 候选: {}",
+                tick, n
+            ),
+            Err(e) => log::warn!("[external_brain_digest] tick={}, prune 失败: {}", tick, e),
+        }
+
+        drop(conn_guard);
+
+        // Skill 索引维护 (UCN Phase 1 写通 KB skills_index)
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let skills_dir = std::path::PathBuf::from(&home).join(".neotrix").join("skills");
+        let mut engine = crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine::new(
+            skills_dir,
+        )
+        .with_kb(kb.clone());
+        let maintained = engine.maintain();
+        log::info!(
+            "[external_brain_digest] tick={}, skills maintained: {}",
+            tick, maintained
+        );
+
+        Ok(StageDecision::Continue)
+    }
+}
+
 pub struct CreditAssignmentStage;
 impl Default for CreditAssignmentStage {
     fn default() -> Self {
@@ -2925,4 +3024,18 @@ impl BrainStage for ConsciousnessRewardStage {
 }
 
 #[cfg(test)]
-mod tests;
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_external_brain_digest_registered() {
+        // C4 接线: 外置大脑消化闭环 stage 必须注册进 SEAL 调度管线 (Dark Forest: 接线或删除)
+        let pipe = seal_pipeline();
+        assert!(
+            pipe.stages
+                .iter()
+                .any(|s| s.name() == "external_brain_digest"),
+            "external_brain_digest stage 未注册进 seal_pipeline"
+        );
+    }
+}
