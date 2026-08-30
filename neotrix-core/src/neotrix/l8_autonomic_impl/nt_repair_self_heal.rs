@@ -25,42 +25,52 @@
 #![forbid(unsafe_code)]
 
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
-use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// 可被置于"损坏"态、亦可被"自愈"恢复的检测器。
 ///
-/// 用 `RefCell` 内部可变性持有 `broken`, 使 `SelfTest::self_test(&self)` 的
-/// 不可变引用下仍可被 `SelfHealLoop` 翻转修复 (无 unsafe, R-P1 合规)。
-#[derive(Debug, Clone)]
+/// 用 `AtomicBool` 内部可变性持有 `broken`, 使 `SelfTest::self_test(&self)` 的
+/// 不可变引用下仍可被 `SelfHealLoop` 翻转修复 (无 unsafe, R-P1 合规; 且 `Send+Sync`)。
+#[derive(Debug)]
 pub struct HealableDetector {
     pub id: &'static str,
     /// 不变量是否被破坏; `true` → self_test 失败。
-    broken: RefCell<bool>,
+    broken: AtomicBool,
     /// 是否可被自愈闭环修复 (不可自愈项模拟外部环境故障, 如磁盘/网络)。
     pub healable: bool,
+}
+
+impl Clone for HealableDetector {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            broken: AtomicBool::new(self.broken.load(Ordering::SeqCst)),
+            healable: self.healable,
+        }
+    }
 }
 
 impl HealableDetector {
     pub fn new(id: &'static str, healable: bool) -> Self {
         Self {
             id,
-            broken: RefCell::new(false),
+            broken: AtomicBool::new(false),
             healable,
         }
     }
 
     /// 注入一次故障 (测试/演练用)。
     pub fn inject_fault(&self) {
-        *self.broken.borrow_mut() = true;
+        self.broken.store(true, Ordering::SeqCst);
     }
 
     /// 自愈闭环调用: 翻转损坏态为健康。
     pub fn heal(&self) {
-        *self.broken.borrow_mut() = false;
+        self.broken.store(false, Ordering::SeqCst);
     }
 
     pub fn is_broken(&self) -> bool {
-        *self.broken.borrow()
+        self.broken.load(Ordering::SeqCst)
     }
 }
 
@@ -70,7 +80,7 @@ impl SelfTest for HealableDetector {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        if *self.broken.borrow() {
+        if self.broken.load(Ordering::SeqCst) {
             Err(vec![format!("{}: invariant violated (broken)", self.id)])
         } else {
             Ok(())
