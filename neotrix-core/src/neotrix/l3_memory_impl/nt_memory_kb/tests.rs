@@ -6,6 +6,53 @@
     }
 
     #[test]
+    fn test_nodes_by_asset_kind() {
+        use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
+        use crate::core::nt_core_memory_asset::MemoryAssetKind;
+
+        let dir = std::env::temp_dir().join(format!("nt_kb_asset_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_asset.db");
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        let mk = |id: &str, nt: NodeType| KnowledgeNode {
+            id: id.into(),
+            node_type: nt,
+            title: id.into(),
+            summary: None,
+            content: None,
+            url: None,
+            domain: None,
+            language: "en".into(),
+            confidence: 1.0,
+            importance: 1.0,
+            recall_weight: 1.0,
+            created_at: 0,
+            updated_at: 0,
+            access_count: 0,
+            metadata: None,
+            temporal: None,
+            supersedes: None,
+            source_episode: None,
+        };
+        kb.insert_node(&mk("s1", NodeType::Skill)).expect("insert skill");
+        kb.insert_node(&mk("r1", NodeType::Repository)).expect("insert repo");
+        kb.insert_node(&mk("w1", NodeType::WikiPage)).expect("insert wiki");
+
+        let skills = kb.nodes_by_asset_kind(MemoryAssetKind::Skill).expect("query skill");
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].id, "s1");
+        let code = kb.nodes_by_asset_kind(MemoryAssetKind::CodeGraph).expect("query code");
+        assert_eq!(code.len(), 1);
+        assert_eq!(code[0].id, "r1");
+        let wiki = kb.nodes_by_asset_kind(MemoryAssetKind::LlmWiki).expect("query wiki");
+        assert_eq!(wiki.len(), 1);
+        assert_eq!(wiki[0].id, "w1");
+        let chat = kb.nodes_by_asset_kind(MemoryAssetKind::ChatMemory).expect("query chat");
+        assert_eq!(chat.len(), 0);
+    }
+
+    #[test]
     fn test_decision_trail_production_chain() {
         // C2 集成测试: 打通生产接线全链路 —
         // KnowledgeBase::record_decision_provenance (生产入口, mod.rs:1580)

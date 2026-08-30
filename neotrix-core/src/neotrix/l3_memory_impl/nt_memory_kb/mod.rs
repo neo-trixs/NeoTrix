@@ -1277,6 +1277,19 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         nt_memory_store::get_all_nodes(&conn).map_err(|e| format!("all_nodes: {}", e))
     }
 
+    /// 四态记忆资产查询（吸收 TencentDB-Agent-Memory）: 按 `MemoryAssetKind` 过滤全部节点。
+    /// 派生维度, 不落物理列 — 由 `MemoryAssetKind::classify` 实时推断, 避免与 node_type 双源真相漂移 (R-P42)。
+    pub fn nodes_by_asset_kind(
+        &self,
+        kind: crate::core::nt_core_memory_asset::MemoryAssetKind,
+    ) -> Result<Vec<KnowledgeNode>, String> {
+        let all = self.all_nodes()?;
+        Ok(all
+            .into_iter()
+            .filter(|n| crate::core::nt_core_memory_asset::MemoryAssetKind::classify(n) == Some(kind))
+            .collect())
+    }
+
     /// 枚举全部知识边 — 供快照/图结构批量灌入。
     pub fn all_edges(&self) -> Result<Vec<KnowledgeEdge>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;

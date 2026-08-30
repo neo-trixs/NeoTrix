@@ -1,7 +1,8 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
+use crate::core::nt_core_memory_asset::MemoryAssetKind;
 use crate::neotrix::nt_memory_kb::{
     diff_snapshots, kb_write_guard, record_write_evidence, snapshot_from_file, snapshot_kb,
-    snapshot_to_file, KnowledgeBase, NodeType, RelationType, WriteGuardVerdict,
+    snapshot_to_file, KnowledgeBase, KnowledgeNode, NodeType, RelationType, WriteGuardVerdict,
 };
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -76,7 +77,7 @@ impl CliCommand for KbCmd {
         vec!["/knowledge", "/knowledge-base"]
     }
     fn description(&self) -> &str {
-        "Knowledge base operations: /kb stats | /kb search <query> | /kb get <node_id> | /kb query <text> | /kb write <json> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map | /kb snapshot [--out <path>] | /kb diff <snapA> [snapB]"
+        "Knowledge base operations: /kb stats | /kb search <query> | /kb get <node_id> | /kb query <text> | /kb write <json> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map | /kb snapshot [--out <path>] | /kb diff <snapA> [snapB] | /kb assets --kind <chat_memory|skill|llm_wiki|code_graph>"
     }
     fn is_primary(&self) -> bool { false }
 
@@ -107,7 +108,8 @@ impl CliCommand for KbCmd {
                   /kb consistency               设定一致性检查 (对标网文每卷设定检查)\n\
                   /kb axioms                    架构公理推演树 (公理→定律→模块约束)\n\
                   /kb snapshot [--out <path>]   捕获 KB 全量快照 (节点/边/统计, 默认 ~/.neotrix/snapshots/)\n\
-                  /kb diff <snapA> [snapB]      比较两个快照 (缺 snapB 则对当前库); --detail <N> 列出明细",
+                  /kb diff <snapA> [snapB]      比较两个快照 (缺 snapB 则对当前库); --detail <N> 列出明细\n\
+                  /kb assets --kind <k>         四态记忆资产查询 (chat_memory|skill|llm_wiki|code_graph)",
             );
         }
 
@@ -136,8 +138,9 @@ impl CliCommand for KbCmd {
             "axioms" => cmd_axioms(rest),
             "snapshot" => cmd_snapshot(rest),
             "diff" => cmd_diff(rest),
+            "assets" => cmd_assets(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, distill, ingest-asset, consistency, axioms, snapshot, diff",
+                "未知子命令: {}. 可用: stats, search, get, query, write, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, distill, ingest-asset, consistency, axioms, snapshot, diff, assets",
                 sub
             )),
         }
@@ -206,6 +209,51 @@ fn cmd_snapshot(args: &[String]) -> CommandOutput {
         "edges": snap.edges.len(),
         "checksum": snap.checksum(),
         "captured_at_ms": snap.captured_at_ms,
+    }))
+}
+
+/// /kb assets --kind <chat_memory|skill|llm_wiki|code_graph> — 四态记忆资产查询
+/// （吸收 TencentDB-Agent-Memory）。派生维度, 实时由 `MemoryAssetKind::classify` 推断。
+fn cmd_assets(args: &[String]) -> CommandOutput {
+    let mut kind: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--kind" {
+            if i + 1 < args.len() {
+                kind = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+            return CommandOutput::err("--kind 需要一个取值");
+        }
+        i += 1;
+    }
+    let Some(kind_str) = kind else {
+        return CommandOutput::err("用法: /kb assets --kind <chat_memory|skill|llm_wiki|code_graph>");
+    };
+    let Some(k) = MemoryAssetKind::from_str(&kind_str) else {
+        return CommandOutput::err(&format!("未知资产类型: {kind_str}"));
+    };
+    let kb = match KnowledgeBase::open(None).ok() {
+        Some(kb) => kb,
+        None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
+    };
+    let nodes: Vec<KnowledgeNode> = match kb.nodes_by_asset_kind(k) {
+        Ok(n) => n,
+        Err(e) => return CommandOutput::err(&format!("查询失败: {e}")),
+    };
+    let titles: Vec<String> = nodes.iter().map(|n| n.title.clone()).collect();
+    let preview: Vec<String> = titles.iter().take(20).map(|t| format!("  - {t}")).collect();
+    let out = format!(
+        "四态资产 [{}]: 命中 {} 个节点\n{}",
+        k.as_str(),
+        nodes.len(),
+        preview.join("\n")
+    );
+    CommandOutput::ok(&out).with_json(serde_json::json!({
+        "kind": k.as_str(),
+        "count": nodes.len(),
+        "titles": titles,
     }))
 }
 
