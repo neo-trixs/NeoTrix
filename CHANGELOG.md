@@ -5,6 +5,27 @@
 > `git cliff -u` (pipelines defined in `cliff.toml`; used by
 > `.github/workflows/release.yml` to emit release notes).
 
+## [0.20.0] — 2026-08-30 — 七域进化统一 + 蜕变重生
+
+> 本次迭代完成 grok-bot/trendshift 生态进化的全域接线与生产化，并施行蜕变重生清理。
+
+### Features
+- **七域进化落地生产**: NT-CORE/MIND/MEMORY/WORLD/ACT/IO/SHIELD 全域能力全部接线生产路径；App Bot 真实推理流 (`react_loop_stream`) + `fork_session` 前后端闭环。
+- **NT-MEMORY 资产派生维度**: KB 四态资产按 `asset_kind` 可查询 (`KnowledgeBase::nodes_by_asset_kind` + `/kb assets --kind` CLI)。
+- **NT-REPAIR 自愈闭环 C5**: `SelfHealLoop` 消费 SelfTest 失败产出（检测→诊断→自愈→复测），`AtomicBool` 实现满足 `Send+Sync`。
+- **NT-MIND SEAL 维度扩展**: 吸收 instincts/security 维度（affaan-m/ECC）。
+- **Superbody 设计语言**: 统一 light gold 官方设计语言资产（logo/图标集/封面/背景/App 图标）。
+- **文档入库**: `/kb doc ingest` 幂等切片 + 列表/删除/重索引命令。
+- **通用 KV 网关**: 开放 JSON 落盘命令（画板等 namespace）。
+
+### Chores
+- **蜕变重生清理**: 移除 8 个已并入分支及入库会话残留，清理构建缓存（target 9.9G + node_modules + dist）。
+- **统一合并**: 并入 `wt/self-heal`、`concurrent-wip`、`design/superbody-lightgold`、`work-branch` 全域分支改动，lib 构建绿。
+- **版本迭代**: `0.19.0-rc1` → `0.20.0`。
+
+### Known Limitations
+- **fix-final-gaps 家族暂缓**: `feat/fix-final-gaps`（及 `feat/w3-metrics`、`feat/w4-absorption-field`、`feat/fix-bin-tests`、`feat/fix-calibration-log`、`feat/fix-metrics-chain` 兄弟分支）与当前依赖树不兼容——`doc_parse.rs` 依赖的 `anydoc::{Document,Block,Inline,Table,MarkerKind}` 在 anydoc 0.2 公共 API 中不存在，且模块接线与 main 分歧。需专项修复（升级 anydoc / 适配 API / 恢复模块声明）后再并入。
+
 ## [Unreleased] — 并行工作批次 + 网络隔离 + 地理瓦片
 
 > git-cliff: `git cliff --unreleased` regenerates the grouped body from
