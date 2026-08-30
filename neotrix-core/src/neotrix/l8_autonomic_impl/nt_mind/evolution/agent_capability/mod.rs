@@ -1083,7 +1083,9 @@ pub fn tree_branch_stimuli(tree: &ConsciousnessTree) -> Vec<(AttentionDomain, f6
 /// 分支薄弱度 [0,1] — health 越低 / fog 越浓 / constellation 越低, 越薄弱。
 /// 纯函数: (1-health)*0.4 + fog*0.4 + (1-constellation.score())*0.2。
 pub fn branch_weakness(branch: &CapabilityBranch) -> f64 {
-    let health_weak = (1.0 - branch.health.clamp(0.0, 1.0)) * 0.4;
+    // T3: 用元认知校准后的健康分 (calibrated_health) 而非原始 health, 防止过度自信域
+    // 在 GWT 路由中被低估为健康 → 注意力错配 (D15)。无证据时 calibrated_health 回退 = health。
+    let health_weak = (1.0 - branch.calibrated_health.clamp(0.0, 1.0)) * 0.4;
     let fog_weak = branch.fog.level.clamp(0.0, 1.0) * 0.4;
     let constel_weak = (1.0 - branch.constellation.score().clamp(0.0, 1.0)) * 0.2;
     (health_weak + fog_weak + constel_weak).clamp(0.0, 1.0)

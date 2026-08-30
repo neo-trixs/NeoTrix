@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 use super::types::*;
 
+// Phase 5 元认知校准权重 (与 ffi/consciousness_tree.rs 一致): ECE 惩罚权重 + 惩罚上限。
+const CALIB_W_ECE: f32 = 0.6;
+const CALIB_MAX_PENALTY: f32 = 0.35;
+
 impl ConsciousnessTree {
     /// 枚举全部 7 域节点快照供遥测/健康面板消费
     pub fn snapshots(&self) -> Vec<NodeSnapshot> {
@@ -49,8 +53,9 @@ impl ConsciousnessTree {
         for (kind, branch_results) in &domain_results {
             if let Some(branch) = self.branches.get_mut(kind) {
                 if branch_results.is_empty() {
-                    // No SelfTest for this domain → neutral
+                    // No SelfTest for this domain → neutral (校准分同步回退, 避免虚高)
                     branch.health = self.config.neutral_health;
+                    branch.calibrated_health = self.config.neutral_health;
                 } else {
                     let passed = branch_results.iter().filter(|r| r.passed).count();
                     let total = branch_results.len();
@@ -88,6 +93,22 @@ impl ConsciousnessTree {
                     branch.maturity_c5 = all_passed && branch.self_test_count >= 4;
                     // 由真实计数重算成熟度 (Constellation 从新推导的 maturity 布尔派生)
                     branch.evaluate_constellation();
+
+                    // Phase 5 T3 接线: 用真实 SelfTest 样本喂元认知校准, 产出 calibrated_health
+                    // (供 branch_weakness / GWT 路由消费, 防 D15 健康虚高)。
+                    // SelfTestResult 无逐测试置信度 → 以域 pass_rate 作为置信代理;
+                    // 真实置信信号接入后 ECE 惩罚自动激活, 过度自信域被压低。
+                    let conf = branch.health as f32;
+                    let samples: Vec<(f32, bool)> = branch_results
+                        .iter()
+                        .map(|r| (conf, r.passed))
+                        .collect();
+                    let ece = crate::core::nt_core_consciousness_tree::metacalib::expected_calibration_error(
+                        &samples, 10,
+                    );
+                    let penalty = (CALIB_W_ECE * ece).min(CALIB_MAX_PENALTY);
+                    branch.calibrated_health =
+                        (branch.health as f64) * (1.0 - penalty as f64);
                 }
             }
         }
@@ -97,6 +118,8 @@ impl ConsciousnessTree {
             if let Some(branch) = self.branches.get_mut(&kind) {
                 if !domain_results.contains_key(&kind) {
                     branch.health = branch.health.max(self.config.neutral_health);
+                    branch.calibrated_health =
+                        branch.calibrated_health.max(self.config.neutral_health);
                     // Don't override if already set
                 }
             }
@@ -288,5 +311,33 @@ impl ConsciousnessTree {
         } else {
             Err(failures)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::nt_core_self_test::SelfTestResult;
+
+    #[test]
+    fn test_set_branch_health_wires_calibrated_health() {
+        // Phase 5 T3 接线: set_branch_health_from_self_tests 必须填充 calibrated_health,
+        // 供 branch_weakness / GWT 路由消费 (防 D15 健康虚高)。
+        let mut tree = ConsciousnessTree::default();
+        let results = vec![
+            SelfTestResult::pass("nt_core_self"),
+            SelfTestResult::pass("nt_core_self"),
+        ];
+        tree.set_branch_health_from_self_tests(&results);
+        let core = tree.branches.get(&BranchKind::Core).unwrap();
+        assert!(core.health > 0.0, "Core 应有真实 SelfTest 健康");
+        // 无逐测试置信度时校准门限不惩罚 → 校准分回退=原始健康
+        assert!(
+            (core.calibrated_health - core.health).abs() < 1e-9,
+            "校准分应回退=原始健康, got {} vs {}",
+            core.calibrated_health,
+            core.health
+        );
+        assert!(core.calibrated_health.is_finite());
     }
 }

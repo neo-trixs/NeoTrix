@@ -186,6 +186,9 @@ pub struct CapabilityBranch {
     pub module_count: usize,
     pub self_test_count: usize,
     pub health: f64,
+    /// Phase 5 元认知校准后的健康分 (T3 生产接线): 经 ECE/过度自信惩罚调整后的可信健康,
+    /// 用于 GWT 注意力路由 (branch_weakness), 防 D15 健康虚高。无证据/无置信信号时回退 = health。
+    pub calibrated_health: f64,
     pub maturity_c0: bool,
     pub maturity_c1: bool,
     pub maturity_c2: bool,
@@ -1197,6 +1200,7 @@ impl CapabilityBranch {
             module_count: 0,
             self_test_count: 0,
             health: 0.0,
+            calibrated_health: 0.0,
             maturity_c0: false,
             maturity_c1: false,
             maturity_c2: false,
