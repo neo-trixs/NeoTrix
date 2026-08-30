@@ -1,6 +1,6 @@
 import { createSignal, For, Show, onCleanup } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
-import { Settings, Archive, RotateCcw, ChevronRight } from 'lucide-solid'
+import { Settings, Archive, RotateCcw, ChevronRight, GitFork } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 import type { Session } from '../stores/chat'
 
@@ -265,6 +265,18 @@ export function Sidebar(props: SidebarProps) {
       initialValue: current,
       confirmLabel: '保存',
     })
+  }
+
+  // 分支新话题：复制源会话历史为新会话（后端 cmd_fork_session 持久化；失败给可见错误）
+  const handleForkSession = async (e: Event, id: string) => {
+    e.stopPropagation()
+    try {
+      const newId = await invoke<string>('cmd_fork_session', { from_id: id })
+      await chatStore.loadSessions()
+      if (newId) await chatStore.switchSession(newId)
+    } catch {
+      showError('分叉会话失败，请重试')
+    }
   }
 
   /* ── 归档（对标 Claude Code Archive：归档箱 + 恢复；焦点管理对标搜索关闭还原） ── */
@@ -734,6 +746,14 @@ export function Sidebar(props: SidebarProps) {
                                       title="重命名"
                                     >
                                       <NeoPencil class="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      class="p-1 rounded text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+                                      onClick={(e) => handleForkSession(e, session.id)}
+                                      aria-label="分叉会话"
+                                      title="分叉（复制历史为新会话）"
+                                    >
+                                      <GitFork class="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
