@@ -77,6 +77,14 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-29 外部吸收 (anthropics/skills Agent Skills 标准): SKILL.md 必需字段校验
     crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::register_skill_standard_self_tests(&mut registry);
+    // 新增: SelfReflectionEngine (Reflexion-inspired verbal reinforcement learning)
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind::experience_tree::self_reflection::SelfReflectionEngine::new(8),
+    ));
+    // 新增: MemoryAdmissionGate (A-MAC-inspired 5维记忆入口控制)
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind_memory::MemoryAdmissionGate::new(0.5, 100),
+    ));
     // 2026-08-16 T2 补齐: 小规模方法评估 (sweep absorption 声明 Phase B 但未注册)
     registry.register(Box::new(
         crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),

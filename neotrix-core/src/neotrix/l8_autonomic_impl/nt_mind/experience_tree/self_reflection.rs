@@ -16,6 +16,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use crate::core::nt_core_self_test::SelfTest;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 
 // ============================================================================
@@ -23,7 +24,7 @@ use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 // ============================================================================
 
 /// Self-reflection record — a single reflective episode.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ReflectionRecord {
     pub session_id: String,
     pub cycle: String,
@@ -143,6 +144,20 @@ impl SelfReflectionEngine {
     /// Get the reflection buffer.
     pub fn buffer(&self) -> &Arc<std::sync::Mutex<ReflectionBuffer>> {
         &self.buffer
+    }
+}
+
+// SelfTest trait implementation for NeoTrix SelfTest registry
+impl SelfTest for SelfReflectionEngine {
+    fn name(&self) -> &str {
+        "self_reflection_engine"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        // Verify engine can be created and buffer operations work
+        drop(self.buffer.lock().map_err(|e| vec![format!("mutex poisoned: {}", e)])?);
+        let _ = self.buffer.lock().unwrap().push(ReflectionRecord::default());
+        Ok(())
     }
 }
 

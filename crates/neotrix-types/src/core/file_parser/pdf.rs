@@ -1288,7 +1288,7 @@ impl FileParser {
                     if t.is_empty() {
                         continue;
                     }
-                    let last = rows.last_mut().unwrap();
+                    let last = rows.last_mut().expect("rows must have at least one entry in PDF table parsing");
                     if last.is_empty() {
                         last.push_str(t);
                     } else {

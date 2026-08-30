@@ -4,6 +4,7 @@ version.workspace = true
 description = "NeoTrix Desktop - Tauri 2.0 Integration"
 authors = ["NeoTrix Team"]
 edition.workspace = true
+license = "MIT"
 
 [[bin]]
 name = "neotrix-tauri"

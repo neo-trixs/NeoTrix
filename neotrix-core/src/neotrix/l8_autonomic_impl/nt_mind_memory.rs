@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::core::nt_core_self_test;
 
 /// Memory tier — 4 levels from ephemeral to permanent
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -651,6 +652,23 @@ impl MemoryAdmissionGate {
 
     fn current_size(&self) -> usize {
         0
+    }
+}
+
+// SelfTest trait implementation for NeoTrix SelfTest registry
+impl nt_core_self_test::SelfTest for MemoryAdmissionGate {
+    fn name(&self) -> &str {
+        "memory_admission_gate"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        // Verify gate can be created and evaluate function works
+        let score = self.evaluate(0.8, 0.7, 0.6, 0.9, 0.5);
+        if score.admitted {
+            Ok(())
+        } else {
+            Err(vec!["test failed: expected admission".to_string()])
+        }
     }
 }
 
