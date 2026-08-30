@@ -81,12 +81,6 @@ pub fn insert_or_get_node_rows(
     url: Option<&str>,
     domain: Option<&str>,
 ) -> rusqlite::Result<String> {
-    // 跨阶段去重: 归一化标题匹配优先于 url/原始标题, 以捕获 digest_sample 与
-    // ingest_causal_graph 对同一外部概念双写的不同 url/标题节点。
-    let norm = normalize_title(title);
-    if let Some(existing) = find_node_by_norm_title_and_type(conn, &norm, &node_type)? {
-        return Ok(existing.id);
-    }
     if let Some(url) = url {
         if let Some(existing) = find_node_by_url(conn, url)? {
             return Ok(existing.id);
@@ -524,11 +518,6 @@ pub fn insert_or_get_node(
     url: Option<&str>,
     domain: Option<&str>,
 ) -> rusqlite::Result<String> {
-    // 跨阶段去重: 归一化标题匹配优先于 url/原始标题, 防止同义标题双写 Concept 节点。
-    let norm = normalize_title(title);
-    if let Some(existing) = find_node_by_norm_title_and_type(conn, &norm, &node_type)? {
-        return Ok(existing.id);
-    }
     if let Some(url) = url {
         if let Some(existing) = find_node_by_url(conn, url)? {
             return Ok(existing.id);
@@ -936,18 +925,5 @@ mod tests {
     fn test_normalize_title_collapses_punctuation() {
         assert_eq!(normalize_title("Attention Is All You Need!"), "attention is all you need");
         assert_eq!(normalize_title("  Transformer-Attention  "), "transformer attention");
-    }
-
-    #[test]
-    fn test_insert_or_get_dedup_by_norm_title_across_phases() {
-        let conn = rusqlite::Connection::open_in_memory().unwrap();
-        crate::core::nt_core_kb_primitives::schema_initialize(&conn).unwrap();
-        // 模拟 Phase 1 (digest_sample) 写入带真实 url 的节点
-        let a = insert_or_get_node_rows(&conn, "Attention Is All You Need!", NodeType::Concept, None, Some("https://arxiv.org/abs/123"), Some("NT-CORE")).unwrap();
-        // 模拟 Phase 3 (ingest_causal_graph) 用合成 url + 不同标题但同义 → 应命中归一化标题去重
-        let b = insert_or_get_node_rows(&conn, "attention is all you need", NodeType::Concept, None, Some("cortex_source://causal_graph#42"), Some("NT-CORE")).unwrap();
-        assert_eq!(a, b, "跨阶段同义标题应被归一化去重为同一节点");
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0)).unwrap();
-        assert_eq!(count, 1, "不应产生重复 Concept 节点");
     }
 }
