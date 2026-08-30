@@ -125,15 +125,14 @@ impl SelfReflectionEngine {
     }
 
     fn compute_confidence(&self, feedback: &str) -> f64 {
-        let len = feedback.len().max(1) as f64;
         let signal_strength = if feedback.contains("error") || feedback.contains("fail") {
-            0.8
+            0.3
         } else if feedback.contains("success") || feedback.contains("pass") {
-            0.9
+            0.8
         } else {
-            0.6
+            0.5
         };
-        (signal_strength * len.min(200.0) / 200.0).clamp(0.0, 1.0)
+        signal_strength
     }
 
     /// Retrieve recent reflections for injection into the agent loop.
