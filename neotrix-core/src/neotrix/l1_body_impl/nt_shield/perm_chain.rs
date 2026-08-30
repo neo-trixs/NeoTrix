@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+use crate::core::nt_core_self_test::SelfTest;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PermissionMode {
     Plan,
@@ -160,6 +162,16 @@ fn is_safe_action(action: &str) -> bool {
 impl Default for PermissionChain {
     fn default() -> Self {
         Self::new(PermissionMode::AcceptEdits)
+    }
+}
+
+impl SelfTest for PermissionChain {
+    fn name(&self) -> &str { "permission_chain" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if self.mode() != PermissionMode::AcceptEdits {
+            return Err(vec![format!("expected AcceptEdits mode, got {:?}", self.mode())]);
+        }
+        Ok(())
     }
 }
 

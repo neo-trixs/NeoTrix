@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::core::nt_core_self_test::SelfTest;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum PermissionAction {
     FileWrite,
@@ -219,6 +221,21 @@ impl PermissionManager {
 impl Default for PermissionManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl SelfTest for PermissionManager {
+    fn name(&self) -> &str { "permission_manager" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let summary = self.policy_summary();
+        if summary.len() != 6 {
+            return Err(vec![format!("expected 6 policies, got {}", summary.len())]);
+        }
+        let file_read = summary.iter().find(|e| e.action == PermissionAction::FileRead);
+        match file_read {
+            Some(entry) if entry.rule == PolicyRule::Allow => Ok(()),
+            _ => Err(vec!["FileRead should be Allow by default".into()]),
+        }
     }
 }
 
