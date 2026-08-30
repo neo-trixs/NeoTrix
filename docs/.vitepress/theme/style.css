@@ -1,0 +1,214 @@
+:root {
+  /* ── Superbody Minimal: cream canvas, light gold accent ── */
+  --vp-c-brand-1: #C2933F;
+  --vp-c-brand-2: #A0752E;
+  --vp-c-brand-3: #7C5822;
+  --vp-c-brand-soft: rgba(214, 172, 88, 0.14);
+
+  /* Cream canvas */
+  --vp-c-bg: #FCFAF3;
+  --vp-c-bg-alt: #F7F0DE;
+  --vp-c-bg-elv: #FFFFFF;
+  --vp-c-bg-soft: #F0E3C4;
+
+  /* Warm ink neutrals */
+  --vp-c-text-1: #262419;
+  --vp-c-text-2: #5C5545;
+  --vp-c-text-3: #8F8666;
+
+  /* Hairline borders */
+  --vp-c-border: #E3DCC9;
+  --vp-c-divider: #EDE6D3;
+  --vp-c-gutter: #F7F0DE;
+
+  --vp-c-mute: #F0E3C4;
+
+  --vp-button-brand-bg: #262419;
+  --vp-button-brand-hover-bg: #3D392A;
+  --vp-button-brand-active-bg: #4A4533;
+
+  --vp-c-default-1: #E3DCC9;
+  --vp-c-default-2: #EDE6D3;
+  --vp-c-default-3: #F7F0DE;
+
+  /* Light gold as the single chromatic accent */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #D6AC58, #C2933F 55%, #A0752E);
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #E7D2A0 0%, #D6AC58 60%, #C2933F 100%);
+  --vp-home-hero-image-filter: blur(70px);
+
+  --vp-c-tip: #C2933F;
+  --vp-c-warning: #A0752E;
+  --vp-c-danger: #C2403F;
+
+  --vp-code-color: #A0752E;
+  --vp-code-bg: #F7F0DE;
+  --vp-code-line-highlight-bg: rgba(214, 172, 88, 0.14);
+
+  --vp-custom-block-tip-bg: rgba(214, 172, 88, 0.08);
+  --vp-custom-block-tip-border: rgba(194, 147, 63, 0.25);
+
+  --vp-font-family-base: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  --vp-c-bg: #1B1813;
+  --vp-c-bg-alt: #242018;
+  --vp-c-bg-elv: #2B261C;
+  --vp-c-bg-soft: #332D1F;
+  --vp-c-text-1: #F3EFE4;
+  --vp-c-text-2: #C7BC9E;
+  --vp-c-text-3: #8F8666;
+  --vp-c-border: #3A3324;
+  --vp-c-divider: #322C1F;
+  --vp-button-brand-bg: #D6AC58;
+  --vp-button-brand-hover-bg: #E7D2A0;
+  --vp-c-tip: #E7D2A0;
+}
+
+.vp-doc h2 {
+  border-top: none;
+  padding-top: 32px;
+}
+
+.vp-doc h2 + h3 {
+  padding-top: 0;
+}
+
+.vp-doc a {
+  color: var(--vp-c-brand-1);
+}
+
+.vp-doc a:hover {
+  color: var(--vp-c-brand-2);
+  text-decoration: underline;
+}
+
+.custom-block.tip {
+  border-left: 4px solid var(--vp-c-brand-1);
+}
+
+.vp-code-group .tabs {
+  background: var(--vp-c-bg-soft);
+}
+
+.vp-code-group .tab {
+  color: var(--vp-c-text-2);
+}
+
+.vp-code-group .tab.active {
+  color: var(--vp-c-brand-1);
+  border-bottom-color: var(--vp-c-brand-1);
+}
+
+table {
+  width: 100%;
+}
+
+th {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-brand-1);
+}
+
+th, td {
+  border-color: var(--vp-c-border);
+}
+
+tr:nth-child(2n) {
+  background: var(--vp-c-bg-soft);
+}
+
+/* ── Superbody Minimal product touches ── */
+
+/* Feature cards: hairline border + warm surface, tight radius */
+.VPFeature {
+  border: 1px solid var(--vp-c-border);
+  border-radius: 10px;
+  background: var(--vp-c-bg-elv);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  border-color: #C9A85C;
+  box-shadow: 0 10px 30px -12px rgba(38, 36, 25, 0.12);
+}
+
+.VPFeature .icon {
+  background: rgba(214, 172, 88, 0.14) !important;
+  border-radius: 8px;
+}
+
+/* Hero name: subtle light gold drop */
+.vp-doc .VPHomeHero h1,
+.VPHomeHero h1 {
+  filter: drop-shadow(0 3px 22px rgba(194, 147, 63, 0.3));
+}
+
+/* Hero image: app-tile card, tight */
+.VPImage.image-src {
+  border-radius: 16px;
+  border: 1px solid #E3DCC9;
+  box-shadow: 0 18px 50px -20px rgba(38, 36, 25, 0.22);
+}
+
+/* Buttons: warm ink pill CTA */
+.VPButton.brand {
+  background: #262419;
+  border: none;
+  color: #FCFAF3;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 500;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.VPButton.brand:hover {
+  background: #3D392A;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -8px rgba(38, 36, 25, 0.4);
+}
+
+/* Secondary button: hairline outline pill */
+.VPButton.alt {
+  border: 1px solid #D8CFB8;
+  color: var(--vp-c-text-1);
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 500;
+}
+.VPButton.alt:hover {
+  border-color: #262419;
+  background: rgba(38, 36, 25, 0.04);
+}
+
+/* Tagline: muted */
+.VPHomeHero .tagline {
+  color: var(--vp-c-text-2);
+  max-width: 640px;
+}
+
+/* Footer subtle */
+.VPFooter {
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+/* Code blocks: warm-tint surface, hairline border */
+div[class*='language-'] {
+  border: 1px solid var(--vp-c-border);
+  border-radius: 10px;
+}
+
+/* Nav: hairline bottom border */
+.VPNavBar {
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.VPNavBarTitle .title {
+  color: var(--vp-c-text-1);
+}
+
+/* Cards used inside docs */
+.vp-doc .custom-block {
+  border-radius: 10px;
+}
