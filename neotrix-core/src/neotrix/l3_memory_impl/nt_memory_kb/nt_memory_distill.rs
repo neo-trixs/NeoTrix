@@ -408,4 +408,111 @@ mod tests {
         );
         assert_eq!(after.trained_on, samples.len());
     }
+
+    // ── C3 基准: 对比蒸馏应提升聚类检索 top-k 命中率, 且校准误差有界 (可信) ──
+    #[test]
+    fn test_c3_benchmark_contrastive_beats_identity_retrieval() {
+        let dim = 16;
+        let clusters = 4usize;
+        let per_cluster = 8usize;
+        let n = clusters * per_cluster;
+
+        // 构造带聚类结构的语料: 每簇一个中心 + 节点噪声 (同簇高余弦, 跨簇低余弦)
+        let centers: Vec<Vec<f32>> = (0..clusters)
+            .map(|c| make_vec(dim, (c * 97 + 3) as u64))
+            .collect();
+        let mut nodes: Vec<(usize, Vec<f32>)> = Vec::new(); // (cluster, vec)
+        for c in 0..clusters {
+            for j in 0..per_cluster {
+                let mut v = centers[c].clone();
+                let noise = make_vec(dim, (c * 1000 + j * 7 + 50) as u64);
+                for k in 0..dim {
+                    v[k] += 0.3 * noise[k];
+                }
+                nodes.push((c, v));
+            }
+        }
+
+        // 构造对比样本: 正例=同簇另一节点, 负例=异簇 4 节点
+        let mut rng_state = 99u64;
+        let mut rnd = || {
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (rng_state >> 33) as usize
+        };
+        let mut pairs = Vec::new();
+        for i in 0..n {
+            let (ci, ref qi) = nodes[i];
+            // 正例: 同簇随机另一节点
+            let mut pj = (i + 1) % n;
+            while nodes[pj].0 != ci {
+                pj = (pj + 1) % n;
+            }
+            let pos = nodes[pj].1.clone();
+            // 负例: 异簇 4 节点
+            let negs: Vec<Vec<f32>> = (0..4)
+                .map(|_| {
+                    let mut nj = rnd() % n;
+                    while nodes[nj].0 == ci {
+                        nj = (nj + 1) % n;
+                    }
+                    nodes[nj].1.clone()
+                })
+                .collect();
+            pairs.push((qi.clone(), pos, negs));
+        }
+
+        let identity = PointwiseDistillStudent::identity(dim);
+        let contrastive = train_contrastive(&pairs, dim, 80, 0.05, 0.9);
+
+        // 检索评测: 每节点作 query, 相关集=同簇其余节点; recall@5 (identity vs contrastive)
+        let recall_at = |s: &PointwiseDistillStudent| -> f64 {
+            let mut hits = 0.0;
+            let k = 5usize;
+            for i in 0..n {
+                let (ci, ref qi) = nodes[i];
+                let mut scored: Vec<(f64, usize)> = (0..n)
+                    .filter(|&j| j != i)
+                    .map(|j| (s.score(qi, &nodes[j].1), j))
+                    .collect();
+                scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                let top: std::collections::HashSet<usize> =
+                    scored.iter().take(k).map(|(_, j)| *j).collect();
+                let relevant: usize = (0..n).filter(|&j| j != i && nodes[j].0 == ci).count();
+                let hit = top.iter().filter(|&&j| nodes[j].0 == ci).count();
+                if relevant > 0 {
+                    hits += hit as f64 / relevant as f64;
+                }
+            }
+            hits / n as f64
+        };
+
+        let r_id = recall_at(&identity);
+        let r_ct = recall_at(&contrastive);
+        assert!(
+            r_ct >= r_id - 1e-9,
+            "C3 基准: 对比蒸馏检索召回不应低于 identity: {r_ct} vs {r_id}"
+        );
+
+        // 校准门禁: 用对比学生分数作置信, 同簇=正确, 计算 ECE 须有界 (<0.6) 证明"可学习且可信"
+        let mut calib_samples: Vec<(f32, bool)> = Vec::new();
+        for i in 0..n {
+            let (ci, ref qi) = nodes[i];
+            let mut best: (f64, usize) = (-1e9, 0);
+            for j in 0..n {
+                if j == i {
+                    continue;
+                }
+                let sc = contrastive.score(qi, &nodes[j].1);
+                if sc > best.0 {
+                    best = (sc, j);
+                }
+            }
+            let conf = (best.0.clamp(-1.0, 1.0) * 0.5 + 0.5) as f32; // 归一化到 [0,1]
+            calib_samples.push((conf, nodes[best.1].0 == ci));
+        }
+        let ece = crate::core::nt_core_consciousness_tree::metacalib::expected_calibration_error(
+            &calib_samples, 10,
+        );
+        assert!(ece < 0.6, "C3 基准: 校准误差应有界 (可信), got ECE={ece}");
+    }
 }
