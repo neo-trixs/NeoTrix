@@ -239,7 +239,7 @@ fn extract_defects(content: &str) -> Vec<String> {
 fn extract_insights(content: &str) -> Vec<String> {
     content
         .lines()
-        .filter(|l| l.contains("insight") || l.contains("insight") || l.contains("洞察") || l.contains("learned"))
+        .filter(|l| l.to_lowercase().contains("insight") || l.to_lowercase().contains("洞察") || l.to_lowercase().contains("learned"))
         .take(5)
         .map(|l| format!("insight: {}", l.trim().chars().take(80).collect::<String>()))
         .collect()

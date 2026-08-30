@@ -88,7 +88,7 @@ fn t4_cross_process_os_level_hash_identity() {
         children.push((wid, child));
     }
 
-    for (wid, mut child) in children {
+    for (wid, child) in children {
         let out = child.wait_with_output().expect("wait worker");
         let stdout = String::from_utf8_lossy(&out.stdout);
         let stderr = String::from_utf8_lossy(&out.stderr);

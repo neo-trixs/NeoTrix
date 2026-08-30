@@ -164,6 +164,9 @@ impl ModuleRunes {
 
     /// 插入符文到指定颜色槽位
     pub fn insert_rune(&mut self, color: RuneColor, rune: &Rune) -> Result<(), String> {
+        if rune.color != color {
+            return Err(format!("Rune color {:?} does not match slot color {:?}", rune.color, color));
+        }
         if let Some(slot) = self.slots.iter_mut().find(|s| s.color == color) {
             slot.insert(rune.id.clone());
             return Ok(());
@@ -372,6 +375,7 @@ mod tests {
         let rune2 = Rune::new("r2", "Shift", RuneColor::Indigo, 0.7);
         mr.insert_rune(RuneColor::Crimson, &rune1).unwrap();
         mr.insert_rune(RuneColor::Indigo, &rune2).unwrap();
+        mr.add_runeword(rw);
         mr.check_runewords();
         assert!(mr.runewords[0].active);
         assert_eq!(mr.total_bonus(), 0.5);
@@ -388,6 +392,7 @@ mod tests {
         let mut mr = ModuleRunes::new("nt-core", vec![RuneColor::Crimson, RuneColor::Indigo]);
         let rune1 = Rune::new("r1", "Fire", RuneColor::Crimson, 0.8);
         mr.insert_rune(RuneColor::Crimson, &rune1).unwrap();
+        mr.add_runeword(rw);
         mr.check_runewords();
         assert!(!mr.runewords[0].active);
         assert_eq!(mr.total_bonus(), 0.0);
@@ -412,14 +417,15 @@ mod tests {
             "nt-core",
             vec![RuneColor::Crimson, RuneColor::Indigo],
         );
-        let mut rw = Runeword::new(
+        let rw = Runeword::new(
             "Test Combo",
             vec![RuneColor::Crimson, RuneColor::Indigo],
             0.5,
             "Test",
         );
-        rs.add_global_runeword(rw);
-
+        if let Some(mod_runes) = rs.module_mut("nt-core") {
+            mod_runes.add_runeword(rw);
+        }
         let rune1 = Rune::new("r1", "Fire", RuneColor::Crimson, 0.8);
         let rune2 = Rune::new("r2", "Shift", RuneColor::Indigo, 0.7);
         rs.insert_rune("nt-core", RuneColor::Crimson, &rune1).unwrap();

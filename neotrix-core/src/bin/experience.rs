@@ -100,7 +100,8 @@ const OBS_BUFFER_RATIO: f64 = 0.2;
 const OBS_BUFFER_ACTIVATION: f64 = 0.8;
 const REF_TOKEN_BUDGET: usize = 40_000;
 const REF_BUFFER_ACTIVATION: f64 = 0.5;
-const OBS_BLOCK_AFTER: f64 = 1.2;
+     #[allow(dead_code)]
+     const OBS_BLOCK_AFTER: f64 = 1.2;
 
 /// 简易 token 估算 (单一事实源, 兼容 CJK): 无 tiktoken 时回退逐字符估算 (保守上界, 最小 1)。
 fn estimate_tokens(text: &str) -> usize {
@@ -552,7 +553,8 @@ impl Extractor {
     fn new(name: &str, schema: Value, extract: ExtractorFn) -> Self {
         Self { name: name.to_string(), schema, extract, on_extracted: None }
     }
-    fn with_hook(mut self, hook: fn(&mut Value) -> Result<(), String>) -> Self {
+     #[allow(dead_code)]
+     fn with_hook(mut self, hook: fn(&mut Value) -> Result<(), String>) -> Self {
         self.on_extracted = Some(hook);
         self
     }
@@ -3281,7 +3283,7 @@ fn cmd_reflect(conn: &mut Connection, domain: Option<&str>, dry_run: bool) {
         println!("[reflect] reflection entry written: {}", refl_key);
     }
     // 5. 更新观察条目: reflection.version++ / last_reflect_ts
-    for (obs_key, obs_entry) in &observations {
+    for (_obs_key, obs_entry) in &observations {
         let mut obs_entry = obs_entry.clone();
         if let Some(obj) = obs_entry.as_object_mut() {
             let mut refl_meta = obj.get("reflection").cloned().unwrap_or(json!({}));

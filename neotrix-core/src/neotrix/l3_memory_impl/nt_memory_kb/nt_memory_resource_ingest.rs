@@ -1093,9 +1093,7 @@ mod tests {
     #[test]
     fn test_reclaim_nt_target_tmp_dry_run_safe() {
         // dry_run 只计数不删除, 对任意 /private/tmp 状态均安全; 验证返回 Ok 且不报错。
-        let n = reclaim_nt_target_tmp(9999, true).expect("reclaim dry-run");
-        // 9999 天阈值下所有 nt-target-* 目录都算"过期", 计数 >= 0 即可 (不删除)
-        assert!(n >= 0, "dry-run 计数应 >= 0");
+         assert!(reclaim_nt_target_tmp(9999, true).is_ok(), "reclaim dry-run");
     }
 
     #[test]

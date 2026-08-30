@@ -346,6 +346,7 @@ mod tests {
         n1.unlocked = true;
         let mut n2 = make_node("n2", Tier::NotablePassive, "NT-CORE");
         n2.add_prerequisite("n1");
+        n2.activation_score = 0.5;
         n2.upgrade_condition.prerequisite_count = 1;
         reg.add_node(n1);
         reg.add_node(n2);
@@ -409,7 +410,7 @@ mod tests {
     #[test]
     fn test_topological_order() {
         let mut reg = SkillTreeRegistry::new();
-        let mut n1 = make_node("n1", Tier::SmallPassive, "NT-CORE");
+        let n1 = make_node("n1", Tier::SmallPassive, "NT-CORE");
         let mut n2 = make_node("n2", Tier::NotablePassive, "NT-CORE");
         n2.add_prerequisite("n1");
         let mut n3 = make_node("n3", Tier::Keystone, "NT-CORE");

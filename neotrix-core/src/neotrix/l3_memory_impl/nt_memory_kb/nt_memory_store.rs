@@ -914,7 +914,7 @@ pub fn find_matching_skills(conn: &Connection, e8_state: u8) -> rusqlite::Result
 mod tests {
 
     use super::*;
-    use crate::core::nt_core_kb_primitives::schema_initialize;
+    
 
     #[test]
     fn test_basic() {

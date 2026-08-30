@@ -1,14 +1,8 @@
 //! NT-REPAIR Self-Heal Integration Tests (Track 3: D22/D26/D27/D28)
 //! Verifies the self-healing loop: monitoring → diagnosis → heal → retest
 
-use crate::neotrix::nt_mind_background_loop::BackgroundLoop;
-use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::core::nt_core_self::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
-use crate::neotrix::nt_mind_autofixer::{HealerRegistry, HealSuggestion};
-use crate::neotrix::nt_repair_self_heal::{SelfHealLoop, HealableDetector};
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::neotrix::nt_mind_autofixer::HealerRegistry;
 use std::fs;
 use std::env;
 
@@ -119,7 +113,7 @@ async fn test_test_flakiness_monitoring() {
 
 #[tokio::test]
 async fn test_healer_registry_integration() {
-    use std::path::Path;
+    
     
     let dir = env::temp_dir().join(format!("neotrix_test_healer_{}", std::process::id()));
     let _ = fs::create_dir_all(&dir);

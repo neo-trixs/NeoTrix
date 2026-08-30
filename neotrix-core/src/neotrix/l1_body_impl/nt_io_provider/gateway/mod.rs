@@ -181,7 +181,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_gateway_selects_free_provider() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("paid", Arc::new(MockProvider::new("paid response")), false);
         gw.register_provider("free", Arc::new(MockProvider::new("free response")), true);
 
@@ -215,7 +215,7 @@ mod tests {
     // ── 候选链: 从池子实际注册名动态构建 ─────────────────────────
     #[tokio::test]
     async fn test_candidate_chain_prefix_first() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("pollinations", Arc::new(MockProvider::new("p")), true);
         gw.register_provider("llm7", Arc::new(MockProvider::new("l")), true);
         gw.register_provider("api-airforce", Arc::new(MockProvider::new("a")), true);
@@ -229,7 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_chain_prefix_catalog_full_name() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("pollinations", Arc::new(MockProvider::new("p")), true);
         gw.register_provider(
             "llm7/codestral-latest",
@@ -248,7 +248,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_chain_free_first_and_dedup() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("paid-a", Arc::new(MockProvider::new("x")), false);
         gw.register_provider("free-b", Arc::new(MockProvider::new("y")), true);
         gw.register_provider("free-c", Arc::new(MockProvider::new("z")), true);
@@ -268,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_chain_limit_and_resolve_default() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("a", Arc::new(MockProvider::new("x")), true);
         gw.register_provider("b", Arc::new(MockProvider::new("y")), false);
         gw.register_provider("c", Arc::new(MockProvider::new("z")), true);
@@ -284,7 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_gateway_fallback_on_failure() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("failing", Arc::new(MockProvider::failing()), false);
         gw.register_provider("working", Arc::new(MockProvider::new("ok")), true);
 
@@ -303,7 +303,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "需联网: 网关/provider 集成测试, 默认忽略; 联网环境 `cargo test -- --ignored` 运行 (R-P79)"]
     async fn test_gateway_rate_limit() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("limited", Arc::new(MockProvider::new("ok")), true);
 
         let req = LlmRequest::new("test", "hello");
@@ -313,7 +313,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_select_best_load_balance() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
 
         // Register 4 providers to test sorting order:
         // 1. free_a: free + available, total_calls=100
@@ -411,7 +411,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "需联网: 网关/provider 集成测试, 默认忽略; 联网环境 `cargo test -- --ignored` 运行 (R-P79)"]
     async fn test_aggressive_retry_recovers_after_all_fail() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         // Register 2 failing providers — normal retry will exhaust both
         gw.register_provider("fail1", Arc::new(MockProvider::failing()), false);
         gw.register_provider("fail2", Arc::new(MockProvider::failing()), false);
@@ -443,7 +443,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "需联网: 网关/provider 集成测试, 默认忽略; 联网环境 `cargo test -- --ignored` 运行 (R-P79)"]
     async fn test_aggressive_retry_succeeds_on_second_wave() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         // fail1 fails always; fail2 fails first 3 times, succeeds on 4th
         let fail_count = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let fc = fail_count.clone();
@@ -512,7 +512,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "需联网: 网关/provider 集成测试, 默认忽略; 联网环境 `cargo test -- --ignored` 运行 (R-P79)"]
     async fn test_stream_aggressive_retry_succeeds_on_second_wave() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         let fail_count = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let fc = fail_count.clone();
 
@@ -588,7 +588,7 @@ mod tests {
 
     #[test]
     fn test_sub_grid_composition() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
             Arc::new(MockProvider::new("ok")),
@@ -620,7 +620,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_select_best_for_profile() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
             Arc::new(MockProvider::new("ok")),
@@ -658,7 +658,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_for_profile() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
             Arc::new(MockProvider::new("ok")),
@@ -688,7 +688,7 @@ mod tests {
     #[tokio::test]
     async fn test_complete_for_profile_fallback() {
         // 没有任何 provider 满足 Tor 级别 → 回退默认 select_best
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
             Arc::new(MockProvider::new("ok")),
@@ -707,7 +707,7 @@ mod tests {
 
     #[test]
     fn test_sub_grids_meeting() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "ollama",
             Arc::new(MockProvider::new("local")),
@@ -751,7 +751,7 @@ mod tests {
 
     #[test]
     fn test_sub_grid_health_report() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "ollama",
             Arc::new(MockProvider::new("local")),
@@ -768,7 +768,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_for_profile_records_health() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
             Arc::new(MockProvider::new("ok")),
@@ -803,7 +803,7 @@ mod tests {
     async fn test_degraded_retry_downgrades_on_failure() {
         // local-fail 满足 Anonymous 但失败; cloud-ok 仅满足 Open 且成功.
         // 请求 Anonymous → local-fail 失败 → 降级链 Anonymous→Tor→Proxied→Open → cloud-ok 成功
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "local-fail",
             Arc::new(MockProvider::failing()),
@@ -875,7 +875,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_capability_coordinator_local_reasoning() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "ollama",
             Arc::new(MockProvider::new("local")),
@@ -898,7 +898,7 @@ mod tests {
     #[tokio::test]
     async fn test_capability_coordinator_fallback_default() {
         // 无任何 provider 满足 Tor → 回退默认 select_best, 通信始终畅通
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "openai",
             Arc::new(MockProvider::new("ok")),
@@ -919,7 +919,7 @@ mod tests {
     async fn test_capability_coordinator_reports_real_degradation() {
         // local-fail 满足 Anonymous 但失败 → 降级链落到 Open → cloud-ok 成功.
         // 关键断言: outcome.degraded == true 且 used_profile == Open (真实降级被报告)
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider_with_category(
             "local-fail",
             Arc::new(MockProvider::failing()),
@@ -989,7 +989,7 @@ mod tests {
     async fn test_quota_exhaustion_trips_provider_not_retried() {
         // D19 (freellmapi/aimux 模式): 配额耗尽应熔断剔除 provider, 而非反复重试
         // 同一个耗尽账户。命中 quota 后将 provider 置为不可用 → select_best 跳过。
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider(
             "quota-exhausted",
             Arc::new(MockProvider::quota_failing()),
@@ -1054,7 +1054,7 @@ mod tests {
     async fn test_model_unavailable_locks_and_failover() {
         // L3 模型级锁 (对齐 OmniRoute model lockout): 单模型 404 只锁定该模型,
         // 不熔断整个 provider, 且自动 failover 到其它可用 provider → 池子不缩水。
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("model-dead", Arc::new(MockProvider::model_failing()), true);
         // working 注册为付费, 确保 free-first 链确定性先试 model-dead (free) 再 failover 到 working
         gw.register_provider("working", Arc::new(MockProvider::new("ok")), false);
@@ -1078,7 +1078,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_candidate_chain_skips_model_locked() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("a", Arc::new(MockProvider::new("a")), true);
         gw.register_provider("b", Arc::new(MockProvider::new("b")), true);
         {
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pool_sufficiency_report() {
-        let mut gw = GatewayV2::new();
+        let gw = GatewayV2::new();
         gw.register_provider("f1", Arc::new(MockProvider::new("a")), true);
         gw.register_provider("f2", Arc::new(MockProvider::new("b")), true);
         assert!(
@@ -1601,7 +1601,7 @@ mod provider_reliability_tests {
         // 完整目录注册名 (`llm7/codestral-latest`) 被选为候选链第一名时,
         // `{name}/` strip 会失败 (model 无尾斜杠), 必须按首段剥离,
         // 否则上游收到 `llm7/codestral-latest` → model_unavailable。
-        let gw = GatewayV2::new();
+        let _gw = GatewayV2::new();
         let cases = [
             // (注册名, 请求 model, 期望传给 provider 的 model)
             ("llm7", "llm7/codestral-latest", Some("codestral-latest")),

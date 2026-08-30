@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_match_score() {
-        let mut router = AscendancyRouter::new();
+        let router = AscendancyRouter::new();
         let score = router.match_score("fix the code");
         assert!(score > 0.0);
     }
@@ -292,11 +292,12 @@ mod tests {
         let mut router = AscendancyRouter::new();
         router.switch_to(WeaponSetKind::Evolution);
         router.switch_to(WeaponSetKind::Acquisition);
-        router.switch_to(WeaponSetKind::Evolution);
         assert_eq!(router.switch_count(), 2);
         assert_eq!(router.switch_history().len(), 2);
         assert_eq!(router.switch_history()[0].from_set, WeaponSetKind::Acquisition);
         assert_eq!(router.switch_history()[0].to_set, WeaponSetKind::Evolution);
+        assert_eq!(router.switch_history()[1].from_set, WeaponSetKind::Evolution);
+        assert_eq!(router.switch_history()[1].to_set, WeaponSetKind::Acquisition);
     }
 
     #[test]
