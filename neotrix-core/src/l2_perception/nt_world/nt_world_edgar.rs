@@ -431,12 +431,12 @@ impl EdgarFetcher {
 /// SEC EDGAR Egress 主机 — 单一事实源 (P2)。
 pub const EDGAR_HOST: &str = "data.sec.gov";
 /// SEC EDGAR Egress allow 规则 (deny-wins 体系中的 allow 分支)。
-pub fn edgar_egress_rule() -> crate::l1_action::nt_io::nt_shield_sandbox::EgressRule {
-    crate::l1_action::nt_io::nt_shield_sandbox::EgressRule::allow(EDGAR_HOST, "443")
+pub fn edgar_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(EDGAR_HOST, "443")
 }
 /// SEC EDGAR 专用 Egress Policy (deny_all 基线 + 单条 allow)。
-pub fn edgar_egress_policy() -> crate::l1_action::nt_io::nt_shield_sandbox::EgressPolicy {
-    crate::l1_action::nt_io::nt_shield_sandbox::EgressPolicy::new(vec![edgar_egress_rule()], false)
+pub fn edgar_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![edgar_egress_rule()], false)
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────
@@ -596,7 +596,7 @@ mod tests {
         assert!(!policy.check("evil.com", 443), "non-edgar host denied");
         // deny-wins: 叠加 deny 规则应覆盖 allow
         let mut with_deny = edgar_egress_policy();
-        with_deny.rules.push(crate::l1_action::nt_io::nt_shield_sandbox::EgressRule::deny(EDGAR_HOST, "443"));
+        with_deny.rules.push(crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::deny(EDGAR_HOST, "443"));
         assert!(!with_deny.check(EDGAR_HOST, 443), "explicit deny wins over allow");
     }
 

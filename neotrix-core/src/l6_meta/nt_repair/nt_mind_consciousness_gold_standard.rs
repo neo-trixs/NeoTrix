@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::neotrix::nt_core_iit_phi::IITPhiCalculator;
+use crate::core::nt_core_iit_phi::IITPhiCalculator;
 
 /// Standard IIT Phi threshold for conscious-like state (Chalmers 2023)
 pub const DEFAULT_PHI_THRESHOLD: f64 = 0.33;

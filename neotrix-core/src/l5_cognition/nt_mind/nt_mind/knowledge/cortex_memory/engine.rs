@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque, HashSet};
 use crate::l5_cognition::nt_mind::nt_mind::embedding::TextEmbedder;
-use crate::neotrix::nt_core_signal::ops::cosine_similarity;
+use crate::neotrix::// nt_core_signal::ops::cosine_similarity;
 use super::types::*;
 
 // CortexMemory — 类人脑多维度存储系统

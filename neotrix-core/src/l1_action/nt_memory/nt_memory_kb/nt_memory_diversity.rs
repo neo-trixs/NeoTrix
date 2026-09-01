@@ -5,7 +5,7 @@
 //!
 //! 纯函数设计便于无 DB 单测。
 
-use super::nt_memory_embed::cosine_similarity;
+// use super::nt_memory_embed::cosine_similarity;
 use super::nt_memory_types::{KnowledgeNode, SearchResult};
 
 /// 当前 unix 秒 — 供 recency 计算用基准
@@ -79,7 +79,7 @@ pub fn rerank_with_recency_and_mmr(
     let recency_sorted = apply_recency_decay(results, now_secs);
     diversify_mmr(recency_sorted, k, |a, b| {
         match (embeddings.get(&a.id), embeddings.get(&b.id)) {
-            (Some(va), Some(vb)) => cosine_similarity(va, vb),
+//             (Some(va), Some(vb)) => cosine_similarity(va, vb),
             _ => 0.0,
         }
     })

@@ -206,14 +206,14 @@ impl GdeltFetcher {
 // ── Egress 登记 ─────────────────────────────────────────────────
 
 /// GDELT Egress 主机 — 单一事实源在 `nt_shield_sandbox::INTEL_GDELT_HOST` (P2)。
-pub const GDELT_HOST: &str = crate::l1_action::nt_io::nt_shield_sandbox::INTEL_GDELT_HOST;
+pub const GDELT_HOST: &str = crate::l3_embodiment::nt_shield::nt_shield_sandbox::INTEL_GDELT_HOST;
 /// GDELT Egress allow 规则 (deny-wins 体系中的 allow 分支)。
-pub fn gdelt_egress_rule() -> crate::l1_action::nt_io::nt_shield_sandbox::EgressRule {
-    crate::l1_action::nt_io::nt_shield_sandbox::EgressRule::allow(GDELT_HOST, "443")
+pub fn gdelt_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(GDELT_HOST, "443")
 }
 /// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow) — 委托 `intel_egress_policy`。
-pub fn gdelt_egress_policy() -> crate::l1_action::nt_io::nt_shield_sandbox::EgressPolicy {
-    crate::l1_action::nt_io::nt_shield_sandbox::intel_egress_policy()
+pub fn gdelt_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::intel_egress_policy()
 }
 
 // ── 入库报告 ───────────────────────────────────────────────────
@@ -325,7 +325,7 @@ mod tests {
         assert!(!policy.check("evil.com", 443), "non-gdelt host denied");
         // deny-wins: 叠加 deny 规则应覆盖 allow
         let mut with_deny = gdelt_egress_policy();
-        with_deny.rules.push(crate::l1_action::nt_io::nt_shield_sandbox::EgressRule::deny(GDELT_HOST, "443"));
+        with_deny.rules.push(crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::deny(GDELT_HOST, "443"));
         assert!(!with_deny.check(GDELT_HOST, 443), "explicit deny wins over allow");
     }
 

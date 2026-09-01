@@ -127,7 +127,7 @@ impl ReasoningBank {
             ("Roo: research-oriented agent with paper reading, experiment design, and result analysis", TaskType::Research, 0.85),
             ("TaskManager: goal-oriented task decomposition and tracking with dependency resolution", TaskType::Planning, 0.87),
             ("ThinkingModel: structured reasoning with chain-of-thought, tree-of-thought, and reflection patterns", TaskType::CodeAnalysis, 0.90),
-            ("SelectiveState: Mamba SSM selective state space for long-range sequence modeling with linear complexity", TaskType::Research, 0.91),
+//             ("SelectiveState: Mamba SSM selective state space for long-range sequence modeling with linear complexity", TaskType::Research, 0.91),
             ("Mamba: state space model architecture with selective scan for efficient long-context processing", TaskType::Research, 0.92),
             ("WalshMemory: Walsh-Hadamard orthogonal memory index with O(n log n) encoding and spectral retrieval", TaskType::CodeAnalysis, 0.88),
             ("Bm25: Okapi BM25 probabilistic retrieval with term frequency saturation and document length normalization", TaskType::CodeAnalysis, 0.86),

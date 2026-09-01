@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::l1_action::nt_memory::nt_memory_kb::unify::skill_list_all;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::skill_list_all;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;

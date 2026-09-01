@@ -15,7 +15,7 @@
 //!   - CapabilityVector as abstract representation space
 //!   - E8 64-hexagram as hidden state space
 //!   - HyperCube for knowledge-enhanced prediction
-//!   - SelectableOperator for state-space temporal dynamics
+// //!   - SelectableOperator for state-space temporal dynamics
 
 pub mod types;
 pub mod encoder;

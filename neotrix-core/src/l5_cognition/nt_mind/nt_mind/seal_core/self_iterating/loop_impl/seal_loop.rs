@@ -21,8 +21,8 @@ use crate::neotrix::nt_io_provider::create_gateway;
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::SparseAutoencoder;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::neotrix::nt_core_signal::select::SelectableOperator;
-use crate::neotrix::nt_core_signal::SelectiveState;
+// // use crate::core::// nt_core_signal::select::SelectableOperator;
+// // use crate::core::// nt_core_signal::SelectiveState;
 use crate::core::nt_core_e8::ewhr_bridge::E8EwhrBridge;
 use std::sync::{Arc, Mutex};
 use crate::cli::shield_enforcer::global_shield;
@@ -30,7 +30,7 @@ use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherC
 use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
 use crate::core::nt_core_reasoning::ContextBuilder;
 use crate::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
-use crate::neotrix::nt_core_parallel::{IntentIsolator, AtomicDecomposer};
+// use crate::l5_cognition::nt_core::nt_core_parallel::{IntentIsolator, AtomicDecomposer};
 
 
 type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
@@ -1167,8 +1167,8 @@ impl SelfIteratingBrain {
     }
 
     pub fn init_select_operator(&mut self, dim: usize, hidden_dim: usize) {
-        self.select_operator = Some(SelectableOperator::new(dim, hidden_dim));
-        self.selective_state = Some(SelectiveState::new(dim, hidden_dim));
+//         self.select_operator = Some(SelectableOperator::new(dim, hidden_dim));
+//         self.selective_state = Some(SelectiveState::new(dim, hidden_dim));
     }
 
     pub fn init_sleep_engine(&mut self, passes: usize) {

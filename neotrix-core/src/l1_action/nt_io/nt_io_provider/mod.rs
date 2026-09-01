@@ -20,6 +20,7 @@ pub mod free_providers;
 pub mod gateway;
 pub mod generation_classifier;
 pub mod gemini;
+pub mod llama_process;
 pub mod ollama;
 pub mod openai;
 pub mod provider_catalog;

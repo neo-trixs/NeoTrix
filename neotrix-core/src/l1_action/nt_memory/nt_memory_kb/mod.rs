@@ -49,7 +49,7 @@ pub mod nt_memory_integration;
 pub mod nt_memory_schema;
 pub mod nt_memory_search;
 pub mod nt_memory_seed;
-pub mod nt_memory_setting_consistency;
+pub mod nt_memory_// setting_consistency;
 pub mod nt_memory_store;
 pub mod nt_memory_svaf_gate;
 pub mod nt_memory_types;
@@ -1739,7 +1739,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         }
         let mut scored: Vec<(String, f64)> = embeddings
             .iter()
-            .map(|(id, v)| (id.clone(), nt_memory_embed::cosine_similarity(&query_vec, v)))
+//             .map(|(id, v)| (id.clone(), nt_memory_embed::cosine_similarity(&query_vec, v)))
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut results = Vec::with_capacity(limit);

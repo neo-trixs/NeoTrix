@@ -386,7 +386,7 @@ pub use nt_core_data_pipeline::{
 };
 
 // ─── NT-SHIELD: 渗透安全能力 (GitHub 开源项目深度集成) ───
-pub use crate::l3_embodiment::nt_shield::nt_shield_impl::{
-    ARTToolbox, FscanModule, GhidraAnalyzer, NucleiEngine, ObjectionAdapter, PentestGPTAdapter,
-    ShieldCapability, W3afEngine,
-};
+// pub use crate::l3_embodiment::nt_shield::nt_shield_impl::{
+//     ARTToolbox, FscanModule, GhidraAnalyzer, NucleiEngine, ObjectionAdapter, PentestGPTAdapter,
+//     ShieldCapability, W3afEngine,
+// };

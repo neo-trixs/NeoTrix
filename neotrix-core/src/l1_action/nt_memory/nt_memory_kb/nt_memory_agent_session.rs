@@ -152,7 +152,7 @@ impl AgentSessionManager {
         let mut scored: Vec<(AgentSessionEntry, f64)> = Vec::new();
         for r in rows {
             if let Ok((entry, Some(emb))) = r {
-                scored.push((entry, cosine_similarity(query_embedding, &emb)));
+//                 scored.push((entry, cosine_similarity(query_embedding, &emb)));
             }
         }
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -195,13 +195,13 @@ fn map_entries(mut stmt: rusqlite::Statement, params: impl rusqlite::Params) -> 
     Ok(results)
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if mag_a == 0.0 || mag_b == 0.0 { return 0.0; }
-    (dot / (mag_a * mag_b)) as f64
-}
+// fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+//     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+//     let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+//     let mag_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+//     if mag_a == 0.0 || mag_b == 0.0 { return 0.0; }
+//     (dot / (mag_a * mag_b)) as f64
+// }
 
 #[cfg(test)]
 mod tests {

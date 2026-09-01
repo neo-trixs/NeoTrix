@@ -5,24 +5,24 @@ use tokio::sync::{RwLock, watch};
 use tokio::task::JoinHandle;
 
 use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-use crate::l5_cognition::nt_mind::knowledge_chain::KnowledgeChain;
+use crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_chain::KnowledgeChain;
 use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
 // use crate::l5_cognition::nt_mind::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
-use crate::l5_cognition::nt_mind_cleanup::CleanupEngine;
+use crate::l5_cognition::nt_mind::nt_mind_cleanup::CleanupEngine;
 use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
 use crate::neotrix::nt_world_model::WorldModelV2;
 use crate::l5_cognition::nt_mind::nt_mind_evolution_daemon::{EvolutionDaemon, EvolutionConfig};
-use crate::l5_cognition::nt_mind::panorama_pipeline::PanoramaPipeline;
+use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipeline;
 use crate::neotrix::nt_act_voice::VoiceInput;
 use crate::l1_action::nt_io::nt_io_user_avatar::DistillationEngine;
-use crate::l5_cognition::nt_mind::self_evolver::SelfEvolver;
+use crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver;
 use crate::core::nt_core_scheduler::SchedulerEngine;
-use crate::l5_cognition::nt_mind::curiosity_drive::CuriosityDrive;
-use crate::l5_cognition::nt_mind::knowledge_aging::KnowledgeAging;
-use crate::l5_cognition::nt_mind::auto_crystallizer::AutoCrystallizer;
+use crate::l5_cognition::nt_mind::nt_mind::curiosity_drive::CuriosityDrive;
+use crate::l5_cognition::nt_mind::nt_mind::knowledge_aging::KnowledgeAging;
+use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
 use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
@@ -30,12 +30,12 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 use crate::core::nt_core_second_brain::SecondBrain;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
-use crate::l5_cognition::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
-use crate::l5_cognition::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
 use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 
-pub use crate::l5_cognition::nt_mind_background_config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
+pub use crate::l5_cognition::nt_mind::nt_mind_background_config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
 
 mod builder;
 mod run;
@@ -217,7 +217,7 @@ mod tests {
         let bg = BackgroundLoop::new(brain.clone());
         let pre_pano_gwt = bg.gwt.is_some();
         assert!(pre_pano_gwt, "new() 必须预置 GWT 单例");
-        let pano = crate::l5_cognition::nt_mind::panorama_pipeline::PanoramaPipeline::new();
+        let pano = crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline::new();
         let bg = bg.with_panorama(pano);
         // B1: with_panorama 会把共享 gwt 注入 pano (self.gwt.take), 故 bg.gwt 转 None、pano 持有它
         assert!(bg.panorama.is_some(), "panorama 已注入");

@@ -2,6 +2,11 @@
 //
 // 统一导出所有前端需要的 API
 
+// ===== 新架构：Domain Plugin System =====
+export * as domain from './domain';
+export { call as domainCall, list as domainList, has as domainHas } from './domain';
+
+// ===== 旧架构导出（保留向后兼容） =====
 export * from './unified';
 
 // 导出客户端工具函数

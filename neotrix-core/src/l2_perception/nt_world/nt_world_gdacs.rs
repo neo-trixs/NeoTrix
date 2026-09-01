@@ -191,11 +191,11 @@ impl GdacsFetcher {
 // ── Egress ───────────────────────────────────────────────────
 
 pub const GDACS_HOST: &str = "www.gdacs.org";
-pub fn gdacs_egress_rule() -> crate::l1_action::nt_io::nt_shield_sandbox::EgressRule {
-    crate::l1_action::nt_io::nt_shield_sandbox::EgressRule::allow(GDACS_HOST, "443")
+pub fn gdacs_egress_rule() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressRule::allow(GDACS_HOST, "443")
 }
-pub fn gdacs_egress_policy() -> crate::l1_action::nt_io::nt_shield_sandbox::EgressPolicy {
-    crate::l1_action::nt_io::nt_shield_sandbox::EgressPolicy::new(vec![gdacs_egress_rule()], false)
+pub fn gdacs_egress_policy() -> crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy {
+    crate::l3_embodiment::nt_shield::nt_shield_sandbox::EgressPolicy::new(vec![gdacs_egress_rule()], false)
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
 //! API/服务注册表元数据 (G30, public-apis / free-for-dev 吸收)。
 //!
 //! 提供公共 API 注册表 schema (与 public-apis 社区维护格式对齐) 与分类目标树,
-//! 输出可直接作为 `nt_agent_mcp_registry` 的发现种子 — 吸收器落地的新知识
+//! 输出可直接作为 `// nt_agent_mcp_registry` 的发现种子 — 吸收器落地的新知识
 //! 节点经此 schema 归一, 供 MCP registry 索引为可调用工具面。
 
 use serde::{Deserialize, Serialize};

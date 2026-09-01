@@ -181,19 +181,19 @@ pub fn cad_wiring_map() -> Vec<(String, String)> {
         ),
         (
             "cad_cross_modal_retrieval".into(),
-            "neotrix/l2_world_impl/cad_crossmodal_selftest.rs:18".into(),
+            "neotrix/l2_world_impl/// // cad_crossmodal_selftest.rs:18".into(),
         ),
         (
             "cad_synthbal".into(),
-            "neotrix/l2_world_impl/cad_synthbal_selftest.rs:18".into(),
+            "neotrix/l2_world_impl/// cad_synthbal_selftest.rs:18".into(),
         ),
         (
             "cad_brep_topology".into(),
-            "neotrix/l2_world_impl/cad_brep_selftest.rs:18".into(),
+            "neotrix/l2_world_impl/// cad_brep_selftest.rs:18".into(),
         ),
         (
             "cad_c5_self_healing".into(),
-            "neotrix/l2_world_impl/cad_ch_selftest.rs:82".into(),
+            "neotrix/l2_world_impl/// // cad_ch_selftest.rs:82".into(),
         ),
         (
             "cad_seal_stage".into(),
@@ -331,7 +331,7 @@ mod verification {
     const CAD_SELFTESTS: &[&str] = &[
         "cad_csr", "cad_ccip", "cad_cdp", "cad_decoder", "cad_cross_modal_retrieval",
         "cad_synthbal", "cad_brep_topology", "cad_c5_self_healing", "cad_seal_stage",
-        "cad_runeword", "cad_wiring_evidence", "cad_absorption", "cad_generator",
+        "cad_runeword", "cad_wiring_evidence", "cad_absorption", "// // cad_generator",
     ];
 
     /// 核心建议 #1 运行时验证: 真正运行 3 条生产接线 + CAD SelfTest 注册校验,

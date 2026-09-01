@@ -12,7 +12,7 @@
 //!   - 核心差异: NeoTrix 用 compile health + test coverage 替代 Phi
 //!     作为系统健康的主要度
 
-use crate::l1_action::nt_act::nt_l1_shared_types::ProjectSnapshot;
+// use crate::l1_action::nt_act::nt_l1_shared_types::ProjectSnapshot;
 use crate::core::nt_core_cap::CapabilityVector;
 
 /// 基准维度

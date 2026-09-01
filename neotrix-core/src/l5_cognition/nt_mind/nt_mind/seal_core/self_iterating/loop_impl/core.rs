@@ -9,14 +9,14 @@ use super::super::super::cortex_memory::CortexMemory;
 use super::super::super::change_archive::ChangeArchive;
 use super::super::super::sleep::{SleepEngine, SleepStats};
 use crate::neotrix::nt_world_model::TaskType;
-use crate::neotrix::nt_core_signal::select::SelectableOperator;
-use crate::neotrix::nt_core_signal::core::SelectiveState;
+// // use crate::core::// nt_core_signal::select::SelectableOperator;
+// // use crate::core::// nt_core_signal::core::SelectiveState;
 use crate::neotrix::nt_act_crypto::CryptoAgent;
 use super::super::super::stagnation::StagnationDetector;
 use super::super::checkpoint::CheckpointManager;
 use super::super::pipeline::{BrainPipeline, BrainSnapshot, AutonomyLevel, PermissionLevel, StageResult, seal_pipeline};
 use super::super::super::goal_loop::GoalLoop;
-use crate::l5_cognition::nt_mind::goal_register::GoalRegister;
+use crate::l5_cognition::nt_mind::nt_mind::goal_register::GoalRegister;
 use super::super::skillopt::{LrScheduler, ValidationGate, RejectedEditBuffer};
 use super::super::aging_monitor::AgingMonitor;
 use super::super::harness_adapter::{HarnessAdapter, HarnessKbExt};
@@ -48,8 +48,8 @@ pub struct SelfIteratingBrain {
     pub regularization_weight: f64,
     pub auto_memory_iteration: bool,
     pub memory_iteration_interval: u64,
-    pub select_operator: Option<SelectableOperator>,
-    pub selective_state: Option<SelectiveState>,
+//     pub select_operator: Option<SelectableOperator>,
+//     pub selective_state: Option<SelectiveState>,
     pub group_manager: Option<MultiBrainManager>,
     pub reasoning_engine: Option<ReasoningEngine>,
     pub attention_router: Option<AttentionRouter>,
@@ -451,7 +451,7 @@ impl SelfIteratingBrain {
         let mut simulated = before.clone();
         simulated.update_from_other(&source_vector, self.brain.learning_rate);
         simulated.normalize();
-        let delta = crate::neotrix::nt_core_signal::ops::cosine_similarity(&simulated.to_full_vector(), &before.to_full_vector());
+// //         let delta = crate::core::// nt_core_signal::ops::cosine_similarity(&simulated.to_full_vector(), &before.to_full_vector());
         (before, simulated, delta)
     }
 
@@ -461,7 +461,7 @@ impl SelfIteratingBrain {
         let dummy_source = KnowledgeSource::DesignPhilosophy;
         simulated.update_from_other(&dummy_source.capability_vector(), self.brain.learning_rate);
         simulated.normalize();
-        let delta = crate::neotrix::nt_core_signal::ops::cosine_similarity(&simulated.to_full_vector(), &self.brain.capability.to_full_vector());
+// //         let delta = crate::core::// nt_core_signal::ops::cosine_similarity(&simulated.to_full_vector(), &self.brain.capability.to_full_vector());
         (simulated, delta)
     }
 

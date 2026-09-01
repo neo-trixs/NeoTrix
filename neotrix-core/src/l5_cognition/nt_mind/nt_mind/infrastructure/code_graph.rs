@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use crate::l5_cognition::nt_mind::nt_mind::graph_types::{
     NodeKind, EdgeKind, GraphNode, GraphEdge,
 };
-use crate::l5_cognition::nt_mind::graph_build::{
+use crate::l5_cognition::nt_mind::nt_mind::graph_build::{
     ParsedItem, parse_rust_file, register_fn_defs, resolve_import,
 };
 

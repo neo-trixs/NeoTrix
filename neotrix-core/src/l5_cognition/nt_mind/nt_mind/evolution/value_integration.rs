@@ -304,9 +304,9 @@ pub mod sleep_integration {
 #[allow(unused_imports)]
     use crate::core::nt_core_bank::ReasoningBank;
 #[allow(unused_imports)]
-    use crate::neotrix::nt_core_signal::core::SelectiveState;
+// //     use crate::core::// nt_core_signal::core::SelectiveState;
 #[allow(unused_imports)]
-    use crate::neotrix::nt_core_signal::select::SelectableOperator;
+// //     use crate::core::// nt_core_signal::select::SelectableOperator;
 
     /// 增强版 SleepEngine：睡眠期触发价值观学习 + 梦境模拟。
     pub struct ValueAwareSleepEngine {
@@ -328,8 +328,8 @@ pub mod sleep_integration {
             &mut self,
             brain: &mut crate::core::nt_core_cap::CapabilityVector,
             bank: &mut crate::core::nt_core_bank::ReasoningBank,
-            operator: &crate::neotrix::nt_core_signal::select::SelectableOperator,
-            state: &mut crate::neotrix::nt_core_signal::core::SelectiveState,
+// //             operator: &crate::core::// nt_core_signal::select::SelectableOperator,
+// //             state: &mut crate::core::// nt_core_signal::core::SelectiveState,
         ) -> crate::neotrix::nt_core_error::NeoTrixResult<SleepResult> {
             // 1. 原有睡眠巩固
             let result = self.inner.sleep(brain, bank, operator, state)?;
@@ -493,9 +493,9 @@ pub mod narrative_integrator_integration {
 #[allow(unused_imports)]
     use crate::core::nt_core_bank::ReasoningBank;
 #[allow(unused_imports)]
-    use crate::neotrix::nt_core_signal::core::SelectiveState;
+// //     use crate::core::// nt_core_signal::core::SelectiveState;
 #[allow(unused_imports)]
-    use crate::neotrix::nt_core_signal::select::SelectableOperator;
+// //     use crate::core::// nt_core_signal::select::SelectableOperator;
 
     /// 增强版 SleepEngine：睡眠期触发价值观学习 + 叙事整合 + 梦境模拟。
     pub struct ValueNarrativeAwareSleepEngine {
@@ -517,8 +517,8 @@ pub mod narrative_integrator_integration {
             &mut self,
             brain: &mut crate::core::nt_core_cap::CapabilityVector,
             bank: &mut crate::core::nt_core_bank::ReasoningBank,
-            operator: &crate::neotrix::nt_core_signal::select::SelectableOperator,
-            state: &mut crate::neotrix::nt_core_signal::core::SelectiveState,
+// //             operator: &crate::core::// nt_core_signal::select::SelectableOperator,
+// //             state: &mut crate::core::// nt_core_signal::core::SelectiveState,
         ) -> crate::neotrix::nt_core_error::NeoTrixResult<SleepResult> {
             // 1. 原有睡眠巩固
             let result = self.inner.sleep(brain, bank, operator, state)?;

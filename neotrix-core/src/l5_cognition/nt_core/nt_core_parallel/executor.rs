@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use crate::neotrix::nt_core_parallel::types::{Task, Agent, AgentId, AllocationStrategy, TodoTask};
+// use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, Agent, AgentId, AllocationStrategy, TodoTask};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExecMode {
@@ -120,13 +120,13 @@ impl OptimalTaskAllocator {
         }
     }
 
-    fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
-        let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-        let na: f64 = a.iter().map(|x| x * x).sum();
-        let nb: f64 = b.iter().map(|x| x * x).sum();
-        if na == 0.0 || nb == 0.0 { return 0.0; }
-        dot / (na.sqrt() * nb.sqrt())
-    }
+//     fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
+//         let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+//         let na: f64 = a.iter().map(|x| x * x).sum();
+//         let nb: f64 = b.iter().map(|x| x * x).sum();
+//         if na == 0.0 || nb == 0.0 { return 0.0; }
+//         dot / (na.sqrt() * nb.sqrt())
+//     }
 
     fn allocate_by_capability(&self, tasks: &[Task], agents: &[Agent]) -> Vec<(AgentId, Vec<usize>)> {
         let mut allocation: Vec<(AgentId, Vec<usize>)> = agents.iter().map(|a| (a.id.clone(), Vec::new())).collect();
@@ -134,7 +134,7 @@ impl OptimalTaskAllocator {
         for (ti, task) in tasks.iter().enumerate() {
             for (ai, agent) in agents.iter().enumerate() {
                 if agent.busy { continue; }
-                scores.push((ti, ai, Self::cosine_similarity(&task.input, &agent.capability)));
+//                 scores.push((ti, ai, Self::cosine_similarity(&task.input, &agent.capability)));
             }
         }
         scores.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(Ordering::Equal));
@@ -172,7 +172,7 @@ impl OptimalTaskAllocator {
         let mut combined: Vec<(AgentId, Vec<usize>)> = agents.iter().map(|a| (a.id.clone(), Vec::new())).collect();
         for (ti, task) in tasks.iter().enumerate() {
             let best = agents.iter().enumerate().map(|(ai, agent)| {
-                let cap = Self::cosine_similarity(&task.input, &agent.capability) * self.capability_weight;
+//                 let cap = Self::cosine_similarity(&task.input, &agent.capability) * self.capability_weight;
                 let load = (1.0 / (combined[ai].1.len() as f64 + 1.0)) * self.load_balance_weight;
                 let tp = agent.throughput * self.throughput_weight;
                 (ai, cap + load + tp)

@@ -31,7 +31,7 @@ use super::nt_io_provider::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
 };
 use crate::l3_embodiment::nt_shield::nt_shield_propagation_guard::PropagationGuard;
-use crate::l3_embodiment::nt_shield::redaction::Redactor;
+// use crate::l3_embodiment::nt_shield::nt_shield::redaction::Redactor;
 use crate::cli::approval::{ActionType, PendingAction};
 use crate::core::nt_core_traits::{NativeTool, ToolOutput};
 
@@ -856,7 +856,7 @@ impl AgentLoop {
         // 使用 L1 NT-SHIELD Redactor (强化现有节点, R-P42): 检测并阻断凭据泄漏
         let redactor = Redactor::new();
         let (risk, hits) = redactor.analyze(&args_text);
-        if risk == crate::l3_embodiment::nt_shield::redaction::RiskLevel::Dangerous {
+        if risk == crate::l3_embodiment::nt_shield::nt_shield::redaction::RiskLevel::Dangerous {
             return Err(format!(
                 "[secret-guard] tool '{}' blocked: potential credential leak in args ({})",
                 name,

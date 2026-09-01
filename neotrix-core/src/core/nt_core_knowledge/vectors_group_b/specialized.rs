@@ -61,7 +61,7 @@ pub(super) fn cap_vec_specialized(s: &KnowledgeSource) -> CapabilityVector {
                 ("hyperdimensional_computing".into(), 0.98),
                 ("kanerva_hdv".into(), 0.97),
                 ("bundle_bind_permute".into(), 0.96),
-                ("cosine_similarity_memory".into(), 0.95),
+//                 ("cosine_similarity_memory".into(), 0.95),
                 ("random_projection".into(), 0.93),
                 ("vsa_binding".into(), 0.92),
                 ("record_keeping".into(), 0.9),

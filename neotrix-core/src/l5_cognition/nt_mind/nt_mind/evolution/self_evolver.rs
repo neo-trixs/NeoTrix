@@ -566,11 +566,11 @@ pub struct AnalysisResult {
 #[cfg(test)]
 mod tests {
 use std::path::PathBuf;
-    use crate::l5_cognition::nt_mind::self_evolver::ComparedItem;
-    use crate::l5_cognition::nt_mind::self_evolver::ComparisonMatrix;
-    use crate::l5_cognition::nt_mind::self_evolver::GapRow;
-    use crate::l5_cognition::nt_mind::self_evolver::GapStatus;
-    use crate::l5_cognition::nt_mind::self_evolver::SelfEvolver;
+    use crate::l5_cognition::nt_mind::nt_mind::self_evolver::ComparedItem;
+    use crate::l5_cognition::nt_mind::nt_mind::self_evolver::ComparisonMatrix;
+    use crate::l5_cognition::nt_mind::nt_mind::self_evolver::GapRow;
+    use crate::l5_cognition::nt_mind::nt_mind::self_evolver::GapStatus;
+    use crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::ReasoningBrain;
     use crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningBank;
     #[test]

@@ -144,6 +144,129 @@ impl LocalInferenceEngine {
         }
     }
     
+    // ═══════════════════════════════════════════════════════════
+    // KB Persistence — 跨 session 记忆优化 profile
+    // ═══════════════════════════════════════════════════════════
+    
+    /// Save optimization profile to disk (TOML in ~/.neotrix/inference_profiles/)
+    pub fn save_profile(&self, profile: &OptimizationProfile) -> Result<(), String> {
+        let dir = neotrix_dirs().join("inference_profiles");
+        std::fs::create_dir_all(&dir).map_err(|e| format!("create dir: {}", e))?;
+        
+        let key = format!("{}_{}", profile.model_name, profile.hardware);
+        let path = dir.join(format!("{}.toml", key));
+        
+        let toml = toml::to_string_pretty(profile)
+            .map_err(|e| format!("serialize: {}", e))?;
+        std::fs::write(&path, toml).map_err(|e| format!("write: {}", e))?;
+        
+        log::info!("[inference] profile saved: {}", path.display());
+        Ok(())
+    }
+    
+    /// Load optimization profile from disk
+    pub fn load_profile(&self, model_name: &str, hardware: &str) -> Option<OptimizationProfile> {
+        let dir = neotrix_dirs().join("inference_profiles");
+        let key = format!("{}_{}", model_name, hardware);
+        let path = dir.join(format!("{}.toml", key));
+        
+        if !path.exists() {
+            return None;
+        }
+        
+        let content = std::fs::read_to_string(&path).ok()?;
+        toml::from_str(&content).ok()
+    }
+    
+    /// Load or create profile (with fallback to defaults)
+    pub fn load_or_create_profile(&mut self, model_name: &str, hardware: &str) -> OptimizationProfile {
+        // Try loading from disk first
+        if let Some(profile) = self.load_profile(model_name, hardware) {
+            log::info!("[inference] loaded cached profile for {} on {}", model_name, hardware);
+            return profile;
+        }
+        
+        // Create new profile with defaults
+        let profile = OptimizationProfile {
+            model_name: model_name.to_string(),
+            hardware: hardware.to_string(),
+            quantization_format: "GGUF".to_string(),
+            quant_level: "Q5_K_M".to_string(),
+            kv_cache_type: "q4_0".to_string(),
+            flash_attention: true,
+            continuous_batching: false,
+            expected_throughput_tok_s: 9.06,
+            memory_requirements_gb: 8.0,
+            e8_reasoning_score: 0.85,
+            gwt_attention_key: format!("infer_{}_{}", model_name, hardware),
+        };
+        
+        // Save for next session
+        let _ = self.save_profile(&profile);
+        profile
+    }
+    
+    /// List all saved profiles
+    pub fn list_profiles() -> Vec<String> {
+        let dir = neotrix_dirs().join("inference_profiles");
+        if !dir.exists() {
+            return Vec::new();
+        }
+        
+        std::fs::read_dir(&dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().map(|ext| ext == "toml").unwrap_or(false))
+                    .filter_map(|e| e.path().file_stem().and_then(|s| s.to_str()).map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+    
+    // ═══════════════════════════════════════════════════════════
+    // KB Integration — SQLite knowledge.db 存储
+    // ═══════════════════════════════════════════════════════════
+    
+    /// Save profile to KB kv_store (cross-device sync ready)
+    pub fn save_profile_to_kb(&self, profile: &OptimizationProfile) -> Result<(), String> {
+        let conn = open_kb_connection()?;
+        let key = format!("{}_{}", profile.model_name, profile.hardware);
+        let value = serde_json::to_string(profile)
+            .map_err(|e| format!("serialize: {}", e))?;
+        
+        crate::core::nt_core_kb_primitives::kv_set(
+            &conn, "inference_profile", &key, &value
+        )?;
+        
+        log::info!("[inference] profile saved to KB: {}", key);
+        Ok(())
+    }
+    
+    /// Load profile from KB kv_store
+    pub fn load_profile_from_kb(&self, model_name: &str, hardware: &str) -> Option<OptimizationProfile> {
+        let conn = open_kb_connection().ok()?;
+        let key = format!("{}_{}", model_name, hardware);
+        
+        let value = crate::core::nt_core_kb_primitives::kv_get(
+            &conn, "inference_profile", &key
+        ).ok()??;
+        
+        serde_json::from_str(&value).ok()
+    }
+    
+    /// List all profiles in KB
+    pub fn list_profiles_from_kb() -> Vec<String> {
+        let conn = match open_kb_connection() {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        
+        crate::core::nt_core_kb_primitives::kv_list(&conn, "inference_profile")
+            .map(|pairs| pairs.into_iter().map(|(k, _)| k).collect())
+            .unwrap_or_default()
+    }
+    
     /// Optimize a model for local inference
     pub async fn optimize_model(
         &mut self,
@@ -213,55 +336,56 @@ impl Default for LocalInferenceEngine {
     }
 }
 
-/// Optimal llama-server command configuration
+/// Optimal llama-server command configuration — 实测最优参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimalServerCmd {
-    pub command: String,
-    pub args: Vec<String>,
-    pub env: Vec<(String, String)>,
-    pub expected_performance: PerformanceExpectation,
-    pub warnings: Vec<String>,
+    pub model: String,
+    pub quant: String,
+    pub ngl: u32,
+    pub ctx: u32,
+    pub batch: u32,
+    pub threads: u32,
+    pub flash_attn: bool,
+    pub kv_cache_type: String,
+    pub use_mlock: bool,
+    pub expected_tok_s: f64,
 }
 
 impl OptimalServerCmd {
-    pub fn default_fallback(model_path: &str) -> Self {
-        Self {
-            command: "llama-server".to_string(),
-            args: vec![
-                "-m".to_string(), model_path.to_string(),
-                "-fa".to_string(), "1".to_string(),
-                "-ngl".to_string(), "99".to_string(),
-                "-ctk".to_string(), "q4_0".to_string(),
-                "-ctv".to_string(), "q4_0".to_string(),
-                "-t".to_string(), "8".to_string(),
-                "-c".to_string(), "4096".to_string(),
-            ],
-            env: vec![],
-            expected_performance: PerformanceExpectation {
-                generation_tok_s: 8.0,
-                prefill_tok_s: 20.0,
-                memory_gb: 8.0,
-                context_tokens: 4096,
-            },
-            warnings: vec!["Using fallback configuration".to_string()],
-        }
+    /// Generate full command line string for llama-server
+    pub fn to_command_string(&self) -> String {
+        format!(
+            "llama-server -m {} -fa {} -ngl {} -ctk {} -ctv {} -t {} -c {} -b {} {}",
+            self.model,
+            if self.flash_attn { "1" } else { "0" },
+            self.ngl,
+            self.kv_cache_type,
+            self.kv_cache_type,
+            self.threads,
+            self.ctx,
+            self.batch,
+            if self.use_mlock { "--load-mode mlock" } else { "" },
+        )
     }
     
-    /// Generate full command line string
-    pub fn to_command_string(&self) -> String {
-        let env_str = self.env.iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<_>>()
-            .join(" ");
-        format!("{} {} {}", env_str, self.command, self.args.join(" "))
+    /// Get model filename from path
+    pub fn model_name(&self) -> &str {
+        self.model.split('/').last().unwrap_or(&self.model)
     }
 }
 
-/// Expected performance metrics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceExpectation {
-    pub generation_tok_s: f64,
-    pub prefill_tok_s: f64,
-    pub memory_gb: f64,
-    pub context_tokens: usize,
+/// Get ~/.neotrix/ directory
+fn neotrix_dirs() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/Users/neo".into());
+    std::path::PathBuf::from(home).join(".neotrix")
+}
+
+/// Open KB connection (SQLite knowledge.db)
+fn open_kb_connection() -> Result<rusqlite::Connection, String> {
+    let db_path = neotrix_dirs().join("knowledge.db");
+    if !db_path.exists() {
+        return Err(format!("KB not found: {}", db_path.display()));
+    }
+    rusqlite::Connection::open(&db_path)
+        .map_err(|e| format!("open KB: {}", e))
 }

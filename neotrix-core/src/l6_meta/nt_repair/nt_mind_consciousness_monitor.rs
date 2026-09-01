@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::core::nt_core_aware::*;
-use crate::neotrix::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
+use crate::core::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
 use crate::neotrix::nt_act_autonomy::awareness_monitor::SelfAwarenessMonitor;
 
 const HISTORY_CAPACITY: usize = 100;

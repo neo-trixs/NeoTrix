@@ -1,7 +1,7 @@
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningMemory;
-use crate::neotrix::nt_core_signal::core::SelectiveState;
-use crate::neotrix::nt_core_signal::select::SelectableOperator;
+// // use crate::core::// nt_core_signal::core::SelectiveState;
+// // use crate::core::// nt_core_signal::select::SelectableOperator;
 
 pub struct HebbianUpdater {
     pub forget_gate_bias: f64,
@@ -32,10 +32,10 @@ impl HebbianUpdater {
         }
     }
 
-    pub fn compute_forget_gate(&self, memory: &ReasoningMemory, state: &SelectiveState) -> f64 {
-        let sim = self.memory_state_similarity(memory, state);
-        (sim + self.forget_gate_bias).clamp(0.1, 0.99)
-    }
+//     pub fn compute_forget_gate(&self, memory: &ReasoningMemory, state: &SelectiveState) -> f64 {
+//         let sim = self.memory_state_similarity(memory, state);
+//         (sim + self.forget_gate_bias).clamp(0.1, 0.99)
+//     }
 
     pub fn compute_input_gate(&self, memory: &ReasoningMemory) -> f64 {
         let reward_gate = (memory.reward + self.input_gate_bias).clamp(0.01, 0.99);
@@ -43,21 +43,21 @@ impl HebbianUpdater {
         (reward_gate * success_boost).clamp(0.01, 0.99)
     }
 
-    pub fn memory_state_similarity(&self, memory: &ReasoningMemory, _state: &SelectiveState) -> f64 {
-        if let Some(ref emb) = memory.embedding {
-            let avg = emb.iter().take(self.dim.min(emb.len())).map(|x| x.abs()).sum::<f64>()
-                / self.dim.min(emb.len()) as f64;
-            avg.clamp(0.0, 1.0)
-        } else {
-            0.3
-        }
-    }
+//     pub fn memory_state_similarity(&self, memory: &ReasoningMemory, _state: &SelectiveState) -> f64 {
+//         if let Some(ref emb) = memory.embedding {
+//             let avg = emb.iter().take(self.dim.min(emb.len())).map(|x| x.abs()).sum::<f64>()
+//                 / self.dim.min(emb.len()) as f64;
+//             avg.clamp(0.0, 1.0)
+//         } else {
+//             0.3
+//         }
+//     }
 
     pub fn hebbian_step(
         &self,
-        state: &mut SelectiveState,
+//         state: &mut SelectiveState,
         memory: &ReasoningMemory,
-        _operator: &SelectableOperator,
+//         _operator: &SelectableOperator,
     ) -> f64 {
         let alpha = self.compute_forget_gate(memory, state);
         let beta = self.compute_input_gate(memory);
@@ -99,7 +99,7 @@ impl HebbianUpdater {
 
     pub fn consolidate_to_capability(
         &self,
-        state: &SelectiveState,
+//         state: &SelectiveState,
         capability: &mut CapabilityVector,
     ) -> f64 {
         let hidden_avg = state.hidden.iter().sum::<f64>() / state.hidden.len().max(1) as f64;
@@ -115,16 +115,16 @@ impl HebbianUpdater {
         delta
     }
 
-    pub fn add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
-        if noise_level <= 0.0 {
-            return;
-        }
-        for (i, h) in state.hidden.iter_mut().enumerate() {
-            let pseudo = ((i * 2654435761) ^ (i << 13) ^ (i >> 7)) as f64 / usize::MAX as f64;
-            let noise = (pseudo - 0.5) * 2.0 * noise_level;
-            *h += noise;
-        }
-    }
+//     pub fn add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {
+//         if noise_level <= 0.0 {
+//             return;
+//         }
+//         for (i, h) in state.hidden.iter_mut().enumerate() {
+//             let pseudo = ((i * 2654435761) ^ (i << 13) ^ (i >> 7)) as f64 / usize::MAX as f64;
+//             let noise = (pseudo - 0.5) * 2.0 * noise_level;
+//             *h += noise;
+//         }
+//     }
 }
 
 #[cfg(test)]
@@ -160,8 +160,8 @@ mod tests {
 
     #[test]
     fn test_hebbian_step_updates_hidden() {
-        let operator = SelectableOperator::new(23, 64);
-        let mut state = SelectiveState::new(23, 64);
+//         let operator = SelectableOperator::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
         let prev_hidden = state.hidden.clone();
         let updater = HebbianUpdater::new(23, 64);
         let mem = dummy_memory(0.8, true, "test1");
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_forget_gate_high_similarity() {
-        let state = SelectiveState::new(23, 64);
+//         let state = SelectiveState::new(23, 64);
         let updater = HebbianUpdater::new(23, 64);
         let mem = dummy_memory(0.9, true, "test2");
 
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_consolidate_to_capability() {
-        let mut state = SelectiveState::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
         for i in 0..state.hidden.len() {
             state.hidden[i] = (i as f64) / 64.0;
         }
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_transition_noise() {
-        let mut state = SelectiveState::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
         let original = state.hidden.clone();
         let updater = HebbianUpdater::new(23, 64);
 
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_zero_noise_no_change() {
-        let mut state = SelectiveState::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
         let original = state.hidden.clone();
         let updater = HebbianUpdater::new(23, 64);
 
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_memory_state_similarity_with_embedding() {
-        let state = SelectiveState::new(23, 64);
+//         let state = SelectiveState::new(23, 64);
         let updater = HebbianUpdater::new(23, 64);
         let mem = dummy_memory(0.5, true, "sim_test");
         let sim = updater.memory_state_similarity(&mem, &state);
@@ -240,8 +240,8 @@ mod tests {
 
     #[test]
     fn test_hebbian_step_delta_decreases_with_low_reward() {
-        let operator = SelectableOperator::new(23, 64);
-        let mut state = SelectiveState::new(23, 64);
+//         let operator = SelectableOperator::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
         let updater = HebbianUpdater::new(23, 64);
 
         let high = updater.hebbian_step(&mut state, &dummy_memory(0.9, true, "h"), &operator);

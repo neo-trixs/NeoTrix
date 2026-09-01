@@ -660,7 +660,7 @@ impl BackgroundLoop {
                 // P1: 启动时从 KB 恢复派单学习证据 — 派单统计跨会话存活。
                 // P3: 同时恢复 MANTA 派单拓扑 (域→档案边, 跨轮 playbook)。
                 // P4: 同时恢复 MAGE 四子图共进化图谱 + 任务级搜索 bandit。
-                let mut shell = crate::l5_cognition::nt_mind::MetaAgentShell::new("dialogue");
+                let mut shell = crate::l5_cognition::nt_mind::nt_mind::MetaAgentShell::new("dialogue");
                 if let Some(ref kb_ref) = kb {
                     if let Err(e) = shell.learner.load(kb_ref) {
                         log::warn!("[bg-meta] route_learner load failed: {}", e);
@@ -956,7 +956,7 @@ pub struct BackgroundLoopHandle {
     /// 让星系派单从仪式变控制面。researcher→搜索, explorer→检索, 等。
     agent_executor: Option<crate::l5_cognition::nt_mind::ProductionAgentExecutor>,
     /// 元认知 agent 外壳 — 对话事件刺激注意力域后按路由跑内核 cycle。
-    meta_shell: Option<crate::l5_cognition::nt_mind::MetaAgentShell>,
+    meta_shell: Option<crate::l5_cognition::nt_mind::nt_mind::MetaAgentShell>,
     kb: Option<Arc<KnowledgeBase>>,
     /// 跨会话模式挖掘 (nexus-weaver) — 定期扫描 experience 命名空间识别跨会话模式。
     nexus_weaver: crate::l5_cognition::nt_mind::experience_tree::NexusWeaverScheduler,
@@ -1174,7 +1174,7 @@ impl BackgroundLoopHandle {
 
 #[cfg(test)]
 mod tests {
-    use crate::l5_cognition::nt_mind::panorama_pipeline::PanoramaPipeline;
+    use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
     use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     use crate::neotrix::nt_world_model_v2::WorldModelV2;

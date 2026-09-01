@@ -70,9 +70,6 @@ pub use crate::l1_action::nt_memory::{
     nt_memory_historian, nt_memory_kb, nt_memory_leann_store, nt_memory_spatial,
 };
 
-// L1 Action — agent re-exports
-pub use crate::l1_action::nt_io::nt_io_provider;
-
 // L2 Perception — nt_world re-exports
 pub use crate::l2_perception::nt_world::{
     nt_world_browse, nt_world_browse_auto, nt_world_code_search, nt_world_crawl, nt_world_e8,
@@ -82,32 +79,26 @@ pub use crate::l2_perception::nt_world::{
 
 // L3 Embodiment — nt_shield re-exports
 pub use crate::l3_embodiment::nt_shield::{
-    nt_shield, nt_shield_audit, nt_shield_comm, nt_shield_sandbox, nt_shield_sandbox_entry,
-    nt_shield_sentry, nt_shield_stealth_net, nt_shield_traffic, nt_shield_agentic_scan,
+    nt_shield_audit, nt_shield_comm, nt_shield_sandbox,
+    nt_shield_sentry, nt_shield_traffic, nt_shield_agentic_scan,
 };
+#[cfg(feature = "sandbox")]
+pub use crate::l3_embodiment::nt_shield::nt_shield_sandbox_entry;
+#[cfg(feature = "stealth-net")]
+pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net;
 
 // L5 Cognition — nt_mind re-exports
 pub use crate::l5_cognition::nt_mind::{
     nt_mind_autofixer, nt_mind_background_config, nt_mind_background_loop,
     nt_mind_benchmark, nt_mind_cleanup, nt_mind_distiller, nt_mind_evolution_daemon,
     nt_mind_evolution_loop, nt_mind_hook, nt_mind_knowledge_pipeline, nt_mind_memory,
-    nt_mind_self_diagnose, nt_mind_skill_engine,
+    nt_mind_skill_engine,
 };
-
-// L5 Cognition — nt_core re-exports
-pub use crate::l5_cognition::nt_core::{nt_core_kernel, nt_core_parallel};
-
-// L5 Cognition — consciousness re-exports
-pub use crate::l5_cognition::nt_core::{nt_core_fep_iit, nt_core_iit_phi, nt_core_signal};
 
 // L6 Meta — re-exports
 pub use crate::l6_meta::nt_meta::nt_core_intra_reflection;
 pub use crate::l6_meta::nt_repair::{
     nt_mind_consciousness_gold_standard, nt_mind_consciousness_monitor,
-    nt_repair_causal_trace, nt_repair_self_heal,
-};
-pub use crate::l6_meta::nt_nexus::{
-    consonance_orchestrator, meta_observer, transcendent_loop,
 };
 
 // ─── Specific type re-exports ───────────────────────────────────────────

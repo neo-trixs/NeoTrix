@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
-use crate::l1_action::nt_memory::nt_memory_kb::pipeline::AbsorbEntry;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 /// 意识核心快照 — 可序列化的跨会话状态 (标量集合 + 果实记录, 不序列化整树)。

@@ -19,3 +19,8 @@ pub mod nt_shield_sentry;
 pub mod nt_shield_stealth_net;
 
 pub mod nt_shield_traffic;
+
+// 安全增强模块
+pub mod nt_shield_threat_detection;
+pub mod nt_shield_adversarial;
+pub mod nt_shield_osint;

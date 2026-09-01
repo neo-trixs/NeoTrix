@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
-use crate::neotrix::nt_core_parallel::types::{Task, AgentId, AllocationStrategy};
+// use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, AgentId, AllocationStrategy};
 use crate::l1_action::nt_io::nt_io_provider::context_budget::estimate_tokens;
 
 pub trait ReasoningProvider: Send + Sync {
     fn reason(&mut self, task: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
 }
-use crate::neotrix::nt_core_parallel::executor::{ParallelExecutor, OptimalTaskAllocator};
+// use crate::l5_cognition::nt_core::nt_core_parallel::executor::{ParallelExecutor, OptimalTaskAllocator};
 
 #[derive(Debug, Clone)]
 pub struct AgentResult {
@@ -63,7 +63,7 @@ impl MultiAgentCoordinator {
 
         let agent_refs: Vec<_> = self.agents.iter().map(|a| (a.id.clone(), a.capability.clone(), a.throughput)).collect();
         let agents: Vec<_> = agent_refs.iter().map(|(id, _, _tp)| {
-            crate::neotrix::nt_core_parallel::types::Agent::new(id.clone())
+//             crate::l5_cognition::nt_core::nt_core_parallel::types::Agent::new(id.clone())
         }).collect();
 
         let allocation = self.allocator.allocate(tasks, &agents);
@@ -154,11 +154,11 @@ impl MultiAgentCoordinator {
             .unwrap_or(1)
             .max(1);
 
-        let candidates: Vec<crate::neotrix::nt_core_parallel::Candidate> = results
+//         let candidates: Vec<crate::l5_cognition::nt_core::nt_core_parallel::Candidate> = results
             .iter()
             .map(|r| {
                 let feat = capability_of.get(&r.agent_id).cloned().unwrap_or_default();
-                crate::neotrix::nt_core_parallel::Candidate::new(
+//                 crate::l5_cognition::nt_core::nt_core_parallel::Candidate::new(
                     &format!("{}#{}", r.agent_id, r.task_index),
                     if r.success { 1.0 } else { 0.0 },
                     feat,
@@ -166,7 +166,7 @@ impl MultiAgentCoordinator {
             })
             .collect();
 
-        let selector = crate::neotrix::nt_core_parallel::DppSelector::new(max_dim);
+//         let selector = crate::l5_cognition::nt_core::nt_core_parallel::DppSelector::new(max_dim);
         let winners = selector.merge_winners(&candidates, keep);
         let winner_ids: std::collections::HashSet<String> =
             winners.iter().map(|w| w.id.clone()).collect();
@@ -358,7 +358,7 @@ impl StagedContextOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::nt_core_parallel::types::Task;
+//     use crate::l5_cognition::nt_core::nt_core_parallel::types::Task;
 
     #[tokio::test]
     async fn test_coordinator_empty_tasks() {

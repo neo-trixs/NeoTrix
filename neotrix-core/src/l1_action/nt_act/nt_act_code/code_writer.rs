@@ -9,7 +9,7 @@ use super::semantic_entropy::SemanticEntropyGate;
 use super::semantic_entropy::SemanticEntropy;
 use super::template_registry::{CodeTemplateRegistry, TemplateCategory};
 
-use crate::l1_action::nt_act::nt_l1_shared_types::ActionPlan;
+// use crate::l1_action::nt_act::nt_l1_shared_types::ActionPlan;
 
 /// N‑gram based content entropy detector — measures code generation uncertainty
 /// via Shannon entropy of token n‑gram distribution.
@@ -320,7 +320,7 @@ impl SelfCodeWriter {
         let lines: Vec<&str> = req.context.lines().collect();
         let suggestions: Vec<String> = Vec::new();
 
-        // 找 mod / impl / pub fn 作为拆分候选
+// // 找 mod / impl / pub fn 作为拆分候选
         for line in lines.iter() {
             let t = line.trim();
             if t.starts_with("pub fn ") || t.starts_with("fn ") {
@@ -466,7 +466,7 @@ mod tests {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
             plan: ActionPlan::HumanDecision {
-                issue_type: crate::l1_action::nt_act::nt_l1_shared_types::IssueType::TodoLeftovers,
+//                 issue_type: crate::l1_action::nt_act::nt_l1_shared_types::IssueType::TodoLeftovers,
                 file: None,
                 reason: "test".into(),
             },

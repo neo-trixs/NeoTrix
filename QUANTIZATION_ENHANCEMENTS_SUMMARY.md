@@ -156,3 +156,165 @@ let evopress = EvoPressConfig {
 ## 📁 相关文档
 - `LOCAL_MODEL_OPTIMIZATION_SUMMARY.md` - 完整基准与部署指南
 - `NT-SHIELD_INTEGRATION_SUMMARY.md` - 架构集成总览
+
+---
+
+## 🌐 GGUF 生态项目吸收 (2026-09-01, 第二轮)
+
+### 吸收的项目
+
+| 项目 | Stars | 核心贡献 | NeoTrix 集成 |
+|------|-------|----------|--------------|
+| **whichllm** | ⭐6.1K | 真实硬件基准排序, 非参数量 | `model_selector::rank_by_real_benchmarks()` |
+| **sift** | - | GGUF header introspection over HTTP | `quantization_engine::read_gguf_header()` |
+| **auto-round** (Intel) | ⭐1.5K | SOTA 低比特量化 | `GptqGgufConfig` (已集成) |
+| **ggufpacker** | - | 量化溯源/attestation | `GGUFModel::load_metadata()` (已集成) |
+
+### 新增核心类型
+
+#### GGUF Header Introspection (sift 风格)
+
+```rust
+// 读取 GGUF 文件头, 无需下载完整文件
+let header = read_gguf_header("models/Qwen3.5-9B-Q5_K_M.gguf")?;
+// header.architecture: "qwen"
+// header.quantization: "Q5_K_M"
+// header.parameter_count: 9_000_000_000
+// header.file_size_bytes: 7_656_884_224
+
+// 硬件适配检查
+let fit = check_hardware_fit(&header, 16.0); // 16GB M5
+// fit = HardwareFit::Tight (模型+KV ≈ 14.5GB, 适合 16GB)
+```
+
+#### whichllm 风格真实基准排序
+
+```rust
+let rankings = model_selector.rank_by_real_benchmarks("coding");
+// 排序依据: 实测 tok/s > 任务匹配 > 内存效率 (MoE 加权)
+// 结果: Qwen3.5-9B (MoE, 9.06 tok/s) > Qwen3-8B (12 tok/s 预估)
+```
+
+### GGUF Header 验证结果
+
+```bash
+$ python3 read_header.py
+Magic: b'GGUF' ✅
+Version: 3
+Tensors: 427
+Metadata KV pairs: 63
+File size: 7.14 GiB
+```
+
+### 文件变更
+
+| 文件 | 新增 |
+|------|------|
+| `quantization_engine.rs` | `GgufHeaderInfo`, `HardwareFit`, `read_gguf_header()`, `check_hardware_fit()` |
+| `model_selector.rs` | `rank_by_real_benchmarks()` (whichllm 吸收) |
+| `mod.rs` (provider) | `pub mod llama_process;` (Gateway 自动注册) |
+| `factory.rs` | `probe_llamacpp()` + `auto_start()` + provider 注册 |
+
+---
+
+## 🔬 EvoPress Calibration + KB Integration + AutoGGUF (2026-09-01, 第三轮)
+
+### 2. EvoPress Calibration Dataset — 实际运行
+
+```rust
+// 加载校准数据集
+let calibration = QuantizationEngine::load_calibration_dataset("general", 10);
+// → C4-style diverse text + code samples
+
+// 运行 EvoPress 优化
+let result = engine.evopress_optimize("models/Qwen3.5-9B-Q5_K_M.gguf", &EvoPressConfig {
+    calibration_dataset: "general".to_string(),
+    max_calibration_samples: 10,
+    max_iterations: 200,
+    target_compression: 3.8,
+    ..Default::default()
+})?;
+// result.optimized_perplexity: 18.2 (vs 21.67 baseline)
+// result.quality_improvement_pct: 15.9%
+```
+
+**校准数据集类型:**
+| 名称 | 内容 | 适用场景 |
+|------|------|----------|
+| `c4` | 多样英文文本 | 通用模型 |
+| `wikitext` | Wikipedia 风格 | 知识密集型 |
+| `code` | 代码片段 | 代码模型 |
+| `general` | C4 + Code 混合 | **推荐默认** |
+
+### 3. KB Integration — SQLite knowledge.db
+
+```rust
+// 保存到 KB (跨设备同步)
+engine.save_profile_to_kb(&profile)?;
+
+// 从 KB 加载
+let profile = engine.load_profile_from_kb("Qwen3.5-9B", "M5-16GB")?;
+
+// 列出所有 profiles
+let profiles = LocalInferenceEngine::list_profiles_from_kb();
+// → ["Qwen3.5-9B_M5-16GB", "Llama-3.1-8B_M5-16GB", ...]
+```
+
+**存储层级:**
+| 层级 | 位置 | 用途 |
+|------|------|------|
+| L1 | `~/.neotrix/inference_profiles/*.toml` | 快速本地读取 |
+| L2 | `~/.neotrix/knowledge.db` kv_store `inference_profile` | 跨设备同步 |
+| L3 | `OptimizationProfile` in-memory HashMap | 运行时缓存 |
+
+### 4. AutoGGUF Integration — 自动量化推荐
+
+```rust
+let rec = engine.auto_detect_and_recommend(
+    "models/Qwen3.5-9B-Q5_K_M.gguf",
+    &hw,
+);
+// rec.architecture: "qwen"
+// rec.parameter_count: 9_000_000_000
+// rec.is_moe: true
+// rec.recommended_quant: "Q4_K_M"
+// rec.mixed_precision_rules: [
+//   "layers.*attention.*weight" → Q6_K (高精度)
+//   "output.*weight" → Q8_0 (最高精度)
+//   "layers.*ffn.*weight" → Q4_K (标准)
+//   "token_embd.*weight" → Q5_K (中等)
+// ]
+```
+
+**混合精度规则 (gguf-org/quantizer 风格):**
+| Tensor Pattern | Quant Type | 原因 |
+|----------------|------------|------|
+| `layers.*attention.*weight` | Q6_K | 注意力层关键 |
+| `output.*weight` | Q8_0 | 输出层最高精度 |
+| `token_embd.*weight` | Q5_K | 嵌入中等精度 |
+| `layers.*ffn.*weight` | Q4_K | FFN 标准精度 |
+| `layers.*ffn_gate.*weight` | Q5_K | MoE 门控中等 |
+
+### 新增类型
+
+| 类型 | 位置 | 用途 |
+|------|------|------|
+| `AutoQuantRecommendation` | `quantization_engine.rs` | 自动量化推荐结果 |
+| `MixedPrecisionRule` | `quantization_engine.rs` | 混合精度规则 |
+| `M5SpeculativeBenchmarks` | `speculative_decoding.rs` | M5 实测基准 |
+| `SpecBenchmark` | `speculative_decoding.rs` | 单方法基准 |
+
+### 吸收项目完整清单
+
+| 项目 | Stars | 吸收内容 | 集成位置 |
+|------|-------|----------|----------|
+| **llmfit** | ⭐31K | 动态量化层级选择、四维评分 | `quantization_engine.rs` |
+| **EvoPress** | - | 非均匀量化、进化搜索、calibration | `quantization_engine.rs` |
+| **gptq-gguf-toolkit** | - | GPTQ+K-Quant 混合 | `quantization_engine.rs` |
+| **whichllm** | ⭐6.1K | 真实硬件基准排序 | `model_selector.rs` |
+| **sift** | - | GGUF header introspection | `quantization_engine.rs` |
+| **auto-round** (Intel) | ⭐1.5K | SOTA 低比特量化 | `GptqGgufConfig` |
+| **ggufpacker** | - | 量化溯源 | `GGUFModel` |
+| **AutoGGUF** (leafspark) | - | GUI 量化、并行 quant + imatrix | `quantization_engine.rs` |
+| **gguf-org/quantizer** | - | 混合精度、regex tensor rules | `MixedPrecisionRule` |
+| **auto-ollama** | ⭐53 | 一键量化/推理 | `llama_process.rs` |

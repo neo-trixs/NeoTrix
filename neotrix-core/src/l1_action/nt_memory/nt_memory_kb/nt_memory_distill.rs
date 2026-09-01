@@ -135,7 +135,7 @@ pub fn sample_training_pairs(
     pairs: usize,
     seed: u64,
 ) -> (Vec<(Vec<f32>, Vec<f32>, f64)>, usize) {
-    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::cosine_similarity;
+//     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::cosine_similarity;
     if embeddings.len() < 2 {
         return (Vec::new(), 0);
     }
@@ -153,7 +153,7 @@ pub fn sample_training_pairs(
         let b = rng() % embeddings.len();
         let (_, va) = &embeddings[a];
         let (_, vb) = &embeddings[b];
-        let teacher = cosine_similarity(va, vb);
+//         let teacher = cosine_similarity(va, vb);
         samples.push((va.clone(), vb.clone(), teacher));
     }
         (samples, dim)
@@ -295,7 +295,7 @@ mod tests {
             .map(|i| {
                 let q = make_vec(dim, i as u64 + 10);
                 let d = make_vec(dim, i as u64 + 100);
-                let teacher = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::cosine_similarity(&q, &d);
+//                 let teacher = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::cosine_similarity(&q, &d);
                 (q, d, teacher)
             })
             .collect();

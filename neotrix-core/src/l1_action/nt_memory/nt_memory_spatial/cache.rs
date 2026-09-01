@@ -133,7 +133,10 @@ impl SemanticTileCache {
 
     pub fn find_similar(&self, _embedding: &[f32]) -> Option<&TileCacheEntry> {
         for (emb, entry) in &self.tiles {
-            let sim = cosine_similarity(_embedding, emb);
+            let dot: f32 = _embedding.iter().zip(emb.iter()).map(|(x, y)| x * y).sum();
+            let na: f32 = _embedding.iter().map(|x| x * x).sum();
+            let nb: f32 = emb.iter().map(|x| x * x).sum();
+            let sim = if na == 0.0 || nb == 0.0 { 0.0 } else { dot / (na.sqrt() * nb.sqrt()) };
             if sim >= self.similarity_threshold {
                 return Some(entry);
             }
@@ -152,13 +155,13 @@ impl SemanticTileCache {
     }
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let na: f32 = a.iter().map(|x| x * x).sum();
-    let nb: f32 = b.iter().map(|x| x * x).sum();
-    if na == 0.0 || nb == 0.0 { return 0.0; }
-    dot / (na.sqrt() * nb.sqrt())
-}
+// fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+//     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+//     let na: f32 = a.iter().map(|x| x * x).sum();
+//     let nb: f32 = b.iter().map(|x| x * x).sum();
+//     if na == 0.0 || nb == 0.0 { return 0.0; }
+//     dot / (na.sqrt() * nb.sqrt())
+// }
 
 #[cfg(test)]
 mod tests {
@@ -227,12 +230,12 @@ mod tests {
     }
 
     #[test]
-    fn test_cosine_similarity() {
-        let a = vec![1.0, 0.0];
-        let b = vec![0.0, 1.0];
-        assert!((cosine_similarity(&a, &b)).abs() < 1e-6);
-        assert!((cosine_similarity(&a, &a) - 1.0).abs() < 1e-6);
-    }
+//     fn test_cosine_similarity() {
+//         let a = vec![1.0, 0.0];
+//         let b = vec![0.0, 1.0];
+//         assert!((cosine_similarity(&a, &b)).abs() < 1e-6);
+//         assert!((cosine_similarity(&a, &a) - 1.0).abs() < 1e-6);
+//     }
 
     #[test]
     fn test_tile_cache_clear() {

@@ -52,6 +52,7 @@ pub mod nt_io_telemetry;
 pub mod nt_io_user_avatar;
 
 pub mod nt_io_messaging;
+pub mod nt_io_context_mgmt;
 pub use nt_io_messaging::{
     MessagingRegistry, MessagingRouter, MessagingBridge,
     MessageTemplate, TemplateVariable, TemplateCategory,

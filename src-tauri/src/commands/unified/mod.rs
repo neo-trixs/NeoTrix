@@ -7,9 +7,8 @@ use tauri::{command, State};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::stub::{
-    UnifiedApi, UnifiedApiImpl, UnifiedRequest, UnifiedResponse, UnifiedError,
-    RequestContext, ResponseMode, SessionInfo, MessageType, ResponseMetadata, ConsciousnessState,
-    ResponsePayload,
+    UnifiedApi, UnifiedApiImpl, UnifiedRequest, UnifiedResponse,
+    RequestContext, ResponseMode, SessionInfo,
 };
 
 // 统一 API 状态
@@ -40,7 +39,7 @@ pub async fn unified_chat(
             selected_code: c.selected_code,
             open_file: c.open_file,
             git_status: c.git_status,
-            metadata: c.metadata.unwrap_or_default(),
+            metadata: c.metadata.map(|m| m.into_iter().collect()).unwrap_or_default(),
         }),
         mode: match request.mode.as_deref() {
             Some("code") => ResponseMode::Code,
@@ -66,8 +65,6 @@ pub async fn unified_chat_stream(
     state: State<'_, UnifiedApiState>,
     request: UnifiedChatRequest,
 ) -> Result<String, String> {
-    let api = state.read().await;
-
     let unified_request = UnifiedRequest {
         session_id: request.session_id,
         input: request.input,
@@ -77,7 +74,7 @@ pub async fn unified_chat_stream(
             selected_code: c.selected_code,
             open_file: c.open_file,
             git_status: c.git_status,
-            metadata: c.metadata.unwrap_or_default(),
+            metadata: c.metadata.map(|m| m.into_iter().collect()).unwrap_or_default(),
         }),
         mode: match request.mode.as_deref() {
             Some("code") => ResponseMode::Code,
@@ -93,7 +90,9 @@ pub async fn unified_chat_stream(
     };
 
     let stream_id = uuid::Uuid::new_v4().to_string();
+    let api_arc = state.inner().clone();
     tokio::spawn(async move {
+        let api = api_arc.read().await;
         let _ = api.handle_stream(unified_request).await;
     });
 

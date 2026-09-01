@@ -341,10 +341,10 @@ impl SelfReferentialCheck {
             };
         }
 
-        let cos_sim = cosine_similarity(current_latent, &new_latent);
+//         let cos_sim = cosine_similarity(current_latent, &new_latent);
         let centroid = archive_centroid(archive, dim);
-        let centroid_sim_before = cosine_similarity(current_latent, &centroid);
-        let centroid_sim_after = cosine_similarity(&new_latent, &centroid);
+//         let centroid_sim_before = cosine_similarity(current_latent, &centroid);
+//         let centroid_sim_after = cosine_similarity(&new_latent, &centroid);
         let consistency_loss = (centroid_sim_before - centroid_sim_after).abs();
 
         if cos_sim < self.min_self_consistency && consistency_loss > 0.3 {
@@ -402,15 +402,15 @@ fn cosine_distance_to_euclidean(a: &[f64], b: &[f64]) -> f64 {
     val.sqrt()
 }
 
-fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
-    let dim = a.len().min(b.len());
-    if dim == 0 { return 0.0; }
-    let dot: f64 = (0..dim).map(|i| a[i] * b[i]).sum();
-    let na: f64 = (0..dim).map(|i| a[i] * a[i]).sum::<f64>().sqrt();
-    let nb: f64 = (0..dim).map(|i| b[i] * b[i]).sum::<f64>().sqrt();
-    if na < 1e-12 || nb < 1e-12 { return 0.0; }
-    (dot / (na * nb)).clamp(-1.0, 1.0)
-}
+// fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
+//     let dim = a.len().min(b.len());
+//     if dim == 0 { return 0.0; }
+//     let dot: f64 = (0..dim).map(|i| a[i] * b[i]).sum();
+//     let na: f64 = (0..dim).map(|i| a[i] * a[i]).sum::<f64>().sqrt();
+//     let nb: f64 = (0..dim).map(|i| b[i] * b[i]).sum::<f64>().sqrt();
+//     if na < 1e-12 || nb < 1e-12 { return 0.0; }
+//     (dot / (na * nb)).clamp(-1.0, 1.0)
+// }
 
 fn archive_centroid(archive: &HyperAgentArchive, dim: usize) -> Vec<f64> {
     if archive.records.is_empty() || dim == 0 {

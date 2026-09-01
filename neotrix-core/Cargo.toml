@@ -95,6 +95,7 @@ async-trait = "0.1"
 rmcp = { version = "1.4", features = ["server", "macros"] }
 lru = "0.18"
 hex = "0.4"
+lazy_static = "1.4"
 blake2 = "0.10"
 bytes = "1"
 ed25519-dalek = { version = "1.0", features = ["rand", "legacy_compatibility"] }

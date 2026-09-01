@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::agent::tool::mcp::{McpToolDef, McpTransport};
+// use crate::agent::tool::mcp::{McpToolDef, McpTransport};
 
 const DEFAULT_MAX_HISTORY: usize = 1000;
 const DEFAULT_MAX_CALLS_PER_MINUTE: usize = 30;
@@ -431,7 +431,7 @@ fn scan_secrets_handler(ctx: &SecurityMcpContext) -> Result<SecurityMcpResponse,
     // 此前 SecretCollector 只有测试调用, 属剧场模块; 此处挂入 scan_secrets 工具生产路径。
     let path = std::path::Path::new(target);
     if !target.is_empty() && path.exists() {
-        use crate::l3_embodiment::nt_shield::nt_shield_secret_collector::SecretCollector;
+//         use crate::l3_embodiment::nt_shield::nt_shield_secret_collector::SecretCollector;
         let collector = SecretCollector::new();
         let report = collector.collect(if path.is_dir() { Some(path) } else { None });
         let mut findings = Vec::new();

@@ -2,11 +2,11 @@
 //!
 //! 当前只保留 unified + PTY 命令，其他旧命令模块暂不编译（依赖 neotrix crate）。
 
+#![allow(dead_code)]
+
 pub mod pty;
 pub mod unified;
-
-// Re-export unified commands
-pub use unified::*;
+pub mod domain_cmd;
 
 // ========== Types (shared) ==========
 

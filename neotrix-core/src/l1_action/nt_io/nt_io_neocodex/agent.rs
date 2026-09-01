@@ -123,7 +123,7 @@ pub struct NeoCodexAgent {
     // agent gains a `mcp_call` tool proxying to the registry; previously the
     // MCP host existed only for CLI/headless and the NeoCodex agent could not
     // call MCP tools despite the desktop UI having zero MCP surface.
-    pub mcp: Option<crate::l1_action::nt_agent_mcp_registry::McpRegistry>,
+    pub mcp: Option<crate::l1_action::// nt_agent_mcp_registry::McpRegistry>,
 }
 
 impl NeoCodexAgent {
@@ -153,7 +153,7 @@ impl NeoCodexAgent {
     /// P2-5: attach the shared MCP registry so the agent can call MCP tools.
     pub fn with_mcp(
         mut self,
-        mcp: crate::l1_action::nt_agent_mcp_registry::McpRegistry,
+        mcp: crate::l1_action::// nt_agent_mcp_registry::McpRegistry,
     ) -> Self {
         self.mcp = Some(mcp);
         self
@@ -161,7 +161,7 @@ impl NeoCodexAgent {
 
     pub fn set_mcp(
         &mut self,
-        mcp: Option<crate::l1_action::nt_agent_mcp_registry::McpRegistry>,
+        mcp: Option<crate::l1_action::// nt_agent_mcp_registry::McpRegistry>,
     ) {
         self.mcp = mcp;
     }

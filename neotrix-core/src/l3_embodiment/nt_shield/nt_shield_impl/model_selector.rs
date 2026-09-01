@@ -388,6 +388,43 @@ impl ModelSelector {
             })
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // whichllm (⭐6.1K) 吸收: 真实硬件基准排序, 不靠参数量
+    // ═══════════════════════════════════════════════════════════
+
+    /// Rank models by real benchmarks (whichllm 风格), not parameter count
+    /// Sorts by: actual_tok_s > task_fit > memory_efficiency
+    pub fn rank_by_real_benchmarks(&self, task: &str) -> Vec<(&ModelInfo, f64)> {
+        let mut scored: Vec<(&ModelInfo, f64)> = self.known_models.values()
+            .map(|m| {
+                // Real benchmark score (M5 16GB actual tok/s)
+                let bench_score = m.estimated_m5_16gb_toks.unwrap_or(0.0) * 10.0;
+                
+                // Task relevance (whichllm: "recency-aware benchmarks")
+                let task_score = if m.best_for.contains(&task.to_string()) {
+                    20.0
+                } else if m.best_for.iter().any(|t| t == "general") {
+                    10.0
+                } else {
+                    0.0
+                };
+                
+                // Memory efficiency: active_params / file_size (MoE bonus)
+                let mem_eff = if m.is_moe {
+                    (m.active_params_b / m.file_size_int4_gb) * 5.0
+                } else {
+                    (m.parameter_count as f64 / 1e9 / m.file_size_int4_gb) * 3.0
+                };
+                
+                let total = bench_score + task_score + mem_eff;
+                (m, total)
+            })
+            .collect();
+        
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored
+    }
+
     /// Estimate model file size
     pub fn estimate_model_size(&self, model_name: &str) -> f64 {
         self.known_models.get(model_name)

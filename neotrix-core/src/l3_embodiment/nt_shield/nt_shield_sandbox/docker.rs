@@ -204,7 +204,7 @@ impl LocalDockerProvider {
 /// Render docker args for logging with secret values masked (Redactor).
 /// Env values are never logged raw — only after secret redaction.
 fn redact_docker_args(args: &[String]) -> String {
-    crate::l3_embodiment::nt_shield::redaction::redact_secrets(&args.join(" "))
+    crate::l3_embodiment::nt_shield::nt_shield::redaction::redact_secrets(&args.join(" "))
 }
 
 #[async_trait]

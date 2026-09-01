@@ -5,7 +5,7 @@ use super::types::{
     extract_authors, extract_categories, extract_xml, strip_html, urlencoding,
 };
 use crate::l5_cognition::nt_mind::nt_mind::embedding::TextEmbedder;
-use crate::neotrix::nt_core_signal::ops::cosine_similarity;
+// // use crate::core::// nt_core_signal::ops::cosine_similarity;
 
 pub struct LiteratureSearcher {
     #[allow(dead_code)] // kept for future embedding-based reranking
@@ -167,7 +167,7 @@ impl KnowledgeEngine {
                 let mut score = 0.0f64;
 
                 if let Some(ev) = &e.embedding {
-                    score += cosine_similarity(&qv, ev) * 0.4;
+//                     score += cosine_similarity(&qv, ev) * 0.4;
                 }
 
                 let title_lower = e.title.to_lowercase();

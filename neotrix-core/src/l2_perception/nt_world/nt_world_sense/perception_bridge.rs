@@ -1,6 +1,6 @@
 //! # Perception Bridge
 //!
-//! 连接 SensoryIntegrationHub (L2 感知层) 和 SelectiveState (L5 意识层)。
+// //! 连接 SensoryIntegrationHub (L2 感知层) 和 SelectiveState (L5 意识层)。
 //! 使用 awareness_score() 作为注意力门控:
 //! - 高觉醒度 → 处理更多感知事件
 //! - 低觉醒度 → 过滤低重要性事件
@@ -11,7 +11,7 @@
 //! - 内联关键路径函数
 
 use crate::core::nt_core_sense::{SensoryEvent, SensoryEventKind};
-use crate::l4_emotion::nt_feel::nt_core_signal::core::SelectiveState;
+// // use crate::l4_emotion::nt_feel::// nt_core_signal::core::SelectiveState;
 
 /// 事件类型索引 (用于静态权重表)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -77,29 +77,29 @@ impl PerceptionBridge {
         self.custom_weights.insert(idx, weight.clamp(0.0, 1.0));
     }
 
-    /// 门控过滤: 根据 SelectiveState 的觉醒度决定是否处理事件
+//     /// 门控过滤: 根据 SelectiveState 的觉醒度决定是否处理事件
     #[inline]
-    pub fn gate_event(&self, event: &SensoryEvent, state: &SelectiveState) -> bool {
-        let awareness = state.awareness_score();
-        let event_importance = self.get_event_importance(event);
-
-        // 高觉醒度 → 降低门控阈值 → 更多事件通过
-        // 低觉醒度 → 提高门控阈值 → 只有高重要性事件通过
-        let effective_threshold = self.attention_threshold * (1.0 - awareness * 0.5);
-
-        event_importance >= effective_threshold
-    }
+//     pub fn gate_event(&self, event: &SensoryEvent, state: &SelectiveState) -> bool {
+//         let awareness = state.awareness_score();
+//         let event_importance = self.get_event_importance(event);
+// 
+//         // 高觉醒度 → 降低门控阈值 → 更多事件通过
+//         // 低觉醒度 → 提高门控阈值 → 只有高重要性事件通过
+//         let effective_threshold = self.attention_threshold * (1.0 - awareness * 0.5);
+// 
+//         event_importance >= effective_threshold
+//     }
 
     /// 批量门控过滤 (预分配结果 Vec)
-    pub fn gate_events(&self, events: &[SensoryEvent], state: &SelectiveState) -> Vec<SensoryEvent> {
-        let mut result = Vec::with_capacity(events.len());
-        for event in events {
-            if self.gate_event(event, state) {
-                result.push(event.clone());
-            }
-        }
-        result
-    }
+//     pub fn gate_events(&self, events: &[SensoryEvent], state: &SelectiveState) -> Vec<SensoryEvent> {
+//         let mut result = Vec::with_capacity(events.len());
+//         for event in events {
+//             if self.gate_event(event, state) {
+//                 result.push(event.clone());
+//             }
+//         }
+//         result
+//     }
 
     /// 获取事件重要性权重 (内联优化)
     #[inline]
@@ -144,7 +144,7 @@ mod tests {
     fn test_gate_high_awareness() {
         let bridge = PerceptionBridge::new();
         let event = make_visual_event(8);
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.8; 8];
 
         assert!(bridge.gate_event(&event, &state));
@@ -154,7 +154,7 @@ mod tests {
     fn test_gate_low_awareness_low_priority() {
         let bridge = PerceptionBridge::new();
         let event = make_visual_event(2);
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.1; 8];
 
         // visual weight = 0.7, threshold = 0.3 * (1 - 0.1 * 0.5) = 0.3 * 0.95 = 0.285
@@ -169,7 +169,7 @@ mod tests {
             make_visual_event(8),
             make_visual_event(2),
         ];
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.5; 8];
 
         let passed = bridge.gate_events(&events, &state);
@@ -188,7 +188,7 @@ mod tests {
         bridge.set_event_importance(kind, 0.95);
 
         let event = make_visual_event(5);
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.8; 8];
 
         // 自定义权重 0.95 > threshold 0.3 * (1 - 0.8*0.5) = 0.3 * 0.6 = 0.18
@@ -200,7 +200,7 @@ mod tests {
         use std::time::Instant;
         
         let bridge = PerceptionBridge::new();
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.5; 8];
         
         let events: Vec<_> = (0..1000)

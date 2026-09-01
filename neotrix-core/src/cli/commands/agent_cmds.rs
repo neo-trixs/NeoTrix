@@ -3,9 +3,9 @@
 use std::sync::{Arc, LazyLock, OnceLock};
 use tokio::sync::RwLock;
 
-use crate::agent::tool::mcp::McpRegistry;
+// use crate::agent::tool::mcp::McpRegistry;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::l1_action::nt_io::nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
+use crate::l1_action::nt_io::// nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
 use crate::core::l7_capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 

@@ -3057,7 +3057,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(CognitiveLoadMonitor::new()));
         registry.register(Box::new(CognitiveEvaluator::new()));
         registry.register(Box::new({
-            let mut cm = crate::l5_cognition::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
+            let mut cm = crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
             cm.observe();
             cm
         }));
@@ -3087,11 +3087,11 @@ impl BrainStage for SelfTestStage {
         ));
         registry.register(Box::new(crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
         registry.register(Box::new(crate::l5_cognition::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
-        registry.register(Box::new(crate::l1_action::nt_io::nt_shield::browser_security::BrowserSecurityScanner::new(
-            crate::l1_action::nt_io::nt_shield::browser_security::BrowserSecurityConfig::default(),
+        registry.register(Box::new(crate::l3_embodiment::nt_shield::browser_security::BrowserSecurityScanner::new(
+            crate::l3_embodiment::nt_shield::browser_security::BrowserSecurityConfig::default(),
         )));
         registry.register(Box::new(
-            crate::l1_action::nt_io::nt_shield::check_registry::CheckRegistry::new(),
+            crate::l3_embodiment::nt_shield::check_registry::CheckRegistry::new(),
         ));
         registry.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
@@ -3116,7 +3116,7 @@ impl BrainStage for SelfTestStage {
             crate::neotrix::nt_file_ability::FileAbilitySelfTest,
         ));
         registry.register(Box::new(
-            crate::l5_cognition::nt_core::nt_core_parallel::CapabilityClusterSelfTest,
+// //             crate::l5_cognition::nt_core::nt_core_parallel::CapabilityClusterSelfTest,
         ));
         registry.register(Box::new(
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,

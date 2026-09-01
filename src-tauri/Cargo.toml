@@ -50,3 +50,4 @@ sentry = "0.34"
 
 [features]
 default = []
+stealth-net = []

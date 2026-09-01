@@ -9,7 +9,7 @@ use crate::neotrix::nt_act_orchestrator::Orchestrator;
 use crate::agent::AgentTeam;
 use crate::core::nt_core_self::MotivationState;
 use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::l5_cognition::nt_mind_distiller::{CommandDistiller, DistilledOutput, SessionDistiller};
+use crate::l5_cognition::nt_mind::nt_mind_distiller::{CommandDistiller, DistilledOutput, SessionDistiller};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 
 fn state_icon(state: &GoalState) -> &str {

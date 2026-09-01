@@ -1,8 +1,8 @@
 use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_bank::ReasoningBank;
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::neotrix::nt_core_signal::core::SelectiveState;
-use crate::neotrix::nt_core_signal::select::SelectableOperator;
+// // use crate::core::// nt_core_signal::core::SelectiveState;
+// // use crate::core::// nt_core_signal::select::SelectableOperator;
 use chrono::Utc;
 use super::hebbian::HebbianUpdater;
 
@@ -69,8 +69,8 @@ impl MemoryConsolidation {
         &self,
         bank: &mut ReasoningBank,
         brain: &mut CapabilityVector,
-        state: &mut SelectiveState,
-        operator: &SelectableOperator,
+//         state: &mut SelectiveState,
+//         operator: &SelectableOperator,
         updater: &HebbianUpdater,
     ) -> ConsolidationResult {
         let memories = self.select_memories_for_sleep(bank);
@@ -205,8 +205,8 @@ mod tests {
     fn test_consolidation_pass_no_crash() {
         let bank = ReasoningBank::new(10);
         let mut cap = CapabilityVector::default();
-        let mut state = SelectiveState::new(23, 64);
-        let operator = SelectableOperator::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
+//         let operator = SelectableOperator::new(23, 64);
         let updater = HebbianUpdater::new(23, 64);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::l5_cognition::nt_mind::MemoryAgentCapability;
+use crate::l5_cognition::nt_mind::nt_mind::MemoryAgentCapability;
 
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_save(&mut self) {
@@ -336,7 +336,7 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_curiosity(&mut self) {
-        use crate::l5_cognition::nt_mind::hypercube_bridge::HyperCubeBridge;
+        use crate::l5_cognition::nt_mind::nt_mind::hypercube_bridge::HyperCubeBridge;
         // 用真实皮层数据构建桥接，而非空桥 — 好奇心 gap 检测必须基于实际知识分布。
         let mut bridge = HyperCubeBridge::new();
         let cortex_traces = self.panorama.as_ref()
@@ -413,7 +413,7 @@ impl BackgroundLoopHandle {
             eprintln!("[bg] aging: {} stale, {} expired", r.stale_count, r.expired_count);
             for url in r.rescans_needed.iter().take(3) {
                 if let Some(ref mut ev) = self.self_evolver {
-                    if crate::l5_cognition::nt_mind::self_evolver::SelfEvolver::is_url(url) {
+                    if crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver::is_url(url) {
                         let _ = ev.evolve_from_url(url);
                     }
                 }

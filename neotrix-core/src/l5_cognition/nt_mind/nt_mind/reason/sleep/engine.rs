@@ -1,7 +1,7 @@
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningBank;
-use crate::neotrix::nt_core_signal::core::SelectiveState;
-use crate::neotrix::nt_core_signal::select::SelectableOperator;
+// // use crate::core::// nt_core_signal::core::SelectiveState;
+// // use crate::core::// nt_core_signal::select::SelectableOperator;
 use crate::neotrix::nt_core_error::NeoTrixResult;
 
 use super::hebbian::HebbianUpdater;
@@ -79,8 +79,8 @@ impl SleepEngine {
         &mut self,
         brain: &mut CapabilityVector,
         bank: &mut ReasoningBank,
-        operator: &SelectableOperator,
-        state: &mut SelectiveState,
+//         operator: &SelectableOperator,
+//         state: &mut SelectiveState,
     ) -> NeoTrixResult<SleepResult> {
         let passes = self.config.passes;
         if passes == 0 {
@@ -176,20 +176,20 @@ mod tests {
         }
     }
 
-    fn setup_engine_and_state() -> (SleepEngine, CapabilityVector, ReasoningBank, SelectableOperator, SelectiveState) {
-        let engine = SleepEngine::with_passes(3);
-        let brain = CapabilityVector::default();
-        let bank = {
-            let mut b = ReasoningBank::new(100);
-            for i in 0..5 {
-                b.store(make_memory(0.5 + (i as f64 * 0.1), true, &format!("m{}", i)));
-            }
-            b
-        };
-        let operator = SelectableOperator::new(23, 64);
-        let state = SelectiveState::new(23, 64);
-        (engine, brain, bank, operator, state)
-    }
+// //     fn setup_engine_and_state() -> (SleepEngine, CapabilityVector, ReasoningBank, SelectableOperator, SelectiveState) {
+// let engine = SleepEngine::with_passes(3);
+// let brain = CapabilityVector::default();
+// let bank = {
+// let mut b = ReasoningBank::new(100);
+// for i in 0..5 {
+// b.store(make_memory(0.5 + (i as f64 * 0.1), true, &format!("m{}", i)));
+// }
+// b
+// };
+//         let operator = SelectableOperator::new(23, 64);
+//         let state = SelectiveState::new(23, 64);
+// (engine, brain, bank, operator, state)
+// }
 
     #[test]
     fn test_sleep_returns_result() {
@@ -213,8 +213,8 @@ mod tests {
         let mut engine = SleepEngine::new(SleepConfig { passes: 0, ..Default::default() });
         let mut brain = CapabilityVector::default();
         let mut bank = ReasoningBank::new(10);
-        let operator = SelectableOperator::new(23, 64);
-        let mut state = SelectiveState::new(23, 64);
+//         let operator = SelectableOperator::new(23, 64);
+//         let mut state = SelectiveState::new(23, 64);
         let result = engine.sleep(&mut brain, &mut bank, &operator, &mut state).expect("value should be ok in test");
         assert_eq!(result.stats.passes_done, 0, "zero passes returns immediately");
     }

@@ -105,16 +105,16 @@ pub fn load_embedding_map(
 }
 
 /// 余弦相似度
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let nb: f32 = b.iter().map(|y| y * y).sum::<f32>().sqrt();
-    if na * nb > 0.0 {
-        (dot / (na * nb)) as f64
-    } else {
-        0.0
-    }
-}
+// pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+//     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+//     let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+//     let nb: f32 = b.iter().map(|y| y * y).sum::<f32>().sqrt();
+//     if na * nb > 0.0 {
+//         (dot / (na * nb)) as f64
+//     } else {
+//         0.0
+//     }
+// }
 
 /// 语义搜索：找到与指定节点最相似的 K 个节点
 pub fn semantic_search(
@@ -143,7 +143,7 @@ pub fn semantic_search(
         .filter(|(nid, _)| nid.as_str() != target_id)
         .map(|(nid, vec)| SearchResult {
             node_id: nid.clone(),
-            similarity: cosine_similarity(target_vec, vec),
+//             similarity: cosine_similarity(target_vec, vec),
             title: titles.get(nid).cloned().unwrap_or_default(),
         })
         .filter(|r| r.similarity >= min_sim)

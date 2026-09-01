@@ -13,6 +13,21 @@ pub mod nt_core_kg_traversal;
 pub mod nt_core_rag;
 pub mod nt_core_model_router;
 pub mod nt_core_prompt_template;
+pub mod nt_core_knowledge_mgmt;
+pub mod nt_core_xai;
+pub mod nt_core_planning;
+pub mod nt_core_autonomous_ai;
+pub mod nt_core_safety_alignment;
+pub mod nt_core_knowledge_repr;
+pub mod nt_core_fsm_topology;
+pub mod nt_core_cuda_rl;
+
+// 意识核心模块 (Consciousness Core)
+pub mod nt_core_resonance_complexity;
+pub mod nt_core_field_resonance;
+pub mod nt_core_golden_ratio;
+pub mod nt_core_integrated_information;
+pub mod nt_core_vibrational_resonance;
 
 // NT-IO 吸收模块 (C1, 来自 notes/absorption-20260827-full-iterative-evolution.md 条目 16,17,19,26,27,29,30,32)
 pub mod nt_io_ai_image_prompts;

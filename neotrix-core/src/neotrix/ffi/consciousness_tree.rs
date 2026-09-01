@@ -287,7 +287,7 @@ fn compute_phi_from_branches(branches: &HashMap<String, BranchState>) -> f32 {
         };
         state.push(v);
     }
-    crate::neotrix::nt_core_iit_phi::IITPhiCalculator::new()
+    crate::core::nt_core_iit_phi::IITPhiCalculator::new()
         .compute_phi(&state)
         .phi as f32
 }

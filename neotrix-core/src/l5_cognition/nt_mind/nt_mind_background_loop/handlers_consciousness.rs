@@ -1067,7 +1067,7 @@ impl BackgroundLoopHandle {
                         .iter()
                         .enumerate()
                         .map(|(i, &activation)| {
-                            crate::l5_cognition::nt_mind_consciousness_gold_standard::E8HexagramState {
+                            crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::E8HexagramState {
                                 index: i as u8,
                                 activation: activation.max(0.0).min(1.0),
                             }
@@ -1698,11 +1698,11 @@ impl BackgroundLoopHandle {
             ),
         ));
         self_tests.register(Box::new(crate::l5_cognition::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
-        self_tests.register(Box::new(crate::l1_action::nt_io::nt_shield::browser_security::BrowserSecurityScanner::new(
-            crate::l1_action::nt_io::nt_shield::browser_security::BrowserSecurityConfig::default(),
+        self_tests.register(Box::new(crate::l3_embodiment::nt_shield::browser_security::BrowserSecurityScanner::new(
+            crate::l3_embodiment::nt_shield::browser_security::BrowserSecurityConfig::default(),
         )));
         self_tests.register(Box::new(
-            crate::l1_action::nt_io::nt_shield::check_registry::CheckRegistry::new(),
+            crate::l3_embodiment::nt_shield::check_registry::CheckRegistry::new(),
         ));
         // ── P0 加密 CoT 生命周期守卫 (2608.09867, T2 注册) ──
         // CohGuard 会话绑定校验 + ReasoningTraceGuard 四项防护。T3 接线:
@@ -1738,7 +1738,7 @@ impl BackgroundLoopHandle {
         // ── 因果链追踪引擎 SelfTest (witr 方法论吸收 2026-08-13, T1→T2) ──
         // T3: results 流入 set_branch_health_from_self_tests (见下) 驱动分支健康。
         self_tests.register(Box::new(
-            crate::l6_meta::nt_repair::nt_mind_causal_trace::CausalTraceSelfTest,
+            crate::l6_meta::nt_repair::// nt_mind_causal_trace::CausalTraceSelfTest,
         ));
         // ── 声明式重构引擎 SelfTest (recipe_refactor 接线, T1→T2) ──
         // T3: results 流入 set_branch_health_from_self_tests (见下) 驱动分支健康。
@@ -1866,7 +1866,7 @@ impl BackgroundLoopHandle {
                 ),
             }
         } else {
-            let mut cm = crate::l5_cognition::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
+            let mut cm = crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
             cm.observe();
             self_tests.register(Box::new(cm));
         }
@@ -2108,7 +2108,7 @@ impl BackgroundLoopHandle {
         }
         // NT-SHIELD: 检查注册表
         let shield_ok =
-            crate::l1_action::nt_io::nt_shield::check_registry::CheckRegistry::new()
+            crate::l3_embodiment::nt_shield::check_registry::CheckRegistry::new()
                 .self_test()
                 .is_ok();
         results.push(if shield_ok {
@@ -2125,7 +2125,7 @@ impl BackgroundLoopHandle {
         // 0.15 (无测试) 收敛至 0.05 (全满足)。此前这些前缀无 SelfTest 喂入,
         // 分支健康恒 0 → 迷雾卡在 0.15。
         let repair_ok =
-            crate::l6_meta::nt_repair::nt_mind_causal_trace::CausalTraceSelfTest
+            crate::l6_meta::nt_repair::// nt_mind_causal_trace::CausalTraceSelfTest
                 .self_test()
                 .is_ok();
         results.push(if repair_ok {

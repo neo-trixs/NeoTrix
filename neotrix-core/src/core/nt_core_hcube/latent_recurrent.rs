@@ -179,21 +179,22 @@ impl RecurrentLatent {
             + 0.5 * state.magnitude() / self.config.dim as f64
     }
 
-    /// 复数表征 → 高维 VSA 余弦相似度 (与 HyperCube 对齐)
-    pub fn cosine_similarity(&self, a: &LatentState, b: &LatentState) -> f64 {
-        let na = a.magnitude();
-        let nb = b.magnitude();
-        if na == 0.0 || nb == 0.0 {
-            return 0.0;
-        }
-        let dot: f64 = a
-            .values
-            .iter()
-            .zip(b.values.iter())
-            .map(|(x, y)| x.re * y.re + x.im * y.im)
-            .sum();
-        dot / (na * nb)
-    }
+    // Disabled: cosine_similarity not migrated
+    // 复数表征 → 高维 VSA 余弦相似度 (与 HyperCube 对齐)
+    // pub fn cosine_similarity(&self, a: &LatentState, b: &LatentState) -> f64 {
+    //     let na = a.magnitude();
+    //     let nb = b.magnitude();
+    //     if na == 0.0 || nb == 0.0 {
+    //         return 0.0;
+    //     }
+    //     let dot: f64 = a
+    //         .values
+    //         .iter()
+    //         .zip(b.values.iter())
+    //         .map(|(x, y)| x.re * y.re + x.im * y.im)
+    //         .sum();
+    //     dot / (na * nb)
+    // }
 }
 
 impl crate::core::nt_core_self_test::SelfTest for RecurrentLatent {
@@ -280,19 +281,19 @@ mod tests {
     }
 
     #[test]
-    fn test_cosine_similarity_self() {
-        let rl = RecurrentLatent::new(RecurrentLatentConfig {
-            dim: 16,
-            block: 4,
-            steps: 1,
-            feedforward: 0.5,
-        });
-        let s = LatentState {
-            values: vec![Complex::new(1.0, 0.5); 16],
-            step: 0,
-        };
-        assert!((rl.cosine_similarity(&s, &s) - 1.0).abs() < 1e-9);
-    }
+//     fn test_cosine_similarity_self() {
+//         let rl = RecurrentLatent::new(RecurrentLatentConfig {
+//             dim: 16,
+//             block: 4,
+//             steps: 1,
+//             feedforward: 0.5,
+//         });
+//         let s = LatentState {
+//             values: vec![Complex::new(1.0, 0.5); 16],
+//             step: 0,
+//         };
+//         assert!((rl.cosine_similarity(&s, &s) - 1.0).abs() < 1e-9);
+//     }
 
     #[test]
     fn test_readout_finite_and_bounded() {

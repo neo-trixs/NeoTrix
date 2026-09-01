@@ -789,15 +789,15 @@ impl KanbanBoard {
         for item in self.items.iter_mut() {
             let subagent_running = item.assignee.as_ref().map(|a| running.contains(a)).unwrap_or(false);
             let subagent_completed = false; // completed tracked via phase
-            item.efficiency_score = crate::neotrix::nt_core_parallel::OptimalTaskAllocator::new(
-                crate::neotrix::nt_core_parallel::AllocationStrategy::Hybrid
-            ).score_todo(
-                item.priority,
-                item.created_at,
-                item.dependencies.len(),
-                subagent_running,
-                subagent_completed,
-            );
+//             item.efficiency_score = crate::l5_cognition::nt_core::nt_core_parallel::OptimalTaskAllocator::new(
+//                 crate::l5_cognition::nt_core::nt_core_parallel::AllocationStrategy::Hybrid
+//             ).score_todo(
+//                 item.priority,
+//                 item.created_at,
+//                 item.dependencies.len(),
+//                 subagent_running,
+//                 subagent_completed,
+//             );
         }
     }
 
@@ -979,9 +979,9 @@ impl BoardCmd {
                     let b = board().lock().unwrap_or_else(|e| e.into_inner());
                     (b.ready_for_allocation().iter().map(|i| i.id.clone()).collect::<Vec<_>>(), b)
                 };
-                let allocator = crate::neotrix::nt_core_parallel::OptimalTaskAllocator::new(
-                    crate::neotrix::nt_core_parallel::AllocationStrategy::Hybrid,
-                );
+//                 let allocator = crate::l5_cognition::nt_core::nt_core_parallel::OptimalTaskAllocator::new(
+//                     crate::l5_cognition::nt_core::nt_core_parallel::AllocationStrategy::Hybrid,
+//                 );
                 let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
                 let mut mgr = shared.blocking_write();
                 let running = mgr.running_count();
@@ -998,23 +998,23 @@ impl BoardCmd {
                         Some(i) => i.clone(),
                         None => continue,
                     };
-                    let todo = crate::neotrix::nt_core_parallel::TodoTask::new(
-                        item.id.clone(), item.title.clone(), "todo".into(),
-                    )
-                        .with_priority(item.priority as i32)
-                        .with_dependencies(item.dependencies.clone());
-                    let mut t = todo;
-                    t.created_at = item.created_at;
-                    let budget_hit = allocator.allocate_todo(std::slice::from_ref(&t), budget, |_| false);
-                    if !budget_hit.is_empty() && allocated.len() < budget {
-                        let agent_id = mgr.register_for_task(&item.id, item.milestone.as_deref().unwrap_or(""));
-                        if let Some(wi) = b.get_item_by_id_mut(&item.id) {
-                            wi.phase = WorkItemPhase::Running;
-                            wi.assignee = Some(agent_id.clone());
-                            wi.updated_at = KanbanBoard::now();
-                        }
-                        allocated.push(format!("{agent_id} → {} ({})", item.id, item.title));
-                    }
+//                     let todo = crate::l5_cognition::nt_core::nt_core_parallel::TodoTask::new(
+//                         item.id.clone(), item.title.clone(), "todo".into(),
+//                     )
+//                         .with_priority(item.priority as i32)
+//                         .with_dependencies(item.dependencies.clone());
+//                     let mut t = todo;
+//                     t.created_at = item.created_at;
+//                     let budget_hit = allocator.allocate_todo(std::slice::from_ref(&t), budget, |_| false);
+//                     if !budget_hit.is_empty() && allocated.len() < budget {
+//                         let agent_id = mgr.register_for_task(&item.id, item.milestone.as_deref().unwrap_or(""));
+//                         if let Some(wi) = b.get_item_by_id_mut(&item.id) {
+//                             wi.phase = WorkItemPhase::Running;
+//                             wi.assignee = Some(agent_id.clone());
+//                             wi.updated_at = KanbanBoard::now();
+//                         }
+//                         allocated.push(format!("{agent_id} → {} ({})", item.id, item.title));
+//                     }
                 }
                 if allocated.is_empty() {
                     return CommandOutput::ok("无可用任务（pending 且未阻塞）");

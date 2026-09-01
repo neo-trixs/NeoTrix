@@ -1,22 +1,25 @@
-//! NeoTrix Tauri Desktop - Unified API Version
+//! NeoTrix Tauri Desktop - Domain Plugin Architecture
 //!
-//! 简化的桌面端入口，通过统一 API 与意识核心交互
-//! 当 neotrix crate 编译失败时使用 stub 类型
+//! 基于 DeepSeek Harness 架构理念：一切皆插件，能力缝可替换。
+//! 通过 DomainRegistry 统一管理 12 个功能域插件。
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use clap::Parser;
-use tauri::{Manager, State, Emitter};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
+use tauri::{Manager, Emitter};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::stub::UnifiedApiImpl;
-use crate::commands::unified::{UnifiedApiState, unified_init, unified_chat, unified_chat_stream, unified_system_state, unified_create_session, unified_list_sessions, unified_delete_session, unified_exec_cli, unified_cli_list};
 
 mod commands;
 mod stub;
+mod domain;
+
+use domain::{DomainRegistry, plugins::*};
+use commands::domain_cmd::{DomainState, domain_call, domain_list, domain_has, domain_action_count};
+use commands::unified::{UnifiedApiState, unified_init, unified_chat, unified_chat_stream, unified_system_state, unified_create_session, unified_list_sessions, unified_delete_session, unified_exec_cli, unified_cli_list};
+use crate::stub::{UnifiedApiImpl, UnifiedApi as _};
 
 #[derive(Parser)]
 #[clap(name = "neotrix-tauri", version)]
@@ -48,12 +51,32 @@ fn main() {
         return;
     }
 
-    // stub: 不初始化 sentry
     let _sentry_guard = crate::stub::init_sentry();
     let cli = Cli::parse();
 
     match cli.command {
         None | Some(Commands::Desktop) => {
+            // 创建域注册表并注册 12 个插件
+            let mut registry = DomainRegistry::new();
+            registry.register(Box::new(SessionPlugin::new())).expect("failed to register session");
+            registry.register(Box::new(ChatPlugin)).expect("failed to register chat");
+            registry.register(Box::new(AgentPlugin)).expect("failed to register agent");
+            registry.register(Box::new(KbPlugin)).expect("failed to register kb");
+            registry.register(Box::new(FilePlugin)).expect("failed to register file");
+            registry.register(Box::new(PluginPlugin)).expect("failed to register plugin");
+            registry.register(Box::new(WorkflowPlugin)).expect("failed to register workflow");
+            registry.register(Box::new(ToolPlugin)).expect("failed to register tool");
+            registry.register(Box::new(SystemPlugin)).expect("failed to register system");
+            registry.register(Box::new(SecurityPlugin)).expect("failed to register security");
+            registry.register(Box::new(MemoryPlugin)).expect("failed to register memory");
+            registry.register(Box::new(ExtPlugin)).expect("failed to register ext");
+
+            println!("🔌 已注册 {} 个域插件", registry.plugin_count());
+            for info in registry.list() {
+                println!("   {} — {} ({} actions)", info.name, info.description, info.actions.len());
+            }
+
+            let domain_state: DomainState = Arc::new(RwLock::new(registry));
             let unified_api: UnifiedApiState = Arc::new(RwLock::new(UnifiedApiImpl::new()));
 
             let (pty_manager, pty_rx) = crate::commands::pty::PtyManager::new();
@@ -94,9 +117,19 @@ fn main() {
                         })
                         .build(),
                 )
-                .manage(unified_api.clone())
-                .manage(pty_manager.clone())
+                // 域插件状态
+                .manage(domain_state)
+                // 统一 API 状态
+                .manage(unified_api)
+                // PTY 状态
+                .manage(pty_manager)
                 .invoke_handler(tauri::generate_handler![
+                    // ===== 域插件统一入口 (3 个命令覆盖 12 域 × ~8 actions) =====
+                    domain_call,
+                    domain_list,
+                    domain_has,
+                    domain_action_count,
+                    // ===== Unified API (保留用于高级对话) =====
                     unified_init,
                     unified_chat,
                     unified_chat_stream,
@@ -106,6 +139,7 @@ fn main() {
                     unified_delete_session,
                     unified_exec_cli,
                     unified_cli_list,
+                    // ===== PTY (硬件级接口) =====
                     crate::commands::pty::pty_spawn,
                     crate::commands::pty::pty_write,
                     crate::commands::pty::pty_resize,
@@ -133,8 +167,9 @@ fn main() {
                         if let Some(window) = app.get_webview_window("main") { window.open_devtools(); }
                     }
 
-                    println!("✅ NeoTrix V2 Desktop ready (unified API stub)");
-                    println!("   统一接口: unified_chat / unified_chat_stream / unified_system_state");
+                    println!("✅ NeoTrix V2 Desktop ready (domain plugin architecture)");
+                    println!("   域调用: domain_call(domain, action, args)");
+                    println!("   域列表: domain_list()");
                     println!("   PTY: 就绪");
 
                     Ok(())
@@ -153,10 +188,11 @@ fn main() {
                 let api = UnifiedApiImpl::new();
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    let state = api.get_system_state().await;
-                    println!("  [tick] phi={:.3} coherence={:.3}",
-                        state.metadata.consciousness_state.phi,
-                        state.metadata.consciousness_state.coherence);
+                    if let Ok(state) = api.get_system_state().await {
+                        println!("  [tick] phi={:.3} coherence={:.3}",
+                            state.metadata.consciousness_state.phi,
+                            state.metadata.consciousness_state.coherence);
+                    }
                 }
             });
         }

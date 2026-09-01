@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
-use crate::l5_cognition::nt_mind::code_graph::CodeGraph;
+use crate::l5_cognition::nt_mind::nt_mind::code_graph::CodeGraph;
 use crate::l5_cognition::nt_mind::nt_mind::graph_types::{
     EdgeKind, GraphNode, ImpactResult, ImpactHop,
     CodeGraphStats, EnrichedSearchResult,

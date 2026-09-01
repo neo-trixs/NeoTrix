@@ -125,3 +125,46 @@ impl PtyManager {
     }
 
 }
+
+// ========== Tauri Command Wrappers ==========
+
+use tauri::State;
+use std::sync::Arc;
+
+#[tauri::command]
+pub fn pty_spawn(
+    session_id: String,
+    cols: u16,
+    rows: u16,
+    manager: State<'_, Arc<PtyManager>>,
+) -> Result<(), String> {
+    manager.spawn(&session_id, cols, rows)
+}
+
+#[tauri::command]
+pub fn pty_write(
+    session_id: String,
+    data: String,
+    manager: State<'_, Arc<PtyManager>>,
+) -> Result<(), String> {
+    manager.write(&session_id, &data)
+}
+
+#[tauri::command]
+pub fn pty_resize(
+    session_id: String,
+    cols: u16,
+    rows: u16,
+    manager: State<'_, Arc<PtyManager>>,
+) -> Result<(), String> {
+    manager.resize(&session_id, cols, rows)
+}
+
+#[tauri::command]
+pub fn pty_close(
+    session_id: String,
+    manager: State<'_, Arc<PtyManager>>,
+) -> Result<(), String> {
+    manager.close(&session_id);
+    Ok(())
+}

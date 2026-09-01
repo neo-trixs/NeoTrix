@@ -154,7 +154,7 @@ fn cmd_consistency(_args: &[String]) -> CommandOutput {
         None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
     };
     let mut out = String::new();
-    let _ = crate::l1_action::nt_memory::nt_memory_kb::setting_consistency::check_and_report_to_string(&conn, &mut out);
+    let _ = crate::l1_action::nt_memory::nt_memory_kb::// setting_consistency::check_and_report_to_string(&conn, &mut out);
     CommandOutput::ok(&out)
 }
 
@@ -357,12 +357,12 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
-//     use crate::l1_action::nt_memory::nt_memory_kb::embed::EmbedMode;
+//     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::EmbedMode;
     let kb = match KnowledgeBase::open(None) {
         Ok(kb) => kb,
         Err(e) => return CommandOutput::err(&format!("无法打开知识库: {}", e)),
     };
-//     let cfg = crate::l1_action::nt_memory::nt_memory_kb::embed::EmbeddingConfig::default();
+//     let cfg = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
     let bundled = kb.with_embedding(cfg);
     let mode_label = match bundled.embedding_config.read().ok().and_then(|c| c.clone()).map(|c| c.mode) {
         Some(EmbedMode::Local) => "本地 hash-kernel (384-dim, 零依赖)",
@@ -384,8 +384,8 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
 /// 从 KB 已有向量采样 (q,d) 对, teacher = 余弦, 点级回归训练双塔对角学生,
 /// 落盘 ~/.neotrix/distill_student.json; hybrid_search Tier 3 自动消费。
 fn cmd_distill(args: &[String]) -> CommandOutput {
-//     use crate::l1_action::nt_memory::nt_memory_kb::embed::load_all_embeddings;
-    use crate::l1_action::nt_memory::nt_memory_kb::distill::{
+//     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::load_all_embeddings;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_distill::{
         load_student, sample_contrastive_pairs, sample_training_pairs, save_student,
         train_contrastive, CONTRASTIVE_MARGIN, PointwiseDistillStudent,
     };

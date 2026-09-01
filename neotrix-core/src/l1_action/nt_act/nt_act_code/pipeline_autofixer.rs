@@ -8,7 +8,7 @@
 use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter};
 use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
 use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
-use crate::l1_action::nt_act::nt_l1_shared_types::{ActionPlan, EvolutionLoopProvider};
+// use crate::l1_action::nt_act::nt_l1_shared_types::{ActionPlan, EvolutionLoopProvider};
 
 
 
@@ -139,7 +139,7 @@ impl Default for PipelineAutoFixer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l1_action::nt_act::nt_l1_shared_types::PrioritizedIssue;
+//     use crate::l1_action::nt_act::nt_l1_shared_types::PrioritizedIssue;
 
     struct MockEvolutionLoop {
         call_count: usize,

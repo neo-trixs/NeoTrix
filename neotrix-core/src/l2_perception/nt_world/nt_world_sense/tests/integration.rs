@@ -4,7 +4,7 @@
 mod perception_bridge_integration {
     use crate::neotrix::nt_world_sense::perception_bridge::PerceptionBridge;
     use crate::neotrix::nt_world_sense::nt_world_sense_hub::SensoryIntegrationHub;
-    use crate::neotrix::nt_core_signal::core::SelectiveState;
+// //     use crate::core::// nt_core_signal::core::SelectiveState;
     use crate::core::nt_core_sense::{SensoryEvent, SensoryEventKind, AnalysisReport};
 
     fn make_test_event(priority: u8, confidence: f64) -> SensoryEvent {
@@ -30,7 +30,7 @@ mod perception_bridge_integration {
         let mut hub = SensoryIntegrationHub::new();
         
         // 设置高觉醒度状态
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.8; 8];
         hub.set_consciousness_state(state);
         
@@ -41,7 +41,7 @@ mod perception_bridge_integration {
     #[test]
     fn test_perception_bridge_attention_gating() {
         let bridge = PerceptionBridge::new();
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         
         // 高觉醒度 - 更多事件通过
         state.data = vec![0.9; 8];
@@ -61,7 +61,7 @@ mod perception_bridge_integration {
     #[test]
     fn test_perception_bridge_batch_filtering() {
         let bridge = PerceptionBridge::new();
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.5; 8];
         
         let events = vec![
@@ -78,7 +78,7 @@ mod perception_bridge_integration {
     #[test]
     fn test_perception_bridge_custom_threshold() {
         let mut bridge = PerceptionBridge::new();
-        let mut state = SelectiveState::new(8, 16);
+//         let mut state = SelectiveState::new(8, 16);
         state.data = vec![0.5; 8];
         
         // 设置高阈值

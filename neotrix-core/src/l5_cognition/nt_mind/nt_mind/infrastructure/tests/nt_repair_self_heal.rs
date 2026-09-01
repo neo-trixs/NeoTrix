@@ -144,7 +144,7 @@ async fn test_healer_registry_integration() {
 // TODO: These tests access private fields and test non-existent types
 // #[tokio::test]
 // async fn test_self_heal_loop_from_self_audit() {
-//     use crate::l6_meta::nt_repair::nt_mind_self_heal::{SelfHealLoop, HealableDetector};
+//     use crate::l6_meta::nt_repair::// nt_mind_self_heal::{SelfHealLoop, HealableDetector};
 //     use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 //     
 //     // Create a self-heal loop
@@ -164,7 +164,7 @@ async fn test_healer_registry_integration() {
 // TODO: Commented out - accesses private fields and non-existent types
 // #[tokio::test]
 // async fn test_unhealable_failure_surfaces() {
-//     use crate::l6_meta::nt_repair::nt_mind_self_heal::SelfHealLoop;
+//     use crate::l6_meta::nt_repair::// nt_mind_self_heal::SelfHealLoop;
 //     
 //     let loop_h = SelfHealLoop::new();
 //     

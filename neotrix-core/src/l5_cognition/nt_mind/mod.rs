@@ -31,6 +31,10 @@ pub mod nt_mind_skill_engine;
 pub mod nt_mind_seal_enhanced;
 pub mod nt_mind_memory_consolidation;
 pub mod nt_mind_skill_chain;
+pub mod nt_mind_git_learning;
+pub mod nt_mind_research;
+pub mod nt_mind_pilot_failure;
+pub mod nt_mind_jit_agent;
 
 pub mod reason {
     pub use super::nt_mind::reason::*;

@@ -27,9 +27,35 @@ pub struct DiagnosticItem {
     pub action: ActionPlan,
 }
 
-pub use crate::l1_action::nt_act::nt_l1_shared_types::{
-    ActionPlan, PrioritizedIssue, CodeUnderlyingIssue, EvolutionLoopProvider,
-};
+// nt_l1_shared_types not yet migrated
+// pub use crate::l1_action::nt_act::nt_l1_shared_types::{
+//     ActionPlan, PrioritizedIssue, CodeUnderlyingIssue, EvolutionLoopProvider,
+// };
+
+#[derive(Debug, Clone)]
+pub enum ActionPlan {
+    AutoFix(String),
+    ManualReview(String),
+    Skip(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct PrioritizedIssue {
+    pub issue: crate::l5_cognition::nt_mind::nt_mind_evolution_loop::Issue,
+    pub score: f64,
+    pub plan: ActionPlan,
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeUnderlyingIssue {
+    pub file: String,
+    pub line: usize,
+    pub message: String,
+}
+
+pub trait EvolutionLoopProvider {
+    fn get_snapshot(&self) -> crate::l5_cognition::nt_mind::nt_mind_evolution_loop::ProjectSnapshot;
+}
 
 // ============================================================
 // 优先级队列

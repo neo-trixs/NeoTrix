@@ -1,4 +1,4 @@
-use crate::neotrix::nt_core_signal::ops::cosine_similarity;
+// // use crate::core::// nt_core_signal::ops::cosine_similarity;
 
 pub use crate::core::nt_core_embed::TextEmbedder;
 
@@ -16,7 +16,7 @@ pub fn recall_similar(query: &str, memories: &[crate::l5_cognition::nt_mind::nt_
         .enumerate()
         .map(|(i, m)| {
             let mv = embedder.embed(&m.task_description);
-            let sim = cosine_similarity(&qv, &mv);
+//             let sim = cosine_similarity(&qv, &mv);
             let reward_bonus = m.reward * 0.3;
             (i, sim + reward_bonus)
         })
