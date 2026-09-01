@@ -90,3 +90,64 @@ impl ToolExecutorTrait for SelfCodeWriter {
         ]
     }
 }
+
+// ════════════════════════════════════════════════════════════════
+// Registry + Router + Bridge
+// ════════════════════════════════════════════════════════════════
+
+/// 代码执行能力注册中心
+pub struct CodeRegistry {
+    executors: Vec<Box<dyn ToolExecutorTrait>>,
+}
+
+impl Default for CodeRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+impl CodeRegistry {
+    pub fn new() -> Self { Self { executors: Vec::new() } }
+    pub fn register(&mut self, executor: Box<dyn ToolExecutorTrait>) { self.executors.push(executor); }
+    pub fn get(&self, id: &str) -> Option<&dyn ToolExecutorTrait> {
+        self.executors.iter().find(|e| e.capability_id() == id).map(|e| e.as_ref())
+    }
+    pub fn health_check_all(&self) -> Vec<(String, CapabilityHealth)> {
+        self.executors.iter().map(|e| (e.capability_id().to_string(), e.health_check())).collect()
+    }
+    pub fn optimal(&self) -> Option<&dyn ToolExecutorTrait> {
+        self.executors.iter()
+            .filter(|e| e.health_check().healthy)
+            .max_by(|a, b| {
+                let a_s = 1.0 - a.health_check().error_rate;
+                let b_s = 1.0 - b.health_check().error_rate;
+                a_s.partial_cmp(&b_s).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|e| e.as_ref())
+    }
+}
+
+/// 代码执行路由器
+pub struct CodeRouter {
+    registry: CodeRegistry,
+}
+
+impl CodeRouter {
+    pub fn new(registry: CodeRegistry) -> Self { Self { registry } }
+    pub fn route(&self, _tool: &str) -> Option<&dyn ToolExecutorTrait> { self.registry.optimal() }
+    pub fn execute(&self, tool: &str, input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
+        self.registry.optimal()
+            .ok_or_else(|| CapabilityError::NotAvailable("No code executor".into()))?
+            .execute(tool, input)
+    }
+}
+
+/// 代码执行桥接
+pub struct CodeBridge {
+    router: CodeRouter,
+}
+
+impl CodeBridge {
+    pub fn new(router: CodeRouter) -> Self { Self { router } }
+    pub fn execute(&self, tool: &str, input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
+        self.router.execute(tool, input)
+    }
+}

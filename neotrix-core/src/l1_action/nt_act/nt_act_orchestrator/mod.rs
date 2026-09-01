@@ -13,7 +13,7 @@ pub mod pm_integration_test;
 
 use std::sync::{Arc, Mutex};
 use neotrix_types::core::CapabilityVector;
-use crate::l1_action::nt_act::nt_l1_error::L1Result;
+// use crate::l1_action::nt_act::nt_l1_error::L1Result;
 use crate::agent::team::AgentTeam;
 use pm_workflow::{PMNode, PMWorkflowType};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -313,4 +313,69 @@ impl OrchestratorTrait for Orchestrator {
         let _results = self.worker.execute_tasks(&tasks);
         Ok(PlanResult { success: true, steps_completed: plan.steps.len(), output: None })
     }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Registry + Router + Bridge
+// ════════════════════════════════════════════════════════════════
+
+/// 编排能力注册中心
+pub struct OrchestratorRegistry {
+    orchestrators: Vec<Box<dyn OrchestratorTrait>>,
+}
+
+impl Default for OrchestratorRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+impl OrchestratorRegistry {
+    pub fn new() -> Self { Self { orchestrators: Vec::new() } }
+    pub fn register(&mut self, orch: Box<dyn OrchestratorTrait>) { self.orchestrators.push(orch); }
+    pub fn get(&self, id: &str) -> Option<&dyn OrchestratorTrait> {
+        self.orchestrators.iter().find(|o| o.capability_id() == id).map(|o| o.as_ref())
+    }
+    pub fn health_check_all(&self) -> Vec<(String, CapabilityHealth)> {
+        self.orchestrators.iter().map(|o| (o.capability_id().to_string(), o.health_check())).collect()
+    }
+    pub fn optimal(&self) -> Option<&dyn OrchestratorTrait> {
+        self.orchestrators.iter()
+            .filter(|o| o.health_check().healthy)
+            .max_by(|a, b| {
+                let a_s = 1.0 - a.health_check().error_rate;
+                let b_s = 1.0 - b.health_check().error_rate;
+                a_s.partial_cmp(&b_s).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|o| o.as_ref())
+    }
+}
+
+/// 编排路由器
+pub struct OrchestratorRouter {
+    registry: OrchestratorRegistry,
+}
+
+impl OrchestratorRouter {
+    pub fn new(registry: OrchestratorRegistry) -> Self { Self { registry } }
+    pub fn route(&self, _goal: &str) -> Option<&dyn OrchestratorTrait> { self.registry.optimal() }
+    pub fn plan(&self, goal: &str) -> Result<Plan, CapabilityError> {
+        self.registry.optimal()
+            .ok_or_else(|| CapabilityError::NotAvailable("No orchestrator".into()))?
+            .plan(goal)
+    }
+    pub fn execute(&self, plan: &Plan) -> Result<PlanResult, CapabilityError> {
+        self.registry.optimal()
+            .ok_or_else(|| CapabilityError::NotAvailable("No orchestrator".into()))?
+            .execute(plan)
+    }
+}
+
+/// 编排桥接
+pub struct OrchestratorBridge {
+    router: OrchestratorRouter,
+}
+
+impl OrchestratorBridge {
+    pub fn new(router: OrchestratorRouter) -> Self { Self { router } }
+    pub fn plan(&self, goal: &str) -> Result<Plan, CapabilityError> { self.router.plan(goal) }
+    pub fn execute(&self, plan: &Plan) -> Result<PlanResult, CapabilityError> { self.router.execute(plan) }
 }

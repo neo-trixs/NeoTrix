@@ -28,6 +28,9 @@ pub mod nt_act_cache;
 pub mod nt_act_circuit_breaker;
 pub mod nt_act_rate_limiter;
 pub mod nt_act_workflow;
+pub mod nt_act_ai_assistant;
+pub mod nt_act_3d_dev;
+pub mod nt_act_3d_render;
 
 pub mod nt_act_disk_guard;
 
@@ -37,5 +40,7 @@ pub mod nt_act_sandbox;
 
 pub mod nt_act_seo;
 
+pub mod nt_act_security;
+
 // Re-export from neotrix/l1_body_impl for backward compatibility
-pub use crate::l1_action::nt_l1_shared_types;
+// pub use crate::l1_action::nt_l1_shared_types;

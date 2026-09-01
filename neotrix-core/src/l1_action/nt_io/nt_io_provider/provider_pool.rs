@@ -389,3 +389,73 @@ impl crate::l1_action::traits::LlmRouter for ProviderPool {
         self.entries.iter().map(|e| e.label.clone()).collect()
     }
 }
+
+// ════════════════════════════════════════════════════════════════
+// Registry + Router + Bridge
+// ════════════════════════════════════════════════════════════════
+
+use crate::l1_action::traits::{
+    L1Capability as L1Cap, LlmRouter as LlmRouterTrait,
+    CapabilityHealth as CH,
+    CapabilityError as CE,
+    LlmRequest, LlmRoute,
+};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// LLM 能力注册中心
+pub struct LlmRegistry {
+    routers: Vec<Box<dyn LlmRouterTrait>>,
+}
+
+impl Default for LlmRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+impl LlmRegistry {
+    pub fn new() -> Self { Self { routers: Vec::new() } }
+    pub fn register(&mut self, router: Box<dyn LlmRouterTrait>) { self.routers.push(router); }
+    pub fn get(&self, id: &str) -> Option<&dyn LlmRouterTrait> {
+        self.routers.iter().find(|r| r.capability_id() == id).map(|r| r.as_ref())
+    }
+    pub fn health_check_all(&self) -> Vec<(String, CH)> {
+        self.routers.iter().map(|r| (r.capability_id().to_string(), r.health_check())).collect()
+    }
+    pub fn optimal(&self) -> Option<&dyn LlmRouterTrait> {
+        self.routers.iter()
+            .filter(|r| r.health_check().healthy)
+            .max_by(|a, b| {
+                let a_s = 1.0 - a.health_check().error_rate;
+                let b_s = 1.0 - b.health_check().error_rate;
+                a_s.partial_cmp(&b_s).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|r| r.as_ref())
+    }
+}
+
+/// LLM 智能路由器 — 按请求上下文选择最佳 Provider
+pub struct LlmSmartRouter {
+    registry: LlmRegistry,
+}
+
+impl LlmSmartRouter {
+    pub fn new(registry: LlmRegistry) -> Self { Self { registry } }
+    pub fn route(&self, request: &LlmRequest) -> Result<LlmRoute, CE> {
+        self.registry.optimal()
+            .ok_or_else(|| CE::NotAvailable("No LLM router".into()))?
+            .route(request)
+    }
+    pub fn providers(&self) -> Vec<String> {
+        self.registry.optimal().map_or(vec![], |r| r.providers())
+    }
+}
+
+/// LLM 桥接 — L5 领域技能 → LlmSmartRouter
+pub struct LlmBridge {
+    router: LlmSmartRouter,
+}
+
+impl LlmBridge {
+    pub fn new(router: LlmSmartRouter) -> Self { Self { router } }
+    pub fn route(&self, request: &LlmRequest) -> Result<LlmRoute, CE> { self.router.route(request) }
+    pub fn providers(&self) -> Vec<String> { self.router.providers() }
+}
