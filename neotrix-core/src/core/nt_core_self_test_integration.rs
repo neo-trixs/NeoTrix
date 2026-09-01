@@ -1,7 +1,7 @@
 use crate::core::nt_core_arch_fitness::arch_fitness_tests;
 use crate::core::nt_core_qtest::QTestEngineSelfTest;
 use crate::core::nt_core_self_test::{ConstitutionComplianceTest, SelfTest, SelfTestRegistry};
-use crate::neotrix::l2_world_impl::cad_selftest;
+use crate::l2_perception::nt_world::cad_selftest;
 use crate::core::nt_core_cad_consciousness;
 
 pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
@@ -19,18 +19,18 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     }
     // 2026-08-15 sweep absorption batch (Phase A): reasoning-trace / TLS 指纹 / 设备沙箱
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_audit::ReasoningTraceGuard::default(),
+        crate::l3_embodiment::nt_shield::nt_shield_audit::ReasoningTraceGuard::default(),
     ));
     // CAD SelfTest (NT-WORLD 实现层): GenCAD 四步框架生成能力
     cad_selftest::register_cad_self_tests(&mut registry);
     // 跨模态检索增强: 文本/点云/草图查询支持 (CCIP 表征空间)
-    crate::neotrix::l2_world_impl::cad_crossmodal_selftest::register_cad_crossmodal_self_tests(
+    crate::l2_perception::nt_world::cad_crossmodal_selftest::register_cad_crossmodal_self_tests(
         &mut registry,
     );
     // CAD 意识核心统一编排 (NT-CORE): SEAL级联 / Runeword / T3证据 / 经验吸收
     nt_core_cad_consciousness::register_cad_consciousness_self_tests(&mut registry);
     // CAD 真实生成管线 (GenCAD 四步: CSR→CCIP→CDP→Decoder) — 替换架构占位
-    crate::neotrix::l2_world_impl::cad_generator::register_cad_generator_self_tests(&mut registry);
+    crate::l2_perception::nt_world::cad_generator::register_cad_generator_self_tests(&mut registry);
     // LLM 核心 (NT-CORE): 统一错误域接入 + token 预算引擎自测 (卫生层 P0)
     crate::core::nt_core_llm::register_llm_self_tests(&mut registry);
     // 缓存核心 (NT-CORE): 精确层往返 + 容量计数自测
@@ -46,48 +46,48 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-29 外部吸收 (firecrawl/anydoc): NT-WORLD 文档格式路由
     crate::neotrix::nt_file_ability::register_format_route_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (reverse-skill): NT-SHIELD 安全技能路由
-    crate::neotrix::l1_body_impl::nt_shield::nt_shield_skill_router::register_skill_router_self_tests(&mut registry);
+    crate::l3_embodiment::nt_shield::nt_shield_skill_router::register_skill_router_self_tests(&mut registry);
     // 2026-08-29 外部吸收 (affaan-m/ECC): NT-MIND SEAL 进化维度 instincts/security
-    crate::neotrix::l8_autonomic_impl::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(&mut registry);
+    crate::l5_cognition::nt_mind::nt_mind_seal_ecc::register_seal_ecc_self_tests(&mut registry);
     // 意识核心本体 (NT-CORE): 跨会话 CoreSnapshot 持久化往返
     crate::core::nt_core_consciousness_core::register_consciousness_core_self_tests(&mut registry);
     // 意识度量 IIT Φ (NT-CORE): 同步可约→phi=0 + 变化状态 phi∈[0,1] + 共振矩阵维度
     crate::core::nt_core_iit_phi::register_iit_phi_self_tests(&mut registry);
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
+        crate::l3_embodiment::nt_shield::nt_shield_traffic::FingerprintStore::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_sandbox::DeviceSandbox::new(
-            crate::neotrix::l1_body_impl::nt_shield_sandbox::SandboxSpec::default(),
+        crate::l3_embodiment::nt_shield::nt_shield_sandbox::DeviceSandbox::new(
+            crate::l3_embodiment::nt_shield::nt_shield_sandbox::SandboxSpec::default(),
         ),
     ));
     // W2.4 (batch3 2026-08-26): 有状态 egress 基准 + W3.5 编排失败类分类法
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_sandbox::stateful_bench::StatefulEgressBench,
+        crate::l3_embodiment::nt_shield::nt_shield_sandbox::stateful_bench::StatefulEgressBench,
     ));
     registry.register(Box::new(
         crate::core::nt_core_orchestration_failure_taxonomy::OrchestrationFailureTaxonomyTest,
     ));
     // 2026-08-15 sweep absorption batch (Phase B): HDA 归因 / 自验证奖励 / 元 harness 优化 / 提示词库
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
+        crate::l5_cognition::nt_mind::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
+        crate::l5_cognition::nt_mind::nt_mind_skill_engine::PromptLibrary::new(),
     ));
     // 2026-08-29 外部吸收 (anthropics/skills Agent Skills 标准): SKILL.md 必需字段校验
-    crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::register_skill_standard_self_tests(&mut registry);
+    crate::l5_cognition::nt_mind_skill_engine::register_skill_standard_self_tests(&mut registry);
     // 新增: SelfReflectionEngine (Reflexion-inspired verbal reinforcement learning)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind::experience_tree::self_reflection::SelfReflectionEngine::new(8),
+        crate::l5_cognition::nt_mind::experience_tree::self_reflection::SelfReflectionEngine::new(8),
     ));
     // 新增: MemoryAdmissionGate (A-MAC-inspired 5维记忆入口控制)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_memory::MemoryAdmissionGate::new(0.5, 100),
+        crate::l5_cognition::nt_mind::nt_mind_memory::MemoryAdmissionGate::new(0.5, 100),
     ));
     // 2026-08-16 T2 补齐: 小规模方法评估 (sweep absorption 声明 Phase B 但未注册)
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
     ));
     // 2026-08-16 T2 补齐: 贝叶斯实验设计 (SelfTest 存在但漏注册, C1→C2)
     registry.register(Box::new(
@@ -98,11 +98,11 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-16 T2 补齐: HDA 归因 (纯函数, 评估域原子 2/3→3/3)
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::HdaAttributionSelfTest,
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::HdaAttributionSelfTest,
     ));
     // 2026-08-16 T2 补齐: 可自验证奖励 (verify_* 纯函数, SelfTest 逻辑搬入独立件)
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
     ));
     // 2026-08-15 sweep absorption batch (Phase C): 模式路由 / 潜循环 / 记忆四能力
     registry.register(Box::new(
@@ -114,66 +114,53 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
         ),
     ));
     registry.register(Box::new(
-        crate::neotrix::l3_memory_impl::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
+        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
     ));
-    // TODO: Re-enable after adding missing SelfTests to nt_memory_sweep_20260815.rs
-    // registry.register(Box::new(
-    //     crate::neotrix::l3_memory_impl::nt_memory_kb::ExperienceTripletPoolSelfTest,
-    // ));
-    // registry.register(Box::new(
-    //     crate::neotrix::l3_memory_impl::nt_memory_kb::GuardMutationSelfTest,
-    // ));
-    // registry.register(Box::new(
-    //     crate::neotrix::l3_memory_impl::nt_memory_kb::RetrievalSelfEvolutionSelfTest,
-    // ));
-    // registry.register(Box::new(
-    //     crate::neotrix::l3_memory_impl::nt_memory_kb::SignedProvenanceSelfTest,
-    // ));
     // 2026-08-15 sweep absorption batch (Phase D): 编排治理 / harness / 感知 / 多模态 / 元数据
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_agent_orchestrator::arbiter_mediation::ArbiterMediator::new(),
+        crate::l1_action::nt_act::nt_act_orchestrator::arbiter_mediation::ArbiterMediator::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_agent_orchestrator::expert_team_diff::ExpertTeamWriter::new(),
+        crate::l1_action::nt_act::nt_act_orchestrator::expert_team_diff::ExpertTeamWriter::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_act_orchestrator::harness_scaffold::HarnessScaffold::new(),
+        crate::l1_action::nt_act::nt_act_orchestrator::harness_scaffold::HarnessScaffold::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_act_code::yagni_ladder::YagniLadder::new(),
+        crate::l1_action::nt_act::nt_act_code::yagni_ladder::YagniLadder::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_scrape::FitExtractor::default(),
+        crate::l2_perception::nt_world::nt_world_scrape::FitExtractor::default(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_crawl::resilient::ResilientCrawler::new(
-            crate::neotrix::l2_world_impl::nt_world_crawl::resilient::ThrottlePolicy::default(),
+        crate::l2_perception::nt_world::nt_world_crawl::resilient::ResilientCrawler::new(
+            crate::l2_perception::nt_world::nt_world_crawl::resilient::ThrottlePolicy::default(),
         ),
     ));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_browse_auto::agentic_browse::AgenticBrowseSelfTest,
+        crate::l2_perception::nt_world::nt_world_browse_auto::agentic_browse::AgenticBrowseSelfTest,
     ));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_osint::sweep::SweepDeltaSelfTest,
+        crate::l2_perception::nt_world::nt_world_osint::sweep::SweepDeltaSelfTest,
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_io_output_style::OutputGovernorSelfTest,
+        crate::l1_action::nt_io::nt_io_output_style::OutputGovernorSelfTest,
     ));
     // 2026-08-16 T2 补齐: UnifiedAbsorber (in-memory KB, 无网络)
     registry.register(Box::new(UnifiedAbsorberSelfTest));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_io_multimodal_transform::VisionPreprocessor::new(),
+        crate::l1_action::nt_io::nt_io_multimodal_transform::VisionPreprocessor::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_io_multimodal_transform::CpuTtsEngine::new(
-            crate::neotrix::l1_body_impl::nt_io_multimodal_transform::VoiceLoader::empty(),
+        crate::l1_action::nt_io::nt_io_multimodal_transform::CpuTtsEngine::new(
+            crate::l1_action::nt_io::nt_io_multimodal_transform::VoiceLoader::empty(),
         ),
     ));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_absorber::metadata::MetadataAggregator::new(),
+        crate::l2_perception::nt_world::nt_world_absorber::metadata::MetadataAggregator::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_video_pipeline::MediaSniffer::new(),
+        crate::l2_perception::nt_world::nt_world_video_pipeline::MediaSniffer::new(),
     ));
     // 2026-08-16 Replica absorb: 量子态最优融合检测 (quantum_fusion) T3 接线
     registry.register(Box::new(
@@ -181,61 +168,61 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-19 write_guard 证据审计闭环 (dbx G4): T1→T2 注册 (run.rs 架构审计侧)
     registry.register(Box::new(
-        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+        crate::l1_action::nt_memory::nt_memory_kb::write_guard::WriteGuardAudit,
     ));
     register_c5_healers(registry);
     // 2026-08-27 Wave6 H4: 10 情报工具 SelfTest 注册 (激活 ConsciousnessTree NT-WORLD 分支)
-    crate::neotrix::l2_world_impl::nt_world_intel_selftest::register_intel_self_tests(registry);
+    crate::l2_perception::nt_world::nt_world_intel_selftest::register_intel_self_tests(registry);
     // 2026-08-27 外部吸收 (arXiv:2608.23642): NT-SHIELD 监督退化 canary (Rev-明 审计强化)
-    crate::neotrix::l1_body_impl::nt_shield_oversight::register_oversight_self_tests(registry);
+    crate::l3_embodiment::nt_shield::nt_shield_oversight::register_oversight_self_tests(registry);
     // 2026-08-28 外部吸收 (arXiv:2608.23642): NT-GOVERNANCE 人类监督治理 affordance + 萎缩对策
-    crate::neotrix::l5_consciousness_impl::nt_governance_human_oversight::register_human_oversight_self_tests(registry);
+    crate::l6_meta::nt_meta::nt_governance::register_human_oversight_self_tests(registry);
 }
 
 /// C5 自愈回路检测件 (检测异常 → 自动恢复)。纯内存, 无网络/磁盘/env IO。
 pub fn register_c5_healers(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_sentry::SentryHealer,
+        crate::l3_embodiment::nt_shield::nt_shield_sentry::SentryHealer,
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_act_orchestrator::task_state_dag::TaskStateDagHealer,
+        crate::l1_action::nt_act::nt_act_orchestrator::task_state_dag::TaskStateDagHealer,
     ));
     // 2026-08-17 C5 自愈回路扩展: nt_mind_skill_engine 可逆效应 (F1) + fiber 生命周期 (F5)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::RevertibleEffectsHealer,
+        crate::l5_cognition::nt_mind::nt_mind_skill_engine::RevertibleEffectsHealer,
     ));
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::FiberLifecycleHealer,
+        crate::l5_cognition::nt_mind::nt_mind_skill_engine::FiberLifecycleHealer,
     ));
     // 2026-08-17 C5 自愈回路扩展: MEMORY 溢出层完整性 + MIND-eval 阶梯单调性
     registry.register(Box::new(
-        crate::neotrix::l3_memory_impl::nt_memory_kb::spill_storage::SpillStorageHealer,
+        crate::l1_action::nt_memory::nt_memory_kb::spill_storage::SpillStorageHealer,
     ));
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::OracleLadderHealer,
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::OracleLadderHealer,
     ));
     // 2026-08-17 C5 自愈回路扩展: CAD 生成能力自我修复
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::cad_ch_selftest::CadCHSelfTest,
+        crate::l2_perception::nt_world::cad_ch_selftest::CadCHSelfTest,
     ));
     // SynthBal 合成数据平衡
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::cad_synthbal_selftest::CadSynthBalSelfTest,
+        crate::l2_perception::nt_world::cad_synthbal_selftest::CadSynthBalSelfTest,
     ));
     // B-Rep 拓扑验证
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::cad_brep_selftest::CadBRepTopologySelfTest,
+        crate::l2_perception::nt_world::cad_brep_selftest::CadBRepTopologySelfTest,
     ));
     // 2026-08-17 C5 自愈回路扩展: CORE scheduler 认领池一致性 + IO 账户池健康度
     registry.register(Box::new(
         crate::core::nt_core_scheduler::event_driven_claim::ClaimPoolHealer,
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_io_provider::account_pool::AccountPoolHealer,
+        crate::l1_action::nt_io::nt_io_provider::account_pool::AccountPoolHealer,
     ));
     // 2026-08-28 Phase3 免疫: 自愈闭环 C5 — 消费 SelfTest 失败产出 (检测→诊断→自愈→复测)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_repair_self_heal::SelfHealLoop::new(),
+        crate::l6_meta::nt_repair::nt_mind_self_heal::SelfHealLoop::new(),
     ));
 }
 
@@ -285,89 +272,89 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     // NT-WORLD (3)
     registry.register(Box::new(VideoPipelineSelfTest));
     registry.register(Box::new(
-        crate::neotrix::l2_world_impl::nt_world_video_pipeline::MediaSniffer::new(),
+        crate::l2_perception::nt_world::nt_world_video_pipeline::MediaSniffer::new(),
     ));
     registry.register(Box::new(UnifiedAbsorberSelfTest));
     // NT-MEMORY (4)
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(
-        crate::neotrix::l3_memory_impl::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
+        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
     ));
     // NT-MEMORY 四态资产 (吸收 TencentDB-Agent-Memory): 纯内存分类自测, 轻量注册
     registry.register(Box::new(
         crate::core::nt_core_memory_asset::MemoryAssetSelfTest,
     ));
     registry.register(Box::new(
-        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::default(),
+        crate::l1_action::nt_memory::nt_memory_kb::commit_tracker::NarrativeConsistencyChecker::default(),
     ));
     registry.register(Box::new(Bm25IndexSelfTest));
     // 2026-08-19 write_guard 证据审计闭环 (dbx G4): 纯内存检测件 → 轻量注册表
     registry.register(Box::new(
-        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
+        crate::l1_action::nt_memory::nt_memory_kb::write_guard::WriteGuardAudit,
     ));
     // NT-MIND (5)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
+        crate::l5_cognition::nt_mind::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
+        crate::l5_cognition::nt_mind::nt_mind_skill_engine::PromptLibrary::new(),
     ));
     // 2026-08-16 T2 补齐 (lightweight): 小规模方法 / HDA 归因 / 可自验证奖励
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::SmallScaleMethod::new(1.0, 0.5, 32),
     ));
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::HdaAttributionSelfTest,
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::HdaAttributionSelfTest,
     ));
     registry.register(Box::new(
-        crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
+        crate::l6_meta::nt_repair::nt_mind_eval_harness::SelfVerifiableRewardSelfTest,
     ));
     // 2026-08-29 外部吸收 (Agent Skills 标准): 轻量注册 (纯内存校验)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::AgentSkillsStandardSelfTest,
+        crate::l5_cognition::nt_mind::nt_mind_skill_engine::AgentSkillsStandardSelfTest,
     ));
     // NT-REPAIR / NT-META / NT-GOVERNANCE / NT-NEXUS (4 分支迷雾治理, 每分支 ≥1)
     registry.register(Box::new(
-        crate::neotrix::l8_autonomic_impl::nt_repair_causal_trace::CausalTraceSelfTest,
+        crate::l6_meta::nt_repair::nt_mind_causal_trace::CausalTraceSelfTest,
     ));
     registry.register(Box::new(
-        crate::neotrix::l10_transcendent_impl::meta_observer::MetaObserverSelfTest,
+        crate::l6_meta::nt_nexus::meta_observer::MetaObserverSelfTest,
     ));
     registry.register(Box::new(
         crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest,
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_act_autonomy::cross_session_memory::CrossSessionMemorySelfTest,
+        crate::l1_action::nt_act::nt_act_autonomy::cross_session_memory::CrossSessionMemorySelfTest,
     ));
     // NT-ACT (3)
     registry.register(Box::new(AgentTeamSelfTest));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_act_code::yagni_ladder::YagniLadder::new(),
+        crate::l1_action::nt_act::nt_act_code::yagni_ladder::YagniLadder::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox::default(),
+        crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox::default(),
     ));
     // NT-SHIELD (4)
     registry.register(Box::new(AgenticScanSelfTest));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_audit::ReasoningTraceGuard::default(),
+        crate::l3_embodiment::nt_shield::nt_shield_audit::ReasoningTraceGuard::default(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
+        crate::l3_embodiment::nt_shield::nt_shield_traffic::FingerprintStore::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_shield_sandbox::DeviceSandbox::new(
-            crate::neotrix::l1_body_impl::nt_shield_sandbox::SandboxSpec::default(),
+        crate::l3_embodiment::nt_shield::nt_shield_sandbox::DeviceSandbox::new(
+            crate::l3_embodiment::nt_shield::nt_shield_sandbox::SandboxSpec::default(),
         ),
     ));
     // NT-IO (3)
     registry.register(Box::new(DigitalHumanSelfTest));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_io_multimodal_transform::VisionPreprocessor::new(),
+        crate::l1_action::nt_io::nt_io_multimodal_transform::VisionPreprocessor::new(),
     ));
     registry.register(Box::new(
-        crate::neotrix::l1_body_impl::nt_io_multimodal_transform::CpuTtsEngine::new(
-            crate::neotrix::l1_body_impl::nt_io_multimodal_transform::VoiceLoader::empty(),
+        crate::l1_action::nt_io::nt_io_multimodal_transform::CpuTtsEngine::new(
+            crate::l1_action::nt_io::nt_io_multimodal_transform::VoiceLoader::empty(),
         ),
     ));
 }
@@ -454,7 +441,7 @@ impl SelfTest for AgentTeamSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l1_body_impl::nt_agent_agent_team::*;
+        use crate::l1_action::nt_io::nt_agent_agent_team::*;
         let mut team = AgentTeam::new("test-team");
         team.add_member(AgentProfile::new(AgentRole::Lead, "alice"));
         team.add_member(AgentProfile::new(AgentRole::Coder, "bob"));
@@ -482,7 +469,7 @@ impl SelfTest for AgenticScanSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l1_body_impl::nt_shield_agentic_scan::*;
+        use crate::l3_embodiment::nt_shield::nt_shield_agentic_scan::*;
         let scanner = AgenticScanner::new(ScanConfig::default());
         if scanner.current_stage() != ScanStage::Recon {
             return Err(vec!["initial stage should be Recon".into()]);
@@ -503,7 +490,7 @@ impl SelfTest for DigitalHumanSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l1_body_impl::nt_io_digital_human::*;
+        use crate::l1_action::nt_io::nt_io_digital_human::*;
         let pipeline = DigitalHumanPipeline::new(PersonaConfig::default());
         if !pipeline.generate_reply("hello").contains("Hello") {
             return Err(vec!["reply should handle hello".into()]);
@@ -548,7 +535,7 @@ impl SelfTest for LeannStoreSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l3_memory_impl::nt_memory_leann_store::*;
+        use crate::l1_action::nt_memory::nt_memory_leann_store::*;
         let store = LeannGraphStore::new(LeannConfig::default());
         if store.node_count() != 0 {
             return Err(vec!["fresh store should have 0 nodes".into()]);
@@ -566,7 +553,7 @@ impl SelfTest for Bm25IndexSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l3_memory_impl::nt_memory_kb::bm25::{Bm25Document, Bm25Index};
+        use crate::l1_action::nt_memory::nt_memory_kb::bm25::{Bm25Document, Bm25Index};
         let docs = vec![
             Bm25Document {
                 id: "d1".into(),
@@ -601,7 +588,7 @@ impl SelfTest for VideoPipelineSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l2_world_impl::nt_world_video_pipeline::*;
+        use crate::l2_perception::nt_world::nt_world_video_pipeline::*;
         let mut orch = VideoOrchestrator::new(TranscodeConfig::default());
         orch.self_test()?;
         // VideoProductionChain 接线 (C1→T2/T3): 纯内存确定性 produce_video 自检。
@@ -636,8 +623,8 @@ impl SelfTest for UnifiedAbsorberSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l2_world_impl::nt_memory_kb_bridge::KnowledgeBase;
-        use crate::neotrix::l2_world_impl::nt_world_absorber::{AbsorberConfig, UnifiedAbsorber};
+//         use crate::l2_perception::nt_world::nt_memory_kb_bridge::KnowledgeBase;
+        use crate::l2_perception::nt_world::nt_world_absorber::{AbsorberConfig, UnifiedAbsorber};
         let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
             .map_err(|e| vec![e])?;
         let absorber = UnifiedAbsorber::new(kb, AbsorberConfig::default())

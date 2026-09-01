@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::cli::cost_tracker::{BudgetAction, BudgetPeriod, COST_TRACKER};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 pub struct BudgetCmd;
 impl CliCommand for BudgetCmd {

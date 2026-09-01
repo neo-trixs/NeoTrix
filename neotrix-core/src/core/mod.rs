@@ -23,10 +23,6 @@
 // L0 — 基底层 (Substrate)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l0_substrate;
-#[cfg(feature = "research")]
-pub mod nt_core_deploy;
-#[cfg(feature = "research")]
-pub mod nt_core_deploy_cache;
 pub mod nt_core_harness;
 
 pub mod nt_core_error;
@@ -94,6 +90,7 @@ pub mod l5_consciousness;
 pub mod nt_core_context;
 pub mod nt_core_dispatch;
 pub mod nt_core_gwt;
+pub mod nt_core_heartbeat; // 统一系统健康聚合器
 // L5 意识组件（过渡期保留原路径，供 l5_consciousness 门面转发）
 pub mod nt_core_consciousness;
 pub mod nt_core_consciousness_core;
@@ -120,8 +117,6 @@ pub mod nt_core_state;
 // L7 — 能力层 (Capability) — *** 核心新增 ***
 // ═══════════════════════════════════════════════════════════════════
 pub mod l7_capability;
-#[cfg(feature = "research")]
-pub mod nt_core_agent_patterns;
 pub mod nt_core_model_skills;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -164,8 +159,6 @@ pub mod nt_core_llm;
 
 pub mod nt_core_answer_engine;
 pub mod nt_core_arch_fitness;
-#[cfg(feature = "research")]
-pub mod nt_core_bounded_collections;
 pub mod nt_core_data_pipeline;
 pub mod nt_core_memory_budget;
 pub mod nt_core_qtest;
@@ -179,12 +172,15 @@ pub mod nt_core_orchestration_failure_taxonomy;
 pub mod nt_core_self_test_integration;
 pub mod nt_core_cad_consciousness;
 pub mod nt_core_simulate_engine;
-#[cfg(feature = "research")]
-pub mod nt_core_source_edit;
 pub mod nt_core_state_substrate;
 pub mod nt_core_subagent;
 pub mod nt_core_telemetry;
 pub mod nt_core_vector_store;
+pub mod nt_core_deploy;
+pub mod nt_core_deploy_cache;
+pub mod nt_core_agent_patterns;
+pub mod nt_core_bounded_collections;
+pub mod nt_core_source_edit;
 // Formal verification proof harnesses
 #[cfg(test)]
 pub mod kani_proofs;
@@ -231,14 +227,6 @@ pub use l7_capability::nt_core_orch_agent::{
 pub use l7_capability::registry::MaturityLevel as CapMaturityLevel;
 
 // --- L0: Substrate ---
-#[cfg(feature = "research")]
-pub use nt_core_deploy::{
-    AWQConfig, AWQQuantization, AneDirectProgramV2, AneProgramCache, AotCompiler, AotResult,
-    AotTarget, CacheEntry, CachePolicy, CoreAiAotConfig, CoreAiAotResult, CoreAiDeployPipeline,
-    DeployReport, EdgeDeployPipeline, GGUFConfig, GGUFLevel, GGUFQuantization, HardwareDetector,
-    HardwarePowerProfile, HardwareProfile, LoraAdapter, OsType, PowerProfile, PowerState,
-    PowerThermalModel, Quantization, QuantizationPipeline, QuantizedModel, Quantizer,
-};
 
 // --- L4: Cognition ---
 pub use nt_core_crt::{CrtPlan, CrtTimeScale};
@@ -395,4 +383,10 @@ pub use nt_core_resource_pool::{
 // ─── 基础设施: 统一数据管道 ───
 pub use nt_core_data_pipeline::{
     DataLineage, LineageEntry, PipelineOrchestrator, PipelineRunReport, PipelineStage, StageResult,
+};
+
+// ─── NT-SHIELD: 渗透安全能力 (GitHub 开源项目深度集成) ───
+pub use crate::l3_embodiment::nt_shield::nt_shield_impl::{
+    ARTToolbox, FscanModule, GhidraAnalyzer, NucleiEngine, ObjectionAdapter, PentestGPTAdapter,
+    ShieldCapability, W3afEngine,
 };

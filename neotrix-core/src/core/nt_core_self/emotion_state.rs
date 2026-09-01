@@ -24,6 +24,10 @@ pub enum EmotionLabel {
     Disgust,
     Surprise,
     Anticipation,
+    /// 数字人专用: 困惑/不确定 (非 PAD 派生, 仅表情映射)
+    Confused,
+    /// 数字人专用: 思考中 (非 PAD 派生, 仅表情映射)
+    Thinking,
 }
 
 impl EmotionLabel {
@@ -38,6 +42,23 @@ impl EmotionLabel {
             Self::Disgust => "disgust",
             Self::Surprise => "surprise",
             Self::Anticipation => "anticipation",
+            Self::Confused => "confused",
+            Self::Thinking => "thinking",
+        }
+    }
+
+    /// 情绪 → 数字人动画键 (统一表情映射)
+    pub fn animation_key(&self) -> &'static str {
+        match self {
+            Self::Neutral | Self::Trust => "idle",
+            Self::Joy => "smile",
+            Self::Sadness | Self::Disgust => "frown",
+            Self::Anger => "fury",
+            Self::Fear => "tilt",
+            Self::Surprise => "shock",
+            Self::Anticipation => "look_up",
+            Self::Confused => "tilt",
+            Self::Thinking => "look_up",
         }
     }
 }
@@ -147,13 +168,16 @@ impl EmotionState {
     }
 
     /// 从 (valence, arousal, dominance) 映射为 Plutchik 8 主情绪标签。
+    /// 阈值校准: EMA alpha=0.3 单次观察仅将维度从 0.5 推至 ~0.6,
+    /// valence 经除以4进一步压缩, 实际范围约 0.47-0.53。
+    /// 阈值必须匹配此动态范围, 否则文本检测会落入 catch-all Anticipation。
     pub fn label(&self) -> EmotionLabel {
         let v = self.valence();
         let a = self.arousal();
         let d = self.dominance();
-        if v < 0.45 {
+        if v < 0.48 {
             if a >= 0.55 {
-                if d >= 0.55 {
+                if d >= 0.48 {
                     EmotionLabel::Anger
                 } else {
                     EmotionLabel::Fear
@@ -163,18 +187,16 @@ impl EmotionState {
             } else {
                 EmotionLabel::Sadness
             }
-        } else if v > 0.6 {
-            if a >= 0.55 {
+        } else if v > 0.52 {
+            if a >= 0.45 {
                 EmotionLabel::Joy
             } else {
                 EmotionLabel::Trust
             }
-        } else if a >= 0.65 {
+        } else if a >= 0.6 {
             EmotionLabel::Surprise
-        } else if a <= 0.35 {
-            EmotionLabel::Neutral
         } else {
-            EmotionLabel::Anticipation
+            EmotionLabel::Neutral
         }
     }
 

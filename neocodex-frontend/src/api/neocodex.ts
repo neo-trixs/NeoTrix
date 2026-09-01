@@ -1,4 +1,5 @@
 import { call } from './client'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   AgentStatus,
   Checkpoint,
@@ -147,6 +148,46 @@ export function stopStream(): Promise<void> {
   return call('neocodex_stop_stream', {})
 }
 
+/**
+ * 订阅流式响应事件
+ * 返回取消订阅函数
+ */
+export async function subscribeStream(callbacks: {
+  onToken?: (delta: string) => void
+  onDone?: () => void
+  onError?: (payload: { message?: string }) => void
+}): Promise<UnlistenFn> {
+  const unlistenFns: UnlistenFn[] = []
+
+  if (callbacks.onToken) {
+    unlistenFns.push(
+      await listen<string>('neocodex-stream-token', (event) => {
+        callbacks.onToken!(event.payload)
+      })
+    )
+  }
+
+  if (callbacks.onDone) {
+    unlistenFns.push(
+      await listen('neocodex-stream-done', () => {
+        callbacks.onDone!()
+      })
+    )
+  }
+
+  if (callbacks.onError) {
+    unlistenFns.push(
+      await listen<{ message?: string }>('neocodex-stream-error', (event) => {
+        callbacks.onError!(event.payload)
+      })
+    )
+  }
+
+  return Promise.resolve(() => {
+    unlistenFns.forEach((unlisten) => unlisten())
+  })
+}
+
 export function editMessage(sessionId: string, index: number, content: string): Promise<NeoCodexMessageItem[]> {
   return call('neocodex_edit_message', { session_id: sessionId, index, content })
 }
@@ -184,6 +225,91 @@ export function setProvider(name: string): Promise<void> {
 /** 连接测试：验证指定提供商是否可达（需后端 neocodex_test_provider 命令）。 */
 export function testProvider(name: string): Promise<boolean> {
   return call('neocodex_test_provider', { name })
+}
+
+/* ── 代理池健康度 ── */
+export interface ProviderHealthStatus {
+  name: string
+  available: boolean
+  circuit_state: string
+  success_rate: string
+  total_calls: number
+  total_errors: number
+  is_free: boolean
+  composite_score: string
+  category: string
+  latency_p95_ms: string
+  latency_avg_ms: string
+  latency_samples: number
+  total_tokens: number
+  health_penalty: string
+  model_locked_count: number
+}
+
+export interface PoolSufficiencyReport {
+  total_providers: number
+  free_total: number
+  free_available: number
+  locked_models: number
+  sufficient: boolean
+}
+
+export interface ProbeResult {
+  name: string
+  reachable: boolean
+  status_code: number
+  latency_ms: number
+  error: string | null
+}
+
+export interface DiscoveryResult {
+  discovered_count: number
+  registered_total: number
+  models: { provider: string; model_id: string; base_url: string; is_free: boolean; tier: string }[]
+}
+
+/** 获取所有 provider 的健康状态（电路/成功率/调用统计） */
+export function providerStatus(): Promise<ProviderHealthStatus[]> {
+  return call('provider_status', {})
+}
+
+/** 获取池子充足度报告 */
+export function poolSufficiency(minFree?: number): Promise<PoolSufficiencyReport> {
+  return call('pool_sufficiency', { min: minFree ?? 3 })
+}
+
+/** 手动触发免费模型发现（刷新 FreeModelCatalog + 注册到 GatewayV2） */
+export function discoverModels(force?: boolean): Promise<DiscoveryResult> {
+  return call('discover_models', { force: force ?? false })
+}
+
+/** 批量探测所有已注册 provider 的网络可达性 */
+export function probeAllProviders(): Promise<ProbeResult[]> {
+  return call('probe_all_providers', {})
+}
+
+/**
+ * 端点连通性探测（兼容 ChatShellProto / ModelsSection 旧调用：providerTest(baseUrl)）。
+ * 优先走后端 neocodex_provider_test（若存在），否则前端直连 /models 探测并计时。
+ * 返回与旧契约一致的 { ok, status_code, latency_ms }，确保自主架构骨架完整。
+ */
+export async function providerTest(baseUrl: string): Promise<{ ok: boolean; status_code: number; latency_ms: number; latencyMs?: number }> {
+  const t0 = Date.now()
+  try {
+    // 尝试后端真实探测（Rust 侧若未注册该命令会抛错，自动回退到前端探测）
+    const r = await call<{ ok: boolean; status_code: number; latency_ms: number }>('neocodex_provider_test', { base_url: baseUrl }).catch(() => null)
+    if (r) return { ...r, latencyMs: r.latency_ms }
+  } catch { /* 回退 */ }
+  // 前端回退：GET {baseUrl}/models 计时
+  try {
+    const url = baseUrl.trim().replace(/\/+$/, '') + '/models'
+    const res = await fetch(url, { method: 'GET' })
+    const latency = Date.now() - t0
+    return { ok: res.ok, status_code: res.status, latency_ms: latency, latencyMs: latency }
+  } catch {
+    const latency = Date.now() - t0
+    return { ok: false, status_code: 0, latency_ms: latency, latencyMs: latency }
+  }
 }
 
 /** 外部第三方模型 API 智能配置：新增一个自定义提供商（OpenAI 兼容 / 自定义网关）。 */

@@ -256,8 +256,7 @@ fn describe_action(action: &ActionType) -> String {
     }
 }
 
-/// Global approval engine, lazily initialized.
-// TODO: inject via DI — pass &ApprovalEngine through CLI command chain instead
+/// Global approval engine fallback — prefer `CliContext.approval` instead.
 pub static APPROVAL_ENGINE: LazyLock<Mutex<ApprovalEngine>> = LazyLock::new(|| {
     Mutex::new(ApprovalEngine::new(ApprovalMode::Suggest))
 });

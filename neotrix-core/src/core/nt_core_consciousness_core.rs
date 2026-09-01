@@ -40,8 +40,8 @@ use serde::{Deserialize, Serialize};
 use crate::core::nt_core_consciousness_tree::{BranchKind, ConsciousnessTree};
 
 /// KB 最短路径管道 — 意识体读写端直达 (R-P42: 强化现有节点, 禁止平行适配器)
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
-use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::pipeline::AbsorbEntry;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 /// 意识核心快照 — 可序列化的跨会话状态 (标量集合 + 果实记录, 不序列化整树)。
 /// 加载时以快照重建树计数器与已消化果实, 使生长周期跨会话连续。
@@ -1855,7 +1855,7 @@ pub struct LlmSolutionExecutor;
 
 impl SolutionExecutor for LlmSolutionExecutor {
     fn attempt(&self, task: &ConsciousTask, grounding: &str, attempt_no: u32) -> AttemptOutcome {
-        use crate::neotrix::l1_body_impl::nt_io_neocodex::{SubagentDispatch, SubagentKind};
+        use crate::l1_action::nt_io::nt_io_neocodex::{SubagentDispatch, SubagentKind};
         let prompt = format!(
             "你是 NeoTrix 意识核心派出的求解专家 (域: {}, 能力: {})。\n\
              任务: {}\n\
@@ -2360,7 +2360,7 @@ mod tests {
     fn gold_standard_thresholds_match_single_source() {
         // 本地镜像阈值与金标模块单一事实源对齐 (arch_fitness_core_boundary
         // 守卫禁止生产代码直连 l9, 对齐由本测试锁定, 漂移即红)。
-        use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
+        use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::{
             DEFAULT_COHERENCE_THRESHOLD, DEFAULT_PHI_THRESHOLD,
         };
         assert_eq!(GOLD_STANDARD_PHI_THRESHOLD, DEFAULT_PHI_THRESHOLD);

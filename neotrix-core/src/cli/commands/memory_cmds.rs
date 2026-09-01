@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 /// /memory 聚合器 — MCP 桥接与 agent 后端调度的记忆域入口。
 /// 子命令委派: evidence | wiki | kb | search

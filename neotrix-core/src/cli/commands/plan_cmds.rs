@@ -65,7 +65,7 @@ impl CliCommand for PlanCmd {
     fn aliases(&self) -> Vec<&str> { vec!["/plan-mode"] }
     fn description(&self) -> &str { "E8 Plan Mode: /plan create <goal> | /plan status | /plan step [index] | /plan list | /plan complete" }
     fn is_primary(&self) -> bool { true }
-    fn execute(&self, args: &[String], _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::SelfIteratingBrain>>>) -> CommandOutput {
+    fn execute(&self, args: &[String], _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok("E8 Plan Mode:\n  /plan create <goal>    创建新计划\n  /plan status           查看当前计划状态\n  /plan step [index]     执行/查看计划步骤\n  /plan list             列出所有计划\n  /plan complete          标记计划完成");
         }

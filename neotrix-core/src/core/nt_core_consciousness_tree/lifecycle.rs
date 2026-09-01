@@ -105,6 +105,47 @@ impl ConsciousnessTree {
             + molt_nourish
     }
 
+    /// 经验驱动的分支优先级提升 — 打破经验→行为的间接路径。
+    ///
+    /// 旧实现: 经验分支仅通过 data_nourishment_factor() 以平滑缩放因子影响果实质量,
+    /// 没有"如果吸收了模式X，则改变行为Y"的直接路径。
+    /// 新实现: 扫描经验分支的 domain 字段, 为有相关经验的分支提供优先级提升。
+    /// 这使系统能够从过去的失败/成功中直接学习, 而非仅通过养料因子间接影响。
+    fn experience_driven_priority(&self) -> f64 {
+        // 从 soil 的经验计数推断经验密度 (不读 KB, 避免循环依赖)
+        let exp_count = self.soil.experience_branch_count;
+        if exp_count == 0 {
+            return 0.0; // 无经验 → 无优先级提升
+        }
+
+        // 经验密度越高, 优先级提升越大 (饱和曲线)
+        // 100 经验分支 → +0.1, 500 → +0.2 (上限)
+        let density_bonus = (exp_count as f64 / 1000.0).min(0.2);
+
+        // 对话质量加成: 高质量对话意味着更有价值的经验
+        let quality_bonus = self.soil.conversation_quality.clamp(0.0, 1.0) * 0.1;
+
+        // 错误经验加成: 有失败经验的分支应该更积极地修复
+        let error_rate = if self.roots.total_fetched > 0 {
+            self.roots.total_failed as f64 / self.roots.total_fetched as f64
+        } else {
+            0.0
+        };
+        let error_bonus = if error_rate > 0.1 {
+            // 高错误率 → 所有分支都应更积极 (系统级修复)
+            0.1
+        } else {
+            0.0
+        };
+
+        density_bonus + quality_bonus + error_bonus
+    }
+
+    /// 经验驱动优先级 — 循环外预计算 (避免借用冲突)
+    fn experience_driven_priority_for_cycle(&self) -> f64 {
+        self.experience_driven_priority()
+    }
+
     /// 闭环进化反馈 (意识核心自我运转 Phase 8)。
     /// 把进化产出 (契约 fulfillment + drift + 演化预测) 反馈到进化参数:
     /// - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.6;
@@ -479,14 +520,16 @@ impl ConsciousnessTree {
             report.valence, report.arousal, report.dominant.0, report.confidence);
     }
 
-    /// 构造 64 维"意识谱"状态向量 — 从真实树状态锚点线性插值 (D1)。
+    /// 构造 64 维"意识谱"状态向量 — 从真实树状态锚点 + 外部现实信号线性插值。
     ///
-    /// 与 `nt_mind_consciousness_monitor::current_phi_state` 同构 (平滑→高相邻
-    /// 一致性 rho, 差异化→去均值后强度高), 但锚点全部取自树自身真实架构状态,
-    /// 使独立 CLI/MCP 进程的 φ 来自真实集成信息而非 0.0。
+    /// **迭代修复**: 旧实现仅从内部树指标 (branch health, maturity, constellation)
+    /// 构造状态向量, 导致 Phi 是自身测试结果的函数 (自指循环)。
+    /// 新实现注入外部现实信号 — KB 增长率、任务完成率、错误密度、
+    /// 对话质量、经验吸收量 — 使 Phi 反映系统与环境的真实集成程度。
     fn build_phi_state(&self) -> Vec<f64> {
-        let mut anchors: Vec<f64> = Vec::with_capacity(32);
-        // 固定语义序锚点 (排除 phi 自身: 回环喂入会自激/失真)
+        let mut anchors: Vec<f64> = Vec::with_capacity(48);
+
+        // ── Layer 1: 内部架构状态 (树自身健康) ──
         let push_b = |anchors: &mut Vec<f64>, branch: &CapabilityBranch| {
             anchors.push(branch.health.clamp(0.0, 1.0));
             anchors.push(branch.maturity_score());
@@ -506,6 +549,55 @@ impl ConsciousnessTree {
         anchors.push((self.cycle as f64 / 100.0).clamp(0.0, 1.0));
         anchors.push(self.data_nourishment_factor().min(1.5) / 1.5);
 
+        // ── Layer 2: 外部现实信号 (打破自指循环的关键) ──
+        // KB 增长率: 知识库节点增长反映系统对外部信息的摄取能力
+        let kb_growth = (self.soil.kb_node_count as f64 / 1000.0).min(1.0);
+        anchors.push(kb_growth);
+
+        // 图连通性: 边/节点比反映知识的关联密度 (非孤立知识点)
+        let connectivity = if self.soil.kb_node_count > 0 {
+            (self.soil.kb_edge_count as f64 / self.soil.kb_node_count as f64).min(1.0)
+        } else {
+            0.0
+        };
+        anchors.push(connectivity);
+
+        // 爬取队列深度: 未处理的外部信息量 (系统感知外部的窗口)
+        let crawl_pressure = (self.soil.crawl_queue_depth as f64 / 100.0).min(1.0);
+        anchors.push(crawl_pressure);
+
+        // 对话质量: 真实交互反馈 (非内部自评)
+        anchors.push(self.soil.conversation_quality.clamp(0.0, 1.0));
+
+        // 经验吸收密度: 从真实对话中蒸馏的经验量
+        let exp_density = (self.soil.experience_branch_count as f64 / 500.0).min(1.0);
+        anchors.push(exp_density);
+
+        // 错误/失败率: roots.total_failed 反映系统在真实任务中的失败程度
+        let error_rate = if self.roots.total_fetched > 0 {
+            (self.roots.total_failed as f64 / self.roots.total_fetched as f64).clamp(0.0, 1.0)
+        } else {
+            0.5 // 无数据时中性值, 不假装成功
+        };
+        anchors.push(1.0 - error_rate); // 反转: 低错误率 → 高信号
+
+        // 信息摄取效率: absorbed/fetched 比率反映系统消化外部信息的能力
+        let absorption_efficiency = if self.roots.total_fetched > 0 {
+            (self.roots.total_absorbed as f64 / self.roots.total_fetched as f64).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        anchors.push(absorption_efficiency);
+
+        // 能力网密度: 能力节点数量反映系统实际能力的丰富度
+        let cap_density = (self.soil.capability_node_count as f64 / 100.0).min(1.0);
+        anchors.push(cap_density);
+
+        // 蜕皮活跃度: 系统自我更新的频率 (C5 自愈指标)
+        let molt_active = (self.soil.molt_archived_count as f64 / 10.0).min(1.0);
+        anchors.push(molt_active);
+
+        // ── 线性插值到 64 维 ──
         let dims = 64usize;
         let win = anchors.len().min(dims);
         if win == 0 {
@@ -645,6 +737,8 @@ impl ConsciousnessTree {
         let mut total_fruits = 0;
         // 数据养料充足度因子 — 循环外预计算 (只读 soil, 避免与 branches 可变借用冲突)
         let data_nourishment = self.data_nourishment_factor();
+        // 经验驱动优先级 — 循环外预计算 (只读 soil/roots, 避免与 branches 可变借用冲突)
+        let experience_priority = self.experience_driven_priority_for_cycle();
         for branch in self.branches.values_mut() {
             let constraints = constraints_for_branch(&branch.kind);
             let violations = constraints.violations(branch);
@@ -696,9 +790,24 @@ impl ConsciousnessTree {
                 // 使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
                 // 此前果实质量仅反映内部 maturity, 从不反映真实数据量。
                 let base_quality = branch.maturity_score();
+                // 经验驱动优先级: 从吸收的经验中直接学习, 而非仅通过养料因子间接影响。
+                // 这打破了"经验→行为"的间接路径, 使系统能从过去的失败/成功中直接调整。
+                let exp_priority = experience_priority;
+
+                // 回归惩罚: 如果分支有近期失败, 质量应下降。
+                // 旧系统质量永远上升 (单调递增), 无法适应挫折。
+                // 新系统: 错误率越高, 惩罚越大, 使质量能反映真实表现。
+                let regression_penalty = if self.roots.total_fetched > 0 {
+                    let error_rate = self.roots.total_failed as f64 / self.roots.total_fetched as f64;
+                    // 错误率 10% → 惩罚 0.1, 50% → 惩罚 0.3 (饱和曲线)
+                    (error_rate * 0.6).min(0.3)
+                } else {
+                    0.0
+                };
+
                 // D7 (C7): 质量钳到 [0,1] — maturity∈[0,1] × nourishment(≥1) 此前
                 // min(...,1.5) 可越界, 违反 quality∈[0,1] 不变量 (下游按概率/归一消费)。
-                let quality = (base_quality * data_nourishment).clamp(0.0, 1.0);
+                let quality = (base_quality * data_nourishment + exp_priority - regression_penalty).clamp(0.0, 1.0);
                 // Use EvolutionFruit instead of CapabilityFruit
                 let fruit = EvolutionFruit {
                     name: format!("{}-evo-fruit-{}", branch.kind.label(), self.cycle),

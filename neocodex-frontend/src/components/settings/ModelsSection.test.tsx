@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@solidjs/testing-library'
 import { createSignal } from 'solid-js'
-import type { ProviderConfig, ProviderMeta } from '../../api/types'
+import type { ProviderConfig } from '../../api/types'
 import { ModelsSection } from './ModelsSection'
 import { resetInvokeMock, mockCommand } from '../../test/invokeMock'
 
@@ -26,20 +26,16 @@ const mount = (cfg: ProviderConfig) => {
   const [config] = createSignal<ProviderConfig | null>(cfg)
   const [loading] = createSignal(false)
   const [switching] = createSignal(false)
-  const [customProviders] = createSignal<ProviderMeta[]>([])
   const onSwitch = vi.fn()
-  const onAddCustomProvider = vi.fn()
   const utils = render(() => (
     <ModelsSection
       config={config}
       loading={loading}
       switching={switching}
       onSwitchProvider={onSwitch}
-      customProviders={customProviders}
-      onAddCustomProvider={onAddCustomProvider}
     />
   ))
-  return { ...utils, onSwitch, onAddCustomProvider }
+  return { ...utils, onSwitch }
 }
 
 describe('ModelsSection', () => {

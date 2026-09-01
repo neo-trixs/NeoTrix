@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::cli::tui::themes::theme_list;
 
 pub struct ThemeCmd;

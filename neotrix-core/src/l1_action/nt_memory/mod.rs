@@ -12,3 +12,4 @@ pub mod nt_memory_yopedia;
 pub mod nt_memory_historian;
 pub mod nt_memory_kb;
 pub mod nt_memory_spatial;
+pub mod nt_memory_openknowledge;

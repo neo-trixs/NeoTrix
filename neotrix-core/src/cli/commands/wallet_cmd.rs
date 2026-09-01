@@ -13,8 +13,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::nt_act_crypto::CryptoAgent;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+// use crate::l1_action::nt_act::nt_act_crypto::crypto::CryptoAgent;
 
 fn with_crypto<F>(f: F) -> CommandOutput
 where
@@ -277,15 +277,15 @@ fn short_addr(addr: &str) -> String {
     }
 }
 
-fn chain_from_name(name: &str) -> crate::neotrix::nt_act_crypto::ChainType {
+fn chain_from_name(name: &str) -> crate::l1_action::nt_act::nt_act_crypto::ChainType {
     match name.to_lowercase().as_str() {
-        "eth" | "ethereum" => crate::neotrix::nt_act_crypto::ChainType::Ethereum,
-        "bsc" | "bnb" => crate::neotrix::nt_act_crypto::ChainType::Bsc,
-        "polygon" | "matic" => crate::neotrix::nt_act_crypto::ChainType::Polygon,
-        "arb" | "arbitrum" => crate::neotrix::nt_act_crypto::ChainType::Arbitrum,
-        "opt" | "optimism" | "op" => crate::neotrix::nt_act_crypto::ChainType::Optimism,
-        "base" => crate::neotrix::nt_act_crypto::ChainType::Base,
-        "avax" | "avalanche" => crate::neotrix::nt_act_crypto::ChainType::Avalanche,
-        _ => crate::neotrix::nt_act_crypto::ChainType::Ethereum,
+        "eth" | "ethereum" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Ethereum,
+        "bsc" | "bnb" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Bsc,
+        "polygon" | "matic" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Polygon,
+        "arb" | "arbitrum" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Arbitrum,
+        "opt" | "optimism" | "op" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Optimism,
+        "base" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Base,
+        "avax" | "avalanche" => crate::l1_action::nt_act::nt_act_crypto::ChainType::Avalanche,
+        _ => crate::l1_action::nt_act::nt_act_crypto::ChainType::Ethereum,
     }
 }

@@ -9,8 +9,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::l1_body_impl::nt_io_neocodex::{AcpServer, NeoCodexAgent};
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+use crate::l1_action::nt_io::nt_io_neocodex::{AcpServer, NeoCodexAgent};
 
 pub struct AcpCmd;
 

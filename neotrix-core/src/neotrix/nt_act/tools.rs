@@ -737,7 +737,7 @@ impl Tool for KnowledgeQueryTool {
         let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
         // Try to access knowledge base
-        if let Ok(kb) = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(None) {
+        if let Ok(kb) = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None) {
             let conn = kb.conn.lock().map_err(|e| format!("KB lock failed: {}", e))?;
             
             // Simple keyword search in kb_store

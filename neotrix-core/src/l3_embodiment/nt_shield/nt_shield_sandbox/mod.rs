@@ -1,0 +1,1147 @@
+use std::collections::HashMap;
+use std::net::TcpStream;
+use std::sync::Arc;
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "sandbox")]
+use crate::l3_embodiment::nt_shield::vault::Vault;
+
+pub mod cli;
+pub mod device;
+pub mod docker;
+pub mod judge;
+pub mod provider;
+pub mod remote;
+pub mod stateful_bench;
+
+pub use device::{DeviceSandbox, DeviceTool, SandboxEngine, SandboxSession, SandboxSpec, SandboxStatus};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CloudRuntime {
+    Python3,
+    Node18,
+    RustStable,
+    Go1_21,
+    GenericLinux,
+}
+
+impl CloudRuntime {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CloudRuntime::Python3 => "python:3.11",
+            CloudRuntime::Node18 => "node:18",
+            CloudRuntime::RustStable => "rust:latest",
+            CloudRuntime::Go1_21 => "golang:1.21",
+            CloudRuntime::GenericLinux => "ubuntu:22.04",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "python3" | "python" | "py" => Some(CloudRuntime::Python3),
+            "node18" | "node" | "js" => Some(CloudRuntime::Node18),
+            "rust" | "ruststable" | "rs" => Some(CloudRuntime::RustStable),
+            "go1.21" | "go" | "golang" => Some(CloudRuntime::Go1_21),
+            "linux" | "generic" | "ubuntu" => Some(CloudRuntime::GenericLinux),
+            _ => None,
+        }
+    }
+
+    pub fn variants() -> &'static [CloudRuntime] {
+        &[
+            CloudRuntime::Python3,
+            CloudRuntime::Node18,
+            CloudRuntime::RustStable,
+            CloudRuntime::Go1_21,
+            CloudRuntime::GenericLinux,
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CloudSessionStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    TimedOut,
+}
+
+/// Per-sandbox egress network policy (OpenSandbox absorption, Cycle 232+).
+/// Controls which outbound hosts/ports a sandbox session may reach before the
+/// workload runs — the sandbox's outbound trust boundary (R-P32 双观独立性).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EgressRule {
+    /// Host pattern: exact host, `*.example.com`, or `*` (all).
+    pub host: String,
+    /// Port range as `"443"` or `"443-8443"`; empty = any port.
+    pub port: String,
+    /// allow (whitelist) or deny (blacklist). Deny takes precedence.
+    pub allow: bool,
+}
+
+impl EgressRule {
+    pub fn allow(host: &str, port: &str) -> Self {
+        Self { host: host.into(), port: port.into(), allow: true }
+    }
+
+    pub fn deny(host: &str, port: &str) -> Self {
+        Self { host: host.into(), port: port.into(), allow: false }
+    }
+
+    fn host_matches(&self, host: &str) -> bool {
+        if self.host == "*" {
+            return true;
+        }
+        if let Some(suffix) = self.host.strip_prefix("*.") {
+            // `*.example.com` matches subdomains only — not the bare apex,
+            // and never across a dot boundary (example.com.evil.net).
+            return host.ends_with(&format!(".{}", suffix));
+        }
+        host == self.host
+    }
+
+    fn port_matches(&self, port: u16) -> bool {
+        if self.port.is_empty() {
+            return true;
+        }
+        if let Some((lo, hi)) = self.port.split_once('-') {
+            let (lo, hi): (u16, u16) = match (lo.parse(), hi.parse()) {
+                (Ok(a), Ok(b)) => (a, b),
+                _ => return false,
+            };
+            port >= lo && port <= hi
+        } else {
+            self.port.parse::<u16>().map(|p| p == port).unwrap_or(false)
+        }
+    }
+}
+
+/// Compiled egress policy over a rule list. Deny wins over allow; unmatched
+/// hosts fall back to the policy default.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EgressPolicy {
+    pub rules: Vec<EgressRule>,
+    /// Default for hosts not matched by any rule.
+    pub default_allow: bool,
+}
+
+impl EgressPolicy {
+    pub fn new(rules: Vec<EgressRule>, default_allow: bool) -> Self {
+        Self { rules, default_allow }
+    }
+
+    /// Everything out — matches legacy sandbox behaviour.
+    pub fn permissive() -> Self {
+        Self { rules: vec![], default_allow: true }
+    }
+
+    /// Nothing out — the closed trust boundary default for agent sandboxes.
+    pub fn deny_all() -> Self {
+        Self { rules: vec![], default_allow: false }
+    }
+
+    /// Evaluate one outbound connection. Deny rules shadow allow rules.
+    pub fn check(&self, host: &str, port: u16) -> bool {
+        let mut matched_allow = false;
+        for rule in &self.rules {
+            if rule.host_matches(host) && rule.port_matches(port) {
+                if !rule.allow {
+                    return false; // explicit deny wins
+                }
+                matched_allow = true;
+            }
+        }
+        matched_allow || self.default_allow
+    }
+
+    /// Sanity validation: deny-all + a localhost allow must pass only the allow.
+    pub fn sanity_check(&self) -> Result<(), String> {
+        if self.rules.iter().any(|r| r.host == "*" && !r.allow) {
+            return Err("egress: global deny-all rule would shadow every allow (use deny_all + specific allows)".into());
+        }
+        Ok(())
+    }
+
+    /// E6 防护层硬化 (R-P106, 吸收 src30 Storm-Breaker recon): Egress Policy
+    /// 的 `apply` 必须幂等 — 同一策略连续应用两次得到完全相同的规范化状态。
+    /// 策略本身是无副作用值类型; 此处返回规范化副本 (规则确定性排序 + 去重),
+    /// 对已是规范化的策略再 `apply` 一次得到逐字段相同的结构。
+    pub fn apply(&self) -> EgressPolicy {
+        let mut rules: Vec<EgressRule> = self.rules.clone();
+        rules.sort_by(|a, b| {
+            (a.host.as_str(), a.port.as_str(), a.allow)
+                .cmp(&(b.host.as_str(), b.port.as_str(), b.allow))
+        });
+        rules.dedup_by(|a, b| a.host == b.host && a.port == b.port && a.allow == b.allow);
+        EgressPolicy { rules, default_allow: self.default_allow }
+    }
+
+    /// 是否已处于规范化 (幂等后) 状态。
+    pub fn is_canonical(&self) -> bool {
+        let mut i = 0;
+        while i + 1 < self.rules.len() {
+            let a = &self.rules[i];
+            let b = &self.rules[i + 1];
+            let ord = (a.host.as_str(), a.port.as_str(), a.allow)
+                .cmp(&(b.host.as_str(), b.port.as_str(), b.allow));
+            if ord == std::cmp::Ordering::Greater {
+                return false;
+            }
+            if a.host == b.host && a.port == b.port && a.allow == b.allow {
+                return false; // duplicate → not canonical
+            }
+            i += 1;
+        }
+        true
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// E6 防护层硬化: Storm-Breaker recon (src30 吸收, R-P48 Rust-native)。
+// 纯 Rust 实现, 不 shell out 到外部工具 (无 `std::process::Command`)。
+// 此处为最小 stub 路径: 不发起真实网络, 仅做静态占位评估; 真实 recon 应扩展为
+// Rust-native socket 探测, 但保持零依赖、零 shell (R-P48)。
+// ────────────────────────────────────────────────────────────────
+
+/// Storm-Breaker recon 结果 (Rust-native TCP 探测, 无 shell / 无第三方 crate)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StormBreakerRecon {
+    pub host: String,
+    pub reachable: bool,
+    pub note: &'static str,
+}
+
+/// Rust-native TCP 探测结果 (R-P48: 零第三方 crate、零 shell-out)。
+/// `Open`=端口可达/开放; `Closed`=连接被拒 (端口关闭); `Unreachable`=超时 /
+/// 网络不可达 / 被 egress policy 阻断。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StormBreakerProbe {
+    Open,
+    Closed,
+    Unreachable,
+}
+
+/// Rust-native Storm-Breaker TCP 可达性探测 (R-P48)。
+/// 仅使用 `std::net::TcpStream::connect_timeout`, 不 shell out 到 nmap/dig 等
+/// 外部工具, 不引入任何第三方网络 crate。给定 host + port, 返回 `ProbeResult`
+/// 枚举 (Open/Closed/Unreachable), 函数本身不抛错。
+pub fn storm_breaker_tcp_probe(host: &str, port: u16) -> StormBreakerProbe {
+    let addr: std::net::SocketAddr = match format!("{host}:{port}").parse() {
+        Ok(a) => a,
+        Err(_) => return StormBreakerProbe::Unreachable,
+    };
+    match TcpStream::connect_timeout(&addr, Duration::from_secs(3)) {
+        Ok(_) => StormBreakerProbe::Open,
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::ConnectionRefused => StormBreakerProbe::Closed,
+            _ => StormBreakerProbe::Unreachable,
+        },
+    }
+}
+
+/// Rust-native Storm-Breaker recon (R-P48): 对默认探测端口列表
+/// (443 / 80) 做 Rust 原生 TCP 探测, 任一端口 Open 即视为 reachable。
+/// 纯 std 实现, 无外部进程、无网络库。
+pub fn storm_breaker_recon(host: &str) -> StormBreakerRecon {
+    let reachable = [443u16, 80]
+        .iter()
+        .any(|&p| storm_breaker_tcp_probe(host, p) == StormBreakerProbe::Open);
+    StormBreakerRecon {
+        host: host.to_string(),
+        reachable,
+        note: "rust-native tcp probe (R-P48, no external tool)",
+    }
+}
+
+/// GDELT Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_GDELT_HOST: &str = "api.gdeltproject.org";
+/// GDELT Egress allow 规则 (deny-wins 体系中的 allow 分支)。
+pub fn gdelt_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_GDELT_HOST, "443")
+}
+/// GDELT 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn intel_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![gdelt_egress_rule()], false)
+}
+
+/// SEC EDGAR Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_EDGAR_HOST: &str = "data.sec.gov";
+/// SEC EDGAR Egress allow 规则 (deny-wins 体系中的 allow 分支)。
+pub fn edgar_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_EDGAR_HOST, "443")
+}
+/// SEC EDGAR 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn edgar_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![edgar_egress_rule()], false)
+}
+
+/// USGS Earthquakes Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_USGS_HOST: &str = "earthquake.usgs.gov";
+/// USGS Egress allow 规则 (deny-wins 体系中的 allow 分支)。
+pub fn usgs_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_USGS_HOST, "443")
+}
+/// USGS 专用 Egress Policy (deny_all 基线 + 单条 allow)。
+pub fn usgs_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![usgs_egress_rule()], false)
+}
+
+/// GDACS Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_GDACS_HOST: &str = "www.gdacs.org";
+pub fn gdacs_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_GDACS_HOST, "443")
+}
+pub fn gdacs_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![gdacs_egress_rule()], false)
+}
+
+/// UCDP Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_UCDP_HOST: &str = "ucdp.uu.se";
+pub fn ucdp_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_UCDP_HOST, "443")
+}
+pub fn ucdp_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![ucdp_egress_rule()], false)
+}
+
+/// URLhaus Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_URLHAUS_HOST: &str = "urlhaus-api.abuse.ch";
+pub fn urlhaus_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_URLHAUS_HOST, "443")
+}
+pub fn urlhaus_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![urlhaus_egress_rule()], false)
+}
+
+/// CISA KEV Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_CISA_KEV_HOST: &str = "www.cisa.gov";
+pub fn cisa_kev_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_CISA_KEV_HOST, "443")
+}
+pub fn cisa_kev_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![cisa_kev_egress_rule()], false)
+}
+
+/// OFAC Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_OFAC_HOST: &str = "www.treasury.gov";
+pub fn ofac_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_OFAC_HOST, "443")
+}
+pub fn ofac_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![ofac_egress_rule()], false)
+}
+
+/// Polymarket Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_POLYMARKET_HOST: &str = "gamma-api.polymarket.com";
+pub fn polymarket_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_POLYMARKET_HOST, "443")
+}
+pub fn polymarket_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![polymarket_egress_rule()], false)
+}
+
+/// AOI (Area of Interest) Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_AOI_HOST: &str = "earthquake.usgs.gov";
+pub fn aoi_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_AOI_HOST, "443")
+}
+pub fn aoi_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![aoi_egress_rule()], false)
+}
+
+/// adsb.lol Egress 主机 — 单一事实源 (P2)。
+pub const INTEL_ADSB_HOST: &str = "api.adsb.lol";
+pub fn adsb_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_ADSB_HOST, "443")
+}
+pub fn adsb_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![adsb_egress_rule()], false)
+}
+
+/// BGPview.io Egress 主机 — 单一事实源 (外部吸收批次).
+pub const INTEL_BGPVIEW_HOST: &str = "api.bgpview.io";
+pub fn bgpview_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_BGPVIEW_HOST, "443")
+}
+pub fn bgpview_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![bgpview_egress_rule()], false)
+}
+
+/// OpenCorporates Egress 主机 — 单一事实源 (外部吸收批次).
+pub const INTEL_OPENCORPORATES_HOST: &str = "api.opencorporates.com";
+pub fn opencorporates_egress_rule() -> EgressRule {
+    EgressRule::allow(INTEL_OPENCORPORATES_HOST, "443")
+}
+pub fn opencorporates_egress_policy() -> EgressPolicy {
+    EgressPolicy::new(vec![opencorporates_egress_rule()], false)
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ResourceUsage {
+    pub cpu_time: f64,
+    pub memory_mb: f64,
+    pub network_kb: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudResult {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+    pub execution_time: Duration,
+    pub resource_usage: ResourceUsage,
+}
+
+pub struct CloudSession {
+    pub session_id: String,
+    pub status: CloudSessionStatus,
+    pub runtime: CloudRuntime,
+    /// Per-session egress policy (snapshot at creation; immutable for the run).
+    pub egress: EgressPolicy,
+    provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
+}
+
+impl CloudSession {
+    pub fn new(
+        session_id: String,
+        runtime: CloudRuntime,
+        egress: EgressPolicy,
+        provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
+    ) -> Self {
+        Self {
+            session_id,
+            status: CloudSessionStatus::Pending,
+            runtime,
+            egress,
+            provider,
+        }
+    }
+
+    pub async fn execute(
+        &mut self,
+        code: &str,
+        runtime: CloudRuntime,
+        env: &HashMap<String, String>,
+    ) -> Result<CloudResult, String> {
+        self.status = CloudSessionStatus::Running;
+        let result = self.provider.execute(&self.session_id, code, runtime, env).await?;
+        self.status = match result.exit_code {
+            0 => CloudSessionStatus::Completed,
+            _ if result.execution_time >= Duration::from_secs(300) => CloudSessionStatus::TimedOut,
+            _ => CloudSessionStatus::Failed,
+        };
+        Ok(result)
+    }
+
+    pub async fn upload_file(&mut self, path: &str, data: Vec<u8>) -> Result<(), String> {
+        self.provider.upload_file(&self.session_id, path, data).await
+    }
+
+    pub async fn download_result(&self) -> Result<CloudResult, String> {
+        self.provider.download_result(&self.session_id).await
+    }
+
+    pub fn stream_logs(&self) -> futures::stream::BoxStream<'static, String> {
+        self.provider.stream_logs(&self.session_id)
+    }
+
+    pub async fn cancel(&mut self) -> Result<(), String> {
+        self.provider.cancel(&self.session_id).await?;
+        self.status = CloudSessionStatus::Failed;
+        Ok(())
+    }
+}
+
+pub struct CloudSandbox {
+    pub cloud_endpoint: String,
+    pub api_key: Option<String>,
+    pub max_runtime: Duration,
+    pub supported_runtimes: Vec<CloudRuntime>,
+    /// Default egress policy applied to every new session.
+    pub egress: EgressPolicy,
+    sessions: Vec<CloudSession>,
+    provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
+    /// AES-256-GCM 凭据保险库 — 执行前注入为容器环境变量 (NEOTRIX_VAULT_*)。
+    #[cfg(feature = "sandbox")]
+    vault: Option<Arc<Vault>>,
+}
+
+impl CloudSandbox {
+    pub fn new(
+        cloud_endpoint: String,
+        api_key: Option<String>,
+        max_runtime: Duration,
+        provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync>,
+    ) -> Self {
+        Self {
+            cloud_endpoint,
+            api_key,
+            max_runtime,
+            supported_runtimes: CloudRuntime::variants().to_vec(),
+            egress: EgressPolicy::permissive(),
+            sessions: Vec::new(),
+            provider,
+            #[cfg(feature = "sandbox")]
+            vault: None,
+        }
+    }
+
+    /// Set the default egress policy for subsequent sessions.
+    pub fn set_egress(&mut self, policy: EgressPolicy) {
+        self.egress = policy;
+    }
+
+    pub fn default_local() -> Self {
+        let provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync> =
+            if Self::docker_available() {
+                Arc::new(docker::LocalDockerProvider::new())
+            } else {
+                Arc::new(provider::NoopProvider)
+            };
+        Self::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(300),
+            provider,
+        )
+    }
+
+    fn docker_available() -> bool {
+        std::process::Command::new("docker")
+            .args(["info"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    /// 挂接外部提供的 Vault (测试/自定义配置)。
+    #[cfg(feature = "sandbox")]
+    pub fn attach_vault(&mut self, vault: Option<Arc<Vault>>) {
+        self.vault = vault;
+    }
+
+    /// 生产接线: 从 `~/.neotrix/vault.enc` 加载默认 Vault。
+    /// 未配置主密钥 (NEOTRIX_VAULT_KEY 缺省) 或加载失败 → 记录 warning,
+    /// 以无注入模式运行 (向后兼容, 不阻断沙盒)。
+    #[cfg(feature = "sandbox")]
+    pub fn attach_default_vault(&mut self) {
+        match Vault::new() {
+            Ok(vault) => {
+                let count = vault.len();
+                self.vault = Some(Arc::new(vault));
+                log::info!(
+                    "[sandbox] vault attached ({} credential(s)); secrets will be injected as env",
+                    count
+                );
+            }
+            Err(e) => {
+                log::warn!("[sandbox] vault unavailable: {}; running without secret injection", e);
+            }
+        }
+    }
+
+    /// 汇总 vault 凭据为待注入 env map (key 前缀 NEOTRIX_VAULT_)。无 vault → 空 map。
+    fn vault_env(&self) -> HashMap<String, String> {
+        #[cfg(feature = "sandbox")]
+        {
+            let mut env = HashMap::new();
+            if let Some(vault) = &self.vault {
+                vault.inject_env(&mut env);
+            }
+            env
+        }
+        #[cfg(not(feature = "sandbox"))]
+        {
+            HashMap::new()
+        }
+    }
+
+    pub fn create_session(&mut self, runtime: CloudRuntime) -> String {
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let session =
+            CloudSession::new(session_id.clone(), runtime, self.egress.clone(), Arc::clone(&self.provider));
+        self.sessions.push(session);
+        session_id
+    }
+
+    pub fn get_session(&self, session_id: &str) -> Option<&CloudSession> {
+        self.sessions.iter().find(|s| s.session_id == session_id)
+    }
+
+    pub fn get_session_mut(&mut self, session_id: &str) -> Option<&mut CloudSession> {
+        self.sessions.iter_mut().find(|s| s.session_id == session_id)
+    }
+
+    pub fn list_sessions(&self) -> &[CloudSession] {
+        &self.sessions
+    }
+
+    pub fn cancel_session(&mut self, session_id: &str) -> Result<(), String> {
+        match self.get_session_mut(session_id) {
+            Some(session) => {
+                let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+                rt.block_on(session.cancel())
+            }
+            None => Err(format!("Session {} not found", session_id)),
+        }
+    }
+
+    pub async fn run_code(
+        &mut self,
+        code: &str,
+        runtime: CloudRuntime,
+    ) -> Result<CloudResult, String> {
+        // Validate-before-connect gate (absorbed: grok-bot local Docker
+        // sandbox): the backend must prove its environment healthy before any
+        // workload is dispatched — fail-closed, never mid-flight.
+        self.provider.validate_ready().await?;
+        let env = self.vault_env();
+        let session_id = self.create_session(runtime);
+        let session = self.get_session_mut(&session_id).ok_or("session creation failed")?;
+        session.execute(code, runtime, &env).await
+    }
+
+    pub fn provider_name(&self) -> &str {
+        self.provider.name()
+    }
+}
+
+/// Per-call enforcement level (deepseek-harness pattern #5). Describes how a
+/// single tool call should be confined. Also doubles as the *reported
+/// enforcement fact* from the sandbox backend (`full`/`partial` honesty):
+/// older backends (e.g. Landlock ABI) may only guarantee `Partial`, which must
+/// be surfaced, never assumed to be `Full`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnforcementLevel {
+    /// Fully confined — file effects and egress fully governed by policy.
+    Full,
+    /// Partially confined — backend cannot guarantee the full boundary.
+    Partial,
+    /// Informational — call proceeds, observed effects reported to the agent.
+    Notify,
+}
+
+impl EnforcementLevel {
+    pub fn is_full(&self) -> bool {
+        matches!(self, EnforcementLevel::Full)
+    }
+}
+
+/// Per-call policy contract (deepseek-harness pattern #5). Strengthens — never
+/// replaces — the existing session egress policy (R-P42): it carries the
+/// demanded enforcement level, an optional per-call egress overlay evaluated
+/// against the session snapshot, and an approval gate. Resolved *per call*;
+/// never mutates the session or global policy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallPolicy {
+    /// Demanded enforcement level for this call.
+    pub level: EnforcementLevel,
+    /// Per-call egress overlay. `None` = evaluate against the session's
+    /// immutable egress snapshot. Deny-wins inside the overlay.
+    pub egress_override: Option<EgressPolicy>,
+    /// When true, the call requires human approval granted *before* execution;
+    /// an unanswered approval seam is a hard deny (fail-closed).
+    pub requires_approval: bool,
+}
+
+impl CallPolicy {
+    pub fn full() -> Self {
+        Self {
+            level: EnforcementLevel::Full,
+            egress_override: None,
+            requires_approval: false,
+        }
+    }
+
+    pub fn with_egress_override(self, egress: EgressPolicy) -> Self {
+        Self {
+            egress_override: Some(egress),
+            ..self
+        }
+    }
+
+    pub fn with_approval(self, requires_approval: bool) -> Self {
+        Self {
+            requires_approval,
+            ..self
+        }
+    }
+
+    /// Deny-wins per-call resolution against the session egress policy and the
+    /// backend-reported enforcement fact. Any denying dimension wins:
+    ///   1. unanswered approval gate → `Approval` denial (fail-closed);
+    ///   2. demanded `Full` but backend reports less than `Full` → `Sandbox`
+    ///      denial (enforcement honesty — a `Partial` ABI cannot honor `Full`);
+    ///   3. egress allow/deny verdict → `Egress` denial.
+    pub fn evaluate(
+        &self,
+        enforcement: EnforcementLevel,
+        session_egress: &EgressPolicy,
+        host: &str,
+        port: u16,
+    ) -> CallVerdict {
+        if self.requires_approval {
+            return CallVerdict::Denied(CallDenial::approval(
+                "approval seam unanswered or not granted",
+            ));
+        }
+        if self.level == EnforcementLevel::Full && enforcement != EnforcementLevel::Full {
+            return CallVerdict::Denied(CallDenial::sandbox(&format!(
+                "demanded {:?} confinement but backend reports {:?}",
+                self.level, enforcement
+            )));
+        }
+        let egress = self.egress_override.as_ref().unwrap_or(session_egress);
+        if !egress.check(host, port) {
+            return CallVerdict::Denied(CallDenial::egress(host, port));
+        }
+        CallVerdict::Allowed(self.level)
+    }
+}
+
+/// Machine-readable denial classification (deepseek-harness pattern #5:
+/// "denial dialect signatures"). Lets a calling agent branch on the *kind*
+/// instead of parsing prose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DenialKind {
+    Egress,
+    Resource,
+    Approval,
+    Sandbox,
+}
+
+/// Structured denial reason — never a bare error string. An agent can act on
+/// `code` (stable machine-readable tag) and `kind`, and show `message` to a
+/// human.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallDenial {
+    pub kind: DenialKind,
+    /// Stable machine-readable code, e.g. `egress_denied:fetch.api.example.com:443`.
+    pub code: String,
+    /// Human-readable explanation.
+    pub message: String,
+}
+
+impl CallDenial {
+    pub fn egress(host: &str, port: u16) -> Self {
+        Self {
+            kind: DenialKind::Egress,
+            code: format!("egress_denied:{}:{}", host, port),
+            message: format!("egress denied for {}:{} — outside the sandbox trust boundary", host, port),
+        }
+    }
+
+    pub fn resource(reason: &str) -> Self {
+        Self {
+            kind: DenialKind::Resource,
+            code: "resource_denied".to_string(),
+            message: format!("resource limit exceeded: {}", reason),
+        }
+    }
+
+    pub fn approval(reason: &str) -> Self {
+        Self {
+            kind: DenialKind::Approval,
+            code: "approval_required".to_string(),
+            message: format!("human approval required: {}", reason),
+        }
+    }
+
+    pub fn sandbox(reason: &str) -> Self {
+        Self {
+            kind: DenialKind::Sandbox,
+            code: "sandbox_denied".to_string(),
+            message: format!("sandbox confinement not enforceable: {}", reason),
+        }
+    }
+
+    /// Agent-actionable directive for the caller of a denied tool call.
+    pub fn agent_action(&self) -> &'static str {
+        match self.kind {
+            DenialKind::Egress => {
+                "rewrite the call to use an allowed host/port from the sandbox egress policy"
+            }
+            DenialKind::Resource => "reduce the call's resource footprint (output size / concurrency)",
+            DenialKind::Approval => "request human approval for the call, then retry",
+            DenialKind::Sandbox => {
+                "use a backend that can enforce the demanded level, or lower the call's level"
+            }
+        }
+    }
+}
+
+/// Per-call resolution outcome.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CallVerdict {
+    Allowed(EnforcementLevel),
+    Denied(CallDenial),
+}
+
+impl CallVerdict {
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, CallVerdict::Allowed(_))
+    }
+
+    pub fn denial(&self) -> Option<&CallDenial> {
+        match self {
+            CallVerdict::Denied(d) => Some(d),
+            CallVerdict::Allowed(_) => None,
+        }
+    }
+}
+
+#[cfg(all(test, feature = "sandbox"))]
+mod sandbox_vault_tests {
+    use super::*;
+    use futures::StreamExt;
+    use crate::l3_embodiment::nt_shield::vault::Vault;
+
+    /// Test-only provider: spawns a real child process that reads the injected
+    /// `NEOTRIX_VAULT_*` variable, proving secrets reach the workload env.
+    struct EnvCaptureProvider;
+
+    #[async_trait::async_trait]
+    impl provider::CloudSandboxProvider for EnvCaptureProvider {
+        fn name(&self) -> &'static str {
+            "env-capture"
+        }
+
+        async fn execute(
+            &self,
+            _session_id: &str,
+            _code: &str,
+            _runtime: CloudRuntime,
+            env: &HashMap<String, String>,
+        ) -> Result<CloudResult, String> {
+            let out = std::process::Command::new("sh")
+                .args(["-c", "printf '%s' \"$NEOTRIX_VAULT_API_KEY\""])
+                .envs(env)
+                .output()
+                .map_err(|e| format!("spawn: {}", e))?;
+            Ok(CloudResult {
+                stdout: String::from_utf8_lossy(&out.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+                exit_code: out.status.code().unwrap_or(-1),
+                execution_time: Duration::from_secs(0),
+                resource_usage: ResourceUsage::default(),
+            })
+        }
+
+        async fn upload_file(&self, _s: &str, _p: &str, _d: Vec<u8>) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn download_result(&self, _s: &str) -> Result<CloudResult, String> {
+            Ok(CloudResult {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+                execution_time: Duration::from_secs(0),
+                resource_usage: ResourceUsage::default(),
+            })
+        }
+
+        fn stream_logs(&self, _s: &str) -> futures::stream::BoxStream<'static, String> {
+            futures::stream::empty().boxed()
+        }
+
+        async fn cancel(&self, _s: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    /// 集成: Vault → CloudSandbox → provider.execute → 子进程 env 含凭据。
+    #[test]
+    fn test_vault_secrets_injected_into_sandbox_child_env() {
+        std::env::set_var(
+            "NEOTRIX_VAULT_KEY",
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        );
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut vault = Vault::with_path(dir.path().join("vault.enc")).expect("vault");
+        vault.set("api_key", "sk-supersecret");
+        vault.save().expect("vault.save");
+
+        let mut cloud = CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            Arc::new(EnvCaptureProvider),
+        );
+        cloud.attach_vault(Some(Arc::new(vault)));
+
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let result = rt.block_on(cloud.run_code("print('hi')", CloudRuntime::Python3)).expect("run");
+        assert_eq!(result.exit_code, 0, "child should run; stderr={}", result.stderr);
+        assert_eq!(
+            result.stdout, "sk-supersecret",
+            "secret must be readable via NEOTRIX_VAULT_API_KEY in the child env"
+        );
+        std::env::remove_var("NEOTRIX_VAULT_KEY");
+    }
+
+    /// 无 vault 挂接时运行仍工作 (向后兼容, 注入为空)。
+    #[test]
+    fn test_run_code_without_vault_is_noop() {
+        let mut cloud = CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            Arc::new(EnvCaptureProvider),
+        );
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let result = rt.block_on(cloud.run_code("echo hi", CloudRuntime::Python3)).expect("run");
+        assert_eq!(result.exit_code, 0);
+    }
+}
+
+#[cfg(test)]
+mod validate_gate_tests {
+    use super::*;
+    use futures::StreamExt;
+
+    /// Stub whose readiness is configurable — proves the gate blocks workload
+    /// dispatch when the backend fails validation, and passes through when it
+    /// succeeds.
+    struct GateStub {
+        ready: bool,
+    }
+
+    #[async_trait::async_trait]
+    impl provider::CloudSandboxProvider for GateStub {
+        fn name(&self) -> &'static str {
+            "gate-stub"
+        }
+
+        async fn execute(
+            &self,
+            _session_id: &str,
+            _code: &str,
+            _runtime: CloudRuntime,
+            _env: &HashMap<String, String>,
+        ) -> Result<CloudResult, String> {
+            Ok(CloudResult {
+                stdout: "executed".into(),
+                stderr: String::new(),
+                exit_code: 0,
+                execution_time: Duration::from_secs(0),
+                resource_usage: ResourceUsage::default(),
+            })
+        }
+
+        async fn upload_file(&self, _: &str, _: &str, _: Vec<u8>) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn download_result(&self, _: &str) -> Result<CloudResult, String> {
+            Ok(CloudResult {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+                execution_time: Duration::from_secs(0),
+                resource_usage: ResourceUsage::default(),
+            })
+        }
+
+        fn stream_logs(&self, _: &str) -> futures::stream::BoxStream<'static, String> {
+            futures::stream::empty().boxed()
+        }
+
+        async fn cancel(&self, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn validate_ready(&self) -> Result<(), String> {
+            if self.ready {
+                Ok(())
+            } else {
+                Err("docker sandbox unavailable (daemon not reachable): gate-stub".into())
+            }
+        }
+    }
+
+    fn sandbox_with(ready: bool) -> CloudSandbox {
+        CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            Arc::new(GateStub { ready }),
+        )
+    }
+
+    /// 门负例: 后端验证失败 → run_code 拒绝执行, 工作负载不派发。
+    #[test]
+    fn test_run_code_blocked_when_backend_not_ready() {
+        let mut cloud = sandbox_with(false);
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let err = rt
+            .block_on(cloud.run_code("print('hi')", CloudRuntime::Python3))
+            .expect_err("unready backend must fail closed");
+        assert!(err.contains("daemon not reachable"), "gate error surfaced: {}", err);
+        // 工作负载未派发 → 无会话创建残留。
+        assert!(cloud.list_sessions().is_empty(), "no session may be created past a failed gate");
+    }
+
+    /// 门正例: 验证通过 → 正常派发执行。
+    #[test]
+    fn test_run_code_dispatches_when_backend_ready() {
+        let mut cloud = sandbox_with(true);
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let result = rt
+            .block_on(cloud.run_code("print('hi')", CloudRuntime::Python3))
+            .expect("ready backend must dispatch");
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(result.stdout, "executed");
+    }
+}
+
+#[cfg(test)]
+mod egress_tests {
+    use super::*;
+
+    #[test]
+    fn test_egress_exact_host_allow() {
+        let policy = EgressPolicy::new(
+            vec![EgressRule::allow("api.github.com", "443")],
+            false,
+        );
+        assert!(policy.check("api.github.com", 443));
+        assert!(!policy.check("api.github.com", 80), "port must match");
+        assert!(!policy.check("evil.com", 443), "unlisted host denied by default");
+    }
+
+    #[test]
+    fn test_egress_wildcard_suffix() {
+        let policy = EgressPolicy::new(vec![EgressRule::allow("*.example.com", "443")], false);
+        assert!(policy.check("api.example.com", 443));
+        assert!(policy.check("a.b.example.com", 443));
+        assert!(!policy.check("example.com", 443), "bare apex must match exactly, not suffix");
+        assert!(!policy.check("example.com.evil.net", 443), "suffix must be dot-bounded");
+    }
+
+    #[test]
+    fn test_egress_deny_shadows_allow() {
+        let policy = EgressPolicy::new(
+            vec![
+                EgressRule::allow("*", "443"),
+                EgressRule::deny("blocked.example.com", "443"),
+            ],
+            false,
+        );
+        assert!(policy.check("ok.example.com", 443));
+        assert!(!policy.check("blocked.example.com", 443), "explicit deny wins");
+    }
+
+    #[test]
+    fn test_egress_port_range() {
+        let policy = EgressPolicy::new(vec![EgressRule::allow("db.internal", "5432-5433")], false);
+        assert!(policy.check("db.internal", 5432));
+        assert!(policy.check("db.internal", 5433));
+        assert!(!policy.check("db.internal", 5434));
+    }
+
+    #[test]
+    fn test_egress_permissive_and_deny_all() {
+        assert!(EgressPolicy::permissive().check("anything.com", 1));
+        assert!(!EgressPolicy::deny_all().check("anything.com", 1));
+    }
+
+    #[test]
+    fn test_sandbox_attaches_egress_to_session() {
+        let provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync> =
+            Arc::new(provider::NoopProvider);
+        let mut cloud = CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            provider,
+        );
+        cloud.set_egress(EgressPolicy::new(
+            vec![EgressRule::allow("api.openai.com", "443")],
+            false,
+        ));
+        let sid = cloud.create_session(CloudRuntime::Python3);
+        let session = cloud.get_session(&sid).expect("session exists");
+        assert!(session.egress.check("api.openai.com", 443));
+        assert!(!session.egress.check("fetch.other.com", 443));
+    }
+}
+
+#[cfg(test)]
+mod call_policy_tests {
+    use super::*;
+
+    #[test]
+    fn test_deny_wins_full_vs_partial() {
+        // Demanded Full but the backend only guarantees Partial → fail-closed denial,
+        // even though the egress policy would allow the host (permissive).
+        let policy = CallPolicy::full();
+        let verdict =
+            policy.evaluate(EnforcementLevel::Partial, &EgressPolicy::permissive(), "api.example.com", 443);
+        assert!(!verdict.is_allowed());
+        assert_eq!(verdict.denial().map(|d| d.kind), Some(DenialKind::Sandbox));
+
+        // When the backend reports Full, the same call is allowed.
+        let ok = policy.evaluate(EnforcementLevel::Full, &EgressPolicy::permissive(), "api.example.com", 443);
+        assert!(ok.is_allowed());
+    }
+
+    #[test]
+    fn test_denial_dialect_maps_to_agent_action() {
+        let denials = [
+            CallDenial::egress("fetch.evil.net", 443),
+            CallDenial::resource(">10MB output"),
+            CallDenial::approval("write to ~/.ssh"),
+            CallDenial::sandbox("provider refused"),
+        ];
+        for d in &denials {
+            assert!(!d.code.is_empty(), "machine-readable code required");
+            assert!(!d.message.is_empty(), "human message required");
+            assert!(
+                !d.agent_action().is_empty(),
+                "agent-actionable directive required for {:?}",
+                d.kind
+            );
+        }
+        assert!(CallDenial::egress("h", 1).code.starts_with("egress_denied:"));
+        assert_eq!(CallDenial::approval("x").kind, DenialKind::Approval);
+        assert_eq!(CallDenial::resource("y").kind, DenialKind::Resource);
+        assert_eq!(CallDenial::sandbox("z").kind, DenialKind::Sandbox);
+        assert_eq!(CallDenial::egress("h", 1).kind, DenialKind::Egress);
+    }
+
+    #[test]
+    fn test_per_call_override_does_not_mutate_global_policy() {
+        let provider: Arc<dyn provider::CloudSandboxProvider + Send + Sync> =
+            Arc::new(provider::NoopProvider);
+        let mut cloud = CloudSandbox::new(
+            "http://localhost".to_string(),
+            None,
+            Duration::from_secs(60),
+            provider,
+        );
+        cloud.set_egress(EgressPolicy::deny_all());
+        let sid = cloud.create_session(CloudRuntime::Python3);
+        let session = cloud.get_session(&sid).expect("session exists");
+
+        // Per-call override allows an API host while the session stays deny-all.
+        let policy = CallPolicy::full().with_egress_override(EgressPolicy::new(
+            vec![EgressRule::allow("api.openai.com", "443")],
+            false,
+        ));
+        let verdict = policy.evaluate(EnforcementLevel::Full, &session.egress, "api.openai.com", 443);
+        assert!(verdict.is_allowed(), "per-call override grants the API host");
+
+        // Global/session policy must be untouched by the per-call override.
+        assert!(!cloud.egress.check("api.openai.com", 443), "global policy unchanged");
+        assert!(!session.egress.check("api.openai.com", 443), "session policy unchanged");
+
+        // Without the override, the same host is denied by the session policy.
+        let denied = CallPolicy::full()
+            .evaluate(EnforcementLevel::Full, &session.egress, "api.openai.com", 443);
+        assert_eq!(denied.denial().map(|d| d.kind), Some(DenialKind::Egress));
+    }
+}

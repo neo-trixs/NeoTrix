@@ -10,7 +10,7 @@ use crate::cli::commands::git_cmds::PrCmd;
 use crate::cli::commands::session_cmds::ForkCmd;
 use crate::cli::commands::swap_cmd::ApproveCmd;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 macro_rules! delegate {
     ($name:expr, $args:expr, $brain:expr) => {{

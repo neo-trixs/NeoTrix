@@ -3,11 +3,50 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-pub(crate) use crate::neotrix::nt_mind::SelfIteratingBrain;
+pub(crate) use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
-use crate::cli::sandbox::check_sandbox;
-use crate::cli::shield_enforcer::global_shield;
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+
+use crate::cli::approval::ApprovalEngine;
+use crate::cli::sandbox::SandboxEnforcer;
+use crate::cli::shield_enforcer::ShieldEnforcer;
+use crate::core::nt_core_conn::ConnectorManager;
+use crate::core::nt_core_router::SmartRouter;
+use crate::core::nt_core_ws::WorkSpaceManager;
+
+/// Centralized dependency container for CLI command execution.
+/// All shared singletons live here as `Arc<Mutex<>>` — commands receive
+/// `&CliContext` instead of reaching for global statics.
+pub struct CliContext {
+    pub workspace: Arc<std::sync::Mutex<WorkSpaceManager>>,
+    pub router: Arc<std::sync::Mutex<SmartRouter>>,
+    pub connectors: Arc<std::sync::Mutex<ConnectorManager>>,
+    pub sandbox: Arc<std::sync::Mutex<SandboxEnforcer>>,
+    pub approval: Arc<std::sync::Mutex<ApprovalEngine>>,
+    pub shield: Arc<std::sync::Mutex<ShieldEnforcer>>,
+}
+
+impl CliContext {
+    pub fn new() -> Self {
+        Self {
+            workspace: Arc::new(std::sync::Mutex::new(WorkSpaceManager::load())),
+            router: Arc::new(std::sync::Mutex::new(SmartRouter::load())),
+            connectors: Arc::new(std::sync::Mutex::new(ConnectorManager::load())),
+            sandbox: Arc::new(std::sync::Mutex::new(SandboxEnforcer::new(
+                crate::cli::sandbox::SandboxMode::Disabled,
+            ))),
+            approval: Arc::new(std::sync::Mutex::new(ApprovalEngine::new(
+                crate::cli::approval::ApprovalMode::Suggest,
+            ))),
+            shield: Arc::new(std::sync::Mutex::new(ShieldEnforcer::new())),
+        }
+    }
+
+    /// Convenience: lock a mutex, unwinding poison.
+    pub fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+        mutex.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
 
 /// 退出码约定（参考 witr: 0=clean / 1=warning / 2=notfound / 3=permission / 4=invalid）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,13 +146,18 @@ pub trait CliCommand {
         vec![]
     }
     fn description(&self) -> &str;
-    fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput;
+    fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput;
+    /// DI-aware variant. Defaults to calling `execute()` so existing impls
+    /// continue to work. Override this to access `CliContext`.
+    fn execute_with_ctx(
+        &self,
+        args: &[String],
+        brain: Option<&Arc<RwLock<SelfIteratingBrain>>>,
+        _ctx: Option<&CliContext>,
+    ) -> CommandOutput {
+        self.execute(args, brain)
+    }
     /// 是否为人类一级入口命令（展示在 /help 与 Tab 补全）。
-    /// 人类交互用不着大量命令 — 领域操作由 agent 后端自我调度（MCP 工具面），
-    /// 因此默认 false；仅显式白名单的控制命令（help/exit/clear/version/
-    /// config/completions/stats/doctor/e8/plan/consciousness/bench）为 true。
-    /// 所有命令仍可被 CommandRegistry::execute 直接执行（agent 调度通道），
-    /// 只是不占据人类一级认知面。
     fn is_primary(&self) -> bool {
         false
     }
@@ -160,6 +204,7 @@ pub struct CommandRegistry {
     commands: Vec<Box<dyn CliCommand>>,
     hooks: Option<EccHookRegistry>,
     kb: Option<KnowledgeBase>,
+    ctx: Option<CliContext>,
 }
 
 impl Default for CommandRegistry {
@@ -170,7 +215,21 @@ impl Default for CommandRegistry {
 
 impl CommandRegistry {
     pub fn new() -> Self {
-        Self { commands: Vec::new(), hooks: None, kb: None }
+        Self { commands: Vec::new(), hooks: None, kb: None, ctx: None }
+    }
+
+    /// Attach a `CliContext` so all subsequent `execute` calls use injected deps.
+    pub fn with_context(mut self, ctx: CliContext) -> Self {
+        self.ctx = Some(ctx);
+        self
+    }
+
+    pub fn set_context(&mut self, ctx: CliContext) {
+        self.ctx = Some(ctx);
+    }
+
+    pub fn context(&self) -> Option<&CliContext> {
+        self.ctx.as_ref()
     }
 
     /// Attach a EccHookRegistry for PreToolUse/PostToolUse hook calls
@@ -346,11 +405,11 @@ impl CommandRegistry {
         let args: Vec<String> = parts.get(1).map(|s| s.split(' ').map(String::from).collect()).unwrap_or_default();
         if let Some(cmd) = self.find(parts[0]) {
             // Sandbox check: block write commands in read-only mode
-            if let Some(blocked) = check_sandbox_for_command(cmd.name(), &args) {
+            if let Some(blocked) = check_sandbox_for_command(cmd.name(), &args, self.ctx.as_ref()) {
                 return blocked;
             }
             // ShieldEnforcer check: unified policy + guardrails + laws
-            if let Some(blocked) = check_shield_for_command(cmd.name(), &args) {
+            if let Some(blocked) = check_shield_for_command(cmd.name(), &args, self.ctx.as_ref()) {
                 return blocked;
             }
             // PreToolUse hook
@@ -370,7 +429,7 @@ impl CommandRegistry {
                 }
             }
 
-            let result = cmd.execute(&args, brain);
+            let result = cmd.execute_with_ctx(&args, brain, self.ctx.as_ref());
 
             // PostToolUse hook
             if let Some(ref hooks) = self.hooks {
@@ -422,32 +481,49 @@ fn is_write_command(name: &str) -> bool {
     )
 }
 
-fn check_sandbox_for_command(name: &str, args: &[String]) -> Option<CommandOutput> {
-    if name == "/git" {
-        if let Some(sub) = args.first() {
-            if DESTRUCTIVE_GIT_SUBCMDS.contains(&sub.as_str()) {
-                return check_sandbox();
+fn check_sandbox_for_command(name: &str, args: &[String], ctx: Option<&CliContext>) -> Option<CommandOutput> {
+    let check = || -> Option<CommandOutput> {
+        if name == "/git" {
+            if let Some(sub) = args.first() {
+                if DESTRUCTIVE_GIT_SUBCMDS.contains(&sub.as_str()) {
+                    return if let Some(ctx) = ctx {
+                        let guard = CliContext::lock(&ctx.sandbox);
+                        guard.check_read_only()
+                    } else {
+                        // Fallback to global for backward compat
+                        crate::cli::sandbox::check_sandbox()
+                    };
+                }
             }
+            return None;
         }
-        return None;
-    }
-    if is_write_command(name) {
-        return check_sandbox();
-    }
-    None
+        if is_write_command(name) {
+            return if let Some(ctx) = ctx {
+                let guard = CliContext::lock(&ctx.sandbox);
+                guard.check_read_only()
+            } else {
+                crate::cli::sandbox::check_sandbox()
+            };
+        }
+        None
+    };
+    check()
 }
 
-fn check_shield_for_command(name: &str, _args: &[String]) -> Option<CommandOutput> {
-    // 只读 CLI 命令直接放行 — 与 check_sandbox_for_command 对称:
-    // shield 权限链 (PermissionChain AcceptEdits) 只拦截写操作,
-    // 否则 /help /kb /board 等只读命令在 App (unified_cli_execute) 内全部被误拦。
+fn check_shield_for_command(name: &str, _args: &[String], ctx: Option<&CliContext>) -> Option<CommandOutput> {
+    // 只读 CLI 命令直接放行
     if !is_write_command(name) && name != "/git" {
         return None;
     }
-    let shield = global_shield();
-    let s = shield.lock().unwrap_or_else(|e| e.into_inner());
     let action = name.trim_start_matches('/');
-    let result = s.check_cli_command(action, action);
+    let result = if let Some(ctx) = ctx {
+        let s = CliContext::lock(&ctx.shield);
+        s.check_cli_command(action, action)
+    } else {
+        let shield = crate::cli::shield_enforcer::global_shield();
+        let s = shield.lock().unwrap_or_else(|e| e.into_inner());
+        s.check_cli_command(action, action)
+    };
     match result {
         Ok(()) => None,
         Err(decision) => {

@@ -5,7 +5,7 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 use super::self_model::SelfModel;
 

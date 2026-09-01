@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::cli::tui::session_store::{SessionData, SessionStore};
 use crate::server::session::SessionShareManager;
 

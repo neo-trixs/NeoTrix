@@ -6,10 +6,10 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::skill_list_all;
-use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
-use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l1_action::nt_memory::nt_memory_kb::unify::skill_list_all;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 /// 惰性 KB 单例 — UCN Phase 1 读通: skill list 优先从 skills_index 表读。
 static KB: OnceLock<Arc<KnowledgeBase>> = OnceLock::new();

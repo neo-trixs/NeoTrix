@@ -346,8 +346,8 @@ pub struct LlmNarrator {
 /// Gateway 句柄 — 持有池子实例，`complete` 时自动 block_on。
 mod gateway_handle {
     use crate::core::nt_core_llm::{LlmError, LlmRequest, LlmResponse};
-    use crate::neotrix::l1_body_impl::nt_io_provider::factory;
-    use crate::neotrix::l1_body_impl::nt_io_provider::gateway::GatewayV2;
+    use crate::l1_action::nt_io::nt_io_provider::factory;
+    use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
     /// 持有 GatewayV2 并封装同步调用（池子内部自动选择 provider）。
     pub struct GatewayHandle(GatewayV2);
 

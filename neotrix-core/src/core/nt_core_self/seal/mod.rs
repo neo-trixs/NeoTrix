@@ -8,6 +8,7 @@ pub mod self_edit_gen;
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_self::self_audit::{converge_check, AuditReport};
+use crate::core::nt_core_self::pilot_steering::{PilotSupervisor, SupervisorConfig, SupervisorDecision, TracePoint, TraceResult};
 
 pub use self::constitution_gate::{ConstitutionGate, SELF_EDIT_MIN_CONSCIOUSNESS};
 pub use self::curriculum::{
@@ -42,6 +43,7 @@ pub struct SealPipeline {
     pub curriculum: CalibratedCurriculumGenerator,
     pub validator: IterationValidator,
     pub analyzer: LearnabilityWindowAnalyzer,
+    pub supervisor: PilotSupervisor,
     iteration_count: u32,
 }
 
@@ -53,12 +55,17 @@ impl SealPipeline {
             curriculum: CalibratedCurriculumGenerator::new(0.7, 10),
             validator: IterationValidator::new(0.3, 3, 5),
             analyzer: LearnabilityWindowAnalyzer::new(10),
+            supervisor: PilotSupervisor::new(SupervisorConfig::default()),
             iteration_count: 0,
         }
     }
 
     pub fn run_iteration(&mut self, task: &str, context: &[&str]) -> SealIterationReport {
         self.iteration_count += 1;
+
+        // PILOT: 启动 worker 监控
+        self.supervisor.launch_worker(format!("iter_{}", self.iteration_count));
+
         let code_context = context.join("\n");
         let edits = self.generator.generate_edits(&code_context, task);
         let rewards: Vec<f64> = edits.iter().map(|e| self.evaluator.evaluate(e)).collect();
@@ -68,6 +75,24 @@ impl SealPipeline {
         } else {
             rewards.iter().sum::<f64>() / rewards.len() as f64
         };
+
+        // PILOT: 记录执行轨迹
+        self.supervisor.record_trace(TracePoint {
+            timestamp: std::time::Instant::now(),
+            action: format!("generate_{}_edits", edits.len()),
+            result: if avg_reward > 0.5 {
+                TraceResult::Success
+            } else {
+                TraceResult::Failure(format!("low reward: {:.3}", avg_reward))
+            },
+            context: std::collections::HashMap::new(),
+        });
+
+        // PILOT: 评估是否需要重定向
+        let decision = self.supervisor.evaluate();
+        if let SupervisorDecision::Redirect { new_task: _, reason } = &decision {
+            log::debug!("[seal] PILOT redirect suggestion: {}", reason);
+        }
 
         let policy_improvement = if self.iteration_count > 1 {
             (avg_reward - 0.5).max(0.0)
@@ -109,6 +134,62 @@ impl SealPipeline {
         converge_check(src_dir)
     }
 
+    /// 使用 CUDA Agent RL 选择优化策略
+    ///
+    /// 参考: arXiv:2602.24286 "CUDA-Agent: Skill-Augmented..."
+    /// 整合强化学习策略选择器, 根据历史效果选择最佳优化策略。
+    pub fn select_optimization_strategy(&self, _task: &str, language: &str) -> Option<String> {
+        use crate::core::nt_core_self::cuda_agent::StrategyManager;
+        use crate::core::nt_core_self::cuda_agent::OptimizationStrategy;
+
+        let mut manager = StrategyManager::new();
+
+        // 注册默认优化策略
+        manager.register(OptimizationStrategy {
+            id: "loop_unrolling".to_string(),
+            name: "loop_unrolling".to_string(),
+            description: "循环展开优化".to_string(),
+            applicable_languages: vec!["rust".to_string(), "c".to_string(), "cpp".to_string()],
+            expected_improvement: 0.15,
+            success_rate: 0.7,
+            usage_count: 0,
+        });
+
+        manager.register(OptimizationStrategy {
+            id: "inlining".to_string(),
+            name: "inlining".to_string(),
+            description: "函数内联优化".to_string(),
+            applicable_languages: vec!["rust".to_string(), "c".to_string(), "cpp".to_string()],
+            expected_improvement: 0.12,
+            success_rate: 0.8,
+            usage_count: 0,
+        });
+
+        manager.register(OptimizationStrategy {
+            id: "parallelization".to_string(),
+            name: "parallelization".to_string(),
+            description: "并行化优化".to_string(),
+            applicable_languages: vec!["rust".to_string()],
+            expected_improvement: 0.25,
+            success_rate: 0.6,
+            usage_count: 0,
+        });
+
+        manager.register(OptimizationStrategy {
+            id: "memory_optimization".to_string(),
+            name: "memory_optimization".to_string(),
+            description: "内存优化".to_string(),
+            applicable_languages: vec!["rust".to_string(), "c".to_string(), "cpp".to_string()],
+            expected_improvement: 0.18,
+            success_rate: 0.65,
+            usage_count: 0,
+        });
+
+        // 根据语言和任务选择策略
+        let strategy = manager.select_strategy(language, "execution_time");
+        strategy.map(|s| s.name.clone())
+    }
+
     pub fn run_curriculum(&mut self, tasks: &[CurriculumTask]) -> Vec<SealIterationReport> {
         let mut reports = Vec::new();
         for task in tasks {
@@ -117,6 +198,50 @@ impl SealPipeline {
             reports.push(report);
         }
         reports
+    }
+
+    /// 获取 PILOT 失败模式
+    pub fn get_failure_patterns(&self) -> Vec<crate::core::nt_core_self::pilot_steering::FailurePattern> {
+        self.supervisor.get_failure_patterns()
+    }
+
+    /// Human Approval 集成: 为 SEAL pipeline 添加审批工作流
+    ///
+    /// 参考: "Human-in-the-Loop Agent Patterns"
+    /// 在关键 SEAL 阶段添加人工审批点。
+    pub fn request_approval_for_iteration(
+        &self,
+        iteration: &str,
+        changes: &[String],
+    ) -> crate::core::nt_core_self::human_approval::ApprovalRequest {
+        use crate::core::nt_core_self::human_approval::*;
+
+        // 根据变更类型确定风险级别
+        let risk_level = if changes.iter().any(|c| c.contains("core") || c.contains("security")) {
+            RiskLevel::High
+        } else if changes.iter().any(|c| c.contains("test") || c.contains("doc")) {
+            RiskLevel::Low
+        } else {
+            RiskLevel::Medium
+        };
+
+        // 使用 Builder 创建审批请求
+        ApprovalRequestBuilder::new(
+            &format!("SEAL_iteration_{}", iteration),
+            "seal_iteration",
+        )
+        .description(&changes.join("\n"))
+        .risk_level(risk_level)
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+    }
+
+    /// Human Approval 集成: 根据审批结果决定是否继续执行
+    pub fn should_continue_with_approval(
+        &self,
+        approval: &crate::core::nt_core_self::human_approval::ApprovalStatus,
+    ) -> bool {
+        matches!(approval, crate::core::nt_core_self::human_approval::ApprovalStatus::Approved)
     }
 }
 

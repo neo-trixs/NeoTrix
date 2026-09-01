@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::core::nt_core_conn::{ConnectorConfig, ConnectorKind, CONNECTOR_MANAGER};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::cli::commands::types::{CliCommand, CliContext, CommandOutput};
+use crate::core::nt_core_conn::{ConnectorConfig, ConnectorKind};
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 pub struct ConnectorCmd;
 impl CliCommand for ConnectorCmd {
@@ -22,12 +22,25 @@ impl CliCommand for ConnectorCmd {
     fn execute(
         &self,
         args: &[String],
+        brain: Option<&Arc<RwLock<SelfIteratingBrain>>>,
+    ) -> CommandOutput {
+        self.execute_with_ctx(args, brain, None)
+    }
+
+    fn execute_with_ctx(
+        &self,
+        args: &[String],
         _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>,
+        ctx: Option<&CliContext>,
     ) -> CommandOutput {
         let subcmd = args.first().map(|s| s.as_str()).unwrap_or("list");
         match subcmd {
             "list" => {
-                let mgr = CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mgr = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.connectors)
+                } else {
+                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 let connectors = mgr.list_connectors();
                 if connectors.is_empty() {
                     return CommandOutput::ok(
@@ -56,7 +69,11 @@ impl CliCommand for ConnectorCmd {
                 }
                 let kind_str = &args[1];
                 let name = &args[2];
-                let mut mgr = CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut mgr = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.connectors)
+                } else {
+                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 let id = match kind_str.as_str() {
                     "github" => {
                         let secret = args.get(3).map(|s| s.as_str()).unwrap_or("default-secret");
@@ -121,7 +138,11 @@ impl CliCommand for ConnectorCmd {
                 if id.is_empty() {
                     return CommandOutput::err("Usage: /connector remove <id>");
                 }
-                let mut mgr = CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut mgr = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.connectors)
+                } else {
+                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 match mgr.remove_connector(id) {
                     Ok(()) => {
                         if let Err(e) = mgr.save() {
@@ -137,7 +158,11 @@ impl CliCommand for ConnectorCmd {
                 if id.is_empty() {
                     return CommandOutput::err("Usage: /connector enable <id>");
                 }
-                let mut mgr = CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut mgr = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.connectors)
+                } else {
+                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 match mgr.enable_connector(id) {
                     Ok(()) => {
                         if let Err(e) = mgr.save() {
@@ -153,7 +178,11 @@ impl CliCommand for ConnectorCmd {
                 if id.is_empty() {
                     return CommandOutput::err("Usage: /connector disable <id>");
                 }
-                let mut mgr = CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut mgr = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.connectors)
+                } else {
+                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 match mgr.disable_connector(id) {
                     Ok(()) => {
                         if let Err(e) = mgr.save() {
@@ -166,7 +195,11 @@ impl CliCommand for ConnectorCmd {
             }
             "server" => {
                 let action = args.get(1).map(|s| s.as_str()).unwrap_or("status");
-                let mut mgr = CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut mgr = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.connectors)
+                } else {
+                    crate::core::nt_core_conn::CONNECTOR_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 match action {
                     "start" => match mgr.start_server() {
                         Ok(()) => CommandOutput::ok(&format!(

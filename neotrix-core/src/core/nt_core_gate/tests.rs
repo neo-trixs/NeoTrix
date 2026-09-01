@@ -2,7 +2,7 @@
     use crate::core::nt_core_hex::ReasoningHexagram;
     use crate::core::nt_core_prm::TrajectoryStep;
     use crate::core::nt_core_traits::SpecialistType;
-    use crate::neotrix::l1_body_impl::nt_io_provider::{
+    use crate::l1_action::nt_io::nt_io_provider::{
         FinishReason, LlmError, LlmRequest, LlmResponse, Usage,
     };
 
@@ -755,7 +755,7 @@
             eprintln!("skipped: set NT_E2E_LLM7=1 to run live LLM7 e2e");
             return;
         }
-        use crate::neotrix::l1_body_impl::nt_io_provider::openai::OpenAiProvider;
+        use crate::l1_action::nt_io::nt_io_provider::openai::OpenAiProvider;
         let mut provider = OpenAiProvider::new(String::new());
         provider = provider.with_base_url("https://api.llm7.io/v1");
         let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(provider);

@@ -6,7 +6,7 @@ use crate::cli::permission_profiles::{
     list_profiles, active_profile_name, switch_profile, create_profile,
     remove_profile, set_rule, get_profile_info,
 };
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 pub struct ProfileCmd;
 impl CliCommand for ProfileCmd {

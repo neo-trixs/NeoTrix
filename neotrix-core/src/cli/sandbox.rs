@@ -60,7 +60,7 @@ impl SandboxEnforcer {
     }
 }
 
-// TODO: inject via DI — pass &SandboxEnforcer through CLI command chain instead
+/// Global fallback — prefer `CliContext.sandbox` instead.
 pub static SANDBOX_ENFORCER: LazyLock<Mutex<SandboxEnforcer>> = LazyLock::new(|| {
     Mutex::new(SandboxEnforcer::new(SandboxMode::Disabled))
 });

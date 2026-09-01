@@ -1,7 +1,7 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_act_crypto::tx::TxBuilder;
-use crate::neotrix::nt_act_crypto::CryptoAgent;
-use crate::neotrix::nt_act_crypto::chain::ChainType;
+use crate::l1_action::nt_act::nt_act_crypto::tx::TxBuilder;
+// use crate::l1_action::nt_act::nt_act_crypto::crypto::CryptoAgent;
+use crate::l1_action::nt_act::nt_act_crypto::chain::ChainType;
 
 fn with_crypto<F>(f: F) -> CommandOutput
 where
@@ -58,7 +58,7 @@ impl CliCommand for SwapCmd {
     fn execute(
         &self,
         args: &[String],
-        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>>>,
+        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain>>>,
     ) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok(
@@ -191,7 +191,7 @@ impl CliCommand for TransferCmd {
     fn execute(
         &self,
         args: &[String],
-        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>>>,
+        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain>>>,
     ) -> CommandOutput {
         if args.len() < 3 {
             return CommandOutput::ok(
@@ -323,7 +323,7 @@ impl CliCommand for ApproveCmd {
     fn execute(
         &self,
         args: &[String],
-        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>>>,
+        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain>>>,
     ) -> CommandOutput {
         if args.len() < 4 {
             return CommandOutput::ok(

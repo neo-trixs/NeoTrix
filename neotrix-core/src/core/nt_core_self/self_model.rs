@@ -1,3 +1,12 @@
+//! # Dynamic SelfModel (动态自我模型)
+//!
+//! **用途**: 性能估算模型 — "我表现如何？"
+//!
+//! **注意**: 这是 neotrix-core 中三个 SelfModel 之一:
+//! - `nt_core_meta::SelfModel` — 静态结构身份 (模块/文件/依赖)
+//! - `nt_core_self::SelfModel` (本文件) — 动态性能模型
+//! - `nt_core_self_model::SelfModel` — 价值函数模型 (身份/目标/权重)
+//!
 //! Phase 9.2 — Dynamic Self-Model (动态自我模型 · 持续自评估).
 //!
 //! MIRROR §5 / Machine Consciousness (2026): beyond the static `SystemIdentity`
@@ -16,7 +25,7 @@
 //! (e.g. it believed it was capable but kept failing), the discrepancy is used
 //! to tighten the model and to drive corrective motivation.
 
-use crate::neotrix::l3_memory_impl::nt_memory_kb::DualBrainWorkingMemory;
+use crate::l1_action::nt_memory::nt_memory_kb::DualBrainWorkingMemory;
 use serde::{Deserialize, Serialize};
 
 /// Number of observed-behavior samples retained for self-error estimation.
@@ -299,7 +308,7 @@ mod tests {
         assert!(m.working_memory().is_none(), "no buffer attached by default");
         m.attach_working_memory(DualBrainWorkingMemory::default());
         let wm = m.working_memory().expect("buffer attached");
-        assert_eq!(wm.capacity(), crate::neotrix::l3_memory_impl::nt_memory_kb::DEFAULT_WORKING_CAPACITY);
+        assert_eq!(wm.capacity(), crate::l1_action::nt_memory::nt_memory_kb::DEFAULT_WORKING_CAPACITY);
         assert!(wm.is_empty());
     }
 

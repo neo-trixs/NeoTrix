@@ -1,6 +1,6 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::l2_world_impl::nt_world_exploration_engine::{ExplorationEngine, ExplorationConfig};
-use crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
+use crate::l2_perception::nt_world::nt_world_exploration_engine::{ExplorationEngine, ExplorationConfig};
+use crate::l5_cognition::nt_mind::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
 
 pub struct ExploreCmd;
 
@@ -11,12 +11,12 @@ impl CliCommand for ExploreCmd {
         "外部知识探索: /explore [cycle|status|absorb <url>|github <url>|search <q>]"
     }
 
-    fn execute(&self, args: &[String], _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::SelfIteratingBrain>>>) -> CommandOutput {
+    fn execute(&self, args: &[String], _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain>>>) -> CommandOutput {
         let mode = args.first().map(|s| s.as_str()).unwrap_or("status");
 
         // Try to open KB connection for pipeline ops
-        fn try_open_kb() -> Option<crate::neotrix::nt_memory_kb::KnowledgeBase> {
-            crate::neotrix::nt_memory_kb::KnowledgeBase::open(None).ok()
+        fn try_open_kb() -> Option<crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase> {
+            crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(None).ok()
         }
         fn try_prepare_pipeline() -> KnowledgeAbsorptionPipeline {
             let mut p = KnowledgeAbsorptionPipeline::new();
@@ -207,7 +207,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_cities(
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_cities(
                                     &mut conn, url, country.as_deref(), limit,
                                 ) {
                                     Ok((nodes, geo)) => CommandOutput::ok(&format!(
@@ -228,7 +228,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_country_boundaries(&conn, url) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_country_boundaries(&conn, url) {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🗺️ 国家边界登记: {} 个国家 (world-atlas)",
                                         n
@@ -255,7 +255,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_peaks(
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_peaks(
                                     &mut conn, &path, limit,
                                 ) {
                                     Ok(n) => CommandOutput::ok(&format!(
@@ -284,7 +284,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_airports(
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_airports(
                                     &mut conn, &path, limit,
                                 ) {
                                     Ok(n) => CommandOutput::ok(&format!(
@@ -313,7 +313,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_boundaries(
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_boundaries(
                                     &mut conn, &path, "admin0", limit,
                                 ) {
                                     Ok(n) => CommandOutput::ok(&format!(
@@ -342,7 +342,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_boundaries(
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_boundaries(
                                     &mut conn, &path, "admin1", limit,
                                 ) {
                                     Ok(n) => CommandOutput::ok(&format!(
@@ -371,7 +371,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::ingest_geo_volcanoes(
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::ingest_geo_volcanoes(
                                     &mut conn, &path, limit,
                                 ) {
                                     Ok(n) => CommandOutput::ok(&format!(
@@ -392,7 +392,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "river") {
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_vectors(&conn, url, "river") {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🏞️ 河流摄取: {} 条 (Natural Earth 10m)",
                                         n
@@ -411,7 +411,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "lake") {
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_vectors(&conn, url, "lake") {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🌊 湖泊摄取: {} 条 (Natural Earth 10m)",
                                         n
@@ -430,7 +430,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "coastline") {
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_vectors(&conn, url, "coastline") {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🗺️ 海岸线摄取: {} 条 (Natural Earth 10m)",
                                         n
@@ -449,7 +449,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "glacier") {
+                                match crate::l1_action::nt_memory::nt_memory_kb::crawl::ingest_geo_vectors(&conn, url, "glacier") {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🏔️ 冰川/冰原摄取: {} 条 (Natural Earth 10m)",
                                         n
@@ -468,7 +468,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_tag_nodes(&conn, limit) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::geo_tag_nodes(&conn, limit) {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🏷️ 地理标签挂载: {} 个节点 (country keyword match, limit={})",
                                         n, limit
@@ -487,7 +487,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_tag_cities(&conn, limit) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::geo_tag_cities(&conn, limit) {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🏙️ 城市级地理标签挂载: {} 个节点 (city match, limit={})",
                                         n, limit
@@ -510,7 +510,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_linked_nodes(&conn, place, limit) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::geo_linked_nodes(&conn, place, limit) {
                                     Ok(list) => {
                                         if list.is_empty() {
                                             return CommandOutput::ok(&format!(
@@ -541,7 +541,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_coverage_report(&conn, min) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::geo_coverage_report(&conn, min) {
                                     Ok(report) => {
                                         let mut lines = vec![format!(
                                             "🗺️ 区域覆盖度报告 (国家知识节点密度, 阈值={}):", min
@@ -569,7 +569,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::fetch_elevations(&conn, limit) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::fetch_elevations(&conn, limit) {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "⛰️ 海拔摄取: {} 条 (Open-Meteo, limit={})",
                                         n, limit
@@ -588,7 +588,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::fetch_weather_snapshot(&conn, limit) {
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::fetch_weather_snapshot(&conn, limit) {
                                     Ok(n) => CommandOutput::ok(&format!(
                                         "🌦️ 气象快照摄取: {} 条 (Open-Meteo, limit={})",
                                         n, limit
@@ -615,7 +615,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::export_geo_ntpack(
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::export_geo_ntpack(
                                     &conn, source.as_deref(), limit, &path,
                                 ) {
                                     Ok((n, bytes)) => CommandOutput::ok(&format!(
@@ -640,7 +640,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::import_geo_ntpack_to_kb(
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::import_geo_ntpack_to_kb(
                                     &conn, &path,
                                 ) {
                                     Ok(n) => CommandOutput::ok(&format!(
@@ -671,7 +671,7 @@ impl CliCommand for ExploreCmd {
                                     Ok(c) => c,
                                     Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
                                 };
-                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::archive_geo_cold(
+                                match crate::l1_action::nt_memory::nt_memory_kb::geo::archive_geo_cold(
                                     &conn, &source, &path,
                                 ) {
                                     Ok((n, bytes)) => CommandOutput::ok(&format!(
@@ -691,7 +691,7 @@ impl CliCommand for ExploreCmd {
                             "{}/.neotrix/geo",
                             std::env::var("HOME").unwrap_or_else(|_| ".".into())
                         );
-                        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_cold_layers(&dir) {
+                        match crate::l1_action::nt_memory::nt_memory_kb::geo::geo_cold_layers(&dir) {
                             Ok(layers) => {
                                 if layers.is_empty() {
                                     CommandOutput::ok("冷层为空 (无 geo_*.ntpack 归档)")

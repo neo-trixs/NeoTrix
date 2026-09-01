@@ -1,18 +1,16 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show, ErrorBoundary } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import {
   Square, RotateCcw, Edit2, Copy, Check, AlertCircle, AlertTriangle, Highlighter, X, Info,
-  FolderTree, Bug, FlaskConical,
-  Search, Cpu, Zap, FileText, AtSign,
+  Search, FileText, AtSign,
 } from 'lucide-solid'
 import { NeoSend, NeoChevronRight } from '../components/neo-icons'
-import { AutonomyMeter } from '../components/AutonomyMeter'
 import { rootCause } from '../lib/errorRootCause'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { tagsStore } from '../stores/tags'
 import { Sidebar } from '../components/Sidebar'
 import { SettingsModal } from '../components/SettingsModal'
 import { RightBar } from '../components/RightBar'
-import { CoworkView } from '../components/CoworkView'
 import { PERMISSION_MODES, type PermissionMode } from '../components/PermissionModeSelector'
 import { ModelSwitcher } from '../components/ModelSwitcher'
 import { ToolCallCard } from '../components/ToolCallCard'
@@ -28,6 +26,7 @@ import { TerminalPanel } from '../components/TerminalPanel'
 import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { runSlashDispatch, parseRunCommand, type SlashContext } from './chat/slashCommands'
 import { HeroMark, UserIcon, BotIcon } from './chat/avatars'
+import { PanelId, resolvePanelShortcut } from './chat/panels'
 import { foldPreview, guessMime, formatSize, estimateTokens, greeting } from '../lib/text'
 import { CommandPalette, type PaletteCommand } from '../components/CommandPalette'
 import { ShortcutHelp } from '../components/ShortcutHelp'
@@ -38,7 +37,7 @@ import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
 import { ApprovalPanel } from '../components/ApprovalPanel'
 import { FileEditorPanel } from '../components/FileEditorPanel'
-import { AgentActivityBar, type AgentPhase } from '../components/AgentActivityBar'
+import type { AgentPhase } from '../components/AgentActivityBar'
 import { AgentActivityLog, type ActivityStep } from '../components/AgentActivityLog'
 import { query } from '../api/query'
 import { usePolling } from '../lib/usePolling'
@@ -87,6 +86,7 @@ function dayLabel(d: Date): string {
 }
 
 export function Chat() {
+  const navigate = useNavigate()
   const [inputValue, setInputValue] = createSignal('')
   // 会话草稿跨切换暂存与自动恢复：per-session 存 localStorage，切回还原（对标 2026 草稿持久化）
   const DRAFT_KEY = 'nt_session_drafts'
@@ -206,16 +206,7 @@ export function Chat() {
   const [planPending, setPlanPending] = createSignal<{ msgId: string } | null>(null)
   const [activeModel, setActiveModel] = createSignal<string | null>(null)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
-  // 「对话即操作系统」App Bot 形态：UI 层模型/Provider 切换 chip（cc-switch 风格）
-  // 纯本地视觉状态，不接后端；可选值对齐 2026 grok-bot / Harness 桌面范式
-  const PROVIDERS = ['Built-in', 'Grok', 'DeepSeek-Harness', 'OpenClaw'] as const
-  type ProviderId = (typeof PROVIDERS)[number]
-  const [activeProvider, setActiveProvider] = createSignal<ProviderId>(
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('nt_provider') as ProviderId)) || 'Built-in',
-  )
-  createEffect(() => {
-    try { localStorage.setItem('nt_provider', activeProvider()) } catch { /* 隐私模式忽略 */ }
-  })
+  // 「对话即操作系统」App Bot 形态：自主架构骨架已内化，第三方痕迹不外显
   // ⌘K 命令面板（对标 Claude Code / Osaurus 命令菜单）：全局唤起，动作复用既有 handler
   const [paletteOpen, setPaletteOpen] = createSignal(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = createSignal(false)
@@ -417,8 +408,7 @@ export function Chat() {
   }
 
   // 视图切换：chat / cowork / computer（对应侧栏 segmented tabs）
-  // 单态对话: 视图切换已移除, activeView 仅存兼容签名
-  const [activeView, setActiveView] = createSignal<'chat'>('chat')
+  const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
 
   // 标签筛选（对标 Obsidian Tag Pane 多选过滤）
   const [activeTags, setActiveTags] = createSignal<string[]>([])
@@ -1445,172 +1435,22 @@ export function Chat() {
         </Show>
 
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
-        {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅作窗口拖拽区） ===== */}
+        {/* ===== 头部 ch-top：极简窗口拖拽区 + 运行时状态（仅生成中显示路由） ===== */}
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>
             <div class="flex items-center gap-2 flex-shrink-0 min-w-0" data-tauri-drag-region>
-              <AgentActivityBar
-                phase={agentPhase}
-                activeDomain={agentDomain}
-                toolCount={agentToolCount}
-                lastActivity={agentLastActivity}
-              />
-              {/* 渐进授权可视层：自治等级 + 审批通过率（对标 2026 自治度可见性） */}
-              <AutonomyMeter
-                level={autonomyLevelNum}
-                mode={permissionMode}
-                rate={() => Math.round(autonomyRate() * 100)}
-              />
-              {/* 模型/Provider 切换 chip（cc-switch 风格）：纯本地视觉状态，不接后端 */}
-              <div
-                class="flex items-center gap-0.5 p-0.5 rounded-full bg-white/50 border border-border-primary/40 flex-shrink-0"
-                role="group"
-                aria-label="切换模型提供商（仅本地 UI 状态）"
-              >
-                <For each={PROVIDERS}>
-                  {(p) => (
-                    <button
-                      class="px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-                      classList={{
-                        'bg-nt-io-500 text-white': activeProvider() === p,
-                        'text-text-muted hover:text-text-primary hover:bg-white/60': activeProvider() !== p,
-                      }}
-                      onClick={() => setActiveProvider(p)}
-                      aria-pressed={activeProvider() === p}
-                      title={`UI 提供商：${p}（纯本地视觉，不接后端）`}
-                    >
-                      {p}
-                    </button>
-                  )}
-                </For>
-              </div>
-              {/* 主题切换（浅金 / 浅紫 / 浅青，均为浅色主题） */}
-              <button
-                class="theme-toggle"
-                onClick={cycleTheme}
-                title={`主题：${THEME_LABEL[theme()]}（点击切换）`}
-                aria-label="切换主题"
-              >
-                <span class="theme-toggle__swatch" />
-                <span>{THEME_LABEL[theme()]}</span>
-              </button>
-              {/* 快捷键帮助（⌘?） */}
-              <button
-                class="theme-toggle"
-                onClick={() => setShortcutHelpOpen(true)}
-                title="快捷键帮助（⌘?）"
-                aria-label="快捷键帮助"
-              >
-                <span>?</span>
-              </button>
-              {/* 会话导出（Markdown / JSON / HTML / 下载） */}
-              <div class="relative flex-shrink-0">
-                <button
-                  class="theme-toggle"
-                  classList={{ on: exportMenuOpen() }}
-                  onClick={exportConversation}
-                  title="导出会话"
-                  aria-label="导出会话"
-                  aria-haspopup="menu"
+              {/* 仅生成中显示路由/域信息（静默不占空间） */}
+              <Show when={isGenerating() && harnessRoute()}>
+                <span
+                  class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-nt-io-500/10 text-nt-io-600 border border-nt-io-500/20"
+                  title={`已路由到 ${harnessRoute()!.domain} · ${harnessRoute()!.specialist}`}
                 >
-                  <span>导出</span>
-                </button>
-                <Show when={exportMenuOpen()}>
-                  <div class="export-menu" role="menu">
-                    <button role="menuitem" onClick={() => copyExport('md')}>复制 Markdown</button>
-                    <button role="menuitem" onClick={() => copyExport('json')}>复制 JSON</button>
-                    <button role="menuitem" onClick={() => copyExport('html')}>复制 HTML</button>
-                    <button role="menuitem" onClick={downloadMd}>下载 .md 文件</button>
-                  </div>
-                </Show>
-              </div>
-              {/* 会话内消息搜索 */}
-              <button
-                class="theme-toggle"
-                classList={{ 'on': msgSearchOpen() }}
-                onClick={() => {
-                  setMsgSearchOpen((o) => !o)
-                  setMsgSearch('')
-                }}
-                title="会话内搜索（聚焦匹配消息）"
-                aria-label="会话内搜索"
-              >
-                <span>🔍</span>
-              </button>
-              <Show when={msgSearchOpen()}>
-                <input
-                  ref={setMsgSearchInput}
-                  class="msg-search-input"
-                  placeholder="搜索本会话…"
-                  value={msgSearch()}
-                  onInput={(e) => { setMsgSearch(e.currentTarget.value); setMatchCursor(0) }}
-                  aria-label="搜索本会话"
-                />
-                <Show when={msgSearch().trim()}>
-                  <span class="msg-search-count">{matchCount()} 命中</span>
-                  <button class="msg-search-nav" onClick={() => jumpMatch(-1)} aria-label="上一个匹配" title="上一个匹配">↑</button>
-                  <button class="msg-search-nav" onClick={() => jumpMatch(1)} aria-label="下一个匹配" title="下一个匹配">↓</button>
-                </Show>
+                  <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500 animate-pulse" />
+                  {harnessRoute()!.domain} · {harnessRoute()!.specialist}
+                </span>
               </Show>
-              {/* 活动日志审计层：展开查看 OS 完整活动时间线 */}
-              <span class="relative flex-shrink-0">
-                <button
-                  class="agent-log-toggle"
-                  onClick={() => setLogOpen((o) => !o)}
-                  title="活动日志（审计层）"
-                  aria-expanded={logOpen()}
-                >
-                  活动 ⌄
-                </button>
-                <Show when={logOpen()}>
-                  <div class="agent-log-pop">
-                    <div class="agent-log-pop__head">
-                      <span>活动日志</span>
-                      <button class="agent-log-pop__close" onClick={() => setLogOpen(false)} aria-label="收起活动日志">×</button>
-                    </div>
-                    <AgentActivityLog steps={agentLog} />
-                  </div>
-                </Show>
-              </span>
             </div>
-            <Show when={harnessRoute()}>
-              <span
-                class="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-nt-io-500/10 text-nt-io-600 border border-nt-io-500/20 flex-shrink-0"
-                title={`已路由到 ${harnessRoute()!.domain} · ${harnessRoute()!.specialist}`}
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500" />
-                {harnessRoute()!.domain} · {harnessRoute()!.specialist}
-              </span>
-            </Show>
           </header>
-          {/* 批次2：上下文占用 gauge 条（可交互，只读轮询数据源；>80% 自动亮起 /compact 一键） */}
-          <Show when={contextPct() !== null}>
-            <div class="ch-ctx" role="status" aria-label="上下文占用">
-              <div
-                class={clsx('ch-ctx-track', (contextPct() ?? 0) >= 80 && 'ch-ctx-track-danger')}
-                title={`上下文占用 ${Math.round(contextPct() ?? 0)}%`}
-              >
-                <div
-                  class={clsx('ch-ctx-fill', (contextPct() ?? 0) >= 80 && 'ch-ctx-fill-danger')}
-                  style={{ width: `${Math.min(contextPct() ?? 0, 100)}%` }}
-                />
-              </div>
-              <span class={clsx('ch-ctx-label', (contextPct() ?? 0) >= 80 && 'text-red-600')}>
-                {Math.round(contextPct() ?? 0)}%
-              </span>
-              <Show when={(contextPct() ?? 0) >= 80 && !compacting()}>
-                <button
-                  class="ch-ctx-compact"
-                  onClick={runCompact}
-                  aria-label="压缩会话"
-                  title="上下文即将用尽，点击压缩"
-                >
-                  <AlertTriangle class="w-3 h-3" />
-                  压缩
-                </button>
-              </Show>
-            </div>
-          </Show>
         </Show>
 
         {/* ===== 顶部工具栏面板（一次一个，右侧滑出 + 遮罩点击关闭） ===== */}
@@ -1656,6 +1496,28 @@ export function Chat() {
 
         {/* ===== 消息流：气泡式 msg.r / msg.l（chat 视图） ===== */}
         <Show when={activeView() === 'chat'}>
+        {/* 消息搜索栏（⌘F 唤起，内联于消息流顶部） */}
+        <Show when={msgSearchOpen()}>
+          <div class="flex items-center gap-2 px-6 py-2 bg-white/40 backdrop-blur-sm border-b border-border-primary/30">
+            <Search class="w-4 h-4 text-text-muted flex-shrink-0" />
+            <input
+              ref={setMsgSearchInput}
+              class="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder-text-muted/60"
+              placeholder="搜索本会话…"
+              value={msgSearch()}
+              onInput={(e) => { setMsgSearch(e.currentTarget.value); setMatchCursor(0) }}
+              aria-label="搜索本会话"
+            />
+            <Show when={msgSearch().trim()}>
+              <span class="text-11px text-text-muted font-mono">{matchCount()} 命中</span>
+              <button class="text-11px text-nt-io-600 hover:text-nt-io-700 font-medium" onClick={() => jumpMatch(-1)} title="上一个匹配">↑</button>
+              <button class="text-11px text-nt-io-600 hover:text-nt-io-700 font-medium" onClick={() => jumpMatch(1)} title="下一个匹配">↓</button>
+            </Show>
+            <button class="text-text-muted hover:text-text-primary" onClick={() => { setMsgSearchOpen(false); setMsgSearch('') }} aria-label="关闭搜索">
+              <X class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </Show>
         <div ref={scrollRef} class="flex-1 overflow-y-auto" role="log" aria-live="polite" onScroll={onScrollMsg}>
           <Show
             when={messages().length > 0}
@@ -2331,10 +2193,10 @@ export function Chat() {
                 </div>
               </div>
 
-              {/* 底部状态条 */}
+              {/* 底部状态条：融合权限模式、模型、上下文、活动日志、主题切换 */}
               <div class="flex items-center justify-between mt-2 px-1 pb-1">
-                <div class="flex items-center gap-3 text-10px text-text-muted/80">
-                  {/* 权限模式徽章（对标 Claude 顶栏 mode 徽章）：短标签 + 色点，点击循环切换 */}
+                <div class="flex items-center gap-2 text-10px text-text-muted/80">
+                  {/* 权限模式徽章 */}
                   <button
                     class="flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-white/30 bg-white/40 hover:bg-white/60 transition-colors text-10px font-medium text-text-primary focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={cyclePermissionMode}
@@ -2345,16 +2207,67 @@ export function Chat() {
                     <span class={clsx('w-1.5 h-1.5 rounded-full bg-current', permissionModeInfo().color)} />
                     <span class="font-medium">{permissionModeInfo().shortLabel}</span>
                   </button>
+                  {/* 上下文占用（内联） */}
+                  <Show when={contextPct() !== null}>
+                    <button
+                      class={clsx(
+                        'flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors font-mono',
+                        (contextPct() ?? 0) >= 80
+                          ? 'border-red-400/40 bg-red-50/60 text-red-600 hover:bg-red-50'
+                          : 'border-white/30 bg-white/40 hover:bg-white/60 text-text-primary',
+                      )}
+                      onClick={runCompact}
+                      title={`上下文占用 ${Math.round(contextPct() ?? 0)}%${(contextPct() ?? 0) >= 80 ? '，点击压缩' : ''}`}
+                      aria-label={`上下文占用 ${Math.round(contextPct() ?? 0)}%`}
+                    >
+                      <span>{Math.round(contextPct() ?? 0)}%</span>
+                    </button>
+                  </Show>
                   <Show when={activeModel()}>
                     <span class="font-mono text-nt-io-700">{activeModel()}</span>
                   </Show>
                   <Show when={isGenerating()}>
-                    <span class="font-mono text-nt-io-700">≈{liveGenTokens()} tok 生成中</span>
+                    <span class="font-mono text-nt-io-700">≈{liveGenTokens()} tok</span>
                   </Show>
-                  <span>NeoTrix v{appVersion() ?? '0.18.0'}</span>
-                  <span class="hidden md:inline">Enter 发送 · Shift+Enter 换行</span>
+                </div>
+                <div class="flex items-center gap-2 text-10px text-text-muted/80">
+                  {/* 活动日志（内联展开） */}
+                  <button
+                    class={clsx(
+                      'flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors',
+                      logOpen()
+                        ? 'border-nt-io-500/30 bg-nt-io-500/10 text-nt-io-600'
+                        : 'border-white/30 bg-white/40 hover:bg-white/60 text-text-primary',
+                    )}
+                    onClick={() => setLogOpen((o) => !o)}
+                    title="活动日志（审计层）"
+                    aria-expanded={logOpen()}
+                  >
+                    <span class={clsx('w-1.5 h-1.5 rounded-full', agentPhase() === 'thinking' || agentPhase() === 'tooling' ? 'bg-nt-io-500 animate-pulse' : agentPhase() === 'done' ? 'bg-emerald-500' : agentPhase() === 'error' ? 'bg-red-500' : 'bg-text-muted/40')} />
+                    <span>活动</span>
+                  </button>
+                  {/* 主题切换（内联） */}
+                  <button
+                    class="flex items-center gap-1 px-2 py-0.5 rounded-md border border-white/30 bg-white/40 hover:bg-white/60 transition-colors text-text-primary"
+                    onClick={cycleTheme}
+                    title={`主题：${THEME_LABEL[theme()]}（点击切换）`}
+                    aria-label="切换主题"
+                  >
+                    <span class="theme-toggle__swatch-inline" />
+                    <span>{THEME_LABEL[theme()]}</span>
+                  </button>
+                  {/* 版本 */}
+                  <span>v{appVersion() ?? '0.18.0'}</span>
                 </div>
               </div>
+              {/* 活动日志面板（底部展开/收起） */}
+              <Show when={logOpen()}>
+                <div class="px-1 pb-2">
+                  <div class="bg-white/40 backdrop-blur-sm rounded-xl border border-border-primary/30 p-3 max-h-40 overflow-y-auto">
+                    <AgentActivityLog steps={agentLog} />
+                  </div>
+                </div>
+              </Show>
             </div>
           </div>
         </Show>

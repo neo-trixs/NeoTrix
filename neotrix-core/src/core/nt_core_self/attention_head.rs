@@ -105,6 +105,23 @@ impl AttentionDomain {
             AttentionDomain::Creativity => "creativity",
         }
     }
+
+    /// 从标签字符串创建 AttentionDomain
+    pub fn from_label(label: &str) -> Option<AttentionDomain> {
+        match label {
+            "pattern_match" => Some(AttentionDomain::PatternMatch),
+            "code" => Some(AttentionDomain::Code),
+            "semantic" => Some(AttentionDomain::Semantic),
+            "temporal" => Some(AttentionDomain::Temporal),
+            "planning" => Some(AttentionDomain::Planning),
+            "self_reflection" => Some(AttentionDomain::SelfReflection),
+            "tool_use" => Some(AttentionDomain::ToolUse),
+            "goal_alignment" => Some(AttentionDomain::GoalAlignment),
+            "risk_assessment" => Some(AttentionDomain::RiskAssessment),
+            "creativity" => Some(AttentionDomain::Creativity),
+            _ => None,
+        }
+    }
 }
 
 /// 规则强度等级 (来自 ponytail 吸收: R-P81 lazy ladder)
@@ -355,13 +372,38 @@ impl AttentionManager {
     pub fn dominant_domain(&self) -> Option<AttentionDomain> {
         self.heads
             .iter()
+            .filter(|h| h.activation >= self.global_threshold)
             .max_by(|a, b| {
                 a.activation
                     .partial_cmp(&b.activation)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .filter(|h| h.activation > 0.0)
             .map(|h| h.domain)
+    }
+
+    /// PILOT 集成: 使用 PILOT 监控数据辅助注意力路由
+    ///
+    /// 参考: arXiv:2608.26530 "PILOT: Live Self-Improvement for Long-Horizon Agents"
+    /// 利用 PILOT 的失败模式检测来调整注意力分配。
+    pub fn pilot_assisted_route(
+        &mut self,
+        current_domain: &AttentionDomain,
+        pilot_failure_patterns: &[String],
+    ) -> AttentionDomain {
+        // 检查当前域是否有失败模式
+        let domain_label = current_domain.label();
+        let has_failure = pilot_failure_patterns.iter().any(|p| p.contains(domain_label));
+
+        if has_failure {
+            // 当前域有失败模式，切换到更稳定的域
+            log::warn!(
+                "[attention] PILOT detected failure patterns for domain '{}', switching to Code",
+                domain_label
+            );
+            AttentionDomain::Code
+        } else {
+            current_domain.clone()
+        }
     }
 
     pub fn profile(&self) -> AttentionProfile {
@@ -447,6 +489,101 @@ impl AttentionManager {
     pub fn allocate_for_task(&self, task: &str) -> ComputeAllocation {
         let d = Self::estimate_task_difficulty(task);
         self.allocate_compute(d)
+    }
+
+    /// FSM 辅助路由: 基于历史轨迹预测下一个最佳注意力域
+    ///
+    /// 参考: arXiv:2608.23670 "Emerging Digital Automata from Agent Traces"
+    /// 利用 FSM 行为拓扑来增强注意力路由决策。
+    pub fn fsm_assisted_route(
+        &self,
+        history: &[AttentionDomain],
+        fsm: &crate::core::nt_core_self::behavior_fsm::FsmModel,
+    ) -> Option<AttentionDomain> {
+        if history.is_empty() {
+            return None;
+        }
+
+        // 将历史域序列转换为 FSM 状态 ID
+        let state_id = format!("domain_{}", history.last().unwrap().label());
+
+        // 从 FSM 获取可能的下一个状态
+        let transitions = fsm.transitions_from(&state_id);
+        if transitions.is_empty() {
+            return None;
+        }
+
+        // 选择概率最高的转换
+        let best_transition = transitions.iter().max_by(|a, b| {
+            a.probability.partial_cmp(&b.probability).unwrap_or(std::cmp::Ordering::Equal)
+        })?;
+
+        // 将 FSM 状态 ID 转换回 AttentionDomain
+        let next_state = &best_transition.to;
+        AttentionDomain::from_label(next_state)
+    }
+
+    /// FSM 失败预测辅助路由: 基于失败概率调整注意力分配
+    ///
+    /// 参考: arXiv:2608.23670 "Emerging Digital Automata from Agent Traces"
+    /// 当 FSM 预测当前状态失败概率较高时, 自动切换到更稳定的注意力域。
+    pub fn fsm_failure_aware_route(
+        &self,
+        current_domain: &AttentionDomain,
+        fsm: &crate::core::nt_core_self::behavior_fsm::FsmModel,
+        failure_threshold: f64,
+    ) -> AttentionDomain {
+        let state_id = format!("domain_{}", current_domain.label());
+        let failure_prob = fsm.predict_failure_probability(&state_id);
+
+        if failure_prob > failure_threshold {
+            // 失败概率高, 切换到更稳定的域 (Code 域通常最稳定)
+            log::warn!(
+                "[attention] FSM predicts high failure probability ({:.2}) for domain '{}', switching to Code",
+                failure_prob,
+                current_domain.label()
+            );
+            AttentionDomain::Code
+        } else {
+            current_domain.clone()
+        }
+    }
+
+    /// CUDA Agent RL 辅助路由: 使用 RL 奖励信号优化注意力分配
+    ///
+    /// 参考: arXiv:2602.24286 "CUDA Agent: Large-Scale Agentic RL for High-Performance CUDA Kernel Generation"
+    /// 利用 CUDA Agent 的 RL 优化历史 (RewardCalculator + StrategyManager) 来评估
+    /// 当前域的奖励趋势, 若近期奖励信号弱则切换到 RL 优化效果更好的域。
+    pub fn cuda_assisted_route(
+        &self,
+        current_domain: &AttentionDomain,
+        cuda_env: &crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment,
+        reward_threshold: f64,
+    ) -> AttentionDomain {
+        // 从 CUDA Agent 的性能分析器获取优化历史
+        let history = cuda_env.get_analyzer().get_history();
+
+        if history.is_empty() {
+            // 无优化历史, 保持当前域
+            return current_domain.clone();
+        }
+
+        // 计算近期优化的平均奖励 (最近 5 次或全部)
+        let recent: Vec<f64> = history.iter().rev().take(5).map(|r| r.reward).collect();
+        let avg_reward = recent.iter().sum::<f64>() / recent.len() as f64;
+
+        if avg_reward < reward_threshold {
+            // RL 奖励信号弱, 切换到 RL 优化效果更好的域 (Code 域通常最受益于 RL)
+            log::warn!(
+                "[attention] CUDA Agent RL reward low ({:.3} < {:.3}) for domain '{}', switching to Code",
+                avg_reward,
+                reward_threshold,
+                current_domain.label()
+            );
+            AttentionDomain::Code
+        } else {
+            current_domain.clone()
+        }
     }
 }
 
@@ -727,6 +864,63 @@ mod tests {
         let mut mgr = AttentionManager::new(0.5);
         mgr.set_intensity(RuleIntensity::Ultra);
         assert_eq!(mgr.global_threshold, 0.6);
+    }
+
+    #[test]
+    fn test_cuda_assisted_route_no_history_keeps_domain() {
+        let mgr = AttentionManager::new(0.3);
+
+        let cuda_env = crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
+        let result = mgr.cuda_assisted_route(&AttentionDomain::Planning, &cuda_env, 0.0);
+        assert_eq!(result, AttentionDomain::Planning);
+    }
+
+    #[test]
+    fn test_cuda_assisted_route_low_reward_switches() {
+        let mgr = AttentionManager::new(0.3);
+        let mut cuda_env = crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
+
+        // 注入低奖励历史: 手动提交任务并优化 (RewardCalculator 默认权重, 零改进 = 奖励 0)
+        let task = crate::core::nt_core_self::cuda_agent::OptimizationTask {
+            id: "t1".into(),
+            name: "low_reward_task".into(),
+            description: "test".into(),
+            code: "x=1".into(),
+            language: "python".into(),
+            metrics: std::collections::HashMap::new(),
+            constraints: vec![],
+            status: crate::core::nt_core_self::cuda_agent::TaskStatus::Pending,
+        };
+        cuda_env.submit_task(task);
+        cuda_env.optimize("t1");
+
+        // 奖励阈值 0.1, 低奖励应切换到 Code
+        let result = mgr.cuda_assisted_route(&AttentionDomain::Creativity, &cuda_env, 0.1);
+        assert_eq!(result, AttentionDomain::Code);
+    }
+
+    #[test]
+    fn test_cuda_assisted_route_high_reward_keeps_domain() {
+        let mgr = AttentionManager::new(0.3);
+        let mut cuda_env = crate::core::nt_core_self::cuda_agent::CudaAgentEnvironment::new();
+
+        // 注入高奖励历史: 提交任务并优化 (有策略时模拟 10% 改进)
+        let task = crate::core::nt_core_self::cuda_agent::OptimizationTask {
+            id: "t1".into(),
+            name: "high_reward_task".into(),
+            description: "test".into(),
+            code: "x=1".into(),
+            language: "python".into(),
+            metrics: std::collections::HashMap::new(),
+            constraints: vec![],
+            status: crate::core::nt_core_self::cuda_agent::TaskStatus::Pending,
+        };
+        cuda_env.submit_task(task);
+        cuda_env.optimize("t1");
+
+        // 奖励阈值 0.0, 零改进刚好等于阈值不触发切换
+        let result = mgr.cuda_assisted_route(&AttentionDomain::Creativity, &cuda_env, 0.0);
+        assert_eq!(result, AttentionDomain::Creativity);
     }
 }
 

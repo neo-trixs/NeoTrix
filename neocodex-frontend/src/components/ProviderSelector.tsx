@@ -128,7 +128,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
             <Loader2 class="w-3.5 h-3.5 animate-spin text-orange-500" />
           ) : currentProvider() ? (
             <>
-              <ProviderIcon name={currentProvider()!.name} size="sm" />
+              <ProviderIcon name={currentProvider()!.name} size="sm" category={currentProvider()!.category} />
               <span class="max-w-[90px] truncate">{pillLabel()}</span>
               <ChevronDown class={clsx('w-3 h-3 text-zinc-400 flex-shrink-0 transition-transform', isOpen() && 'rotate-180')} />
             </>
@@ -142,8 +142,8 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                 <Loader2 class="w-4 h-4 animate-spin text-nt-io-500" />
               ) : currentProvider() ? (
                 <>
-                  <ProviderIcon name={currentProvider()!.name} />
-                  <span class="font-medium truncate">{currentProvider()!.display_name}</span>
+                   <ProviderIcon name={currentProvider()!.name} category={currentProvider()!.category} />
+                   <span class="font-medium truncate">{currentProvider()!.display_name}</span>
                   <CategoryBadge category={currentProvider()!.category} className="hidden md:inline-flex" />
                 </>
               ) : (
@@ -203,7 +203,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                       })
                     }}
                   >
-                    <ProviderIcon name={provider.name} size="sm" />
+                    <ProviderIcon name={provider.name} size="sm" category={provider.category} />
                     <div class="flex-1 min-w-0 flex flex-col gap-1">
                       <div class="flex items-center gap-1.5 min-w-0">
                         <span class="font-medium truncate">{provider.display_name}</span>

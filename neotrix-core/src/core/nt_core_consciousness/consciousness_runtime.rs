@@ -14,7 +14,7 @@ use crate::core::nt_core_self::affective_interface::{
     AffectiveInterface, UserAffectSnapshot, UserEmotion,
 };
 use crate::core::nt_core_self::emotion_state::{EmotionDimension, EmotionEngine, EmotionReport};
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 /// 每次 tick 最多注入的 KB 知识条目数，防止无界流入意识流。
 const KB_INJECT_LIMIT: usize = 4;
@@ -147,7 +147,7 @@ impl ConsciousnessRuntime {
                 Ok(c) => c,
                 Err(_) => return,
             };
-            match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_field_ledger::field_journal_since(
+            match crate::l1_action::nt_memory::nt_memory_kb::nt_field_ledger::field_journal_since(
                 &conn,
                 self.last_field_version_seen,
                 FIELD_FACT_CAP,

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 use super::contract::*;
 use super::nodes::*;

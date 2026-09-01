@@ -75,7 +75,7 @@ export function GeneralSection(props: Props) {
                       const matched = cfg().providers.some((p) => p.model === cfg().active_model)
                       return (
                         <>
-                          <ProviderIcon name={ap().name} />
+                           <ProviderIcon name={ap().name} category={ap().category} />
                           <div class="min-w-0">
                             <div class="flex items-center gap-1.5">
                               <span class="text-[13px] font-medium text-text-primary truncate">{ap().display_name}</span>
@@ -130,7 +130,7 @@ export function GeneralSection(props: Props) {
         </div>
       </div>
 
-      {/* API 密钥管理（明确作用域：ANTHROPIC_API_KEY） */}
+      {/* API 密钥管理 */}
       <div class="ss-card">
         <div class="ss-card-header">
           <InfoIcon />
@@ -138,7 +138,7 @@ export function GeneralSection(props: Props) {
         </div>
         <div class="ss-card-body space-y-3">
           <p class="text-[11px] text-text-muted leading-relaxed -mt-1">
-            密钥保存在本地 <span class="font-mono text-text-secondary">ANTHROPIC_API_KEY</span>（Claude 网关）。
+            密钥保存在本地系统 keyring（<span class="font-mono text-text-secondary">neotrix</span> 服务）。
             各云端提供商分别读取自己的环境变量（如 <span class="font-mono">OPENAI_API_KEY</span> / <span class="font-mono">GOOGLE_API_KEY</span>）。
           </p>
           <div class="flex items-center gap-2">

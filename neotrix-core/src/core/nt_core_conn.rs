@@ -207,8 +207,7 @@ impl Default for ConnectorManager {
     }
 }
 
-/// Global connector manager
-// TODO: inject via DI — pass &ConnectorManager through server context
+/// Global connector manager fallback — prefer `CliContext.connectors` instead.
 pub static CONNECTOR_MANAGER: LazyLock<Mutex<ConnectorManager>> =
     LazyLock::new(|| Mutex::new(ConnectorManager::load()));
 

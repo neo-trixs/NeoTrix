@@ -144,6 +144,6 @@ impl Default for WorkSpaceManager {
     }
 }
 
-// TODO: inject via DI — pass &WorkSpaceManager through CLI command context
+/// Global workspace manager fallback — prefer `CliContext.workspace` instead.
 pub static WORKSPACE_MANAGER: LazyLock<Mutex<WorkSpaceManager>> =
     LazyLock::new(|| Mutex::new(WorkSpaceManager::load()));

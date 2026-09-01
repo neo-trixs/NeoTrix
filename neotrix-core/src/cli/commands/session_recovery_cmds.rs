@@ -19,7 +19,7 @@ impl CliCommand for SessionRecoveryCmd {
     fn execute(
         &self,
         args: &[String],
-        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::SelfIteratingBrain>>>,
+        _brain: Option<&std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain>>>,
     ) -> CommandOutput {
         let mut mgr = SessionRecoveryManager::new("cli-session");
         let mode = args.first().map(|s| s.as_str()).unwrap_or("status");

@@ -21,7 +21,7 @@ use crate::core::nt_core_kernel_types::{KERNEL_DIM, ReasoningKernel, Vector};
 use crate::core::nt_core_llm::{
     estimate_tokens, truncate_preserving, LlmProvider, LlmRequest, Message, Role,
 };
-use crate::neotrix::l8_autonomic_impl::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
+use crate::l5_cognition::nt_mind::reason::reasoning_engine::engine_core::ReasoningEngine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

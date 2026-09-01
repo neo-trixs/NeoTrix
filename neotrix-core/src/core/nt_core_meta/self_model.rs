@@ -1,7 +1,18 @@
 use std::collections::HashMap;
 
-/// Complete representation of the project's current state.
-/// This is the "self-image" — what the system knows about itself.
+/// # Static SelfModel (静态自我模型)
+///
+/// **用途**: 项目的结构身份快照 — "我是什么？"
+///
+/// 包含: 模块列表、文件信息、依赖图、组件映射、测试覆盖率、编译状态、技术债务、演化历史
+///
+/// **注意**: 这是 neotrix-core 中三个 SelfModel 之一:
+/// - `nt_core_meta::SelfModel` (本文件) — 静态结构身份
+/// - `nt_core_self::SelfModel` — 动态性能模型 (能力/不确定性/疲劳)
+/// - `nt_core_self_model::SelfModel` — 价值函数模型 (身份/目标/权重)
+///
+/// 完整表示项目的当前状态。
+/// 这是 "自我形象" — 系统对自己的了解。
 #[derive(Debug, Clone)]
 pub struct SelfModel {
     pub timestamp: chrono::DateTime<chrono::Utc>,

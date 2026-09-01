@@ -4,8 +4,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::nt_mind::goal_loop::{GoalConfig, GoalTracker};
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalConfig, GoalTracker};
 use crate::neotrix::nt_world_model::TaskType;
 
 // ====== /goal ======

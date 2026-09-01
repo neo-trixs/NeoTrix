@@ -5,7 +5,6 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use tokio::sync::mpsc;
 use serde::Serialize;
-use neotrix::neotrix::nt_core_error::NeoTrixError;
 use portable_pty::{PtySize, native_pty_system, CommandBuilder, ChildKiller, PtyPair};
 
 /// PTY 事件（流式输出到前端）
@@ -41,12 +40,12 @@ impl PtyManager {
         (Self { sessions: Mutex::new(HashMap::new()), sender: tx }, rx)
     }
 
-    pub fn spawn(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), NeoTrixError> {
+    pub fn spawn(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
         let system = native_pty_system();
         let pair = system.openpty(PtySize {
             rows, cols,
             pixel_width: 0, pixel_height: 0,
-        }).map_err(|e| NeoTrixError::Io(format!("openpty failed: {}", e)))?;
+        }).map_err(|e| format!("openpty failed: {}", e))?;
 
         let cmd = if cfg!(target_os = "windows") {
             CommandBuilder::new("powershell.exe")
@@ -56,12 +55,12 @@ impl PtyManager {
         };
 
         let child = pair.slave.spawn_command(cmd)
-            .map_err(|e| NeoTrixError::Io(format!("spawn failed: {}", e)))?;
+            .map_err(|e| format!("spawn failed: {}", e))?;
         let killer = child.clone_killer();
         let mut reader = pair.master.try_clone_reader()
-            .map_err(|e| NeoTrixError::Io(format!("clone reader failed: {}", e)))?;
+            .map_err(|e| format!("clone reader failed: {}", e))?;
         let writer = pair.master.take_writer()
-            .map_err(|e| NeoTrixError::Io(format!("take writer failed: {}", e)))?;
+            .map_err(|e| format!("take writer failed: {}", e))?;
 
         let sid = session_id.to_string();
         let tx = self.sender.clone();

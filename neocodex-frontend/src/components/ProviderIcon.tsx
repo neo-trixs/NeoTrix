@@ -1,125 +1,155 @@
 import { clsx } from 'clsx'
-import { Show } from 'solid-js'
+import { Show, For } from 'solid-js'
 
 /* ════════════════════════════════════════════
-   ProviderIcon — LLM 第三方统一品牌标识（对标 Slack/Linear brand avatar）
-   视觉语言：品牌色 monogram（厂商字色块）+ 可选分类徽章
-   - 分类徽章：本地(绿) / 代理(琥珀) / 云端(蓝)
-   - 免费徽章：keyless / free tier 提供商
-   全站 ProviderSelector / SettingsModal 共用，保证同一提供商呈现一致
-   ProviderMeta 契约见 api/types.ts（单一事实源）
+   ProviderIcon — NeoTrix 自主几何标识系统
+   视觉语言：E8 Hexagram 六边形基座 + 分类几何纹理
+   - 本地(自我主体)：实心六边形 + 内嵌菱形
+   - 代理(自定义中转)：六边形 + 同心环
+   - 云端(第三方)：六边形 + 点阵网络
+   色彩统一走 NeoTrix 设计 token（非厂商品牌色）
+   全站 ProviderSelector / SettingsModal / ModelSwitcher 共用
    ════════════════════════════════════════════ */
 
-/** 品牌色 + 首字 monogram（无版权风险的自绘标识） */
-const BRAND: Record<string, { color: string; glyph: string }> = {
-  openai: { color: '#10a37f', glyph: 'O' },
-  anthropic: { color: '#d97757', glyph: 'C' },
-  gemini: { color: '#4285f4', glyph: 'G' },
-  deepseek: { color: '#4d6bfe', glyph: 'D' },
-  'deepseek-free': { color: '#4d6bfe', glyph: 'D' },
-  groq: { color: '#f55036', glyph: 'G' },
-  openrouter: { color: '#6d5ce6', glyph: 'OR' },
-  cerebras: { color: '#1f9d7c', glyph: 'C' },
-  sambanova: { color: '#7c3aed', glyph: 'S' },
-  mistral: { color: '#f7a600', glyph: 'M' },
-  cohere: { color: '#39594d', glyph: 'Co' },
-  together: { color: '#4d5de0', glyph: 'T' },
-  'together-free': { color: '#4d5de0', glyph: 'T' },
-  'github-models': { color: '#24292e', glyph: 'GH' },
-  huggingface: { color: '#ff9d00', glyph: 'HF' },
-  siliconflow: { color: '#0ea5e9', glyph: 'SF' },
-  nvidia: { color: '#76b900', glyph: 'NV' },
-  cloudflare: { color: '#f6821f', glyph: 'CF' },
-  zai: { color: '#e85454', glyph: 'ZA' },
-  pollinations: { color: '#db2777', glyph: 'P' },
-  bazaarlink: { color: '#0d9488', glyph: 'B' },
-  'opencode-zen': { color: '#f0913a', glyph: 'OZ' },
-  modelscope: { color: '#2563eb', glyph: 'MS' },
-  ovh: { color: '#1a3fbf', glyph: 'OVH' },
-  freetheai: { color: '#9333ea', glyph: 'F' },
-  zerolimit: { color: '#10b981', glyph: 'ZL' },
-  llm7: { color: '#64748b', glyph: '7' },
-  kilo: { color: '#e85454', glyph: 'K' },
-  // 主流供应商（2026-08 扩展）
-  xai: { color: '#111111', glyph: 'X' },
-  grok: { color: '#111111', glyph: 'X' },
-  moonshot: { color: '#16a34a', glyph: 'K2' },
-  kimi: { color: '#16a34a', glyph: 'K2' },
-  qwen: { color: '#615ced', glyph: 'Q' },
-  dashscope: { color: '#615ced', glyph: 'Q' },
-  doubao: { color: '#0d6efd', glyph: 'DB' },
-  ark: { color: '#0d6efd', glyph: 'DB' },
-  minimax: { color: '#ef4444', glyph: 'MM' },
-  perplexity: { color: '#20808d', glyph: 'PX' },
-  // 本地推理 — 统一绿
-  ollama: { color: '#16a34a', glyph: 'O' },
-  'lm-studio': { color: '#0d9488', glyph: 'LM' },
-  llamacpp: { color: '#3b82f6', glyph: 'LC' },
-  'vllm-local': { color: '#2563eb', glyph: 'VL' },
-  'sglang-local': { color: '#9333ea', glyph: 'SG' },
+/* 六边形路径（pointy-top，外接圆半径 r，中心 cx,cy） */
+function hexPath(cx: number, cy: number, r: number): string {
+  const pts: string[] = []
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 180) * (60 * i - 30)
+    pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`)
+  }
+  return `M${pts.join('L')}Z`
 }
 
-const FALLBACK_COLORS = ['#f0913a', '#e85454', '#16a34a', '#2563eb', '#9333ea', '#0d9488']
-
-function fallbackColor(name: string): string {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return FALLBACK_COLORS[h % FALLBACK_COLORS.length]
+/* 部署分类 → 几何纹理 + 色彩语义 */
+const CAT_STYLE: Record<string, { fill: string; accent: string; label: string; desc: string }> = {
+  local:   { fill: 'var(--nt-color-core-500, #8b5cf6)', accent: 'var(--nt-color-core-400, #a78bfa)', label: '本地', desc: '数据不出设备' },
+  proxy:   { fill: 'var(--nt-color-act-500, #f59e0b)',    accent: 'var(--nt-color-act-400, #fbbf24)',    label: '代理', desc: '自定义中转' },
+  cloud:   { fill: 'var(--nt-color-io-500, #3b82f6)',     accent: 'var(--nt-color-io-400, #60a5fa)',     label: '云端', desc: '第三方 API' },
+  unknown: { fill: 'var(--nt-color-text-muted, #9ca3af)', accent: 'var(--nt-color-text-muted, #6b7280)', label: '未知', desc: '' },
 }
 
-function glyphOf(name: string): string {
-  const meta = BRAND[name.toLowerCase()]
-  if (meta) return meta.glyph
-  // 兜底：取名字前两个字符大写
-  const clean = name.replace(/[-_]/g, '')
-  return (clean[0] ?? '?').toUpperCase() + (clean[1] !== undefined ? clean[1].toLowerCase() : '')
+/* 型号尺寸映射 */
+const SIZE = {
+  sm: { svg: 24, hexR: 9, inner: 5, stroke: 1.5, fontSize: 7 },
+  md: { svg: 32, hexR: 13, inner: 7, stroke: 2,   fontSize: 10 },
+} as const
+
+function HexagonInner(props: { category: string; cx: number; cy: number; r: number }) {
+  const cat = () => props.category ?? 'unknown'
+  const cx = () => props.cx
+  const cy = () => props.cy
+  const r = () => props.r
+
+  return (
+    <Show
+      when={cat() === 'local'}
+      fallback={
+        <Show
+          when={cat() === 'proxy'}
+          fallback={
+            /* cloud / unknown: 点阵网络 */
+            <g opacity="0.7">
+              <For each={[-1, 0, 1]}>
+                {(dx) => (
+                  <For each={[-1, 0, 1]}>
+                    {(dy) => {
+                      const dist = Math.sqrt(dx * dx + dy * dy)
+                      if (dist > 1.2) return null
+                      return (
+                        <circle
+                          cx={cx() + dx * r() * 0.5}
+                          cy={cy() + dy * r() * 0.5}
+                          r={r() * 0.12}
+                          fill="white"
+                          opacity={0.9 - dist * 0.3}
+                        />
+                      )
+                    }}
+                  </For>
+                )}
+              </For>
+            </g>
+          }
+        >
+          {/* proxy: 同心环（中继/转发语义） */}
+          <g opacity="0.6">
+            <circle cx={cx()} cy={cy()} r={r() * 0.7} fill="none" stroke="white" stroke-width="1" opacity="0.5" />
+            <circle cx={cx()} cy={cy()} r={r() * 0.4} fill="none" stroke="white" stroke-width="1" opacity="0.7" />
+            <circle cx={cx()} cy={cy()} r={r() * 0.15} fill="white" opacity="0.9" />
+          </g>
+        </Show>
+      }
+    >
+      {/* local: 内嵌菱形（自我主体/自包含语义） */}
+      <g opacity="0.7">
+        <path
+          d={`M${cx()} ${cy() - r() * 0.6} L${cx() + r() * 0.6} ${cy()} L${cx()} ${cy() + r() * 0.6} L${cx() - r() * 0.6} ${cy()} Z`}
+          fill="white"
+          opacity="0.5"
+        />
+        <path
+          d={`M${cx()} ${cy() - r() * 0.35} L${cx() + r() * 0.35} ${cy()} L${cx()} ${cy() + r() * 0.35} L${cx() - r() * 0.35} ${cy()} Z`}
+          fill="white"
+          opacity="0.8"
+        />
+      </g>
+    </Show>
+  )
 }
 
-export function ProviderIcon(props: { name: string; size?: 'sm' | 'md'; className?: string }) {
-  const size = () => props.size ?? 'md'
-  const key = () => props.name.toLowerCase()
+export function ProviderIcon(props: { name: string; size?: 'sm' | 'md'; className?: string; category?: string }) {
+  const s = () => SIZE[props.size ?? 'md']
+  const cat = () => CAT_STYLE[props.category ?? 'unknown'] ?? CAT_STYLE.unknown
+  const cx = () => s().svg / 2
+  const cy = () => s().svg / 2
+
   return (
     <span
       class={clsx(
-        'rounded-lg flex items-center justify-center font-semibold text-white flex-shrink-0 select-none',
-        size() === 'md' ? 'w-8 h-8 text-[12px]' : 'w-6 h-6 text-10px',
-        props.className
+        'flex items-center justify-center flex-shrink-0 select-none',
+        props.className,
       )}
-      style={{
-        background: BRAND[key()]?.color ?? fallbackColor(props.name),
-        'box-shadow': 'inset 0 1px 0 rgba(255,255,255,0.25)',
-      }}
       aria-hidden="true"
+      title={cat().desc ? `${cat().label} · ${cat().desc}` : cat().label}
     >
-      {glyphOf(props.name)}
+      <svg
+        width={s().svg}
+        height={s().svg}
+        viewBox={`0 0 ${s().svg} ${s().svg}`}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* 外层六边形 */}
+        <path
+          d={hexPath(cx(), cy(), s().hexR)}
+          fill={cat().fill}
+          stroke={cat().accent}
+          stroke-width={s().stroke}
+        />
+        {/* 内层纹理（分类几何） */}
+        <HexagonInner category={props.category ?? 'unknown'} cx={cx()} cy={cy()} r={s().hexR * 0.85} />
+      </svg>
     </span>
   )
 }
 
 /** 分类徽章：本地(自我主体)/代理(自定义)/云端(第三方) — 对标目录三分类语义 */
 export function CategoryBadge(props: { category: string; className?: string }) {
-  const cat = () => props.category ?? 'unknown'
+  const cat = () => CAT_STYLE[props.category ?? 'unknown'] ?? CAT_STYLE.unknown
   return (
     <span
       class={clsx(
         'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-9px font-medium whitespace-nowrap',
-        cat() === 'local' && 'bg-nt-core-500/10 text-nt-core-700',
-        cat() === 'proxy' && 'bg-nt-act-500/12 text-nt-act-700',
-        cat() === 'cloud' && 'bg-nt-memory-500/10 text-nt-memory-700',
-        cat() === 'unknown' && 'bg-bg-tertiary text-text-muted',
-        props.className
+        props.category === 'local' && 'bg-nt-core-500/10 text-nt-core-700',
+        props.category === 'proxy' && 'bg-nt-act-500/12 text-nt-act-700',
+        props.category === 'cloud' && 'bg-nt-memory-500/10 text-nt-memory-700',
+        props.category !== 'local' && props.category !== 'proxy' && props.category !== 'cloud' && 'bg-bg-tertiary text-text-muted',
+        props.className,
       )}
-      title={
-        cat() === 'local' ? '本地推理 · 数据不出设备'
-        : cat() === 'proxy' ? '自定义代理 · OpenAI 兼容中转'
-        : cat() === 'cloud' ? '云端 API · 数据发送至第三方'
-        : '未知分类'
-      }
+      title={cat().desc ? `${cat().label} · ${cat().desc}` : cat().label}
     >
-      {cat() === 'local' ? '本地'
-        : cat() === 'proxy' ? '代理'
-        : cat() === 'cloud' ? '云端'
-        : '未知'}
+      {cat().label}
     </span>
   )
 }
@@ -131,7 +161,7 @@ export function FreeBadge(props: { free: boolean; className?: string }) {
       <span
         class={clsx(
           'inline-flex items-center px-1.5 py-0.5 rounded-full text-9px font-medium whitespace-nowrap bg-nt-repair-500/10 text-nt-repair-700',
-          props.className
+          props.className,
         )}
         title="免费 / keyless 提供商"
       >

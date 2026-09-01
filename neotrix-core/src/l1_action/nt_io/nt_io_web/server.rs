@@ -1,0 +1,398 @@
+use axum::{
+    extract::{DefaultBodyLimit, Request},
+    http::StatusCode,
+    middleware::{self, Next},
+    response::{Html, IntoResponse, Response},
+    routing::{delete, get, post},
+    Router,
+};
+use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, Mutex};
+
+use super::{api, AgentStatus, SessionInfo, AppState};
+
+const FRONTEND_HTML: &str = include_str!("frontend.html");
+
+/// OpenAPI 3.0 规范 — 单一事实源在 docs/6-REFERENCE/openapi.yaml (R-P83),
+/// 构建期嵌入, 服务端 /openapi.yaml 直接提供 (不再只有静态文档)。
+const OPENAPI_YAML: &str = include_str!("../../../../../docs/6-REFERENCE/openapi.yaml");
+
+pub async fn handle_frontend() -> impl IntoResponse {
+    Html(FRONTEND_HTML)
+}
+
+/// 服务端提供 OpenAPI 规范 (YAML, 与 docs 单一事实源同源嵌入)。
+/// 对应 release-checklist "5.3 API 参考" 缺口: 此前无 /openapi.json 或 Swagger UI。
+pub async fn handle_openapi() -> impl IntoResponse {
+    axum::response::Response::builder()
+        .header("Content-Type", "application/yaml; charset=utf-8")
+        .header("Cache-Control", "no-cache")
+        .body(axum::body::Body::from(OPENAPI_YAML))
+        .unwrap_or_else(|e| {
+            axum::response::Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(axum::body::Body::from(format!("failed to serve spec: {e}")))
+                .expect("static error response body is infallible")
+        })
+}
+
+pub async fn not_found_handler() -> impl IntoResponse {
+    axum::response::Json(serde_json::json!({
+        "error": "not_found",
+        "message": "Endpoint not found"
+    }))
+}
+
+/// API Token 认证中间件 (F1)。
+/// 只保护 `/api/*` 路径 — `/` (前端 UI)、`/openapi.yaml`、`/chat`、`/ws` 保持公开。
+/// 未配置 NEOTRIX_API_TOKEN 时直接放行 (本地开发默认开放, 不破坏现有 API 消费者)。
+async fn auth_middleware(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if req.uri().path().starts_with("/api/") {
+        if let Some(expected) = &state.api_token {
+            let auth_header = req
+                .headers()
+                .get("Authorization")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            let provided = auth_header.strip_prefix("Bearer ").unwrap_or("");
+            if provided != expected {
+                return (StatusCode::UNAUTHORIZED, axum::response::Json(serde_json::json!({
+                    "error": "unauthorized",
+                    "message": "Invalid or missing API token. Provide via Authorization: Bearer <token>"
+                }))).into_response();
+            }
+        }
+    }
+    next.run(req).await
+}
+
+/// 全局固定窗口限流中间件 (F2, release-checklist 8.6)。
+/// 只对 `/api/*` 计数, 超出 `NEOTRIX_RATE_LIMIT_PER_MIN` (默认 60) 返回 429。
+async fn rate_limit_middleware(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if req.uri().path().starts_with("/api/") {
+        let allowed = state
+            .rate_limiter
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .allow();
+        if !allowed {
+            return (StatusCode::TOO_MANY_REQUESTS, axum::response::Json(serde_json::json!({
+                "error": "rate_limited",
+                "message": "Too many requests, please retry later"
+            }))).into_response();
+        }
+    }
+    next.run(req).await
+}
+
+pub fn build_router(state: AppState) -> Router {
+    Router::new()
+        // Brain
+        .route("/api/brain/stats", get(api::brain_stats_handler))
+        .route("/api/brain/absorb", post(api::absorb_source_handler))
+        .route("/api/brain/knowledge/search", get(api::search_knowledge_handler))
+        .route("/api/brain/reason", post(api::reason_handler))
+        // Sessions
+        .route("/api/sessions", get(api::session_list_handler).post(api::session_create_handler))
+        .route(
+            "/api/sessions/{id}/switch",
+            post(api::session_switch_handler),
+        )
+        .route(
+            "/api/sessions/{id}",
+            delete(api::session_delete_handler),
+        )
+        .route("/api/sessions/{id}/fork", post(api::session_fork_handler))
+        .route(
+            "/api/sessions/{id}/export",
+            get(api::session_export_handler),
+        )
+        .route("/api/sessions/import", post(api::session_import_handler))
+        // Agent
+        .route(
+            "/api/agent/status",
+            get(api::agent_status_handler),
+        )
+        .route("/api/agent/start", post(api::agent_start_handler))
+        .route("/api/agent/stop", post(api::agent_stop_handler))
+        .route(
+            "/api/agent/reason-stream",
+            get(api::agent_reason_stream_handler),
+        )
+        // Project
+        .route("/api/project/tree", get(api::file_tree_handler))
+        .route("/api/project/file", get(api::read_file_handler).post(api::write_file_handler))
+        .route("/api/project/detect", get(api::detect_project_handler))
+        // Diff
+        .route("/api/diff/staged", get(api::diff_staged_handler))
+        .route("/api/diff/unstaged", get(api::diff_unstaged_handler))
+        .route("/api/diff/file", get(api::diff_file_handler))
+        // Permissions
+        .route(
+            "/api/permissions/pending",
+            get(api::pending_permissions_handler),
+        )
+        .route(
+            "/api/permissions/request",
+            post(api::permission_request_handler),
+        )
+        .route(
+            "/api/permissions/{id}/approve",
+            post(api::permission_approve_handler),
+        )
+        .route(
+            "/api/permissions/{id}/deny",
+            post(api::permission_deny_handler),
+        )
+        // MCP / provider
+        .route(
+            "/api/mcp/test-provider",
+            post(api::test_provider_handler),
+        )
+        .route(
+            "/api/mcp/save-provider",
+            post(api::save_provider_handler),
+        )
+        .route("/api/mcp/command", post(api::cli_command_handler))
+        // Session share (从 server/http.rs 融合)
+        .route("/api/sessions/share", post(api::share_create_handler))
+        .route(
+            "/api/sessions/share/{token}",
+            get(api::share_get_handler),
+        )
+        // H5 远程聊天 (从 server/h5.rs 融合)
+        .route("/chat", get(api::h5_page))
+        // WebSocket echo (从 server/http.rs ws_handler 融合)
+        .route("/ws", get(ws_echo_handler))
+        // B3 瓦片服务: NT-Pack 冷层 bbox 查询 (R-P42 强化 NT-IO 节点)
+        .route("/api/geo/tiles", get(super::tiles::geo_tiles_handler))
+        // OpenAI 兼容 API (/v1/) — 标准化供外部消费
+        .route("/v1/chat/completions", post(api::openai_chat_completions))
+        .route("/v1/models", get(api::openai_list_models))
+        .route("/v1/models/{*model}", get(api::openai_get_model))
+        // Frontend + fallback
+        .route("/", get(handle_frontend))
+        .route("/openapi.yaml", get(handle_openapi))
+        .route("/openapi.json", get(handle_openapi))
+        .fallback(not_found_handler)
+        // NOTE: auth middleware 不在 build_router 内套用——merge 进来的
+        // KB/EWHR 路由不会继承 base router 的 route_layer（axum 语义）。
+        // 统一在 start_server_with 对合并后的完整 router 套 auth（见下）。
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_middleware,
+        ))
+        .with_state(state)
+}
+
+/// WebSocket echo + 数字人情感化文本 (从 server/http.rs 拆解融合; affective R-P36 生产消费)。
+/// 客户端发送 `{type:'text', content: ...}` → 经 DigitalHumanPipeline::process_audio_input
+/// 产出情感化回复 + 微表情 + 韵律, 返回 `{type:'text', content, emotion, animation}`;
+/// 其他消息保持原 echo 语义。
+pub async fn ws_echo_handler(
+    ws: axum::extract::ws::WebSocketUpgrade,
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> impl axum::response::IntoResponse {
+    ws.on_upgrade(move |socket| ws_echo_loop(socket, state))
+}
+
+async fn ws_echo_loop(
+    socket: axum::extract::ws::WebSocket,
+    state: AppState,
+) {
+    use axum::extract::ws::{Message};
+    use futures::{SinkExt, StreamExt};
+    let (mut sender, mut receiver) = socket.split();
+    while let Some(msg) = receiver.next().await {
+        if let Ok(Message::Text(text)) = msg {
+            let reply = handle_ws_text(&state.digital_human, &text);
+            if sender.send(Message::Text(reply.into())).await.is_err() {
+                break;
+            }
+        }
+    }
+}
+
+/// 文本消息 → 数字人情感化回复; 非 `{type:'text'}` JSON 回落 echo。
+fn handle_ws_text(
+    digital_human: &std::sync::Mutex<crate::l1_action::nt_io::nt_io_digital_human::DigitalHumanPipeline>,
+    text: &str,
+) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(text) {
+        if v.get("type").and_then(|t| t.as_str()) == Some("text") {
+            if let Some(content) = v.get("content").and_then(|c| c.as_str()) {
+                let mut pipe = digital_human.lock().unwrap_or_else(|e| e.into_inner());
+                let resp = pipe.process_audio_input(content);
+                let trust = pipe.affective.relationship.trust;
+                return serde_json::json!({
+                    "type": "text",
+                    "content": resp.reply,
+                    "emotion": format!("{:?}", resp.emotion),
+                    "animation": resp.animation,
+                    "trust": trust,
+                })
+                .to_string();
+            }
+        }
+    }
+    format!("echo: {}", text)
+}
+
+/// Inner server start — accepts pre-constructed brain and bank
+/// to avoid L1→L8 direct dependency. Callers from L8/binaries
+/// construct the brain and pass it in.
+pub async fn start_server_with(
+    port: u16,
+    brain: Box<dyn crate::core::nt_core_traits::BrainProvider>,
+    bank: crate::core::ReasoningBank,
+) {
+
+    // Read api_token from config.toml
+    let api_token = std::env::var("NEOTRIX_API_TOKEN").ok().or_else(|| {
+        let config_path = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".config")
+            .join("neotrix")
+            .join("config.toml");
+        std::fs::read_to_string(&config_path).ok().and_then(|content| {
+            content.lines().find_map(|line| {
+                if line.trim().starts_with("api_token") {
+                    let parts: Vec<&str> = line.splitn(2, '=').collect();
+                    if parts.len() == 2 {
+                        Some(parts[1].trim().trim_matches('"').to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+        })
+    });
+
+    // 零信任绑定策略：无 API token 时只绑定回环地址（127.0.0.1），
+    // 防止局域网内未鉴权访问推理/知识库 API。配置 token 后才暴露 0.0.0.0。
+    let has_token = api_token.is_some();
+    let bind_host = if has_token { "0.0.0.0" } else { "127.0.0.1" };
+
+    let mut state = AppState {
+        brain: Arc::new(Mutex::new(brain)),
+        bank: Arc::new(Mutex::new(bank)),
+        sessions: Arc::new(Mutex::new(vec![SessionInfo {
+            id: "default".into(),
+            name: "Default Session".into(),
+            message_count: 0,
+            created: chrono::Utc::now().timestamp(),
+        }])),
+        permission_counter: Arc::new(AtomicU64::new(1)),
+        pending_permissions: Arc::new(Mutex::new(Vec::new())),
+        agent_running: Arc::new(Mutex::new(AgentStatus {
+            running: false,
+            current_task: None,
+            uptime_secs: 0,
+        })),
+        agent_start_time: Arc::new(Mutex::new(None)),
+        api_token,
+        rate_limiter: Arc::new(Mutex::new(super::RateWindow::new(300))),
+        digital_human: Arc::new(Mutex::new(
+            crate::l1_action::nt_io::nt_io_digital_human::DigitalHumanPipeline::new(
+                crate::l1_action::nt_io::nt_io_digital_human::PersonaConfig::default(),
+            ),
+        )),
+        gateway: None,
+    };
+
+    // Initialize LLM gateway and store in state
+    let gateway = crate::l1_action::nt_io::nt_io_provider::factory::create_gateway_async().await;
+    state.gateway = Some(Arc::new(gateway));
+
+    let mut app = build_router(state.clone());
+
+    // Merge KB API routes if KnowledgeBase can be opened
+    if let Some(kb_state) = crate::neotrix::nt_memory_kb::nt_memory_api::KbApiState::try_open_default() {
+        let kb_router = crate::neotrix::nt_memory_kb::nt_memory_api::build_kb_router(kb_state);
+        app = app.merge(kb_router);
+    }
+
+    // Merge EWHR API routes if KB can be opened
+    if let Some(ewhr_state) = crate::neotrix::nt_memory_historian::EvidenceApiState::try_open_default() {
+        let ewhr_router = crate::neotrix::nt_memory_historian::build_ewhr_router(ewhr_state);
+        app = app.merge(ewhr_router);
+    }
+
+    // Auth middleware on ALL API routes (含 merge 进来的 KB/EWHR 路由)。
+    // 必须在 merge 之后套用——axum 的 route_layer 只作用于当前 router 的路由，
+    // 先套再 merge 会导致 KB/EWHR 路由无鉴权（C-1 修复）。
+    app = app.route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
+
+    let addr = format!("{}:{}", bind_host, port);
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to bind address {}: {}", addr, e);
+            return;
+        }
+    };
+
+    println!("╔══════════════════════════════════════════════╗");
+    println!("║     NeoTrix Web UI                          ║");
+    println!("║     Listening on http://{}               ║", addr);
+    if !has_token {
+        println!("║     ⚠ 无 API token — 仅绑定回环地址            ║");
+    }
+    println!("╚══════════════════════════════════════════════╝");
+
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Server failed: {}", e);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_pipe() -> std::sync::Mutex<crate::l1_action::nt_io::nt_io_digital_human::DigitalHumanPipeline> {
+        std::sync::Mutex::new(
+            crate::l1_action::nt_io::nt_io_digital_human::DigitalHumanPipeline::new(
+                crate::l1_action::nt_io::nt_io_digital_human::PersonaConfig::default(),
+            ),
+        )
+    }
+
+    /// C2: 生产消费者 handle_ws_text — 情感化回复 + 关系推进 + 跨消息连续。
+    #[test]
+    fn test_ws_text_routes_to_digital_human() {
+        let pipe = test_pipe();
+        let reply = handle_ws_text(&pipe, r#"{"type":"text","content":"我很难过，真的很难受"}"#);
+        let v: serde_json::Value = serde_json::from_str(&reply).expect("valid json reply");
+        assert_eq!(v["type"], "text");
+        assert!(v["content"].as_str().unwrap().contains("我"));
+        assert!(v["emotion"].as_str().unwrap().len() > 0);
+        assert!(v["animation"].as_str().unwrap().len() > 0);
+        assert!(v["trust"].as_f64().unwrap() > 0.0);
+        // 关系推进: 悲伤披露 → 信任上升。
+        let trust2 = handle_ws_text(&pipe, r#"{"type":"text","content":"我很难过，真的很难受"}"#);
+        let v2: serde_json::Value = serde_json::from_str(&trust2).expect("valid json reply");
+        assert!(v2["trust"].as_f64().unwrap() > v["trust"].as_f64().unwrap());
+    }
+
+    /// 非 text 消息保持原 echo 语义 (向后兼容)。
+    #[test]
+    fn test_ws_echo_fallback() {
+        let pipe = test_pipe();
+        assert_eq!(handle_ws_text(&pipe, "plain message"), "echo: plain message");
+        assert_eq!(
+            handle_ws_text(&pipe, r#"{"type":"other","content":"x"}"#),
+            r#"echo: {"type":"other","content":"x"}"#
+        );
+    }
+}

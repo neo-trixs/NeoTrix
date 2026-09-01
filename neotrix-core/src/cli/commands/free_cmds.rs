@@ -10,10 +10,10 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_io_provider::free_catalog::FreeModelCatalog;
-use crate::neotrix::nt_io_provider::factory::LlmProviderType;
+use crate::l1_action::nt_io::nt_io_provider::factory::LlmProviderType;
 use crate::neotrix::nt_io_provider::free_pool::global_free_pool;
 use crate::neotrix::nt_io_provider::rate_profiles::free_provider_rate_profiles;
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 pub struct FreeCmd;
 

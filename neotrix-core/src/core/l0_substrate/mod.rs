@@ -8,15 +8,4 @@
 //! - L0 的变更影响全局 — 必须经过完整的大过滤器验证
 //! - L0 不包含任何推理逻辑
 
-#[cfg(feature = "research")]
-pub use crate::core::nt_core_deploy as deploy;
-#[cfg(feature = "research")]
-pub use crate::core::nt_core_deploy_cache as deploy_cache;
 
-#[cfg(feature = "research")]
-pub use crate::core::nt_core_deploy::{
-    AWQConfig, AWQQuantization, AneProgramCache, AotCompiler, AotResult, AotTarget, CacheEntry,
-    CachePolicy, DeployReport, EdgeDeployPipeline, GGUFConfig, GGUFLevel, GGUFQuantization,
-    HardwareDetector, HardwarePowerProfile, HardwareProfile, LoraAdapter, OsType, PowerProfile,
-    PowerState, PowerThermalModel, Quantization, QuantizationPipeline, QuantizedModel, Quantizer,
-};

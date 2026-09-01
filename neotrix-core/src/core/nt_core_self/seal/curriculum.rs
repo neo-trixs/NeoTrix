@@ -114,6 +114,55 @@ impl CalibratedCurriculumGenerator {
         }
         curve
     }
+
+    /// CUDA Agent RL 辅助任务选择
+    ///
+    /// 参考: arXiv:2602.24286 "CUDA-Agent: Skill-Augmented..."
+    /// 利用强化学习策略选择器来优化课程任务选择。
+    pub fn rl_assisted_select(
+        &self,
+        available_tasks: &[(String, f64, Vec<String>)],
+        language: &str,
+    ) -> Option<(String, f64, Vec<String>)> {
+        use crate::core::nt_core_self::cuda_agent::StrategyManager;
+        use crate::core::nt_core_self::cuda_agent::OptimizationStrategy;
+
+        // 首先使用标准难度过滤
+        let candidates: Vec<_> = available_tasks.iter()
+            .filter(|t| t.1 <= self.difficulty_level + 0.2)
+            .collect();
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // 使用 CUDA Agent 策略管理器选择最佳任务
+        let mut manager = StrategyManager::new();
+
+        // 为每个候选任务注册策略
+        for (idx, task) in candidates.iter().enumerate() {
+            let strategy = OptimizationStrategy {
+                id: format!("task_{}", idx),
+                name: task.0.clone(),
+                description: format!("Curriculum task: {}", task.0),
+                applicable_languages: vec![language.to_string()],
+                expected_improvement: 1.0 - (task.1 - self.difficulty_level).abs(),
+                success_rate: self.mastery_level(),
+                usage_count: 0,
+            };
+            manager.register(strategy);
+        }
+
+        // 选择最佳策略 (任务)
+        if let Some(best) = manager.select_strategy(language, "difficulty") {
+            candidates.into_iter()
+                .find(|t| t.0 == best.name)
+                .cloned()
+        } else {
+            // 回退到标准选择
+            self.generate_next_task(available_tasks)
+        }
+    }
 }
 
 impl IterationValidator {

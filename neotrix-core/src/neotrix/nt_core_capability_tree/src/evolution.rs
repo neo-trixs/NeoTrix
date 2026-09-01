@@ -232,7 +232,8 @@ impl<'a> EvolutionEngine<'a> {
                         to_node: Some(new_node_id.clone()),
                         note,
                         timestamp: chrono::Utc::now(),
-                    });
+                                    runeword_change: None,
+            });
                     self.registry.register(node)?;
                 }
                 EvolutionAction::Graft { target_node_id, folded_nodes, note } => {
@@ -245,7 +246,8 @@ impl<'a> EvolutionEngine<'a> {
                             to_node: Some(target_node_id.clone()),
                             note,
                             timestamp: chrono::Utc::now(),
-                        });
+                                        runeword_change: None,
+            });
                         // 标记 folded 为废弃
                         for folded in &folded_nodes {
                             if let Some(n) = self.registry.get_mut(folded) {
@@ -275,6 +277,7 @@ impl<'a> EvolutionEngine<'a> {
                             to_node: Some(shared_node_id.clone()),
                             note: format!("Cross-pollinated between {} and {}: {}", domain_a, domain_b, note),
                             timestamp: chrono::Utc::now(),
+                                                runeword_change: None,
                         });
                     }
                 }
@@ -294,7 +297,8 @@ impl<'a> EvolutionEngine<'a> {
                             to_node: Some(node_id.clone()),
                             note,
                             timestamp: chrono::Utc::now(),
-                        });
+                                        runeword_change: None,
+            });
                     }
                 }
                 EvolutionAction::HarnessSynthesize { node_id, task_signature, note } => {
@@ -306,6 +310,7 @@ impl<'a> EvolutionEngine<'a> {
                             to_node: Some(node_id.clone()),
                             note: format!("jit_harness_synthesize({}): {}", task_signature, note),
                             timestamp: chrono::Utc::now(),
+                                                runeword_change: None,
                         });
                         let entry = serde_json::json!({ "task_signature": task_signature, "note": note });
                         let mut sig = serde_json::json!([entry]);
@@ -328,6 +333,7 @@ impl<'a> EvolutionEngine<'a> {
                             to_node: Some(node_id.clone()),
                             note: format!("jit_harness_repair: {}", note),
                             timestamp: chrono::Utc::now(),
+                                                runeword_change: None,
                         });
                         node.metadata.insert("harness_repaired".into(), serde_json::Value::Bool(true));
                     }
@@ -341,7 +347,8 @@ impl<'a> EvolutionEngine<'a> {
                             to_node: Some(node_id.clone()),
                             note: "compounding_archive: record harness performance signal".into(),
                             timestamp: chrono::Utc::now(),
-                        });
+                                        runeword_change: None,
+            });
                         let mut archive = serde_json::json!([&perf]);
                         if let Some(existing) = node.metadata.get("compounding_archive") {
                             if let Some(arr) = existing.as_array() {

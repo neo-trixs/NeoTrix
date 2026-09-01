@@ -511,3 +511,41 @@
         assert!(crate::nt_field_ledger::field_tick(&conn).unwrap().is_none());
         assert!(crate::nt_field_ledger::field_verify_chain(&conn).unwrap());
     }
+
+    #[test]
+    fn test_cmd_rune_set_and_get() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+        // set crimson
+        cmd_rune(&conn, "set", Some("crimson"), Some("NT-MEMORY"));
+        let val = kv_get(&conn, NS, "rune:NT-MEMORY:crimson");
+        assert!(val.is_some(), "rune should be stored");
+        let v: Value = serde_json::from_str(&val.unwrap()).unwrap();
+        assert_eq!(v["color"], "crimson");
+        assert_eq!(v["module"], "NT-MEMORY");
+        // get should not panic (count query)
+        cmd_rune(&conn, "get", None, Some("NT-MEMORY"));
+        // invalid color should not insert
+        cmd_rune(&conn, "set", Some("invalid"), Some("NT-MEMORY"));
+        let invalid = kv_get(&conn, NS, "rune:NT-MEMORY:invalid");
+        assert!(invalid.is_none(), "invalid color must not be stored");
+    }
+
+    #[test]
+    fn test_cmd_constellation_audit_and_mature() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+        // insert a maturity record
+        conn.execute(
+            "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+            params![NS, "maturity:NT-CORE", "4", now_ts()],
+        )
+        .unwrap();
+        // audit should not panic (covers both target=all and specific)
+        cmd_constellation(&conn, "audit", None);
+        cmd_constellation(&conn, "audit", Some("NT-CORE"));
+        cmd_constellation(&conn, "mature", None);
+        cmd_constellation(&conn, "mature", Some("NT-CORE"));
+        // empty domain case already covered by audit with C0
+    }
+

@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // activation = importance * ln(1 + degree)
     let mut activations: Vec<(SpecialistType, f64)> = Vec::new();
     
-    for (nid, blob) in &rows {
+    for (nid, _blob) in &rows {
         if let Some((node_type, importance)) = node_info.get(nid) {
             // 计算 degree（简化：用 content 长度近似）
             let degree: i64 = conn.query_row(

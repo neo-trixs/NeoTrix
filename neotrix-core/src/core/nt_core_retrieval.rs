@@ -13,7 +13,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_code_search::{CodeSearchEngine, SymbolIndex};
-use crate::neotrix::l8_autonomic_impl::nt_mind::infrastructure::code_graph::CodeGraph;
+use crate::l5_cognition::nt_mind::infrastructure::code_graph::CodeGraph;
 
 /// MCP 工具调用结果 (确定性, 可缓存/可审计)。
 #[derive(Debug, Clone, Serialize, Deserialize)]

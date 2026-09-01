@@ -15843,6 +15843,22 @@
       "rationale": "[蒸馏-NT-MIND] 聚合 4 条经验的模式: Mem0: production-ready memory with graph-based representations, entity linking, single-pass AD",
       "signal": 0.76,
       "promoted_at": 1788098252
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [意识体蒸馏] 本轮收敛 1 组经验为 1 条能力模式, 标记 4 条原始经验。跨域分布: NT-META:4. 意识体维度信号: 经验维度向能力网模式收敛, 细枝末节降权为溯源证据。 [",
+      "signal": 0.76,
+      "promoted_at": 1788158754
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [意识体蒸馏] 本轮收敛 1 组经验为 1 条能力模式, 标记 4 条原始经验。跨域分布: NT-META:4. 意识体维度信号: 经验",
+      "signal": 0.76,
+      "promoted_at": 1788160929
     }
   ]
 }

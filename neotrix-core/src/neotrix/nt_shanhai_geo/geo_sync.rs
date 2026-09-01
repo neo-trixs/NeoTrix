@@ -5,7 +5,7 @@
 
 use rusqlite::Connection;
 
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::{upsert_geo, GeoRecord};
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_geo::{upsert_geo, GeoRecord};
 use crate::neotrix::nt_shanhai_geo::{all_mappings, known_peaks};
 
 /// 同步全部 shanhai 坐标到 geo_index。返回写入条数。

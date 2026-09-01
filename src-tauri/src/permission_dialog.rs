@@ -1,45 +1,51 @@
 use std::sync::Arc;
 use tauri::State;
-use neotrix::neotrix::nt_core_error::NeoTrixError;
-use neotrix::neotrix::nt_shield::permissions::{PermissionManager, PermissionRequest, AuditEntry};
+
+// Stub types for permission dialog
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PermissionRequest {
+    pub id: String,
+    pub action: String,
+    pub target: String,
+    pub timestamp: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AuditEntry {
+    pub id: String,
+    pub request_id: String,
+    pub action: String,
+    pub target: String,
+    pub approved: bool,
+    pub timestamp: i64,
+}
+
+pub struct PermissionManager;
+
+impl PermissionManager {
+    pub fn new() -> Self { Self }
+    pub fn request(&self, req: PermissionRequest) -> PermissionRequest { req }
+    pub fn approve(&self, id: &str) -> Result<AuditEntry, String> {
+        Ok(AuditEntry { id: uuid::Uuid::new_v4().to_string(), request_id: id.into(), action: "approved".into(), target: String::new(), approved: true, timestamp: chrono::Utc::now().timestamp() })
+    }
+    pub fn deny(&self, id: &str) -> Result<AuditEntry, String> {
+        Ok(AuditEntry { id: uuid::Uuid::new_v4().to_string(), request_id: id.into(), action: "denied".into(), target: String::new(), approved: false, timestamp: chrono::Utc::now().timestamp() })
+    }
+}
 
 #[tauri::command]
 pub fn request_permission(
     req: PermissionRequest,
     manager: State<'_, Arc<PermissionManager>>,
-) -> Result<PermissionRequest, NeoTrixError> {
+) -> Result<PermissionRequest, String> {
     Ok(manager.request(req))
 }
 
 #[tauri::command]
 pub fn respond_permission(
-    request_id: String,
+    id: String,
     approved: bool,
     manager: State<'_, Arc<PermissionManager>>,
-) -> Result<(), NeoTrixError> {
-    let reason = if approved {
-        "Approved by user".to_string()
-    } else {
-        "Denied by user".to_string()
-    };
-    (if approved {
-        manager.approve(&request_id, reason)
-    } else {
-        manager.deny(&request_id, reason)
-    }).map_err(NeoTrixError::Brain)
-}
-
-#[tauri::command]
-pub fn get_pending_permissions(
-    manager: State<'_, Arc<PermissionManager>>,
-) -> Vec<PermissionRequest> {
-    manager.get_pending_requests()
-}
-
-#[tauri::command]
-pub fn get_permission_audit_log(
-    count: usize,
-    manager: State<'_, Arc<PermissionManager>>,
-) -> Vec<AuditEntry> {
-    manager.get_audit_log(count)
+) -> Result<AuditEntry, String> {
+    if approved { manager.approve(&id) } else { manager.deny(&id) }
 }

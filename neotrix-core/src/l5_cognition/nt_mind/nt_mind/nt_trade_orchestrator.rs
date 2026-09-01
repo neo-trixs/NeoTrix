@@ -359,7 +359,7 @@ impl TradeOrchestrator {
 
     /// FT01: 社交媒体内容创作与发布
     pub fn create_social_content(&self, platform: Platform, body: &str) -> crate::l1_action::nt_act::nt_act_media::Post {
-        use crate::l1_action::nt_act::nt_act_media::{Post, ContentType, ContentStatus, EngagementMetrics};
+        // use crate::l1_action::nt_act::nt_act_media::{Post, ContentType, ContentStatus, EngagementMetrics};
         Post {
             id: uuid::Uuid::new_v4().to_string(),
             platform,

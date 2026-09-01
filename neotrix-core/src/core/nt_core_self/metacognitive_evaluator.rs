@@ -14,6 +14,15 @@ pub struct CognitiveHealthReport {
     pub evaluation_id: usize,
 }
 
+/// 质量指标 (用于质量监控系统集成)
+#[derive(Debug, Clone)]
+pub struct QualityMetrics {
+    pub agent_id: String,
+    pub task_id: String,
+    pub metrics: std::collections::HashMap<String, f64>,
+    pub recommendations: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct CognitiveFlag {
     pub severity: FlagSeverity,
@@ -122,6 +131,45 @@ impl CognitiveEvaluator {
             self.history.drain(..overflow);
         }
         report
+    }
+
+    /// Trace Evaluation 集成: 将轨迹评估结果转换为质量指标
+    ///
+    /// 参考: GenAI_Agents "Trace-Based Agent Evaluation"
+    /// 将轨迹评估结果转换为质量监控系统可消费的指标格式。
+    pub fn trace_to_quality_metrics(
+        &self,
+        trace_report: &crate::core::nt_core_self::trace_evaluation::EvaluationReport,
+    ) -> QualityMetrics {
+        let mut metrics = std::collections::HashMap::new();
+
+        // 提取各维度分数作为质量指标
+        for result in &trace_report.results {
+            metrics.insert(
+                format!("{:?}", result.dimension).to_lowercase(),
+                result.score,
+            );
+        }
+
+        // 添加总体指标
+        metrics.insert("overall_score".to_string(), trace_report.overall_score);
+        metrics.insert(
+            "grade_numeric".to_string(),
+            match trace_report.grade {
+                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Excellent => 1.0,
+                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Good => 0.8,
+                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Adequate => 0.6,
+                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Poor => 0.4,
+                crate::core::nt_core_self::trace_evaluation::EvaluationGrade::Failed => 0.2,
+            },
+        );
+
+        QualityMetrics {
+            agent_id: trace_report.agent_id.clone(),
+            task_id: trace_report.task_id.clone(),
+            metrics,
+            recommendations: trace_report.recommendations.clone(),
+        }
     }
 
     fn compute_attention_health(&self, model: &SiliconSelfModel) -> f64 {

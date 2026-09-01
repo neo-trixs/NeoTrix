@@ -35,15 +35,6 @@ const VIEW_ORDER = ['chat'] as const
 type ViewKey = (typeof VIEW_ORDER)[number]
 
 export function Sidebar(props: SidebarProps) {
-  // 容错导航：Sidebar 契约上不强制 Router 环境（既有冒烟测试裸渲染），
-  // 缺上下文时导航按钮退化为空操作，生产路径（Route 内渲染）正常跳转。
-  let navigate: (to: string) => void
-  try {
-    const n = useNavigate()
-    navigate = (to) => n(to)
-  } catch {
-    navigate = () => {}
-  }
   const collapsed = () => props.collapsed ?? false
   // 折叠态 hover 预览：收起为图标栏时，悬停临时展开为完整侧栏
   const [peek, setPeek] = createSignal(false)
@@ -831,64 +822,6 @@ export function Sidebar(props: SidebarProps) {
               <span>已归档</span>
             </button>
           </Show>
-
-          {/* 功能导航：知识库 / 插件市场 / 洞察（Phase 1-2 页面化入口） */}
-          <div class="flex items-center gap-1 mx-3 mb-2" role="navigation" aria-label="功能页面">
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={() => navigate('/kb')}
-              aria-label="知识库"
-              title="知识库"
-            >
-              <Database class="w-4 h-4" />
-              <span>知识库</span>
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={() => navigate('/plugins')}
-              aria-label="插件市场"
-              title="插件市场"
-            >
-              <Store class="w-4 h-4" />
-              <span>插件</span>
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={() => navigate('/insights')}
-              aria-label="洞察"
-              title="洞察"
-            >
-              <Gauge class="w-4 h-4" />
-              <span>洞察</span>
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={() => navigate('/skills')}
-              aria-label="技能"
-              title="技能"
-            >
-              <Sparkles class="w-4 h-4" />
-              <span>技能</span>
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={() => navigate('/memory')}
-              aria-label="记忆"
-              title="记忆"
-            >
-              <BrainCircuit class="w-4 h-4" />
-              <span>记忆</span>
-            </button>
-            <button
-              class="flex flex-1 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/40 transition-colors text-12px focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={() => navigate('/workflows')}
-              aria-label="工作流"
-              title="工作流"
-            >
-              <Workflow class="w-4 h-4" />
-              <span>流程</span>
-            </button>
-          </div>
 
           {/* Footer: 用户条 sf（设计 v2）—— 头像+信息+设置整合为整体 */}
           <button class="sf" onClick={openSettings} aria-label="用户设置" title="用户设置">

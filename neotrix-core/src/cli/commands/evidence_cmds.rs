@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_memory_historian::EvidenceRecord;
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 #[derive(Debug, Subcommand)]
 pub enum EvidenceCommand {

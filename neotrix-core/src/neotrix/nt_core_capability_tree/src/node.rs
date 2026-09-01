@@ -100,9 +100,10 @@ impl NodeLayer {
 }
 
 /// 星座成熟度 (Y 轴) - C0 到 C6
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ConstellationLevel {
+    #[default]
     C0Compile,
     C1UnitTest,
     #[serde(alias = "c2integration")]
@@ -228,6 +229,21 @@ pub struct EvolutionLogEntry {
     pub note: String,
     #[serde(default)]
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runeword_change: Option<String>,
+}
+
+/// Runeword 配置 — 基于 constellation level 自动分配的 rune 槽
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RunewordConfig {
+    /// 当前填满的 rune 槽 (按 constellation level 自动分配)
+    pub sockets: Vec<RuneSocket>,
+    /// 当前 runeword 名称 (随 constellation 晋升而变化)
+    pub runeword: String,
+    /// 是否启用 Scry (完整 ETL, 5 槽全开)
+    pub scry_enabled: bool,
+    /// 上一次晋升时的 constellation level
+    pub last_promotion_level: ConstellationLevel,
 }
 
 /// 能力节点核心定义
@@ -256,6 +272,8 @@ pub struct CapabilityNode {
     pub deprecated: bool,
     #[serde(default)]
     pub deprecated_reason: Option<String>,
+    #[serde(default)]
+    pub runeword_config: RunewordConfig,
 }
 
 impl CapabilityNode {
@@ -281,6 +299,7 @@ impl CapabilityNode {
             updated_at: now,
             deprecated: false,
             deprecated_reason: None,
+            runeword_config: RunewordConfig::default(),
         }
     }
 
@@ -308,6 +327,7 @@ impl CapabilityNode {
             updated_at: now,
             deprecated: false,
             deprecated_reason: None,
+            runeword_config: RunewordConfig::default(),
         }
     }
 
@@ -335,6 +355,7 @@ impl CapabilityNode {
             updated_at: now,
             deprecated: false,
             deprecated_reason: None,
+            runeword_config: RunewordConfig::default(),
         }
     }
 
@@ -486,7 +507,15 @@ impl CapabilityNode {
             return Err(reason.unwrap_or_else(|| "evidence gate rejected".into()));
         }
         if let Some(next) = self.constellation.next() {
+            let prev_runeword = self.runeword_config.runeword.clone();
             self.constellation = next;
+            self.update_runeword_config();
+            let new_runeword = self.runeword_config.runeword.clone();
+            let runeword_change = if prev_runeword != new_runeword {
+                Some(format!("{} → {}", prev_runeword, new_runeword))
+            } else {
+                None
+            };
             self.record_evolution(EvolutionLogEntry {
                 cycle: "auto".into(),
                 op: EvolutionOp::Maturation,
@@ -494,6 +523,7 @@ impl CapabilityNode {
                 to_node: Some(self.id.clone()),
                 note: format!("Promoted to {}", next.as_str()),
                 timestamp: chrono::Utc::now(),
+                runeword_change,
             });
             Ok(true)
         } else {
@@ -512,7 +542,52 @@ impl CapabilityNode {
             to_node: Some(self.id.clone()),
             note: format!("Deprecated: {}", reason),
             timestamp: chrono::Utc::now(),
+            runeword_change: None,
         });
+    }
+
+    /// 根据 constellation level 计算 rune 槽位
+    ///
+    /// C0: 1 slot (Crimson), C1: +Indigo, C2: +Obsidian, C3: +Golden, C4+: +Alabaster (Scry enabled)
+    pub fn compute_rune_sockets(&self) -> Vec<RuneSocket> {
+        use RuneSocket::*;
+        match self.constellation {
+            ConstellationLevel::C0Compile => vec![Crimson],
+            ConstellationLevel::C1UnitTest => vec![Crimson, Indigo],
+            ConstellationLevel::C2IntegrationTest => vec![Crimson, Indigo, Obsidian],
+            ConstellationLevel::C3Benchmark => vec![Crimson, Indigo, Obsidian, Golden],
+            ConstellationLevel::C4MainPipeline
+            | ConstellationLevel::C5SelfHealing
+            | ConstellationLevel::C6EvolutionLoop => {
+                vec![Crimson, Indigo, Obsidian, Golden, Alabaster]
+            }
+        }
+    }
+
+    /// Runeword 名称随 constellation level 变化
+    fn runeword_name_for_level(level: ConstellationLevel) -> &'static str {
+        match level {
+            ConstellationLevel::C0Compile => "Fehu",
+            ConstellationLevel::C1UnitTest => "Uruz",
+            ConstellationLevel::C2IntegrationTest => "Thurisaz",
+            ConstellationLevel::C3Benchmark => "Ansuz",
+            ConstellationLevel::C4MainPipeline => "Raidho",
+            ConstellationLevel::C5SelfHealing => "Kaunan",
+            ConstellationLevel::C6EvolutionLoop => "Scry",
+        }
+    }
+
+    /// 更新 runeword_config (根据当前 constellation level 自动计算槽位和 runeword 名称)
+    pub fn update_runeword_config(&mut self) {
+        self.runeword_config.sockets = self.compute_rune_sockets();
+        self.runeword_config.runeword = Self::runeword_name_for_level(self.constellation).to_string();
+        self.runeword_config.scry_enabled = matches!(
+            self.constellation,
+            ConstellationLevel::C4MainPipeline
+                | ConstellationLevel::C5SelfHealing
+                | ConstellationLevel::C6EvolutionLoop
+        );
+        self.runeword_config.last_promotion_level = self.constellation;
     }
 
     /// 检查是否为 L0 Primitive

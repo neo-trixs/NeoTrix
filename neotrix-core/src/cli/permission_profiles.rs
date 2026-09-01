@@ -167,8 +167,7 @@ fn profiles_path() -> PathBuf {
     home.join(".neotrix").join("profiles.toml")
 }
 
-/// Global profile manager.
-// TODO: inject via DI — pass &ProfileStore through call chain instead
+/// Global profile manager fallback — prefer `CliContext` injection instead.
 pub static PROFILE_MANAGER: LazyLock<Mutex<ProfileStore>> = LazyLock::new(|| {
     let path = profiles_path();
     let store = if path.exists() {
@@ -376,8 +375,8 @@ pub fn action_type_to_key(action: &crate::cli::approval::ActionType) -> &'static
 
 use crate::cli::approval::ApprovalMode;
 use crate::cli::shield_enforcer::global_shield;
-use crate::neotrix::l1_body_impl::nt_shield::perm_chain::PermissionMode;
-use crate::neotrix::l1_body_impl::nt_shield::policy::PolicyDecision;
+use crate::l3_embodiment::nt_shield::nt_shield::perm_chain::PermissionMode;
+use crate::l3_embodiment::nt_shield::nt_shield::policy::PolicyDecision;
 
 /// 三轴权限快照
 #[derive(Debug, Clone, Serialize)]

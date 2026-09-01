@@ -11,7 +11,8 @@ import { useNavigate } from '@solidjs/router'
 import { ArrowLeft, Gauge, RefreshCw, Loader2, Wallet, Coins, Database, Info } from 'lucide-solid'
 import { clsx } from 'clsx'
 import type { AgentStatus } from '../api/types'
-import { neocodex, providerUsageSnapshot, type ProviderUsageRow } from '../api'
+import { neocodex } from '../api'
+import type { ProviderUsageRow } from '../api/types'
 import { query } from '../api/query'
 import { createInsightsStore } from '../stores/insights'
 
@@ -40,9 +41,6 @@ export function Insights() {
   onMount(() => {
     void ins.refresh()
     void loadStatus()
-    void providerUsageSnapshot()
-      .then((rows) => setLiveLedger(rows.length > 0 ? rows : null))
-      .catch(() => undefined)
   })
 
   const budgetPct = () => {

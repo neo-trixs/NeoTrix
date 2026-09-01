@@ -1,6 +1,6 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::core::nt_core_memory_asset::MemoryAssetKind;
-use crate::neotrix::nt_memory_kb::{
+use crate::l1_action::nt_memory::nt_memory_kb::{
     diff_snapshots, kb_write_guard, record_write_evidence, snapshot_from_file, snapshot_kb,
     snapshot_to_file, KnowledgeBase, KnowledgeNode, NodeType, RelationType, WriteGuardVerdict,
 };
@@ -85,7 +85,7 @@ impl CliCommand for KbCmd {
         &self,
         args: &[String],
         _brain: Option<
-            &std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::SelfIteratingBrain>>,
+            &std::sync::Arc<tokio::sync::RwLock<crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain>>,
         >,
     ) -> CommandOutput {
         if args.is_empty() {
@@ -154,7 +154,7 @@ fn cmd_consistency(_args: &[String]) -> CommandOutput {
         None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
     };
     let mut out = String::new();
-    let _ = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_setting_consistency::check_and_report_to_string(&conn, &mut out);
+    let _ = crate::l1_action::nt_memory::nt_memory_kb::setting_consistency::check_and_report_to_string(&conn, &mut out);
     CommandOutput::ok(&out)
 }
 
@@ -319,7 +319,7 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
         return CommandOutput::ok(&out).with_json(serde_json::json!(diff));
     }
 
-    let render_nodes = |items: &[crate::neotrix::nt_memory_kb::DiffNode], tag: &str| {
+    let render_nodes = |items: &[crate::l1_action::nt_memory::nt_memory_kb::DiffNode], tag: &str| {
         let mut s = String::new();
         for item in items.iter().take(detail) {
             s.push_str(&format!(
@@ -357,12 +357,12 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
-    use crate::neotrix::nt_memory_kb::nt_memory_embed::EmbedMode;
+//     use crate::l1_action::nt_memory::nt_memory_kb::embed::EmbedMode;
     let kb = match KnowledgeBase::open(None) {
         Ok(kb) => kb,
         Err(e) => return CommandOutput::err(&format!("无法打开知识库: {}", e)),
     };
-    let cfg = crate::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
+//     let cfg = crate::l1_action::nt_memory::nt_memory_kb::embed::EmbeddingConfig::default();
     let bundled = kb.with_embedding(cfg);
     let mode_label = match bundled.embedding_config.read().ok().and_then(|c| c.clone()).map(|c| c.mode) {
         Some(EmbedMode::Local) => "本地 hash-kernel (384-dim, 零依赖)",
@@ -384,8 +384,8 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
 /// 从 KB 已有向量采样 (q,d) 对, teacher = 余弦, 点级回归训练双塔对角学生,
 /// 落盘 ~/.neotrix/distill_student.json; hybrid_search Tier 3 自动消费。
 fn cmd_distill(args: &[String]) -> CommandOutput {
-    use crate::neotrix::nt_memory_kb::nt_memory_embed::load_all_embeddings;
-    use crate::neotrix::nt_memory_kb::nt_memory_distill::{
+//     use crate::l1_action::nt_memory::nt_memory_kb::embed::load_all_embeddings;
+    use crate::l1_action::nt_memory::nt_memory_kb::distill::{
         load_student, sample_contrastive_pairs, sample_training_pairs, save_student,
         train_contrastive, CONTRASTIVE_MARGIN, PointwiseDistillStudent,
     };
@@ -513,7 +513,7 @@ fn cmd_distill(args: &[String]) -> CommandOutput {
 /// /kb ingest-asset <url> — ARTEX 资产图手动入口 (R-P79 生产验证)。
 /// 把单个 URL 的资产层级 (root_domain→subdomain→service→endpoint) 落 KB。
 fn cmd_ingest_asset(args: &[String]) -> CommandOutput {
-    use crate::neotrix::l2_world_impl::nt_world_crawl::asset_graph::AssetGraphWriter;
+    use crate::l2_perception::nt_world::nt_world_crawl::asset_graph::AssetGraphWriter;
     let Some(url) = args.first() else {
         return CommandOutput::err("用法: /kb ingest-asset <url>");
     };
@@ -554,7 +554,7 @@ fn cmd_absorb_map(args: &[String]) -> CommandOutput {
     };
     let limit_opt = if limit == usize::MAX { None } else { Some(limit) };
 
-    let (mapped, report) = match crate::neotrix::nt_memory_kb::map_nodes(&conn, None, types.as_deref(), limit_opt)
+    let (mapped, report) = match crate::l1_action::nt_memory::nt_memory_kb::map_nodes(&conn, None, types.as_deref(), limit_opt)
     {
         Ok(r) => r,
         Err(e) => return CommandOutput::err(&format!("全库溯源失败: {}", e)),
@@ -589,7 +589,7 @@ fn cmd_absorb_map(args: &[String]) -> CommandOutput {
         return CommandOutput::ok(&lines.join("\n"));
     }
 
-    match crate::neotrix::nt_memory_kb::apply_mappings(&conn, &mapped) {
+    match crate::l1_action::nt_memory::nt_memory_kb::apply_mappings(&conn, &mapped) {
         Ok(n) => {
             lines.push(String::new());
             lines.push(format!("[absorb-map] 已写库: {} 条 absorbed_capability + knowledge_source", n));
@@ -704,7 +704,7 @@ fn cmd_search(args: &[String]) -> CommandOutput {
     // Operator terminal context: Confidential clearance (keeps Secret-tier nodes
     // out unless the operator runs the full tree). Wiring the permission-aware
     // retrieval path (Onyx pattern) instead of raw search.
-    let permission = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::Confidential;
+    let permission = crate::l1_action::nt_memory::nt_memory_kb::types::PermissionLevel::Confidential;
     match kb.search_permission_aware(&query, 10, permission) {
         Ok(results) => {
             if results.is_empty() {
@@ -1503,7 +1503,7 @@ mod tests {
     fn test_absorb_map_dry_run() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             seed_node(&conn, "u_2", "paper", "Attention Is All You Need", "https://arxiv.org/abs/1706.03762");
             drop(conn);
@@ -1520,7 +1520,7 @@ mod tests {
     fn test_absorb_map_apply_writes_metadata() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 
@@ -1542,7 +1542,7 @@ mod tests {
     fn test_snapshot_then_diff_reports_added_node() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 
@@ -1574,7 +1574,7 @@ mod tests {
     fn test_snapshot_roundtrip_via_diff_same_db() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 

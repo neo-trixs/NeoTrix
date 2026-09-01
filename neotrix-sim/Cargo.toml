@@ -1,0 +1,18 @@
+[package]
+name = "neotrix-sim"
+version = "0.1.0"
+edition = "2021"
+description = "NeoTrix consciousness embodiment simulator — virtual world for NT-PHYSICAL, NT-FEEL, NT-CORE co-evolution"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+rand = "0.8"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+
+[[bin]]
+name = "nt-sim"
+path = "src/main.rs"

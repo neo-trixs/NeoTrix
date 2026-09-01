@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use crate::cli::approval::{ActionType, global_approval};
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::cli::shield_enforcer::global_shield;
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 /// Check ShieldEnforcer for a file action. Returns Some(block) if hard-denied.
 fn check_shield_for_file(action: &str, path: &str) -> Option<CommandOutput> {

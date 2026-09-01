@@ -47,3 +47,10 @@ export async function readTextFileAt(path: string): Promise<string> {
   if (!isTauriRuntime()) throw new Error('文件读取仅在桌面宿主可用')
   return await readTextFile(path)
 }
+
+/** 弹出目录选择对话框，返回选中路径（用户取消返回 null；非 Tauri 宿主返回 null） */
+export async function openDirectoryDialog(): Promise<string | null> {
+  if (!isTauriRuntime()) return null
+  const path = await open({ directory: true })
+  return typeof path === 'string' ? path : null
+}

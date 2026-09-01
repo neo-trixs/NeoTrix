@@ -1,4 +1,4 @@
-use crate::neotrix::nt_shield::key_encryption;
+use crate::l3_embodiment::nt_shield::nt_shield::key_encryption;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

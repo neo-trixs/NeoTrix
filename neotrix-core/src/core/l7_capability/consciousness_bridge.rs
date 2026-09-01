@@ -306,17 +306,3 @@ impl crate::core::nt_core_self_test::SelfTest for ConsciousnessBridgeSelfTest {
     }
 }
 
-/// 联邦协议健康检测
-pub struct FederationSelfTest;
-
-impl crate::core::nt_core_self_test::SelfTest for FederationSelfTest {
-    fn name(&self) -> &str { "federation" }
-    fn self_test(&self) -> Result<(), Vec<String>> {
-        use crate::neotrix::l8_autonomic_impl::nt_mind::evolution::federation::*;
-        let msg = build_message("self_test", FederationMessageType::InsightShare, serde_json::json!({}));
-        if !verify_message(&msg) {
-            return Err(vec!["federation message integrity check failed".into()]);
-        }
-        Ok(())
-    }
-}

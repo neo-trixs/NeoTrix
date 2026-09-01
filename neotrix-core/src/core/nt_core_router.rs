@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
-/// Global smart router singleton
-// TODO: inject via DI — pass &SmartRouter through ReasoningEngine constructor
+/// Global smart router singleton fallback — prefer `CliContext.router` instead.
 pub static SMART_ROUTER: LazyLock<Mutex<SmartRouter>> =
     LazyLock::new(|| Mutex::new(SmartRouter::new()));
 

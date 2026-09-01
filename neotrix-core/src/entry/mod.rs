@@ -370,7 +370,7 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
                 // 在 entry (bin 层) 构造 ReasoningBrain 后经 start_server_with 注入。
                 neotrix::neotrix::nt_io_web::server::start_server_with(
                     http_port,
-                    Box::new(neotrix::neotrix::l8_autonomic_impl::nt_mind::ReasoningBrain::new()),
+                    Box::new(crate::l5_cognition::nt_mind::nt_mind::ReasoningBrain::new()),
                     neotrix::core::ReasoningBank::new(10000),
                 )
                 .await;
@@ -1080,7 +1080,7 @@ pub fn run_mcp_server() {
     server.register_all_tools();
     // 单调授权守卫: 阻断破坏性 shell 命令 (NT-SHIELD GuardChain 生产接线)
     {
-        use neotrix::neotrix::l1_body_impl::nt_shield::guard_chain::GuardVerdict;
+        use crate::l3_embodiment::nt_shield::nt_shield_guard_chain::GuardVerdict;
         server.add_guard("destructive_shell", |tool, args| {
             if tool != "execute_command" {
                 return GuardVerdict::Allow;
@@ -1105,8 +1105,8 @@ pub fn run_mcp_server() {
     // Allow → 放行; RequiresApproval → Ask (人工审批); Reject → Deny。
     // 读工具 (kb_get/kb_stats/kb_query) 恒 Allow。
     {
-        use neotrix::neotrix::l1_body_impl::nt_shield::guard_chain::GuardVerdict;
-        use neotrix::neotrix::l3_memory_impl::nt_memory_kb::{
+        use crate::l3_embodiment::nt_shield::nt_shield_guard_chain::GuardVerdict;
+        use crate::l1_action::nt_memory::nt_memory_kb::{
             kb_write_guard, WriteGuardVerdict,
         };
         server.add_guard("kb_tier", |tool, args| {
@@ -2117,8 +2117,8 @@ pub fn run_wallet_export(label: &str) {
 #[allow(dead_code)]
 pub fn run_agent_mode(profile: &str) {
     use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
-    use neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop;
-    use neotrix::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
+    use crate::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
+    use crate::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
     use std::io::{self, Write};
 
     const NT_CORE_SYSTEM_PROMPT: &str = "\
@@ -2149,7 +2149,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
         // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
         // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
         let mut tools = mcp_registry.as_native_tools();
-        tools.extend(neotrix::neotrix::l1_body_impl::nt_io_awareness_core::awareness_core_tools());
+        tools.extend(crate::l1_action::nt_io::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
@@ -2213,8 +2213,8 @@ You have tools available; call them when they help. Be concise and evidence-firs
 ///   - 流式 markdown 增量渲染（`streaming_text` → `commit_stream`）
 pub fn run_agent_tui(profile: &str) {
     use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
-    use neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop;
-    use neotrix::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
+    use crate::l1_action::nt_io::nt_io_agent_loop::AgentLoop;
+    use crate::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
     use neotrix::cli::tui::TuiApp;
     use neotrix::cli::tui::app::KeyAction;
     use crossterm::event::{self, Event};
@@ -2254,7 +2254,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
         // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
         // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
         let mut tools = mcp_registry.as_native_tools();
-        tools.extend(neotrix::neotrix::l1_body_impl::nt_io_awareness_core::awareness_core_tools());
+        tools.extend(crate::l1_action::nt_io::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
@@ -2790,7 +2790,7 @@ enum WorkerEvent {
 fn handle_slash_tui(
     app: &mut neotrix::cli::tui::TuiApp,
     input: &str,
-    agent: Option<&Arc<Mutex<neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop>>>,
+    agent: Option<&Arc<Mutex<crate::l1_action::nt_io::nt_io_agent_loop::AgentLoop>>>,
 ) -> SlashResult {
     let (cmd, rest) = match input.split_once(' ') {
         Some((c, r)) => (c, r),

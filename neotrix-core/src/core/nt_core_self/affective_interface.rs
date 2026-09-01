@@ -902,7 +902,7 @@ mod tests {
                 .unwrap_or_default()
                 .as_nanos()
         ));
-        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(tmp))
+        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(tmp))
             .expect("open temp KB");
         let kb = std::sync::Arc::new(kb);
         let mut sb = crate::core::nt_core_second_brain::SecondBrain::new();
@@ -933,8 +933,8 @@ mod tests {
         assert_eq!(restored.user.emotion, iface.user.emotion);
 
         // 6) 数字人生产消费: 恢复的 interface 驱动情感化回复/表情/韵律。
-        let mut pipe = crate::neotrix::l1_body_impl::nt_io_digital_human::DigitalHumanPipeline::new(
-            crate::neotrix::l1_body_impl::nt_io_digital_human::PersonaConfig::default(),
+        let mut pipe = crate::l1_action::nt_io::nt_io_digital_human::DigitalHumanPipeline::new(
+            crate::l1_action::nt_io::nt_io_digital_human::PersonaConfig::default(),
         );
         pipe.affective = restored;
         pipe.start_session();

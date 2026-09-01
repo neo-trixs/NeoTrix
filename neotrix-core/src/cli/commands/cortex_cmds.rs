@@ -9,11 +9,11 @@ use tokio::sync::RwLock;
 use rusqlite::Connection;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_resource_ingest::{
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+use crate::l1_action::nt_memory::nt_memory_kb::resource_ingest::{
     corpus_archive_path, migrate_cortex_corpus, prune_cortex_orphans, register_cortex_brain,
 };
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::{
+use crate::l1_action::nt_memory::nt_memory_kb::cortex_sync::{
     digest_sample, export_delta, ingest_causal_graph, report_lineage,
 };
 
@@ -385,7 +385,7 @@ impl CortexCmd {
             Ok(c) => c,
             Err(e) => return CommandOutput::err(&format!("无法打开 live KB: {e}")),
         };
-        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_cortex_sync::prune_external(
+        match crate::l1_action::nt_memory::nt_memory_kb::cortex_sync::prune_external(
             &conn,
             &corpus,
             stale_days,

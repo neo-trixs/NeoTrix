@@ -9,7 +9,7 @@
 //! 2. trade_production_logistics — 生产物流闭环 (FT07-FT13)
 //! 3. trade_finance_compliance — 财务合规闭环 (FT05-FT06, FT14-FT16)
 
-use crate::neotrix::nt_core_capability_tree::{
+use nt_core_capability_tree::{
     CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, NodeLayer, RuneSocket,
 };
 use serde::{Deserialize, Serialize};

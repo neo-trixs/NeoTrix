@@ -107,9 +107,9 @@ export function ModelSwitcher(props: {
         {loading() ? (
           <Loader2 class="w-3.5 h-3.5 animate-spin text-orange-500" />
         ) : currentProvider() ? (
-          <ProviderIcon name={currentProvider()!.name} size="sm" />
+          <ProviderIcon name={currentProvider()!.name} size="sm" category={currentProvider()!.category} />
         ) : (
-          <span class="w-4 h-4 rounded-full bg-orange-500/15 text-orange-600 flex items-center justify-center text-[9px] font-bold">N</span>
+          <span class="w-5 h-5 rounded-full bg-nt-core-500/15 text-nt-core-600 flex items-center justify-center text-[9px] font-bold">N</span>
         )}
         <span class="max-w-[110px] truncate">{pillModel()}</span>
         <ChevronDown class={clsx('w-3 h-3 text-zinc-400 flex-shrink-0 transition-transform', isOpen() && 'rotate-180')} />
@@ -153,7 +153,7 @@ export function ModelSwitcher(props: {
                       })
                     }}
                   >
-                    <ProviderIcon name={provider.name} size="sm" />
+                    <ProviderIcon name={provider.name} size="sm" category={provider.category} />
                     <div class="flex-1 min-w-0 flex flex-col gap-1">
                       <div class="flex items-center gap-1.5 min-w-0">
                         <span class="font-medium truncate">{provider.display_name}</span>

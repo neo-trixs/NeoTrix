@@ -36,7 +36,7 @@ pub use knowledge::exploration_pipeline;    // Unified exploration pipeline — 
 pub mod goal_register;           // ExplicitGoalRegister: goal tracking + progress quantification
 pub use knowledge::exploration_seeds;       // URL seed data extracted from exploration_pipeline
 pub use knowledge::change_archive;          // Structured Archive + Delta Spec + 冲突检测
-pub use knowledge::context_artifacts;       // Context Artifacts — index non-code knowledge alongside source code
+// pub use knowledge::context_artifacts;       // Context Artifacts — index non-code knowledge alongside source code
 
 // ============================================================================
 // Domain 3: 自我改进与进化（Self-Improvement & Evolution）
@@ -65,7 +65,7 @@ pub use reason::sleep;                           // SleepEngine: 离线递归记
 pub mod hpa_axis;                        // #9 — HPA轴: 应激-认知反馈闭环
 pub mod developmental_window;            // #11 — 发育窗口: 关键期可塑性
 pub mod peak_window;                     // #12 — 峰值窗口: 优化性能窗口
-pub use consciousness::bbrain_monitor;                  // B-Brain unified monitoring (P0-2)
+// pub use consciousness::bbrain_monitor;                  // B-Brain unified monitoring (P0-2)
 pub use consciousness::element;                         // Plugin Element architecture (Phase 1)
 pub use infrastructure::code_graph;                      // CodeGraphEngine: 代码依赖图 + 影响分析（借鉴 GitNexus）
 pub mod graph_types;                     // CodeGraph type definitions (NodeKind, EdgeKind, etc.)
@@ -175,7 +175,7 @@ pub use hpa_axis::{HpaAxisState, HpaPhase};
 pub use developmental_window::{DevelopmentalWindow, DevelopmentalSchedule};
 pub use peak_window::{PeakWindow, PeakSchedule};
 pub use thinking_bridge::SkillBridge;
-pub use bbrain_monitor::{BMonitor, BMonitorReport, AlertLevel};
+// pub use bbrain_monitor::{BMonitor, BMonitorReport, AlertLevel};
 pub use element::registry::ElementRegistry;
 
 // --- Specialized Tools ---

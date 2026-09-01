@@ -48,7 +48,7 @@ use neotrix::neotrix::nt_memory_kb::nt_field_ledger;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
 use neotrix::neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
 use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
-use neotrix::neotrix::l8_autonomic_impl::nt_mind_guard::{MapeGate, MapeGateConfig, MetricEval};
+use crate::l5_cognition::nt_mind::nt_mind_guard::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::core::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };
@@ -3750,6 +3750,22 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
+    /// 符文配置 (Rune Socketing)：为模块设置/获取 5 色符文组合，动态调整 KB 读写策略。
+    Rune {
+        #[arg(long, required = true)]
+        action: String, // "set" 或 "get"
+        #[arg(long)]
+        color: Option<String>, // crimson|indigo|obsidian|golden|alabaster
+        #[arg(long)]
+        module: Option<String>,
+    },
+    /// 成熟度星座审计：检查每个模块的 C0‑C6 等级并报告是否满足流水线要求。
+    Constellation {
+        #[arg(long, required = true)]
+        action: String, // "audit" 或 "mature"
+        #[arg(long)]
+        domain: Option<String>,
+    },
 }
 
 fn main() {
@@ -3792,6 +3808,8 @@ fn main() {
             json,
         } => cmd_topology(&conn, dim, steps, max_points, json),
         Cmd::Reflect { domain, dry_run } => cmd_reflect(&mut conn, domain.as_deref(), dry_run),
+        Cmd::Rune { action, color, module } => cmd_rune(&mut conn, &action, color.as_deref(), module.as_deref()),
+        Cmd::Constellation { action, domain } => cmd_constellation(&mut conn, &action, domain.as_deref()),
     }
 }
 
@@ -4012,6 +4030,95 @@ fn cluster_union(parent: &mut [usize], a: usize, b: usize) {
     let rb = cluster_find(parent, b);
     if ra != rb {
         parent[ra] = rb;
+    }
+}
+
+fn cmd_rune(conn: &Connection, action: &str, color: Option<&str>, module: Option<&str>) {
+    match action {
+        "set" => {
+            let color_str = color.expect("color required for rune set");
+            let valid_colors = ["crimson", "indigo", "obsidian", "golden", "alabaster"];
+            if !valid_colors.iter().any(|c| c == &color_str) {
+                eprintln!("invalid rune color: {}. valid: crimson, indigo, obsidian, golden, alabaster", color_str);
+                return;
+            }
+            let module_str = module.unwrap_or("default");
+            let key = format!("rune:{}:{}", module_str, color_str);
+            let val = json!({ "color": color_str, "module": module_str, "set_at": now_ts() });
+            conn.execute(
+                "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![NS, key, serde_json::to_string(&val).unwrap(), now_ts()],
+            )
+            .expect("failed to set rune");
+            println!("rune set: module={}, color={}", module_str, color_str);
+        }
+        "get" => {
+            let module_str = module.unwrap_or("default");
+            let prefix = format!("rune:{}:", module_str);
+            let mut stmt = conn.prepare("SELECT count(*) FROM kv_store WHERE namespace=?1 AND key LIKE ?2").expect("failed to prepare");
+            if let Ok(count) = stmt.query_row(params![NS, format!("{}%", prefix)], |row| row.get::<_, i64>(0)) {
+                if count > 0 {
+                    println!("rune config for module {} exists", module_str);
+                } else {
+                    println!("no rune config for module {}", module_str);
+                }
+            } else {
+                println!("error querying rune config");
+            }
+        }
+        _ => {
+            eprintln!("unknown rune action: {}. use 'set' or 'get'", action);
+        }
+    }
+}
+
+fn cmd_constellation(conn: &Connection, action: &str, domain: Option<&str>) {
+    let all_domains = [
+        "NT-CORE", "NT-MIND", "NT-MEMORY", "NT-WORLD", "NT-ACT", "NT-IO", "NT-SHIELD", "NT-META", "NT-REPAIR", "NT-GOVERNANCE", "NT-NEXUS",
+    ];
+    let target = domain.unwrap_or("all");
+    match action {
+        "audit" => {
+            println!("=== Constellation Audit ===");
+            let domains: Vec<&str> = if target == "all" {
+                all_domains.iter().map(|&d| d).collect()
+            } else {
+                vec![target]
+            };
+            for d in domains.iter() {
+                let key = format!("maturity:{}", d);
+                match conn.query_row("SELECT value FROM kv_store WHERE namespace=?1 AND key=?2", params![NS, key], |row| row.get::<_, String>(0)) {
+                    Ok(val) => println!("domain {} maturity: {}", d, val),
+                    Err(_) => println!("domain {}: no maturity record (C0)", d),
+                }
+            }
+        }
+        "mature" => {
+            println!("=== Constellation Maturity Report ===");
+            let domains: Vec<&str> = if target == "all" {
+                all_domains.iter().map(|&d| d).collect()
+            } else {
+                vec![target]
+            };
+            for d in domains.iter() {
+                let key = format!("maturity:{}", d);
+                match conn.query_row("SELECT value FROM kv_store WHERE namespace=?1 AND key=?2", params![NS, key], |row| row.get::<_, String>(0)) {
+                    Ok(val) => {
+                        let maturity: i32 = val.parse().unwrap_or(0);
+                        let status = if maturity >= 4 {
+                            "C4+ pipeline-ready".to_string()
+                        } else {
+                            format!("C{}", maturity)
+                        };
+                        println!("domain {}: {} → {}", d, maturity, status);
+                    }
+                    Err(_) => println!("domain {}: no maturity record (C0)", d),
+                }
+            }
+        }
+        _ => {
+            eprintln!("unknown constellation action: {}. use 'audit' or 'mature'", action);
+        }
     }
 }
 

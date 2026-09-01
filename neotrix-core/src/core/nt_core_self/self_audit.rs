@@ -177,7 +177,10 @@ fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
         let is_mod_rs = rs_file.file_name().and_then(|n| n.to_str()) == Some("mod.rs");
         if let Ok(content) = fs::read_to_string(rs_file) {
             for line in content.lines() {
-                let trimmed = line.trim();
+                // Strip inline comments before mod parsing — e.g.
+                // `pub mod nt_core_heartbeat; // 注释` would otherwise fail
+                // `strip_suffix(';')` because the line ends with the comment.
+                let trimmed = line.split("//").next().unwrap_or(line).trim();
                 if let Some(name) = trimmed
                     .strip_prefix("pub(crate) mod ")
                     .or_else(|| trimmed.strip_prefix("pub mod "))

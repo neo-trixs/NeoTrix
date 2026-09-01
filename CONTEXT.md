@@ -27,6 +27,8 @@ This document defines the precise meaning of domain terms used across NeoTrix. E
 | **NT-ACT** | Action domain: MCP tools, social media, code, autonomy, orchestration. "行动执行者". | "act module" |
 | **NT-IO** | Interface domain: LLM providers, CLI, web server, ACP, LSP. "界面使徒". | "io module" |
 | **NT-SHIELD** | Security domain: stealth net, proxy pool, Tor client, fingerprint management, audit. "影卫". | "shield module" |
+| **NT-PHYSICAL** | Physical embodiment domain: sensors, motors, safety kernel, power management, body schema. "具身骨架". | "physical module", "hardware module" |
+| **NT-FEEL** | Emotional domain: EmotionEngine (unified), regulation, expression, social emotion. "情感中枢". | "emotion module", "feel module" |
 
 ### ConsciousnessTree Branches (11 Branches)
 
@@ -57,12 +59,18 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 
 | Term | Definition | Avoid |
 |------|-----------|-------|
+| **Six-Layer Architecture** | 6-layer consciousness-embodiment architecture: L1 Action (行动层: nt_act+nt_io+nt_memory), L2 Perception (感知层: nt_world+nt_sense), L3 Embodiment (具身层: nt_physical+nt_shield+nt_feel), L4 Emotion (情感层: nt_feel core), L5 Cognition (认知层: nt_core+nt_mind), L6 Meta-Cognition (元认知层: nt_meta+nt_repair+nt_nexus). Each layer has `traits.rs` interface contracts. | "3-tier", "three layer", "Consciousness-Embodiment-Capability" |
+| **Consciousness-Embodiment-Capability** | Legacy 3-layer architecture (now expanded to 6 layers). L5 Consciousness (涌现觉知: E8+GWT+Emotion+SEAL), L3 Embodiment (具身骨架: sensors+motors+safety+power), L1 Capability Network (能力网: tools+perception+memory+action). | "3-tier", "three layer" (use Six-Layer Architecture instead) |
 | **Skill Tree** | Per-domain capability progression with 3 node tiers: Small Passive (微节点), Notable Passive (显节点), Keystone (基石). POE-inspired. | "skill tree", "passive tree" |
 | **Rune Socketing** | Per-module configuration with 5 rune colors: Crimson (data), Indigo (transform), Obsidian (cache), Golden (error), Alabaster (monitor). Runeword = emergent effect from rune combination. | "plugin system", "config slots" |
 | **Constellations (C0-C6)** | Module maturity ladder: C0=compiles, C1=unit tests, C2=integration tests, C3=benchmarked, C4=integrated into pipeline, C5=self-healing. Genshin-inspired. | "maturity levels" |
 | **Dual Specialization** | Weapon Set I/II switching per context. AttentionManager routes between CORE+WORLD (acquisition) and CORE+MIND (evolution) modes. POE-inspired. | "modes", "profiles" |
 | **The Spice Must Flow** | Data pipeline axiom: every module must have clear input→transform→output with no disconnects. Dune-inspired. | "data flow" |
 | **Dark Forest** | Module survival axiom: every module must compile + test + connect (have consumers) or be deleted. Three-Body-inspired. | "cleanup rule" |
+| **Heartbeat Aggregator** | Unified system health signal collector. Aggregates compilation/test/KB/eventbus/module health into single `SystemHealthSnapshot` with time-decay. Single fact source for GWT attention modulation. | "health check", "health monitor" |
+| **EmotionLabel** | Unified emotion enum (11 variants: Neutral/Joy/Sadness/Anger/Fear/Trust/Disgust/Surprise/Anticipation/Confused/Thinking). Single fact source for all emotion expression. Replaces per-module Emotion enums. | "Emotion enum", "emotion type" |
+| **PerceptionBridge** | Attention-gated bridge connecting SensoryIntegrationHub (L2 perception) with SelectiveState (L5 consciousness). Uses `awareness_score()` to filter sensory events based on consciousness level. Single fact source for attention-gated perception flow. | "sensory filter", "attention gate" |
+| **CapabilityBridge** | Bridge connecting evolution view (CapabilityTree) with runtime view (CapabilityRegistry). Maps tree node IDs to runtime capability IDs, enabling cross-view queries and auto-discovery of relationships. | "registry bridge", "capability mapper" |
 
 ## Audit Dimensions (D1-D50)
 

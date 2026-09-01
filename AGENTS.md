@@ -31,8 +31,76 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 ```
 NT-CORE  (E8引导者)  | NT-MIND  (进化工匠)  | NT-MEMORY (知识守护者)
 NT-WORLD (虚空探索者) | NT-ACT   (行动执行者) | NT-SHIELD (影卫)
-NT-IO    (界面使徒)
+NT-IO    (界面使徒)   | NT-PHYSICAL (具身骨架) | NT-FEEL (情感中枢)
 ```
+
+### 3-Layer Architecture (意识-具身-能力网)
+
+```
+L5 Consciousness (涌现觉知)  →  E8 + GWT + Emotion + SEAL
+L3 Embodiment (具身骨架)     →  sensors + motors + safety + power
+L1 Capability Network (能力网) →  tools + perception + memory + action
+```
+
+### 6-Layer Architecture (新架构)
+
+```
+L6 Meta-Cognition (元认知层)  →  nt_meta + nt_repair + nt_nexus
+L5 Cognition (认知层)         →  nt_core + nt_mind
+L4 Emotion (情感层)           →  nt_feel (core emotion engine)
+L3 Embodiment (具身层)        →  nt_physical + nt_shield + nt_feel
+L2 Perception (感知层)        →  nt_world + nt_sense
+L1 Action (行动层)            →  nt_act + nt_io + nt_memory
+```
+
+### Layer Directories
+
+```
+neotrix-core/src/
+├── l1_action/          # L1 行动层
+│   ├── traits.rs       # ActionLayer trait
+│   ├── nt_act/         # 工具/动作
+│   ├── nt_io/          # IO/接口
+│   └── nt_memory/      # 记忆
+├── l2_perception/      # L2 感知层
+│   ├── traits.rs       # PerceptionLayer trait
+│   ├── nt_world/       # 世界感知
+│   └── nt_sense/       # 感官处理
+├── l3_embodiment/      # L3 具身层
+│   ├── traits.rs       # EmbodimentLayer trait
+│   ├── nt_physical/    # 身体模式
+│   ├── nt_shield/      # 安全/保护
+│   └── nt_feel/        # 情感具身
+├── l4_emotion/         # L4 情感层
+│   ├── traits.rs       # EmotionLayer trait
+│   └── nt_feel/        # 情感引擎
+├── l5_cognition/       # L5 认知层
+│   ├── traits.rs       # CognitionLayer trait
+│   ├── nt_core/        # 核心推理
+│   └── nt_mind/        # 自我进化
+└── l6_meta/            # L6 元认知层
+    ├── traits.rs       # MetaLayer trait
+    ├── nt_meta/        # 元认知协调
+    ├── nt_repair/      # 自愈修复
+    └── nt_nexus/       # 跨会话记忆
+```
+
+### Key Components
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| **PerceptionBridge** | Attention-gated bridge connecting SensoryIntegrationHub with SelectiveState | `l2_world_impl/nt_world_sense/perception_bridge.rs` |
+| **CapabilityBridge** | Bridge connecting evolution view (CapabilityTree) with runtime view (CapabilityRegistry) | `nt_core_capability_tree/src/bridge.rs` |
+| **HeartbeatAggregator** | Unified system health signal collector | `core/nt_core_heartbeat.rs` |
+| **EmotionLabel** | Unified emotion enum (11 variants) | `core/nt_core_self/emotion_state.rs` |
+
+### SelfModel Types (neotrix-core)
+
+| Type | Purpose | Avoid |
+|------|---------|-------|
+| `nt_core_meta::SelfModel` | Static structural identity (modules/files/dependencies) | "the self model" |
+| `nt_core_self::SelfModel` | Dynamic performance model (capability/uncertainty/fatigue) | "performance model" |
+| `nt_core_self_model::SelfModel` | Value function model (identity/goals/weights) | "value model" |
 
 - **技能节点 3 层**: Small Passive (微节点自愈) / Notable Passive (域级突破) / Keystone (跨域变革)
 - **Ascendancy 双专精**: 每 session 两个 Weapon Set，经 `nt_core_self::AttentionManager` 按任务类型路由

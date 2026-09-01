@@ -56,6 +56,14 @@ pub mod neotrix;
 pub mod config;
 pub mod unified_cmd;
 
+// 六层架构 (Consciousness-Embodiment-Capability)
+pub mod l1_action;
+pub mod l2_perception;
+pub mod l3_embodiment;
+pub mod l4_emotion;
+pub mod l5_cognition;
+pub mod l6_meta;
+
 #[macro_export]
 macro_rules! make_stage {
     ($name:ident) => {

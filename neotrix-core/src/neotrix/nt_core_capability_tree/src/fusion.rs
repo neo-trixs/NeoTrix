@@ -111,6 +111,7 @@ impl CapabilityRegistry {
                 to_node: Some(normalized.clone()),
                 note: "trait 能力节点融合吸收".into(),
                 timestamp: chrono::Utc::now(),
+                            runeword_change: None,
             });
             if let Err(e) = self.register(node) {
                 eprintln!("[fusion] register skipped {}: {}", normalized, e);

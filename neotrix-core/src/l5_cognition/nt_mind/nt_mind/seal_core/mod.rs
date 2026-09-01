@@ -1,0 +1,20 @@
+// SEAL loop core: brain loop, self-edit, model routing, retrieval primitives
+//
+// Fused real module directory (Cycle 161b): flat nt_mind modules moved in,
+// replacing the earlier empty re-export shell.
+//
+#![deny(clippy::unwrap_used)]
+
+pub mod activation_audit;
+pub mod core;
+pub mod embedding;
+pub mod model_router;
+pub mod multi_brain;
+pub mod self_edit;
+pub mod self_iterating;
+pub mod stats;
+
+pub use crate::l1_action::nt_memory::nt_memory_kb::bm25;
+
+// Cross-domain surface: re-export nt_mind scope so internal super:: refs resolve at domain level
+pub use super::*;

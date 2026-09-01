@@ -18,6 +18,7 @@ pub mod sandbox;
 pub mod jsonl_stream;
 pub use tui::TuiApp;
 pub use commands::CommandRegistry;
+pub use commands::types::CliContext;
 pub use approval::{ApprovalMode, ApprovalEngine, ActionType, PendingAction, global_approval};
 pub use permission_profiles::{
     PermissionProfile, ProfileDecision, ProfileStore, global_profile_manager,

@@ -293,3 +293,19 @@ export interface McpToolInfo {
   description: string
   server: string
 }
+
+/* ── Insights ── */
+export interface ProviderUsageRow {
+  provider: string
+  request_count: number
+  prompt_tokens: number
+  completion_tokens: number
+  cost: number
+  timestamp: number
+}
+
+export interface ProviderUsageSnapshot {
+  entries: ProviderUsageRow[]
+  totalCount: number
+  totalCost: number
+}

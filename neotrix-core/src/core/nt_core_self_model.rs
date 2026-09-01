@@ -1,4 +1,13 @@
-//! # NT-CORE SELF-MODEL (L5/L6 自我模型)
+//! # Value SelfModel (价值函数自我模型)
+//!
+//! **用途**: 价值评估模型 — "我重视什么？"
+//!
+//! **注意**: 这是 neotrix-core 中三个 SelfModel 之一:
+//! - `nt_core_meta::SelfModel` — 静态结构身份 (模块/文件/依赖)
+//! - `nt_core_self::SelfModel` — 动态性能模型 (能力/不确定性/疲劳)
+//! - `nt_core_self_model::SelfModel` (本文件) — 价值函数模型
+//!
+//! NT-CORE SELF-MODEL (L5/L6 自我模型)
 //!
 //! 最小可编译骨架 (C0→C1)：持有持久化自我状态（身份、目标、价值权重），
 //! 提供 `value_function` 评估某个动作/状态相对价值权重的契合度，并暴露

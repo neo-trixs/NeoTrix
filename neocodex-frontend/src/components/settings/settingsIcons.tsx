@@ -215,3 +215,23 @@ export function PlusIcon(props: { class?: string }) {
     </svg>
   )
 }
+
+/* ── 网络代理：三层堆叠（代理池/系统/外部） ── */
+export function NetworkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
+      {CURRENT_GRAD}
+      {/* 三层堆叠：应用→代理→外部 */}
+      <rect x="3" y="2" width="10" height="3" rx="0.8" stroke="currentColor" stroke-width="1" />
+      <rect x="3" y="6.5" width="10" height="3" rx="0.8" stroke="currentColor" stroke-width="1" />
+      <rect x="3" y="11" width="10" height="3" rx="0.8" stroke="currentColor" stroke-width="1" />
+      {/* 连接线 */}
+      <line x1="8" y1="5" x2="8" y2="6.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+      <line x1="8" y1="9.5" x2="8" y2="11" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+      {/* 发光节点 */}
+      <circle cx="8" cy="3.5" r="0.7" fill="url(#nt-current-grad)" />
+      <circle cx="8" cy="8" r="0.7" fill="url(#nt-current-grad)" />
+      <circle cx="8" cy="12.5" r="0.7" fill="url(#nt-current-grad)" />
+    </svg>
+  )
+}

@@ -324,7 +324,7 @@ mod verification {
     use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
     use crate::core::nt_core_gwt::cad_route::register_cad_gwt;
     use crate::core::nt_core_knowledge::cad_absorb::absorb_cad_experience;
-    use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+    use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
     use nt_core_capability_tree::cad_node::{register_cad_capability, CadCapabilityNode};
     use nt_core_capability_tree::registry::CapabilityRegistry;
 

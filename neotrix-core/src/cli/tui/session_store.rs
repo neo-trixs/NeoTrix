@@ -39,7 +39,7 @@ pub struct SessionData {
 /// 会话存储 — 真实落盘到 KB `session_logs` 表 + `~/.neotrix/session-logs/*.md`
 /// 蒸馏输入。覆盖 `/session` 全子命令，替代原内存桩 (R-P79 接线)。
 pub struct SessionStore {
-    kb: crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase,
+    kb: crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
     base: std::path::PathBuf,
 }
 
@@ -55,7 +55,7 @@ impl SessionStore {
 
     /// 测试/隔离环境: 指定 base 目录 (KB + session-logs 均在其下)
     pub fn with_base(base: std::path::PathBuf) -> Self {
-        let kb = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(Some(base.join("knowledge.db")))
+        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(base.join("knowledge.db")))
             .expect("KB open");
         Self { kb, base }
     }
@@ -206,8 +206,8 @@ impl SessionStore {
     }
 
     /// 触发会话蒸馏: 从 `~/.neotrix/session-logs/` 提取行为模式并产出报告
-    pub fn distill(&mut self) -> Result<crate::neotrix::nt_mind_distiller::DistillationReport, String> {
-        let mut d = crate::neotrix::nt_mind_distiller::SessionDistiller::with_paths(
+    pub fn distill(&mut self) -> Result<crate::l5_cognition::nt_mind::nt_mind_distiller::DistillationReport, String> {
+        let mut d = crate::l5_cognition::nt_mind::nt_mind_distiller::SessionDistiller::with_paths(
             self.logs_dir(),
             self.base.join("AGENTS-distilled.md"),
         );
@@ -223,10 +223,8 @@ mod tests {
     /// save_session → KB session_logs + session-logs/*.md 落盘 → distill() 读取 md → 产出报告
     #[test]
     fn test_distill_end_to_end() {
-        let dir = std::env::temp_dir().join(format!("nt_session_e2e_{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).ok();
-        let mut store = SessionStore::with_base(dir.clone());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut store = SessionStore::with_base(dir.path().to_path_buf());
 
         let data = SessionData {
             id: "e2e-1".to_string(),
@@ -241,7 +239,7 @@ mod tests {
 
         // 1. save → KB + md 文件
         store.save_session("e2e-1", &data).expect("save session");
-        let md_path = dir.join("session-logs").join("e2e-1.md");
+        let md_path = dir.path().join("session-logs").join("e2e-1.md");
         assert!(md_path.exists(), "session-logs/e2e-1.md 必须落盘");
         let md_content = std::fs::read_to_string(&md_path).expect("read md");
         assert!(md_content.contains("同步执行"), "md 内容需保留消息文本");

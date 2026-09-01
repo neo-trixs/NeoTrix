@@ -3,11 +3,10 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::core::nt_core_router::{SMART_ROUTER, TaskComplexity, TaskContext};
-use crate::core::WORKSPACE_MANAGER;
-use crate::neotrix::nt_mind_background_loop::always_on::ALWAYS_ON_ENGINE;
+use crate::cli::commands::types::{CliCommand, CliContext, CommandOutput};
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+use crate::core::nt_core_router::{TaskComplexity, TaskContext};
+use crate::l5_cognition::nt_mind::nt_mind_background_loop::always_on::ALWAYS_ON_ENGINE;
 
 // ====== /side ======
 
@@ -40,7 +39,16 @@ impl CliCommand for WorkSpaceCmd {
     }
     fn is_primary(&self) -> bool { false }
 
-    fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+    fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+        self.execute_with_ctx(args, brain, None)
+    }
+
+    fn execute_with_ctx(
+        &self,
+        args: &[String],
+        _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>,
+        ctx: Option<&CliContext>,
+    ) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let clean_args: Vec<&str> = args.iter().map(|s| s.as_str()).filter(|a| *a != "--json").collect();
 
@@ -50,7 +58,12 @@ impl CliCommand for WorkSpaceCmd {
             return if want_json { out.with_json(serde_json::json!({"subcommands": ["create", "list", "switch", "delete", "rename", "status"]})) } else { out };
         }
 
-        let mut mgr = WORKSPACE_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+        // Resolve the workspace manager — prefer injected context, fall back to global
+        let mut mgr = if let Some(ctx) = ctx {
+            CliContext::lock(&ctx.workspace)
+        } else {
+            crate::core::WORKSPACE_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+        };
         let sub = clean_args[0];
 
         match sub {
@@ -177,7 +190,16 @@ impl CliCommand for RouterCmd {
     }
     fn is_primary(&self) -> bool { false }
 
-    fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+    fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+        self.execute_with_ctx(args, brain, None)
+    }
+
+    fn execute_with_ctx(
+        &self,
+        args: &[String],
+        _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>,
+        ctx: Option<&CliContext>,
+    ) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let plain_args: Vec<&str> = args.iter().map(|s| s.as_str()).filter(|a| *a != "--json").collect();
 
@@ -190,7 +212,11 @@ impl CliCommand for RouterCmd {
         let sub = plain_args[0];
         match sub {
             "status" | "stats" => {
-                let router = SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner());
+                let router = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.router)
+                } else {
+                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 let msg = router.savings_report();
                 let out = CommandOutput::ok(&msg);
                 if want_json {
@@ -204,21 +230,33 @@ impl CliCommand for RouterCmd {
                 } else { out }
             }
             "enable" | "on" => {
-                let mut router = SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut router = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.router)
+                } else {
+                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 router.set_enabled(true);
                 let _ = router.save();
                 let out = CommandOutput::ok("🔀 智能路由已启用");
                 if want_json { out.with_json(serde_json::json!({"smart_router": "enabled"})) } else { out }
             }
             "disable" | "off" => {
-                let mut router = SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut router = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.router)
+                } else {
+                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 router.set_enabled(false);
                 let _ = router.save();
                 let out = CommandOutput::ok("🔀 智能路由已禁用，将使用默认 flagship provider");
                 if want_json { out.with_json(serde_json::json!({"smart_router": "disabled"})) } else { out }
             }
             "reset" => {
-                let mut router = SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut router = if let Some(ctx) = ctx {
+                    CliContext::lock(&ctx.router)
+                } else {
+                    crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                };
                 router.reset_stats();
                 let out = CommandOutput::ok("🔀 路由统计已重置");
                 if want_json { out.with_json(serde_json::json!({"routing_stats": "reset"})) } else { out }
@@ -236,7 +274,11 @@ impl CliCommand for RouterCmd {
                 let cost_in = plain_args.get(4).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.01);
                 let cost_out = plain_args.get(5).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.03);
                 {
-                    let mut router = SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut router = if let Some(ctx) = ctx {
+                        CliContext::lock(&ctx.router)
+                    } else {
+                        crate::core::nt_core_router::SMART_ROUTER.lock().unwrap_or_else(|e| e.into_inner())
+                    };
                     router.set_rule(complexity, provider, model, cost_in, cost_out);
                     let _ = router.save();
                 }
@@ -284,15 +326,15 @@ impl CliCommand for RouterCmd {
             "failover" => {
                 let want_clear = plain_args.get(1).map(|s| *s == "clear").unwrap_or(false);
                 if want_clear {
-                    crate::neotrix::l1_body_impl::nt_io_provider::clear_history();
+                    crate::l1_action::nt_io::nt_io_provider::clear_history();
                     return CommandOutput::ok("🔄 故障转移历史已清空");
                 }
-                let msg = crate::neotrix::l1_body_impl::nt_io_provider::failover_report();
+                let msg = crate::l1_action::nt_io::nt_io_provider::failover_report();
                 let out = CommandOutput::ok(&msg);
                 if want_json {
-                    let events = crate::neotrix::l1_body_impl::nt_io_provider::failover_history();
+                    let events = crate::l1_action::nt_io::nt_io_provider::failover_history();
                     out.with_json(serde_json::json!({
-                        "total": crate::neotrix::l1_body_impl::nt_io_provider::total_failovers(),
+                        "total": crate::l1_action::nt_io::nt_io_provider::total_failovers(),
                         "events": events.iter().map(|e| serde_json::json!({
                             "timestamp": e.timestamp, "from": e.from_profile, "to": e.to_profile,
                             "success": e.success, "reason": e.reason, "provider": e.provider,

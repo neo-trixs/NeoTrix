@@ -387,7 +387,7 @@ impl SubagentManager {
     /// Persist subagent states to the KB `subagents` namespace.
     pub fn save_to_kb(
         &self,
-        kb: &crate::neotrix::nt_memory_kb::KnowledgeBase,
+        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
     ) -> Result<(), String> {
         let json = serde_json::to_string_pretty(&self.agents)
             .map_err(|e| format!("SubagentManager serialize: {e}"))?;
@@ -397,7 +397,7 @@ impl SubagentManager {
     /// Load subagent states from the KB `subagents` namespace, merging into current state.
     pub fn load_from_kb(
         &mut self,
-        kb: &crate::neotrix::nt_memory_kb::KnowledgeBase,
+        kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase,
     ) -> Result<usize, String> {
         let json = kb.kv_get("subagents", "registry")?;
         let Some(json) = json else { return Ok(0) };
@@ -1544,7 +1544,7 @@ mod tests {
     fn test_kb_subagents_roundtrip() {
         let dir = std::env::temp_dir().join(format!("nt_orch_agent_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
-        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(dir.join("orch.db")))
+        let kb = crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase::open(Some(dir.join("orch.db")))
             .expect("open kb");
         let mut mgr = SubagentManager::new();
         mgr.register_for_task("S-TASK-5", "cycle-202");

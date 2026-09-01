@@ -5,7 +5,7 @@
 //!
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
-use crate::neotrix::nt_core_capability_tree::{
+use nt_core_capability_tree::{
     CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};

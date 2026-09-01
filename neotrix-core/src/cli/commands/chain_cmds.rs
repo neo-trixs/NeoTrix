@@ -14,9 +14,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
-use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_visibility::{filter_visibility, Visibility, VisibilityConfig};
-use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::visibility::{filter_visibility, Visibility, VisibilityConfig};
+use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 
 /// 获取共享 KB (惰性打开, 与 sources_cmds 相同模式)
 fn shared_kb() -> Option<KnowledgeBase> {

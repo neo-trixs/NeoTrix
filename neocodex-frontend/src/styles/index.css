@@ -2682,6 +2682,14 @@
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
 
+.theme-toggle__swatch-inline {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nt-color-gold-500);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5);
+}
+
 /* ===== 快捷键帮助面板 ===== */
 .shortcut-help-card {
   width: min(420px, 92vw);

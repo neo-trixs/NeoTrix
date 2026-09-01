@@ -41,8 +41,9 @@ fn test_fep_iit_emits_consciousness_critique_and_external_reward() {
     let free_energy = 5.0_f64;
     let phi = 0.6_f64;
     let coherence = 0.7_f64;
+    let external_reality = 0.5_f64; // 外部现实指标 (KB增长率/任务完成率)
 
-    let score = bridge.compute_consciousness_score(free_energy, phi, coherence);
+    let score = bridge.compute_consciousness_score(free_energy, phi, coherence, external_reality);
     let bounded_fe = bridge.iit_bounded_free_energy(free_energy, phi);
 
     // Contract checks on the FEP/IIT math itself.
@@ -217,7 +218,8 @@ fn test_consciousness_evolution_loop_end_to_end() {
     let free_energy = 4.0_f64;
     let phi = 0.55_f64;
     let coherence = 0.65_f64;
-    let score = bridge.compute_consciousness_score(free_energy, phi, coherence);
+    let external_reality = 0.5_f64;
+    let score = bridge.compute_consciousness_score(free_energy, phi, coherence, external_reality);
     let bounded_fe = bridge.iit_bounded_free_energy(free_energy, phi);
 
     // ── EventBus ──

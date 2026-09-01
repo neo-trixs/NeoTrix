@@ -110,6 +110,7 @@ unicode-normalization = "0.1"
 flate2 = "1"
 tar = "0.4"
 anydoc = { version = "0.2", optional = true }
+semver = "1.0"
 zstd = "0.13"
 crc32fast = "1"
 syn = { version = "2", features = ["full", "visit"] }
@@ -217,25 +218,24 @@ harness = false
 # keyring 纳入 default：API key 加密默认走 OS keychain（macOS Keychain/Linux Secret Service），
 # 避免静默降级到可推导的机器派生密钥（C-3 安全加固）。
 default = ["keyring", "anydoc"]
-office = []
-wip = []
 # pmtiles feature removed - now a regular dependency
 stealth-net = ["dep:chromiumoxide"]
 sandbox = ["dep:wasmtime", "dep:agent-sandbox"]
 telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
-research = []
 rkyv-storage = ["dep:rkyv", "dep:memmap2"]
 keyring = ["dep:keyring"]
 anyhow = ["dep:anyhow"]
 anydoc = ["dep:anydoc"]
 simd-vsa = ["dep:holon"]
 self-update = ["dep:self_update"]
-self_model = []
-integration_tests = []
-network_tests = []
-echo_bridge = []
 ios-bridge = ["dep:uniffi"]
-full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "integration_tests", "network_tests", "echo_bridge", "office", "ios-bridge"]
+full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "ios-bridge"]
+# Internal features (not for external use)
+wip = []
+research = []
+self_model = []
+echo_bridge = []
+desktop = []
 
 [[example]]
 name = "evolve"

@@ -47,6 +47,7 @@ pub struct CapabilityEvolutionExperience {
     pub to_node: Option<String>,
     pub note: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub runeword_change: Option<String>,
 }
 
 impl From<EvolutionLogEntry> for CapabilityEvolutionExperience {
@@ -59,6 +60,7 @@ impl From<EvolutionLogEntry> for CapabilityEvolutionExperience {
             to_node: entry.to_node,
             note: entry.note,
             timestamp: entry.timestamp,
+            runeword_change: entry.runeword_change,
         }
     }
 }
@@ -76,6 +78,7 @@ pub fn export_experiences(registry: &CapabilityRegistry) -> Vec<CapabilityEvolut
                 to_node: entry.to_node.clone(),
                 note: entry.note.clone(),
                 timestamp: entry.timestamp,
+                runeword_change: entry.runeword_change.clone(),
             });
         }
     }
@@ -98,6 +101,7 @@ pub fn import_experiences(registry: &mut CapabilityRegistry, experiences: &[Capa
                     to_node: exp.to_node.clone(),
                     note: exp.note.clone(),
                     timestamp: exp.timestamp,
+                    runeword_change: exp.runeword_change.clone(),
                 });
             }
         }

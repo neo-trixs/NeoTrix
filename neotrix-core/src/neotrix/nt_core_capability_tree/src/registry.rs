@@ -493,6 +493,7 @@ impl CapabilityRegistry {
                             f.claimed.as_str(), f.supported.as_str()
                         ),
                         timestamp: chrono::Utc::now(),
+                                        runeword_change: None,
                     });
                     count += 1;
                 }
@@ -1068,7 +1069,8 @@ mod tests {
             to_node: None,
             note: "evidence".into(),
             timestamp: chrono::Utc::now(),
-        };
+                        runeword_change: None,
+            };
         // 直接构造带证据的 p1
         reg2.get_mut("p1").unwrap().evolution_log = vec![entry.clone(), entry.clone(), entry];
         let sp_p1_ev = reg2.shortest_path_to_primitive("c1").unwrap();

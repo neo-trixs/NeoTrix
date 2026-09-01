@@ -9,11 +9,12 @@ import { storageGet, storageSet } from '../lib/env'
 import type { MemoryStats, ProviderConfig, ProviderMeta, CustomProviderReq } from '../api/types'
 import { GeneralSection } from './settings/GeneralSection'
 import { ModelsSection } from './settings/ModelsSection'
+import { NetworkSection } from './settings/NetworkSection'
 import { AppearanceSection, type MessageWidthPref } from './settings/AppearanceSection'
 import { DataSection } from './settings/DataSection'
 import { TagsSection } from './settings/TagsSection'
 import { AboutSection } from './settings/AboutSection'
-import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon, ModelIcon } from './settings/settingsIcons'
+import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon, ModelIcon, NetworkIcon } from './settings/settingsIcons'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v3）
@@ -25,11 +26,12 @@ import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIco
    ════════════════════════════════════════════ */
 
 /** 提供商分类分组（对标 Claude Desktop 分类设置） */
-type SectionId = 'general' | 'models' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
+type SectionId = 'general' | 'models' | 'network' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
 
 const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'general', label: '通用', icon: ExpandIcon },
   { id: 'models', label: '模型', icon: ModelIcon },
+  { id: 'network', label: '网络', icon: NetworkIcon },
   { id: 'appearance', label: '外观', icon: PaletteIcon },
   { id: 'plugins', label: '插件', icon: PluginsIcon },
   { id: 'data', label: '数据', icon: DataIcon },
@@ -40,7 +42,7 @@ const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
 /* 分组侧栏导航（对标 osaurus ManagementView 分组结构）：
    常规 General / 扩展 Extensions / 数据 Data / 系统 System */
 const NAV_GROUPS: { title: string; ids: SectionId[] }[] = [
-  { title: '常规', ids: ['general', 'models', 'appearance'] },
+  { title: '常规', ids: ['general', 'models', 'network', 'appearance'] },
   { title: '扩展', ids: ['plugins'] },
   { title: '数据', ids: ['data', 'tags'] },
   { title: '系统', ids: ['about'] },
@@ -322,7 +324,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setPendingDeleteKey(true)
     setModalReq({
       title: '删除 API 密钥',
-      message: '确定删除本地保存的 ANTHROPIC_API_KEY？删除后需重新配置。',
+      message: '确定删除本地保存的 API 密钥？删除后需重新配置。',
       danger: true,
       confirmLabel: '删除',
     })
@@ -586,6 +588,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   <div class="text-[11px] text-text-muted">
                     {section() === 'general' && '提供商与 API 密钥'}
                     {section() === 'models' && '可用模型代理池'}
+                    {section() === 'network' && '网络代理健康度'}
                     {section() === 'appearance' && '界面视觉与动效'}
                     {section() === 'plugins' && '技能插件与扩展'}
                     {section() === 'data' && '记忆与数据管理'}
@@ -623,9 +626,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   onSwitchProvider={switchProvider}
                   onTestConnection={testConnection}
                   testState={testState}
-                  customProviders={customProviders}
-                  onAddCustomProvider={handleAddCustomProvider}
                 />
+              </Show>
+              <Show when={section() === 'network'}>
+                <NetworkSection />
               </Show>
               <Show when={section() === 'appearance'}>
                 <AppearanceSection

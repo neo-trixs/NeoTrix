@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_self::emotion_state::EmotionEngine;
 // [豁免] core 层 second_brain 持久化需落 KB 单一事实源 (attach_kb/kv_set 生产路径, 非测试注入)
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrainSnapshot {
