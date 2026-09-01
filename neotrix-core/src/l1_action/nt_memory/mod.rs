@@ -1,6 +1,8 @@
 //! L1 Action Layer - Memory Modules
 
 pub mod nt_trade_product_spec;
+pub mod nt_memory_lead;
+pub use nt_memory_lead::{LeadManager, Lead, LeadSource, LeadStage, LeadQuality, LeadScorer, Interaction, InteractionType};
 
 pub mod nt_memory_babeldoc;
 pub mod nt_memory_graphify;

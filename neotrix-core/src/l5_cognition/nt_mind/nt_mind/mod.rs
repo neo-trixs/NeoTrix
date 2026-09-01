@@ -198,6 +198,7 @@ pub mod nt_trade_quote_negotiation;
 pub mod nt_trade_production_logistics;
 pub mod nt_trade_finance_compliance;
 pub mod nt_trade_mock_adapters;
+pub mod nt_trade_orchestrator;
 
 // Re-exports for foreign trade
 pub use nt_trade_full_cycle::{
@@ -252,4 +253,10 @@ pub use nt_trade_mock_adapters::{
     TradeIntegrationHarness, MockOrder, MockOrderStatus, MockLc, MockLcStatus,
     MockPayment, MockDeclaration, MockCustomsStatus, MockShipment, MockShipmentStatus,
     MockContainer,
+};
+pub use nt_trade_orchestrator::{
+    TradePhase, TradeGroup, TradeContext, TradeEvent,
+    BuyerProfile, Quotation, QuotationItem, Contract,
+    ProductionStatus, LogisticsInfo, PaymentInfo, SettlementInfo,
+    TradeOrchestrator,
 };
