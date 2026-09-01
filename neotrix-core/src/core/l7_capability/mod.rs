@@ -14,6 +14,7 @@ pub mod a2a;
 pub mod group_evolve;
 pub mod mature;
 pub mod nt_act_orch_patterns;
+pub mod l7_l1_bridge;
 pub mod nt_core_antidistil;
 pub mod observer;
 pub mod protocol;

@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::l1_action::nt_io::nt_io_messaging::{MessagingBridge, MessagingRouter, MessagingRegistry, Channel};
 use crate::l1_action::nt_act::nt_act_media::{ContentGenerator, ScheduleEngine, SocialAnalytics, Platform};
-use crate::l1_action::nt_memory::nt_memory_lead::{LeadManager, Lead, LeadSource, LeadStage, LeadQuality};
+use crate::l1_action::nt_memory::nt_memory_lead::{LeadManager, Lead, LeadSource, LeadQuality};
 
 // ════════════════════════════════════════════════════════════════
 // 全链路状态机
@@ -327,7 +327,6 @@ impl TradeOrchestrator {
         let messaging = MessagingBridge::new(router);
         Self {
             messaging,
-            messaging: MessagingBus::new(),
             content_gen: ContentGenerator::new(crate::l1_action::nt_act::nt_act_media::ContentStrategy {
                 name: "Foreign Trade Marketing".into(),
                 target_platforms: vec![Platform::LinkedIn, Platform::Instagram, Platform::Alibaba],
@@ -335,12 +334,10 @@ impl TradeOrchestrator {
                 posting_frequency: crate::l1_action::nt_act::nt_act_media::PostingFrequency {
                     posts_per_week: 5,
                     best_times: vec![(9, 0), (14, 0)],
-                    content_mix: HashMap::new(),
                 },
                 hashtag_strategy: crate::l1_action::nt_act::nt_act_media::HashtagStrategy {
                     branded: vec![],
                     industry: vec!["#manufacturing".into(), "#export".into(), "#trade".into()],
-                    trending: vec![],
                     max_per_post: 10,
                 },
                 tone_of_voice: "Professional".into(),
@@ -358,22 +355,13 @@ impl TradeOrchestrator {
     // ════════════════════════════════════════════════════════════════
 
     /// FT01: 社交媒体内容创作与发布
-    pub fn create_social_content(&self, platform: Platform, body: &str) -> crate::l1_action::nt_act::nt_act_media::Post {
-        // use crate::l1_action::nt_act::nt_act_media::{Post, ContentType, ContentStatus, EngagementMetrics};
-        Post {
+    pub fn create_social_content(&self, platform: Platform, body: &str) -> crate::l1_action::traits::Post {
+        crate::l1_action::traits::Post {
             id: uuid::Uuid::new_v4().to_string(),
-            platform,
-            content_type: ContentType::Text,
-            title: None,
+            platform: format!("{:?}", platform).to_lowercase(),
             body: body.to_string(),
             hashtags: vec!["#trade".into(), "#export".into()],
-            media_urls: vec![],
-            link_url: None,
-            status: ContentStatus::Draft,
-            scheduled_at: None,
-            published_at: None,
-            engagement: EngagementMetrics::default(),
-            metadata: HashMap::new(),
+            status: "draft".into(),
         }
     }
 
