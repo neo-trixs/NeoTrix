@@ -9,3 +9,6 @@ pub mod nt_infra_breaker;
 pub mod nt_infra_semantic_router;
 pub mod nt_infra_agent_card;
 pub mod nt_infra_scatter_gather;
+pub mod nt_infra_persistence;
+pub mod nt_infra_learning;
+pub mod nt_infra_integration;
