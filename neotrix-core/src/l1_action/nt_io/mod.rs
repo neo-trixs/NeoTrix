@@ -52,7 +52,13 @@ pub mod nt_io_telemetry;
 pub mod nt_io_user_avatar;
 
 pub mod nt_io_messaging;
-pub use nt_io_messaging::{MessagingBus, MessageTemplate, Channel, Message, MessageStatus, Conversation, ConversationStatus, MessageProvider, WhatsAppProvider, EmailProvider, trade_templates};
+pub use nt_io_messaging::{
+    MessagingRegistry, MessagingRouter, MessagingBridge,
+    MessageTemplate, TemplateVariable, TemplateCategory,
+    Channel, MessageDirection, Conversation, ConversationStatus,
+    WhatsAppProvider, EmailProvider, ExtendedMessage, Attachment,
+    trade_templates,
+};
 
 #[cfg(feature = "desktop")]
 pub mod nt_io_desktop;

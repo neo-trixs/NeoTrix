@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
-use crate::l1_action::nt_io::nt_io_messaging::{MessagingBus, Channel, Conversation, ConversationStatus};
+use crate::l1_action::nt_io::nt_io_messaging::{MessagingBridge, MessagingRouter, MessagingRegistry, Channel};
 use crate::l1_action::nt_act::nt_act_media::{ContentGenerator, ScheduleEngine, SocialAnalytics, Platform};
 use crate::l1_action::nt_memory::nt_memory_lead::{LeadManager, Lead, LeadSource, LeadStage, LeadQuality};
 
@@ -302,8 +302,8 @@ pub struct TradeEvent {
 
 /// 外贸全链路编排器 — 编排 L1 能力网
 pub struct TradeOrchestrator {
-    /// L1: 消息总线 (WhatsApp + Email)
-    pub messaging: MessagingBus,
+    /// L1: 消息能力桥接
+    pub messaging: MessagingBridge,
     /// L1: 社交媒体运营
     pub content_gen: ContentGenerator,
     pub schedule: ScheduleEngine,
@@ -322,7 +322,11 @@ impl Default for TradeOrchestrator {
 
 impl TradeOrchestrator {
     pub fn new() -> Self {
+        let registry = MessagingRegistry::new();
+        let router = MessagingRouter::new(registry);
+        let messaging = MessagingBridge::new(router);
         Self {
+            messaging,
             messaging: MessagingBus::new(),
             content_gen: ContentGenerator::new(crate::l1_action::nt_act::nt_act_media::ContentStrategy {
                 name: "Foreign Trade Marketing".into(),

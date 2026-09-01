@@ -9,16 +9,16 @@
 // ============================================================================
 // Domain 1: 核心推理系统（Core Reasoning）
 // ============================================================================
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core;                    // CapabilityVector, KnowledgeSource, AbsorptionRecord
-pub use reason::reasoning_engine;        // ReasoningEngine: LLM + Knowledge + Capability 统一入口
-pub use reason::reasoning_types;         // ReasoningMethod, PerspectiveLens, ReasoningType, ReasoningTrace
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::self_edit;               // SelfEdit, MicroEdit, ToolCall, generate_self_edit()
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::self_iterating;          // ReasoningBrain, SelfIteratingBrain, EvaluationRecord
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::stats;                   // BrainStats, BrainReport, IterationResult
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::model_router;            // 智能模型分级路由 (T0-T4)
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::multi_brain;             // 多 ReasoningBrain 协同 (S-13)
-pub use crate::l1_action::nt_memory::nt_memory_kb::bm25;  // BM25 (implementation in L3)
-pub use crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::embedding;               // TEXT embedding 模块（EMB-1）
+pub use seal_core::core;
+pub use reason::reasoning_engine;
+pub use reason::reasoning_types;
+pub use seal_core::self_edit;
+pub use seal_core::self_iterating;
+pub use seal_core::stats;
+pub use seal_core::model_router;
+pub use seal_core::multi_brain;
+pub use crate::l1_action::nt_memory::nt_memory_kb::bm25;
+pub use seal_core::embedding;
 
 // ============================================================================
 // Domain 2: 记忆与知识管理（Memory & Knowledge）
@@ -201,17 +201,19 @@ pub mod nt_trade_mock_adapters;
 pub mod nt_trade_orchestrator;
 
 // Re-exports for foreign trade
+// Old FT01-FT17 types are superseded by orchestrator's FT01-FT26
+// Keep sub-skill types for internal use only
 pub use nt_trade_full_cycle::{
-    TradePhase, TradePhaseGroup, TradeContext, TradeResult, TradeStateMachine,
-    BuyerProfile, InquiryDetail, IntentLevel, ProductSpec, ProductType,
+    TradeStateMachine, TradeCapabilitySpec, TradeResult,
+    InquiryDetail, IntentLevel, ProductSpec, ProductType,
     BomItem, RoutingStep, PackagingSpec, CompanyPolicy, RiskControl,
-    MarketEnvironment, QuoteSheet, Contract, ContractItem, Schedule,
+    MarketEnvironment, QuoteSheet, ContractItem, Schedule,
     Milestone, MilestoneStatus, InspectionReport, InspectionResult, Defect,
     DefectSeverity, LogisticsDocSet, CiqCertificate, BookingConfirmation,
     CustomsDeclaration, BillOfLading, PackingList, PackingItem,
     FinanceDocSet, PaymentProof, LcReview, CollectionRecord, SettlementRecord,
     TaxRefundClaim, RiskAlert, RiskLevel, ActionRecommendation, Lesson,
-    KnowledgeDelta, KnowledgeOperation, TradeCapabilitySpec,
+    KnowledgeDelta, KnowledgeOperation,
     execute_trade_full_cycle, register_trade_full_cycle_capability, capability_spec,
 };
 pub use nt_trade_quote_negotiation::{
