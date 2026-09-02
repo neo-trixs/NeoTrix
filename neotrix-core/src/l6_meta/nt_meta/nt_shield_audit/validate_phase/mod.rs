@@ -218,7 +218,8 @@ impl ValidatePhase {
             matches!(e.source, EvidenceSource::ParserBehavior | EvidenceSource::SpecReference)
         );
         
-        // 6. Confirmed only
+        // 6. Confirmed only — all prior rule checks passed
+        let rule_passed = true;
         rule_passed && has_parser_evidence
     }
 

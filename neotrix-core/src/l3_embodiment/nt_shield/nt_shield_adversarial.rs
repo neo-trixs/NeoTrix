@@ -208,7 +208,7 @@ impl AdversarialTestFramework {
         for test_case in &suite.test_cases {
             let start = std::time::Instant::now();
             let result = self.run_test_case(test_case);
-            let duration = start.elapsed().as_millis() as u64;
+            let _duration = start.elapsed().as_millis() as u64;
 
             if let Some(ref vuln) = result.vulnerability_found {
                 vulnerabilities.push(vuln.clone());

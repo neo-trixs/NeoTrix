@@ -1,7 +1,15 @@
 use std::collections::{HashMap, VecDeque, HashSet};
 use crate::l5_cognition::nt_mind::nt_mind::embedding::TextEmbedder;
-use crate::neotrix::// nt_core_signal::ops::cosine_similarity;
 use super::types::*;
+
+fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
+    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let na: f64 = a.iter().map(|x| x * x).sum();
+    let nb: f64 = b.iter().map(|x| x * x).sum();
+    if na == 0.0 && nb == 0.0 { return 1.0; }
+    if na == 0.0 || nb == 0.0 { return 0.0; }
+    dot / (na.sqrt() * nb.sqrt())
+}
 
 // CortexMemory — 类人脑多维度存储系统
 // ============================================================

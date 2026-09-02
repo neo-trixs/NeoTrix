@@ -4,7 +4,7 @@
 //! 支持风格迁移、色彩匹配、视觉一致性
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 风格定义
@@ -109,7 +109,7 @@ impl StyleHarmonizer {
     }
     
     /// 分析风格
-    pub fn analyze_style(&self, image_path: &str) -> StyleAnalysis {
+    pub fn analyze_style(&self, _image_path: &str) -> StyleAnalysis {
         // TODO: 实际调用风格分析
         StyleAnalysis {
             features: Style特征 {
@@ -130,7 +130,7 @@ impl StyleHarmonizer {
     pub fn harmonize(
         &mut self,
         input_path: &str,
-        reference_path: Option<&str>,
+        _reference_path: Option<&str>,
     ) -> StyleHarmonizationResult {
         let start = std::time::Instant::now();
         
@@ -151,7 +151,7 @@ impl StyleHarmonizer {
     pub fn match_colors(
         &self,
         source_path: &str,
-        target_path: &str,
+        _target_path: &str,
     ) -> StyleHarmonizationResult {
         // TODO: 实际调用色彩匹配
         StyleHarmonizationResult {

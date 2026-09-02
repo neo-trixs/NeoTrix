@@ -6,8 +6,8 @@
 //! - 分布式限流
 //! - 自适应限流
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, VecDeque};
+
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
@@ -229,7 +229,7 @@ impl RateLimiter {
     }
 
     /// 清理不活跃的限流器
-    pub fn cleanup(&mut self, max_age: Duration) {
+    pub fn cleanup(&mut self, _max_age: Duration) {
         // TODO: 实现基于最后访问时间的清理
     }
 }

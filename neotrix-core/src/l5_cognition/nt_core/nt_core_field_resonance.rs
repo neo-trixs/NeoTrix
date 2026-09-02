@@ -6,7 +6,6 @@
 //! - 跨频率耦合: 相位-振幅耦合、频率-频率耦合
 //! - 嵌套振荡层级: 超慢波动 → delta → theta → alpha → beta → gamma
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 场共振协调器

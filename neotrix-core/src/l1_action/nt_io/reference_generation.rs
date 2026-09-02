@@ -217,7 +217,7 @@ impl ReferenceBasedGeneration {
     }
     
     /// 执行风格迁移
-    pub fn style_transfer(&mut self, content_path: &str, style_path: &str) -> GenerationResult {
+    pub fn style_transfer(&mut self, content_path: &str, _style_path: &str) -> GenerationResult {
         // TODO: 实际调用风格迁移模型
         let result = GenerationResult {
             success: true,
@@ -238,7 +238,8 @@ impl ReferenceBasedGeneration {
         match self.config.mode {
             GenerationMode::ImageToImage => {
                 if let Some(ref_path) = self.config.references.first() {
-                    self.image_to_image(&ref_path.file_path)
+                    let path = ref_path.file_path.clone();
+                    self.image_to_image(&path)
                 } else {
                     GenerationResult {
                         success: false,
@@ -253,7 +254,8 @@ impl ReferenceBasedGeneration {
             }
             GenerationMode::VideoToVideo => {
                 if let Some(ref_path) = self.config.references.first() {
-                    self.video_to_video(&ref_path.file_path)
+                    let path = ref_path.file_path.clone();
+                    self.video_to_video(&path)
                 } else {
                     GenerationResult {
                         success: false,
@@ -268,7 +270,8 @@ impl ReferenceBasedGeneration {
             }
             GenerationMode::ImageToVideo => {
                 if let Some(ref_path) = self.config.references.first() {
-                    self.image_to_video(&ref_path.file_path)
+                    let path = ref_path.file_path.clone();
+                    self.image_to_video(&path)
                 } else {
                     GenerationResult {
                         success: false,
@@ -283,10 +286,9 @@ impl ReferenceBasedGeneration {
             }
             GenerationMode::StyleTransfer => {
                 if self.config.references.len() >= 2 {
-                    self.style_transfer(
-                        &self.config.references[0].file_path,
-                        &self.config.references[1].file_path,
-                    )
+                    let path0 = self.config.references[0].file_path.clone();
+                    let path1 = self.config.references[1].file_path.clone();
+                    self.style_transfer(&path0, &path1)
                 } else {
                     GenerationResult {
                         success: false,

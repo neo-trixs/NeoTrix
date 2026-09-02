@@ -234,13 +234,14 @@ impl IntegrationPatternLibrary {
             }
         }).collect();
 
+        let step_count = steps.len() as u64;
         Some(IntegrationPlan {
             plan_id: uuid::Uuid::new_v4().to_string(),
             pattern_id: pattern_id.to_string(),
             source_module: source.to_string(),
             target_module: target.to_string(),
             steps,
-            estimated_duration: steps.len() as u64 * 1800, // 每步30分钟
+            estimated_duration: step_count * 1800, // 每步30分钟
         })
     }
 

@@ -153,7 +153,12 @@ pub fn sample_training_pairs(
         let b = rng() % embeddings.len();
         let (_, va) = &embeddings[a];
         let (_, vb) = &embeddings[b];
-//         let teacher = cosine_similarity(va, vb);
+        let teacher = {
+            let dot: f32 = va.iter().zip(vb.iter()).map(|(x, y)| x * y).sum();
+            let na: f32 = va.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
+            let nb: f32 = vb.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-8);
+            (dot / (na * nb)) as f64
+        };
         samples.push((va.clone(), vb.clone(), teacher));
     }
         (samples, dim)

@@ -186,7 +186,7 @@ impl TemporalContinuityChecker {
     pub fn check_scene_transition(
         &self,
         frames: &[String],
-        transition_type: &str,
+        _transition_type: &str,
     ) -> ContinuityCheckResult {
         // TODO: 实际调用场景转场检查逻辑
         let checked_frames = frames.len() as u32;
@@ -206,7 +206,7 @@ impl TemporalContinuityChecker {
     pub fn check_element_position(
         &self,
         frames: &[String],
-        element_id: &str,
+        _element_id: &str,
     ) -> ContinuityCheckResult {
         // TODO: 实际调用元素位置跟踪逻辑
         let checked_frames = frames.len() as u32;

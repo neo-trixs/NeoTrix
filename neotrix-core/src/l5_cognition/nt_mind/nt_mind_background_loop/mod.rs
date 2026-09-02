@@ -8,7 +8,7 @@ use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_chain::KnowledgeChain;
 use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
-// use crate::l5_cognition::nt_mind::bbrain_monitor::BMonitor;
+use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
 use crate::l5_cognition::nt_mind::nt_mind_cleanup::CleanupEngine;
 use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
@@ -26,7 +26,7 @@ use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
 use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
-// use crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery;
+// AgentDiscovery not defined — field removed from BackgroundLoop
 
 use crate::core::nt_core_second_brain::SecondBrain;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
@@ -68,12 +68,11 @@ pub struct BackgroundLoop {
     pub telemetry: Arc<TelemetryCollector>,
     pub goal_loop: GoalLoop,
     pub metacognition: Option<MetaCognitionBridge>,
-    pub bbrain: BMonitor,
+pub bbrain: Option<BMonitor>,
     pub daemon: Option<EvolutionDaemon>,
     pub exploration_pipeline: Option<ExplorationPipeline>,
     pub nt_world_model: Option<WorldModelV2>,
     pub panorama: Option<PanoramaPipeline>,
-    pub agent_discovery: Option<AgentDiscovery>,
     pub self_evolver: Option<SelfEvolver>,
     pub curiosity_drive: CuriosityDrive,
     pub knowledge_aging: KnowledgeAging,
@@ -107,7 +106,7 @@ pub struct BackgroundLoop {
     pub session_recovery: Option<SessionRecoveryManager>,
     pub consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
-    pub fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
+    pub fep_iit_bridge: Option<()>,
     pub cognitive_load: Option<CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案经 VolitionEngine 门控后执行。
     pub volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
@@ -140,12 +139,11 @@ impl BackgroundLoop {
             telemetry: Arc::new(TelemetryCollector::new()),
             goal_loop: GoalLoop::new(),
             metacognition: Some(MetaCognitionBridge::new(".")),
-            bbrain: BMonitor::new(),
+            bbrain: Some(crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor::new()),
             daemon: Some(EvolutionDaemon::new(EvolutionConfig::default())),
             exploration_pipeline: None,
             nt_world_model: None,
             panorama: None,
-            agent_discovery: None,
             self_evolver: None,
             curiosity_drive: CuriosityDrive::new(),
             knowledge_aging: KnowledgeAging::new(),
@@ -178,7 +176,7 @@ impl BackgroundLoop {
             session_recovery: Some(SessionRecoveryManager::new("bg-loop")),
             consciousness_runtime: Some(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()),
             consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
-            fep_iit_bridge: Some(crate::neotrix::nt_core_fep_iit::FEPIITBridge::new()),
+            fep_iit_bridge: None, // nt_core_fep_iit module not found
             cognitive_load: Some(CognitiveLoadMonitor::new()),
             volition: Some(crate::core::nt_core_consciousness::VolitionEngine::new()),
             second_brain: Some(SecondBrain::new()),

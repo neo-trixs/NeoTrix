@@ -130,7 +130,7 @@ impl SecurityGuard for SecurityGuardManager {
         self.evaluate(action)
     }
 
-    fn audit(&self, entry: &AuditEntry) -> Result<(), CapabilityError> {
+    fn audit(&self, _entry: &AuditEntry) -> Result<(), CapabilityError> {
         // Audit is read-only in check; recording happens externally
         Ok(())
     }

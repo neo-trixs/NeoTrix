@@ -266,7 +266,7 @@ impl ResearchAutomationEngine {
 
     /// 分析结果
     pub fn analyze_results(&mut self, experiment_id: &str, data: HashMap<String, serde_json::Value>) -> Option<ExperimentResult> {
-        let experiment = self.experiments.iter().find(|e| e.id == experiment_id)?;
+        let _experiment = self.experiments.iter().find(|e| e.id == experiment_id)?;
 
         // 简化版: 模拟统计分析
         let statistical_analysis = Some(StatisticalAnalysis {

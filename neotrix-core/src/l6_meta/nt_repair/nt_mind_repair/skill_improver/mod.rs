@@ -279,7 +279,7 @@ impl SkillImprover {
         
         // Safety
         let danger_marks = ["rm -rf", "curl.*|.*sh", "sudo ", "--force", "dangerously"];
-        let mut safety = 1.0;
+        let mut safety: f32 = 1.0;
         let body_lower = body.to_lowercase();
         for mark in danger_marks {
             if body_lower.contains(mark) {

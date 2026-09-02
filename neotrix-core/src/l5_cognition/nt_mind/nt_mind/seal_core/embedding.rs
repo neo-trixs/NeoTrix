@@ -16,7 +16,12 @@ pub fn recall_similar(query: &str, memories: &[crate::l5_cognition::nt_mind::nt_
         .enumerate()
         .map(|(i, m)| {
             let mv = embedder.embed(&m.task_description);
-//             let sim = cosine_similarity(&qv, &mv);
+            let sim = {
+                let dot: f64 = qv.iter().zip(mv.iter()).map(|(x, y)| (*x as f64) * (*y as f64)).sum();
+                let nq: f64 = qv.iter().map(|x| (*x as f64) * (*x as f64)).sum::<f64>().sqrt().max(1e-8);
+                let nm: f64 = mv.iter().map(|x| (*x as f64) * (*x as f64)).sum::<f64>().sqrt().max(1e-8);
+                dot / (nq * nm)
+            };
             let reward_bonus = m.reward * 0.3;
             (i, sim + reward_bonus)
         })

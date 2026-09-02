@@ -361,7 +361,7 @@ impl crate::l1_action::traits::L1Capability for ProviderPool {
         crate::l1_action::traits::ConstellationLevel::C2Integration
     }
     fn health_check(&self) -> crate::l1_action::traits::CapabilityHealth {
-        use std::time::{SystemTime, UNIX_EPOCH};
+
         crate::l1_action::traits::CapabilityHealth {
             healthy: !self.entries.is_empty(),
             latency_ms: None,
@@ -375,7 +375,7 @@ impl crate::l1_action::traits::L1Capability for ProviderPool {
 }
 
 impl crate::l1_action::traits::LlmRouter for ProviderPool {
-    fn route(&self, request: &crate::l1_action::traits::LlmRequest) -> Result<crate::l1_action::traits::LlmRoute, crate::l1_action::traits::CapabilityError> {
+    fn route(&self, _request: &crate::l1_action::traits::LlmRequest) -> Result<crate::l1_action::traits::LlmRoute, crate::l1_action::traits::CapabilityError> {
         let entry = self.entries.first()
             .ok_or_else(|| crate::l1_action::traits::CapabilityError::NotAvailable("No providers in pool".into()))?;
         Ok(crate::l1_action::traits::LlmRoute {
@@ -395,7 +395,7 @@ impl crate::l1_action::traits::LlmRouter for ProviderPool {
 // ════════════════════════════════════════════════════════════════
 
 use crate::l1_action::traits::{
-    L1Capability as L1Cap, LlmRouter as LlmRouterTrait,
+    LlmRouter as LlmRouterTrait,
     CapabilityHealth as CH,
     CapabilityError as CE,
     LlmRequest, LlmRoute,

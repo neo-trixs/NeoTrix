@@ -206,7 +206,7 @@ impl AutonomousAIFramework {
     }
 
     /// 决策
-    pub fn decide(&self, context: &serde_json::Value) -> DecisionResult {
+    pub fn decide(&self, _context: &serde_json::Value) -> DecisionResult {
         // 简化版: 基于当前目标和能力做出决策
         let active_goals: Vec<&Goal> = self.goals.iter()
             .filter(|g| g.status == GoalStatus::Active)

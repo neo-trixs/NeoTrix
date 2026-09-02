@@ -235,7 +235,7 @@ impl SemanticExtractionPipeline {
                     }
                 }
                 PatternType::Regex => {
-                    if let Some(ref regex_str) = pattern.regex {
+                    if let Some(ref _regex_str) = pattern.regex {
                         // 简化版: 查找反引号中的代码
                         let mut start = 0;
                         while let Some(begin) = text[start..].find('`') {

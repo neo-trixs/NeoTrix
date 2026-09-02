@@ -240,12 +240,13 @@ impl AISafetyAlignmentEngine {
         }
 
         // 监控行为
-        for monitor in &mut self.monitors {
-            let result = self.check_monitor(monitor);
+        let monitor_len = self.monitors.len();
+        for i in 0..monitor_len {
+            let result = self.check_monitor(&self.monitors[i]);
             if result.is_violation {
                 warnings.push(SafetyWarning {
                     warning_type: "monitor_alert".into(),
-                    message: format!("Monitor {} exceeded threshold", monitor.monitor_id),
+                    message: format!("Monitor {} exceeded threshold", self.monitors[i].monitor_id),
                     risk_level: format!("{:?}", result.severity),
                     recommendation: result.recommendation,
                 });
@@ -267,7 +268,7 @@ impl AISafetyAlignmentEngine {
     }
 
     /// 评估约束
-    fn evaluate_constraint(&self, constraint: &SafetyConstraint, _action: &serde_json::Value) -> bool {
+    fn evaluate_constraint(&self, _constraint: &SafetyConstraint, _action: &serde_json::Value) -> bool {
         // 简化版: 总是返回 false (没有违规)
         false
     }

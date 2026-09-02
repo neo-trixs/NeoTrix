@@ -148,9 +148,9 @@ impl CostManager {
     pub fn check_budget(&self) -> BudgetStatus {
         let usage_ratio = self.total_cost / self.budget_config.total_budget;
         
-        let status = if usage_ratio >= self.budget_config.hard_limit_threshold {
+        let status = if usage_ratio >= self.budget_config.hard_limit_threshold as f64 {
             BudgetExceededStatus::Exceeded
-        } else if usage_ratio >= self.budget_config.warning_threshold {
+        } else if usage_ratio >= self.budget_config.warning_threshold as f64 {
             BudgetExceededStatus::Warning
         } else {
             BudgetExceededStatus::Normal
@@ -160,10 +160,10 @@ impl CostManager {
             total_budget: self.budget_config.total_budget,
             used_budget: self.total_cost,
             remaining_budget: self.budget_config.total_budget - self.total_cost,
-            usage_ratio,
+            usage_ratio: usage_ratio as f32,
             status,
             should_pause: self.budget_config.enable_auto_pause && 
-                          usage_ratio >= self.budget_config.hard_limit_threshold,
+                          usage_ratio >= self.budget_config.hard_limit_threshold as f64,
         }
     }
     

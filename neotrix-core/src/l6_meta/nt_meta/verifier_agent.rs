@@ -4,7 +4,7 @@
 //! 支持多维度验证：实体一致性、环境一致性、叙事进展
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 验证定义
@@ -185,8 +185,8 @@ impl VerifierAgent {
     /// 验证视频片段
     pub fn verify_shot(
         &mut self,
-        shot_id: &str,
-        video_path: &str,
+        _shot_id: &str,
+        _video_path: &str,
         spec_description: &str,
         memory_context: Option<&str>,
     ) -> VerificationResult {

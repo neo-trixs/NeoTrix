@@ -20,6 +20,7 @@ use crate::core::nt_core_iit_phi::IITPhiCalculator;
 use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
 // pub use crate::l1_action::nt_act::nt_l1_shared_types::IssueType;
 use serde::{Deserialize, Serialize};
+use crate::neotrix::nt_mind_evolution_daemon::IssueType;
 
 // ============================================================
 // 常量
@@ -1551,15 +1552,36 @@ impl EvolutionLoop {
 }
 
 impl EvolutionLoopProvider for EvolutionLoop {
+    fn get_snapshot(&self) -> ProjectSnapshot {
+        self.last_snapshot.clone().unwrap_or_else(|| ProjectSnapshot {
+            total_files: 0,
+            total_lines: 0,
+            large_files: Vec::new(),
+            modules_without_tests: Vec::new(),
+            file_unsafe_hotspots: Vec::new(),
+            unsafe_count: 0,
+            unwrap_count: 0,
+            todo_count: 0,
+            compile_errors: 0,
+            compile_warnings: 0,
+            test_count: 0,
+            test_failures: 0,
+        })
+    }
+
     fn self_diagnose(&mut self) -> (Vec<String>, Vec<PrioritizedIssue>) {
         let (items, pq) = Self::self_diagnose(self);
         let issues: Vec<PrioritizedIssue> = pq.into_vec().into_iter().map(|di| {
             PrioritizedIssue {
+                issue: di.underlying_issue.clone(),
+                score: di.composite_score,
+                plan: di.action.clone(),
                 action: di.action,
                 composite_score: di.composite_score,
                 underlying_issue: CodeUnderlyingIssue {
-                    file: di.underlying_issue.file.clone(),
-                    issue_type: format!("{:?}", di.underlying_issue.issue_type),
+                    file: di.underlying_issue.file.clone().unwrap_or_default(),
+                    line: 0,
+                    message: di.underlying_issue.description.clone(),
                 },
             }
         }).collect();

@@ -6,7 +6,6 @@
 //! - 降级策略
 //! - 指标收集
 
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +26,7 @@ pub struct CircuitBreakerConfig {
     pub success_threshold: u32,
     pub timeout: Duration,
     pub half_open_max_calls: u32,
-    pub降级策略: FallbackStrategy,
+    pub fallback_strategy: FallbackStrategy,
 }
 
 impl Default for CircuitBreakerConfig {
@@ -37,7 +36,7 @@ impl Default for CircuitBreakerConfig {
             success_threshold: 3,
             timeout: Duration::from_secs(30),
             half_open_max_calls: 3,
-            降级策略: FallbackStrategy::ReturnDefault,
+            fallback_strategy: FallbackStrategy::ReturnDefault,
         }
     }
 }
@@ -139,7 +138,7 @@ impl CircuitBreaker {
                 if let Some(fallback_fn) = fallback {
                     CircuitBreakerResult::Fallback(fallback_fn())
                 } else {
-                    match self.config.降级策略 {
+                    match self.config.fallback_strategy {
                         FallbackStrategy::ReturnDefault => CircuitBreakerResult::Rejected(format!("Default fallback: {}", e)),
                         FallbackStrategy::ReturnError => CircuitBreakerResult::Rejected(e.to_string()),
                         _ => CircuitBreakerResult::Rejected(e.to_string()),

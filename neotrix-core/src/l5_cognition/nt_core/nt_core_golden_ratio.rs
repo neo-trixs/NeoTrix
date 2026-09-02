@@ -7,7 +7,6 @@
 //! - Fibonacci 介导的跨频率耦合路径
 //! - 分离 (独立并行处理) 与 整合 (灵活受控通信) 的平衡
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 黄金比例频率架构
@@ -197,7 +196,7 @@ impl GoldenRatioFrequencyArchitecture {
     fn find_closest_fibonacci_ratio(ratio: f64) -> f64 {
         let fib_ratios = [1.0, 1.0, 2.0, 1.5, 1.667, 1.6, 1.625, 1.615, 1.619, 1.618];
         fib_ratios.iter()
-            .min_by(|&&a| (a - ratio).abs())
+            .min_by(|a, b| (**a - ratio).abs().partial_cmp(&(**b - ratio).abs()).unwrap_or(std::cmp::Ordering::Equal))
             .copied()
             .unwrap_or(1.618)
     }

@@ -180,7 +180,7 @@ impl HuntPhase {
         self.findings.clone()
     }
 
-    async fn hunt_scope(&self, scope: &HuntScope) -> Vec<HuntingFinding> {
+    async fn hunt_scope(&self, _scope: &HuntScope) -> Vec<HuntingFinding> {
         // 实际实现中应根据攻击类别应用 12 个狩猎角度
         // 这里返回模拟发现
         vec![]

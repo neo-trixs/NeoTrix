@@ -143,7 +143,7 @@ impl AgentCardRegistry {
     }
 }
 
-/// 全局 Agent Card 注册表
+// 全局 Agent Card 注册表
 lazy_static::lazy_static! {
     static ref GLOBAL_CARDS: Mutex<AgentCardRegistry> = Mutex::new(AgentCardRegistry::new());
 }
@@ -157,11 +157,11 @@ pub fn agent_card_get(id: &str) -> Option<AgentCard> {
 }
 
 pub fn agent_card_find_by_capability(cap: &str) -> Vec<AgentCard> {
-    GLOBAL_CARDS.lock().unwrap().find_by_capability(cap)
+    GLOBAL_CARDS.lock().unwrap().find_by_capability(cap).into_iter().cloned().collect()
 }
 
 pub fn agent_card_alive() -> Vec<AgentCard> {
-    GLOBAL_CARDS.lock().unwrap().alive_agents()
+    GLOBAL_CARDS.lock().unwrap().alive_agents().into_iter().cloned().collect()
 }
 
 #[cfg(test)]

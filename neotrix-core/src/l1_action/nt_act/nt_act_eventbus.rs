@@ -8,7 +8,6 @@
 //! - 事件溯源
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 
 /// 统一事件总线 — 跨层通信核心

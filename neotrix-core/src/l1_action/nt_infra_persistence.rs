@@ -70,7 +70,7 @@ impl RegistryPersistence {
     pub fn count(&self) -> usize { self.entries.len() }
 }
 
-/// 全局持久化存储
+// 全局持久化存储
 lazy_static::lazy_static! {
     static ref GLOBAL_PERSISTENCE: std::sync::Mutex<RegistryPersistence> =
         std::sync::Mutex::new(RegistryPersistence::new(

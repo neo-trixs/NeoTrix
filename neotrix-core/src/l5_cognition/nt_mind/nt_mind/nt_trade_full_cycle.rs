@@ -10,7 +10,7 @@
 //! 3. trade_finance_compliance — 财务合规闭环 (FT05-FT06, FT14-FT16)
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, NodeLayer, RuneSocket,
+    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

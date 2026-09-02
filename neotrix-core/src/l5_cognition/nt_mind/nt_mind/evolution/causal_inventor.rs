@@ -47,7 +47,7 @@ impl CausalInventor {
     }
 
     /// 加载知识引擎数据
-    pub fn load_from_engine(&mut self, entries: &[crate::l5_cognition::nt_mind::knowledge_engine::KnowledgeEntry]) {
+    pub fn load_from_engine(&mut self, entries: &[crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_engine::KnowledgeEntry]) {
         for entry in entries {
             for tag in &entry.tags {
                 self.domain_index.entry(tag.clone()).or_default().push(entry.title.clone());

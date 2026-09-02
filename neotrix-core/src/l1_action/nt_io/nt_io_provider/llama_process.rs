@@ -228,7 +228,7 @@ pub fn compute_optimal_config(model_path: &Path, hw: &HardwareProfile) -> LlamaS
         .unwrap_or(7.0);
     let n_gpu_layers = if hw.is_apple_silicon { 99 } else { 35 };
     let system_reserved_gb = 4.0;
-    let available_gb = (hw.total_ram_gb as f64 - model_size_gb - system_reserved_gb).max(2.0);
+    let _available_gb = (hw.total_ram_gb as f64 - model_size_gb - system_reserved_gb).max(2.0);
     let threads = hw.cpu_cores.saturating_sub(2).max(2);
 
     // ═══════════════════════════════════════════════════════════

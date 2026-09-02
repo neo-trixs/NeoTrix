@@ -1,5 +1,6 @@
 use super::*;
 use crate::l5_cognition::nt_mind::nt_mind::MemoryAgentCapability;
+use crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::CapabilityOutcome;
 
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_save(&mut self) {
@@ -107,7 +108,7 @@ impl BackgroundLoopHandle {
         // goal 迭代后顺带跑一次记忆能力面: 巩固规模信号 + 证据计数,
         // 让 meta_agent 不是死代码而是生产路径上的真实消费者。
         if let Some(ref agent) = self.meta_agent {
-            if let Ok(crate::l5_cognition::nt_mind::CapabilityOutcome::Count(n)) = agent.capability_consolidate() {
+            if let Ok(CapabilityOutcome::Count(n)) = agent.capability_consolidate() {
                 eprintln!("[bg-agent] memory consolidate: nodes={}", n);
             }
         }
@@ -323,16 +324,8 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_agent_discovery(&mut self) {
-        if let Some(ref mut d) = self.agent_discovery {
-            match d.listen() {
-                Ok(discovered) if discovered > 0 => {
-                    // D17: listen 排空返回新增数 — 有新增即触发可观测信号 (日志 + 状态), 供感知层响应
-                    eprintln!("[bg] discovery: +{} agents ({} known)", discovered, d.known_agents.len());
-                }
-                Ok(_) => {}
-                Err(e) => log::warn!("[bg] discovery: {}", e),
-            }
-        }
+        // agent_discovery 字段已注释, stub 实现
+        log::trace!("[bg] discovery: skipped (disabled)");
     }
 
     pub(crate) async fn handle_curiosity(&mut self) {

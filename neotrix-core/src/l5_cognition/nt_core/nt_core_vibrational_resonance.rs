@@ -7,7 +7,6 @@
 //! - Gamma 同步 (40-100 Hz) 为意识锚点
 //! - Certs 共振: 39 Hz 微管共振 + 40 Hz 丘脑皮层场
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 振动共振整合框架

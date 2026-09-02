@@ -6,7 +6,6 @@
 //! - 时空吸引子编码主观意识
 //! - 嵌套干涉晶格: 慢振荡提供高频模式稳定的时间支架
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 共振复杂度引擎
@@ -173,7 +172,7 @@ impl ResonanceComplexityEngine {
         let g = 2.0; // 信号增益
         let tau = 150.0; // 驻留时间 (ms)
 
-        let composite = (d * c * g * tau).sqrt() / 100.0;
+        let composite: f64 = (d * c * g * tau).sqrt() / 100.0_f64;
 
         ComplexityIndex {
             fractal_dimension: d,

@@ -3,7 +3,7 @@
 //! 服务于动态漫节奏设计和分镜脚本生成
 
 use serde::{Serialize, Deserialize};
-use std::fmt;
+
 
 // ============================================================================
 // 节段数据结构
@@ -99,7 +99,7 @@ pub fn generate_quick_segments(default_duration: f32) -> Vec<SegmentData> {
             r#type: match i {
                 0 => SegmentType::Setup,
                 1 => SegmentType::Conflict,
-                2 => SegmentType::Climax,
+                _ => SegmentType::Climax,
             },
             base_length: default_duration * ratios[i] / total_ratio,
             content_priority: 1.0,
@@ -134,7 +134,7 @@ pub fn get_core_scuang_index(segments: &[SegmentData]) -> Option<usize> {
     segments.iter().position(|s| s.is_core_scuang)
 }
 
-pub fn check_emotion_beat_interval(segments: &[SegmentData], total_duration: f32) -> bool {
+pub fn check_emotion_beat_interval(segments: &[SegmentData], _total_duration: f32) -> bool {
     let core_count = segments.iter().filter(|s| s.is_core_scuang).count();
     if core_count == 0 {
         return false;

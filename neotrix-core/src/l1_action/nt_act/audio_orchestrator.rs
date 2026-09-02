@@ -4,7 +4,7 @@
 //! 支持多轨道音频混合、音量平衡
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 音频定义
@@ -148,7 +148,7 @@ impl AudioOrchestrator {
     }
     
     /// 生成 TTS
-    pub fn generate_tts(&self, text: &str, config: &TTSConfig) -> String {
+    pub fn generate_tts(&self, text: &str, _config: &TTSConfig) -> String {
         // TODO: 实际调用 TTS API
         format!("/tmp/tts_{}.wav", &text[..10.min(text.len())])
     }

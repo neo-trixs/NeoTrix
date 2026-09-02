@@ -10,6 +10,18 @@
 //!   成熟度由 Constellation 承载（原 GreatFilterGate 已归档，输入指标无生产源）
 //! - L7 不执行能力，只调度
 
+// 新增：核心类型和 trait
+pub mod types;
+pub mod traits;
+pub mod wisdom;
+pub mod energy_integration;
+
+// 重新导出核心类型 (排除与 registry 重复的 CapabilityCost/Kind/Stats)
+pub use types::{Layer, Wisdom, ConsciousnessState};
+pub use traits::*;
+pub use wisdom::{WisdomBridgeImpl, WisdomAccumulator, WisdomPool};
+pub use energy_integration::{EnergyCapabilityPlugin, EnergyWisdomBridge};
+
 pub mod a2a;
 pub mod group_evolve;
 pub mod mature;

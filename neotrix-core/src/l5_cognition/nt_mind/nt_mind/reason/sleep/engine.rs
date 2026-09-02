@@ -101,18 +101,14 @@ impl SleepEngine {
         let mut total_memories = 0;
         let mut total_sim = 0.0;
 
-        for pass_idx in 0..passes {
+        for _pass_idx in 0..passes {
             let result = self.consolidator.run_consolidation_pass(
-                bank, brain, state, operator, &self.updater,
+                bank, brain, &self.updater,
             );
             total_delta += result.total_delta;
             delta_per_pass.push(result.total_delta);
             total_memories += result.memories_processed;
             total_sim += result.avg_similarity * result.memories_processed as f64;
-
-            if pass_idx < passes - 1 {
-                self.updater.add_transition_noise(state, self.config.transition_noise);
-            }
         }
 
         let avg_sim = if total_memories > 0 { total_sim / total_memories as f64 } else { 0.0 };

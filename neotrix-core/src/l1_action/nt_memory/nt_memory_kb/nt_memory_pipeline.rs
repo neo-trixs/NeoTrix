@@ -19,7 +19,7 @@ use super::KnowledgeBase;
 
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
-// use crate::l3_embodiment::nt_shield::evomal_guard::scan_absorb_text;
+use crate::l3_embodiment::nt_shield::nt_shield::self_poison::scan_absorb_text;
 use crate::l3_embodiment::nt_shield::nt_shield::receipt::AgentReceipt;
 
 use serde::{Deserialize, Serialize};

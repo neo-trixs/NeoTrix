@@ -2014,7 +2014,7 @@ pub fn run_config_decrypt_keys() {
 // ── Wallet commands ──
 
 pub fn run_wallet_create(label: &str) {
-    let mut crypto = neotrix::neotrix::nt_act_crypto::CryptoAgent::new();
+    let mut crypto = crate::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     match crypto.persist_wallet(label) {
         Ok(lbl) => {
             if let Some(w) = crypto.wallet_manager.active_wallet() {
@@ -2029,7 +2029,7 @@ pub fn run_wallet_create(label: &str) {
 }
 
 pub fn run_wallet_import(label: &str, private_key: &str) {
-    let mut crypto = neotrix::neotrix::nt_act_crypto::CryptoAgent::new();
+    let mut crypto = crate::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     match crypto.import_wallet(private_key, label) {
         Ok(w) => {
             println!("{}", success("Wallet imported successfully"));
@@ -2041,7 +2041,7 @@ pub fn run_wallet_import(label: &str, private_key: &str) {
 }
 
 pub fn run_wallet_list(json: bool) {
-    let crypto = neotrix::neotrix::nt_act_crypto::CryptoAgent::new();
+    let crypto = crate::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     match crypto.wallet_store.list_wallets() {
         Ok(wallets) => {
             if json {
@@ -2075,7 +2075,7 @@ pub fn run_wallet_list(json: bool) {
 }
 
 pub fn run_wallet_balance(chain: &str) {
-    let crypto = neotrix::neotrix::nt_act_crypto::CryptoAgent::new();
+    let crypto = crate::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     let addr = match crypto.wallet_manager.active_wallet() {
         Some(w) => w.address.clone(),
         None => {
@@ -2087,7 +2087,7 @@ pub fn run_wallet_balance(chain: &str) {
 }
 
 pub fn run_wallet_delete(label: &str) {
-    let mut crypto = neotrix::neotrix::nt_act_crypto::CryptoAgent::new();
+    let mut crypto = crate::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     match crypto.delete_persisted_wallet(label) {
         Ok(_) => println!("{} Wallet '{}' deleted", success("✓"), label),
         Err(e) => eprintln!("{} {}", err("Error:"), e),
@@ -2095,7 +2095,7 @@ pub fn run_wallet_delete(label: &str) {
 }
 
 pub fn run_wallet_export(label: &str) {
-    let crypto = neotrix::neotrix::nt_act_crypto::CryptoAgent::new();
+    let crypto = crate::l1_action::nt_act::nt_act_crypto::CryptoAgent::new();
     match crypto.wallet_store.load_wallet(label) {
         Ok(w) => {
             println!("{}", warn("⚠️  安全警告: 私钥可控制你的全部资产, 请勿泄露!"));

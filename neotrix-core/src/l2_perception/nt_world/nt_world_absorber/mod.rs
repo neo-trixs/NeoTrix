@@ -13,9 +13,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use super::nt_world_github_absorber::{GitHubAbsorbReport, GitHubAbsorber};
-// use crate::l2_perception::nt_memory_kb_bridge::{
-//     CrawlCycleReport, KnowledgeBase, KnowledgeNode, NodeType,
-// };
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::core::nt_core_kb_types::NodeType;
+use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
 use rusqlite::Connection;
 
 // ── Types ──
@@ -506,37 +506,37 @@ mod nt_memory_kb_crawl {
 }
 
 mod nt_memory_kb_discovery {
-//     pub use crate::l2_perception::nt_memory_kb_bridge::DiscoveryPipelineConfig;
+    pub use crate::l1_action::nt_memory::nt_memory_kb::nt_discovery_github_topics::DiscoveryPipelineConfig;
 }
 
 mod nt_memory_store {
     use rusqlite::Connection;
-    #[allow(dead_code)]
-    fn bridge_node(n: crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::KnowledgeNode) -> super::KnowledgeNode {
-//         use crate::l2_perception::nt_memory_kb_bridge as bridge;
-        let nt = bridge::from_real_node_type(&n.node_type);
-        super::KnowledgeNode {
-            id: n.id,
-            title: n.title,
-            node_type: nt,
-            content: n.content,
-            summary: n.summary,
-            url: n.url,
-            domain: n.domain,
-            language: n.language,
-            confidence: n.confidence,
-            importance: n.importance,
-            access_count: n.access_count,
-            metadata: n.metadata,
-            created_at: n.created_at,
-            updated_at: n.updated_at,
-        }
-    }
-    #[allow(dead_code)]
-    pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<super::KnowledgeNode>> {
-        let nodes = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::get_all_nodes(conn)?;
-        Ok(nodes.into_iter().map(bridge_node).collect())
-    }
+    // bridge_node and get_all_nodes commented out - nt_memory_kb_bridge module not found
+    // #[allow(dead_code)]
+    // fn bridge_node(n: crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::KnowledgeNode) -> super::KnowledgeNode {
+    //     let nt = bridge::from_real_node_type(&n.node_type);
+    //     super::KnowledgeNode {
+    //         id: n.id,
+    //         title: n.title,
+    //         node_type: nt,
+    //         content: n.content,
+    //         summary: n.summary,
+    //         url: n.url,
+    //         domain: n.domain,
+    //         language: n.language,
+    //         confidence: n.confidence,
+    //         importance: n.importance,
+    //         access_count: n.access_count,
+    //         metadata: n.metadata,
+    //         created_at: n.created_at,
+    //         updated_at: n.updated_at,
+    //     }
+    // }
+    // #[allow(dead_code)]
+    // pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<super::KnowledgeNode>> {
+    //     let nodes = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::get_all_nodes(conn)?;
+    //     Ok(nodes.into_iter().map(bridge_node).collect())
+    // }
     pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str, priority: i64, ts: i64) -> rusqlite::Result<()> {
         crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::upsert_crawl_queue(conn, url, depth, domain, priority, ts)
     }

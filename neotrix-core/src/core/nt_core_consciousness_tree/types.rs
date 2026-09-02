@@ -160,6 +160,7 @@ pub enum BranchKind {
     Repair,
     Governance,
     Nexus,
+    Game,
 }
 
 impl BranchKind {
@@ -176,6 +177,7 @@ impl BranchKind {
             BranchKind::Repair => "NT-REPAIR (自愈工程师) — 故障诊断+自修复+回滚恢复",
             BranchKind::Governance => "NT-GOVERNANCE (架构仲裁者) — 宪法规则+合规验证+行为护栏",
             BranchKind::Nexus => "NT-NEXUS (枢纽) — 跨会话记忆编织+经验图连接+断点桥接",
+            BranchKind::Game => "NT-PLAY (游戏进化者) — 自我对弈+意识训练+策略结晶",
         }
     }
 }
@@ -1019,6 +1021,13 @@ pub fn constraints_for_branch(kind: &BranchKind) -> BranchConstraints {
             min_required_modules: 1,
             min_self_tests: 1,
         },
+        BranchKind::Game => BranchConstraints {
+            idle_ticks_threshold: 3,
+            min_growth_health: 0.30,
+            max_active_modules: 10,
+            min_required_modules: 1,
+            min_self_tests: 1,
+        },
     }
 }
 // ═══════════════════════════════════════════════════════════════════
@@ -1111,6 +1120,7 @@ impl BranchKind {
             BranchKind::Repair,
             BranchKind::Governance,
             BranchKind::Nexus,
+            BranchKind::Game,
         ]
     }
 
@@ -1138,6 +1148,8 @@ impl BranchKind {
             Some(BranchKind::Governance)
         } else if name_lower.starts_with("nt_nexus_") {
             Some(BranchKind::Nexus)
+        } else if name_lower.starts_with("nt_game") {
+            Some(BranchKind::Game)
         } else {
             None
         }

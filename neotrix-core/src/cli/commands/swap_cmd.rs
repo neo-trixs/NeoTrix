@@ -1,6 +1,6 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l1_action::nt_act::nt_act_crypto::tx::TxBuilder;
-// use crate::l1_action::nt_act::nt_act_crypto::crypto::CryptoAgent;
+use crate::l1_action::nt_act::nt_act_crypto::CryptoAgent;
 use crate::l1_action::nt_act::nt_act_crypto::chain::ChainType;
 
 fn with_crypto<F>(f: F) -> CommandOutput

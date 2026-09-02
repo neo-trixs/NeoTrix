@@ -174,6 +174,8 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Git,
         "session" | "resume" | "fork" | "history" | "context" | "compact" | "distill" | "session-all" | "sess"
             => CommandCategory::Session,
+        "game" | "gm" | "play"
+            => CommandCategory::Brain,
         "e8"
             => CommandCategory::System,
         "agent" | "agents" | "agent-all" | "agents-all" | "discover" | "mcp" | "acp"

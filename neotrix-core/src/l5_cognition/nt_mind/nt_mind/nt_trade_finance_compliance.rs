@@ -65,6 +65,19 @@ pub enum PaymentType {
     Other,
 }
 
+impl std::fmt::Display for PaymentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PaymentType::Deposit => write!(f, "Deposit"),
+            PaymentType::Balance => write!(f, "Balance"),
+            PaymentType::LetterOfCredit => write!(f, "LetterOfCredit"),
+            PaymentType::DocumentaryCollection => write!(f, "DocumentaryCollection"),
+            PaymentType::AdvancePayment => write!(f, "AdvancePayment"),
+            PaymentType::Other => write!(f, "Other"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PaymentStatus {
     Pending,
@@ -74,6 +87,20 @@ pub enum PaymentStatus {
     Failed,
     Disputed,
     Refunded,
+}
+
+impl std::fmt::Display for PaymentStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PaymentStatus::Pending => write!(f, "Pending"),
+            PaymentStatus::Received => write!(f, "Received"),
+            PaymentStatus::Verified => write!(f, "Verified"),
+            PaymentStatus::Paid => write!(f, "Paid"),
+            PaymentStatus::Failed => write!(f, "Failed"),
+            PaymentStatus::Disputed => write!(f, "Disputed"),
+            PaymentStatus::Refunded => write!(f, "Refunded"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,6 +266,10 @@ pub enum RefundStatus {
 /// Finance Engine
 pub struct FinanceEngine;
 
+impl Default for FinanceEngine {
+    fn default() -> Self { Self }
+}
+
 impl FinanceEngine {
     /// Review contract for compliance and risk (FT05)
     pub fn review_contract(
@@ -397,8 +428,8 @@ impl FinanceEngine {
         clauses
     }
 
-    fn check_discrepancies(lc_text: &str, contract: &super::nt_trade_full_cycle::Contract) -> Vec<Discrepancy> {
-        let mut discrepancies = Vec::new();
+    fn check_discrepancies(_lc_text: &str, _contract: &super::nt_trade_full_cycle::Contract) -> Vec<Discrepancy> {
+        let discrepancies = Vec::new();
         // Simplified - would check actual documents against LC terms
         discrepancies
     }
@@ -506,13 +537,15 @@ impl FinanceEngine {
         Ok(SettlementRecord {
             settlement_id: format!("SET-{}", uuid::Uuid::new_v4().simple()),
             contract_id: "unknown".into(),
-            payment_id: "unknown".into(),
-            amount: 0.0,
-            currency: "USD".into(),
+            collection_id: "unknown".into(),
+            bank_receipt: "unknown".into(),
+            received_amount: 0.0,
+            received_currency: "USD".into(),
+            settlement_amount: 0.0,
+            settlement_currency: "USD".into(),
             fx_rate: 1.0,
-            settled_amount: 0.0,
-            settlement_date: chrono::Utc::now().date_naive().to_string(),
-            bank_reference: None,
+            bank_fees: 0.0,
+            net_amount: 0.0,
             verification_status: VerificationStatus::Pending,
             verification_date: None,
             verification_officer: None,

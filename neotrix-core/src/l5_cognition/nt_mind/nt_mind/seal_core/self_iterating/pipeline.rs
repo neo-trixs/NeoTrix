@@ -56,6 +56,14 @@ use super::sft_stage::SupervisedExample;
 use crate::core::nt_core_self_review::SelfReviewGate;
 use crate::make_stage;
 use crate::l5_cognition::nt_mind::nt_mind_memory::MemoryTier;
+use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::{PerformanceEvaluator, ExecutionFeedback};
+use crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate;
+use crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate;
+use crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox;
+use crate::l5_cognition::nt_mind::nt_mind::consciousness::consciousness_bridge::ConsciousnessBridge;
+use crate::l3_embodiment::nt_shield::nt_shield::browser_security::{BrowserSecurityScanner, BrowserSecurityConfig};
+use crate::l3_embodiment::nt_shield::nt_shield::check_registry::CheckRegistry;
+use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
 
 fn compute_capability_deltas(brain: &SelfIteratingBrain) -> Vec<(String, f64)> {
@@ -993,29 +1001,31 @@ impl BrainStage for SleepStage {
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref mut engine) = brain.sleep_engine {
-            if let (Some(op), Some(ref mut st)) = (
-                brain.select_operator.as_ref(),
-                brain.selective_state.as_mut(),
-            ) {
-                match engine.sleep(
-                    &mut brain.brain.capability,
-                    &mut brain.reasoning_bank,
-                    op,
-                    st,
-                ) {
-                    Ok(result) => {
-                        let stats = result.stats.clone();
-                        brain.last_sleep_stats = Some(result.stats);
-                        log::info!(
-                            "[sleep] passes={} memories={} delta={:.6}",
-                            stats.passes_done,
-                            stats.total_memories,
-                            stats.total_delta
-                        );
-                    }
-                    Err(e) => log::warn!("[sleep] engine error: {}", e),
-                }
-            }
+            // FIXME: select_operator / selective_state fields commented out in SelfIteratingBrain
+            // if let (Some(op), Some(ref mut st)) = (
+            //     brain.select_operator.as_ref(),
+            //     brain.selective_state.as_mut(),
+            // ) {
+            //     match engine.sleep(
+            //         &mut brain.brain.capability,
+            //         &mut brain.reasoning_bank,
+            //         op,
+            //         st,
+            //     ) {
+            //         Ok(result) => {
+            //             let stats = result.stats.clone();
+            //             brain.last_sleep_stats = Some(result.stats);
+            //             log::info!(
+            //                 "[sleep] passes={} memories={} delta={:.6}",
+            //                 stats.passes_done,
+            //                 stats.total_memories,
+            //                 stats.total_delta
+            //             );
+            //         }
+            //         Err(e) => log::warn!("[sleep] engine error: {}", e),
+            //     }
+            // }
+            log::debug!("[sleep] engine present but select_operator/selective_state not wired");
         } else {
             let result = brain.consolidate_memories();
             log::info!(
@@ -2921,9 +2931,9 @@ impl BrainStage for RewardCalculationStage {
             let blended = if ext >= 0.0 {
                 let affective = crate::core::nt_core_knowledge::take_affective_observation();
                 match affective {
-                    Some(a) => crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::combine_reward_with_affective(
-                        brain._snapshot_score(),
-                        crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::ExecutionFeedback::new(true, 1.0, ext),
+                Some(a) => PerformanceEvaluator::combine_reward_with_affective(
+                    brain._snapshot_score(),
+                    ExecutionFeedback::new(true, 1.0, ext),
                         Some(a),
                         1.0,
                     ),
@@ -3036,7 +3046,6 @@ impl BrainStage for SelfTestStage {
         use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
         use crate::core::nt_core_self_review::SelfReviewGate;
         use crate::core::nt_core_self_test::SelfTestRegistry;
-//         use crate::l5_cognition::nt_mind::bbrain_monitor::BMonitor;
         let mut registry = SelfTestRegistry::new();
         registry.register(Box::new(SchemaWatchdog::new()));
         registry.register(Box::new(ConvergeCheckFn));
@@ -3070,29 +3079,22 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new(),
         ));
-        registry.register(Box::new(
-            crate::l1_action::nt_io::nt_act_autonomy::oracle_gate::OracleGate::new(),
-        ));
-        registry.register(Box::new(
-            crate::l1_action::nt_io::nt_act_code::semantic_entropy::SemanticEntropyGate::new(),
-        ));
-        registry.register(Box::new(
-            crate::l1_action::nt_io::nt_act_sandbox::ActionSandbox::new(),
-        ));
+        registry.register(Box::new(OracleGate::new()));
+        registry.register(Box::new(SemanticEntropyGate::new()));
+        registry.register(Box::new(ActionSandbox::new()));
         registry.register(Box::new(
             crate::core::nt_core_consciousness_review::ConsciousnessReview::new(),
         ));
-        registry.register(Box::new(
-            crate::l4_emotion::nt_feel::nt_core_fep_iit::bridge::FEPIITBridge::new(),
-        ));
+        // nt_core_fep_iit module not found - removed
+        // registry.register(Box::new(
+        //     crate::l4_emotion::nt_feel::nt_core_fep_iit::bridge::FEPIITBridge::new(),
+        // ));
         registry.register(Box::new(crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
-        registry.register(Box::new(crate::l5_cognition::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
-        registry.register(Box::new(crate::l3_embodiment::nt_shield::browser_security::BrowserSecurityScanner::new(
-            crate::l3_embodiment::nt_shield::browser_security::BrowserSecurityConfig::default(),
+        registry.register(Box::new(ConsciousnessBridge::new()));
+        registry.register(Box::new(BrowserSecurityScanner::new(
+            BrowserSecurityConfig::default(),
         )));
-        registry.register(Box::new(
-            crate::l3_embodiment::nt_shield::check_registry::CheckRegistry::new(),
-        ));
+        registry.register(Box::new(CheckRegistry::new()));
         registry.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
         ));
@@ -3115,9 +3117,9 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::neotrix::nt_file_ability::FileAbilitySelfTest,
         ));
-        registry.register(Box::new(
-// //             crate::l5_cognition::nt_core::nt_core_parallel::CapabilityClusterSelfTest,
-        ));
+        // registry.register(Box::new(
+        //     crate::l5_cognition::nt_core::nt_core_parallel::CapabilityClusterSelfTest,
+        // ));
         registry.register(Box::new(
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardAudit,
         ));

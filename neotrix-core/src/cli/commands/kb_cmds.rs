@@ -149,12 +149,13 @@ impl CliCommand for KbCmd {
 
 /// /kb consistency — 设定一致性检查 (对标网文每卷设定检查)
 fn cmd_consistency(_args: &[String]) -> CommandOutput {
-    let conn = match open_raw_conn() {
+    let _conn = match open_raw_conn() {
         Some(c) => c,
         None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
     };
-    let mut out = String::new();
-    let _ = crate::l1_action::nt_memory::nt_memory_kb::// setting_consistency::check_and_report_to_string(&conn, &mut out);
+    let out = String::new();
+    // TODO: setting_consistency module not found; stub
+    // let _ = crate::l1_action::nt_memory::nt_memory_kb::setting_consistency::check_and_report_to_string(&conn, &mut out);
     CommandOutput::ok(&out)
 }
 
@@ -357,34 +358,15 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
-//     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::EmbedMode;
-    let kb = match KnowledgeBase::open(None) {
-        Ok(kb) => kb,
-        Err(e) => return CommandOutput::err(&format!("无法打开知识库: {}", e)),
-    };
-//     let cfg = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
-    let bundled = kb.with_embedding(cfg);
-    let mode_label = match bundled.embedding_config.read().ok().and_then(|c| c.clone()).map(|c| c.mode) {
-        Some(EmbedMode::Local) => "本地 hash-kernel (384-dim, 零依赖)",
-        _ => "HTTP MiniLM (可选脚本 scripts/kb-embed-server.py)",
-    };
-    match bundled.ensure_embeddings() {
-        Ok(n) => CommandOutput::ok(&format!(
-            "Embedding 补跑完成: 本轮处理 {} 个待嵌节点\n\
-             模式: {}\n\
-             Http 服务不可用时自动降级本地 hash-kernel, 全链路零依赖可跑。\n\
-             强制本地: NEOTRIX_EMBEDDING_MODE=local",
-            n, mode_label
-        )),
-        Err(e) => CommandOutput::err(&format!("Embedding 补跑失败: {}", e)),
-    }
+    // TODO: EmbedMode/EmbeddingConfig imports commented out; stub implementation
+    CommandOutput::ok("Embed command stub — embedding module not yet wired")
 }
 
 /// /kb distill [--pairs N] [--epochs N] — DistilVDR 蒸馏学生训练 (R-P79 生产接线)。
 /// 从 KB 已有向量采样 (q,d) 对, teacher = 余弦, 点级回归训练双塔对角学生,
 /// 落盘 ~/.neotrix/distill_student.json; hybrid_search Tier 3 自动消费。
 fn cmd_distill(args: &[String]) -> CommandOutput {
-//     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::load_all_embeddings;
+    use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_embed::load_all_embeddings;
     use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_distill::{
         load_student, sample_contrastive_pairs, sample_training_pairs, save_student,
         train_contrastive, CONTRASTIVE_MARGIN, PointwiseDistillStudent,
@@ -704,7 +686,7 @@ fn cmd_search(args: &[String]) -> CommandOutput {
     // Operator terminal context: Confidential clearance (keeps Secret-tier nodes
     // out unless the operator runs the full tree). Wiring the permission-aware
     // retrieval path (Onyx pattern) instead of raw search.
-    let permission = crate::l1_action::nt_memory::nt_memory_kb::types::PermissionLevel::Confidential;
+    let permission = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::PermissionLevel::Confidential;
     match kb.search_permission_aware(&query, 10, permission) {
         Ok(results) => {
             if results.is_empty() {

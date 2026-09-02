@@ -4,7 +4,7 @@
 // replacing the earlier empty re-export shell.
 //
 
-// pub mod bbrain_monitor;
+pub mod bbrain_monitor;
 pub mod consciousness_bridge;
 pub mod curiosity_drive;
 pub mod element;

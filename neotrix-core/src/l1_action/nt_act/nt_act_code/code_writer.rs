@@ -11,6 +11,19 @@ use super::template_registry::{CodeTemplateRegistry, TemplateCategory};
 
 // use crate::l1_action::nt_act::nt_l1_shared_types::ActionPlan;
 
+/// ActionPlan — local stub for code generation routing
+#[derive(Debug, Clone)]
+pub enum ActionPlan {
+    AddTestStub { file: String },
+    RunCargoFix,
+    RemoveTodo { file: String },
+    SplitLargeFile { file: String },
+    ReviewUnsafe { file: String },
+    ReplaceUnwrap { file: String },
+    HumanDecision { reason: String },
+    NoAction { reason: String },
+}
+
 /// N‑gram based content entropy detector — measures code generation uncertainty
 /// via Shannon entropy of token n‑gram distribution.
 /// High entropy → needs LLM intervention (OracleGate).

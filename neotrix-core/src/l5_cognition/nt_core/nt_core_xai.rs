@@ -163,7 +163,7 @@ impl ExplainableAIEngine {
         input: &HashMap<String, serde_json::Value>,
         model_output: Option<&HashMap<String, f64>>,
     ) -> ExplanationResult {
-        let start = std::time::Instant::now();
+        let _start = std::time::Instant::now();
 
         // 计算特征重要性
         let feature_importance = self.calculate_feature_importance(input, model_output);
@@ -201,7 +201,7 @@ impl ExplainableAIEngine {
     fn calculate_feature_importance(
         &self,
         input: &HashMap<String, serde_json::Value>,
-        model_output: Option<&HashMap<String, f64>>,
+        _model_output: Option<&HashMap<String, f64>>,
     ) -> Vec<FeatureImportance> {
         let mut importance: Vec<FeatureImportance> = input.iter()
             .map(|(name, value)| {
@@ -241,12 +241,12 @@ impl ExplainableAIEngine {
     fn generate_counterfactuals(
         &self,
         input: &HashMap<String, serde_json::Value>,
-        prediction: &serde_json::Value,
+        _prediction: &serde_json::Value,
     ) -> Vec<Counterfactual> {
         let mut counterfactuals = Vec::new();
 
         // 简化版: 修改每个特征生成反事实
-        for (key, value) in input {
+        for (key, _value) in input {
             let mut modified = input.clone();
             modified.insert(key.clone(), serde_json::json!("modified_value"));
 
@@ -281,7 +281,7 @@ impl ExplainableAIEngine {
     }
 
     /// 执行审计
-    pub fn audit_model(&mut self, model_id: &str, test_data: &[HashMap<String, serde_json::Value>]) -> AuditReport {
+    pub fn audit_model(&mut self, model_id: &str, _test_data: &[HashMap<String, serde_json::Value>]) -> AuditReport {
         self.stats.audits_performed += 1;
 
         AuditReport {

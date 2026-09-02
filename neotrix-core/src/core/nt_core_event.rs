@@ -53,6 +53,31 @@ pub enum CoreEvent {
         consistency: f64,
         timestamp: i64,
     },
+    #[serde(rename = "game_session_created")]
+    GameSessionCreated {
+        game_name: String,
+        session_id: u64,
+    },
+    #[serde(rename = "game_episode_completed")]
+    GameEpisodeCompleted {
+        game_name: String,
+        episode_id: u64,
+        score: f64,
+        turns: usize,
+    },
+    #[serde(rename = "game_training_update")]
+    GameTrainingUpdate {
+        game_name: String,
+        iteration: usize,
+        policy_loss: f64,
+        win_rate: f64,
+    },
+    #[serde(rename = "game_consciousness_feedback")]
+    GameConsciousnessFeedback {
+        phi_delta: f64,
+        emotion_label: String,
+        attention_shift: String,
+    },
 }
 
 // ── Backward-compatible type aliases ──────────────────────────────────────

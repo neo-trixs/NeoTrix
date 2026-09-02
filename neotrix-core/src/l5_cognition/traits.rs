@@ -4,7 +4,6 @@
 //! 吸收来源: RD-Agent (R&D 自动化), PentestCode (多智能体协调), Sentrux (质量门禁)
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// 推理任务
 #[derive(Debug, Clone, Serialize, Deserialize)]

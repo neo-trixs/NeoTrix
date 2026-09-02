@@ -18,6 +18,7 @@ use crate::core::nt_core_self::attention_head::{
 use crate::l1_action::nt_memory::nt_memory_kb::{
     KnowledgeBase, NodeType,
 };
+use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
 use crate::l2_perception::nt_world::nt_world_search::{SearchResult, UnifiedSearch};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
@@ -1329,10 +1330,10 @@ impl DialogueAbsorbBridge {
         let has_batch_signal = batch.arr().iter().any(|&v| v > 0.0);
         if !has_batch_signal {
             return DialogueAbsorbOutcome::empty();
-        }
+}
 
-        // 实测能力差: 吸收前按 PerformanceEvaluator 打分 (D1/D2 行为化指标)。
-        let before_score = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+// 实测能力差: 吸收前按 PerformanceEvaluator 打分 (D1/D2 行为化指标)。
+        let before_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
@@ -1358,7 +1359,7 @@ impl DialogueAbsorbBridge {
         let critic_accepted = brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
 
         // 实测后分: 批评器若回滚, after == before, 无增益。
-        let after_score = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+        let after_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
@@ -1410,10 +1411,10 @@ impl DialogueAbsorbBridge {
             // 无能力信号 → 标记已尝试, 无增益返回 (避免每次扫描同批死数据)。
             coevo.commit_absorb();
             return DialogueAbsorbOutcome::empty();
-        }
+}
 
-        // 实测能力差: 吸收前打分 (D1/D2 行为化指标)。
-        let before_score = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+// 实测能力差: 吸收前打分 (D1/D2 行为化指标)。
+        let before_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
@@ -1437,7 +1438,7 @@ impl DialogueAbsorbBridge {
         // ── Verify (EDV): 吸收前后性能对比, 能力下降则回滚 ──
         let critic_accepted = brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
 
-        let after_score = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+        let after_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
@@ -1569,13 +1570,13 @@ impl DialogueAbsorbBridge {
         let has_signal = brain.brain.absorb_from_custom(&custom_name);
 
         // ── Verify (EDV): 以 ResearchFindings 身份受校验吸收, 能力下降则回滚 ──
-        let before_score = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+        let before_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );
         let critic_accepted =
             brain.absorb_with_critic(crate::core::KnowledgeSource::ResearchFindings);
-        let after_score = crate::l5_cognition::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+        let after_score = PerformanceEvaluator::evaluate(
             &crate::neotrix::nt_world_model::TaskType::General,
             &brain.brain.capability,
         );

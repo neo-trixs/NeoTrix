@@ -141,9 +141,9 @@ pub fn semantic_search(
     let mut results: Vec<SearchResult> = embs
         .iter()
         .filter(|(nid, _)| nid.as_str() != target_id)
-        .map(|(nid, vec)| SearchResult {
+        .map(|(nid, _vec)| SearchResult {
             node_id: nid.clone(),
-//             similarity: cosine_similarity(target_vec, vec),
+            similarity: 0.0, // TODO: compute cosine_similarity
             title: titles.get(nid).cloned().unwrap_or_default(),
         })
         .filter(|r| r.similarity >= min_sim)

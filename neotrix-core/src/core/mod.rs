@@ -55,6 +55,7 @@ pub mod nt_core_hcube;
 // L4 — 认知层 (Cognition)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l4_cognition;
+pub mod nt_game;
 pub mod nt_core_rule_memory;
 pub mod nt_core_dao_engine;
 pub mod nt_core_meaning;
@@ -118,6 +119,9 @@ pub mod nt_core_state;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l7_capability;
 pub mod nt_core_model_skills;
+
+// 能量核心模块
+pub mod energy_core;
 
 // ═══════════════════════════════════════════════════════════════════
 // L8 — 自主神经层 (Autonomic)

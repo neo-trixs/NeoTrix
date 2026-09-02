@@ -24,7 +24,7 @@ use std::path::PathBuf;
 // 统一 Φ 计算：从 L5 真实 IITPhiCalculator 导入 (单一事实源, 消除本地平行实现)
 // ============================================================
 
-pub use crate::core::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
+pub use crate::core::nt_core_iit_phi::PhiReport;
 
 /// 问题生命周期
 #[derive(Debug, Clone, PartialEq)]

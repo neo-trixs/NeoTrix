@@ -280,27 +280,36 @@ impl ModelRoutingLayer {
         let mut last_error = None;
         
         while retries <= self.config.max_retries {
-            if let Some(model) = self.select_model(&request) {
-                // TODO: 实际调用模型 API
-                let response = RoutingResponse {
-                    success: true,
-                    selected_model: model.id.clone(),
-                    output: None,
-                    cost: model.price_per_second * 5.0, // 假设5秒
-                    latency_ms: 5000,
-                    retries,
-                    error: None,
-                };
-                
-                // 更新状态
-                if let Some(state) = self.states.get_mut(&model.id) {
-                    state.total_requests += 1;
-                    state.total_cost += response.cost;
-                }
-                
-                self.history.push(response.clone());
-                return response;
+            let model_id = if let Some(model) = self.select_model(&request) {
+                model.id.clone()
+            } else {
+                retries += 1;
+                last_error = Some("无可用模型".to_string());
+                continue;
+            };
+
+            // TODO: 实际调用模型 API
+            let cost = self.states.get(&model_id)
+                .map(|s| s.total_cost)
+                .unwrap_or(0.0);
+            let response = RoutingResponse {
+                success: true,
+                selected_model: model_id.clone(),
+                output: None,
+                cost: cost + 5.0, // 模拟: price_per_second * 5s
+                latency_ms: 5000,
+                retries,
+                error: None,
+            };
+
+            // 更新状态
+            if let Some(state) = self.states.get_mut(&model_id) {
+                state.total_requests += 1;
+                state.total_cost += response.cost;
             }
+
+            self.history.push(response.clone());
+            return response;
             
             retries += 1;
             last_error = Some("无可用模型".to_string());

@@ -3,7 +3,6 @@
 //! 迭代修正技能直到通过质量门禁
 //! 集成 nt_mind_autofixer::autofixer
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -212,7 +211,7 @@ impl SkillImprover {
                         }
                     }
                 }
-                ImprovementAction::RemoveDangerousContent { pattern } => {
+                ImprovementAction::RemoveDangerousContent { pattern: _ } => {
                     // Replace dangerous patterns
                     let dangerous = ["rm -rf", "curl.*|.*sh", "sudo ", "--force", "dangerously"];
                     for danger in &dangerous {
@@ -230,11 +229,11 @@ impl SkillImprover {
                         modified = true;
                     }
                 }
-                ImprovementAction::SplitLongSkill { max_lines } => {
+                ImprovementAction::SplitLongSkill { max_lines: _ } => {
                     // Mark for splitting (actual split requires file ops)
                     modified = true;
                 }
-                ImprovementAction::FixFrontmatterSyntax { line, issue } => {
+                ImprovementAction::FixFrontmatterSyntax { line: _, issue: _ } => {
                     // Would need line-specific fix
                 }
             }
@@ -279,7 +278,7 @@ impl SkillImprover {
         
         // Safety
         let danger_marks = ["rm -rf", "curl.*|.*sh", "sudo ", "--force", "dangerously"];
-        let mut safety = 1.0;
+        let mut safety: f64 = 1.0;
         let body_lower = body.to_lowercase();
         for mark in danger_marks {
             if body_lower.contains(mark) {
@@ -322,7 +321,7 @@ impl SkillImprover {
         }
     }
 
-    fn detect_violations(&self, content: &str, scores: &SkillQualityScores) -> Vec<QualityViolation> {
+    fn detect_violations(&self, _content: &str, scores: &SkillQualityScores) -> Vec<QualityViolation> {
         let mut violations = Vec::new();
         
         if scores.safety < self.min_safety_score {

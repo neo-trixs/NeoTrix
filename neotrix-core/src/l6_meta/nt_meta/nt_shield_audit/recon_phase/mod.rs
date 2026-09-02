@@ -205,7 +205,7 @@ impl ReconPhase {
     /// SelfTest for C1 promotion
     pub fn self_test() -> Result<(), String> {
         let temp_dir = tempfile::tempdir().map_err(|e| e.to_string())?;
-        let phase = ReconPhase::new(temp_dir.path().to_path_buf());
+        let _phase = ReconPhase::new(temp_dir.path().to_path_buf());
         
         // Test architecture summary serialization
         let summary = ArchitectureSummary {

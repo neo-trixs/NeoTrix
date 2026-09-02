@@ -4,7 +4,7 @@
 //! 支持 FFmpeg 操作、时间线编辑
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 拼接定义
@@ -238,7 +238,7 @@ impl VideoStitcher {
     pub fn add_transition(
         &self,
         clip_a: &VideoClip,
-        clip_b: &VideoClip,
+        _clip_b: &VideoClip,
         transition: TransitionType,
         duration: f32,
     ) -> String {

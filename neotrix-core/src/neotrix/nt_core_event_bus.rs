@@ -107,7 +107,7 @@ impl EventBus {
                     use std::io::Write;
                     // 隐私脱敏挂载点: 落盘前净化 secrets/PII (R-P42 强化 nt_shield 节点)。
                     // 用 JSON 感知脱敏 — 只替换字符串值, 不破坏数值/结构 (R-P86 类教训)。
-                    let redacted = crate::neotrix::nt_shield::redaction::redact_json_line(&line);
+                    let redacted = crate::l3_embodiment::nt_shield::nt_shield::redaction::redact_json_line(&line);
                     let _ = writeln!(file, "{}", redacted);
                 }
             }
@@ -314,7 +314,7 @@ pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandl
                         crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                             log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                         }
-                            crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                            crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
                             log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                         }
                         _ => {
@@ -384,7 +384,7 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
                             crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                                 log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                             }
-                        crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                        crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::l5_cognition::nt_mind::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
                                 log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                             }
                             _ => {

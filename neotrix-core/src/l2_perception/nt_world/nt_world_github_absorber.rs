@@ -8,9 +8,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-// use crate::l2_perception::nt_memory_kb_bridge::{
-//     KnowledgeBase, NodeType, RelationType,
-// };
+use crate::core::nt_core_kb_types::{NodeType, RelationType};
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
 // ── HTTP Client ──
 

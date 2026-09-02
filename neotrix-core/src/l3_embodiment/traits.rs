@@ -4,7 +4,6 @@
 //! 吸收来源: PentestCode (持久状态), Blender-MCP/Unity-MCP (3D 工具)
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// 安全事件
 #[derive(Debug, Clone, Serialize, Deserialize)]

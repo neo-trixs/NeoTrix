@@ -62,7 +62,7 @@ impl SemanticRouter {
             }
         }
 
-        best_map.map(|(rule, score)| {
+        best_match.map(|(rule, score)| {
             let provider = rule.provider_preference.first()
                 .cloned()
                 .unwrap_or_default();

@@ -64,5 +64,17 @@ pub mod verifier_agent;
 // 分层质量检查
 pub mod layered_qa;
 
+// 空值标准化器 (LLM 输出空值处理)
+pub mod null_normalizer;
+
+// 视频质量评分器 (自动化质量评分 + 时序一致性)
+pub mod video_quality_scorer;
+
+// 内容审核 (提示词过滤 + 输出分析 + 人工审核路由)
+pub mod content_moderation;
+
+// 视频审计追踪 (合规日志 + 溯源追踪)
+pub mod video_audit_trail;
+
 // 向后兼容别名
 pub use quality_control::QualityGate;

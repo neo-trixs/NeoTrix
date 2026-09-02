@@ -4,7 +4,7 @@
 //! 确保所有模块之间的协同工作
 
 use serde::{Serialize, Deserialize};
-use crate::l2_perception::nt_core_self::dynamic_params::{DynamicParams, ScalingRating};
+use crate::core::nt_core_self::dynamic_params::{DynamicParams, ScalingRating};
 use crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentData;
 
 // ============================================================================
@@ -142,7 +142,7 @@ impl CrossModuleAudit {
         
         // 验证动态参数与等级对应关系
         for (i, params) in dynamic_params.iter().enumerate() {
-            let expected_rating = params.to_scaling_rating();
+            let expected_rating: ScalingRating = params.to_scaling_rating();
             if i < dynamic_ratings.len() {
                 let actual_rating = dynamic_ratings[i];
                 if expected_rating != actual_rating {
@@ -208,7 +208,7 @@ impl CrossModuleAudit {
         // 检查段落顺序合理性
         if segments.len() >= 2 {
             let first = &segments[0];
-            let last = &segments[segments.len() - 1];
+            let _last = &segments[segments.len() - 1];
             
             if first.r#type == crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentType::Climax {
                 passed = false;
@@ -232,7 +232,7 @@ impl CrossModuleAudit {
         let mut passed = true;
         
         for params in dynamic_params {
-            if !params.validate() {
+            if !DynamicParams::validate(params) {
                 passed = false;
                 details.push(CrossModuleDetail {
                     dimension: "参数边界".to_string(),

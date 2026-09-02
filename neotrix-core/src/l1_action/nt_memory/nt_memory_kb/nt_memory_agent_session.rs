@@ -129,7 +129,7 @@ impl AgentSessionManager {
         map_entries(stmt, params![session_id, pattern, limit as i64])
     }
 
-    pub fn recall_similar(conn: &Connection, agent_id: &str, query_embedding: &[f32], limit: usize) -> rusqlite::Result<Vec<(AgentSessionEntry, f64)>> {
+    pub fn recall_similar(conn: &Connection, agent_id: &str, _query_embedding: &[f32], limit: usize) -> rusqlite::Result<Vec<(AgentSessionEntry, f64)>> {
         let mut stmt = conn.prepare(
             "SELECT id, agent_id, session_id, tier, content, metadata, created_at, access_count, superseded, superseded_by, embedding
              FROM agent_memory_entries
@@ -151,7 +151,7 @@ impl AgentSessionManager {
         })?;
         let mut scored: Vec<(AgentSessionEntry, f64)> = Vec::new();
         for r in rows {
-            if let Ok((entry, Some(emb))) = r {
+            if let Ok((_entry, Some(_emb))) = r {
 //                 scored.push((entry, cosine_similarity(query_embedding, &emb)));
             }
         }

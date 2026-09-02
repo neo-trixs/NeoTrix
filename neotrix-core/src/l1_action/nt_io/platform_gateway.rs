@@ -219,9 +219,9 @@ impl PlatformGateway {
     pub fn send_request(
         &mut self,
         platform_id: &str,
-        request: PlatformRequest,
+        _request: PlatformRequest,
     ) -> PlatformResponse {
-        let platform = match self.platforms.get(platform_id) {
+        let _platform = match self.platforms.get(platform_id) {
             Some(p) => p,
             None => {
                 return PlatformResponse {
@@ -255,10 +255,11 @@ impl PlatformGateway {
         task_type: &str,
         request: &PlatformRequest,
     ) -> PlatformResponse {
-        let platforms = self.get_available_platforms(task_type);
-        
-        for platform in platforms {
-            let response = self.send_request(&platform.id, request.clone());
+        let platform_ids: Vec<String> = self.get_available_platforms(task_type)
+            .iter().map(|p| p.id.clone()).collect();
+
+        for pid in &platform_ids {
+            let response = self.send_request(pid, request.clone());
             if response.success {
                 return response;
             }

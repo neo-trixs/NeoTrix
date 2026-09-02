@@ -4,7 +4,7 @@
 //! 将剧本转换为结构化分镜脚本
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 分镜定义
@@ -287,7 +287,7 @@ impl StoryboardExtractor {
     
     /// 生成镜头运动规划
     pub fn plan_camera_movements(&self, script: &mut StoryboardScript) {
-        for (i, shot) in script.shots.iter_mut().enumerate() {
+        for (_i, shot) in script.shots.iter_mut().enumerate() {
             // 根据景别和情绪自动规划镜头运动
             if shot.camera_movement == CameraMovement::Static {
                 shot.camera_movement = match shot.shot_size {

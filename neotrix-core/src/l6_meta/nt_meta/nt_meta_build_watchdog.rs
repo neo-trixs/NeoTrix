@@ -193,7 +193,7 @@ impl BuildWatchdog {
         let cache_status = self.check_cache();
 
         // 计算整体健康度
-        let mut health_score = 1.0;
+        let mut health_score: f32 = 1.0;
         if !lib_compilation.success {
             health_score -= 0.4;
         }
@@ -210,7 +210,7 @@ impl BuildWatchdog {
         let overall_health = health_score.max(0.0);
 
         // 生成告警
-        if health_score < self.config.alert_threshold {
+        if (health_score as f64) < self.config.alert_threshold {
             self.generate_alert("build_health", AlertSeverity::Warning,
                 &format!("Build health score: {:.2}", health_score));
         }
@@ -233,7 +233,7 @@ impl BuildWatchdog {
             test_compilation,
             test_execution,
             cache_status,
-            overall_health,
+            overall_health: overall_health as f64,
         };
 
         // 记录历史
@@ -253,7 +253,7 @@ impl BuildWatchdog {
     }
 
     /// 检查编译
-    fn check_compilation(&self, target: &str) -> CompilationResult {
+    fn check_compilation(&self, _target: &str) -> CompilationResult {
         // 简化版: 模拟编译检查
         CompilationResult {
             success: true,

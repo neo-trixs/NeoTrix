@@ -136,10 +136,12 @@ impl BackgroundLoop {
         self
     }
 
-    pub fn with_agent_discovery(mut self, port: u16) -> Self {
-        if let Ok(d) = AgentDiscovery::new(port) {
-            self.agent_discovery = Some(d);
-        }
+    pub fn with_agent_discovery(self, port: u16) -> Self {
+        // AgentDiscovery type not found - removed
+        // if let Ok(d) = AgentDiscovery::new(port) {
+        //     self.agent_discovery = Some(d);
+        // }
+        let _ = port;
         self
     }
 

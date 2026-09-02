@@ -116,7 +116,7 @@ impl RouterLearner {
     }
 }
 
-/// 全局 Router 学习引擎
+// 全局 Router 学习引擎
 lazy_static::lazy_static! {
     static ref GLOBAL_LEARNER: std::sync::Mutex<RouterLearner> =
         std::sync::Mutex::new(RouterLearner::new());

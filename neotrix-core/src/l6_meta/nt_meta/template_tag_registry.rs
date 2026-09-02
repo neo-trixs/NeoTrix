@@ -240,7 +240,7 @@ impl TemplateTagRegistry {
     }
     
     fn find_most_used_tags(&self, limit: usize) -> Vec<(String, u32)> {
-        let mut tags: Vec<(&TemplateTag)> = self.tags.values().collect();
+        let mut tags: Vec<&TemplateTag> = self.tags.values().collect();
         tags.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
         tags.into_iter()
             .take(limit)

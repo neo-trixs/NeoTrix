@@ -167,7 +167,7 @@ impl FaceConsistencyManager {
     pub fn fix_faces(
         &mut self,
         image_path: &str,
-        character_id: Option<&str>,
+        _character_id: Option<&str>,
     ) -> FaceFixResult {
         // TODO: 实际调用面部修复逻辑
         let result = FaceFixResult {

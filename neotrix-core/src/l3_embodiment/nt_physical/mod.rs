@@ -348,5 +348,14 @@ pub mod video_post_processor;
 // LUT 色彩分级
 pub mod lut_color_grading;
 
+// 健康检查器
+pub mod health_checker;
+
+// 帧采样器 (视频帧采样 + 去重)
+pub mod frame_sampler;
+
+// C2PA 溯源验证 (水印嵌入 + 元数据嵌入 + 真实性验证)
+pub mod c2pa_provenance;
+
 // 向后兼容别名
 pub use video_post_processor::VideoTemporalStabilizer;

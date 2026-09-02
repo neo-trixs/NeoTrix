@@ -235,7 +235,7 @@ impl MemoryConsolidation {
     /// 执行整合
     pub fn consolidate(&mut self) -> ConsolidationResult {
         let mut items_consolidated = 0;
-        let mut items_forgotten = 0;
+        let items_forgotten = 0;
         let mut items_compressed = 0;
         let mut new_long_term_items = Vec::new();
         let mut compressed_summaries = Vec::new();

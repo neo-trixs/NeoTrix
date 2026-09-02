@@ -8,7 +8,6 @@
 //! - 缓存穿透保护
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
@@ -28,8 +27,8 @@ pub struct CacheConfig {
     pub l2_enabled: bool,
     pub l2_path: Option<String>,
     pub l2_max_size_mb: usize,
-    pub穿透保护: bool,
-    pub预热_enabled: bool,
+    pub penetration_protection: bool,
+    pub warmup_enabled: bool,
 }
 
 impl Default for CacheConfig {
@@ -40,14 +39,14 @@ impl Default for CacheConfig {
             l2_enabled: false,
             l2_path: None,
             l2_max_size_mb: 100,
-            穿透保护: true,
-            预热_enabled: false,
+            penetration_protection: true,
+            warmup_enabled: false,
         }
     }
 }
 
 /// 缓存条目
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CacheEntry {
     pub key: String,
     pub value: serde_json::Value,
@@ -195,7 +194,7 @@ impl CacheLayer {
         }
 
         // 穿透保护
-        if self.config.穿透保护 {
+        if self.config.penetration_protection {
             // TODO: 实现布隆过滤器
         }
 

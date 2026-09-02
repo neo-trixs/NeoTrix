@@ -11,7 +11,7 @@ use std::collections::HashMap;
 // ============================================================================
 
 /// 资源类型
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ResourceType {
     /// Token
     Token,

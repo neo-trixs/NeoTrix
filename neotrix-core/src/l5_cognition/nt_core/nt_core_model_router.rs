@@ -176,7 +176,7 @@ impl ModelRouter {
                 provider: best_model.provider.clone(),
                 estimated_cost: self.estimate_cost(best_model, requirements),
                 estimated_latency: best_model.avg_latency_ms,
-                confidence: score,
+                confidence: *score,
                 reason: format!("Best match for task type: {}", task_type),
             };
 

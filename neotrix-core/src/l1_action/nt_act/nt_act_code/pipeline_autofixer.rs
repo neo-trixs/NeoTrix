@@ -5,10 +5,10 @@
 //!
 //! 零 LLM 依赖: 所有决策基于规则 + 历史模式 + 确定性模板
 
-use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter};
+use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter, ActionPlan};
 use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
 use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
-// use crate::l1_action::nt_act::nt_l1_shared_types::{ActionPlan, EvolutionLoopProvider};
+use crate::l5_cognition::nt_mind::nt_mind_self_diagnose::EvolutionLoopProvider;
 
 
 
@@ -61,22 +61,22 @@ impl PipelineAutoFixer {
 
         // 2. 对高分项尝试代码生成
         for item in pq.as_slice() {
-            if matches!(item.action, ActionPlan::HumanDecision { .. } | ActionPlan::NoAction { .. }) {
+            if matches!(item.plan, ActionPlan::HumanDecision { .. } | ActionPlan::NoAction { .. }) {
                 result.human_needed += 1;
                 continue;
             }
 
             // 跳过低分项
-            if item.composite_score < 0.3 {
+            if item.score < 0.3 {
                 continue;
             }
 
             // 3. 生成代码
-            let file = item.underlying_issue.file.as_deref().unwrap_or("unknown");
+            let file = item.issue.file.as_deref().unwrap_or("unknown");
             let context = std::fs::read_to_string(file).unwrap_or_default();
 
             let req = CodeGenRequest {
-                plan: item.action.clone(),
+                plan: item.plan.clone(),
                 file: file.to_string(),
                 context,
             };
@@ -92,7 +92,7 @@ impl PipelineAutoFixer {
             result.auto_generated += 1;
 
             // 4. 安全应用
-            let issue_type_str = format!("{:?}", item.underlying_issue.issue_type);
+            let issue_type_str = format!("{:?}", item.issue.issue_type);
             let apply_result = self.applier.safe_write(
                 &gen_result.file,
                 &gen_result.new_content,

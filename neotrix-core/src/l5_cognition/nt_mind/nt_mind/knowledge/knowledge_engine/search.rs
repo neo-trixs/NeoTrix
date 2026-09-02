@@ -158,7 +158,7 @@ impl LiteratureSearcher {
 
 impl KnowledgeEngine {
     pub fn search(&mut self, query: &str, limit: usize) -> Vec<(&KnowledgeEntry, f64)> {
-        let qv = self.embedder.embed(query);
+        let _qv = self.embedder.embed(query);
         let q_lower = query.to_lowercase();
         let q_chars: Vec<char> = q_lower.chars().collect();
 
@@ -166,7 +166,7 @@ impl KnowledgeEngine {
             .map(|e| {
                 let mut score = 0.0f64;
 
-                if let Some(ev) = &e.embedding {
+                if let Some(_ev) = &e.embedding {
 //                     score += cosine_similarity(&qv, ev) * 0.4;
                 }
 

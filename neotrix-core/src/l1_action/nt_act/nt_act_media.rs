@@ -8,7 +8,7 @@
 //! 排期引擎: 按最佳时间自动安排发布
 //! 分析引擎: 跨平台互动数据聚合
 
-use std::collections::HashMap;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
@@ -162,7 +162,7 @@ impl L1Capability for LinkedInProvider {
 }
 
 impl ContentProvider for LinkedInProvider {
-    fn publish(&self, post: &Post) -> Result<String, CapabilityError> {
+    fn publish(&self, _post: &Post) -> Result<String, CapabilityError> {
         let post_id = format!("li_{}", uuid::Uuid::new_v4());
         // 实际实现: POST linkedin.com/v2/ugcPosts
         Ok(post_id)
@@ -214,7 +214,7 @@ impl L1Capability for InstagramProvider {
 }
 
 impl ContentProvider for InstagramProvider {
-    fn publish(&self, post: &Post) -> Result<String, CapabilityError> {
+    fn publish(&self, _post: &Post) -> Result<String, CapabilityError> {
         let post_id = format!("ig_{}", uuid::Uuid::new_v4());
         Ok(post_id)
     }
@@ -286,7 +286,7 @@ impl ContentRouter {
         Self { registry }
     }
 
-    pub fn route(&self, platform: Platform) -> Option<&dyn ContentProvider> {
+    pub fn route(&self, _platform: Platform) -> Option<&dyn ContentProvider> {
         self.registry.optimal()
     }
 

@@ -178,12 +178,12 @@ impl KnowledgeGraph {
         let mut distances: HashMap<String, f64> = HashMap::new();
         let mut previous: HashMap<String, String> = HashMap::new();
         let mut visited = HashSet::new();
-        let mut queue = Vec::new();
+        let mut queue = std::collections::VecDeque::new();
 
         distances.insert(start.to_string(), 0.0);
-        queue.push((0.0, start.to_string()));
+        queue.push_back((0.0, start.to_string()));
 
-        while let Some((dist, current)) = queue.pop_first() {
+        while let Some((dist, current)) = queue.pop_front() {
             if current == end {
                 // 重建路径
                 let mut path = vec![end.to_string()];
@@ -207,7 +207,7 @@ impl KnowledgeGraph {
                     if new_dist < *distances.get(&edge.target).unwrap_or(&f64::INFINITY) {
                         distances.insert(edge.target.clone(), new_dist);
                         previous.insert(edge.target.clone(), current.clone());
-                        queue.push((new_dist, edge.target.clone()));
+                        queue.push_back((new_dist, edge.target.clone()));
                     }
                 }
             }

@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
-// use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, AgentId, AllocationStrategy};
+use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, AgentId, AllocationStrategy};
 use crate::l1_action::nt_io::nt_io_provider::context_budget::estimate_tokens;
 
 pub trait ReasoningProvider: Send + Sync {
     fn reason(&mut self, task: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
 }
-// use crate::l5_cognition::nt_core::nt_core_parallel::executor::{ParallelExecutor, OptimalTaskAllocator};
+use crate::l5_cognition::nt_core::nt_core_parallel::executor::{ParallelExecutor, OptimalTaskAllocator};
 
 #[derive(Debug, Clone)]
 pub struct AgentResult {
@@ -62,8 +62,14 @@ impl MultiAgentCoordinator {
         }
 
         let agent_refs: Vec<_> = self.agents.iter().map(|a| (a.id.clone(), a.capability.clone(), a.throughput)).collect();
-        let agents: Vec<_> = agent_refs.iter().map(|(id, _, _tp)| {
-//             crate::l5_cognition::nt_core::nt_core_parallel::types::Agent::new(id.clone())
+        let agents: Vec<_> = agent_refs.iter().map(|(id, cap, tp)| {
+            crate::l5_cognition::nt_core::nt_core_parallel::types::Agent {
+                id: id.clone(),
+                busy: false,
+                current_task: None,
+                capability: cap.clone(),
+                throughput: *tp,
+            }
         }).collect();
 
         let allocation = self.allocator.allocate(tasks, &agents);
@@ -139,45 +145,8 @@ impl MultiAgentCoordinator {
         if results.is_empty() || keep == 0 {
             return Vec::new();
         }
-        // agent id → 能力特征映射
-        let capability_of: std::collections::HashMap<String, Vec<f64>> = self
-            .agents
-            .iter()
-            .map(|a| (a.id.clone(), a.capability.clone()))
-            .collect();
-
-        let max_dim = self
-            .agents
-            .iter()
-            .map(|a| a.capability.len())
-            .max()
-            .unwrap_or(1)
-            .max(1);
-
-//         let candidates: Vec<crate::l5_cognition::nt_core::nt_core_parallel::Candidate> = results
-            .iter()
-            .map(|r| {
-                let feat = capability_of.get(&r.agent_id).cloned().unwrap_or_default();
-//                 crate::l5_cognition::nt_core::nt_core_parallel::Candidate::new(
-                    &format!("{}#{}", r.agent_id, r.task_index),
-                    if r.success { 1.0 } else { 0.0 },
-                    feat,
-                )
-            })
-            .collect();
-
-//         let selector = crate::l5_cognition::nt_core::nt_core_parallel::DppSelector::new(max_dim);
-        let winners = selector.merge_winners(&candidates, keep);
-        let winner_ids: std::collections::HashSet<String> =
-            winners.iter().map(|w| w.id.clone()).collect();
-
-        results
-            .iter()
-            .filter(|r| {
-                winner_ids.contains(&format!("{}#{}", r.agent_id, r.task_index))
-            })
-            .cloned()
-            .collect()
+        // NOTE: DppSelector/Candidate types not yet defined — return first `keep` results as fallback
+        results.iter().take(keep).cloned().collect()
     }
 }
 

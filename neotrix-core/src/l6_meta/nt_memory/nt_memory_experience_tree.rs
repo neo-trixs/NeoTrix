@@ -64,6 +64,18 @@ pub enum ExperienceType {
     Cycle,
 }
 
+impl std::fmt::Display for ExperienceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Pattern => write!(f, "pattern"),
+            Self::Rule => write!(f, "rule"),
+            Self::Defect => write!(f, "defect"),
+            Self::Insight => write!(f, "insight"),
+            Self::Cycle => write!(f, "cycle"),
+        }
+    }
+}
+
 /// 经验反馈
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExperienceFeedback {

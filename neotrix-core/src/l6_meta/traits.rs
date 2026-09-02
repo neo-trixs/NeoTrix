@@ -4,7 +4,6 @@
 //! 吸收来源: PentestCode (持久状态), Git Knowledge Loop (知识版本控制)
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// 元认知事件
 #[derive(Debug, Clone, Serialize, Deserialize)]

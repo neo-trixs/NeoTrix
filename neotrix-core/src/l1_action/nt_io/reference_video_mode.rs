@@ -211,7 +211,7 @@ impl ReferenceVideoMode {
     pub fn select_and_compose(
         &self,
         generation_records: &[GenerationRecord],
-        voice_config: &serde_json::Value,
+        _voice_config: &serde_json::Value,
     ) -> Result<serde_json::Value, String> {
         // TODO: 实际调用选片配音剪辑逻辑
         let result = serde_json::json!({

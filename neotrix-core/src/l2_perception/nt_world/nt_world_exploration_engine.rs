@@ -12,8 +12,9 @@
 use std::collections::HashMap;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
-// use crate::l2_perception::nt_memory_kb_bridge::{KnowledgeBase, NodeType};
+use crate::core::nt_core_kb_types::NodeType;
 
 /// 探索数据源类型
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

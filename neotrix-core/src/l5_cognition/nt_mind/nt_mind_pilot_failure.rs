@@ -7,7 +7,6 @@
 //! - goal loop 集成
 //! - attention routing 集成
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// PILOT 失败模式检测器

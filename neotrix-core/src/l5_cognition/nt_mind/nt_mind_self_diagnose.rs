@@ -315,15 +315,13 @@ impl SelfDiagnose {
             }
             IssueType::TodoLeftovers => {
                 ActionPlan::HumanDecision {
-                    issue_type: IssueType::TodoLeftovers,
-                    file: None,
                     reason: format!("{} 个 TODO 需要人工判定哪些已完成", TODO_LEFTOVERS_THRESHOLD),
+                    options: vec!["标记为已完成".into(), "保留在 TODO.md".into(), "删除".into()],
                 }
             }
             _ => ActionPlan::HumanDecision {
-                issue_type: issue.issue_type,
-                file: issue.file.clone(),
                 reason: "无法自动处理,需要人工决策".into(),
+                options: vec!["手动修复".into(), "跳过".into()],
             },
         }
     }
@@ -394,6 +392,9 @@ impl ActionExecutor {
     /// 执行一个 ActionPlan,返回修复结果描述
     pub fn execute(plan: &ActionPlan) -> Result<String, String> {
         match plan {
+            ActionPlan::AutoFix(msg) => Ok(format!("AutoFix: {}", msg)),
+            ActionPlan::ManualReview(msg) => Ok(format!("ManualReview: {}", msg)),
+            ActionPlan::Skip(msg) => Ok(format!("Skipped: {}", msg)),
             ActionPlan::AddTestStub { file } => AutoFixer::add_test_stub(file),
             ActionPlan::RunCargoFix => AutoFixer::cargo_fix(),
             ActionPlan::RemoveTodo { file } => {
@@ -585,9 +586,8 @@ mod tests {
     #[test]
     fn test_action_executor_human_decision_returns_err() {
         let plan = ActionPlan::HumanDecision {
-            issue_type: IssueType::TodoLeftovers,
-            file: None,
             reason: "test".into(),
+            options: vec!["option1".into()],
         };
         let result = ActionExecutor::execute(&plan);
         assert!(result.is_err());
@@ -667,9 +667,8 @@ mod tests {
     fn test_execute_with_breaker_stops_on_persistent_failure() {
         // HumanDecision 恒为 Err → 连续无进展 → 断路器跳闸并返回明确错误
         let plan = ActionPlan::HumanDecision {
-            issue_type: IssueType::TodoLeftovers,
-            file: None,
             reason: "needs human".into(),
+            options: vec!["fix".into(), "skip".into()],
         };
         let mut breaker = RepairCircuitBreaker::new(3);
         for _ in 0..3 {

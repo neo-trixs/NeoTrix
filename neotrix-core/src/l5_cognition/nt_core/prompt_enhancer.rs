@@ -4,7 +4,7 @@
 //! 支持风格注入、负面提示词生成、质量标签
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 提示词定义
@@ -100,16 +100,16 @@ impl PromptEnhancer {
                         name: "电影感".to_string(),
                         positive_prefix: "cinematic lighting, film grain, ".to_string(),
                         negative_prefix: "cartoon, anime, ".to_string(),
-                        quality_tags: vec!["masterpiece", "best quality", "highly detailed".to_string()],
-                        style_tags: vec!["cinematic", "film".to_string()],
+                        quality_tags: vec!["masterpiece".to_string(), "best quality".to_string(), "highly detailed".to_string()],
+                        style_tags: vec!["cinematic".to_string(), "film".to_string()],
                     },
                     StylePreset {
                         id: "anime".to_string(),
                         name: "动漫风格".to_string(),
                         positive_prefix: "anime style, ".to_string(),
                         negative_prefix: "realistic, photo, ".to_string(),
-                        quality_tags: vec!["masterpiece", "best quality".to_string()],
-                        style_tags: vec!["anime", "manga".to_string()],
+                        quality_tags: vec!["masterpiece".to_string(), "best quality".to_string()],
+                        style_tags: vec!["anime".to_string(), "manga".to_string()],
                     },
                 ],
                 quality_tags: vec![

@@ -200,8 +200,8 @@ impl VisualConsistencyManager {
     pub fn fix_consistency(
         &mut self,
         image_path: &str,
-        element_id: Option<&str>,
-        element_type: VisualElementType,
+        _element_id: Option<&str>,
+        _element_type: VisualElementType,
     ) -> ConsistencyFixResult {
         // TODO: 实际调用修复逻辑
         let result = ConsistencyFixResult {

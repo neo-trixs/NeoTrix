@@ -58,6 +58,12 @@ pub mod prompt_enhancer;
 // 风格协调器
 pub mod style_harmonizer;
 
+// 提示词缓存 (提示词缓存 + 去重)
+pub mod prompt_cache;
+
+// 视频提示词缓存 (语义相似度缓存 + 版本管理)
+pub mod video_prompt_cache;
+
 // 向后兼容别名
 pub use visual_consistency::FaceConsistencyManager;
 pub use narrative_structuring::StoryboardExtractor;

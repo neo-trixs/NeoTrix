@@ -192,11 +192,14 @@ impl ContextManager {
 
     /// 添加上下文项
     pub fn add_item(&mut self, window_id: &str, item: ContextItem) -> Result<(), String> {
-        let window = self.windows.get_mut(window_id)
-            .ok_or_else(|| format!("Window {} not found", window_id))?;
+        // Check if compression is needed (immutable borrow, scoped)
+        let need_compress = {
+            let window = self.windows.get(window_id)
+                .ok_or_else(|| format!("Window {} not found", window_id))?;
+            window.current_size + item.token_count > window.max_size
+        };
 
-        // 检查是否需要压缩
-        if window.current_size + item.token_count > window.max_size {
+        if need_compress {
             if self.config.enable_auto_compression {
                 self.compress_window(window_id)?;
             } else {
@@ -204,13 +207,15 @@ impl ContextManager {
             }
         }
 
-        window.items.push(item.clone());
+        // Now push the item (no outstanding borrows on self.windows)
+        self.priority_queue.push(item.clone());
+        self.priority_queue.sort_by(|a, b| b.priority.cmp(&a.priority));
+
+        let window = self.windows.get_mut(window_id)
+            .ok_or_else(|| format!("Window {} not found", window_id))?;
+        window.items.push(item);
         window.current_size += item.token_count;
         window.last_accessed = chrono::Utc::now();
-
-        // 更新优先级队列
-        self.priority_queue.push(item);
-        self.priority_queue.sort_by(|a, b| b.priority.cmp(&a.priority));
 
         self.stats.total_items += 1;
         Ok(())
@@ -263,7 +268,7 @@ impl ContextManager {
 
     /// 协调多文件编辑
     pub fn coordinate_multi_file_edit(&self, files: Vec<FileContext>, edit_plan: Vec<EditOperation>) -> MultiFileCoordination {
-        let mut dependencies = Vec::new();
+        let dependencies = Vec::new();
         let mut conflicts = Vec::new();
 
         // 分析依赖关系

@@ -1,5 +1,6 @@
 use super::*;
 use crate::core::nt_core_gate::{GateDecision, ToolRegistry};
+use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -17,6 +18,8 @@ mod handlers_guard;
 mod handlers_absorption;
 #[path = "handlers_daily_intel.rs"]
 mod handlers_daily_intel;
+#[path = "handlers_game.rs"]
+mod handlers_game;
 
 // ── 常驻定时器间隔 (D5: 魔法常量命名化, 保留原值语义) ──
 // 独立小周期定时器不纳入 BackgroundConfig (避免配置面膨胀), 以具名常量固化。
@@ -43,6 +46,7 @@ const LOOP_READINESS_INTERVAL_SECS: u64 = 300;
 const MARKET_RE_EVAL_INTERVAL_SECS: u64 = 300;
 const TELEMETRY_INTERVAL_SECS: u64 = 60;
 const SYSTEM_HEALTH_HEAL_INTERVAL_SECS: u64 = 300; // 5min NT-REPAIR 自愈巡检 (Track 3: D22/D26/D27/D28)
+const GAME_TRAINING_INTERVAL_SECS: u64 = 300; // 5min NT-PLAY 自主进化训练
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
@@ -567,6 +571,7 @@ impl BackgroundLoop {
 
         let this = Arc::new(Mutex::new(BackgroundLoopHandle {
             brain: self.brain.clone(),
+            bbrain: self.bbrain.take().map(|b| std::sync::Arc::new(tokio::sync::RwLock::new(b))),
             cleanup_engine,
             goal_loop: std::mem::take(&mut self.goal_loop),
             awareness: self.awareness.take(),
@@ -583,7 +588,7 @@ impl BackgroundLoop {
             always_on: std::mem::take(&mut self.always_on),
             plugin_registry: std::mem::take(&mut self.plugin_registry),
             config: self.config.clone(),
-            agent_discovery: self.agent_discovery.take(),
+            // agent_discovery: self.agent_discovery.take(),
             panorama: self.panorama.take(),
             nt_world_model: self.nt_world_model.take(),
             scheduler: self.scheduler.take(),
@@ -602,7 +607,7 @@ impl BackgroundLoop {
                 // Experience Tree — 会话结束自动触发五阶段吸收 (cycle 1053)
                 hooks.register(
                     HookEvent::SessionEnd,
-                    Box::new(crate::l5_cognition::nt_mind::experience_tree::SessionEndHook::new(kb.clone())),
+                    Box::new(crate::l5_cognition::nt_mind::nt_mind::experience_tree::SessionEndHook::new(kb.clone())),
                 );
                 SkillEngine::new(PathBuf::from(
                     &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
@@ -635,7 +640,7 @@ impl BackgroundLoop {
             fep_iit_bridge: self.fep_iit_bridge.take(),
             cognitive_load: self.cognitive_load.take(),
             volition: self.volition.take(),
-            bbrain: std::mem::take(&mut self.bbrain),
+            // bbrain already set above (line 571)
             cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
             second_brain: {
                 let mut sb = SecondBrain::new();
@@ -654,7 +659,7 @@ impl BackgroundLoop {
                 crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::DialogueAbsorbBridge::new(kb_ref)
             }),
             agent_executor: self.kb.clone().map(|kb_ref| {
-                crate::l5_cognition::nt_mind::ProductionAgentExecutor::new(kb_ref)
+                crate::l5_cognition::nt_mind::nt_mind::ProductionAgentExecutor::new(kb_ref)
             }),
             meta_shell: {
                 // P1: 启动时从 KB 恢复派单学习证据 — 派单统计跨会话存活。
@@ -677,7 +682,7 @@ impl BackgroundLoop {
             kb,
             nexus_weaver: {
                 let kb_ref = kb_for_nexus.clone().unwrap_or_else(|| Arc::new(KnowledgeBase::open(None).unwrap_or_else(|_| KnowledgeBase::open(None).unwrap())));
-                crate::l5_cognition::nt_mind::experience_tree::NexusWeaverScheduler::new(kb_ref)
+                crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler::new(kb_ref)
             },
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             absorption_in_progress: std::sync::atomic::AtomicBool::new(false),
@@ -784,7 +789,7 @@ impl BackgroundLoop {
         #[cfg(feature = "stealth-net")]
         spawn_handler!(cfg.nt_world_sense_interval_secs, "proxy_heartbeat", |h| h.handle_proxy_heartbeat().await);
         spawn_handler!(SKILL_SCAN_INTERVAL_SECS, |h| h.handle_skill_scan().await);
-        spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
+        // spawn_handler!(SESSION_ROUTER_FLUSH_INTERVAL_SECS, "session_router", |h| h.handle_session_router_flush().await);
         // ── Nexus-Weaver 跨会话模式挖掘 (cycle 1053): 每 30min 扫描 experience 命名空间
         //    识别跨会话模式并触发 nexus-weaver 调度。
         spawn_handler!(NEXUS_WEAVER_INTERVAL_SECS, "nexus_weaver", |h| h.handle_nexus_weaver().await);
@@ -855,6 +860,8 @@ impl BackgroundLoop {
             const WISDOM_TICK_INTERVAL_SECS: u64 = 300; // 5 min
             spawn_handler!(WISDOM_TICK_INTERVAL_SECS, "wisdom", |h| h.handle_wisdom_tick().await);
         }
+        // NT-PLAY 自主进化训练 — 意识体通过自我对弈持续进化
+        spawn_handler!(GAME_TRAINING_INTERVAL_SECS, "game_training", |h| h.handle_game_training().await);
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {
@@ -899,6 +906,7 @@ impl BackgroundLoop {
 /// Lightweight inner state for concurrent handler access.
 pub struct BackgroundLoopHandle {
     brain: Arc<RwLock<SelfIteratingBrain>>,
+    bbrain: Option<std::sync::Arc<tokio::sync::RwLock<BMonitor>>>,
     cleanup_engine: Option<CleanupEngine>,
     config: BackgroundConfig,
     goal_loop: GoalLoop,
@@ -938,7 +946,7 @@ pub struct BackgroundLoopHandle {
     proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
     consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
-    fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
+    fep_iit_bridge: Option<()>,
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
     volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
@@ -954,12 +962,12 @@ pub struct BackgroundLoopHandle {
     dialogue_bridge: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::DialogueAbsorbBridge>,
     /// 派单执行桥 (P0) — 把 MetaAgentShell 派单结果接到真实子系统,
     /// 让星系派单从仪式变控制面。researcher→搜索, explorer→检索, 等。
-    agent_executor: Option<crate::l5_cognition::nt_mind::ProductionAgentExecutor>,
+    agent_executor: Option<crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::ProductionAgentExecutor>,
     /// 元认知 agent 外壳 — 对话事件刺激注意力域后按路由跑内核 cycle。
     meta_shell: Option<crate::l5_cognition::nt_mind::nt_mind::MetaAgentShell>,
     kb: Option<Arc<KnowledgeBase>>,
     /// 跨会话模式挖掘 (nexus-weaver) — 定期扫描 experience 命名空间识别跨会话模式。
-    nexus_weaver: crate::l5_cognition::nt_mind::experience_tree::NexusWeaverScheduler,
+    nexus_weaver: crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler,
     emotion_restored: std::sync::atomic::AtomicBool,
     /// pending-absorb 自动吸收重入标志 (handlers_absorption.rs)。
     absorption_in_progress: std::sync::atomic::AtomicBool,

@@ -5,6 +5,7 @@ use crate::cli::commands::bench_cmds::BenchmarkCmd;
 use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd, McpCmd};
 use crate::cli::commands::brain_cmds::E8Cmd;
 use crate::cli::commands::consciousness_cmds::ConsciousnessCmd;
+use crate::cli::commands::game_cmds::GameCmd;
 use crate::cli::commands::cortex_cmds::CortexCmd;
 use crate::cli::commands::core_cmds::{ClearCmd, CompletionsCmd, ExitCmd, HelpCmd, StatsCmd, VersionCmd, ConfigCmd, CatalogCmd};
 use crate::cli::commands::cost_cmds::CostCmd;
@@ -60,6 +61,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(BenchmarkCmd));
     reg.register(Box::new(ConsciousnessCmd));
     reg.register(Box::new(CortexCmd));
+    reg.register(Box::new(GameCmd));
 
     // E8 (diagnostic, kept as System)
     reg.register(Box::new(E8Cmd));

@@ -6,10 +6,9 @@
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, NodeLayer,
+    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Negotiation Strategy Types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -136,6 +135,19 @@ pub struct NegotiationEngine {
     pub competitor_data: Option<CompetitorData>,
 }
 
+impl Default for NegotiationEngine {
+    fn default() -> Self {
+        Self {
+            strategy: NegotiationStrategy::Collaborative,
+            bottom_line: 0.0,
+            current_quote: 0.0,
+            round: 0,
+            concessions_made: Vec::new(),
+            competitor_data: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Concession {
     pub round: u32,
@@ -259,6 +271,7 @@ pub fn execute_quote_negotiation(
 ) -> (Vec<QuoteSheet>, Vec<NegotiationRecord>) {
     // Generate initial quote
     let cost_breakdown = calculate_cost_breakdown(&product_spec, &market_env);
+    let bottom_line = cost_breakdown.total * 1.10;
     let generator = QuoteGenerator {
         base_cost: cost_breakdown.total,
         margin_target: 0.20,
@@ -272,7 +285,7 @@ pub fn execute_quote_negotiation(
     // Simulate negotiation rounds
     let mut engine = NegotiationEngine {
         strategy: NegotiationStrategy::Collaborative,
-        bottom_line: cost_breakdown.total * 1.10,
+        bottom_line,
         current_quote: initial_quote.unit_price,
         round: 1,
         concessions_made: Vec::new(),

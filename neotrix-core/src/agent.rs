@@ -505,7 +505,7 @@ pub mod tool {
     }
 }
 
-pub type McpServer = tool::mcp::McpServerEntry;
+// McpServerEntry not defined — placeholder type alias removed
 
 pub use team::{AgentTeam, AgentRole, ProcessType};
 

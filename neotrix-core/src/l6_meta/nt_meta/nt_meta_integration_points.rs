@@ -8,7 +8,6 @@
 //! - Self-healing 集成
 //! - Performance monitoring 集成
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 集成点管理器

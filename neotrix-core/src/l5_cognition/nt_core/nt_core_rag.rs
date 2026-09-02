@@ -153,8 +153,9 @@ impl DocumentChunker {
         }
 
         // 更新 total_chunks
+        let total = chunks.len();
         for chunk in &mut chunks {
-            chunk.metadata.total_chunks = chunks.len();
+            chunk.metadata.total_chunks = total;
         }
 
         chunks
@@ -325,6 +326,7 @@ impl RAGPipeline {
             .collect();
 
         let chunks: Vec<DocumentChunk> = filtered_results.iter().map(|r| r.chunk.clone()).collect();
+        let len = chunks.len();
 
         // 压缩上下文
         let (context, citations) = if self.config.enable_compression {
@@ -341,8 +343,8 @@ impl RAGPipeline {
             (ctx, cits)
         };
 
-        let relevance_score = if !filtered_results.is_empty() {
-            filtered_results.iter().map(|r| r.score).sum::<f64>() / filtered_results.len() as f64
+        let relevance_score = if len > 0 {
+            filtered_results.iter().map(|r| r.score).sum::<f64>() / len as f64
         } else {
             0.0
         };

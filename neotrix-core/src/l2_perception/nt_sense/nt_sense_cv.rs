@@ -229,7 +229,7 @@ impl ComputerVisionPipeline {
     }
 
     /// 提取特征
-    pub fn extract_features(&self, image: &Image) -> Vec<Feature> {
+    pub fn extract_features(&self, _image: &Image) -> Vec<Feature> {
         vec![
             Feature {
                 name: "color_histogram".into(),

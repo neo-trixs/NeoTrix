@@ -1,5 +1,5 @@
 mod types;
-mod engine;
+pub mod engine;
 #[cfg(test)]
 mod tests;
 

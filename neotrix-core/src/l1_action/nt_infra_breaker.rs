@@ -165,7 +165,7 @@ impl BreakerRegistry {
     }
 }
 
-/// 全局断路器注册表
+// 全局断路器注册表
 lazy_static::lazy_static! {
     static ref GLOBAL_BREAKERS: Mutex<BreakerRegistry> = Mutex::new(BreakerRegistry::new());
 }

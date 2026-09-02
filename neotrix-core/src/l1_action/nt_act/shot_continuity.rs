@@ -4,7 +4,7 @@
 //! 确保镜头之间的视觉连贯性
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 镜头衔接定义
@@ -111,8 +111,8 @@ impl ShotContinuityChecker {
     /// 检查首尾帧链接
     pub fn check_first_last_frame_link(
         &mut self,
-        prev_shot_end_frame: &str,
-        current_shot_start_frame: &str,
+        _prev_shot_end_frame: &str,
+        _current_shot_start_frame: &str,
     ) -> ContinuityResult {
         // TODO: 实际调用图像相似度检查
         let score = 0.92; // 模拟检查结果

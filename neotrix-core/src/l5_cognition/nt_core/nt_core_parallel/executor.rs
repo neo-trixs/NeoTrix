@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-// use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, Agent, AgentId, AllocationStrategy, TodoTask};
+use crate::l5_cognition::nt_core::nt_core_parallel::types::{Task, TodoTask, Agent, AgentId, AllocationStrategy};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExecMode {
@@ -131,8 +131,8 @@ impl OptimalTaskAllocator {
     fn allocate_by_capability(&self, tasks: &[Task], agents: &[Agent]) -> Vec<(AgentId, Vec<usize>)> {
         let mut allocation: Vec<(AgentId, Vec<usize>)> = agents.iter().map(|a| (a.id.clone(), Vec::new())).collect();
         let mut scores: Vec<(usize, usize, f64)> = Vec::new();
-        for (ti, task) in tasks.iter().enumerate() {
-            for (ai, agent) in agents.iter().enumerate() {
+        for (_ti, _task) in tasks.iter().enumerate() {
+            for (_ai, agent) in agents.iter().enumerate() {
                 if agent.busy { continue; }
 //                 scores.push((ti, ai, Self::cosine_similarity(&task.input, &agent.capability)));
             }
@@ -172,7 +172,12 @@ impl OptimalTaskAllocator {
         let mut combined: Vec<(AgentId, Vec<usize>)> = agents.iter().map(|a| (a.id.clone(), Vec::new())).collect();
         for (ti, task) in tasks.iter().enumerate() {
             let best = agents.iter().enumerate().map(|(ai, agent)| {
-//                 let cap = Self::cosine_similarity(&task.input, &agent.capability) * self.capability_weight;
+                let cap = {
+                    let dot: f64 = task.input.iter().zip(agent.capability.iter()).map(|(x, y)| x * y).sum();
+                    let na: f64 = task.input.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+                    let nb: f64 = agent.capability.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+                    dot / (na * nb)
+                };
                 let load = (1.0 / (combined[ai].1.len() as f64 + 1.0)) * self.load_balance_weight;
                 let tp = agent.throughput * self.throughput_weight;
                 (ai, cap + load + tp)

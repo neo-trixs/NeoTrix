@@ -4,7 +4,6 @@
 //! 集成到 Registry/Router/Bridge 的调用链路中
 
 use std::collections::HashMap;
-use crate::l1_action::traits::{CapabilityHealth, CapabilityError};
 
 // ════════════════════════════════════════════════════════════════
 // 增强 Registry — 自动追踪 + 断路器 + Agent Card
@@ -123,7 +122,7 @@ impl EnhancedRouter {
         }
         // 2. 学习权重
         if let Some(best) = self.learner.best_provider() {
-            return Some(best);
+            return Some(best.to_string());
         }
         // 3. 回退
         None
@@ -137,7 +136,7 @@ impl EnhancedRouter {
     }
 
     /// Scatter-Gather: 并行查询多个 Provider
-    pub fn scatter_gather(&self, query: &str, providers: Vec<String>) -> super::nt_infra_scatter_gather::GatherResult {
+    pub fn scatter_gather(&self, _query: &str, providers: Vec<String>) -> super::nt_infra_scatter_gather::GatherResult {
         let responses = providers.into_iter().map(|p| {
             super::nt_infra_scatter_gather::ProviderResponse {
                 provider_id: p,

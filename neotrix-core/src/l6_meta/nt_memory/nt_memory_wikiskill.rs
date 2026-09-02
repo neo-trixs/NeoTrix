@@ -269,11 +269,12 @@ impl WikiSkillThreeLayerKB {
             }
         }
 
+        let skill_count = new_skills.len();
         EvolutionResult {
             success: true,
             promoted_count,
             new_skills,
-            message: format!("演进完成: 提升 {} 条知识, 创建 {} 个技能", promoted_count, new_skills.len()),
+            message: format!("演进完成: 提升 {} 条知识, 创建 {} 个技能", promoted_count, skill_count),
         }
     }
 

@@ -270,7 +270,7 @@ impl ParallelTaskManager {
                 if task.current_retries < task.max_retries {
                     task.status = TaskStatus::Pending;
                     // 指数退避重试
-                    let delay = self.config.retry_interval_base_secs
+                    let _delay = self.config.retry_interval_base_secs
                         * (2u32.pow(task.current_retries).min(self.config.retry_max_multiplier));
                     // TODO: 实际实现延迟调度
                     self.task_queue.push(task);

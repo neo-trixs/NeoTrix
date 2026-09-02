@@ -26,7 +26,8 @@ pub struct SupervisorL1Bridge {
 
 impl SupervisorL1Bridge {
     pub fn new(inner: Box<dyn L7Orchestrator>) -> Self {
-        Self { inner, id: format!("l7_bridge_{}", inner.pattern_name()) }
+        let id = format!("l7_bridge_{}", inner.pattern_name());
+        Self { inner, id }
     }
 }
 

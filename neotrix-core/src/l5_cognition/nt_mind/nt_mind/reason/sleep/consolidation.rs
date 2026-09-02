@@ -85,22 +85,20 @@ impl MemoryConsolidation {
         }
 
         let mut total_delta = 0.0;
-        let mut total_sim = 0.0;
 
         for mem in &memories {
-            let delta = updater.hebbian_step(state, mem, operator);
+            let delta = updater.hebbian_step(mem);
             total_delta += delta;
-            total_sim += updater.memory_state_similarity(mem, state);
         }
 
-        let cap_delta = updater.consolidate_to_capability(state, brain);
+        let cap_delta = updater.consolidate_to_capability(brain);
         total_delta += cap_delta;
 
         ConsolidationResult {
             memories_processed: count,
             total_delta,
             passes_done: 1,
-            avg_similarity: if count > 0 { total_sim / count as f64 } else { 0.0 },
+            avg_similarity: 0.0,
         }
     }
 

@@ -6,7 +6,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod change_archive;
-// pub mod context_artifacts;
+pub mod context_artifacts;
 pub mod cortex_memory;
 pub mod exploration_pipeline;
 pub mod exploration_seeds;

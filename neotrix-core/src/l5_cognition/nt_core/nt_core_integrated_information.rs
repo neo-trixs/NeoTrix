@@ -6,7 +6,6 @@
 //! - 因果-现象学公理映射: 公理 → 后设 → 概念 → 网络 → 数学形式化
 //! - 排他性: 机制/概念/状态选择最强因果效力者
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 整合信息量化器

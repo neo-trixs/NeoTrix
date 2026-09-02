@@ -60,11 +60,19 @@ pub enum DefaultAction {
 }
 
 /// 确认门控引擎
-#[derive(Debug)]
 pub struct ConfirmationGate {
     pending_requests: Arc<RwLock<HashMap<String, ConfirmationRequest>>>,
     policies: HashMap<ConfirmationType, ConfirmationPolicy>,
     approval_callback: Option<Arc<dyn Fn(ConfirmationRequest) -> Result<bool, String> + Send + Sync>>,
+}
+
+impl std::fmt::Debug for ConfirmationGate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConfirmationGate")
+            .field("policies", &self.policies)
+            .field("approval_callback", &self.approval_callback.as_ref().map(|_| "..."))
+            .finish()
+    }
 }
 
 impl ConfirmationGate {

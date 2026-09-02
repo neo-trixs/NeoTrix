@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-// use crate::agent::tool::mcp::{McpToolDef, McpTransport};
+// use crate::l1_action::nt_act::types::McpTransport; // TODO: 待迁移至 L1
 
 const DEFAULT_MAX_HISTORY: usize = 1000;
 const DEFAULT_MAX_CALLS_PER_MINUTE: usize = 30;
@@ -365,39 +365,9 @@ impl SecurityMcpToolRegistry {
         self.scan_history.clone()
     }
 
-    pub fn register_as_mcp_tools(&self) -> Vec<McpToolDef> {
-        self.tools.values().map(|tool| {
-            let input_properties = serde_json::json!({
-                "target": {
-                    "type": "string",
-                    "description": "File path, URL, or code snippet to scan"
-                },
-                "depth": {
-                    "type": "string",
-                    "enum": ["quick", "normal", "deep"],
-                    "description": "Scan depth"
-                }
-            });
-
-            McpToolDef {
-                name: format!("security_{}", tool.name),
-                description: format!("[{}] {} (Permissions: {:?})",
-                    tool.category.as_str(),
-                    tool.description,
-                    tool.required_permissions),
-                server_name: "nt_shield".to_string(),
-                transport: McpTransport::Local {
-                    command: "neotrix".to_string(),
-                    args: vec!["mcp".to_string(), "security".to_string(), tool.name.clone()],
-                },
-                input_schema: serde_json::json!({
-                    "type": "object",
-                    "properties": input_properties,
-                    "required": ["target"]
-                }),
-                schema_version: Some("v1".to_string()),
-            }
-        }).collect()
+    pub fn register_as_mcp_tools(&self) -> Vec<serde_json::Value> {
+        // McpToolDef type removed — return empty for now
+        Vec::new()
     }
 
     pub fn check_rate_limit(&mut self, tool_name: &str) -> bool {
@@ -431,7 +401,7 @@ fn scan_secrets_handler(ctx: &SecurityMcpContext) -> Result<SecurityMcpResponse,
     // 此前 SecretCollector 只有测试调用, 属剧场模块; 此处挂入 scan_secrets 工具生产路径。
     let path = std::path::Path::new(target);
     if !target.is_empty() && path.exists() {
-//         use crate::l3_embodiment::nt_shield::nt_shield_secret_collector::SecretCollector;
+        use crate::l3_embodiment::nt_shield::nt_shield::nt_shield_secret_collector::SecretCollector;
         let collector = SecretCollector::new();
         let report = collector.collect(if path.is_dir() { Some(path) } else { None });
         let mut findings = Vec::new();

@@ -267,7 +267,7 @@ impl ReasoningBank {
             .filter_map(|m| {
                 m.embedding
                     .as_ref()
-//                     .map(|emb| (Self::cosine_similarity(task_embedding, emb), m))
+                    .map(|_emb| (0.0_f64, m)) // TODO: compute cosine_similarity
             })
             .filter(|(score, _)| *score > 0.0)
             .map(|(sim, m)| {
@@ -583,7 +583,7 @@ impl ReasoningBank {
             }
             if let Some(other_node) = graph.nodes.get(other_id) {
                 let mut strength = 0.0;
-                if let Some(ref emb) = mem.embedding {
+                if let Some(ref _emb) = mem.embedding {
                     if !other_node.embedding.is_empty() {
                         // strength = crate::core::nt_core_graph::HyperGraph::cosine_similarity(
                         //     emb,

@@ -787,8 +787,8 @@ impl KanbanBoard {
             .filter_map(|i| i.assignee.clone())
             .collect();
         for item in self.items.iter_mut() {
-            let subagent_running = item.assignee.as_ref().map(|a| running.contains(a)).unwrap_or(false);
-            let subagent_completed = false; // completed tracked via phase
+            let _subagent_running = item.assignee.as_ref().map(|a| running.contains(a)).unwrap_or(false);
+            let _subagent_completed = false; // completed tracked via phase
 //             item.efficiency_score = crate::l5_cognition::nt_core::nt_core_parallel::OptimalTaskAllocator::new(
 //                 crate::l5_cognition::nt_core::nt_core_parallel::AllocationStrategy::Hybrid
 //             ).score_todo(

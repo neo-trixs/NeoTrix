@@ -4,7 +4,7 @@
 //! 提升 AI 漫剧生产任务的调度效率
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+
 
 // ============================================================================
 // 任务调度定义
@@ -189,7 +189,7 @@ impl TaskScheduler {
     }
     
     /// 分配显存
-    pub fn allocate_memory(&mut self, task_id: &str, required_mb: u32) -> bool {
+    pub fn allocate_memory(&mut self, _task_id: &str, required_mb: u32) -> bool {
         if self.check_memory_available(required_mb) {
             self.gpu_config.used_memory_mb += required_mb;
             self.memory_usage_history.push((
@@ -206,7 +206,7 @@ impl TaskScheduler {
     }
     
     /// 释放显存
-    pub fn release_memory(&mut self, task_id: &str, released_mb: u32) {
+    pub fn release_memory(&mut self, _task_id: &str, released_mb: u32) {
         self.gpu_config.used_memory_mb = self.gpu_config.used_memory_mb.saturating_sub(released_mb);
     }
     
@@ -227,7 +227,7 @@ impl TaskScheduler {
     /// 计算退避时间
     pub fn calculate_backoff(&self, retry_count: u32) -> u64 {
         let base_backoff = self.retry_config.initial_backoff_ms as f64 *
-            self.retry_config.backoff_multiplier.powi(retry_count as i32);
+            (self.retry_config.backoff_multiplier as f64).powi(retry_count as i32);
         
         let backoff = base_backoff.min(self.retry_config.max_backoff_ms as f64) as u64;
         
@@ -241,57 +241,75 @@ impl TaskScheduler {
     
     /// 执行任务
     pub fn execute_task(&mut self, task_id: &str) -> SchedulingResult {
-        let task = self.task_queue.iter_mut().find(|t| t.id == task_id);
-        
-        if let Some(task) = task {
-            // 分配显存
-            if !self.allocate_memory(task_id, task.required_memory_mb) {
-                return SchedulingResult {
-                    task_id: task_id.to_string(),
-                    success: false,
-                    execution_time_ms: 0,
-                    used_memory_mb: 0,
-                    error: Some("显存不足".to_string()),
-                    should_retry: true,
-                    next_retry_ms: Some(self.calculate_backoff(task.retry_count)),
-                };
+        // Extract needed fields first to avoid double mutable borrow
+        let (required_memory_mb, retry_count) = {
+            let task = self.task_queue.iter().find(|t| t.id == task_id);
+            match task {
+                Some(t) => (t.required_memory_mb, t.retry_count),
+                None => {
+                    return SchedulingResult {
+                        task_id: task_id.to_string(),
+                        success: false,
+                        execution_time_ms: 0,
+                        used_memory_mb: 0,
+                        error: Some("任务不存在".to_string()),
+                        should_retry: false,
+                        next_retry_ms: None,
+                    };
+                }
             }
-            
+        };
+
+        // 分配显存
+        if !self.allocate_memory(task_id, required_memory_mb) {
+            return SchedulingResult {
+                task_id: task_id.to_string(),
+                success: false,
+                execution_time_ms: 0,
+                used_memory_mb: 0,
+                error: Some("显存不足".to_string()),
+                should_retry: true,
+                next_retry_ms: Some(self.calculate_backoff(retry_count)),
+            };
+        }
+
+        // TODO: 实际执行任务逻辑
+        let success = true; // 模拟成功
+
+        if success {
             // 更新任务状态
-            task.state = TaskState::Running;
-            task.started_at = Some(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs()
-            );
-            
-            // TODO: 实际执行任务逻辑
-            let success = true; // 模拟成功
-            
-            if success {
+            if let Some(task) = self.task_queue.iter_mut().find(|t| t.id == task_id) {
                 task.state = TaskState::Completed;
+                task.started_at = Some(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                );
                 task.completed_at = Some(
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
-                        .as_secs()
+                        .as_secs(),
                 );
-                self.release_memory(task_id, task.required_memory_mb);
-                
-                let result = SchedulingResult {
-                    task_id: task_id.to_string(),
-                    success: true,
-                    execution_time_ms: 5000, // 模拟执行时间
-                    used_memory_mb: task.required_memory_mb,
-                    error: None,
-                    should_retry: false,
-                    next_retry_ms: None,
-                };
-                
-                self.history.push(result.clone());
-                result
-            } else {
+            }
+            self.release_memory(task_id, required_memory_mb);
+
+            let result = SchedulingResult {
+                task_id: task_id.to_string(),
+                success: true,
+                execution_time_ms: 5000,
+                used_memory_mb: required_memory_mb,
+                error: None,
+                should_retry: false,
+                next_retry_ms: None,
+            };
+
+            self.history.push(result.clone());
+            result
+        } else {
+            // 更新任务状态
+            if let Some(task) = self.task_queue.iter_mut().find(|t| t.id == task_id) {
                 task.retry_count += 1;
                 task.state = if task.retry_count >= self.retry_config.max_retries {
                     TaskState::Failed
@@ -299,35 +317,26 @@ impl TaskScheduler {
                     TaskState::Waiting
                 };
                 task.error = Some("任务执行失败".to_string());
-                self.release_memory(task_id, task.required_memory_mb);
-                
-                let result = SchedulingResult {
-                    task_id: task_id.to_string(),
-                    success: false,
-                    execution_time_ms: 5000,
-                    used_memory_mb: task.required_memory_mb,
-                    error: Some("任务执行失败".to_string()),
-                    should_retry: task.retry_count < self.retry_config.max_retries,
-                    next_retry_ms: if task.retry_count < self.retry_config.max_retries {
-                        Some(self.calculate_backoff(task.retry_count - 1))
-                    } else {
-                        None
-                    },
-                };
-                
-                self.history.push(result.clone());
-                result
             }
-        } else {
-            SchedulingResult {
+            self.release_memory(task_id, required_memory_mb);
+
+            let new_retry_count = retry_count + 1;
+            let result = SchedulingResult {
                 task_id: task_id.to_string(),
                 success: false,
-                execution_time_ms: 0,
-                used_memory_mb: 0,
-                error: Some("任务不存在".to_string()),
-                should_retry: false,
-                next_retry_ms: None,
-            }
+                execution_time_ms: 5000,
+                used_memory_mb: required_memory_mb,
+                error: Some("任务执行失败".to_string()),
+                should_retry: new_retry_count < self.retry_config.max_retries,
+                next_retry_ms: if new_retry_count < self.retry_config.max_retries {
+                    Some(self.calculate_backoff(new_retry_count - 1))
+                } else {
+                    None
+                },
+            };
+
+            self.history.push(result.clone());
+            result
         }
     }
     

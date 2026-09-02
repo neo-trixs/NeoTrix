@@ -133,6 +133,10 @@ pub struct DailyProgress {
     pub actual_hours: f64,
     pub output_qty: u64,
     pub efficiency: f64,
+    pub stage: String,
+    pub progress_pct: f64,
+    pub eta: Option<u64>,
+    pub issues: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -369,6 +373,10 @@ pub enum BlStatus {
 /// Production Engine (FT07-FT09)
 pub struct ProductionEngine;
 
+impl Default for ProductionEngine {
+    fn default() -> Self { Self }
+}
+
 impl ProductionEngine {
     pub fn create_production_order(
         contract_id: &str,
@@ -479,6 +487,10 @@ impl ProductionEngine {
 /// Logistics Engine (FT10-FT13)
 pub struct LogisticsEngine;
 
+impl Default for LogisticsEngine {
+    fn default() -> Self { Self }
+}
+
 impl LogisticsEngine {
     pub fn apply_ciq(
         product: &str,
@@ -524,7 +536,7 @@ impl LogisticsEngine {
     pub fn declare_customs(
         contract: &super::nt_trade_full_cycle::Contract,
         product_spec: &super::nt_trade_full_cycle::ProductSpec,
-        booking: &BookingConfirmation,
+        _booking: &BookingConfirmation,
     ) -> CustomsDeclaration {
         CustomsDeclaration {
             declaration_id: format!("CUST-{}", uuid::Uuid::new_v4().simple()),
@@ -597,8 +609,8 @@ impl LogisticsEngine {
     /// Instance method: book and pack cargo
     pub fn book_and_pack(
         &self,
-        booking: &BookingConfirmation,
-        packing_list: &PackingList,
+        _booking: &BookingConfirmation,
+        _packing_list: &PackingList,
     ) -> Result<(), String> {
         // In production, this would call external booking API
         Ok(())
@@ -607,7 +619,7 @@ impl LogisticsEngine {
     /// Instance method: customs clearance
     pub fn customs_clearance(
         &self,
-        declaration: &CustomsDeclaration,
+        _declaration: &CustomsDeclaration,
     ) -> Result<(), String> {
         // In production, this would call customs API
         Ok(())
@@ -616,7 +628,7 @@ impl LogisticsEngine {
     /// Instance method: manage bill of lading
     pub fn manage_bl(
         &self,
-        bl: &BillOfLading,
+        _bl: &BillOfLading,
     ) -> Result<(), String> {
         // In production, this would manage BL documents
         Ok(())

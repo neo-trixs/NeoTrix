@@ -95,6 +95,23 @@ pub enum DataType {
     ThreatActor,
 }
 
+impl std::fmt::Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Domain => write!(f, "Domain"),
+            DataType::IP => write!(f, "IP"),
+            DataType::Email => write!(f, "Email"),
+            DataType::Phone => write!(f, "Phone"),
+            DataType::Username => write!(f, "Username"),
+            DataType::Organization => write!(f, "Organization"),
+            DataType::Person => write!(f, "Person"),
+            DataType::Vulnerability => write!(f, "Vulnerability"),
+            DataType::Malware => write!(f, "Malware"),
+            DataType::ThreatActor => write!(f, "ThreatActor"),
+        }
+    }
+}
+
 /// OSINT 分析
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OSINTAnalysis {

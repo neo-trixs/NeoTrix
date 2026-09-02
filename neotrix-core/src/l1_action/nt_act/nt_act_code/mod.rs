@@ -62,7 +62,7 @@ impl L1Capability for SelfCodeWriter {
 }
 
 impl ToolExecutorTrait for SelfCodeWriter {
-    fn execute(&self, tool: &str, input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
+    fn execute(&self, tool: &str, _input: &ToolInput) -> Result<ToolOutput, CapabilityError> {
         match tool {
             "generate" => {
                 // Delegate to existing generate method

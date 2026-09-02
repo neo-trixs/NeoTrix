@@ -1734,7 +1734,7 @@ impl SearchEngineTrait for KbSearchEngine {
             id: r.node.id,
             score: r.score,
             title: r.node.title,
-            snippet: r.node.summary,
+            snippet: r.node.summary.unwrap_or_default(),
         }).collect())
     }
 

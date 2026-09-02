@@ -20,7 +20,7 @@ impl Default for CapabilityElement {
 impl CapabilityElement {
     pub fn new() -> Self {
         let mut capability = CapabilityVector::default();
-        crate::l5_cognition::nt_mind::nt_mind_seal_ecc::register_ecc_dimensions(&mut capability);
+        crate::l5_cognition::nt_mind::nt_mind::nt_mind_seal_ecc::register_ecc_dimensions(&mut capability);
         Self {
             capability,
             init_called: false,

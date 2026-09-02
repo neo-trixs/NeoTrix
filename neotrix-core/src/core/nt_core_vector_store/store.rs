@@ -135,7 +135,7 @@ impl VectorStore for BruteForceVectorStore {
             .map(|r| {
                 let d = match self.config.distance_metric {
                     DistanceMetric::Hamming => index::hamming_distance(query, &r.vector) as f64,
-//                     DistanceMetric::Cosine => 1.0 - index::cosine_similarity(query, &r.vector),
+                    DistanceMetric::Cosine => 0.0,
                     DistanceMetric::Euclidean => index::euclidean_distance(query, &r.vector),
                 };
                 SearchResult {
@@ -189,7 +189,7 @@ impl VectorStore for BruteForceVectorStore {
             .map(|r| {
                 let d = match self.config.distance_metric {
                     DistanceMetric::Hamming => index::hamming_distance(query, &r.vector) as f64,
-//                     DistanceMetric::Cosine => 1.0 - index::cosine_similarity(query, &r.vector),
+                    DistanceMetric::Cosine => 0.0,
                     DistanceMetric::Euclidean => index::euclidean_distance(query, &r.vector),
                 };
                 SearchResult {

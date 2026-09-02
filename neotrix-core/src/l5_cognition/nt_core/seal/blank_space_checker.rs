@@ -207,8 +207,8 @@ impl BlankSpaceChecker {
         let mut passed = true;
         
         // 计算连续无爽点段的最大时长
-        let mut max_blank = 0.0;
-        let mut current_blank = 0.0;
+        let mut max_blank: f32 = 0.0;
+        let mut current_blank: f32 = 0.0;
         
         for segment in segments {
             if !segment.is_core_scuang {
@@ -253,7 +253,7 @@ impl BlankSpaceChecker {
         let mut passed = true;
         
         // 计算爽点数量
-        let climax_count = segments.iter().filter(|s| s.is_core_scuang).count();
+        let _climax_count = segments.iter().filter(|s| s.is_core_scuang).count();
         
         // 计算应该有多少个情绪节拍 (每30秒至少1个)
         let expected_beats = (total_duration / self.config.emotion_beat_interval).ceil() as usize;

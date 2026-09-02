@@ -156,7 +156,7 @@ impl ModelAdapter {
         &mut self,
         lora_id: &str,
         input_path: &str,
-        strength: f32,
+        _strength: f32,
     ) -> AdapterResult {
         // TODO: 实际调用 LoRA 应用逻辑
         let adapter = self.adapters.get(lora_id);
@@ -180,8 +180,8 @@ impl ModelAdapter {
         &mut self,
         adapter_id: &str,
         content_path: &str,
-        reference_path: &str,
-        strength: f32,
+        _reference_path: &str,
+        _strength: f32,
     ) -> AdapterResult {
         // TODO: 实际调用 IP-Adapter 应用逻辑
         let adapter = self.adapters.get(adapter_id);
@@ -204,9 +204,9 @@ impl ModelAdapter {
     pub fn apply_controlnet(
         &mut self,
         adapter_id: &str,
-        prompt: &str,
+        _prompt: &str,
         control_image: &str,
-        strength: f32,
+        _strength: f32,
     ) -> AdapterResult {
         // TODO: 实际调用 ControlNet 应用逻辑
         let adapter = self.adapters.get(adapter_id);

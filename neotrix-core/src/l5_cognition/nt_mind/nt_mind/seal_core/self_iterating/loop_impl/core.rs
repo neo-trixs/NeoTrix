@@ -5,13 +5,13 @@ use super::super::super::memory::ReasoningBank;
 use super::super::super::multi_brain::MultiBrainManager;
 use super::super::super::reasoning_engine::ReasoningEngine;
 use super::super::super::attention_router::AttentionRouter;
-use super::super::super::cortex_memory::CortexMemory;
+use super::super::super::knowledge::cortex_memory::CortexMemory;
 use super::super::super::change_archive::ChangeArchive;
 use super::super::super::sleep::{SleepEngine, SleepStats};
 use crate::neotrix::nt_world_model::TaskType;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
-use crate::neotrix::nt_act_crypto::CryptoAgent;
+use crate::l1_action::nt_act::nt_act_crypto::CryptoAgent;
 use super::super::super::stagnation::StagnationDetector;
 use super::super::checkpoint::CheckpointManager;
 use super::super::pipeline::{BrainPipeline, BrainSnapshot, AutonomyLevel, PermissionLevel, StageResult, seal_pipeline};
@@ -174,8 +174,6 @@ impl SelfIteratingBrain {
             regularization_weight: 0.001,
             auto_memory_iteration: true,
             memory_iteration_interval: 10,
-            select_operator: None,
-            selective_state: None,
             group_manager: None,
             reasoning_engine: None,
             attention_router: None,
@@ -451,7 +449,14 @@ impl SelfIteratingBrain {
         let mut simulated = before.clone();
         simulated.update_from_other(&source_vector, self.brain.learning_rate);
         simulated.normalize();
-// //         let delta = crate::core::// nt_core_signal::ops::cosine_similarity(&simulated.to_full_vector(), &before.to_full_vector());
+        let delta = {
+            let a = simulated.to_full_vector();
+            let b = before.to_full_vector();
+            let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+            let na: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            let nb: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            dot / (na * nb)
+        };
         (before, simulated, delta)
     }
 
@@ -461,7 +466,14 @@ impl SelfIteratingBrain {
         let dummy_source = KnowledgeSource::DesignPhilosophy;
         simulated.update_from_other(&dummy_source.capability_vector(), self.brain.learning_rate);
         simulated.normalize();
-// //         let delta = crate::core::// nt_core_signal::ops::cosine_similarity(&simulated.to_full_vector(), &self.brain.capability.to_full_vector());
+        let delta = {
+            let a = simulated.to_full_vector();
+            let b = self.brain.capability.to_full_vector();
+            let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+            let na: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            let nb: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            dot / (na * nb)
+        };
         (simulated, delta)
     }
 

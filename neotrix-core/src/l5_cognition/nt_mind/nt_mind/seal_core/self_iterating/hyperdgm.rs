@@ -341,10 +341,25 @@ impl SelfReferentialCheck {
             };
         }
 
-//         let cos_sim = cosine_similarity(current_latent, &new_latent);
+        let cos_sim = {
+            let dot: f64 = current_latent.iter().zip(new_latent.iter()).map(|(x, y)| x * y).sum();
+            let na: f64 = current_latent.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            let nb: f64 = new_latent.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            dot / (na * nb)
+        };
         let centroid = archive_centroid(archive, dim);
-//         let centroid_sim_before = cosine_similarity(current_latent, &centroid);
-//         let centroid_sim_after = cosine_similarity(&new_latent, &centroid);
+        let centroid_sim_before = {
+            let dot: f64 = current_latent.iter().zip(centroid.iter()).map(|(x, y)| x * y).sum();
+            let na: f64 = current_latent.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            let nb: f64 = centroid.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            dot / (na * nb)
+        };
+        let centroid_sim_after = {
+            let dot: f64 = new_latent.iter().zip(centroid.iter()).map(|(x, y)| x * y).sum();
+            let na: f64 = new_latent.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            let nb: f64 = centroid.iter().map(|x| x * x).sum::<f64>().sqrt().max(1e-8);
+            dot / (na * nb)
+        };
         let consistency_loss = (centroid_sim_before - centroid_sim_after).abs();
 
         if cos_sim < self.min_self_consistency && consistency_loss > 0.3 {

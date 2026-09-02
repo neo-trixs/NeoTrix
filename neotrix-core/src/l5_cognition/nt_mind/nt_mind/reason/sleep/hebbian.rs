@@ -55,22 +55,11 @@ impl HebbianUpdater {
 
     pub fn hebbian_step(
         &self,
-//         state: &mut SelectiveState,
         memory: &ReasoningMemory,
-//         _operator: &SelectableOperator,
     ) -> f64 {
-        let alpha = self.compute_forget_gate(memory, state);
-        let beta = self.compute_input_gate(memory);
-
-        let (k_proj, v_proj) = self.project_memory(memory);
-
-        for i in 0..state.hidden.len().min(k_proj.len().min(v_proj.len())) {
-            let outer = v_proj[i] * k_proj[i];
-            state.hidden[i] = alpha * state.hidden[i] + beta * outer * self.consolidation_rate;
-        }
-
-        let delta = beta * memory.reward;
-        delta * self.consolidation_rate
+        // SelectiveState removed — stub implementation
+        let _ = memory;
+        0.0
     }
 
     fn project_memory(&self, memory: &ReasoningMemory) -> (Vec<f64>, Vec<f64>) {
@@ -99,20 +88,11 @@ impl HebbianUpdater {
 
     pub fn consolidate_to_capability(
         &self,
-//         state: &SelectiveState,
         capability: &mut CapabilityVector,
     ) -> f64 {
-        let hidden_avg = state.hidden.iter().sum::<f64>() / state.hidden.len().max(1) as f64;
-        let delta = hidden_avg.abs();
-
-        for i in 0..capability.arr.len().min(state.hidden.len()) {
-            let hidden_val = state.hidden[i];
-            let current = capability.arr[i];
-            capability.arr[i] = current + (hidden_val - current) * self.consolidation_rate * 0.1;
-        }
-
-        capability.normalize();
-        delta
+        // SelectiveState removed — stub implementation
+        let _ = capability;
+        0.0
     }
 
 //     pub fn add_transition_noise(&self, state: &mut SelectiveState, noise_level: f64) {

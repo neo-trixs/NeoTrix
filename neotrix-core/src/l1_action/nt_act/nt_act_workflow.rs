@@ -7,8 +7,8 @@
 //! - 任务依赖管理
 //! - 进度追踪
 
-use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 工作流引擎
@@ -269,7 +269,7 @@ impl WorkflowEngine {
                                 }
                             }
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             instance.task_states.insert(task_id.clone(), TaskState::Failed);
                             completed_tasks.push((task_id.clone(), TaskState::Failed));
 

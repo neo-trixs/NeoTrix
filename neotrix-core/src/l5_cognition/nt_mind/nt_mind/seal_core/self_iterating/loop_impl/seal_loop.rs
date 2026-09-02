@@ -30,7 +30,8 @@ use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherC
 use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
 use crate::core::nt_core_reasoning::ContextBuilder;
 use crate::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
-// use crate::l5_cognition::nt_core::nt_core_parallel::{IntentIsolator, AtomicDecomposer};
+use crate::l5_cognition::nt_core::nt_core_parallel::isolation::{IntentIsolator, AtomicDecomposer};
+use crate::l5_cognition::nt_mind::nt_mind::infrastructure::code_review::CodeReviewEngine;
 
 
 type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
@@ -182,7 +183,7 @@ impl SelfIteratingBrain {
         let task_type = TaskType::CodeReview;
         let score_before = self.brain.evaluate_capability(task_type);
 
-        let engine = crate::l5_cognition::nt_mind::code_review::CodeReviewEngine::new(self.brain.capability.clone());
+        let engine = CodeReviewEngine::new(self.brain.capability.clone());
         let mut all_issues = Vec::new();
         let mut finding_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
 
@@ -1166,7 +1167,7 @@ impl SelfIteratingBrain {
         self.attention_router = Some(router);
     }
 
-    pub fn init_select_operator(&mut self, dim: usize, hidden_dim: usize) {
+    pub fn init_select_operator(&mut self, _dim: usize, _hidden_dim: usize) {
 //         self.select_operator = Some(SelectableOperator::new(dim, hidden_dim));
 //         self.selective_state = Some(SelectiveState::new(dim, hidden_dim));
     }
@@ -1199,7 +1200,8 @@ mod tests {
         // 惰性初始化：这几项在构造时为 None，由 run_* 按需装配。
         assert!(brain.reasoning_engine.is_none());
         assert!(brain.attention_router.is_none());
-        assert!(brain.select_operator.is_none());
+        // FIXME: select_operator field commented out in SelfIteratingBrain
+        // assert!(brain.select_operator.is_none());
         assert!(brain.sleep_engine.is_none());
         // 能力向量维度固定为 23。
         assert_eq!(brain.brain.capability.total_dim(), 23);

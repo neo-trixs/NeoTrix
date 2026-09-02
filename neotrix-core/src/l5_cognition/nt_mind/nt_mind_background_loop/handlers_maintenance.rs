@@ -367,18 +367,8 @@ impl BackgroundLoopHandle {
 
     /// G18 统一会话 digest flush (novu 吸收): 周期清出超窗摘要桶, 报告会话拓扑。
     pub(crate) async fn handle_session_router_flush(&mut self) {
-        let sessions = self.session_router.session_count();
-        let digests = self.session_router.flush_digests();
-        if !digests.is_empty() {
-            log::info!(
-                "[bg] session_router: flushed {} digest buckets ({} live sessions)",
-                digests.len(),
-                sessions
-            );
-        }
-        if sessions > 0 {
-            log::trace!("[bg] session_router: {} live unified sessions", sessions);
-        }
+        // session_router 字段已注释, stub 实现
+        log::trace!("[bg] session_router: flush skipped (disabled)");
     }
 
     /// G28 自维护巡检 healers (topics/code-health 吸收): 多维度代码健康扫描,

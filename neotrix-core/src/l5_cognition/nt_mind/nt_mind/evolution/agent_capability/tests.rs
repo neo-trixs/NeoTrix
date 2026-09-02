@@ -1103,7 +1103,7 @@
             None,
         )
         .expect("write");
-        let executor = crate::l5_cognition::nt_mind::ProductionAgentExecutor::new(kb);
+        let executor = crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::ProductionAgentExecutor::new(kb);
         // balanced → 常规执行 (默认路径, 不改变行为)。
         let outcome = executor.execute_with_strategy("explorer", "knowledge", "balanced");
         assert!(outcome.is_success(), "default path still works: {}", outcome.summary());

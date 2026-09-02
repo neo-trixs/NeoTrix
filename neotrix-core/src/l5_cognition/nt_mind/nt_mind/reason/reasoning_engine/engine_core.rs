@@ -17,6 +17,7 @@ use crate::core::nt_core_e8::nt_latent_transformer::LatentReasoningTransformer;
 use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
 use crate::core::nt_core_sae_bridge::SAEBridge;
+use crate::l5_cognition::nt_mind::nt_mind::knowledge::context_artifacts::indexer::ArtifactIndexer;
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::core::nt_core_prm::ProcessRewardLearner;
 use crate::core::nt_core_aura::IntentEngine;

@@ -11,7 +11,7 @@ use std::collections::HashMap;
 // ============================================================================
 
 /// 检查阶段
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum QAStage {
     /// 结构验证 (规格级别)
     Structural,
@@ -297,7 +297,7 @@ impl LayeredQA {
     }
     
     /// 执行单个检查
-    fn execute_check(&self, item: &QACheckItem, spec: &serde_json::Value, output: &serde_json::Value) -> QACheckResult {
+    fn execute_check(&self, item: &QACheckItem, _spec: &serde_json::Value, _output: &serde_json::Value) -> QACheckResult {
         // TODO: 实际执行检查逻辑
         QACheckResult {
             check_item_id: item.id.clone(),

@@ -6,7 +6,6 @@
 //! - 验证反馈回路
 //! - 自适应学习率
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// SEAL 管线增强版
@@ -220,7 +219,7 @@ impl SEALPipelineEnhanced {
             match stage.stage_type {
                 StageType::Exploration => {
                     // 探索阶段
-                    let candidates = self.explore(task, context);
+                    let _candidates = self.explore(task, context);
                     stages_completed.push("exploration".into());
                 }
                 StageType::Distillation => {
@@ -270,18 +269,19 @@ impl SEALPipelineEnhanced {
         // 记录失败模式
         self.failure_library.patterns.extend(failures.clone());
 
+        let success = failures.is_empty();
         SEALResult {
             cycle_id,
             stages_completed,
             extracted_knowledge,
             failures,
             adjustments,
-            success: failures.is_empty(),
+            success,
         }
     }
 
     /// 探索阶段
-    fn explore(&self, task: &str, context: &serde_json::Value) -> Vec<serde_json::Value> {
+    fn explore(&self, task: &str, _context: &serde_json::Value) -> Vec<serde_json::Value> {
         // 简化版: 返回模拟候选
         vec![
             serde_json::json!({
@@ -322,7 +322,7 @@ impl SEALPipelineEnhanced {
     }
 
     /// 吸收阶段
-    fn absorb(&self, knowledge: &[ExtractedKnowledge]) -> bool {
+    fn absorb(&self, _knowledge: &[ExtractedKnowledge]) -> bool {
         // 简化版: 总是成功
         true
     }

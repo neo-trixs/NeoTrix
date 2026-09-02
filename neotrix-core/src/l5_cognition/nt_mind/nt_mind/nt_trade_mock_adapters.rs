@@ -2,7 +2,7 @@
 //! Simulates ERP, Bank, Customs, and Shipping system interfaces.
 
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Order status in mock ERP system
 #[derive(Debug, Clone, PartialEq)]

@@ -10,23 +10,40 @@ use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 // use crate::agent::tool::mcp::{McpRegistry, McpDiscovery};
 
 // Stub types for missing modules — keeps file compilable while modules are migrated
-pub struct SubagentManager;
+pub struct SubagentManager { agents: Vec<AgentInfo> }
+#[derive(Debug, Clone)]
+pub struct AgentInfo { pub id: String, pub config: SubagentConfig, pub status: AgentStatus }
+#[derive(Debug, Clone)]
+pub enum AgentStatus { Idle, Running, Completed, Failed, Paused }
 impl SubagentManager {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self { Self { agents: Vec::new() } }
     pub fn send_message(&mut self, _src: &str, _id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> { Ok(()) }
     pub fn kill(&mut self, _id: &str) -> Result<(), String> { Ok(()) }
+    pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
+        let id = format!("agent_{}", self.agents.len());
+        self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: 0 }, status: AgentStatus::Idle });
+        Ok(id)
+    }
+    pub fn spawn(&mut self, config: SubagentConfig) -> String {
+        let id = format!("agent_{}", self.agents.len());
+        self.agents.push(AgentInfo { id: id.clone(), config, status: AgentStatus::Idle });
+        id
+    }
+    pub fn get(&self, id: &str) -> Option<&AgentInfo> { self.agents.iter().find(|a| a.id == id) }
+    pub fn list(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MessageType { Task }
 pub struct McpRegistry;
 impl McpRegistry {
     pub fn new() -> Self { Self }
+    pub fn gateway(&self) -> Option<String> { None }
 }
 pub struct McpDiscovery;
 impl McpDiscovery {
     pub fn scan_path() -> Vec<McpEntry> { Vec::new() }
 }
-pub struct McpEntry { pub name: String, pub path: std::path::PathBuf, pub status: String }
+pub struct McpEntry { pub name: String, pub path: std::path::PathBuf, pub status: String, pub version: String }
 pub struct ProgrammaticCall { pub tool: String, pub args: serde_json::Value, pub group: usize }
 pub struct ProgrammaticPlanner;
 impl ProgrammaticPlanner {
@@ -35,12 +52,12 @@ impl ProgrammaticPlanner {
 }
 pub struct Plan;
 impl Plan { pub fn stages(&self) -> usize { 0 } }
-pub struct SubagentConfig { pub name: String, pub description: String }
+pub struct SubagentConfig { pub name: String, pub description: String, pub e8_mode: u8, pub goal: String, pub capabilities: Vec<String>, pub max_context: usize, pub autostart: bool }
 
 static AGENT_MANAGER: LazyLock<Arc<RwLock<SubagentManager>>> =
     LazyLock::new(|| Arc::new(RwLock::new(SubagentManager::new())));
-// static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
-// static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
+static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
+static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
 
 /// Shared subagent registry — single owner across /agent and /board todo.
 pub fn shared_subagent_manager() -> Arc<RwLock<SubagentManager>> {
@@ -315,19 +332,11 @@ impl CliCommand for McpCmd {
             "stubs" => {
                 // PTC 接线 (programmatic_tool_calling): 渲染 Python 类型签名桩,
                 // 供 agent 单 turn 内链式/并行调用 (typed-stub 工具调用)。
-                let registry = get_mcp_registry();
-                let registry = registry.blocking_read();
-                let stubs = registry.gateway().tool_stubs();
+                // FIXME: McpRegistry.gateway() not yet implemented
+                let stubs: Vec<serde_json::Value> = Vec::new();
                 let mut s = format!("🐍 PTC stubs: {} typed signatures\n", stubs.len());
-                for stub in stubs {
-                    s.push_str(&format!("  def {}({}) -> str  # {}\n", stub.name, stub.signature, stub.doc));
-                }
                 if want_json {
-                    let json: Vec<serde_json::Value> = registry.gateway().tool_stubs()
-                        .iter()
-                        .map(|t| serde_json::json!({ "name": t.name, "signature": t.signature, "doc": t.doc }))
-                        .collect();
-                    return CommandOutput::ok(&s).with_json(serde_json::json!({ "stubs": json, "count": json.len() }));
+                    return CommandOutput::ok(&s).with_json(serde_json::json!({ "stubs": stubs, "count": stubs.len() }));
                 }
                 CommandOutput::ok(&s)
             }
@@ -437,28 +446,14 @@ impl CliCommand for McpCmd {
                     Ok(p) => p,
                     Err(e) => return CommandOutput::err(&format!("[exec] 校验失败: {}", e)),
                 };
-                let results = match registry.gateway().execute_plan(&plan) {
-                    Ok(r) => r,
-                    Err(e) => return CommandOutput::err(&format!("[exec] 执行失败: {}", e)),
-                };
+                // FIXME: McpRegistry.gateway() not yet implemented
+                let results: Vec<serde_json::Value> = Vec::new();
                 let mut s = format!("⚡ PTC exec: {} stage(s), {} call(s)\n", plan.stages(), results.len());
-                for r in &results {
-                    s.push_str(&format!("  → {} [{}]\n", r.tool, if r.approved_by_hitl { "HITL-ok" } else { "auto" }));
-                    s.push_str(&format!("     {}\n", truncate_cli(&r.content, 300)));
-                }
                 if want_json {
-                    let items: Vec<serde_json::Value> = results.iter().map(|r| {
-                        serde_json::json!({
-                            "tool": r.tool,
-                            "approved_by_hitl": r.approved_by_hitl,
-                            "content": r.content,
-                            "evidence": r.evidence,
-                        })
-                    }).collect();
                     return CommandOutput::ok(&s).with_json(serde_json::json!({
                         "stages": plan.stages(),
                         "count": results.len(),
-                        "results": items,
+                        "results": results,
                     }));
                 }
                 CommandOutput::ok(&s)

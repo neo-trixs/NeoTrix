@@ -123,7 +123,7 @@ impl TracingCollector {
     }
 }
 
-/// 全局追踪收集器 (lazy_static)
+// 全局追踪收集器 (lazy_static)
 lazy_static::lazy_static! {
     static ref GLOBAL_COLLECTOR: Mutex<TracingCollector> = Mutex::new(TracingCollector::new());
 }

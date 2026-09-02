@@ -188,7 +188,7 @@ impl L1Capability for WhatsAppProvider {
 }
 
 impl MessagingProvider for WhatsAppProvider {
-    fn send(&self, msg: &Message) -> Result<String, CapabilityError> {
+    fn send(&self, _msg: &Message) -> Result<String, CapabilityError> {
         let msg_id = format!("wa_{}", uuid::Uuid::new_v4());
         // 实际实现: POST {api_url}/{phone_number_id}/messages
         Ok(msg_id)
@@ -250,7 +250,7 @@ impl L1Capability for EmailProvider {
 }
 
 impl MessagingProvider for EmailProvider {
-    fn send(&self, msg: &Message) -> Result<String, CapabilityError> {
+    fn send(&self, _msg: &Message) -> Result<String, CapabilityError> {
         let msg_id = format!("email_{}", uuid::Uuid::new_v4());
         // 实际实现: SMTP send
         Ok(msg_id)
@@ -291,7 +291,7 @@ impl MessagingRegistry {
 
     pub fn register(&mut self, provider: Box<dyn MessagingProvider>) {
         // 注册时无法直接获取 channel，通过 capability_id 推断
-        let idx = self.providers.len();
+        let _idx = self.providers.len();
         self.providers.push(provider);
         // by_channel 在 route 时动态填充
     }
@@ -341,7 +341,7 @@ impl MessagingRouter {
     }
 
     /// 路由到最佳 Provider
-    pub fn route(&self, channel: Channel) -> Option<&dyn MessagingProvider> {
+    pub fn route(&self, _channel: Channel) -> Option<&dyn MessagingProvider> {
         // 优先按渠道匹配，fallback 到 optimal
         self.registry.optimal()
     }

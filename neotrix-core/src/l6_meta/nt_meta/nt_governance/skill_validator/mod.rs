@@ -4,7 +4,6 @@
 //! 版本匹配、frontmatter 有效性、tool/agent 键区分、subagent_type 命名空间、
 //! 无硬编码路径、modern-python 命令、无 sidecar、uv.lock、loadability 检查
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 

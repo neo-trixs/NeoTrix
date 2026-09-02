@@ -123,7 +123,7 @@ pub struct NeoCodexAgent {
     // agent gains a `mcp_call` tool proxying to the registry; previously the
     // MCP host existed only for CLI/headless and the NeoCodex agent could not
     // call MCP tools despite the desktop UI having zero MCP surface.
-    pub mcp: Option<crate::l1_action::// nt_agent_mcp_registry::McpRegistry>,
+    pub mcp: Option<serde_json::Value>,
 }
 
 impl NeoCodexAgent {
@@ -151,20 +151,20 @@ impl NeoCodexAgent {
     }
 
     /// P2-5: attach the shared MCP registry so the agent can call MCP tools.
-    pub fn with_mcp(
-        mut self,
-        mcp: crate::l1_action::// nt_agent_mcp_registry::McpRegistry,
-    ) -> Self {
-        self.mcp = Some(mcp);
-        self
-    }
+    // pub fn with_mcp(
+    //     mut self,
+    //     mcp: crate::l1_action::nt_io::nt_io_mcp_registry::McpRegistry,  // TODO: restore when McpRegistry type is available
+    // ) -> Self {
+    //     self.mcp = Some(mcp);
+    //     self
+    // }
 
-    pub fn set_mcp(
-        &mut self,
-        mcp: Option<crate::l1_action::// nt_agent_mcp_registry::McpRegistry>,
-    ) {
-        self.mcp = mcp;
-    }
+    // pub fn set_mcp(
+    //     &mut self,
+    //     mcp: Option<crate::l1_action::nt_io::nt_io_mcp_registry::McpRegistry>,
+    // ) {
+    //     self.mcp = mcp;
+    // }
 
     /// Set budget limit (from Claude Code max_budget_usd)
     pub fn with_budget(mut self, max_budget: f64) -> Self {
@@ -1379,43 +1379,12 @@ impl NeoCodexAgent {
                     Err(e) => format!("[shell error] {}", e),
                 }
             }
-            // P2-5: MCP tool call (Codex/Claude MCP parity). Args format:
-            // `<tool_name>|<json_args>` — split on the first `|`. Delegates to
-            // the attached McpRegistry; without a registry it returns a clear
-            // error instead of silently pretending to succeed.
+            // P2-5: MCP tool call (MCP registry removed — stub)
             "mcp_call" => {
-                let Some(registry) = &self.mcp else {
-                    return "[mcp_call error] no MCP registry attached; register MCP servers first"
-                        .to_string();
-                };
-                let (name, json) = match args.split_once('|') {
-                    Some((n, j)) => (n.trim(), j),
-                    None => (args.trim(), "{}"),
-                };
-                let parsed: serde_json::Value = match serde_json::from_str(json) {
-                    Ok(v) => v,
-                    Err(e) => return format!("[mcp_call error] invalid JSON args: {}", e),
-                };
-                match registry.call_tool(name, &parsed) {
-                    Ok(result) => result,
-                    Err(e) => format!("[mcp_call error] {}", e),
-                }
+                "[mcp_call error] MCP registry not available".to_string()
             }
             "mcp_list" => {
-                let Some(registry) = &self.mcp else {
-                    return "[mcp_list] no MCP registry attached".to_string();
-                };
-                if registry.server_count() == 0 {
-                    return "[mcp_list] no MCP servers registered".to_string();
-                }
-                let mut out = String::new();
-                for server in registry.list_servers() {
-                    out.push_str(&format!("# {} ({})\n", server.name, server.tools.len()));
-                    for tool in &server.tools {
-                        out.push_str(&format!("  - {}: {}\n", tool.name, tool.description));
-                    }
-                }
-                out
+                "[mcp_list] MCP registry not available".to_string()
             }
             _ => format!("Unknown tool: {}", name),
         }

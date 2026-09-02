@@ -4,8 +4,8 @@ use std::sync::Mutex;
 use crate::cli::approval::{ActionType, ApprovalEngine, ApprovalMode};
 use crate::cli::sandbox::{SandboxEnforcer, SandboxMode};
 use crate::cli::laws::{LawViolation, ProjectLaws};
-// use crate::l3_embodiment::nt_shield::guard::{GuardDecision, SecurityGuard};
-// use crate::l3_embodiment::nt_shield::guardrails::{GuardrailConfig, GuardrailSystem};
+use crate::l3_embodiment::nt_shield::nt_shield::guard::{GuardDecision, SecurityGuard};
+use crate::l3_embodiment::nt_shield::nt_shield::guardrails::{GuardrailConfig, GuardrailSystem};
 use crate::l3_embodiment::nt_shield::nt_shield::perm_chain::{PermissionChain, PermissionMode, PermissionResult};
 use crate::l3_embodiment::nt_shield::nt_shield::policy::{ActionPolicy, PolicyDecision};
 
@@ -188,7 +188,7 @@ impl ShieldEnforcer {
     }
 
     /// Get pending guard requests.
-    pub fn pending_guard_requests(&self) -> Vec<crate::l3_embodiment::nt_shield::guard::GuardRequest> {
+    pub fn pending_guard_requests(&self) -> Vec<crate::l3_embodiment::nt_shield::nt_shield::guard::GuardRequest> {
         self.guard.pending_requests()
     }
 
