@@ -338,3 +338,6 @@ pub struct PhysicalSnapshot {
     pub emergency_stop: bool,
     pub violations: usize,
 }
+
+// 动态-音效同步模式库
+pub mod audio_sync_library;

@@ -48,3 +48,6 @@ pub use nt_meta_concurrency_detector::*;
 
 // 跨模块一致性检查 (动态漫技能吸收)
 pub mod cross_module_audit;
+
+// 模板复用标签系统
+pub mod template_tag_registry;

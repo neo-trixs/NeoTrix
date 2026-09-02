@@ -58,6 +58,9 @@ pub mod nt_l1_error;
 // 平台适配器模块 (Seedance2.0/Runtime 等多平台适配)
 pub mod platform_adapter;
 
+// 快速入门向导
+pub mod quick_start_guide;
+
 pub use nt_io_messaging::{
     MessagingRegistry, MessagingRouter, MessagingBridge,
     MessageTemplate, TemplateVariable, TemplateCategory,

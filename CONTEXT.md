@@ -137,3 +137,6 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **BlankSpaceChecker** | 留白量化检查器：检查爽点后留白是否符合节奏呼吸感要求（3-5秒无台词+微动态）。实现于 `seal::blank_space_checker`。 | "留白检查" |
 | **TransitionGradientAdvisor** | 转场梯度建议器：根据节奏快慢自动推荐转场类型（慢→渐变，快→硬切）。实现于 `seal::transition_gradient`。 | "转场建议" |
 | **CrossModuleAudit** | 跨模块一致性检查器：检查动态等级与情绪拐点、节奏节拍的三线一致。实现于 `nt_meta::cross_module_audit`。 | "一致性检查" |
+| **TemplateTagRegistry** | 模板复用标签系统：管理动态漫技能模板的标签、分类、复用关系，支持跨模块一致性检查和模板检索。实现于 `nt_meta::template_tag_registry`。 | "模板标签" |
+| **AudioSyncPattern** | 动态-音效同步模式：定义动态效果和音效的同步模式，支持动态漫制作中的音画同步。实现于 `nt_physical::audio_sync_library`。 | "音效同步" |
+| **QuickStartGuide** | 快速入门向导：提供动态漫技能的快速入门指引，帮助用户快速理解和使用 NeoTrix 动态漫能力。实现于 `nt_io::quick_start_guide`。 | "入门指南" |
