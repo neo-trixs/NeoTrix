@@ -53,6 +53,11 @@ pub mod nt_io_user_avatar;
 
 pub mod nt_io_messaging;
 pub mod nt_io_context_mgmt;
+pub mod nt_l1_error;
+
+// 平台适配器模块 (Seedance2.0/Runtime 等多平台适配)
+pub mod platform_adapter;
+
 pub use nt_io_messaging::{
     MessagingRegistry, MessagingRouter, MessagingBridge,
     MessageTemplate, TemplateVariable, TemplateCategory,

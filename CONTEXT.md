@@ -124,3 +124,16 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **M-open check** | Predictive adequacy check in Bayesian experiment design: when posterior concentrates on < threshold of hypotheses, the hypothesis space is expanded. (P3) | "expansion trigger" |
 | **Disclosure Ladder** | Anchor-then-promote: first request anchors on a Minimal tool budget, promotes to Standard once the session is durable. Implemented as `AnchorPromote` in `nt_mind_skill_engine` (P4). | "tool budget", "context budget" |
 | **Ordered Backend Router** | Single search interface routing across backends (DDG→Wikipedia) with ordered fallback, zero external API cost. Lives in `nt_world_search` (P16). | "search router", "fallback chain" |
+
+## Absorbed Terminology (2026-09-02, 动态漫技能吸收)
+
+| Term | Definition | Avoid |
+|------|-----------|-------|
+| **DynamicParams** | 动态参数元数据结构：统一速度 (speed)、幅度 (amplitude)、频率 (frequency) 三要素的物理单位和约束规范。实现于 `nt_core_self::dynamic_params`。 | "动态参数" |
+| **ScalingRating** | 爽点动态等级对应情感强度：Micro(微)/Medium(中)/Macro(强) 三级，映射到 EmotionLabel 11 variants。用于动态漫动态等级分类。 | "动态等级", "强度等级" |
+| **RhythmRecalculator** | 节奏重算模块：基于功率律 (ratio^0.8) 的节段时长重算，支持默认/快节奏/10集系列布局。实现于 `seal::rhythm_recalculator`。 | "节奏重算", "时长分配" |
+| **SegmentType** | 分段类型枚举：Setup(铺垫)/Conflict(冲突)/Climax(爽点)/Transition(转折)。用于动态漫剧情节奏设计。 | "节段类型" |
+| **CharacterInteractionGraph** | 角色互动谱系图：管理角色、互动关系、成长弧线的结构化网络。实现于 `nt_core_self::character_interaction`。 | "角色关系图" |
+| **BlankSpaceChecker** | 留白量化检查器：检查爽点后留白是否符合节奏呼吸感要求（3-5秒无台词+微动态）。实现于 `seal::blank_space_checker`。 | "留白检查" |
+| **TransitionGradientAdvisor** | 转场梯度建议器：根据节奏快慢自动推荐转场类型（慢→渐变，快→硬切）。实现于 `seal::transition_gradient`。 | "转场建议" |
+| **CrossModuleAudit** | 跨模块一致性检查器：检查动态等级与情绪拐点、节奏节拍的三线一致。实现于 `nt_meta::cross_module_audit`。 | "一致性检查" |

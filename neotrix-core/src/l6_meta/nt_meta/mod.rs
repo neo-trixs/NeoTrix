@@ -23,9 +23,28 @@ pub use nt_shield_approval::*;
 pub use nt_shield_audit::*;
 pub use nt_mind_repair::*;
 pub use nt_meta_sentrux::{SentruxSensor, QualitySnapshot, SessionComparison};
-pub use nt_meta_build_watchdog::*;
-pub use nt_meta_integration_patterns::*;
-pub use nt_meta_integration_points::*;
-pub use nt_meta_concurrency_tester::*;
-pub use nt_meta_async_safety::*;
+pub use nt_meta_build_watchdog::{
+    BuildWatchdog, WatchdogConfig, BuildMonitor, MonitorStatus, BuildStatus,
+    CompilationResult, TestResult, CacheStatus, BuildAlert, AlertSeverity, WatchdogStats, FixAction,
+};
+pub use nt_meta_integration_patterns::{
+    IntegrationPatternLibrary, IntegrationConfig, IntegrationPattern, PatternCategory,
+    ActiveIntegration, IntegrationPlan, PlanStep, IntegrationCheck, RuleViolation,
+};
+pub use nt_meta_integration_points::{
+    IntegrationPointManager, IntegrationPointConfig, IntegrationPoint, IntegrationType,
+    IntegrationStatus, ModuleIntegration, ComplianceStatus, IntegrationPointStats,
+    IntegrationAuditResult,
+};
+pub use nt_meta_concurrency_tester::{
+    ConcurrencyIsolationTester, ConcurrencyConfig, TestSession, SessionStatus,
+    IsolationConfig, ConcurrencyStats,
+};
+pub use nt_meta_async_safety::{
+    AsyncSafetyWrapper, AsyncSafetyConfig, BlockingWrapper, WrapperType,
+    AsyncSafetyStats, SafetyCheckResult, SafetyViolation, ViolationSeverity,
+};
 pub use nt_meta_concurrency_detector::*;
+
+// 跨模块一致性检查 (动态漫技能吸收)
+pub mod cross_module_audit;
