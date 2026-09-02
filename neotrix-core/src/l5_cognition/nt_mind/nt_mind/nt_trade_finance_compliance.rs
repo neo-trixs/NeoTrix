@@ -6,10 +6,9 @@
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, NodeLayer,
+    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Contract Review Result (FT05)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +70,7 @@ pub enum PaymentStatus {
     Pending,
     Received,
     Verified,
+    Paid,
     Failed,
     Disputed,
     Refunded,
@@ -498,6 +498,44 @@ impl FinanceEngine {
                 },
             ],
         }
+    }
+
+    /// Instance method: verify settlement (FT22)
+    pub fn verify_settlement(&self) -> Result<SettlementRecord, String> {
+        // In production, this would verify bank settlement
+        Ok(SettlementRecord {
+            settlement_id: format!("SET-{}", uuid::Uuid::new_v4().simple()),
+            contract_id: "unknown".into(),
+            payment_id: "unknown".into(),
+            amount: 0.0,
+            currency: "USD".into(),
+            fx_rate: 1.0,
+            settled_amount: 0.0,
+            settlement_date: chrono::Utc::now().date_naive().to_string(),
+            bank_reference: None,
+            verification_status: VerificationStatus::Pending,
+            verification_date: None,
+            verification_officer: None,
+        })
+    }
+
+    /// Instance method: declare tax refund (FT23)
+    pub fn declare_tax_refund(
+        &self,
+        claim: &TaxRefundClaim,
+    ) -> Result<RefundDocument, String> {
+        // In production, this would submit tax refund application
+        Ok(RefundDocument {
+            doc_type: "Tax Refund Application".into(),
+            doc_number: claim.refund_id.clone(),
+            issue_date: chrono::Utc::now().date_naive().to_string(),
+        })
+    }
+
+    /// Instance method: reconcile accounts (FT24)
+    pub fn reconcile_accounts(&self) -> Result<(), String> {
+        // In production, this would reconcile all accounts
+        Ok(())
     }
 }
 

@@ -6,8 +6,9 @@
 //!   - 每个诊断项 → ActionPlan 执行策略
 
 use crate::l5_cognition::nt_mind::nt_mind_autofixer::AutoFixer;
+use crate::neotrix::nt_mind_evolution_daemon::IssueType;
 use crate::l5_cognition::nt_mind::nt_mind_evolution_loop::{
-    Issue, IssueType, ProjectSnapshot,
+    Issue, ProjectSnapshot,
     EXCESS_UNWRAP_THRESHOLD,
     LARGE_FILE_THRESHOLD, MISSING_TESTS_THRESHOLD, TODO_LEFTOVERS_THRESHOLD,
 };
@@ -37,6 +38,14 @@ pub enum ActionPlan {
     AutoFix(String),
     ManualReview(String),
     Skip(String),
+    AddTestStub { file: String },
+    NoAction { reason: String },
+    RunCargoFix,
+    SplitLargeFile { file: String },
+    ReviewUnsafe { file: String },
+    ReplaceUnwrap { file: String },
+    RemoveTodo { file: String },
+    HumanDecision { reason: String, options: Vec<String> },
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +53,9 @@ pub struct PrioritizedIssue {
     pub issue: crate::l5_cognition::nt_mind::nt_mind_evolution_loop::Issue,
     pub score: f64,
     pub plan: ActionPlan,
+    pub composite_score: f64,
+    pub action: ActionPlan,
+    pub underlying_issue: CodeUnderlyingIssue,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +67,8 @@ pub struct CodeUnderlyingIssue {
 
 pub trait EvolutionLoopProvider {
     fn get_snapshot(&self) -> crate::l5_cognition::nt_mind::nt_mind_evolution_loop::ProjectSnapshot;
+    fn self_diagnose(&mut self) -> (Vec<String>, Vec<PrioritizedIssue>);
+    fn on_fix_applied(&mut self);
 }
 
 // ============================================================

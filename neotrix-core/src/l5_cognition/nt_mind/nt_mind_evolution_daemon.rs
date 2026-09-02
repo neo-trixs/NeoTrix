@@ -6,13 +6,14 @@
 //! 真实实现来自 L1 nt_act_goal 与 L2 nt_world_infer，替代原本的本地存根。
 
 use crate::l5_cognition::nt_mind::nt_mind_autofixer::AutoFixer;
-use crate::l5_cognition::nt_mind::nt_mind_evolution_loop::{EvolutionLoop, ProjectSnapshot};
+use crate::l5_cognition::nt_mind::nt_mind_evolution_loop::EvolutionLoop;
 use crate::neotrix::nt_act_goal::{
     BehavioralVerifier, CoverageAnalyzer, AutoGoalGenerator, RLFeedbackLoop,
     EvolutionGoal, GoalCategory,
 };
 use crate::neotrix::nt_act_goal::behavioral_verifier::VerificationLevel;
 use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
+use crate::core::nt_core_iit_phi::IITPhiCalculator;
 use crate::core::nt_core_absorb::spec_driven::{
     SpecDrivenPipeline, SpecPipelineConfig, EvolutionSpec, SpecDiff, SpecStatus,
 };
@@ -23,8 +24,7 @@ use std::path::PathBuf;
 // 统一 Φ 计算：从 L5 真实 IITPhiCalculator 导入 (单一事实源, 消除本地平行实现)
 // ============================================================
 
-// IITPhiCalculator and PhiReport not yet migrated
-// pub use crate::core::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
+pub use crate::core::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
 
 /// 问题生命周期
 #[derive(Debug, Clone, PartialEq)]
@@ -71,13 +71,17 @@ pub struct IssueTrackerItem {
 }
 
 /// 问题类型
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum IssueType {
     MissingTests,
     CompileWarning,
     LargeFile,
     TodoLeftovers,
     UnusedImport,
+    HighFreeEnergy,
+    LowPhi,
+    ExcessUnsafe,
+    ExcessUnwrap,
     Other,
 }
 
@@ -335,7 +339,20 @@ impl EvolutionDaemon {
 
     pub fn run_intelligent_cycle(&mut self) -> (u32, f64) {
         let snapshot = self.evolution_loop.scan_project();
-        let l1_snapshot = to_l1_snapshot(&snapshot);
+        let l1_snapshot = crate::neotrix::nt_act_goal::goal_generator::ProjectSnapshot {
+            total_files: snapshot.total_files,
+            total_lines: snapshot.total_lines,
+            large_files: snapshot.large_files,
+            modules_without_tests: snapshot.modules_without_tests,
+            file_unsafe_hotspots: snapshot.file_unsafe_hotspots,
+            unsafe_count: snapshot.unsafe_count,
+            unwrap_count: snapshot.unwrap_count,
+            todo_count: snapshot.todo_count,
+            compile_errors: snapshot.compile_errors,
+            compile_warnings: snapshot.compile_warnings,
+            test_count: snapshot.test_count,
+            test_failures: snapshot.test_failures,
+        };
         let goals = AutoGoalGenerator::generate_from_snapshot(&l1_snapshot);
         let mut fixes = 0u32;
         let mut total_reward = 0.0;

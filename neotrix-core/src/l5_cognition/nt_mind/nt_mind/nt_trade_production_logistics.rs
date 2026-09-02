@@ -6,10 +6,9 @@
 //! This is a NOTABLE skill (域级突破) under the foreign_trade_full_cycle Keystone.
 
 use nt_core_capability_tree::{
-    CapabilityNode, CapabilityRegistry, ConstellationLevel, Domain, NodeLayer,
+    CapabilityNode, CapabilityRegistry, Domain, NodeLayer,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Production Order (FT07)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -593,6 +592,40 @@ impl LogisticsEngine {
             total_gross_kg: cargo.gross_kg_per_ctn * cargo.ctns as f64,
             total_net_kg: cargo.net_kg_per_ctn * cargo.ctns as f64,
         }
+    }
+
+    /// Instance method: book and pack cargo
+    pub fn book_and_pack(
+        &self,
+        booking: &BookingConfirmation,
+        packing_list: &PackingList,
+    ) -> Result<(), String> {
+        // In production, this would call external booking API
+        Ok(())
+    }
+
+    /// Instance method: customs clearance
+    pub fn customs_clearance(
+        &self,
+        declaration: &CustomsDeclaration,
+    ) -> Result<(), String> {
+        // In production, this would call customs API
+        Ok(())
+    }
+
+    /// Instance method: manage bill of lading
+    pub fn manage_bl(
+        &self,
+        bl: &BillOfLading,
+    ) -> Result<(), String> {
+        // In production, this would manage BL documents
+        Ok(())
+    }
+
+    /// Instance method: track shipment
+    pub fn track_shipment(&self) -> Result<String, String> {
+        // In production, this would call tracking API
+        Ok("Shipment in transit".into())
     }
 }
 

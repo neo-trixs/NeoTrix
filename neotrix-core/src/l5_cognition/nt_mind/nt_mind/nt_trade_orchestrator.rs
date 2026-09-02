@@ -726,12 +726,12 @@ impl TradeOrchestrator {
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         self.logistics_engine.book_and_pack(booking, packing_list)?;
         ctx.logistics = Some(LogisticsInfo {
-            vessel: booking.vessel.clone(),
-            bl_number: booking.bl_number.clone(),
-            pol: booking.pol.clone(),
-            pod: booking.pod.clone(),
-            etd: booking.etd,
-            eta: booking.eta,
+            vessel: Some(booking.vessel.clone()),
+            bl_number: None,
+            pol: booking.port_of_loading.clone(),
+            pod: booking.port_of_discharge.clone(),
+            etd: None,
+            eta: None,
             status: "Booked".into(),
         });
         ctx.conversations.push("FT17_BookingPackingListCompleted".into());
