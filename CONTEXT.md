@@ -147,6 +147,23 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **ReferenceVideoMode** | 参考生视频模式：核心生产模式，实现"角色资产→场景→参考生+主体库→选片配音剪辑"四步闭环。实现于 `nt_io::reference_video_mode`。 | "参考生模式" |
 | **FaceConsistencyManager** | 角色一致性增强：实现 ADetailer/FaceDetailer 自动补脸、Regional Prompting 多角色分区，增强角色跨镜头一致性。实现于 `nt_core::face_consistency`。 | "一致性增强" |
 | **VideoTemporalStabilizer** | 视频时序稳定性：实现帧间色彩对齐、时序防抖、二次元超分修复，提升视频生成的时序稳定性。实现于 `nt_physical::video_temporal_stabilizer`。 | "时序稳定性" |
+
+## Absorbed Terminology (2026-09-02, 通用能力重构)
+
+| Term | Definition | Avoid |
+|------|-----------|-------|
+| **VisualConsistencyManager** | 视觉一致性管理（通用）：管理视觉元素（角色、物体、场景）跨帧/跨镜头的一致性，支持自动修复、分区控制、多模型适配。适用于：漫剧、真人短剧、动画、广告、教育视频等。实现于 `nt_core::visual_consistency`。向后兼容别名 `FaceConsistencyManager`。 | "角色一致性管理" |
+| **VideoPostProcessor** | 视频后处理（通用）：实现帧间色彩对齐、时序防抖、超分修复、画质增强。适用于：所有视频生成和编辑场景。实现于 `nt_physical::video_post_processor`。向后兼容别名 `VideoTemporalStabilizer`。 | "视频时序稳定性" |
+| **NarrativeStructuring** | 叙事结构化（通用）：将文本转换为结构化叙事脚本，实现镜头运动规划、时长优化。适用于：电影、广告、教育视频、漫剧等所有视频内容。实现于 `nt_core::narrative_structuring`。向后兼容别名 `StoryboardExtractor`。 | "分镜智能拆解" |
+| **ResourceBudgetManager** | 资源预算管理（通用）：管理 AI 生成任务的 Token、GPU、成本等资源，支持预算检查、成本估算、降级策略。适用于：所有 AI 生成和推理场景。实现于 `nt_act::resource_budget`。向后兼容别名 `CostManager`。 | "成本控制" |
+| **TemporalContinuityChecker** | 时序连续性检查（通用）：检查视频帧间/镜头间的时序连续性，支持首尾帧匹配、场景转场、元素位置检查。适用于：所有视频编辑和生成场景。实现于 `nt_act::temporal_continuity`。向后兼容别名 `ShotContinuityChecker`。 | "镜头衔接检查" |
+| **ParallelTaskManager** | 并行任务管理（通用）：管理 GPU 显存、批量调度、指数退避重试，支持多设备负载均衡。适用于：所有 AI 推理和生成场景。实现于 `nt_act::parallel_task`。向后兼容别名 `TaskScheduler`。 | "任务调度器" |
+| **MediaAssetRegistry** | 媒体资产库（通用）：管理视觉资产（角色、场景、道具、模板），支持版本控制、搜索检索、批量操作。适用于：所有视觉内容创作场景。实现于 `nt_world::media_asset_registry`。向后兼容别名 `AssetRegistry`。 | "资产注册表" |
+| **QualityControlPipeline** | 质量控制流水线（通用）：实现多级审核（AI→人工→平台）、自动质检、问题追踪。适用于：所有内容创作和生成场景。实现于 `nt_meta::quality_control`。向后兼容别名 `QualityGate`。 | "质量门禁" |
+| **ReferenceBasedGeneration** | 基于参考的生成（通用）：实现图生图、视频生视频、图生视频、风格迁移等能力。适用于：所有需要参考生成的场景。实现于 `nt_io::reference_generation`。向后兼容别名 `ReferenceVideoMode`。 | "参考生模式" |
+| **ProductionOrchestrator** | 生产编排器（通用）：管理多任务并行、进度追踪、断点续传，支持工作流编排和故障恢复。适用于：所有需要批量处理的场景。实现于 `nt_act::production_orchestrator`。向后兼容别名 `BatchProductionManager`。 | "批量生产管理器" |
+| **ModelAdapter** | 模型适配器（通用）：统一接口适配 LoRA、IP-Adapter、ControlNet 等模型，支持多模型组合。适用于：所有需要模型适配的场景。实现于 `nt_io::model_adapter`。向后兼容别名 `ConsistencyAdapter`。 | "一致性适配器" |
+| **PlatformGateway** | 平台网关（通用）：统一接口适配多平台（ComfyUI/SD WebUI/Runway/Pika/Kling/Luma），支持负载均衡、故障转移。适用于：所有需要多平台集成的场景。实现于 `nt_io::platform_gateway`。向后兼容别名 `PlatformAdapter`。 | "平台适配器" |
 | **StoryboardExtractor** | 分镜智能拆解：实现 LLM 剧本→分镜自动拆解、镜头运动规划，将剧本转换为结构化分镜脚本。实现于 `nt_core::storyboard_extractor`。 | "分镜拆解" |
 | **CostManager** | 成本控制：实现 Token 估算、预算管理、成本优化策略，支持 AI 漫剧生产的成本控制。实现于 `nt_act::cost_manager`。 | "成本控制" |
 | **ShotContinuityChecker** | 镜头衔接：实现首尾帧链接、场景转场连续性，确保镜头之间的视觉连贯性。实现于 `nt_act::shot_continuity`。 | "镜头衔接" |

@@ -67,6 +67,16 @@ pub mod consistency_adapter;
 // 参考生视频模式
 pub mod reference_video_mode;
 
+// 通用能力模块 (从漫剧专用重构为通用)
+pub mod platform_gateway;     // 平台网关 (原 platform_adapter)
+pub mod model_adapter;        // 模型适配器 (原 consistency_adapter)
+pub mod reference_generation; // 基于参考的生成 (原 reference_video_mode)
+
+// 向后兼容别名
+pub use platform_gateway::PlatformAdapter;
+pub use model_adapter::ConsistencyAdapter;
+pub use reference_generation::ReferenceVideoMode;
+
 pub use nt_io_messaging::{
     MessagingRegistry, MessagingRouter, MessagingBridge,
     MessageTemplate, TemplateVariable, TemplateCategory,

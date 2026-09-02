@@ -48,6 +48,18 @@ pub mod nt_act_security;
 // 批量生产工作流
 pub mod production_pipeline;
 
+// 通用能力模块 (从漫剧专用重构为通用)
+pub mod resource_budget;      // 资源预算管理 (原 cost_manager)
+pub mod temporal_continuity;  // 时序连续性检查 (原 shot_continuity)
+pub mod parallel_task;        // 并行任务管理 (原 task_scheduler)
+pub mod production_orchestrator; // 生产编排器 (原 batch_production)
+
+// 向后兼容别名
+pub use resource_budget::CostManager;
+pub use temporal_continuity::ShotContinuityChecker;
+pub use parallel_task::TaskScheduler;
+pub use production_orchestrator::BatchProductionManager;
+
 // 成本控制
 pub mod cost_manager;
 

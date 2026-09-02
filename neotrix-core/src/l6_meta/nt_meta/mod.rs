@@ -54,3 +54,9 @@ pub mod template_tag_registry;
 
 // 质量控制审核
 pub mod quality_gate;
+
+// 通用能力模块 (从漫剧专用重构为通用)
+pub mod quality_control; // 质量控制流水线 (原 quality_gate)
+
+// 向后兼容别名
+pub use quality_control::QualityGate;

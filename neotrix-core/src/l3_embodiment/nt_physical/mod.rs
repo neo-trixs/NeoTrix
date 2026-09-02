@@ -342,5 +342,8 @@ pub struct PhysicalSnapshot {
 // 动态-音效同步模式库
 pub mod audio_sync_library;
 
-// 视频时序稳定性
-pub mod video_temporal_stabilizer;
+// 视频后处理 (原 video_temporal_stabilizer)
+pub mod video_post_processor;
+
+// 向后兼容别名
+pub use video_post_processor::VideoTemporalStabilizer;

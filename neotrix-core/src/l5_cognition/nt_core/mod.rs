@@ -48,6 +48,14 @@ pub mod nt_io_generative_media_skills;
 // 节奏重算模块 (动态漫爽点-节奏设计吸收)
 pub mod seal;
 
+// 通用能力模块 (从漫剧专用重构为通用)
+pub mod visual_consistency;   // 视觉一致性管理 (原 face_consistency)
+pub mod narrative_structuring; // 叙事结构化 (原 storyboard_extractor)
+
+// 向后兼容别名
+pub use visual_consistency::FaceConsistencyManager;
+pub use narrative_structuring::StoryboardExtractor;
+
 // 角色一致性增强
 pub mod face_consistency;
 
