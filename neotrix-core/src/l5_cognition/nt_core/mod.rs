@@ -48,5 +48,11 @@ pub mod nt_io_generative_media_skills;
 // 节奏重算模块 (动态漫爽点-节奏设计吸收)
 pub mod seal;
 
+// 角色一致性增强
+pub mod face_consistency;
+
+// 分镜智能拆解
+pub mod storyboard_extractor;
+
 // Parallel task execution
 // pub mod nt_core_parallel; // Removed duplicate

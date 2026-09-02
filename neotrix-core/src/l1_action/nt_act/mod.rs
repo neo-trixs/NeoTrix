@@ -48,5 +48,14 @@ pub mod nt_act_security;
 // 批量生产工作流
 pub mod production_pipeline;
 
+// 成本控制
+pub mod cost_manager;
+
+// 镜头衔接
+pub mod shot_continuity;
+
+// 任务调度优化
+pub mod task_scheduler;
+
 // Re-export from neotrix/l1_body_impl for backward compatibility
 // pub use crate::l1_action::nt_l1_shared_types;

@@ -145,3 +145,9 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **QualityGate** | 质量控制审核：实现 AI 初检 → 人工复审 → 平台终审的三级审核流程，支持自动化质量评估。实现于 `nt_meta::quality_gate`。 | "质量审核" |
 | **ConsistencyAdapter** | 一致性控制接口：定义角色一致性控制的统一接口，支持 LoRA、IP-Adapter 等技术对接。实现于 `nt_io::consistency_adapter`。 | "一致性接口" |
 | **ReferenceVideoMode** | 参考生视频模式：核心生产模式，实现"角色资产→场景→参考生+主体库→选片配音剪辑"四步闭环。实现于 `nt_io::reference_video_mode`。 | "参考生模式" |
+| **FaceConsistencyManager** | 角色一致性增强：实现 ADetailer/FaceDetailer 自动补脸、Regional Prompting 多角色分区，增强角色跨镜头一致性。实现于 `nt_core::face_consistency`。 | "一致性增强" |
+| **VideoTemporalStabilizer** | 视频时序稳定性：实现帧间色彩对齐、时序防抖、二次元超分修复，提升视频生成的时序稳定性。实现于 `nt_physical::video_temporal_stabilizer`。 | "时序稳定性" |
+| **StoryboardExtractor** | 分镜智能拆解：实现 LLM 剧本→分镜自动拆解、镜头运动规划，将剧本转换为结构化分镜脚本。实现于 `nt_core::storyboard_extractor`。 | "分镜拆解" |
+| **CostManager** | 成本控制：实现 Token 估算、预算管理、成本优化策略，支持 AI 漫剧生产的成本控制。实现于 `nt_act::cost_manager`。 | "成本控制" |
+| **ShotContinuityChecker** | 镜头衔接：实现首尾帧链接、场景转场连续性，确保镜头之间的视觉连贯性。实现于 `nt_act::shot_continuity`。 | "镜头衔接" |
+| **TaskScheduler** | 任务调度优化：实现 GPU 显存管理、批量调度优化、指数退避重试，提升 AI 漫剧生产任务的调度效率。实现于 `nt_act::task_scheduler`。 | "任务调度" |
