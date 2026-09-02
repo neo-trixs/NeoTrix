@@ -345,5 +345,8 @@ pub mod audio_sync_library;
 // 视频后处理 (原 video_temporal_stabilizer)
 pub mod video_post_processor;
 
+// LUT 色彩分级
+pub mod lut_color_grading;
+
 // 向后兼容别名
 pub use video_post_processor::VideoTemporalStabilizer;

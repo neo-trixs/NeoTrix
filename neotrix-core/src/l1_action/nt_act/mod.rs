@@ -54,6 +54,12 @@ pub mod temporal_continuity;  // 时序连续性检查 (原 shot_continuity)
 pub mod parallel_task;        // 并行任务管理 (原 task_scheduler)
 pub mod production_orchestrator; // 生产编排器 (原 batch_production)
 
+// 视频规格系统 (类型化规格)
+pub mod video_spec;
+
+// 检查点持久化
+pub mod checkpoint_persistence;
+
 // 向后兼容别名
 pub use resource_budget::CostManager;
 pub use temporal_continuity::ShotContinuityChecker;

@@ -72,6 +72,9 @@ pub mod platform_gateway;     // 平台网关 (原 platform_adapter)
 pub mod model_adapter;        // 模型适配器 (原 consistency_adapter)
 pub mod reference_generation; // 基于参考的生成 (原 reference_video_mode)
 
+// 多模型路由
+pub mod model_routing;
+
 // 向后兼容别名
 pub use platform_gateway::PlatformAdapter;
 pub use model_adapter::ConsistencyAdapter;

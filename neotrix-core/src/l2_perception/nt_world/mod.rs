@@ -48,5 +48,8 @@ pub mod asset_registry;
 // 通用能力模块 (从漫剧专用重构为通用)
 pub mod media_asset_registry; // 媒体资产库 (原 asset_registry)
 
+// 动态记忆库 (实体级一致性管理)
+pub mod dynamic_memory_bank;
+
 // 向后兼容别名
 pub use media_asset_registry::AssetRegistry;

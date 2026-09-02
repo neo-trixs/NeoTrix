@@ -58,5 +58,11 @@ pub mod quality_gate;
 // 通用能力模块 (从漫剧专用重构为通用)
 pub mod quality_control; // 质量控制流水线 (原 quality_gate)
 
+// 验证器引导模块
+pub mod verifier_agent;
+
+// 分层质量检查
+pub mod layered_qa;
+
 // 向后兼容别名
 pub use quality_control::QualityGate;
