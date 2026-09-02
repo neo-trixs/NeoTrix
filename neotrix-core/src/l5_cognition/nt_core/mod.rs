@@ -21,6 +21,7 @@ pub mod nt_core_safety_alignment;
 pub mod nt_core_knowledge_repr;
 pub mod nt_core_fsm_topology;
 pub mod nt_core_cuda_rl;
+pub mod nt_core_parallel;
 
 // 意识核心模块 (Consciousness Core)
 pub mod nt_core_resonance_complexity;
@@ -43,3 +44,6 @@ pub mod nt_io_pi_agent_desktop;
 pub mod nt_io_video_shotcraft;
 pub mod nt_io_cozyclay;
 pub mod nt_io_generative_media_skills;
+
+// Parallel task execution
+// pub mod nt_core_parallel; // Removed duplicate

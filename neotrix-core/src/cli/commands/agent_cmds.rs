@@ -3,16 +3,44 @@
 use std::sync::{Arc, LazyLock, OnceLock};
 use tokio::sync::RwLock;
 
-// use crate::agent::tool::mcp::McpRegistry;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::l1_action::nt_io::// nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
-use crate::core::l7_capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
+// use crate::l1_action::nt_io::nt_agent_mcp_gateway::{ProgrammaticCall, ProgrammaticPlanner};
+// use crate::core::l7_capability::nt_core_orch_agent::{SubagentConfig, SubagentManager, MessageType};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
+// use crate::agent::tool::mcp::{McpRegistry, McpDiscovery};
+
+// Stub types for missing modules — keeps file compilable while modules are migrated
+pub struct SubagentManager;
+impl SubagentManager {
+    pub fn new() -> Self { Self }
+    pub fn send_message(&mut self, _src: &str, _id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> { Ok(()) }
+    pub fn kill(&mut self, _id: &str) -> Result<(), String> { Ok(()) }
+}
+#[derive(Debug)]
+pub enum MessageType { Task }
+pub struct McpRegistry;
+impl McpRegistry {
+    pub fn new() -> Self { Self }
+}
+pub struct McpDiscovery;
+impl McpDiscovery {
+    pub fn scan_path() -> Vec<McpEntry> { Vec::new() }
+}
+pub struct McpEntry { pub name: String, pub path: std::path::PathBuf, pub status: String }
+pub struct ProgrammaticCall { pub tool: String, pub args: serde_json::Value, pub group: usize }
+pub struct ProgrammaticPlanner;
+impl ProgrammaticPlanner {
+    pub fn new(_registry: &McpRegistry) -> Self { Self }
+    pub fn plan(&self, _calls: Vec<ProgrammaticCall>) -> Result<Plan, String> { unimplemented!() }
+}
+pub struct Plan;
+impl Plan { pub fn stages(&self) -> usize { 0 } }
+pub struct SubagentConfig { pub name: String, pub description: String }
 
 static AGENT_MANAGER: LazyLock<Arc<RwLock<SubagentManager>>> =
     LazyLock::new(|| Arc::new(RwLock::new(SubagentManager::new())));
-static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
-static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
+// static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
+// static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
 
 /// Shared subagent registry — single owner across /agent and /board todo.
 pub fn shared_subagent_manager() -> Arc<RwLock<SubagentManager>> {

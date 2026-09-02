@@ -137,7 +137,6 @@ impl GoalLoop {
         if improved && reward >= tracker.config.improvement_threshold
             && tracker.stalled_count == 0 && tracker.iterations_completed >= 2 {
                 tracker.state = GoalState::Achieved;
-                brain.brain.absorb(KnowledgeSource::AutonomousGoal);
                 return false;
             }
 

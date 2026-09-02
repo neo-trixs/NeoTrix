@@ -80,7 +80,6 @@ impl GoalLoop {
             match orch.run_recursive_loop(task) {
                 Ok(_result) => {
                     let score_before = brain.brain.evaluate_capability(TaskType::General);
-                    brain.brain.absorb(KnowledgeSource::AutonomousGoal);
                     let score_after = brain.brain.evaluate_capability(TaskType::General);
                     return IterationResult {
                         iteration: brain.iteration,
