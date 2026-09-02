@@ -52,6 +52,12 @@ pub mod seal;
 pub mod visual_consistency;   // 视觉一致性管理 (原 face_consistency)
 pub mod narrative_structuring; // 叙事结构化 (原 storyboard_extractor)
 
+// 提示词增强器
+pub mod prompt_enhancer;
+
+// 风格协调器
+pub mod style_harmonizer;
+
 // 向后兼容别名
 pub use visual_consistency::FaceConsistencyManager;
 pub use narrative_structuring::StoryboardExtractor;

@@ -60,6 +60,18 @@ pub mod video_spec;
 // 检查点持久化
 pub mod checkpoint_persistence;
 
+// 运行手册系统
+pub mod operator_runbook;
+
+// 视频拼接器
+pub mod video_stitcher;
+
+// 音频编排器
+pub mod audio_orchestrator;
+
+// 发布网关
+pub mod publish_gateway;
+
 // 向后兼容别名
 pub use resource_budget::CostManager;
 pub use temporal_continuity::ShotContinuityChecker;
