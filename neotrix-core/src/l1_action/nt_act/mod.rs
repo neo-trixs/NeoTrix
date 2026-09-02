@@ -15,6 +15,9 @@ pub mod nt_act_autonomy;
 // Crypto operations
 pub mod nt_act_crypto;
 
+// Types module
+pub mod nt_act_types;
+
 // Voice commands
 pub mod nt_act_voice;
 
@@ -41,6 +44,9 @@ pub mod nt_act_sandbox;
 pub mod nt_act_seo;
 
 pub mod nt_act_security;
+
+// 批量生产工作流
+pub mod production_pipeline;
 
 // Re-export from neotrix/l1_body_impl for backward compatibility
 // pub use crate::l1_action::nt_l1_shared_types;

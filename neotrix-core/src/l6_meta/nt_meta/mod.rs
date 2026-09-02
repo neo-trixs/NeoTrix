@@ -51,3 +51,6 @@ pub mod cross_module_audit;
 
 // 模板复用标签系统
 pub mod template_tag_registry;
+
+// 质量控制审核
+pub mod quality_gate;

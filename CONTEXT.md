@@ -140,3 +140,8 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **TemplateTagRegistry** | 模板复用标签系统：管理动态漫技能模板的标签、分类、复用关系，支持跨模块一致性检查和模板检索。实现于 `nt_meta::template_tag_registry`。 | "模板标签" |
 | **AudioSyncPattern** | 动态-音效同步模式：定义动态效果和音效的同步模式，支持动态漫制作中的音画同步。实现于 `nt_physical::audio_sync_library`。 | "音效同步" |
 | **QuickStartGuide** | 快速入门向导：提供动态漫技能的快速入门指引，帮助用户快速理解和使用 NeoTrix 动态漫能力。实现于 `nt_io::quick_start_guide`。 | "入门指南" |
+| **AssetRegistry** | 主体库管理：管理角色、场景、道具、特效、配音等标准化资产，支持资产沉淀、复用、版本控制。实现于 `nt_world::asset_registry`。 | "资产库" |
+| **BatchProductionManager** | 批量生产工作流：管理多任务并行、进度追踪、断点续传，支持工业化生产流水线。实现于 `nt_act::production_pipeline`。 | "批量生产" |
+| **QualityGate** | 质量控制审核：实现 AI 初检 → 人工复审 → 平台终审的三级审核流程，支持自动化质量评估。实现于 `nt_meta::quality_gate`。 | "质量审核" |
+| **ConsistencyAdapter** | 一致性控制接口：定义角色一致性控制的统一接口，支持 LoRA、IP-Adapter 等技术对接。实现于 `nt_io::consistency_adapter`。 | "一致性接口" |
+| **ReferenceVideoMode** | 参考生视频模式：核心生产模式，实现"角色资产→场景→参考生+主体库→选片配音剪辑"四步闭环。实现于 `nt_io::reference_video_mode`。 | "参考生模式" |

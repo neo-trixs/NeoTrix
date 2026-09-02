@@ -41,3 +41,6 @@ pub mod nt_world_myip;
 pub mod nt_world_dsh_explore;
 pub mod nt_world_agent_reach;
 pub mod nt_world_semantic_extract;
+
+// 主体库管理
+pub mod asset_registry;

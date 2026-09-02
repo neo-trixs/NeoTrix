@@ -61,6 +61,12 @@ pub mod platform_adapter;
 // 快速入门向导
 pub mod quick_start_guide;
 
+// 一致性控制接口
+pub mod consistency_adapter;
+
+// 参考生视频模式
+pub mod reference_video_mode;
+
 pub use nt_io_messaging::{
     MessagingRegistry, MessagingRouter, MessagingBridge,
     MessageTemplate, TemplateVariable, TemplateCategory,
