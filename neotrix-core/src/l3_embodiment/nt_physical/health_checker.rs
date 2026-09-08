@@ -7,14 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// 组件健康状态
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum HealthStatus {
-    Healthy,
-    Degraded,
-    Unhealthy,
-    Unknown,
-}
+use neotrix_types::shared::HealthStatus;
 
 /// 单个健康检查结果
 #[derive(Debug, Clone)]

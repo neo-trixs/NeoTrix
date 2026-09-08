@@ -4,14 +4,7 @@
 
 use std::collections::HashMap;
 
-/// 健康状态
-#[derive(Debug, Clone, PartialEq)]
-pub enum HealthStatus {
-    Healthy,
-    Degraded,
-    Unhealthy,
-    Unknown,
-}
+use neotrix_types::shared::HealthStatus;
 
 /// 健康报告
 #[derive(Debug, Clone)]
