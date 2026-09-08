@@ -1,12 +1,7 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BreakerState {
-    Closed,
-    Open,
-    HalfOpen,
-}
+pub use neotrix_types::shared::BreakerState;
 
 #[derive(Debug, Clone)]
 pub struct CircuitBreaker {

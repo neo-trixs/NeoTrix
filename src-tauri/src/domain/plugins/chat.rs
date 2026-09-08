@@ -3,11 +3,96 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use rusqlite::Connection;
 use tauri::{AppHandle, Emitter};
+use neotrix::core::nt_core_consciousness_core::{
+    ConsciousTask, SolutionExecutor, AttemptOutcome,
+    ExternalClosureConfig, CORE,
+};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 pub fn set_app_handle(app: AppHandle) {
     let _ = APP_HANDLE.set(app);
+}
+
+/// LLM 池子执行器 — 实现 consciousness core 的 SolutionExecutor trait
+/// 从 config.toml + provider_pool.toml 读取模型，调用本地/远程 LLM
+struct LlmPoolExecutor {
+    endpoint: String,
+    model: String,
+}
+
+impl LlmPoolExecutor {
+    fn from_config() -> Self {
+        let path = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".config").join("neotrix").join("config.toml");
+        let empty_endpoint = "http://127.0.0.1:8080/v1".to_string();
+        let empty_model = "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".to_string();
+        if !path.exists() {
+            return Self { endpoint: empty_endpoint, model: empty_model };
+        }
+        let content = std::fs::read_to_string(&path).unwrap_or_default();
+        let mut endpoint = empty_endpoint;
+        let mut model = empty_model;
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('#') || line.is_empty() { continue; }
+            if let Some(v) = line.strip_prefix("custom_endpoint = ") {
+                endpoint = v.trim_matches('"').trim_matches('\'').to_string();
+            } else if let Some(v) = line.strip_prefix("default_model = ") {
+                model = v.trim_matches('"').trim_matches('\'').to_string();
+            }
+        }
+        Self { endpoint, model }
+    }
+}
+
+impl SolutionExecutor for LlmPoolExecutor {
+    fn attempt(&self, task: &ConsciousTask, grounding: &str, _attempt_no: u32) -> AttemptOutcome {
+        let url = format!("{}/chat/completions", self.endpoint);
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build();
+        let client = match client {
+            Ok(c) => c,
+            Err(e) => return AttemptOutcome::Failed { error: e.to_string(), tokens_used: 0 },
+        };
+
+        let system_prompt = format!(
+            "你是 NeoTrix 意识核心的任务执行器。当前任务: {} (域: {}, 能力: {})\n\
+             上下文: {}\n\
+             请直接执行此任务并返回结果。",
+            task.summary, task.domain, task.capability_tag, grounding
+        );
+
+        let body = serde_json::json!({
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": task.summary}
+            ],
+            "stream": false,
+            "temperature": 0.7,
+            "max_tokens": 2048,
+        });
+
+        let resp = client.post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send();
+
+        match resp {
+            Ok(r) => {
+                let json: serde_json::Value = r.json().unwrap_or_default();
+                let content = json["choices"][0]["message"]["content"]
+                    .as_str()
+                    .unwrap_or("[LLM 未返回内容]");
+                let tokens = json["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32;
+                AttemptOutcome::Solved { solution: content.to_string(), tokens_used: tokens }
+            }
+            Err(e) => AttemptOutcome::Failed { error: e.to_string(), tokens_used: 0 },
+        }
+    }
 }
 
 pub struct ChatPlugin {
@@ -78,99 +163,60 @@ impl ChatPlugin {
         Ok(())
     }
 
-    fn read_config() -> (String, String, String) {
-        let path = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".config").join("neotrix").join("config.toml");
-        let empty = ("llamacpp".into(), "http://127.0.0.1:8080/v1".into(), "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".into());
-        if !path.exists() { return empty; }
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => return empty,
-        };
-        let mut provider = empty.0;
-        let mut endpoint = empty.1;
-        let mut model = empty.2;
-        for line in content.lines() {
-            let line = line.trim();
-            if line.starts_with('#') || line.is_empty() { continue; }
-            if let Some(v) = line.strip_prefix("provider = ") {
-                provider = v.trim_matches('"').trim_matches('\'').to_string();
-            } else if let Some(v) = line.strip_prefix("custom_endpoint = ") {
-                endpoint = v.trim_matches('"').trim_matches('\'').to_string();
-            } else if let Some(v) = line.strip_prefix("default_model = ") {
-                model = v.trim_matches('"').trim_matches('\'').to_string();
-            }
-        }
-        (provider, endpoint, model)
-    }
-
     fn call_llm(&self, content: &str) -> Result<String, DomainError> {
-        let (_provider, endpoint, model) = Self::read_config();
-        let url = format!("{}/chat/completions", endpoint);
-        
         // 发射流开始事件
         if let Some(app) = APP_HANDLE.get() {
             let _ = app.emit("neocodex_stream_start", "");
         }
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
-            .build()
-            .map_err(|e| DomainError { code: "HTTP_ERROR".into(), message: format!("创建 HTTP 客户端失败: {}", e), recoverable: true })?;
+        // 使用意识核心分解任务并路由到最佳模型
+        let executor = LlmPoolExecutor::from_config();
+        let config = ExternalClosureConfig {
+            max_attempts: 3,
+            token_budget: 4096,
+            max_llm_tokens: 2048,
+            acquire_knowledge: false,
+        };
 
-        // 使用意识核心风格的系统提示 — 任务分解 + 路由
-        let system_prompt = format!(
-            "你是 NeoTrix 意识核心。用户输入: '{}'\n\
-             请分析此输入，如果包含多个子任务，先分解再逐一回答。\
-             直接给出清晰、有条理的回答。",
-            content
-        );
-
-        let body = serde_json::json!({
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": content}
-            ],
-            "stream": false,
-            "temperature": 0.7,
-            "max_tokens": 2048,
-        });
-
-        let resp = client.post(&url)
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .map_err(|e| {
-                if let Some(app) = APP_HANDLE.get() {
-                    let _ = app.emit("neocodex_stream_error", serde_json::json!({
-                        "code": "HTTP_ERROR",
-                        "message": format!("调用 LLM 失败: {}", e),
-                    }));
-                }
-                DomainError { code: "HTTP_ERROR".into(), message: format!("调用 LLM 失败: {}", e), recoverable: true }
+        let report = {
+            let mut core = CORE.write().map_err(|e| DomainError {
+                code: "CORE_LOCK".into(),
+                message: format!("获取意识核心锁失败: {}", e),
+                recoverable: true,
             })?;
+            core.execute_task_loop(content, &executor, &config)
+        };
 
-        let json: serde_json::Value = resp.json()
-            .map_err(|e| DomainError { code: "PARSE_ERROR".into(), message: format!("解析 LLM 响应失败: {}", e), recoverable: true })?;
+        // 聚合所有子任务的结果
+        let mut results = Vec::new();
+        for result in &report.internal_results {
+            results.push(result.output.clone());
+        }
+        for gap in &report.external_gaps {
+            results.push(format!("[外部缺口] {}", gap));
+        }
 
-        let assistant_content = json["choices"][0]["message"]["content"]
-            .as_str()
-            .unwrap_or("[LLM 未返回内容]");
-        
-        // 发射流式 token 事件（完整内容作为单个 token）
+        let combined = if results.is_empty() {
+            "[意识核心未返回结果]".to_string()
+        } else {
+            results.join("\n\n")
+        };
+
+        // 发射流式 token 事件
         if let Some(app) = APP_HANDLE.get() {
-            let _ = app.emit("neocodex_stream_token", assistant_content.to_string());
-            let _ = app.emit("neocodex_stream_end", assistant_content.to_string());
+            let _ = app.emit("neocodex_stream_token", combined.clone());
+            let _ = app.emit("neocodex_stream_end", combined.clone());
             let _ = app.emit("neocodex_stream_done", serde_json::json!({
                 "cancelled": false,
                 "elapsed_ms": 0,
-                "content": assistant_content,
+                "content": combined,
+                "tasks_decomposed": report.allocations.len(),
+                "internal_executed": report.internal_count,
+                "external_gaps": report.external_gap_count,
             }));
         }
-        
-        Ok(assistant_content.to_string())
+
+        Ok(combined)
     }
 }
 

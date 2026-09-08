@@ -53,6 +53,8 @@ pub struct NtxStats {
 }
 
 /// NTX 文件核心结构
+use std::collections::HashMap;
+
 pub struct NtxFile {
     path: PathBuf,
     file: File,
@@ -60,6 +62,7 @@ pub struct NtxFile {
     toc: NtxToc,
     wal: EmbeddedWal,
     frames: Vec<KnowledgeFrame>,
+    frame_index: HashMap<u64, usize>,  // frame_id → frames 索引 (O(1) 查找)
     vec_segment: Option<VecSegment>,
     graph_segment: Option<GraphSegment>,
     time_segment: Option<TimeSegment>,
@@ -98,6 +101,7 @@ impl NtxFile {
         Ok(Self {
             path, file, header, toc, wal,
             frames: Vec::new(),
+            frame_index: HashMap::new(),
             vec_segment: None,
             graph_segment: None,
             time_segment: None,
@@ -126,9 +130,15 @@ impl NtxFile {
         let time_segment = Self::load_time_segment(&mut file, &toc)?;
         let lex_segment = Self::load_lex_segment(&mut file, &toc)?;
 
+        // 构建帧索引 (O(1) 查找)
+        let mut frame_index = HashMap::new();
+        for (i, frame) in frames.iter().enumerate() {
+            frame_index.insert(frame.frame_id, i);
+        }
+
         Ok(Self {
             path, file, header, toc, wal,
-            frames, vec_segment, graph_segment, time_segment, lex_segment,
+            frames, frame_index, vec_segment, graph_segment, time_segment, lex_segment,
             dirty: false,
             read_only: false,
         })
@@ -156,6 +166,7 @@ impl NtxFile {
             header,
             toc,
             frames: Vec::new(),
+            frame_index: HashMap::new(),
             vec_segment: None,
             graph_segment: None,
             time_segment: None,
@@ -165,8 +176,11 @@ impl NtxFile {
             read_only: true,
         };
 
-        // 只读时也加载帧
+        // 只读时也加载帧并构建索引
         ntx.frames = Self::load_frames_segment(&mut ntx.file, &ntx.toc)?;
+        for (i, frame) in ntx.frames.iter().enumerate() {
+            ntx.frame_index.insert(frame.frame_id, i);
+        }
         Ok(ntx)
     }
 
@@ -181,7 +195,9 @@ impl NtxFile {
             ));
         }
         self.wal.append(&mut self.file, frame)?;
+        let idx = self.frames.len();
         self.frames.push(frame.clone());
+        self.frame_index.insert(frame.frame_id, idx);
         self.header.frame_count += 1;
         self.dirty = true;
 
@@ -201,7 +217,9 @@ impl NtxFile {
         }
         for frame in frames {
             self.wal.append(&mut self.file, frame)?;
+            let idx = self.frames.len();
             self.frames.push(frame.clone());
+            self.frame_index.insert(frame.frame_id, idx);
             self.header.frame_count += 1;
         }
         self.dirty = true;

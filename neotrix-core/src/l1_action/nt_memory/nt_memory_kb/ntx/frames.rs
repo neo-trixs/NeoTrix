@@ -97,7 +97,7 @@ impl KnowledgeFrame {
         crc32(&data) == self.checksum
     }
 
-    /// 帧序列化为字节 (磁盘格式)
+    /// 帧序列化为字节 (磁盘格式, 写入时验证校验和)
     pub fn encode_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(256 + self.payload.len());
         buf.extend_from_slice(&self.frame_id.to_le_bytes());
@@ -107,6 +107,11 @@ impl KnowledgeFrame {
         buf.extend_from_slice(&(self.payload.len() as u32).to_le_bytes());
         buf.extend_from_slice(&self.payload);
         buf.extend_from_slice(&self.uncompressed_len.to_le_bytes());
+        // 验证校验和一致性
+        let computed = crc32(&self.payload);
+        if self.checksum != 0 && self.checksum != computed {
+            eprintln!("[NTX] 帧 {} 校验和不匹配: 存储={}, 计算={}", self.frame_id, self.checksum, computed);
+        }
         buf.extend_from_slice(&self.checksum.to_le_bytes());
         buf.extend_from_slice(&self.timestamp.to_le_bytes());
         let tags_bytes = self.tags.as_deref().unwrap_or("").as_bytes();

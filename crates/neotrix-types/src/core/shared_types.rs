@@ -67,3 +67,10 @@ pub enum TaskState { Pending, Running, Completed, Failed, Cancelled, Timeout }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrendDirection { Rising, Stable, Falling, Volatile }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BreakerState {
+    Closed,
+    Open,
+    HalfOpen,
+}

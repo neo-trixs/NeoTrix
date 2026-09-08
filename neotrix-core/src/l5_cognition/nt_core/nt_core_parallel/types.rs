@@ -1,19 +1,10 @@
 //! 并行模块基础类型
 
+pub use neotrix_types::core::shared_types::TaskState;
 use serde::{Deserialize, Serialize};
 
 pub type TaskId = u64;
 pub type AgentId = String;
-
-/// 任务状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskState {
-    Pending,
-    Running,
-    Completed,
-    Failed,
-    Cancelled,
-}
 
 /// 任务定义
 #[derive(Debug, Clone, Serialize, Deserialize)]

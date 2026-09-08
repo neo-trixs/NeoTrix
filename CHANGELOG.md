@@ -11,11 +11,14 @@
   - `call_llm` 发射 `neocodex_stream_start`/`neocodex_stream_token`/`neocodex_stream_end`/`neocodex_stream_done` 事件
 - **涉及文件**: `src-tauri/src/domain/plugins/chat.rs`, `src-tauri/src/domain/plugins/mod.rs`, `src-tauri/src/main.rs`
 
-### 意识核心集成尝试 (已回退)
+### 意识核心集成完成
 - **目标**: 将 chat plugin 连接到 neotrix-core 的意识核心 (ConsciousnessCore)，实现任务分解 → 模型路由 → 自动执行
-- **发现**: neotrix-core 有 87 个编译错误，无法作为依赖引入 Tauri 应用
-- **当前状态**: chat plugin 使用简化版本 — 直接调用 llama.cpp，系统提示中加入任务分解指令
-- **后续**: 需要先修复 neotrix-core 的编译错误，才能完整集成意识核心
+- **修复**: 
+  - 修复 neotrix-core 编译错误 (kanban_cmds.rs: `let mut mgr` + 重复 Mutex import)
+  - 添加 neotrix crate 作为 Tauri app 依赖
+  - 实现 `LlmPoolExecutor` (SolutionExecutor trait)，从 config.toml 读取模型，调用本地/远程 LLM
+  - `call_llm` 使用 `CORE.write().execute_task_loop()` 执行完整任务闭环
+- **当前状态**: 意识核心已集成，chat plugin 可通过 consciousness core 执行任务分解 → 模型路由 → 执行
 
 ### ModelSwitcher: 动态模型池加载
 - **问题**: 模型名硬编码为 `neotrix-core` 或 GGUF 文件名

@@ -136,11 +136,25 @@ impl EmbeddedWal {
         Ok(Self { wal_offset, wal_size, write_pos, sequence, checkpoint_pos, entry_count })
     }
 
-    /// 追加条目
+    /// 追加条目 (预分配缓冲区优化)
     pub fn append(&mut self, file: &mut File, frame: &KnowledgeFrame) -> std::io::Result<u64> {
         self.sequence += 1;
         let entry = WalEntry::append(frame, self.sequence);
-        self.write_entry(file, &entry)?;
+        // 预分配条目缓冲区 (避免多次 seek)
+        let bytes = entry.encode();
+        let needed = 4 + bytes.len() as u64;
+        if self.write_pos + needed > self.wal_offset + self.wal_size {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::OutOfMemory,
+                "WAL full, checkpoint needed",
+            ));
+        }
+        file.seek(SeekFrom::Start(self.write_pos))?;
+        let mut buf = Vec::with_capacity(4 + bytes.len());
+        buf.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+        buf.extend_from_slice(&bytes);
+        file.write_all(&buf)?;
+        self.write_pos += needed;
         self.entry_count += 1;
         Ok(self.sequence)
     }

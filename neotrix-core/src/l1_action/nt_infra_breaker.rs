@@ -8,13 +8,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
-/// 断路器状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum BreakerState {
-    Closed,
-    Open,
-    HalfOpen,
-}
+use neotrix_types::shared::BreakerState;
 
 /// 断路器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
