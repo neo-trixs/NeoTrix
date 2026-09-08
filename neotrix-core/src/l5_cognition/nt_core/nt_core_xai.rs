@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 可解释AI引擎
+#[allow(dead_code)]
 pub struct ExplainableAIEngine {
     explainer: ModelExplainer,
     feature_analyzer: FeatureAnalyzer,
@@ -40,18 +41,21 @@ impl Default for XAIConfig {
 }
 
 /// 模型解释器
+#[allow(dead_code)]
 pub struct ModelExplainer {
     method: String,
     background_data: Option<Vec<HashMap<String, f64>>>,
 }
 
 /// 特征分析器
+#[allow(dead_code)]
 pub struct FeatureAnalyzer {
     feature_importance: HashMap<String, f64>,
     feature_correlations: HashMap<String, HashMap<String, f64>>,
 }
 
 /// 注意力可视化器
+#[allow(dead_code)]
 pub struct AttentionVisualizer {
     attention_weights: HashMap<String, Vec<f64>>,
 }

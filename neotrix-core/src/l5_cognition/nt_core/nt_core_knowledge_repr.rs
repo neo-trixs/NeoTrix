@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识表示引擎
+#[allow(dead_code)]
 pub struct KnowledgeRepresentationEngine {
     ontology: Ontology,
     knowledge_base: KnowledgeBase,
@@ -136,6 +137,7 @@ pub struct Fact {
 }
 
 /// 推理器
+#[allow(dead_code)]
 pub struct Reasoner {
     inference_rules: Vec<InferenceRule>,
     inference_cache: HashMap<String, Vec<String>>,

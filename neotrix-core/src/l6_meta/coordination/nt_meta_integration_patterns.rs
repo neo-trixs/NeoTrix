@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 集成模式库
+#[allow(dead_code)]
 pub struct IntegrationPatternLibrary {
     patterns: Vec<IntegrationPattern>,
     active_integrations: Vec<ActiveIntegration>,

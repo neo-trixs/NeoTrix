@@ -57,6 +57,7 @@ impl Default for PromptCacheConfig {
 }
 
 /// 视频提示词缓存
+#[allow(dead_code)]
 pub struct VideoPromptCache {
     /// 缓存存储
     entries: HashMap<String, PromptCacheEntry>,
@@ -159,6 +160,7 @@ impl VideoPromptCache {
     }
 
     /// 查找相似条目
+    #[allow(dead_code)]
     fn find_similar(&mut self, query_embedding: &[f64]) -> Option<String> {
         let mut best_score = 0.0;
         let mut best_id = None;
@@ -175,6 +177,7 @@ impl VideoPromptCache {
     }
 
     /// 查找相似条目 ID (immutable borrow)
+    #[allow(dead_code)]
     fn find_similar_id(&self, query_embedding: &[f64]) -> Option<String> {
         let mut best_score = 0.0;
         let mut best_id = None;

@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 经验树管理器
+#[allow(dead_code)]
 pub struct ExperienceTreeManager {
     experiences: Vec<Experience>,
     branches: Vec<ExperienceBranch>,

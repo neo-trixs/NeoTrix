@@ -83,12 +83,14 @@ pub struct Community {
 }
 
 /// 语义索引
+#[allow(dead_code)]
 pub struct SemanticIndex {
     index: HashMap<String, Vec<f32>>,
     metadata: HashMap<String, HashMap<String, String>>,
 }
 
 /// 推理引擎
+#[allow(dead_code)]
 pub struct ReasoningEngine {
     rules: Vec<ReasoningRule>,
     inference_cache: HashMap<String, Vec<String>>,

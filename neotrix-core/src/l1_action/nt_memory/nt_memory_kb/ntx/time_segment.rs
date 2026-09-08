@@ -25,17 +25,17 @@ impl TimeSegment {
         Self { entries: Vec::new() }
     }
 
-    /// 添加条目
+    /// 添加条目 (二分查找插入位置)
     pub fn insert(&mut self, entry: TimeEntry) {
-        self.entries.push(entry);
-        // 保持时间有序
-        self.entries.sort_by_key(|e| e.timestamp);
+        let pos = self.entries.partition_point(|e| e.timestamp < entry.timestamp);
+        self.entries.insert(pos, entry);
     }
 
-    /// 查询时间范围内的条目
+    /// 查询时间范围内的条目 (二分查找)
     pub fn range(&self, from: u64, to: u64) -> Vec<&TimeEntry> {
-        self.entries.iter()
-            .filter(|e| e.timestamp >= from && e.timestamp <= to)
+        let start = self.entries.partition_point(|e| e.timestamp < from);
+        self.entries[start..].iter()
+            .take_while(|e| e.timestamp <= to)
             .collect()
     }
 

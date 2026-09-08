@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 并发冲突检测器
+#[allow(dead_code)]
 pub struct ConcurrencyConflictDetector {
     monitored_files: Vec<MonitoredFile>,
     conflicts: Vec<Conflict>,

@@ -42,29 +42,32 @@ pub struct GraphNeighbor {
     pub direction: EdgeDirection,
 }
 
-/// 图谱段
+use std::collections::HashMap;
+
+/// 图谱段 (O(1) 邻居查询 via HashMap 索引)
 pub struct GraphSegment {
     nodes: Vec<GraphNode>,
     edges: Vec<GraphEdge>,
+    node_index: HashMap<[u8; 36], usize>,  // node_id → nodes 索引
 }
 
 impl GraphSegment {
     pub fn new() -> Self {
-        Self { nodes: Vec::new(), edges: Vec::new() }
+        Self { nodes: Vec::new(), edges: Vec::new(), node_index: HashMap::new() }
     }
 
     /// 添加边
     pub fn add_edge(&mut self, edge: GraphEdge) {
         let edge_clone = edge.clone();
         self.edges.push(edge);
-        // 更新邻接表
         self.update_adjacency(&edge_clone);
     }
 
-    /// 更新邻接表
+    /// 更新邻接表 (O(1) via HashMap 索引)
     fn update_adjacency(&mut self, edge: &GraphEdge) {
         // 源节点
-        if let Some(node) = self.nodes.iter_mut().find(|n| n.node_id == edge.source) {
+        if let Some(&idx) = self.node_index.get(&edge.source) {
+            let node = &mut self.nodes[idx];
             node.neighbors.push(GraphNeighbor {
                 node_id: edge.target,
                 edge_type: edge.edge_type,
@@ -73,6 +76,7 @@ impl GraphSegment {
             });
             node.degree += 1;
         } else {
+            let idx = self.nodes.len();
             self.nodes.push(GraphNode {
                 node_id: edge.source,
                 degree: 1,
@@ -83,11 +87,13 @@ impl GraphSegment {
                     direction: edge.direction,
                 }],
             });
+            self.node_index.insert(edge.source, idx);
         }
 
         // 目标节点 (双向或入边)
         if edge.direction == EdgeDirection::Bidirectional || edge.direction == EdgeDirection::Incoming {
-            if let Some(node) = self.nodes.iter_mut().find(|n| n.node_id == edge.target) {
+            if let Some(&idx) = self.node_index.get(&edge.target) {
+                let node = &mut self.nodes[idx];
                 node.neighbors.push(GraphNeighbor {
                     node_id: edge.source,
                     edge_type: edge.edge_type,
@@ -96,6 +102,7 @@ impl GraphSegment {
                 });
                 node.degree += 1;
             } else {
+                let idx = self.nodes.len();
                 self.nodes.push(GraphNode {
                     node_id: edge.target,
                     degree: 1,
@@ -106,20 +113,20 @@ impl GraphSegment {
                         direction: EdgeDirection::Outgoing,
                     }],
                 });
+                self.node_index.insert(edge.target, idx);
             }
         }
     }
 
-    /// 获取节点邻居
+    /// 获取节点邻居 (O(1))
     pub fn neighbors(&self, node_id: &[u8; 36]) -> Option<&[GraphNeighbor]> {
-        self.nodes.iter()
-            .find(|n| n.node_id == *node_id)
-            .map(|n| n.neighbors.as_slice())
+        self.node_index.get(node_id)
+            .map(|&idx| self.nodes[idx].neighbors.as_slice())
     }
 
-    /// 获取度数
+    /// 获取度数 (O(1))
     pub fn degree(&self, node_id: &[u8; 36]) -> Option<u32> {
-        self.nodes.iter().find(|n| n.node_id == *node_id).map(|n| n.degree)
+        self.node_index.get(node_id).map(|&idx| self.nodes[idx].degree)
     }
 
     /// BFS 遍历
@@ -282,7 +289,7 @@ impl GraphSegment {
             });
         }
 
-        Ok(Self { nodes, edges })
+        Ok(Self { nodes, edges, node_index: std::collections::HashMap::new() })
     }
 }
 

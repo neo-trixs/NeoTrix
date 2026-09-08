@@ -4,7 +4,6 @@
 
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::fs::File;
-use super::format::{sha256};
 use super::frames::{KnowledgeFrame, FrameError};
 
 /// WAL 条目类型
@@ -88,6 +87,20 @@ pub struct EmbeddedWal {
     sequence: u64,
     checkpoint_pos: u64,
     entry_count: u64,
+}
+
+impl EmbeddedWal {
+    /// 创建只读 WAL (无状态)
+    pub fn new_read_only(header: &super::format::NtxHeader) -> Self {
+        Self {
+            wal_offset: header.wal_offset,
+            wal_size: header.wal_size,
+            write_pos: header.wal_offset + header.wal_size,
+            sequence: 0,
+            checkpoint_pos: 0,
+            entry_count: 0,
+        }
+    }
 }
 
 impl EmbeddedWal {

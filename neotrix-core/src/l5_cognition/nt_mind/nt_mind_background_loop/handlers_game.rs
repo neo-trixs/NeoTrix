@@ -181,6 +181,7 @@ fn rng_step(cells: &mut [u8], seed: u64, step: usize) {
 // Game Training Daemon
 // ═══════════════════════════════════════════════════════════════════
 
+#[allow(dead_code)]
 pub struct GameTrainingDaemon {
     pub state: GameDaemonState,
     pub episodes_per_tick: usize,
@@ -264,10 +265,12 @@ impl GameTrainingDaemon {
         }
     }
 
+    #[allow(dead_code)]
     pub fn run(&mut self, ticks: usize) -> Vec<GameTickReport> {
         (0..ticks).map(|_| self.tick()).collect()
     }
 
+    #[allow(dead_code)]
     pub fn status(&self) -> String {
         serde_json::json!({
             "constellation": self.state.constellation,

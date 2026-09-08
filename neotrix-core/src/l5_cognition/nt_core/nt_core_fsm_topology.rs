@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// FSM 行为拓扑引擎
+#[allow(dead_code)]
 pub struct FSMBehaviorTopologyEngine {
     states: Vec<FSMState>,
     transitions: Vec<FSMTransition>,

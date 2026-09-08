@@ -82,6 +82,7 @@ pub struct AdapterResult {
 
 /// 适配器注册配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ModelAdapterConfig {
     /// 默认适配器目录
     pub adapter_dir: String,

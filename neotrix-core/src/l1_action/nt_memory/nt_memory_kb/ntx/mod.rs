@@ -65,6 +65,7 @@ pub struct NtxFile {
     time_segment: Option<TimeSegment>,
     lex_segment: Option<LexSegment>,
     dirty: bool,
+    read_only: bool,
 }
 
 impl NtxFile {
@@ -102,6 +103,7 @@ impl NtxFile {
             time_segment: None,
             lex_segment: None,
             dirty: false,
+            read_only: false,
         })
     }
 
@@ -128,19 +130,57 @@ impl NtxFile {
             path, file, header, toc, wal,
             frames, vec_segment, graph_segment, time_segment, lex_segment,
             dirty: false,
+            read_only: false,
         })
     }
 
     /// 只读打开
+    /// 只读打开 (不写 WAL, 不修改)
     pub fn open_read_only(path: impl AsRef<Path>) -> std::io::Result<Self> {
-        Self::open(path)
+        let path = path.as_ref().to_path_buf();
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .create(false)
+            .open(&path)?;
+
+        let header = NtxHeader::read_from(&mut file)?;
+        let toc = NtxToc::read_from(&mut file)?;
+
+        // 只读打开时跳过 WAL
+        let wal = EmbeddedWal::new_read_only(&header);
+
+        let mut ntx = NtxFile {
+            file,
+            wal,
+            header,
+            toc,
+            frames: Vec::new(),
+            vec_segment: None,
+            graph_segment: None,
+            time_segment: None,
+            lex_segment: None,
+            path,
+            dirty: false,
+            read_only: true,
+        };
+
+        // 只读时也加载帧
+        ntx.frames = Self::load_frames_segment(&mut ntx.file, &ntx.toc)?;
+        Ok(ntx)
     }
 
     // ── 帧操作 ──────────────────────────────────────
 
-    /// 写入知识帧 (先入 WAL, 满时检查点到 frames segment)
+    /// 写入知识帧 (只读检查)
     pub fn put_frame(&mut self, frame: &KnowledgeFrame) -> std::io::Result<()> {
-        self.wal.append(frame)?;
+        if self.read_only {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "NTX file opened read-only",
+            ));
+        }
+        self.wal.append(&mut self.file, frame)?;
         self.frames.push(frame.clone());
         self.header.frame_count += 1;
         self.dirty = true;
@@ -153,8 +193,14 @@ impl NtxFile {
 
     /// 批量写入
     pub fn put_frames(&mut self, frames: &[KnowledgeFrame]) -> std::io::Result<()> {
+        if self.read_only {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "NTX file opened read-only",
+            ));
+        }
         for frame in frames {
-            self.wal.append(frame)?;
+            self.wal.append(&mut self.file, frame)?;
             self.frames.push(frame.clone());
             self.header.frame_count += 1;
         }
@@ -229,6 +275,12 @@ impl NtxFile {
         if !self.dirty {
             return Ok(());
         }
+        if self.read_only {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "NTX file opened read-only",
+            ));
+        }
 
         // 检查点: WAL → frames
         self.checkpoint()?;
@@ -273,7 +325,7 @@ impl NtxFile {
         }
 
         // 刷新 WAL
-        self.wal.flush()?;
+        self.wal.flush(&mut self.file)?;
 
         // 重写 TOC
         self.file.seek(SeekFrom::End(0))?;
@@ -293,14 +345,15 @@ impl NtxFile {
 
     // ── 检查点 ──────────────────────────────────────
 
-    /// 检查点: WAL → frames 内存缓冲
+    /// 检查点: WAL → frames (HashSet 去重, O(N) 替代 O(N²))
     fn checkpoint(&mut self) -> std::io::Result<()> {
-        let entries = self.wal.checkpoint()?;
+        use std::collections::HashSet;
+        let entries = self.wal.checkpoint(&mut self.file)?;
+        let existing: HashSet<u64> = self.frames.iter().map(|f| f.frame_id).collect();
         for entry in &entries {
             if entry.entry_type == WalEntryType::Append {
                 if let Ok(frame) = KnowledgeFrame::decode_bytes(&entry.payload) {
-                    // 去重: 已在 put_frame 时加入 frames
-                    if !self.frames.iter().any(|f| f.frame_id == frame.frame_id) {
+                    if !existing.contains(&frame.frame_id) {
                         self.frames.push(frame);
                     }
                 }
@@ -311,7 +364,7 @@ impl NtxFile {
 
     /// 恢复: 重放 WAL
     pub fn recover(&mut self) -> std::io::Result<Vec<KnowledgeFrame>> {
-        let entries = self.wal.recover()?;
+        let entries = self.wal.recover(&mut self.file)?;
         let mut frames = Vec::new();
         for entry in &entries {
             if entry.entry_type == WalEntryType::Append {
@@ -376,6 +429,7 @@ impl NtxFile {
     }
 
     /// 从文件加载帧段
+    #[allow(dead_code)]
     fn load_frames_segment(file: &mut File, toc: &NtxToc) -> std::io::Result<Vec<KnowledgeFrame>> {
         let desc = match toc.find_segment(SegmentType::Frames) {
             Some(d) => d,
@@ -386,15 +440,36 @@ impl NtxFile {
         file.read_exact(&mut count_buf)?;
         let count = u32::from_le_bytes(count_buf) as usize;
         let mut frames = Vec::with_capacity(count);
-        for _ in 0..count {
+        let mut errors = 0u32;
+        for i in 0..count {
             let mut len_buf = [0u8; 4];
-            file.read_exact(&mut len_buf)?;
-            let len = u32::from_le_bytes(len_buf) as usize;
-            let mut buf = vec![0u8; len];
-            file.read_exact(&mut buf)?;
-            if let Ok(frame) = KnowledgeFrame::decode_bytes(&buf) {
-                frames.push(frame);
+            if file.read_exact(&mut len_buf).is_err() {
+                errors += 1;
+                eprintln!("[NTX] load_frames: 帧 {} 长度读取失败", i);
+                continue;
             }
+            let len = u32::from_le_bytes(len_buf) as usize;
+            if len > 1024 * 1024 {  // 1MB 帧大小上限
+                errors += 1;
+                eprintln!("[NTX] load_frames: 帧 {} 大小异常 ({} bytes)", i, len);
+                continue;
+            }
+            let mut buf = vec![0u8; len];
+            if file.read_exact(&mut buf).is_err() {
+                errors += 1;
+                eprintln!("[NTX] load_frames: 帧 {} 数据读取失败", i);
+                continue;
+            }
+            match KnowledgeFrame::decode_bytes(&buf) {
+                Ok(frame) => frames.push(frame),
+                Err(e) => {
+                    errors += 1;
+                    eprintln!("[NTX] load_frames: 帧 {} 解码失败: {}", i, e);
+                }
+            }
+        }
+        if errors > 0 {
+            eprintln!("[NTX] load_frames: {} / {} 帧加载失败", errors, count);
         }
         Ok(frames)
     }

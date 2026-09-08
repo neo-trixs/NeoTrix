@@ -29,6 +29,7 @@ pub struct Style特征 {
 
 /// 风格协调配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct StyleHarmonizerConfig {
     /// 目标风格
     pub target_style: Option<String>,
@@ -77,6 +78,7 @@ pub struct StyleAnalysis {
 // ============================================================================
 
 /// 风格协调器
+#[allow(dead_code)]
 pub struct StyleHarmonizer {
     /// 配置
     config: StyleHarmonizerConfig,

@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 治理合规检查器
+#[allow(dead_code)]
 pub struct GovernanceComplianceChecker {
     rules: Vec<GovernanceRule>,
     violations: Vec<ComplianceViolation>,

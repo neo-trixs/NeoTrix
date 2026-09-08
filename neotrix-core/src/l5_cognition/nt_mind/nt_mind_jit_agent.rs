@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// JIT-Agent 协议编排器
+#[allow(dead_code)]
 pub struct JITAgentProtocolOrchestrator {
     modules: Vec<JITModule>,
     protocols: Vec<JITProtocol>,

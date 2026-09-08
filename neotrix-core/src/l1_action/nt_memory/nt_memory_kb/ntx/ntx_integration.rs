@@ -4,26 +4,53 @@
 //! 当 NTX 文件存在时, 优先从 NTX 加载向量; 否则回退 SQLite。
 
 use std::path::{Path, PathBuf};
+use std::cell::RefCell;
 use super::{NtxFile, NtxStats};
 use super::vec_segment::{VecSegment, HnswParams};
 use super::frames::{KnowledgeFrame, FrameType, Encoding};
 use super::graph_segment::{GraphSegment, GraphEdge, EdgeDirection};
 use rusqlite::Connection;
 
-/// NTX 索引管理器
+/// NTX 索引管理器 (带文件缓存)
 pub struct NtxIndexManager {
     ntx_path: PathBuf,
+    cached_ntx: RefCell<Option<NtxFile>>,
 }
 
 impl NtxIndexManager {
     pub fn new(ntx_dir: impl AsRef<Path>, db_name: &str) -> Self {
         let ntx_path = ntx_dir.as_ref().join(format!("{db_name}.ntx"));
-        Self { ntx_path }
+        Self { ntx_path, cached_ntx: RefCell::new(None) }
+    }
+
+    /// 获取或打开 NTX 文件 (缓存复用)
+    fn get_or_open(&self, read_only: bool) -> std::io::Result<std::cell::RefMut<'_, Option<NtxFile>>> {
+        let mut cache = self.cached_ntx.borrow_mut();
+        if cache.is_none() {
+            let ntx = if self.ntx_path.exists() {
+                if read_only {
+                    NtxFile::open_read_only(&self.ntx_path)?
+                } else {
+                    NtxFile::open(&self.ntx_path)?
+                }
+            } else {
+                if read_only {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "NTX file does not exist",
+                    ));
+                }
+                NtxFile::create(&self.ntx_path)?
+            };
+            *cache = Some(ntx);
+        }
+        Ok(cache)
     }
 
     /// 从 SQLite 全量同步到 NTX (增量由 sync 模块处理)
     pub fn full_sync(&self, conn: &Connection, dimension: usize) -> std::io::Result<NtxStats> {
-        let mut ntx = NtxFile::create(&self.ntx_path)?;
+        let mut cache = self.get_or_open(false)?;
+        let ntx = cache.as_mut().unwrap();
 
         // 1. 同步节点帧
         let mut stmt = conn.prepare(

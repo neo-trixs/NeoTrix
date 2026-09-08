@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 模型路由器
+#[allow(dead_code)]
 pub struct ModelRouter {
     providers: HashMap<String, Provider>,
     models: HashMap<String, ModelInfo>,

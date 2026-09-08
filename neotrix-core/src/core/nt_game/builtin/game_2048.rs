@@ -18,6 +18,7 @@ use super::super::framework::{Action, ActorId, Observation, StepResult};
 const GRID: usize = 4;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Game2048 {
     board: [[u32; GRID]; GRID],
     score: u32,
