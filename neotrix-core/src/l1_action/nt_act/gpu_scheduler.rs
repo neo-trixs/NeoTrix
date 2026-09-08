@@ -4,8 +4,6 @@
 //! 支持 GPU 利用率从 15-25% 提升到 60-75%。
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 /// GPU 设备状态
 #[derive(Debug, Clone)]

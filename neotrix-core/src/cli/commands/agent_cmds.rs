@@ -14,7 +14,7 @@ pub struct SubagentManager { agents: Vec<AgentInfo> }
 #[derive(Debug, Clone)]
 pub struct AgentInfo { pub id: String, pub config: SubagentConfig, pub status: AgentStatus }
 #[derive(Debug, Clone)]
-pub enum AgentStatus { Idle, Running, Completed, Failed, Paused }
+pub enum AgentStatus { Idle, Running { progress: f64 }, Completed { result: String }, Failed { error: String }, Paused, Stale }
 impl SubagentManager {
     pub fn new() -> Self { Self { agents: Vec::new() } }
     pub fn send_message(&mut self, _src: &str, _id: &str, _msg: &str, _mt: MessageType) -> Result<(), String> { Ok(()) }
@@ -159,12 +159,12 @@ impl CliCommand for AgentCmd {
                 let mut out = format!("Active subagents ({}):\n", agents.len());
                 for a in &agents {
                     let status_str = match &a.status {
-                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Idle => "idle",
-                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Running { .. } => "running",
-                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Completed { .. } => "completed",
-                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Failed { .. } => "failed",
-                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Paused => "paused",
-                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Stale => "stale",
+                        AgentStatus::Idle => "idle",
+                        AgentStatus::Running { .. } => "running",
+                        AgentStatus::Completed { .. } => "completed",
+                        AgentStatus::Failed { .. } => "failed",
+                        AgentStatus::Paused => "paused",
+                        AgentStatus::Stale => "stale",
                     };
                     out.push_str(&format!("  {} | {} | E8:{} | {} | msgs:{}\n",
                         a.id, a.config.name, a.config.e8_mode, status_str, a.messages.len()));
@@ -190,8 +190,8 @@ impl CliCommand for AgentCmd {
                 let id = &args[1];
                 let mut mgr = AGENT_MANAGER.blocking_write();
                 match mgr.kill(id) {
-                    Some(agent) => CommandOutput::ok(&format!("Subagent '{}' ({}) terminated.", agent.config.name, id)),
-                    None => CommandOutput::err(&format!("Subagent '{}' not found.", id)),
+                    Ok(()) => CommandOutput::ok(&format!("Subagent '{}' ({}) terminated.", id, id)),
+                    Err(e) => CommandOutput::err(&format!("Subagent '{}' kill failed: {}", id, e)),
                 }
             }
             "background" | "bg" => {

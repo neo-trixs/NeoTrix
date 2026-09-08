@@ -4,8 +4,7 @@
 //! 支持 47-85% 的成本节省。
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// 质量分级
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

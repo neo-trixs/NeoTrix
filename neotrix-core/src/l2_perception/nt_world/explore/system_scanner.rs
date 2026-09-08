@@ -1,0 +1,173 @@
+//! System Scanner - 系统垃圾扫描
+//!
+//! 扫描系统级缓存、日志、临时文件
+//! 域: NT-WORLD (虚空探索者)
+//! 层: L2 Perception
+
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScanCategory {
+    SystemCache,
+    SystemLog,
+    TempFile,
+    BrowserCache,
+    DeveloperCache,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RiskLevel {
+    Safe,
+    Moderate,
+    High,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScanResult {
+    pub path: PathBuf,
+    pub size_bytes: u64,
+    pub age_days: u32,
+    pub category: ScanCategory,
+    pub risk_level: RiskLevel,
+    pub description: String,
+}
+
+pub fn calculate_age_days(metadata: &std::fs::Metadata) -> u32 {
+    metadata.modified()
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .map(|d| (d.as_secs() / 86400) as u32)
+        .unwrap_or(0)
+}
+
+/// 扫描路径配置
+#[derive(Debug, Clone)]
+pub struct ScanPath {
+    pub path: PathBuf,
+    pub category: ScanCategory,
+    pub risk_level: RiskLevel,
+    pub recursive: bool,
+}
+
+pub struct SystemScanner {
+    scan_paths: Vec<ScanPath>,
+    min_age_days: u32,
+    min_size_bytes: u64,
+}
+
+impl SystemScanner {
+    pub fn new() -> Self {
+        let mut scanner = Self { scan_paths: Vec::new(), min_age_days: 7, min_size_bytes: 1024 * 1024 };
+        scanner.init_default_paths();
+        scanner
+    }
+
+    fn init_default_paths(&mut self) {
+        let home = dirs::home_dir().unwrap_or_default();
+        let paths = vec![
+            (home.join("Library/Caches"), ScanCategory::SystemCache, RiskLevel::Safe),
+            (home.join("Library/Logs"), ScanCategory::SystemLog, RiskLevel::Safe),
+            (PathBuf::from("/tmp"), ScanCategory::TempFile, RiskLevel::Safe),
+            (PathBuf::from("/private/var/folders"), ScanCategory::TempFile, RiskLevel::Safe),
+            (home.join("Library/Caches/Google/Chrome"), ScanCategory::BrowserCache, RiskLevel::Safe),
+            (home.join(".cargo/registry"), ScanCategory::DeveloperCache, RiskLevel::Moderate),
+            (home.join(".npm"), ScanCategory::DeveloperCache, RiskLevel::Safe),
+            (home.join("Library/Caches/Homebrew"), ScanCategory::DeveloperCache, RiskLevel::Safe),
+        ];
+        for (path, category, risk_level) in paths {
+            self.scan_paths.push(ScanPath { path, category, risk_level, recursive: true });
+        }
+    }
+
+    pub fn set_min_age(&mut self, days: u32) { self.min_age_days = days; }
+    pub fn set_min_size(&mut self, bytes: u64) { self.min_size_bytes = bytes; }
+
+    pub fn add_scan_path(&mut self, path: PathBuf, category: ScanCategory, risk_level: RiskLevel) {
+        self.scan_paths.push(ScanPath { path, category, risk_level, recursive: true });
+    }
+
+    pub fn scan(&self) -> Vec<ScanResult> {
+        use rayon::prelude::*;
+        let results: Vec<ScanResult> = self.scan_paths.par_iter()
+            .filter(|sp| sp.path.exists())
+            .flat_map(|sp| self.scan_directory(sp))
+            .collect();
+        let mut sorted = results;
+        sorted.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+        sorted
+    }
+
+    fn scan_directory(&self, scan_path: &ScanPath) -> Vec<ScanResult> {
+        let mut results = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&scan_path.path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Ok(metadata) = std::fs::metadata(&path) {
+                    let size = metadata.len();
+                    let age = calculate_age_days(&metadata);
+                    if size >= self.min_size_bytes && age >= self.min_age_days {
+                        results.push(ScanResult {
+                            path: path.clone(),
+                            size_bytes: size,
+                            age_days: age,
+                            category: scan_path.category.clone(),
+                            risk_level: scan_path.risk_level.clone(),
+                            description: self.generate_description(&path, &scan_path.category),
+                        });
+                    }
+                }
+            }
+        }
+        results
+    }
+
+    fn generate_description(&self, path: &Path, category: &ScanCategory) -> String {
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
+        match category {
+            ScanCategory::SystemCache => format!("系统缓存: {}", name),
+            ScanCategory::SystemLog => format!("系统日志: {}", name),
+            ScanCategory::TempFile => format!("临时文件: {}", name),
+            ScanCategory::BrowserCache => format!("浏览器缓存: {}", name),
+            ScanCategory::DeveloperCache => format!("开发者缓存: {}", name),
+            _ => format!("文件: {}", name),
+        }
+    }
+}
+
+impl Default for SystemScanner { fn default() -> Self { Self::new() } }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_scanner_new() {
+        let s = SystemScanner::new();
+        assert!(!s.scan_paths.is_empty());
+    }
+
+    #[test]
+    fn test_scan_empty() {
+        let temp = TempDir::new().unwrap();
+        let mut s = SystemScanner::new();
+        s.scan_paths.clear();
+        s.min_age_days = 0;
+        s.min_size_bytes = 0;
+        s.scan_paths.push(ScanPath { path: temp.path().to_path_buf(), category: ScanCategory::TempFile, risk_level: RiskLevel::Safe, recursive: false });
+        assert!(s.scan().is_empty());
+    }
+
+    #[test]
+    fn test_scan_with_files() {
+        let temp = TempDir::new().unwrap();
+        std::fs::write(temp.path().join("test.log"), "content").unwrap();
+        let mut s = SystemScanner::new();
+        s.scan_paths.clear();
+        s.min_age_days = 0;
+        s.min_size_bytes = 0;
+        s.scan_paths.push(ScanPath { path: temp.path().to_path_buf(), category: ScanCategory::SystemLog, risk_level: RiskLevel::Safe, recursive: false });
+        let r = s.scan();
+        assert_eq!(r.len(), 1);
+    }
+}

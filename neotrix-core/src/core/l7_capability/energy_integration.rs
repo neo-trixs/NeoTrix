@@ -189,7 +189,7 @@ impl WisdomBridge for EnergyWisdomBridge {
         let vibration = Vibration::from_frequency(&frequency, result);
         vibration.to_wisdom(capability_id)
     }
-    
+
     async fn accumulate(&mut self, wisdom: Wisdom) -> Result<(), String> {
         // 根据智慧类型添加能量
         let (energy, layer) = match &wisdom {
@@ -210,12 +210,12 @@ impl WisdomBridge for EnergyWisdomBridge {
         
         Ok(())
     }
-    
+
     fn get_wisdom(&self) -> Vec<Wisdom> {
         // 从能量场状态生成智慧
         vec![]
     }
-    
+
     fn clear_wisdom(&mut self) {
         // 重置能量场
         self.energy_field = EnergyField::new();

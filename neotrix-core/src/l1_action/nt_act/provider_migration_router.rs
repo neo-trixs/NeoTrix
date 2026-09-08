@@ -4,7 +4,6 @@
 //! 支持在提供商之间无缝切换 (Runway, Veo, Wan, Hunyuan)。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 提供商信息

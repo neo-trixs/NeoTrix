@@ -154,7 +154,7 @@ impl WebKnowledgeMiner {
                     success += 1;
 
                     // 存储到 ReasoningBank
-                    let task_type = knowledge.source_type.to_task_type();
+                    let task_type = super::super::self_edit::world_to_knowledge_task_type(&knowledge.source_type.to_task_type());
                     let micro_edits: Vec<MicroEdit> = knowledge.edits.iter()
                         .map(|(d, v)| MicroEdit::AdjustDimension(d.clone(), *v))
                         .collect();

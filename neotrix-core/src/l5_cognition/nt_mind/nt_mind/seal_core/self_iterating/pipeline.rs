@@ -787,7 +787,7 @@ impl BrainStage for ReasoningBankStorageStage {
         let task = brain._current_task.clone();
         let reward = brain._reward;
         if !task.is_empty() {
-            let task_type = brain._current_task_type;
+            let task_type = super::super::self_edit::world_to_knowledge_task_type(&brain._current_task_type);
             let edits = brain._micro_edits.clone();
             let memory = crate::core::nt_core_bank::ReasoningMemory::new(
                 &task,

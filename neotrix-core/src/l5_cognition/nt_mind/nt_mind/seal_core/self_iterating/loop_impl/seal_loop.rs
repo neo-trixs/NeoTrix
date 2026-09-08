@@ -924,7 +924,7 @@ impl SelfIteratingBrain {
         let bank = std::mem::replace(&mut self.reasoning_bank, ReasoningBank::new(100));
         let mut engine = ReasoningEngine::new(Box::new(brain), bank);
         if let Some(ref jepa) = self.nt_world_jepa {
-            engine = engine.with_jepa(jepa.clone());
+            engine = engine.with_jepa((*jepa).clone());
         }
         if !self.skip_kb_io {
             if let Ok(mut kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {

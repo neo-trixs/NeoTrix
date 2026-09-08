@@ -1119,6 +1119,7 @@ pub fn branch_attention_domains(kind: &BranchKind) -> Vec<AttentionDomain> {
         BranchKind::Repair => vec![AttentionDomain::RiskAssessment, AttentionDomain::ToolUse],
         BranchKind::Governance => vec![AttentionDomain::RiskAssessment, AttentionDomain::GoalAlignment],
         BranchKind::Nexus => vec![AttentionDomain::Semantic, AttentionDomain::SelfReflection],
+        BranchKind::Game => vec![AttentionDomain::Creativity, AttentionDomain::GoalAlignment],
     }
 }
 

@@ -169,7 +169,7 @@ fn run_hex_crucible(grid: usize, seed: u64, max_games: usize) -> (usize, usize, 
         total_phi += phi;
         if territory[0] > territory[1] { wins += 1; }
     }
-    (wins, max_games, total_phi / max_games as f64)
+    (wins, max_games, 0.0, total_phi / max_games as f64)
 }
 
 fn rng_step(cells: &mut [u8], seed: u64, step: usize) {
@@ -224,7 +224,7 @@ impl GameTrainingDaemon {
             }
             _ => {
                 let grid = (c as usize + 2).min(8);
-                let (w, l, phi) = run_hex_crucible(grid, seed, eps);
+                let (w, l, _losses, phi) = run_hex_crucible(grid, seed, eps);
                 (w, l, w as f64 / eps as f64, grid as f64 * 2.0, phi, "HexCrucible")
             }
         };
@@ -355,10 +355,13 @@ impl BackgroundLoopHandle {
     /// No human interaction — fully autonomous self-play training.
     pub(crate) async fn handle_game_training(&mut self) {
         let report = {
-            let mut daemon = GAME_DAEMON.lock().unwrap_or_else(|e| {
-                eprintln!("[bg] game_training: lock poisoned: {}", e);
-                return GameTrainingDaemon::new();
-            });
+            let mut daemon = match GAME_DAEMON.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    eprintln!("[bg] game_training: lock poisoned: {}", poisoned);
+                    poisoned.into_inner()
+                }
+            };
             daemon.tick()
         };
 

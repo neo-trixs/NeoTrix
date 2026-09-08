@@ -4,7 +4,6 @@
 //! 支持视频内容的长期存储和分发。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 存储对象

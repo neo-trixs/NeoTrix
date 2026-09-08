@@ -124,7 +124,7 @@ impl BrainStage for DpSgdStage {
         let task = brain._current_task();
         let task_type = brain._current_task_type();
 
-        let mode = brain._e8_policy.select_mode(&task, task_type, &brain._transition_learner);
+        let mode = brain._e8_policy.select_mode(&task, super::super::self_edit::world_to_knowledge_task_type(&task_type), &brain._transition_learner);
         let mode_idx = mode.0 as usize;
         let old_value = brain._e8_policy.mode_values[mode_idx];
         let td_error = reward - old_value;

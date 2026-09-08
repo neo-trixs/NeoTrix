@@ -74,3 +74,33 @@ pub fn generate_tool_calls(task_type: &TaskType, _task: &str) -> Vec<ToolCall> {
 
     calls
 }
+
+/// Convert `core::nt_core_knowledge::TaskType` to `nt_world_model::TaskType`
+pub fn knowledge_to_world_task_type(t: &crate::core::nt_core_knowledge::TaskType) -> crate::neotrix::nt_world_model::TaskType {
+    use crate::core::nt_core_knowledge::TaskType as K;
+    use crate::neotrix::nt_world_model::TaskType as W;
+    match t {
+        K::General => W::General,
+        K::Design | K::UIDesign => W::Design,
+        K::CodeAnalysis => W::CodeAnalysis,
+        K::CodeGeneration => W::CodeGeneration,
+        K::CodeReview | K::Debugging => W::CodeAnalysis,
+        K::Security => W::Security,
+        K::Planning | K::Reflection | K::Research | K::Learning => W::General,
+    }
+}
+
+/// Convert `nt_world_model::TaskType` to `core::nt_core_knowledge::TaskType`
+pub fn world_to_knowledge_task_type(t: &crate::neotrix::nt_world_model::TaskType) -> crate::core::nt_core_knowledge::TaskType {
+    use crate::core::nt_core_knowledge::TaskType as K;
+    use crate::neotrix::nt_world_model::TaskType as W;
+    match t {
+        W::General => K::General,
+        W::Design => K::Design,
+        W::UIDesign => K::UIDesign,
+        W::CodeAnalysis => K::CodeAnalysis,
+        W::CodeGeneration => K::CodeGeneration,
+        W::Security => K::Security,
+        W::Prediction | W::Classification | W::Generation => K::General,
+    }
+}

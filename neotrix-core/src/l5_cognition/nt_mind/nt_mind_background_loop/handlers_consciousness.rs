@@ -275,18 +275,16 @@ impl BackgroundLoopHandle {
         let actionable = EvolutionHarness::actionable_suggestions(&report, 0.7);
         let goal_count = actionable.len();
         if goal_count > 0 {
-            if let Some(b) = self.bbrain.as_mut() {
-                if let Ok(mut brain) = b.try_write() {
-                    for s in actionable.iter().take(3) {
-                        self.goal_loop.enqueue_goal(
-                            &mut brain,
-                            &format!(
-                                "[transcendent] strengthen {} (resonance={:.2}) — {}",
-                                s.node_id, s.resonance, s.suggestion
-                            ),
-                            None,
-                        );
-                    }
+            if let Ok(mut brain) = self.brain.try_write() {
+                for s in actionable.iter().take(3) {
+                    self.goal_loop.enqueue_goal(
+                        &mut brain,
+                        &format!(
+                            "[transcendent] strengthen {} (resonance={:.2}) — {}",
+                            s.node_id, s.resonance, s.suggestion
+                        ),
+                        None,
+                    );
                 }
             }
         }
@@ -484,8 +482,7 @@ impl BackgroundLoopHandle {
             // Evolution contract → goal loop: enqueue a behavioral goal when drift or unmet contract detected
             if let Some(drift) = &growth_report.phase7_drift {
                 if drift.drift_detected {
-                    if let Some(b) = self.bbrain.as_mut() {
-                        if let Ok(mut brain) = b.try_write() {
+                    if let Ok(mut brain) = self.brain.try_write() {
                             let action = drift
                                 .corrective_actions
                                 .first()
@@ -496,7 +493,6 @@ impl BackgroundLoopHandle {
                                 &format!("evolution_drift_recovery: {}", action),
                                 None,
                             );
-                        }
                     }
                 }
             }
@@ -579,12 +575,10 @@ impl BackgroundLoopHandle {
                         if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.critical_quality {
                         // BEHAVIORAL RESPONSE: enqueue self-review goal on critical quality,
                         // using volition's selected_action if available.
-                        if let Some(b) = self.bbrain.as_mut() {
-                            if let Ok(mut brain) = b.try_write() {
+                        if let Ok(mut brain) = self.brain.try_write() {
                                 let action_desc = c.selected_action.clone()
                                     .unwrap_or_else(|| "consciousness_recovery: quality critically low — initiating self-review".into());
                                 self.goal_loop.enqueue_goal(&mut brain, &action_desc, None);
-                            }
                         }
                     }
                 } else if c.overall_quality > 0.7 {
@@ -595,14 +589,12 @@ impl BackgroundLoopHandle {
                     );
                     // B2: execute volition's selected action by enqueueing it as a goal
                     if let Some(ref action_desc) = c.selected_action {
-                        if let Some(b) = self.bbrain.as_mut() {
-                            if let Ok(mut brain) = b.try_write() {
+                        if let Ok(mut brain) = self.brain.try_write() {
                                 self.goal_loop.enqueue_goal(
                                     &mut brain,
                                     &format!("volition_execute: {}", action_desc),
                                     None,
                                 );
-                            }
                         }
                     }
                 } else {
@@ -886,14 +878,12 @@ impl BackgroundLoopHandle {
 
                 // BEHAVIORAL RESPONSE: When deep mode is active, trigger deeper reasoning cycle
                 if new_state_mode == crate::core::nt_core_state_substrate::ThinkingMode::Deep {
-                    if let Some(b) = self.bbrain.as_mut() {
-                        if let Ok(mut brain) = b.try_write() {
+                    if let Ok(mut brain) = self.brain.try_write() {
                             self.goal_loop.enqueue_goal(
                                 &mut brain,
                                 "deep_reasoning_available: cognitive budget healthy — initiating extended analysis cycle",
                                 None,
                             );
-                        }
                     }
                     log::info!(
                         "[bg] cognitive_load: DEEP mode active — enqueued deep_reasoning goal"
@@ -1120,14 +1110,12 @@ impl BackgroundLoopHandle {
                     "[bg] auto-heal: degraded tools detected: {}",
                     names.join(", ")
                 );
-                if let Some(b) = self.bbrain.as_mut() {
-                    if let Ok(mut brain) = b.try_write() {
+                if let Ok(mut brain) = self.brain.try_write() {
                         self.goal_loop.enqueue_goal(
                             &mut brain,
                             &format!("[auto-heal] Tools degraded: {}", names.join(", ")),
                             None,
                         );
-                    }
                 }
             }
             // Convergence stalled detection: if same layer for >10 iterations with gaps,
@@ -1180,14 +1168,12 @@ impl BackgroundLoopHandle {
                 error,
             } if severity == "critical" => {
                 log::error!("[bg] event_bus: CRITICAL {}: {}", component, error);
-                if let Some(b) = self.bbrain.as_mut() {
-                    if let Ok(mut brain) = b.try_write() {
+                if let Ok(mut brain) = self.brain.try_write() {
                         self.goal_loop.enqueue_goal(
                             &mut brain,
                             &format!("event_bus_critical: {} - {}", component, error),
                             None,
                         );
-                    }
                 }
             }
             CoreEvent::GlobalHalt { reason, source } => {
@@ -1205,14 +1191,12 @@ impl BackgroundLoopHandle {
                         .to_string(),
                     );
                 }
-                if let Some(b) = self.bbrain.as_mut() {
-                    if let Ok(mut brain) = b.try_write() {
+                if let Ok(mut brain) = self.brain.try_write() {
                         self.goal_loop.enqueue_goal(
                             &mut brain,
                             &format!("event_bus_recovery: {} - {}", source, reason),
                             None,
                         );
-                    }
                 }
             }
             CoreEvent::ConsciousnessCritique { quality, .. }
@@ -1931,10 +1915,8 @@ impl BackgroundLoopHandle {
                 failure_count,
             );
             log::warn!("[bg] {}", reason);
-            if let Some(b) = self.bbrain.as_mut() {
-                if let Ok(mut brain) = b.try_write() {
-                    self.goal_loop.enqueue_goal(&mut brain, &reason, None);
-                }
+            if let Ok(mut brain) = self.brain.try_write() {
+                self.goal_loop.enqueue_goal(&mut brain, &reason, None);
             }
         }
     }

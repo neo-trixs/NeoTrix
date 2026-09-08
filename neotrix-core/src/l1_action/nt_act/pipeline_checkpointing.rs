@@ -4,7 +4,6 @@
 //! 支持从失败的作业中恢复，避免重新开始。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 检查点信息

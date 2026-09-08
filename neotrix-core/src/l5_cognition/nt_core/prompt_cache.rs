@@ -4,7 +4,6 @@
 //! 减少重复计算，提升响应速度。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 缓存条目

@@ -137,11 +137,11 @@ pub fn run_provider_wizard() {
             let mut model = String::new();
             if io::stdin().read_line(&mut model).is_err() {
                 eprintln!("Failed to read stdin; using default model.");
-                model.push_str("gpt-4o-mini");
+                model.push_str("Agents-A1-4B-kimi-Preview-heretic-IQ4_NL");
             }
             model.trim().to_string()
         }
-        _ => "gpt-4o-mini".to_string(),
+        _ => "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".to_string(),
     };
 
     let config_path = neotrix::config::NeoTrixConfig::path();

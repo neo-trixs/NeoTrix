@@ -3,8 +3,7 @@
 //! 视频帧采样和去重，支持均匀采样、关键帧检测、场景变化检测。
 //! 优化视频处理性能，减少冗余计算。
 
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// 采样策略
 #[derive(Debug, Clone, PartialEq, Eq)]

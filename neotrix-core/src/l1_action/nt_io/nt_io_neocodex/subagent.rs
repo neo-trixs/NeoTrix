@@ -26,7 +26,7 @@ pub struct SubagentResult {
 }
 
 /// 默认 subagent 模型 (与 entry/mod.rs 中 opencode 默认模型同级别)。
-const DEFAULT_SUBAGENT_MODEL: &str = "gpt-4o-mini";
+const DEFAULT_SUBAGENT_MODEL: &str = "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL";
 /// 可通过环境变量覆盖 subagent 模型。
 const SUBAGENT_MODEL_ENV: &str = "NEOTRIX_SUBAGENT_MODEL";
 const SUBAGENT_MAX_TOKENS: u32 = 2048;

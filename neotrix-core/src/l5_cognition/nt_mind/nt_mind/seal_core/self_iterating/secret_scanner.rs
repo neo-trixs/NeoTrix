@@ -8,8 +8,6 @@ pub struct SecretPattern {
     pub regex: &'static str,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-
 #[derive(Debug, Clone)]
 pub struct SecretFinding {
     pub pattern: &'static str,
@@ -98,6 +96,7 @@ impl ScanResult {
             Severity::Medium => 0.3,
             Severity::High => 0.6,
             Severity::Critical => 1.0,
+            _ => 0.0,
         }).sum::<f64>();
         (base / self.findings.len() as f64).max(0.0).min(1.0)
     }

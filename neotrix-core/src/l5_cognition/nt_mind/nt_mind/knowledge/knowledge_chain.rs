@@ -195,7 +195,7 @@ impl KnowledgeChain {
             });
 
             // 存储到 ReasoningBank
-            let task_type = KnowledgeMiner::domain_to_task_type(&knowledge.domain);
+            let task_type = super::super::self_edit::world_to_knowledge_task_type(&KnowledgeMiner::domain_to_task_type(&knowledge.domain));
             let memory = ReasoningMemory::new(
                 &format!("KnowledgeChain: {} from {}", knowledge.source_name, knowledge.source_url),
                 task_type,

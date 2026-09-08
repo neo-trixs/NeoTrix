@@ -1,0 +1,11 @@
+pub mod netease;
+pub mod kuwo;
+pub mod kugou;
+pub mod migu;
+pub mod soundcloud;
+pub mod spotify;
+pub mod piped;
+pub mod jiosaavn;
+pub mod deezer;
+pub mod bandcamp;
+pub mod qqmusic;

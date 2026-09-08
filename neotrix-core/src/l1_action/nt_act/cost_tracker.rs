@@ -4,8 +4,7 @@
 //! 支持按模型、功能、提供商分类追踪。
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// 成本条目
 #[derive(Debug, Clone)]

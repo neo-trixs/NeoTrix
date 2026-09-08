@@ -33,7 +33,7 @@ impl MemoryElement {
     }
 
     pub fn store(&mut self, description: &str, reward: f64) {
-        use crate::neotrix::nt_world_model::TaskType;
+        use crate::core::nt_core_knowledge::TaskType;
         let memory = crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningMemory::new(
             description, TaskType::General, &[], reward,
         );

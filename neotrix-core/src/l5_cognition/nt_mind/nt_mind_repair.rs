@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use neotrix_types::shared::Severity;
 
 /// 根因假设
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,8 +28,6 @@ pub struct Diagnosis {
 }
 
 /// 严重度
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-
 /// 修复选项类型 (参考 APR 文献: GenProg/Prophet/Template/LLM-based)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RepairStrategyType {
@@ -507,7 +506,6 @@ pub struct RepairHistory {
 
 /// SelfTest for RepairPlanner
 #[cfg(test)]
-use neotrix_types::shared::Severity;
 mod tests {
     use super::*;
 

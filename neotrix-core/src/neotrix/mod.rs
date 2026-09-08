@@ -72,9 +72,10 @@ pub use crate::l1_action::nt_memory::{
 
 // L2 Perception — nt_world re-exports
 pub use crate::l2_perception::nt_world::{
-    nt_world_browse, nt_world_browse_auto, nt_world_code_search, nt_world_crawl, nt_world_e8,
-    nt_world_infer, nt_world_jepa, nt_world_map, nt_world_model, nt_world_model_v2, nt_world_scrape,
+    nt_world_code_search, nt_world_crawl, nt_world_e8,
+    nt_world_infer, nt_world_scrape,
     nt_world_search, nt_world_sense,
+    nt_world_model, nt_world_jepa, nt_world_model_v2,
 };
 
 // L3 Embodiment — nt_shield re-exports

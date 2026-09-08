@@ -96,9 +96,6 @@ impl SweepRunner {
     }
 }
 
-/// 条目严重级别
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-
 /// 增量条目
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeltaEntry {
@@ -289,6 +286,7 @@ impl AlertSummary {
                 Severity::High => s.high += 1,
                 Severity::Medium => s.medium += 1,
                 Severity::Info => s.info += 1,
+                _ => {}
             }
         }
         s

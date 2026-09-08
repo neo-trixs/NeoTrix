@@ -81,7 +81,15 @@ pub struct AttackVector {
 }
 
 /// 严重程度
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum Severity {
+    Critical,
+    High,
+    Medium,
+    Low,
+    Informational,
+}
 
 /// 套件元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,7 +156,6 @@ pub struct AdversarialStats {
 }
 
 /// 测试报告
-use neotrix_types::shared::Severity;
 pub struct TestReport {
     pub report_id: String,
     pub suite_id: String,
@@ -287,6 +294,7 @@ impl AdversarialTestFramework {
                 Severity::Low => {
                     recommendations.push(format!("INFO: Consider fixing {} when convenient", vuln.vuln_type));
                 }
+                _ => {}
             }
         }
 

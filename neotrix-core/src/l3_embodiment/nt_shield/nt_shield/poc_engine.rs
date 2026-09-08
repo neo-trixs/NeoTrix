@@ -121,16 +121,14 @@ pub struct Evidence {
     pub reproducible: bool,
 }
 
-
-impl Severity {
-    pub fn label(&self) -> &'static str {
-        match self {
-            Severity::Critical => "Critical",
-            Severity::High => "High",
-            Severity::Medium => "Medium",
-            Severity::Low => "Low",
-            Severity::Info => "Info",
-        }
+pub fn severity_label(severity: &Severity) -> &'static str {
+    match severity {
+        Severity::Critical => "Critical",
+        Severity::High => "High",
+        Severity::Medium => "Medium",
+        Severity::Low => "Low",
+        Severity::Info => "Info",
+        _ => "Unknown",
     }
 }
 

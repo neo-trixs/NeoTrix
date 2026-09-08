@@ -159,8 +159,8 @@ fn test_score_with_official_fix() {
 
 #[test]
 fn test_severity_boundaries() {
-    assert_eq!(Severity::from_score(0.0), Severity::None);
-    assert_eq!(Severity::from_score(0.09), Severity::None);
+    assert_eq!(Severity::from_score(0.0), Severity::Informational);
+    assert_eq!(Severity::from_score(0.09), Severity::Informational);
     assert_eq!(Severity::from_score(0.1), Severity::Low);
     assert_eq!(Severity::from_score(3.9), Severity::Low);
     assert_eq!(Severity::from_score(4.0), Severity::Medium);
@@ -185,7 +185,7 @@ fn test_zero_impact_zero_score() {
         ..Default::default()
     };
     assert_eq!(cvss.base_score(), 0.0);
-    assert_eq!(cvss.score().severity, Severity::None);
+    assert_eq!(cvss.score().severity, Severity::Informational);
 }
 
 #[test]
@@ -260,7 +260,7 @@ fn test_adjacent_network_score() {
 
 #[test]
 fn test_severity_display() {
-    assert_eq!(Severity::None.to_string(), "None");
+    assert_eq!(Severity::Informational.to_string(), "Informational");
     assert_eq!(Severity::Low.to_string(), "Low");
     assert_eq!(Severity::Medium.to_string(), "Medium");
     assert_eq!(Severity::High.to_string(), "High");

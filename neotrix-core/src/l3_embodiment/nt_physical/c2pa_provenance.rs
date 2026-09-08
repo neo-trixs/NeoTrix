@@ -4,7 +4,7 @@
 //! 支持 C2PA 标准的内容真实性验证。
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// C2PA 声明
 #[derive(Debug, Clone)]

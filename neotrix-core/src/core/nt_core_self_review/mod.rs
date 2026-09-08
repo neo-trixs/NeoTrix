@@ -24,16 +24,6 @@ mod scanners;
 use scanners::*;
 
 
-impl fmt::Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Severity::Error => write!(f, "ERROR"),
-            Severity::Warning => write!(f, "WARN"),
-            Severity::Info => write!(f, "INFO"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewFinding {
     pub severity: Severity,
@@ -313,6 +303,7 @@ impl SelfReviewGate {
                 Severity::Error => failed += 1,
                 Severity::Warning => warnings += 1,
                 Severity::Info => {}
+                _ => {}
             }
         }
         let passed = self.findings.len().saturating_sub(failed + warnings);
@@ -1656,7 +1647,6 @@ pub struct PatternMatch {
 
 // ─── Scanner helpers ───
 
-use neotrix_types::shared::Severity;
 fn count_rs_files(dir: &Path) -> usize {
     cached_rs_files(dir).len()
 }
@@ -1710,6 +1700,8 @@ pub fn scan_for_patterns(
     }
     results
 }
+
+pub use neotrix_types::shared::Severity;
 
 #[cfg(test)]
 mod tests;

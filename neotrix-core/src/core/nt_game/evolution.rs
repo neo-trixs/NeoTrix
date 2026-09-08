@@ -8,13 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::env::{Difficulty, GameMeta, NtGameEnv, RenderMode};
-use super::framework::{
-    Action, Actor, Episode, Observation, Role, Rubric, StepResult, Trajectory, TrajectoryStep,
-    WinLossReward,
-};
+use super::env::NtGameEnv;
+use super::framework::{Action, Observation, StepResult};
 use super::play::adaptive::{AdaptiveDifficultyConfig, DifficultyAdjuster};
-use super::play::buffer::GameTrajectoryBuffer;
 
 // ═══════════════════════════════════════════════════════════════════
 // Config
@@ -148,6 +144,7 @@ impl AutoGame for AutoTicTacToe {
                 Some(1) => 1.0,
                 Some(2) => -1.0,
                 None => 0.0,
+                _ => 0.0,
             }
         } else {
             0.0

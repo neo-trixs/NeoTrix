@@ -78,7 +78,15 @@ impl std::fmt::Display for RuleType {
 }
 
 /// 严重程度
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum Severity {
+    Critical,
+    High,
+    Medium,
+    Low,
+    Informational,
+}
 
 /// 异常事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,7 +146,6 @@ pub struct ThreatStats {
 }
 
 /// 检测结果
-use neotrix_types::shared::Severity;
 pub struct DetectionResult {
     pub is_threat: bool,
     pub confidence: f64,
@@ -275,6 +282,7 @@ impl ThreatDetectionEngine {
             Severity::Medium => 0.6,
             Severity::High => 0.8,
             Severity::Critical => 0.95,
+            _ => 0.5,
         }
     }
 

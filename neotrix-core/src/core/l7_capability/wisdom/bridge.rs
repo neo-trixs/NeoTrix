@@ -63,15 +63,15 @@ impl WisdomBridge for WisdomBridgeImpl {
             },
         }
     }
-    
+
     async fn accumulate(&mut self, wisdom: Wisdom) -> Result<(), String> {
         self.accumulator.accumulate(wisdom).await
     }
-    
+
     fn get_wisdom(&self) -> Vec<Wisdom> {
         self.accumulator.get_wisdom()
     }
-    
+
     fn clear_wisdom(&mut self) {
         self.accumulator.clear();
     }

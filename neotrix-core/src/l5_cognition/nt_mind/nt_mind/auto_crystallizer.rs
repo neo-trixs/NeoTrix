@@ -6,7 +6,7 @@ use crate::core::nt_core_self::skill_crystal::{
 };
 use crate::core::nt_core_self::reasoning_strategy::StrategyKind;
 use crate::core::nt_core_self::attention_head::AttentionDomain;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 
 pub struct AutoCrystallizer {
     pub registry: CrystalRegistry,

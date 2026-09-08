@@ -4,7 +4,6 @@
 //! 减少 15-30% 的冗余调用。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 缓存条目

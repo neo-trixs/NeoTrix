@@ -4,8 +4,7 @@
 //! 集成 HeartbeatAggregator 信号，支持恢复检测和降级模式。
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use neotrix_types::shared::HealthStatus;
 

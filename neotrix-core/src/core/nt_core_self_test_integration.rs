@@ -3,6 +3,7 @@ use crate::core::nt_core_qtest::QTestEngineSelfTest;
 use crate::core::nt_core_self_test::{ConstitutionComplianceTest, SelfTest, SelfTestRegistry};
 // use crate::l2_perception::nt_world::cad_selftest;
 use crate::core::nt_core_cad_consciousness;
+use crate::l2_perception::nt_world::osint::{UnifiedAbsorber, AbsorberConfig};
 
 pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
@@ -186,7 +187,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
         ),
     ));
     registry.register(Box::new(
-        crate::l2_perception::nt_world::nt_world_browse_auto::agentic_browse::AgenticBrowseSelfTest,
+        crate::l2_perception::nt_world::crawl::agentic_browse::AgenticBrowseSelfTest,
     ));
     registry.register(Box::new(
         crate::l2_perception::nt_world::nt_world_osint::sweep::SweepDeltaSelfTest,
@@ -205,7 +206,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
         ),
     ));
     registry.register(Box::new(
-        crate::l2_perception::nt_world::nt_world_absorber::metadata::MetadataAggregator::new(),
+        crate::l2_perception::nt_world::osint::metadata::MetadataAggregator::new(),
     ));
     registry.register(Box::new(
         crate::l2_perception::nt_world::nt_world_video_pipeline::MediaSniffer::new(),
@@ -675,8 +676,7 @@ impl SelfTest for UnifiedAbsorberSelfTest {
     }
 
     fn self_test(&self) -> Result<(), Vec<String>> {
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-        use crate::l2_perception::nt_world::nt_world_absorber::{AbsorberConfig, UnifiedAbsorber};
+        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
         let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
             .map_err(|e| vec![e])?;
         let absorber = UnifiedAbsorber::new(kb, AbsorberConfig::default())

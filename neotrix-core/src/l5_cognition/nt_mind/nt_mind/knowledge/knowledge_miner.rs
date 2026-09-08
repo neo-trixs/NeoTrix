@@ -162,7 +162,7 @@ impl KnowledgeMiner {
                     let memory = ReasoningMemory {
                         id: uuid::Uuid::new_v4().to_string(),
                         task_description: format!("KnowledgeMined: {} ({})", knowledge.source_name, knowledge.domain),
-                        task_type: Self::domain_to_task_type(&knowledge.domain),
+                        task_type: crate::core::nt_core_knowledge::TaskType::General,
                         micro_edits: knowledge.micro_edits.clone(),
                         reward: knowledge.confidence * 0.85,
                         reward_source: crate::l5_cognition::nt_mind::nt_mind::core::RewardSource::External,

@@ -1187,6 +1187,7 @@ impl BranchKind {
             BranchKind::Repair => "NT-REPAIR",
             BranchKind::Governance => "NT-GOVERNANCE",
             BranchKind::Nexus => "NT-NEXUS",
+            BranchKind::Game => "NT-GAME",
         }
     }
 }
@@ -1205,6 +1206,7 @@ impl CapabilityBranch {
             BranchKind::Repair => "repair",
             BranchKind::Governance => "governance",
             BranchKind::Nexus => "nexus",
+            BranchKind::Game => "game",
         };
         let absorbed: Vec<String> = ALL_CAPABILITIES
             .iter()

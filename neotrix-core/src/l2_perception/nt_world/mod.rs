@@ -1,10 +1,34 @@
 //! L2 Perception Layer - World Modules
+//!
+//! 5 目录架构:
+//!   crawl/   — 爬虫类 (crawl + browse + browse_auto)
+//!   osint/   — 情报类 (osint + absorber)
+//!   sense/   — 感知类 (sense + jepa + model)
+//!   explore/ — 探索类 (map + cleanup)
+//!   source/  — 源类 (media_source)
 
-pub mod nt_world_browse;
-pub mod nt_world_browse_auto;
+pub mod crawl;
+pub mod osint;
+pub mod sense;
+pub mod explore;
+pub mod source;
+
+// 向后兼容别名
+pub use crawl as nt_world_crawl;
+pub use osint as nt_world_osint;
+pub use sense as nt_world_sense;
+pub use explore as nt_world_map;
+pub use source as nt_world_media_source;
+
+// Stub modules (legacy types still referenced by downstream code)
+pub mod nt_world_model;
+pub mod nt_world_jepa;
+pub mod nt_world_model_v2;
+
+// 单文件模块
 pub mod nt_world_code_search;
-pub mod nt_world_crawl;
 pub mod nt_world_e8;
+pub mod nt_world_github_absorber;
 pub mod nt_world_edgar;
 pub mod nt_world_gdelt;
 pub mod nt_world_usgs;
@@ -19,20 +43,12 @@ pub mod nt_world_bgpview;
 pub mod nt_world_opencorporates;
 pub mod nt_world_intel_selftest;
 pub mod nt_world_infer;
-pub mod nt_world_jepa;
-pub mod nt_world_map;
-pub mod nt_world_model;
-pub mod nt_world_model_v2;
 pub mod nt_world_scrape;
 pub mod nt_world_search;
 pub mod nt_world_prefetch;
 pub mod nt_world_doc;
-pub mod nt_world_sense;
 pub mod nt_world_exploration_engine;
-pub mod nt_world_github_absorber;
-pub mod nt_world_absorber;
 pub mod nt_world_video_pipeline;
-pub mod nt_world_osint;
 pub mod nt_world_novel;
 pub mod nt_world_ods;
 pub mod nt_world_monitor;
@@ -45,10 +61,10 @@ pub mod nt_world_semantic_extract;
 // 主体库管理
 pub mod asset_registry;
 
-// 通用能力模块 (从漫剧专用重构为通用)
-pub mod media_asset_registry; // 媒体资产库 (原 asset_registry)
+// 通用能力模块
+pub mod media_asset_registry;
 
-// 动态记忆库 (实体级一致性管理)
+// 动态记忆库
 pub mod dynamic_memory_bank;
 
 // 向后兼容别名

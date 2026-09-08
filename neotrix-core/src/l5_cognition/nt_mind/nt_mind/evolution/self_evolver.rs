@@ -132,7 +132,7 @@ impl SelfEvolver {
         let memory = ReasoningMemory {
             id: uuid::Uuid::new_v4().to_string(),
             task_description: format!("Evolve from: {}", analysis.source_url),
-            task_type: crate::neotrix::nt_world_model::TaskType::CodeAnalysis,
+            task_type: crate::core::nt_core_knowledge::TaskType::CodeAnalysis,
             micro_edits: micro_edits.clone(),
             reward,
             reward_source: crate::l5_cognition::nt_mind::nt_mind::core::RewardSource::External,

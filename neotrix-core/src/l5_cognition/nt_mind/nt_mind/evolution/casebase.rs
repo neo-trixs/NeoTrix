@@ -18,7 +18,7 @@ pub const NS_CASEBASE: &str = "casebase";
 
 /// 严重度序数辅助 (Low=0..Critical=3)。
 fn severity_rank(s: &Severity) -> u8 {
-    match s { Severity::Low => 0, Severity::Medium => 1, Severity::High => 2, Severity::Critical => 3 }
+    match s { Severity::Low => 0, Severity::Medium => 1, Severity::High => 2, Severity::Critical => 3, _ => 0 }
 }
 
 /// 经典判例优先 (fallback 排序 tie-break)。
@@ -525,7 +525,6 @@ pub struct SearchResult {
 }
 
 /// 类比推理结果。
-use neotrix_types::shared::Severity;
 pub struct AnalogicalResult {
     pub case: EthicalCase,
     pub similarity: f64,
@@ -613,3 +612,5 @@ mod tests {
         assert_eq!(loaded[0].case.id, "test_case");
     }
 }
+
+pub use neotrix_types::shared::Severity;

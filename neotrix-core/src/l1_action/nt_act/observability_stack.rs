@@ -4,7 +4,6 @@
 //! 支持 per-layer latency budgets, cost attribution, 诊断上下文。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 可观测性事件类型

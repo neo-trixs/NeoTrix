@@ -8,7 +8,7 @@
 use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter, ActionPlan};
 use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
 use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
-use crate::l5_cognition::nt_mind::nt_mind_self_diagnose::EvolutionLoopProvider;
+use crate::l5_cognition::nt_mind::nt_mind_self_diagnose::{EvolutionLoopProvider, ActionPlan as DiagnoseActionPlan};
 
 
 
@@ -61,7 +61,7 @@ impl PipelineAutoFixer {
 
         // 2. 对高分项尝试代码生成
         for item in pq.as_slice() {
-            if matches!(item.plan, ActionPlan::HumanDecision { .. } | ActionPlan::NoAction { .. }) {
+            if matches!(item.plan, DiagnoseActionPlan::HumanDecision { .. } | DiagnoseActionPlan::NoAction { .. }) {
                 result.human_needed += 1;
                 continue;
             }
@@ -76,7 +76,19 @@ impl PipelineAutoFixer {
             let context = std::fs::read_to_string(file).unwrap_or_default();
 
             let req = CodeGenRequest {
-                plan: item.plan.clone(),
+                plan: match &item.plan {
+                    DiagnoseActionPlan::AddTestStub { file } => ActionPlan::AddTestStub { file: file.clone() },
+                    DiagnoseActionPlan::RunCargoFix => ActionPlan::RunCargoFix,
+                    DiagnoseActionPlan::RemoveTodo { file } => ActionPlan::RemoveTodo { file: file.clone() },
+                    DiagnoseActionPlan::SplitLargeFile { file } => ActionPlan::SplitLargeFile { file: file.clone() },
+                    DiagnoseActionPlan::ReviewUnsafe { file } => ActionPlan::ReviewUnsafe { file: file.clone() },
+                    DiagnoseActionPlan::ReplaceUnwrap { file } => ActionPlan::ReplaceUnwrap { file: file.clone() },
+                    DiagnoseActionPlan::HumanDecision { reason, .. } => ActionPlan::HumanDecision { reason: reason.clone() },
+                    DiagnoseActionPlan::NoAction { reason } => ActionPlan::NoAction { reason: reason.clone() },
+                    DiagnoseActionPlan::AutoFix(s) => ActionPlan::NoAction { reason: s.clone() },
+                    DiagnoseActionPlan::ManualReview(s) => ActionPlan::HumanDecision { reason: s.clone() },
+                    DiagnoseActionPlan::Skip(s) => ActionPlan::NoAction { reason: s.clone() },
+                },
                 file: file.to_string(),
                 context,
             };

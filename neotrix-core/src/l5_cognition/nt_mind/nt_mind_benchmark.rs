@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use crate::core::CapabilityVector;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
+use crate::neotrix::nt_world_model::TaskType as WorldTaskType;
 use crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningBank;
 use crate::l5_cognition::nt_mind::nt_mind::ReasoningBrain;
 use crate::core::nt_core_knowledge::KnowledgeSource;
@@ -57,10 +58,10 @@ impl BenchmarkSuite {
         ];
 
         for (name, tt) in &[
-            ("design", TaskType::Design),
-            ("code_analysis", TaskType::CodeAnalysis),
-            ("code_review", TaskType::CodeReview),
-            ("nt_shield", TaskType::Security),
+            ("design", WorldTaskType::Design),
+            ("code_analysis", WorldTaskType::CodeAnalysis),
+            ("code_review", WorldTaskType::CodeAnalysis),
+            ("nt_shield", WorldTaskType::Security),
         ] {
             let score = crate::l5_cognition::nt_mind::nt_mind::core::PerformanceEvaluator::evaluate(tt, cap);
             results.push(BenchmarkResult {

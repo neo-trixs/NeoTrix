@@ -98,7 +98,7 @@ impl ReasoningBrain {
             .map(|d| MicroEdit::AdjustDimension(d.dimension, d.delta))
             .collect();
 
-        let extension_dims = Self::generate_extension_dims(&task_type);
+        let extension_dims = Self::generate_extension_dims(&super::super::self_edit::knowledge_to_world_task_type(&task_type));
         if !extension_dims.is_empty() {
             micro_edits.push(MicroEdit::AddExtension(extension_dims));
         }

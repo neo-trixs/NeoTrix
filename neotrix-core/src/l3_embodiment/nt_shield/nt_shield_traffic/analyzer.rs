@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use neotrix_types::shared::Severity;
+pub use neotrix_types::shared::Severity;
 use std::time::{Duration, Instant};
 
 use crate::core::nt_core_self_test::SelfTest;

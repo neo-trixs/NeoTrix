@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use neotrix_types::shared::Severity;
+pub use neotrix_types::shared::Severity;
 
 use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardStats;
 
@@ -42,8 +42,6 @@ pub enum AuditDimension {
     TestingAuthenticity,
     TypeSafety,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum VulnDomain {

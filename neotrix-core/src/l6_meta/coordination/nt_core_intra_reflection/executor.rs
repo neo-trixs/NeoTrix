@@ -29,7 +29,6 @@ pub struct Revision {
 }
 
 /// Reflection 闭环执行器。
-use neotrix_types::shared::Severity;
 pub struct ReflectionExecutor {
     pub coherence_threshold: f64,
     pub efficiency_threshold: f64,
@@ -207,3 +206,5 @@ mod tests {
         assert!(rev.revised_response.contains("switch to conservative mode"));
     }
 }
+
+pub use neotrix_types::shared::Severity;

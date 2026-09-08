@@ -138,10 +138,10 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         display_name: "llama.cpp (本地)",
         category: ProviderCategory::Local,
         base_url: "http://localhost:8080/v1",
-        default_model: "local-model",
+        default_model: "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL",
         api_key_env: None,
         is_free: true,
-        models: &["local-model"],
+        models: &["Agents-A1-4B-kimi-Preview-heretic-IQ4_NL", "qwen3.5-9b-fable", "local-model"],
         security_profile: CommunicationProfile::Anonymous,
     },
     ProviderInfo {

@@ -297,11 +297,11 @@ impl L1Capability for Orchestrator {
 
 impl OrchestratorTrait for Orchestrator {
     fn plan(&self, goal: &str) -> Result<Plan, CapabilityError> {
-        let tasks = self.planner.decompose(goal);
-        let steps: Vec<PlanStep> = tasks.iter().enumerate().map(|(i, t)| {
+        let _tasks = self.planner.decompose(goal);
+        let steps: Vec<PlanStep> = _tasks.iter().enumerate().map(|(i, t)| {
             PlanStep {
                 id: format!("step_{}", i),
-                action: t.clone(),
+                action: format!("{:?}", t),
                 depends_on: if i > 0 { vec![format!("step_{}", i - 1)] } else { vec![] },
             }
         }).collect();
@@ -309,7 +309,9 @@ impl OrchestratorTrait for Orchestrator {
     }
 
     fn execute(&self, plan: &Plan) -> Result<PlanResult, CapabilityError> {
-        let tasks: Vec<String> = plan.steps.iter().map(|s| s.action.clone()).collect();
+        let tasks: Vec<types::Task> = plan.steps.iter().enumerate().map(|(i, s)| {
+            types::Task::new(format!("step_{}", i), vec![], 0)
+        }).collect();
         let _results = self.worker.execute_tasks(&tasks);
         Ok(PlanResult { success: true, steps_completed: plan.steps.len(), output: None })
     }

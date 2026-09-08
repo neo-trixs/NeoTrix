@@ -4,8 +4,7 @@
 //! 支持多区域部署和数据复制。
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// 区域信息
 #[derive(Debug, Clone)]

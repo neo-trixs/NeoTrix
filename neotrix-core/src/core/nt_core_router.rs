@@ -253,30 +253,30 @@ impl SmartRouter {
             TaskComplexity::Trivial,
             RoutingRule {
                 complexity: TaskComplexity::Trivial,
-                provider: "opencode".to_string(),
-                model: "gpt-4o-mini".to_string(),
-                cost_per_1k_in: 0.0015,
-                cost_per_1k_out: 0.006,
+                provider: "llamacpp".to_string(),
+                model: "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".to_string(),
+                cost_per_1k_in: 0.0,
+                cost_per_1k_out: 0.0,
             },
         );
         rules.insert(
             TaskComplexity::Simple,
             RoutingRule {
                 complexity: TaskComplexity::Simple,
-                provider: "opencode".to_string(),
-                model: "gpt-4o-mini".to_string(),
-                cost_per_1k_in: 0.0015,
-                cost_per_1k_out: 0.006,
+                provider: "llamacpp".to_string(),
+                model: "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".to_string(),
+                cost_per_1k_in: 0.0,
+                cost_per_1k_out: 0.0,
             },
         );
         rules.insert(
             TaskComplexity::Moderate,
             RoutingRule {
                 complexity: TaskComplexity::Moderate,
-                provider: "opencode".to_string(),
-                model: "gpt-4o".to_string(),
-                cost_per_1k_in: 0.01,
-                cost_per_1k_out: 0.03,
+                provider: "llamacpp".to_string(),
+                model: "qwen3.5-9b-fable".to_string(),
+                cost_per_1k_in: 0.0,
+                cost_per_1k_out: 0.0,
             },
         );
         let flagship = RoutingRule {

@@ -7,10 +7,10 @@
 //!
 //! 从 nt_world_model.rs 拆分 (Session 30: 880→660行)
 
-use crate::neotrix::nt_world_model::{WorldModel, Context};
-use crate::neotrix::nt_world_jepa::JepaWorldModel;
-use crate::neotrix::nt_world_e8::E8WorldModel;
-use crate::neotrix::nt_world_infer::{ActiveInferenceEngine, FreeEnergyReport};
+use super::nt_world_model::{WorldModel, Context};
+use super::nt_world_jepa::JepaWorldModel;
+use super::nt_world_e8::E8WorldModel;
+use super::nt_world_infer::{ActiveInferenceEngine, FreeEnergyReport};
 // Local types — layer-safe (no L5 nt_core_iit_phi dependency)
 #[derive(Debug, Clone)]
 pub struct PhiReport {

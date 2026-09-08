@@ -4,7 +4,6 @@
 //! 支持 10-1000+ 视频/小时的水平扩展，无架构变更。
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// 作业状态

@@ -3,7 +3,8 @@ use super::super::tracker::GoalTracker;
 use super::super::super::memory::ReasoningMemory;
 use super::super::super::self_iterating::SelfIteratingBrain;
 // use crate::l5_cognition::nt_mind::KnowledgeSource;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
+use crate::neotrix::nt_world_model::TaskType as WorldTaskType;
 use super::core::GoalLoop;
 use super::core::truncate;
 
@@ -79,15 +80,15 @@ impl GoalLoop {
             }
         }
 
-        let score_before = brain.brain.evaluate_capability(TaskType::General);
+        let score_before = brain.brain.evaluate_capability(WorldTaskType::General);
 
         let result = if is_complex {
             self._execute_complex_iteration(brain, &desc)
         } else {
-            brain.iterate(TaskType::General)
+            brain.iterate(WorldTaskType::General)
         };
 
-        let score_after = brain.brain.evaluate_capability(TaskType::General);
+        let score_after = brain.brain.evaluate_capability(WorldTaskType::General);
         let improved = result.improved;
         let reward = score_after - score_before;
 
@@ -317,7 +318,7 @@ impl GoalLoop {
                     let _suggestion_text = suggestions.join("\n");
                     let memory = ReasoningMemory::new(
                         &format!("session_distillation: {}", desc.chars().take(40).collect::<String>()),
-                        crate::neotrix::nt_world_model::TaskType::General,
+                        TaskType::General,
                         &[],
                         0.85,
                     );

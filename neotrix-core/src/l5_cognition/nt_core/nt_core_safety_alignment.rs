@@ -73,6 +73,7 @@ pub enum ConstraintType {
 }
 
 /// 严重程度
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 
 /// 行为监控器
@@ -291,6 +292,7 @@ impl AISafetyAlignmentEngine {
             Severity::Medium => 0.3,
             Severity::High => 0.6,
             Severity::Critical => 1.0,
+            _ => 0.0,
         }).sum();
 
         let warning_score: f64 = warnings.len() as f64 * 0.05;
@@ -313,6 +315,7 @@ impl AISafetyAlignmentEngine {
                 Severity::Low => {
                     recommendations.push(format!("INFO: Review {}", violation.constraint_name));
                 }
+                _ => {}
             }
         }
 

@@ -65,7 +65,7 @@ pub struct BlankSpaceDetail {
 }
 
 /// 严重程度
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 
 // ============================================================================
 // 留白量化检查器

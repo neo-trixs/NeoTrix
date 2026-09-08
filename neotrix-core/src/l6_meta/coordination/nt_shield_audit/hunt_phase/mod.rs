@@ -94,9 +94,6 @@ pub struct Impact {
     pub rce: bool,
 }
 
-/// 严重性
-#[serde(rename_all = "lowercase")]
-
 /// 狩猎范围分配
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HuntScope {

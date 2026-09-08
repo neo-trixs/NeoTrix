@@ -45,13 +45,13 @@ impl PredictiveCortex {
             trajectory.push(PredictedStep {
                 step,
                 latent_mean: mean.clone(),
-                latent_variance: variance,
+                latent_variance: variance.to_vec(),
                 hexagram_state: hexagram,
                 free_energy: fe_report.variational_fe,
                 confidence,
             });
 
-            latent = mean;
+            latent = mean.to_vec();
         }
 
         let avg_confidence = total_confidence / horizon.max(1) as f64;

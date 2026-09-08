@@ -59,9 +59,6 @@ pub struct Impact {
     pub rce: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Evidence {
     pub source: EvidenceSource,

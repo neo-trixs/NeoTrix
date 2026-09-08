@@ -51,7 +51,7 @@ impl BenchmarkSuite {
     pub fn run(&self, brain: &mut SelfIteratingBrain) -> HashMap<String, f64> {
         let mut scores = HashMap::new();
         for task in &self.tasks {
-            let score = brain.brain.evaluate_capability(task.task_type);
+            let score = brain.brain.evaluate_capability(super::super::self_edit::knowledge_to_world_task_type(&task.task_type));
             scores.insert(task.name.clone(), score);
         }
         scores
