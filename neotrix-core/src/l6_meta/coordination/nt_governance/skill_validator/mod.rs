@@ -23,12 +23,7 @@ pub enum RuleCategory {
 }
 
 /// 验证严重性
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum Severity {
-    Error,
-    Warning,
-}
 
 /// 验证发现
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,7 +74,7 @@ impl ValidationReport {
 }
 
 /// 技能验证器
-#[derive(Debug)]
+use neotrix_types::shared::Severity;
 pub struct SkillValidator {
     plugin_root: PathBuf,
 }

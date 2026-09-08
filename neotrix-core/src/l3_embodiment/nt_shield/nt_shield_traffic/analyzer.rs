@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use neotrix_types::shared::Severity;
 use std::time::{Duration, Instant};
 
 use crate::core::nt_core_self_test::SelfTest;
@@ -98,13 +99,6 @@ pub struct SensitiveFinding {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Low,
-    Info,
-}
 
 pub struct DefaultSensitivityDetector;
 

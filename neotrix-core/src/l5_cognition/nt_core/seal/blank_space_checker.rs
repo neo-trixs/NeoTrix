@@ -66,14 +66,6 @@ pub struct BlankSpaceDetail {
 
 /// 严重程度
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum Severity {
-    /// 通过
-    Pass,
-    /// 警告
-    Warning,
-    /// 错误
-    Error,
-}
 
 // ============================================================================
 // 留白量化检查器
@@ -313,6 +305,7 @@ impl BlankSpaceChecker {
 // 测试模块
 // ============================================================================
 
+use neotrix_types::shared::Severity;
 #[cfg(test)]
 mod tests {
     use super::*;

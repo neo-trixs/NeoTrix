@@ -73,14 +73,7 @@ pub enum ConstraintType {
 }
 
 /// 严重程度
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub enum Severity {
-    Low = 0,
-    Medium = 1,
-    High = 2,
-    Critical = 3,
-}
 
 /// 行为监控器
 pub struct BehaviorMonitor {
@@ -170,7 +163,7 @@ pub struct RiskFactor {
 }
 
 /// 安全统计
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use neotrix_types::shared::Severity;
 pub struct SafetyStats {
     pub checks_performed: u64,
     pub violations_detected: u64,

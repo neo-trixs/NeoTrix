@@ -84,3 +84,4 @@ pub use core::{
     EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus,
     MetaCognitiveLoop, MetaCycleResult,
 };
+pub use core::shared_types as shared;

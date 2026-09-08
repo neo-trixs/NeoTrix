@@ -137,3 +137,4 @@ pub mod self_measure;
 pub mod self_model;
 pub mod llm_timeout;
 pub mod context_strategy;
+pub mod shared_types;

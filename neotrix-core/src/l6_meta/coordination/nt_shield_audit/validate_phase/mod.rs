@@ -61,13 +61,6 @@ pub struct Impact {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Low,
-    Informational,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Evidence {
@@ -97,7 +90,7 @@ pub enum DomainCompanion {
 }
 
 /// Validate Phase 引擎
-#[derive(Debug)]
+use neotrix_types::shared::Severity;
 pub struct ValidatePhase {
     raw_findings: Vec<ValidatedFinding>,
     validated: Vec<ValidationResult>,

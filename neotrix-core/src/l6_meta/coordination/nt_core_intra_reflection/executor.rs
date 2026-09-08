@@ -9,12 +9,6 @@
 use super::types::ReflectionReport;
 
 /// 批判严重度。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Severity {
-    Low,
-    Medium,
-    High,
-}
 
 /// 单条批判意见。
 #[derive(Debug, Clone)]
@@ -35,7 +29,7 @@ pub struct Revision {
 }
 
 /// Reflection 闭环执行器。
-#[derive(Debug, Clone)]
+use neotrix_types::shared::Severity;
 pub struct ReflectionExecutor {
     pub coherence_threshold: f64,
     pub efficiency_threshold: f64,

@@ -1,4 +1,5 @@
 use std::io::{Read, Write};
+use neotrix_types::shared::Severity;
 use std::net::TcpStream;
 use std::time::Duration;
 
@@ -120,14 +121,6 @@ pub struct Evidence {
     pub reproducible: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Low,
-    Info,
-}
 
 impl Severity {
     pub fn label(&self) -> &'static str {

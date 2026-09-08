@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use neotrix_types::shared::Severity;
 
 #[derive(Debug, Clone)]
 pub struct SecretPattern {
@@ -8,13 +9,6 @@ pub struct SecretPattern {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub enum Severity {
-    #[default]
-    Low,
-    Medium,
-    High,
-    Critical,
-}
 
 #[derive(Debug, Clone)]
 pub struct SecretFinding {

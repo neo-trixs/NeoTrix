@@ -30,13 +30,6 @@ pub struct AuditFindingSummary {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Low,
-    Informational,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -81,6 +74,7 @@ pub struct ConflictVerdict {
 
 /// 审计记忆引擎
 #[derive(Debug)]
+use neotrix_types::shared::Severity;
 pub struct AuditMemory {
     runs: Vec<AuditRun>,
     project_root: PathBuf,

@@ -98,12 +98,6 @@ impl SweepRunner {
 
 /// 条目严重级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Info,
-}
 
 /// 增量条目
 #[derive(Debug, Clone, PartialEq)]
@@ -303,6 +297,7 @@ impl AlertSummary {
 
 /// SelfTest (T1): 扫描降级 + 增量 + 分级 + 聚合
 pub struct SweepDeltaSelfTest;
+use neotrix_types::shared::Severity;
 
 impl SelfTest for SweepDeltaSelfTest {
     fn name(&self) -> &str {

@@ -1,13 +1,6 @@
 use std::fmt;
+use neotrix_types::shared::Severity;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Severity {
-    None,
-    Low,
-    Medium,
-    High,
-    Critical,
-}
 
 impl Severity {
     pub fn from_score(score: f64) -> Self {

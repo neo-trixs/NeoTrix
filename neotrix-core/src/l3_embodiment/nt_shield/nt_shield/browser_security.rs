@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use neotrix_types::shared::Severity;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BrowserVulnType {

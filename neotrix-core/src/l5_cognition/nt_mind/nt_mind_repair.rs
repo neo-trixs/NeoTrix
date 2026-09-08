@@ -28,12 +28,6 @@ pub struct Diagnosis {
 
 /// 严重度
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Low,
-}
 
 /// 修复选项类型 (参考 APR 文献: GenProg/Prophet/Template/LLM-based)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -513,6 +507,7 @@ pub struct RepairHistory {
 
 /// SelfTest for RepairPlanner
 #[cfg(test)]
+use neotrix_types::shared::Severity;
 mod tests {
     use super::*;
 

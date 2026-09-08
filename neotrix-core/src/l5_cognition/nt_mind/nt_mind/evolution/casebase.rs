@@ -89,13 +89,6 @@ pub enum ConflictType {
 }
 
 /// 严重度等级。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Severity {
-    Low,        // 低风险，日常决策
-    Medium,     // 中等，影响有限群体
-    High,       // 高风险，生命/基本权利相关
-    Critical,   // 极高，生死/基本人权/生存
-}
 
 /// 利益相关者。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -532,7 +525,7 @@ pub struct SearchResult {
 }
 
 /// 类比推理结果。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use neotrix_types::shared::Severity;
 pub struct AnalogicalResult {
     pub case: EthicalCase,
     pub similarity: f64,

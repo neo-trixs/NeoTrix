@@ -95,15 +95,7 @@ pub struct Impact {
 }
 
 /// 严重性
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Severity {
-    Critical,
-    High,
-    Medium,
-    Low,
-    Informational,
-}
 
 /// 狩猎范围分配
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,7 +107,7 @@ pub struct HuntScope {
 }
 
 /// Hunt Phase 引擎
-#[derive(Debug)]
+use neotrix_types::shared::Severity;
 pub struct HuntPhase {
     architecture_summary: String, // 注入的 architecture.md
     scopes: Vec<HuntScope>,

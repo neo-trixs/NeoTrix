@@ -23,12 +23,6 @@ use syn;
 mod scanners;
 use scanners::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Severity {
-    Error,
-    Warning,
-    Info,
-}
 
 impl fmt::Display for Severity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1662,6 +1656,7 @@ pub struct PatternMatch {
 
 // ─── Scanner helpers ───
 
+use neotrix_types::shared::Severity;
 fn count_rs_files(dir: &Path) -> usize {
     cached_rs_files(dir).len()
 }

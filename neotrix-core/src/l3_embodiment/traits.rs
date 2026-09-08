@@ -29,15 +29,7 @@ pub enum SecurityEventType {
 }
 
 /// 严重程度
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub enum Severity {
-    Info,
-    Low,
-    Medium,
-    High,
-    Critical,
-}
 
 /// 具身状态 — 持久化 (PentestCode 吸收)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -160,7 +152,7 @@ pub trait EmbodimentLayer: Send + Sync {
 }
 
 /// 具身状态快照
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use neotrix_types::shared::Severity;
 pub struct EmbodimentSnapshot {
     pub host_count: usize,
     pub vuln_count: usize,

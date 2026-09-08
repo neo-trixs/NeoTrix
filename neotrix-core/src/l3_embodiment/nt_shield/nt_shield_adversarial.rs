@@ -81,14 +81,7 @@ pub struct AttackVector {
 }
 
 /// 严重程度
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
-pub enum Severity {
-    Low = 0,
-    Medium = 1,
-    High = 2,
-    Critical = 3,
-}
 
 /// 套件元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,7 +148,7 @@ pub struct AdversarialStats {
 }
 
 /// 测试报告
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use neotrix_types::shared::Severity;
 pub struct TestReport {
     pub report_id: String,
     pub suite_id: String,

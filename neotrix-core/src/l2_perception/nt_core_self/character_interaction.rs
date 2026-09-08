@@ -299,14 +299,6 @@ pub enum IssueType {
 
 /// 严重程度
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum Severity {
-    /// 信息
-    Info,
-    /// 警告
-    Warning,
-    /// 错误
-    Error,
-}
 
 /// 图统计信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -327,6 +319,7 @@ pub struct GraphStatistics {
 // 测试模块
 // ============================================================================
 
+use neotrix_types::shared::Severity;
 #[cfg(test)]
 mod tests {
     use super::*;
