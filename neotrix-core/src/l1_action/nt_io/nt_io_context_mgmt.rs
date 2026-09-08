@@ -213,8 +213,9 @@ impl ContextManager {
 
         let window = self.windows.get_mut(window_id)
             .ok_or_else(|| format!("Window {} not found", window_id))?;
+        let token_count = item.token_count;
         window.items.push(item);
-        window.current_size += item.token_count;
+        window.current_size += token_count;
         window.last_accessed = chrono::Utc::now();
 
         self.stats.total_items += 1;

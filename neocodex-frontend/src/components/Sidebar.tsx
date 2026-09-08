@@ -678,7 +678,7 @@ export function Sidebar(props: SidebarProps) {
                               onDrop={(e) => { e.preventDefault(); e.stopPropagation(); reorderSession(session.id) }}
                             >
                               <div class={clsx(
-                                'rounded-lg transition-colors',
+                                'w-full rounded-lg transition-colors',
                                 active
                                   ? 'bg-nt-io-500/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
                                   : 'hover:bg-white/40'
@@ -701,11 +701,8 @@ export function Sidebar(props: SidebarProps) {
                                     )}>
                                       {session.title}
                                     </span>
-                                    <span class="text-11px text-text-muted flex-shrink-0">
-                                      {formatRelativeTime(session.updatedAt)}
-                                    </span>
                                   </button>
-                                  <div class="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                  <div class="absolute right-0 top-0 bottom-0 flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-gradient-to-l from-white/80 via-white/60 to-transparent pointer-events-none group-hover:pointer-events-auto">
                                     <button
                                       class={clsx(
                                         'p-1 rounded transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',

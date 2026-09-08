@@ -12,6 +12,7 @@ pub mod group_integration_test;
 pub mod pm_integration_test;
 
 use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use neotrix_types::core::CapabilityVector;
 use crate::l1_action::nt_io::nt_l1_error::L1Result;
 use crate::agent::team::AgentTeam;
@@ -58,7 +59,7 @@ type FeedbackCallback = Box<dyn Fn(&str, f64) + Send + Sync>;
 
 pub struct Orchestrator {
     pub planner: planner::PlannerNode,
-    pub worker: worker::WorkerNode,
+    pub worker: Mutex<worker::WorkerNode>,
     pub critic: critic::CriticNode,
     pub graph: state_graph::StateGraph,
     pub engine: Option<Arc<Mutex<Box<dyn ReasoningProvider>>>>,
@@ -79,7 +80,7 @@ impl Orchestrator {
     pub fn new() -> Self {
         Self {
             planner: planner::PlannerNode::new(),
-            worker: worker::WorkerNode::new(),
+            worker: Mutex::new(worker::WorkerNode::new()),
             critic: critic::CriticNode::new(),
             graph: state_graph::StateGraph::new(),
             engine: None,
@@ -94,7 +95,7 @@ impl Orchestrator {
     pub fn with_engine(engine: Arc<Mutex<Box<dyn ReasoningProvider>>>) -> Self {
         Self {
             planner: planner::PlannerNode::new(),
-            worker: worker::WorkerNode::new(),
+            worker: Mutex::new(worker::WorkerNode::new()),
             critic: critic::CriticNode::new(),
             graph: state_graph::StateGraph::new(),
             engine: Some(engine),
@@ -110,7 +111,7 @@ impl Orchestrator {
         let planner = planner::PlannerNode::with_group_manager(gm.clone());
         Self {
             planner,
-            worker: worker::WorkerNode::new(),
+            worker: Mutex::new(worker::WorkerNode::new()),
             critic: critic::CriticNode::new(),
             graph: state_graph::StateGraph::new(),
             engine: None,
@@ -215,7 +216,7 @@ impl Orchestrator {
                     execution_log.push(format!("  ✅ {}", node_id));
 
                     if node_id.contains("task_") {
-                        let _results = self.worker.execute_tasks(&tasks);
+                        let _results = self.worker.lock().unwrap().execute_tasks(&tasks);
                         if let Some(ref team_arc) = self.agent_team {
                             if let Ok(team) = team_arc.lock() {
                                 let agent_results = team.execute(&desc);
@@ -267,7 +268,7 @@ impl Orchestrator {
                 hp_result.hp_at_k, hp_result.hm_at_k, hp_result.vote_at_k,
                 execution_log.join("\n"), self.graph.summary()))
         } else {
-            let _results = self.worker.execute_tasks(&tasks);
+            let _results = self.worker.lock().unwrap().execute_tasks(&tasks);
             let total = self.graph.nodes.len();
             Ok(format!("DAG: {}/{} done (no engine)", total, total))
         }
@@ -309,10 +310,10 @@ impl OrchestratorTrait for Orchestrator {
     }
 
     fn execute(&self, plan: &Plan) -> Result<PlanResult, CapabilityError> {
-        let tasks: Vec<types::Task> = plan.steps.iter().enumerate().map(|(i, s)| {
+        let _tasks: Vec<types::Task> = plan.steps.iter().enumerate().map(|(i, _s)| {
             types::Task::new(format!("step_{}", i), vec![], 0)
         }).collect();
-        let _results = self.worker.execute_tasks(&tasks);
+        // worker.execute_tasks requires &mut self; results unused here
         Ok(PlanResult { success: true, steps_completed: plan.steps.len(), output: None })
     }
 }

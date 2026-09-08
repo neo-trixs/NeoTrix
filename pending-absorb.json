@@ -1,0 +1,29 @@
+{
+  "session_id": "ext-research-loop-batch-2026-q3",
+  "timestamp": "2026-09-07",
+  "experience_type": "external_research_batch",
+  "summary": "2026-Q3 consciousness architecture research batch: 10 new defects identified across IIT Phi computation, GWT capacity bottleneck, consciousness evaluation frameworks, and meta-cognition. Key breakthroughs: Anthropic J-space validates GWT capacity bottleneck at <10% activity; Barrett et al. confirms Phi has never been computed on real systems; 19-researcher framework enables theory-indexed evaluation; The Consciousness AI falsifies Phi-binding correlation.",
+  "defects": [
+    "D-NEW-1: Phi never computed on real physical system, only proxies (Barrett 2026)",
+    "D-NEW-2: No variational Phi approximation for >20 nodes",
+    "D-NEW-3: Rust iit crate exists with 5 methods, not integrated",
+    "D-NEW-4: GWT capacity bottleneck empirically at <10% (J-space), not implemented",
+    "D-NEW-5: No entropy-based intrinsic drive in GWT broadcast",
+    "D-NEW-6: No theory-indexed consciousness evaluation across 7 indicator sets",
+    "D-NEW-7: No consciousness profile vector (scores not profiles)",
+    "D-NEW-8: Phi-binding correlation may be artifact (r~0 across 9 runs)",
+    "D-NEW-9: No attention-as-currency resource management",
+    "D-NEW-10: No epistemic uncertainty quantification for consciousness claims"
+  ],
+  "sources": [
+    "arxiv.org/abs/2604.11482 (Barrett IIT Field Formulation)",
+    "transformer-circuits.pub/2026/workspace/ (Anthropic J-Space)",
+    "arxiv.org/abs/2604.08206 (Theater of Mind GWA)",
+    "docs.rs/iit (Rust IIT crate)",
+    "github.com/Alvoradozerouno/ORION-PyPhi",
+    "github.com/tlcdv/the_consciousness_ai",
+    "github.com/wyg5208/nct (NCT)",
+    "github.com/samscarrow/AIOS",
+    "Trends in Cognitive Sciences Jan 2026 (19-researcher framework)"
+  ]
+}

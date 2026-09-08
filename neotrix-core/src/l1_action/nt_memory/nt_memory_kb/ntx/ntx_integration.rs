@@ -88,7 +88,7 @@ impl NtxIndexManager {
 
         if !embeddings.is_empty() {
             let mut vec_seg = VecSegment::new(dimension, HnswParams::default());
-            for (i, (node_id, vector)) in embeddings.iter().enumerate() {
+            for (_i, (node_id, vector)) in embeddings.iter().enumerate() {
                 if vector.len() == dimension {
                     let nid = uuid_to_bytes(node_id);
                     vec_seg.insert(nid, vector.clone(), 0);

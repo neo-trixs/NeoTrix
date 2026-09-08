@@ -3,7 +3,7 @@
 //! 解决痛点 #2: FTS5 内容复制 2× → 嵌入 FTS5 数据库文件
 //! 将 SQLite FTS5 数据库完整嵌入 NTX 单文件。
 
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use super::format::sha256;
 
 /// Lex Segment magic
@@ -37,7 +37,7 @@ impl LexSegment {
     }
 
     /// 写入段 (magic + checksum + data)
-    pub fn write_to(&self, writer: &mut impl Write) -> std::io::Result<u64> {
+    pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
 
         // Magic

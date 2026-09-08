@@ -38,10 +38,10 @@ pub struct GameDaemonState {
 // Inline mini-games (self-contained)
 // ═══════════════════════════════════════════════════════════════════
 
-fn run_tictactoe(seed: u64, max_games: usize) -> (usize, usize, f64) {
+fn run_tictactoe(_seed: u64, max_games: usize) -> (usize, usize, f64) {
     let mut wins = 0;
     let mut total_turns = 0usize;
-    for g in 0..max_games {
+    for _g in 0..max_games {
         let mut board = [0u8; 9];
         let mut turn = 0usize;
         let mut done = false;
@@ -213,7 +213,7 @@ impl GameTrainingDaemon {
         let seed = self.state.total_ticks as u64;
         let eps = self.episodes_per_tick;
 
-        let (wins, losses, avg_reward, avg_turns, phi_avg, game_name) = match c {
+        let (wins, losses, avg_reward, _avg_turns, phi_avg, game_name) = match c {
             0 => {
                 let (w, l, t) = run_tictactoe(seed, eps);
                 (w, l, w as f64 / eps as f64, t, 0.1, "HexTicTacToe")

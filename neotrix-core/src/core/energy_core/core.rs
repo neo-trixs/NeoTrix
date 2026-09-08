@@ -141,7 +141,7 @@ impl EnergyCore for EnergyCoreImpl {
         // 找出最强的智慧类型
         let dominant_layer = distribution
             .iter()
-            .max_by_key(|(_, count)| count)
+            .max_by_key(|(_, count)| **count)
             .map(|(layer, _)| *layer)
             .unwrap_or(Layer::L5Cognition);
         

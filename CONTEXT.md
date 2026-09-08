@@ -168,3 +168,66 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **CostManager** | 成本控制：实现 Token 估算、预算管理、成本优化策略，支持 AI 漫剧生产的成本控制。实现于 `nt_act::cost_manager`。 | "成本控制" |
 | **ShotContinuityChecker** | 镜头衔接：实现首尾帧链接、场景转场连续性，确保镜头之间的视觉连贯性。实现于 `nt_act::shot_continuity`。 | "镜头衔接" |
 | **TaskScheduler** | 任务调度优化：实现 GPU 显存管理、批量调度优化、指数退避重试，提升 AI 漫剧生产任务的调度效率。实现于 `nt_act::task_scheduler`。 | "任务调度" |
+
+## Absorbed Terminology (2026-09-02, 清理子系统)
+
+| Term | Definition | Avoid |
+|------|-----------|-------|
+| **CleanupScanner** | 系统清理扫描器：扫描系统缓存、日志、临时文件、大文件，支持并行扫描。实现于 `nt_world::system_scanner`。 | "扫描器" |
+| **CacheDetector** | 缓存检测器：检测 13+ 种开发工具缓存（npm/pip/cargo/brew/docker/go），支持命令行路径探测。实现于 `nt_world::cache_detector`。 | "缓存检测" |
+| **PathValidator** | 路径验证器：验证路径安全性，防止误删系统文件，支持 TOCTOU 竞态防护和符号链接验证。实现于 `nt_shield::path_validator`。 | "路径检查" |
+| **RiskAssessor** | 风险评估器：评估清理操作风险（0-100 分），支持白名单机制和用户自定义保护路径。实现于 `nt_shield::risk_assessor`。 | "风险检查" |
+| **SafeDeleter** | 安全删除器：支持回收站（osascript）、归档、永久删除三种模式，自动创建备份清单。实现于 `nt_act::safe_deleter`。 | "删除器" |
+| **CleanupCoordinator** | 清理协调器：协调扫描→评估→删除流程，支持策略选择（保守/平衡/激进）和事件日志。实现于 `nt_meta::coordinator`。 | "协调器" |
+| **CleanupStrategy** | 清理策略：Conservative（保守）、Balanced（平衡）、Aggressive（激进）、Custom（自定义）。用于控制清理行为。 | "策略" |
+| **RiskLevel** | 风险等级：Safe（安全）、Moderate（中等）、Risky（高风险）、Protected（保护）。用于分级清理决策。 | "等级" |
+| **CleanupEvent** | 清理事件：ScanStarted/Completed、CleanStarted/Completed/Failed、ArchiveCreated、BackupCreated。用于 EventBus 集成。 | "事件" |
+
+## Absorbed Terminology (2026-09-08, 8-Source Batch Absorption)
+
+### Core Axioms (3)
+
+| Axiom | Definition | Source |
+|-------|-----------|--------|
+| **Cost-Aware Routing** | Not all tasks need the strongest model. Intelligent routing allocates cheap models to simple tasks, expensive models to hard tasks. Spotify Portal Shunt achieves ~90% token savings by routing I/O to Gemini Flash. | Spotify Portal Shunt |
+| **Context as Scarce Resource** | The fundamental bottleneck for persistent agents is context window / KV capacity. KVMem proves 1M tokens on 24GB GPU via paged KV virtualization. | KVMem (arXiv:2609.04852) |
+| **Skill as Production Template** | Skills are structured, composable, versionable expert knowledge templates — not prompts. Easel's 112 skills each follow SKILL.md (<200 lines) + references/ + scripts/ contract. | Easel (419★) |
+
+### Cross-Source Patterns (5)
+
+| Pattern | Definition | Sources | NeoTrix Mapping |
+|---------|-----------|---------|-----------------|
+| **P1: Model Routing / Delegation** | Route tasks to cheapest capable model. Spotify Shunt (I/O→Gemini Flash), KVMem (hot/cold tiering), claude-vibe-squad (71 specialists). | Spotify + KVMem + claude-vibe-squad | GWT salience + cost weight |
+| **P2: Isolation-per-Task** | Each task gets isolated context/state. claude-vibe-squad worktree, KVMem paged KV, castor headless Chrome. | claude-vibe-squad + KVMem + castor | Worktree isolation + paged memory |
+| **P3: Profile-Driven Adaptation** | Persistent profile shapes behavior across sessions. Easel 6-dimension profile, Spotify routing rules. | Easel + Spotify | SelfModel extension |
+| **P4: Ordered Backend Fallback** | Single interface with ordered fallback chain. castor (video sources), Better-Fullstack (ecosystems), Easel (platforms). | castor + Better-Fullstack + Easel | Ordered Backend Router (R-P82) |
+| **P5: Skill as Reusable Template** | Skills are composable atoms with strict interfaces. hand-drawn-video skill, Easel 112 skills, claude-vibe-squad 71 specialists. | hand-drawn-video + Easel + claude-vibe-squad | SKILL-SPEC.md contract |
+
+### Easel Patterns (5 Transferable)
+
+| Pattern | Easel Implementation | NeoTrix Mapping | Priority |
+|---------|---------------------|-----------------|----------|
+| **Skill Interface Contract** | SKILL.md (<200 lines) + references/ + scripts/ + tests/ | NT-ACT skill nodes | P0 |
+| **Manifest-as-Thin-Index** | `.easel.json` with summary + outputs[] paths | SEAL pipeline inter-stage | P1 |
+| **Profile-Driven Continuity** | 6-dimension profile (identity/style/audience/platforms/preferences/memory) | SelfModel + NT-MEMORY | P2 |
+| **Prompt Stack Layering** | SOUL→AGENTS→CONTEXT→SKILL (permanent vs on-demand) | GWT attention routing | P2 |
+| **Content Guard Taxonomy** | BLOCK (fail-closed) vs WARN (soft) dual-tier | NT-SHIELD egress guard | P1 |
+
+### KVMem Key Insights
+
+| Concept | Definition | NeoTrix Integration |
+|---------|-----------|---------------------|
+| **Attention-Space Index** | Block-level Mean-K vectors (32-token blocks) for model-native relevance scoring. Retrieval in bounded GPU tiles. | GWT refinement: model-native scoring |
+| **Paged KV Virtualization** | GPU→Host→NVMe tiered KV storage. GPU memory constant (~35 GiB) regardless of workspace size. | kv_cache_optimizer.rs extension |
+| **Step-Level Scheduling** | Update working set once per agent step (inter-step KL 37× higher than intra-step). | ConsciousnessTree cycle boundary |
+| **Delta Reuse** | Working set decomposed into Retained/Incoming/Outgoing. GPU pages of retained blocks reused directly. | experience-tree lazy branch loading |
+
+### Contradictions & Resolutions
+
+| Tension | Resolution |
+|---------|-----------|
+| KVMem vs Compaction: short tasks faster with compaction, long tasks better with paged KV | Adaptive: use compaction for <256K tokens, KVMem for >256K |
+| Easel 112 flat skills vs NeoTrix domain model | Map Easel skill taxonomy to NT-* domains, don't adopt wholesale |
+| Easel Python vs NeoTrix Rust | Absorb methodology (patterns) not code (scripts) |
+| castor DRM vs nt_shield security | Align: DRM restriction is consistent with security policy |
+| Easel auto-publish risk | Risk assessment gate required (R-P82同构) |

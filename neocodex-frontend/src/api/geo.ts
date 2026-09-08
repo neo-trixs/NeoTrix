@@ -1,4 +1,4 @@
-import { call } from './client'
+import { enhancedInvoke as call } from './adapter'
 
 /* ════════════════════════════════════════════
    api/geo.ts — 地图数据 API 层（前后端分离）

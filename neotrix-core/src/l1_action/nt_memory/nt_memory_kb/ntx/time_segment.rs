@@ -3,7 +3,7 @@
 //! 解决痛点 #4: 无时间旅行 → 时间索引 + 追加帧
 //! 支持按时间范围查询知识快照
 
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use serde::{Serialize, Deserialize};
 
 /// 时间索引条目
@@ -67,7 +67,7 @@ impl TimeSegment {
     }
 
     /// 写入段
-    pub fn write_to(&self, writer: &mut impl Write) -> std::io::Result<u64> {
+    pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
         writer.write_all(&(self.entries.len() as u64).to_le_bytes())?;
         for entry in &self.entries {

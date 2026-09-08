@@ -4,7 +4,7 @@
    KbDocSummary / KbDocIngestResult
    kb_doc_ingest / kb_doc_list / kb_doc_delete / kb_doc_reindex
    ════════════════════════════════════════════ */
-import { call } from './client'
+import { enhancedInvoke as call } from './adapter'
 
 export interface KbDocSummary {
   doc_id: string

@@ -164,7 +164,9 @@ impl HuntPhase {
         }
         
         // 应用验证规则
-        self.findings.retain(|f| self.validate_finding(f));
+        let findings_clone = self.findings.clone();
+        let valid: Vec<_> = findings_clone.iter().filter(|f| self.validate_finding(f)).cloned().collect();
+        self.findings = valid;
         
         self.findings.clone()
     }

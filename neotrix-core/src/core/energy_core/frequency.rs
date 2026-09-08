@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 频率类型 - 每个层级有独特的振动模式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Frequency {
     /// L1 行动层：低频、稳定、接地
     /// 如：物理世界的重力频率

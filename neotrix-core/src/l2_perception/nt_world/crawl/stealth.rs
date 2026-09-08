@@ -36,11 +36,26 @@ impl SessionPool {
             Fingerprint::random()
         }
     }
+
+    pub fn active_count(&self) -> usize {
+        self.sessions.lock().unwrap().len()
+    }
+
+    pub fn banned_count(&self) -> usize {
+        0
+    }
+
+    pub fn acquire(&mut self) -> Fingerprint {
+        self.get_session()
+    }
+
+    pub fn mark_banned(&mut self, _id: u64) {}
 }
 
 const PLATFORMS: &[&str] = &["Win32", "MacIntel", "Linux x86_64"];
 const LANGUAGES: &[&str] = &["en-US,en;q=0.9", "en-GB,en;q=0.9", "en-CA,en;q=0.8"];
 
+#[derive(Clone)]
 pub struct Fingerprint {
     pub user_agent: String,
     pub platform: String,

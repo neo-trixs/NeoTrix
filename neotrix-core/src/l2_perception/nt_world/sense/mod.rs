@@ -156,7 +156,7 @@ impl WorldModel {
         expert_ids: &[usize],
     ) -> Vector {
         let z = self.context_encoder.encode(context);
-        let latent = LatentState { vector: z, timestamp: 0 };
+        let latent = LatentState { value: z.clone(), delta: vec![0.0; z.len()] };
 
         self.expert_predictor.predict_all(&latent, expert_ids)
     }
@@ -171,7 +171,7 @@ impl WorldModel {
 
         for _ in 0..num_candidates {
             let mut sequence = Vec::new();
-            let mut z = initial_state.vector.clone();
+            let mut z = initial_state.value.clone();
 
             for _ in 0..horizon {
                 let expert_id = if self.num_experts > 0 {
@@ -191,7 +191,7 @@ impl WorldModel {
         let mut scored: Vec<(Vec<usize>, f64)> = candidates
             .into_iter()
             .map(|seq| {
-                let score = self.evaluate_sequence(&initial_state.vector, &seq);
+                let score = self.evaluate_sequence(&initial_state.value, &seq);
                 (seq, score)
             })
             .collect();

@@ -189,7 +189,7 @@ impl CacheLayer {
         }
 
         // L2 查找
-        if let Some(ref mut disk_cache) = self.l2_cache {
+        if let Some(ref mut _disk_cache) = self.l2_cache {
             // TODO: 实际从磁盘读取
         }
 

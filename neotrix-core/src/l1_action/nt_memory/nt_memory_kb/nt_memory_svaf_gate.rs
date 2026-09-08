@@ -111,7 +111,7 @@ impl SvafGate {
             Some(c) => c,
             None => return 0.5,
         };
-        let query_vec = match nt_memory_embed::embed_text(&config, &text) {
+        let _query_vec = match nt_memory_embed::embed_text(&config, &text) {
             Ok(v) => v,
             _ => return 0.5,
         };

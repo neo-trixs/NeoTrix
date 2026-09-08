@@ -1,4 +1,4 @@
-import { call } from './client'
+import { enhancedInvoke as call } from './adapter'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   AgentStatus,

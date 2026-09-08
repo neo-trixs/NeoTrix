@@ -129,7 +129,6 @@ impl SystemScanner {
             ScanCategory::TempFile => format!("临时文件: {}", name),
             ScanCategory::BrowserCache => format!("浏览器缓存: {}", name),
             ScanCategory::DeveloperCache => format!("开发者缓存: {}", name),
-            _ => format!("文件: {}", name),
         }
     }
 }

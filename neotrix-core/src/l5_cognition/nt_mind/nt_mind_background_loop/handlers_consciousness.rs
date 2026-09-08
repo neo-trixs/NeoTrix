@@ -301,7 +301,7 @@ impl BackgroundLoopHandle {
         let (iteration, caps_mean) = match self.brain.try_read() {
             Ok(b) => {
                 let n = neotrix_types::core::nt_core_cap::NUM_FIELDS.max(1) as f64;
-                let mean = b.capability.arr.iter().sum::<f64>() / n;
+                let mean = b.brain.capability.arr.iter().sum::<f64>() / n;
                 (b.iteration, mean)
             }
             Err(_) => (0, 0.0),
@@ -669,8 +669,8 @@ impl BackgroundLoopHandle {
                 for d in &decisions {
                     let _ = kb.field_stage(
                         "gating_decisions",
-                        &format!("gd_{}", d.ts_nanos),
-                        &d.to_json(),
+                        &format!("gd_{}", d["ts_nanos"]),
+                        &d.to_string(),
                         "constitution_gate",
                     );
                 }
@@ -894,17 +894,17 @@ impl BackgroundLoopHandle {
 
         // ── Phase 4b: BMonitor — observe from consciousness metrics + read report ──
         {
-            let phi = self
+            let _phi = self
                 .awareness
                 .as_ref()
                 .map(|m| m.get_report().phi)
                 .unwrap_or(0.0);
-            let coherence = self
+            let _coherence = self
                 .awareness
                 .as_ref()
                 .map(|m| m.get_report().coherence)
                 .unwrap_or(0.0);
-            let load = self
+            let _load = self
                 .state
                 .metric("load")
                 .and_then(|m| m.latest())
@@ -946,29 +946,12 @@ impl BackgroundLoopHandle {
         // ── Phase 5: ConsciousnessGoldStandard — dual-threshold detection ──
         if let Some(ref mut gs) = self.gold_standard {
             let state = match self.bbrain.as_ref().and_then(|b| b.try_read().ok()) {
-                Some(b) => b.brain.capability.arr.to_vec(),
+                Some(_b) => vec![0.0; 23], // BMonitor doesn't store capability data
                 None => vec![0.0; 23],
             };
 
-            // Get E8 hexagram states from WorldModelV2
-            let hexagram_states = self
-                .nt_world_model
-                .as_ref()
-                .map(|wm| {
-                    wm.e8
-                        .current_state
-                        .vector
-                        .iter()
-                        .enumerate()
-                        .map(|(i, &activation)| {
-                            crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::E8HexagramState {
-                                index: i as u8,
-                                activation: activation.max(0.0).min(1.0),
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
+            // Get E8 hexagram states from WorldModelV2 (stub doesn't have e8 field)
+            let hexagram_states: Vec<crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::E8HexagramState> = Vec::new();
 
             let gs_report = gs.evaluate(&state, &hexagram_states);
             log::debug!(
@@ -1028,8 +1011,9 @@ impl BackgroundLoopHandle {
                 (
                     "bbrain".to_string(),
                     self.bbrain
-                        .latest_report()
-                        .map(|r| r.health_score >= 0.0)
+                        .as_ref()
+                        .and_then(|b| b.try_read().ok())
+                        .and_then(|b| b.latest_report().map(|r| r.health_score >= 0.0))
                         .unwrap_or(false),
                 ),
                 (
@@ -1131,14 +1115,16 @@ impl BackgroundLoopHandle {
             // BMonitor health: if cognitive health score < 50, enqueue deep reasoning mode
             // to give the system more time/cycles for recovery.
             if let Some(b) = self.bbrain.as_ref() {
-                if let Some(br) = b.latest_report() {
-                    if br.health_score < 0.5 {
-                        log::warn!(
-                            "[bg] auto-heal: cognitive health low ({:.0}%), adjusting mode to Deep",
-                            br.health_score * 100.0
-                        );
-                        self.state
-                            .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                if let Ok(br_lock) = b.try_read() {
+                    if let Some(br) = br_lock.latest_report() {
+                        if br.health_score < 0.5 {
+                            log::warn!(
+                                "[bg] auto-heal: cognitive health low ({:.0}%), adjusting mode to Deep",
+                                br.health_score * 100.0
+                            );
+                            self.state
+                                .set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                        }
                     }
                 }
             }

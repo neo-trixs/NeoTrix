@@ -172,7 +172,7 @@ impl ResonanceComplexityEngine {
         let g = 2.0; // 信号增益
         let tau = 150.0; // 驻留时间 (ms)
 
-        let composite: f64 = (d * c * g * tau).sqrt() / 100.0_f64;
+        let composite: f64 = (d as f64 * c as f64 * g as f64 * tau as f64).sqrt() / 100.0_f64;
 
         ComplexityIndex {
             fractal_dimension: d,

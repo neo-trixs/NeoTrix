@@ -310,9 +310,6 @@ impl ModelRoutingLayer {
 
             self.history.push(response.clone());
             return response;
-            
-            retries += 1;
-            last_error = Some("无可用模型".to_string());
         }
         
         RoutingResponse {

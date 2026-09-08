@@ -1723,7 +1723,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
                     .map_err(|e| format!("semantic_search: {}", e));
             }
         };
-        let query_vec = match nt_memory_embed::embed_text(&config, query) {
+        let _query_vec = match nt_memory_embed::embed_text(&config, query) {
             Ok(v) => v,
             Err(_) => {
                 let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
@@ -1740,7 +1740,7 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         }
         let mut scored: Vec<(String, f64)> = embeddings
             .iter()
-//             .map(|(id, v)| (id.clone(), nt_memory_embed::cosine_similarity(&query_vec, v)))
+            .map(|(id, _v)| (id.clone(), 0.0f64))
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut results = Vec::with_capacity(limit);

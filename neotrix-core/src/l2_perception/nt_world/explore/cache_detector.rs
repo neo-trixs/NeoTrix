@@ -93,15 +93,15 @@ impl CacheDetector {
     fn init_cache_registry(&mut self) {
         let home = dirs::home_dir().unwrap_or_default();
         let entries: Vec<(&str, CacheType, Box<dyn Fn() -> Option<PathBuf>>, bool)> = vec![
-            ("npm", CacheType::NodeJs, Box::new(move || Some(home.join(".npm"))), true),
-            ("yarn", CacheType::NodeJs, Box::new(move || Some(home.join(".cache/yarn"))), true),
-            ("pip", CacheType::Python, Box::new(move || Some(home.join("Library/Caches/pip"))), true),
-            ("cargo-registry", CacheType::Rust, Box::new(move || Some(home.join(".cargo/registry"))), true),
-            ("go-build", CacheType::Go, Box::new(move || Some(home.join("Library/Caches/go-build"))), true),
-            ("xcode-derived", CacheType::Xcode, Box::new(move || Some(home.join("Library/Developer/Xcode/DerivedData"))), true),
-            ("chrome", CacheType::Browser, Box::new(move || Some(home.join("Library/Caches/Google/Chrome"))), true),
-            ("safari", CacheType::Browser, Box::new(move || Some(home.join("Library/Caches/com.apple.Safari"))), true),
-            ("firefox", CacheType::Browser, Box::new(move || Some(home.join("Library/Caches/Firefox"))), true),
+            ("npm", CacheType::NodeJs, Box::new({ let h = home.clone(); move || Some(h.join(".npm")) }), true),
+            ("yarn", CacheType::NodeJs, Box::new({ let h = home.clone(); move || Some(h.join(".cache/yarn")) }), true),
+            ("pip", CacheType::Python, Box::new({ let h = home.clone(); move || Some(h.join("Library/Caches/pip")) }), true),
+            ("cargo-registry", CacheType::Rust, Box::new({ let h = home.clone(); move || Some(h.join(".cargo/registry")) }), true),
+            ("go-build", CacheType::Go, Box::new({ let h = home.clone(); move || Some(h.join("Library/Caches/go-build")) }), true),
+            ("xcode-derived", CacheType::Xcode, Box::new({ let h = home.clone(); move || Some(h.join("Library/Developer/Xcode/DerivedData")) }), true),
+            ("chrome", CacheType::Browser, Box::new({ let h = home.clone(); move || Some(h.join("Library/Caches/Google/Chrome")) }), true),
+            ("safari", CacheType::Browser, Box::new({ let h = home.clone(); move || Some(h.join("Library/Caches/com.apple.Safari")) }), true),
+            ("firefox", CacheType::Browser, Box::new({ let h = home.clone(); move || Some(h.join("Library/Caches/Firefox")) }), true),
             ("brew-cli", CacheType::Homebrew, Box::new(|| {
                 std::process::Command::new("brew").arg("--cache").output().ok()
                     .and_then(|o| String::from_utf8(o.stdout).ok()).map(|s| PathBuf::from(s.trim()))
@@ -117,8 +117,7 @@ impl CacheDetector {
     }
 
     pub fn detect_all(&self) -> Vec<CacheInfo> {
-        use rayon::prelude::*;
-        let mut caches: Vec<CacheInfo> = self.cache_registry.par_iter().filter_map(|entry| {
+        let mut caches: Vec<CacheInfo> = self.cache_registry.iter().filter_map(|entry| {
             let path = (entry.path_resolver)()?;
             if !path.exists() { return None; }
             let size = calculate_directory_size(&path);

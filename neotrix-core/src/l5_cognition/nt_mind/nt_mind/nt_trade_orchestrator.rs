@@ -27,7 +27,7 @@ use crate::l5_cognition::nt_mind::nt_mind::nt_trade_quote_negotiation::{
 };
 use crate::l5_cognition::nt_mind::nt_mind::nt_trade_production_logistics::{
     ProductionEngine, LogisticsEngine, ProductionOrder,
-    BomRequirement, DailyProgress,
+    BomRequirement, DailyProgress, ProductionSchedule,
     CiqCertificate, CiqStatus,
     BookingConfirmation as PLBookingConfirmation, PackingList as PLPackingList,
     CustomsDeclaration as PLCustomsDeclaration, BillOfLading as PLBillOfLading,
@@ -654,8 +654,15 @@ impl TradeOrchestrator {
             production_order_id: format!("PO-{}", uuid::Uuid::new_v4().simple()),
             contract_id: order_id.to_string(),
             bom: materials.iter().map(|m| m.clone()).collect(),
-            status: "Pending".into(),
-            progress_pct: 0.0,
+            routing: Vec::new(),
+            schedule: ProductionSchedule {
+                start_date: String::new(),
+                end_date: String::new(),
+                critical_path: Vec::new(),
+                buffer_days: 0,
+            },
+            supplier_orders: Vec::new(),
+            milestones: Vec::new(),
         };
         ctx.production_status = Some(ProductionStatus {
             stage: "Preparation".into(),

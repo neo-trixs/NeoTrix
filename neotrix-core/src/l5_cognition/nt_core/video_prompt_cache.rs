@@ -92,11 +92,13 @@ impl VideoPromptCache {
         // 语义相似度匹配
         if self.config.semantic_search {
             let prompt_embedding = self.embed_prompt(prompt);
-            if let Some(entry) = self.find_similar(&prompt_embedding) {
+            if let Some(id) = self.find_similar_id(&prompt_embedding) {
+                let entry = self.entries.get_mut(&id).unwrap();
                 entry.last_accessed = Instant::now();
                 entry.access_count += 1;
+                let resp = entry.response.clone();
                 self.stats.semantic_hits += 1;
-                return Some(entry.response.clone());
+                return Some(resp);
             }
         }
 
@@ -157,7 +159,7 @@ impl VideoPromptCache {
     }
 
     /// 查找相似条目
-    fn find_similar(&self, query_embedding: &[f64]) -> Option<&mut PromptCacheEntry> {
+    fn find_similar(&mut self, query_embedding: &[f64]) -> Option<String> {
         let mut best_score = 0.0;
         let mut best_id = None;
 
@@ -169,11 +171,23 @@ impl VideoPromptCache {
             }
         }
 
-        if let Some(id) = best_id {
-            self.entries.get_mut(&id)
-        } else {
-            None
+        best_id
+    }
+
+    /// 查找相似条目 ID (immutable borrow)
+    fn find_similar_id(&self, query_embedding: &[f64]) -> Option<String> {
+        let mut best_score = 0.0;
+        let mut best_id = None;
+
+        for (id, entry) in &self.entries {
+            let similarity = self.cosine_similarity(query_embedding, &entry.embedding);
+            if similarity > best_score && similarity >= self.config.similarity_threshold {
+                best_score = similarity;
+                best_id = Some(id.clone());
+            }
         }
+
+        best_id
     }
 
     /// 计算余弦相似度
@@ -208,8 +222,9 @@ impl VideoPromptCache {
             entries.sort_by(|a, b| a.1.access_count.cmp(&b.1.access_count));
 
             let to_remove_count = self.entries.len() - self.config.max_entries + 1000;
-            for (id, _) in entries.iter().take(to_remove_count) {
-                self.entries.remove(*id);
+            let keys_to_remove: Vec<_> = entries.iter().take(to_remove_count).map(|(id, _)| (*id).clone()).collect();
+            for id in keys_to_remove {
+                self.entries.remove(&id);
             }
         }
     }

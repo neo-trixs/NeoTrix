@@ -947,7 +947,7 @@ impl BoardCmd {
                 // Persist subagent registry first so efficiency scoring sees real state.
                 if let Some(kb) = open_kb() {
                     let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
-                    let mut mgr = shared.blocking_write();
+                let mgr = shared.blocking_write();
                     if let Err(e) = mgr.load_from_kb(&kb) {
                         log::warn!("todo sync: load subagents: {e}");
                     }
@@ -975,7 +975,7 @@ impl BoardCmd {
             }
             "allocate" => {
                 let max_parallel: usize = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(3);
-                let (ready_ids, mut b) = {
+                let (ready_ids, b) = {
                     let b = board().lock().unwrap_or_else(|e| e.into_inner());
                     (b.ready_for_allocation().iter().map(|i| i.id.clone()).collect::<Vec<_>>(), b)
                 };
@@ -990,11 +990,11 @@ impl BoardCmd {
                         "已达最大并行数 ({max_parallel})，当前 running={running}，等待…"
                     ));
                 }
-                let budget = max_parallel - running;
-                let mut allocated = Vec::new();
+                let _budget = max_parallel - running;
+                let allocated: Vec<String> = Vec::new();
                 // Build TodoTask views of ready items and pick top-budget by efficiency score.
                 for id in &ready_ids {
-                    let item = match b.get_item_by_id(id) {
+                    let _item = match b.get_item_by_id(id) {
                         Some(i) => i.clone(),
                         None => continue,
                     };

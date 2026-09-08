@@ -11,6 +11,33 @@ pub enum TaskType {
     Security,
     Design,
     UIDesign,
+    Planning,
+    CodeReview,
+    Learning,
+    CharacterGeneration,
+    Code,
+    CodeExample,
+    Creative,
+    Debugging,
+    Extraction,
+    FactLookup,
+    InstructionFollowing,
+    Knowledge,
+    KnowledgeQA,
+    Math,
+    MetaCognition,
+    MultiTurn,
+    Reasoning,
+    Reflection,
+    Research,
+    ResearchSurvey,
+    Safety,
+    ScriptParsing,
+    Summarization,
+    TechnicalQuery,
+    ToolUse,
+    TrendAnalysis,
+    Verification,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -63,6 +90,15 @@ impl WorldModel {
 
     pub fn update(&mut self, _observation: &str) -> Result<(), String> {
         Ok(())
+    }
+
+    pub fn predict_expert_performance(
+        &self,
+        _x: &[f64],
+        _context: &Context,
+        _expert_ids: &[usize],
+    ) -> Vec<f64> {
+        vec![0.0; self.num_experts]
     }
 }
 

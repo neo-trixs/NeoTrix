@@ -3,7 +3,6 @@
 //! Fix 2 (EvolveR): 将原始 MicroEdit 序列蒸馏为抽象策略原则
 //! Fix 3 (Self-Consolidation): 从失败记忆中提取错误模式（对比反思）
 
-use crate::neotrix::nt_world_model::TaskType;
 use super::core::CapabilityVector;
 use super::memory::ReasoningMemory;
 use super::self_edit::MicroEdit;
@@ -18,7 +17,7 @@ use std::collections::HashMap;
 pub struct StrategicPrinciple {
     pub id: String,
     pub description: String,
-    pub task_type: TaskType,
+    pub task_type: crate::core::TaskType,
     /// 抽象后的维度调整模式（维度名 → 调整幅度）
     pub adjustment_pattern: HashMap<String, f64>,
     /// 该原则的历史平均奖励
@@ -32,7 +31,7 @@ pub struct StrategicPrinciple {
 pub struct AntiPattern {
     pub id: String,
     pub description: String,
-    pub task_type: TaskType,
+    pub task_type: crate::core::TaskType,
     /// 导致失败的维度调整模式
     pub harmful_pattern: HashMap<String, f64>,
     /// 观察到的失败次数
@@ -48,7 +47,7 @@ impl ExperienceDistiller {
     /// 2. 对每组，提取 MicroEdit 的公共模式
     /// 3. 加权平均维度调整值（以 reward 为权重）
     pub fn distill(memories: &[ReasoningMemory]) -> Vec<StrategicPrinciple> {
-        let mut grouped: HashMap<TaskType, Vec<&ReasoningMemory>> = HashMap::new();
+        let mut grouped: HashMap<crate::core::TaskType, Vec<&ReasoningMemory>> = HashMap::new();
         for m in memories {
             grouped.entry(m.task_type).or_default().push(m);
         }
@@ -159,7 +158,7 @@ impl ExperienceDistiller {
         anti_patterns
     }
 
-    fn describe_pattern(pattern: &HashMap<String, f64>, task_type: &TaskType) -> String {
+    fn describe_pattern(pattern: &HashMap<String, f64>, task_type: &crate::core::TaskType) -> String {
         let dims: Vec<&String> = pattern.keys().collect();
         format!(
             "Distilled strategy for {:?}: adjust {} dimensions ({:.2?})",

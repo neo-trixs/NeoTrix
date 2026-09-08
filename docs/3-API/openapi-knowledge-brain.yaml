@@ -1,0 +1,517 @@
+openapi: 3.1.0
+info:
+  title: NeoTrix Knowledge Consciousness Brain API
+  version: 1.0.0
+  description: |
+    知识意识大脑 API - 提供高维知识检索、推理链查询、跨域类比、反事实分析等能力。
+    基于 5D 知识晶格架构：Domain × Abstraction × Scale × Concern × Temporal
+  contact:
+    name: NeoTrix Team
+    email: neotrix@example.com
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 本地开发环境
+  - url: https://api.neotrix.ai/v1
+    description: 生产环境
+
+paths:
+  /health:
+    get:
+      summary: 健康检查
+      operationId: healthCheck
+      responses:
+        '200':
+          description: 系统健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /knowledge/query:
+    post:
+      summary: 知识检索
+      operationId: queryKnowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQueryRequest'
+      responses:
+        '200':
+          description: 检索结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeQueryResponse'
+
+  /knowledge/reasoning:
+    post:
+      summary: 推理链查询
+      operationId: queryReasoning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasoningQueryRequest'
+      responses:
+        '200':
+          description: 推理结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReasoningQueryResponse'
+
+  /knowledge/analogies:
+    post:
+      summary: 跨域类比搜索
+      operationId: findAnalogies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalogyQueryRequest'
+      responses:
+        '200':
+          description: 类比结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalogyQueryResponse'
+
+  /knowledge/counterfactuals:
+    post:
+      summary: 反事实分析
+      operationId: analyzeCounterfactuals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CounterfactualQueryRequest'
+      responses:
+        '200':
+          description: 反事实结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterfactualQueryResponse'
+
+  /knowledge/insights:
+    post:
+      summary: 智慧层洞察提取
+      operationId: extractInsights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsightQueryRequest'
+      responses:
+        '200':
+          description: 洞察结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightQueryResponse'
+
+  /knowledge/gaps:
+    get:
+      summary: 获取知识缺口报告
+      operationId: getKnowledgeGaps
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, investigating, resolved]
+          description: 过滤状态
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 缺口报告列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GapReportsResponse'
+
+  /knowledge/gaps/{gapId}/resolve:
+    post:
+      summary: 标记缺口为已解决
+      operationId: resolveKnowledgeGap
+      parameters:
+        - name: gapId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  /dimensions/abstraction/{level}:
+    get:
+      summary: 按抽象层级获取节点
+      operationId: getNodesByAbstraction
+      parameters:
+        - name: level
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [building_block, pattern, architecture, case_study]
+      responses:
+        '200':
+          description: 节点列表
+
+  /dimensions/scale:
+    get:
+      summary: 按规模指标查询
+      operationId: getNodesByScale
+      parameters:
+        - name: indicator
+          in: query
+          schema:
+            type: string
+        - name: min_value
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: 节点列表
+
+  /multimodal/search:
+    post:
+      summary: 多模态检索 (文本→图片 / 图片→概念)
+      operationId: multimodalSearch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultimodalSearchRequest'
+      responses:
+        '200':
+          description: 检索结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultimodalSearchResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        kb_stats:
+          $ref: '#/components/schemas/KBStats'
+        version:
+          type: string
+
+    KBStats:
+      type: object
+      properties:
+        nodes:
+          type: integer
+        edges:
+          type: integer
+        embeddings:
+          type: integer
+        fts:
+          type: integer
+
+    KnowledgeQueryRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: 自然语言查询
+        top_k:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+        abstraction_level:
+          type: string
+          enum: [building_block, pattern, architecture, case_study]
+          description: 限定抽象层级
+        domains:
+          type: array
+          items:
+            type: string
+          description: 限定领域
+        include_synthesis:
+          type: boolean
+          default: true
+          description: 是否包含合成节点
+
+    KnowledgeQueryResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeNode'
+        total:
+          type: integer
+        query_time_ms:
+          type: number
+
+    KnowledgeNode:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        content:
+          type: string
+        url:
+          type: string
+        domain:
+          type: string
+        abstraction:
+          type: string
+        importance:
+          type: number
+        img_hash:
+          type: string
+
+    ReasoningQueryRequest:
+      type: object
+      required: [premise]
+      properties:
+        premise:
+          type: string
+          description: 前提条件
+        direction:
+          type: string
+          enum: [forward, backward, abductive]
+          default: forward
+        max_depth:
+          type: integer
+          default: 3
+          minimum: 1
+          maximum: 5
+        confidence_threshold:
+          type: number
+          default: 0.5
+
+    ReasoningQueryResponse:
+      type: object
+      properties:
+        chains:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReasoningChain'
+        conclusion:
+          type: string
+        confidence:
+          type: number
+
+    ReasoningChain:
+      type: object
+      properties:
+        chain_id:
+          type: string
+        chain_type:
+          type: string
+        premise_nodes:
+          type: array
+          items:
+            type: string
+        conclusion_node:
+          type: string
+        confidence:
+          type: number
+        rules_used:
+          type: array
+          items:
+            type: string
+
+    AnalogyQueryRequest:
+      type: object
+      required: [source_concept]
+      properties:
+        source_concept:
+          type: string
+        target_domain:
+          type: string
+          description: 目标领域 (可选，跨域搜索)
+        similarity_threshold:
+          type: number
+          default: 0.3
+        max_results:
+          type: integer
+          default: 10
+
+    AnalogyQueryResponse:
+      type: object
+      properties:
+        analogies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Analogy'
+
+    Analogy:
+      type: object
+      properties:
+        source:
+          $ref: '#/components/schemas/KnowledgeNode'
+        target:
+          $ref: '#/components/schemas/KnowledgeNode'
+        similarity:
+          type: number
+        shared_structure:
+          type: array
+          items:
+            type: string
+
+    CounterfactualQueryRequest:
+      type: object
+      required: [source_node]
+      properties:
+        source_node:
+          type: string
+          description: 源节点 ID
+        alternative_choices:
+          type: array
+          items:
+            type: string
+          description: 备选决策
+        depth:
+          type: integer
+          default: 2
+
+    CounterfactualQueryResponse:
+      type: object
+      properties:
+        counterfactuals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Counterfactual'
+
+    Counterfactual:
+      type: object
+      properties:
+        original_choice:
+          type: string
+        alternative_choice:
+          type: string
+        impact_analysis:
+          type: string
+        confidence:
+          type: number
+
+    InsightQueryRequest:
+      type: object
+      required: [topic]
+      properties:
+        topic:
+          type: string
+        insight_types:
+          type: array
+          items:
+            type: string
+            enum: [analogy, counterfactual, creative, synthesis]
+        max_results:
+          type: integer
+          default: 15
+
+    InsightQueryResponse:
+      type: object
+      properties:
+        insights:
+          type: array
+          items:
+            $ref: '#/components/schemas/Insight'
+
+    Insight:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        confidence:
+          type: number
+
+    GapReportsResponse:
+      type: object
+      properties:
+        gaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/GapReport'
+        total:
+          type: integer
+
+    GapReport:
+      type: object
+      properties:
+        id:
+          type: string
+        gap_type:
+          type: string
+        description:
+          type: string
+        severity:
+          type: number
+        suggested_actions:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        created_at:
+          type: integer
+
+    MultimodalSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+        query_type:
+          type: string
+          enum: [text_to_image, image_to_concept, text_to_concept]
+          default: text_to_image
+        top_k:
+          type: integer
+          default: 10
+
+    MultimodalSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MultimodalResult'
+
+    MultimodalResult:
+      type: object
+      properties:
+        node:
+          $ref: '#/components/schemas/KnowledgeNode'
+        img_hash:
+          type: string
+        clip_similarity:
+          type: number
+

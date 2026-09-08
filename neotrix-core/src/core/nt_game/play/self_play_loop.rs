@@ -155,7 +155,7 @@ impl SelfPlayLoop {
             // Play until terminal or turn limit
             while !env.is_terminal() && !episode.is_turn_limit_reached() {
                 let current_player = env.current_player();
-                let observation = env.legal_actions();
+                let _observation = env.legal_actions();
                 let legal = env.legal_actions();
 
                 let action = if legal.is_empty() {

@@ -3,7 +3,7 @@
    契约镜像 project_cmds.rs::parse_doc_file / ParsedDocFile
    ════════════════════════════════════════════ */
 import { openFileDialog } from './fs'
-import { call } from './client'
+import { enhancedInvoke as call } from './adapter'
 
 export interface ParsedDocFile {
   path: string

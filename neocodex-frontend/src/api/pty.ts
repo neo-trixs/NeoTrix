@@ -13,17 +13,17 @@ export function ptySpawn(cols: number, rows: number): Promise<string> {
 
 /** 写入数据到 PTY stdin */
 export function ptyWrite(sessionId: string, data: string): Promise<void> {
-  return invoke('pty_write', { sessionId, data })
+  return invoke('pty_write', { session_id: sessionId, data })
 }
 
 /** 通知后端终端尺寸变更 */
 export function ptyResize(sessionId: string, cols: number, rows: number): Promise<void> {
-  return invoke('pty_resize', { sessionId, cols, rows })
+  return invoke('pty_resize', { session_id: sessionId, cols, rows })
 }
 
 /** 关闭 PTY 会话 */
 export function ptyClose(sessionId: string): Promise<void> {
-  return invoke('pty_close', { sessionId })
+  return invoke('pty_close', { session_id: sessionId })
 }
 
 /** 订阅 PTY 输出（服务端 → 前端的字节流），返回取消订阅函数 */

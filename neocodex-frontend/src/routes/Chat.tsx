@@ -37,6 +37,7 @@ import { listen } from '@tauri-apps/api/event'
 import { HarnessReportCard } from '../components/HarnessReportCard'
 import { ApprovalPanel } from '../components/ApprovalPanel'
 import { FileEditorPanel } from '../components/FileEditorPanel'
+import { ArtifactPreview } from '../components/ArtifactPreview'
 import type { AgentPhase } from '../components/AgentActivityBar'
 import { AgentActivityLog, type ActivityStep } from '../components/AgentActivityLog'
 import { query } from '../api/query'
@@ -1893,6 +1894,19 @@ export function Chat() {
             </div>
           </Show>
         </div>
+
+        {/* ===== 对话制品预览（内联显示最近产生的制品） ===== */}
+        <Show when={messages().length > 2}>
+          <div class="mx-auto w-full max-w-[800px] px-6">
+            <ArtifactPreview
+              maxItems={4}
+              onExpand={() => {
+                // 切换到右栏画板 tab
+                document.querySelector('[data-tab="canvas"]')?.click()
+              }}
+            />
+          </div>
+        </Show>
 
         {/* Stream Error Toast（结构化错误：what / why / next） */}
         <Show when={streamError()}>

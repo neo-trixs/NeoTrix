@@ -82,10 +82,10 @@ pub struct WorldModelV2 {
 }
 
 impl WorldModelV2 {
-    pub fn new(num_experts: usize, input_dim: usize) -> Self {
+    pub fn new(num_experts: usize, _input_dim: usize) -> Self {
         Self {
             legacy: WorldModel::new(num_experts),
-            jepa: JepaWorldModel::new(input_dim),
+            jepa: JepaWorldModel::new(),
             e8: E8WorldModel::new(),
             nt_world_infer: ActiveInferenceEngine::new(),
             iit: IITPhiCalculator::new(),

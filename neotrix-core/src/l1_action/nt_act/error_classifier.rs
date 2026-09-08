@@ -103,7 +103,7 @@ impl ErrorClassifier {
     }
 
     /// 检查是否应触发故障转移
-    pub fn should_fallback(&self, provider: &str) -> bool {
+    pub fn should_fallback(&self, _provider: &str) -> bool {
         let recent_errors: Vec<_> = self.history.iter()
             .filter(|e| e.timestamp.elapsed() < Duration::from_secs(60))
             .collect();

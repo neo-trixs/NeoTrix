@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "session_id": "sess_1757400000_tech_survey_absorption",
+  "cycle": "10",
+  "ts": 1757400000,
+  "entries": [
+    {
+      "type": "insight",
+      "domain": "NT-WORLD",
+      "content": "Hyalite: SDF lens map + SVG feDisplacementMap real-time refraction. Two-level cache (geometry buckets + filter reuse). Two-pass anti-staircase split for Chromium nearest-neighbour staircase. Per-corner radii exact. Map = PNG data URL (R=x, G=y, B=rim).",
+      "evidence": "https://github.com/VII-Cae/hyalite--liquid-glass",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-MIND",
+      "content": "Vercel design.md: three-part on-brand system — design.md (public URL guidance, named anti-patterns) + CSS stylesheet (constrained primitives: classes/tokens) + eval loop (7 scenarios, blind A/B, deterministic checks + model judge). 57% failure reduction. Evaluated on Claude Opus 4.8 + Codex GPT-5.5. Key insight: guidance changed structure/hierarchy, not just styling.",
+      "evidence": "https://vercel.com/blog/how-our-agents-build-on-brand-pages-with-design-md",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-MIND",
+      "content": "Skill distribution: SKILL.md instruction injection — single file bundles task-specific capability (trigger words, preconditions, steps). GitHub repo as distribution unit. .opencode/skills/ directory convention. Multi-skill orchestration: brainstorming → TDD → code-review → dispatching-parallel-agents.",
+      "evidence": "https://github.com/mattpocock/skills",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-CORE",
+      "content": "Colibrì ExpertStore: 3-tier placement (VRAM hot / RAM warm / NVMe cold), each with independent LRU cache + persistent affinity tracking. LFRU eviction (low-frequency-first, recency-breaks-ties). PilotPrefetcher: 71.6% accuracy, async I/O worker threads, heatmap ordering for SSD locality. LeaseManager: formal borrow/release semantics, RAII LeaseGuard, timeout auto-reclaim.",
+      "evidence": "https://github.com/HKUDS/nanobot",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-META",
+      "content": "SysData ProbeRegistry self-audit architecture: one StorageProbe per category returning StorageItem + Safety badge (Safe/Review/Manual) + ReclaimAction. 180 items across 18 categories. History delta tracking (growth/deletion). Trash-first for review items. --json CLI output. Catch-all probe fills gaps.",
+      "evidence": "https://github.com/Jarvis322/macos-sysdata",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "[NT-PHYSICAL] Clay Safari: Blender Python parametric modeling (20-40 lines/model, 19 models in ~10s) + procedural world gen (value noise terrain, instanced vegetation, vertex-color paint) + zero external assets. MeshPhysicalMaterial sheen for clay feel. Web Audio synthesis for 17 sounds. GLB export with pivot() joint origins.",
+      "evidence": "https://github.com/cclank/clay-safari",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-SHIELD",
+      "content": "Ripwire: lightweight agent network isolation sandbox for untrusted code execution. Egress control with per-agent network rules.",
+      "evidence": "https://github.com/redhat-et/ripwire",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-IO",
+      "content": "Tel-Agent: LLM-driven telephony agent with voice interaction, real-time conversation, and multi-turn state management for phone-based AI interaction.",
+      "evidence": "https://github.com/Dpro-at/Tel-Agent",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-ACT",
+      "content": "Multi-agent DAG orchestration: task decomposition + dependency graph + parallel execution + result merging. GenOffice: office automation. SuperHermes: multi-agent collaboration with cross-platform integration.",
+      "evidence": "https://github.com/genspark-ai/genoffice",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-META",
+      "content": "NVIDIA SkillSpector: skill validation framework — quality scoring + compatibility detection + security audit for AI agent skills. Automated skill health checks.",
+      "evidence": "https://github.com/NVIDIA/SkillSpector",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "Pumpkin MC: Rust high-performance Minecraft server. Async IO + zero-copy + ECS architecture. Demonstrates Rust game engine patterns for high-concurrency real-time systems.",
+      "evidence": "https://github.com/Pumpkin-MC/Pumpkin",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-ACT",
+      "content": "Excalidraw: infinite canvas + real-time collaboration + vector graphics + WebSocket sync. State serialization for offline/online. Whiteboard-as-code paradigm.",
+      "evidence": "https://github.com/excalidraw/excalidraw",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "[NT-PHYSICAL] MuJoCo: DeepMind physics simulation engine. Contact dynamics + joint constraints + GPU acceleration. Standard for robotics sim. Rust bindings available.",
+      "evidence": "https://github.com/google-deepmind/mujoco",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-SHIELD",
+      "content": "Adversarial AI security: red team testing framework + prompt injection defense library + model robustness verification. exploitarium and adverserial.ai provide complementary approaches.",
+      "evidence": "https://github.com/bikini/exploitarium",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-MEMORY",
+      "content": "FineWeb-10B: large-scale pretraining dataset processing + data cleaning pipeline. Qdrant vector store integration for semantic search at scale.",
+      "evidence": "https://huggingface.co/blog/Qdrant/fineweb-10b-release",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-WORLD",
+      "content": "Skyvern: browser automation with visual understanding (screenshot→action mapping) + workflow orchestration. Computer-use agent paradigm.",
+      "evidence": "https://github.com/Skyvern-AI/skyvern",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "[NT-PHYSICAL] ciechanow.ski: interactive physics visualization (fluid/collision) + pedagogical engineering documentation. Sets bar for technical content quality.",
+      "evidence": "https://ciechanow.ski/",
+      "source": "research"
+    },
+    {
+      "type": "pattern",
+      "domain": "NT-ACT",
+      "content": "OpenInterpreter 01: local code executor with sandboxed multi-language runtime. Agent can execute Python/JS/shell locally with safety controls.",
+      "evidence": "https://github.com/OpenInterpreter/open-interpreter",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-SHIELD",
+      "content": "browser-act skills: anti-detection browser automation — stealth browsing + fingerprint spoofing + proxy rotation for agent web interaction.",
+      "evidence": "https://github.com/browser-act/skills",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-IO",
+      "content": "Ollama containerized deployment: Docker/Podman templates for local LLM serving with GPU passthrough. Integrates with LlamaProcessManager auto-start flow.",
+      "evidence": "https://github.com/ollama/ollama",
+      "source": "research"
+    }
+  ]
+}

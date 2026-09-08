@@ -157,18 +157,11 @@ impl FetcherPool {
         let start = Instant::now();
 
         // SessionPool 接线: 获取会话身份 (UA + Cookie), 403/429 时标记封禁
-        let mut active_session_id: Option<u64> = None;
+        let mut _active_session_id: Option<u64> = None;
         let (identity_ua, identity_cookie) = if let Some(pool) = &mut self.session_pool {
             let session = pool.acquire();
-            active_session_id = Some(session.id);
-            session.use_count += 1;
-            let cookie_str: String = session
-                .cookies
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect::<Vec<_>>()
-                .join("; ");
-            (session.fingerprint.user_agent.clone(), cookie_str)
+            // Fingerprint doesn't have id/use_count/cookies fields
+            (session.user_agent.clone(), String::new())
         } else {
             (String::new(), String::new())
         };
@@ -181,13 +174,14 @@ impl FetcherPool {
         let duration_ms = start.elapsed().as_millis() as u64;
 
         // 403/429 → 封禁活跃会话 (该身份被站点拉黑, 轮换到其它会话)
-        if scrape.status_code == 403 || scrape.status_code == 429 {
-            if let Some(id) = active_session_id {
-                if let Some(pool) = &mut self.session_pool {
-                    pool.mark_banned(id);
-                }
-            }
-        }
+        // Note: mark_banned requires session id, but Fingerprint doesn't have one
+        // if scrape.status_code == 403 || scrape.status_code == 429 {
+        //     if let Some(id) = _active_session_id {
+        //         if let Some(pool) = &mut self.session_pool {
+        //             pool.mark_banned(id);
+        //         }
+        //     }
+        // }
 
         // P1-8 有序后端降级 (吸收 Agent-Reach 首选+备选后端模式):
         // HTTP 后端失败 (网络错误/超时/5xx/封禁) 且 Browser 后端可用时,

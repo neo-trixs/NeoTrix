@@ -238,7 +238,7 @@ impl SelfIteratingBrain {
         let micro_edits = self.brain.generate_self_edit("code_review");
         let memory = ReasoningMemory::new(
             &format!("code_review_iteration_{}", self.iteration),
-            task_type, &micro_edits, reward);
+            task_type.into(), &micro_edits, reward);
         self.reasoning_bank.store(memory);
 
         if self.auto_memory_iteration && self.iteration.is_multiple_of(self.memory_iteration_interval) {

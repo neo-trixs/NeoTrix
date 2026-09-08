@@ -331,7 +331,6 @@ pub struct EpisodeMeta {
 ///
 /// From legos: episodes are the core unit of interaction with a game environment.
 /// From SIMPLE: episodes track metadata for reproducibility.
-#[derive(Clone)]
 pub struct Episode {
     pub meta: EpisodeMeta,
     pub actors: Vec<Actor>,
@@ -339,6 +338,18 @@ pub struct Episode {
     pub trajectory: Trajectory,
     /// Maximum number of turns before forced termination.
     pub max_turns: usize,
+}
+
+impl Clone for Episode {
+    fn clone(&self) -> Self {
+        Self {
+            meta: self.meta.clone(),
+            actors: self.actors.clone(),
+            rubric: Rubric::new(),
+            trajectory: self.trajectory.clone(),
+            max_turns: self.max_turns,
+        }
+    }
 }
 
 impl Episode {

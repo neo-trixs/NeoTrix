@@ -3,7 +3,7 @@
 //! 解决痛点 #1: HNSW 每次启动重建 → 持久化, mmap 加载 < 100ms
 //! 解决痛点 #8: load_all_embeddings 全量加载 → O(log N) 查询
 
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use serde::{Serialize, Deserialize};
 
 /// HNSW 参数
@@ -27,7 +27,7 @@ impl Default for HnswParams {
 }
 
 /// 向量条目 (磁盘格式)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct VecEntry {
     pub node_id: [u8; 36],
     pub vector: Vec<f32>,
@@ -84,7 +84,7 @@ impl VecSegment {
     }
 
     /// 写入段
-    pub fn write_to(&self, writer: &mut impl Write) -> std::io::Result<u64> {
+    pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
 
         // 段头

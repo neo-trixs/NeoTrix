@@ -21,7 +21,7 @@ impl SubagentManager {
     pub fn kill(&mut self, _id: &str) -> Result<(), String> { Ok(()) }
     pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
         let id = format!("agent_{}", self.agents.len());
-        self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: 0 }, status: AgentStatus::Idle });
+        self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: 0, goal: String::new(), capabilities: Vec::new(), max_context: 0, autostart: false }, status: AgentStatus::Idle });
         Ok(id)
     }
     pub fn spawn(&mut self, config: SubagentConfig) -> String {
@@ -31,13 +31,28 @@ impl SubagentManager {
     }
     pub fn get(&self, id: &str) -> Option<&AgentInfo> { self.agents.iter().find(|a| a.id == id) }
     pub fn list(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
+    pub fn spawn_background(&mut self, name: &str, mode: u8) -> String {
+        let id = format!("bg_{}", self.agents.len());
+        self.agents.push(AgentInfo { id: id.clone(), config: SubagentConfig { name: name.to_string(), description: String::new(), e8_mode: mode, goal: String::new(), capabilities: Vec::new(), max_context: 0, autostart: true }, status: AgentStatus::Running { progress: 0.0 } });
+        id
+    }
+    pub fn list_tasks(&self) -> Vec<&AgentInfo> { self.agents.iter().collect() }
+    pub fn load_from_kb(&mut self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> { Ok(()) }
+    pub fn save_to_kb(&self, _kb: &crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase) -> Result<(), String> { Ok(()) }
+    pub fn running_count(&self) -> usize { self.agents.iter().filter(|a| matches!(a.status, AgentStatus::Running { .. })).count() }
 }
 #[derive(Debug, Clone)]
 pub enum MessageType { Task }
+#[derive(Debug, Clone)]
+pub struct McpToolInfo { pub name: String, pub description: String, pub server_name: String }
 pub struct McpRegistry;
 impl McpRegistry {
     pub fn new() -> Self { Self }
     pub fn gateway(&self) -> Option<String> { None }
+    pub fn list_tools(&self) -> Vec<McpToolInfo> { Vec::new() }
+    pub fn search(&self, _query: &str) -> Vec<McpToolInfo> { Vec::new() }
+    pub fn publish(&mut self, _name: &str, _command: &str, _args: &[String], _desc: &str) -> usize { 0 }
+    pub fn as_native_tools(&self) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> { Vec::new() }
 }
 pub struct McpDiscovery;
 impl McpDiscovery {
@@ -52,6 +67,7 @@ impl ProgrammaticPlanner {
 }
 pub struct Plan;
 impl Plan { pub fn stages(&self) -> usize { 0 } }
+#[derive(Debug, Clone)]
 pub struct SubagentConfig { pub name: String, pub description: String, pub e8_mode: u8, pub goal: String, pub capabilities: Vec<String>, pub max_context: usize, pub autostart: bool }
 
 static AGENT_MANAGER: LazyLock<Arc<RwLock<SubagentManager>>> =
@@ -166,8 +182,8 @@ impl CliCommand for AgentCmd {
                         AgentStatus::Paused => "paused",
                         AgentStatus::Stale => "stale",
                     };
-                    out.push_str(&format!("  {} | {} | E8:{} | {} | msgs:{}\n",
-                        a.id, a.config.name, a.config.e8_mode, status_str, a.messages.len()));
+                    out.push_str(&format!("  {} | {} | E8:{} | {}\n",
+                        a.id, a.config.name, a.config.e8_mode, status_str));
                 }
                 CommandOutput::ok(&out)
             }
@@ -216,12 +232,14 @@ impl CliCommand for AgentCmd {
                 let mut out = format!("Background tasks ({}):\n", tasks.len());
                 for t in &tasks {
                     let status_str = match &t.status {
-                        crate::core::l7_capability::nt_core_orch_agent::TaskStatus::Pending => "pending",
-                        crate::core::l7_capability::nt_core_orch_agent::TaskStatus::Running => "running",
-                        crate::core::l7_capability::nt_core_orch_agent::TaskStatus::Completed(_) => "completed",
-                        crate::core::l7_capability::nt_core_orch_agent::TaskStatus::Failed(_) => "failed",
+                        AgentStatus::Idle => "idle",
+                        AgentStatus::Running { .. } => "running",
+                        AgentStatus::Completed { .. } => "completed",
+                        AgentStatus::Failed { .. } => "failed",
+                        AgentStatus::Paused => "paused",
+                        AgentStatus::Stale => "stale",
                     };
-                    out.push_str(&format!("  {} | {} | E8:{} | {}\n", t.id, t.name, t.e8_mode, status_str));
+                    out.push_str(&format!("  {} | {} | E8:{} | {}\n", t.id, t.config.name, t.config.e8_mode, status_str));
                 }
                 CommandOutput::ok(&out)
             }
@@ -238,13 +256,6 @@ impl CliCommand for AgentCmd {
                         out.push_str(&format!("  E8 Mode:     {}\n", agent.config.e8_mode));
                         out.push_str(&format!("  Status:      {}\n", status_str));
                         out.push_str(&format!("  Goal:        {}\n", agent.config.goal));
-                        out.push_str(&format!("  Messages:    {}\n", agent.messages.len()));
-                        out.push_str(&format!("  Created:     {}\n", agent.created_at));
-                        out.push_str(&format!("  Last Active: {}\n", agent.last_active));
-                        out.push_str(&format!("  Executions:  {}\n", agent.execution_count));
-                        if let Some(plan) = &agent.current_plan {
-                            out.push_str(&format!("  Plan:        {} ({} steps)\n", &plan.id[..8.min(plan.id.len())], plan.metrics.total_steps));
-                        }
                         CommandOutput::ok(&out)
                     }
                     None => CommandOutput::err(&format!("Subagent '{}' not found.", id)),
@@ -334,7 +345,7 @@ impl CliCommand for McpCmd {
                 // 供 agent 单 turn 内链式/并行调用 (typed-stub 工具调用)。
                 // FIXME: McpRegistry.gateway() not yet implemented
                 let stubs: Vec<serde_json::Value> = Vec::new();
-                let mut s = format!("🐍 PTC stubs: {} typed signatures\n", stubs.len());
+                let s = format!("🐍 PTC stubs: {} typed signatures\n", stubs.len());
                 if want_json {
                     return CommandOutput::ok(&s).with_json(serde_json::json!({ "stubs": stubs, "count": stubs.len() }));
                 }
@@ -448,7 +459,7 @@ impl CliCommand for McpCmd {
                 };
                 // FIXME: McpRegistry.gateway() not yet implemented
                 let results: Vec<serde_json::Value> = Vec::new();
-                let mut s = format!("⚡ PTC exec: {} stage(s), {} call(s)\n", plan.stages(), results.len());
+                let s = format!("⚡ PTC exec: {} stage(s), {} call(s)\n", plan.stages(), results.len());
                 if want_json {
                     return CommandOutput::ok(&s).with_json(serde_json::json!({
                         "stages": plan.stages(),
@@ -464,10 +475,10 @@ impl CliCommand for McpCmd {
                 }
                 let name = &args[1];
                 let command = &args[2];
-                let rest: Vec<&str> = args[3..]
+                let rest: Vec<String> = args[3..]
                     .iter()
                     .filter(|a| !a.starts_with("--"))
-                    .map(|a| a.as_str())
+                    .map(|a| a.to_string())
                     .collect();
                 let desc = args.iter()
                     .position(|a| a == "--description" || a == "-d")

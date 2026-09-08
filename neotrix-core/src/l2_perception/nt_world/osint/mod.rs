@@ -491,7 +491,7 @@ pub struct UnifiedAbsorber {
 impl UnifiedAbsorber {
     pub fn new(kb: KnowledgeBase, _config: AbsorberConfig) -> Result<Self, String> {
         Ok(Self {
-            github: GitHubAbsorber::new(kb.clone_connection()?),
+            github: GitHubAbsorber::new(kb.clone_connection()),
             kb,
             api_registry: api_registry::ApiRegistry::new(),
         })

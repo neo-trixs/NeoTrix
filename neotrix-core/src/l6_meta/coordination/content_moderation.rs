@@ -194,7 +194,7 @@ impl ContentModeration {
 
         // 简化的内容审核逻辑
         for rule in &self.rules {
-            let score = self.evaluate_output_risk(content_type, metadata, &rule.category);
+            let score = self.evaluate_output_risk(content_type.clone(), metadata, &rule.category);
             category_scores.insert(rule.category.clone(), score);
 
             if score >= rule.threshold {
@@ -246,7 +246,7 @@ impl ContentModeration {
     }
 
     /// 确定审核结果
-    fn determine_result(&self, scores: &HashMap<RiskCategory, f64>, triggered_rules: &[String]) -> ModerationResult {
+    fn determine_result(&self, _scores: &HashMap<RiskCategory, f64>, triggered_rules: &[String]) -> ModerationResult {
         if triggered_rules.is_empty() {
             ModerationResult::Passed
         } else {

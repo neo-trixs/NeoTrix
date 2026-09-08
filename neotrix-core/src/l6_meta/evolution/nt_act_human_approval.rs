@@ -193,7 +193,7 @@ impl HumanApprovalWorkflow {
     }
 
     /// 检查操作是否需要审批
-    pub fn requires_approval(&self, operation_type: &OperationType, risk_level: &RiskLevel) -> bool {
+    pub fn requires_approval(&self, _operation_type: &OperationType, risk_level: &RiskLevel) -> bool {
         match risk_level {
             RiskLevel::Low => !self.config.auto_approve_low_risk,
             RiskLevel::Medium => true,

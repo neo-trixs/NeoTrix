@@ -1000,7 +1000,7 @@ impl BrainStage for SleepStage {
         100
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        if let Some(ref mut engine) = brain.sleep_engine {
+        if let Some(ref mut _engine) = brain.sleep_engine {
             // FIXME: select_operator / selective_state fields commented out in SelfIteratingBrain
             // if let (Some(op), Some(ref mut st)) = (
             //     brain.select_operator.as_ref(),

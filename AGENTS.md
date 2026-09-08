@@ -114,6 +114,10 @@ neotrix-core/src/
 - **R-P16**: 每次编辑后 re-read 文件验证持久化 — 不信工具成功消息
 - **R-P79**: 外部技术吸收必须同 session 接线到生产路径，禁止延期死代码
 - **R-P42**: 吸收强化现有节点，禁止平行适配器模块
+- **R-P81**: 清理前必须归档 — 使用 SafeDeleter 时默认启用 archive_before_delete，防止误删不可恢复数据
+- **R-P82**: 清理风险分级 — RiskAssessor 评分 ≥60 必须人工确认，评分 ≥80 自动拒绝执行
+- **R-P83**: 清理白名单优先 — RiskAssessor 白名单路径跳过风险评估，直接标记为 Safe
+- **R-P84**: 清理事件日志 — CleanupCoordinator 必须记录所有清理事件到 event_log，支持审计追溯
 - **全量规则**: 见 `@dev-rules.md` (处理编码/审查任务时加载)
 
 ## Shared Language
@@ -129,6 +133,24 @@ Key shared language decisions:
 - Distinguish "ConsciousnessTree" (meta-cognition loop) from "GWT" (attention routing)
 - Use C0-C6 constellation notation for module maturity (not "levels" or "stages")
 - Use "T1/T2/T3" for SelfTest wiring tiers (not "partial/full")
+
+## Axioms (2026-09-08, 8-Source Batch)
+
+| # | Axiom | Implication |
+|---|-------|-------------|
+| A1 | **Cost-Aware Routing** — Not all tasks need the strongest model | GWT salience 加入 token 成本权重；cheap models for I/O, expensive for reasoning |
+| A2 | **Context as Scarce Resource** — Context window / KV capacity is the fundamental bottleneck | KVMem paged KV for >256K sessions; compaction for <256K; adaptive switching |
+| A3 | **Skill as Production Template** — Skills are structured, composable, versionable expert knowledge | SKILL-SPEC.md contract (<200 lines) for all NT-* skill implementations |
+
+## Cross-Source Patterns (5)
+
+| # | Pattern | Definition | NeoTrix Mapping |
+|---|---------|-----------|-----------------|
+| P1 | **Model Routing / Delegation** | Route tasks to cheapest capable model | GWT salience + cost weight |
+| P2 | **Isolation-per-Task** | Each task gets isolated context/state | Worktree isolation + paged memory |
+| P3 | **Profile-Driven Adaptation** | Persistent profile shapes behavior across sessions | SelfModel extension |
+| P4 | **Ordered Backend Fallback** | Single interface with ordered fallback chain | Ordered Backend Router |
+| P5 | **Skill as Reusable Template** | Skills are composable atoms with strict interfaces | SKILL-SPEC.md contract |
 
 ## Build
 

@@ -1,11 +1,11 @@
 /* ════════════════════════════════════════════
-   components/settings/ModelsSection.tsx — 代理池健康度 + 模型池
-   双面板：健康度（内部通信 + 外部网络）+ 模型池选择
+   components/settings/ModelsSection.tsx — Free LLM 池子 + 模型池
+   双面板：Free LLM 池子模型列表 + 模型池选择
    ════════════════════════════════════════════ */
-import { createSignal, For, Show, onMount, onCleanup, batch } from 'solid-js'
+import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
 import type { ProviderConfig, ProviderMeta } from '../../api/types'
-import type { ProviderHealthStatus, PoolSufficiencyReport, ProbeResult, DiscoveryResult } from '../../api/neocodex'
+import type { ProviderHealthStatus, PoolSufficiencyReport } from '../../api/neocodex'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
 import { ModelIcon, CheckIcon, ActiveDotIcon, TestTubeIcon, AlertCircleIcon } from './settingsIcons'
 
@@ -39,48 +39,14 @@ const providerPoolGroups = (cfg: ProviderConfig) => {
   return groups
 }
 
-/* ── 小型可视化组件 ── */
-const circuitColor = (state: string) => {
-  switch (state) {
-    case 'Closed': return 'text-emerald-600 bg-emerald-50 border-emerald-200'
-    case 'Open': return 'text-red-600 bg-red-50 border-red-200'
-    case 'HalfOpen': return 'text-amber-600 bg-amber-50 border-amber-200'
-    default: return 'text-zinc-500 bg-zinc-50 border-zinc-200'
-  }
-}
-const circuitLabel = (state: string) => {
-  switch (state) {
-    case 'Closed': return '正常'
-    case 'Open': return '熔断'
-    case 'HalfOpen': return '半开'
-    default: return state
-  }
-}
-const circuitDot = (state: string) => {
-  switch (state) {
-    case 'Closed': return 'bg-emerald-500'
-    case 'Open': return 'bg-red-500'
-    case 'HalfOpen': return 'bg-amber-500'
-    default: return 'bg-zinc-400'
-  }
-}
-const healthBar = (rate: number) => {
-  if (rate >= 0.95) return 'bg-emerald-500'
-  if (rate >= 0.8) return 'bg-amber-500'
-  return 'bg-red-500'
-}
 const formatNum = (n: number) => n.toLocaleString()
-const parseRate = (s: string) => parseFloat(s) || 0
 
 export function ModelsSection(props: Props) {
   const [health, setHealth] = createSignal<ProviderHealthStatus[]>([])
   const [poolReport, setPoolReport] = createSignal<PoolSufficiencyReport | null>(null)
-  const [probes, setProbes] = createSignal<ProbeResult[]>([])
   const [healthLoading, setHealthLoading] = createSignal(true)
-  const [probeLoading, setProbeLoading] = createSignal(false)
   const [discoverLoading, setDiscoverLoading] = createSignal(false)
-  const [discoverResult, setDiscoverResult] = createSignal<DiscoveryResult | null>(null)
-  const [healthTab, setHealthTab] = createSignal<'internal' | 'external'>('internal')
+  const [discoverResult, setDiscoverResult] = createSignal<{ discovered_count: number; registered_total: number; models: { provider: string; model_id: string; base_url: string; is_free: boolean; tier: string }[] } | null>(null)
 
   const fetchHealth = async () => {
     try {
@@ -95,22 +61,11 @@ export function ModelsSection(props: Props) {
     }
   }
 
-  const fetchProbes = async () => {
-    setProbeLoading(true)
-    try {
-      const result = await import('../../api/neocodex').then((m) => m.probeAllProviders())
-      setProbes(result)
-    } catch { /* silent */ } finally {
-      setProbeLoading(false)
-    }
-  }
-
   const handleDiscover = async () => {
     setDiscoverLoading(true)
     try {
       const result = await import('../../api/neocodex').then((m) => m.discoverModels())
       setDiscoverResult(result)
-      // 刷新健康数据
       await fetchHealth()
     } catch { /* silent */ } finally {
       setDiscoverLoading(false)
@@ -134,34 +89,29 @@ export function ModelsSection(props: Props) {
 
   const testState: () => Record<string, 'testing' | 'ok' | 'fail'> = props.testState ?? (() => ({}))
 
+  // 过滤免费模型
+  const freeModels = () => health().filter(h => h.is_free)
+
   return (
     <div class="space-y-4">
       {/* ════════════════════════════════════════
-         代理池健康度面板
+         Free LLM 池子面板
          ════════════════════════════════════════ */}
       <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
         <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">
           <ModelIcon />
-          代理池健康度
+          Free LLM 池子
           <div class="ml-auto flex items-center gap-1.5">
-            <button
-              class={clsx(
-                'text-10px px-2 py-0.5 rounded-md border transition-colors',
-                healthTab() === 'internal'
-                  ? 'bg-nt-io-500/10 text-nt-io-600 border-nt-io-200'
-                  : 'text-zinc-500 border-zinc-200 hover:bg-zinc-100'
+            <Show when={poolReport()}>
+              {(rpt) => (
+                <span class={clsx(
+                  'text-10px px-2 py-0.5 rounded-full font-medium border',
+                  rpt().sufficient ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                )}>
+                  {rpt().free_available} 可用 / {rpt().free_total} 总计
+                </span>
               )}
-              onClick={() => setHealthTab('internal')}
-            >内部通信</button>
-            <button
-              class={clsx(
-                'text-10px px-2 py-0.5 rounded-md border transition-colors',
-                healthTab() === 'external'
-                  ? 'bg-nt-io-500/10 text-nt-io-600 border-nt-io-200'
-                  : 'text-zinc-500 border-zinc-200 hover:bg-zinc-100'
-              )}
-              onClick={() => { setHealthTab('external'); if (probes().length === 0) fetchProbes() }}
-            >外部网络</button>
+            </Show>
           </div>
         </div>
 
@@ -199,99 +149,40 @@ export function ModelsSection(props: Props) {
               )}
             </Show>
 
-            {/* ── 内部通信 Tab ── */}
-            <Show when={healthTab() === 'internal'}>
-              <Show when={health().length > 0} fallback={
-                <div class="text-[11px] text-zinc-400 text-center py-2">暂无运行时数据</div>
-              }>
-                <div class="grid grid-cols-1 gap-1.5">
-                  <For each={health()}>
-                    {(h) => {
-                      const rate = parseRate(h.success_rate)
-                      const locked = h.model_locked_count
-                      return (
-                        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/60 text-[11px]">
-                          {/* 状态灯 */}
-                          <span class={clsx('w-2 h-2 rounded-full flex-shrink-0', circuitDot(h.circuit_state))} />
-                          {/* 名称 + 分类 */}
-                          <span class="font-medium text-text-primary truncate min-w-0 flex-1">{h.name}</span>
-                          <span class="text-10px text-zinc-400 font-mono w-12 text-right">{h.category}</span>
-                          {/* 电路状态 */}
-                          <span class={clsx('px-1.5 py-0.5 rounded text-10px font-medium border', circuitColor(h.circuit_state))}>
-                            {circuitLabel(h.circuit_state)}
-                          </span>
-                          {/* 成功率条 */}
-                          <div class="flex items-center gap-1 w-16">
-                            <div class="flex-1 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
-                              <div class={clsx('h-full rounded-full', healthBar(rate))} style={{ width: `${Math.min(rate * 100, 100)}%` }} />
-                            </div>
-                            <span class="text-10px text-zinc-500 font-mono w-8 text-right">{(rate * 100).toFixed(0)}%</span>
-                          </div>
-                          {/* 延迟 */}
-                          <span class="text-zinc-400 font-mono w-12 text-right">{h.latency_p95_ms}ms</span>
-                          {/* 调用统计 */}
-                          <span class="text-zinc-400 font-mono w-16 text-right">{formatNum(h.total_calls)}/{formatNum(h.total_errors)}</span>
-                          {/* 锁定数 */}
-                          <Show when={locked > 0}>
-                            <span class="text-amber-500 font-mono text-10px">{locked}锁</span>
-                          </Show>
-                        </div>
-                      )
-                    }}
-                  </For>
-                </div>
-              </Show>
-            </Show>
-
-            {/* ── 外部网络 Tab ── */}
-            <Show when={healthTab() === 'external'}>
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-10px text-zinc-500">端点可达性探测（HEAD 5s 超时）</span>
-                <button
-                  class={clsx(
-                    'text-10px px-2 py-0.5 rounded-md border transition-colors',
-                    probeLoading()
-                      ? 'text-zinc-400 border-zinc-200 cursor-not-allowed'
-                      : 'text-nt-io-600 border-nt-io-200 hover:bg-nt-io-50'
+            {/* 免费模型列表 */}
+            <Show when={freeModels().length > 0} fallback={
+              <div class="text-[11px] text-zinc-400 text-center py-2">暂无免费模型</div>
+            }>
+              <div class="grid grid-cols-1 gap-1.5">
+                <For each={freeModels()}>
+                  {(h) => (
+                    <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/60 text-[11px]">
+                      {/* 状态灯 */}
+                      <span class={clsx(
+                        'w-2 h-2 rounded-full flex-shrink-0',
+                        h.available ? 'bg-emerald-500' : 'bg-red-500'
+                      )} />
+                      {/* 名称 */}
+                      <span class="font-medium text-text-primary truncate min-w-0 flex-1">{h.name}</span>
+                      {/* 分类 */}
+                      <span class="text-10px text-zinc-400 font-mono w-12 text-right">{h.category}</span>
+                      {/* 可用状态 */}
+                      <span class={clsx(
+                        'px-1.5 py-0.5 rounded text-10px font-medium border',
+                        h.available
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-red-50 text-red-600 border-red-200'
+                      )}>
+                        {h.available ? '可用' : '不可用'}
+                      </span>
+                      {/* 成功率 */}
+                      <span class="text-zinc-400 font-mono w-12 text-right">{(parseFloat(h.success_rate) * 100).toFixed(0)}%</span>
+                      {/* 调用统计 */}
+                      <span class="text-zinc-400 font-mono w-16 text-right">{formatNum(h.total_calls)}/{formatNum(h.total_errors)}</span>
+                    </div>
                   )}
-                  onClick={fetchProbes}
-                  disabled={probeLoading()}
-                >
-                  {probeLoading() ? '探测中…' : '重新探测'}
-                </button>
+                </For>
               </div>
-
-              <Show when={probes().length > 0} fallback={
-                <div class="text-[11px] text-zinc-400 text-center py-2">
-                  {probeLoading() ? '正在探测所有端点…' : '点击「重新探测」检测网络可达性'}
-                </div>
-              }>
-                <div class="grid grid-cols-1 gap-1.5">
-                  <For each={probes()}>
-                    {(p) => (
-                      <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/60 text-[11px]">
-                        <span class={clsx(
-                          'w-2 h-2 rounded-full flex-shrink-0',
-                          p.reachable ? 'bg-emerald-500' : 'bg-red-500'
-                        )} />
-                        <span class="font-medium text-text-primary truncate min-w-0 flex-1">{p.name}</span>
-                        <span class={clsx(
-                          'px-1.5 py-0.5 rounded text-10px font-medium border',
-                          p.reachable
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-red-50 text-red-600 border-red-200'
-                        )}>
-                          {p.reachable ? `HTTP ${p.status_code}` : '不可达'}
-                        </span>
-                        <span class="text-zinc-400 font-mono w-12 text-right">{p.latency_ms}ms</span>
-                        <Show when={p.error}>
-                          <span class="text-red-400 text-10px truncate max-w-24">{p.error}</span>
-                        </Show>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </Show>
             </Show>
           </Show>
         </div>
@@ -307,7 +198,7 @@ export function ModelsSection(props: Props) {
         <div class="ss-card-body bg-white">
           <div class="flex items-center gap-3">
             <p class="text-[11px] text-zinc-500 flex-1">
-              刷新免费模型目录（12+ 源：OpenRouter / Groq / Cloudflare / GitHub 等），自动注册到代理池。
+              刷新免费模型目录（12+ 源：OpenRouter / Groq / Cloudflare / GitHub 等），自动注册到池子。
             </p>
             <button
               class={clsx(

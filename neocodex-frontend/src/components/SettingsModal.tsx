@@ -10,11 +10,13 @@ import type { MemoryStats, ProviderConfig, ProviderMeta, CustomProviderReq } fro
 import { GeneralSection } from './settings/GeneralSection'
 import { ModelsSection } from './settings/ModelsSection'
 import { NetworkSection } from './settings/NetworkSection'
+import { ImSection } from './settings/ImSection'
 import { AppearanceSection, type MessageWidthPref } from './settings/AppearanceSection'
 import { DataSection } from './settings/DataSection'
 import { TagsSection } from './settings/TagsSection'
 import { AboutSection } from './settings/AboutSection'
-import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon, ModelIcon, NetworkIcon } from './settings/settingsIcons'
+import { CapabilitiesSection } from './settings/CapabilitiesSection'
+import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon, ModelIcon, NetworkIcon, ImIcon, SearchIcon, CapabilitiesIcon } from './settings/settingsIcons'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v3）
@@ -26,26 +28,26 @@ import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIco
    ════════════════════════════════════════════ */
 
 /** 提供商分类分组（对标 Claude Desktop 分类设置） */
-type SectionId = 'general' | 'models' | 'network' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
+type SectionId = 'general' | 'models' | 'network' | 'im' | 'appearance' | 'market' | 'data' | 'tags' | 'capabilities' | 'about'
 
 const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'general', label: '通用', icon: ExpandIcon },
   { id: 'models', label: '模型', icon: ModelIcon },
   { id: 'network', label: '网络', icon: NetworkIcon },
+  { id: 'im', label: 'IM', icon: ImIcon },
   { id: 'appearance', label: '外观', icon: PaletteIcon },
-  { id: 'plugins', label: '插件', icon: PluginsIcon },
+  { id: 'market', label: '市场', icon: SearchIcon },
   { id: 'data', label: '数据', icon: DataIcon },
   { id: 'tags', label: '标签', icon: TagIcon },
+  { id: 'capabilities', label: '能力', icon: CapabilitiesIcon },
   { id: 'about', label: '关于', icon: InfoIcon },
 ]
 
-/* 分组侧栏导航（对标 osaurus ManagementView 分组结构）：
-   常规 General / 扩展 Extensions / 数据 Data / 系统 System */
 const NAV_GROUPS: { title: string; ids: SectionId[] }[] = [
-  { title: '常规', ids: ['general', 'models', 'network', 'appearance'] },
-  { title: '扩展', ids: ['plugins'] },
+  { title: '常规', ids: ['general', 'models', 'network', 'im', 'appearance'] },
+  { title: '扩展', ids: ['market'] },
   { title: '数据', ids: ['data', 'tags'] },
-  { title: '系统', ids: ['about'] },
+  { title: '系统', ids: ['capabilities', 'about'] },
 ]
 
 const sectionById = (id: SectionId) => SECTIONS.find((s) => s.id === id)!
@@ -106,9 +108,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     root.dataset.motion = motion
     root.dataset.fontSize = fontSize
     root.dataset.messageWidth = messageWidth
-    root.dataset.theme = 'light'
+    // 不覆盖 theme — 由 Chat.tsx 的主题切换器管理
     try {
-      storageSet('neotrix:prefs', JSON.stringify({ density, motion, theme: 'light', fontSize, messageWidth }))
+      const existing = JSON.parse(storageGet('neotrix:prefs') || '{}')
+      storageSet('neotrix:prefs', JSON.stringify({ ...existing, density, motion, fontSize, messageWidth }))
     } catch { /* 持久化失败静默 */ }
   }
 
@@ -587,12 +590,13 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   </div>
                   <div class="text-[11px] text-text-muted">
                     {section() === 'general' && '提供商与 API 密钥'}
-                    {section() === 'models' && '可用模型代理池'}
+                    {section() === 'models' && 'Free LLM 池子与模型选择'}
                     {section() === 'network' && '网络代理健康度'}
                     {section() === 'appearance' && '界面视觉与动效'}
-                    {section() === 'plugins' && '技能插件与扩展'}
+                    {section() === 'market' && '插件市场与扩展'}
                     {section() === 'data' && '记忆与数据管理'}
-                    {section() === 'tags' && '标签色板与层级管理'}
+                    {section() === 'tags' && '标签层级与自动打标'}
+                    {section() === 'capabilities' && '能力模块与域插件状态'}
                     {section() === 'about' && '版本与诊断信息'}
                   </div>
                 </div>
@@ -631,6 +635,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
               <Show when={section() === 'network'}>
                 <NetworkSection />
               </Show>
+              <Show when={section() === 'im'}>
+                <ImSection />
+              </Show>
               <Show when={section() === 'appearance'}>
                 <AppearanceSection
                   fontSizePref={fontSizePref}
@@ -643,7 +650,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   setMessageWidth={setMessageWidth}
                 />
               </Show>
-              <Show when={section() === 'plugins'}>
+              <Show when={section() === 'market'}>
                 <PluginMarketplace embedded open onClose={() => {}} />
               </Show>
               <Show when={section() === 'data'}>
@@ -666,6 +673,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   onRequestDelete={requestDeleteTag}
                   showNotice={showNotice}
                 />
+              </Show>
+              <Show when={section() === 'capabilities'}>
+                <CapabilitiesSection />
               </Show>
               <Show when={section() === 'about'}>
                 <AboutSection

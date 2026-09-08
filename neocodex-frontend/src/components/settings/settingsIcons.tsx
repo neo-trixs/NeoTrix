@@ -235,3 +235,76 @@ export function NetworkIcon() {
     </svg>
   )
 }
+
+/* ── IM 渠道：对话气泡 + 多点连接（即时通讯语义） ── */
+export function ImIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
+      {CURRENT_GRAD}
+      {/* 主对话气泡 */}
+      <path d="M3 3h10a1 1 0 011 1v6a1 1 0 01-1 1H6l-3 3V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1" stroke-linejoin="round" />
+      {/* 气泡内三个连接点（多渠道语义） */}
+      <circle cx="6" cy="7" r="0.8" fill="url(#nt-current-grad)" />
+      <circle cx="8" cy="7" r="0.8" fill="url(#nt-current-grad)" />
+      <circle cx="10" cy="7" r="0.8" fill="url(#nt-current-grad)" />
+      {/* 外扩射线（渠道扩展） */}
+      <line x1="14" y1="2" x2="15.2" y2="1" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" opacity="0.5" />
+      <line x1="14" y1="5" x2="15.2" y2="5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" opacity="0.5" />
+    </svg>
+  )
+}
+
+/* ── 市场/搜索：放大镜 + 电流节点（搜索/发现语义） ── */
+export function SearchIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
+      {CURRENT_GRAD}
+      {/* 放大镜圆环 */}
+      <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1" />
+      {/* 手柄 */}
+      <line x1="10.2" y1="10.2" x2="14" y2="14" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+      {/* 镜内电流节点 */}
+      <circle cx="7" cy="7" r="1.2" fill="url(#nt-current-grad)" />
+      {/* 外扩射线 */}
+      <line x1="7" y1="1.2" x2="7" y2="0.5" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" opacity="0.4" />
+      <line x1="1.2" y1="7" x2="0.5" y2="7" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" opacity="0.4" />
+    </svg>
+  )
+}
+
+/* ── 能力模块：拼图 + 电流节点（能力/模块语义） ── */
+export function CapabilitiesIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
+      {CURRENT_GRAD}
+      {/* 拼图块组合（四块能力） */}
+      <rect x="2" y="2" width="5" height="5" rx="0.8" stroke="currentColor" stroke-width="1" />
+      <rect x="9" y="2" width="5" height="5" rx="0.8" stroke="currentColor" stroke-width="1" />
+      <rect x="2" y="9" width="5" height="5" rx="0.8" stroke="currentColor" stroke-width="1" />
+      <rect x="9" y="9" width="5" height="5" rx="0.8" stroke="currentColor" stroke-width="1" />
+      {/* 中心电流节点（能力连接点） */}
+      <circle cx="8" cy="8" r="1.5" fill="url(#nt-current-grad)" />
+      {/* 四条连接线 */}
+      <line x1="8" y1="4.5" x2="8" y2="6.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+      <line x1="8" y1="9.5" x2="8" y2="11.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+      <line x1="4.5" y1="8" x2="6.5" y2="8" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+      <line x1="9.5" y1="8" x2="11.5" y2="8" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+    </svg>
+  )
+}
+
+/* ── 自动打标：标签 + 电流节点（自动标记语义） ── */
+export function AutoTagIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" class="nt-ic">
+      {CURRENT_GRAD}
+      {/* 标签形状 */}
+      <path d="M2 8.5V3a1 1 0 011-1h5.5L14 7.5 8.5 13 2 8.5z" stroke="currentColor" stroke-width="1" stroke-linejoin="round" />
+      {/* 电流节点 */}
+      <circle cx="4.5" cy="4.5" r="1" fill="url(#nt-current-grad)" />
+      {/* 自动箭头 */}
+      <path d="M11 2v3h3" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M11 2l3 3" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" />
+    </svg>
+  )
+}

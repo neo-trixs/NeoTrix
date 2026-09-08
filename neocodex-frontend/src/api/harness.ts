@@ -1,4 +1,4 @@
-import { call } from './client'
+import { enhancedInvoke as call } from './adapter'
 
 /* ════════════════════════════════════════════
    api/harness.ts — Harness 统一网关前端 SDK

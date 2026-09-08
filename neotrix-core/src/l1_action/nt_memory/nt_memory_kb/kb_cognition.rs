@@ -124,7 +124,7 @@ pub fn semantic_search(
     min_sim: f64,
 ) -> Result<Vec<SearchResult>, String> {
     let embs = load_embedding_map(conn, 256)?;
-    let target_vec = embs
+    let _target_vec = embs
         .get(target_id)
         .ok_or_else(|| format!("node {target_id} has no embedding"))?;
 

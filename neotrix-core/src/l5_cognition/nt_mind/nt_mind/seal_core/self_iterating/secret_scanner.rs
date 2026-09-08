@@ -75,11 +75,21 @@ impl SecretScanner {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ScanResult {
     pub findings: Vec<SecretFinding>,
     pub max_severity: Severity,
     pub count_by_severity: HashMap<Severity, usize>,
+}
+
+impl Default for ScanResult {
+    fn default() -> Self {
+        Self {
+            findings: Vec::new(),
+            max_severity: Severity::Info,
+            count_by_severity: HashMap::new(),
+        }
+    }
 }
 
 impl ScanResult {

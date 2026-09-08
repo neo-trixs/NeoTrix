@@ -211,7 +211,7 @@ impl SkillImprover {
                         }
                     }
                 }
-                ImprovementAction::RemoveDangerousContent { pattern } => {
+                ImprovementAction::RemoveDangerousContent { pattern: _ } => {
                     // Replace dangerous patterns
                     let dangerous = ["rm -rf", "curl.*|.*sh", "sudo ", "--force", "dangerously"];
                     for danger in &dangerous {
@@ -229,11 +229,11 @@ impl SkillImprover {
                         modified = true;
                     }
                 }
-                ImprovementAction::SplitLongSkill { max_lines } => {
+                ImprovementAction::SplitLongSkill { max_lines: _ } => {
                     // Mark for splitting (actual split requires file ops)
                     modified = true;
                 }
-                ImprovementAction::FixFrontmatterSyntax { line, issue } => {
+                ImprovementAction::FixFrontmatterSyntax { line: _, issue: _ } => {
                     // Would need line-specific fix
                 }
             }
@@ -321,7 +321,7 @@ impl SkillImprover {
         }
     }
 
-    fn detect_violations(&self, content: &str, scores: &SkillQualityScores) -> Vec<QualityViolation> {
+    fn detect_violations(&self, _content: &str, scores: &SkillQualityScores) -> Vec<QualityViolation> {
         let mut violations = Vec::new();
         
         if scores.safety < self.min_safety_score {

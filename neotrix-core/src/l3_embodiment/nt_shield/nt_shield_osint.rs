@@ -353,7 +353,7 @@ impl OSINTReconEngine {
     }
 
     /// 分析目标
-    pub fn analyze_target(&mut self, target: &str, target_type: &str) -> Result<OSINTAnalysis, String> {
+    pub fn analyze_target(&mut self, target: &str, _target_type: &str) -> Result<OSINTAnalysis, String> {
         self.stats.analyses_performed += 1;
 
         let mut findings = Vec::new();

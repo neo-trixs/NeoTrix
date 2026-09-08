@@ -26,7 +26,7 @@ pub enum JobStatus {
 }
 
 /// 作业优先级
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum JobPriority {
     Critical,
     High,

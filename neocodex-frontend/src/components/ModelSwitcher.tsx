@@ -1,29 +1,67 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
 import { ChevronDown, Loader2, Check, AlertCircle } from 'lucide-solid'
 import { clsx } from 'clsx'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
 import { neocodex, errText } from '../api'
+import { getModelPoolStatus } from '../api/model-pool'
 import type { ProviderConfig, ProviderMeta } from '../api/types'
+import type { ModelPoolEntry } from '../api/model-pool'
 
 /* ════════════════════════════════════════════
-   ModelSwitcher — 模型切换（仅模型，权限模式已移除）
-   对标 OpenWebUI 顶栏模型选择：单药丸展示当前模型，下拉为模型池。
-   默认展示「neotrix意识核心模型」（provider 未加载时的品牌占位）。
+   ModelSwitcher — 动态模型切换
+   从 config.toml + provider_pool.toml 自动加载真实模型列表。
    ════════════════════════════════════════════ */
-
-const DEFAULT_MODEL_LABEL = 'neotrix意识核心模型'
 
 export function ModelSwitcher(props: {
   disabled?: boolean
 }) {
   const [config, setConfig] = createSignal<ProviderConfig | null>(null)
+  const [poolModels, setPoolModels] = createSignal<ModelPoolEntry[]>([])
   const [isOpen, setIsOpen] = createSignal(false)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
 
+  // 合并后的完整模型列表：config.toml 活跃模型 + provider_pool.toml 池子模型
+  const allModels = (): ProviderMeta[] => {
+    const cfg = config()
+    const pool = poolModels()
+    const providers: ProviderMeta[] = []
+    const seen = new Set<string>()
+
+    // 1. config.toml 中的活跃模型（优先）
+    if (cfg) {
+      for (const p of cfg.providers) {
+        if (!seen.has(p.model)) {
+          seen.add(p.model)
+          providers.push(p)
+        }
+      }
+    }
+
+    // 2. provider_pool.toml 中的池子模型
+    for (const entry of pool) {
+      if (!seen.has(entry.model)) {
+        seen.add(entry.model)
+        providers.push({
+          id: entry.provider,
+          name: entry.label,
+          display_name: entry.label,
+          category: entry.base_url?.includes('127.0.0.1') ? 'local' : 'cloud',
+          is_free: entry.tags.includes('free') || entry.api_key_masked === 'no-key',
+          base_url: entry.base_url || '',
+          model: entry.model,
+          models: [entry.model],
+          resolvable: true,
+          api_key: entry.api_key_masked,
+        })
+      }
+    }
+
+    return providers
+  }
+
   onMount(async () => {
-    await loadConfig()
+    await loadData()
     window.addEventListener('neotrix:provider-changed', handleProviderChanged)
     window.addEventListener('keydown', handleEsc)
   })
@@ -33,30 +71,44 @@ export function ModelSwitcher(props: {
   })
 
   const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false) }
-  const handleProviderChanged = () => loadConfig()
+  const handleProviderChanged = () => loadData()
 
-  const loadConfig = async () => {
+  const loadData = async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await neocodex.providerConfig()
-      setConfig(result)
+      // 并行加载 config + pool
+      const [cfgResult, poolResult] = await Promise.allSettled([
+        neocodex.providerConfig(),
+        getModelPoolStatus(),
+      ])
+
+      if (cfgResult.status === 'fulfilled') {
+        setConfig(cfgResult.value)
+      } else {
+        console.warn('[ModelSwitcher] providerConfig failed:', cfgResult.reason)
+      }
+
+      if (poolResult.status === 'fulfilled') {
+        setPoolModels(poolResult.value.providers || [])
+      } else {
+        console.warn('[ModelSwitcher] model_pool_status failed:', poolResult.reason)
+      }
     } catch (err) {
-      setError(errText(err) || '获取模型配置失败')
-      console.error('[ModelSwitcher] load failed:', err)
+      setError(errText(err) || '加载模型列表失败')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSelectProvider = async (name: string) => {
+  const handleSelectModel = async (model: string) => {
     setLoading(true)
     setError(null)
     try {
-      await neocodex.setProvider(name)
-      await loadConfig()
+      await neocodex.setProvider(model)
+      await loadData()
       setIsOpen(false)
-      window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name } }))
+      window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { model } }))
     } catch (err) {
       setError(errText(err) || '切换模型失败')
     } finally {
@@ -64,17 +116,18 @@ export function ModelSwitcher(props: {
     }
   }
 
-  const currentProvider = (): ProviderMeta | null => {
+  const currentModel = (): ProviderMeta | null => {
     const cfg = config()
-    if (!cfg) return null
-    return cfg.providers.find((p) => p.model === cfg.active_model) || cfg.providers[0] || null
+    const models = allModels()
+    if (!cfg) return models[0] || null
+    return models.find((p) => p.model === cfg.active_model) || models[0] || null
   }
 
-  const pillModel = () => {
-    const p = currentProvider()
-    if (!p) return DEFAULT_MODEL_LABEL
-    const short = p.model.split('/').pop() || p.display_name
-    return short.length > 14 ? short.slice(0, 14) + '…' : short
+  const pillLabel = () => {
+    const p = currentModel()
+    if (!p) return '选择模型'
+    const name = p.display_name || p.model
+    return name.length > 18 ? name.slice(0, 18) + '…' : name
   }
 
   let panelRef: HTMLDivElement | undefined
@@ -102,16 +155,16 @@ export function ModelSwitcher(props: {
         aria-label="模型切换"
         aria-expanded={isOpen()}
         aria-haspopup="listbox"
-        title={pillModel()}
+        title={pillLabel()}
       >
         {loading() ? (
           <Loader2 class="w-3.5 h-3.5 animate-spin text-orange-500" />
-        ) : currentProvider() ? (
-          <ProviderIcon name={currentProvider()!.name} size="sm" category={currentProvider()!.category} />
+        ) : currentModel() ? (
+          <ProviderIcon name={currentModel()!.id} size="sm" category={currentModel()!.category} />
         ) : (
           <span class="w-5 h-5 rounded-full bg-nt-core-500/15 text-nt-core-600 flex items-center justify-center text-[9px] font-bold">N</span>
         )}
-        <span class="max-w-[110px] truncate">{pillModel()}</span>
+        <span class="max-w-[120px] truncate">{pillLabel()}</span>
         <ChevronDown class={clsx('w-3 h-3 text-zinc-400 flex-shrink-0 transition-transform', isOpen() && 'rotate-180')} />
       </button>
 
@@ -124,28 +177,29 @@ export function ModelSwitcher(props: {
       )}
 
       <Show when={isOpen()}>
-        <div ref={panelRef} class="absolute bottom-full left-0 mb-2 glass-pop border border-black/8 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in w-[min(380px,92vw)]">
-          <div class="px-3 py-2 border-b border-white/40 text-[11px] font-medium text-text-muted">
-            选择模型
+        <div ref={panelRef} class="absolute bottom-full left-0 mb-2 glass-pop border border-black/8 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in w-[min(400px,92vw)]">
+          <div class="px-3 py-2 border-b border-white/40 text-[11px] font-medium text-text-muted flex items-center justify-between">
+            <span>可用模型 ({allModels().length})</span>
+            <button onClick={loadData} class="text-nt-io-500 hover:text-nt-io-600 text-[10px]">刷新</button>
           </div>
           <div class="max-h-64 overflow-y-auto" role="listbox" aria-label="模型列表">
-            <For each={config()?.providers || []}>
-              {(provider: ProviderMeta, i) => {
-                const isActive = () => provider.model === config()?.active_model
+            <For each={allModels()}>
+              {(model: ProviderMeta, i) => {
+                const isActive = () => model.model === config()?.active_model
                 return (
                   <button
                     class={clsx(
-                      'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-bg-tertiary focus-visible:bg-bg-tertiary focus-visible:outline-none',
+                      'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-bg-tertiary focus-visible:bg-bg-tertiary focus-visible:outline-none',
                       isActive() && 'bg-nt-io-500/10 text-nt-io-600',
                     )}
-                    onClick={() => handleSelectProvider(provider.name)}
+                    onClick={() => handleSelectModel(model.model)}
                     disabled={loading() || isActive()}
                     role="option"
                     aria-selected={isActive()}
                     onKeyDown={(e) => {
                       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
                       e.preventDefault()
-                      const list = config()?.providers || []
+                      const list = allModels()
                       if (list.length === 0) return
                       requestAnimationFrame(() => {
                         const opts = Array.from(panelRef?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])
@@ -153,30 +207,31 @@ export function ModelSwitcher(props: {
                       })
                     }}
                   >
-                    <ProviderIcon name={provider.name} size="sm" category={provider.category} />
-                    <div class="flex-1 min-w-0 flex flex-col gap-1">
+                    <ProviderIcon name={model.id} size="sm" category={model.category} />
+                    <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                       <div class="flex items-center gap-1.5 min-w-0">
-                        <span class="font-medium truncate">{provider.display_name}</span>
-                        {provider.is_free && <FreeBadge free />}
+                        <span class="font-medium text-[12px] truncate">{model.display_name}</span>
+                        {model.is_free && <FreeBadge free />}
                       </div>
                       <div class="flex items-center gap-1.5 min-w-0">
-                        <span class="text-xs text-text-muted truncate font-mono">{provider.model}</span>
-                        <CategoryBadge category={provider.category} className="hidden sm:inline-flex" />
+                        <span class="text-[10px] text-text-muted truncate font-mono">{model.model}</span>
+                        <CategoryBadge category={model.category} className="hidden sm:inline-flex" />
                       </div>
                     </div>
                     {isActive() && <Check class="w-4 h-4 text-nt-io-500 flex-shrink-0" />}
-                    {!provider.resolvable && <span class="text-xs text-amber-600 px-2 py-1 rounded bg-amber-500/10 flex-shrink-0">不可用</span>}
                   </button>
                 )
               }}
             </For>
-            {(config()?.providers?.length || 0) === 0 && !loading() && (
+            {allModels().length === 0 && !loading() && (
               <div class="px-3 py-6 text-center text-text-muted text-sm">暂无可用模型</div>
             )}
           </div>
 
-          <div class="px-3 py-2 border-t border-white/40 text-xs text-text-muted">
-            当前模型: <span class="font-mono text-text-secondary">{config()?.active_model || DEFAULT_MODEL_LABEL}</span>
+          <div class="px-3 py-2 border-t border-white/40 text-[10px] text-text-muted">
+            活跃: <span class="font-mono text-text-secondary">{config()?.active_model || '未配置'}</span>
+            <span class="mx-1">·</span>
+            池子: {poolModels().length} 个
           </div>
         </div>
       </Show>

@@ -1,4 +1,4 @@
-import { call } from './client'
+import { enhancedInvoke as call } from './adapter'
 import type { CoworkAction, CoworkDeliverable, CoworkSession } from './types'
 
 /* ════════════════════════════════════════════

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "type": "defect",
+  "session_id": "sess_864_agent4_error_types",
+  "cycle": "864",
+  "ts": 1725686400,
+  "domain": "NT-CORE",
+  "entries": [
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-001: NeoTrixError is a god-enum with 18 string-wrapped variants that collapse all failure modes into opaque strings. The Brain(String) sink from From<String> and From<&str> conversions silently absorbs any string error with no distinction between LLM failure, parse error, or logic bug. Best practice: one enum per domain/module (Source #8, #12, #3).",
+      "evidence": "neotrix-core/src/unified/core/nt_core_error.rs:11-48",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-002: NeoTrixError::From<io::Error> loses the error source chain — converts via err.to_string() discarding .source(). When propagated to anyhow/eyre, OS error code, ErrorKind, and chained context are permanently lost. Fix: use #[source] or #[from] to preserve chain (Source #4, #6, #11).",
+      "evidence": "neotrix-core/src/unified/core/nt_core_error.rs:88-92",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-003: Three parallel, unlinked error hierarchies: NeoTrixError (core, 22 variants, Chinese), L1Error (L1 layer, 11 variants, English), FFI NeoTrixError (8 unit variants). None implement From for each other. Overlapping semantics (Config/Io/Serde/Network/Brain) but distinct types with no conversion path. Fix: layer error chain via From (Source #10, #8).",
+      "evidence": "neotrix-core/src/unified/core/nt_core_error.rs:11-48, nt_l1_error.rs:7-25, ffi/types.rs:11-20",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-004: From<String> and From<&str> for NeoTrixError silently convert to Brain(String). Network timeouts, config parse failures, and serde errors all become 'Brain error' — indistinguishable. The from_string_result helper makes Brain-sink the canonical conversion path. Fix: use anyhow for application-level string errors or map explicitly (Source #3, #14).",
+      "evidence": "neotrix-core/src/unified/core/nt_core_error.rs:94-103",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-005: No #[non_exhaustive] on any error enum across the codebase — NeoTrixError, L1Error, CapabilityError, ConsistencyError, LlmError, CoTError, TaskDispatchError, MediaSourceError, MailError, FileAbilityError. Adding variants breaks all match arms. For FFI boundary this is a semver violation. Fix: add #[non_exhaustive] to all public error types (Source #5, #12, #13).",
+      "evidence": "All error enum definitions across codebase",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-006: Inconsistent error derivation — 3 strategies: thiserror::Error derive (FileAbilityError, MediaSourceError, MailError), manual Display+Error (NeoTrixError, L1Error, CapabilityError, LlmError), manual Display+no Error (SandboxError, PdfEditError, CryptoError). No unified strategy. Fix: standardize on thiserror for all domain errors (Source #1, #14).",
+      "evidence": "Multiple error type definitions across codebase",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-IO",
+      "content": "D-ERR-007: MailError has #[from] anyhow::Error — a domain-level error type depends on application-level error crate. Once wrapped in MailError::Other, original typed error irretrievable without downcasting. Fix: remove anyhow dependency, use Box<dyn Error> or specific wrapper (Source #3, #5).",
+      "evidence": "neotrix-core/src/unified/layers/action/nt_io/nt_io_mail/error.rs:53-54",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-008: No error context chaining — no .context() or .with_context() at trust boundaries. Only 6 anyhow imports in entire codebase. Error messages like 'IO error: connection refused' lack the 'what were you doing?' layer. Fix: adopt eyre or anyhow with .with_context() at every boundary (Source #6, #10).",
+      "evidence": "grep anyhow across codebase: only 6 matches",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-ACT",
+      "content": "D-ERR-009: ConsistencyError lacks std::error::Error trait — only derives Debug/Clone/Serialize/Deserialize, no Display impl. Cannot be used with ?, cannot convert to anyhow::Error, cannot participate in error chain. CapabilityError has manual empty Error impl. Fix: derive thiserror::Error for both (Source #7, #11).",
+      "evidence": "nt_io/consistency_adapter.rs:137-151, traits.rs:164-187",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-010: Mixed error message languages — NeoTrixError uses Chinese ('配置错误:', 'IO 错误:', '网络错误:'), L1Error uses English ('Config error:', 'IO error:'), CapabilityError uses English. Inconsistent for log parsing, grep-ability, and i18n. Fix: standardize on one language (Source #5, #4).",
+      "evidence": "neotrix-core/src/unified/core/nt_core_error.rs:50-83",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-IO",
+      "content": "D-ERR-011: FFI NeoTrixError is unit-only variants (InitFailed, InvalidInput, OperationFailed...) with no payload. Native iOS/Android apps receive 'OperationFailed' with no detail on what failed or why. Fix: add detail field or use #[uniffi(record)] with data (Source #1, #5).",
+      "evidence": "neotrix-core/src/neotrix/ffi/types.rs:10-20",
+      "source": "research"
+    },
+    {
+      "type": "defect",
+      "domain": "NT-CORE",
+      "content": "D-ERR-012: LlmError From<String> maps to Unknown(String) — any string error bypasses the well-structured 6-variant classification (Network/Auth/RateLimit/InvalidRequest/Server/Unknown). Fix: remove blanket From<String>, map explicitly at each call site (Source #12, #3).",
+      "evidence": "neotrix-core/src/unified/core/nt_core_llm.rs:368-369",
+      "source": "research"
+    }
+  ]
+}

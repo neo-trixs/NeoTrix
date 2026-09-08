@@ -114,7 +114,7 @@ impl EnergyField {
         frequency: Frequency,
         capability_id: &str,
     ) -> Wisdom {
-        let start_time = std::time::SystemTime::now()
+        let _start_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;

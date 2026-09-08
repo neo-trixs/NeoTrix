@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "session_id": "sess_1757400001_tech_survey_missing",
+  "cycle": "10",
+  "ts": 1757400001,
+  "entries": [
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "[NT-PHYSICAL] Clay Safari: Blender Python parametric modeling (20-40 lines/model, 19 models in ~10s) + procedural world gen (value noise terrain, instanced vegetation, vertex-color paint) + zero external assets. MeshPhysicalMaterial sheen for clay feel. Web Audio synthesis for 17 sounds. GLB export with pivot() joint origins.",
+      "evidence": "https://github.com/cclank/clay-safari",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "[NT-PHYSICAL] MuJoCo: DeepMind physics simulation engine. Contact dynamics + joint constraints + GPU acceleration. Standard for robotics sim. Rust bindings available.",
+      "evidence": "https://github.com/google-deepmind/mujoco",
+      "source": "research"
+    },
+    {
+      "type": "insight",
+      "domain": "NT-CORE",
+      "content": "[NT-PHYSICAL] ciechanow.ski: interactive physics visualization (fluid/collision) + pedagogical engineering documentation. Sets bar for technical content quality.",
+      "evidence": "https://ciechanow.ski/",
+      "source": "research"
+    }
+  ]
+}

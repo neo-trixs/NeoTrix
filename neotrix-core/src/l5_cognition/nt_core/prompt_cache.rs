@@ -136,8 +136,9 @@ impl PromptCache {
             entries.sort_by(|a, b| a.1.access_count.cmp(&b.1.access_count));
 
             let to_remove_count = self.entries.len() - self.config.max_entries + 100;
-            for (hash, _) in entries.iter().take(to_remove_count) {
-                self.entries.remove(*hash);
+            let keys_to_remove: Vec<_> = entries.iter().take(to_remove_count).map(|(hash, _)| (*hash).clone()).collect();
+            for hash in keys_to_remove {
+                self.entries.remove(&*hash);
             }
         }
     }

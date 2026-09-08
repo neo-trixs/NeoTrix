@@ -211,7 +211,7 @@ impl ProviderMigrationRouter {
     }
 
     /// 计算提供商分数
-    fn calculate_provider_score(&self, provider: &ProviderInfo, requirements: &ProviderRequirements) -> f64 {
+    fn calculate_provider_score(&self, provider: &ProviderInfo, _requirements: &ProviderRequirements) -> f64 {
         let cost_score = provider.cost_tier as f64 / 5.0;
         let latency_score = provider.latency_tier as f64 / 5.0;
         let quality_score = provider.quality_tier as f64 / 5.0;

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::env::NtGameEnv;
 use super::framework::{Action, Observation, StepResult};
 use super::play::adaptive::{AdaptiveDifficultyConfig, DifficultyAdjuster};
 

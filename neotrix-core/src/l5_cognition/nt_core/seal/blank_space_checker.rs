@@ -11,7 +11,7 @@ use crate::l5_cognition::nt_core::seal::rhythm_recalculator::{SegmentData, Segme
 // ============================================================================
 
 /// 留白检查配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlankSpaceConfig {
     /// 爽点后最小留白时长 (秒)
     pub min_blank_after_climax: f32,
@@ -193,7 +193,7 @@ impl BlankSpaceChecker {
     }
     
     /// 检查无爽点最大平淡期
-    fn check_max_blank_period(&self, segments: &[SegmentData], total_duration: f32) -> BlankSpaceCheckResult {
+    fn check_max_blank_period(&self, segments: &[SegmentData], _total_duration: f32) -> BlankSpaceCheckResult {
         let mut details = Vec::new();
         let mut suggestions = Vec::new();
         let mut passed = true;

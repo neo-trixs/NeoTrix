@@ -1,138 +1,80 @@
-# Changelog
+# NeoTrix Desktop V2 — Changelog
 
-> This changelog is a wrapper around the git-cliff pipeline. Regenerate the
-> `[Unreleased]` body with:
-> `git cliff -u` (pipelines defined in `cliff.toml`; used by
-> `.github/workflows/release.yml` to emit release notes).
+## v0.19.0-rc2 (2026-09-08)
 
-## [0.21.0] — 2026-08-30 — fix-final-gaps 专项集成 + 版本迭代
+### Chat Plugin: 对话打通 + Tauri 事件发射
+- **问题**: 前端调用 `neocodex_send_message_stream` 报 "Command not found"；流式事件未发射导致前端卡在生成中
+- **根因**: ChatPlugin 只有 `send` action，没有 `send_message_stream`/`stop_stream`/`get_session_messages`；无 Tauri 事件发射
+- **修复**: 
+  - ChatPlugin 新增 3 个 action，`send_message_stream` 调用本地 llama.cpp (`http://127.0.0.1:8080/v1/chat/completions`)
+  - 使用 `OnceLock<AppHandle>` 存储 app handle，通过 `setup` hook 注入
+  - `call_llm` 发射 `neocodex_stream_start`/`neocodex_stream_token`/`neocodex_stream_end`/`neocodex_stream_done` 事件
+- **涉及文件**: `src-tauri/src/domain/plugins/chat.rs`, `src-tauri/src/domain/plugins/mod.rs`, `src-tauri/src/main.rs`
 
-> 本次迭代完成 `feat/fix-final-gaps` 顶点分支的专项推进与版本跃迁，保持全链路构建绿。
+### 意识核心集成尝试 (已回退)
+- **目标**: 将 chat plugin 连接到 neotrix-core 的意识核心 (ConsciousnessCore)，实现任务分解 → 模型路由 → 自动执行
+- **发现**: neotrix-core 有 87 个编译错误，无法作为依赖引入 Tauri 应用
+- **当前状态**: chat plugin 使用简化版本 — 直接调用 llama.cpp，系统提示中加入任务分解指令
+- **后续**: 需要先修复 neotrix-core 的编译错误，才能完整集成意识核心
 
-### Features
-- **fix-final-gaps 顶点合并**: 将 `feat/fix-final-gaps`（及其 5 个兄弟分支 w3-metrics/w4-absorption-field/fix-bin-tests/fix-calibration-log/fix-metrics-chain）并入 main，保留新增模块文件（`nt_act/` 行动域、`nt_mind_skill_engine/` 子模块）。
-- **依赖修复**: Cargo.toml 去重 `anydoc` 重复键、新增 `rayon` 依赖，解决编译阻塞。
-- **不兼容代码回退**: 为保绿，回退 fix-final-gaps 的陈旧 `io_provider`/`nt_io_web`/`capability_tree` 文件到 main 版本（`cli_session_backend.rs` 删除、`node.rs`/`evolution.rs` 重复 match 臂修复），删除未实现的 tauri 命令注册（`kb_doc_*`/`parse_doc_file`）。
+### ModelSwitcher: 动态模型池加载
+- **问题**: 模型名硬编码为 `neotrix-core` 或 GGUF 文件名
+- **修复**: ModelSwitcher 并行加载 `providerConfig()` (config.toml) + `getModelPoolStatus()` (provider_pool.toml)，合并去重后动态展示所有可用模型
+- **涉及文件**: `src/components/ModelSwitcher.tsx`
 
-### Known Limitations
-- **nt_act 行动域待移植**: fix-final-gaps 新增 `nt_act/` 子模块（acp/client/decision/mcp/search/tools/types）针对旧 API 编写，启用后 164 编译错误（`unresolved import`/`no associated item`/`mismatched types`），已按 main 原设计禁用（`// pub mod nt_act;`），待 API 对齐后启用。
-- **doc_parse PDF 增强待适配**: fix-final-gaps 的 `doc_parse.rs` 含 PDF marker pipeline 等增强，但与当前 `anydoc`/`office_oxide` API 不兼容，暂不编译（`// mod doc_parse;` 注释），保留文件供后续移植。
+### Theme Consistency Fix
+- **问题**: 对话界面 (main) 变黑，左侧栏 (sidebar) 保持白色，主题不一致
+- **根因**: `body` 背景用硬编码渐变，`glass-side` 用硬编码 `#fbfbfa`，`--color-canvas`/`--color-panel` 变量存在但未被任何组件引用
+- **修复**:
+  - `body` 背景改为 `var(--color-canvas, #ffffff)` — 主题变量控制
+  - `.glass-side` 背景改为 `var(--color-panel, #f9fafb)` — 主题变量控制
+  - `:root` 定义完整 surface tokens（canvas/panel/line/ink 等），所有主题继承
+  - 删除死文件 `src/style/main.css`（v4 Tailwind 暗色主题，从未 import）
+  - 删除死文件 `src/styles/design-tokens.css`（从未 import）
+- **涉及文件**: `src/styles/index.css`
 
-### Chores
-- **版本迭代**: `0.20.0` → `0.21.0`。
-- **全链路构建绿**: `cargo check -p neotrix --lib` 0 error、`cargo build --manifest-path src-tauri/Cargo.toml` 成功、lib 测试 self_heal 7/7 + self_test_integration 5/5 通过。
+### Model Name Display Fix
+- **问题**: 模型切换器显示原始 GGUF 文件名 `Agents-A1-4B-kimi-Preview-heretic-IQ4_NL`，截断后为 `Agents-A1-4B-k...`
+- **修复**: `pillModel()` 去掉 GGUF 后缀 (`heretic`/`IQ4_NL`/`gguf`)，`-`/`_` 转空格，显示 `Agents A1 4B kimi Preview`
+- **涉及文件**: `src/components/ModelSwitcher.tsx`
 
-## [0.20.0] — 2026-08-30 — 七域进化统一 + 蜕变重生
+### Tauri Window Rounded Corners Fix
+- **问题**: 窗口失去圆角
+- **根因**: `html`/`body` 缺少 `overflow: hidden` + `border-radius: 12px`，与 Tauri `windowEffects.radius: 12` 不匹配
+- **修复**: `html` 和 `body` 都加了 `overflow: hidden; border-radius: 12px`
+- **涉及文件**: `src/styles/index.css`
 
-> 本次迭代完成 grok-bot/trendshift 生态进化的全域接线与生产化，并施行蜕变重生清理。
+### Agent Stub Plugin (Real Data)
+- **问题**: Agent 插件 `provider_config`/`provider_status`/`pool_sufficiency`/`discover_models` 返回空 stub
+- **修复**: 读取 `~/.config/neotrix/config.toml` 返回真实数据
+- **涉及文件**: `src-tauri/src/domain/plugins/stubs.rs`
 
-### Features
-- **七域进化落地生产**: NT-CORE/MIND/MEMORY/WORLD/ACT/IO/SHIELD 全域能力全部接线生产路径；App Bot 真实推理流 (`react_loop_stream`) + `fork_session` 前后端闭环。
-- **NT-MEMORY 资产派生维度**: KB 四态资产按 `asset_kind` 可查询 (`KnowledgeBase::nodes_by_asset_kind` + `/kb assets --kind` CLI)。
-- **NT-REPAIR 自愈闭环 C5**: `SelfHealLoop` 消费 SelfTest 失败产出（检测→诊断→自愈→复测），`AtomicBool` 实现满足 `Send+Sync`。
-- **NT-MIND SEAL 维度扩展**: 吸收 instincts/security 维度（affaan-m/ECC）。
-- **Superbody 设计语言**: 统一 light gold 官方设计语言资产（logo/图标集/封面/背景/App 图标）。
-- **文档入库**: `/kb doc ingest` 幂等切片 + 列表/删除/重索引命令。
-- **通用 KV 网关**: 开放 JSON 落盘命令（画板等 namespace）。
+---
 
-### Chores
-- **蜕变重生清理**: 移除 8 个已并入分支及入库会话残留，清理构建缓存（target 9.9G + node_modules + dist）。
-- **统一合并**: 并入 `wt/self-heal`、`concurrent-wip`、`design/superbody-lightgold`、`work-branch` 全域分支改动，lib 构建绿。
-- **版本迭代**: `0.19.0-rc1` → `0.20.0`。
+## v0.19.0-rc1 (2026-09-08)
 
-### Known Limitations
-- **fix-final-gaps 家族暂缓**: `feat/fix-final-gaps`（及 `feat/w3-metrics`、`feat/w4-absorption-field`、`feat/fix-bin-tests`、`feat/fix-calibration-log`、`feat/fix-metrics-chain` 兄弟分支）与当前依赖树不兼容——`doc_parse.rs` 依赖的 `anydoc::{Document,Block,Inline,Table,MarkerKind}` 在 anydoc 0.2 公共 API 中不存在，且模块接线与 main 分歧。需专项修复（升级 anydoc / 适配 API / 恢复模块声明）后再并入。
+### Architecture
+- 12 Domain Plugins registered via `DomainRegistry`
+- All frontend API routed through `adapter.ts` → `enhancedInvoke` → `domain_call`
+- Tauri 2 with `decorations: false`, `transparent: true`, `windowEffects.radius: 12`
 
-## [Unreleased] — 并行工作批次 + 网络隔离 + 地理瓦片
+### API Routing Migration
+- 9 API files changed from `call()` to `enhancedInvoke()`
+- Adapter `DOMAIN_MAP` expanded with `memory_*`, `kb_doc_*`, `save_api_key`/`has_api_key`/`delete_api_key`
+- `mapAction()` strips prefixes: `neocodex_`, `kb_`, `canvas_`, `provider_`, `pool_`, `discover_`, `probe_`, `memory_`
 
-> git-cliff: `git cliff --unreleased` regenerates the grouped body from
-> conventional commits.
+### Config
+- `~/.config/neotrix/config.toml`: `provider = "llamacpp"`, `default_model = "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL"`
 
-### Features
-- **nt-core**: CLI 并行批次 — 命令全英文描述 + 动态补全池 + 主题持久化 + shield 写操作 ToolSpec 单一事实源。
-- **nt-shield**: 网络隔离默认阻断 — `DeniedProvider` + 本地回环放行 + `NEOTRIX_NETWORK_UNBLOCK` 逃生门。
-- **nt-io**: B3 地理瓦片服务 + `/openapi` 端点 — 瓦片路由 + 构建期嵌入 openapi.yaml。
-- **nt-mind**: 蜕皮机制融入意识能力网 + C5 自愈养分闭环。
-- **nt-core**: 意识核心子代理定义 (`opencode agent nt-core.md`) 与 `status/tick/health/branches` CLI 通道。
-- **tauri**: NT-Pack 进程级缓存 + 桌面命令/catalog/gate 演进 + 重启安装更新。
-- **frontend**: 代码分包/懒加载 + Globe NT-Pack + CommandPalette/TaskList/LivePreview + 错误监控、更新重启 UX。
-- **Capability registry**: 去硬编码读 capability_tree DAG + `neotrix guard` 门禁 + 能力网健康度回流。
+---
 
-### Bug Fixes
-- **nt-shield**: `keyvault --features full` 编译修复。
-- **nt-core**: 迷雾治理 — 真实 SelfTest 分支健康持久化到 `consciousness/core` 快照。
-- **nt-core**: types 测试断言质量 — `unwrap`→`expect` / `len>0`→`is_empty`。
+## Regression Rules
 
-### Chores
-- **arch**: 蜕皮归档 — 移除旧躯壳 (frontend-v1/session-log/anchor) 到 `_archive/`，代码树只留最新态。
-- **docs/config**: capability registry 重构 + `.gitignore _archive` + progress/docs。
-
-## [Unreleased] — 独立项目进化链路 (G1-G4)
-
-### Project Evolve (G1+G2)
-- **`project-evolve` 命令**: 对任意第三方目标项目运行进化链路 (`scan→detect→score→report`), 支持 `--json`/`--autofix`/`--max-rounds`; CLI 插件化入口。
-- **EvolutionLoop 目标参数化**: `for_target()`/`scan_project_in()`/`run_cycle_in()`/`autofix_cycle_in()`; `target_dir` 字段 (None=旧行为)。
-- **扫描排除非源码目录**: 跳过 `target/.git/.backup/node_modules/_archive` (此前 `.backup/` 被误扫为源码)。
-
-### Autofix 端到端修复
-- **修复 `EvolutionLoopProvider::self_diagnose` file=None bug**: `underlying_issue.file` 此前被硬编码为 `None` 丢弃文件路径 → pipeline 对 `AddTestStub`/`SplitLargeFile` 等写空文件路径 `"unknown"` 全部失败。端到端验证 `auto_fixes` 0→1, 测试 stub 真实落盘且编译通过。
-
-### Free_Energy / Phi 接线
-- **project-evolve 输出不再恒 0**: `world_fe`/`world_phi` 为 None 时由 `derive_free_energy_phi()` 从项目快照派生 — `free_energy` 接 `ActiveInferenceEngine` (风险密度×精度 + E8 熵), `phi` 接 `IITPhiCalculator` (健康维度共振整合度)。
-- 新增单测: 显式值透传 / 派生值有限 / 脏项目自由能高于干净项目。
-
-## [0.19.1] - 2026-07-01 — Cycle 4 Phase 2: 编译全线漂绿
-
-### Compilation & Linting
-- **编译器错误 19→0**: tool impls(6), builtin_adapter(5), anthropic(1), sentry(1), etc.
-- **neotrix-types clippy 26→0**: self_model(12), pid(5), engine(6), pairwise(2), context_strategy(1)
-- **bin target 4 path fixes**: `crate::neotrix` → `neotrix::neotrix` in config.rs + entry/mod.rs
-- **孤儿二进制归档**: 19 orphan one-shot scripts → `bin-archive/`
-- **双tool目录合并**: `agent/tools/`(4 files) → `agent/tool/mcp/`, 12 consumers updated
-
-### IIT Φ 修复
-- 新增 `compute_tononi_phi()` — 基于 MIP-EI 的精确 Φ 值
-- 新增 `find_mip()`, `bipartition_ei()`, `covariance_matrix()` 算法
-- 11 个测试覆盖对称/非对称/高噪声/链式/星形拓扑
-
-### GatewayV2 全面集成
-- `engine_core.rs`, `consciousness_reasoner.rs`, `ProviderRouter` 全部改用 GatewayV2
-- 2-phase aggressive retry (Phase 1 normal + Phase 2 all-providers)
-- Proxy Pool L7 HTTP HEAD + TCP双重探测
-
-### Async Runtime 修复
-- 3 个预存 `state_rollback_on_llm_failure` 测试: `block_on_future()` helper 处理内嵌 tokio runtime
-
-## [0.19.0] - 2026-07-01 — Cycle 4: 盲点补齐完成
-
-### P0 核心推理升级
-- **PRM头**: Observer 添加四维评分头(novelty/progress/alignment/efficiency)
-- **SAE**: SparseAutoencoder + SAEBridge + SteeringController 三层
-- **GRPO**: 组采样(G≥4) + 相对优势 + clipped surrogate + Beam Search(K=4-8)
-- **WTA Gate**: GWT 竞争点火取代累加广播
-- **5层压缩**: Budget→Snip→Microcompact→Collapse→Auto 管线
-- **E8→VSA**: ChaCha12 seeded VSA ℝ^1024 消除E8-GWT梯度壁垒
-- **ProceduralMemory**: 成功E8序列→KB技能固化
-- **PER分离**: Planner/Executor/Reflector 三角色
-
-### P1 重要功能
-- **权限模式链**: Plan/AcceptEdits/BypassPermissions
-- **MCP认证**: OAuth 2.1 PKCE + JSON-RPC 2.0 握手
-- **Mamba-2 SSD**: SSM_STATE_SIZE=256 + 双门控
-- **JEPA重构**: ViT编码器 + Block/Random掩码 + 动作条件预测器
-- **隐私架构**: PrivacyEnforcer + DataSovereigntyProof
-- **混合编排**: HybridOrchestrator + 成本感知路由
-- **主动推理**: ActiveInferenceLoop + expected_free_energy
-- **错误恢复**: Retry→CircuitBreaker→Fallback 三层
-- **边缘部署**: Quantizer + HardwareDetector + AOT + LoRA
-- **IIT φ**: KLD因果效应谱系(≈MIP)
-
-### P2 优化
-- **MoE学习路由**: MoERouter + ExpertGate + REINFORCE
-- **规模化律**: ChinchillaLaw + KaplanLaw 预测器
-- **ANE缓存**: AneProgramCache + LRU + TTL
-- **量化管线**: AWQ + GGUF(Q2K→Q8_0)
-- **功耗模型**: PowerThermalModel + 17硬件Profile
-- **SAE Steering**: SteeringController + 4层覆盖
-- **FHRR VSA**: FhrrHyperCube D=2048 bind/bundle/permute
-- **谐振器网络**: AdaptiveCouplingKuramoto + ResonatorBank
+1. **CSS 变量单一事实源**: 所有背景/边框/文字色必须用 CSS 变量，禁止硬编码 hex
+2. **主题继承**: `:root` 定义默认值，`[data-theme]` 仅覆盖 accent 色
+3. **死文件清理**: 未 import 的 CSS/JS 文件必须删除，防止混淆
+4. **模型名显示**: ModelSwitcher 从 config.toml + provider_pool.toml 动态加载，禁止硬编码模型名
+5. **窗口圆角**: `html`/`body` 必须有 `overflow: hidden; border-radius: 12px`
+6. **构建验证**: 每次修改 CSS/组件后，必须 `npx vite build` + `cargo build --release`，检查 dist 产物
+7. **Chat action 命名**: 前端 `neocodex_send_message_stream` → adapter 剥离前缀 → `send_message_stream`，chat plugin 必须有此 action
+8. **动态模型列表**: ModelSwitcher 必须并行加载 `providerConfig()` + `getModelPoolStatus()`，合并去重

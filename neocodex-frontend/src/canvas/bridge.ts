@@ -47,7 +47,7 @@ function spawnTool(m: Message, idx: number) {
   }
 }
 
-/** 文本消息 → 流程图(mermaid) / 网页(URL) / 长文(markdown) 节点 */
+/** 文本消息 → 流程图(mermaid) / 代码块 / HTML / 网页(URL) / 长文(markdown) 节点 */
 function spawnText(m: Message) {
   const c = m.content
   // 流程图：```mermaid 围栏
@@ -56,6 +56,34 @@ function spawnText(m: Message) {
     const id = `mer:${m.id}`
     if (!canvasStore.has(id))
       canvasStore.spawn({ id, kind: 'mermaid', title: '流程图', data: mer[1].trim(), salience: 0.7, source: m.role })
+  }
+  // 代码块：```language ... ```（非 mermaid）
+  const codeBlocks = [...c.matchAll(/```(\w*)\s*\n([\s\S]*?)```/g)]
+  for (let i = 0; i < codeBlocks.length; i++) {
+    const [, lang, code] = codeBlocks[i]
+    if (lang === 'mermaid') continue // 已处理
+    if (code.trim().length > 10) {
+      const id = `code:${m.id}:${i}`
+      if (!canvasStore.has(id))
+        canvasStore.spawn({ id, kind: 'code', title: lang || '代码片段', data: code.trim(), salience: 0.6, source: m.role })
+    }
+  }
+  // HTML 代码块
+  const htmlBlocks = [...c.matchAll(/```(?:html)\s*\n([\s\S]*?)```/g)]
+  for (let i = 0; i < htmlBlocks.length; i++) {
+    const [, html] = htmlBlocks[i]
+    if (html.trim().length > 20) {
+      const id = `html:${m.id}:${i}`
+      if (!canvasStore.has(id))
+        canvasStore.spawn({ id, kind: 'html', title: 'HTML 片段', data: html.trim(), salience: 0.65, source: m.role })
+    }
+  }
+  // 图片 URL：独立的图片链接（非附件，如 markdown 图片）
+  const imgUrl = c.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/)
+  if (imgUrl) {
+    const id = `imgurl:${m.id}`
+    if (!canvasStore.has(id))
+      canvasStore.spawn({ id, kind: 'image', title: '图片', data: { src: imgUrl[1] }, salience: 0.7, source: m.role })
   }
   // 网页：消息中的 URL
   const url = c.match(/https?:\/\/[^\s)]+/)

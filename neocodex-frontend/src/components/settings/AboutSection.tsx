@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════
-   components/settings/AboutSection.tsx — 关于：版本/更新/诊断
+   components/settings/AboutSection.tsx — 关于：版本/更新/诊断/API 健康度
    update 状态机自管理（检查/下载/进度/重启 + unlisten 生命周期 onCleanup 释放）。
    仅依赖：appVersion 访问器 + config 访问器（诊断只读）。
    ════════════════════════════════════════════ */
@@ -9,6 +9,8 @@ import { listenUpdateEvents } from '../../api/system'
 import type { ProviderConfig } from '../../api/types'
 import { clsx } from 'clsx'
 import { InfoIcon, ExpandIcon } from './settingsIcons'
+import { SettingsHealthPanel } from './SettingsHealthPanel'
+import { ComponentInteractionTest } from './ComponentInteractionTest'
 
 interface Props {
   /** 应用版本访问器（父组件加载，只读展示） */
@@ -190,6 +192,12 @@ export function AboutSection(props: Props) {
           </div>
         </div>
       </div>
+      
+      {/* API 连通性测试面板 */}
+      <SettingsHealthPanel />
+      
+      {/* 组件交互测试 */}
+      <ComponentInteractionTest />
     </div>
   )
 }

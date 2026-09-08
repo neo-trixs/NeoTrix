@@ -15,9 +15,11 @@ use tokio::sync::RwLock;
 mod commands;
 mod stub;
 mod domain;
+pub mod market;
 
 use domain::{DomainRegistry, plugins::*};
 use commands::domain_cmd::{DomainState, domain_call, domain_list, domain_has, domain_action_count};
+use market::commands::*;
 use commands::unified::{UnifiedApiState, unified_init, unified_chat, unified_chat_stream, unified_system_state, unified_create_session, unified_list_sessions, unified_delete_session, unified_exec_cli, unified_cli_list};
 use crate::stub::{UnifiedApiImpl, UnifiedApi as _};
 
@@ -59,16 +61,16 @@ fn main() {
             // 创建域注册表并注册 12 个插件
             let mut registry = DomainRegistry::new();
             registry.register(Box::new(SessionPlugin::new())).expect("failed to register session");
-            registry.register(Box::new(ChatPlugin)).expect("failed to register chat");
+            registry.register(Box::new(ChatPlugin::new())).expect("failed to register chat");
             registry.register(Box::new(AgentPlugin)).expect("failed to register agent");
-            registry.register(Box::new(KbPlugin)).expect("failed to register kb");
+            registry.register(Box::new(KbPlugin::new())).expect("failed to register kb");
             registry.register(Box::new(FilePlugin)).expect("failed to register file");
             registry.register(Box::new(PluginPlugin)).expect("failed to register plugin");
             registry.register(Box::new(WorkflowPlugin)).expect("failed to register workflow");
             registry.register(Box::new(ToolPlugin)).expect("failed to register tool");
             registry.register(Box::new(SystemPlugin)).expect("failed to register system");
             registry.register(Box::new(SecurityPlugin)).expect("failed to register security");
-            registry.register(Box::new(MemoryPlugin)).expect("failed to register memory");
+            registry.register(Box::new(MemoryPlugin::new())).expect("failed to register memory");
             registry.register(Box::new(ExtPlugin)).expect("failed to register ext");
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
@@ -103,6 +105,11 @@ fn main() {
                         let _ = window.set_focus();
                     }
                 }))
+                .setup(|app| {
+                    // 设置 chat plugin 的 app handle 以支持事件发射
+                    set_app_handle(app.handle().clone());
+                    Ok(())
+                })
                 .plugin(
                     tauri_plugin_global_shortcut::Builder::new()
                         .with_handler(|app, shortcut, event| {
@@ -144,6 +151,46 @@ fn main() {
                     crate::commands::pty::pty_write,
                     crate::commands::pty::pty_resize,
                     crate::commands::pty::pty_close,
+                    // ===== Model Pool (模型池) =====
+                    crate::commands::model_pool::model_pool_status,
+                    crate::commands::model_pool::model_pool_add,
+                    crate::commands::model_pool::model_pool_remove,
+                    crate::commands::model_pool::model_pool_update_key,
+                    crate::commands::model_pool::model_pool_check,
+                    // ===== Proxy Pool (代理池) =====
+                    crate::commands::proxy_pool::proxy_pool_status,
+                    crate::commands::proxy_pool::proxy_pool_snapshot,
+                    crate::commands::proxy_pool::proxy_pool_add,
+                    crate::commands::proxy_pool::proxy_pool_remove,
+                    crate::commands::proxy_pool::proxy_pool_add_subscription,
+                    crate::commands::proxy_pool::proxy_pool_remove_subscription,
+                    crate::commands::proxy_pool::proxy_pool_set_strategy,
+                    crate::commands::proxy_pool::proxy_pool_list_strategies,
+                    // ===== IM Channel (即时通讯) =====
+                    crate::commands::im::im_status,
+                    crate::commands::im::im_list_channels,
+                    crate::commands::im::im_get_channel,
+                    crate::commands::im::im_toggle_channel,
+                    crate::commands::im::im_add_bot,
+                    crate::commands::im::im_remove_bot,
+                    crate::commands::im::im_update_bot,
+                    crate::commands::im::im_set_context_enhancement,
+                    crate::commands::im::im_set_proactive_delivery,
+                    // ===== DSH 市场模式 =====
+                    crate::commands::im::im_dsh_market_status,
+                    crate::commands::im::im_dsh_market_toggle,
+                    crate::commands::im::im_dsh_market_config,
+                    crate::commands::im::im_dsh_market_sync,
+                    // ===== Market (市场发现引擎) =====
+                    market_status,
+                    market_search,
+                    market_get_detail,
+                    market_download,
+                    market_install,
+                    market_uninstall,
+                    market_list_installed,
+                    market_check_updates,
+                    market_config,
                 ])
                 .setup(move |app| {
                     // PTY 事件转发

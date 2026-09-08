@@ -1,12 +1,12 @@
 /* ════════════════════════════════════════════
-   components/settings/TagsSection.tsx — 标签：新建/层级/计数/推荐
+   components/settings/TagsSection.tsx — 标签：层级/自动打标/计数/推荐
    消费全局 tagsStore；破坏性删除经 onRequestDelete(tagName) 回调父组件确认模态。
    ════════════════════════════════════════════ */
 import { For, Show } from 'solid-js'
 import { clsx } from 'clsx'
-import { tagsStore, TAG_PALETTE, RECOMMENDED_TAGS } from '../../stores/tags'
+import { tagsStore, TAG_PALETTE, RECOMMENDED_TAGS, TAG_KEYWORDS } from '../../stores/tags'
 import { TagRow } from './TagRow'
-import { TagIcon, ExpandIcon, PaletteIcon } from './settingsIcons'
+import { TagIcon, ExpandIcon, PaletteIcon, AutoTagIcon } from './settingsIcons'
 
 interface Props {
   newTagInput: () => string
@@ -19,8 +19,36 @@ interface Props {
 }
 
 export function TagsSection(props: Props) {
+  // 标签树统计
+  const tagTree = () => tagsStore.tagTree()
+  const tagCounts = () => tagsStore.tagCounts()
+  const totalSessions = () => Object.keys(tagsStore.state.sessionTags).length
+
   return (
     <div class="space-y-4">
+      {/* 标签概览统计 */}
+      <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
+        <div class="ss-card-body bg-white">
+          <div class="flex items-center gap-4">
+            <div class="text-center">
+              <div class="text-[18px] font-semibold text-zinc-900 leading-none">{Object.keys(tagsStore.state.tags).length}</div>
+              <div class="text-10px text-zinc-500 mt-1">标签总数</div>
+            </div>
+            <div class="w-px h-8 bg-black/5" />
+            <div class="text-center">
+              <div class="text-[18px] font-semibold text-emerald-600 leading-none">{totalSessions()}</div>
+              <div class="text-10px text-zinc-500 mt-1">已打标会话</div>
+            </div>
+            <div class="w-px h-8 bg-black/5" />
+            <div class="text-center">
+              <div class="text-[18px] font-semibold text-zinc-900 leading-none">{tagTree().length}</div>
+              <div class="text-10px text-zinc-500 mt-1">根分组</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 标签管理 */}
       <div class="ss-card">
         <div class="ss-card-header">
           <TagIcon />
@@ -65,7 +93,7 @@ export function TagsSection(props: Props) {
                   <TagRow
                     name={name}
                     color={color}
-                    count={tagsStore.tagCounts()[name] ?? 0}
+                    count={tagCounts()[name] ?? 0}
                     onColorChange={(c) => tagsStore.setTagColor(name, c)}
                     onRename={(next) => {
                       const err = tagsStore.renameTag(name, next)
@@ -81,7 +109,48 @@ export function TagsSection(props: Props) {
         </div>
       </div>
 
-      {/* 推荐标签：预置工作流标签（对标 Linear/GitHub 默认 label） */}
+      {/* 标签树 */}
+      <Show when={tagTree().length > 0}>
+        <div class="ss-card">
+          <div class="ss-card-header">
+            <ExpandIcon />
+            标签树
+          </div>
+          <div class="ss-card-body">
+            <p class="text-[11px] text-text-muted leading-relaxed pb-3">
+              层级视图：根标签聚合子标签计数，点击展开查看子标签详情。
+            </p>
+            <div class="space-y-1.5">
+              <For each={tagTree()}>
+                {(root) => (
+                  <div class="rounded-lg border border-border-primary/40 overflow-hidden">
+                    <div class="flex items-center gap-2 px-3 py-2 bg-zinc-50/60">
+                      <span class="w-3 h-3 rounded-full flex-shrink-0" style={{ background: root.color }} />
+                      <span class="text-[12px] font-medium text-text-primary">#{root.name}</span>
+                      <span class="text-10px text-zinc-400 font-mono ml-auto">{root.count} 会话</span>
+                    </div>
+                    <Show when={root.children.length > 0}>
+                      <div class="px-3 py-1.5 bg-white/40 space-y-1">
+                        <For each={root.children}>
+                          {(child) => (
+                            <div class="flex items-center gap-2 text-[11px]">
+                              <span class="w-2 h-2 rounded-full flex-shrink-0" style={{ background: child.color }} />
+                              <span class="text-text-secondary">#{child.name}</span>
+                              <span class="text-10px text-zinc-400 font-mono ml-auto">{child.count}</span>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* 推荐标签 */}
       <div class="ss-card">
         <div class="ss-card-header">
           <ExpandIcon />
@@ -92,7 +161,7 @@ export function TagsSection(props: Props) {
         </div>
         <div class="ss-card-body">
           <p class="text-[11px] text-text-muted leading-relaxed pb-3">
-            一套面向 AI 开发工作流的预置标签：<b>工作</b> 归类任务类型，<b>领域</b> 归类技术栈。
+            一套面向 AI 开发工作流的预置标签：<b>工作</b> 归类任务类型，<b>领域</b> 归类技术栈，<b>星域</b> 归类 NeoTrix 七域。
             仅添加缺失项，不会覆盖你已有的标签。
           </p>
           <div class="flex items-center gap-2 flex-wrap">
@@ -131,6 +200,31 @@ export function TagsSection(props: Props) {
         </div>
       </div>
 
+      {/* 自动打标配置 */}
+      <div class="ss-card">
+        <div class="ss-card-header">
+          <AutoTagIcon />
+          自动打标
+        </div>
+        <div class="ss-card-body">
+          <p class="text-[11px] text-text-muted leading-relaxed pb-3">
+            首条用户消息将自动匹配关键词，为会话打上推荐标签。每会话至多触发一次，最多匹配 2 个标签。
+          </p>
+          <div class="space-y-2">
+            <For each={Object.entries(TAG_KEYWORDS)}>
+              {([tag, keywords]) => (
+                <div class="flex items-start gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/60 text-[11px]">
+                  <span class="font-mono text-nt-io-600 whitespace-nowrap">#{tag}</span>
+                  <span class="text-zinc-400">→</span>
+                  <span class="text-zinc-500 flex-1">{keywords.slice(0, 6).join('、')}{keywords.length > 6 ? '…' : ''}</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+      </div>
+
+      {/* 标签色板 */}
       <div class="ss-card">
         <div class="ss-card-header">
           <PaletteIcon />
@@ -150,7 +244,7 @@ export function TagsSection(props: Props) {
             </For>
           </div>
           <p class="text-[10.5px] text-text-muted mt-2">
-            新标签自动按名称分配色板颜色，可在上方标签列表手动覆盖。
+            新标签自动按名称哈希分配色板颜色，可在上方标签列表手动覆盖。
           </p>
         </div>
       </div>

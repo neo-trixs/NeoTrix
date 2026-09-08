@@ -113,7 +113,7 @@ impl C2paProvenance {
     }
 
     /// 嵌入水印
-    pub fn embed_watermark(&self, content_id: &str, data: &[u8]) -> Vec<u8> {
+    pub fn embed_watermark(&mut self, _content_id: &str, data: &[u8]) -> Vec<u8> {
         // TODO: 实际的水印嵌入逻辑
         // 这里只是一个示例
         self.stats.total_watermarked += 1;
@@ -121,7 +121,7 @@ impl C2paProvenance {
     }
 
     /// 验证 C2PA 声明
-    pub fn verify_claim(&self, content_id: &str) -> VerificationResult {
+    pub fn verify_claim(&mut self, content_id: &str) -> VerificationResult {
         if let Some(claim) = self.claims.get(content_id) {
             // 检查签名
             if claim.hardware_signature.is_none() && claim.software_signature.is_none() {

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- NeoTrix Favicon — 中色橘橙 + 白色水滴溅射生命之花 + 极限NT -->
+  
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="50%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </radialGradient>
+  </defs>
+  
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="url(#bg)"/>
+  
+  <!-- 生命之花 白色水滴溅射 粗细对比 -->
+  <circle cx="16" cy="16" r="7.5" stroke="white" stroke-width="1.8" fill="none" opacity="0.95" stroke-linecap="round"/>
+  <circle cx="16" cy="10" r="7.5" stroke="white" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+  <circle cx="21.2" cy="13" r="7.5" stroke="white" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+  <circle cx="21.2" cy="19" r="7.5" stroke="white" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+  <circle cx="16" cy="22" r="7.5" stroke="white" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+  <circle cx="10.8" cy="19" r="7.5" stroke="white" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+  <circle cx="10.8" cy="13" r="7.5" stroke="white" stroke-width="1" fill="none" opacity="0.6" stroke-linecap="round"/>
+  
+  <!-- 极限NT融入中心点 -->
+  <circle cx="16" cy="16" r="2" fill="white" opacity="0.95"/>
+  <path d="M15 15.5 L15 16.5 M15.3 15.5 L15.3 16.5 M15 16 L15.3 16" stroke="#EA580C" stroke-width="0.3" stroke-linecap="round"/>
+  <path d="M16.5 15.5 L16.8 15.5 M16.65 15.5 L16.65 16.5" stroke="#EA580C" stroke-width="0.3" stroke-linecap="round"/>
+</svg>

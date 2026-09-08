@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- NeoTrix Logo — 中色橘橙 + 白色水滴溅射生命之花 + 极限NT符文 -->
+  
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="50%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- 圆角方形背景 -->
+  <rect x="32" y="32" width="448" height="448" rx="108" fill="url(#bg)"/>
+  
+  <!-- 生命之花 — 白色水滴溅射 粗细对比大 -->
+  <!-- 中心圆 (最粗) -->
+  <circle cx="256" cy="256" r="72" stroke="white" stroke-width="5" fill="none" opacity="0.95" stroke-linecap="round"/>
+  
+  <!-- 第一层 6圆 (粗) -->
+  <circle cx="256" cy="184" r="72" stroke="white" stroke-width="3" fill="none" opacity="0.65" stroke-linecap="round"/>
+  <circle cx="318.4" cy="220" r="72" stroke="white" stroke-width="3" fill="none" opacity="0.65" stroke-linecap="round"/>
+  <circle cx="318.4" cy="292" r="72" stroke="white" stroke-width="3" fill="none" opacity="0.65" stroke-linecap="round"/>
+  <circle cx="256" cy="328" r="72" stroke="white" stroke-width="3" fill="none" opacity="0.65" stroke-linecap="round"/>
+  <circle cx="193.6" cy="292" r="72" stroke="white" stroke-width="3" fill="none" opacity="0.65" stroke-linecap="round"/>
+  <circle cx="193.6" cy="220" r="72" stroke="white" stroke-width="3" fill="none" opacity="0.65" stroke-linecap="round"/>
+  
+  <!-- 第二层散射 (中等) -->
+  <circle cx="256" cy="112" r="72" stroke="white" stroke-width="1.5" fill="none" opacity="0.35" stroke-linecap="round"/>
+  <circle cx="380.8" cy="184" r="72" stroke="white" stroke-width="1.5" fill="none" opacity="0.35" stroke-linecap="round"/>
+  <circle cx="380.8" cy="328" r="72" stroke="white" stroke-width="1.5" fill="none" opacity="0.35" stroke-linecap="round"/>
+  <circle cx="256" cy="400" r="72" stroke="white" stroke-width="1.5" fill="none" opacity="0.35" stroke-linecap="round"/>
+  <circle cx="131.2" cy="328" r="72" stroke="white" stroke-width="1.5" fill="none" opacity="0.35" stroke-linecap="round"/>
+  <circle cx="131.2" cy="184" r="72" stroke="white" stroke-width="1.5" fill="none" opacity="0.35" stroke-linecap="round"/>
+  
+  <!-- 最外层散射 (最细) -->
+  <circle cx="256" cy="40" r="72" stroke="white" stroke-width="0.4" fill="none" opacity="0.12" stroke-linecap="round"/>
+  <circle cx="443.2" cy="184" r="72" stroke="white" stroke-width="0.4" fill="none" opacity="0.12" stroke-linecap="round"/>
+  <circle cx="443.2" cy="328" r="72" stroke="white" stroke-width="0.4" fill="none" opacity="0.12" stroke-linecap="round"/>
+  <circle cx="256" cy="472" r="72" stroke="white" stroke-width="0.4" fill="none" opacity="0.12" stroke-linecap="round"/>
+  <circle cx="68.8" cy="328" r="72" stroke="white" stroke-width="0.4" fill="none" opacity="0.06" stroke-linecap="round"/>
+  <circle cx="68.8" cy="184" r="72" stroke="white" stroke-width="0.4" fill="none" opacity="0.06" stroke-linecap="round"/>
+  
+  <!-- 极限NT符文 — 融入中心点 -->
+  <circle cx="256" cy="256" r="6" fill="white" opacity="0.95"/>
+  <path d="M252 254 L252 258 M254 254 L254 258 M252 256 L254 256" stroke="#EA580C" stroke-width="0.8" stroke-linecap="round"/>
+  <path d="M257 254 L259 254 M258 254 L258 258" stroke="#EA580C" stroke-width="0.8" stroke-linecap="round"/>
+</svg>

@@ -3,7 +3,7 @@
 //! 解决痛点 #6: 便携性 — 图谱嵌入单文件
 //! O(1) 邻居查询, 顺序扫描全图
 
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use serde::{Serialize, Deserialize};
 
 /// 边方向
@@ -16,7 +16,7 @@ pub enum EdgeDirection {
 }
 
 /// 图谱边
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct GraphEdge {
     pub source: [u8; 36],
     pub target: [u8; 36],
@@ -26,7 +26,7 @@ pub struct GraphEdge {
 }
 
 /// 图谱节点
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct GraphNode {
     pub node_id: [u8; 36],
     pub degree: u32,
@@ -34,7 +34,7 @@ pub struct GraphNode {
 }
 
 /// 邻居
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct GraphNeighbor {
     pub node_id: [u8; 36],
     pub edge_type: u16,
@@ -55,9 +55,10 @@ impl GraphSegment {
 
     /// 添加边
     pub fn add_edge(&mut self, edge: GraphEdge) {
+        let edge_clone = edge.clone();
         self.edges.push(edge);
         // 更新邻接表
-        self.update_adjacency(&self.edges.last().unwrap());
+        self.update_adjacency(&edge_clone);
     }
 
     /// 更新邻接表
@@ -166,7 +167,7 @@ impl GraphSegment {
     }
 
     /// 写入段
-    pub fn write_to(&self, writer: &mut impl Write) -> std::io::Result<u64> {
+    pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
 
         writer.write_all(&(self.nodes.len() as u64).to_le_bytes())?;

@@ -7,7 +7,7 @@ use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_edit::MicroEdit;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use crate::neotrix::nt_world_model::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
 use crate::core::nt_core_iit_phi::PhiReport;
 use super::cortex_memory::{CortexMemory, MemoryTrace, DimensionTag, Modality};
@@ -153,7 +153,7 @@ impl PanoramaPipeline {
 
                 let edit_mem = ReasoningMemory::new(
                     &format!("repair_{}", self.cycle),
-                    TaskType::Debugging,
+                    TaskType::Debugging.into(),
                     &repair.suggested_edits,
                     0.5 + repair.severity * 0.5,
                 );
@@ -194,7 +194,7 @@ impl PanoramaPipeline {
 
         let mem = ReasoningMemory::new(
             &format!("panorama_cycle_{}", self.cycle),
-            TaskType::Learning,
+            TaskType::Learning.into(),
             &[
                 MicroEdit::AdjustDimension("prediction_energy".into(), fe_report.prediction_energy.min(1.0)),
                 MicroEdit::AdjustDimension("phi".into(), phi_report.phi.min(1.0)),

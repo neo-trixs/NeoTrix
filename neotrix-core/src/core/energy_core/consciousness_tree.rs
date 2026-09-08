@@ -147,8 +147,14 @@ impl ConsciousnessTreeImpl {
         }
         
         // 更新根节点的子节点
-        if let Some(root) = nodes.get_mut(&self.root_id) {
-            root.children.retain(|id| nodes.contains_key(id));
+        let root_children: Vec<_> = if let Some(root) = nodes.get(&self.root_id) {
+            root.children.clone()
+        } else {
+            Vec::new()
+        };
+        let ids_to_keep: Vec<_> = root_children.iter().filter(|id| nodes.contains_key(*id)).cloned().collect();
+        if let Some(r) = nodes.get_mut(&self.root_id) {
+            r.children = ids_to_keep;
         }
         
         pruned

@@ -19,6 +19,11 @@ pub mod search_bridge;
 pub mod ntx_integration;
 pub mod benchmark;
 
+/// Trait for NTX segment types that can be serialized via `write_to`.
+pub trait NtxWritable {
+    fn write_to(&self, writer: &mut std::io::Cursor<Vec<u8>>) -> std::io::Result<u64>;
+}
+
 use std::path::{Path, PathBuf};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -233,37 +238,37 @@ impl NtxFile {
         self.header.wal_checkpoint_pos = self.wal.stats().checkpoint_pos;
 
         // 写帧段
-        let frames_offset = self.write_frames_segment()?;
+        let _frames_offset = self.write_frames_segment()?;
 
         // 写向量段
-        if let Some(ref seg) = self.vec_segment {
-            let offset = self.write_vec_segment(seg)?;
+        if self.vec_segment.is_some() {
+            let (offset, len) = self.write_vec_segment_and_len()?;
             self.toc.add_segment(SegmentDescriptor::new(
-                SegmentType::Vec, offset, self.segment_len(seg)?, &[],
+                SegmentType::Vec, offset, len, &[],
             ));
         }
 
         // 写图谱段
-        if let Some(ref seg) = self.graph_segment {
-            let offset = self.write_graph_segment(seg)?;
+        if self.graph_segment.is_some() {
+            let (offset, len) = self.write_graph_segment_and_len()?;
             self.toc.add_segment(SegmentDescriptor::new(
-                SegmentType::Graph, offset, self.segment_len(seg)?, &[],
+                SegmentType::Graph, offset, len, &[],
             ));
         }
 
         // 写时间索引段
-        if let Some(ref seg) = self.time_segment {
-            let offset = self.write_time_segment(seg)?;
+        if self.time_segment.is_some() {
+            let (offset, len) = self.write_time_segment_and_len()?;
             self.toc.add_segment(SegmentDescriptor::new(
-                SegmentType::Time, offset, self.segment_len(seg)?, &[],
+                SegmentType::Time, offset, len, &[],
             ));
         }
 
         // 写 Lex 段 (FTS5 快照)
-        if let Some(ref seg) = self.lex_segment {
-            let offset = self.write_lex_segment(seg)?;
+        if self.lex_segment.is_some() {
+            let (offset, len) = self.write_lex_segment_and_len()?;
             self.toc.add_segment(SegmentDescriptor::new(
-                SegmentType::Lex, offset, self.segment_len(seg)?, &[],
+                SegmentType::Lex, offset, len, &[],
             ));
         }
 
@@ -463,11 +468,46 @@ impl NtxFile {
     }
 
     /// 计算段序列化大小 (用于 TOC)
-    fn segment_len<T: std::io::Write>(&self, seg: &T) -> std::io::Result<u64> {
-        // 简单估计: 通过序列化到空 writer
+    fn segment_len(&self, seg: &impl NtxWritable) -> std::io::Result<u64> {
         let mut buf = std::io::Cursor::new(Vec::new());
         seg.write_to(&mut buf)?;
         Ok(buf.position())
+    }
+
+    /// 写向量段并返回 (offset, len)
+    fn write_vec_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
+        let offset = self.file.seek(SeekFrom::End(0))?;
+        let seg = self.vec_segment.as_ref().unwrap();
+        seg.write_to(&mut self.file)?;
+        let len = self.segment_len(seg)?;
+        Ok((offset, len))
+    }
+
+    /// 写图谱段并返回 (offset, len)
+    fn write_graph_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
+        let offset = self.file.seek(SeekFrom::End(0))?;
+        let seg = self.graph_segment.as_ref().unwrap();
+        seg.write_to(&mut self.file)?;
+        let len = self.segment_len(seg)?;
+        Ok((offset, len))
+    }
+
+    /// 写时间索引段并返回 (offset, len)
+    fn write_time_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
+        let offset = self.file.seek(SeekFrom::End(0))?;
+        let seg = self.time_segment.as_ref().unwrap();
+        seg.write_to(&mut self.file)?;
+        let len = self.segment_len(seg)?;
+        Ok((offset, len))
+    }
+
+    /// 写 Lex 段并返回 (offset, len)
+    fn write_lex_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
+        let offset = self.file.seek(SeekFrom::End(0))?;
+        let seg = self.lex_segment.as_ref().unwrap();
+        seg.write_to(&mut self.file)?;
+        let len = self.segment_len(seg)?;
+        Ok((offset, len))
     }
 }
 
@@ -645,5 +685,29 @@ mod tests {
             assert_eq!(s.graph_nodes, 2);
             assert_eq!(s.time_entries, 1);
         }
+    }
+}
+
+impl NtxWritable for vec_segment::VecSegment {
+    fn write_to(&self, writer: &mut std::io::Cursor<Vec<u8>>) -> std::io::Result<u64> {
+        vec_segment::VecSegment::write_to(self, writer)
+    }
+}
+
+impl NtxWritable for graph_segment::GraphSegment {
+    fn write_to(&self, writer: &mut std::io::Cursor<Vec<u8>>) -> std::io::Result<u64> {
+        graph_segment::GraphSegment::write_to(self, writer)
+    }
+}
+
+impl NtxWritable for time_segment::TimeSegment {
+    fn write_to(&self, writer: &mut std::io::Cursor<Vec<u8>>) -> std::io::Result<u64> {
+        time_segment::TimeSegment::write_to(self, writer)
+    }
+}
+
+impl NtxWritable for lex_segment::LexSegment {
+    fn write_to(&self, writer: &mut std::io::Cursor<Vec<u8>>) -> std::io::Result<u64> {
+        lex_segment::LexSegment::write_to(self, writer)
     }
 }

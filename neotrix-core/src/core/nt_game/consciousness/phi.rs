@@ -49,7 +49,7 @@ pub fn compute_board_phi(hexagram_states: &[u8]) -> f64 {
     // Compute pairwise resonance
     let mut total_resonance = 0.0f64;
     let mut max_resonance = 0.0f64;
-    let mut max_pair = (0, 1);
+    let mut _max_pair = (0, 1);
 
     for i in 0..active.len() {
         for j in (i + 1)..active.len() {
@@ -59,7 +59,7 @@ pub fn compute_board_phi(hexagram_states: &[u8]) -> f64 {
             total_resonance += resonance;
             if resonance > max_resonance {
                 max_resonance = resonance;
-                max_pair = (ai, aj);
+                _max_pair = (ai, aj);
             }
         }
     }
