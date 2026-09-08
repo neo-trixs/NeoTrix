@@ -78,6 +78,7 @@ pub struct GameTickReport {
 // ═══════════════════════════════════════════════════════════════════
 
 /// Minimal game engine for autonomous training.
+#[allow(dead_code)]
 trait AutoGame {
     fn reset(&mut self, seed: u64);
     fn step(&mut self, action: &Action) -> StepResult;

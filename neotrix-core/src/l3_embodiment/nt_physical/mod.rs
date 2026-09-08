@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 物理具身核心 — 传感器/执行器/安全内核
+#[allow(dead_code)]
 pub struct PhysicalEmbodiment {
     sensors: Vec<Sensor>,
     motors: Vec<Motor>,

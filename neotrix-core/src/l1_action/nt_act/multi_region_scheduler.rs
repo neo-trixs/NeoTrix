@@ -82,6 +82,7 @@ pub enum RegionalStrategy {
 }
 
 /// 多区域调度器
+#[allow(dead_code)]
 pub struct MultiRegionScheduler {
     /// 区域列表
     regions: HashMap<String, RegionInfo>,

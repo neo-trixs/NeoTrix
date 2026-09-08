@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 上下文管理器
+#[allow(dead_code)]
 pub struct ContextManager {
     windows: HashMap<String, ContextWindow>,
     priority_queue: Vec<ContextItem>,
@@ -80,6 +81,7 @@ pub enum ItemType {
 }
 
 /// 压缩引擎
+#[allow(dead_code)]
 pub struct CompressionEngine {
     compression_map: HashMap<String, String>,
 }

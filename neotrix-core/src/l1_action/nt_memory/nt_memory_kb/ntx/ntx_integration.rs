@@ -169,21 +169,7 @@ impl NtxIndexManager {
 
 // ── 工具函数 ──────────────────────────────────────
 
-fn uuid_to_bytes(uuid: &str) -> [u8; 36] {
-    let mut bytes = [0u8; 36];
-    let clean: String = uuid.chars().filter(|c| c.is_alphanumeric()).collect();
-    for (i, chunk) in clean.as_bytes().chunks(2).enumerate() {
-        if i >= 36 { break; }
-        if let Ok(b) = u8::from_str_radix(std::str::from_utf8(chunk).unwrap_or("0"), 16) {
-            bytes[i] = b;
-        }
-    }
-    bytes
-}
-
-fn bytes_to_uuid(bytes: &[u8; 36]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>()
-}
+use super::format::{uuid_to_bytes, bytes_to_uuid};
 
 fn blob_to_vector(blob: &[u8]) -> Vec<f32> {
     blob.chunks(4)

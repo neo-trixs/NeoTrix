@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 威胁检测引擎
+#[allow(dead_code)]
 pub struct ThreatDetectionEngine {
     rules: Vec<DetectionRule>,
     anomalies: Vec<AnomalyEvent>,

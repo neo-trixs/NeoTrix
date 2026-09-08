@@ -117,6 +117,7 @@ pub struct EventBusStats {
 }
 
 /// 订阅句柄
+#[allow(dead_code)]
 pub struct SubscriptionHandle {
     id: String,
     event_type: String,

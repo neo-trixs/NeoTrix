@@ -140,14 +140,57 @@ impl NtxSync {
     }
 
     /// 从 NTX 导入到 SQLite (恢复)
-    pub fn import_to_sqlite(&self) -> std::io::Result<ImportResult> {
+    pub fn import_to_sqlite(&self, conn: &rusqlite::Connection) -> std::io::Result<ImportResult> {
         let ntx = NtxFile::open(&self.ntx_path)?;
         let stats = ntx.stats();
 
+        // 批量导入节点
+        let mut stmt = conn.prepare(
+            "INSERT OR REPLACE INTO nodes (id, namespace, data_json) VALUES (?1, ?2, ?3)"
+        ).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+        let mut node_count = 0u64;
+        for frame in ntx.frames() {
+            if frame.frame_type == super::frames::FrameType::Node {
+                let data = String::from_utf8_lossy(&frame.payload).to_string();
+                let node_id = bytes_to_uuid(&frame.node_id);
+                // 从 tags 提取 namespace
+                let namespace = frame.tags.as_ref()
+                    .and_then(|t| serde_json::from_str::<serde_json::Value>(t).ok())
+                    .and_then(|v| v.get("ns")?.as_str().map(String::from))
+                    .unwrap_or_else(|| "default".to_string());
+
+                stmt.execute(rusqlite::params![node_id, namespace, data])
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                node_count += 1;
+            }
+        }
+
+        // 批量导入边
+        let mut edge_stmt = conn.prepare(
+            "INSERT OR REPLACE INTO edges (source_id, target_id, edge_type, weight) VALUES (?1, ?2, ?3, ?4)"
+        ).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+        let mut edge_count = 0u64;
+        for frame in ntx.frames() {
+            if frame.frame_type == super::frames::FrameType::Edge {
+                if let Ok(data) = serde_json::from_slice::<serde_json::Value>(&frame.payload) {
+                    let source = data.get("source").and_then(|v| v.as_str()).unwrap_or("");
+                    let target = data.get("target").and_then(|v| v.as_str()).unwrap_or("");
+                    let edge_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    let weight = data.get("weight").and_then(|v| v.as_f64()).unwrap_or(1.0) as f32;
+
+                    edge_stmt.execute(rusqlite::params![source, target, edge_type, weight])
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                    edge_count += 1;
+                }
+            }
+        }
+
         Ok(ImportResult {
             frame_count: stats.frame_count,
-            node_count: stats.node_count,
-            edge_count: stats.edge_count,
+            node_count,
+            edge_count,
             has_vec_index: stats.has_vec_index,
             has_graph: stats.has_graph,
         })
@@ -195,17 +238,7 @@ pub struct ImportResult {
 // 工具函数
 // ============================================================
 
-fn uuid_to_bytes(uuid: &str) -> [u8; 36] {
-    let mut bytes = [0u8; 36];
-    let clean: String = uuid.chars().filter(|c| c.is_alphanumeric()).collect();
-    for (i, chunk) in clean.as_bytes().chunks(2).enumerate() {
-        if i >= 36 { break; }
-        if let Ok(b) = u8::from_str_radix(std::str::from_utf8(chunk).unwrap_or("0"), 16) {
-            bytes[i] = b;
-        }
-    }
-    bytes
-}
+use super::format::{uuid_to_bytes, bytes_to_uuid};
 
 fn f32_vec_to_bytes(vec: &[f32]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(vec.len() * 4);
@@ -215,6 +248,7 @@ fn f32_vec_to_bytes(vec: &[f32]) -> Vec<u8> {
     bytes
 }
 
+#[allow(dead_code)]
 fn bytes_to_f32_vec(bytes: &[u8]) -> Vec<f32> {
     bytes.chunks(4)
         .filter_map(|chunk| {

@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 计算机视觉管线
+#[allow(dead_code)]
 pub struct ComputerVisionPipeline {
     processors: Vec<ImageProcessor>,
     detectors: Vec<ObjectDetector>,
@@ -42,12 +43,14 @@ impl Default for CVConfig {
 }
 
 /// 图像处理器
+#[allow(dead_code)]
 pub struct ImageProcessor {
     processor_type: String,
     parameters: HashMap<String, f64>,
 }
 
 /// 目标检测器
+#[allow(dead_code)]
 pub struct ObjectDetector {
     detector_type: String,
     model_path: Option<String>,
@@ -55,6 +58,7 @@ pub struct ObjectDetector {
 }
 
 /// 图像分割器
+#[allow(dead_code)]
 pub struct ImageSegmenter {
     segmenter_type: String,
     num_segments: u32,

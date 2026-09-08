@@ -400,6 +400,7 @@ impl NtxFile {
     }
 
     /// 写向量段
+    #[allow(dead_code)]
     fn write_vec_segment(&mut self, seg: &VecSegment) -> std::io::Result<u64> {
         let offset = self.file.seek(SeekFrom::End(0))?;
         seg.write_to(&mut self.file)?;
@@ -417,6 +418,7 @@ impl NtxFile {
     }
 
     /// 写图谱段
+    #[allow(dead_code)]
     fn write_graph_segment(&mut self, seg: &GraphSegment) -> std::io::Result<u64> {
         let offset = self.file.seek(SeekFrom::End(0))?;
         seg.write_to(&mut self.file)?;
@@ -434,6 +436,7 @@ impl NtxFile {
     }
 
     /// 写时间索引段
+    #[allow(dead_code)]
     fn write_time_segment(&mut self, seg: &TimeSegment) -> std::io::Result<u64> {
         let offset = self.file.seek(SeekFrom::End(0))?;
         seg.write_to(&mut self.file)?;
@@ -451,6 +454,7 @@ impl NtxFile {
     }
 
     /// 写 Lex 段
+    #[allow(dead_code)]
     fn write_lex_segment(&mut self, seg: &LexSegment) -> std::io::Result<u64> {
         let offset = self.file.seek(SeekFrom::End(0))?;
         seg.write_to(&mut self.file)?;

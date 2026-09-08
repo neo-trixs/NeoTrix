@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
+#[allow(dead_code)]
 pub struct VTuberEmotionEngine {
     persona: CharacterPersona,
     emotion_history: Vec<EmotionReading>,

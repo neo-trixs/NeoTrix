@@ -35,6 +35,7 @@ pub enum DownloadStatus {
     Failed(String),
 }
 
+#[allow(dead_code)]
 pub struct DownloadEngine {
     config: DownloadConfig,
 }

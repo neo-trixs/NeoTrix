@@ -12,7 +12,6 @@ pub mod group_integration_test;
 pub mod pm_integration_test;
 
 use std::sync::{Arc, Mutex};
-use std::sync::Mutex;
 use neotrix_types::core::CapabilityVector;
 use crate::l1_action::nt_io::nt_l1_error::L1Result;
 use crate::agent::team::AgentTeam;

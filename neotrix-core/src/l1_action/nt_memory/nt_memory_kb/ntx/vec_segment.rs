@@ -83,9 +83,12 @@ impl VecSegment {
         results
     }
 
-    /// 写入段
+    /// 写入段 (magic + checksum + data)
     pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
+
+        // Magic
+        writer.write_all(b"NTVH")?;
 
         // 段头
         writer.write_all(&(self.dimension as u32).to_le_bytes())?;
@@ -116,6 +119,16 @@ impl VecSegment {
 
     /// 读取段
     pub fn read_from(reader: &mut impl Read) -> std::io::Result<Self> {
+        // Magic
+        let mut magic = [0u8; 4];
+        reader.read_exact(&mut magic)?;
+        if magic != *b"NTVH" {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid Vec magic: expected NTVH, got {:?}", magic),
+            ));
+        }
+
         let mut dim_buf = [0u8; 4];
         reader.read_exact(&mut dim_buf)?;
         let dimension = u32::from_le_bytes(dim_buf) as usize;

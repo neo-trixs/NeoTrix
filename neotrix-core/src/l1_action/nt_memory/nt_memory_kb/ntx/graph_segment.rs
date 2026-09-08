@@ -166,9 +166,12 @@ impl GraphSegment {
         self.edges.len()
     }
 
-    /// 写入段
+    /// 写入段 (magic + data)
     pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
+
+        // Magic
+        writer.write_all(b"NTGR")?;
 
         writer.write_all(&(self.nodes.len() as u64).to_le_bytes())?;
         writer.write_all(&(self.edges.len() as u64).to_le_bytes())?;
@@ -198,6 +201,16 @@ impl GraphSegment {
 
     /// 读取段
     pub fn read_from(reader: &mut impl Read) -> std::io::Result<Self> {
+        // Magic
+        let mut magic = [0u8; 4];
+        reader.read_exact(&mut magic)?;
+        if magic != *b"NTGR" {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid Graph magic: expected NTGR, got {:?}", magic),
+            ));
+        }
+
         let mut node_count_buf = [0u8; 8];
         reader.read_exact(&mut node_count_buf)?;
         let node_count = u64::from_le_bytes(node_count_buf) as usize;

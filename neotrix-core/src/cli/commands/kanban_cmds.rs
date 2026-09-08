@@ -947,7 +947,7 @@ impl BoardCmd {
                 // Persist subagent registry first so efficiency scoring sees real state.
                 if let Some(kb) = open_kb() {
                     let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
-                let mgr = shared.blocking_write();
+                    let mut mgr = shared.blocking_write();
                     if let Err(e) = mgr.load_from_kb(&kb) {
                         log::warn!("todo sync: load subagents: {e}");
                     }
@@ -983,7 +983,7 @@ impl BoardCmd {
 //                     crate::l5_cognition::nt_core::nt_core_parallel::AllocationStrategy::Hybrid,
 //                 );
                 let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
-                let mut mgr = shared.blocking_write();
+                let mgr = shared.blocking_write();
                 let running = mgr.running_count();
                 if running >= max_parallel {
                     return CommandOutput::ok(&format!(

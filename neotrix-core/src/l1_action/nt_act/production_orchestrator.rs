@@ -124,6 +124,7 @@ pub struct ProgressUpdate {
 
 /// 生产编排器
 /// 管理多任务并行、进度追踪、断点续传
+#[allow(dead_code)]
 pub struct ProductionOrchestrator {
     /// 配置
     config: OrchestratorConfig,

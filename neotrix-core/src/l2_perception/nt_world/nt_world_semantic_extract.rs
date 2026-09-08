@@ -19,6 +19,7 @@ pub struct SemanticExtractionPipeline {
 }
 
 /// 实体提取器
+#[allow(dead_code)]
 pub struct EntityExtractor {
     patterns: Vec<EntityPattern>,
     confidence_threshold: f64,
@@ -71,6 +72,7 @@ pub enum EntityType {
 }
 
 /// 关系提取器
+#[allow(dead_code)]
 pub struct RelationExtractor {
     patterns: Vec<RelationPattern>,
     confidence_threshold: f64,
@@ -97,6 +99,7 @@ pub struct Relation {
 }
 
 /// 嵌入生成器
+#[allow(dead_code)]
 pub struct EmbeddingGenerator {
     model: String,
     dimension: usize,

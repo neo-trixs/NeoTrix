@@ -66,9 +66,11 @@ impl TimeSegment {
         &self.entries
     }
 
-    /// 写入段
+    /// 写入段 (magic + data)
     pub fn write_to(&self, writer: &mut (impl Write + Seek)) -> std::io::Result<u64> {
         let start = writer.stream_position()?;
+        // Magic
+        writer.write_all(b"NTTI")?;
         writer.write_all(&(self.entries.len() as u64).to_le_bytes())?;
         for entry in &self.entries {
             writer.write_all(&entry.timestamp.to_le_bytes())?;
@@ -81,6 +83,16 @@ impl TimeSegment {
 
     /// 读取段
     pub fn read_from(reader: &mut impl Read) -> std::io::Result<Self> {
+        // Magic
+        let mut magic = [0u8; 4];
+        reader.read_exact(&mut magic)?;
+        if magic != *b"NTTI" {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid Time magic: expected NTTI, got {:?}", magic),
+            ));
+        }
+
         let mut count_buf = [0u8; 8];
         reader.read_exact(&mut count_buf)?;
         let count = u64::from_le_bytes(count_buf) as usize;

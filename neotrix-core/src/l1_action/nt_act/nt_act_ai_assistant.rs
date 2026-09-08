@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// AI 助手协调器
+#[allow(dead_code)]
 pub struct AIAssistantCoordinator {
     tools: HashMap<String, Tool>,
     task_queue: Vec<Task>,

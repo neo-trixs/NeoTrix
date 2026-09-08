@@ -141,6 +141,7 @@ pub struct PlatformGatewayConfig {
 
 /// 平台网关
 /// 统一管理多平台集成
+#[allow(dead_code)]
 pub struct PlatformGateway {
     /// 配置
     config: PlatformGatewayConfig,

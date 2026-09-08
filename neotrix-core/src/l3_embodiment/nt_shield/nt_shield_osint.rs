@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// OSINT 侦察引擎
+#[allow(dead_code)]
 pub struct OSINTReconEngine {
     sources: Vec<OSINTSource>,
     collected_data: Vec<OSINTData>,
