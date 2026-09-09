@@ -20,8 +20,6 @@ pub use sense as nt_world_sense;
 pub use explore as nt_world_map;
 pub use source as nt_world_media_source;
 
-
-
 // Stub modules (legacy types still referenced by downstream code)
 pub mod nt_world_model;
 pub mod nt_world_jepa;
