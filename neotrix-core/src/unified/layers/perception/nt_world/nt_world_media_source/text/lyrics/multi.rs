@@ -5,6 +5,39 @@ pub struct MultiLyricSource;
 
 impl MultiLyricSource {
     pub fn new() -> Self { Self }
+
+    /// 解析 LRC 时间轴
+    fn parse_lrc_time(time_str: &str) -> Option<i64> {
+        let parts: Vec<&str> = time_str.split(':').collect();
+        if parts.len() == 2 {
+            let min = parts[0].parse::<i64>().ok()?;
+            let sec = parts[1].parse::<f64>().ok()?;
+            Some(min * 60000 + (sec * 1000.0) as i64)
+        } else {
+            None
+        }
+    }
+
+    /// 解析逐字歌词 (增强版 LRC)
+    fn parse_enhanced_lrc(line: &str) -> Vec<LyricWord> {
+        let mut words = Vec::new();
+        let mut remaining = line;
+        while let Some(start) = remaining.find('<') {
+            if let Some(end) = remaining[start..].find('>') {
+                let tag = &remaining[start + 1..start + end];
+                if let Some(comma) = tag.find(',') {
+                    if let Ok(time_ms) = tag[comma + 1..].parse::<i64>() {
+                        let text = tag[..comma].to_string();
+                        words.push(LyricWord { time_ms, text });
+                    }
+                }
+                remaining = &remaining[start + end + 1..];
+            } else {
+                break;
+            }
+        }
+        words
+    }
 }
 
 impl MediaSource for MultiLyricSource {
@@ -50,22 +83,42 @@ impl MediaSource for MultiLyricSource {
             let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
             let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
             let synced = json["syncedLyrics"].as_str().or(json["plainLyrics"].as_str()).ok_or("No lyrics")?;
-            let lines: Vec<LyricLine> = synced.lines().enumerate().map(|(i, line)| {
+            let lines: Vec<LyricLine> = synced.lines().filter_map(|line| {
                 if let Some(stripped) = line.strip_prefix('[') {
                     if let Some(close) = stripped.find(']') {
-                        let time_part = &stripped[..close];
+                        let time_str = &stripped[..close];
                         let text = stripped[close + 1..].trim().to_string();
-                        let parts: Vec<&str> = time_part.split(':').collect();
-                        if parts.len() == 2 {
-                            if let (Ok(min), Ok(sec)) = (parts[0].parse::<i64>(), parts[1].parse::<f64>()) {
-                                return LyricLine { time_ms: min * 60000 + (sec * 1000.0) as i64, text };
-                            }
+                        if let Some(time_ms) = Self::parse_lrc_time(time_str) {
+                            return Some(LyricLine { time_ms, text });
                         }
                     }
                 }
-                LyricLine { time_ms: (i as i64) * 4000, text: line.to_string() }
+                None
             }).collect();
             Ok(Lyric { title, artist, lines, source: "multi_lyric".into() })
         })
     }
+}
+
+/// 歌词行
+#[derive(Debug, Clone)]
+pub struct LyricLine {
+    pub time_ms: i64,
+    pub text: String,
+}
+
+/// 歌词中的单个字
+#[derive(Debug, Clone)]
+pub struct LyricWord {
+    pub time_ms: i64,
+    pub text: String,
+}
+
+/// 歌词
+#[derive(Debug, Clone)]
+pub struct Lyric {
+    pub title: String,
+    pub artist: String,
+    pub lines: Vec<LyricLine>,
+    pub source: String,
 }
