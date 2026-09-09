@@ -10,6 +10,8 @@ pub mod crypto;
 pub mod kb_bridge;
 pub mod security_bridge;
 pub mod evolution_bridge;
+pub mod search_aggregator;
+pub mod search_cache;
 
 pub use types::*;
 pub use engine::MediaEngine;
@@ -22,3 +24,5 @@ pub use crypto::*;
 pub use kb_bridge::KbBridge;
 pub use security_bridge::SecurityBridge;
 pub use evolution_bridge::EvolutionBridge;
+pub use search_aggregator::SearchAggregator;
+pub use search_cache::SearchCache;
