@@ -26,10 +26,7 @@ pub mod nt_act_voice;
 // ============================================================================
 
 pub mod nt_act_action_cache;
-pub mod nt_act_eventbus;
-pub mod nt_act_cache;
-pub mod nt_act_circuit_breaker;
-pub mod nt_act_rate_limiter;
+
 pub mod nt_act_workflow;
 pub mod nt_act_ai_assistant;
 pub mod nt_act_3d_dev;
@@ -88,40 +85,13 @@ pub mod shot_continuity;
 pub mod task_scheduler;
 
 // ============================================================================
-// 生产级基础设施模块
+// 生产级基础设施模块 (moved to actions/)
 // ============================================================================
 
-// 错误分类器 (错误类型分类 + 重试策略)
-pub mod error_classifier;
-
-// 可观测性栈 (traces, metrics, logs, evals)
-pub mod observability_stack;
-
-// 成本追踪器 (成本追踪 + 预算告警)
-pub mod cost_tracker;
-
-// ============================================================================
-// 生产级调度和路由模块
-// ============================================================================
-
-// 视频作业管线 (异步作业队列 + 持久状态 + 检查点)
-pub mod video_job_pipeline;
-
-// GPU 调度器 (VRAM 感知路由 + 优先级队列 + 自动扩缩容)
-pub mod gpu_scheduler;
-
-// 模型路由器 (质量分级路由 + 成本优化 + 故障转移)
-pub mod model_router;
-
-// ============================================================================
-// 生产级基础设施模块
-// ============================================================================
+pub use actions::{error_classifier, observability_stack, cost_tracker, gpu_scheduler, model_router, multi_region_scheduler};
 
 // 提供商迁移路由器 (厂商抽象 + 迁移路径)
 pub mod provider_migration_router;
-
-// 多区域调度器 (跨区域路由 + 故障转移)
-pub mod multi_region_scheduler;
 
 // 视频对象存储 (持久存储 + 生命周期管理)
 pub mod video_object_storage;
