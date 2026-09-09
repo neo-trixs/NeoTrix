@@ -12,6 +12,8 @@ pub mod security_bridge;
 pub mod evolution_bridge;
 pub mod search_aggregator;
 pub mod search_cache;
+pub mod playback_retry;
+pub mod playback_history;
 
 pub use types::*;
 pub use engine::MediaEngine;
@@ -26,3 +28,5 @@ pub use security_bridge::SecurityBridge;
 pub use evolution_bridge::EvolutionBridge;
 pub use search_aggregator::SearchAggregator;
 pub use search_cache::SearchCache;
+pub use playback_retry::PlaybackRetry;
+pub use playback_history::PlaybackHistory;
