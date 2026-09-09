@@ -118,7 +118,7 @@ impl NoiseHandshake {
         let ephemeral_pub = ephemeral.public();
         self.ephemeral_private = Some(ephemeral);
 
-        let mut msg = ephemeral_pub.to_bytes().to_vec();
+        let msg = ephemeral_pub.to_bytes().to_vec();
         self.hash_concat(&msg);
         self.state = HandshakeState::Message1Sent;
         Ok(msg)
@@ -169,8 +169,8 @@ impl NoiseHandshake {
         self.mix_key(es.as_bytes());
 
         // psk2
-        if let Some(psk) = &self.psk {
-            self.mix_psk(psk);
+        if let Some(psk) = self.psk {
+            self.mix_psk(&psk);
         }
 
         self.hash_concat(&msg);
@@ -199,7 +199,9 @@ impl NoiseHandshake {
         // s (decrypt)
         let enc_static = &msg[32..32 + 48];
         let plain_static = self.decrypt(enc_static)?;
-        let remote_static = PublicKey::from_bytes(plain_static.try_into().unwrap());
+        let mut static_bytes = [0u8; 32];
+        static_bytes.copy_from_slice(&plain_static[..32]);
+        let remote_static = PublicKey::from_bytes(&static_bytes);
         self.remote_static_public = Some(remote_static.clone());
 
         // es
@@ -207,8 +209,8 @@ impl NoiseHandshake {
         self.mix_key(es.as_bytes());
 
         // psk2
-        if let Some(psk) = &self.psk {
-            self.mix_psk(psk);
+        if let Some(psk) = self.psk {
+            self.mix_psk(&psk);
         }
 
         self.hash_concat(msg);
@@ -238,7 +240,7 @@ impl NoiseHandshake {
         }
 
         let enc_static = self.encrypt(self.static_public.as_bytes())?;
-        let mut msg = enc_static;
+        let msg = enc_static;
 
         // se
         let remote_eph = self.remote_ephemeral.as_ref().ok_or(NoiseError::InvalidState)?;
@@ -246,8 +248,8 @@ impl NoiseHandshake {
         self.mix_key(se.as_bytes());
 
         // psk2
-        if let Some(psk) = &self.psk {
-            self.mix_psk(psk);
+        if let Some(psk) = self.psk {
+            self.mix_psk(&psk);
         }
 
         self.hash_concat(&msg);
@@ -266,7 +268,9 @@ impl NoiseHandshake {
 
         let enc_static = &msg[..48];
         let plain_static = self.decrypt(enc_static)?;
-        let initiator_static = PublicKey::from_bytes(plain_static.try_into().unwrap());
+        let mut static_bytes = [0u8; 32];
+        static_bytes.copy_from_slice(&plain_static[..32]);
+        let initiator_static = PublicKey::from_bytes(&static_bytes);
 
         // se
         let remote_eph = self.remote_ephemeral.as_ref().ok_or(NoiseError::InvalidState)?;
@@ -274,8 +278,8 @@ impl NoiseHandshake {
         self.mix_key(se.as_bytes());
 
         // psk2
-        if let Some(psk) = &self.psk {
-            self.mix_psk(psk);
+        if let Some(psk) = self.psk {
+            self.mix_psk(&psk);
         }
 
         self.hash_concat(msg);

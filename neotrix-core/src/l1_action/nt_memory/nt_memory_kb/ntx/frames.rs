@@ -246,6 +246,8 @@ pub enum FrameError {
     InvalidEncoding,
     #[error("解压失败")]
     DecompressFailed,
+    #[error("无效压缩类型")]
+    InvalidCompression,
     #[error("大小不匹配: expected {expected}, got {actual}")]
     SizeMismatch { expected: usize, actual: usize },
 }

@@ -5,9 +5,9 @@
 //!   - 历史 + 能力向量 → 优先级排序
 //!   - 每个诊断项 → ActionPlan 执行策略
 
-use crate::l5_cognition::nt_mind::nt_mind_autofixer::AutoFixer;
-use crate::neotrix::nt_mind_evolution_daemon::IssueType;
-use crate::l5_cognition::nt_mind::nt_mind_evolution_loop::{
+use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
+use crate::neotrix::evolution::evolution_daemon::IssueType;
+use crate::l5_cognition::nt_mind::evolution::evolution_loop::{
     Issue, ProjectSnapshot,
     EXCESS_UNWRAP_THRESHOLD,
     LARGE_FILE_THRESHOLD, MISSING_TESTS_THRESHOLD, TODO_LEFTOVERS_THRESHOLD,
@@ -50,7 +50,7 @@ pub enum ActionPlan {
 
 #[derive(Debug, Clone)]
 pub struct PrioritizedIssue {
-    pub issue: crate::l5_cognition::nt_mind::nt_mind_evolution_loop::Issue,
+    pub issue: crate::l5_cognition::nt_mind::evolution::evolution_loop::Issue,
     pub score: f64,
     pub plan: ActionPlan,
     pub composite_score: f64,
@@ -66,7 +66,7 @@ pub struct CodeUnderlyingIssue {
 }
 
 pub trait EvolutionLoopProvider {
-    fn get_snapshot(&self) -> crate::l5_cognition::nt_mind::nt_mind_evolution_loop::ProjectSnapshot;
+    fn get_snapshot(&self) -> crate::l5_cognition::nt_mind::evolution::evolution_loop::ProjectSnapshot;
     fn self_diagnose(&mut self) -> (Vec<String>, Vec<PrioritizedIssue>);
     fn on_fix_applied(&mut self);
 }
@@ -482,7 +482,7 @@ impl crate::core::nt_core_self_test::SelfTest for SelfDiagnose {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
-        let snapshot = crate::l5_cognition::nt_mind::nt_mind_evolution_loop::ProjectSnapshot {
+        let snapshot = crate::l5_cognition::nt_mind::evolution::evolution_loop::ProjectSnapshot {
             total_files: 10,
             total_lines: 1000,
             large_files: vec!["src/main.rs".into()],

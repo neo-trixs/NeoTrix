@@ -71,7 +71,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 2026-08-15 sweep absorption batch (Phase B): HDA 归因 / 自验证奖励 / 元 harness 优化 / 提示词库
     registry.register(Box::new(
-        crate::l5_cognition::nt_mind::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
+        crate::l5_cognition::nt_mind::evolution::evolution_loop::MetaHarnessOptimizer::new(),
     ));
     registry.register(Box::new(
         crate::l5_cognition::nt_mind::nt_mind_skill_engine::PromptLibrary::new(),
@@ -346,7 +346,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     ));
     // NT-MIND (5)
     registry.register(Box::new(
-        crate::l5_cognition::nt_mind::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
+        crate::l5_cognition::nt_mind::evolution::evolution_loop::MetaHarnessOptimizer::new(),
     ));
     registry.register(Box::new(
         crate::l5_cognition::nt_mind::nt_mind_skill_engine::PromptLibrary::new(),

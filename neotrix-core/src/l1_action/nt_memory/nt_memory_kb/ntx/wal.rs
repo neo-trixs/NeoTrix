@@ -16,6 +16,27 @@ pub enum WalEntryType {
     Checkpoint = 0x04,
 }
 
+/// WAL 压缩类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CompressionType {
+    None  = 0x00,
+    Zstd  = 0x01,
+    LZ4   = 0x02,
+}
+
+impl CompressionType {
+    /// 从 u8 转换
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0x00 => Some(Self::None),
+            0x01 => Some(Self::Zstd),
+            0x02 => Some(Self::LZ4),
+            _ => None,
+        }
+    }
+}
+
 /// WAL 条目
 #[derive(Debug, Clone)]
 pub struct WalEntry {
@@ -23,33 +44,96 @@ pub struct WalEntry {
     pub entry_type: WalEntryType,
     pub payload: Vec<u8>,
     pub checksum: u32,
+    pub compression: CompressionType,
+    pub uncompressed_size: u32,
 }
 
 impl WalEntry {
     pub fn append(frame: &KnowledgeFrame, sequence: u64) -> Self {
         let payload = frame.encode_bytes();
         let checksum = super::format::crc32(&payload);
-        Self { sequence, entry_type: WalEntryType::Append, payload, checksum }
+        Self {
+            sequence,
+            entry_type: WalEntryType::Append,
+            payload,
+            checksum,
+            compression: CompressionType::None,
+            uncompressed_size: 0,
+        }
+    }
+
+    /// 创建压缩条目
+    pub fn append_compressed(frame: &KnowledgeFrame, sequence: u64, compression: CompressionType) -> Self {
+        let payload = frame.encode_bytes();
+        let uncompressed_size = payload.len() as u32;
+        
+        let (compressed_payload, comp_type) = match compression {
+            CompressionType::None => (payload, CompressionType::None),
+            CompressionType::Zstd => {
+                match zstd::encode_all(&payload[..], 3) {
+                    Ok(compressed) => (compressed, CompressionType::Zstd),
+                    Err(_) => (payload, CompressionType::None),  // 回退到无压缩
+                }
+            }
+            CompressionType::LZ4 => {
+                let compressed = lz4_flex::compress_prepend_size(&payload);
+                (compressed, CompressionType::LZ4)
+            }
+        };
+        
+        let checksum = super::format::crc32(&compressed_payload);
+        Self {
+            sequence,
+            entry_type: WalEntryType::Append,
+            payload: compressed_payload,
+            checksum,
+            compression: comp_type,
+            uncompressed_size,
+        }
+    }
+
+    /// 解压条目
+    pub fn decompress_payload(&self) -> Result<Vec<u8>, FrameError> {
+        match self.compression {
+            CompressionType::None => Ok(self.payload.clone()),
+            CompressionType::Zstd => {
+                zstd::decode_all(&self.payload[..])
+                    .map_err(|_| FrameError::DecompressionFailed)
+            }
+            CompressionType::LZ4 => {
+                lz4_flex::decompress_size_prepended(&self.payload)
+                    .map_err(|_| FrameError::DecompressionFailed)
+            }
+        }
     }
 
     pub fn tombstone(frame_id: u64, sequence: u64) -> Self {
         let payload = frame_id.to_le_bytes().to_vec();
         let checksum = super::format::crc32(&payload);
-        Self { sequence, entry_type: WalEntryType::Delete, payload, checksum }
+        Self {
+            sequence,
+            entry_type: WalEntryType::Delete,
+            payload,
+            checksum,
+            compression: CompressionType::None,
+            uncompressed_size: 0,
+        }
     }
 
     pub fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(21 + self.payload.len());
+        let mut buf = Vec::with_capacity(26 + self.payload.len());
         buf.extend_from_slice(&self.sequence.to_le_bytes());
         buf.push(self.entry_type as u8);
         buf.extend_from_slice(&(self.payload.len() as u32).to_le_bytes());
+        buf.push(self.compression as u8);
+        buf.extend_from_slice(&self.uncompressed_size.to_le_bytes());
         buf.extend_from_slice(&self.payload);
         buf.extend_from_slice(&self.checksum.to_le_bytes());
         buf
     }
 
     pub fn decode(data: &[u8]) -> Result<Self, FrameError> {
-        if data.len() < 17 {
+        if data.len() < 22 {
             return Err(FrameError::Truncated);
         }
         let sequence = u64::from_le_bytes(data[0..8].try_into().unwrap());
@@ -61,12 +145,23 @@ impl WalEntry {
             _ => return Err(FrameError::InvalidFrameType),
         };
         let payload_len = u32::from_le_bytes(data[9..13].try_into().unwrap()) as usize;
-        if data.len() < 13 + payload_len + 4 {
+        let compression = CompressionType::from_u8(data[13])
+            .ok_or(FrameError::InvalidCompression)?;
+        let uncompressed_size = u32::from_le_bytes(data[14..18].try_into().unwrap());
+        
+        if data.len() < 18 + payload_len + 4 {
             return Err(FrameError::Truncated);
         }
-        let payload = data[13..13+payload_len].to_vec();
-        let checksum = u32::from_le_bytes(data[13+payload_len..17+payload_len].try_into().unwrap());
-        Ok(Self { sequence, entry_type, payload, checksum })
+        let payload = data[18..18+payload_len].to_vec();
+        let checksum = u32::from_le_bytes(data[18+payload_len..22+payload_len].try_into().unwrap());
+        Ok(Self {
+            sequence,
+            entry_type,
+            payload,
+            checksum,
+            compression,
+            uncompressed_size,
+        })
     }
 }
 
@@ -87,6 +182,21 @@ pub struct EmbeddedWal {
     sequence: u64,
     checkpoint_pos: u64,
     entry_count: u64,
+    default_compression: CompressionType,
+}
+
+impl Default for EmbeddedWal {
+    fn default() -> Self {
+        Self {
+            wal_offset: 0,
+            wal_size: 0,
+            write_pos: 0,
+            sequence: 0,
+            checkpoint_pos: 0,
+            entry_count: 0,
+            default_compression: CompressionType::Zstd,
+        }
+    }
 }
 
 impl EmbeddedWal {
@@ -99,7 +209,14 @@ impl EmbeddedWal {
             sequence: 0,
             checkpoint_pos: 0,
             entry_count: 0,
+            default_compression: CompressionType::Zstd,
         }
+    }
+
+    /// 设置默认压缩类型
+    pub fn with_compression(mut self, compression: CompressionType) -> Self {
+        self.default_compression = compression;
+        self
     }
 }
 
@@ -133,13 +250,21 @@ impl EmbeddedWal {
             entry_count += 1;
         }
 
-        Ok(Self { wal_offset, wal_size, write_pos, sequence, checkpoint_pos, entry_count })
+        Ok(Self {
+            wal_offset,
+            wal_size,
+            write_pos,
+            sequence,
+            checkpoint_pos,
+            entry_count,
+            default_compression: CompressionType::Zstd,
+        })
     }
 
     /// 追加条目 (预分配缓冲区优化)
     pub fn append(&mut self, file: &mut File, frame: &KnowledgeFrame) -> std::io::Result<u64> {
         self.sequence += 1;
-        let entry = WalEntry::append(frame, self.sequence);
+        let entry = WalEntry::append_compressed(frame, self.sequence, self.default_compression);
         // 预分配条目缓冲区 (避免多次 seek)
         let bytes = entry.encode();
         let needed = 4 + bytes.len() as u64;
@@ -244,7 +369,7 @@ impl EmbeddedWal {
         Ok(entries)
     }
 
-    /// 恢复: 重放未检查点条目
+    /// 恢复: 重放未检查点条目 (自动解压)
     pub fn recover(&self, file: &mut File) -> std::io::Result<Vec<WalEntry>> {
         file.seek(SeekFrom::Start(self.wal_offset))?;
         let mut entries = Vec::new();
@@ -270,6 +395,31 @@ impl EmbeddedWal {
         }
 
         Ok(entries)
+    }
+
+    /// 恢复并解压条目 (返回解压后的 payload)
+    pub fn recover_decompressed(&self, file: &mut File) -> std::io::Result<Vec<WalEntry>> {
+        let entries = self.recover(file)?;
+        let mut decompressed = Vec::with_capacity(entries.len());
+        
+        for entry in entries {
+            match entry.decompress_payload() {
+                Ok(payload) => {
+                    decompressed.push(WalEntry {
+                        payload,
+                        compression: CompressionType::None,
+                        uncompressed_size: 0,
+                        ..entry
+                    });
+                }
+                Err(_) => {
+                    // 解压失败, 保留原始条目
+                    decompressed.push(entry);
+                }
+            }
+        }
+        
+        Ok(decompressed)
     }
 
     pub fn flush(&self, _file: &mut File) -> std::io::Result<()> {
@@ -340,5 +490,83 @@ mod tests {
         assert_eq!(entries.len(), 20);
         assert!(!wal.needs_checkpoint());
         assert_eq!(wal.stats().pending_bytes, 0);
+    }
+
+    #[test]
+    fn test_wal_compression_zstd() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("test.ntx");
+        let mut file = File::create(&path).unwrap();
+
+        let mut header = NtxHeader::default();
+        header.wal_size = 1024 * 1024;
+        header.write_to(&mut file).unwrap();
+        file.seek(SeekFrom::Start(header.wal_offset)).unwrap();
+        file.write_all(&vec![0u8; header.wal_size as usize]).unwrap();
+
+        let mut wal = EmbeddedWal::open(&mut file, &header)
+            .unwrap()
+            .with_compression(CompressionType::Zstd);
+
+        // 写入可压缩的数据
+        let data = "compress this data ".repeat(100);
+        let mut node_id = [0u8; 36];
+        node_id[0] = 1;
+        let frame = KnowledgeFrame::new(1, node_id, FrameType::Node, data.as_bytes(), Encoding::Raw, None);
+        
+        wal.append(&mut file, &frame).unwrap();
+
+        // 恢复并验证
+        let entries = wal.recover(&mut file).unwrap();
+        assert_eq!(entries.len(), 1);
+        
+        // 验证压缩有效
+        let entry = &entries[0];
+        assert_eq!(entry.compression, CompressionType::Zstd);
+        assert!(entry.uncompressed_size > 0);
+        assert!(entry.payload.len() < entry.uncompressed_size as usize);
+        
+        // 验证解压正确
+        let decompressed = entry.decompress_payload().unwrap();
+        assert_eq!(decompressed.len(), entry.uncompressed_size as usize);
+    }
+
+    #[test]
+    fn test_wal_compression_lz4() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("test.ntx");
+        let mut file = File::create(&path).unwrap();
+
+        let mut header = NtxHeader::default();
+        header.wal_size = 1024 * 1024;
+        header.write_to(&mut file).unwrap();
+        file.seek(SeekFrom::Start(header.wal_offset)).unwrap();
+        file.write_all(&vec![0u8; header.wal_size as usize]).unwrap();
+
+        let mut wal = EmbeddedWal::open(&mut file, &header)
+            .unwrap()
+            .with_compression(CompressionType::LZ4);
+
+        // 写入可压缩的数据
+        let data = "compress this data ".repeat(100);
+        let mut node_id = [0u8; 36];
+        node_id[0] = 1;
+        let frame = KnowledgeFrame::new(1, node_id, FrameType::Node, data.as_bytes(), Encoding::Raw, None);
+        
+        wal.append(&mut file, &frame).unwrap();
+
+        // 恢复并验证
+        let entries = wal.recover(&mut file).unwrap();
+        assert_eq!(entries.len(), 1);
+        
+        // 验证压缩有效
+        let entry = &entries[0];
+        assert_eq!(entry.compression, CompressionType::LZ4);
+        assert!(entry.uncompressed_size > 0);
+        assert!(entry.payload.len() < entry.uncompressed_size as usize);
+        
+        // 验证解压正确
+        let decompressed = entry.decompress_payload().unwrap();
+        assert_eq!(decompressed.len(), entry.uncompressed_size as usize);
     }
 }

@@ -1552,7 +1552,7 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(meta_monitor));
         self_tests.register(Box::new(meta_cog_loop));
         self_tests.register(Box::new(
-            crate::l5_cognition::nt_mind::nt_mind_self_diagnose::SelfDiagnose,
+            crate::l5_cognition::nt_mind::evolution::self_diagnose::SelfDiagnose,
         ));
         self_tests.register(Box::new(
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),

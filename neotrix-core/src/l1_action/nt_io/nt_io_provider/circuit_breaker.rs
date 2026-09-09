@@ -26,7 +26,7 @@ impl ProviderBreaker {
     }
 
     pub fn state(&self) -> BreakerState {
-        self.inner.state()
+        self.inner.state
     }
 
     pub fn is_available(&self) -> bool {
@@ -54,7 +54,7 @@ impl ProviderBreaker {
     }
 
     pub fn force_open_secs(&mut self, cooldown_secs: u64) {
-        self.inner.state = BreakerState::Open { since: None };
+        self.inner.state = BreakerState::Open;
         self.inner.cooldown = Duration::from_secs(cooldown_secs);
         self.inner.last_state_change = Some(Instant::now());
         self.inner.half_open_probes_used = 0;
@@ -83,7 +83,7 @@ impl ProviderBreaker {
 
         let recent_failures = self.sliding_window.iter().filter(|&&s| !s).count();
         if recent_failures >= self.inner.failure_threshold as usize {
-            self.inner.state = BreakerState::Open { since: None };
+            self.inner.state = BreakerState::Open;
             self.inner.last_state_change = Some(Instant::now());
         } else {
             self.inner.on_failure();
@@ -100,11 +100,13 @@ impl ProviderBreaker {
     }
 
     pub fn cooldown_reset(&mut self) {
-        if self.inner.state == BreakerState::Open { .. } {
-            let elapsed = self.inner.last_state_change.map(|t| t.elapsed()).unwrap_or_default();
-            if elapsed >= self.inner.cooldown {
-                self.inner.state = BreakerState::HalfOpen;
-                self.inner.last_state_change = Some(Instant::now());
+        if self.inner.state == BreakerState::Open {
+            if let Some(t) = self.inner.last_state_change {
+                let elapsed = t.elapsed();
+                if elapsed >= self.inner.cooldown {
+                    self.inner.state = BreakerState::HalfOpen;
+                    self.inner.last_state_change = Some(Instant::now());
+                }
             }
         }
     }

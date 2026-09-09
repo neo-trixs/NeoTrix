@@ -61,7 +61,7 @@ impl Default for ValueGateConfig {
 
 /// 熔断器状态。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CircuitBreaker {
+struct ValueGateBreaker {
     consecutive_interceptions: usize,
     last_trip_time: Option<i64>,
     is_open: bool,
@@ -72,7 +72,7 @@ pub struct ValueGate {
     compass: ValueCompassRuntime,
     learning: Option<ValueLearningEngine>,
     config: ValueGateConfig,
-    circuit_breaker: Arc<RwLock<CircuitBreaker>>,
+    circuit_breaker: Arc<RwLock<ValueGateBreaker>>,
     interception_log: Arc<RwLock<VecDeque<InterceptionRecord>>>,
     max_log_size: usize,
 }
@@ -87,7 +87,7 @@ impl ValueGate {
             compass,
             learning,
             config,
-            circuit_breaker: Arc::new(RwLock::new(CircuitBreaker {
+            circuit_breaker: Arc::new(RwLock::new(ValueGateBreaker {
                 consecutive_interceptions: 0,
                 last_trip_time: None,
                 is_open: false,

@@ -568,7 +568,7 @@ impl BackgroundLoop {
             kb_pipeline.attach_kb(kb_ref.clone());
         }
         let kb_for_nexus = self.kb.clone();
-        let healer_registry = crate::l5_cognition::nt_mind::nt_mind_autofixer::HealerRegistry::new();
+        let healer_registry = crate::l5_cognition::nt_mind::evolution::autofixer::HealerRegistry::new();
 
         let this = Arc::new(Mutex::new(BackgroundLoopHandle {
             brain: self.brain.clone(),
@@ -933,7 +933,7 @@ pub struct BackgroundLoopHandle {
     daemon: Option<EvolutionDaemon>,
     skill_engine: SkillEngine,
     /// G28 自维护巡检 healers (topics/code-health 吸收) — 多维度代码健康巡检。
-    healer_registry: crate::l5_cognition::nt_mind::nt_mind_autofixer::HealerRegistry,
+    healer_registry: crate::l5_cognition::nt_mind::evolution::autofixer::HealerRegistry,
     /// 统一会话路由器 (G18, novu 吸收) — agent↔渠道统一会话模型:
     /// 入站归一 → capability 路由 → digest 合并出站。周期 flush 清出超窗摘要。
 //     session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter,

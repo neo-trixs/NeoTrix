@@ -18,6 +18,8 @@ pub mod sync;
 pub mod search_bridge;
 pub mod ntx_integration;
 pub mod benchmark;
+#[cfg(test)]
+mod integration_test;
 
 /// Trait for NTX segment types that can be serialized via `write_to`.
 pub trait NtxWritable {
@@ -521,6 +523,7 @@ impl NtxFile {
     // ── Drop 实现 ──────────────────────────────────────
 
     /// Drop: 刷新写缓冲区 + 尝试提交
+    #[allow(dead_code)]
     fn drop(&mut self) {
         // 尝试刷新写缓冲区
         if !self.write_buffer.is_empty() {
@@ -634,6 +637,18 @@ impl NtxFile {
         // 最终大小验证
         if total_bytes_read > desc.length {
             eprintln!("[NTX] load_frames: 段大小不匹配: 实际读取 {} > 段长度 {}", total_bytes_read, desc.length);
+        }
+
+        // 段完整性验证: SHA-256 校验
+        if !desc.checksum.iter().all(|&b| b == 0) {
+            // 读取段数据进行校验
+            file.seek(SeekFrom::Start(desc.offset))?;
+            let mut segment_data = vec![0u8; desc.length as usize];
+            if file.read_exact(&mut segment_data).is_ok() {
+                if !desc.verify(&segment_data) {
+                    eprintln!("[NTX] load_frames: 段 SHA-256 校验失败");
+                }
+            }
         }
 
         if errors > 0 {

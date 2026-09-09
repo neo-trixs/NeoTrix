@@ -131,7 +131,7 @@ impl LoadBalancer {
         let mut entropy = 0.0;
         for &f in &load {
             if f > 1e-10 {
-                entropy -= *f * f.ln();
+                entropy -= f * f.ln();
             }
         }
         entropy

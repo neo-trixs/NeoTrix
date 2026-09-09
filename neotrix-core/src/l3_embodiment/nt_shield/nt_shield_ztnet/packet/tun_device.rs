@@ -2,8 +2,6 @@
 //!
 //! 跨平台TUN设备封装 (macOS/Linux/Windows)
 
-use std::io::{Read, Write};
-
 /// TUN设备配置
 #[derive(Debug, Clone)]
 pub struct TunConfig {

@@ -72,12 +72,12 @@ impl InfraBreaker {
                     self.recent_results.remove(0);
                 }
                 if self.error_rate() >= self.config.error_threshold {
-                    self.inner.state = BreakerState::Open { since: None };
+                    self.inner.state = BreakerState::Open;
                     self.inner.last_state_change = Some(std::time::Instant::now());
                     self.open_since = Some(now);
                 }
             }
-            BreakerState::Open { .. } => {
+            BreakerState::Open => {
                 if let Some(since) = self.open_since {
                     if now - since >= self.config.open_duration_ms {
                         self.inner.state = BreakerState::HalfOpen;
@@ -94,7 +94,7 @@ impl InfraBreaker {
                         self.inner.state = BreakerState::Closed;
                         self.recent_results.clear();
                     } else {
-                        self.inner.state = BreakerState::Open { since: None };
+                        self.inner.state = BreakerState::Open;
                         self.inner.last_state_change = Some(std::time::Instant::now());
                         self.open_since = Some(now);
                     }
@@ -207,7 +207,7 @@ mod tests {
         b.record_result(false);
         b.record_result(true);
         b.record_result(false); // 75% error → open
-        assert_eq!(b.state(), BreakerState::Open { since: None });
+        assert_eq!(b.state(), BreakerState::Open);
         assert!(!b.allow());
     }
 
@@ -222,7 +222,7 @@ mod tests {
         let mut b = InfraBreaker::new(config);
         b.record_result(false);
         b.record_result(false); // open
-        assert_eq!(b.state(), BreakerState::Open { since: None });
+        assert_eq!(b.state(), BreakerState::Open);
         // After duration, allow → half-open
         b.record_result(true); // triggers half-open check
         assert!(b.allow() || b.state() == BreakerState::HalfOpen);

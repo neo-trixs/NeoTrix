@@ -28,20 +28,13 @@ pub mod nt_act_voice;
 // Standalone modules
 // ============================================================================
 
-pub mod nt_act_action_cache;
-
 pub mod nt_act_3d_dev;
 pub mod nt_act_3d_render;
 
-pub mod nt_act_disk_guard;
-
-pub mod nt_act_media;
-
-pub mod nt_act_sandbox;
-
 pub mod nt_act_seo;
 
-pub mod nt_act_security;
+// Backward-compat re-exports for moved modules
+pub use actions::{action_cache as nt_act_action_cache, disk_guard as nt_act_disk_guard, media as nt_act_media, sandbox as nt_act_sandbox, security as nt_act_security};
 
 // 通用能力模块 (从漫剧专用重构为通用)
 pub mod resource_budget;      // 资源预算管理 (原 cost_manager)

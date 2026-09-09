@@ -2,7 +2,7 @@
 //! Verifies the self-healing loop: monitoring → diagnosis → heal → retest
 
 use crate::core::nt_core_self::self_audit::{scan_system_health, scan_disk_pressure, scan_memory_pressure, scan_build_status, scan_test_flakiness, AuditSeverity};
-use crate::l5_cognition::nt_mind::nt_mind_autofixer::HealerRegistry;
+use crate::l5_cognition::nt_mind::evolution::autofixer::HealerRegistry;
 use std::fs;
 use std::env;
 

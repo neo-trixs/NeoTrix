@@ -3071,7 +3071,7 @@ impl BrainStage for SelfTestStage {
             cm
         }));
         registry.register(Box::new(
-            crate::l5_cognition::nt_mind::nt_mind_self_diagnose::SelfDiagnose,
+            crate::l5_cognition::nt_mind::evolution::self_diagnose::SelfDiagnose,
         ));
         registry.register(Box::new(
             crate::l1_action::nt_memory::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),

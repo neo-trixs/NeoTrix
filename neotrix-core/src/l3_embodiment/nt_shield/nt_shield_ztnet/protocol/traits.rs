@@ -196,7 +196,7 @@ impl<P: NtProtocol> PeerDemux<P> {
     }
 
     /// 移除不活跃的Peer
-    pub fn prune_inactive(&mut self, threshold: Instant) {
+    pub fn prune_inactive(&mut self, _threshold: Instant) {
         self.peers.retain(|_, peer| {
             matches!(peer.state_summary(), ProtocolState::Established | ProtocolState::Handshaking)
         });

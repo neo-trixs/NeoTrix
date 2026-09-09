@@ -1,6 +1,7 @@
 pub struct PluginSandbox {
     allowed_hosts: Vec<String>,
     max_requests_per_minute: u32,
+    #[allow(dead_code)]
     timeout_ms: u64,
 }
 

@@ -4,7 +4,7 @@
 
 use std::net::IpAddr;
 use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 
 /// 扫描配置
 #[derive(Debug, Clone)]

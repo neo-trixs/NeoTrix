@@ -5,8 +5,8 @@
 //!
 //! 真实实现来自 L1 nt_act_goal 与 L2 nt_world_infer，替代原本的本地存根。
 
-use crate::l5_cognition::nt_mind::nt_mind_autofixer::AutoFixer;
-use crate::l5_cognition::nt_mind::nt_mind_evolution_loop::EvolutionLoop;
+use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
+use crate::l5_cognition::nt_mind::evolution::evolution_loop::EvolutionLoop;
 use crate::neotrix::nt_act_goal::{
     BehavioralVerifier, CoverageAnalyzer, AutoGoalGenerator, RLFeedbackLoop,
     EvolutionGoal, GoalCategory,

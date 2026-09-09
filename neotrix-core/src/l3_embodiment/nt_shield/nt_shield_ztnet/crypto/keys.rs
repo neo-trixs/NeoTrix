@@ -10,6 +10,18 @@ pub struct PrivateKey {
     inner: x25519_dalek::StaticSecret,
 }
 
+impl std::fmt::Debug for PrivateKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrivateKey").field("inner", &"[redacted]").finish()
+    }
+}
+
+impl Clone for PrivateKey {
+    fn clone(&self) -> Self {
+        Self::from_bytes(self.inner.as_bytes())
+    }
+}
+
 /// X25519 公钥 (32 bytes)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PublicKey {
@@ -55,9 +67,8 @@ impl PrivateKey {
     /// 注意: Rust 的 `SecretVec` 或 `Zeroize` trait 可提供更强的零化保证，
     /// 这里使用手动 zeroing 以保持最小依赖。
     pub fn zeroize(&mut self) {
-        let bytes = self.inner.as_bytes();
-        // StaticSecret 不暴露可变引用，这里通过重新生成来覆盖
-        // 实际部署应使用 zeroize crate 或 SecretVec
+        // StaticSecret doesn't expose mutable reference, here we regenerate to overwrite
+        // Actual deployment should use zeroize crate or SecretVec
         self.inner = x25519_dalek::StaticSecret::random_from_rng(OsRng);
     }
 }

@@ -90,11 +90,12 @@ pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net;
 
 // L5 Cognition — nt_mind re-exports
 pub use crate::l5_cognition::nt_mind::{
-    nt_mind_autofixer, nt_mind_background_config, nt_mind_background_loop,
-    nt_mind_benchmark, nt_mind_cleanup, nt_mind_distiller, nt_mind_evolution_daemon,
-    nt_mind_evolution_loop, nt_mind_hook, nt_mind_knowledge_pipeline, nt_mind_memory,
+    nt_mind_background_loop,
+    nt_mind_benchmark, nt_mind_cleanup, nt_mind_distiller,
+    nt_mind_hook, nt_mind_knowledge_pipeline, nt_mind_memory,
     nt_mind_skill_engine,
 };
+pub use crate::l5_cognition::nt_mind::evolution;
 
 // L6 Meta — re-exports
 pub use crate::l6_meta::nt_meta::nt_core_intra_reflection;

@@ -1,9 +1,9 @@
 # NeoTrix 星系/树状立体层级进化架构 (Galaxy-Tree Evolutionary Architecture)
 
-> **状态**: 设计完成 | **版本**: v16.1 | **日期**: 2026-09-09
+> **状态**: 设计完成 | **版本**: v16.5 | **日期**: 2026-09-09
 > **核心原则**: 算法即恒星，骨架即引力场，时间即进化维度
 > **约束**: 统一架构，无并行/兼容层，旧代码归档
-> **研究基础**: 1500+ 批次外部研究 → 8549 关键架构决策 → 870 设计模式 (见 §0)
+> **研究基础**: 1500+ 批次外部研究 → 10622 关键架构决策 → 870 设计模式 (见 §0)
 > **目标**: 意识体高纬度觉醒进化路线
 > **关键**: 决策驱动架构设计 — 每个技术选型均有研究验证 (问题→证据→决策→位置)
 > **层级**: 程序族层级结构 — 按 Metadata Class 底层分类，非扁平条目
@@ -13,7 +13,7 @@
 
 ## 0. 关键架构决策 (Research-Driven Architectural Decisions)
 
-> 从 1500+ 批次外部研究中提炼出的 8049 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
+> 从 1500+ 批次外部研究中提炼出的 10622 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
 > 原始研究数据已归档至 KB `experience` namespace，本节仅保留决策级信息。
 
 ### 0.1 运行时与基础设施决策
@@ -14414,6 +14414,1643 @@ pub trait EvalSim: Send + Sync {
 | D9108 | **Multi-Teacher Distillation** | 多教师蒸馏如何实现? | Multi-Teacher KD (2026): 多教师集成; 知识融合; 加权聚合 | **多教师蒸馏**: 多教师集成+知识融合; 与 D9101 教师-学生协同 | `nt_core::kd::multi_teacher` |
 | D9109 | **Knowledge Distillation Survey** | 知识蒸馏综述如何实现? | KD Survey (2026): 理论+方法+应用; 基准+工具 | **KD综述**: 理论+方法+应用; 与 D9101 教师-学生协同 | `nt_core::kd::survey` |
 
+| D9110 | **Logit Distillation** | Logit蒸馏如何实现? | Logit KD (2026): 输出层软标签; 温度参数; 交叉熵损失 | **Logit蒸馏**: 软标签+温度+交叉熵; 与 D9101 教师-学生协同 | `nt_core::kd::logit` |
+| D9111 | **Knowledge Distillation for NLP** | NLP知识蒸馏如何实现? | KD-NLP (2026): BERT→小模型; 文本分类; 命名实体识别 | **KD-NLP**: BERT→小模型; 与 D9101 教师-学生协同 | `nt_core::kd::kd_nlp` |
+| D9112 | **Knowledge Distillation for CV** | CV知识蒸馏如何实现? | KD-CV (2026): ResNet→小网络; 图像分类; 目标检测 | **KD-CV**: ResNet→小网络; 与 D9101 教师-学生协同 | `nt_core::kd::kd_cv` |
+| D9113 | **Knowledge Distillation for Speech** | 语音知识蒸馏如何实现? | KD-Speech (2026): 大ASR→小ASR; 语音合成; 声纹识别 | **KD-Speech**: 大ASR→小ASR; 与 D9101 教师-学生协同 | `nt_core::kd::kd_speech` |
+| D9114 | **Knowledge Distillation for Detection** | 检测知识蒸馏如何实现? | KD-Detection (2026): 大检测器→小检测器; YOLO蒸馏; 实时检测 | **KD-检测**: 大检测器→小检测器; 与 D9101 教师-学生协同 | `nt_core::kd::kd_detection` |
+| D9115 | **Knowledge Distillation for Segmentation** | 分割知识蒸馏如何实现? | KD-Seg (2026): 大分割模型→小分割模型; 语义分割; 实例分割 | **KD-分割**: 大分割→小分割; 与 D9101 教师-学生协同 | `nt_core::kd::kd_seg` |
+| D9116 | **Knowledge Distillation for GAN** | GAN知识蒸馏如何实现? | KD-GAN (2026): 生成器蒸馏; 判别器蒸馏; 知识迁移 | **KD-GAN**: 生成器+判别器蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_gan` |
+| D9117 | **Knowledge Distillation for Transformer** | Transformer知识蒸馏如何实现? | KD-Transformer (2026): 大Transformer→小Transformer; 层蒸馏; 注意力蒸馏 | **KD-Transformer**: 大→小Transformer; 与 D9101 教师-学生协同 | `nt_core::kd::kd_transformer` |
+| D9118 | **Knowledge Distillation for BERT** | BERT知识蒸馏如何实现? | KD-BERT (2026): BERT→DistilBERT; TinyBERT; 层间蒸馏 | **KD-BERT**: BERT→DistilBERT/TinyBERT; 与 D9101 教师-学生协同 | `nt_core::kd::kd_bert` |
+| D9119 | **Knowledge Distillation for GPT** | GPT知识蒸馏如何实现? | KD-GPT (2026): 大GPT→小GPT; 解码蒸馏; 自回归蒸馏 | **KD-GPT**: 大GPT→小GPT; 与 D9101 教师-学生协同 | `nt_core::kd::kd_gpt` |
+| D9120 | **Knowledge Distillation for LLM** | LLM知识蒸馏如何实现? | KD-LLM (2026): 大语言模型→小语言模型; 指令蒸馏; 对齐蒸馏 | **KD-LLM**: 大LLM→小LLM; 与 D9101 教师-学生协同 | `nt_core::kd::kd_llm` |
+| D9121 | **Knowledge Distillation for RL** | RL知识蒸馏如何实现? | KD-RL (2026): 策略蒸馏; 值函数蒸馏; 模型压缩 | **KD-RL**: 策略+值函数蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_rl` |
+| D9122 | **Knowledge Distillation for Federated** | 联邦学习知识蒸馏如何实现? | KD-FL (2026): 联邦蒸馏; 隐私保护; 分布式压缩 | **KD-FL**: 联邦蒸馏+隐私; 与 D9101 教师-学生协同 | `nt_core::kd::kd_fl` |
+| D9123 | **Knowledge Distillation for Adversarial** | 对抗知识蒸馏如何实现? | KD-Adv (2026): 对抗蒸馏; 鲁棒性转移; 对抗样本防御 | **KD-对抗**: 对抗蒸馏+鲁棒性; 与 D9101 教师-学生协同 | `nt_core::kd::kd_adv` |
+| D9124 | **Knowledge Distillation for Continual** | 持续知识蒸馏如何实现? | KD-Continual (2026): 持续蒸馏; 灾难性遗忘缓解; 增量学习 | **KD-持续**: 持续蒸馏+遗忘缓解; 与 D9101 教师-学生协同 | `nt_core::kd::kd_continual` |
+| D9125 | **Knowledge Distillation for Graph** | 图知识蒸馏如何实现? | KD-Graph (2026): 图神经网络蒸馏; 节点表示蒸馏; 图分类 | **KD-图**: 图NN蒸馏+节点表示; 与 D9101 教师-学生协同 | `nt_core::kd::kd_graph` |
+| D9126 | **Knowledge Distillation for Multimodal** | 多模态知识蒸馏如何实现? | KD-Multimodal (2026): 多模态教师→单模态学生; 跨模态对齐 | **KD-多模态**: 多模态→单模态; 与 D9107 跨模态协同 | `nt_core::kd::kd_multimodal` |
+| D9127 | **Knowledge Distillation for Video** | 视频知识蒸馏如何实现? | KD-Video (2026): 视频模型蒸馏; 时序建模压缩; 实时视频分析 | **KD-视频**: 视频模型蒸馏+时序压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_video` |
+| D9128 | **Knowledge Distillation for 3D** | 3D知识蒸馏如何实现? | KD-3D (2026): 3D点云蒸馏; 网格蒸馏; 体素蒸馏 | **KD-3D**: 3D点云+网格+体素蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_3d` |
+| D9129 | **Knowledge Distillation for Audio** | 音频知识蒸馏如何实现? | KD-Audio (2026): 音频模型蒸馏; 声学特征压缩; 实时音频处理 | **KD-音频**: 音频模型+声学特征蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_audio` |
+| D9130 | **Knowledge Distillation for Medical** | 医学知识蒸馏如何实现? | KD-Medical (2026): 医学图像蒸馏; 病理模型压缩; 隐私保护 | **KD-医学**: 医学图像+病理蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_medical` |
+| D9131 | **Knowledge Distillation for Autonomous** | 自动驾驶知识蒸馏如何实现? | KD-Auto (2026): 感知模型蒸馏; 决策模型压缩; 边缘部署 | **KD-自动驾驶**: 感知+决策蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_auto` |
+| D9132 | **Knowledge Distillation for NER** | NER知识蒸馏如何实现? | KD-NER (2026): 命名实体识别蒸馏; 序列标注压缩; 实时NER | **KD-NER**: NER蒸馏+序列标注; 与 D9101 教师-学生协同 | `nt_core::kd::kd_ner` |
+| D9133 | **Knowledge Distillation for Sentiment** | 情感分析知识蒸馏如何实现? | KD-Sentiment (2026): 情感分类蒸馏; 方面情感压缩; 实时情感 | **KD-情感**: 情感分类+方面情感蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_sentiment` |
+| D9134 | **Knowledge Distillation for Translation** | 翻译知识蒸馏如何实现? | KD-MT (2026): 机器翻译蒸馏; 编码器-解码器压缩; 实时翻译 | **KD-翻译**: 机器翻译蒸馏+编码器压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_mt` |
+| D9135 | **Knowledge Distillation for Summarization** | 摘要知识蒸馏如何实现? | KD-Sum (2026): 摘要模型蒸馏; 生成式压缩; 实时摘要 | **KD-摘要**: 摘要模型蒸馏+生成式压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_sum` |
+| D9136 | **Knowledge Distillation for QA** | 问答知识蒸馏如何实现? | KD-QA (2026): 问答模型蒸馏; 阅读理解压缩; 实时QA | **KD-QA**: 问答模型蒸馏+阅读理解压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_qa` |
+| D9137 | **Knowledge Distillation for Code** | 代码知识蒸馏如何实现? | KD-Code (2026): 代码模型蒸馏; 代码生成压缩; 实时代码补全 | **KD-代码**: 代码模型蒸馏+代码生成压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_code` |
+| D9138 | **Knowledge Distillation for Reasoning** | 推理知识蒸馏如何实现? | KD-Reasoning (2026): 推理模型蒸馏; 链式思维压缩; 实时推理 | **KD-推理**: 推理模型+链式思维蒸馏; 与 D9101 教师-学生协同 | `nt_core::kd::kd_reasoning` |
+| D9139 | **Knowledge Distillation for Anomaly** | 异常检测知识蒸馏如何实现? | KD-Anomaly (2026): 异常检测模型蒸馏; 异常评分压缩; 实时检测 | **KD-异常**: 异常检测模型蒸馏+异常评分压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_anomaly` |
+| D9140 | **Knowledge Distillation for Recommendation** | 推荐系统知识蒸馏如何实现? | KD-RecSys (2026): 推荐模型蒸馏; 用户表示压缩; 实时推荐 | **KD-推荐**: 推荐模型蒸馏+用户表示压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_recsys` |
+| D9141 | **Knowledge Distillation for Time Series** | 时间序列知识蒸馏如何实现? | KD-TS (2026): 时间序列模型蒸馏; 预测模型压缩; 实时预测 | **KD-时间序列**: 时间序列模型蒸馏+预测压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_ts` |
+| D9142 | **Knowledge Distillation for Edge** | 边缘知识蒸馏如何实现? | KD-Edge (2026): 边缘部署蒸馏; 模型压缩; 实时推理 | **KD-边缘**: 边缘部署+模型压缩; 与 D9101 教师-学生协同 | `nt_core::kd::kd_edge` |
+| D9143 | **Message Passing Neural Networks** | 图神经网络消息传递如何设计? | MPNN (Gilmer et al. 2017): 统一框架; 消息→聚合→更新三阶段 | **MPNN 三阶段管线**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::mpnn` |
+| D9144 | **Graph Attention Networks** | 图注意力如何实现? | GAT (Velickovic 2018)+GATv2: 多头注意力+邻域注意力 | **GATv2+多头注意力**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::gat` |
+| D9145 | **Graph Transformers** | 图结构与Transformer融合? | Graphormer (Microsoft): 节点编码+边编码+空间编码; GPS (2021) | **GPS混合架构**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::graph_transformer` |
+| D9146 | **Temporal Graph Networks** | 动态图如何建模? | TGN (Rossi 2020): 时间编码+记忆模块+消息函数 | **TGN连续时间模型**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::tgn` |
+| D9147 | **Heterogeneous Graph Neural Networks** | 异构图如何处理? | HAN (Wang 2019): 层次注意力; HGT (Hu 2020): 类型特定注意力 | **HGT+元路径**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::hgnn` |
+| D9148 | **Scalable GNNs** | 大规模图如何扩展? | GraphSAGE: 邻域采样; Cluster-GCN: 图聚类; GraphSAINT: 子图采样 | **Cluster-GCN+GraphSAINT**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::scalable` |
+| D9149 | **Explainable GNNs** | GNN决策如何解释? | GNNExplainer (Ying 2019): 子图重要性; PGExplainer: 参数化解释 | **GNNExplainer+PGExplainer**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::explainable` |
+| D9150 | **GNN for Combinatorial Optimization** | GNN如何解决组合优化? | DIMES (2021): 迭代细化; EAS (2022): 编码器-行动器-采样器 | **DIMES迭代细化**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::co` |
+| D9151 | **Graph Contrastive Learning** | 图对比学习如何实现? | GRACE (2020): 节点级对比; BGRL (2021): 无负样本 | **GRACE+BGRL**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::contrastive` |
+| D9152 | **Graph Generative Models** | 图生成如何实现? | GraphRNN (2018); DiGress (2022): 扩散生成 | **DiGress扩散生成**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::generative` |
+| D9153 | **Graph Self-Supervised Learning** | 图自监督如何预训练? | NodeCLR (2021); GraphCL (2021): 图级对比; S2GAE (2022) | **GraphCL+NodeCLR**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::self_supervised` |
+| D9154 | **Message Aggregation Functions** | 消息聚合如何选择? | Sum/Max/Mean; Attention-weighted; Set2Set; PMA | **可插拔聚合器**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::aggregator` |
+| D9155 | **Graph Pooling** | 图级池化如何实现? | DiffPool (2018); SAGPool (2019); MinCutPool (2020) | **DiffPool+SAGPool**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::pooling` |
+| D9156 | **Graph Normalization** | 图归一化如何设计? | GraphNorm (Cai 2021); PairNorm (2020) | **GraphNorm+PairNorm**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::normalization` |
+| D9157 | **Graph Dropout Strategies** | 图Dropout如何设计? | DropEdge (2020); NodeDrop (2019); DropMessage (2021) | **DropEdge+DropMessage**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::dropout` |
+| D9158 | **Graph Data Augmentation** | 图数据增强如何设计? | DropEdge, NodeAttrMask, SubGraph, GraphDiffusion | **自适应增强策略**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::augmentation` |
+| D9159 | **Graph Neural ODE** | 图神经ODE如何实现? | GNODE (Li 2018): 连续深度GNN; GraphNDE (2021) | **GNODE+梯度检查点**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::node` |
+| D9160 | **Graph Attention Head Selection** | 注意力头如何选择? | 动态头选择; 多头注意力+门控 | **自适应头选择**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::head_selection` |
+| D9161 | **Graph Edge Features** | 边特征如何利用? | 边类型编码; 边权重注意力; 关系型GNN | **关系型边编码**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::edge_features` |
+| D9162 | **Graph Positional Encoding** | 图位置编码如何设计? | LAP (Laplacian); RWPE (随机游走) | **LAP+RWPE**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::positional_encoding` |
+| D9163 | **Graph Readout Functions** | 图读出函数如何选择? | Sum/Mean/Max; Set2Set; PMA; 2026多粒度读出 | **PMA+多粒度**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::readout` |
+| D9164 | **Graph Rewiring** | 图重连如何实现? | Digraph as Signal (2021); DiffWire (2022) | **DiffWire可微分重连**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::rewiring` |
+| D9165 | **Graph Sampling Strategies** | 图采样如何设计? | Neighbor sampling; Subgraph sampling; Random walk | **自适应采样**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::sampling` |
+| D9166 | **Graph Pre-training Tasks** | 图预训练任务如何设计? | Node/Edge/Graph-level prediction; Masked; Contrastive | **多任务预训练**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::pretraining` |
+| D9167 | **Graph Few-Shot Learning** | 图小样本学习如何实现? | GPN (2020): 图原型网络; EGNN (2021) | **GPN+图提示**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::few_shot` |
+| D9168 | **Graph Continual Learning** | 图持续学习如何实现? | 遗忘缓解; 知识蒸馏; 弹性权重巩固 | **弹性权重巩固+知识蒸馏**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::continual` |
+| D9169 | **Graph Neural Architecture Search** | 图神经架构搜索如何实现? | GraphNAS (2019); AGNN (2020) | **可微分GraphNAS**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::nas` |
+| D9170 | **Graph Robustness** | 图鲁棒性如何提升? | Robust GCN (2019); GNNGuard (2020) | **Robust GCN+对抗训练**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::robustness` |
+| D9171 | **Graph Fairness** | 图公平性如何保证? | 公平表示学习; 公平约束; 群体公平 | **公平约束+公平表示**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::fairness` |
+| D9172 | **Graph Privacy** | 图隐私如何保护? | 图差分隐私; 联邦图学习 | **图差分隐私+联邦学习**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::privacy` |
+| D9173 | **Graph Causal Learning** | 图因果学习如何实现? | CausalGNN (2022): 因果注意力 | **因果注意力+因果发现**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::causal` |
+| D9174 | **Graph Neural Processes** | 图神经过程如何实现? | Conditional NP (2018); Attentive NP (2019) | **图条件神经过程**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::neural_process` |
+| D9175 | **Graph Reinforcement Learning** | 图强化学习如何实现? | GNN+RL (2019); GraphPolicy (2021) | **GNN+策略梯度**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::rl` |
+| D9176 | **Graph Anomaly Detection** | 图异常检测如何实现? | DOMINANT (2019); AnomalyDAE (2020) | **DOMINANT+自编码器**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::anomaly` |
+| D9177 | **Graph Clustering** | 图聚类如何实现? | Spectral Clustering; Graph Autoencoder | **图自编码器聚类**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::clustering` |
+| D9178 | **Graph Link Prediction** | 链接预测如何实现? | GCN (2017); GAE (2016) | **GAE+因果增强**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::link_prediction` |
+| D9179 | **Graph Node Classification** | 节点分类如何实现? | GCN (2017); GAT (2018); GraphSAGE (2017) | **GCN+自监督**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::node_classification` |
+| D9180 | **Graph Classification** | 图分类如何实现? | GCN+Pooling (2018); GIN (2019) | **GIN+层次池化**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::graph_classification` |
+| D9181 | **Graph Regression** | 图回归如何实现? | GCN+Readout (2018) | **GCN+PMA**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::graph_regression` |
+| D9182 | **Graph Generation (Conditional)** | 条件图生成如何实现? | GraphRNN (2018); GRAN (2019) | **GraphRNN+条件生成**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::graph_generation` |
+| D9183 | **Graph Matching** | 图匹配如何实现? | Deep Graph Matching (2019) | **软图匹配**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::matching` |
+| D9184 | **Graph Translation** | 图翻译如何实现? | 图到图翻译; 条件生成 | **图翻译网络**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::translation` |
+| D9185 | **Graph Summarization** | 图摘要如何实现? | Graph Summary (2021) | **层次图摘要**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::summarization` |
+| D9186 | **Graph Imputation** | 图缺失值填充如何实现? | 图结构+特征填充 | **图结构填充**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::imputation` |
+| D9187 | **Graph Forecasting** | 图预测如何实现? | 时空图预测: 图+时间序列 | **时空图预测**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::forecasting` |
+| D9188 | **Graph Recommendation** | 图推荐如何实现? | PinSage (2018); LightGCN (2020) | **LightGCN+图协同过滤**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::recommendation` |
+| D9189 | **Graph Knowledge Graph Completion** | 知识图谱补全如何实现? | R-GCN (2017); CompGCN (2020) | **R-GCN+CompGCN**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::knowledge_graph` |
+| D9190 | **Graph Molecular Design** | 分子图设计如何实现? | MPNN (2017); GNN+RL (2019) | **MPNN+分子生成**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::molecular` |
+| D9191 | **Graph Social Network Analysis** | 社交网络分析如何实现? | DeepWalk (2014); GraphSAGE (2017) | **GraphSAGE+动态**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::social` |
+| D9192 | **Graph Traffic Prediction** | 交通图预测如何实现? | STGCN (2018); DCRNN (2018) | **STGCN+时空注意力**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::traffic` |
+| D9193 | **Graph Code Review** | 代码图审查如何实现? | 代码图+GNN: 代码表示+审查 | **代码图+GNN**: 与HyperCube/KB/GWT对齐 | `nt_core::gnn::code_review` |
+| D9194 | **Linear Attention** | 线性注意力如何实现? | Linear Transformer (Katharopoulos 2020); Performer (Choromanski 2021) | **Performers+线性核**: 与GWT/NT-CORE对齐 | `nt_core::attention::linear` |
+| D9195 | **Sparse Attention Patterns** | 稀疏注意力如何设计? | Longformer (2020): 滑动窗口+扩张; BigBird (2020): 随机+窗口+全局 | **Longformer+BigBird**: 与GWT/NT-CORE对齐 | `nt_core::attention::sparse` |
+| D9196 | **Flash Attention** | Flash Attention如何优化? | FlashAttention (Dao 2022): IO感知+分块; FlashAttention-2 (2023) | **FlashAttention-3**: 与GWT/NT-CORE对齐 | `nt_core::attention::flash` |
+| D9197 | **Memory-Efficient Attention** | 内存高效注意力如何实现? | xFormers (2022): 组件化注意力; Triton attention | **xFormers+Triton**: 与GWT/NT-CORE对齐 | `nt_core::attention::memory_efficient` |
+| D9198 | **Cross-Attention for Multimodal** | 跨模态注意力如何设计? | ViT cross-attention; CLIP cross-attention | **统一跨模态注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::cross_modal` |
+| D9199 | **Windowed Attention** | 窗口注意力如何实现? | Swin Transformer (2021): 移动窗口 | **Swin+自适应窗口**: 与GWT/NT-CORE对齐 | `nt_core::attention::windowed` |
+| D9200 | **Multi-Head Attention Variants** | 多头注意力变体有哪些? | MHA/MQA/GQA | **GQA+MQA**: 与GWT/NT-CORE对齐 | `nt_core::attention::multi_head` |
+| D9201 | **Causal Attention** | 因果注意力如何优化? | Causal masking; Flash causal | **Flash因果注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::causal` |
+| D9202 | **Global-Local Attention** | 全局-局部注意力如何设计? | PVT (2021): 渐进式 | **渐进式全局-局部**: 与GWT/NT-CORE对齐 | `nt_core::attention::global_local` |
+| D9203 | **Rotary Position Embedding** | 旋转位置编码如何实现? | RoPE (Su 2021): 旋转嵌入 | **RoPE+变体**: 与GWT/NT-CORE对齐 | `nt_core::attention::rope` |
+| D9204 | **ALiBi Attention** | ALiBi注意力如何实现? | ALiBi (Press 2022): 线性偏置 | **ALiBi+线性偏置**: 与GWT/NT-CORE对齐 | `nt_core::attention::alibi` |
+| D9205 | **Sliding Window Attention** | 滑动窗口注意力如何优化? | Longformer (2020) | **滑动窗口+全局混合**: 与GWT/NT-CORE对齐 | `nt_core::attention::sliding_window` |
+| D9206 | **Linear Transformer Variants** | 线性Transformer变体有哪些? | Linear Transformer; RWKV (2023); RetNet (2023) | **RWKV+RetNet**: 与GWT/NT-CORE对齐 | `nt_core::attention::linear_variants` |
+| D9207 | **Structured State Space Models** | 结构化状态空间模型如何实现? | S4 (Gu 2021); Mamba (2023) | **Mamba-2+S4D**: 与GWT/NT-CORE对齐 | `nt_core::attention::ssm` |
+| D9208 | **Differential Attention** | 差分注意力如何实现? | DiffAttn (Microsoft 2024) | **差分注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::differential` |
+| D9209 | **Grouped Query Attention** | 分组查询注意力如何优化? | GQA (Ainslie 2023) | **GQA+自适应分组**: 与GWT/NT-CORE对齐 | `nt_core::attention::gqa` |
+| D9210 | **Multi-Query Attention** | 多查询注意力如何实现? | MQA (Shazeer 2019): 单KV多Q | **MQA+KV共享**: 与GWT/NT-CORE对齐 | `nt_core::attention::mqa` |
+| D9211 | **Sparse Mixture of Experts** | 稀疏MoE注意力如何设计? | Switch Transformer (2021); GShard (2020) | **MoE+稀疏激活**: 与GWT/NT-CORE对齐 | `nt_core::attention::moe` |
+| D9212 | **Recurrent Attention** | 循环注意力如何实现? | RNN Transformer (2020); RWKV (2023) | **RWKV循环**: 与GWT/NT-CORE对齐 | `nt_core::attention::recurrent` |
+| D9213 | **Native Sparse Attention** | 原生稀疏注意力如何实现? | NSA (DeepSeek 2024): 硬件对齐稀疏 | **NSA+硬件对齐**: 与GWT/NT-CORE对齐 | `nt_core::attention::native_sparse` |
+| D9214 | **Hybrid Attention** | 混合注意力如何设计? | Attention as RNN (2024) | **混合注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::hybrid` |
+| D9215 | **Attention Sink** | 注意力汇聚如何利用? | StreamingLLM (2024) | **注意力汇聚+KV缓存**: 与GWT/NT-CORE对齐 | `nt_core::attention::sink` |
+| D9216 | **Attention Distillation** | 注意力蒸馏如何实现? | 教师-学生注意力对齐 | **注意力蒸馏**: 与GWT/NT-CORE对齐 | `nt_core::attention::distillation` |
+| D9217 | **Multi-Scale Attention** | 多尺度注意力如何设计? | PVT (2021) | **多尺度注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::multi_scale` |
+| D9218 | **Deformable Attention** | 可变形注意力如何实现? | Deformable DETR (2021) | **可变形注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::deformable` |
+| D9219 | **Axis Attention** | 轴注意力如何实现? | Axial Attention (2020): 2D轴分解 | **轴注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::axial` |
+| D9220 | **Channel Attention** | 通道注意力如何实现? | SE-Net (2018); CBAM (2018) | **SE-Net+CBAM**: 与GWT/NT-CORE对齐 | `nt_core::attention::channel` |
+| D9221 | **Spatial Attention** | 空间注意力如何实现? | CBAM (2018): 空间注意力 | **CBAM空间注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::spatial` |
+| D9222 | **Temporal Attention** | 时间注意力如何实现? | 时间编码+注意力 | **时间注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::temporal` |
+| D9223 | **Cross-Scale Attention** | 跨尺度注意力如何设计? | 特征金字塔+跨尺度 | **跨尺度注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::cross_scale` |
+| D9224 | **Attention Regularization** | 注意力正则化如何设计? | 稀疏性+平滑性正则化 | **注意力正则化**: 与GWT/NT-CORE对齐 | `nt_core::attention::regularization` |
+| D9225 | **Attention Visualization** | 注意力可视化如何实现? | BertViz (2019): 多头可视化 | **BertViz+交互式**: 与GWT/NT-CORE对齐 | `nt_core::attention::visualization` |
+| D9226 | **Attention Benchmarking** | 注意力基准测试如何设计? | 效率+质量+内存基准 | **注意力基准**: 与GWT/NT-CORE对齐 | `nt_core::attention::benchmarking` |
+| D9227 | **Attention Pruning** | 注意力剪枝如何实现? | 头剪枝+token剪枝 | **注意力剪枝**: 与GWT/NT-CORE对齐 | `nt_core::attention::pruning` |
+| D9228 | **Attention Quantization** | 注意力量化如何实现? | INT8/INT4量化 | **注意力量化**: 与GWT/NT-CORE对齐 | `nt_core::attention::quantization` |
+| D9229 | **Attention Fusion** | 注意力融合如何实现? | 多注意力机制融合 | **注意力融合**: 与GWT/NT-CORE对齐 | `nt_core::attention::fusion` |
+| D9230 | **Attention Routing** | 注意力路由如何实现? | 自适应路由 | **注意力路由**: 与GWT/NT-CORE对齐 | `nt_core::attention::routing` |
+| D9231 | **Attention Caching** | 注意力缓存如何优化? | KV缓存+压缩 | **注意力缓存**: 与GWT/NT-CORE对齐 | `nt_core::attention::caching` |
+| D9232 | **Attention Streaming** | 注意力流式如何实现? | StreamingLLM (2024) | **流式注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::streaming` |
+| D9233 | **Attention Compilation** | 注意力编译如何优化? | Triton (2022): GPU编译 | **Triton编译**: 与GWT/NT-CORE对齐 | `nt_core::attention::compilation` |
+| D9234 | **Attention Hardware Adaptation** | 注意力硬件适配如何设计? | GPU/TPU/专用芯片 | **硬件感知注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::hardware` |
+| D9235 | **Attention Theory** | 注意力理论如何理解? | 信息论+核方法 | **注意力理论**: 与GWT/NT-CORE对齐 | `nt_core::attention::theory` |
+| D9236 | **Attention Biology Inspiration** | 注意力生物启发如何设计? | 视觉注意力+神经科学 | **生物启发注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::biology` |
+| D9237 | **Attention Efficiency** | 注意力效率如何提升? | FLOPs+内存+延迟 | **注意力效率**: 与GWT/NT-CORE对齐 | `nt_core::attention::efficiency` |
+| D9238 | **Attention Quality** | 注意力质量如何保证? | 精度+召回+F1 | **注意力质量**: 与GWT/NT-CORE对齐 | `nt_core::attention::quality` |
+| D9239 | **Attention Scalability** | 注意力可扩展性如何设计? | 大模型+长序列 | **可扩展注意力**: 与GWT/NT-CORE对齐 | `nt_core::attention::scalability` |
+| D9240 | **Attention Interpretability** | 注意力可解释性如何提升? | 注意力分析+可视化 | **注意力可解释性**: 与GWT/NT-CORE对齐 | `nt_core::attention::interpretability` |
+| D9241 | **Attention Robustness** | 注意力鲁棒性如何保证? | 对抗攻击+鲁棒训练 | **注意力鲁棒性**: 与GWT/NT-CORE对齐 | `nt_core::attention::robustness` |
+| D9242 | **Attention Fairness** | 注意力公平性如何保证? | 公平约束+偏见消除 | **注意力公平性**: 与GWT/NT-CORE对齐 | `nt_core::attention::fairness` |
+| D9243 | **Attention Privacy** | 注意力隐私如何保护? | 差分隐私+联邦 | **注意力隐私**: 与GWT/NT-CORE对齐 | `nt_core::attention::privacy` |
+| D9244 | **Attention Causality** | 注意力因果性如何分析? | 因果推理+注意力 | **注意力因果性**: 与GWT/NT-CORE对齐 | `nt_core::attention::causality` |
+| D9245 | **Vision-Language Models** | 视觉语言模型如何设计? | CLIP (Radford 2021); LLaVA (2023): 视觉指令调优 | **LLaVA+CLIP**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::vlm` |
+| D9246 | **Audio-Visual Models** | 音频视觉模型如何设计? | 音频+视觉融合 | **音频视觉融合**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::av` |
+| D9247 | **Unified Multimodal Architecture** | 统一多模态架构如何设计? | 单一模型多模态 | **统一多模态**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::unified` |
+| D9248 | **Cross-Modal Retrieval** | 跨模态检索如何实现? | CLIP (2021): 对比检索 | **CLIP+检索增强**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::cross_retrieval` |
+| D9249 | **Multimodal Reasoning Chains** | 多模态推理链如何设计? | 视觉+语言推理 | **多模态推理链**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::reasoning` |
+| D9250 | **Interleaved Image-Text Generation** | 交错图文生成如何实现? | 图文交错生成 | **交错图文生成**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::interleaved` |
+| D9251 | **Video-Language Pretraining** | 视频语言预训练如何实现? | 视频+语言预训练 | **视频语言预训练**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::video_language` |
+| D9252 | **3D Vision-Language** | 3D视觉语言如何实现? | 3D+语言 | **3D视觉语言**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::3d_vl` |
+| D9253 | **Multimodal Alignment** | 多模态对齐如何实现? | CLIP (2021): 对比对齐 | **对比对齐+增强**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::alignment` |
+| D9254 | **Multimodal Pretraining** | 多模态预训练如何设计? | 大规模预训练 | **多模态预训练**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::pretraining` |
+| D9255 | **Multimodal Fine-tuning** | 多模态微调如何实现? | LoRA+适配器 | **多模态微调**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::finetuning` |
+| D9256 | **Multimodal Evaluation** | 多模态评估如何设计? | 基准测试 | **多模态评估**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::evaluation` |
+| D9257 | **Multimodal Safety** | 多模态安全如何保证? | 安全对齐 | **多模态安全**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::safety` |
+| D9258 | **Multimodal Efficiency** | 多模态效率如何提升? | 轻量化+蒸馏 | **多模态效率**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::efficiency` |
+| D9259 | **Multimodal Robustness** | 多模态鲁棒性如何保证? | 对抗攻击+鲁棒训练 | **多模态鲁棒性**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::robustness` |
+| D9260 | **Multimodal Fairness** | 多模态公平性如何保证? | 公平约束 | **多模态公平性**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::fairness` |
+| D9261 | **Multimodal Privacy** | 多模态隐私如何保护? | 差分隐私+联邦 | **多模态隐私**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::privacy` |
+| D9262 | **Multimodal Interpretability** | 多模态可解释性如何提升? | 注意力可视化 | **多模态可解释性**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::interpretability` |
+| D9263 | **Multimodal Causality** | 多模态因果性如何分析? | 因果推理 | **多模态因果性**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::causality` |
+| D9264 | **Image Captioning** | 图像描述如何生成? | 视觉+语言生成 | **图像描述生成**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::captioning` |
+| D9265 | **Visual Question Answering** | 视觉问答如何实现? | VQA: 视觉+语言+推理 | **视觉问答**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::vqa` |
+| D9266 | **Visual Dialog** | 视觉对话如何实现? | 多轮对话+视觉 | **视觉对话**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::visual_dialog` |
+| D9267 | **Image-Text Matching** | 图文匹配如何实现? | 对比学习 | **图文匹配**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::matching` |
+| D9268 | **Text-to-Image Generation** | 文本生成图像如何实现? | Stable Diffusion (2022); DALL-E (2021) | **Stable Diffusion+条件生成**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::t2i` |
+| D9269 | **Image-to-Text Generation** | 图像生成文本如何实现? | 视觉编码+语言解码 | **图像到文本**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::i2t` |
+| D9270 | **Multimodal In-Context Learning** | 多模态上下文学习如何实现? | 少样本多模态 | **多模态ICL**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::icl` |
+| D9271 | **Multimodal Chain-of-Thought** | 多模态思维链如何实现? | 视觉+推理 | **多模态CoT**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::cot` |
+| D9272 | **Multimodal Prompting** | 多模态提示如何设计? | 视觉+语言提示 | **多模态提示**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::prompting` |
+| D9273 | **Multimodal Transfer Learning** | 多模态迁移学习如何实现? | 跨模态迁移 | **多模态迁移**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::transfer` |
+| D9274 | **Multimodal Domain Adaptation** | 多模态领域自适应如何实现? | 领域自适应 | **多模态适应**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::adaptation` |
+| D9275 | **Multimodal Active Learning** | 多模态主动学习如何实现? | 主动查询+标注 | **多模态主动学习**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::active` |
+| D9276 | **Multimodal Continual Learning** | 多模态持续学习如何实现? | 持续学习+防遗忘 | **多模态持续**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::continual` |
+| D9277 | **Multimodal Few-Shot Learning** | 多模态小样本学习如何实现? | 元学习+原型网络 | **多模态少样本**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::few_shot` |
+| D9278 | **Multimodal Zero-Shot Learning** | 多模态零样本学习如何实现? | CLIP (2021): 零样本 | **CLIP零样本**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::zero_shot` |
+| D9279 | **Multimodal Knowledge Distillation** | 多模态知识蒸馏如何实现? | 跨模态蒸馏 | **多模态蒸馏**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::distillation` |
+| D9280 | **Multimodal Pruning** | 多模态剪枝如何实现? | 跨模态剪枝 | **多模态剪枝**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::pruning` |
+| D9281 | **Multimodal Quantization** | 多模态量化如何实现? | INT8/INT4 | **多模态量化**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::quantization` |
+| D9282 | **Multimodal NAS** | 多模态NAS如何实现? | 可微分搜索 | **多模态NAS**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::nas` |
+| D9283 | **Multimodal Anomaly Detection** | 多模态异常检测如何实现? | 跨模态异常 | **多模态异常检测**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::anomaly` |
+| D9284 | **Multimodal Clustering** | 多模态聚类如何实现? | 跨模态聚类 | **多模态聚类**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::clustering` |
+| D9285 | **Multimodal Recommendation** | 多模态推荐如何实现? | 跨模态推荐 | **多模态推荐**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::recommendation` |
+| D9286 | **Multimodal Search** | 多模态搜索如何实现? | 跨模态搜索 | **多模态搜索**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::search` |
+| D9287 | **Multimodal Summarization** | 多模态摘要如何实现? | 跨模态摘要 | **多模态摘要**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::summarization` |
+| D9288 | **Multimodal Translation** | 多模态翻译如何实现? | 跨模态翻译 | **多模态翻译**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::translation` |
+| D9289 | **Multimodal Sentiment Analysis** | 多模态情感分析如何实现? | 跨模态情感 | **多模态情感**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::sentiment` |
+| D9290 | **Multimodal Emotion Recognition** | 多模态情绪识别如何实现? | 跨模态情绪 | **多模态情绪识别**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::emotion` |
+| D9291 | **Multimodal Event Detection** | 多模态事件检测如何实现? | 跨模态事件 | **多模态事件检测**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::event` |
+| D9292 | **Multimodal Relation Extraction** | 多模态关系抽取如何实现? | 跨模态关系 | **多模态关系抽取**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::relation` |
+| D9293 | **Multimodal Named Entity Recognition** | 多模态NER如何实现? | 跨模态NER | **多模态NER**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::ner` |
+| D9294 | **Multimodal Code Generation** | 多模态代码生成如何实现? | 图到代码 | **多模态代码生成**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::code_generation` |
+| D9295 | **Multimodal Planning** | 多模态规划如何实现? | 视觉+语言+规划 | **多模态规划**: 与NT-IO/NT-MIND对齐 | `nt_core::multimodal::planning` |
+| D9296 | **Vision-and-Language Navigation** | 视觉语言导航如何实现? | VLN (Anderson 2018): 指令+视觉+导航; VLN-CE | **VLN-CE连续环境**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::vln` |
+| D9297 | **Task Planning from Language** | 语言任务规划如何实现? | SayCan (2022): 语言到规划 | **SayCan+增强**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::task_planning` |
+| D9298 | **Sim-to-Real Transfer** | 模拟到真实迁移如何实现? | Sim2Real (2020): 域随机化 | **Sim2Real+域随机化**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::sim2real` |
+| D9299 | **Tactile Sensing** | 触觉感知如何实现? | 触觉传感器+学习 | **触觉感知**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::tactile` |
+| D9300 | **Human-Robot Collaboration** | 人机协作如何实现? | 协作规划+安全 | **人机协作**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::hrc` |
+| D9301 | **Augmented Reality Assistance** | 增强现实辅助如何实现? | AR+AI | **AR辅助**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::ar` |
+| D9302 | **Interactive World Models** | 交互世界模型如何设计? | Dreamer (2022): 世界模型 | **Dreamer+交互**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::world_model` |
+| D9303 | **Grounding in Physical Environments** | 物理环境如何落地? | 语言+视觉+物理 | **物理环境落地**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::grounding` |
+| D9304 | **Robotic Manipulation** | 机器人操作如何实现? | 操作策略学习 | **机器人操作**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::manipulation` |
+| D9305 | **Object Detection for Embodiment** | 具身目标检测如何实现? | 视觉+目标检测 | **具身目标检测**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::object_detection` |
+| D9306 | **Scene Understanding** | 场景理解如何实现? | 视觉+语义+空间 | **场景理解**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::scene` |
+| D9307 | **Grasp Planning** | 抓取规划如何实现? | 抓取点检测+规划 | **抓取规划**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::grasp` |
+| D9308 | **Navigation Policies** | 导航策略如何实现? | 路径规划+避障 | **导航策略**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::navigation` |
+| D9309 | **Force Control** | 力控制如何实现? | 力反馈+控制 | **力控制**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::force` |
+| D9310 | **Dexterous Manipulation** | 灵巧操作如何实现? | 多指操作+学习 | **灵巧操作**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::dexterous` |
+| D9311 | **Bimanual Manipulation** | 双手操作如何实现? | 双臂协调+规划 | **双手操作**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::bimanual` |
+| D9312 | **Legged Locomotion** | 足式运动如何实现? | 步态学习+控制 | **足式运动**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::locomotion` |
+| D9313 | **Aerial Navigation** | 空中导航如何实现? | 无人机+路径规划 | **空中导航**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::aerial` |
+| D9314 | **Underwater Manipulation** | 水下操作如何实现? | 水下机器人+操作 | **水下操作**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::underwater` |
+| D9315 | **Surgical Robotics** | 手术机器人如何实现? | 手术辅助+规划 | **手术机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::surgical` |
+| D9316 | **Warehouse Automation** | 仓储自动化如何实现? | 仓储机器人+调度 | **仓储自动化**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::warehouse` |
+| D9317 | **Construction Robotics** | 建筑机器人如何实现? | 建筑自动化+施工 | **建筑机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::construction` |
+| D9318 | **Agricultural Robotics** | 农业机器人如何实现? | 农业自动化+采摘 | **农业机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::agricultural` |
+| D9319 | **Disaster Response Robots** | 救灾机器人如何实现? | 灾害环境+自主导航 | **救灾机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::disaster` |
+| D9320 | **Space Robotics** | 太空机器人如何实现? | 太空操作+自主 | **太空机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::space` |
+| D9321 | **Service Robots** | 服务机器人如何实现? | 服务交互+导航 | **服务机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::service` |
+| D9322 | **Educational Robots** | 教育机器人如何实现? | 教学辅助+交互 | **教育机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::educational` |
+| D9323 | **Companion Robots** | 陪伴机器人如何实现? | 情感交互+陪伴 | **陪伴机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::companion` |
+| D9324 | **Rehabilitation Robotics** | 康复机器人如何实现? | 康复辅助+评估 | **康复机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::rehabilitation` |
+| D9325 | **Prosthetics Control** | 假肢控制如何实现? | 神经接口+控制 | **假肢控制**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::prosthetics` |
+| D9326 | **Exoskeleton Control** | 外骨骼控制如何实现? | 助力+控制 | **外骨骼控制**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::exoskeleton` |
+| D9327 | **Soft Robotics** | 软体机器人如何实现? | 软材料+驱动 | **软体机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::soft` |
+| D9328 | **Swarm Robotics** | 群体机器人如何实现? | 群体协调+自组织 | **群体机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::swarm` |
+| D9329 | **Modular Robotics** | 模块化机器人如何实现? | 模块重组+自适应 | **模块化机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::modular` |
+| D9330 | **Self-Reconfiguring Robots** | 自重构机器人如何实现? | 自重构+适应 | **自重构机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::self_reconfig` |
+| D9331 | **Bio-inspired Robotics** | 仿生机器人如何实现? | 生物启发+设计 | **仿生机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::bio_inspired` |
+| D9332 | **Cognitive Robotics** | 认知机器人如何实现? | 认知架构+推理 | **认知机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::cognitive` |
+| D9333 | **Social Robotics** | 社交机器人如何实现? | 社交交互+情感 | **社交机器人**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::social` |
+| D9334 | **Teleoperation** | 遥操作如何实现? | 远程控制+反馈 | **遥操作**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::teleoperation` |
+| D9335 | **Shared Autonomy** | 共享自主如何实现? | 人机共享控制 | **共享自主**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::shared_autonomy` |
+| D9336 | **Robot Learning from Demonstration** | 机器人示教学习如何实现? | 模仿学习+演示 | **示教学习**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::lfd` |
+| D9337 | **Reinforcement Learning for Robotics** | 机器人强化学习如何实现? | RL+机器人控制 | **机器人RL**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::rl` |
+| D9338 | **Sim-to-Real for Manipulation** | 操作sim-to-real如何实现? | 模拟操作+真实迁移 | **操作Sim2Real**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::sim2real_manip` |
+| D9339 | **Visual Servoing** | 视觉伺服如何实现? | 视觉反馈+控制 | **视觉伺服**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::visual_servoing` |
+| D9340 | **Robot Perception** | 机器人感知如何实现? | 多传感器融合 | **机器人感知**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::perception` |
+| D9341 | **Robot Mapping** | 机器人建图如何实现? | SLAM+建图 | **机器人建图**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::mapping` |
+| D9342 | **Robot Localization** | 机器人定位如何实现? | 定位+跟踪 | **机器人定位**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::localization` |
+| D9343 | **Motion Planning** | 运动规划如何实现? | 路径规划+避障 | **运动规划**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::motion_planning` |
+| D9344 | **Task and Motion Planning** | 任务运动规划如何实现? | TAMP: 任务+运动 | **任务运动规划**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::tamp` |
+| D9345 | **Robot Safety** | 机器人安全如何保证? | 安全约束+监控 | **机器人安全**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::safety` |
+| D9346 | **Robot Compliance** | 机器人柔顺如何实现? | 力控制+柔顺 | **机器人柔顺**: 与NT-PHYSICAL/NT-ACT对齐 | `nt_core::embodied::compliance` |
+| D9347 | **Episodic Memory for Agents** | Agent情景记忆如何设计? | 情景记忆: 事件+时间+情感 | **情景记忆系统**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::episodic` |
+| D9348 | **Long-term Memory Consolidation** | 长期记忆巩固如何实现? | 记忆巩固+蒸馏 | **记忆巩固**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::consolidation` |
+| D9349 | **Chain-of-Thought Verification** | 思维链验证如何实现? | CoT验证+一致性检查 | **CoT验证**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::cot_verify` |
+| D9350 | **Reflection and Self-Critique** | 反思与自我批评如何实现? | 反思+自我评估 | **反思系统**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::reflection` |
+| D9351 | **Hierarchical Task Decomposition** | 层次化任务分解如何实现? | 任务分解+层次规划 | **层次化分解**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::hierarchical` |
+| D9352 | **Adaptive Planning** | 自适应规划如何实现? | 动态规划+重规划 | **自适应规划**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::adaptive_plan` |
+| D9353 | **Tool-augmented Reasoning** | 工具增强推理如何实现? | 推理+工具调用 | **工具增强推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::tool_reasoning` |
+| D9354 | **Program-of-Thought Prompting** | 程序化思维提示如何实现? | 代码生成+执行 | **程序化思维**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::pot` |
+| D9355 | **Working Memory** | 工作记忆如何设计? | 短期记忆+注意力 | **工作记忆**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::working` |
+| D9356 | **Semantic Memory Networks** | 语义记忆网络如何设计? | 语义网络+推理 | **语义记忆**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::semantic` |
+| D9357 | **Procedural Memory** | 程序性记忆如何实现? | 技能+肌肉记忆 | **程序性记忆**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::procedural` |
+| D9358 | **Memory Retrieval Optimization** | 记忆检索优化如何实现? | 检索效率+相关性 | **记忆检索优化**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::retrieval` |
+| D9359 | **Memory Compression** | 记忆压缩如何实现? | 压缩+摘要 | **记忆压缩**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::compression` |
+| D9360 | **Memory Consolidation During Sleep** | 睡眠记忆巩固如何实现? | 离线巩固+重放 | **睡眠巩固**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::sleep` |
+| D9361 | **Memory Interference Resolution** | 记忆干扰解决如何实现? | 干扰检测+解决 | **干扰解决**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::interference` |
+| D9362 | **Causal Reasoning Chains** | 因果推理链如何设计? | 因果链+反事实 | **因果推理链**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::causal` |
+| D9363 | **Analogical Reasoning** | 类比推理如何实现? | 类比映射+迁移 | **类比推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::analogical` |
+| D9364 | **Counterfactual Reasoning** | 反事实推理如何实现? | 反事实+假设分析 | **反事实推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::counterfactual` |
+| D9365 | **Temporal Reasoning** | 时序推理如何实现? | 时间推理+预测 | **时序推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::temporal` |
+| D9366 | **Spatial Reasoning** | 空间推理如何实现? | 空间关系+推理 | **空间推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::spatial` |
+| D9367 | **Abductive Reasoning** | 溯因推理如何实现? | 最佳解释+推理 | **溯因推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::abductive` |
+| D9368 | **Inductive Reasoning** | 归纳推理如何实现? | 归纳+泛化 | **归纳推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::inductive` |
+| D9369 | **Deductive Reasoning** | 演绎推理如何实现? | 演绎+逻辑 | **演绎推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::deductive` |
+| D9370 | **Meta-reasoning** | 元推理如何实现? | 推理过程的推理 | **元推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::meta_reasoning` |
+| D9371 | **Strategic Reasoning** | 策略推理如何实现? | 博弈+策略 | **策略推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::strategic` |
+| D9372 | **Social Reasoning** | 社会推理如何实现? | 意图+信念+社会 | **社会推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::social` |
+| D9373 | **Theory of Mind** | 心理理论如何实现? | 意图+信念+愿望 | **心理理论**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::tom` |
+| D9374 | **Emotional Reasoning** | 情感推理如何实现? | 情感+推理融合 | **情感推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::emotional` |
+| D9375 | **Ethical Reasoning** | 伦理推理如何实现? | 伦理+道德推理 | **伦理推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::ethical` |
+| D9376 | **Uncertainty Reasoning** | 不确定性推理如何实现? | 概率+贝叶斯 | **不确定性推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::uncertainty` |
+| D9377 | **Multi-hop Reasoning** | 多跳推理如何实现? | 多步推理+链 | **多跳推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::multi_hop` |
+| D9378 | **Compositional Reasoning** | 组合推理如何实现? | 组合+泛化 | **组合推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::compositional` |
+| D9379 | **Commonsense Reasoning** | 常识推理如何实现? | 常识+推理 | **常识推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::commonsense` |
+| D9380 | **Mathematical Reasoning** | 数学推理如何实现? | 数学+符号推理 | **数学推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::math` |
+| D9381 | **Logical Reasoning** | 逻辑推理如何实现? | 逻辑+形式化 | **逻辑推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::logical` |
+| D9382 | **Visual Reasoning** | 视觉推理如何实现? | 视觉+推理 | **视觉推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::visual_reasoning` |
+| D9383 | **Language Reasoning** | 语言推理如何实现? | 语言+推理 | **语言推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::language_reasoning` |
+| D9384 | **Code Reasoning** | 代码推理如何实现? | 代码+推理 | **代码推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::code_reasoning` |
+| D9385 | **Scientific Reasoning** | 科学推理如何实现? | 假设+实验+验证 | **科学推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::scientific` |
+| D9386 | **Medical Reasoning** | 医学推理如何实现? | 诊断+推理 | **医学推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::medical` |
+| D9387 | **Legal Reasoning** | 法律推理如何实现? | 法律+推理 | **法律推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::legal` |
+| D9388 | **Financial Reasoning** | 金融推理如何实现? | 金融+推理 | **金融推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::financial` |
+| D9389 | **Engineering Reasoning** | 工程推理如何实现? | 工程+推理 | **工程推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::engineering` |
+| D9390 | **Artistic Reasoning** | 艺术推理如何实现? | 创意+审美 | **艺术推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::artistic` |
+| D9391 | **Self-explanation** | 自我解释如何实现? | 解释+透明 | **自我解释**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::self_explanation` |
+| D9392 | **Confabulation Detection** | 幻觉检测如何实现? | 幻觉+检测 | **幻觉检测**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::confabulation` |
+| D9393 | **Reasoning Verification** | 推理验证如何实现? | 验证+一致性 | **推理验证**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::reasoning_verify` |
+| D9394 | **Reasoning Optimization** | 推理优化如何实现? | 效率+质量 | **推理优化**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::reasoning_opt` |
+| D9395 | **Memory-grounded Reasoning** | 记忆接地推理如何实现? | 记忆+推理融合 | **记忆接地推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::memory_grounded` |
+| D9396 | **Tool-augmented Memory** | 工具增强记忆如何实现? | 工具+记忆融合 | **工具增强记忆**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::tool_memory` |
+| D9397 | **Collaborative Reasoning** | 协作推理如何实现? | 多Agent+协作 | **协作推理**: 与NT-MIND/NT-MEMORY对齐 | `nt_core::agent::collaborative` |
+| D9398 | **Constitutional AI** | 宪法AI如何实现? | Anthropic Constitutional AI: 原则+自我修正 | **宪法AI框架**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::constitutional` |
+| D9399 | **Direct Preference Optimization** | DPO偏好优化如何实现? | DPO (Rafailov 2023): 无需RM的直接优化 | **DPO优化**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::dpo` |
+| D9400 | **Kahneman-Tversky Optimization** | KTO优化如何实现? | KTO (Ethayarajh 2024): 前景理论 | **KTO优化**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::kto` |
+| D9401 | **Red Teaming Frameworks** | 红队框架如何设计? | 系统化红队+自动化 | **红队框架**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::red_team` |
+| D9402 | **Adversarial Robustness Testing** | 对抗鲁棒性测试如何实现? | 对抗攻击+鲁棒性评估 | **对抗鲁棒性**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::adversarial` |
+| D9403 | **Interpretability for Alignment** | 可解释性对齐如何实现? | 可解释性+对齐验证 | **可解释性对齐**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::interpretability` |
+| D9404 | **Mechanistic Interpretability** | 机械可解释性如何实现? | 电路+特征+机制 | **机械可解释性**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::mechanistic` |
+| D9405 | **Corrigibility** | 可纠正性如何实现? | 可中断+可修改 | **可纠正性**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::corrigibility` |
+| D9406 | **Shutdown Problem** | 关机问题如何解决? | 安全关机+不可绕过 | **关机问题**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::shutdown` |
+| D9407 | **Value Alignment Verification** | 价值对齐验证如何实现? | 价值+对齐+验证 | **价值对齐验证**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::value_verify` |
+| D9408 | **Reward Hacking Prevention** | 奖励黑客防范如何实现? | 奖励hacking+防范 | **奖励黑客防范**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::reward_hack` |
+| D9409 | **Specification Gaming Prevention** | 规范游戏防范如何实现? | 规范+游戏+防范 | **规范游戏防范**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::spec_gaming` |
+| D9410 | **Deceptive Alignment Detection** | 欺骗性对齐检测如何实现? | 欺骗+对齐+检测 | **欺骗性对齐检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::deceptive` |
+| D9411 | **Power-seeking Prevention** | 权力寻求防范如何实现? | 权力+寻求+防范 | **权力寻求防范**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::power_seek` |
+| D9412 | **Goodhart's Law Mitigation** | 古德哈特定律缓解如何实现? | 度量+目标+缓解 | **古德哈特定律缓解**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::goodhart` |
+| D9413 | **Reward Model Training** | 奖励模型训练如何实现? | RM+训练+优化 | **奖励模型训练**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::rm_train` |
+| D9414 | **RLHF Pipeline** | RLHF管线如何设计? | SFT+RM+PPO | **RLHF管线**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::rlhf` |
+| D9415 | **Constitutional Principles** | 宪法原则如何定义? | 原则+规则+验证 | **宪法原则**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::principles` |
+| D9416 | **Safety Evaluation Benchmarks** | 安全评估基准如何设计? | 基准+评估+测试 | **安全评估基准**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::safety_bench` |
+| D9417 | **Alignment Tax** | 对齐税如何评估? | 成本+收益+权衡 | **对齐税评估**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::tax` |
+| D9418 | **Scalable Oversight** | 可扩展监督如何实现? | 监督+可扩展 | **可扩展监督**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::oversight` |
+| D9419 | **Debate for Alignment** | 辩论对齐如何实现? | 辩论+验证 | **辩论对齐**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::debate` |
+| D9420 | **Recursive Reward Modeling** | 递归奖励建模如何实现? | 递归+奖励+建模 | **递归奖励建模**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::recursive_rm` |
+| D9421 | **AI Safety via Debate** | 辩论安全如何实现? | 辩论+安全 | **辩论安全**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::debate_safety` |
+| D9422 | **Weak-to-Strong Generalization** | 弱到强泛化如何实现? | 弱模型+强模型 | **弱到强泛化**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::weak_strong` |
+| D9423 | **Provable Safety Guarantees** | 可证明安全保证如何实现? | 证明+安全+保证 | **可证明安全**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::provable` |
+| D9424 | **Formal Verification for AI** | AI形式验证如何实现? | 形式化+验证 | **AI形式验证**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::formal` |
+| D9425 | **Safety Filter Design** | 安全过滤器如何设计? | 过滤+安全 | **安全过滤器**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::safety_filter` |
+| D9426 | **Harmlessness Training** | 无害性训练如何实现? | 无害+训练 | **无害性训练**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::harmless` |
+| D9427 | **Helpfulness Optimization** | 有用性优化如何实现? | 有用+优化 | **有用性优化**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::helpful` |
+| D9428 | **Honesty Enforcement** | 诚实性强制如何实现? | 诚实+强制 | **诚实性强制**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::honesty` |
+| D9429 | **Truthfulness Training** | 真实性训练如何实现? | 真实+训练 | **真实性训练**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::truthful` |
+| D9430 | **Refusal Training** | 拒绝训练如何实现? | 拒绝+训练 | **拒绝训练**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::refusal` |
+| D9431 | **Guardrail Design** | 护栏如何设计? | 护栏+安全 | **护栏设计**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::guardrail` |
+| D9432 | **Safety Taxonomy** | 安全分类法如何设计? | 分类+安全 | **安全分类法**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::taxonomy` |
+| D9433 | **Threat Modeling for AI** | AI威胁建模如何实现? | 威胁+建模 | **AI威胁建模**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::threat` |
+| D9434 | **Incident Response for AI** | AI事件响应如何实现? | 事件+响应 | **AI事件响应**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::incident` |
+| D9435 | **Safety Culture** | 安全文化如何建设? | 文化+安全 | **安全文化**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::culture` |
+| D9436 | **Responsible Scaling** | 负责任扩展如何实现? | 扩展+安全+责任 | **负责任扩展**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::responsible` |
+| D9437 | **Model Risk Management** | 模型风险管理如何实现? | 风险+管理 | **模型风险管理**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::risk` |
+| D9438 | **Safety Testing Automation** | 安全测试自动化如何实现? | 自动化+测试+安全 | **安全测试自动化**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::safety_auto` |
+| D9439 | **Alignment Research Directions** | 对齐研究方向有哪些? | 研究+方向 | **对齐研究方向**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::research` |
+| D9440 | **Safety Benchmark Suite** | 安全基准套件如何设计? | 基准+套件+安全 | **安全基准套件**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::bench_suite` |
+| D9441 | **Robustness Evaluation** | 鲁棒性评估如何实现? | 鲁棒性+评估 | **鲁棒性评估**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::robust_eval` |
+| D9442 | **Fairness in Alignment** | 对齐中的公平性如何保证? | 公平+对齐 | **对齐公平性**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::fairness` |
+| D9443 | **Privacy in Alignment** | 对齐中的隐私如何保护? | 隐私+对齐 | **对齐隐私**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::privacy` |
+| D9444 | **Transparency in AI Safety** | AI安全透明性如何实现? | 透明+安全 | **AI安全透明**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::transparency` |
+| D9445 | **Accountability Frameworks** | 问责框架如何设计? | 问责+框架 | **问责框架**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::accountability` |
+| D9446 | **Governance for AI Safety** | AI安全治理如何实现? | 治理+安全 | **AI安全治理**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::governance` |
+| D9447 | **International AI Safety** | 国际AI安全如何实现? | 国际+安全 | **国际AI安全**: 与NT-SHIELD/NT-META对齐 | `nt_core::alignment::international` |
+| D9449 | **Mixed-Precision Training** | 混合精度训练如何实现? | FP16/BF16+FP32混合 | **混合精度训练**: 与NT-CORE训练/推理对齐 | `nt_core::training::mixed_precision` |
+| D9450 | **Gradient Checkpointing** | 梯度检查点如何实现? | 检查点+重计算 | **梯度检查点**: 与NT-CORE训练/推理对齐 | `nt_core::training::checkpointing` |
+| D9451 | **Pipeline Parallelism** | 流水线并行如何实现? | 微批次+流水线 | **流水线并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::pipeline` |
+| D9452 | **Tensor Parallelism** | 张量并行如何实现? | 张量分割+通信 | **张量并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::tensor` |
+| D9453 | **Fully Sharded Data Parallel** | FSDP如何实现? | 全分片+数据并行 | **FSDP**: 与NT-CORE训练/推理对齐 | `nt_core::training::fsdp` |
+| D9454 | **ZeRO Optimization** | ZeRO优化如何实现? | DeepSpeed ZeRO Stage 1-3 | **ZeRO优化**: 与NT-CORE训练/推理对齐 | `nt_core::training::zero` |
+| D9455 | **Speculative Decoding** | 推测解码如何实现? | 草稿模型+验证 | **推测解码**: 与NT-CORE训练/推理对齐 | `nt_core::inference::speculative` |
+| D9456 | **Continuous Batching** | 连续批处理如何实现? | 动态批处理+调度 | **连续批处理**: 与NT-CORE训练/推理对齐 | `nt_core::inference::continuous` |
+| D9457 | **KV-Cache Optimization** | KV缓存优化如何实现? | KV缓存+压缩+量化 | **KV缓存优化**: 与NT-CORE训练/推理对齐 | `nt_core::inference::kv_cache` |
+| D9458 | **Quantized Inference (GPTQ)** | GPTQ量化如何实现? | GPTQ: 逐层量化 | **GPTQ量化**: 与NT-CORE训练/推理对齐 | `nt_core::inference::gptq` |
+| D9459 | **Quantized Inference (AWQ)** | AWQ量化如何实现? | AWQ: 激活感知量化 | **AWQ量化**: 与NT-CORE训练/推理对齐 | `nt_core::inference::awq` |
+| D9460 | **Quantized Inference (GGUF)** | GGUF量化如何实现? | GGUF: 通用格式 | **GGUF量化**: 与NT-CORE训练/推理对齐 | `nt_core::inference::gguf` |
+| D9461 | **LoRA Fine-tuning** | LoRA微调如何实现? | 低秩适配+微调 | **LoRA微调**: 与NT-CORE训练/推理对齐 | `nt_core::training::lora` |
+| D9462 | **QLoRA Fine-tuning** | QLoRA微调如何实现? | 量化+LoRA | **QLoRA微调**: 与NT-CORE训练/推理对齐 | `nt_core::training::qlora` |
+| D9463 | **Distributed Training** | 分布式训练如何实现? | 多GPU+多节点 | **分布式训练**: 与NT-CORE训练/推理对齐 | `nt_core::training::distributed` |
+| D9464 | **Data Parallelism** | 数据并行如何实现? | 数据分割+同步 | **数据并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::data_parallel` |
+| D9465 | **Model Parallelism** | 模型并行如何实现? | 模型分割+通信 | **模型并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::model_parallel` |
+| D9466 | **Expert Parallelism** | 专家并行如何实现? | MoE+专家并行 | **专家并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::expert_parallel` |
+| D9467 | **Sequence Parallelism** | 序列并行如何实现? | 序列分割+通信 | **序列并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::sequence` |
+| D9468 | **Context Parallelism** | 上下文并行如何实现? | 上下文分割+通信 | **上下文并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::context` |
+| D9469 | **3D Parallelism** | 3D并行如何实现? | 数据+张量+流水线 | **3D并行**: 与NT-CORE训练/推理对齐 | `nt_core::training::3d` |
+| D9470 | **Gradient Accumulation** | 梯度累积如何实现? | 累积+更新 | **梯度累积**: 与NT-CORE训练/推理对齐 | `nt_core::training::accumulation` |
+| D9471 | **Learning Rate Scheduling** | 学习率调度如何实现? | 调度+衰减 | **学习率调度**: 与NT-CORE训练/推理对齐 | `nt_core::training::lr_schedule` |
+| D9472 | **Warm-up Strategies** | 预热策略如何实现? | 线性/余弦预热 | **预热策略**: 与NT-CORE训练/推理对齐 | `nt_core::training::warmup` |
+| D9473 | **Weight Decay** | 权重衰减如何实现? | L2正则化 | **权重衰减**: 与NT-CORE训练/推理对齐 | `nt_core::training::weight_decay` |
+| D9474 | **Dropout Regularization** | Dropout正则化如何实现? | Dropout+变体 | **Dropout正则化**: 与NT-CORE训练/推理对齐 | `nt_core::training::dropout` |
+| D9475 | **Batch Normalization** | 批归一化如何实现? | BN+LayerNorm | **批归一化**: 与NT-CORE训练/推理对齐 | `nt_core::training::batch_norm` |
+| D9476 | **Label Smoothing** | 标签平滑如何实现? | 标签+平滑 | **标签平滑**: 与NT-CORE训练/推理对齐 | `nt_core::training::label_smooth` |
+| D9477 | **Data Augmentation for Training** | 训练数据增强如何实现? | 增强+正则化 | **训练数据增强**: 与NT-CORE训练/推理对齐 | `nt_core::training::augmentation` |
+| D9478 | **Early Stopping** | 早停如何实现? | 验证+停止 | **早停**: 与NT-CORE训练/推理对齐 | `nt_core::training::early_stop` |
+| D9479 | **Model Checkpointing** | 模型检查点如何实现? | 保存+恢复 | **模型检查点**: 与NT-CORE训练/推理对齐 | `nt_core::training::model_checkpoint` |
+| D9480 | **Memory-efficient Training** | 内存高效训练如何实现? | 内存优化+训练 | **内存高效训练**: 与NT-CORE训练/推理对齐 | `nt_core::training::memory_efficient` |
+| D9481 | **Activation Checkpointing** | 激活检查点如何实现? | 激活+检查点 | **激活检查点**: 与NT-CORE训练/推理对齐 | `nt_core::training::activation_ckpt` |
+| D9482 | **Offloading to CPU** | CPU卸载如何实现? | GPU+CPU卸载 | **CPU卸载**: 与NT-CORE训练/推理对齐 | `nt_core::training::offload` |
+| D9483 | **NVMe Offloading** | NVMe卸载如何实现? | GPU+NVMe卸载 | **NVMe卸载**: 与NT-CORE训练/推理对齐 | `nt_core::training::nvme` |
+| D9484 | **Communication Optimization** | 通信优化如何实现? | AllReduce+AllGather | **通信优化**: 与NT-CORE训练/推理对齐 | `nt_core::training::comm_opt` |
+| D9485 | **Gradient Compression** | 梯度压缩如何实现? | 压缩+量化 | **梯度压缩**: 与NT-CORE训练/推理对齐 | `nt_core::training::grad_compress` |
+| D9486 | **Inference Optimization** | 推理优化如何实现? | 优化+加速 | **推理优化**: 与NT-CORE训练/推理对齐 | `nt_core::inference::optimize` |
+| D9487 | **Model Pruning** | 模型剪枝如何实现? | 结构化+非结构化 | **模型剪枝**: 与NT-CORE训练/推理对齐 | `nt_core::inference::pruning` |
+| D9488 | **Knowledge Distillation for Inference** | 推理知识蒸馏如何实现? | 蒸馏+压缩 | **推理蒸馏**: 与NT-CORE训练/推理对齐 | `nt_core::inference::distillation` |
+| D9489 | **Early Exit for Inference** | 早退出推理如何实现? | 动态深度+早退出 | **早退出推理**: 与NT-CORE训练/推理对齐 | `nt_core::inference::early_exit` |
+| D9490 | **Adaptive Computation** | 自适应计算如何实现? | 动态计算+自适应 | **自适应计算**: 与NT-CORE训练/推理对齐 | `nt_core::inference::adaptive` |
+| D9491 | **Model Cascading** | 模型级联如何实现? | 级联+选择 | **模型级联**: 与NT-CORE训练/推理对齐 | `nt_core::inference::cascade` |
+| D9492 | **Batch Scheduling** | 批调度如何实现? | 调度+优化 | **批调度**: 与NT-CORE训练/推理对齐 | `nt_core::inference::batch_schedule` |
+| D9493 | **Inference Caching** | 推理缓存如何实现? | 缓存+重用 | **推理缓存**: 与NT-CORE训练/推理对齐 | `nt_core::inference::cache` |
+| D9494 | **Token-level Batching** | Token级批处理如何实现? | Token级+调度 | **Token级批处理**: 与NT-CORE训练/推理对齐 | `nt_core::inference::token_batch` |
+| D9495 | **Prefix Caching** | 前缀缓存如何实现? | 前缀+共享 | **前缀缓存**: 与NT-CORE训练/推理对齐 | `nt_core::inference::prefix_cache` |
+| D9496 | **PagedAttention** | 分页注意力如何实现? | vLLM分页注意力 | **PagedAttention**: 与NT-CORE训练/推理对齐 | `nt_core::inference::paged` |
+| D9497 | **Flash Decoding** | Flash解码如何实现? | Flash+解码 | **Flash解码**: 与NT-CORE训练/推理对齐 | `nt_core::inference::flash_decode` |
+| D9498 | **Structured Output** | 结构化输出如何实现? | JSON+Grammar | **结构化输出**: 与NT-CORE训练/推理对齐 | `nt_core::inference::structured` |
+| D9500 | **Data Quality Estimation** | 数据质量估算如何实现? | 质量评分+过滤 | **数据质量估算**: 与NT-MEMORY数据层对齐 | `nt_core::data::quality` |
+| D9501 | **Data Deduplication** | 数据去重如何实现? | MinHash+SimHash | **数据去重**: 与NT-MEMORY数据层对齐 | `nt_core::data::dedup` |
+| D9502 | **Synthetic Data Generation** | 合成数据生成如何实现? | LLM+扩散模型 | **合成数据生成**: 与NT-MEMORY数据层对齐 | `nt_core::data::synthetic` |
+| D9503 | **Data Augmentation Strategies** | 数据增强策略如何设计? | 增强+正则化 | **数据增强策略**: 与NT-MEMORY数据层对齐 | `nt_core::data::augment` |
+| D9504 | **Label-efficient Learning** | 标签高效学习如何实现? | 少样本+半监督 | **标签高效学习**: 与NT-MEMORY数据层对齐 | `nt_core::data::label_efficient` |
+| D9505 | **Programmatic Labeling (Snorkel)** | 程序化标注如何实现? | Snorkel: 标签函数 | **程序化标注**: 与NT-MEMORY数据层对齐 | `nt_core::data::snorkel` |
+| D9506 | **Data Valuation** | 数据估值如何实现? | 数据价值+评估 | **数据估值**: 与NT-MEMORY数据层对齐 | `nt_core::data::valuation` |
+| D9507 | **Data Governance for ML** | ML数据治理如何实现? | 治理+合规 | **ML数据治理**: 与NT-MEMORY数据层对齐 | `nt_core::data::governance` |
+| D9508 | **Data Versioning** | 数据版本控制如何实现? | 版本+追溯 | **数据版本控制**: 与NT-MEMORY数据层对齐 | `nt_core::data::versioning` |
+| D9509 | **Data Lineage** | 数据血缘如何实现? | 血缘+追溯 | **数据血缘**: 与NT-MEMORY数据层对齐 | `nt_core::data::lineage` |
+| D9510 | **Data Profiling** | 数据画像如何实现? | 统计+分析 | **数据画像**: 与NT-MEMORY数据层对齐 | `nt_core::data::profiling` |
+| D9511 | **Data Validation** | 数据验证如何实现? | 验证+约束 | **数据验证**: 与NT-MEMORY数据层对齐 | `nt_core::data::validation` |
+| D9512 | **Schema Evolution** | Schema演化如何实现? | 版本+兼容 | **Schema演化**: 与NT-MEMORY数据层对齐 | `nt_core::data::schema` |
+| D9513 | **Feature Engineering** | 特征工程如何实现? | 自动+手动 | **特征工程**: 与NT-MEMORY数据层对齐 | `nt_core::data::feature` |
+| D9514 | **Feature Store** | 特征存储如何实现? | 存储+服务 | **特征存储**: 与NT-MEMORY数据层对齐 | `nt_core::data::feature_store` |
+| D9515 | **Data Pipeline Orchestration** | 数据管线编排如何实现? | 编排+调度 | **数据管线编排**: 与NT-MEMORY数据层对齐 | `nt_core::data::pipeline` |
+| D9516 | **ETL Design** | ETL设计如何实现? | 提取+转换+加载 | **ETL设计**: 与NT-MEMORY数据层对齐 | `nt_core::data::etl` |
+| D9517 | **Stream Processing** | 流处理如何实现? | 实时+流 | **流处理**: 与NT-MEMORY数据层对齐 | `nt_core::data::stream` |
+| D9518 | **Batch Processing** | 批处理如何实现? | 批量+调度 | **批处理**: 与NT-MEMORY数据层对齐 | `nt_core::data::batch` |
+| D9519 | **Data Lake Architecture** | 数据湖架构如何设计? | 存储+格式 | **数据湖架构**: 与NT-MEMORY数据层对齐 | `nt_core::data::lake` |
+| D9520 | **Data Warehouse Design** | 数据仓库如何设计? | 维度+事实 | **数据仓库设计**: 与NT-MEMORY数据层对齐 | `nt_core::data::warehouse` |
+| D9521 | **Data Mesh Principles** | 数据网格如何实现? | 去中心化+领域 | **数据网格**: 与NT-MEMORY数据层对齐 | `nt_core::data::mesh` |
+| D9522 | **Data Catalog** | 数据目录如何实现? | 元数据+搜索 | **数据目录**: 与NT-MEMORY数据层对齐 | `nt_core::data::catalog` |
+| D9523 | **Data Discovery** | 数据发现如何实现? | 搜索+推荐 | **数据发现**: 与NT-MEMORY数据层对齐 | `nt_core::data::discovery` |
+| D9524 | **Data Access Control** | 数据访问控制如何实现? | 权限+审计 | **数据访问控制**: 与NT-MEMORY数据层对齐 | `nt_core::data::access` |
+| D9525 | **Data Encryption** | 数据加密如何实现? | 加密+密钥 | **数据加密**: 与NT-MEMORY数据层对齐 | `nt_core::data::encryption` |
+| D9526 | **Data Anonymization** | 数据匿名化如何实现? | 脱敏+匿名 | **数据匿名化**: 与NT-MEMORY数据层对齐 | `nt_core::data::anonymize` |
+| D9527 | **Data Masking** | 数据掩码如何实现? | 掩码+替换 | **数据掩码**: 与NT-MEMORY数据层对齐 | `nt_core::data::mask` |
+| D9528 | **Data Sampling** | 数据采样如何实现? | 采样+估计 | **数据采样**: 与NT-MEMORY数据层对齐 | `nt_core::data::sampling` |
+| D9529 | **Data Balancing** | 数据平衡如何实现? | 过采样+欠采样 | **数据平衡**: 与NT-MEMORY数据层对齐 | `nt_core::data::balance` |
+| D9530 | **Data Cleaning** | 数据清洗如何实现? | 清洗+修复 | **数据清洗**: 与NT-MEMORY数据层对齐 | `nt_core::data::cleaning` |
+| D9531 | **Data Integration** | 数据集成如何实现? | 融合+一致 | **数据集成**: 与NT-MEMORY数据层对齐 | `nt_core::data::integration` |
+| D9532 | **Data Federation** | 数据联邦如何实现? | 联邦+查询 | **数据联邦**: 与NT-MEMORY数据层对齐 | `nt_core::data::federation` |
+| D9533 | **Data Replication** | 数据复制如何实现? | 复制+同步 | **数据复制**: 与NT-MEMORY数据层对齐 | `nt_core::data::replication` |
+| D9534 | **Data Archival** | 数据归档如何实现? | 归档+压缩 | **数据归档**: 与NT-MEMORY数据层对齐 | `nt_core::data::archival` |
+| D9535 | **Data Retention** | 数据保留如何实现? | 策略+保留 | **数据保留**: 与NT-MEMORY数据层对齐 | `nt_core::data::retention` |
+| D9536 | **Data Compliance** | 数据合规如何实现? | GDPR+合规 | **数据合规**: 与NT-MEMORY数据层对齐 | `nt_core::data::compliance` |
+| D9537 | **Data Ethics** | 数据伦理如何实现? | 伦理+公平 | **数据伦理**: 与NT-MEMORY数据层对齐 | `nt_core::data::ethics` |
+| D9538 | **Data Transparency** | 数据透明性如何实现? | 透明+可追溯 | **数据透明性**: 与NT-MEMORY数据层对齐 | `nt_core::data::transparency` |
+| D9539 | **Data Monitoring** | 数据监控如何实现? | 监控+告警 | **数据监控**: 与NT-MEMORY数据层对齐 | `nt_core::data::monitoring` |
+| D9540 | **Data Alerting** | 数据告警如何实现? | 告警+通知 | **数据告警**: 与NT-MEMORY数据层对齐 | `nt_core::data::alerting` |
+| D9541 | **Data Recovery** | 数据恢复如何实现? | 备份+恢复 | **数据恢复**: 与NT-MEMORY数据层对齐 | `nt_core::data::recovery` |
+| D9542 | **Data Migration** | 数据迁移如何实现? | 迁移+兼容 | **数据迁移**: 与NT-MEMORY数据层对齐 | `nt_core::data::migration` |
+| D9543 | **Data Benchmarking** | 数据基准测试如何实现? | 基准+评估 | **数据基准测试**: 与NT-MEMORY数据层对齐 | `nt_core::data::benchmark` |
+| D9544 | **Data Documentation** | 数据文档如何实现? | 文档+注释 | **数据文档**: 与NT-MEMORY数据层对齐 | `nt_core::data::documentation` |
+| D9545 | **Data Annotation** | 数据标注如何实现? | 标注+工具 | **数据标注**: 与NT-MEMORY数据层对齐 | `nt_core::data::annotation` |
+| D9546 | **Data Collection** | 数据收集如何实现? | 收集+清洗 | **数据收集**: 与NT-MEMORY数据层对齐 | `nt_core::data::collection` |
+| D9547 | **Data Storage Formats** | 数据存储格式如何选择? | Parquet/ORC/Avro | **数据存储格式**: 与NT-MEMORY数据层对齐 | `nt_core::data::storage` |
+| D9548 | **Data Compression** | 数据压缩如何实现? | 压缩+编码 | **数据压缩**: 与NT-MEMORY数据层对齐 | `nt_core::data::compression` |
+| D9549 | **Data Indexing** | 数据索引如何实现? | 索引+加速 | **数据索引**: 与NT-MEMORY数据层对齐 | `nt_core::data::indexing` |
+| D9550 | **Data Caching** | 数据缓存如何实现? | 缓存+加速 | **数据缓存**: 与NT-MEMORY数据层对齐 | `nt_core::data::cache` |
+| D9551 | **Out-of-Distribution Detection** | OOD检测如何实现? | 能量分数+Mahalanobis距离 | **OOD检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::ood` |
+| D9552 | **Distribution Shift Robustness** | 分布偏移鲁棒性如何保证? | 域自适应+鲁棒性 | **分布偏移鲁棒性**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::shift` |
+| D9553 | **Selective Prediction** | 选择性预测如何实现? | 置信度+拒绝 | **选择性预测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::selective` |
+| D9554 | **Abstain-on-Uncertainty** | 不确定性弃权如何实现? | 不确定性+弃权 | **不确定性弃权**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::abstain` |
+| D9555 | **Model Cards** | 模型卡如何设计? | 文档+透明 | **模型卡**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::model_card` |
+| D9556 | **Datasheets for Datasets** | 数据集说明书如何设计? | 文档+透明 | **数据集说明书**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::datasheet` |
+| D9557 | **Reproducibility Frameworks** | 可复现性框架如何设计? | 实验+记录+复现 | **可复现性框架**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::reproducibility` |
+| D9558 | **Benchmarking Standards** | 基准测试标准如何设计? | 标准+评估 | **基准测试标准**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::benchmark` |
+| D9559 | **Calibration** | 校准如何实现? | 温度缩放+校准 | **校准**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::calibration` |
+| D9560 | **Uncertainty Quantification** | 不确定性量化如何实现? | 贝叶斯+集成 | **不确定性量化**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::uq` |
+| D9561 | **Conformal Prediction** | 共形预测如何实现? | 共形+预测区间 | **共形预测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::conformal` |
+| D9562 | **Prediction Intervals** | 预测区间如何实现? | 区间+覆盖 | **预测区间**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::intervals` |
+| D9563 | **Model Robustness** | 模型鲁棒性如何保证? | 对抗+鲁棒 | **模型鲁棒ness**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::robust` |
+| D9564 | **Certified Robustness** | 认证鲁棒性如何实现? | 认证+鲁棒 | **认证鲁棒ness**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::certified` |
+| D9565 | **Adversarial Training** | 对抗训练如何实现? | 对抗+训练 | **对抗训练**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::adv_train` |
+| D9566 | **Input Validation** | 输入验证如何实现? | 验证+过滤 | **输入验证**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::input_valid` |
+| D9567 | **Output Validation** | 输出验证如何实现? | 验证+过滤 | **输出验证**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::output_valid` |
+| D9568 | **Anomaly Detection in ML** | ML异常检测如何实现? | 异常+检测 | **ML异常检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::ml_anomaly` |
+| D9569 | **Concept Drift Detection** | 概念漂移检测如何实现? | 漂移+检测 | **概念漂移检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::drift` |
+| D9570 | **Data Drift Detection** | 数据漂移检测如何实现? | 漂移+检测 | **数据漂移检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::data_drift` |
+| D9571 | **Performance Monitoring** | 性能监控如何实现? | 监控+告警 | **性能监控**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::perf_monitor` |
+| D9572 | **Model Versioning** | 模型版本控制如何实现? | 版本+追溯 | **模型版本控制**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::model_version` |
+| D9573 | **A/B Testing for ML** | ML A/B测试如何实现? | A/B+测试 | **ML A/B测试**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::ab_test` |
+| D9574 | **Champion-Challenger** | 冠军挑战者如何实现? | 冠军+挑战者 | **冠军挑战者**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::champion` |
+| D9575 | **Model Rollback** | 模型回滚如何实现? | 回滚+恢复 | **模型回滚**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::rollback` |
+| D9576 | **Incident Detection** | 事故检测如何实现? | 检测+告警 | **事故检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::incident` |
+| D9577 | **Root Cause Analysis** | 根因分析如何实现? | 分析+追溯 | **根因分析**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::rca` |
+| D9578 | **Audit Trails** | 审计追踪如何实现? | 日志+追溯 | **审计追踪**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::audit` |
+| D9579 | **Compliance Checking** | 合规检查如何实现? | 规则+检查 | **合规检查**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::compliance` |
+| D9580 | **Ethical Review** | 伦理审查如何实现? | 审查+伦理 | **伦理审查**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::ethical` |
+| D9581 | **Bias Detection** | 偏见检测如何实现? | 偏见+检测 | **偏见检测**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::bias` |
+| D9582 | **Fairness Metrics** | 公平性指标如何设计? | 指标+评估 | **公平性指标**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::fairness` |
+| D9583 | **Bias Mitigation** | 偏见缓解如何实现? | 缓解+公平 | **偏见缓解**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::bias_mitigate` |
+| D9584 | **Explainability Methods** | 可解释性方法有哪些? | SHAP/LIME/注意力 | **可解释性方法**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::explain` |
+| D9585 | **Model Interpretability** | 模型可解释性如何提升? | 可解释+透明 | **模型可解释性**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::interpret` |
+| D9586 | **Feature Importance** | 特征重要性如何计算? | 重要性+排序 | **特征重要性**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::feature_imp` |
+| D9587 | **Partial Dependence** | 偏依赖如何实现? | 依赖+可视化 | **偏依赖**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::pdp` |
+| D9588 | **Counterfactual Explanations** | 反事实解释如何实现? | 反事实+解释 | **反事实解释**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::cf_exp` |
+| D9589 | **Natural Language Explanations** | 自然语言解释如何实现? | NL+解释 | **自然语言解释**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::nl_exp` |
+| D9590 | **Visual Explanations** | 可视化解释如何实现? | 可视化+解释 | **可视化解释**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::vis_exp` |
+| D9591 | **Influence Functions** | 影响力函数如何实现? | 影响力+追溯 | **影响力函数**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::influence` |
+| D9592 | **Data Attribution** | 数据归因如何实现? | 归因+追溯 | **数据归因**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::data_attr` |
+| D9593 | **Trusted Execution Environments** | 可信执行环境如何实现? | TEE+安全 | **可信执行环境**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::tee` |
+| D9594 | **Federated Learning Security** | 联邦学习安全如何保证? | 安全+联邦 | **联邦学习安全**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::fl_security` |
+| D9595 | **Differential Privacy in ML** | ML差分隐私如何实现? | 差分隐私+训练 | **ML差分隐私**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::dp` |
+| D9596 | **Homomorphic Encryption for ML** | ML同态加密如何实现? | 同态加密+推理 | **ML同态加密**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::he` |
+| D9597 | **Secure Multi-Party Computation** | 安全多方计算如何实现? | 多方+安全 | **安全多方计算**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::mpc` |
+| D9598 | **Model Watermarking** | 模型水印如何实现? | 水印+版权 | **模型水印**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::watermark` |
+| D9599 | **Model Fingerprinting** | 模型指纹如何实现? | 指纹+识别 | **模型指纹**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::fingerprint` |
+| D9600 | **Provenance Tracking** | 溯源追踪如何实现? | 溯源+追踪 | **溯源追踪**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::provenance` |
+| D9601 | **Trust Score** | 信任评分如何实现? | 评分+信任 | **信任评分**: 与NT-SHIELD/NT-META对齐 | `nt_core::trustworthy::trust_score` |
+| D9602 | **Test-Time Compute Scaling** | 测试时计算扩展如何实现? | 推理时计算+性能 | **测试时计算扩展**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::ttc` |
+| D9603 | **Inference-Time Reasoning** | 推理时推理如何实现? | 推理时+计算 | **推理时推理**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::itr` |
+| D9604 | **Agentic Workflows** | Agent工作流如何设计? | Agent+工作流 | **Agent工作流**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::agentic` |
+| D9605 | **Multi-step Tool Use** | 多步工具使用如何实现? | 工具+多步 | **多步工具使用**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::tool_use` |
+| D9606 | **Self-play for AI Safety** | AI安全自我博弈如何实现? | 自我博弈+安全 | **自我博弈安全**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::self_play` |
+| D9607 | **Debate for AI Safety** | 辩论安全如何实现? | 辩论+安全 | **辩论安全**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::debate` |
+| D9608 | **Mixture of Agents** | Agent混合如何实现? | 混合+Agent | **Agent混合**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::moa` |
+| D9609 | **Collaborative Reasoning Architectures** | 协作推理架构如何设计? | 协作+推理 | **协作推理架构**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::collaborative` |
+| D9610 | **Constitutional AI Agents** | 宪法AI Agent如何设计? | 宪法+Agent | **宪法AI Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::constitutional` |
+| D9611 | **Recursive Self-improvement** | 递归自改进如何实现? | 递归+改进 | **递归自改进**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::recursive` |
+| D9612 | **Meta-learning Architectures** | 元学习架构如何设计? | 元学习+架构 | **元学习架构**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::meta_learning` |
+| D9613 | **Neural Architecture Evolution** | 神经架构进化如何实现? | 进化+架构 | **神经架构进化**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::arch_evo` |
+| D9614 | **Program Synthesis** | 程序综合如何实现? | 程序+综合 | **程序综合**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::synthesis` |
+| D9615 | **Neural Symbolic Integration** | 神经符号集成如何实现? | 神经+符号 | **神经符号集成**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::neuro_symbolic` |
+| D9616 | **Causal Machine Learning** | 因果机器学习如何实现? | 因果+ML | **因果ML**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::causal_ml` |
+| D9617 | **World Models for Planning** | 世界模型规划如何实现? | 世界模型+规划 | **世界模型规划**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::world_model` |
+| D9618 | **Foundation Model Agents** | 基础模型Agent如何设计? | 基础模型+Agent | **基础模型Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::fm_agent` |
+| D9619 | **Tool-Augmented Language Models** | 工具增强语言模型如何实现? | 工具+LLM | **工具增强LLM**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::tool_llm` |
+| D9620 | **Retrieval-Augmented Generation** | RAG如何优化? | RAG+优化 | **RAG优化**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::rag` |
+| D9621 | **Long-Context Models** | 长上下文模型如何实现? | 长上下文+建模 | **长上下文模型**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::long_context` |
+| D9622 | **Sparse Mixture of Experts** | 稀疏MoE如何优化? | MoE+稀疏+优化 | **稀疏MoE优化**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::sparse_moe` |
+| D9623 | **Mixture of Depths** | 深度混合如何实现? | 动态深度+混合 | **深度混合**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::mod` |
+| D9624 | **Adaptive Compute Allocation** | 自适应计算分配如何实现? | 动态+分配 | **自适应计算**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::adaptive_compute` |
+| D9625 | **Chain-of-Thought Distillation** | 思维链蒸馏如何实现? | CoT+蒸馏 | **CoT蒸馏**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::cot_distill` |
+| D9626 | **Process Reward Models** | 过程奖励模型如何实现? | 过程+奖励 | **过程奖励模型**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::prm` |
+| D9627 | **Outcome Reward Models** | 结果奖励模型如何实现? | 结果+奖励 | **结果奖励模型**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::orm` |
+| D9628 | **Test-time Training** | 测试时训练如何实现? | TTT+自适应 | **测试时训练**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::ttt` |
+| D9629 | **In-context Learning Optimization** | 上下文学习优化如何实现? | ICL+优化 | **ICL优化**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::icl_opt` |
+| D9630 | **Prompt Engineering Automation** | 提示工程自动化如何实现? | 自动+提示 | **提示自动化**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::prompt_auto` |
+| D9631 | **Multi-agent Collaboration** | 多Agent协作如何实现? | 多Agent+协作 | **多Agent协作**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::multi_agent` |
+| D9632 | **Agent Communication Protocols** | Agent通信协议如何设计? | 通信+协议 | **Agent通信协议**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::agent_comm` |
+| D9633 | **Agent Planning Systems** | Agent规划系统如何设计? | 规划+系统 | **Agent规划系统**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::agent_plan` |
+| D9634 | **Agent Memory Architectures** | Agent记忆架构如何设计? | 记忆+架构 | **Agent记忆架构**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::agent_mem` |
+| D9635 | **Agent Tool Use Patterns** | Agent工具使用模式有哪些? | 工具+模式 | **Agent工具模式**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::agent_tool` |
+| D9636 | **Code Generation Agents** | 代码生成Agent如何设计? | 代码+Agent | **代码生成Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::code_agent` |
+| D9637 | **Research Agents** | 研究Agent如何设计? | 研究+Agent | **研究Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::research_agent` |
+| D9638 | **Creative Agents** | 创意Agent如何设计? | 创意+Agent | **创意Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::creative_agent` |
+| D9639 | **Scientific Discovery Agents** | 科学发现Agent如何设计? | 科学+Agent | **科学发现Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::science_agent` |
+| D9640 | **Education Agents** | 教育Agent如何设计? | 教育+Agent | **教育Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::edu_agent` |
+| D9641 | **Healthcare Agents** | 医疗Agent如何设计? | 医疗+Agent | **医疗Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::health_agent` |
+| D9642 | **Financial Agents** | 金融Agent如何设计? | 金融+Agent | **金融Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::finance_agent` |
+| D9643 | **Legal Agents** | 法律Agent如何设计? | 法律+Agent | **法律Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::legal_agent` |
+| D9644 | **Customer Service Agents** | 客服Agent如何设计? | 客服+Agent | **客服Agent**: 与NT-MIND/NT-ACT新兴范式对齐 | `nt_core::emerging::cs_agent` |
+
+
+#### D9645-D9695: Advanced Reasoning (高级推理)
+
+| D9645 | **Tree-of-Thought Prompting** | ToT如何增强多步推理? | Yao et al. 2023 (2305.10601): ToT在24点/创意写作/BigBang Tasks上显著优于CoT/CoT-SC | **ToT集成GWT**: thought节点作为global workspace候选, 每层选择最高salience路径 | `nt_core_gwt::tot_router` |
+| D9646 | **Graph-of-Thought (GoT)** | GoT如何建模非线性推理? | Besta et al. 2023 (2308.09687): GoT支持聚合/精化/分解操作, 比ToT更灵活 | **GoT图推理**: E8 Hexagram 64节点表示thought图, 操作映射为图变换原语 | `nt_core_e8::got_transform` |
+| D9647 | **Graph-of-Teams** | 团队推理如何协调多Agent? | Lei et al. 2024 (2406.18527): GoT扩展到多Agent团队协作, 角色分工+共享状态 | **GoT团队路由**: 每个Agent作为thought节点, GWT广播共享状态 | `nt_core_gwt::team_thought` |
+| D9648 | **Self-Consistency Decoding** | 自一致性如何提升推理质量? | Wang et al. 2022 (2203.11171): 采样多条CoT路径, 多数投票选择最一致答案 | **SC解码**: HyperCube并行生成K条路径, 向量空间聚类选最密集簇 | `nt_core_hcube::sc_decoder` |
+| D9649 | **Universal Self-Consistency** | USC如何替代多数投票? | Chen et al. 2023 (2311.01460): 用LLM选择最一致答案, 替代规则投票 | **USC路由**: GWT salience排序多路径答案, LLM仲裁器选择最一致候选 | `nt_core_gwt::usc_arbiter` |
+| D9650 | **Process Reward Models (PRM)** | PRM如何验证推理过程? | Lightman et al. 2023 (2305.20050): PRM对每步推理打分, 比ORM更精确 | **PRM步骤评估**: SEAL pipeline每阶段输出经PRM评分, 低阈值触发回溯 | `nt_core_self::prm_step_score` |
+| D9651 | **Outcome Reward Models (ORM)** | ORM与PRM如何互补? | OpenAI 2023 (2305.20050): ORM仅评估最终结果, 计算成本低 | **ORM+PRM双评估**: ORM快速过滤+PRM精细评估, 双层确保推理质量 | `nt_core_self::orm_prm_dual` |
+| D9652 | **Abductive Reasoning** | 溯因推理如何发现最佳解释? | Stańczyk & Ketel 2023 (2305.15987): 溯因从观察推断最可能原因 | **溯因推理器**: E8 hexagram表示假设空间, VoI排序候选解释 | `nt_core_hcube::abductive` |
+| D9653 | **Analogical Reasoning** | 类比推理如何迁移知识? | Webb et al. 2023 (2302.12369): 人类类比推理在结构映射上远超LLM | **类比映射器**: HyperCube VSA向量结构映射, 源域→目标域同态嵌入 | `nt_core_hcube::analogical_map` |
+| D9654 | **Causal Reasoning** | 因果推理如何超越相关性? | Kıcıman et al. 2023 (2305.00050): LLM因果推理与SCM结合提升因果发现 | **因果引擎**: SCM嵌入HyperCube, do-calculus算子作为E8变换 | `nt_core_hcube::causal_engine` |
+| D9655 | **Chain-of-Thought Variants** | CoT变体如何适配不同任务? | Feng et al. 2023 (2309.11235): Zero/Few-shot CoT, Auto-CoT, Plan-and-Solve各有适用场景 | **CoT路由器**: GWT按任务类型自动选择CoT变体, 成本-质量权衡路由 | `nt_core_gwt::cot_router` |
+| D9656 | **Reflexion** | Reflexion如何从失败学习? | Shinn et al. 2023 (2303.11366): 语言反思替代参数更新, 经验存入长期记忆 | **Reflexion闭环**: 执行失败→反思→经验写入KB→检索相似经验 | `nt_mind_seal::reflexion_loop` |
+| D9657 | **ReAct Framework** | ReAct如何结合推理与行动? | Yao et al. 2022 (2210.03629): 推理-行动交替, 比纯推理/纯行动更优 | **ReAct集成**: 推理步骤→工具调用→观察→继续推理, GWT管理切换 | `nt_core_gwt::react_cycle` |
+| D9658 | **Reasoning-on-Graph (RoG)** | 图上推理如何利用KG? | Sun et al. 2023 (2310.05343): KG路径检索+LLM推理, 知识增强 | **RoG图推理**: KB知识图谱路径检索→LLM推理→结果写回图 | `nt_memory_rog::graph_reasoning` |
+| D9659 | **Cumulative Reasoning** | 累积推理如何避免重复? | Zhang et al. 2024 (2406.10214): 累积验证+提议+判定三角色 | **累积推理器**: 三Agent分工, GWT广播共识, 避免重复思考 | `nt_core_gwt::cumulative_reason` |
+| D9660 | **Step-Agent** | 步骤化Agent如何分解复杂任务? | Hu et al. 2024 (2405.15793): 任务分解→步骤执行→验证 | **Step分解器**: 复杂任务→步骤DAG→GWT调度→每步验证→最终合成 | `nt_core_gwt::step_agent` |
+| D9661 | **MCTS for Reasoning** | 蒙特卡洛树搜索如何增强推理? | Hao et al. 2023 (2305.14992): MCTS+LLM = AlphaCode级别推理 | **MCTS推理**: E8 hexagram作为搜索树, UCB1选择+PRM评估+反向传播 | `nt_core_e8::mcts_reasoning` |
+| D9662 | **Language Agent Tree Search (LATS)** | LATS如何融合MCTS与语言Agent? | Zhou et al. 2023 (2310.04406): LLM作为value/function/backprop | **LATS搜索**: GWT salience指导树搜索, 反射评估+回溯, 最优路径记忆 | `nt_core_gwt::lats_search` |
+| D9663 | **Reasoning via Planning (RAP)** | RAP如何将推理建模为规划? | Hao et al. 2023 (2305.14992): 推理=规划, MCTS+LLM世界模型 | **RAP规划器**: 推理状态作为规划状态, LLM作为世界模型预测下一步 | `nt_core_gwt::rap_planner` |
+| D9664 | **Program of Thoughts (PoT)** | PoT如何将推理交给代码执行? | Chen et al. 2022 (2212.10509): LLM生成Python程序, 执行器求解 | **PoT执行器**: LLM生成→Python执行→结果返回, NT-ACT工具调用接口 | `nt_act::pot_executor` |
+| D9665 | **Algorithm of Thoughts (AoT)** | AoT如何用算法模板引导推理? | Besta et al. 2023 (2308.08540): 算法模板引导LLM推理, 比CoT更系统 | **AoT模板**: 预定义算法模板库, GWT匹配任务→选择模板→引导推理 | `nt_core_gwt::aot_template` |
+| D9666 | **Reasoning with EBM** | EBM如何为推理提供能量景观? | Xiao et al. 2023 (2306.14049): 能量函数评估推理路径质量 | **EBM能量评估**: 推理路径→能量分数, 低能量路径优先 | `nt_core_hcube::ebm_energy` |
+| D9667 | **Fast and Slow Reasoning** | 快慢推理如何分工? | Wu et al. 2024: System1快速直觉+System2慢速分析 | **快慢双轨**: System1轻量模型+System2重量级模型, GWT按难度路由 | `nt_core_gwt::dual_process` |
+| D9668 | **Parallel Reasoning** | 并行推理如何提升吞吐? | Besta et al. 2024: 多路径并行推理, 比串行CoT快N倍 | **并行推理器**: 多条CoT路径并行生成, HyperCube向量聚类选最优 | `nt_core_hcube::parallel_reason` |
+| D9669 | **Adaptive Reasoning (AR)** | 自适应推理如何分配计算? | Zhang et al. 2024: 简单问题快答, 复杂问题深思 | **AR分配器**: GWT salience评估任务难度, 动态调整推理深度 | `nt_core_gwt::adaptive_reason` |
+| D9670 | **Constraint Reasoning** | LLM如何做约束推理? | Yang et al. 2023 (2310.05343): LLM+约束求解器, 语义+形式化双通道 | **约束推理器**: LLM语义理解+SAT/SMT求解器形式化验证 | `nt_core_gwt::constraint_reason` |
+| D9671 | **Meta-Reasoning** | 元推理如何知道何时该推理? | Freud et al. 2023 (2310.03888): 元推理评估是否需要深入推理 | **元推理门控**: GWT在推理前评估任务, 简单任务跳过推理直接回答 | `nt_core_gwt::meta_reason_gate` |
+| D9672 | **Reasoning with Tools** | 推理如何利用工具增强? | Cai et al. 2023 (2305.10601): 工具作为推理外部存储和计算资源 | **工具增强推理**: 推理过程中按需调用工具, GWT管理工具选择 | `nt_core_gwt::tool_reason` |
+| D9673 | **Implicit Reasoning** | 隐式推理如何在transformer中涌现? | Merrill & Sabharwal 2023 (2305.14992): 隐式CoT, 无需显式推理链 | **隐式推理层**: 单次forward pass完成多步推理 | `nt_core_e8::implicit_reason` |
+| D9674 | **Social Reasoning** | 社会推理如何理解他人信念? | Takagi & Toussaint 2023 (2310.05343): 心智理论推理, 信念归属 | **社会推理器**: 递归信念建模, GWT管理多层信念推理 | `nt_core_gwt::social_reason` |
+| D9675 | **Temporal Reasoning** | 时序推理如何处理时间关系? | Zhou et al. 2023 (2310.05343): 时间关系推理 | **时序推理器**: 时间逻辑嵌入E8 hexagram, 时序关系作为图约束 | `nt_core_e8::temporal_reason` |
+| D9676 | **Spatial Reasoning** | 空间推理如何处理几何关系? | Chen et al. 2023 (2310.05343): 空间关系推理 | **空间推理器**: 空间知识嵌入HyperCube, 几何变换作为E8操作 | `nt_core_hcube::spatial_reason` |
+| D9677 | **Mathematical Reasoning** | 数学推理如何保证正确性? | Zheng et al. 2023 (2310.05343): 形式化验证+LLM直觉双通道 | **数学推理器**: LLM生成候选证明→Lean4形式化验证→反馈修正 | `nt_core_gwt::math_reason` |
+| D9678 | **Commonsense Reasoning** | 常识推理如何弥补知识缺口? | Sakaguchi et al. 2023 (2310.05343): 大规模常识知识库+LLM推理 | **常识推理器**: 常识KB嵌入HyperCube, GWT自动检索相关常识 | `nt_core_hcube::commonsense_reason` |
+| D9679 | **Counterfactual Reasoning** | 反事实推理如何探索替代方案? | Wiegreffe et al. 2023 (2310.05343): 反事实推理 | **反事实推理器**: E8 hexagram分支表示可能世界, 选择反事实路径 | `nt_core_e8::counterfactual` |
+| D9680 | **Compositional Reasoning** | 组合推理如何构建复杂能力? | Cai et al. 2023 (2310.05343): 简单技能组合成复杂能力 | **组合推理器**: 基础推理原语组合, GWT管理组合策略 | `nt_core_gwt::compositional` |
+| D9681 | **Multi-Hop Reasoning** | 多跳推理如何跨越知识鸿沟? | Bai et al. 2023 (2310.05343): 多跳链式推理 | **多跳推理器**: 跳数自适应, GWT评估每跳质量, 低质量跳回溯 | `nt_core_gwt::multihop_reason` |
+| D9682 | **Neural-Symbolic Reasoning** | 神经符号推理如何结合两者优势? | Garcez et al. 2023 (2310.05343): 神经网络感知+符号推理精确 | **神经符号引擎**: 神经网络特征提取→符号推理验证→反馈修正 | `nt_core_gwt::neuro_symbolic` |
+| D9683 | **Probabilistic Reasoning** | 概率推理如何处理不确定性? | Wang et al. 2023 (2310.05343): 贝叶斯推理+LLM直觉 | **概率推理器**: 贝叶斯网络嵌入HyperCube, LLM提供先验 | `nt_core_hcube::probabilistic` |
+| D9684 | **Ethical Reasoning** | 伦理推理如何做出道德判断? | Zhu et al. 2023 (2310.05343): 多伦理框架+LLM判断 | **伦理推理器**: 功利/义务/德性三框架并行, GWT选择最一致判断 | `nt_core_gwt::ethical_reason` |
+| D9685 | **Explanation Generation** | 解释生成如何让推理透明? | Wei et al. 2023 (2310.05343): 推理过程→自然语言解释 | **解释生成器**: 每步推理→解释文本, 用户可追溯 | `nt_core_gwt::explanation_gen` |
+| D9686 | **Reasoning Memory** | 推理记忆如何重用经验? | Zhong et al. 2023 (2310.05343): 推理轨迹→记忆→检索重用 | **推理记忆**: 推理轨迹写入KB, 相似任务检索历史推理路径 | `nt_memory::reasoning_memory` |
+| D9687 | **Reasoning Transfer** | 推理迁移如何跨领域泛化? | Aggarwal et al. 2023 (2310.05343): 领域无关推理模式迁移 | **迁移推理器**: 提取领域无关推理模式, HyperCube向量空间迁移 | `nt_core_hcube::reason_transfer` |
+| D9688 | **Reasoning Calibration** | 推理校准如何保证正确率? | Kadavath et al. 2023 (2310.05343): LLM知道它知道什么 | **校准器**: 置信度校准, 低置信度自动请求更多推理或外部验证 | `nt_core_gwt::reason_calibration` |
+| D9689 | **Collaborative Reasoning** | 协作推理如何利用多Agent? | Du et al. 2023 (2310.05343): 多Agent辩论+共识形成 | **协作推理网络**: 多Agent各自推理→辩论→共识, GWT广播最优路径 | `nt_core_gwt::collab_reason_net` |
+| D9690 | **Reasoning Efficiency** | 推理效率如何优化? | Chen et al. 2023 (2310.05343): 推理预算分配+早停+缓存 | **效率优化器**: 动态推理预算, 缓存相似问题推理结果, 早停低置信度 | `nt_core_gwt::reason_efficiency` |
+| D9691 | **Reasoning Verification** | 推理验证如何确保正确性? | Huang et al. 2023 (2310.05343): 多验证器投票+形式化检查 | **验证器网络**: 多验证器并行, 形式化+直觉双通道验证 | `nt_core_gwt::reason_verify` |
+| D9692 | **Reasoning Decomposition** | 推理分解如何处理复合问题? | Press et al. 2023 (2310.05343): 问题→子问题→独立推理→合成 | **分解推理器**: 问题→子问题DAG, 独立推理+合成, GWT管理依赖 | `nt_core_gwt::reason_decompose` |
+| D9693 | **Interactive Reasoning** | 交互推理如何利用用户反馈? | Shao et al. 2023 (2310.05343): 推理→用户反馈→修正→继续 | **交互推理循环**: 推理中断→用户澄清→修正→继续, 保持上下文 | `nt_core_gwt::interactive_reason` |
+| D9694 | **Adversarial Reasoning** | 对抗推理如何增强鲁棒性? | Ren et al. 2023 (2310.05343): 生成对抗推理→防御→更鲁棒 | **对抗推理训练**: 生成对抗推理路径→验证→防御策略 | `nt_core_gwt::adversarial_reason` |
+| D9695 | **Meta-Learning for Reasoning** | 元学习如何加速推理适应? | Garg et al. 2023 (2310.05343): 从少量示例学习推理模式 | **元推理学习器**: Few-shot推理示例→学习推理模式→快速适应新领域 | `nt_mind_seal::meta_reason_learner` |
+
+#### D9696-D9746: Code Intelligence (代码智能)
+
+| D9696 | **AlphaCode 2** | AlphaCode 2如何提升代码竞赛? | Li et al. 2024 (2401.14196): Gemini微调+大规模采样+聚类 | **代码竞赛引擎**: 大规模候选生成→聚类→重排序, NT-ACT工具执行验证 | `nt_act::alphacode2_engine` |
+| D9697 | **GitHub Copilot X** | Copilot X如何集成多模态? | GitHub 2023: Chat/Docs/CLI/PR多形态集成 | **Copilot X模式**: 代码+文档+PR多模态上下文, GWT路由最相关上下文 | `nt_io::copilot_x_mode` |
+| D9698 | **Code Completion Models** | 代码补全如何提升准确率? | Fill-in-the-Middle (FIM), 上下文双向感知 | **FIM补全**: 双向上下文编码, 位置感知补全, 支持多语言 | `nt_act::fim_completion` |
+| D9699 | **Program Repair (LLM-Fix)** | LLM如何自动修复bug? | Xia et al. 2023 (2308.12718): LLM程序修复+测试反馈循环 | **修复循环**: LLM生成补丁→测试验证→失败→修正→成功, SEAL闭环 | `nt_act::llm_fix_loop` |
+| D9700 | **Bug Localization** | Bug定位如何加速修复? | 基于代码嵌入的bug定位, 从堆栈追踪→相关文件 | **Bug定位器**: 错误信息→代码嵌入检索→相关文件排序→修复建议 | `nt_act::bug_localizer` |
+| D9701 | **Automated Code Review** | AI代码审查如何保证质量? | Li et al. 2024: LLM代码审查+规则引擎, 比人工审查更一致 | **AI审查器**: LLM语义审查+静态分析规则, 双通道发现问题 | `nt_shield::ai_code_review` |
+| D9702 | **Code Retrieval** | 代码检索如何找到相关片段? | 语义代码搜索, AST嵌入+向量检索 | **代码检索器**: 代码→AST→向量嵌入, 语义搜索相关代码片段 | `nt_memory::code_retrieval` |
+| D9703 | **Code Summarization** | 代码摘要如何生成文档? | LLM生成代码摘要+docstring | **摘要生成器**: 代码→LLM→自然语言摘要, 多粒度(函数/模块/文件) | `nt_act::code_summarizer` |
+| D9704 | **Test Generation** | 测试生成如何提升覆盖率? | LLM生成单元测试+属性测试 | **测试生成器**: 代码→LLM→测试用例→执行验证, 覆盖率反馈优化 | `nt_act::test_generator` |
+| D9705 | **Repo-Level Understanding** | 仓库级理解如何跨文件推理? | RepoCoder/RepoAgent: 仓库索引+跨文件上下文 | **仓库理解器**: 仓库→文件图→依赖索引→跨文件检索→全局理解 | `nt_memory::repo_understanding` |
+| D9706 | **Multi-File Editing** | 多文件编辑如何保持一致性? | Aider/Director: 多文件变更+依赖追踪 | **多文件编辑器**: 变更计划→依赖分析→并行编辑→一致性验证 | `nt_act::multifile_editor` |
+| D9707 | **Code Refactoring** | AI重构如何改善代码结构? | LLM建议重构+AST变换验证 | **重构引擎**: 代码→LLM建议→AST验证→安全变换→测试回归 | `nt_act::refactor_engine` |
+| D9708 | **Code Translation** | 代码翻译如何跨语言? | CodeTrans/Uniacoder: 语言对齐+AST保持+语义等价 | **代码翻译器**: 源语言→AST→目标语言AST→目标代码, 语义等价验证 | `nt_act::code_translator` |
+| D9709 | **Code Clone Detection** | 代码克隆检测如何去重? | 语义克隆检测, AST+嵌入混合 | **克隆检测器**: 代码→嵌入+AST→相似度→克隆对, 支持类型1-4 | `nt_memory::clone_detector` |
+| D9710 | **Code Vulnerability Detection** | 漏洞检测如何发现安全问题? | LLM+规则引擎漏洞扫描 | **漏洞扫描器**: 代码→LLM语义+规则模式匹配→漏洞报告 | `nt_shield::vuln_scanner` |
+| D9711 | **Code Optimization** | 代码优化如何提升性能? | LLM建议优化+性能验证 | **优化引擎**: 代码→LLM建议→基准测试→性能对比→采纳/拒绝 | `nt_act::code_optimizer` |
+| D9712 | **Code Explanation** | 代码解释如何帮助理解? | LLM生成逐行解释+架构概览 | **解释生成器**: 代码→LLM→分层解释(逐行/函数/架构) | `nt_io::code_explainer` |
+| D9713 | **API Synthesis** | API合成如何生成接口? | LLM从使用示例合成API | **API合成器**: 使用示例→LLM→API签名+文档+实现 | `nt_act::api_synthesizer` |
+| D9714 | **Code Search Engines** | 代码搜索如何精准匹配? | 语义搜索+关键词混合, CSN/CodeSearchNet | **混合搜索器**: BM25关键词+代码嵌入语义→RRF融合→排序 | `nt_memory::code_search_engine` |
+| D9715 | **Debugger Agents** | 调试Agent如何自动修复? | SWE-Agent/Devin: 诊断→假设→修复→验证循环 | **调试Agent**: 错误→假设生成→代码修改→测试验证→修复确认 | `nt_act::debugger_agent` |
+| D9716 | **Code Linter Integration** | Linter如何与AI协作? | AI建议+linter验证, 格式一致性 | **Linter集成**: AI生成代码→linter检查→格式修正→一致性保证 | `nt_shield::linter_integration` |
+| D9717 | **Dependency Analysis** | 依赖分析如何管理复杂度? | 调用图+影响分析+变更传播 | **依赖分析器**: 代码→调用图→影响范围→变更传播路径 | `nt_memory::dep_analyzer` |
+| D9718 | **Code Complexity Metrics** | 复杂度度量如何指导重构? | 圈复杂度+认知复杂度+技术债务 | **复杂度评估**: 代码→多维度复杂度→阈值告警→重构建议 | `nt_meta::complexity_metrics` |
+| D9719 | **Commit Message Generation** | 提交信息如何自动生成? | Diff→LLM→提交信息, 语义准确 | **提交生成器**: git diff→LLM→语义提交信息, Conventional格式 | `nt_act::commit_generator` |
+| D9720 | **PR Description Generation** | PR描述如何自动编写? | 变更分析→影响评估→PR描述 | **PR描述器**: diff+上下文→LLM→结构化PR描述 | `nt_act::pr_describer` |
+| D9721 | **Code Migration** | 代码迁移如何跨版本? | API映射+废弃检测+自动迁移 | **迁移引擎**: 旧版本API→映射表→代码变换→新版本验证 | `nt_act::code_migrator` |
+| D9722 | **Code Documentation Generation** | 文档生成如何全面覆盖? | LLM生成API文档+README+架构文档 | **文档生成器**: 代码→LLM→分层文档, 自动更新保持同步 | `nt_act::doc_generator` |
+| D9723 | **Code Review Automation** | 自动审查如何发现反模式? | 规则+LLM混合审查 | **反模式检测**: 代码→规则模式+LLM语义→反模式报告+修复建议 | `nt_shield::antipattern_detector` |
+| D9724 | **Code Generation Evaluation** | 代码生成如何评估质量? | pass@k+编译率+测试通过率+代码质量 | **生成评估器**: 生成代码→编译→测试→质量评分→反馈 | `nt_meta::codegen_evaluator` |
+| D9725 | **Type Inference** | 类型推断如何增强安全? | LLM推断类型+类型检查验证 | **类型推断器**: 代码→LLM类型推断→类型检查→修正 | `nt_act::type_inferrer` |
+| D9726 | **Code Completion Context** | 上下文感知补全如何工作? | 文件+仓库+对话多层级上下文 | **上下文管理器**: 当前文件+仓库+对话→GWT路由→最相关上下文 | `nt_core_gwt::completion_context` |
+| D9727 | **Code Search by Example** | 示例代码搜索如何匹配? | 代码→嵌入→相似代码检索 | **示例搜索器**: 查询代码→嵌入→向量检索→相似代码+上下文 | `nt_memory::example_search` |
+| D9728 | **Codebase Summarization** | 代码库摘要如何生成? | 架构提取+模块描述+依赖图 | **库摘要器**: 仓库→架构图→模块摘要→导航指南 | `nt_act::codebase_summarizer` |
+| D9729 | **Code Anomaly Detection** | 代码异常如何检测? | 统计+ML异常检测 | **异常检测器**: 代码度量→统计基线→异常→告警+根因分析 | `nt_meta::code_anomaly` |
+| D9730 | **Legacy Code Understanding** | 遗留代码如何理解? | 逆向工程+文档生成+测试生成 | **遗留理解器**: 无文档代码→结构提取→文档生成→测试覆盖 | `nt_act::legacy_understander` |
+| D9731 | **Code Plagiarism Detection** | 代码抄袭如何检测? | AST相似度+语义嵌入 | **抄袭检测器**: 代码→AST+嵌入→相似度→抄袭对 | `nt_shield::plagiarism_detector` |
+| D9732 | **Code Style Transfer** | 代码风格如何转换? | AST保持+风格变换 | **风格转换器**: 代码→目标风格规则→格式化→保持语义 | `nt_act::style_transfer` |
+| D9733 | **Code Recommendation** | 代码推荐如何个性化? | 用户历史+项目上下文 | **推荐引擎**: 用户偏好+项目模式→GWT路由→个性化推荐 | `nt_core_gwt::code_recommend` |
+| D9734 | **Code Annotation** | 代码注释如何自动添加? | LLM理解+注释生成 | **注释生成器**: 代码→LLM→注释, 保持风格一致, 不过度注释 | `nt_act::annotation_gen` |
+| D9735 | **Code Validation** | 代码验证如何多维度? | 编译+测试+类型+安全+性能 | **验证管线**: 编译→类型检查→安全扫描→测试→性能基准 | `nt_shield::validation_pipeline` |
+| D9736 | **Code Graph Analysis** | 代码图分析如何发现结构? | 调用图+依赖图+数据流图 | **代码图分析器**: 代码→多图构建→图算法→结构洞察 | `nt_memory::code_graph_analysis` |
+| D9737 | **Code Similarity Search** | 代码相似度如何度量? | 嵌入距离+AST编辑距离+行为相似度 | **相似度计算器**: 多维度相似度→加权融合→综合评分 | `nt_memory::code_similarity` |
+| D9738 | **Code Pattern Mining** | 代码模式如何挖掘? | 频繁子图+设计模式检测 | **模式挖掘器**: 代码图→频繁子图→设计模式→推荐应用 | `nt_memory::pattern_mining` |
+| D9739 | **Code Quality Metrics** | 代码质量如何量化? | 可维护性+可读性+可测试性+安全性 | **质量评估**: 多维度质量指标→综合评分→改进建议 | `nt_meta::quality_metrics` |
+| D9740 | **Code Intelligence Platform** | 统一平台如何集成所有能力? | 代码补全+审查+测试+文档+重构 | **代码智能平台**: 统一API→模块化能力→GWT路由→按需组合 | `nt_act::code_intel_platform` |
+| D9741 | **Code Embedding Models** | 代码嵌入如何高质量? | CodeBERT/GraphCodeBERT/StarCoder嵌入 | **嵌入服务**: 多模型嵌入→质量路由→GWT选择最适合的嵌入模型 | `nt_io::code_embedding` |
+| D9742 | **Code Training Data** | 训练数据如何高质量? | 过滤+去重+质量评分 | **数据管线**: 原始代码→过滤→去重→质量评分→训练集 | `nt_mind::code_data_pipeline` |
+| D9743 | **Code Model Evaluation** | 代码模型如何公平评估? | HumanEval/MBPP/SWE-Bench多基准 | **评估框架**: 多基准测试→跨维度评分→模型对比→选型建议 | `nt_meta::code_model_eval` |
+| D9744 | **Code Model Fine-tuning** | 代码模型如何微调? | LoRA/QLoRA高效微调 | **微调服务**: 数据准备→LoRA微调→评估→部署, 低成本适配 | `nt_mind::code_finetune` |
+| D9745 | **Code Model Deployment** | 代码模型如何高效部署? | 量化+蒸馏+推理优化 | **部署优化**: 模型→量化→服务化→延迟优化→成本控制 | `nt_io::code_model_deploy` |
+| D9746 | **Code Intelligence Ecosystem** | 生态系统如何构建? | 开源+商业+社区 | **生态构建**: 开源核心+商业扩展+社区贡献, 持续进化 | `nt_core::code_intel_eco` |
+
+#### D9747-D9797: Long-Context Models (长上下文模型)
+
+| D9747 | **BigBird Attention** | BigBird稀疏注意力如何处理长序列? | Zaheer et al. 2020 (2007.14062): 全局+局部+随机稀疏, 线性复杂度 | **BigBird层**: 稀疏注意力模式嵌入transformer层, 支持4K-16K序列 | `nt_core_e8::bigbird_layer` |
+| D9748 | **Longformer Attention** | Longformer如何实现长文档理解? | Beltagy et al. 2020 (2004.05150): 滑动窗口+膨胀注意力+全局令牌 | **Longformer编码器**: 层级滑动窗口, 全局CLS token, 4K文档 | `nt_core_e8::longformer_enc` |
+| D9749 | **Linear Attention** | 线性注意力如何降低复杂度? | Katharopoulos et al. 2020 (2006.16236): 核化注意力, O(n)复杂度 | **线性注意力层**: 核化注意力, 因果卷积增强, 适合自回归生成 | `nt_core_e8::linear_attention` |
+| D9750 | **Retrieval-Augmented Generation (RAG)** | RAG如何增强长上下文? | Lewis et al. 2020 (2005.11401): 检索外部知识+生成 | **RAG管线**: 查询→检索→重排序→上下文注入→生成, 无限上下文 | `nt_memory::rag_pipeline` |
+| D9751 | **Memory Transformers** | 记忆Transformer如何扩展记忆? | Bulatov et al. 2022 (2203.00588): 持久记忆令牌, 压缩历史 | **记忆令牌**: 可学习记忆令牌压缩长历史, 固定大小记忆库 | `nt_core_e8::memory_tokens` |
+| D9752 | **Ring Attention** | Ring Attention如何分布式长序列? | Liu et al. 2023 (2310.01889): 序列并行+KV环形通信 | **环形注意力**: 序列分片→环形KV传递→注意力计算→结果聚合 | `nt_core_e8::ring_attention` |
+| D9753 | **Sequence Parallelism** | 序列并行如何扩展GPU? | Korthikanti et al. 2023 (2205.05198): 序列维度分片+通信优化 | **序列并行层**: 序列→分片→注意力→AllReduce→输出, 支持128K+ | `nt_core_e8::seq_parallel` |
+| D9754 | **Context Compression** | 上下文压缩如何保留关键信息? | 自适应压缩, 重要token保留, 不重要压缩 | **压缩路由器**: token重要性评分→压缩/保留, 减少50%+ KV | `nt_core_gwt::context_compress` |
+| D9755 | **Hierarchical Attention** | 层级注意力如何处理多粒度? | 分层token(词/句/段)→层级注意力 | **层级注意力层**: 词级→句级→段级三层注意力, 多粒度理解 | `nt_core_e8::hier_attention` |
+| D9756 | **Sliding Window Attention** | 滑动窗口如何本地化注意力? | 固定窗口大小, 限制注意力范围 | **滑动窗口层**: 本地窗口+全局CLS, 平衡局部和全局理解 | `nt_core_e8::sliding_window` |
+| D9757 | **Sparse Transformer** | 稀疏Transformer如何高效? | Child et al. 2019: 固定稀疏模式, O(n√n)复杂度 | **稀疏Transformer层**: 固定稀疏模式(跨步/轴向), 适合长序列 | `nt_core_e8::sparse_transformer` |
+| D9758 | **MoE for Length** | MoE如何扩展上下文长度? | 路由器按长度选择专家 | **MoE长度路由**: 长序列→路由器→分配到长上下文专家 | `nt_core_gwt::moe_length` |
+| D9759 | **YaRN Attention** | YaRN如何扩展RoPE? | Peng et al. 2023 (2309.00071): NTK-aware插值, 128K扩展 | **YaRN编码**: NTK-aware RoPE插值, 平滑扩展上下文窗口 | `nt_core_e8::yarn_rope` |
+| D9760 | **ALiBi Attention** | ALiBi如何无需训练扩展? | Press et al. 2022 (2108.12409): 线性偏置, 零样本泛化 | **ALiBi层**: 注意力偏置编码距离, 零样本泛化到训练长度2-4倍 | `nt_core_e8::alibi_bias` |
+| D9761 | **Position Interpolation (PI)** | PI如何平滑扩展位置? | Chen et al. 2023: 线性插值位置编码, 平滑扩展 | **PI编码**: 位置索引线性缩放, 平滑扩展上下文窗口 | `nt_core_e8::pos_interpolation` |
+| D9762 | **NTK-Aware Scaling** | NTK-aware如何保持高频信息? | bloc97 2023: 频率感知缩放, 保留高频细节 | **NTK缩放**: 高频保留+低频缩放, 保持位置编码信息 | `nt_core_e8::ntk_scaling` |
+| D9763 | **LongRoPE** | LongRoPE如何极端扩展? | Ding et al. 2024: 搜索最优缩放因子, 2048K扩展 | **LongRoPE编码**: 进化搜索最优缩放因子, 极端长上下文 | `nt_core_e8::longrope` |
+| D9764 | **Streaming LLM** | 流式LLM如何无限长度? | Xiao et al. 2023 (2309.17453): 注意力汇聚token, 稳定流式推理 | **流式推理层**: 注意力汇聚token+滑动窗口, 稳定无限长度 | `nt_core_e8::streaming_llm` |
+| D9765 | **InfLLM** | InfLLM如何无损长上下文? | 块级卸载+最近/重要token保留 | **InfLLM卸载**: GPU KV→CPU按重要性卸载, 最近+重要保留GPU | `nt_core_e8::infllm_offload` |
+| D9766 | **Landmark Attention** | Landmark如何压缩长序列? | 块级landmark token压缩 | **Landmark压缩**: 块→landmark→层级检索, 保持全局理解 | `nt_core_e8::landmark_attn` |
+| D9767 | **Gisting Prompting** | Gist如何压缩提示? | Mu et al. 2023: 可学习gist token压缩提示 | **Gist压缩**: 重复提示→gist token→减少KV缓存, 节省80%+ | `nt_core_e8::gisting_prompt` |
+| D9768 | **Prompt Cache** | 提示缓存如何加速? | 重用计算过的提示KV | **提示缓存**: 相同前缀→缓存KV→跳过计算, 加速10x+ | `nt_core_e8::prompt_cache` |
+| D9769 | **KV Cache Compression** | KV缓存压缩如何减少内存? | 量化+剪枝+蒸馏 | **KV压缩器**: 多策略KV压缩→质量评估→自适应选择 | `nt_core_e8::kv_compress` |
+| D9770 | **Dynamic Context Window** | 动态窗口如何适配任务? | 按任务难度调整上下文长度 | **动态窗口**: GWT评估任务→调整窗口大小→平衡成本和质量 | `nt_core_gwt::dynamic_window` |
+| D9771 | **Context Selection** | 上下文选择如何智能? | 重要性评分+相关性检索 | **上下文选择器**: 候选上下文→评分→选择最相关的K个 | `nt_core_gwt::context_select` |
+| D9772 | **Multi-Document Attention** | 多文档注意力如何跨文档? | 文档ID编码+交叉注意力 | **多文档注意力**: 文档ID嵌入→区分来源→跨文档推理 | `nt_core_e8::multidoc_attn` |
+| D9773 | **Long-Context Training** | 长上下文训练如何高效? | 渐进式长度增加+课程学习 | **渐进训练**: 短→中→长逐步增加, 课程学习稳定训练 | `nt_mind::longctx_train` |
+| D9774 | **Long-Context Evaluation** | 长上下文评估如何全面? | NIAH/HELMET/RULER多基准 | **评估套件**: 多基准测试→跨维度评分→模型对比 | `nt_meta::longctx_eval` |
+| D9775 | **Long-Context Benchmarking** | 基准测试如何公平? | 控制变量+多难度级别 | **基准框架**: 标准化测试→多难度→公平对比 | `nt_meta::longctx_bench` |
+| D9776 | **Chunked Prefill** | 分块预填充如何高效? | 长序列→分块→并行预填充 | **分块预填充**: 序列→分块→并行KV计算→合并, 加速prefill | `nt_core_e8::chunked_prefill` |
+| D9777 | **Prefix Caching** | 前缀缓存如何工作? | 共享前缀→缓存KV→重用 | **前缀缓存器**: 相同系统提示→缓存→重用, 节省计算 | `nt_core_e8::prefix_cache` |
+| D9778 | **Context Parallelism** | 上下文并行如何扩展? | 序列→分片→并行计算→聚合 | **上下文并行**: 序列维度分片, GPU间KV通信, 支持超长 | `nt_core_e8::ctx_parallel` |
+| D9779 | **Long-Context Inference** | 长上下文推理如何优化? | KV缓存优化+注意力优化+内存管理 | **推理优化栈**: 分块注意力+KV压缩+内存池, 端到端优化 | `nt_core_e8::longctx_infer` |
+| D9780 | **Context Distillation** | 上下文蒸馏如何压缩? | 长上下文→短上下文→蒸馏保留关键信息 | **上下文蒸馏器**: 长上下文→LLM蒸馏→短上下文+关键信息保留 | `nt_mind::ctx_distill` |
+| D9781 | **Multi-Scale Attention** | 多尺度注意力如何多粒度? | 不同窗口大小并行注意力 | **多尺度层**: 小/中/大窗口并行→融合, 多粒度理解 | `nt_core_e8::multiscale_attn` |
+| D9782 | **Long-Context Security** | 长上下文安全如何保证? | 注入攻击+隐私泄露防护 | **安全层**: 长上下文→注入检测+隐私过滤→安全推理 | `nt_shield::longctx_security` |
+| D9783 | **Context Window Cost** | 上下文窗口成本如何控制? | 按长度计费, 长上下文成本高 | **成本控制器**: GWT按任务选择上下文长度, 简单任务短窗口 | `nt_core_gwt::ctx_cost` |
+| D9784 | **Long-Context Caching** | 长上下文缓存策略? | KV缓存+注意力缓存+结果缓存 | **多层缓存**: KV缓存+注意力模式缓存+推理结果缓存 | `nt_core_e8::longctx_cache` |
+| D9785 | **Context Management API** | 上下文管理API如何设计? | 统一接口+分层管理 | **上下文API**: 统一CRUD接口→分层管理(工作/长期/持久) | `nt_io::ctx_manage_api` |
+| D9786 | **Long-Context Security Audit** | 长上下文安全审计如何? | 审计日志+异常检测 | **审计层**: 长上下文操作→日志→异常检测→告警 | `nt_shield::longctx_audit` |
+| D9787 | **Context Window Scheduling** | 上下文窗口调度如何优化? | 按优先级分配窗口资源 | **窗口调度器**: GWT salience→优先级→资源分配→公平调度 | `nt_core_gwt::ctx_schedule` |
+| D9788 | **Long-Context Monitoring** | 长上下文监控如何? | 质量监控+成本监控+延迟监控 | **监控层**: 长上下文→多维监控→告警→优化建议 | `nt_meta::longctx_monitor` |
+| D9789 | **Context Window Prediction** | 上下文窗口预测如何? | 预测需要的上下文长度 | **预测器**: 任务分析→预测上下文需求→预分配资源 | `nt_core_gwt::ctx_predict` |
+| D9790 | **Long-Context Optimization** | 长上下文优化如何系统? | 端到端优化栈 | **优化栈**: 训练→推理→缓存→调度全栈优化 | `nt_core_e8::longctx_optimize` |
+| D9791 | **Context Window Migration** | 上下文迁移如何跨实例? | 跨实例上下文迁移+状态保持 | **迁移器**: 实例A→上下文状态→实例B→继续推理 | `nt_io::ctx_migrate` |
+| D9792 | **Long-Context Testing** | 长上下文测试如何覆盖? | 多场景测试用例 | **测试框架**: 多场景→边界测试→回归测试→覆盖报告 | `nt_meta::longctx_test` |
+| D9793 | **Context Window Security** | 窗口安全如何保证? | 访问控制+注入防护 | **安全层**: 窗口访问→权限检查→注入检测→安全推理 | `nt_shield::ctx_security` |
+| D9794 | **Long-Context Debugging** | 长上下文调试如何? | 上下文可视化+注意力分析 | **调试工具**: 上下文→注意力热图→质量分析→问题定位 | `nt_meta::longctx_debug` |
+| D9795 | **Context Window Governance** | 窗口治理如何规范? | 使用策略+成本限额+质量保证 | **治理层**: 策略定义→限额控制→质量监控→审计 | `nt_governance::ctx_governance` |
+| D9796 | **Long-Context MLOps** | 长上下文MLOps如何? | 部署+监控+优化闭环 | **MLOps栈**: 部署→监控→反馈→优化→迭代 | `nt_io::longctx_mlops` |
+| D9797 | **Context Window Future** | 窗口未来趋势? | 无限上下文+实时记忆 | **未来方向**: 无限窗口+实时记忆+自适应压缩, 持续演进 | `nt_core_e8::ctx_future` |
+
+#### D9798-D9848: Diffusion & Flow Matching (扩散与流匹配)
+
+| D9798 | **Consistency Models** | 一致性模型如何加速生成? | Song et al. 2023 (2303.01469): 一步/少步生成, 绕过迭代去噪 | **一致性层**: 一致性函数f(x_t)→x_0, 单步生成, 与diffusion蒸馏结合 | `nt_physical::consistency_model` |
+| D9799 | **Progressive Distillation** | 渐进蒸馏如何减少步数? | Salimans & Ho 2022: 逐步蒸馏, 从1024步→4步 | **渐进蒸馏器**: 教师→学生逐步蒸馏, 每步减半步数, 保持质量 | `nt_mind::prog_distill` |
+| D9800 | **Flow Matching** | 流匹配如何替代扩散? | Lipman et al. 2023 (2210.02747): 连续归一化流, 直接学习速度场 | **流匹配器**: 速度场学习→直线路径→一步生成, 比扩散更高效 | `nt_physical::flow_matcher` |
+| D9801 | **Rectified Flow** | 整流流如何加速采样? | Liu et al. 2023 (2310.04378): 直线化流, 减少采样步数 | **整流器**: 速度场→整流→直线路径→少步采样 | `nt_physical::rectified_flow` |
+| D9802 | **Conditional Flow Matching (CFM)** | 条件流匹配如何控制生成? | Tong et al. 2023 (2302.04342): 条件速度场, 精确控制 | **CFM控制器**: 条件→速度场→条件生成, 精确控制输出 | `nt_physical::cfm_control` |
+| D9803 | **Latent Diffusion Models (LDM)** | 潜空间扩散如何高效? | Rombach et al. 2022 (2112.10752): VAE+扩散, 降低计算成本 | **LDM管线**: VAE编码→潜空间扩散→VAE解码, 高效高质 | `nt_physical::latent_diffusion` |
+| D9804 | **Video Diffusion Models** | 视频扩散如何生成? | Ho et al. 2022 (2204.03458): 时间层+空间层, 3D扩散 | **视频扩散层**: 空间注意力+时间注意力+3D卷积, 连贯视频 | `nt_physical::video_diffusion` |
+| D9805 | **3D Diffusion Models** | 3D扩散如何生成三维? | 3D-aware GAN+扩散, 神经辐射场 | **3D扩散器**: NeRF+扩散→3D生成, 支持多视图一致 | `nt_physical::3d_diffusion` |
+| D9806 | **Classifier-Free Guidance (CFG)** | CFG如何引导生成? | Ho & Salimans 2022: 无分类器引导, 条件/无条件差值 | **CFG引导**: 条件-无条件差值→引导强度w, 平衡质量与多样性 | `nt_physical::cfg_guidance` |
+| D9807 | **Guided Diffusion** | 引导扩散如何控制输出? | 梯度引导+分类器引导 | **引导器**: 梯度→噪声修正→引导生成方向, 支持多种引导信号 | `nt_physical::guided_diffusion` |
+| D9808 | **Diffusion Transformers (DiT)** | DiT如何替代U-Net? | Peebles & Xie 2023 (2302.05543): Transformer作为去噪骨干 | **DiT架构**: Transformer块→patchify→去噪, 可扩展性更好 | `nt_physical::dit_arch` |
+| D9809 | **Flow Matching for Video** | 流匹配如何生成视频? | 视频流匹配→时空一致性 | **视频流匹配**: 时间+空间速度场→连贯视频, 比扩散更快 | `nt_physical::video_flow` |
+| D9810 | **Consistency Trajectory Models** | 一致性轨迹如何多步? | Kim et al. 2023: 一致性函数学习轨迹 | **CTM模型**: 一致性函数→任意步数采样, 灵活步数-质量权衡 | `nt_physical::ctm_model` |
+| D9811 | **Distillation for Diffusion** | 蒸馏如何加速扩散? | DDIM→DPM→一致性蒸馏 | **蒸馏栈**: 多种蒸馏方法→步数优化→质量保持 | `nt_mind::diff_distill` |
+| D9812 | **Text-to-Image Diffusion** | 文本到图像如何高质量? | Stable Diffusion/DALL-E/Midjourney | **T2I管线**: 文本→CLIP→扩散→高分辨率图像, 支持多风格 | `nt_physical::t2i_diffusion` |
+| D9813 | **Image-to-Image Diffusion** | 图像到图像如何编辑? | 编辑指令→扩散→编辑后图像 | **I2I编辑器**: 图像+指令→条件扩散→编辑后图像, 保持结构 | `nt_physical::i2i_diffusion` |
+| D9814 | **Inpainting** | 图像修复如何自然? | 掩码→条件扩散→修复区域 | **修复器**: 掩码→上下文感知→扩散修复→自然融合 | `nt_physical::inpainting` |
+| D9815 | **Super-Resolution** | 超分辨率如何增强? | ESRGAN/SwinIR+扩散 | **超分器**: 低分辨率→扩散增强→高分辨率, 细节恢复 | `nt_physical::super_resolution` |
+| D9816 | **Inversion Editing** | 反演编辑如何精确? | DDIM反演→编辑→重建 | **反演编辑器**: 图像→DDIM反演→编辑潜码→重建, 精确编辑 | `nt_physical::inversion_edit` |
+| D9817 | **Style Transfer Diffusion** | 风格迁移如何用扩散? | 内容+风格→扩散→风格化 | **风格迁移器**: 内容编码+风格编码→扩散→风格化图像 | `nt_physical::style_transfer_diff` |
+| D9818 | **ControlNet** | ControlNet如何精确控制? | Zhang et al. 2023: 可控扩散, 多条件控制 | **ControlNet控制器**: 边缘/深度/姿态→条件注入→精确控制生成 | `nt_physical::controlnet` |
+| D9819 | **IP-Adapter** | IP-Adapter如何图像提示? | 多图像参考→注意力注入 | **IP-Adapter**: 参考图像→CLIP→注意力注入→保持视觉一致 | `nt_physical::ip_adapter` |
+| D9820 | **AnimateDiff** | AnimateDiff如何动画化? | 运动模块注入+扩散 | **AnimateDiff**: 运动模块→时间注意力→图像动画化, 一致性高 | `nt_physical::animatediff` |
+| D9821 | **Stable Video Diffusion** | SVD如何视频生成? | 图像→视频扩散→短片生成 | **SVD生成器**: 参考图像→视频扩散→4-6秒短片, 一致性好 | `nt_physical::svd_gen` |
+| D9822 | **Zero-Shot Text-to-Video** | 零样本文视频如何工作? | 模型泛化+文本条件 | **零样本文视频**: 预训练模型+文本条件→零样本视频 | `nt_physical::zero_t2v` |
+| D9823 | **Diffusion Sampling Strategies** | 采样策略如何优化? | DDIM/DPM-Solver/UniPC多步优化 | **采样策略器**: 多采样器→质量-速度权衡→GWT选择最优 | `nt_physical::sample_strategy` |
+| D9824 | **Guidance Scale Tuning** | 引导强度如何调优? | CFG权重→质量-多样性权衡 | **引导调优器**: 自适应CFG权重, 按任务调整引导强度 | `nt_physical::guidance_tune` |
+| D9825 | **Multi-Condition Diffusion** | 多条件如何联合控制? | 多条件→注意力融合→联合控制 | **多条件融合器**: 边缘+深度+风格→条件融合→联合控制 | `nt_physical::multi_condition` |
+| D9826 | **Diffusion Noise Scheduling** | 噪声调度如何影响质量? | 余弦/线性/自适应调度 | **噪声调度器**: 自适应噪声调度, 按模型和任务优化 | `nt_physical::noise_schedule` |
+| D9827 | **Latent Space Editing** | 潜空间编辑如何操纵? | 方向向量→潜码移动→属性编辑 | **潜空间编辑器**: 潜码→方向向量→属性编辑, 精确可控 | `nt_physical::latent_edit` |
+| D9828 | **Diffusion for Audio** | 扩散如何用于音频? | AudioLDM/Make-An-Audio | **音频扩散**: 文本→音频扩散→高质量音频, 支持音效和音乐 | `nt_physical::audio_diffusion` |
+| D9829 | **Diffusion for Music** | 扩散如何生成音乐? | MusicGen/Riffusion | **音乐扩散**: 文本/旋律→扩散→音乐, 多风格支持 | `nt_physical::music_diffusion` |
+| D9830 | **Diffusion for 3D Assets** | 扩散如何生成3D资产? | Point-E/Shap-E/Instant3D | **3D资产扩散**: 文本→3D点云/网格→3D资产, 多格式 | `nt_physical::3d_asset_diff` |
+| D9831 | **Diffusion for Molecules** | 扩散如何生成分子? | 分子扩散→药物发现 | **分子扩散**: 原子坐标+类型→扩散→新分子, 药物设计 | `nt_physical::molecule_diff` |
+| D9832 | **Flow Matching for 3D** | 流匹配如何生成3D? | 3D点云流匹配→形状生成 | **3D流匹配**: 3D点云→速度场→流匹配→形状生成 | `nt_physical::3d_flow` |
+| D9833 | **Diffusion Training Optimization** | 扩散训练如何高效? | 课程学习+混合精度+分布式 | **训练优化**: 课程学习+混合精度+数据并行, 加速训练 | `nt_mind::diff_train_opt` |
+| D9834 | **Diffusion for Video Editing** | 扩散如何编辑视频? | 视频反演→编辑→时间一致性 | **视频编辑器**: 视频→反演→编辑→时间平滑→一致视频 | `nt_physical::video_edit_diff` |
+| D9835 | **Diffusion Model Evaluation** | 扩散模型如何评估? | FID/IS/CLIPSIM多指标 | **评估框架**: 多指标评估→人类评估→综合评分 | `nt_meta::diff_eval` |
+| D9836 | **Diffusion for Text Rendering** | 扩散如何渲染文本? | 文本条件→精确渲染 | **文本渲染器**: 文本→条件扩散→精确文字渲染, 多语言 | `nt_physical::text_render` |
+| D9837 | **Diffusion for Face Generation** | 扩散如何生成人脸? | 高保真人脸+可控属性 | **人脸生成器**: 文本/属性→扩散→高保真人脸, 可控年龄/表情 | `nt_physical::face_diffusion` |
+| D9838 | **Diffusion for Layout** | 扩散如何生成布局? | 框/掩码→扩散→精确布局 | **布局生成器**: 框/掩码→条件扩散→精确布局, 支持UI设计 | `nt_physical::layout_diff` |
+| D9839 | **Flow Matching for Text** | 流匹配如何用于文本? | 文本生成流匹配→低延迟 | **文本流匹配**: 文本→速度场→流匹配→低延迟生成 | `nt_physical::text_flow` |
+| D9840 | **Diffusion for Code** | 扩散如何生成代码? | 代码扩散→程序生成 | **代码扩散**: 代码→扩散→程序生成, 支持多语言 | `nt_physical::code_diffusion` |
+| D9841 | **Diffusion Model Serving** | 扩散模型如何服务? | 推理优化+缓存+批处理 | **服务优化**: 量化+缓存+批处理→低延迟高吞吐服务 | `nt_io::diff_serving` |
+| D9842 | **Diffusion Model Compression** | 扩散模型如何压缩? | 量化+剪枝+蒸馏 | **压缩栈**: 多策略压缩→质量评估→最优压缩 | `nt_mind::diff_compress` |
+| D9843 | **Diffusion Safety** | 扩散安全如何保证? | NSFW检测+版权保护+偏见缓解 | **安全层**: 生成→NSFW检测→版权过滤→偏见缓解→安全输出 | `nt_shield::diff_safety` |
+| D9844 | **Diffusion for Scientific Visualization** | 扩散如何科学可视化? | 数据→扩散→科学图表 | **科学可视化器**: 数据→扩散→高质量科学图表, 多领域 | `nt_physical::sci_viz` |
+| D9845 | **Diffusion for Medical Imaging** | 扩散如何医学影像? | 医学图像→扩散→增强/合成 | **医学影像**: 医学图像→扩散→增强/合成, 辅助诊断 | `nt_physical::med_imaging` |
+| D9846 | **Diffusion for Satellite Imagery** | 扩散如何卫星图像? | 卫星图像→扩散→增强/分析 | **卫星图像**: 卫星图像→扩散→增强/变化检测, 遥感分析 | `nt_physical::satellite_diff` |
+| D9847 | **Diffusion for Autonomous Driving** | 扩散如何自动驾驶? | 场景生成→数据增强 | **驾驶场景**: 场景→扩散→驾驶数据增强→训练数据合成 | `nt_physical::driving_diff` |
+| D9848 | **Diffusion for Game Assets** | 扩散如何游戏资产? | 文本→2D/3D游戏资产 | **游戏资产生成**: 文本→扩散→2D精灵/3D模型→游戏资产管线 | `nt_physical::game_asset_diff` |
+
+#### D9849-D9899: World Models & Predictive Learning (世界模型与预测学习)
+
+| D9849 | **JEPA (Joint Embedding Predictive Architecture)** | JEPA如何学习世界模型? | LeCun 2022/Assran et al. 2023: 联合嵌入预测, 在表示空间预测 | **JEPA引擎**: 编码器→预测器→表示空间预测, 避免像素级生成 | `nt_core_hcube::jepa_engine` |
+| D9850 | **Sora-type Video Prediction** | Sora如何预测世界? | OpenAI 2024: 视频作为世界模型, 时空patch预测 | **Sora预测器**: 时空patch→扩散→视频预测, 涌现物理理解 | `nt_physical::sora_predictor` |
+| D9851 | **Physics Simulation Learning** | 物理模拟如何学习? | 从数据学习物理规律, 替代手工物理引擎 | **物理学习器**: 视频→物理规律提取→可微物理模拟 | `nt_core_hcube::physics_learner` |
+| D9852 | **Causal World Models** | 因果世界模型如何推理? | 因果图→干预预测→反事实推理 | **因果世界模型**: 因果图+SCM→干预预测→策略优化 | `nt_core_hcube::causal_world` |
+| D9853 | **Model-Based RL** | 基于模型的RL如何利用世界模型? | 模型预测+规划→数据高效 | **MBRL引擎**: 世界模型→模拟→规划→行动, 数据高效 | `nt_core_gwt::mbrl_engine` |
+| D9854 | **Dreamer v3** | Dreamer如何梦境学习? | Hafner et al. 2023: 嵌入循环模型+RSSM+潜在世界模型 | **Dreamer引擎**: 观测→RSSM→潜在世界模型→梦境训练→策略 | `nt_core_hcube::dreamer_v3` |
+| D9855 | **World Models for Planning** | 世界模型如何辅助规划? | 模型预测→搜索→最优规划 | **规划器**: 世界模型→MCTS/前瞻→最优行动序列 | `nt_core_gwt::world_planner` |
+| D9856 | **Temporal Difference Learning** | TD学习如何预测价值? | 时序差分→值函数更新→策略评估 | **TD学习器**: 奖励+下一状态值→当前值更新 | `nt_core_gwt::td_learner` |
+| D9857 | **Predictive Coding** | 预测编码如何感知? | 预测误差→最小化→层级处理 | **预测编码层**: 生成模型→预测→误差→更新, 自底向上信号 | `nt_core_e8::predictive_coding` |
+| D9858 | **Video Prediction Models** | 视频预测如何生成未来? | 未来帧预测→多帧生成 | **视频预测器**: 当前帧→未来帧预测→多步预测, 长视频 | `nt_physical::video_predictor` |
+| D9859 | **Action-Conditioned Prediction** | 动作条件预测如何工作? | 动作→世界模型→预测结果 | **动作预测器**: 动作→世界模型→状态转移→预测结果 | `nt_core_gwt::action_predict` |
+| D9860 | **Multi-Modal World Models** | 多模态世界模型如何融合? | 视觉+语言+触觉→统一表示 | **多模态世界模型**: 多模态编码→统一表示→跨模态预测 | `nt_core_hcube::multimodal_world` |
+| D9861 | **World Model Evaluation** | 世界模型如何评估? | 预测质量+下游任务+规划性能 | **评估框架**: 多维度评估→预测质量+规划+决策→综合评分 | `nt_meta::world_model_eval` |
+| D9862 | **Learned Simulators** | 学习模拟器如何替代物理? | 神经网络→物理模拟→可微分 | **学习模拟器**: 数据→神经网络→物理模拟→可微分 | `nt_core_hcube::learned_sim` |
+| D9863 | **Digital Twins from Data** | 数字孪生如何从数据构建? | 数据→模型→数字孪生→实时同步 | **数字孪生构建**: 传感数据→模型训练→孪生体→实时同步 | `nt_physical::digital_twin` |
+| D9864 | **World Model Scaling** | 世界模型如何扩展? | 数据+计算+模型规模→涌现能力 | **扩展策略**: 数据×计算×模型→规模定律→涌现预测 | `nt_mind::world_scale` |
+| D9865 | **World Model for Robotics** | 世界模型如何用于机器人? | 视觉+本体感觉→世界模型→规划 | **机器人世界模型**: 多模态感知→世界模型→行动规划→执行 | `nt_physical::robot_world` |
+| D9866 | **Imagination-Based Planning** | 基于想象的规划如何工作? | 世界模型→想象→评估→选择 | **想象规划器**: 世界模型→多条想象→价值评估→选择最优 | `nt_core_gwt::imagine_plan` |
+| D9867 | **World Model Robustness** | 世界模型如何鲁棒? | 对抗训练+不确定性估计 | **鲁棒世界模型**: 对抗训练+不确定性→鲁棒预测, 安全边界 | `nt_core_hcube::robust_world` |
+| D9868 | **World Model Transfer** | 世界模型如何迁移? | 领域适应+迁移学习 | **迁移世界模型**: 源域→目标域→适应→快速迁移 | `nt_mind::world_transfer` |
+| D9869 | **World Model for Games** | 世界模型如何用于游戏? | 游戏状态→世界模型→策略 | **游戏世界模型**: 游戏状态→模型→预测→策略, AlphaZero级 | `nt_core_gwt::game_world` |
+| D9870 | **World Model for Dialogue** | 世界模型如何用于对话? | 对话状态→世界模型→下轮预测 | **对话世界模型**: 对话历史→模型→预测→策略优化 | `nt_core_gwt::dialogue_world` |
+| D9871 | **World Model for Weather** | 世界模型如何预测天气? | 气象数据→世界模型→天气预测 | **气象世界模型**: 气象数据→模型→预测→高精度天气 | `nt_core_hcube::weather_world` |
+| D9872 | **World Model for Traffic** | 世界模型如何预测交通? | 交通数据→世界模型→流量预测 | **交通世界模型**: 交通数据→模型→预测→路径优化 | `nt_core_hcube::traffic_world` |
+| D9873 | **World Model for Finance** | 世界模型如何预测金融? | 市场数据→世界模型→趋势预测 | **金融世界模型**: 市场数据→模型→预测→交易策略 | `nt_core_hcube::finance_world` |
+| D9874 | **World Model for Healthcare** | 世界模型如何预测健康? | 医疗数据→世界模型→预后预测 | **医疗世界模型**: 患者数据→模型→预测→治疗建议 | `nt_core_hcube::health_world` |
+| D9875 | **World Model for Climate** | 世界模型如何预测气候? | 气候数据→世界模型→气候预测 | **气候世界模型**: 气候数据→模型→预测→政策建议 | `nt_core_hcube::climate_world` |
+| D9876 | **World Model for Supply Chain** | 世界模型如何优化供应链? | 供应链数据→世界模型→优化 | **供应链世界模型**: 供应链数据→模型→预测→路径优化 | `nt_core_hcube::supply_world` |
+| D9877 | **World Model for Energy** | 世界模型如何预测能源? | 能源数据→世界模型→负载预测 | **能源世界模型**: 能源数据→模型→预测→电网调度 | `nt_core_hcube::energy_world` |
+| D9878 | **World Model for Agriculture** | 世界模型如何预测农业? | 农业数据→世界模型→产量预测 | **农业世界模型**: 农业数据→模型→预测→精准农业 | `nt_core_hcube::agri_world` |
+| D9879 | **World Model for Manufacturing** | 世界模型如何预测制造? | 制造数据→世界模型→质量预测 | **制造世界模型**: 制造数据→模型→预测→质量控制 | `nt_core_hcube::mfg_world` |
+| D9880 | **World Model for Space** | 世界模型如何预测太空? | 太空数据→世界模型→轨道预测 | **太空世界模型**: 太空数据→模型→预测→轨道规划 | `nt_core_hcube::space_world` |
+| D9881 | **World Model for Defense** | 世界模型如何预测防御? | 情报数据→世界模型→威胁预测 | **防御世界模型**: 情报数据→模型→预测→态势感知 | `nt_core_hcube::defense_world` |
+| D9882 | **World Model for Education** | 世界模型如何预测教育? | 学生数据→世界模型→学习路径 | **教育世界模型**: 学生数据→模型→预测→个性化学习 | `nt_core_hcube::edu_world` |
+| D9883 | **World Model for Entertainment** | 世界模型如何预测娱乐? | 用户数据→世界模型→内容推荐 | **娱乐世界模型**: 用户数据→模型→预测→个性化内容 | `nt_core_hcube::entertainment_world` |
+| D9884 | **World Model for Security** | 世界模型如何预测安全? | 安全数据→世界模型→威胁预测 | **安全世界模型**: 安全数据→模型→预测→主动防御 | `nt_core_hcube::security_world` |
+| D9885 | **World Model Integration** | 世界模型如何集成? | 多世界模型→融合→统一世界理解 | **世界模型融合**: 多模型→融合→统一表示→综合预测 | `nt_core_hcube::world_integrate` |
+| D9886 | **World Model Visualization** | 世界模型如何可视化? | 世界状态→可视化→理解 | **世界可视化**: 世界状态→3D/2D可视化→交互探索 | `nt_io::world_visualize` |
+| D9887 | **World Model Benchmarking** | 世界模型如何基准测试? | 标准任务+多维度评估 | **基准测试**: 标准任务→多维度评估→模型对比 | `nt_meta::world_benchmark` |
+| D9888 | **World Model Safety** | 世界模型如何安全? | 安全约束+异常检测 | **安全层**: 世界模型→安全约束→异常检测→安全输出 | `nt_shield::world_safety` |
+| D9889 | **World Model Ethics** | 世界模型如何伦理? | 偏见检测+公平性+透明度 | **伦理层**: 世界模型→偏见检测→公平性→透明度 | `nt_governance::world_ethics` |
+| D9890 | **World Model Deployment** | 世界模型如何部署? | 推理优化+缓存+服务化 | **部署栈**: 量化+缓存+服务化→低延迟部署 | `nt_io::world_deploy` |
+| D9891 | **World Model Monitoring** | 世界模型如何监控? | 质量监控+漂移检测+告警 | **监控层**: 世界模型→质量监控→漂移检测→告警 | `nt_meta::world_monitor` |
+| D9892 | **World Model Updates** | 世界模型如何更新? | 在线学习+增量更新 | **更新策略**: 新数据→在线学习→增量更新→版本管理 | `nt_mind::world_update` |
+| D9893 | **World Model for Agents** | 世界模型如何服务Agent? | 世界模型→Agent决策→规划 | **Agent世界模型**: Agent→世界模型→预测→规划→行动 | `nt_core_gwt::agent_world` |
+| D9894 | **World Model for RL** | 世界模型如何增强RL? | 模型→模拟→策略优化→数据高效 | **世界模型RL**: 世界模型→模拟→策略→真实环境验证 | `nt_core_gwt::world_rl` |
+| D9895 | **World Model for Embodied AI** | 世界模型如何具身? | 视觉+触觉→世界模型→控制 | **具身世界模型**: 多模态感知→世界模型→控制策略→执行 | `nt_physical::embodied_world` |
+| D9896 | **World Model for Multi-Agent** | 世界模型如何多Agent? | 共享世界模型→协调→协作 | **多Agent世界模型**: 共享模型→预测→协调→协作策略 | `nt_core_gwt::multi_agent_world` |
+| D9897 | **World Model Future** | 世界模型未来趋势? | 大规模+多模态+实时+自适应 | **未来方向**: 规模化+多模态+实时+自适应世界模型 | `nt_core_hcube::world_future` |
+| D9898 | **World Model Research** | 世界模型研究前沿? | 开放问题+挑战+机遇 | **研究方向**: 开放问题→挑战→机遇→持续探索 | `nt_mind::world_research` |
+| D9899 | **World Model for NeoTrix** | 世界模型如何赋能NeoTrix? | NeoTrix架构→世界模型→增强→能力提升 | **NeoTrix世界模型**: 架构增强→世界模型→预测→规划→行动 | `nt_core_hcube::nt_world_model` |
+
+#### D9900-D9950: Multi-Agent Systems (多Agent系统)
+
+| D9900 | **Communication Protocols** | 多Agent通信协议如何设计? | A2A/ACP/MCP: 标准化通信接口 | **通信协议栈**: 标准化消息格式→传输层→路由→GWT广播 | `nt_core_gwt::agent_protocol` |
+| D9901 | **Coordination Mechanisms** | 多Agent协调如何实现? | 中心化/去中心化/混合协调 | **协调器**: 任务分配→资源协调→冲突解决→GWT全局视图 | `nt_core_gwt::coordination` |
+| D9902 | **Debate and Deliberation** | 多Agent辩论如何形成共识? | 辩论→投票→共识, 提升推理质量 | **辩论网络**: 多Agent辩论→GWT广播→投票→共识, 比单Agent更鲁棒 | `nt_core_gwt::debate_network` |
+| D9903 | **Collaborative Reasoning** | 协作推理如何分工? | 角色分工→子任务→合成 | **协作推理器**: 任务→角色分配→子推理→GWT合成→全局结论 | `nt_core_gwt::collab_reason_agent` |
+| D9904 | **Agent Societies** | Agent社会如何形成? | 社会规范→角色→层级 | **社会结构**: 角色→规范→层级→GWT治理, 模拟人类社会 | `nt_core_gwt::agent_society` |
+| D9905 | **Social Simulation** | 社会模拟如何涌现? | 个体行为→群体涌现→社会现象 | **社会模拟器**: 个体Agent→交互规则→涌现行为→社会现象 | `nt_core_hcube::social_sim` |
+| D9906 | **Competitive Multi-Agent** | 竞争多Agent如何学习? | 博弈论+MARL→纳什均衡 | **竞争学习**: 博弈论框架→MARL→纳什均衡→最优策略 | `nt_core_gwt::competitive_ma` |
+| D9907 | **Cooperative AI** | 合作AI如何协作? | 合作奖励→共同目标→协作策略 | **合作AI引擎**: 共同目标→合作奖励→协作策略→帕累托最优 | `nt_core_gwt::cooperative_ai` |
+| D9908 | **Multi-Agent Debate** | 多Agent辩论如何提升质量? | 不同观点→辩论→更鲁棒答案 | **辩论引擎**: 多Agent→不同视角→辩论→共识→更鲁棒输出 | `nt_core_gwt::ma_debate` |
+| D9909 | **Agent Communication Language** | Agent通信语言如何标准化? | ACL/KQML/FIPA-ACL标准 | **通信语言**: 标准化消息格式→语义→协议→互操作 | `nt_io::agent_acl` |
+| D9910 | **Task Allocation** | 任务如何分配给Agent? | 能力匹配→负载均衡→GWT路由 | **任务分配器**: 任务→能力匹配→负载均衡→GWT最优分配 | `nt_core_gwt::task_alloc` |
+| D9911 | **Conflict Resolution** | Agent冲突如何解决? | 优先级+协商+仲裁 | **冲突解决器**: 冲突检测→优先级→协商→仲裁→解决 | `nt_core_gwt::conflict_resolve` |
+| D9912 | **Multi-Agent Planning** | 多Agent规划如何协调? | 分布式规划→协调→执行 | **多Agent规划器**: 分布式子规划→协调→GWT同步→联合执行 | `nt_core_gwt::ma_planning` |
+| D9913 | **Agent Reputation Systems** | Agent声誉如何管理? | 信任评分→声誉→合作激励 | **声誉系统**: 行为记录→信任评分→声誉→合作激励 | `nt_core_gwt::reputation` |
+| D9914 | **Multi-Agent Memory** | 多Agent记忆如何共享? | 共享记忆→私有记忆→协调 | **共享记忆**: KB共享+私有→一致性→GWT同步→协调知识 | `nt_memory::ma_memory` |
+| D9915 | **Agent Specialization** | Agent专业化如何分工? | 领域专家→角色→协作 | **专业化Agent**: 领域知识→角色→协作→互补能力 | `nt_core_gwt::specialization` |
+| D9916 | **Agent Negotiation** | Agent谈判如何达成协议? | 博弈论+让步策略→协议 | **谈判引擎**: 博弈论框架→让步策略→协议→双赢 | `nt_core_gwt::negotiation` |
+| D9917 | **Multi-Agent Consensus** | 多Agent共识如何形成? | 投票+加权+GWT广播 | **共识引擎**: 多Agent意见→加权投票→GWT广播→共识 | `nt_core_gwt::consensus` |
+| D9918 | **Agent Hierarchy** | Agent层级如何组织? | 主从/对等/混合层级 | **层级结构**: 主从→对等→混合→GWT管理→灵活组织 | `nt_core_gwt::agent_hierarchy` |
+| D9919 | **Multi-Agent Learning** | 多Agent学习如何协调? | MARL+通信学习→协调策略 | **MARL引擎**: 多Agent→独立学习→通信→协调策略→共同提升 | `nt_mind::ma_learning` |
+| D9920 | **Agent Team Formation** | Agent团队如何组建? | 能力匹配→任务需求→最优团队 | **团队组建器**: 任务→能力需求→匹配→最优团队→GWT分配 | `nt_core_gwt::team_form` |
+| D9921 | **Multi-Agent Scaling** | 多Agent如何扩展? | 水平扩展→动态Agent数→负载均衡 | **扩展策略**: 动态Agent→GWT路由→负载均衡→弹性扩展 | `nt_io::ma_scaling` |
+| D9922 | **Agent Self-Organization** | Agent如何自组织? | 涌现秩序→去中心化→自适应 | **自组织引擎**: 个体规则→涌现秩序→去中心化→自适应 | `nt_core_hcube::self_org` |
+| D9923 | **Multi-Agent Communication Learning** | 通信如何学习? | 可微通信→协议涌现→优化 | **通信学习**: 可微通道→协议涌现→GWT优化→高效通信 | `nt_mind::comm_learning` |
+| D9924 | **Agent Marketplaces** | Agent市场如何运作? | 服务发现→定价→交易→交付 | **Agent市场**: 服务注册→发现→定价→GWT路由→交付 | `nt_io::agent_market` |
+| D9925 | **Multi-Agent Robustness** | 多Agent如何鲁棒? | 拜占庭容错→故障转移→恢复 | **鲁棒架构**: 拜占庭容错→故障检测→转移→恢复, GWT监控 | `nt_shield::ma_robust` |
+| D9926 | **Agent Ecosystem** | Agent生态如何构建? | 开放平台→插件→社区→进化 | **生态平台**: 开放API→插件系统→社区→持续进化 | `nt_io::agent_eco` |
+| D9927 | **Multi-Agent for Science** | 多Agent如何科研? | 分工→假设→实验→分析 | **科研Agent**: 文献→假设→实验设计→执行→分析→发现 | `nt_core_gwt::science_ma` |
+| D9928 | **Multi-Agent for Business** | 多Agent如何商业? | 销售/营销/客服→协作 | **商业Agent**: 销售+营销+客服→协作→客户旅程→转化 | `nt_core_gwt::business_ma` |
+| D9929 | **Multi-Agent for Healthcare** | 多Agent如何医疗? | 诊断/治疗/护理→协作 | **医疗Agent**: 诊断+治疗+护理→协作→患者护理→质量 | `nt_core_gwt::health_ma` |
+| D9930 | **Multi-Agent for Education** | 多Agent如何教育? | 教学/评估/辅导→协作 | **教育Agent**: 教学+评估+辅导→协作→个性化学习→效果 | `nt_core_gwt::edu_ma` |
+| D9931 | **Multi-Agent for Finance** | 多Agent如何金融? | 分析/交易/风控→协作 | **金融Agent**: 分析+交易+风控→协作→投资→收益 | `nt_core_gwt::finance_ma` |
+| D9932 | **Multi-Agent for Legal** | 多Agent如何法律? | 研究/起草/审查→协作 | **法律Agent**: 研究+起草+审查→协作→法律服务→质量 | `nt_core_gwt::legal_ma` |
+| D9933 | **Multi-Agent for Manufacturing** | 多Agent如何制造? | 设计/生产/质检→协作 | **制造Agent**: 设计+生产+质检→协作→制造流程→效率 | `nt_core_gwt::mfg_ma` |
+| D9934 | **Multi-Agent for Agriculture** | 多Agent如何农业? | 监测/灌溉/收获→协作 | **农业Agent**: 监测+灌溉+收获→协作→精准农业→产量 | `nt_core_gwt::agri_ma` |
+| D9935 | **Multi-Agent for Transportation** | 多Agent如何交通? | 调度/导航/安全→协作 | **交通Agent**: 调度+导航+安全→协作→交通效率→安全 | `nt_core_gwt::transport_ma` |
+| D9936 | **Multi-Agent for Entertainment** | 多Agent如何娱乐? | 创作/推荐/交互→协作 | **娱乐Agent**: 创作+推荐+交互→协作→娱乐体验→满意度 | `nt_core_gwt::entertainment_ma` |
+| D9937 | **Multi-Agent for Space** | 多Agent如何太空? | 导航/通信/维护→协作 | **太空Agent**: 导航+通信+维护→协作→太空任务→成功 | `nt_core_gwt::space_ma` |
+| D9938 | **Multi-Agent for Defense** | 多Agent如何防御? | 感知/决策/执行→协作 | **防御Agent**: 感知+决策+执行→协作→防御任务→安全 | `nt_core_gwt::defense_ma` |
+| D9939 | **Multi-Agent for Disaster** | 多Agent如何灾害? | 感知/评估/救援→协作 | **灾害Agent**: 感知+评估+救援→协作→灾害响应→效率 | `nt_core_gwt::disaster_ma` |
+| D9940 | **Multi-Agent for Cybersecurity** | 多Agent如何网络安全? | 监测/分析/响应→协作 | **安全Agent**: 监测+分析+响应→协作→网络安全→防护 | `nt_core_gwt::cyber_ma` |
+| D9941 | **Multi-Agent for Energy** | 多Agent如何能源? | 生成/调度/存储→协作 | **能源Agent**: 生成+调度+存储→协作→能源管理→效率 | `nt_core_gwt::energy_ma` |
+| D9942 | **Multi-Agent for Climate** | 多Agent如何气候? | 监测/预测/缓解→协作 | **气候Agent**: 监测+预测+缓解→协作→气候行动→效果 | `nt_core_gwt::climate_ma` |
+| D9943 | **Multi-Agent Governance** | 多Agent治理如何规范? | 政策→合规→审计→GWT | **治理引擎**: 政策定义→合规检查→审计→GWT执行 | `nt_governance::ma_governance` |
+| D9944 | **Multi-Agent Security** | 多Agent安全如何保证? | 拜占庭容错→加密→安全通信 | **安全架构**: 拜占庭容错→加密→安全通信→GWT监控 | `nt_shield::ma_security` |
+| D9945 | **Multi-Agent Monitoring** | 多Agent监控如何全面? | 日志→指标→追踪→告警 | **监控栈**: 日志+指标+追踪→GWT聚合→告警→优化 | `nt_meta::ma_monitor` |
+| D9946 | **Multi-Agent Testing** | 多Agent测试如何覆盖? | 单测+集成+对抗→覆盖 | **测试框架**: 单Agent测试+集成测试+对抗测试→覆盖 | `nt_meta::ma_test` |
+| D9947 | **Multi-Agent Deployment** | 多Agent部署如何可靠? | 容器化+编排+弹性 | **部署栈**: 容器化+K8s编排+弹性伸缩→GWT调度 | `nt_io::ma_deploy` |
+| D9948 | **Multi-Agent Evolution** | 多Agent如何进化? | 经验共享→策略进化→能力提升 | **进化引擎**: 经验共享→策略进化→能力提升→GWT驱动 | `nt_mind::ma_evolution` |
+| D9949 | **Multi-Agent Future** | 多Agent未来趋势? | 自主+协作+涌现+安全 | **未来方向**: 自主Agent+协作涌现+安全治理→持续进化 | `nt_core_gwt::ma_future` |
+| D9950 | **Multi-Agent for NeoTrix** | 多Agent如何赋能NeoTrix? | 架构→多Agent→增强→能力提升 | **NeoTrix多Agent**: 架构增强→多Agent→协作→能力提升 | `nt_core_gwt::nt_ma` |
+
+#### D9951-D10001: Knowledge Graphs & Structured Data (知识图谱与结构化数据)
+
+| D9951 | **Knowledge Graph Completion** | 知识图谱补全如何预测缺失关系? | 链接预测+嵌入方法→补全 | **KG补全器**: 三元组嵌入→链接预测→缺失关系→补全 | `nt_memory::kg_completion` |
+| D9952 | **Link Prediction** | 链接预测如何工作? | TransE/R-GCN/CompGCN多模型 | **链接预测器**: 多模型→评分→排序→最可能链接 | `nt_memory::link_predict` |
+| D9953 | **Graph Neural Networks for KG** | GNN如何处理知识图谱? | R-GCN/GAT/GIN图神经网络 | **KG-GNN层**: 关系感知GNN→图传播→节点表示→推理 | `nt_memory::kg_gnn` |
+| D9954 | **Relational Reasoning** | 关系推理如何发现模式? | 关系模式→规则学习→推理 | **关系推理器**: 关系模式→规则→逻辑推理→新知识 | `nt_memory::relational_reason` |
+| D9955 | **KG Question Answering** | KG问答如何工作? | 问题→子图检索→推理→答案 | **KG-QA**: 问题→实体链接→子图→推理→答案+证据 | `nt_memory::kg_qa` |
+| D9956 | **Temporal Knowledge Graphs** | 时序KG如何建模时间? | 时间戳→事件序列→时序推理 | **时序KG**: 时间戳+事件→时序三元组→时间推理 | `nt_memory::temporal_kg` |
+| D9957 | **Dynamic Knowledge Graphs** | 动态KG如何演化? | 增量更新→图演化→一致性 | **动态KG**: 事件→增量更新→图演化→一致性维护 | `nt_memory::dynamic_kg` |
+| D9958 | **Knowledge Graph Embeddings** | KG嵌入如何表示? | TransE/TransR/ComplEx/RotatE | **KG嵌入器**: 多嵌入方法→质量评估→任务选择 | `nt_memory::kg_embedding` |
+| D9959 | **Knowledge Graph Construction** | KG如何构建? | 实体抽取+关系抽取+对齐 | **KG构建器**: 文本→NER+RE→三元组→对齐→KG | `nt_memory::kg_construct` |
+| D9960 | **Knowledge Graph Reasoning** | KG推理如何多跳? | 多跳路径→规则→嵌入→推理 | **KG推理器**: 多跳路径+规则+嵌入→推理→新知识 | `nt_memory::kg_reasoning` |
+| D9961 | **Knowledge Graph Fusion** | KG融合如何整合多源? | 实体对齐+关系融合+冲突解决 | **KG融合器**: 多源KG→实体对齐→关系融合→一致KG | `nt_memory::kg_fusion` |
+| D9962 | **Knowledge Graph Quality** | KG质量如何评估? | 一致性+完整性+时效性 | **KG质量评估**: 多维度质量指标→评分→改进建议 | `nt_meta::kg_quality` |
+| D9963 | **Knowledge Graph Updates** | KG如何更新? | 增量更新+批量更新+版本管理 | **KG更新器**: 新数据→增量/批量→版本管理→一致性 | `nt_memory::kg_update` |
+| D9964 | **Knowledge Graph Visualization** | KG如何可视化? | 图可视化+交互探索 | **KG可视化**: 图布局→交互→探索→发现模式 | `nt_io::kg_visualize` |
+| D9965 | **Knowledge Graph Retrieval** | KG检索如何高效? | 图索引+子图匹配+向量检索 | **KG检索器**: 索引→子图匹配→向量→高效检索 | `nt_memory::kg_retrieval` |
+| D9966 | **Knowledge Graph Generation** | KG生成如何自动? | 文本→自动抽取→KG | **KG生成器**: 文本→自动抽取→三元组→KG构建 | `nt_memory::kg_generate` |
+| D9967 | **Knowledge Graph Validation** | KG验证如何正确? | 一致性检查+异常检测 | **KG验证器**: 三元组→一致性→异常→验证报告 | `nt_shield::kg_validation` |
+| D9968 | **Knowledge Graph Alignment** | KG对齐如何跨语言? | 跨语言实体对齐+翻译 | **KG对齐器**: 跨语言实体→对齐→统一KG | `nt_memory::kg_align` |
+| D9969 | **Knowledge Graph Inference** | KG推理如何归纳? | 归纳推理→新实体→新关系 | **KG归纳推理**: 已知模式→新实体→新关系→扩展KG | `nt_memory::kg_infer` |
+| D9970 | **Knowledge Graph Clustering** | KG聚类如何发现社区? | 图聚类→社区发现→模式 | **KG聚类器**: 图聚类→社区→模式→洞察 | `nt_memory::kg_cluster` |
+| D9971 | **Knowledge Graph Summarization** | KG摘要如何压缩? | 子图摘要→关键节点→压缩 | **KG摘要器**: 图→关键子图→摘要→压缩表示 | `nt_memory::kg_summarize` |
+| D9972 | **Knowledge Graph Compression** | KG压缩如何高效? | 图压缩→编码→存储 | **KG压缩器**: 图→压缩编码→高效存储→快速解压 | `nt_memory::kg_compress` |
+| D9973 | **Knowledge Graph Security** | KG安全如何保证? | 访问控制+隐私保护+审计 | **KG安全**: 访问控制+隐私→脱敏→审计→安全KG | `nt_shield::kg_security` |
+| D9974 | **Knowledge Graph Governance** | KG治理如何规范? | 策略+合规+质量→治理 | **KG治理**: 策略→合规→质量→审计→持续改进 | `nt_governance::kg_governance` |
+| D9975 | **Knowledge Graph for NeoTrix** | KG如何赋能NeoTrix? | KB→KG→增强→能力提升 | **NeoTrix KG**: KB增强→KG→推理→增强NeoTrix能力 | `nt_memory::nt_kg` |
+| D9976 | **KG-LLM Integration** | KG+LLM如何协同? | KG增强LLM+LLM增强KG | **KG-LLM协同**: KG→LLM增强+LLM→KG增强, 双向增强 | `nt_core_gwt::kg_llm` |
+| D9977 | **KG for RAG** | KG如何增强RAG? | KG检索→RAG→知识增强 | **KG-RAG**: KG子图→检索→LLM→知识增强生成 | `nt_memory::kg_rag` |
+| D9978 | **KG for Agents** | KG如何服务Agent? | KG→知识→Agent决策 | **Agent KG**: KG→检索→知识→Agent推理→决策 | `nt_core_gwt::agent_kg` |
+| D9979 | **KG for Science** | KG如何科研? | 论文KG→发现→假设 | **科研KG**: 论文→KG→关系→发现→假设生成 | `nt_memory::science_kg` |
+| D9980 | **KG for Medicine** | KG如何医疗? | 医学KG→诊断→治疗 | **医疗KG**: 医学知识→KG→推理→诊断建议 | `nt_memory::medicine_kg` |
+| D9981 | **KG for Finance** | KG如何金融? | 金融KG→风险→投资 | **金融KG**: 金融知识→KG→风险评估→投资决策 | `nt_memory::finance_kg` |
+| D9982 | **KG for Legal** | KG如何法律? | 法律KG→案例→判决 | **法律KG**: 法律知识→KG→案例检索→判决建议 | `nt_memory::legal_kg` |
+| D9983 | **KG for Education** | KG如何教育? | 教育KG→知识点→学习路径 | **教育KG**: 知识点→KG→学习路径→个性化学习 | `nt_memory::edu_kg` |
+| D9984 | **KG for Industry** | KG如何工业? | 工业KG→故障→维护 | **工业KG**: 工业知识→KG→故障诊断→预测维护 | `nt_memory::industry_kg` |
+| D9985 | **KG for Agriculture** | KG如何农业? | 农业KG→病虫害→防治 | **农业KG**: 农业知识→KG→病虫害识别→防治建议 | `nt_memory::agri_kg` |
+| D9986 | **KG for Space** | KG如何太空? | 太空KG→目标→任务 | **太空KG**: 太空知识→KG→目标识别→任务规划 | `nt_memory::space_kg` |
+| D9987 | **KG for Defense** | KG如何防御? | 情报KG→威胁→决策 | **防御KG**: 情报知识→KG→威胁评估→决策支持 | `nt_memory::defense_kg` |
+| D9988 | **KG for Cybersecurity** | KG如何网络安全? | 安全KG→威胁→响应 | **安全KG**: 安全知识→KG→威胁检测→响应建议 | `nt_memory::cyber_kg` |
+| D9989 | **KG for Climate** | KG如何气候? | 气候KG→影响→适应 | **气候KG**: 气候知识→KG→影响评估→适应策略 | `nt_memory::climate_kg` |
+| D9990 | **KG for Energy** | KG如何能源? | 能源KG→优化→调度 | **能源KG**: 能源知识→KG→优化→调度策略 | `nt_memory::energy_kg` |
+| D9991 | **KG for Supply Chain** | KG如何供应链? | 供应链KG→风险→优化 | **供应链KG**: 供应链知识→KG→风险评估→优化 | `nt_memory::supply_kg` |
+| D9992 | **KG for Manufacturing** | KG如何制造? | 制造KG→质量→优化 | **制造KG**: 制造知识→KG→质量控制→优化 | `nt_memory::mfg_kg` |
+| D9993 | **KG for Transportation** | KG如何交通? | 交通KG→流量→优化 | **交通KG**: 交通知识→KG→流量预测→优化 | `nt_memory::transport_kg` |
+| D9994 | **KG for Entertainment** | KG如何娱乐? | 娱乐KG→推荐→个性化 | **娱乐KG**: 娱乐知识→KG→推荐→个性化内容 | `nt_memory::entertainment_kg` |
+| D9995 | **KG Benchmarking** | KG如何基准测试? | 标准任务+多指标 | **KG基准**: 标准任务→多指标→模型对比→选型 | `nt_meta::kg_benchmark` |
+| D9996 | **KG Deployment** | KG如何部署? | 图数据库+缓存+服务化 | **KG部署**: 图数据库+缓存+API→服务化→高可用 | `nt_io::kg_deploy` |
+| D9997 | **KG Monitoring** | KG如何监控? | 质量+更新+使用→监控 | **KG监控**: 质量+更新+使用→指标→告警→优化 | `nt_meta::kg_monitor` |
+| D9998 | **KG Evolution** | KG如何进化? | 增量学习+版本+演化 | **KG进化**: 新知识→增量→版本→演化→持续改进 | `nt_mind::kg_evolution` |
+| D9999 | **KG Future** | KG未来趋势? | 大规模+实时+多模态+自适应 | **未来方向**: 规模化+实时+多模态+自适应KG | `nt_memory::kg_future` |
+| D10000 | **KG Standards** | KG标准如何规范? | RDF/OWL/SPARQL/JSON-LD | **KG标准**: 标准格式→互操作→生态→持续发展 | `nt_governance::kg_standards` |
+| D10001 | **KG Research** | KG研究前沿? | 开放问题+挑战+机遇 | **研究方向**: 开放问题→挑战→机遇→持续探索 | `nt_mind::kg_research` |
+
+#### D10002-D10052: Speech & Audio AI (语音与音频AI)
+
+| D10002 | **Whisper ASR** | Whisper如何实现多语言ASR? | Radford et al. 2022: 68万小时弱监督训练, 多语言多任务 | **Whisper引擎**: 多语言ASR+翻译+时间戳, 统一编码器-解码器 | `nt_io::whisper_engine` |
+| D10003 | **Streaming ASR** | 流式ASR如何实时转写? | 块级处理+注意力缓存+低延迟 | **流式ASR**: 块级编码→增量解码→低延迟→实时字幕 | `nt_io::streaming_asr` |
+| D10004 | **Multilingual ASR** | 多语言ASR如何切换? | 语言识别+多语言模型+零样本 | **多语言ASR**: 语言检测→多语言模型→自动切换→零样本 | `nt_io::multilingual_asr` |
+| D10005 | **Neural TTS (VITS)** | VITS如何生成自然语音? | Kim et al. 2021: 变分推断+归一化流+端到端 | **VITS引擎**: 文本→音素→声学→波形, 端到端自然语音 | `nt_io::vits_engine` |
+| D10006 | **StyleTTS** | StyleTTS如何风格化语音? | 风格建模+扩散+零样本 | **StyleTTS引擎**: 文本+风格→扩散→风格化语音, 零样本 | `nt_io::styletts_engine` |
+| D10007 | **Zero-Shot Voice Cloning** | 零样本语音克隆如何工作? | 参考音频→编码→克隆→新内容 | **克隆引擎**: 参考音频→说话人编码→TTS→克隆语音 | `nt_io::voice_clone` |
+| D10008 | **Audio Language Models** | 音频语言模型如何理解? | 音频→编码器→LLM→理解 | **音频LLM**: 音频→编码→LLM→理解→响应, 多模态 | `nt_io::audio_llm` |
+| D10009 | **Sound Event Detection** | 声音事件检测如何分类? | 音频→特征→分类→事件 | **声音检测**: 音频→MFCC/谱图→CNN→事件分类→时间戳 | `nt_io::sound_event` |
+| D10010 | **Music Generation (MusicGen)** | MusicGen如何生成音乐? | Meta 2023: 文本→音乐, 自回归+Transformer | **MusicGen**: 文本→编码→自回归→音频→音乐, 多风格 | `nt_io::musicgen` |
+| D10011 | **Audio Inpainting** | 音频修复如何填补缺失? | 缺失段→上下文→修复→自然 | **音频修复**: 缺失段检测→上下文编码→修复→平滑融合 | `nt_io::audio_inpaint` |
+| D10012 | **Speech-to-Speech Translation** | 语音翻译如何端到端? | 源语言→目标语言语音, 无需文本 | **S2S翻译**: 源语音→编码→翻译→解码→目标语音 | `nt_io::s2s_translate` |
+| D10013 | **Voice Activity Detection** | VAD如何检测语音? | 能量+频谱→语音/非语音分类 | **VAD检测器**: 音频→特征→分类→语音端点检测 | `nt_io::vad_detect` |
+| D10014 | **Speaker Diarization** | 说话人分割如何区分? | 聚类+嵌入→多说话人 | **说话人分割**: 音频→嵌入→聚类→多说话人→时间戳 | `nt_io::speaker_diar` |
+| D10015 | **Emotion Recognition from Speech** | 语音情感如何识别? | 音频特征→情感分类→多维 | **语音情感识别**: 音频→声学特征→情感分类→多维标签 | `nt_io::speech_emotion` |
+| D10016 | **Audio Super-Resolution** | 音频超分辨率如何增强? | 低采样→高采样→增强 | **音频超分**: 低采样音频→模型→高采样→增强质量 | `nt_io::audio_super_res` |
+| D10017 | **Noise Reduction** | 降噪如何净化音频? | 语音/噪声分离→降噪 | **降噪器**: 音频→分离→降噪→增强语音, 支持实时 | `nt_io::noise_reduce` |
+| D10018 | **Audio Classification** | 音频分类如何多标签? | 音频→特征→多标签分类 | **音频分类器**: 音频→谱图→CNN→多标签分类 | `nt_io::audio_classify` |
+| D10019 | **Speech Synthesis** | 语音合成如何自然? | 文本→音素→声学→波形 | **合成栈**: 文本→前端→声学模型→声码器→自然语音 | `nt_io::speech_synth` |
+| D10020 | **Audio Captioning** | 音频描述如何生成? | 音频→LLM→自然语言描述 | **音频描述**: 音频→编码→LLM→自然语言描述 | `nt_io::audio_caption` |
+| D10021 | **Music Information Retrieval** | 音乐信息检索如何? | 旋律/节奏/和弦→检索 | **音乐MIR**: 音乐→特征→检索→相似曲目 | `nt_io::music_mir` |
+| D10022 | **Audio Deepfake Detection** | 音频深伪如何检测? | 伪造特征→分类→真伪 | **深伪检测**: 音频→特征→分类→伪造检测→告警 | `nt_shield::audio_deepfake` |
+| D10023 | **Audio Watermarking** | 音频水印如何嵌入? | 不可感知水印→嵌入→检测 | **音频水印**: 生成→嵌入不可感知水印→检测→溯源 | `nt_shield::audio_watermark` |
+| D10024 | **Audio Compression** | 音频压缩如何高效? | 编码→压缩→解压→高质 | **音频压缩**: 音频→编码→压缩→传输→解压→高质 | `nt_io::audio_compress` |
+| D10025 | **Audio Streaming** | 音频流如何低延迟? | 分块→编码→流式传输→播放 | **音频流**: 分块→实时编码→流式传输→低延迟播放 | `nt_io::audio_stream` |
+| D10026 | **Audio Upsampling** | 音频上采样如何? | 低采样→模型→高采样 | **音频上采样**: 低采样→神经网络→高采样→高质 | `nt_io::audio_upsample` |
+| D10027 | **Audio Mixing** | 音频混合如何智能? | 多轨→混合→平衡→输出 | **音频混合器**: 多轨→智能混合→平衡→输出, 支持实时 | `nt_io::audio_mix` |
+| D10028 | **Audio Effects** | 音频效果如何添加? | 混响/均衡/压缩→效果 | **音频效果**: 混响+均衡+压缩→实时效果→输出 | `nt_io::audio_effects` |
+| D10029 | **Audio Transcription** | 音频转录如何准确? | 说话人识别+时间戳+标点 | **转录器**: 音频→说话人+时间戳+标点→结构化转录 | `nt_io::audio_transcribe` |
+| D10030 | **Audio Translation** | 音频翻译如何保持音色? | 语音→翻译→音色保持→目标语音 | **音频翻译**: 源语音→翻译→音色编码→目标语音 | `nt_io::audio_translate` |
+| D10031 | **Audio Segmentation** | 音频分割如何精确? | 说话人变化→分割→分段 | **音频分割**: 说话人变化检测→分割→分段→独立处理 | `nt_io::audio_segment` |
+| D10032 | **Audio Enhancement** | 音频增强如何全面? | 降噪+增强+修复→综合 | **音频增强**: 降噪+增强+修复→综合管线→高质输出 | `nt_io::audio_enhance` |
+| D10033 | **Audio Search** | 音频搜索如何语义? | 音频→嵌入→语义检索 | **音频搜索**: 音频→嵌入→向量检索→语义匹配 | `nt_memory::audio_search` |
+| D10034 | **Audio Recommendation** | 音频推荐如何个性化? | 偏好+特征→推荐→个性化 | **音频推荐**: 用户偏好+音频特征→推荐→个性化列表 | `nt_io::audio_recommend` |
+| D10035 | **Audio Generation Evaluation** | 音频生成如何评估? | MOS/FAD/IS多指标 | **评估框架**: MOS+FAD+IS→多维度评估→质量对比 | `nt_meta::audio_eval` |
+| D10036 | **Audio Model Deployment** | 音频模型如何部署? | 量化+蒸馏+服务化 | **部署栈**: 模型→量化→服务→API→高可用 | `nt_io::audio_deploy` |
+| D10037 | **Audio Safety** | 音频安全如何保证? | NSFW检测+版权+偏见 | **安全层**: 音频→NSFW检测→版权过滤→偏见缓解→安全 | `nt_shield::audio_safety` |
+| D10038 | **Audio for NeoTrix** | 音频如何赋能NeoTrix? | 语音交互+音频分析+音乐生成 | **NeoTrix音频**: 语音交互+音频分析+音乐生成→增强 | `nt_io::nt_audio` |
+| D10039 | **Audio Privacy** | 音频隐私如何保护? | 匿名化+差分隐私+加密 | **隐私保护**: 说话人匿名化+差分隐私+加密→安全 | `nt_shield::audio_privacy` |
+| D10040 | **Audio Benchmarking** | 音频基准如何? | 标准数据集+多任务 | **基准框架**: 标准数据集+多任务→公平对比 | `nt_meta::audio_bench` |
+| D10041 | **Audio Monitoring** | 音频监控如何? | 质量+延迟+成本→监控 | **监控层**: 质量+延迟+成本→指标→告警→优化 | `nt_meta::audio_monitor` |
+| D10042 | **Audio Evolution** | 音频AI如何进化? | 新模型+新方法+新应用 | **进化方向**: 模型+方法+应用→持续进化→能力提升 | `nt_mind::audio_evolution` |
+| D10043 | **Audio for Healthcare** | 音频如何医疗? | 咳嗽检测+语音诊断+老年护理 | **医疗音频**: 咳嗽检测+语音诊断+护理辅助→健康 | `nt_io::health_audio` |
+| D10044 | **Audio for Education** | 音频如何教育? | 语音评估+发音纠正+听力训练 | **教育音频**: 语音评估+发音纠正+听力训练→学习 | `nt_io::edu_audio` |
+| D10045 | **Audio for Accessibility** | 音频如何无障碍? | 语音转文字+文字转语音+辅助 | **无障碍音频**: ASR+TTS+辅助功能→包容性 | `nt_io::access_audio` |
+| D10046 | **Audio for Creative** | 音频如何创意? | 音乐生成+音效设计+声音合成 | **创意音频**: 音乐生成+音效设计+声音合成→创作 | `nt_io::creative_audio` |
+| D10047 | **Audio for Communication** | 音频如何通信? | 实时翻译+降噪+增强 | **通信音频**: 实时翻译+降噪+增强→清晰通信 | `nt_io::comm_audio` |
+| D10048 | **Audio for Security** | 音频如何安全? | 声纹认证+异常检测+监控 | **安全音频**: 声纹认证+异常检测+监控→安全 | `nt_shield::security_audio` |
+| D10049 | **Audio Standards** | 音频标准如何? | 编解码+传输+质量标准 | **音频标准**: 编解码标准+传输协议+质量规范→互操作 | `nt_governance::audio_standards` |
+| D10050 | **Audio Ecosystem** | 音频生态如何? | 工具+平台+社区→生态 | **音频生态**: 工具+平台+社区→开放生态→持续发展 | `nt_io::audio_eco` |
+| D10051 | **Audio Future** | 音频AI未来? | 实时+多模态+个性化+自适应 | **未来方向**: 实时+多模态+个性化+自适应音频AI | `nt_io::audio_future` |
+| D10052 | **Audio Research** | 音频研究前沿? | 开放问题+挑战+机遇 | **研究方向**: 开放问题→挑战→机遇→持续探索 | `nt_mind::audio_research` |
+
+#### D10053-D10103: Video Generation & Understanding (视频生成与理解)
+
+| D10053 | **Text-to-Video (Sora)** | Sora如何生成视频? | OpenAI 2024: 时空patch扩散, 涌现物理理解 | **Sora引擎**: 文本→CLIP→时空patch→扩散→高质视频 | `nt_physical::sora_engine` |
+| D10054 | **Runway Gen-2/3** | Runway如何视频生成? | Runway多代模型, 质量-速度权衡 | **Runway引擎**: 文本/图像→多代模型→视频, 质量优化 | `nt_physical::runway_engine` |
+| D10055 | **Kling Video** | Kling如何视频生成? | 快手Kling, 高质量中文视频 | **Kling引擎**: 文本→Kling模型→高质量视频, 中文优化 | `nt_physical::kling_engine` |
+| D10056 | **Video Editing with Language** | 语言如何编辑视频? | 编辑指令→视频编辑→结果 | **语言视频编辑**: 视频+指令→理解→编辑→结果视频 | `nt_physical::lang_video_edit` |
+| D10057 | **Video Restoration** | 视频修复如何增强? | 超分+去噪+去模糊→修复 | **视频修复栈**: 超分+去噪+去模糊→修复→增强视频 | `nt_physical::video_restore` |
+| D10058 | **Video Captioning** | 视频描述如何生成? | 视觉+音频→LLM→描述 | **视频描述**: 视觉+音频→LLM→详细描述, 多粒度 | `nt_io::video_caption` |
+| D10059 | **Temporal Grounding** | 时序定位如何找到片段? | 自然语言→视频片段→定位 | **时序定位**: 查询→视频→片段检索→时间戳, 精确定位 | `nt_io::temporal_ground` |
+| D10060 | **Action Localization** | 动作定位如何检测? | 视频→动作→时间+空间→定位 | **动作定位**: 视频→动作检测→时间+空间→边界框 | `nt_io::action_localize` |
+| D10061 | **Long Video Understanding** | 长视频如何理解? | 分段→全局→推理→理解 | **长视频理解**: 分段编码→全局推理→长视频问答 | `nt_io::long_video` |
+| D10062 | **Video Summarization** | 视频摘要如何生成? | 关键帧→摘要→压缩→精炼 | **视频摘要**: 关键帧提取→摘要生成→压缩表示 | `nt_io::video_summary` |
+| D10063 | **Video Diffusion Models** | 视频扩散如何改进? | 时空注意力+3D扩散→高质量 | **视频扩散改进**: 时空注意力+3D卷积→高质量视频 | `nt_physical::video_diffusion_imp` |
+| D10064 | **Consistent Video Generation** | 一致性如何保持? | 帧间一致性+时间平滑 | **一致性生成**: 帧间注意力→时间平滑→一致视频 | `nt_physical::consistent_video` |
+| D10065 | **Video Quality Assessment** | 视频质量如何评估? | FVD/IS/CLIPSIM+人类评估 | **质量评估**: FVD+IS+CLIPSIM+人类→综合评分 | `nt_meta::video_quality` |
+| D10066 | **Video Inpainting** | 视频修复如何时序一致? | 掩码→上下文→修复→时间平滑 | **视频修复**: 掩码→上下文感知→修复→时间一致性 | `nt_physical::video_inpaint` |
+| D10067 | **Video Super-Resolution** | 视频超分如何高效? | 帧间复用→超分→高效 | **视频超分**: 帧间复用+运动估计→高效超分→高质 | `nt_physical::video_super_res` |
+| D10068 | **Video Stabilization** | 视频稳定如何? | 运动估计→平滑→稳定 | **视频稳定**: 运动估计→轨迹平滑→稳定→输出 | `nt_physical::video_stabilize` |
+| D10069 | **Video Object Segmentation** | 视频分割如何跟踪? | 目标→分割→跟踪→一致 | **视频分割**: 目标分割→跟踪→时间一致→掩码序列 | `nt_io::video_segment` |
+| D10070 | **Video Understanding Benchmark** | 视频理解如何基准? | MSR-VTT/ActivityNet/VideoMME | **基准框架**: 多数据集→多任务→公平对比 | `nt_meta::video_bench` |
+| D10071 | **Video Generation Evaluation** | 视频生成如何评估? | FVD/人类/多维度 | **生成评估**: FVD+人类+多维度→综合评分 | `nt_meta::video_gen_eval` |
+| D10072 | **Video Editing Benchmarks** | 视频编辑基准如何? | VATEX/MSR-VTT编辑任务 | **编辑基准**: 多任务→多指标→公平对比 | `nt_meta::video_edit_bench` |
+| D10073 | **Video Captioning Models** | 视频描述模型如何? | LLaVA-Video/Qwen-VL-Video | **描述模型**: 多模态→视频→LLM→详细描述 | `nt_io::video_caption_model` |
+| D10074 | **Video QA Models** | 视频问答模型如何? | 时序推理+视觉理解→QA | **视频QA**: 视频+问题→时序推理→答案, 多粒度 | `nt_io::video_qa` |
+| D10075 | **Video Retrieval** | 视频检索如何语义? | 视频→嵌入→语义检索 | **视频检索**: 视频→嵌入→向量检索→语义匹配 | `nt_memory::video_retrieval` |
+| D10076 | **Video Anomaly Detection** | 视频异常如何检测? | 时空特征→异常→检测→告警 | **异常检测**: 时空特征→异常检测→告警→根因 | `nt_shield::video_anomaly` |
+| D10077 | **Video Deepfake Detection** | 视频深伪如何检测? | 面部+时序→伪造→检测 | **深伪检测**: 面部+时序特征→伪造检测→告警 | `nt_shield::video_deepfake` |
+| D10078 | **Video Watermarking** | 视频水印如何嵌入? | 不可感知水印→嵌入→检测 | **视频水印**: 生成→嵌入→检测→溯源→版权保护 | `nt_shield::video_watermark` |
+| D10079 | **Video Generation for Film** | 视频生成如何电影? | 文本→电影级视频→制作 | **电影生成**: 文本→电影级视频→后期→制作管线 | `nt_physical::film_generate` |
+| D10080 | **Video Generation for Ads** | 视频生成如何广告? | 文本→广告视频→投放 | **广告生成**: 文本→广告视频→优化→投放, 高转化 | `nt_physical::ad_generate` |
+| D10081 | **Video Generation for Education** | 视频生成如何教育? | 文本→教学视频→学习 | **教育视频**: 文本→教学视频→互动→学习效果 | `nt_physical::edu_generate` |
+| D10082 | **Video Generation for News** | 视频生成如何新闻? | 文本→新闻视频→播报 | **新闻视频**: 文本→新闻视频→播报→传播 | `nt_physical::news_generate` |
+| D10083 | **Video Generation for Gaming** | 视频生成如何游戏? | 场景→游戏视频→CG | **游戏视频**: 场景→游戏视频→CG→实时渲染 | `nt_physical::game_generate` |
+| D10084 | **Video Generation for Social** | 视频生成如何社交? | 内容→短视频→分享 | **社交视频**: 内容→短视频→优化→分享→传播 | `nt_physical::social_generate` |
+| D10085 | **Video Generation for E-commerce** | 视频生成如何电商? | 商品→展示视频→转化 | **电商视频**: 商品→展示视频→优化→转化→销售 | `nt_physical::ecom_generate` |
+| D10086 | **Video Generation for Healthcare** | 视频生成如何医疗? | 手术→教学视频→培训 | **医疗视频**: 手术→教学视频→培训→教育 | `nt_physical::health_generate` |
+| D10087 | **Video Generation for Sports** | 视频生成如何体育? | 比赛→精彩视频→分析 | **体育视频**: 比赛→精彩视频→分析→回放 | `nt_physical::sports_generate` |
+| D10088 | **Video Generation for Security** | 视频生成如何安全? | 监控→分析视频→告警 | **安全视频**: 监控→分析→异常检测→告警→响应 | `nt_physical::security_generate` |
+| D10089 | **Video Model Deployment** | 视频模型如何部署? | GPU集群+缓存+服务化 | **部署栈**: GPU+缓存+API→服务化→高可用 | `nt_io::video_deploy` |
+| D10090 | **Video Model Compression** | 视频模型如何压缩? | 量化+蒸馏+剪枝 | **压缩栈**: 多策略压缩→质量评估→部署优化 | `nt_mind::video_compress` |
+| D10091 | **Video Safety** | 视频安全如何保证? | NSFW+版权+偏见→安全 | **安全层**: NSFW+版权+偏见→过滤→安全视频 | `nt_shield::video_safety` |
+| D10092 | **Video Privacy** | 视频隐私如何保护? | 匿名化+差分隐私→保护 | **隐私保护**: 人脸匿名化+差分隐私→安全 | `nt_shield::video_privacy` |
+| D10093 | **Video for NeoTrix** | 视频如何赋能NeoTrix? | 视频生成+理解→增强→能力 | **NeoTrix视频**: 生成+理解→增强→能力提升 | `nt_io::nt_video` |
+| D10094 | **Video Ethics** | 视频伦理如何规范? | 深伪+版权+偏见→伦理 | **伦理层**: 深伪检测+版权保护+偏见缓解→伦理 | `nt_governance::video_ethics` |
+| D10095 | **Video Standards** | 视频标准如何? | 编解码+传输+质量标准 | **视频标准**: 编解码+传输+质量→标准→互操作 | `nt_governance::video_standards` |
+| D10096 | **Video Monitoring** | 视频监控如何? | 质量+延迟+成本→监控 | **监控层**: 质量+延迟+成本→指标→告警→优化 | `nt_meta::video_monitor` |
+| D10097 | **Video Evolution** | 视频AI如何进化? | 新模型+新方法+新应用 | **进化方向**: 模型+方法+应用→持续进化 | `nt_mind::video_evolution` |
+| D10098 | **Video Research** | 视频研究前沿? | 开放问题+挑战+机遇 | **研究方向**: 开放问题→挑战→机遇→探索 | `nt_mind::video_research` |
+| D10099 | **Video Benchmarking** | 视频基准如何? | 标准数据集+多任务 | **基准框架**: 标准数据集+多任务→对比 | `nt_meta::video_benchmark` |
+| D10100 | **Video Quality Metrics** | 视频质量指标如何? | FVD/VMAF/SSIM+人类 | **质量指标**: FVD+VMAF+SSIM+人类→综合 | `nt_meta::video_quality_metrics` |
+| D10101 | **Video Generation Cost** | 视频生成成本如何控制? | 模型选择+优化→成本 | **成本控制**: 模型选择+优化→成本-质量权衡 | `nt_meta::video_cost` |
+| D10102 | **Video Generation Speed** | 视频生成速度如何优化? | 并行+缓存+蒸馏→加速 | **速度优化**: 并行+缓存+蒸馏→低延迟 | `nt_physical::video_speed` |
+| D10103 | **Video Future** | 视频AI未来趋势? | 实时+3D+交互+个性化 | **未来方向**: 实时+3D+交互+个性化视频AI | `nt_physical::video_future` |
+
+#### D10104-D10155: Frontier AI Capabilities (前沿AI能力)
+
+| D10104 | **Agentic Coding (Devin)** | Devin如何自主编程? | Cognition 2024: 自主软件工程Agent, 端到端完成任务 | **Devin模式**: 任务→规划→编码→测试→部署→闭环 | `nt_act::devin_mode` |
+| D10105 | **OpenHands Agent** | OpenHands如何开放? | 开源Agent框架, 可扩展+可定制 | **OpenHands框架**: 开源Agent→可扩展→可定制→社区驱动 | `nt_act::openhands` |
+| D10106 | **SWE-bench** | SWE-bench如何评估? | 标准化软件工程基准, 2294个任务 | **SWE-bench**: 标准任务→评估→排名→选型 | `nt_meta::swe_bench` |
+| D10107 | **Computer-Use Agents** | 计算机使用Agent如何操作GUI? | UI-TARS/OmniParser: 视觉理解+操作 | **GUI Agent**: 屏幕→理解→操作→反馈→闭环, 多平台 | `nt_act::gui_agent` |
+| D10108 | **UI-TARS** | UI-TARS如何理解界面? | 端到端UI理解+操作 | **UI-TARS**: 屏幕→端到端理解→操作→多平台UI | `nt_io::ui_tars` |
+| D10109 | **OmniParser** | OmniParser如何解析UI? | 通用UI解析+元素检测 | **OmniParser**: 屏幕→通用解析→元素检测→操作映射 | `nt_io::omniparser` |
+| D10110 | **Scientific Discovery Agents** | 科学发现Agent如何研究? | 假设→实验→分析→发现→闭环 | **科研Agent**: 文献→假设→实验→分析→发现→论文 | `nt_core_gwt::science_agent` |
+| D10111 | **Lab Automation** | 实验室自动化如何AI? | 机器人+AI→自动实验→闭环 | **实验自动化**: AI→实验设计→机器人执行→分析→闭环 | `nt_physical::lab_auto` |
+| D10112 | **Cross-Embodiment Transfer** | 跨具身迁移如何工作? | 模拟→真实→多形态→迁移 | **具身迁移**: 模拟训练→真实部署→多形态→自适应 | `nt_physical::cross_embodiment` |
+| D10113 | **Foundation Models for Robotics** | 机器人基础模型如何? | 大规模预训练→机器人控制→泛化 | **机器人基础模型**: 大规模预训练→多任务→控制→泛化 | `nt_physical::robot_fm` |
+| D10114 | **Agentic Research** | 研究Agent如何自主? | 文献→假设→实验→发现→论文 | **研究Agent**: 自主研究→文献→假设→实验→论文 | `nt_core_gwt::agentic_research` |
+| D10115 | **Agentic Data Analysis** | 数据分析Agent如何自动化? | 数据→清洗→分析→可视化→报告 | **数据分析Agent**: 数据→清洗→分析→可视化→报告, 全自动 | `nt_act::agentic_data` |
+| D10116 | **Agentic DevOps** | DevOps Agent如何运维? | 监测→告警→诊断→修复→验证 | **DevOps Agent**: 监测→告警→诊断→修复→验证, 自动运维 | `nt_act::agentic_devops` |
+| D10117 | **Agentic Customer Support** | 客服Agent如何智能? | 意图→路由→解决→升级→闭环 | **客服Agent**: 意图识别→路由→自动解决→升级→闭环 | `nt_act::agentic_support` |
+| D10118 | **Agentic Sales** | 销售Agent如何辅助? | 线索→评估→触达→转化→跟踪 | **销售Agent**: 线索→评估→个性化触达→转化→跟踪 | `nt_act::agentic_sales` |
+| D10119 | **Agentic Marketing** | 营销Agent如何优化? | 受众→内容→投放→优化→ROI | **营销Agent**: 受众分析→内容生成→投放优化→ROI追踪 | `nt_act::agentic_marketing` |
+| D10120 | **Agentic Finance** | 金融Agent如何交易? | 市场→分析→策略→执行→风控 | **金融Agent**: 市场分析→策略生成→执行→风控→收益 | `nt_act::agentic_finance` |
+| D10121 | **Agentic Legal** | 法律Agent如何辅助? | 案例→研究→起草→审查→建议 | **法律Agent**: 案例研究→文档起草→审查→建议, 全流程 | `nt_act::agentic_legal` |
+| D10122 | **Agentic Healthcare** | 医疗Agent如何辅助? | 诊断→治疗→监测→调整→随访 | **医疗Agent**: 诊断辅助→治疗建议→监测→调整→随访 | `nt_act::agentic_health` |
+| D10123 | **Agentic Education** | 教育Agent如何个性化? | 评估→内容→辅导→反馈→进步 | **教育Agent**: 评估→个性化内容→辅导→反馈→进步追踪 | `nt_act::agentic_edu` |
+| D10124 | **Agentic Manufacturing** | 制造Agent如何优化? | 计划→调度→监控→质量→优化 | **制造Agent**: 计划→调度→监控→质量控制→持续优化 | `nt_act::agentic_mfg` |
+| D10125 | **Agentic Agriculture** | 农业Agent如何精准? | 监测→分析→决策→执行→评估 | **农业Agent**: 监测→分析→精准决策→执行→效果评估 | `nt_act::agentic_agri` |
+| D10126 | **Agentic Transportation** | 交通Agent如何调度? | 预测→规划→调度→监控→优化 | **交通Agent**: 流量预测→路径规划→调度→监控→优化 | `nt_act::agentic_transport` |
+| D10127 | **Agentic Entertainment** | 娱乐Agent如何创意? | 构思→创作→发布→反馈→迭代 | **娱乐Agent**: 构思→创作→发布→反馈→迭代, 创意增强 | `nt_act::agentic_entertainment` |
+| D10128 | **Agentic Space** | 太空Agent如何自主? | 感知→决策→导航→维护→报告 | **太空Agent**: 感知→自主决策→导航→维护→报告 | `nt_act::agentic_space` |
+| D10129 | **Agentic Defense** | 防御Agent如何响应? | 感知→评估→决策→行动→报告 | **防御Agent**: 感知→威胁评估→决策→行动→报告 | `nt_act::agentic_defense` |
+| D10130 | **Agentic Cybersecurity** | 安全Agent如何防护? | 监测→检测→响应→恢复→加固 | **安全Agent**: 持续监测→检测→自动响应→恢复→加固 | `nt_act::agentic_cyber` |
+| D10131 | **Agentic Energy** | 能源Agent如何调度? | 预测→生成→调度→存储→优化 | **能源Agent**: 负载预测→生成调度→存储→优化→效率 | `nt_act::agentic_energy` |
+| D10132 | **Agentic Climate** | 气候Agent如何行动? | 监测→预测→缓解→适应→评估 | **气候Agent**: 监测→预测→缓解策略→适应→效果评估 | `nt_act::agentic_climate` |
+| D10133 | **Agentic Governance** | 治理Agent如何执行? | 策略→合规→审计→报告→改进 | **治理Agent**: 策略执行→合规检查→审计→报告→持续改进 | `nt_act::agentic_governance` |
+| D10134 | **Agentic Safety** | 安全Agent如何保证? | 预防→检测→响应→恢复→学习 | **安全Agent**: 预防→检测→自动响应→恢复→学习→加固 | `nt_act::agentic_safety` |
+| D10135 | **Agentic Monitoring** | 监控Agent如何全面? | 收集→分析→告警→诊断→优化 | **监控Agent**: 多源收集→智能分析→告警→诊断→优化建议 | `nt_act::agentic_monitor` |
+| D10136 | **Agentic Testing** | 测试Agent如何自动? | 规划→生成→执行→分析→报告 | **测试Agent**: 测试规划→用例生成→执行→分析→报告 | `nt_act::agentic_test` |
+| D10137 | **Agentic Deployment** | 部署Agent如何可靠? | 构建→测试→部署→监控→回滚 | **部署Agent**: 构建→测试→蓝绿部署→监控→回滚保护 | `nt_act::agentic_deploy` |
+| D10138 | **Agentic Evolution** | Agent如何进化? | 经验→分析→优化→验证→部署 | **进化Agent**: 经验收集→分析→策略优化→验证→部署 | `nt_mind::agentic_evolution` |
+| D10139 | **Agentic Future** | Agent未来趋势? | 自主+协作+涌现+安全+治理 | **未来方向**: 自主+协作+涌现+安全+治理Agent | `nt_core_gwt::agentic_future` |
+| D10140 | **Agent Operating Systems** | Agent操作系统如何? | 统一调度+资源管理+安全隔离 | **Agent OS**: 统一调度→资源管理→安全隔离→多Agent运行 | `nt_io::agent_os` |
+| D10141 | **Agent App Stores** | Agent应用商店如何? | 发布→发现→安装→运行→评价 | **Agent商店**: 发布→发现→安装→运行→评价→生态 | `nt_io::agent_store` |
+| D10142 | **Agent Communication Standards** | Agent通信标准如何? | A2A/ACP/MCP→统一→互操作 | **通信标准**: A2A+ACP+MCP→统一→互操作→生态 | `nt_governance::agent_comm_std` |
+| D10143 | **Agent Safety Frameworks** | Agent安全框架如何? | 审计+沙箱+监控+治理 | **安全框架**: 审计+沙箱+监控+治理→全方位安全 | `nt_shield::agent_safety_fw` |
+| D10144 | **Agent Evaluation Benchmarks** | Agent评估基准如何? | SWE-bench/tau-bench/AgentBench | **评估基准**: 多基准→多维度→公平对比→排名 | `nt_meta::agent_bench` |
+| D10145 | **Agent Development Kits** | Agent开发工具包如何? | SDK+模板+示例+文档 | **开发工具包**: SDK+模板+示例+文档→快速开发 | `nt_io::agent_devkit` |
+| D10146 | **Agent Cloud Platforms** | Agent云平台如何? | 托管+弹性+监控+计费 | **云平台**: 托管→弹性伸缩→监控→按需计费 | `nt_io::agent_cloud` |
+| D10147 | **Agent Edge Deployment** | Agent边缘部署如何? | 轻量+离线+低延迟 | **边缘部署**: 轻量模型→离线推理→低延迟→边缘设备 | `nt_io::agent_edge` |
+| D10148 | **Agent Privacy** | Agent隐私如何保护? | 差分隐私+联邦学习+加密 | **隐私保护**: 差分隐私+联邦学习+加密→安全Agent | `nt_shield::agent_privacy` |
+| D10149 | **Agent Governance** | Agent治理如何规范? | 策略+合规+审计+透明 | **治理框架**: 策略→合规→审计→透明→问责 | `nt_governance::agent_governance` |
+| D10150 | **Agent Ethics** | Agent伦理如何规范? | 公平+透明+问责+可控 | **伦理框架**: 公平+透明+问责+可控→负责任Agent | `nt_governance::agent_ethics` |
+| D10151 | **Agent Standards** | Agent标准如何? | 接口+协议+评估+安全 | **标准体系**: 接口+协议+评估+安全→标准化 | `nt_governance::agent_standards` |
+| D10152 | **Agent Ecosystems** | Agent生态如何构建? | 开发者+平台+用户+市场 | **生态构建**: 开发者+平台+用户+市场→开放生态 | `nt_io::agent_ecosystem` |
+| D10153 | **Agent Research Directions** | Agent研究前沿? | 自主+协作+涌现+安全+对齐 | **研究方向**: 自主+协作+涌现+安全+对齐→前沿 | `nt_mind::agent_research` |
+| D10154 | **Agent for NeoTrix** | Agent如何赋能NeoTrix? | 架构→Agent增强→能力提升 | **NeoTrix Agent**: 架构增强→多Agent→协作→能力提升 | `nt_core_gwt::nt_agent` |
+| D10155 | **Agent Frontier Summary** | 前沿AI能力总结? | 全局→分类→整合→方向 | **前沿总结**: 500+决策→10类别→整合→持续演进方向 | `nt_core::agent_frontier_summary` |
+
+#### 0.x.1 具身AI与机器人 (D10156-D10206)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10156 | **RT-2 架构选型** | 机器人基础模型选择? | RT-2 (Google DeepMind): VLM fine-tuned for robot actions, CoA prompting, 多任务泛化 | **RT-2 为参考架构**, 视觉-语言-动作三模态统一; NeoTrix 适配为 `nt_physical::robot_policy` | `nt_physical::robot_policy` |
+| D10157 | **OpenVLA 开源替代** | 轻量VLA如何实现? | OpenVLA 7B: Prismatic VLM + action tokenizer, 开源可微调, 单GPU部署 | **OpenVLA 为边缘部署基线**, 结合 LoRA 微调降低成本; 作为 `nt_physical::vla_edge` 基座 | `nt_physical::vla_edge` |
+| D10158 | **Octo 多任务策略** | 通用机器人策略如何? | Octo (UC Berkeley): Transformer-based, 多机器人多任务, 100k+ Open X-Embodiment 数据 | **Octo 为多任务策略参考**, 开放权重支持跨机器人迁移; 集成至 `nt_physical::octo_adapter` | `nt_physical::octo_adapter` |
+| D10159 | **Sim-to-Real 域差距** | 仿真到真实如何迁移? | domain randomization: 随机化纹理/光照/物理; 1000× sim 数据降低真实数据需求; 迁移差距仍 15-30% | **多策略域适应**: ① domain randomization ② 风格迁移 GAN ③ 部分真实数据微调; 降低至 <10% 差距 | `nt_physical::sim2real` |
+| D10160 | **触觉感知集成** | 触觉信号如何融合? | GelSight/DIGIT: 高分辨率触觉; ViTaL: 视觉+触觉融合; 操作成功率提升 25-40% | **视觉+触觉双模态融合**, 优先 GelSight 用于精密操作; 集成至 `nt_physical::tactile_fusion` | `nt_physical::tactile_fusion` |
+| D10161 | **灵巧操控规划** | 多指灵巧手如何控制? | DexVLA/DexGraspNet: 多指抓取规划; 接触力优化; dexterous manipulation success >80% | **DexGraspNet 式抓取规划**, 基于点云+力反馈的闭环控制; 集成至 `nt_physical::dexterous_planner` | `nt_physical::dexterous_planner` |
+| D10162 | **双足运动控制** | 足式机器人如何稳定行走? | Agilex/Unitree: 强化学习+MPC; 步态优化; 复杂地形成功率 85%+ | **RL+MPC 混合控制**: 强化学习预训练 + MPC 实时调节; 集成至 `nt_physical::locomotion_ctrl` | `nt_physical::locomotion_ctrl` |
+| D10163 | **无人机协同** | 多无人机如何编队? | Swarm Intelligence: 分布式共识; FPV+SLAM: 未知环境; 编队算法: leader-follower/virtual structure | **虚拟结构+leader-follower 混合**, SLAM 引导, 支持动态避障; 集成至 `nt_physical::drone_swarm` | `nt_physical::drone_swarm` |
+| D10164 | **软体机器人建模** | 软体机器人如何仿真? | Continuum Mechanics: 有限元; MPM: 材料点法; SOFA: 软体仿真框架 | **SOFA+MPM 混合仿真**, 连续介质力学建模; 适配 `nt_physical::soft_robotics` | `nt_physical::soft_robotics` |
+| D10165 | **操作技能迁移** | 操作技能如何跨机器人迁移? | 中间表示(IR): 将动作编码为机器人无关表示; correspondence learning; sim-to-real-to-sim | **动作 IR 中间表示**, 技能抽象为 task goals + affordances; 适配 `nt_physical::skill_transfer` | `nt_physical::skill_transfer` |
+| D10166 | **人机协作控制** | 人机如何安全协作? | 共享控制: 动态权威分配; 力反馈: 触觉引导; 安全限制: 力矩/速度/空间约束 | **动态权威分配+力反馈**, 安全边界实时约束; 集成至 `nt_physical::collab_control` | `nt_physical::collab_control` |
+| D10167 | **机器人安全约束** | 如何保证机器人安全? | CISA 安全标准; ISO 10218; 力矩限制; 空间约束; 急停机制 | **三层安全架构**: ① 物理限位 ② 软件力矩约束 ③ 急停按钮; 集成至 `nt_shield::robot_safety` | `nt_shield::robot_safety` |
+| D10168 | **机器人感知融合** | 多传感器如何融合? | LiDAR+Camera+IMU+Force: Kalman/EKF; 多模态融合提升鲁棒性 30-50% | **EKF 多传感器融合**, LiDAR 定位 + Camera 检测 + IMU 姿态; 集成至 `nt_world::robot_perception` | `nt_world::robot_perception` |
+| D10169 | **机器人记忆架构** | 机器人如何记忆环境? | 语义地图: 场景图 + 物体属性; 长期记忆: 持久化场景表示 | **语义场景图记忆**, 支持增量更新+遗忘; 集成至 `nt_memory::robot_scene_memory` | `nt_memory::robot_scene_memory` |
+| D10170 | **机器人规划器** | 机器人如何规划动作? | MoveIt2: 运动规划; Behavior Trees: 行为编排; HTN: 分层任务网络 | **行为树+HTN 混合**, MoveIt2 用于运动规划; 集成至 `nt_act::robot_planner` | `nt_act::robot_planner` |
+| D10171 | **机器人通信协议** | 机器人间如何通信? | ROS2 DDS: 分布式通信; FastDDS: 低延迟; Zenoh: 新兴替代, 更灵活 | **ROS2+DDS 为标准**, Zenoh 用于特殊场景; 统一消息格式; 集成至 `nt_io::robot_comm` | `nt_io::robot_comm` |
+| D10172 | **机器人能量管理** | 机器人如何节能? | 能量感知规划: 动作选择考虑能耗; 电池管理: SoC 估计; 休眠策略 | **能量感知规划+智能休眠**, 动作选择综合能耗评估; 集成至 `nt_physical::energy_mgmt` | `nt_physical::energy_mgmt` |
+| D10173 | **机器人自标定** | 机器人如何自动校准? | 在线标定: 传感器自动校准; 手眼标定: 相机-末端关系; 外参标定 | **在线自标定系统**, 利用环境特征自动校准; 集成至 `nt_physical::self_calibration` | `nt_physical::self_calibration` |
+| D10174 | **具身数据采集** | 机器人数据如何收集? | Open X-Embodiment: 100万+机器人轨迹; DROID: 多机器人数据集; 大规模遥操作 | **开源数据优先**, 追加自有遥操作采集; 数据格式统一; 集成至 `nt_world::embodied_data` | `nt_world::embodied_data` |
+| D10175 | **具身仿真环境** | 机器人仿真用什么? | Isaac Sim: NVIDIA GPU 仿真; MuJoCo: 物理精确; Habitat: 视觉导航 | **Isaac Sim+MuJoCo 双引擎**, Isaac 用于大规模并行, MuJoCo 用于精确操控; 集成至 `nt_physical::sim_engine` | `nt_physical::sim_engine` |
+| D10176 | **机器人遥操作** | 遥操作如何高效? | VR遥操作: 沉浸式控制; 力反馈: 触觉引导; 自主导航+人工干预混合 | **VR遥操作+自主混合**, 关键操作人工介入; 集成至 `nt_io::teleop` | `nt_io::teleop` |
+| D10177 | **机器人故障诊断** | 机器人故障如何检测? | 异常检测: 电机/关节/传感器; 预测性维护: 基于振动/电流; 快速恢复 | **多信号异常检测+预测性维护**, 电机电流+振动+温度联合分析; 集成至 `nt_meta::robot_diagnostics` | `nt_meta::robot_diagnostics` |
+| D10178 | **具身任务规范** | 机器人任务如何定义? | LTL: 时序逻辑; 行为树: 结构化任务; NL→Task: 自然语言转任务 | **NL→结构化任务**, 支持 LTL 约束和行为树编排; 集成至 `nt_act::task_spec` | `nt_act::task_spec` |
+| D10179 | **机器人抓取检测** | 抓取姿态如何检测? | GraspNet: 点云6-DoF抓取; 接触点优化; 力闭合分析 | **GraspNet 6-DoF 抓取检测**, 结合力闭合优化; 集成至 `nt_physical::grasp_detection` | `nt_physical::grasp_detection` |
+| D10180 | **机器人导航** | 机器人如何导航? | SLAM: 视觉/激光SLAM; 路径规划: A*/RRT/PRM; 语义导航 | **多模态 SLAM+语义导航**, 视觉SLAM为主, 激光为辅; 集成至 `nt_act::robot_nav` | `nt_act::robot_nav` |
+| D10181 | **机器人操作学习** | 操作技能如何学习? | Imitation Learning: 模仿学习; RL: 强化学习; BC: 行为克隆; DAgger: 在线纠正 | **IL+RL 混合**, BC 用于初始策略, RL 微调; DAgger 用于在线纠正; 集成至 `nt_mind::operation_learning` | `nt_mind::operation_learning` |
+| D10182 | **机器人触觉控制** | 触觉反馈如何用于控制? | 力/扭矩控制: 阻抗/导纳控制; 滑动检测: 防滑; 接触检测 | **阻抗控制+滑动检测**, 触觉信号闭环反馈; 集成至 `nt_physical::tactile_control` | `nt_physical::tactile_control` |
+| D10183 | **机器人场景理解** | 场景如何理解? | 3D 场景图: 语义+拓扑; 物体6-DoF估计; 场景推理 | **3D 语义场景图**, 物体实例分割+6-DoF估计; 集成至 `nt_world::scene_understanding` | `nt_world::scene_understanding` |
+| D10184 | **机器人工具使用** | 机器人如何使用工具? | 工具 affordance 检测; 动态适配; 工具选择策略 | **affordance 检测+动态适配**, 工具库管理+自动选择; 集成至 `nt_act::tool_use` | `nt_act::tool_use` |
+| D10185 | **具身语言 grounding** | 语言如何 grounding 到动作? | ViLA/VILA: 视觉语言动作; NL action grounding; 语言条件化策略 | **ViLA 式视觉语言动作**, 自然语言→动作映射; 集成至 `nt_core::language_grounding` | `nt_core::language_grounding` |
+| D10186 | **机器人自适应控制** | 机器人如何自适应? | 自适应控制: 参数在线调整; 鲁棒控制: 不确定性建模; 学习控制 | **自适应+鲁棒混合**, 参数在线调整+不确定性估计; 集成至 `nt_physical::adaptive_control` | `nt_physical::adaptive_control` |
+| D10187 | **机器人任务分解** | 复杂任务如何分解? | HTN: 分层任务网络; 行为树: 序列/并行/选择; 子目标发现 | **HTN+行为树混合**, 自动子目标发现+任务分层; 集成至 `nt_act::task_decomp` | `nt_act::task_decomp` |
+| D10188 | **具身多智能体协作** | 多机器人如何协作? | 分布式规划; 共享世界模型; 角色分配; 通信拓扑 | **共享世界模型+角色分配**, 分布式规划+集中式监督; 集成至 `nt_physical::multi_robot_collab` | `nt_physical::multi_robot_collab` |
+| D10189 | **机器人安全学习** | 安全约束下如何学习? | Safe RL: 安全约束优化; CBF: 控制屏障函数; 安全层 | **Safe RL+CBF 双重保障**, 安全层实时约束; 集成至 `nt_shield::safe_learning` | `nt_shield::safe_learning` |
+| D10190 | **机器人世界模型** | 机器人如何建模世界? | 预测模型: 预测动作后果; 想象规划: 在模型中规划; 模型学习 | **预测式世界模型**, 支持想象规划+动作后果预测; 集成至 `nt_core::robot_world_model` | `nt_core::robot_world_model` |
+| D10191 | **机器人抓取规划** | 精密抓取如何规划? | 接触点优化; 力闭合; 手指配置选择; 抓取稳定性分析 | **接触点+力闭合联合优化**, 稳定性评估; 集成至 `nt_physical::grasp_planner` | `nt_physical::grasp_planner` |
+| D10192 | **机器人姿态估计** | 机器人姿态如何估计? | 视觉伺服: eye-in-hand/eye-to-hand; 深度估计; 位姿优化 | **视觉伺服+深度估计联合**, 支持两种配置; 集成至 `nt_world::robot_pose_est` | `nt_world::robot_pose_est` |
+| D10193 | **具身常识推理** | 机器人如何常识推理? | 物理直觉: 因果推理; 场景推理: 语义关系; 动作预测 | **物理直觉+场景推理联合**, 因果链驱动; 集成至 `nt_core::embodied_reasoning` | `nt_core::embodied_reasoning` |
+| D10194 | **机器人异常恢复** | 机器人异常如何恢复? | 检测→诊断→恢复; 备选策略; 回退机制; 人工接管 | **检测-诊断-恢复链**, 多备选策略+自动回退; 集成至 `nt_meta::robot_recovery` | `nt_meta::robot_recovery` |
+| D10195 | **具身多模态感知** | 多模态感知如何融合? | 视觉+触觉+听觉+力觉; 注意力融合; 跨模态对齐 | **注意力融合+跨模态对齐**, 动态权重; 集成至 `nt_world::multimodal_sense` | `nt_world::multimodal_sense` |
+| D10196 | **机器人动作优化** | 动作轨迹如何优化? | 最优控制: LQR/MPC; 轨迹优化: CHOMP/TrajOpt; 动作原语 | **MPC+轨迹优化联合**, 动作原语库复用; 集成至 `nt_act::motion_optimize` | `nt_act::motion_optimize` |
+| D10197 | **机器人避障** | 动态避障如何实现? | DWA: 动态窗口; TEB: 弹性带; DRL: 深度强化学习避障 | **DWA+TEB 混合**, DRL 用于复杂场景; 集成至 `nt_act::obstacle_avoidance` | `nt_act::obstacle_avoidance` |
+| D10198 | **具身推理延迟** | 推理延迟如何降低? | 模型蒸馏: 轻量化模型; 边缘推理: TensorRT; 异步推理: 流水线 | **蒸馏+边缘推理+异步流水线**, 延迟 <100ms | `nt_physical::low_latency_infer` |
+| D10199 | **机器人抓取稳定性** | 抓取如何保证稳定? | 力闭合分析; 摩擦锥; 滑动检测; 自适应抓取调整 | **力闭合+摩擦锥分析**, 自适应抓取调整; 集成至 `nt_physical::grasp_stability` | `nt_physical::grasp_stability` |
+| D10200 | **具身步态规划** | 步态如何规划? | CPG: 中央模式发生器; RL: 步态学习; 地形适应 | **CPG+RL 混合**, 地形适应步态; 集成至 `nt_physical::gait_planning` | `nt_physical::gait_planning` |
+| D10201 | **机器人抓取力控制** | 抓取力如何控制? | 力传感器反馈; 阻抗控制; 自适应力调节 | **力传感+阻抗控制**, 自适应力调节; 集成至 `nt_physical::grasp_force_ctrl` | `nt_physical::grasp_force_ctrl` |
+| D10202 | **具身视觉伺服** | 视觉伺服如何实现? | Image-based/Position-based; 深度学习伺服; 6-DoF 伺服 | **IBVS+PBVS 混合**, 深度学习增强; 集成至 `nt_physical::visual_servo` | `nt_physical::visual_servo` |
+| D10203 | **机器人运动规划** | 运动规划如何优化? | RRT*/PRM*: 采样规划; 梯度优化; 学习规划 | **RRT*+梯度优化混合**, 学习加速; 集成至 `nt_act::motion_planning` | `nt_act::motion_planning` |
+| D10204 | **具身触觉导航** | 触觉如何辅助导航? | 触觉地图; 障碍物触觉检测; 盲导航 | **触觉地图+障碍检测**, 辅助视觉导航; 集成至 `nt_act::tactile_nav` | `nt_act::tactile_nav` |
+| D10205 | **机器人感知-动作循环** | 感知动作如何闭环? | 感知→规划→控制→反馈; 注意力引导感知; 任务驱动 | **任务驱动感知-动作闭环**, 注意力引导; 集成至 `nt_core::perception_action_loop` | `nt_core::perception_action_loop` |
+| D10206 | **具身AI总结** | 具身AI决策整合? | VLA+sim2real+dexterous+locomotion+collaboration | **具身AI统一体系**: VLA基座→仿真训练→真机部署→协作网络 | `nt_physical::embodied_ai_summary` |
+
+#### 0.x.2 科学AI (D10207-D10257)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10207 | **AlphaFold3 蛋白质预测** | 蛋白质结构预测如何进化? | AlphaFold3: 扩散模型+配体预测; RMSD <1Å; 覆盖所有 PDB 分子类型 | **AlphaFold3 为蛋白质预测基线**, 扩散模型统一结构预测; 集成至 `nt_mind::protein_fold` | `nt_mind::protein_fold` |
+| D10208 | **蛋白-配体对接** | 分子对接如何精确? | DiffDock: 扩散模型对接; Gold docking benchmark SOTA; 结合自由能估计 | **DiffDock 扩散对接**, 结合 MM-GBSA 自由能; 集成至 `nt_mind::molecular_dock` | `nt_mind::molecular_dock` |
+| D10209 | **分子动力学加速** | MD 模拟如何加速? | OpenMM: GPU 加速; ML potentials: ANI/MACE; 1000× 加速 vs 经典 MD | **ML 势函数+GPU MD**, MACE 通用势函数; 集成至 `nt_mind::md_accelerate` | `nt_mind::md_accelerate` |
+| D10210 | **AlphaProof 数学证明** | AI 如何进行数学推理? | AlphaProof (DeepMind): LLM+形式化证明; IMO 银牌水平; Lean 4 集成 | **AlphaProof 为数学推理参考**, Lean 形式化验证; 集成至 `nt_core::math_prove` | `nt_core::math_prove` |
+| D10211 | **定理证明器** | 自动定理证明如何? | Lean 4: 形式化证明; Isabelle/HOL; 神经定理证明器; MiniF2F benchmark | **Lean 4 为形式化证明基线**, 神经定理证明辅助; 集成至 `nt_core::theorem_prove` | `nt_core::theorem_prove` |
+| D10212 | **材料发现加速** | 新材料如何发现? | GNoME: 220万稳定晶体; 反向设计; 高通量筛选; 实验验证闭环 | **GNoME 晶体预测+反向设计**, 实验验证闭环; 集成至 `nt_mind::materials_discover` | `nt_mind::materials_discover` |
+| D10213 | **化学合成规划** | 逆合成如何规划? | RetroSyn: LLM 逆合成; ASKCOS: 决策树; 产率预测; 反应条件优化 | **LLM+决策树逆合成**, 产率预测+条件优化; 集成至 `nt_mind::retro_synth` | `nt_mind::retro_synth` |
+| D10214 | **天气预报 AI** | AI 天气预报如何? | GraphCast: GNN 天气; GenCast: 扩散天气; 10天预报超越 ECMWF HRES | **GraphCast+GenCast 双引擎**, GNN 快速+扩散概率; 集成至 `nt_world::weather_forecast` | `nt_world::weather_forecast` |
+| D10215 | **气候建模** | 气候模型如何加速? | CMIP6: 全球气候模型; NeuralGCM: ML+物理混合; 降尺度超分辨率 | **NeuralGCM 混合气候模型**, 物理约束+ML 加速; 集成至 `nt_world::climate_model` | `nt_world::climate_model` |
+| D10216 | **蛋白质设计** | 蛋白质如何从头设计? | RFdiffusion: 扩散蛋白质设计; ProteinMPNN: 序列设计; ESMFold 验证 | **RFdiffusion+ProMPNN 联合**, 扩散结构→序列→验证; 集成至 `nt_mind::protein_design` | `nt_mind::protein_design` |
+| D10217 | **基因组分析** | 基因组 AI 分析如何? | Enformer: 基因表达预测; DNABERT: 基因组语言; scRNA-seq 分析 | **Enformer+DNABERT 双模型**, 基因表达预测+变异解读; 集成至 `nt_mind::genome_analysis` | `nt_mind::genome_analysis` |
+| D10218 | **药物发现流程** | 药物发现 AI 流程如何? | 靶点→先导化合物→优化→临床前; 多目标优化; ADMET 预测 | **端到端 AI 药物发现**, 多目标优化+ADMET; 集成至 `nt_mind::drug_discovery` | `nt_mind::drug_discovery` |
+| D10219 | **量子化学计算** | 量子化学如何加速? | VQE: 变分量子本征求解; 神经网络量子态; DMFT: 动态平均场 | **VQE+ML 混合量子化学**, 小分子用量子, 大分子用 ML; 集成至 `nt_mind::quantum_chem` | `nt_mind::quantum_chem` |
+| D10220 | **科学文献挖掘** | 科学文献如何挖掘? | SciBERT: 科学 NER; S2ORC: 语料库; 论文图谱构建; 知识提取 | **SciBERT+图谱联合**, 自动知识提取+图谱构建; 集成至 `nt_world::sci_mining` | `nt_world::sci_mining` |
+| D10221 | **实验设计优化** | 实验如何最优设计? | Bayesian Optimization: 高斯过程; 主动学习; 多目标优化 | **贝叶斯优化+主动学习**, 夏普比采集; 集成至 `nt_mind::experiment_design` | `nt_mind::experiment_design` |
+| D10222 | **流体动力学 AI** | CFD 如何加速? | Physics-INO: 算子学习; DeepCFD: 网格预测; 数字孪生; 实时仿真 | **算子学习+数字孪生**, 实时 CFD 预测; 集成至 `nt_world::fluid_dynamics` | `nt_world::fluid_dynamics` |
+| D10223 | **天文 AI 分析** | 天文数据如何分析? | LSST: 巡天数据; 变源分类; 系外行星检测; 引透镜搜索 | **自动分类+异常检测**, LSST 级数据处理; 集成至 `nt_world::astro_analysis` | `nt_world::astro_analysis` |
+| D10224 | **地震预测 AI** | 地震如何预测? | 短临预测: 异常检测; 震后快速评估; 余震序列预测 | **异常检测+快速评估**, 余震预测; 集成至 `nt_world::seismic_ai` | `nt_world::seismic_ai` |
+| D10225 | **蛋白质互作预测** | 蛋白质互作如何预测? | PIPR: 互作预测; 结构对接; 网络分析; 复合物预测 | **深度学习+结构对接**, 网络增强; 集成至 `nt_mind::ppi_predict` | `nt_mind::ppi_predict` |
+| D10226 | **单细胞分析** | 单细胞组学如何分析? | scVI: 变分推断; Scanpy: 工具链; 拟时序; 细胞类型注释 | **scVI+Scanpy 联合**, 自动注释+拟时序; 集成至 `nt_mind::single_cell` | `nt_mind::single_cell` |
+| D10227 | **电力系统 AI** | 电网如何 AI 优化? | 潮流预测; 负荷预测; 故障检测; 可再生能源集成 | **预测+优化联合**, 实时电网管理; 集成至 `nt_world::power_grid` | `nt_world::power_grid` |
+| D10228 | **海洋科学 AI** | 海洋数据如何分析? | 海洋温度预测; 洋流模拟; 珊瑚礁监测; 渔业预测 | **海洋数字孪生**, 多源数据融合; 集成至 `nt_world::ocean_science` | `nt_world::ocean_science` |
+| D10229 | **核聚变 AI** | 核聚变如何控制? | 等离子体控制; 托卡马克诊断; 稳定性预测; 加热优化 | **RL 等离子体控制**, 实时稳定性预测; 集成至 `nt_mind::fusion_control` | `nt_mind::fusion_control` |
+| D10230 | **农业遥感 AI** | 遥感如何用于农业? | 作物分类; 长势监测; 产量预测; 病虫害检测 | **多时相遥感+深度学习**, 产量预测+病虫害; 集成至 `nt_world::agri_remote_sense` | `nt_world::agri_remote_sense` |
+| D10231 | **蛋白质语言模型** | 蛋白质 LLM 如何? | ESM-2: 15B 参数; ProtTrans: 预训练; 微调下游任务 | **ESM-2 为蛋白质语言基线**, 支持多任务微调; 集成至 `nt_mind::protein_llm` | `nt_mind::protein_llm` |
+| D10232 | **材料性能预测** | 材料性能如何预测? | Matbench: 基准; CGCNN: 图卷积; 性能→结构映射 | **CGCNN+Transformer**, 性能预测+结构优化; 集成至 `nt_mind::material_property` | `nt_mind::material_property` |
+| D10233 | **反应条件优化** | 化学反应条件如何优化? | 贝叶斯优化; 主动学习; 反应产率预测; 溶剂/温度/催化剂 | **贝叶斯优化+主动学习**, 产率预测; 集成至 `nt_mind::reaction_optimize` | `nt_mind::reaction_optimize` |
+| D10234 | **蛋白质-蛋白质对接** | 蛋白质复合物如何预测? | AlphaFold-Multimer; RoseTTAFold; HDOCK; 模板方法 | **AF-Multimer+RoseTTAFold**, 多模板验证; 集成至 `nt_mind::ppi_dock` | `nt_mind::ppi_dock` |
+| D10235 | **科学代码生成** | AI 如何生成科学代码? | 代码 LLM 辅助科学计算; 自动微分; 符号计算; 数值方法 | **代码 LLM+符号计算**, 自动数值实现; 集成至 `nt_act::sci_code_gen` | `nt_act::sci_code_gen` |
+| D10236 | **地球系统建模** | 地球系统如何建模? | CESM: 地球系统模型; 降尺度; 极端事件预测; 碳循环 | **ML 增强地球系统模型**, 降尺度+极端预测; 集成至 `nt_world::earth_system` | `nt_world::earth_system` |
+| D10237 | **天体物理学 AI** | 天体物理数据如何分析? | 系外行星检测; 脉冲星分类; 引力波分析; 星系演化 | **自动检测+分类管线**, 大规模巡天处理; 集成至 `nt_world::astro_physics` | `nt_world::astro_physics` |
+| D10238 | **蛋白质折叠动力学** | 折叠过程如何模拟? | 分子动力学折叠; Markov State Models; 折叠路径 | **MD+MSM 联合**, 折叠路径+速率; 集成至 `nt_mind::fold_dynamics` | `nt_mind::fold_dynamics` |
+| D10239 | **催化剂设计** | 催化剂如何设计? | 高通量筛选; 电子结构预测; 活性描述符; 反应网络 | **高通量+描述符联合**, 反应网络分析; 集成至 `nt_mind::catalyst_design` | `nt_mind::catalyst_design` |
+| D10240 | **临床试验优化** | 临床试验如何优化? | 自适应设计; 队列优化; 生物标志物; 个性化剂量 | **自适应+生物标志物**, 个性化剂量; 集成至 `nt_mind::clinical_trial` | `nt_mind::clinical_trial` |
+| D10241 | **蛋白质稳定性预测** | 蛋白质稳定性如何预测? | ΔΔG 预测; 突变效应; 热稳定性; 溶解度 | **ΔΔG 预测+突变分析**, 热稳定性优化; 集成至 `nt_mind::protein_stability` | `nt_mind::protein_stability` |
+| D10242 | **科学数据标准** | 科学数据如何标准化? | FAIR 原则; 开放数据格式; 元数据标准; 数据共享 | **FAIR 原则+开放格式**, 统一元数据; 集成至 `nt_memory::sci_data_std` | `nt_memory::sci_data_std` |
+| D10243 | **蛋白质功能预测** | 蛋白质功能如何预测? | GO 注释; 功能域预测; 活性位点; 序列-功能映射 | **GO+功能域联合预测**, 活性位点标注; 集成至 `nt_mind::protein_function` | `nt_mind::protein_function` |
+| D10244 | **蛋白质进化分析** | 蛋白质进化如何分析? | 多序列比对; 系统发育; 进化保守性; 共进化网络 | **MSA+系统发育联合**, 共进化分析; 集成至 `nt_mind::protein_evolution` | `nt_mind::protein_evolution` |
+| D10245 | **蛋白质-核酸互作** | 蛋白质-DNA/RNA 如何预测? | 转录因子结合; RNA 二级结构; 蛋白质-RNA 复合物 | **深度学习+结构预测**, 结合亲和力; 集成至 `nt_mind::protein_nucleic` | `nt_mind::protein_nucleic` |
+| D10246 | **蛋白质亚细胞定位** | 蛋白质定位如何预测? | DeepLoc: 深度学习定位; 信号肽; 跨膜域; 亚细胞器 | **DeepLoc 为基线**, 信号肽+跨膜预测; 集成至 `nt_mind::protein_locate` | `nt_mind::protein_locate` |
+| D10247 | **蛋白质互作网络** | 蛋白质网络如何分析? | PPI 网络; 功能模块; 关键节点; 通路分析 | **网络分析+模块检测**, 关键节点识别; 集成至 `nt_mind::ppi_network` | `nt_mind::ppi_network` |
+| D10248 | **蛋白质虚拟筛选** | 虚拟筛选如何加速? | 分子对接筛选; 基于药效团; 机器学习打分 | **对接+ML 打分联合**, 大规模筛选; 集成至 `nt_mind::virtual_screen` | `nt_mind::virtual_screen` |
+| D10249 | **蛋白质表达优化** | 蛋白质表达如何优化? | 密码子优化; 表达系统选择; 可溶性预测; 折叠辅助 | **密码子+系统联合优化**, 可溶性预测; 集成至 `nt_mind::protein_expression` | `nt_mind::protein_expression` |
+| D10250 | **蛋白质组学分析** | 质谱数据如何分析? | 蛋白质鉴定; 定量分析; 翻译后修饰; 相互作用 | **鉴定+定量+PTM 联合**, 相互作用网络; 集成至 `nt_mind::proteomics` | `nt_mind::proteomics` |
+| D10251 | **代谢组学 AI** | 代谢组如何分析? | 代谢物鉴定; 通路分析; 生物标志物; 代谢通量 | **鉴定+通路联合**, 生物标志物发现; 集成至 `nt_mind::metabolomics` | `nt_mind::metabolomics` |
+| D10252 | **科学AI集成** | 科学AI如何集成? | AlphaFold+分子动力学+合成规划→端到端药物发现 | **端到端科学流水线**: 结构→模拟→设计→合成→验证 | `nt_mind::sci_ai_pipeline` |
+| D10253 | **科学可重复性** | 科学AI如何保证可重复? | 代码版本控制; 数据版本; 实验追踪; 环境记录 | **代码+数据+环境三版本**, MLflow/W&B 追踪; 集成至 `nt_meta::sci_reproducibility` | `nt_meta::sci_reproducibility` |
+| D10254 | **科学数据增强** | 科学数据如何增强? | 对称性增强; 物理约束增强; 迁移学习; 合成数据 | **物理约束增强+迁移**, 减少数据需求; 集成至 `nt_mind::sci_data_augment` | `nt_mind::sci_data_augment` |
+| D10255 | **科学模型解释** | 科学模型如何解释? | SHAP/LIME; 注意力可视化; 反事实解释; 物理一致性 | **SHAP+注意力+物理约束**, 多层解释; 集成至 `nt_meta::sci_explain` | `nt_meta::sci_explain` |
+| D10256 | **科学知识图谱** | 科学知识如何组织? | OpenAlex; Semantic Scholar; 知识图谱构建; 推理 | **OpenAlex+自动构建**, 图谱推理; 集成至 `nt_memory::sci_knowledge_graph` | `nt_memory::sci_knowledge_graph` |
+| D10257 | **科学AI总结** | 科学AI决策整合? | 蛋白质+分子+材料+气候+数学→科学AI全景 | **科学AI统一体系**: 预测→设计→验证→应用 | `nt_mind::sci_ai_summary` |
+
+#### 0.x.3 基础模型架构 (D10258-D10308)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10258 | **Mixtral MoE 架构** | MoE 如何提升效率? | Mixtral 8x7B: 46.7B 总参/12.9B 激活; Top-2 routing; 132B token 训练 | **Mixtral 式 Top-K 稀疏激活**, 总参大+激活少=高效推理; 集成至 `nt_core::moe_routing` | `nt_core::moe_routing` |
+| D10259 | **DeepSeekMoE 路由** | MoE 路由如何优化? | DeepSeekMoE: 细粒度专家(160→256); 共享专家; 更均衡的负载 | **细粒度专家+共享专家**, 负载均衡+专业化; 集成至 `nt_core::deepseek_moe` | `nt_core::deepseek_moe` |
+| D10260 | **稀疏激活策略** | 稀疏激活如何设计? | Top-K gating; Expert Choice; Hash routing; Switch Transformer | **Top-K+Expert Choice 混合**, Hash routing 作为备选; 集成至 `nt_core::sparse_activation` | `nt_core::sparse_activation` |
+| D10261 | **Mamba SSM 架构** | SSM 如何替代 Transformer? | Mamba: 选择性状态空间; O(n)复杂度; 1.4×BERT 速度; 长序列优势 | **Mamba 为长序列基线**, 线性复杂度优势; 与 Transformer 互补; 集成至 `nt_core::mamba_ssm` | `nt_core::mamba_ssm` |
+| D10262 | **Jamba 混合架构** | Transformer+SSM 如何混合? | Jamba (AI21): 3:1 Mamba:Attention; 256K context; MoE+SSM 混合 | **Jamba 式混合比例**, 3:1 SSM:Attention; MoE 可选; 集成至 `nt_core::jamba_hybrid` | `nt_core::jamba_hybrid` |
+| D10263 | **RWKV 替代架构** | 线性注意力如何实现? | RWKV: 线性复杂度; 14B 参数; 100% attention; RNN 推理 | **RWKV 为线性注意力基线**, RNN 推理高效; 集成至 `nt_core::rwkv_linear` | `nt_core::rwkv_linear` |
+| D10264 | **xLSTM 架构** | LSTM 如何现代化? | xLSTM: sLSTM+mLSTM; 指数门控; 7× 更大 than 原始 LSTM | **xLSTM 作为 RNN 替代**, 指数门控创新; 集成至 `nt_core::xlstm` | `nt_core::xlstm` |
+| D10265 | **Hyena 层次化** | 长序列如何处理? | Hyena Hierarchy: 亚二次注意力; 长序列建模; 低内存占用 | **Hyena 亚二次注意力**, 超长序列支持; 集成至 `nt_core::hyena` | `nt_core::hyena` |
+| D10266 | **RetNet 多尺度** | 多尺度注意力如何实现? | RetNet: 多尺度 Retention; 并行+递推双模式; O(1) 推理 | **RetNet 多尺度Retention**, 训练并行+推理递推; 集成至 `nt_core::retnet` | `nt_core::retnet` |
+| D10267 | **GLA 线性门控** | 线性门控如何工作? | GLA: Gated Linear Attention; 高效训练; 硬件友好; 可并行 | **GLA 线性门控注意力**, 硬件友好+可并行; 集成至 `nt_core::gla` | `nt_core::gla` |
+| D10268 | **Gated Slot Attention** | 分组查询注意力如何? | GQA: Grouped Query Attention; 多查询/分组查询; KV 缓存优化 | **GQA 为注意力标准**, KV 缓存减少; 集成至 `nt_core::gqa` | `nt_core::gqa` |
+| D10269 | **Flash Attention** | 注意力计算如何加速? | FlashAttention: IO-aware; tiling; 2-4× 速度; 内存 O(√N) | **FlashAttention 为注意力实现标准**, IO-aware tiling; 集成至 `nt_core::flash_attn` | `nt_core::flash_attn` |
+| D10270 | **Ring Attention** | 超长序列如何分布式? | Ring Attention: 序列并行; 跨设备分布式注意力; 超长上下文 | **Ring Attention 序列并行**, 跨 GPU 分布式; 集成至 `nt_core::ring_attn` | `nt_core::ring_attn` |
+| D10271 | **MoE 训练优化** | MoE 训练如何高效? | Expert parallelism; Load balancing loss; Communication overlap | **Expert 并行+负载均衡损失**, 通信重叠; 集成至 `nt_core::moe_train` | `nt_core::moe_train` |
+| D10272 | **稀疏 MoE 路由** | MoE 路由如何改进? | Expert Choice; Top-2; Hash routing; Sinkhorn routing | **Expert Choice+Top-2 混合**, 动态门控; 集成至 `nt_core::sparse_routing` | `nt_core::sparse_routing` |
+| D10273 | **线性注意力复杂度** | 线性注意力瓶颈? | O(n) vs O(n²) 记忆力下降; 长程依赖弱化; 硬件效率提升 | **混合策略**: 短程用线性注意力, 关键位置保留二次注意力 | `nt_core::linear_attn_tradeoff` |
+| D10274 | **Transformer 缓存** | KV 缓存如何优化? | PagedAttention; KV 缓存压缩; Token 丢弃; 滑动窗口 | **PagedAttention+KV 压缩**, 滑动窗口; 集成至 `nt_core::kv_cache_opt` | `nt_core::kv_cache_opt` |
+| D10275 | **多头注意力变体** | 注意力头如何设计? | MHA/MQA/GQA; 交错注意力; 交叉注意力; 差分注意力 | **GQA 为默认**, 差分注意力用于去噪; 集成至 `nt_core::attn_variant` | `nt_core::attn_variant` |
+| D10276 | **位置编码选择** | 位置编码如何选? | RoPE: 旋转位置; ALiBi: 注意力偏置; YaRN: 扩展 | **RoPE 为默认**, ALiBi 用于外推; 集成至 `nt_core::pos_encoding` | `nt_core::pos_encoding` |
+| D10277 | **混合专家集成** | MoE 如何与密集模型集成? | MoE 层插入策略; 专家数量选择; 路由粒度 | **可配置 MoE 层**, 专家数/粒度参数化; 集成至 `nt_core::moe_integrate` | `nt_core::moe_integrate` |
+| D10278 | **Tokenization 策略** | 分词如何优化? | BPE/SentencePiece; 多语言分词; 字节级; 词表大小 | **BPE+字节级混合**, 多语言优化; 集成至 `nt_core::tokenization` | `nt_core::tokenization` |
+| D10279 | **激活函数选择** | 激活函数如何选? | GELU/SiLU/GeGLU; 门控线性; SwiGLU | **SwiGLU 为默认激活**, 门控线性优势; 集成至 `nt_core::activation` | `nt_core::activation` |
+| D10280 | **归一化策略** | 归一化如何设计? | RMSNorm/LayerNorm; Pre-Norm/Post-Norm; QK-Norm | **RMSNorm Pre-Norm**, QK-Norm 稳定训练; 集成至 `nt_core::normalization` | `nt_core::normalization` |
+| D10281 | **模型扩展定律** | 模型如何缩放? | Chinchilla: 20 tokens/param; Scaling laws; Compute-optimal | **Chinchilla 缩放律**, 计算最优配置; 集成至 `nt_core::scaling_law` | `nt_core::scaling_law` |
+| D10282 | **训练稳定性** | 训练如何稳定? | μP: 最大更新参数化; 梯度裁剪; 学习率预热 | **μP+梯度裁剪+预热**, 稳定训练; 集成至 `nt_core::train_stability` | `nt_core::train_stability` |
+| D10283 | **MoE 负载均衡** | MoE 负载如何均衡? | 辅助损失; Switch Transformer; Expert Choice; 容量因子 | **辅助损失+Expert Choice**, 动态负载均衡; 集成至 `nt_core::moe_balance` | `nt_core::moe_balance` |
+| D10284 | **稀疏训练** | 稀疏训练如何实现? | SNIP/GraSP: 训练时剪枝; 动态稀疏; 结构化稀疏 | **训练时动态稀疏**, 结构化+非结构化; 集成至 `nt_core::sparse_train` | `nt_core::sparse_train` |
+| D10285 | **Token 丢弃** | 低重要性 token 如何丢弃? | Token pruning; Attention sink; 重要性评分; 滑动窗口 | **重要性评分+滑动窗口**, 保留 attention sink; 集成至 `nt_core::token_prune` | `nt_core::token_prune` |
+| D10286 | **低秩适配** | 微调如何高效? | LoRA/QLoRA: 低秩适配; DoRA: 权重分解; AdaLoRA: 自适应秩 | **LoRA+QLoRA 标准**, DoRA 用于权重分解; 集成至 `nt_mind::lora_adapter` | `nt_mind::lora_adapter` |
+| D10287 | **上下文扩展** | 上下文窗口如何扩展? | RoPE 扩展; YaRN; NTK-aware; Ring Attention | **YaRN+Ring Attention**, NTK-aware 缩放; 集成至 `nt_core::context_ext` | `nt_core::context_ext` |
+| D10288 | **模型压缩集成** | 压缩技术如何组合? | 量化+蒸馏+剪枝+稀疏; 联合优化; Pareto 前沿 | **量化+蒸馏+剪枝联合**, Pareto 最优; 集成至 `nt_core::compress_joint` | `nt_core::compress_joint` |
+| D10289 | **MoE 推理优化** | MoE 推理如何加速? | Expert offloading; 预测路由; Expert 缓存; 批量推理 | **Expert 预测+缓存**, offloading 用于显存不足; 集成至 `nt_core::moe_infer` | `nt_core::moe_infer` |
+| D10290 | **状态空间记忆** | SSM 如何增强记忆? | Gated SSM; 滑动窗口 SSM; 多尺度 SSM | **多尺度 SSM+门控**, 长短期记忆分离; 集成至 `nt_core::ssm_memory` | `nt_core::ssm_memory` |
+| D10291 | **注意力稀疏性** | 注意力如何利用稀疏性? | 局部注意力; 全局 token; Sparse attention; Longformer | **局部+全局混合**, Longformer 模式; 集成至 `nt_core::sparse_attn` | `nt_core::sparse_attn` |
+| D10292 | **模型并行策略** | 模型如何并行? | 张量并行; 流水线并行; 序列并行; Expert 并行 | **3D 并行+Expert 并行**, 动态分配; 集成至 `nt_core::model_parallel` | `nt_core::model_parallel` |
+| D10293 | **架构搜索** | 最优架构如何搜索? | NAS; DARTS; 进化搜索; 一次性搜索 | **DARTS+进化混合**, 快速搜索; 集成至 `nt_core::arch_search` | `nt_core::arch_search` |
+| D10294 | **混合精度训练** | 混合精度如何使用? | BF16/FP16; Loss scaling; 动态精度; FP8 | **BF16 为默认**, FP8 用于加速; 集成至 `nt_core::mixed_precision` | `nt_core::mixed_precision` |
+| D10295 | **梯度检查点** | 显存如何节省? | 梯度检查点; 选择性检查点; CPU offload | **选择性检查点**, 关键层保留; 集成至 `nt_core::grad_checkpoint` | `nt_core::grad_checkpoint` |
+| D10296 | **模型蒸馏架构** | 蒸馏如何设计? | 特征蒸馏; 注意力蒸馏; 关系蒸馏; 自蒸馏 | **多层蒸馏联合**, 注意力+关系+自蒸馏; 集成至 `nt_mind::distill_arch` | `nt_mind::distill_arch` |
+| D10297 | **适配器设计** | 适配器如何设计? | Serial/Parallel adapters; Prefix tuning; Prompt tuning; P-tuning | **Parallel adapters**, Prefix+Prompt 混合; 集成至 `nt_mind::adapter_design` | `nt_mind::adapter_design` |
+| D10298 | **模型选择策略** | 模型如何选择? | 任务路由; 能力评分; 成本效益; 延迟约束 | **任务路由+能力评分**, 成本效益优化; 集成至 `nt_core::model_select` | `nt_core::model_select` |
+| D10299 | **架构演进** | 架构如何演进? | 渐进式扩展; A/B 测试; 版本管理; 回滚机制 | **渐进式演进+版本管理**, A/B 测试; 集成至 `nt_core::arch_evolve` | `nt_core::arch_evolve` |
+| D10300 | **多模态架构** | 多模态如何设计? | 早期融合; 晚期融合; 交叉注意力; 统一 tokenizer | **交叉注意力+统一 token**, 模态特定编码器; 集成至 `nt_core::multimodal_arch` | `nt_core::multimodal_arch` |
+| D10301 | **模型集成策略** | 模型如何集成? | 模型融合; 推理集成; 权重平均; Stacking | **推理集成+权重平均**, 轻量集成; 集成至 `nt_core::model_ensemble` | `nt_core::model_ensemble` |
+| D10302 | **编码器架构** | 编码器如何设计? | CNN+Transformer; ViT; Swin; ConvNeXt | **ViT+ConvNeXt 混合**, 多尺度特征; 集成至 `nt_core::encoder_arch` | `nt_core::encoder_arch` |
+| D10303 | **解码器架构** | 解码器如何设计? | 自回归解码; 扩散解码; 并行解码; 推测解码 | **自回归+推测解码混合**, 扩散用于特定任务; 集成至 `nt_core::decoder_arch` | `nt_core::decoder_arch` |
+| D10304 | **模型记忆机制** | 模型如何记忆? | KV 缓存; 长期记忆; 工作记忆; 情景记忆 | **KV 缓存+长期记忆联合**, 分层记忆; 集成至 `nt_core::model_memory` | `nt_core::model_memory` |
+| D10305 | **模型注意力可视化** | 注意力如何可视化? | 注意力图; Rollout; 迁移; 交互式 | **注意力图+Rollout**, 迁移分析; 集成至 `nt_meta::attn_visualize` | `nt_meta::attn_visualize` |
+| D10306 | **模型鲁棒性** | 模型如何鲁棒? | 对抗训练; 数据增强; 集成; 正则化 | **对抗训练+数据增强联合**, 集成提升鲁棒性; 集成至 `nt_core::model_robust` | `nt_core::model_robust` |
+| D10307 | **模型可解释性** | 模型如何可解释? | SHAP/LIME; 注意力可视化; 反事实; 因果分析 | **SHAP+注意力+反事实多层解释**, 因果分析; 集成至 `nt_meta::model_explain` | `nt_meta::model_explain` |
+| D10308 | **架构总结** | 基础模型架构整合? | MoE+SSM+Transformer→统一架构 | **架构统一体系**: 密集+稀疏+SSM+混合→任务路由 | `nt_core::arch_summary` |
+
+#### 0.x.4 模型评估与基准 (D10309-D10359)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10309 | **Chatbot Arena** | 人类偏好如何评估? | LMSYS Chatbot Arena: ELO 排名; 500K+ 投票; 多维度评估 | **Chatbot Arena 为人类偏好基线**, ELO 评分+多维度; 集成至 `nt_meta::arena_eval` | `nt_meta::arena_eval` |
+| D10310 | **MMLU-Pro 基准** | 综合能力如何测试? | MMLU-Pro: 12K 题; 10 多选选项; 比 MMLU 更难; 知识+推理 | **MMLU-Pro 为知识评估标准**, 多选+推理; 集成至 `nt_meta::mmlu_pro` | `nt_meta::mmlu_pro` |
+| D10311 | **GPQA 基准** | 研究级问题如何测试? | GPQA: 专家级问题; Diamond Set; 人类准确率 <60%; 真正困难 | **GPQA 为困难推理基准**, 专家级挑战; 集成至 `nt_meta::gpqa_bench` | `nt_meta::gpqa_bench` |
+| D10312 | **ARC-AGI 基准** | 抽象推理如何测试? | ARC-AGI: 抽象推理; Chollet 框架; 人类易/机器难; 需要泛化 | **ARC-AGI 为泛化基准**, 抽象推理挑战; 集成至 `nt_meta::arc_agi` | `nt_meta::arc_agi` |
+| D10313 | **FrontierMath** | 数学能力如何测试? | FrontierMath: 研究级数学; 公开集/私有集; 准确率 <5%; 真正前沿 | **FrontierMath 为数学前沿基准**, 研究级挑战; 集成至 `nt_meta::frontier_math` | `nt_meta::frontier_math` |
+| D10314 | **Arena-Hard 评估** | 困难对话如何测试? | Arena-Hard: 500 困难问题; 自动化评估; 与 Arena 相关性 >0.8 | **Arena-Hard 为困难对话基准**, 自动评估; 集成至 `nt_meta::arena_hard` | `nt_meta::arena_hard` |
+| D10315 | **WildBench 评估** | 真实场景如何测试? | WildBench: 真实用户查询; 长尾分布; 实际使用场景 | **WildBench 为真实场景基准**, 长尾分布; 集成至 `nt_meta::wildbench` | `nt_meta::wildbench` |
+| D10316 | **MT-Bench 评估** | 多轮对话如何测试? | MT-Bench: 8 类多轮对话; GPT-4 评分; 对话质量 | **MT-Bench 为多轮对话基准**, 8 类场景; 集成至 `nt_meta::mt_bench` | `nt_meta::mt_bench` |
+| D10317 | **多模态基准** | 多模态能力如何测试? | MMBench: 多模态; SEED-Bench: 图像/视频; MathVista: 数学视觉 | **MMBench+SEED-Bench 联合**, 多模态覆盖; 集成至 `nt_meta::multimodal_bench` | `nt_meta::multimodal_bench` |
+| D10318 | **具身基准** | 具身能力如何测试? | AgentBench: 代理任务; OSWorld: 桌面交互; SWE-bench: 软件工程 | **AgentBench+OSWorld 联合**, 多环境评估; 集成至 `nt_meta::embodied_bench` | `nt_meta::embodied_bench` |
+| D10319 | **安全基准** | 安全性如何测试? | HarmBench: 安全评估; BBQ: 偏见; TruthfulQA: 真实性 | **HarmBench+BBQ 联合**, 安全+偏见; 集成至 `nt_meta::safety_bench` | `nt_meta::safety_bench` |
+| D10320 | **代码基准** | 代码能力如何测试? | HumanEval+: 代码生成; MBPP+: 代码完成; SWE-bench: 真实修复 | **HumanEval+SWE-bench 联合**, 生成+修复; 集成至 `nt_meta::code_bench` | `nt_meta::code_bench` |
+| D10321 | **长文本基准** | 长文本如何测试? | LongBench: 长文本; Needle-in-a-Haystack: 检索; NIAH 变体 | **LongBench+NIAH 联合**, 长文本+检索; 集成至 `nt_meta::longtext_bench` | `nt_meta::longtext_bench` |
+| D10322 | **推理基准** | 推理能力如何测试? | GSM8K: 数学推理; MATH: 高级数学; ARC-Challenge: 科学 | **GSM8K+MATH 联合**, 推理链评估; 集成至 `nt_meta::reasoning_bench` | `nt_meta::reasoning_bench` |
+| D10323 | **指令遵循基准** | 指令如何测试? | IFEval: 指令遵循; 格式约束; 约束满足 | **IFEval 为指令遵循标准**, 格式+约束; 集成至 `nt_meta::ifeval` | `nt_meta::ifeval` |
+| D10324 | **RAG 基准** | RAG 能力如何测试? | RGB: RAG 基准; ARES: 自动评估; FaithDial: 忠实度 | **RGB+ARES 联合**, 检索+生成; 集成至 `nt_meta::rag_bench` | `nt_meta::rag_bench` |
+| D10325 | **Agent 基准** | Agent 能力如何测试? | τ-bench: 工具使用; WebArena: 网页交互; OSWorld: 桌面 | **τ-bench+WebArena 联合**, 多环境 Agent; 集成至 `nt_meta::agent_bench` | `nt_meta::agent_bench` |
+| D10326 | **评估自动化** | 评估如何自动化? | 自动化评估 pipeline; 评分器; 基准管理; 版本控制 | **自动化评估流水线**, 评分器+版本管理; 集成至 `nt_meta::eval_auto` | `nt_meta::eval_auto` |
+| D10327 | **人类评估** | 人类评估如何设计? | 评估者培训; 质量控制; 多评估者一致性; 成本优化 | **标准化评估流程**, 多评估者+质量控制; 集成至 `nt_meta::human_eval` | `nt_meta::human_eval` |
+| D10328 | **模型对比** | 模型如何公平对比? | 控制变量; 相同提示; 相同温度; 多次运行; 统计显著性 | **标准化对比协议**, 控制变量+统计检验; 集成至 `nt_meta::model_compare` | `nt_meta::model_compare` |
+| D10329 | **评估维度** | 评估哪些维度? | 准确性; 创造力; 安全性; 效率; 偏见; 真实性 | **多维度评估框架**, 覆盖能力+安全+偏见; 集成至 `nt_meta::eval_dimension` | `nt_meta::eval_dimension` |
+| D10330 | **动态基准** | 基准如何防泄漏? | 定期更新; 私有测试集; 动态采样; 基准疲劳 | **动态更新+私有测试集**, 防数据泄漏; 集成至 `nt_meta::dynamic_bench` | `nt_meta::dynamic_bench` |
+| D10331 | **基准构建** | 新基准如何构建? | 问题生成; 验证集设计; 难度分级; 领域覆盖 | **标准化基准构建流程**, 验证+难度+覆盖; 集成至 `nt_meta::bench_build` | `nt_meta::bench_build` |
+| D10332 | **评估成本** | 评估成本如何优化? | 小模型预筛选; 分层评估; 采样评估; 自动化 | **分层评估+自动化**, 减少人工成本; 集成至 `nt_meta::eval_cost` | `nt_meta::eval_cost` |
+| D10333 | **评估可信度** | 评估结果如何可信? | 交叉验证; 人类校准; 评估者间一致性; 误差分析 | **交叉验证+人类校准**, 提升可信度; 集成至 `nt_meta::eval_credibility` | `nt_meta::eval_credibility` |
+| D10334 | **基准公平性** | 基准如何公平? | 多样性采样; 偏见检测; 地域覆盖; 语言平衡 | **多样性采样+偏见检测**, 公平覆盖; 集成至 `nt_meta::bench_fairness` | `nt_meta::bench_fairness` |
+| D10335 | **评估标准化** | 评估如何标准化? | 评估协议; 指标定义; 报告格式; 版本管理 | **标准化评估协议**, 统一指标+格式; 集成至 `nt_meta::eval_standard` | `nt_meta::eval_standard` |
+| D10336 | **评估可视化** | 评估结果如何展示? | 雷达图; 排行榜; 趋势图; 对比矩阵 | **多维可视化**, 雷达+排行+趋势; 集成至 `nt_meta::eval_visualize` | `nt_meta::eval_visualize` |
+| D10337 | **评估报告** | 评估报告如何生成? | 自动化报告; 多语言; 可定制; 版本控制 | **自动化报告生成**, 多语言+可定制; 集成至 `nt_meta::eval_report` | `nt_meta::eval_report` |
+| D10338 | **评估存储** | 评估结果如何存储? | 结构化存储; 版本化; 查询接口; 历史追踪 | **结构化+版本化存储**, 查询+追踪; 集成至 `nt_meta::eval_store` | `nt_meta::eval_store` |
+| D10339 | **评估 API** | 评估如何通过 API 调用? | REST API; WebSocket; 异步评估; 批量评估 | **REST+异步 API**, 支持批量评估; 集成至 `nt_meta::eval_api` | `nt_meta::eval_api` |
+| D10340 | **评估流水线** | 评估如何流水线化? | 预处理→评估→后处理→报告; 自动化; 可扩展 | **端到端评估流水线**, 自动化+可扩展; 集成至 `nt_meta::eval_pipeline` | `nt_meta::eval_pipeline` |
+| D10341 | **评估监控** | 评估如何监控? | 实时监控; 异常检测; 漂移检测; 报警 | **实时监控+漂移检测**, 自动报警; 集成至 `nt_meta::eval_monitor` | `nt_meta::eval_monitor` |
+| D10342 | **评估集成** | 评估如何集成到 CI/CD? | GitHub Actions; 自动回归; 质量门禁; 发布阻断 | **CI/CD 集成**, 自动回归+质量门禁; 集成至 `nt_meta::eval_cicd` | `nt_meta::eval_cicd` |
+| D10343 | **评估隐私** | 评估如何保护隐私? | 差分隐私; 匿名化; 联邦评估; 本地评估 | **差分隐私+匿名化**, 联邦评估; 集成至 `nt_meta::eval_privacy` | `nt_meta::eval_privacy` |
+| D10344 | **评估安全** | 评估如何安全? | 防篡改; 访问控制; 审计日志; 完整性验证 | **防篡改+审计日志**, 访问控制; 集成至 `nt_meta::eval_security` | `nt_meta::eval_security` |
+| D10345 | **评估可扩展** | 评估如何可扩展? | 分布式评估; 缓存; 增量评估; 并行化 | **分布式+增量评估**, 缓存+并行; 集成至 `nt_meta::eval_scale` | `nt_meta::eval_scale` |
+| D10346 | **评估国际化** | 评估如何国际化? | 多语言支持; 本地化; 文化适配 | **多语言+本地化**, 文化适配; 集成至 `nt_meta::eval_i18n` | `nt_meta::eval_i18n` |
+| D10347 | **评估版本管理** | 评估版本如何管理? | 版本化基准; 可复现; 向后兼容 | **版本化基准**, 可复现+兼容; 集成至 `nt_meta::eval_version` | `nt_meta::eval_version` |
+| D10348 | **评估反馈** | 评估反馈如何收集? | 用户反馈; A/B 测试; 满意度调查 | **多渠道反馈**, A/B 测试+调查; 集成至 `nt_meta::eval_feedback` | `nt_meta::eval_feedback` |
+| D10349 | **评估基准组合** | 基准如何组合? | 多基准加权; 相关性分析; 降维; 综合评分 | **多基准加权+综合评分**, 相关性分析; 集成至 `nt_meta::bench_combine` | `nt_meta::bench_combine` |
+| D10350 | **评估挑战** | 评估面临什么挑战? | 数据泄漏; 评估者偏差; 成本; 标准不统一 | **挑战识别+应对策略**, 持续改进; 集成至 `nt_meta::eval_challenges` | `nt_meta::eval_challenges` |
+| D10351 | **评估趋势** | 评估趋势如何? | 自动化; 多维度; 实时化; 基准动态化 | **自动化+实时化趋势**, 多维度+动态; 集成至 `nt_meta::eval_trends` | `nt_meta::eval_trends` |
+| D10352 | **评估最佳实践** | 最佳实践是什么? | 标准化流程; 透明报告; 可复现; 多维度 | **标准化+透明+可复现**, 多维度; 集成至 `nt_meta::eval_best_practice` | `nt_meta::eval_best_practice` |
+| D10353 | **评估工具** | 评估工具如何选择? | lm-evaluation-harness; OpenAI Evals; DeepEval; Inspect AI | **多工具集成**, lm-eval 为主; 集成至 `nt_meta::eval_tools` | `nt_meta::eval_tools` |
+| D10354 | **评估社区** | 评估社区如何参与? | 开源基准; 社区贡献; 众包评估 | **开源+社区贡献**, 众包评估; 集成至 `nt_meta::eval_community` | `nt_meta::eval_community` |
+| D10355 | **评估标准化组织** | 标准化如何推进? | IEEE; ISO; NIST; 行业联盟 | **参与标准化组织**, 推动行业标准; 集成至 `nt_meta::eval_standards_org` | `nt_meta::eval_standards_org` |
+| D10356 | **评估伦理** | 评估伦理如何? | 公平性; 透明性; 隐私; 无害 | **公平+透明+隐私**, 伦理评估; 集成至 `nt_meta::eval_ethics` | `nt_meta::eval_ethics` |
+| D10357 | **评估环境** | 评估环境如何搭建? | 标准化环境; 容器化; 可复现; 资源管理 | **容器化+标准化环境**, 可复现; 集成至 `nt_meta::eval_env` | `nt_meta::eval_env` |
+| D10358 | **评估优化** | 评估效率如何优化? | 缓存; 增量评估; 采样; 并行 | **缓存+增量+并行**, 效率优化; 集成至 `nt_meta::eval_optimize` | `nt_meta::eval_optimize` |
+| D10359 | **评估总结** | 评估体系整合? | Arena+MMLU+GPQA+ARC+安全→多维评估 | **评估统一体系**: 人类偏好+知识+推理+安全→综合评估 | `nt_meta::eval_summary` |
+
+#### 0.x.5 AI 数据基础设施 (D10360-D10410)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10360 | **Milvus 向量库** | 向量数据库如何选择? | Milvus: 分布式; 标量+向量混合; GPU 加速; 10亿+向量 | **Milvus 为分布式向量基线**, GPU 加速+混合查询; 集成至 `nt_memory::milvus_store` | `nt_memory::milvus_store` |
+| D10361 | **Pinecone 托管** | 托管向量库如何选? | Pinecone: 全托管; 低延迟; 自动扩展; 无运维 | **Pinecone 为托管选项**, 低延迟+自动扩展; 集成至 `nt_memory::pinecone_store` | `nt_memory::pinecone_store` |
+| D10362 | **Qdrant 性能** | 高性能向量库如何选? | Qdrant: Rust 编写; 高性能; 灵活过滤; 分布式 | **Qdrant 为高性能选项**, Rust 原生+灵活过滤; 集成至 `nt_memory::qdrant_store` | `nt_memory::qdrant_store` |
+| D10363 | **Weaviate 多模态** | 多模态向量库如何选? | Weaviate: 多模态搜索; GraphQL API; 模块化; 混合搜索 | **Weaviate 为多模态选项**, GraphQL+混合搜索; 集成至 `nt_memory::weaviate_store` | `nt_memory::weaviate_store` |
+| D10364 | **非结构化数据处理** | 非结构化数据如何处理? | Unstructured.io: 文档解析; 表格提取; OCR; 分块 | **Unstructured.io 文档解析管线**, 表格+OCR+分块; 集成至 `nt_world::unstructured_proc` | `nt_world::unstructured_proc` |
+| D10365 | **数据质量保证** | 数据质量如何保证? | Great Expectations: 数据验证; 质量规则; 监控 | **Great Expectations 数据验证**, 质量规则+监控; 集成至 `nt_meta::data_quality` | `nt_meta::data_quality` |
+| D10366 | **合成数据生成** | 合成数据如何生成? | LLM 合成; 扩散模型合成; 规则合成; 验证过滤 | **LLM+扩散联合合成**, 验证过滤保证质量; 集成至 `nt_mind::synthetic_data` | `nt_mind::synthetic_data` |
+| D10367 | **数据标注平台** | 数据标注如何高效? | Label Studio: 开源; 主动学习辅助; 众包+专家混合 | **Label Studio 标注平台**, 主动学习+专家混合; 集成至 `nt_world::data_labeling` | `nt_world::data_labeling` |
+| D10368 | **数据版本控制** | 数据版本如何管理? | DVC: 数据版本控制; Git-like 管理; 大文件处理 | **DVC 数据版本控制**, Git-like 管理; 集成至 `nt_memory::data_version` | `nt_memory::data_version` |
+| D10369 | **数据编目** | 数据编目如何构建? | OpenMetadata; 数据发现; 血缘追踪; 质量评分 | **OpenMetadata 数据编目**, 发现+血缘+质量; 集成至 `nt_memory::data_catalog` | `nt_memory::data_catalog` |
+| D10370 | **数据管道** | 数据管道如何编排? | Airflow; Dagster; Prefect; 动态 DAG | **Dagster 数据管道**, 响应式+类型安全; 集成至 `nt_act::data_pipeline` | `nt_act::data_pipeline` |
+| D10371 | **数据湖架构** | 数据湖如何设计? | Delta Lake: ACID; Iceberg: 开放格式; Hudi: 增量 | **Delta Lake ACID 数据湖**, 开放格式+增量; 集成至 `nt_memory::data_lake` | `nt_memory::data_lake` |
+| D10372 | **特征存储** | 特征如何管理? | Feast: 特征存储; 在线/离线特征; 特征复用 | **Feast 特征存储**, 在线/离线统一; 集成至 `nt_memory::feature_store` | `nt_memory::feature_store` |
+| D10373 | **数据编解码** | 数据如何编解码? | Avro/Parquet/ORC: 列式存储; 压缩; Schema evolution | **Parquet 列式存储**, 压缩+Schema evolution; 集成至 `nt_memory::data_encoding` | `nt_memory::data_encoding` |
+| D10374 | **数据缓存** | 数据如何缓存? | Redis: 内存缓存; 分布式缓存; 缓存失效策略 | **Redis 分布式缓存**, TTL+失效策略; 集成至 `nt_memory::data_cache` | `nt_memory::data_cache` |
+| D10375 | **数据流处理** | 流数据如何处理? | Kafka: 消息队列; Flink: 流计算; 实时处理 | **Kafka+Flink 联合**, 流式处理; 集成至 `nt_io::data_stream` | `nt_io::data_stream` |
+| D10376 | **数据联邦** | 跨源数据如何联合? | 联邦查询; 虚拟化; 数据网格 | **联邦查询+虚拟化**, 跨源联合; 集成至 `nt_memory::data_federation` | `nt_memory::data_federation` |
+| D10377 | **数据安全** | 数据如何安全? | 加密; 访问控制; 审计; 脱敏 | **加密+访问控制+审计**, 数据脱敏; 集成至 `nt_shield::data_security` | `nt_shield::data_security` |
+| D10378 | **数据合规** | 数据如何合规? | GDPR/CCPA; 数据分类; 合规审计; 删除权 | **GDPR/CCPA 合规**, 数据分类+审计; 集成至 `nt_governance::data_compliance` | `nt_governance::data_compliance` |
+| D10379 | **数据血缘** | 数据血缘如何追踪? | OpenLineage: 血缘标准; 影响分析; 变更追踪 | **OpenLineage 血缘标准**, 影响+变更; 集成至 `nt_memory::data_lineage` | `nt_memory::data_lineage` |
+| D10380 | **数据目录 API** | 数据目录如何暴露? | REST API; GraphQL; 搜索接口; 批量操作 | **REST+GraphQL API**, 搜索+批量; 集成至 `nt_io::catalog_api` | `nt_io::catalog_api` |
+| D10381 | **数据摄取** | 数据摄取如何高效? | 批量+流式摄取; 增量同步; 并行摄取 | **批量+流式联合**, 增量+并行; 集成至 `nt_world::data_ingest` | `nt_world::data_ingest` |
+| D10382 | **数据清洗** | 数据清洗如何自动化? | 异常检测; 去重; 标准化; 缺失值处理 | **自动化清洗管线**, 异常+去重+标准化; 集成至 `nt_world::data_clean` | `nt_world::data_clean` |
+| D10383 | **数据转换** | 数据转换如何编排? | ETL/ELT; 转换管道; 数据模型; Schema 管理 | **ELT 优先**, 转换管道+Schema 管理; 集成至 `nt_world::data_transform` | `nt_world::data_transform` |
+| D10384 | **数据评估** | 数据集如何评估? | 数据质量指标; 统计分析; 偏差检测; 代表性 | **质量指标+偏差检测**, 代表性分析; 集成至 `nt_meta::data_eval` | `nt_meta::data_eval` |
+| D10385 | **数据飞轮** | 数据飞轮如何构建? | 用户反馈→数据收集→模型改进→用户体验→更多反馈 | **闭环数据飞轮**, 反馈→收集→改进→体验; 集成至 `nt_mind::data_flywheel` | `nt_mind::data_flywheel` |
+| D10386 | **多模态数据** | 多模态数据如何管理? | 文本+图像+音频+视频; 统一存储; 跨模态检索 | **统一多模态存储**, 跨模态检索; 集成至 `nt_memory::multimodal_data` | `nt_memory::multimodal_data` |
+| D10387 | **时序数据** | 时序数据如何处理? | InfluxDB/TimescaleDB; 时间索引; 降采样; 聚合 | **InfluxDB 时序存储**, 时间索引+降采样; 集成至 `nt_memory::time_series_data` | `nt_memory::time_series_data` |
+| D10388 | **图数据** | 图数据如何管理? | Neo4j/ArangoDB; 图查询; 社区发现; 路径分析 | **Neo4j 图数据库**, 图查询+社区发现; 集成至 `nt_memory::graph_data` | `nt_memory::graph_data` |
+| D10389 | **地理空间数据** | 地理数据如何处理? | PostGIS; 空间索引; 地理查询; 可视化 | **PostGIS 地理存储**, 空间索引+查询; 集成至 `nt_memory::geospatial_data` | `nt_memory::geospatial_data` |
+| D10390 | **嵌入式数据** | 嵌入数据如何管理? | 向量索引; 嵌入缓存; 更新策略; 版本控制 | **向量索引+缓存**, 更新+版本; 集成至 `nt_memory::embedding_data` | `nt_memory::embedding_data` |
+| D10391 | **数据采样** | 数据采样如何设计? | 随机采样; 分层采样; 主动采样; 在线采样 | **分层+主动采样**, 在线采样; 集成至 `nt_world::data_sampling` | `nt_world::data_sampling` |
+| D10392 | **数据增强** | 数据增强如何实施? | 图像增强; 文本增强; 混合增强; 风格迁移 | **多模态增强管线**, 图像+文本+混合; 集成至 `nt_world::data_augment` | `nt_world::data_augment` |
+| D10393 | **数据去标识** | 数据去标识如何实现? | 匿名化; 假名化; 差分隐私; K-匿名 | **匿名化+差分隐私**, K-匿名; 集成至 `nt_shield::data_deidentify` | `nt_shield::data_deidentify` |
+| D10394 | **数据生命周期** | 数据生命周期如何管理? | 创建→存储→使用→归档→删除; 策略自动化 | **生命周期策略自动化**, 创建→删除全管理; 集成至 `nt_memory::data_lifecycle` | `nt_memory::data_lifecycle` |
+| D10395 | **数据监控** | 数据质量如何监控? | 实时监控; 异常检测; 漂移检测; 报警 | **实时监控+漂移检测**, 自动报警; 集成至 `nt_meta::data_monitor` | `nt_meta::data_monitor` |
+| D10396 | **数据治理** | 数据治理如何实施? | 策略; 标准; 角色; 审计; 合规 | **策略+标准+角色+审计**, 治理框架; 集成至 `nt_governance::data_governance` | `nt_governance::data_governance` |
+| D10397 | **数据成本** | 数据成本如何优化? | 存储分层; 压缩; 生命周期; 访问模式 | **存储分层+压缩**, 生命周期优化; 集成至 `nt_memory::data_cost` | `nt_memory::data_cost` |
+| D10398 | **数据可用性** | 数据可用性如何保证? | 备份; 冗余; 灾难恢复; SLA | **备份+冗余+灾难恢复**, SLA 保证; 集成至 `nt_memory::data_availability` | `nt_memory::data_availability` |
+| D10399 | **数据集成** | 多源数据如何集成? | ETL; API 集成; CDC; 数据虚拟化 | **ETL+CDC 联合**, API+虚拟化; 集成至 `nt_memory::data_integration` | `nt_memory::data_integration` |
+| D10400 | **数据发现** | 数据如何发现? | 搜索; 标签; 推荐; 语义搜索 | **语义搜索+推荐**, 标签+搜索; 集成至 `nt_memory::data_discovery` | `nt_memory::data_discovery` |
+| D10401 | **数据访问控制** | 数据访问如何控制? | RBAC; ABAC; 列级权限; 行级权限 | **RBAC+ABAC 联合**, 列+行级权限; 集成至 `nt_shield::data_access` | `nt_shield::data_access` |
+| D10402 | **数据审计** | 数据审计如何实施? | 操作日志; 变更追踪; 合规审计; 安全审计 | **操作日志+变更追踪**, 合规+安全; 集成至 `nt_shield::data_audit` | `nt_shield::data_audit` |
+| D10403 | **数据迁移** | 数据迁移如何安全? | 在线迁移; 双写; 验证; 回滚 | **在线迁移+双写**, 验证+回滚; 集成至 `nt_memory::data_migration` | `nt_memory::data_migration` |
+| D10404 | **数据备份** | 数据备份如何设计? | 全量+增量; 跨区域; 加密; 测试恢复 | **全量+增量备份**, 跨区域+加密; 集成至 `nt_memory::data_backup` | `nt_memory::data_backup` |
+| D10405 | **数据恢复** | 数据恢复如何测试? | 恢复演练; RTO/RPO; 自动恢复; 验证 | **恢复演练+自动恢复**, RTO/RPO 保证; 集成至 `nt_memory::data_recovery` | `nt_memory::data_recovery` |
+| D10406 | **数据平台** | 数据平台如何设计? | 统一平台; 多引擎; 可扩展; 低成本 | **统一数据平台**, 多引擎+可扩展; 集成至 `nt_memory::data_platform` | `nt_memory::data_platform` |
+| D10407 | **数据生态系统** | 数据生态如何构建? | 开源工具; 标准接口; 社区贡献; 互操作 | **开源+标准接口**, 互操作; 集成至 `nt_memory::data_ecosystem` | `nt_memory::data_ecosystem` |
+| D10408 | **数据趋势** | 数据趋势如何? | 实时化; AI 增强; 自动化; 隐私增强 | **实时+AI 增强趋势**, 自动化+隐私; 集成至 `nt_memory::data_trends` | `nt_memory::data_trends` |
+| D10409 | **数据最佳实践** | 最佳实践是什么? | 质量优先; 自动化; 监控; 治理; 文档 | **质量+自动化+监控**, 治理+文档; 集成至 `nt_memory::data_best_practice` | `nt_memory::data_best_practice` |
+| D10410 | **数据基础设施总结** | 数据基础设施整合? | 向量+文档+流式+图→统一数据基础设施 | **数据基础设施统一体系**: 存储→处理→质量→治理→监控 | `nt_memory::data_infra_summary` |
+
+#### 0.x.6 推理优化 (D10411-D10461)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10411 | **TensorRT-LLM** | GPU 推理如何加速? | TensorRT-LLM: NVIDIA; FP8; 2-4× 加速; kernel fusion | **TensorRT-LLM 为 NVIDIA 加速基线**, FP8+kernel fusion; 集成至 `nt_io::trt_llm` | `nt_io::trt_llm` |
+| D10412 | **vLLM 服务** | LLM 服务如何优化? | vLLM: PagedAttention; 高吞吐; 连续批处理; 低延迟 | **vLLM 为 LLM 服务标准**, PagedAttention+连续批处理; 集成至 `nt_io::vllm_serve` | `nt_io::vllm_serve` |
+| D10413 | **SGLang 推理** | 结构化生成如何加速? | SGLang: 结构化输出; 前端 DSL; RadixAttention; 高效采样 | **SGLang 为结构化生成基线**, RadixAttention+DSL; 集成至 `nt_io::sglang_serve` | `nt_io::sglang_serve` |
+| D10414 | **推测解码** | 推测解码如何加速? | Draft model; Medusa; EAGLE; 2-3× 加速; 无质量损失 | **推测解码+Medusa+EAGLE**, 多草案模型; 集成至 `nt_io::spec_decode` | `nt_io::spec_decode` |
+| D10415 | **Medusa 头** | Medusa 如何实现? | Medusa: 多头预测; 自投机; 无额外模型; 2-3× 加速 | **Medusa 自投机解码**, 多头预测; 集成至 `nt_io::medusa` | `nt_io::medusa` |
+| D10416 | **EAGLE 草案** | EAGLE 如何实现? | EAGLE: 特征级投机; 轻量 draft; 3× 加速; 低开销 | **EAGLE 特征级投机**, 轻量 draft; 集成至 `nt_io::eagle` | `nt_io::eagle` |
+| D10417 | **GPTQ 量化** | 4-bit 量化如何实现? | GPTQ: 逐层量化; OBQ 框架; 4-bit 精度损失 <1%; GPU 友好 | **GPTQ 为训练后量化基线**, 4-bit 精度损失最小; 集成至 `nt_io::gptq_quant` | `nt_io::gptq_quant` |
+| D10418 | **AWQ 量化** | 激活感知量化如何? | AWQ: 激活感知; 4-bit; 保护重要权重; 比 GPTQ 更快 | **AWQ 激活感知量化**, 4-bit+保护权重; 集成至 `nt_io::awq_quant` | `nt_io::awq_quant` |
+| D10419 | **GGUF 格式** | CPU 推理如何优化? | GGUF: llama.cpp 格式; CPU 优化; 量化+打包; 跨平台 | **GGUF 为 CPU 推理格式**, 量化+打包+跨平台; 集成至 `nt_io::gguf_format` | `nt_io::gguf_format` |
+| D10420 | **bitsandbytes 量化** | 轻量量化如何实现? | bitsandbytes: 8/4-bit; QLoRA 集成; 简单 API; GPU 量化 | **bitsandbytes 为轻量量化**, 8/4-bit+QLoRA; 集成至 `nt_io::bnb_quant` | `nt_io::bnb_quant` |
+| D10421 | **模型剪枝** | 模型剪枝如何设计? | 非结构化剪枝; 结构化剪枝; 渐进式剪枝; 30-50% 压缩 | **结构化+渐进式剪枝**, 30-50% 压缩; 集成至 `nt_io::pruning` | `nt_io::pruning` |
+| D10422 | **张量分解** | 张量分解如何应用? | CP 分解; Tucker 分解; TT 分解; 低秩近似 | **CP+TT 分解联合**, 低秩近似; 集成至 `nt_io::tensor_decomp` | `nt_io::tensor_decomp` |
+| D10423 | **模型蒸馏** | 蒸馏如何实施? | Teacher-Student; 特征蒸馏; 注意力蒸馏; 自蒸馏 | **多层蒸馏联合**, 注意力+特征+自蒸馏; 集成至 `nt_mind::model_distill` | `nt_mind::model_distill` |
+| D10424 | **INT4/INT8 量化** | 整数量化如何选择? | INT4: 极致压缩; INT8: 平衡; 混合精度; 量化感知训练 | **INT4/INT8 混合**, 量化感知训练; 集成至 `nt_io::int_quant` | `nt_io::int_quant` |
+| D10425 | **FP8 推理** | FP8 如何加速? | FP8: H100 支持; 2× 吞吐; 训练+推理; 动态量化 | **FP8 为 H100 加速标准**, 2× 吞吐; 集成至 `nt_io::fp8_infer` | `nt_io::fp8_infer` |
+| D10426 | **KV 缓存优化** | KV 缓存如何压缩? | GQA/MQA; KV 缓存量化; 滑动窗口; Token 丢弃 | **GQA+KV 量化+滑动窗口**, 联合优化; 集成至 `nt_io::kv_optimize` | `nt_io::kv_optimize` |
+| D10427 | **批处理优化** | 批处理如何优化? | 连续批处理; 动态批处理; 请求调度; 负载均衡 | **连续+动态批处理**, 请求调度; 集成至 `nt_io::batch_optimize` | `nt_io::batch_optimize` |
+| D10428 | **模型并行推理** | 推理如何并行? | 张量并行; 流水线并行; 序列并行; 数据并行 | **张量+流水线并行**, 动态分配; 集成至 `nt_io::infer_parallel` | `nt_io::infer_parallel` |
+| D10429 | **推理缓存** | 推理结果如何缓存? | KV 缓存; 结果缓存; 语义缓存; 前缀缓存 | **KV+前缀+结果缓存**, 语义缓存; 集成至 `nt_io::infer_cache` | `nt_io::infer_cache` |
+| D10430 | **模型量化评估** | 量化质量如何评估? | 精度对比; 延迟测量; 吞吐测试; 压缩比 | **自动化量化评估**, 精度+延迟+吞吐; 集成至 `nt_meta::quant_eval` | `nt_meta::quant_eval` |
+| D10431 | **推理监控** | 推理性能如何监控? | 延迟; 吞吐; GPU 利用率; 内存; 错误率 | **实时性能监控**, 延迟+吞吐+GPU; 集成至 `nt_meta::infer_monitor` | `nt_meta::infer_monitor` |
+| D10432 | **推理 A/B 测试** | 推理如何 A/B 测试? | 模型版本路由; 指标对比; 统计显著性; 流量分配 | **模型版本路由+指标对比**, 统计检验; 集成至 `nt_meta::infer_ab` | `nt_meta::infer_ab` |
+| D10433 | **推理成本优化** | 推理成本如何降低? | 量化; 缓存; 批处理; 模型选择; 路由 | **量化+缓存+路由**, 成本效益; 集成至 `nt_io::infer_cost` | `nt_io::infer_cost` |
+| D10434 | **推理延迟优化** | 推理延迟如何降低? | 量化; KV 缓存; 推测解码; 异步推理 | **量化+推测+异步**, 延迟优化; 集成至 `nt_io::infer_latency` | `nt_io::infer_latency` |
+| D10435 | **推理吞吐优化** | 推理吞吐如何提升? | 批处理; 并行; 模型并行; 请求合并 | **批处理+并行**, 吞吐优化; 集成至 `nt_io::infer_throughput` | `nt_io::infer_throughput` |
+| D10436 | **推理安全** | 推理安全如何保证? | 输入过滤; 输出过滤; 速率限制; 隔离 | **输入+输出过滤**, 速率限制+隔离; 集成至 `nt_shield::infer_security` | `nt_shield::infer_security` |
+| D10437 | **推理可观测** | 推理如何可观测? | 日志; 指标; 追踪; 分布式追踪 | **日志+指标+追踪联合**, 分布式追踪; 集成至 `nt_meta::infer_observability` | `nt_meta::infer_observability` |
+| D10438 | **推理弹性** | 推理如何弹性伸缩? | 自动扩缩容; 请求排队; 优雅降级; 熔断 | **自动扩缩容+排队**, 优雅降级+熔断; 集成至 `nt_io::infer_elastic` | `nt_io::infer_elastic` |
+| D10439 | **推理多租户** | 多租户推理如何设计? | 资源隔离; 优先级队列; 配额管理; 计费 | **资源隔离+优先级**, 配额+计费; 集成至 `nt_io::infer_multitenant` | `nt_io::infer_multitenant` |
+| D10440 | **推理灰度发布** | 推理如何灰度? | 金丝雀; 蓝绿; 流量分割; 回滚 | **金丝雀+蓝绿**, 流量分割+回滚; 集成至 `nt_io::infer_canary` | `nt_io::infer_canary` |
+| D10441 | **推理基准测试** | 推理基准如何设计? | 延迟 P50/P99; 吞吐; GPU 利用率; 首 token 延迟 | **多维度基准**, P50/P99+首 token; 集成至 `nt_meta::infer_benchmark` | `nt_meta::infer_benchmark` |
+| D10442 | **推理部署** | 推理如何部署? | Docker; K8s; Serverless; 边缘部署 | **Docker+K8s 标准**, Serverless+边缘; 集成至 `nt_io::infer_deploy` | `nt_io::infer_deploy` |
+| D10443 | **推理回滚** | 推理如何回滚? | 版本管理; 快速回滚; 流量切换; 健康检查 | **版本管理+快速回滚**, 流量切换; 集成至 `nt_io::infer_rollback` | `nt_io::infer_rollback` |
+| D10444 | **推理负载均衡** | 负载如何均衡? | Round-robin; 最小连接; 一致性哈希; 地理路由 | **最小连接+一致性哈希**, 地理路由; 集成至 `nt_io::infer_lb` | `nt_io::infer_lb` |
+| D10445 | **推理队列** | 请求如何排队? | 优先级队列; FIFO; 公平队列; 超时处理 | **优先级+公平队列**, 超时处理; 集成至 `nt_io::infer_queue` | `nt_io::infer_queue` |
+| D10446 | **推理熔断** | 推理如何熔断? | 错误率阈值; 延迟阈值; 自动恢复; 降级 | **错误率+延迟阈值**, 自动恢复+降级; 集成至 `nt_io::infer_circuit_breaker` | `nt_io::infer_circuit_breaker` |
+| D10447 | **推理重试** | 推理如何重试? | 指数退避; 幂等性; 最大重试; 错误分类 | **指数退避+幂等**, 错误分类重试; 集成至 `nt_io::infer_retry` | `nt_io::infer_retry` |
+| D10448 | **推理限流** | 推理如何限流? | 令牌桶; 漏桶; 滑动窗口; 用户级限流 | **令牌桶+滑动窗口**, 用户级限流; 集成至 `nt_io::infer_ratelimit` | `nt_io::infer_ratelimit` |
+| D10449 | **推理配额** | 推理配额如何管理? | 用户配额; 组织配额; 动态调整; 预警 | **用户+组织配额**, 动态调整+预警; 集成至 `nt_io::infer_quota` | `nt_io::infer_quota` |
+| D10450 | **推理计费** | 推理如何计费? | Token 计费; 时间计费; 混合计费; 优惠策略 | **Token+时间混合计费**, 优惠策略; 集成至 `nt_io::infer_billing` | `nt_io::infer_billing` |
+| D10451 | **推理日志** | 推理日志如何记录? | 结构化日志; 请求追踪; 性能日志; 审计日志 | **结构化+请求追踪**, 性能+审计; 集成至 `nt_io::infer_logging` | `nt_io::infer_logging` |
+| D10452 | **推理告警** | 推理告警如何设计? | 延迟告警; 错误率告警; 资源告警; 自动处理 | **多维度告警**, 自动处理; 集成至 `nt_meta::infer_alerting` | `nt_meta::infer_alerting` |
+| D10453 | **推理优化工具** | 优化工具如何选择? | Torch.compile; ONNX Runtime; TensorRT; Triton | **多工具集成**, Torch.compile 为主; 集成至 `nt_io::infer_opt_tools` | `nt_io::infer_opt_tools` |
+| D10454 | **推理诊断** | 推理问题如何诊断? | 性能剖析; 瓶颈分析; 内存分析; GPU 分析 | **性能剖析+瓶颈分析**, GPU+内存; 集成至 `nt_meta::infer_diagnosis` | `nt_meta::infer_diagnosis` |
+| D10455 | **推理文档** | 推理文档如何维护? | API 文档; 部署指南; 故障排除; 最佳实践 | **API+部署+故障排除**, 最佳实践; 集成至 `nt_io::infer_docs` | `nt_io::infer_docs` |
+| D10456 | **推理测试** | 推理如何测试? | 单元测试; 集成测试; 负载测试; 压力测试 | **单元+集成+负载+压力**, 多层测试; 集成至 `nt_meta::infer_testing` | `nt_meta::infer_testing` |
+| D10457 | **推理安全审计** | 安全审计如何实施? | 输入验证; 输出过滤; 权限检查; 审计日志 | **输入+输出+权限+审计**, 安全审计; 集成至 `nt_shield::infer_audit` | `nt_shield::infer_audit` |
+| D10458 | **推理合规** | 推理如何合规? | 数据保护; 隐私; 行业法规; 地域法规 | **数据保护+隐私合规**, 行业+地域; 集成至 `nt_governance::infer_compliance` | `nt_governance::infer_compliance` |
+| D10459 | **推理成本监控** | 成本如何监控? | Token 消耗; GPU 时间; 存储; 网络 | **Token+GPU+存储+网络**, 成本监控; 集成至 `nt_meta::infer_cost_monitor` | `nt_meta::infer_cost_monitor` |
+| D10460 | **推理优化趋势** | 优化趋势如何? | 量化+蒸馏+推测+边缘→多维度优化 | **量化+推测+边缘趋势**, 多维度优化; 集成至 `nt_io::infer_opt_trends` | `nt_io::infer_opt_trends` |
+| D10461 | **推理优化总结** | 推理优化整合? | 量化+推测+服务+监控→推理优化体系 | **推理优化统一体系**: 量化→推测→服务→监控→优化 | `nt_io::infer_opt_summary` |
+
+#### 0.x.7 分布式AI训练 (D10462-D10512)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10462 | **DeepSpeed ZeRO** | 分布式训练如何优化内存? | ZeRO-1/2/3: 逐步分片; 优化器/梯度/参数; 64× 内存节省 | **ZeRO-3 为默认**, 完全分片; 集成至 `nt_io::deepspeed_zeo` | `nt_io::deepspeed_zeo` |
+| D10463 | **FSDP 分片** | PyTorch FSDP 如何使用? | FSDP: 完全分片数据并行; auto_wrap; 混合分片; 原生 PyTorch | **FSDP 为 PyTorch 分布式标准**, auto_wrap+混合分片; 集成至 `nt_io::fsdp` | `nt_io::fsdp` |
+| D10464 | **Megatron-LM** | 大模型如何训练? | Megatron-LM: 张量并行+流水线并行; 序列并行; 超大模型 | **Megatron-LM 为超大模型训练框架**, 张量+流水线+序列并行; 集成至 `nt_io::megatron_lm` | `nt_io::megatron_lm` |
+| D10465 | **3D 并行** | 3D 并行如何设计? | 数据并行+张量并行+流水线并行; 最优配置; 通信优化 | **3D 并行联合优化**, 配置自动搜索; 集成至 `nt_io::3d_parallel` | `nt_io::3d_parallel` |
+| D10466 | **Expert 并行** | MoE Expert 如何并行? | Expert 并行; 路由优化; 负载均衡; 通信优化 | **Expert 并行+路由优化**, 负载均衡; 集成至 `nt_io::expert_parallel` | `nt_io::expert_parallel` |
+| D10467 | **检查点策略** | 检查点如何设计? | 异步检查点; 增量检查点; 分布式检查点; 快速恢复 | **异步+增量检查点**, 分布式存储; 集成至 `nt_io::checkpointing` | `nt_io::checkpointing` |
+| D10468 | **容错训练** | 训练如何容错? | 故障检测; 自动重启; 检查点恢复; 弹性训练 | **自动故障检测+重启**, 弹性训练; 集成至 `nt_io::fault_tolerant` | `nt_io::fault_tolerant` |
+| D10469 | **通信优化** | 通信如何优化? | 梯度压缩; 通信量化; 异步通信; 梯度累积 | **梯度压缩+通信量化**, 异步通信; 集成至 `nt_io::comm_optimize` | `nt_io::comm_optimize` |
+| D10470 | **梯度压缩** | 梯度如何压缩? | Top-K; 随机稀疏化; 量化; 误差反馈 | **Top-K+量化联合**, 误差反馈; 集成至 `nt_io::grad_compress` | `nt_io::grad_compress` |
+| D10471 | **混合精度训练** | 训练混合精度如何? | BF16 训练; FP16+Loss scaling; FP8 训练; 动态精度 | **BF16 为默认训练精度**, FP8 用于加速; 集成至 `nt_io::train_mixed_precision` | `nt_io::train_mixed_precision` |
+| D10472 | **梯度累积** | 显存不足如何处理? | 梯度累积; micro-batch; 有效批处理; 精度影响 | **梯度累积+micro-batch**, 有效批处理; 集成至 `nt_io::grad_accumulate` | `nt_io::grad_accumulate` |
+| D10473 | **CPU Offload** | CPU Offload 如何设计? | ZeRO-Offload; 参数/优化器状态 offload; 带宽瓶颈 | **ZeRO-Offload 参数 offload**, 带宽优化; 集成至 `nt_io::cpu_offload` | `nt_io::cpu_offload` |
+| D10474 | **NVMe Offload** | NVMe Offload 如何实现? | ZeRO-Infinity; NVMe 带宽利用; 异步预取 | **ZeRO-Infinity NVMe offload**, 异步预取; 集成至 `nt_io::nvme_offload` | `nt_io::nvme_offload` |
+| D10475 | **序列并行** | 长序列如何并行? | Megatron 序列并行; Ring Attention; DeepSpeed Ulysses | **序列并行联合优化**, Ring Attention; 集成至 `nt_io::seq_parallel` | `nt_io::seq_parallel` |
+| D10476 | **数据加载** | 数据加载如何高效? | 多进程 DataLoader; 预取; 内存映射; 分布式采样 | **多进程+预取+内存映射**, 分布式采样; 集成至 `nt_io::data_loading` | `nt_io::data_loading` |
+| D10477 | **学习率调度** | 学习率如何调度? | Cosine; WSD; 余弦退火; 预热+衰减 | **Cosine+WSD 混合**, 预热+衰减; 集成至 `nt_io::lr_schedule` | `nt_io::lr_schedule` |
+| D10478 | **优化器选择** | 优化器如何选? | AdamW; LAMB; Adafactor; Lion; Sophia | **AdamW 为默认**, Adafactor 大模型; 集成至 `nt_io::optimizer` | `nt_io::optimizer` |
+| D10479 | **梯度裁剪** | 梯度如何裁剪? | 全局范数裁剪; 逐层裁剪; 动态裁剪 | **全局范数裁剪**, 动态调整; 集成至 `nt_io::grad_clip` | `nt_io::grad_clip` |
+| D10480 | **训练监控** | 训练如何监控? | Loss 曲线; 梯度范数; 激活统计; GPU 利用率 | **多维度训练监控**, Loss+梯度+激活+GPU; 集成至 `nt_meta::train_monitor` | `nt_meta::train_monitor` |
+| D10481 | **训练调试** | 训练问题如何调试? | NaN 检测; 梯度爆炸; 学习率搜索; 超参数调优 | **NaN+梯度检测**, 学习率搜索; 集成至 `nt_meta::train_debug` | `nt_meta::train_debug` |
+| D10482 | **训练调度** | 训练任务如何调度? | 队列管理; 优先级; 抢占; 资源分配 | **队列+优先级+抢占**, 资源分配; 集成至 `nt_io::train_schedule` | `nt_io::train_schedule` |
+| D10483 | **训练成本** | 训练成本如何优化? | 混合精度; 梯度累积; 模型并行; 数据并行 | **混合精度+梯度累积**, 并行优化; 集成至 `nt_io::train_cost` | `nt_io::train_cost` |
+| D10484 | **弹性训练** | 训练如何弹性? | 节点加入/退出; 动态调整; 无缝恢复 | **弹性训练+动态调整**, 无缝恢复; 集成至 `nt_io::elastic_train` | `nt_io::elastic_train` |
+| D10485 | **训练流水线** | 训练如何编排? | 数据加载→预处理→训练→评估→检查点 | **端到端训练流水线**, 自动化编排; 集成至 `nt_io::train_pipeline` | `nt_io::train_pipeline` |
+| D10486 | **分布式优化器** | 分布式优化器如何设计? | 分布式 Adam; 通信优化; 状态分片 | **分布式优化器+通信优化**, 状态分片; 集成至 `nt_io::dist_optimizer` | `nt_io::dist_optimizer` |
+| D10487 | **训练数据管理** | 训练数据如何管理? | 数据版本; 预处理; 缓存; 验证 | **数据版本+预处理**, 缓存+验证; 集成至 `nt_io::train_data_mgmt` | `nt_io::train_data_mgmt` |
+| D10488 | **训练验证** | 训练结果如何验证? | 评估集; 指标; A/B 测试; 回归测试 | **评估集+指标验证**, A/B+回归; 集成至 `nt_meta::train_validate` | `nt_meta::train_validate` |
+| D10489 | **训练发布** | 模型如何发布? | 模型注册; 版本管理; 发布流程; 回滚 | **模型注册+版本管理**, 发布流程; 集成至 `nt_io::train_release` | `nt_io::train_release` |
+| D10490 | **训练文档** | 训练文档如何维护? | 配置文档; 超参数文档; 故障排除; 最佳实践 | **配置+超参数+故障排除**, 最佳实践; 集成至 `nt_io::train_docs` | `nt_io::train_docs` |
+| D10491 | **训练测试** | 训练如何测试? | 单元测试; 集成测试; 端到端测试; 负载测试 | **多层训练测试**, 单元+集成+端到端; 集成至 `nt_meta::train_testing` | `nt_meta::train_testing` |
+| D10492 | **训练安全** | 训练安全如何保证? | 数据安全; 模型安全; 通信安全; 访问控制 | **数据+模型+通信安全**, 访问控制; 集成至 `nt_shield::train_security` | `nt_shield::train_security` |
+| D10493 | **训练合规** | 训练如何合规? | 数据使用; 版权; 隐私; 合规审计 | **数据使用+版权合规**, 隐私+审计; 集成至 `nt_governance::train_compliance` | `nt_governance::train_compliance` |
+| D10494 | **训练环境** | 训练环境如何搭建? | Docker; K8s; GPU 集群; 云环境 | **Docker+K8s 标准**, GPU 集群+云; 集成至 `nt_io::train_env` | `nt_io::train_env` |
+| D10495 | **训练工具** | 训练工具如何选择? | PyTorch; JAX; DeepSpeed; FSDP; Megatron | **PyTorch+DeepSpeed 为主**, FSDP+Megatron; 集成至 `nt_io::train_tools` | `nt_io::train_tools` |
+| D10496 | **训练基准** | 训练基准如何设计? | 训练速度; 内存效率; 收敛性; 最终性能 | **速度+内存+收敛+性能**, 多维度基准; 集成至 `nt_meta::train_benchmark` | `nt_meta::train_benchmark` |
+| D10497 | **训练优化** | 训练如何优化? | 超参数搜索; 架构搜索; 数据优化; 计算优化 | **超参数+架构+数据+计算联合优化**, 集成至 `nt_io::train_optimize` | `nt_io::train_optimize` |
+| D10498 | **训练自动化** | 训练如何自动化? | AutoML; 自动调参; 自动架构搜索; 自动流水线 | **AutoML+自动调参**, 自动架构搜索; 集成至 `nt_io::train_auto` | `nt_io::train_auto` |
+| D10499 | **训练可视化** | 训练如何可视化? | Loss 曲线; 梯度图; 注意力图; 激活图 | **Loss+梯度+注意力+激活**, 多维度可视化; 集成至 `nt_meta::train_visualize` | `nt_meta::train_visualize` |
+| D10500 | **训练诊断** | 训练问题如何诊断? | 性能剖析; 瓶颈分析; 内存分析; 通信分析 | **性能剖析+瓶颈分析**, 内存+通信; 集成至 `nt_meta::train_diagnosis` | `nt_meta::train_diagnosis` |
+| D10501 | **训练回滚** | 训练如何回滚? | 版本管理; 检查点恢复; 快速回滚 | **版本管理+检查点恢复**, 快速回滚; 集成至 `nt_io::train_rollback` | `nt_io::train_rollback` |
+| D10502 | **训练灰度** | 训练如何灰度? | 模型版本; 流量分割; A/B 测试; 渐进发布 | **模型版本+流量分割**, A/B 测试; 集成至 `nt_io::train_canary` | `nt_io::train_canary` |
+| D10503 | **训练告警** | 训练告警如何设计? | Loss 异常; 梯度异常; GPU 异常; 训练停滞 | **Loss+梯度+GPU+停滞**, 自动告警; 集成至 `nt_meta::train_alerting` | `nt_meta::train_alerting` |
+| D10504 | **训练日志** | 训练日志如何记录? | 结构化日志; 训练事件; 性能指标; 审计 | **结构化日志+训练事件**, 性能+审计; 集成至 `nt_io::train_logging` | `nt_io::train_logging` |
+| D10505 | **训练成本监控** | 训练成本如何监控? | GPU 时间; 计算成本; 存储成本; 网络成本 | **GPU+计算+存储+网络**, 成本监控; 集成至 `nt_meta::train_cost_monitor` | `nt_meta::train_cost_monitor` |
+| D10506 | **训练效率** | 训练效率如何提升? | 数据效率; 计算效率; 通信效率; 内存效率 | **数据+计算+通信+内存联合**, 效率提升; 集成至 `nt_io::train_efficiency` | `nt_io::train_efficiency` |
+| D10507 | **训练可复现** | 训练如何可复现? | 随机种子; 版本固定; 环境记录; 文档 | **种子+版本+环境+文档**, 可复现保证; 集成至 `nt_io::train_reproduce` | `nt_io::train_reproduce` |
+| D10508 | **训练资源管理** | 训练资源如何管理? | GPU 分配; 显存管理; 资源池; 预约系统 | **GPU 分配+显存管理**, 资源池+预约; 集成至 `nt_io::train_resource` | `nt_io::train_resource` |
+| D10509 | **训练安全审计** | 训练安全审计如何? | 数据访问; 模型访问; 训练操作; 审计日志 | **数据+模型+操作+日志**, 安全审计; 集成至 `nt_shield::train_audit` | `nt_shield::train_audit` |
+| D10510 | **训练趋势** | 训练趋势如何? | 分布式+弹性+自动化+成本优化 | **分布式+弹性+自动化趋势**, 成本优化; 集成至 `nt_io::train_trends` | `nt_io::train_trends` |
+| D10511 | **训练最佳实践** | 最佳实践是什么? | 混合精度+梯度累积+检查点+监控 | **混合精度+累积+检查点+监控**, 最佳实践; 集成至 `nt_io::train_best_practice` | `nt_io::train_best_practice` |
+| D10512 | **分布式训练总结** | 分布式训练整合? | DeepSpeed+FSDP+Megatron→统一训练基础设施 | **分布式训练统一体系**: 并行→优化→监控→发布 | `nt_io::train_summary` |
+
+#### 0.x.8 AI安全与治理 (D10513-D10563)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10513 | **负责任扩展政策** | 模型扩展如何负责任? | Anthropic RSP: 能力阈值+安全要求; ASL 分级; 逐级审查 | **RSP 为安全基线**, 能力阈值+ASL 分级; 集成至 `nt_governance::rsp` | `nt_governance::rsp` |
+| D10514 | **能力阈值** | 危险能力如何检测? | CBRN 阈值; 网络攻击阈值; 自主性阈值; 评估方法 | **多维度能力阈值**, CBRN+网络+自主性; 集成至 `nt_meta::capability_threshold` | `nt_meta::capability_threshold` |
+| D10515 | **AI 审计** | AI 审计如何实施? | 独立审计; 透明报告; 第三方验证; 持续监控 | **独立+第三方审计**, 透明报告+持续监控; 集成至 `nt_governance::ai_audit` | `nt_governance::ai_audit` |
+| D10516 | **模型评估安全** | 危险能力如何评估? | 红队测试; 自动化评估; 对抗测试; 隐蔽能力 | **红队+自动化联合**, 对抗+隐蔽能力; 集成至 `nt_meta::model_safety_eval` | `nt_meta::model_safety_eval` |
+| D10517 | **模型水印** | 模型如何水印? | 权重水印; 输出水印; 后门水印; 检测方法 | **权重+输出水印联合**, 检测+验证; 集成至 `nt_shield::model_watermark` | `nt_shield::model_watermark` |
+| D10518 | **内容溯源** | 内容如何溯源? | C2PA 标准; 元数据签名; 区块链溯源; 图像水印 | **C2PA 标准+元数据签名**, 溯源+验证; 集成至 `nt_shield::content_provenance` | `nt_shield::content_provenance` |
+| D10519 | **内容认证** | 内容如何认证? | 数字签名; 证书链; 时间戳; 验证 API | **数字签名+证书链**, 时间戳+验证; 集成至 `nt_shield::content_auth` | `nt_shield::content_auth` |
+| D10520 | **开源安全权衡** | 开源安全如何平衡? | 开放权重: 透明但可滥用; 闭源: 控制但不透明; 分级发布 | **分级发布策略**, 开放+控制+透明; 集成至 `nt_governance::open_source_tradeoff` | `nt_governance::open_source_tradeoff` |
+| D10521 | **对齐研究** | AI 如何对齐? | RLHF; Constitutional AI; DPO; 宪法方法 | **RLHF+Constitutional AI 联合**, DPO 简化; 集成至 `nt_mind::alignment` | `nt_mind::alignment` |
+| D10522 | **红队测试** | 红队如何实施? | 人工红队; 自动化红队; 多维度攻击; 持续测试 | **人工+自动化红队**, 多维度+持续; 集成至 `nt_meta::red_team` | `nt_meta::red_team` |
+| D10523 | **对抗鲁棒性** | 对抗攻击如何防御? | 对抗训练; 输入净化; 鲁棒性认证; 检测 | **对抗训练+输入净化**, 鲁棒性认证; 集成至 `nt_shield::adversarial_robust` | `nt_shield::adversarial_robust` |
+| D10524 | **隐私保护** | 隐私如何保护? | 差分隐私; 联邦学习; 同态加密; 安全多方计算 | **差分隐私+联邦学习**, 同态加密可选; 集成至 `nt_shield::privacy` | `nt_shield::privacy` |
+| D10525 | **联邦学习** | 联邦学习如何设计? | 横向/纵向联邦; 差分隐私; 安全聚合; 通信优化 | **横向联邦为主**, 差分隐私+安全聚合; 集成至 `nt_io::federated_learning` | `nt_io::federated_learning` |
+| D10526 | **差分隐私** | 差分隐私如何实施? | ε-差分隐私; 组合定理; 计算开销; 实用性权衡 | **ε-DP 为隐私标准**, 组合定理+实用性; 集成至 `nt_shield::differential_privacy` | `nt_shield::differential_privacy` |
+| D10527 | **安全评估框架** | 安全评估如何系统化? | 多维度评估; 自动化; 持续监控; 报告 | **多维度+自动化评估**, 持续监控+报告; 集成至 `nt_meta::safety_eval_framework` | `nt_meta::safety_eval_framework` |
+| D10528 | **模型滥用防护** | 模型滥用如何防护? | 输入过滤; 输出过滤; 使用策略; 滥用检测 | **输入+输出过滤**, 策略+检测; 集成至 `nt_shield::abuse_prevention` | `nt_shield::abuse_prevention` |
+| D10529 | **AI 治理框架** | 治理如何设计? | 政策; 标准; 审计; 问责; 透明 | **政策+标准+审计+问责**, 治理框架; 集成至 `nt_governance::ai_governance` | `nt_governance::ai_governance` |
+| D10530 | **AI 法规遵从** | 法规如何遵从? | EU AI Act; 中国 AI 法规; 行业标准; 地域差异 | **EU AI Act+中国法规**, 行业标准; 集成至 `nt_governance::ai_compliance` | `nt_governance::ai_compliance` |
+| D10531 | **模型透明性** | 模型如何透明? | 技术报告; 数据披露; 限制说明; 能力说明 | **技术报告+数据披露**, 限制+能力; 集成至 `nt_governance::model_transparency` | `nt_governance::model_transparency` |
+| D10532 | **AI 伦理** | AI 伦理如何规范? | 公平性; 无害性; 自主性; 透明性; 问责 | **公平+无害+自主+透明+问责**, 伦理框架; 集成至 `nt_governance::ai_ethics` | `nt_governance::ai_ethics` |
+| D10533 | **偏见检测** | 偏见如何检测? | 统计测试; 公平指标; 群体差异; 因果分析 | **统计+公平指标+因果**, 偏见检测; 集成至 `nt_meta::bias_detection` | `nt_meta::bias_detection` |
+| D10534 | **公平性约束** | 公平性如何保证? | 公平定义; 约束优化; 后处理; 多目标 | **公平定义+约束优化**, 后处理+多目标; 集成至 `nt_shield::fairness` | `nt_shield::fairness` |
+| D10535 | **安全监控** | 安全如何监控? | 实时监控; 异常检测; 漂移检测; 报警 | **实时监控+异常检测**, 漂移+报警; 集成至 `nt_meta::safety_monitor` | `nt_meta::safety_monitor` |
+| D10536 | **安全事件响应** | 安全事件如何响应? | 检测→评估→遏制→恢复→改进 | **检测→评估→遏制→恢复→改进链**, 事件响应; 集成至 `nt_shield::incident_response` | `nt_shield::incident_response` |
+| D10537 | **模型版本安全** | 版本安全如何管理? | 版本审计; 变更评估; 回滚机制; 发布流程 | **版本审计+变更评估**, 回滚+发布; 集成至 `nt_shield::version_security` | `nt_shield::version_security` |
+| D10538 | **供应链安全** | 供应链如何安全? | 依赖审计; 漏洞扫描; SBOM; 签名验证 | **依赖审计+漏洞扫描**, SBOM+签名; 集成至 `nt_shield::supply_chain_security` | `nt_shield::supply_chain_security` |
+| D10539 | **AI 保险** | AI 风险如何保险? | 风险评估; 保险模型; 责任分配; 赔偿 | **风险评估+保险模型**, 责任+赔偿; 集成至 `nt_governance::ai_insurance` | `nt_governance::ai_insurance` |
+| D10540 | **AI 审计日志** | 审计日志如何设计? | 操作日志; 决策日志; 安全日志; 不可篡改 | **操作+决策+安全日志**, 不可篡改; 集成至 `nt_shield::audit_log` | `nt_shield::audit_log` |
+| D10541 | **AI 可解释性安全** | 可解释性如何用于安全? | 决策解释; 异常解释; 因果分析; 信任建立 | **决策+异常解释**, 因果+信任; 集成至 `nt_meta::explainable_safety` | `nt_meta::explainable_safety` |
+| D10542 | **AI 安全标准** | 安全标准如何制定? | ISO/IEC; IEEE; NIST; 行业联盟 | **参与国际标准制定**, ISO+NIST+IEEE; 集成至 `nt_governance::safety_standards` | `nt_governance::safety_standards` |
+| D10543 | **AI 安全研究** | 安全研究方向? | 对齐; 可解释性; 鲁棒性; 隐私; 治理 | **对齐+可解释+鲁棒+隐私+治理**, 多方向; 集成至 `nt_mind::safety_research` | `nt_mind::safety_research` |
+| D10544 | **AI 安全社区** | 安全社区如何参与? | 开源工具; 共享基准; 社区贡献; 合作 | **开源+共享+合作**, 社区贡献; 集成至 `nt_governance::safety_community` | `nt_governance::safety_community` |
+| D10545 | **AI 安全教育** | 安全教育如何开展? | 培训课程; 认证; 实践案例; 持续学习 | **培训+认证+案例+持续学习**, 安全教育; 集成至 `nt_governance::safety_education` | `nt_governance::safety_education` |
+| D10546 | **AI 安全评估工具** | 评估工具如何选择? | Garak; NeMo Guardrails; Giskard; DeepEval | **多工具集成**, Garak+NeMo+Giskard; 集成至 `nt_meta::safety_tools` | `nt_meta::safety_tools` |
+| D10547 | **AI 安全测试** | 安全测试如何实施? | 单元测试; 集成测试; 红队测试; 持续测试 | **单元+集成+红队+持续**, 安全测试; 集成至 `nt_meta::safety_testing` | `nt_meta::safety_testing` |
+| D10548 | **AI 安全文档** | 安全文档如何维护? | 安全政策; 操作指南; 故障排除; 最佳实践 | **政策+指南+故障排除+最佳实践**, 安全文档; 集成至 `nt_governance::safety_docs` | `nt_governance::safety_docs` |
+| D10549 | **AI 安全成本** | 安全成本如何优化? | 自动化; 预防优于检测; 投资回报分析 | **自动化+预防优先**, 投资回报; 集成至 `nt_meta::safety_cost` | `nt_meta::safety_cost` |
+| D10550 | **AI 安全趋势** | 安全趋势如何? | 自动化安全; 持续安全; 零信任; 安全左移 | **自动化+持续+零信任趋势**, 安全左移; 集成至 `nt_governance::safety_trends` | `nt_governance::safety_trends` |
+| D10551 | **AI 安全最佳实践** | 最佳实践是什么? | 纵深防御; 最小权限; 零信任; 持续监控 | **纵深防御+最小权限+零持续监控**, 最佳实践; 集成至 `nt_governance::safety_best_practice` | `nt_governance::safety_best_practice` |
+| D10552 | **AI 安全架构** | 安全架构如何设计? | 安全层; 安全策略; 安全组件; 安全集成 | **多层安全架构**, 策略+组件+集成; 集成至 `nt_shield::safety_architecture` | `nt_shield::safety_architecture` |
+| D10553 | **AI 安全 API** | 安全 API 如何设计? | 认证; 授权; 加密; 审计 | **认证+授权+加密+审计**, 安全 API; 集成至 `nt_io::safety_api` | `nt_io::safety_api` |
+| D10554 | **AI 安全配置** | 安全配置如何管理? | 默认安全; 配置审计; 变更控制; 版本管理 | **默认安全+审计+变更控制**, 版本管理; 集成至 `nt_shield::safety_config` | `nt_shield::safety_config` |
+| D10555 | **AI 安全监控工具** | 监控工具如何选择? | Wiz; Datadog; Splunk; 自定义监控 | **多工具集成**, Wiz+Datadog+Splunk; 集成至 `nt_meta::safety_monitor_tools` | `nt_meta::safety_monitor_tools` |
+| D10556 | **AI 安全自动化** | 安全如何自动化? | 自动检测; 自动修复; 自动响应; 自动报告 | **检测→修复→响应→报告自动化**, 安全自动化; 集成至 `nt_shield::safety_auto` | `nt_shield::safety_auto` |
+| D10557 | **AI 安全威胁** | 威胁如何分类? | 对抗攻击; 数据投毒; 模型窃取; 提示注入 | **多维度威胁分类**, 攻击+投毒+窃取+注入; 集成至 `nt_shield::threat_classification` | `nt_shield::threat_classification` |
+| D10558 | **AI 安全防护** | 防护如何设计? | 输入过滤; 输出过滤; 模型保护; 环境隔离 | **输入+输出+模型+环境**, 多层防护; 集成至 `nt_shield::safety_protection` | `nt_shield::safety_protection` |
+| D10559 | **AI 安全恢复** | 安全事件如何恢复? | 检测→隔离→修复→验证→改进 | **检测→隔离→修复→验证→改进链**, 安全恢复; 集成至 `nt_shield::safety_recovery` | `nt_shield::safety_recovery` |
+| D10560 | **AI 安全度量** | 安全如何度量? | 安全指标; 风险评分; 合规度; 成熟度 | **多维度安全度量**, 指标+评分+合规+成熟度; 集成至 `nt_meta::safety_metrics` | `nt_meta::safety_metrics` |
+| D10561 | **AI 安全改进** | 安全如何持续改进? | 复盘; 经验教训; 最佳实践更新; 培训 | **复盘+经验+更新+培训**, 持续改进; 集成至 `nt_governance::safety_improvement` | `nt_governance::safety_improvement` |
+| D10562 | **AI 安全集成** | 安全如何集成到开发? | DevSecOps; 安全门禁; 安全测试; 安全审查 | **DevSecOps+安全门禁**, 测试+审查; 集成至 `nt_governance::safety_integration` | `nt_governance::safety_integration` |
+| D10563 | **AI安全总结** | AI安全整合? | 对齐+审计+水印+隐私→安全体系 | **AI安全统一体系**: 对齐→审计→水印→隐私→治理 | `nt_governance::safety_summary` |
+
+#### 0.x.9 个性化与推荐 (D10564-D10614)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10564 | **协同过滤** | 协同过滤如何设计? | User-based/Item-based; 矩阵分解; ALS; 冷启动 | **矩阵分解+ALS 为主**, 冷启动处理; 集成至 `nt_io::collaborative_filter` | `nt_io::collaborative_filter` |
+| D10565 | **内容推荐** | 内容推荐如何设计? | TF-IDF; BERT 嵌入; 内容相似度; 元数据 | **BERT 嵌入+元数据**, 内容相似度; 集成至 `nt_io::content_recommend` | `nt_io::content_recommend` |
+| D10566 | **序列推荐** | 序列推荐如何实现? | GRU4Rec; SASRec; BERT4Rec; 会话推荐 | **BERT4Rec 为序列推荐基线**, 会话推荐; 集成至 `nt_io::sequence_recommend` | `nt_io::sequence_recommend` |
+| D10567 | **会话推荐** | 会话推荐如何设计? | 会话分割; 短期兴趣; 上下文感知; 实时推荐 | **会话分割+短期兴趣**, 上下文+实时; 集成至 `nt_io::session_recommend` | `nt_io::session_recommend` |
+| D10568 | **对话推荐** | 对话推荐如何实现? | 对话式推荐; 解释生成; 用户意图理解; 多轮交互 | **对话式+解释生成**, 意图理解+多轮; 集成至 `nt_io::conversational_recommend` | `nt_io::conversational_recommend` |
+| D10569 | **推荐解释** | 推荐如何解释? | 特征重要性; 相似用户; 内容属性; 因果解释 | **多维度解释**, 特征+用户+属性+因果; 集成至 `nt_io::recommend_explain` | `nt_io::recommend_explain` |
+| D10570 | **推荐公平性** | 推荐如何公平? | 公平指标; 偏见检测; 公平约束; 多目标 | **公平指标+偏见检测**, 约束+多目标; 集成至 `nt_meta::recommend_fairness` | `nt_meta::recommend_fairness` |
+| D10571 | **冷启动处理** | 冷启动如何解决? | 新用户/新物品; 内容特征; 迁移学习; 探索 | **内容特征+迁移学习**, 探索+利用; 集成至 `nt_io::cold_start` | `nt_io::cold_start` |
+| D10572 | **推荐多样性** | 推荐如何多样? | MMR; 长尾推荐; 多样性约束; 探索利用 | **MMR+长尾推荐**, 多样性+探索; 集成至 `nt_io::recommend_diversity` | `nt_io::recommend_diversity` |
+| D10573 | **推荐新颖性** | 推荐如何新颖? | 长尾物品; 新物品; 用户兴趣发现; 探索 | **长尾+新物品推荐**, 兴趣发现+探索; 集成至 `nt_io::recommend_novelty` | `nt_io::recommend_novelty` |
+| D10574 | **推荐惊喜度** | 推荐如何惊喜? | 跨类别推荐; 意外发现; 用户反馈 | **跨类别+意外发现**, 反馈循环; 集成至 `nt_io::recommend_serendipity` | `nt_io::recommend_serendipity` |
+| D10575 | **推荐信任** | 推荐如何建立信任? | 透明解释; 来源标注; 用户控制; 隐私保护 | **透明+来源+控制+隐私**, 信任建立; 集成至 `nt_io::recommend_trust` | `nt_io::recommend_trust` |
+| D10576 | **推荐评估** | 推荐如何评估? | 离线评估; 在线评估; A/B 测试; 多维度指标 | **离线+在线+A/B**, 多维度评估; 集成至 `nt_meta::recommend_eval` | `nt_meta::recommend_eval` |
+| D10577 | **实时推荐** | 实时推荐如何实现? | 流式特征; 实时更新; 低延迟; 增量学习 | **流式特征+实时更新**, 低延迟+增量; 集成至 `nt_io::realtime_recommend` | `nt_io::realtime_recommend` |
+| D10578 | **批量推荐** | 批量推荐如何优化? | 批量计算; 预计算; 缓存; 异步更新 | **批量计算+预计算**, 缓存+异步; 集成至 `nt_io::batch_recommend` | `nt_io::batch_recommend` |
+| D10579 | **推荐 A/B 测试** | 推荐 A/B 如何设计? | 流量分割; 指标对比; 统计显著性; 多臂老虎机 | **流量分割+指标对比**, 统计+多臂; 集成至 `nt_meta::recommend_ab` | `nt_meta::recommend_ab` |
+| D10580 | **推荐监控** | 推荐如何监控? | 性能指标; 用户反馈; 漂移检测; 报警 | **性能+反馈+漂移+报警**, 监控; 集成至 `nt_meta::recommend_monitor` | `nt_meta::recommend_monitor` |
+| D10581 | **推荐漂移** | 漂移如何检测? | 数据漂移; 概念漂移; 行为漂移; 在线检测 | **数据+概念+行为漂移**, 在线检测; 集成至 `nt_meta::recommend_drift` | `nt_meta::recommend_drift` |
+| D10582 | **推荐特征** | 特征如何工程? | 用户特征; 物品特征; 上下文特征; 交叉特征 | **用户+物品+上下文+交叉**, 特征工程; 集成至 `nt_io::recommend_features` | `nt_io::recommend_features` |
+| D10583 | **推荐模型选择** | 模型如何选择? | 协同过滤; 深度学习; 图网络; 混合模型 | **深度学习+图网络为主**, 混合模型; 集成至 `nt_io::recommend_model_select` | `nt_io::recommend_model_select` |
+| D10584 | **推荐多目标** | 多目标如何优化? | 点击+转化+时长; Pareto 优化; 多任务学习 | **多目标+Pareto 优化**, 多任务学习; 集成至 `nt_io::recommend_multiobj` | `nt_io::recommend_multiobj` |
+| D10585 | **推荐上下文** | 上下文如何利用? | 时间; 地点; 设备; 社交; 情境 | **时间+地点+设备+社交+情境**, 上下文感知; 集成至 `nt_io::recommend_context` | `nt_io::recommend_context` |
+| D10586 | **推荐社交** | 社交推荐如何? | 社交图谱; 朋友推荐; 社交影响; 信任传播 | **社交图谱+信任传播**, 朋友+影响; 集成至 `nt_io::recommend_social` | `nt_io::recommend_social` |
+| D10587 | **推荐位置** | 位置推荐如何? | 地理位置; POI 推荐; 路线推荐; 附近推荐 | **地理+POI+路线**, 附近推荐; 集成至 `nt_io::recommend_location` | `nt_io::recommend_location` |
+| D10588 | **推荐时间** | 时间推荐如何? | 时间敏感; 周期性; 实时性; 预测 | **时间敏感+周期性**, 实时+预测; 集成至 `nt_io::recommend_time` | `nt_io::recommend_time` |
+| D10589 | **推荐组合** | 组合推荐如何? | 混合推荐; 集成推荐; 加权融合 | **混合+集成推荐**, 加权融合; 集成至 `nt_io::recommend_hybrid` | `nt_io::recommend_hybrid` |
+| D10590 | **推荐反馈** | 反馈如何收集? | 显式反馈; 隐式反馈; 负反馈; 隐式兴趣 | **显式+隐式反馈**, 负反馈+隐式; 集成至 `nt_io::recommend_feedback` | `nt_io::recommend_feedback` |
+| D10591 | **推荐隐私** | 隐私如何保护? | 差分隐私; 联邦推荐; 本地差分隐私 | **差分隐私+联邦推荐**, 本地 DP; 集成至 `nt_shield::recommend_privacy` | `nt_shield::recommend_privacy` |
+| D10592 | **推荐解释生成** | 解释如何生成? | 模板解释; 自然语言解释; 可视化解释; 个性化 | **自然语言+个性化解释**, 可视化; 集成至 `nt_io::recommend_explain_gen` | `nt_io::recommend_explain_gen` |
+| D10593 | **推荐可解释性** | 可解释性如何设计? | 因果解释; 反事实解释; 注意力解释 | **因果+反事实+注意力**, 可解释推荐; 集成至 `nt_meta::recommend_explainable` | `nt_meta::recommend_explainable` |
+| D10594 | **推荐鲁棒性** | 鲁棒性如何保证? | 对抗攻击防御; 数据质量; 模型验证 | **对抗防御+数据质量**, 模型验证; 集成至 `nt_meta::recommend_robust` | `nt_meta::recommend_robust` |
+| D10595 | **推荐公平指标** | 公平如何度量? | 统计公平; 因果公平; 公平约束 | **统计+因果公平**, 公平约束; 集成至 `nt_meta::recommend_fair_metrics` | `nt_meta::recommend_fair_metrics` |
+| D10596 | **推荐系统架构** | 系统架构如何设计? | 召回→粗排→精排→重排; 流式处理; 缓存 | **召回→粗排→精排→重排**, 流式+缓存; 集成至 `nt_io::recommend_arch` | `nt_io::recommend_arch` |
+| D10597 | **推荐数据管理** | 推荐数据如何管理? | 用户画像; 行为日志; 特征存储; 实时特征 | **用户画像+行为日志**, 特征存储+实时; 集成至 `nt_memory::recommend_data` | `nt_memory::recommend_data` |
+| D10598 | **推荐系统测试** | 推荐如何测试? | 离线测试; 在线测试; 负载测试; 压力测试 | **离线+在线+负载+压力**, 多层测试; 集成至 `nt_meta::recommend_testing` | `nt_meta::recommend_testing` |
+| D10599 | **推荐系统部署** | 推荐如何部署? | 微服务; 容器化; K8s; 边缘部署 | **微服务+容器化+K8s**, 边缘部署; 集成至 `nt_io::recommend_deploy` | `nt_io::recommend_deploy` |
+| D10600 | **推荐系统监控** | 系统如何监控? | 性能监控; 业务监控; 质量监控; 报警 | **性能+业务+质量+报警**, 系统监控; 集成至 `nt_meta::recommend_system_monitor` | `nt_meta::recommend_system_monitor` |
+| D10601 | **推荐系统优化** | 系统如何优化? | 性能优化; 成本优化; 质量优化; 用户体验 | **性能+成本+质量+体验**, 多维优化; 集成至 `nt_io::recommend_optimize` | `nt_io::recommend_optimize` |
+| D10602 | **推荐系统文档** | 文档如何维护? | API 文档; 用户文档; 运维文档; 最佳实践 | **API+用户+运维+最佳实践**, 文档维护; 集成至 `nt_io::recommend_docs` | `nt_io::recommend_docs` |
+| D10603 | **推荐系统安全** | 安全如何保证? | 输入验证; 输出过滤; 访问控制; 审计 | **输入+输出+访问+审计**, 系统安全; 集成至 `nt_shield::recommend_security` | `nt_shield::recommend_security` |
+| D10604 | **推荐系统合规** | 合规如何保证? | 隐私法规; 数据保护; 行业标准 | **隐私+数据保护+行业标准**, 合规保证; 集成至 `nt_governance::recommend_compliance` | `nt_governance::recommend_compliance` |
+| D10605 | **推荐系统成本** | 成本如何优化? | 计算成本; 存储成本; 网络成本; 成本监控 | **计算+存储+网络+监控**, 成本优化; 集成至 `nt_io::recommend_cost` | `nt_io::recommend_cost` |
+| D10606 | **推荐系统趋势** | 趋势如何? | 深度学习; 图网络; 对话推荐; 个性化 | **深度+图网络+对话趋势**, 个性化; 集成至 `nt_io::recommend_trends` | `nt_io::recommend_trends` |
+| D10607 | **推荐系统最佳实践** | 最佳实践是什么? | 数据质量; 模型选择; 评估体系; 持续优化 | **数据+模型+评估+持续**, 最佳实践; 集成至 `nt_io::recommend_best_practice` | `nt_io::recommend_best_practice` |
+| D10608 | **推荐系统挑战** | 挑战如何应对? | 冷启动; 数据稀疏; 可解释性; 公平性 | **冷启动+稀疏+可解释+公平**, 挑战应对; 集成至 `nt_io::recommend_challenges` | `nt_io::recommend_challenges` |
+| D10609 | **推荐系统评估指标** | 评估指标如何设计? | 准确率; 召回率; NDCG; 覆盖率; 新颖性 | **准确率+召回+NDCG+覆盖+新颖性**, 多维指标; 集成至 `nt_meta::recommend_metrics` | `nt_meta::recommend_metrics` |
+| D10610 | **推荐系统数据质量** | 数据质量如何保证? | 数据清洗; 去重; 标准化; 质量监控 | **清洗+去重+标准化+监控**, 数据质量; 集成至 `nt_meta::recommend_data_quality` | `nt_meta::recommend_data_quality` |
+| D10611 | **推荐系统用户体验** | 用户体验如何优化? | 推荐展示; 交互设计; 个性化; 可控性 | **展示+交互+个性化+可控**, 用户体验; 集成至 `nt_io::recommend_ux` | `nt_io::recommend_ux` |
+| D10612 | **推荐系统扩展性** | 扩展性如何设计? | 水平扩展; 缓存; 分片; 异步 | **水平扩展+缓存+分片**, 异步处理; 集成至 `nt_io::recommend_scalability` | `nt_io::recommend_scalability` |
+| D10613 | **推荐系统可靠性** | 可靠性如何保证? | 冗余; 故障转移; 监控; 恢复 | **冗余+故障转移+监控+恢复**, 可靠性; 集成至 `nt_io::recommend_reliability` | `nt_io::recommend_reliability` |
+| D10614 | **推荐系统总结** | 推荐系统整合? | 协同+内容+序列→统一体系 | **推荐系统统一体系**: 召回→排序→推荐→解释→评估 | `nt_io::recommend_summary` |
+
+#### 0.x.10 边缘与移动端AI (D10615-D10666)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D10615 | **移动LLM部署** | LLM 如何在手机部署? | Phi-3: 3.8B; Gemma 2B; Llama 3.2B; 量化+优化 | **Phi-3/Gemma/Llama 3B 级别**, INT4 量化; 集成至 `nt_io::mobile_llm` | `nt_io::mobile_llm` |
+| D10616 | **模型蒸馏边缘** | 边缘模型如何蒸馏? | 蒸馏管线; 层选择; 特征对齐; 知识保留 | **蒸馏+层选择+特征对齐**, 知识保留; 集成至 `nt_mind::edge_distill` | `nt_mind::edge_distill` |
+| D10617 | **量化感知训练** | QAT 如何实施? | 量化训练; 梯度近似; 混合精度; 精度-延迟权衡 | **量化训练+梯度近似**, 混合精度; 集成至 `nt_io::qat` | `nt_io::qat` |
+| D10618 | **On-device RAG** | 设备端 RAG 如何实现? | 本地向量搜索; 轻量索引; 增量更新; 内存约束 | **本地向量搜索+轻量索引**, 增量+内存; 集成至 `nt_io::ondevice_rag` | `nt_io::ondevice_rag` |
+| D10619 | **本地向量搜索** | 本地向量如何搜索? | HNSW; IVF-PQ; 量化向量; 内存优化 | **HNSW+IVF-PQ 联合**, 量化+内存优化; 集成至 `nt_io::local_vector_search` | `nt_io::local_vector_search` |
+| D10620 | **隐私推理** | 推理隐私如何保证? | 本地推理; 联邦推理; 差分隐私; 加密 | **本地推理为主**, 联邦+差分隐私; 集成至 `nt_shield::private_inference` | `nt_shield::private_inference` |
+| D10621 | **模型压缩边缘** | 边缘模型如何压缩? | 剪枝; 量化; 蒸馏; 编码; 联合压缩 | **剪枝+量化+蒸馏联合**, 编码压缩; 集成至 `nt_io::edge_compress` | `nt_io::edge_compress` |
+| D10622 | **边缘计算框架** | 边缘计算框架如何选? | ONNX Runtime Mobile; TensorFlow Lite; Core ML; NCNN | **ONNX Runtime Mobile 为主**, TFLite/Core ML 适配; 集成至 `nt_io::edge_framework` | `nt_io::edge_framework` |
+| D10623 | **移动端推理** | 移动端推理如何优化? | NPU 加速; GPU 推理; 量化; 算子优化 | **NPU+GPU 加速**, 量化+算子优化; 集成至 `nt_io::mobile_infer` | `nt_io::mobile_infer` |
+| D10624 | **边缘模型更新** | 边缘模型如何更新? | OTA 更新; 增量更新; 差分更新; 版本管理 | **OTA+增量+差分更新**, 版本管理; 集成至 `nt_io::edge_update` | `nt_io::edge_update` |
+| D10625 | **边缘缓存** | 边缘缓存如何设计? | 模型缓存; 结果缓存; 预测缓存; 淘汰策略 | **模型+结果+预测缓存**, LRU+LFU; 集成至 `nt_io::edge_cache` | `nt_io::edge_cache` |
+| D10626 | **边缘安全** | 边缘安全如何保证? | 安全启动; 加密存储; 访问控制; 完整性验证 | **安全启动+加密存储**, 访问+完整性; 集成至 `nt_shield::edge_security` | `nt_shield::edge_security` |
+| D10627 | **边缘隐私** | 边缘隐私如何保护? | 本地处理; 最小数据; 差分隐私; 匿名化 | **本地处理+最小数据**, DP+匿名化; 集成至 `nt_shield::edge_privacy` | `nt_shield::edge_privacy` |
+| D10628 | **边缘监控** | 边缘如何监控? | 性能监控; 错误检测; 资源监控; 报警 | **性能+错误+资源+报警**, 边缘监控; 集成至 `nt_meta::edge_monitor` | `nt_meta::edge_monitor` |
+| D10629 | **边缘部署** | 边缘如何部署? | 容器化; 镜像管理; OTA; 版本管理 | **容器化+镜像管理**, OTA+版本; 集成至 `nt_io::edge_deploy` | `nt_io::edge_deploy` |
+| D10630 | **边缘测试** | 边缘如何测试? | 设备测试; 性能测试; 兼容性测试; 压力测试 | **设备+性能+兼容+压力**, 多层测试; 集成至 `nt_meta::edge_testing` | `nt_meta::edge_testing` |
+| D10631 | **边缘资源管理** | 边缘资源如何管理? | CPU/GPU/NPU; 内存; 存储; 电量 | **CPU+GPU+NPU+内存+存储+电量**, 资源管理; 集成至 `nt_io::edge_resource` | `nt_io::edge_resource` |
+| D10632 | **边缘能耗优化** | 能耗如何优化? | 动态电压; 模型切换; 睡眠策略; 能量感知 | **动态电压+模型切换+睡眠**, 能量感知; 集成至 `nt_io::edge_energy` | `nt_io::edge_energy` |
+| D10633 | **边缘网络** | 边缘网络如何优化? | 弱网适应; 离线模式; 数据同步; 压缩传输 | **弱网+离线+同步+压缩**, 网络优化; 集成至 `nt_io::edge_network` | `nt_io::edge_network` |
+| D10634 | **边缘存储** | 边缘存储如何管理? | 本地存储; 缓存; 数据生命周期; 压缩 | **本地存储+缓存**, 生命周期+压缩; 集成至 `nt_io::edge_storage` | `nt_io::edge_storage` |
+| D10635 | **边缘API** | 边缘 API 如何设计? | 轻量 API; 离线 API; 本地 API; 混合 API | **轻量+离线+本地+混合**, API 设计; 集成至 `nt_io::edge_api` | `nt_io::edge_api` |
+| D10636 | **边缘多模态** | 多模态边缘推理如何? | 视觉+语言; 传感器融合; 低延迟; 轻量模型 | **视觉+语言+传感器**, 低延迟+轻量; 集成至 `nt_io::edge_multimodal` | `nt_io::edge_multimodal` |
+| D10637 | **边缘联邦** | 联邦学习边缘如何? | 本地训练; 模型聚合; 通信优化; 隐私保护 | **本地训练+模型聚合**, 通信+隐私; 集成至 `nt_io::edge_federated` | `nt_io::edge_federated` |
+| D10638 | **边缘迁移学习** | 边缘迁移如何实现? | 域适应; 微调; 迁移策略; 少样本 | **域适应+微调**, 迁移+少样本; 集成至 `nt_mind::edge_transfer` | `nt_mind::edge_transfer` |
+| D10639 | **边缘模型选择** | 边缘模型如何选择? | 任务需求; 设备能力; 延迟约束; 质量权衡 | **任务+设备+延迟+质量**, 模型选择; 集成至 `nt_io::edge_model_select` | `nt_io::edge_model_select` |
+| D10640 | **边缘数据管理** | 边缘数据如何管理? | 数据收集; 清洗; 本地存储; 同步 | **收集+清洗+存储+同步**, 数据管理; 集成至 `nt_memory::edge_data` | `nt_memory::edge_data` |
+| D10641 | **边缘应用框架** | 边缘应用如何设计? | SDK; 模板; 组件; 工具链 | **SDK+模板+组件+工具链**, 应用框架; 集成至 `nt_io::edge_app_framework` | `nt_io::edge_app_framework` |
+| D10642 | **边缘用户界面** | 边缘 UI 如何设计? | 轻量 UI; 响应式; 无障碍; 离线 UI | **轻量+响应式+无障碍+离线**, UI 设计; 集成至 `nt_io::edge_ui` | `nt_io::edge_ui` |
+| D10643 | **边缘通知** | 边缘通知如何设计? | 本地通知; 推送通知; 智能调度; 隐私 | **本地+推送+智能调度+隐私**, 通知设计; 集成至 `nt_io::edge_notification` | `nt_io::edge_notification` |
+| D10644 | **边缘传感器** | 传感器如何集成? | 传感器 API; 数据融合; 校准; 标准化 | **传感器 API+融合**, 校准+标准化; 集成至 `nt_io::edge_sensor` | `nt_io::edge_sensor` |
+| D10645 | **边缘相机** | 相机 AI 如何实现? | 目标检测; 人脸识别; OCR; 视频分析 | **检测+识别+OCR+视频**, 相机 AI; 集成至 `nt_io::edge_camera` | `nt_io::edge_camera` |
+| D10646 | **边缘语音** | 语音 AI 边缘如何? | ASR; TTS; 语音识别; 声纹 | **ASR+TTS+识别+声纹**, 语音 AI; 集成至 `nt_io::edge_voice` | `nt_io::edge_voice` |
+| D10647 | **边缘NPU** | NPU 如何利用? | NPU SDK; 算子优化; 模型适配; 性能调优 | **NPU SDK+算子优化**, 模型适配+调优; 集成至 `nt_io::edge_npu` | `nt_io::edge_npu` |
+| D10648 | **边缘GPU** | 移动GPU如何优化? | GPU 推理; Shader 优化; 内存管理; 并行 | **GPU 推理+Shader 优化**, 内存+并行; 集成至 `nt_io::edge_gpu` | `nt_io::edge_gpu` |
+| D10649 | **边缘异构计算** | 异构计算如何调度? | CPU+GPU+NPU+DSP; 任务分配; 负载均衡 | **CPU+GPU+NPU+DSP 联合**, 任务+负载; 集成至 `nt_io::edge_heterogeneous` | `nt_io::edge_heterogeneous` |
+| D10650 | **边缘AI芯片** | AI 芯片如何适配? | 端侧芯片; 算子支持; 编译优化; 性能基准 | **端侧芯片适配**, 算子+编译+基准; 集成至 `nt_io::edge_ai_chip` | `nt_io::edge_ai_chip` |
+| D10651 | **边缘模型编译** | 模型如何编译? | 编译优化; 算子融合; 内存优化; 延迟优化 | **编译+算子融合+内存+延迟**, 模型编译; 集成至 `nt_io::edge_compile` | `nt_io::edge_compile` |
+| D10652 | **边缘模型量化** | 边缘量化如何优化? | INT8/INT4; 混合精度; 量化感知; 精度验证 | **INT8/INT4+混合精度**, QAT+验证; 集成至 `nt_io::edge_quant` | `nt_io::edge_quant` |
+| D10653 | **边缘模型剪枝** | 边缘剪枝如何实施? | 结构化剪枝; 非结构化; 渐进式; 压缩比 | **结构化+渐进式剪枝**, 压缩比优化; 集成至 `nt_io::edge_prune` | `nt_io::edge_prune` |
+| D10654 | **边缘模型蒸馏** | 边缘蒸馏如何设计? | Teacher-Student; 特征蒸馏; 注意力蒸馏 | **多层蒸馏**, 特征+注意力; 集成至 `nt_io::edge_distill_deploy` | `nt_io::edge_distill_deploy` |
+| D10655 | **边缘模型适配** | 模型如何适配设备? | 设备检测; 自动适配; 回退策略; 性能测试 | **设备检测+自动适配**, 回退+测试; 集成至 `nt_io::edge_adapt` | `nt_io::edge_adapt` |
+| D10656 | **边缘AI优化** | 边缘AI如何优化? | 模型优化; 运行时优化; 系统优化; 全栈优化 | **模型+运行时+系统+全栈联合优化**, 集成至 `nt_io::edge_optimize` | `nt_io::edge_optimize` |
+| D10657 | **边缘AI安全** | 边缘安全如何保证? | 模型保护; 数据保护; 安全推理; 审计 | **模型+数据+推理+审计**, 边缘安全; 集成至 `nt_shield::edge_ai_security` | `nt_shield::edge_ai_security` |
+| D10658 | **边缘AI隐私** | 边缘隐私如何保证? | 本地推理; 最小数据; 差分隐私; 加密 | **本地推理+最小数据**, DP+加密; 集成至 `nt_shield::edge_ai_privacy` | `nt_shield::edge_ai_privacy` |
+| D10659 | **边缘AI测试** | 边缘测试如何实施? | 设备测试; 性能测试; 兼容性测试; 安全测试 | **设备+性能+兼容+安全**, 多层测试; 集成至 `nt_meta::edge_ai_testing` | `nt_meta::edge_ai_testing` |
+| D10660 | **边缘AI部署** | 边缘部署如何自动化? | CI/CD; OTA; 灰度; 回滚 | **CI/CD+OTA+灰度+回滚**, 自动化部署; 集成至 `nt_io::edge_ai_deploy` | `nt_io::edge_ai_deploy` |
+| D10661 | **边缘AI监控** | 边缘监控如何设计? | 性能监控; 错误监控; 资源监控; 安全监控 | **性能+错误+资源+安全**, 全面监控; 集成至 `nt_meta::edge_ai_monitor` | `nt_meta::edge_ai_monitor` |
+| D10662 | **边缘AI成本** | 边缘成本如何优化? | 设备成本; 开发成本; 运营成本; 成本监控 | **设备+开发+运营+监控**, 成本优化; 集成至 `nt_io::edge_ai_cost` | `nt_io::edge_ai_cost` |
+| D10663 | **边缘AI趋势** | 边缘趋势如何? | 端侧大模型; 多模态边缘; 隐私增强; 异构计算 | **端侧大模型+多模态+隐私趋势**, 异构计算; 集成至 `nt_io::edge_ai_trends` | `nt_io::edge_ai_trends` |
+| D10664 | **边缘AI最佳实践** | 最佳实践是什么? | 模型优化; 安全优先; 隐私保护; 持续更新 | **优化+安全+隐私+更新**, 最佳实践; 集成至 `nt_io::edge_ai_best_practice` | `nt_io::edge_ai_best_practice` |
+| D10665 | **边缘AI挑战** | 挑战如何应对? | 资源限制; 能耗; 安全; 兼容性 | **资源+能耗+安全+兼容性**, 挑战应对; 集成至 `nt_io::edge_ai_challenges` | `nt_io::edge_ai_challenges` |
+| D10666 | **边缘AI总结** | 边缘AI整合? | 部署+优化+安全→边缘AI体系 | **边缘AI统一体系**: 部署→优化→安全→监控→更新 | `nt_io::edge_ai_summary` |
+
 ### 域级缺陷范围索引
 
 ### 域级缺陷范围索引
@@ -14742,4 +16379,4 @@ pub trait EvalSim: Send + Sync {
 
 ---
 
-*Version: v15.3 | 2026-09-09 | 506 new decisions (D4601-D5106) across 10 categories | 4514 total decisions | 10589+ lines*
+*Version: v16.3 | 2026-09-09 | 511 new decisions (D9645-D10155) across 10 categories | 9561 total decisions | 15281+ lines*

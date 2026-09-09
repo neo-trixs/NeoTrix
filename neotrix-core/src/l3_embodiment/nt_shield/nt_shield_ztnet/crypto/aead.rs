@@ -18,6 +18,12 @@ pub struct AeadKey {
     inner: aead::LessSafeKey,
 }
 
+impl std::fmt::Debug for AeadKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AeadKey").field("inner", &"[redacted]").finish()
+    }
+}
+
 /// Nonce (8 bytes counter + 4 bytes zero)
 pub struct Nonce([u8; NONCE_LEN]);
 
@@ -53,7 +59,7 @@ impl AeadKey {
     ///
     /// 输入: ciphertext || 16-byte tag
     /// 返回: plaintext (tag 已被 ring 原地剥离)
-    pub fn open(&self, nonce: &Nonce, ciphertext_with_tag: &mut [u8]) -> Result<&[u8], AeadError> {
+    pub fn open<'a>(&self, nonce: &Nonce, ciphertext_with_tag: &'a mut [u8]) -> Result<&'a [u8], AeadError> {
         let open_nonce = aead::Nonce::assume_unique_for_key(nonce.0);
         let plaintext = self.inner.open_in_place(open_nonce, aead::Aad::empty(), ciphertext_with_tag)
             .map_err(|_| AeadError::DecryptionFailed)?;

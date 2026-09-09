@@ -87,6 +87,7 @@ aes = "0.8"
 cbc = "0.1"
 ecb = "0.1"
 cipher = "0.4"
+ring = "0.17"
 bitflags = { version = "2", features = ["serde"] }
 bincode = "1"
 lz4_flex = "0.11"

@@ -13,7 +13,7 @@ use self::always_on::AlwaysOnEngine;
 use crate::l5_cognition::nt_mind::nt_mind_cleanup::CleanupEngine;
 use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
 use crate::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
-use crate::l5_cognition::nt_mind::nt_mind_evolution_daemon::{EvolutionDaemon, EvolutionConfig};
+use crate::l5_cognition::nt_mind::evolution::evolution_daemon::{EvolutionDaemon, EvolutionConfig};
 use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipeline;
 use crate::neotrix::nt_act_voice::VoiceInput;
@@ -35,9 +35,9 @@ use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonit
 use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 
-pub use crate::l5_cognition::nt_mind::nt_mind_background_config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
-
 mod builder;
+pub mod config;
+pub use config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
 mod run;
 mod handlers;
 pub mod always_on;

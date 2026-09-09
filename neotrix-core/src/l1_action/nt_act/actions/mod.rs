@@ -33,3 +33,10 @@ pub mod production_pipeline;
 
 // Batch 3h - Production orchestrator (backward-compat alias host)
 pub mod production_orchestrator;
+
+// Moved from nt_act/ root for consolidation
+pub mod action_cache;
+pub mod disk_guard;
+pub mod media;
+pub mod sandbox;
+pub mod security;
