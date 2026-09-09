@@ -118,7 +118,7 @@ impl NtxIndexManager {
             for (_i, (node_id, vector)) in embeddings.iter().enumerate() {
                 if vector.len() == dimension {
                     let nid = uuid_to_bytes(node_id);
-                    vec_seg.insert(nid, vector.clone(), 0);
+                    vec_seg.insert(nid, vector.clone());
                 }
             }
             ntx.put_vec_segment(vec_seg);

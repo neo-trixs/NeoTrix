@@ -20,6 +20,8 @@ pub mod nt_shield_stealth_net;
 
 pub mod nt_shield_traffic;
 
+pub mod nt_shield_ztnet;
+
 // 安全增强模块
 pub mod nt_shield_threat_detection;
 pub mod nt_shield_adversarial;

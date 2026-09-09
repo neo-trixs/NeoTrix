@@ -123,7 +123,7 @@ pub fn bench_vec_search(dimension: usize, vec_count: usize, k: usize, iterations
             let mut node_id = [0u8; 36];
             node_id[0] = (i % 256) as u8;
             let vec: Vec<f32> = (0..dimension).map(|d| (i * d) as f32 / dimension as f32).collect();
-            seg.insert(node_id, vec, 0);
+            seg.insert(node_id, vec);
         }
         ntx.put_vec_segment(seg);
         ntx.commit().unwrap();

@@ -123,6 +123,16 @@ fn is_free_provider(name: &str) -> bool {
     matches!(name, "llamacpp" | "groq" | "openrouter" | "siliconflow")
 }
 
+fn is_free_provider_with_url(name: &str, base_url: &str) -> bool {
+    if is_free_provider(name) {
+        return true;
+    }
+    if base_url.contains("127.0.0.1") || base_url.contains("localhost") || base_url.contains("0.0.0.0") {
+        return true;
+    }
+    false
+}
+
 fn get_provider_models(provider: &str) -> Vec<String> {
     match provider {
         "llamacpp" => vec!["Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".into()],
@@ -139,6 +149,7 @@ fn get_provider_models(provider: &str) -> Vec<String> {
 
 fn read_provider_config() -> Result<serde_json::Value, DomainError> {
     let cfg = read_config_file();
+    let pool = read_pool_entries();
     let models = get_provider_models(&cfg.provider);
     let masked_key = if cfg.api_key.len() > 8 {
         format!("{}...{}", &cfg.api_key[..4], &cfg.api_key[cfg.api_key.len()-4..])
@@ -149,22 +160,44 @@ fn read_provider_config() -> Result<serde_json::Value, DomainError> {
     };
     let resolvable = !cfg.provider.is_empty() && !cfg.default_model.is_empty();
 
+    let mut providers = vec![serde_json::json!({
+        "id": cfg.provider,
+        "name": cfg.provider,
+        "display_name": provider_display_name(&cfg.provider),
+        "category": provider_category(&cfg.provider),
+        "is_free": is_free_provider_with_url(&cfg.provider, cfg.custom_endpoint.as_deref().unwrap_or("")),
+        "base_url": cfg.custom_endpoint.clone().unwrap_or_default(),
+        "model": cfg.default_model,
+        "models": models,
+        "resolvable": resolvable,
+        "api_key": masked_key
+    })];
+
+    for entry in &pool {
+        let label = entry.get("label").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let provider = entry.get("provider").and_then(|v| v.as_str()).unwrap_or("");
+        let model = entry.get("model").and_then(|v| v.as_str()).unwrap_or("");
+        let base_url = entry.get("base_url").and_then(|v| v.as_str()).unwrap_or("");
+        let pool_models = if model.is_empty() { vec![] } else { vec![model.to_string()] };
+        providers.push(serde_json::json!({
+            "id": label,
+            "name": provider,
+            "display_name": label,
+            "category": provider_category(provider),
+            "is_free": is_free_provider_with_url(provider, base_url),
+            "base_url": base_url,
+            "model": model,
+            "models": pool_models,
+            "resolvable": true,
+            "api_key": "no-key"
+        }));
+    }
+
     Ok(serde_json::json!({
-        "provider_count": 1,
+        "provider_count": providers.len(),
         "resolvable": resolvable,
         "active_model": cfg.default_model,
-        "providers": [{
-            "id": cfg.provider,
-            "name": cfg.provider,
-            "display_name": provider_display_name(&cfg.provider),
-            "category": provider_category(&cfg.provider),
-            "is_free": is_free_provider(&cfg.provider),
-            "base_url": cfg.custom_endpoint.unwrap_or_default(),
-            "model": cfg.default_model,
-            "models": models,
-            "resolvable": resolvable,
-            "api_key": masked_key
-        }]
+        "providers": providers
     }))
 }
 
@@ -177,6 +210,7 @@ fn provider_status() -> Result<serde_json::Value, DomainError> {
     // 主 provider
     if !cfg.provider.is_empty() {
         let models = get_provider_models(&cfg.provider);
+        let base_url = cfg.custom_endpoint.as_deref().unwrap_or("");
         health_list.push(serde_json::json!({
             "name": provider_display_name(&cfg.provider),
             "available": resolvable(&cfg),
@@ -184,7 +218,7 @@ fn provider_status() -> Result<serde_json::Value, DomainError> {
             "success_rate": "1.00",
             "total_calls": 0u32,
             "total_errors": 0u32,
-            "is_free": is_free_provider(&cfg.provider),
+            "is_free": is_free_provider_with_url(&cfg.provider, base_url),
             "composite_score": "1.0000",
             "category": provider_category(&cfg.provider),
             "latency_p95_ms": "0",
@@ -200,6 +234,7 @@ fn provider_status() -> Result<serde_json::Value, DomainError> {
     for entry in &pool {
         let name = entry.get("label").and_then(|v| v.as_str()).unwrap_or("unknown");
         let provider = entry.get("provider").and_then(|v| v.as_str()).unwrap_or("");
+        let base_url = entry.get("base_url").and_then(|v| v.as_str()).unwrap_or("");
         health_list.push(serde_json::json!({
             "name": name,
             "available": true,
@@ -207,7 +242,7 @@ fn provider_status() -> Result<serde_json::Value, DomainError> {
             "success_rate": "1.00",
             "total_calls": 0u32,
             "total_errors": 0u32,
-            "is_free": is_free_provider(provider),
+            "is_free": is_free_provider_with_url(provider, base_url),
             "composite_score": "1.0000",
             "category": provider_category(provider),
             "latency_p95_ms": "0",
@@ -229,14 +264,15 @@ fn pool_sufficiency(min_free: usize) -> Result<serde_json::Value, DomainError> {
     let mut free_total = 0usize;
     let mut free_available = 0usize;
 
-    if is_free_provider(&cfg.provider) && resolvable(&cfg) {
+    if is_free_provider_with_url(&cfg.provider, cfg.custom_endpoint.as_deref().unwrap_or("")) && resolvable(&cfg) {
         free_total += 1;
         free_available += 1;
     }
 
     for entry in &pool {
         let provider = entry.get("provider").and_then(|v| v.as_str()).unwrap_or("");
-        if is_free_provider(provider) {
+        let base_url = entry.get("base_url").and_then(|v| v.as_str()).unwrap_or("");
+        if is_free_provider_with_url(provider, base_url) {
             free_total += 1;
             free_available += 1;
         }
@@ -257,16 +293,33 @@ fn discover_models() -> Result<serde_json::Value, DomainError> {
     let cfg = read_config_file();
     let pool = read_pool_entries();
     let models = get_provider_models(&cfg.provider);
+    let base_url = cfg.custom_endpoint.as_deref().unwrap_or("");
 
-    let discovered: Vec<serde_json::Value> = models.iter().map(|m| {
+    let mut discovered: Vec<serde_json::Value> = models.iter().map(|m| {
         serde_json::json!({
             "provider": cfg.provider,
             "model_id": m,
-            "base_url": cfg.custom_endpoint.as_deref().unwrap_or(""),
-            "is_free": is_free_provider(&cfg.provider),
+            "base_url": base_url,
+            "is_free": is_free_provider_with_url(&cfg.provider, base_url),
             "tier": "local",
         })
     }).collect();
+
+    for entry in &pool {
+        let label = entry.get("label").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let provider = entry.get("provider").and_then(|v| v.as_str()).unwrap_or("");
+        let model = entry.get("model").and_then(|v| v.as_str()).unwrap_or("");
+        let pool_base = entry.get("base_url").and_then(|v| v.as_str()).unwrap_or("");
+        if !model.is_empty() {
+            discovered.push(serde_json::json!({
+                "provider": provider,
+                "model_id": model,
+                "base_url": pool_base,
+                "is_free": is_free_provider_with_url(provider, pool_base),
+                "tier": "local",
+            }));
+        }
+    }
 
     Ok(serde_json::json!({
         "discovered_count": discovered.len(),

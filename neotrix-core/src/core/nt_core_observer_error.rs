@@ -5,7 +5,9 @@
 //! 2. **Circuit Breaker** — trip after N consecutive failures, half-open after timeout
 //! 3. **Fallback** — degrade gracefully when all retries + circuit breaker fail
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+pub use neotrix_types::shared::{BreakerState, CircuitBreaker};
 
 use crate::core::nt_core_observer::ObserverReport;
 
@@ -109,102 +111,27 @@ impl Default for RetryConfig {
     }
 }
 
-/// State of the circuit breaker.
-#[derive(Debug, Clone, PartialEq)]
-pub enum CircuitState {
-    /// Circuit is closed — requests proceed normally.
-    Closed,
-    /// Circuit is open — requests are blocked.
-    /// Contains the tick count when the circuit tripped.
-    Open { since: usize },
-    /// Circuit is half-open — a single test request is allowed.
-    HalfOpen,
+/// Backward-compatible alias for `BreakerState`.
+pub type CircuitState = BreakerState;
+
+/// Extension methods on the canonical `CircuitBreaker` for the observer error recovery domain.
+pub trait CircuitBreakerExt {
+    fn allow_request(&mut self) -> bool;
+    fn record_success(&mut self);
+    fn record_failure(&mut self);
 }
 
-/// Circuit breaker that trips after N consecutive failures
-/// and transitions to half-open after a timeout.
-#[derive(Debug, Clone)]
-pub struct CircuitBreaker {
-    pub state: CircuitState,
-    /// Number of consecutive failures before the circuit trips (default: 3)
-    pub failure_threshold: u32,
-    /// Time in milliseconds before transitioning from open to half-open (default: 30000)
-    pub half_open_timeout_ms: u64,
-    /// Current consecutive failure count
-    pub consecutive_failures: u32,
-    /// Timestamp of when the circuit was last tripped (Instant for relative time)
-    last_tripped: Option<Instant>,
-}
-
-impl CircuitBreaker {
-    pub fn new(failure_threshold: u32, half_open_timeout_ms: u64) -> Self {
-        Self {
-            state: CircuitState::Closed,
-            failure_threshold,
-            half_open_timeout_ms,
-            consecutive_failures: 0,
-            last_tripped: None,
-        }
+impl CircuitBreakerExt for CircuitBreaker {
+    fn allow_request(&mut self) -> bool {
+        self.is_available()
     }
 
-    /// Check whether a request may proceed.
-    ///
-    /// - **Closed**: always allowed.
-    /// - **Open**: denied unless the half-open timeout has elapsed (→ transitions to HalfOpen).
-    /// - **HalfOpen**: allowed (single test request).
-    pub fn allow_request(&mut self) -> bool {
-        match self.state {
-            CircuitState::Closed => true,
-            CircuitState::Open { since: _ } => {
-                if let Some(tripped) = self.last_tripped {
-                    if tripped.elapsed() >= Duration::from_millis(self.half_open_timeout_ms) {
-                        self.state = CircuitState::HalfOpen;
-                        return true;
-                    }
-                }
-                false
-            }
-            CircuitState::HalfOpen => true,
-        }
+    fn record_success(&mut self) {
+        self.on_success();
     }
 
-    /// Record a successful operation.
-    ///
-    /// - Resets consecutive failures to 0.
-    /// - If half-open, transitions back to closed.
-    pub fn record_success(&mut self) {
-        self.consecutive_failures = 0;
-        if self.state == CircuitState::HalfOpen {
-            self.state = CircuitState::Closed;
-            self.last_tripped = None;
-        }
-    }
-
-    /// Record a failed operation.
-    ///
-    /// - Increments consecutive failures.
-    /// - If threshold is reached, transitions to Open and records the trip time.
-    pub fn record_failure(&mut self) {
-        self.consecutive_failures += 1;
-        if self.consecutive_failures >= self.failure_threshold {
-            self.state = CircuitState::Open {
-                since: self.consecutive_failures as usize,
-            };
-            self.last_tripped = Some(Instant::now());
-        }
-    }
-
-    /// Reset the circuit breaker to its initial closed state.
-    pub fn reset(&mut self) {
-        self.state = CircuitState::Closed;
-        self.consecutive_failures = 0;
-        self.last_tripped = None;
-    }
-}
-
-impl Default for CircuitBreaker {
-    fn default() -> Self {
-        Self::new(3, 30000)
+    fn record_failure(&mut self) {
+        self.on_failure();
     }
 }
 
@@ -330,35 +257,32 @@ mod tests {
     #[test]
     fn test_circuit_breaker_starts_closed() {
         let cb = CircuitBreaker::default();
-        assert_eq!(cb.state, CircuitState::Closed);
-        assert_eq!(cb.consecutive_failures, 0);
+        assert_eq!(cb.state, BreakerState::Closed);
+        assert_eq!(cb.failure_count, 0);
     }
 
     #[test]
     fn test_circuit_breaker_trips_after_threshold() {
-        let mut cb = CircuitBreaker::new(3, 30000);
+        let mut cb = CircuitBreaker::new(3, 30);
         assert!(cb.allow_request());
         cb.record_failure();
         assert!(cb.allow_request());
         cb.record_failure();
         assert!(cb.allow_request());
         cb.record_failure();
-        // After 3 failures, circuit should be open
-        assert_eq!(cb.state, CircuitState::Open { since: 3 });
+        assert!(cb.is_open());
         assert!(!cb.allow_request());
     }
 
     #[test]
     fn test_circuit_breaker_half_open_transition() {
-        let mut cb = CircuitBreaker::new(1, 1); // trip after 1 failure, 1ms timeout
+        let mut cb = CircuitBreaker::new(1, 1);
         cb.record_failure();
-        assert_eq!(cb.state, CircuitState::Open { since: 1 });
-        // Immediately still open
+        assert!(cb.is_open());
         assert!(!cb.allow_request());
-        // After 1ms, should transition to half-open
         std::thread::sleep(Duration::from_millis(2));
         assert!(cb.allow_request());
-        assert_eq!(cb.state, CircuitState::HalfOpen);
+        assert_eq!(cb.state, BreakerState::HalfOpen);
     }
 
     #[test]
@@ -366,24 +290,23 @@ mod tests {
         let mut cb = CircuitBreaker::new(2, 1);
         cb.record_failure();
         cb.record_failure();
-        assert_eq!(cb.state, CircuitState::Open { since: 2 });
-        // Wait for half-open
+        assert!(cb.is_open());
         std::thread::sleep(Duration::from_millis(2));
-        assert!(cb.allow_request()); // transitions to half-open
+        assert!(cb.allow_request());
         cb.record_success();
-        assert_eq!(cb.state, CircuitState::Closed);
-        assert_eq!(cb.consecutive_failures, 0);
+        assert_eq!(cb.state, BreakerState::Closed);
+        assert_eq!(cb.failure_count, 0);
     }
 
     #[test]
     fn test_circuit_breaker_reset() {
-        let mut cb = CircuitBreaker::new(2, 30000);
+        let mut cb = CircuitBreaker::new(2, 30);
         cb.record_failure();
         cb.record_failure();
-        assert_eq!(cb.state, CircuitState::Open { since: 2 });
+        assert!(cb.is_open());
         cb.reset();
-        assert_eq!(cb.state, CircuitState::Closed);
-        assert_eq!(cb.consecutive_failures, 0);
+        assert_eq!(cb.state, BreakerState::Closed);
+        assert_eq!(cb.failure_count, 0);
     }
 
     #[test]

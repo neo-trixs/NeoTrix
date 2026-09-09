@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
-use neotrix_types::shared::BreakerState;
+use neotrix_types::shared::{BreakerState, CircuitBreaker as CanonicalCircuitBreaker};
 
 /// 断路器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,9 +34,11 @@ impl Default for BreakerConfig {
     }
 }
 
-/// 断路器
-pub struct CircuitBreaker {
-    state: BreakerState,
+/// Infrastructure circuit breaker — wraps canonical `CircuitBreaker` with
+/// error-rate sliding-window tracking and timestamp-based cooldown.
+#[derive(Debug, Clone)]
+pub struct InfraBreaker {
+    inner: CanonicalCircuitBreaker,
     config: BreakerConfig,
     recent_results: Vec<bool>,
     open_since: Option<u64>,
@@ -44,10 +46,14 @@ pub struct CircuitBreaker {
     half_open_successes: u32,
 }
 
-impl CircuitBreaker {
+/// Backward-compatible alias.
+pub type CircuitBreaker = InfraBreaker;
+
+impl InfraBreaker {
     pub fn new(config: BreakerConfig) -> Self {
+        let cooldown_secs = config.open_duration_ms / 1000;
         Self {
-            state: BreakerState::Closed,
+            inner: CanonicalCircuitBreaker::new(config.half_open_max_calls as u64, cooldown_secs),
             config,
             recent_results: Vec::new(),
             open_since: None,
@@ -59,21 +65,22 @@ impl CircuitBreaker {
     /// 记录调用结果
     pub fn record_result(&mut self, success: bool) {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
-        match self.state {
+        match self.inner.state {
             BreakerState::Closed => {
                 self.recent_results.push(success);
                 if self.recent_results.len() > self.config.window_size as usize {
                     self.recent_results.remove(0);
                 }
                 if self.error_rate() >= self.config.error_threshold {
-                    self.state = BreakerState::Open;
+                    self.inner.state = BreakerState::Open { since: None };
+                    self.inner.last_state_change = Some(std::time::Instant::now());
                     self.open_since = Some(now);
                 }
             }
-            BreakerState::Open => {
+            BreakerState::Open { .. } => {
                 if let Some(since) = self.open_since {
                     if now - since >= self.config.open_duration_ms {
-                        self.state = BreakerState::HalfOpen;
+                        self.inner.state = BreakerState::HalfOpen;
                         self.half_open_calls = 0;
                         self.half_open_successes = 0;
                     }
@@ -84,10 +91,11 @@ impl CircuitBreaker {
                 if success { self.half_open_successes += 1; }
                 if self.half_open_calls >= self.config.half_open_max_calls {
                     if self.half_open_successes as f64 / self.half_open_calls as f64 >= 0.5 {
-                        self.state = BreakerState::Closed;
+                        self.inner.state = BreakerState::Closed;
                         self.recent_results.clear();
                     } else {
-                        self.state = BreakerState::Open;
+                        self.inner.state = BreakerState::Open { since: None };
+                        self.inner.last_state_change = Some(std::time::Instant::now());
                         self.open_since = Some(now);
                     }
                 }
@@ -97,14 +105,14 @@ impl CircuitBreaker {
 
     /// 检查是否允许调用
     pub fn allow(&self) -> bool {
-        match self.state {
+        match self.inner.state {
             BreakerState::Closed => true,
-            BreakerState::Open => false,
+            BreakerState::Open { .. } => false,
             BreakerState::HalfOpen => self.half_open_calls < self.config.half_open_max_calls,
         }
     }
 
-    pub fn state(&self) -> BreakerState { self.state }
+    pub fn state(&self) -> BreakerState { self.inner.state }
     pub fn error_rate(&self) -> f64 {
         if self.recent_results.is_empty() { return 0.0; }
         let failures = self.recent_results.iter().filter(|&&r| !r).count();
@@ -114,7 +122,7 @@ impl CircuitBreaker {
 
 /// 断路器注册表 — 每个 capability 一个
 pub struct BreakerRegistry {
-    breakers: HashMap<String, CircuitBreaker>,
+    breakers: HashMap<String, InfraBreaker>,
     default_config: BreakerConfig,
 }
 
@@ -137,9 +145,9 @@ impl BreakerRegistry {
         }
     }
 
-    pub fn get_or_create(&mut self, capability_id: &str) -> &mut CircuitBreaker {
+    pub fn get_or_create(&mut self, capability_id: &str) -> &mut InfraBreaker {
         self.breakers.entry(capability_id.to_string())
-            .or_insert_with(|| CircuitBreaker::new(self.default_config.clone()))
+            .or_insert_with(|| InfraBreaker::new(self.default_config.clone()))
     }
 
     pub fn allow(&self, capability_id: &str) -> bool {
@@ -182,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_breaker_closed_allows() {
-        let mut b = CircuitBreaker::new(BreakerConfig::default());
+        let mut b = InfraBreaker::new(BreakerConfig::default());
         assert!(b.allow());
         assert_eq!(b.state(), BreakerState::Closed);
     }
@@ -194,12 +202,12 @@ mod tests {
             window_size: 4,
             ..Default::default()
         };
-        let mut b = CircuitBreaker::new(config);
+        let mut b = InfraBreaker::new(config);
         b.record_result(false);
         b.record_result(false);
         b.record_result(true);
         b.record_result(false); // 75% error → open
-        assert_eq!(b.state(), BreakerState::Open);
+        assert_eq!(b.state(), BreakerState::Open { since: None });
         assert!(!b.allow());
     }
 
@@ -211,10 +219,10 @@ mod tests {
             open_duration_ms: 0, // instant for test
             half_open_max_calls: 2,
         };
-        let mut b = CircuitBreaker::new(config);
+        let mut b = InfraBreaker::new(config);
         b.record_result(false);
         b.record_result(false); // open
-        assert_eq!(b.state(), BreakerState::Open);
+        assert_eq!(b.state(), BreakerState::Open { since: None });
         // After duration, allow → half-open
         b.record_result(true); // triggers half-open check
         assert!(b.allow() || b.state() == BreakerState::HalfOpen);

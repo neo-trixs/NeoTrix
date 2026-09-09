@@ -187,7 +187,23 @@ impl EmbeddedWal {
         used >= threshold || self.entry_count >= 1000
     }
 
-    /// 检查点: 读取所有条目并清空 WAL
+    /// 获取 WAL 空间使用率
+    pub fn usage_ratio(&self) -> f64 {
+        let used = self.write_pos - self.wal_offset;
+        used as f64 / self.wal_size as f64
+    }
+
+    /// 获取 WAL 统计信息
+    pub fn stats(&self) -> WalStats {
+        WalStats {
+            pending_bytes: self.write_pos - self.wal_offset,
+            total_entries: self.entry_count,
+            sequence: self.sequence,
+            checkpoint_pos: self.checkpoint_pos,
+        }
+    }
+
+    /// 检查点: 读取所有条目并清空 WAL (空间回收)
     pub fn checkpoint(&mut self, file: &mut File) -> std::io::Result<Vec<WalEntry>> {
         file.seek(SeekFrom::Start(self.wal_offset))?;
         let mut entries = Vec::new();
@@ -213,7 +229,7 @@ impl EmbeddedWal {
         self.checkpoint_pos = self.sequence;
         self.entry_count = 0;
 
-        // 清空 WAL
+        // 清空 WAL (空间回收)
         file.seek(SeekFrom::Start(self.wal_offset))?;
         let zero_buf = vec![0u8; 8192];
         let mut remaining = self.wal_size as usize;
@@ -258,15 +274,6 @@ impl EmbeddedWal {
 
     pub fn flush(&self, _file: &mut File) -> std::io::Result<()> {
         _file.flush()
-    }
-
-    pub fn stats(&self) -> WalStats {
-        WalStats {
-            pending_bytes: self.write_pos - self.wal_offset,
-            total_entries: self.entry_count,
-            sequence: self.sequence,
-            checkpoint_pos: self.checkpoint_pos,
-        }
     }
 }
 

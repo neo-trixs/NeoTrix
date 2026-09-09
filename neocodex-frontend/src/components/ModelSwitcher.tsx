@@ -64,13 +64,22 @@ export function ModelSwitcher(props: {
     await loadData()
     window.addEventListener('neotrix:provider-changed', handleProviderChanged)
     window.addEventListener('keydown', handleEsc)
+    document.addEventListener('mousedown', handleClickOutside)
   })
   onCleanup(() => {
     window.removeEventListener('neotrix:provider-changed', handleProviderChanged)
     window.removeEventListener('keydown', handleEsc)
+    document.removeEventListener('mousedown', handleClickOutside)
   })
 
   const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false) }
+  const handleClickOutside = (e: MouseEvent) => {
+    if (!isOpen()) return
+    const target = e.target as Node
+    if (panelRef && !panelRef.contains(target) && !(e.target as HTMLElement)?.closest?.('[aria-label="模型切换"]')) {
+      setIsOpen(false)
+    }
+  }
   const handleProviderChanged = () => loadData()
 
   const loadData = async () => {
@@ -235,8 +244,6 @@ export function ModelSwitcher(props: {
           </div>
         </div>
       </Show>
-
-      <div class={isOpen() ? 'fixed inset-0 z-40' : 'hidden'} onClick={() => setIsOpen(false)} aria-hidden="true" />
     </div>
   )
 }

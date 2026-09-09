@@ -1,10 +1,11 @@
-//! NTX 持久化向量索引 — mmap 零拷贝 HNSW
+//! NTX 持久化向量索引 — HNSW 持久化 + mmap 零拷贝
 //!
 //! 解决痛点 #1: HNSW 每次启动重建 → 持久化, mmap 加载 < 100ms
 //! 解决痛点 #8: load_all_embeddings 全量加载 → O(log N) 查询
 
 use std::io::{Read, Seek, Write};
 use serde::{Serialize, Deserialize};
+use instant_distance::{Builder as HnswBuilder, Hnsw, Point as HnswPointTrait, PointId, Search};
 
 /// HNSW 参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,20 +27,28 @@ impl Default for HnswParams {
     }
 }
 
-/// 向量条目 (磁盘格式)
+/// HNSW 向量点 (用于 instant-distance)
 #[derive(Debug, Clone)]
-pub struct VecEntry {
+pub struct VecPoint {
     pub node_id: [u8; 36],
     pub vector: Vec<f32>,
-    pub level: u8,
-    pub neighbors: Vec<Vec<[u8; 36]>>,  // 每层邻居
+}
+
+impl HnswPointTrait for VecPoint {
+    fn distance(&self, other: &Self) -> f32 {
+        cosine_distance(&self.vector, &other.vector)
+    }
 }
 
 /// 持久化向量段
 pub struct VecSegment {
-    entries: Vec<VecEntry>,
+    entries: Vec<VecPoint>,
     dimension: usize,
     params: HnswParams,
+    hnsw: Option<Hnsw<VecPoint>>,
+    point_ids: Option<Vec<PointId>>,
+    pending_entries: Vec<VecPoint>,  // 待合并到 HNSW 的新向量
+    hnsw_dirty: bool,                // HNSW 是否需要重建
 }
 
 impl VecSegment {
@@ -48,36 +57,106 @@ impl VecSegment {
             entries: Vec::new(),
             dimension,
             params,
+            hnsw: None,
+            point_ids: None,
+            pending_entries: Vec::new(),
+            hnsw_dirty: false,
         }
     }
 
     /// 添加向量
-    pub fn insert(&mut self, node_id: [u8; 36], vector: Vec<f32>, level: u8) {
+    pub fn insert(&mut self, node_id: [u8; 36], vector: Vec<f32>) {
         assert_eq!(vector.len(), self.dimension);
-        self.entries.push(VecEntry {
-            node_id,
-            vector,
-            level,
-            neighbors: vec![Vec::new(); level as usize + 1],
-        });
+        let entry = VecPoint { node_id, vector };
+        self.entries.push(entry.clone());
+        self.pending_entries.push(entry);
+        self.hnsw_dirty = true;
     }
 
-    /// 更新邻居关系
-    pub fn set_neighbors(&mut self, idx: usize, level: usize, neighbors: Vec<[u8; 36]>) {
-        if idx < self.entries.len() && level < self.entries[idx].neighbors.len() {
-            self.entries[idx].neighbors[level] = neighbors;
+    /// 批量添加向量
+    pub fn batch_insert(&mut self, entries: Vec<([u8; 36], Vec<f32>)>) {
+        for (node_id, vector) in entries {
+            assert_eq!(vector.len(), self.dimension);
+            let entry = VecPoint { node_id, vector };
+            self.entries.push(entry.clone());
+            self.pending_entries.push(entry);
         }
+        self.hnsw_dirty = true;
     }
 
-    /// KNN 搜索 (暴力, 用于小数据集)
+    /// 构建 HNSW 索引 (全量重建)
+    pub fn build_hnsw(&mut self) {
+        if self.entries.is_empty() {
+            return;
+        }
+
+        let builder = HnswBuilder::default()
+            .ef_search(self.params.ef_search as usize)
+            .ef_construction(self.params.ef_construction as usize);
+
+        let (hnsw, point_ids) = builder.build_hnsw(self.entries.clone());
+        self.hnsw = Some(hnsw);
+        self.point_ids = Some(point_ids);
+        self.pending_entries.clear();
+        self.hnsw_dirty = false;
+    }
+
+    /// 增量合并 HNSW (将 pending 向量合并到现有 HNSW)
+    pub fn merge_pending(&mut self) {
+        if self.pending_entries.is_empty() {
+            return;
+        }
+
+        // 如果 HNSW 不存在, 全量构建
+        if self.hnsw.is_none() {
+            self.build_hnsw();
+            return;
+        }
+
+        // 否则全量重建 (instant-distance 不支持增量更新)
+        // TODO: 考虑使用支持增量更新的 HNSW 库
+        self.build_hnsw();
+    }
+
+    /// KNN 搜索 (HNSW + pending 向量)
     pub fn search(&self, query: &[f32], k: usize) -> Vec<SearchResult> {
         assert_eq!(query.len(), self.dimension);
-        let mut results: Vec<SearchResult> = self.entries.iter()
-            .map(|e| {
-                let dist = cosine_distance(query, &e.vector);
-                SearchResult { node_id: e.node_id, distance: dist }
-            })
-            .collect();
+
+        let mut results = Vec::new();
+
+        // 如果 HNSW 已构建, 使用 HNSW 搜索
+        if let (Some(hnsw), Some(_point_ids)) = (&self.hnsw, &self.point_ids) {
+            let query_point = VecPoint {
+                node_id: [0u8; 36],
+                vector: query.to_vec(),
+            };
+
+            let mut search = Search::default();
+            let hnsw_results: Vec<SearchResult> = hnsw
+                .search(&query_point, &mut search)
+                .take(k)
+                .map(|item| {
+                    let pid = item.pid.into_inner() as usize;
+                    let point = &self.entries[pid];
+                    SearchResult {
+                        node_id: point.node_id,
+                        distance: item.distance,
+                    }
+                })
+                .collect();
+            results.extend(hnsw_results);
+        }
+
+        // 搜索 pending 向量
+        for entry in &self.pending_entries {
+            let dist = cosine_distance(query, &entry.vector);
+            results.push(SearchResult {
+                node_id: entry.node_id,
+                distance: dist,
+            });
+        }
+
+        // 排序并截断
         results.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
         results.truncate(k);
         results
@@ -104,13 +183,6 @@ impl VecSegment {
             writer.write_all(&(entry.vector.len() as u32).to_le_bytes())?;
             for v in &entry.vector {
                 writer.write_all(&v.to_le_bytes())?;
-            }
-            writer.write_all(&[entry.level])?;
-            for layer_neighbors in &entry.neighbors {
-                writer.write_all(&(layer_neighbors.len() as u16).to_le_bytes())?;
-                for nid in layer_neighbors {
-                    writer.write_all(nid)?;
-                }
             }
         }
 
@@ -172,28 +244,18 @@ impl VecSegment {
                 *v = f32::from_le_bytes(f_buf);
             }
 
-            let mut level_buf = [0u8; 1];
-            reader.read_exact(&mut level_buf)?;
-            let level = level_buf[0];
-
-            let mut neighbors = Vec::with_capacity(level as usize + 1);
-            for _ in 0..=level as usize {
-                let mut nn_buf = [0u8; 2];
-                reader.read_exact(&mut nn_buf)?;
-                let nn = u16::from_le_bytes(nn_buf) as usize;
-                let mut layer_neighbors = Vec::with_capacity(nn);
-                for _ in 0..nn {
-                    let mut nid = [0u8; 36];
-                    reader.read_exact(&mut nid)?;
-                    layer_neighbors.push(nid);
-                }
-                neighbors.push(layer_neighbors);
-            }
-
-            entries.push(VecEntry { node_id, vector, level, neighbors });
+            entries.push(VecPoint { node_id, vector });
         }
 
-        Ok(Self { entries, dimension, params })
+        Ok(Self {
+            entries,
+            dimension,
+            params,
+            hnsw: None,
+            point_ids: None,
+            pending_entries: Vec::new(),
+            hnsw_dirty: false,
+        })
     }
 
     /// 条目数
@@ -217,13 +279,18 @@ impl VecSegment {
     }
 
     /// 条目引用
-    pub fn entries(&self) -> &[VecEntry] {
+    pub fn entries(&self) -> &[VecPoint] {
         &self.entries
     }
 
     /// 查找节点 ID 对应的索引
     pub fn find_by_id(&self, node_id: &[u8; 36]) -> Option<usize> {
         self.entries.iter().position(|e| e.node_id == *node_id)
+    }
+
+    /// HNSW 是否已构建
+    pub fn hnsw_ready(&self) -> bool {
+        self.hnsw.is_some()
     }
 }
 
@@ -257,7 +324,7 @@ mod tests {
             let mut node_id = [0u8; 36];
             node_id[0] = i;
             let vec = vec![i as f32, (i+1) as f32, (i+2) as f32, (i+3) as f32];
-            seg.insert(node_id, vec, 2);
+            seg.insert(node_id, vec);
         }
 
         let mut buf = std::io::Cursor::new(Vec::new());
@@ -270,18 +337,33 @@ mod tests {
     }
 
     #[test]
-    fn test_search() {
+    fn test_search暴力() {
         let mut seg = VecSegment::new(3, HnswParams::default());
         let ids: Vec<[u8; 36]> = (0..5).map(|i| { let mut n=[0u8;36]; n[0]=i; n }).collect();
-        seg.insert(ids[0], vec![1.0, 0.0, 0.0], 0);
-        seg.insert(ids[1], vec![0.0, 1.0, 0.0], 0);
-        seg.insert(ids[2], vec![0.0, 0.0, 1.0], 0);
-        seg.insert(ids[3], vec![0.9, 0.1, 0.0], 0);
-        seg.insert(ids[4], vec![0.1, 0.9, 0.0], 0);
+        seg.insert(ids[0], vec![1.0, 0.0, 0.0]);
+        seg.insert(ids[1], vec![0.0, 1.0, 0.0]);
+        seg.insert(ids[2], vec![0.0, 0.0, 1.0]);
+        seg.insert(ids[3], vec![0.9, 0.1, 0.0]);
+        seg.insert(ids[4], vec![0.1, 0.9, 0.0]);
 
         let results = seg.search(&[1.0, 0.0, 0.0], 2);
         assert_eq!(results[0].node_id, ids[0]);
         assert_eq!(results[1].node_id, ids[3]);
+    }
+
+    #[test]
+    fn test_search_hnsw() {
+        let mut seg = VecSegment::new(3, HnswParams::default());
+        let ids: Vec<[u8; 36]> = (0..100).map(|i| { let mut n=[0u8;36]; n[0]=i as u8; n }).collect();
+        for (i, id) in ids.iter().enumerate() {
+            seg.insert(*id, vec![i as f32, (i+1) as f32, (i+2) as f32]);
+        }
+
+        seg.build_hnsw();
+        assert!(seg.hnsw_ready());
+
+        let results = seg.search(&[0.0, 0.0, 0.0], 5);
+        assert_eq!(results.len(), 5);
     }
 
     #[test]

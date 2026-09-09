@@ -1,5 +1,46 @@
 # NeoTrix Desktop V2 — Changelog
 
+## v0.23.1 (2026-09-09)
+
+### UI 交互修复
+
+#### ModelSwitcher — 点击空白处关闭弹窗
+- **问题**: 模型选择弹窗点击空白处无法关闭
+- **修复**: 添加 `document.addEventListener('mousedown', handleClickOutside)` 监听，点击弹窗外区域自动关闭
+- **涉及文件**: `src/components/ModelSwitcher.tsx`
+
+#### SettingsModal — 交通灯点击无反应
+- **问题**: 设置界面左上角三色交通灯点击无交互反应
+- **根因**: `data-tauri-drag-region` 属性导致 Tauri 拦截所有鼠标事件，按钮无法接收 click
+- **修复**: 
+  - 移除 TrafficLights 组件上的 `data-tauri-drag-region` 属性
+  - 提升 `.traffic` z-index 到 9999 确保在 modal 之上
+- **涉及文件**: `src/components/TrafficLights.tsx`, `src/styles/index.css`
+
+### Free LLM 池子 + 代理池修复
+
+#### Free LLM 池子 — 本地 OpenAI-compatible 模型未被识别为免费
+- **问题**: `provider_pool.toml` 中 `provider = "openai"` 的本地模型被 `is_free_provider()` 过滤掉
+- **根因**: `is_free_provider()` 硬编码只认 `llamacpp | groq | openrouter | siliconflow`
+- **修复**: 
+  - 新增 `is_free_provider_with_url()` 函数：如果 `base_url` 指向 `127.0.0.1`/`localhost`/`0.0.0.0`，自动标记为免费
+  - 所有 `is_free_provider` 调用点统一迁移到 `is_free_provider_with_url()`
+- **涉及文件**: `src-tauri/src/domain/plugins/stubs.rs`
+
+#### 模型池 — 只显示主 provider，忽略 pool entries
+- **问题**: `read_provider_config()` 只读 `config.toml`，不读 `provider_pool.toml`
+- **修复**: `read_provider_config()` 合并 pool entries 到 `providers[]` 数组
+- **效果**: 模型池列表从 1 个 provider 增加到 2 个（llamacpp + qwen3.5-9b-fable）
+- **涉及文件**: `src-tauri/src/domain/plugins/stubs.rs`
+
+#### 网络代理订阅 IP 池子 — cache 不存在导致返回空
+- **问题**: `proxy_pool_status` 从 `proxy_pool_cache.json` 读取，但该文件不存在 → 返回 0 节点
+- **修复**: 
+  - Cache 不存在时，从 `subscriptions.json` 中提取 `http://ip:port` 格式的直连代理节点
+  - 新增 `extract_direct_proxies()` 和 `infer_geo_from_ip()` 辅助函数
+  - 首次提取后写入 cache，后续读 cache
+- **涉及文件**: `src-tauri/src/commands/proxy_pool.rs`
+
 ## v0.19.0-rc2 (2026-09-08)
 
 ### Chat Plugin: 对话打通 + Tauri 事件发射

@@ -60,7 +60,7 @@ export function TrafficLights() {
   })
 
   return (
-    <div class={clsx('traffic', !focused() && 'blurred')} data-tauri-drag-region>
+    <div class={clsx('traffic', !focused() && 'blurred')}>
       <button
         class="t-dot t-c"
         onClick={close}

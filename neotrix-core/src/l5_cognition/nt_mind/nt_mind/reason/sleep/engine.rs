@@ -172,33 +172,31 @@ mod tests {
         }
     }
 
-// //     fn setup_engine_and_state() -> (SleepEngine, CapabilityVector, ReasoningBank, SelectableOperator, SelectiveState) {
-// let engine = SleepEngine::with_passes(3);
-// let brain = CapabilityVector::default();
-// let bank = {
-// let mut b = ReasoningBank::new(100);
-// for i in 0..5 {
-// b.store(make_memory(0.5 + (i as f64 * 0.1), true, &format!("m{}", i)));
-// }
-// b
-// };
-//         let operator = SelectableOperator::new(23, 64);
-//         let state = SelectiveState::new(23, 64);
-// (engine, brain, bank, operator, state)
-// }
+    fn setup_engine_and_bank() -> (SleepEngine, CapabilityVector, ReasoningBank) {
+        let engine = SleepEngine::with_passes(3);
+        let brain = CapabilityVector::default();
+        let bank = {
+            let mut b = ReasoningBank::new(100);
+            for i in 0..5 {
+                b.store(make_memory(0.5 + (i as f64 * 0.1), true, &format!("m{}", i)));
+            }
+            b
+        };
+        (engine, brain, bank)
+    }
 
     #[test]
     fn test_sleep_returns_result() {
-        let (mut engine, mut brain, mut bank, operator, mut state) = setup_engine_and_state();
-        let result = engine.sleep(&mut brain, &mut bank, &operator, &mut state).expect("value should be ok in test");
+        let (mut engine, mut brain, mut bank) = setup_engine_and_bank();
+        let result = engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
         assert_eq!(result.stats.passes_done, 3, "should execute 3 passes");
         assert!(result.stats.total_memories > 0, "should process memories");
     }
 
     #[test]
     fn test_sleep_all_passes_produce_delta() {
-        let (mut engine, mut brain, mut bank, operator, mut state) = setup_engine_and_state();
-        let result = engine.sleep(&mut brain, &mut bank, &operator, &mut state).expect("value should be ok in test");
+        let (mut engine, mut brain, mut bank) = setup_engine_and_bank();
+        let result = engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
         assert_eq!(result.stats.delta_per_pass.len(), 3, "should have 3 deltas");
         assert!(result.stats.delta_per_pass.iter().all(|d| *d >= 0.0),
             "all pass deltas should be non-negative");
@@ -209,9 +207,7 @@ mod tests {
         let mut engine = SleepEngine::new(SleepConfig { passes: 0, ..Default::default() });
         let mut brain = CapabilityVector::default();
         let mut bank = ReasoningBank::new(10);
-//         let operator = SelectableOperator::new(23, 64);
-//         let mut state = SelectiveState::new(23, 64);
-        let result = engine.sleep(&mut brain, &mut bank, &operator, &mut state).expect("value should be ok in test");
+        let result = engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
         assert_eq!(result.stats.passes_done, 0, "zero passes returns immediately");
     }
 
@@ -251,9 +247,9 @@ mod tests {
 
     #[test]
     fn test_capability_changes_after_sleep() {
-        let (mut engine, mut brain, mut bank, operator, mut state) = setup_engine_and_state();
+        let (mut engine, mut brain, mut bank) = setup_engine_and_bank();
         let before = brain.arr.clone();
-        engine.sleep(&mut brain, &mut bank, &operator, &mut state).expect("value should be ok in test");
+        engine.sleep(&mut brain, &mut bank).expect("value should be ok in test");
         let changed = brain.arr.iter().zip(before.iter()).any(|(a, b)| (a - b).abs() > 1e-6);
         assert!(changed, "capability should change after sleep");
     }

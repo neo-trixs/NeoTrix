@@ -159,7 +159,18 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
         serde_json::from_str(&content)
             .unwrap_or_default()
     } else {
-        vec![]
+        // Cache 不存在，从 subscriptions.json 中提取直连代理节点
+        let extracted = extract_direct_proxies(&subs);
+        if !extracted.is_empty() {
+            // 写入缓存供下次使用
+            if let Some(parent) = cache_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Ok(json) = serde_json::to_string_pretty(&extracted) {
+                let _ = std::fs::write(&cache_path, json);
+            }
+        }
+        extracted
     };
 
     let healthy = nodes.iter().filter(|n| n.fail_count < 3).count();
@@ -180,6 +191,48 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
         nodes,
         subscriptions: subs,
     })
+}
+
+/// 从订阅列表中提取直连代理节点 (http://ip:port 格式)
+fn extract_direct_proxies(subs: &[String]) -> Vec<ProxyPoolEntry> {
+    let mut nodes = vec![];
+    for url in subs {
+        if url.starts_with("http://") || url.starts_with("https://") {
+            // 验证格式: 必须包含 ip:port
+            let stripped = url.trim_start_matches("https://").trim_start_matches("http://");
+            if let Some(colon_pos) = stripped.rfind(':') {
+                let host = &stripped[..colon_pos];
+                let port_str = &stripped[colon_pos + 1..];
+                if port_str.parse::<u16>().is_ok() && !host.is_empty() {
+                    let geo_tag = infer_geo_from_ip(host);
+                    nodes.push(ProxyPoolEntry {
+                        url: url.clone(),
+                        tag: format!("sub-{}", &host[host.len().saturating_sub(12)..]),
+                        geo_tag,
+                        latency_ms: None,
+                        success_count: 0,
+                        fail_count: 0,
+                        speed_tier: "unknown".into(),
+                        from_subscription: true,
+                    });
+                }
+            }
+        }
+    }
+    nodes
+}
+
+/// 根据 IP 首位推断地理区域 (简化版)
+fn infer_geo_from_ip(ip: &str) -> Option<String> {
+    let first_octet = ip.split('.').next()?.parse::<u8>().ok()?;
+    match first_octet {
+        1..=50 => Some("US".into()),
+        51..=100 => Some("EU".into()),
+        101..=150 => Some("AS".into()),
+        151..=200 => Some("SA".into()),
+        201..=255 => Some("AF".into()),
+        _ => None,
+    }
 }
 
 /// 获取代理池快照

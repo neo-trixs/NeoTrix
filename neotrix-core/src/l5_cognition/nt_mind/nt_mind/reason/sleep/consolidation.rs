@@ -203,13 +203,10 @@ mod tests {
     fn test_consolidation_pass_no_crash() {
         let bank = ReasoningBank::new(10);
         let mut cap = CapabilityVector::default();
-//         let mut state = SelectiveState::new(23, 64);
-//         let operator = SelectableOperator::new(23, 64);
-        let updater = HebbianUpdater::new(23, 64);
         let mc = MemoryConsolidation::new(ConsolidationConfig::default());
 
         let mut bank = bank;
-        let result = mc.run_consolidation_pass(&mut bank, &mut cap, &mut state, &operator, &updater);
+        let result = mc.run_consolidation_pass(&mut bank, &mut cap);
         assert_eq!(result.memories_processed, 0, "empty bank should process 0 memories");
     }
 

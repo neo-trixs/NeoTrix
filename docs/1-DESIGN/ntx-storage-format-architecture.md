@@ -4,14 +4,16 @@
 
 ## 1. 设计目标
 
-| 目标 | 度量 | 当前差距 |
-|------|------|----------|
-| 持久化向量索引 | 冷启动 0 重建 | 当前 HNSW 每次重启重建 (390K 向量) |
-| 崩溃恢复 | 嵌入式 WAL, 零外部文件 | 当前依赖 SQLite WAL (.wal/.shm) |
-| 单文件便携 | `.ntx` 可分享/迁移 | 当前 SQLite + 多表 + 外部索引 |
-| 追加只读 | 时间旅行查询 | 当前原地更新, 无版本历史 |
-| 压缩存储 | Zstd 按帧压缩 | 当前无压缩, 浪费 30-50% 空间 |
-| 消除 FTS5 内容复制 | 存储减半 | 当前 FTS5 复制 title+summary+content |
+| 目标 | 度量 | 当前差距 | 状态 |
+|------|------|----------|------|
+| 持久化向量索引 | 冷启动 0 重建 | 当前 HNSW 每次重启重建 (390K 向量) | ✅ 已实现 |
+| 崩溃恢复 | 嵌入式 WAL, 零外部文件 | 当前依赖 SQLite WAL (.wal/.shm) | ✅ 已实现 |
+| 单文件便携 | `.ntx` 可分享/迁移 | 当前 SQLite + 多表 + 外部索引 | ✅ 已实现 |
+| 追加只读 | 时间旅行查询 | 当前原地更新, 无版本历史 | ✅ 已实现 |
+| 压缩存储 | Zstd 按帧压缩 | 当前无压缩, 浪费 30-50% 空间 | ✅ 已实现 |
+| 消除 FTS5 内容复制 | 存储减半 | 当前 FTS5 复制 title+summary+content | ✅ 已实现 |
+| 并发安全 | RwLock + 文件锁 | 当前无同步机制 | ✅ 已实现 |
+| 版本兼容性 | 版本检查 | 当前无版本检查 | ✅ 已实现 |
 
 ## 2. NTX 文件格式规范 (v1.0)
 
@@ -208,6 +210,59 @@ SegmentDescriptor:
 5. 重写 TOC (段偏移更新)
 ```
 
+## 4. 并发控制
+
+### 4.1 锁机制
+
+```rust
+pub struct NtxFile {
+    // ... 现有字段
+    lock: RwLock<()>,        // 读写锁: 读操作用 read(), 写操作用 write()
+    wal_lock: Mutex<()>,     // WAL 锁: 保护 WAL 顺序写入
+}
+```
+
+### 4.2 锁使用模式
+
+| 操作 | 锁类型 | 说明 |
+|------|--------|------|
+| `put_frame()` | `wal_lock.lock()` | WAL 顺序写入保护 |
+| `put_frames()` | `wal_lock.lock()` | 批量写入保护 |
+| `commit()` | `lock.write()` | 写操作保护 |
+| `frames()` | 无锁 | 只读访问 |
+| `vec_segment()` | 无锁 | 只读访问 |
+
+### 4.3 文件锁
+
+```rust
+// 创建时获取独占锁
+file.lock_exclusive()?;
+
+// 只读打开时获取共享锁
+file.lock_shared()?;
+
+// Drop 时自动释放
+impl Drop for NtxFile {
+    fn drop(&mut self) {
+        if let Err(e) = self.file.unlock() {
+            eprintln!("[NTX] 释放文件锁失败: {}", e);
+        }
+    }
+}
+```
+
+### 4.4 版本兼容性
+
+```rust
+// 打开时检查版本
+if header.version < 0x0100 || header.version > 0x0101 {
+    return Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("NTX 版本不兼容: 期望 0x0100-0x0101, 实际 0x{:04X}", header.version),
+    ));
+}
+```
+
 ## 4. 持久化向量索引
 
 ### 4.1 构建流程
@@ -299,18 +354,19 @@ import_from_ntx():
 |------|------|-------|---------|
 | `zstd` | 帧压缩 | ✅ 已有 | - |
 | `crc32fast` | 帧校验 | ✅ 已有 | - |
-| `sha2` | 段校验 | ❌ | 引入 |
-| `memmap2` | mmap 加载 | ❌ | 引入 |
+| `sha2` | 段校验 | ✅ 已有 | - |
+| `memmap2` | mmap 加载 | ✅ 已有 | - |
 | `instant-distance` | HNSW | ✅ 已有 | - |
-| `bincode` | 二进制序列化 | ❌ | 引入 |
+| `bincode` | 二进制序列化 | ✅ 已有 | - |
 | `tempfile` | 临时文件 | ✅ 已有 | - |
+| `fs2` | 文件锁 | ✅ 已有 | - |
 
 ## 8. 文件结构
 
 ```
 neotrix-core/src/l1_action/nt_memory/nt_memory_kb/
 ├── ntx/
-│   ├── mod.rs              # NTX 公共 API
+│   ├── mod.rs              # NTX 公共 API + 并发控制
 │   ├── format.rs           # NTX 格式定义 (Header, TOC, Segment)
 │   ├── wal.rs              # 嵌入式 WAL 实现
 │   ├── frames.rs           # Knowledge Frame 读写

@@ -641,7 +641,7 @@ impl GatewayV2 {
                 .iter()
                 .filter_map(|name| {
                     states.get(name).and_then(|s| {
-                        if s.circuit_breaker.state() == BreakerState::Open {
+                        if matches!(s.circuit_breaker.state(), BreakerState::Open { .. }) {
                             let saved = s.circuit_breaker.half_open_max_probes();
                             Some((name.clone(), saved))
                         } else {
@@ -1018,7 +1018,7 @@ impl GatewayV2 {
                 .iter()
                 .filter_map(|name| {
                     states.get(name).and_then(|s| {
-                        if s.circuit_breaker.state() == BreakerState::Open {
+                        if matches!(s.circuit_breaker.state(), BreakerState::Open { .. }) {
                             let saved = s.circuit_breaker.half_open_max_probes();
                             Some((name.clone(), saved))
                         } else {

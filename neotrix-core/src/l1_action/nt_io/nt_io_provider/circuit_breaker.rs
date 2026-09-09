@@ -1,92 +1,68 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
+use neotrix_types::shared::CircuitBreaker as CanonicalCircuitBreaker;
 pub use neotrix_types::shared::BreakerState;
 
+/// Provider circuit breaker — wraps canonical `CircuitBreaker` with
+/// sliding-window failure tracking, force-open, and health-penalty scoring.
 #[derive(Debug, Clone)]
-pub struct CircuitBreaker {
-    state: BreakerState,
-    failure_count: u64,
-    failure_threshold: u64,
-    cooldown: Duration,
-    last_state_change: Option<Instant>,
-    half_open_probes_used: u64,
-    half_open_max_probes: u64,
+pub struct ProviderBreaker {
+    inner: CanonicalCircuitBreaker,
     sliding_window: VecDeque<bool>,
     window_size: usize,
 }
 
-impl CircuitBreaker {
+/// Backward-compatible alias.
+pub type CircuitBreaker = ProviderBreaker;
+
+impl ProviderBreaker {
     pub fn new(failure_threshold: u64, cooldown_secs: u64, window_size: usize) -> Self {
         Self {
-            state: BreakerState::Closed,
-            failure_count: 0,
-            failure_threshold,
-            cooldown: Duration::from_secs(cooldown_secs),
-            last_state_change: None,
-            half_open_probes_used: 0,
-            half_open_max_probes: 3,
+            inner: CanonicalCircuitBreaker::new(failure_threshold, cooldown_secs),
             sliding_window: VecDeque::with_capacity(window_size),
             window_size,
         }
     }
 
     pub fn state(&self) -> BreakerState {
-        self.state
-    }
-
-    pub fn set_half_open_max_probes(&mut self, n: u64) {
-        self.half_open_max_probes = n;
-    }
-
-    pub fn half_open_max_probes(&self) -> u64 {
-        self.half_open_max_probes
-    }
-
-    pub fn health_penalty(&self) -> f64 {
-        match self.state {
-            BreakerState::Closed => 1.0,
-            BreakerState::HalfOpen => 0.5,
-            BreakerState::Open => 0.0,
-        }
+        self.inner.state()
     }
 
     pub fn is_available(&self) -> bool {
-        match self.state {
-            BreakerState::Closed => true,
-            BreakerState::HalfOpen => self.half_open_probes_used < self.half_open_max_probes,
-            BreakerState::Open => {
-                if let Some(t) = self.last_state_change {
-                    t.elapsed() >= self.cooldown
-                } else {
-                    false
-                }
-            }
+        self.inner.is_available()
+    }
+
+    pub fn set_half_open_max_probes(&mut self, n: u64) {
+        self.inner.half_open_max_probes = n;
+    }
+
+    pub fn half_open_max_probes(&self) -> u64 {
+        self.inner.half_open_max_probes
+    }
+
+    pub fn health_penalty(&self) -> f64 {
+        match self.inner.state {
+            BreakerState::Closed => 1.0,
+            BreakerState::HalfOpen => 0.5,
+            BreakerState::Open { .. } => 0.0,
         }
     }
 
-    /// 强制 Open — 配额耗尽等非瞬时错误直接熔断, 不依赖连续失败计数。
-    /// 冷却期沿用默认 cooldown, 期间 select_best 会跳过该 provider。
     pub fn force_open(&mut self) {
-        self.state = BreakerState::Open;
-        self.last_state_change = Some(Instant::now());
-        self.half_open_probes_used = 0;
+        self.inner.force_open();
     }
 
-    /// 强制 Open 并自定义冷却时长 (秒) — 用于维护窗等非瞬时错误 (如 empero
-    /// "switching to new models"): 让 selector 在冷却期内跳过该 provider,
-    /// 透明 failover 到备用源, 无需手动等其恢复。
     pub fn force_open_secs(&mut self, cooldown_secs: u64) {
-        self.state = BreakerState::Open;
-        self.cooldown = Duration::from_secs(cooldown_secs);
-        self.last_state_change = Some(Instant::now());
-        self.half_open_probes_used = 0;
+        self.inner.state = BreakerState::Open { since: None };
+        self.inner.cooldown = Duration::from_secs(cooldown_secs);
+        self.inner.last_state_change = Some(Instant::now());
+        self.inner.half_open_probes_used = 0;
     }
 
-    /// 熔断冷却是否已过 (配额恢复探测窗口)
     pub fn cooldown_elapsed(&self) -> bool {
-        match self.last_state_change {
-            Some(t) => t.elapsed() >= self.cooldown,
+        match self.inner.last_state_change {
+            Some(t) => t.elapsed() >= self.inner.cooldown,
             None => true,
         }
     }
@@ -96,26 +72,7 @@ impl CircuitBreaker {
         if self.sliding_window.len() > self.window_size {
             self.sliding_window.pop_front();
         }
-
-        match self.state {
-            BreakerState::HalfOpen => {
-                self.half_open_probes_used += 1;
-                if self.half_open_probes_used >= self.half_open_max_probes {
-                    self.state = BreakerState::Closed;
-                    self.failure_count = 0;
-                    self.half_open_probes_used = 0;
-                    self.last_state_change = Some(Instant::now());
-                }
-            }
-            BreakerState::Open => {
-                self.state = BreakerState::HalfOpen;
-                self.half_open_probes_used = 1;
-                self.last_state_change = Some(Instant::now());
-            }
-            BreakerState::Closed => {
-                self.failure_count = self.failure_count.saturating_sub(1);
-            }
-        }
+        self.inner.on_success();
     }
 
     pub fn on_failure(&mut self) {
@@ -124,24 +81,12 @@ impl CircuitBreaker {
             self.sliding_window.pop_front();
         }
 
-        self.failure_count += 1;
-
-        match self.state {
-            BreakerState::Closed => {
-                let recent_failures = self.sliding_window.iter().filter(|&&s| !s).count();
-                if recent_failures >= self.failure_threshold as usize
-                    || self.failure_count >= self.failure_threshold
-                {
-                    self.state = BreakerState::Open;
-                    self.last_state_change = Some(Instant::now());
-                }
-            }
-            BreakerState::HalfOpen => {
-                self.state = BreakerState::Open;
-                self.last_state_change = Some(Instant::now());
-                self.half_open_probes_used = 0;
-            }
-            BreakerState::Open => {}
+        let recent_failures = self.sliding_window.iter().filter(|&&s| !s).count();
+        if recent_failures >= self.inner.failure_threshold as usize {
+            self.inner.state = BreakerState::Open { since: None };
+            self.inner.last_state_change = Some(Instant::now());
+        } else {
+            self.inner.on_failure();
         }
     }
 
@@ -155,17 +100,17 @@ impl CircuitBreaker {
     }
 
     pub fn cooldown_reset(&mut self) {
-        if self.state == BreakerState::Open {
-            let elapsed = self.last_state_change.map(|t| t.elapsed()).unwrap_or_default();
-            if elapsed >= self.cooldown {
-                self.state = BreakerState::HalfOpen;
-                self.last_state_change = Some(Instant::now());
+        if self.inner.state == BreakerState::Open { .. } {
+            let elapsed = self.inner.last_state_change.map(|t| t.elapsed()).unwrap_or_default();
+            if elapsed >= self.inner.cooldown {
+                self.inner.state = BreakerState::HalfOpen;
+                self.inner.last_state_change = Some(Instant::now());
             }
         }
     }
 }
 
-impl Default for CircuitBreaker {
+impl Default for ProviderBreaker {
     fn default() -> Self {
         Self::new(5, 60, 20)
     }

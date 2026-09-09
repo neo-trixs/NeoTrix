@@ -173,7 +173,7 @@ mod tests {
             for i in 0..10 {
                 let mut node_id = [0u8; 36];
                 node_id[0] = i;
-                seg.insert(node_id, vec![i as f32; 3], 0);
+                seg.insert(node_id, vec![i as f32; 3]);
             }
             ntx.put_vec_segment(seg);
             ntx.commit().unwrap();
@@ -210,7 +210,7 @@ mod tests {
         let bridge = NtxSearchBridge::open(&path).unwrap();
         assert!(bridge.has_graph());
 
-        let start = [0u8; 36]; start[0] = 1; // 注意: 实际是 src[0]=1
+        let mut start = [0u8; 36]; start[0] = 1; // 注意: 实际是 src[0]=1
         let mut start_id = [0u8; 36]; start_id[0] = 1;
         let results = bridge.graph_search(&start_id, 2);
         assert!(!results.is_empty());
