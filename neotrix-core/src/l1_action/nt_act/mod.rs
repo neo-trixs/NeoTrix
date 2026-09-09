@@ -28,11 +28,6 @@ pub mod nt_act_voice;
 // Standalone modules
 // ============================================================================
 
-pub mod nt_act_3d_dev;
-pub mod nt_act_3d_render;
-
-pub mod nt_act_seo;
-
 // Backward-compat re-exports for moved modules
 pub use actions::{action_cache as nt_act_action_cache, disk_guard as nt_act_disk_guard, media as nt_act_media, sandbox as nt_act_sandbox, security as nt_act_security};
 

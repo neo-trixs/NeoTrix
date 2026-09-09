@@ -98,11 +98,11 @@ impl WalEntry {
             CompressionType::None => Ok(self.payload.clone()),
             CompressionType::Zstd => {
                 zstd::decode_all(&self.payload[..])
-                    .map_err(|_| FrameError::DecompressionFailed)
+                    .map_err(|_| FrameError::DecompressFailed)
             }
             CompressionType::LZ4 => {
                 lz4_flex::decompress_size_prepended(&self.payload)
-                    .map_err(|_| FrameError::DecompressionFailed)
+                    .map_err(|_| FrameError::DecompressFailed)
             }
         }
     }

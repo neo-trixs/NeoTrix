@@ -352,8 +352,8 @@ fn main() {
         }
     };
 
-    neotrix::neotrix::nt_io_logging::init_tracing();
-    let _sentry_guard = neotrix::neotrix::nt_shield_sentry::init_sentry();
+    neotrix::nt_io_logging::init_tracing();
+    let _sentry_guard = neotrix::nt_shield_sentry::init_sentry();
 
     // --quiet: 必须在 NeoTrixConfig::load() 之前设置环境变量,
     // 否则 load() 的 "[config] loaded" 诊断已在 quiet 之前输出。
@@ -431,7 +431,7 @@ fn main() {
             }
             if cli.standalone {
                 // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络
-                use neotrix::neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
+                use neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
                 let mut engine = StandaloneEngine::new(cli.stage.min(18));
                 let response = engine.reason(&resolved);
                 if *json {
@@ -477,7 +477,7 @@ fn main() {
             let resolved = resolve_prompt(prompt.as_deref(), file.as_deref(), *pipe);
             if cli.standalone {
                 // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络 (无 LLM 环境可用)
-                use neotrix::neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
+                use neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
                 let mut engine = StandaloneEngine::new(cli.stage.min(18));
                 println!("{}", engine.reason(&resolved));
             } else {
