@@ -1,5 +1,8 @@
 //! L1 Action Layer - Action Modules
 
+// Actions subdirectory
+pub mod actions;
+
 // Orchestration and planning
 pub mod nt_act_orchestrator;
 
@@ -27,8 +30,6 @@ pub mod nt_act_voice;
 
 pub mod nt_act_action_cache;
 
-pub mod nt_act_workflow;
-pub mod nt_act_ai_assistant;
 pub mod nt_act_3d_dev;
 pub mod nt_act_3d_render;
 
@@ -42,38 +43,16 @@ pub mod nt_act_seo;
 
 pub mod nt_act_security;
 
-// 批量生产工作流
-pub mod production_pipeline;
-
 // 通用能力模块 (从漫剧专用重构为通用)
 pub mod resource_budget;      // 资源预算管理 (原 cost_manager)
 pub mod temporal_continuity;  // 时序连续性检查 (原 shot_continuity)
 pub mod parallel_task;        // 并行任务管理 (原 task_scheduler)
-pub mod production_orchestrator; // 生产编排器 (原 batch_production)
-
-// 视频规格系统 (类型化规格)
-pub mod video_spec;
-
-// 检查点持久化
-pub mod checkpoint_persistence;
-
-// 运行手册系统
-pub mod operator_runbook;
-
-// 视频拼接器
-pub mod video_stitcher;
-
-// 音频编排器
-pub mod audio_orchestrator;
-
-// 发布网关
-pub mod publish_gateway;
 
 // 向后兼容别名
 pub use resource_budget::CostManager;
 pub use temporal_continuity::ShotContinuityChecker;
 pub use parallel_task::TaskScheduler;
-pub use production_orchestrator::BatchProductionManager;
+pub use actions::production_orchestrator::BatchProductionManager;
 
 // 成本控制
 pub mod cost_manager;
@@ -90,11 +69,11 @@ pub mod task_scheduler;
 
 pub use actions::{error_classifier, observability_stack, cost_tracker, gpu_scheduler, model_router, multi_region_scheduler};
 
-// 提供商迁移路由器 (厂商抽象 + 迁移路径)
-pub mod provider_migration_router;
+// ============================================================================
+// Video pipeline modules (moved to actions/)
+// ============================================================================
 
-// 视频对象存储 (持久存储 + 生命周期管理)
-pub mod video_object_storage;
+pub use actions::{video_job_pipeline, video_object_storage, video_spec, video_stitcher, audio_orchestrator};
 
 // 管线检查点 (中间结果存储 + 恢复)
 pub mod pipeline_checkpointing;
