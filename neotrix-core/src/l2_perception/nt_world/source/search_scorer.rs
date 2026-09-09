@@ -1,4 +1,4 @@
-use crate::unified::layers::perception::nt_world::nt_world_media_source::types::*;
+use crate::l2_perception::nt_world::source::types::*;
 
 pub fn score_result(item: &MediaItem, query: &str) -> f64 {
     let title_score = fuzzy_match(&item.title, query);

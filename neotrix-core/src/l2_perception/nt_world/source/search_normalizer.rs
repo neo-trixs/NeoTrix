@@ -1,4 +1,4 @@
-use crate::unified::layers::perception::nt_world::nt_world_media_source::types::*;
+use crate::l2_perception::nt_world::source::types::*;
 
 /// 搜索结果标准化器
 pub struct SearchNormalizer;

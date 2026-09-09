@@ -71,6 +71,8 @@ pub struct NtxFile {
     dirty: bool,
     read_only: bool,
     wal_lock: Mutex<()>,  // WAL 操作锁
+    write_buffer: Vec<KnowledgeFrame>,  // 写缓冲区
+    flush_threshold: usize,  // 刷新阈值 (默认 1000)
 }
 
 impl NtxFile {
@@ -111,6 +113,8 @@ impl NtxFile {
             dirty: false,
             read_only: false,
             wal_lock: Mutex::new(()),
+            write_buffer: Vec::new(),
+            flush_threshold: 1000,
         })
     }
 
@@ -145,6 +149,8 @@ impl NtxFile {
             dirty: false,
             read_only: false,
             wal_lock: Mutex::new(()),
+            write_buffer: Vec::new(),
+            flush_threshold: 1000,
         })
     }
 
@@ -179,6 +185,8 @@ impl NtxFile {
             dirty: false,
             read_only: true,
             wal_lock: Mutex::new(()),
+            write_buffer: Vec::new(),
+            flush_threshold: 1000,
         };
 
         // 只读时也加载帧并构建索引
@@ -191,8 +199,7 @@ impl NtxFile {
 
     // ── 帧操作 ──────────────────────────────────────
 
-    /// 写入知识帧 (只读检查)
-    /// 写入知识帧 (只读检查 + WAL 锁)
+    /// 写入知识帧 (只读检查 + WAL 锁 + 写缓冲)
     pub fn put_frame(&mut self, frame: &KnowledgeFrame) -> std::io::Result<()> {
         if self.read_only {
             return Err(std::io::Error::new(
@@ -200,41 +207,32 @@ impl NtxFile {
                 "NTX file opened read-only",
             ));
         }
+
+        // 添加到写缓冲区
+        self.write_buffer.push(frame.clone());
+
+        // 如果缓冲区达到阈值, 刷新到 WAL
+        if self.write_buffer.len() >= self.flush_threshold {
+            self.flush_write_buffer()?;
+        }
+
+        Ok(())
+    }
+
+    /// 刷新写缓冲区到 WAL
+    fn flush_write_buffer(&mut self) -> std::io::Result<()> {
+        if self.write_buffer.is_empty() {
+            return Ok(());
+        }
+
         // WAL 锁: 保护顺序写入
         {
             let _wal_guard = self.wal_lock.lock().map_err(|e| {
                 std::io::Error::new(std::io::ErrorKind::Other, format!("WAL 锁获取失败: {}", e))
             })?;
-            self.wal.append(&mut self.file, frame)?;
-            let idx = self.frames.len();
-            self.frames.push(frame.clone());
-            self.frame_index.insert(frame.frame_id, idx);
-            self.header.frame_count += 1;
-            self.dirty = true;
-        }
 
-        if self.wal.needs_checkpoint() {
-            self.checkpoint()?;
-        }
-        Ok(())
-    }
-
-    /// 批量写入 (优化: 合并 WAL 写入)
-    pub fn put_frames(&mut self, frames: &[KnowledgeFrame]) -> std::io::Result<()> {
-        if self.read_only {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "NTX file opened read-only",
-            ));
-        }
-        // WAL 锁: 批量写入
-        {
-            let _wal_guard = self.wal_lock.lock().map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, format!("WAL 锁获取失败: {}", e))
-            })?;
-
-            // 批量写入 WAL (减少系统调用)
-            for frame in frames {
+            // 批量写入 WAL
+            for frame in &self.write_buffer {
                 self.wal.append(&mut self.file, frame)?;
                 let idx = self.frames.len();
                 self.frames.push(frame.clone());
@@ -244,9 +242,33 @@ impl NtxFile {
             self.dirty = true;
         }
 
+        // 清空缓冲区
+        self.write_buffer.clear();
+
         if self.wal.needs_checkpoint() {
             self.checkpoint()?;
         }
+
+        Ok(())
+    }
+
+    /// 批量写入 (优化: 合并 WAL 写入 + 写缓冲)
+    pub fn put_frames(&mut self, frames: &[KnowledgeFrame]) -> std::io::Result<()> {
+        if self.read_only {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "NTX file opened read-only",
+            ));
+        }
+
+        // 添加到写缓冲区
+        self.write_buffer.extend_from_slice(frames);
+
+        // 如果缓冲区达到阈值, 刷新到 WAL
+        if self.write_buffer.len() >= self.flush_threshold {
+            self.flush_write_buffer()?;
+        }
+
         Ok(())
     }
 
@@ -309,9 +331,9 @@ impl NtxFile {
 
     // ── 提交 ──────────────────────────────────────
 
-    /// 提交: 检查点 + 写段 + 刷盘
+    /// 提交: 刷新缓冲区 + 检查点 + 写段 + 刷盘
     pub fn commit(&mut self) -> std::io::Result<()> {
-        if !self.dirty {
+        if !self.dirty && self.write_buffer.is_empty() {
             return Ok(());
         }
         if self.read_only {
@@ -320,6 +342,9 @@ impl NtxFile {
                 "NTX file opened read-only",
             ));
         }
+
+        // 刷新写缓冲区
+        self.flush_write_buffer()?;
 
         // 检查点: WAL → frames
         self.checkpoint()?;
