@@ -1,5 +1,6 @@
 use crate::unified::layers::perception::nt_world::nt_world_media_source::types::*;
 use crate::unified::layers::perception::nt_world::nt_world_media_source::engine::MediaSource;
+use crate::unified::layers::perception::nt_world::nt_world_media_source::core::crypto;
 
 pub struct KugouSource;
 
@@ -40,7 +41,11 @@ impl MediaSource for KugouSource {
                 Quality::High => 320,
                 _ => 128,
             };
-            let url = format!("https://trackercdn.kugou.com/i/v2/?cmd=25&hash={}&pid=1&behavior=play", id);
+            let params = format!(
+                r#"{{"appid":1005,"platid":4,"encode_album_audio_id":"{}","token":""}}"#,
+                id
+            );
+            let url = crypto::kugou_eapi_encrypt("https://trackercdn.kugou.com/i/v2/", &params);
             Ok(ViewSource { url, quality, format: "mp3".into(), bitrate: br, size: 0, source: "kugou".into() })
         })
     }

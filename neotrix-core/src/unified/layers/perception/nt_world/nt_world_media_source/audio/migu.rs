@@ -1,5 +1,6 @@
 use crate::unified::layers::perception::nt_world::nt_world_media_source::types::*;
 use crate::unified::layers::perception::nt_world::nt_world_media_source::engine::MediaSource;
+use crate::unified::layers::perception::nt_world::nt_world_media_source::core::crypto;
 
 pub struct MiguSource;
 
@@ -35,12 +36,22 @@ impl MediaSource for MiguSource {
     fn play_url(&self, item: &MediaItem, quality: Quality) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ViewSource, String>> + Send>> {
         let id = item.id.clone();
         Box::pin(async move {
+            let tone_flag = match quality {
+                Quality::Flac => "ZQ",
+                Quality::High => "HQ",
+                _ => "PQ",
+            };
             let br = match quality {
                 Quality::Flac => 2000,
                 Quality::High => 320,
                 _ => 128,
             };
-            let url = format!("https://app.c.nf.migu.cn/MIGUM2.0/v1.0/content/sub/listenSong?toneFlag={}&songId={}", "HQ", id);
+            let params = format!("songId={}", id);
+            let _sign = crypto::migu_sign(&params);
+            let url = format!(
+                "https://app.c.nf.migu.cn/MIGUM2.0/v1.0/content/sub/listenSong?toneFlag={}&songId={}&resourceType=E&songType=0",
+                tone_flag, id
+            );
             Ok(ViewSource { url, quality, format: "mp3".into(), bitrate: br, size: 0, source: "migu".into() })
         })
     }
