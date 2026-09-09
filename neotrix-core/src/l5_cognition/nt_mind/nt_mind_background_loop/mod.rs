@@ -10,7 +10,7 @@ use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
-use crate::l5_cognition::nt_mind::nt_mind_cleanup::CleanupEngine;
+use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngine;
 use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
 use crate::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
 use crate::l5_cognition::nt_mind::evolution::evolution_daemon::{EvolutionDaemon, EvolutionConfig};
@@ -117,8 +117,8 @@ pub bbrain: Option<BMonitor>,
     pub gwt: Option<GlobalWorkspace>,
     /// KB 守卫 (WAL 备份 + 自动恢复) + 工作区守卫 + 文件编辑安全。
     /// Rust 化自 scripts/kb-guard.sh + workspace-guard.sh + file-edit-safety.sh。
-    pub kb_guard: crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard,
-    pub workspace_guard: crate::l5_cognition::nt_mind::nt_mind_guard::WorkspaceGuard,
+    pub kb_guard: crate::l5_cognition::nt_mind::foundation::guardian::KbGuard,
+    pub workspace_guard: crate::l5_cognition::nt_mind::foundation::guardian::WorkspaceGuard,
 }
 
 impl BackgroundLoop {
@@ -182,8 +182,8 @@ impl BackgroundLoop {
             second_brain: Some(SecondBrain::new()),
             kb: None,
             gwt: Some(shared_gwt),
-            kb_guard: crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard::default(),
-            workspace_guard: crate::l5_cognition::nt_mind::nt_mind_guard::WorkspaceGuard::default_for(
+            kb_guard: crate::l5_cognition::nt_mind::foundation::guardian::KbGuard::default(),
+            workspace_guard: crate::l5_cognition::nt_mind::foundation::guardian::WorkspaceGuard::default_for(
                 std::env::current_dir().unwrap_or_default(),
             ),
         }

@@ -158,7 +158,7 @@ impl IceAgent {
     }
 
     /// 开始连通性检查
-    pub fn start_checking(&mut self, stun_client: &mut crate::connectivity::stun::StunClient) -> Vec<ConnectivityCheck> {
+    pub fn start_checking(&mut self, stun_client: &mut super::stun::StunClient) -> Vec<ConnectivityCheck> {
         self.state = IceState::Checking;
         let mut checks = Vec::new();
 
@@ -188,7 +188,7 @@ impl IceAgent {
         &self,
         local: &IceCandidate,
         remote: &RemoteCandidate,
-        stun_client: &mut crate::connectivity::stun::StunClient,
+        stun_client: &mut super::stun::StunClient,
     ) -> Option<ConnectivityCheck> {
         let binding_request = stun_client.poll_request()?;
 
@@ -206,19 +206,32 @@ impl IceAgent {
         &mut self,
         remote_addr: SocketAddr,
         response: &[u8],
-        stun_client: &mut crate::connectivity::stun::StunClient,
+        stun_client: &mut super::stun::StunClient,
     ) -> bool {
-        if let Some(mapped_addr) = stun_client.handle_response(response) {
+        if stun_client.handle_response(response).is_some() {
             // 更新对应peer的状态
+            let mut found = false;
             for peer in &mut self.peers {
                 if peer.remote.address == remote_addr {
                     peer.state = CheckState::Succeeded;
-                    peer.score = self.calculate_priority(&peer.local, &peer.remote);
-
-                    // 更新最佳对端
-                    self.update_best_peer();
-                    return true;
+                    found = true;
+                    break;
                 }
+            }
+
+            if found {
+                // 更新所有peer的分数
+                for i in 0..self.peers.len() {
+                    if self.peers[i].state == CheckState::Succeeded {
+                        let local = self.peers[i].local.clone();
+                        let remote = self.peers[i].remote.clone();
+                        self.peers[i].score = self.calculate_priority(&local, &remote);
+                    }
+                }
+
+                // 更新最佳对端
+                self.update_best_peer();
+                return true;
             }
         }
         false

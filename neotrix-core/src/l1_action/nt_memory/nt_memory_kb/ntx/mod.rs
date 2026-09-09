@@ -20,6 +20,8 @@ pub mod ntx_integration;
 pub mod benchmark;
 #[cfg(test)]
 mod integration_test;
+#[cfg(test)]
+mod benchmark_compression;
 
 /// Trait for NTX segment types that can be serialized via `write_to`.
 pub trait NtxWritable {
@@ -201,6 +203,7 @@ impl NtxFile {
 
         // 只读时也加载帧并构建索引
         ntx.frames = Self::load_frames_segment(&mut ntx.file, &ntx.toc)?;
+        ntx.vec_segment = Self::load_vec_segment(&mut ntx.file, &ntx.toc)?;
         for (i, frame) in ntx.frames.iter().enumerate() {
             ntx.frame_index.insert(frame.frame_id, i);
         }

@@ -4,7 +4,7 @@ use crate::l3_embodiment::nt_shield::nt_shield::browser_security::BrowserSecurit
 use crate::l3_embodiment::nt_shield::nt_shield::browser_security::BrowserSecurityConfig;
 use crate::l3_embodiment::nt_shield::nt_shield::check_registry::CheckRegistry;
 use crate::l5_cognition::nt_mind::nt_mind::evolution::dispatch_self_test::DispatchControlPlaneSelfTest;
-use crate::l5_cognition::nt_mind::nt_mind_cleanup::CleanupEngineSelfTest;
+use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest;
 use crate::l1_action::nt_act::nt_act_code::recipe_refactor;
 
 

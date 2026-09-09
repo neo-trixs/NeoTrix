@@ -84,7 +84,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     ));
     // 新增: MemoryAdmissionGate (A-MAC-inspired 5维记忆入口控制)
     registry.register(Box::new(
-        crate::l5_cognition::nt_mind::nt_mind_memory::MemoryAdmissionGate::new(0.5, 100),
+        crate::l5_cognition::nt_mind::foundation::memory_bank::MemoryAdmissionGate::new(0.5, 100),
     ));
     // 2026-08-16 T2 补齐: 小规模方法评估 (sweep absorption 声明 Phase B 但未注册)
     registry.register(Box::new(

@@ -75,7 +75,7 @@ impl StunMessage {
         // Attributes
         let mut attr_len = 0u16;
         for attr in &self.attributes {
-            let (attr_type, attr_data) = match attr {
+            let (attr_type, attr_data): (u16, Vec<u8>) = match attr {
                 StunAttribute::MappedAddress(addr) => {
                     (0x0001, encode_address(addr))
                 }
@@ -92,9 +92,10 @@ impl StunMessage {
             };
 
             buf.put_u16(attr_type);
-            buf.put_u16(attr_data.len() as u16);
+            let len = attr_data.len() as u16;
+            buf.put_u16(len);
             buf.put_slice(&attr_data);
-            attr_len += 4 + attr_data.len() as u16;
+            attr_len += 4 + len;
 
             // Padding to 4 bytes
             let padding = (4 - (attr_data.len() % 4)) % 4;

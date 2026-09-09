@@ -6,7 +6,7 @@
 //!   - 每个诊断项 → ActionPlan 执行策略
 
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
-use crate::neotrix::evolution::evolution_daemon::IssueType;
+use crate::l5_cognition::nt_mind::evolution::evolution_daemon::IssueType;
 use crate::l5_cognition::nt_mind::evolution::evolution_loop::{
     Issue, ProjectSnapshot,
     EXCESS_UNWRAP_THRESHOLD,

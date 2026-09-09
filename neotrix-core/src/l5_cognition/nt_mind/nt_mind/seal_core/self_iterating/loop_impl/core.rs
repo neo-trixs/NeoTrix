@@ -32,7 +32,7 @@ use crate::core::nt_core_consciousness::{
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_act_autonomy::knowledge_distiller::KnowledgeDistiller;
-use crate::l5_cognition::nt_mind::nt_mind_memory::{MemoryOrchestrator, MemoryTier};
+use crate::l5_cognition::nt_mind::foundation::memory_bank::{MemoryOrchestrator, MemoryTier};
 use crate::l5_cognition::nt_mind::nt_mind::element::registry::ElementRegistry;
 use crate::l5_cognition::nt_mind::nt_mind::element::{capability_element::CapabilityElement, memory_element::MemoryElement, skill_element::SkillElement};
 use std::sync::{Arc, Mutex};

@@ -142,7 +142,7 @@ fn bootstrap(plist: &Path) -> Result<(), String> {
 
 /// 子命令: guard — 手动运行一次 KB 守卫 (备份+健康检查)
 fn cmd_guard() {
-    use crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard;
+    use crate::l5_cognition::nt_mind::foundation::guardian::KbGuard;
     let guard = KbGuard::default();
     let report = guard.guard();
     if report.healthy {
@@ -156,7 +156,7 @@ fn cmd_guard() {
 
 /// 子命令: backup — 手动执行一次 KB 快照备份 (并发写入下带重试)
 fn cmd_backup() {
-    use crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard;
+    use crate::l5_cognition::nt_mind::foundation::guardian::KbGuard;
     let guard = KbGuard::default();
     let mut last_err = String::new();
     for attempt in 0..3 {
@@ -178,7 +178,7 @@ fn cmd_backup() {
 
 /// 子命令: status — KB 健康 + 备份 + daemon 状态总览
 fn cmd_status() {
-    use crate::l5_cognition::nt_mind::nt_mind_guard::db_healthy_fast;
+    use crate::l5_cognition::nt_mind::foundation::guardian::db_healthy_fast;
     let kb = home_dir().join(".neotrix/knowledge.db");
     // 用 fast 健康检查 (schema 校验, 毫秒级); db_healthy 的 PRAGMA integrity_check
     // 对大型库 (28 万边) 全表校验耗时数秒~数十秒, 不适合 status 查询路径。
@@ -345,7 +345,7 @@ fn cmd_daemons(sub: &str) {
 
 /// 子命令: uninstall — 安全卸载 (先备份 KB, 再删 ~/.neotrix)
 fn cmd_uninstall(force: bool) {
-    use crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard;
+    use crate::l5_cognition::nt_mind::foundation::guardian::KbGuard;
     let guard = KbGuard::default();
 
     println!("{} 卸载前先备份 KB...", info("→"));

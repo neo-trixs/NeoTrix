@@ -206,8 +206,8 @@ impl SessionStore {
     }
 
     /// 触发会话蒸馏: 从 `~/.neotrix/session-logs/` 提取行为模式并产出报告
-    pub fn distill(&mut self) -> Result<crate::l5_cognition::nt_mind::nt_mind_distiller::DistillationReport, String> {
-        let mut d = crate::l5_cognition::nt_mind::nt_mind_distiller::SessionDistiller::with_paths(
+    pub fn distill(&mut self) -> Result<crate::l5_cognition::nt_mind::foundation::distiller::DistillationReport, String> {
+        let mut d = crate::l5_cognition::nt_mind::foundation::distiller::SessionDistiller::with_paths(
             self.logs_dir(),
             self.base.join("AGENTS-distilled.md"),
         );

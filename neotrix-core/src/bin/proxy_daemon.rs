@@ -3,14 +3,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::RwLock;
-use neotrix::neotrix::nt_shield_stealth_net::local_proxy::{LocalProxy, TorManager};
-use neotrix::neotrix::nt_shield_stealth_net::proxy_pool::global_pool;
-use neotrix::neotrix::nt_shield_stealth_net::rules::RuleEngine;
-use neotrix::neotrix::nt_shield_stealth_net::geo_proxy::RuleUpdater;
-use neotrix::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler;
-use neotrix::neotrix::nt_shield_stealth_net::self_iterating::FingerprintManager;
-use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyControl, DaemonMode};
-use neotrix::neotrix::nt_shield_traffic::api_proxy::{ApiProxy, ApiProxyConfig};
+use neotrix::nt_shield_stealth_net::local_proxy::{LocalProxy, TorManager};
+use neotrix::nt_shield_stealth_net::proxy_pool::global_pool;
+use neotrix::nt_shield_stealth_net::rules::RuleEngine;
+use neotrix::nt_shield_stealth_net::geo_proxy::RuleUpdater;
+use neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler;
+use neotrix::nt_shield_stealth_net::self_iterating::FingerprintManager;
+use neotrix::nt_shield_stealth_net::proxy_control::{ProxyControl, DaemonMode};
+use neotrix::nt_shield_traffic::api_proxy::{ApiProxy, ApiProxyConfig};
 use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 
 #[tokio::main]
@@ -113,7 +113,7 @@ async fn main() {
         std::process::exit(0);
     });
 
-    let mut net_monitor = neotrix::neotrix::nt_shield_stealth_net::NetworkMonitor::default();
+    let mut net_monitor = neotrix::nt_shield_stealth_net::NetworkMonitor::default();
 
     while running.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_secs(15)).await;

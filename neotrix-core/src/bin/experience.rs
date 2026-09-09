@@ -44,11 +44,11 @@ use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use neotrix::neotrix::nt_memory_kb::nt_field_ledger;
-use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
-use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::l5_cognition::nt_mind::nt_mind_guard::{MapeGate, MapeGateConfig, MetricEval};
+use neotrix::nt_memory_kb::nt_field_ledger;
+use neotrix::nt_memory_kb::nt_memory_schema;
+use neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
+use neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::nt_mind::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::core::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };
@@ -2964,7 +2964,7 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
 // 但只吃单条高信号 (importance ≥ 0.6) 而非聚类模式 — 保证高信号发现当天生效。
 // ────────────────────────────────────────────────────────────────
 fn immediate_promote_entries(entries: &[Value]) -> usize {
-    use neotrix::neotrix::nt_capability_bridge::{
+    use neotrix::nt_capability_bridge::{
         ExperienceDimension, ExperienceEntry, ExperienceRouter, promote_to_file,
     };
     let mut dims: Vec<ExperienceDimension> = Vec::new();
@@ -3031,7 +3031,7 @@ fn immediate_promote_entries(entries: &[Value]) -> usize {
 /// 接入点: 蒸馏模式 (domain, pattern, src_keys) → ExperienceRouter.route_experience
 ///   → 能力标签路由 → EvolutionPlan (Strengthen 已有节点 / Bud 新节点建议)
 fn distill_promote_to_capability(distilled: &[(String, String, Vec<String>)]) -> Vec<String> {
-    use neotrix::neotrix::nt_capability_bridge::{
+    use neotrix::nt_capability_bridge::{
         ExperienceDimension, ExperienceEntry, ExperienceRouter, promote_to_file,
     };
     let mut promoted = Vec::new();

@@ -6,6 +6,7 @@ mod tests {
     use super::super::wal::{CompressionType, EmbeddedWal};
     use super::super::frames::{KnowledgeFrame, FrameType, Encoding};
     use super::super::format::NtxHeader;
+    use super::super::vec_segment::{VecSegment, HnswParams};
     use tempfile::tempdir;
     use std::fs::File;
     use std::io::{Seek, Write};
@@ -131,5 +132,70 @@ mod tests {
         
         let entries = wal.recover(&mut file).unwrap();
         assert_eq!(entries.len(), 1);
+    }
+
+    #[test]
+    fn test_vec_segment_mmap() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("test.vec");
+        
+        // 创建测试数据
+        let mut seg = VecSegment::new(4, HnswParams::default());
+        for i in 0..100 {
+            let mut node_id = [0u8; 36];
+            node_id[0] = i;
+            let vec = vec![i as f32, (i+1) as f32, (i+2) as f32, (i+3) as f32];
+            seg.insert(node_id, vec);
+        }
+        
+        // 写入文件
+        let mut file = File::create(&path).unwrap();
+        seg.write_to(&mut file).unwrap();
+        drop(file);
+        
+        // 加载 (使用 from_file)
+        let loaded = VecSegment::from_file(&path).unwrap();
+        assert_eq!(loaded.len(), 100);
+        assert_eq!(loaded.dimension(), 4);
+        
+        // 验证数据正确性
+        for i in 0..100 {
+            let mut node_id = [0u8; 36];
+            node_id[0] = i;
+            assert!(loaded.find_by_id(&node_id).is_some());
+        }
+    }
+
+    #[test]
+    fn test_vec_segment_search_after_mmap_load() {
+        let tmp = tempdir().unwrap();
+        let path = tmp.path().join("test.vec");
+        
+        // 创建测试数据
+        let mut seg = VecSegment::new(3, HnswParams::default());
+        let ids: Vec<[u8; 36]> = (0..100)
+            .map(|i| {
+                let mut n = [0u8; 36];
+                n[0] = i as u8;
+                n
+            })
+            .collect();
+        
+        for (i, id) in ids.iter().enumerate() {
+            seg.insert(*id, vec![i as f32, (i + 1) as f32, (i + 2) as f32]);
+        }
+        
+        // 写入文件
+        let mut file = File::create(&path).unwrap();
+        seg.write_to(&mut file).unwrap();
+        drop(file);
+        
+        // 加载并搜索
+        let loaded = VecSegment::from_file(&path).unwrap();
+        let results = loaded.search(&[0.0, 0.0, 0.0], 5);
+        
+        assert_eq!(results.len(), 5);
+        // 验证结果包含预期的节点
+        assert!(results.iter().any(|r| r.node_id == ids[0]));
     }
 }

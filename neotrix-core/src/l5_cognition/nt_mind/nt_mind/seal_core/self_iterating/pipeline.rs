@@ -55,7 +55,7 @@ use super::secret_scanner::SecretScanner;
 use super::sft_stage::SupervisedExample;
 use crate::core::nt_core_self_review::SelfReviewGate;
 use crate::make_stage;
-use crate::l5_cognition::nt_mind::nt_mind_memory::MemoryTier;
+use crate::l5_cognition::nt_mind::foundation::memory_bank::MemoryTier;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::{PerformanceEvaluator, ExecutionFeedback};
 use crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate;
 use crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate;
@@ -2901,7 +2901,7 @@ impl BrainStage for CacheCleanupStage {
         50
     }
     fn process(&self, _brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::l5_cognition::nt_mind::nt_mind_cleanup::{CleanupEngine, CleanupKind};
+        use crate::l5_cognition::nt_mind::foundation::cleanup_engine::{CleanupEngine, CleanupKind};
         let mut engine = CleanupEngine::new().with_project_root(std::path::PathBuf::from("."));
         engine.dry_run_default = false;
         engine.archive_on_clean = true;
@@ -3112,7 +3112,7 @@ impl BrainStage for SelfTestStage {
             crate::core::nt_core_second_brain::SecondBrain::new(),
         ));
         registry.register(Box::new(
-            crate::l5_cognition::nt_mind::nt_mind_cleanup::CleanupEngineSelfTest,
+            crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest,
         ));
         registry.register(Box::new(
             crate::neotrix::nt_file_ability::FileAbilitySelfTest,

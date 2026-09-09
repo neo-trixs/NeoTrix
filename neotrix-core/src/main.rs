@@ -431,7 +431,7 @@ fn main() {
             }
             if cli.standalone {
                 // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络
-                use neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
+                use neotrix::nt_io_standalone::StandaloneEngine;
                 let mut engine = StandaloneEngine::new(cli.stage.min(18));
                 let response = engine.reason(&resolved);
                 if *json {
@@ -477,7 +477,7 @@ fn main() {
             let resolved = resolve_prompt(prompt.as_deref(), file.as_deref(), *pipe);
             if cli.standalone {
                 // standalone: 纯 ReasoningKernel 推理, 不依赖外部 LLM/网络 (无 LLM 环境可用)
-                use neotrix::l1_body_impl::nt_io_standalone::StandaloneEngine;
+                use neotrix::nt_io_standalone::StandaloneEngine;
                 let mut engine = StandaloneEngine::new(cli.stage.min(18));
                 println!("{}", engine.reason(&resolved));
             } else {

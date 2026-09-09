@@ -233,7 +233,7 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
 }
 
 use crate::core::nt_core_self_constitution::ConstitutionLoader;
-use crate::l5_cognition::nt_mind::nt_mind_cleanup::{CleanupEngine, CleanupKind, BackupEngine};
+use crate::l5_cognition::nt_mind::foundation::cleanup_engine::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
 use crate::l5_cognition::nt_mind::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
@@ -695,8 +695,8 @@ impl BackgroundLoop {
             meta_auditor: crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor::new(),
             // 门控注册表 — 默认只读工具, 运行时可扩展。
             gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
-            kb_guard: crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard::default(),
-            workspace_guard: crate::l5_cognition::nt_mind::nt_mind_guard::WorkspaceGuard::default_for(
+            kb_guard: crate::l5_cognition::nt_mind::foundation::guardian::KbGuard::default(),
+            workspace_guard: crate::l5_cognition::nt_mind::foundation::guardian::WorkspaceGuard::default_for(
                 std::env::current_dir().unwrap_or_default(),
             ),
             last_consumed_fruit_cycle: 0,
@@ -989,8 +989,8 @@ pub struct BackgroundLoopHandle {
     /// 门控注册表 — 背景循环工具执行前置检查用。
     gate_registry: Option<ToolRegistry>,
     /// KB 守卫 + 工作区守卫 (Rust 化自 sh 守护脚本)
-    kb_guard: crate::l5_cognition::nt_mind::nt_mind_guard::KbGuard,
-    workspace_guard: crate::l5_cognition::nt_mind::nt_mind_guard::WorkspaceGuard,
+    kb_guard: crate::l5_cognition::nt_mind::foundation::guardian::KbGuard,
+    workspace_guard: crate::l5_cognition::nt_mind::foundation::guardian::WorkspaceGuard,
     /// 已注入 SEAL 的意识树果实最大 cycle (H1 修复: 增量注入防重复消费)。
     /// 树内 fruits 从不清理, 全量克隆会让历史果实每 tick 重新注入 SEAL,
     /// 同一 trace 反复进 process buffer → 学习被重复污染。只注入比此值新的果实。
