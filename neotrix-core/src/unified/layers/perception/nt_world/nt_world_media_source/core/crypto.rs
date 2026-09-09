@@ -77,3 +77,53 @@ fn pkcs7_pad(data: &[u8], block_size: usize) -> Vec<u8> {
     padded.extend(std::iter::repeat(padding_len as u8).take(padding_len));
     padded
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pkcs7_pad() {
+        let data = b"hello";
+        let padded = pkcs7_pad(data, 16);
+        assert_eq!(padded.len(), 16);
+        assert_eq!(padded[5], 11); // 16 - 5 = 11
+    }
+
+    #[test]
+    fn test_kugou_eapi_encrypt() {
+        let url = "https://trackercdn.kugou.com/i/v2/";
+        let params = r#"{"appid":1005,"platid":4,"encode_album_audio_id":"test","token":""}"#;
+        let encrypted = kugou_eapi_encrypt(url, params);
+        assert!(encrypted.contains("eapi="));
+        assert!(encrypted.contains("verify="));
+    }
+
+    #[test]
+    fn test_netease_weapi_encrypt() {
+        let params = r#"{"s":"test","type":1,"limit":30,"offset":0}"#;
+        let encrypted = netease_weapi_encrypt(params);
+        assert!(!encrypted.is_empty());
+        // 应该是 base64 编码
+        assert!(base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &encrypted).is_ok());
+    }
+
+    #[test]
+    fn test_netease_eapi_encrypt() {
+        let url = "/api/song/enhance/player/url";
+        let params = r#"{"ids":"[12345]","br":320000}"#;
+        let encrypted = netease_eapi_encrypt(url, params);
+        assert!(!encrypted.is_empty());
+        // 应该是 hex 编码
+        assert!(hex::decode(&encrypted).is_ok());
+    }
+
+    #[test]
+    fn test_migu_sign() {
+        let params = "songId=12345";
+        let sign = migu_sign(params);
+        assert!(!sign.is_empty());
+        // 应该是 hex 编码
+        assert!(hex::decode(&sign).is_ok());
+    }
+}
