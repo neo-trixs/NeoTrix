@@ -28,7 +28,7 @@ impl MediaSource for LxScriptSource {
         page: u32,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<SearchResult, String>> + Send>>
     {
-        let q = query.to_string();
+        let _q = query.to_string();
         Box::pin(async move {
             Ok(SearchResult {
                 data: vec![],

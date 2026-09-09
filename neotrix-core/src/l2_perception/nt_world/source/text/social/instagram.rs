@@ -25,11 +25,11 @@ impl MediaSource for InstagramSource {
             let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
             let users = json["users"].as_array().ok_or("No results")?;
             let data: Vec<MediaItem> = users.iter().enumerate().skip(((page - 1) * 20) as usize).take(20).filter_map(|(i, u)| {
-                let user = u["user"]?;
-                let pk = user["pk"].as_i64()?.to_string();
-                let username = user["username"].as_str()?.to_string();
-                let full_name = user["full_name"].as_str().unwrap_or(&username).to_string();
-                let avatar = user["profile_pic_url"].as_str().map(String::from);
+                let user = u.get("user")?;
+                let pk = user.get("pk")?.as_i64()?.to_string();
+                let username = user.get("username")?.as_str()?.to_string();
+                let full_name = user.get("full_name").and_then(|v| v.as_str()).unwrap_or(&username).to_string();
+                let avatar = user.get("profile_pic_url").and_then(|v| v.as_str()).map(String::from);
                 Some(MediaItem {
                     id: pk,
                     title: full_name,

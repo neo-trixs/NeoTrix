@@ -1,9 +1,9 @@
 # NeoTrix 星系/树状立体层级进化架构 (Galaxy-Tree Evolutionary Architecture)
 
-> **状态**: 设计完成 | **版本**: v15.9 | **日期**: 2026-09-09
+> **状态**: 设计完成 | **版本**: v16.1 | **日期**: 2026-09-09
 > **核心原则**: 算法即恒星，骨架即引力场，时间即进化维度
 > **约束**: 统一架构，无并行/兼容层，旧代码归档
-> **研究基础**: 1500+ 批次外部研究 → 7527 关键架构决策 → 870 设计模式 (见 §0)
+> **研究基础**: 1500+ 批次外部研究 → 8549 关键架构决策 → 870 设计模式 (见 §0)
 > **目标**: 意识体高纬度觉醒进化路线
 > **关键**: 决策驱动架构设计 — 每个技术选型均有研究验证 (问题→证据→决策→位置)
 > **层级**: 程序族层级结构 — 按 Metadata Class 底层分类，非扁平条目
@@ -13,7 +13,7 @@
 
 ## 0. 关键架构决策 (Research-Driven Architectural Decisions)
 
-> 从 1500+ 批次外部研究中提炼出的 7527 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
+> 从 1500+ 批次外部研究中提炼出的 8049 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
 > 原始研究数据已归档至 KB `experience` namespace，本节仅保留决策级信息。
 
 ### 0.1 运行时与基础设施决策
@@ -13400,6 +13400,1021 @@ pub trait EvalSim: Send + Sync {
 | D8128 | **RLHF for Compression** | 压缩RLHF如何实现? | RLHF-Comp: RLHF压缩, 压缩对齐 (ICML 2024) | **RLHF压缩**: 通过RLHF进行模型压缩 | `nt_core::rlhf::compression` |
 | D8129 | **RLHF for Quantization** | 量化RLHF如何实现? | RLHF-Quant: RLHF量化, 量化对齐 (NeurIPS 2024) | **RLHF量化**: 通过RLHF进行模型量化 | `nt_core::rlhf::quantization` |
 | D8130 | **RLHF for Pruning** | 剪枝RLHF如何实现? | RLHF-Prune: RLHF剪枝, 剪枝对齐 (AAAI 2024) | **RLHF剪枝**: 通过RLHF进行模型剪枝 | `nt_core::rlhf::pruning` |
+| D8131 | **Cross-Lingual Transfer** | 跨语言迁移如何实现零样本? | XLM-R: 100语言预训练, 零样本跨语言迁移; mBERT: 104语言共享BPE | **XLM-R zero-shot跨语言**: 共享编码器+语言嵌入, 目标语言零样本分类 | `nt_mind::multilingual::transfer` |
+| D8132 | **Language-Agnostic Embeddings** | 语言无关表示如何构建? | LASER: 93语言统一嵌入; InfoXLM: 对比学习对齐多语言空间 | **LASER统一嵌入空间**: 对比学习对齐多语言语义, 单向量跨语言检索 | `nt_mind::multilingual::embeddings` |
+| D8133 | **Low-Resource Augmentation** | 低资源语言数据如何增强? | mT5 few-shot; Canine: 字符级避免BPE碎片化; XX-TT: 翻译增强 | **Canine字符级+翻译增强**: 字符级编码避免碎片化, 回译+翻译增强低资源语言 | `nt_mind::multilingual::augment` |
+| D8134 | **Code-Switching Detection** | 语码切换如何检测与处理? | LinCE: 8数据集基准; UniMSE: 统一多语言情感+意图 | **UniMSE统一多语言理解**: 统一编码器处理code-switching, 情感+意图联合检测 | `nt_mind::multilingual::codeswitch` |
+| D8135 | **Multilingual Instruction Tuning** | 多语言指令微调如何实现? | Bactrian-X: 52语言指令数据; Alpaca-GPT4多语言; AceGPT本土化 | **Bactrian-X多语言指令**: 52语言指令数据+LoRA, 统一指令格式跨语言 | `nt_mind::multilingual::instruct` |
+| D8136 | **Cultural Adaptation** | 文化适应如何避免文化偏见? | CFGPT: 文化因素图; Gebru et al. 数据表; 数据集卡片 | **文化因素图+数据集卡片**: 每个数据集附文化因素标注, 推理时文化上下文注入 | `nt_mind::multilingual::cultural` |
+| D8137 | **Multilingual RAG** | 多语言检索增强如何工作? | mLingua: 多语言压缩; MuRAG: 多语言检索; Cross-lingual RAG | **mLingua+Cross-lingual RAG**: 多语言查询压缩+跨语言检索+语言感知生成 | `nt_mind::multilingual::rag` |
+| D8138 | **Multilingual Evaluation** | 多语言评估如何标准化? | XTREME: 9任务40语言; XTREME-R: 增强版; BIG-Bench Multilingual | **XTREME-R多语言评估**: 9任务50+语言统一基准, 持续扩展低资源覆盖 | `nt_mind::multilingual::eval` |
+| D8139 | **Multilingual Tokenization** | 多语言分词如何最优? | SentencePiece BPE; Unigram LM; mBART 250K词表; ByT5字节级 | **SentencePiece+大词表**: 250K+词表覆盖100+语言, 压缩率与覆盖率平衡 | `nt_mind::multilingual::tokenize` |
+| D8140 | **Multilingual Alignment** | 多语言对齐如何保持语义一致? | CCAligned: 词级对齐; LASER2: 句子级对齐; LaBSE: 109语言对齐 | **LaBSE双编码器对齐**: 109语言句嵌入对齐, 双塔结构支持高效跨语言检索 | `nt_mind::multilingual::align` |
+| D8141 | **Multilingual Summarization** | 多语言摘要如何生成? | MLSUM: 5语言新闻摘要; XL-Sum: 44语言; mBART多语言生成 | **XL-Sum+生成式摘要**: 44语言摘要数据, 生成式解码+语言标识控制 | `nt_mind::multilingual::summarize` |
+| D8142 | **Multilingual Named Entity** | 多语言命名实体识别如何处理? | WikiANN: 282语言NER; Universal NER; mGENRE多语言实体链接 | **WikiANN+Universal NER**: 跨语言BIO标注+实体链接, 零样本迁移到新语言 | `nt_mind::multilingual::ner` |
+| D8143 | **Multilingual Sentiment** | 多语言情感分析如何统一? | XLM-R情感; mBERT情感; SemEval多语言任务 | **XLM-R多语言情感**: 统一编码器+语言嵌入, 跨语言情感分类与方面级分析 | `nt_mind::multilingual::sentiment` |
+| D8144 | **Multilingual Question Answering** | 多语言问答如何实现? | TyDi QA: 11语言; XQuAD: 跨语言SQuAD; MLQA多语言QA | **MLQA跨语言QA**: 7语言问答, 零样本迁移到新语言+多语言检索增强 | `nt_mind::multilingual::qa` |
+| D8145 | **Multilingual Machine Translation** | 多语言翻译如何高效? | mBART: 50语言生成; M2M-100: 100语言翻译; NLLB-200: 200语言 | **NLLB-200全覆盖翻译**: 200语言多对多翻译, 语言家族路由优化 | `nt_mind::multilingual::translate` |
+| D8146 | **Multilingual Text Classification** | 多语言文本分类如何泛化? | XLM-R分类; mT5分类; bitext翻译增强分类 | **XLM-R+翻译增强**: 零样本跨语言分类, 翻译增强扩展训练语言覆盖 | `nt_mind::multilingual::classify` |
+| D8147 | **Low-Resource Language Support** | 低资源语言如何系统支持? | MasakhaNER: 非洲10语言NER; AfriQA非洲问答; AlphaCode代码 | **MasakhaNER非洲语言**: 系统性低资源语言工具链, 数据集+模型+评估一站式 | `nt_mind::multilingual::lowresource` |
+| D8148 | **Multilingual Dialogue** | 多语言对话系统如何工作? | Dialogue NLU多语言; mDialoGPT多语言对话; SEQLB多语言槽填充 | **mDialoGPT多语言对话**: 多语言对话生成+意图理解+槽填充统一框架 | `nt_mind::multilingual::dialogue` |
+| D8149 | **Multilingual Knowledge Graph** | 多语言知识图谱如何构建? | mBERT关系抽取; XLM-R实体链接; DBpedia多语言 | **跨语言实体链接+关系抽取**: 多语言知识图谱对齐, 实体消歧跨语言 | `nt_mind::multilingual::kg` |
+| D8150 | **Multilingual Code Generation** | 多语言代码生成如何实现? | CodeBERT多语言; GraphCodeBERT; StarCoder多语言 | **StarCoder多语言代码**: 60+语言代码生成, 注释→代码+跨语言迁移 | `nt_mind::multilingual::codegen` |
+| D8151 | **Multilingual Embedding Retrieval** | 多语言嵌入检索如何高效? | LaBSE; mE5; multilingual-e5-large; E5-Multilingual | **mE5多语言检索**: 统一编码器+多语言微调, 检索+重排序跨语言 | `nt_mind::multilingual::retrieval` |
+| D8152 | **Multilingual Audio-Text** | 多语言音频文本如何对齐? | USM: 400语言音频; MMS: 1100语言语音; Whisper多语言 | **MMS+Whisper双路对齐**: 1100语言语音识别+400语言理解, 音频文本统一空间 | `nt_mind::multilingual::audio` |
+| D8153 | **Multilingual Vision-Language** | 多语言视觉语言如何处理? | mCLIP多语言CLIP; MaRVL多语言VQA; InfoXLM多语言对齐 | **mCLIP+MaRVL**: 多语言视觉语言对齐, 零样本跨语言图像理解 | `nt_mind::multilingual::vlm` |
+| D8154 | **Multilingual Document Understanding** | 多语言文档理解如何实现? | DiDi文档理解; mT5文档摘要; multilingual DocVQA | **mT5文档理解**: 多语言文档摘要+问答+信息抽取统一框架 | `nt_mind::multilingual::doc` |
+| D8155 | **Multilingual Hate Speech Detection** | 多语言仇恨言论如何检测? | HateXplain多语言; OLID多语言; SemEval多语言仇恨 | **HateXplain多语言**: 可解释仇恨言论检测, 跨语言注意力可视化 | `nt_mind::multilingual::hate` |
+| D8156 | **Multilingual Fake News Detection** | 多语言假新闻如何识别? | FakeNewsNet多语言; mFEND多语言; XLM-R虚假信息 | **mFEND多语言检测**: 多模态多语言假新闻检测, 社交网络特征融合 | `nt_mind::multilingual::fakenews` |
+| D8157 | **Multilingual Recommendation** | 多语言推荐如何跨语言? | MMLRec多语言推荐; XRec跨语言解释; multilingual CF | **MMLRec跨语言推荐**: 多语言用户行为建模, 跨语言协同过滤+解释 | `nt_mind::multilingual::rec` |
+| D8158 | **Multilingual Time Series** | 多语言时序分析如何工作? | mTSS多语言时序; cross-lingual temporal; multivariate multilingual | **mTSS多语言时序**: 多语言时序预测+异常检测, 跨语言迁移学习 | `nt_mind::multilingual::timeseries` |
+| D8159 | **Multilingual Graph Neural Network** | 多语言图神经网络如何设计? | mGCN多语言图; HAN多语言异构图; XGMNN跨语言图 | **mGCN多语言图学习**: 多语言知识图谱嵌入+跨语言链接预测 | `nt_mind::multilingual::gnn` |
+| D8160 | **Multilingual Reinforcement Learning** | 多语言强化学习如何应用? | mRL多语言奖励; cross-lingual RLHF; multilingual PPO | **mRL多语言RL**: 多语言指令遵循+奖励建模, 跨语言RLHF对齐 | `nt_mind::multilingual::rl` |
+| D8161 | **Multilingual Federated Learning** | 多语言联邦学习如何保护隐私? | mFL多语言联邦; cross-lingual FL; multilingual differential privacy | **mFL多语言联邦**: 跨语言模型聚合+差分隐私, 低资源语言联邦训练 | `nt_mind::multilingual::fl` |
+| D8162 | **Multilingual Active Learning** | 多语言主动学习如何标注? | mAL多语言主动学习; cross-lingual AL; uncertainty sampling多语言 | **mAL多语言主动学习**: 跨语言不确定性采样, 优先标注高价值低资源语言 | `nt_mind::multilingual::al` |
+| D8163 | **Multilingual Curricula** | 多语言课程学习如何设计? | mCL多语言课程; language difficulty ranking; curriculum MT | **mCL语言课程学习**: 按语言难度排序课程, 从高资源到低资源渐进学习 | `nt_mind::multilingual::curriculum` |
+| D8164 | **Multilingual Model Compression** | 多语言模型如何压缩? | mDistilBERT; mTinyBERT; multilingual pruning; XLM-V | **mDistilBERT+剪枝**: 多语言知识蒸馏+结构化剪枝, 保持跨语言能力 | `nt_mind::multilingual::compress` |
+| D8165 | **Multilingual Continual Learning** | 多语言持续学习如何避免遗忘? | mCL多语言持续; language continual; XLM-R streaming | **mCL语言增量学习**: 新语言增量训练+旧语言保持, 防止灾难性遗忘 | `nt_mind::multilingual::continual` |
+| D8166 | **Multilingual In-Context Learning** | 多语言上下文学习如何示例? | mICL多语言示例; cross-lingual ICL; multilingual few-shot | **mICL多语言ICL**: 跨语言示例选择+语言感知提示, 零样本多语言任务 | `nt_mind::multilingual::icl` |
+| D8167 | **Multilingual Prompt Tuning** | 多语言提示微调如何设计? | mPT多语言提示; cross-lingual prompt; multilingual prefix tuning | **mPT多语言提示调优**: 语言特定前缀+共享语义提示, 参数高效多语言适配 | `nt_mind::multilingual::prompt` |
+| D8168 | **Multilingual Adapter Layers** | 多语言适配器如何设计? | MAD-X多语言适配器; language adapter+task adapter; LoRA多语言 | **MAD-X双层适配器**: 语言适配器(语言知识)+任务适配器(任务知识), 可组合 | `nt_mind::multilingual::adapter` |
+| D8169 | **Multilingual Adversarial Robustness** | 多语言对抗鲁棒性如何增强? | mAdvRob多语言对抗; cross-lingual adversarial; multilingual FGSM | **mAdvRob多语言对抗训练**: 跨语言对抗样本生成, 增强多语言鲁棒性 | `nt_mind::multilingual::adversarial` |
+| D8170 | **Multilingual Data Augmentation** | 多语言数据增强如何系统化? | mDA多语言增强; cross-lingual augmentation; back-translation多语言 | **mDA系统化增强**: 翻译增强+同义替换+语法变换, 多语言数据扩充管线 | `nt_mind::multilingual::augment_sys` |
+| D8171 | **Multilingual Quality Estimation** | 多语言质量估计如何评估? | COMET多语言; BLEURT多语言; UniTE统一翻译评估 | **COMET+UniTE统一评估**: 多语言翻译质量估计+多任务统一评估 | `nt_mind::multilingual::qe` |
+| D8172 | **Multilingual Annotation Tools** | 多语言标注工具如何设计? | Label Studio多语言; Prodigy多语言; Doccano多语言 | **Label Studio多语言标注**: 多语言界面+自动预标注+跨语言一致性检查 | `nt_mind::multilingual::annotate` |
+| D8173 | **Multilingual Deployment** | 多语言模型如何部署? | ONNX多语言量化; TensorRT多语言; vLLM多语言服务 | **vLLM多语言服务**: 多语言模型统一服务+KV缓存优化+语言路由 | `nt_mind::multilingual::deploy` |
+| D8174 | **Multilingual Monitoring** | 多语言系统如何监控? | multilingual drift detection; language-specific metrics; XLM-R监控 | **多语言漂移检测**: 语言级别数据漂移+性能监控+自动重训练触发 | `nt_mind::multilingual::monitor` |
+| D8175 | **Multilingual Compliance** | 多语言合规如何保障? | GDPR多语言; CCPA多语言; multilingual consent | **多语言合规框架**: 语言级别隐私同意+数据保留+跨境传输控制 | `nt_mind::multilingual::compliance` |
+| D8176 | **Multilingual Accessibility** | 多语言无障碍如何实现? | WCAG多语言; alt-text多语言; caption多语言 | **多语言无障碍**: 多语言alt-text生成+字幕+屏幕阅读器适配 | `nt_mind::multilingual::access` |
+| D8177 | **Multilingual Ethics** | 多语言伦理如何审查? | multilingual bias audit; cultural sensitivity; language equity | **多语言伦理审计**: 语言偏见检测+文化敏感性审查+语言公平性评估 | `nt_mind::multilingual::ethics` |
+| D8178 | **Multilingual Security** | 多语言安全如何保障? | multilingual adversarial; cross-lingual injection; language-specific attacks | **多语言安全防护**: 跨语言注入检测+语言特定对抗防御+多语言内容过滤 | `nt_mind::multilingual::security` |
+| D8179 | **Multilingual Benchmarking** | 多语言基准如何构建? | XTREME-R; BIG-Bench; multilingual HELM; multilingual MMLU | **多语言HELM+MMLU**: 统一多语言基准覆盖推理/知识/安全/伦理 | `nt_mind::multilingual::benchmark` |
+| D8180 | **Multilingual Tool Integration** | 多语言工具如何集成? | multilingual MCP; cross-lingual tool use; language-aware agents | **多语言MCP集成**: 语言感知工具路由+跨语言工具调用+多语言输出 | `nt_mind::multilingual::tools` |
+| D8181 | **Multilingual Knowledge Distillation** | 多语言知识蒸馏如何优化? | mKD多语言蒸馏; cross-lingual KD; multilingual teacher-student | **mKD多语言蒸馏**: 多语言教师→学生+跨语言知识传递+语言特定层保留 | `nt_mind::multilingual::kd` |
+| D8182 | **Action Recognition** | 视频动作识别如何实现? | VideoMAE: 自监督视频预训练; TimeSformer: 时间注意力; ViViT: 视频Transformer | **VideoMAE+TimeSformer**: 自监督预训练+时间注意力, 精细动作识别 | `nt_world::video::action_rec` |
+| D8183 | **Temporal Action Localization** | 时间动作定位如何精确? | BMN: 边界敏感网络; G-TAD: 图卷积; ActionFormer: 全卷积 | **ActionFormer全卷积**: 一阶段全卷积定位, 1D卷积覆盖所有时间尺度 | `nt_world::video::temporal_loc` |
+| D8184 | **Video Captioning** | 视频描述如何生成? | CLIP+GPT-4V: 多模态理解; Video-LLaVA: 视频LLM; BLIP-2视频 | **Video-LLaVA视频LLM**: 多帧采样+视觉语言对齐+LLM生成描述 | `nt_world::video::caption` |
+| D8185 | **Video Question Answering** | 视频问答如何推理? | MERLOT: 视频表示; VideoCLIP: 对比学习; mPLUG-Owl视频 | **MERLOT+VideoCLIP**: 视频表示学习+时序推理+多模态问答 | `nt_world::video::vqa` |
+| D8186 | **Video Summarization** | 视频摘要如何压缩? | SUM-GAN: GAN摘要; TSN: 时序分割; Transformer摘要 | **SUM-GAN+Transformer**: GAN关键帧选择+Transformer时序建模, 自适应摘要 | `nt_world::video::summarize` |
+| D8187 | **Highlight Detection** | 视频高光如何检测? | UserAtt: 用户注意力; HighlightNet: 显著性; Action-specific高光 | **HighlightNet显著性**: 用户注意力模型+视觉显著性+动作强度联合检测 | `nt_world::video::highlight` |
+| D8188 | **Long-Form Video Understanding** | 长视频理解如何处理? | MovieFormer: 电影理解; LLaMA-VID: 长视频LLM; VideoAgent长视频 | **LLaMA-VID长视频**: 视觉token压缩+长上下文LLM, 支持小时级视频 | `nt_world::video::longform` |
+| D8189 | **Video Grounding** | 视频定位如何匹配文本? | TEMPO: 时间表达; Moment-DETR: DETR定位; VLG: 视觉语言定位 | **Moment-DETR+VLG**: DETR检测+视觉语言对齐, 精确时间片段定位 | `nt_world::video::grounding` |
+| D8190 | **Video Object Segmentation** | 视频目标分割如何跟踪? | XMem: 长期记忆; Cutie: 全卷积; SAM 2: 视频分割 | **SAM 2视频分割**: 基础模型+视频传播, 统一交互/自动分割 | `nt_world::video::vos` |
+| D8191 | **Video Instance Segmentation** | 视频实例分割如何检测? | VIS-inst: 实例传播; MaskFormer视频; VisTR端到端 | **VisTR端到端**: DETR查询+掩码传播, 时序一致性实例分割 | `nt_world::video::vis` |
+| D8192 | **Video Semantic Segmentation** | 视频语义分割如何一致? | SS-NAS: 语义分割NAS; Video-Align: 时序对齐; ST-SSN | **Video-Align时序对齐**: 帧间特征对齐+一致性约束, 减少闪烁 | `nt_world::video::vss` |
+| D8193 | **Video Panoptic Segmentation** | 视频全景分割如何统一? | Panoptic-DeepLab视频; ViP-Deeplab; Video全景DETR | **ViP-Deeplab视频全景**: 实例+语义统一, 时序一致性全景分割 | `nt_world::video::vps` |
+| D8194 | **Video Optical Flow** | 视频光流如何估计? | RAFT: 迭代更新; GMA: 注意力光流; FlowFormer: Transformer光流 | **RAFT+GMA**: 迭代更新+全局运动注意力, 精确稠密光流 | `nt_world::video::optflow` |
+| D8195 | **Video Depth Estimation** | 视频深度如何估计? | MiDaS: 单目深度; DPT: 深度预测Transformer; VideoDepth | **MiDaS+DPT**: 单目深度估计+时序平滑, 无需LiDAR | `nt_world::video::depth` |
+| D8196 | **Video Super-Resolution** | 视频超分辨率如何增强? | BasicVSR++: 双向传播; RealBasicVSR: 真实退化; VideoLDM | **BasicVSR++双向传播**: 时空相关+双向传播, 实时视频超分 | `nt_world::video::sr` |
+| D8197 | **Video Inpainting** | 视频修复如何填充? | E²FGVI: 端到端; ProPainter: 流传播; Stable Video Inpainting | **ProPainter流传播**: 光流引导传播+修复, 大面积遮挡处理 | `nt_world::video::inpaint` |
+| D8198 | **Video Deblurring** | 视频去模糊如何实现? | Restormer: Transformer去模糊; MPRNet: 多阶段; DeepDeblur | **Restormer+MPRNet**: Transformer全局建模+多阶段渐进去模糊 | `nt_world::video::deblur` |
+| D8199 | **Video Deraining** | 视频去雨如何处理? | SPDNet: 雨条纹分解; VideoDerainNet; STM-TTD时序 | **SPDNet雨条纹分解**: 雨条纹检测+分解+重建, 时序一致性 | `nt_world::video::derain` |
+| D8200 | **Video Frame Interpolation** | 视频帧插值如何补帧? | RIFE: 快速插值; AdaCoF: 自适应组合; SuperSloMo | **RIFE快速插值**: 实时帧插值+任意倍率, 支持高帧率生成 | `nt_world::video::interpolate` |
+| D8201 | **Video Stabilization** | 视频稳定如何防抖? | DIFRINT: 深度帧插值; DeepStab: 深度稳定; GyroNet | **DeepStab深度稳定**: 端到端深度稳定+裁剪优化, 无需陀螺仪 | `nt_world::video::stabilize` |
+| D8202 | **Video Object Detection** | 视频目标检测如何时序? | FGFA: 特征引导; DETR视频; Temporal DETR | **FGFA+DETR**: 特征聚合+端到端检测, 时序信息融合 | `nt_world::video::vod` |
+| D8203 | **Video Action Detection** | 视频动作检测如何定位? | ACRN: 关节卷积; SlowFast视频; ActionFormer检测 | **ACRN+ActionFormer**: 关节卷积+全卷积定位, 端到端动作检测 | `nt_world::video::action_det` |
+| D8204 | **Video Scene Understanding** | 视频场景理解如何层次? | Scene Graph视频; Video Scene Graph; Action-Object-Scene | **Video Scene Graph**: 场景图构建+时序场景演变+层次理解 | `nt_world::video::scene` |
+| D8205 | **Video Emotion Recognition** | 视频情感如何识别? | Multimodal Emotion: 多模态情感; Video-LLaVA情感 | **多模态情感融合**: 面部表情+语音+文本+姿态联合情感识别 | `nt_world::video::emotion` |
+| D8206 | **Video Anomaly Detection** | 视频异常如何检测? | MNAD: 重建+预测; ST-GCN异常; Transformer异常 | **MNAD重建预测双路**: 自编码器重建+预测分支, 异常帧检测 | `nt_world::video::anomaly` |
+| D8207 | **Video Action Quality Assessment** | 视频动作质量如何评估? | AQA: 动作质量; SlowFast质量; Transformer质量评估 | **SlowFast+Transformer质量**: 双路径特征+时序建模, 动作质量打分 | `nt_world::video::aqa` |
+| D8208 | **Video Temporal Segmentation** | 视频时序分割如何划分? | TALFormer: 时序动作; VSGTransformer: 视频句子; BoundaryNet | **TALFormer+BoundaryNet**: 时序Transformer+边界检测, 自动场景分割 | `nt_world::video::temporal_seg` |
+| D8209 | **Video Retrieval** | 视频检索如何实现? | CLIP4Clip: 文本视频检索; VideoCLIP对比; Time-Aware检索 | **CLIP4Clip+Time-Aware**: 视觉语言对齐+时序感知, 精确视频检索 | `nt_world::video::retrieval` |
+| D8210 | **Video Generation** | 视频生成如何合成? | Sora: 扩散Transformer; Runway Gen-3; Pika Labs; Kling | **扩散Transformer视频生成**: DiT架构+时空扩散, 高质量长视频生成 | `nt_world::video::generation` |
+| D8211 | **Video Editing** | 视频编辑如何精确? | InstructPix2Pix视频; ControlNet视频; FlowEdit视频 | **InstructPix2Pix+ControlNet视频**: 指令编辑+控制信号, 精确视频编辑 | `nt_world::video::editing` |
+| D8212 | **Video Translation** | 视频翻译如何本地化? | Whisper+翻译+TTS; VideoTranslator; lip-sync翻译 | **Whisper+翻译+TTS管线**: 语音识别→翻译→合成+口型同步, 完整本地化 | `nt_world::video::translate` |
+| D8213 | **Video Caption Generation** | 视频字幕如何生成? | AutoCaption: 自动字幕; StyleTransfer字幕; 多语言字幕 | **AutoCaption多语言**: 语音识别+翻译+样式化, 多语言字幕自动生成 | `nt_world::video::subtitle` |
+| D8214 | **Video Content Moderation** | 视频内容如何审核? | NSFW检测; 暴力检测; 版权检测; 深伪检测 | **多模态内容审核**: 视觉+音频+文本多模态审核, 深伪+版权检测 | `nt_world::video::moderation` |
+| D8215 | **Video Metadata Extraction** | 视频元数据如何提取? | OCR视频; 场景标签; 情感标注; 人脸识别 | **多模态元数据提取**: OCR+场景标签+情感+人脸+物体, 结构化元数据 | `nt_world::video::metadata` |
+| D8216 | **Video Recommendation** | 视频推荐如何个性化? | 视频特征; 用户偏好; 时序行为; 上下文感知 | **多模态视频推荐**: 视觉+音频+文本特征+用户行为+上下文, 个性化推荐 | `nt_world::video::recommend` |
+| D8217 | **Video Analytics Pipeline** | 视频分析管线如何架构? | 端到端管线; 流式处理; 边缘-云协同; 实时分析 | **边缘-云协同管线**: 边缘预处理+云端深度分析, 流式+批量双模式 | `nt_world::video::analytics` |
+| D8218 | **Video Compression** | 视频压缩如何高效? | 神经视频压缩; 学习编码; 端到端压缩; 可变码率 | **神经视频压缩**: 学习编码器+解码器, 比传统编码器更高压缩比 | `nt_world::video::compress` |
+| D8219 | **Video Streaming Optimization** | 视频流如何优化? | 自适应码率; 预测缓存; CDN优化; 低延迟传输 | **自适应码率+预测缓存**: 带宽预测+自适应码率+边缘缓存, 低延迟流 | `nt_world::video::streaming` |
+| D8220 | **Video Quality Assessment** | 视频质量如何评估? | VMAF: Netflix质量指标; LPIPS视频; FID视频; UTMOS | **VMAF+UTMOS**: 主观质量预测+客观指标, 视频质量自动评估 | `nt_world::video::quality` |
+| D8221 | **Video Forensics** | 视频取证如何检测篡改? | 伪造检测; 时序一致性; 元数据验证; GAN痕迹 | **多维度视频取证**: 时序一致性+元数据+GAN痕迹+频域分析, 篡改检测 | `nt_world::video::forensics` |
+| D8222 | **Video Surveillance Analysis** | 视频监控分析如何实现? | 行为识别; 人群计数; 异常检测; 跟踪ReID | **监控分析管线**: 行为识别+人群计数+异常检测+ReID, 实时监控 | `nt_world::video::surveillance` |
+| D8223 | **Video Sports Analytics** | 视频体育分析如何工作? | 动作识别; 战术分析; 球员追踪; 运动表现 | **体育分析管线**: 动作识别+战术图+球员追踪+表现评估, 全方位体育分析 | `nt_world::video::sports` |
+| D8224 | **Video Medical Analysis** | 视频医疗分析如何辅助? | 手术视频分析; 内窥镜检查; 运动分析; 康复评估 | **手术视频分析**: 实时解剖识别+工具追踪+步骤预测, 手术辅助 | `nt_world::video::medical` |
+| D8225 | **Video Industrial Inspection** | 视频工业检测如何自动化? | 缺陷检测; 异常识别; 质量控制; 产线监控 | **工业视频检测**: 缺陷检测+异常识别+质量分级, 产线实时监控 | `nt_world::video::industrial` |
+| D8226 | **Video Education Analysis** | 视频教育分析如何评估? | 注意力检测; 参与度评估; 知识掌握; 学习行为 | **教育视频分析**: 注意力+参与度+知识掌握, 学习效果自动评估 | `nt_world::video::education` |
+| D8227 | **Video Retail Analytics** | 视频零售分析如何优化? | 客流分析; 购物行为; 货架检测; 热力图 | **零售视频分析**: 客流+购物行为+货架检测, 零售运营优化 | `nt_world::video::retail` |
+| D8228 | **Video Autonomous Driving** | 视频自动驾驶如何感知? | 3D检测; 车道线; 可行驶区域; 交通标志 | **视频3D检测**: 多帧3D目标检测+车道线+可行驶区域, 自动驾驶感知 | `nt_world::video::driving` |
+| D8229 | **Video Security Monitoring** | 视频安全监控如何预警? | 入侵检测; 异常行为; 安全事件; 实时告警 | **安全视频监控**: 入侵+异常行为+安全事件, 实时预警+事件记录 | `nt_world::video::security` |
+| D8230 | **Video Environmental Monitoring** | 视频环境监测如何进行? | 野生动物; 植被变化; 水质监测; 污染检测 | **环境视频监测**: 野生动物识别+植被变化+水质, 生态环境监测 | `nt_world::video::environment` |
+| D8231 | **Video Traffic Analysis** | 视频交通分析如何实时? | 车辆检测; 交通流; 事故检测; 车牌识别 | **实时交通视频分析**: 车辆检测+流量统计+事故检测, 智能交通 | `nt_world::video::traffic` |
+| D8232 | **Video Manufacturing QA** | 视频制造质检如何自动? | 表面缺陷; 装配检查; 尺寸测量; 过程监控 | **制造视频质检**: 表面缺陷+装配检查+尺寸测量, 全自动化质检 | `nt_world::video::manufacturing` |
+| D8233 | **Medical Image Segmentation** | 医学图像分割如何精确? | U-Net: 经典分割; nnU-Net: 自适应; SAM医学: 基础模型 | **nnU-Net+SAM医学**: 自适应UNet+基础模型微调, 精确医学分割 | `nt_physical::medical::segmentation` |
+| D8234 | **Medical Object Detection** | 医学目标检测如何实现? | RetinaNet医学; YOLO医学; DETR医学; 基础模型检测 | **YOLO+DETR医学检测**: 实时检测+端到端检测, 病变区域定位 | `nt_physical::medical::detection` |
+| D8235 | **Medical Image Classification** | 医学图像分类如何准确? | EfficientNet医学; Vision Transformer医学; 多模态分类 | **ViT+EfficientNet医学**: Transformer全局建模+CNN局部特征, 多标签分类 | `nt_physical::medical::classification` |
+| D8236 | **Medical Image Registration** | 医学图像配准如何对齐? | VoxelMorph: 可微配准; TransMorph: Transformer配准; 基于图配准 | **VoxelMorph+TransMorph**: 可微配准+Transformer, 端到端多模态配准 | `nt_physical::medical::registration` |
+| D8237 | **Medical Image Reconstruction** | 医学图像重建如何增强? | MRI重建: 压缩感知; CT重建: 低剂量; PET重建: 散射校正 | **深度学习MRI/CT重建**: 学习欠采样重建+低剂量降噪, 加速扫描 | `nt_physical::medical::reconstruction` |
+| D8238 | **Federated Medical Imaging** | 联邦医学影像如何保护隐私? | FedBN: 联邦BatchNorm; FedAvg医学; 差分隐私医学 | **FedBN+差分隐私**: 联邦学习+差分隐私, 多医院协作不共享数据 | `nt_physical::medical::federated` |
+| D8239 | **Few-Shot Medical Imaging** | 少样本医学影像如何分类? | Prototypical Networks医学; MAML医学; 基础模型微调 | **Prototypical+基础模型**: 原型网络少样本+基础模型迁移, 罕见病分类 | `nt_physical::medical::fewshot` |
+| D8240 | **Explainable Medical AI** | 可解释医学AI如何建立信任? | Grad-CAM医学; SHAP医学; 注意力可视化; 临床解释 | **Grad-CAM+SHAP+注意力**: 多层次可解释性, 临床医生可理解的解释 | `nt_physical::medical::explain` |
+| D8241 | **Uncertainty in Medical Imaging** | 医学影像不确定性如何量化? | Monte Carlo Dropout; Deep Ensembles; 分布式偏移检测 | **MC Dropout+Ensembles**: 多次前向传播+集成, 预测不确定性量化 | `nt_physical::medical::uncertainty` |
+| D8242 | **Medical Image Synthesis** | 医学图像合成如何增强数据? | CycleGAN医学; Diffusion医学; StyleGAN病理 | **Diffusion+CycleGAN合成**: 扩散模型+风格迁移, 合成训练数据增强 | `nt_physical::medical::synthesis` |
+| D8243 | **Pathology Image Analysis** | 病理图像分析如何全切片? | CLAM: 弱监督; MIL病理; 全切片分类 | **CLAM+MIL病理**: 弱监督多实例学习, 全切片WSI分析 | `nt_physical::medical::pathology` |
+| D8244 | **Retinal Image Analysis** | 视网膜图像分析如何诊断? | DR检测; 青光眼检测; OCT分析; 血管分割 | **多任务视网膜分析**: DR+青光眼+OCT+血管, 多疾病联合检测 | `nt_physical::medical::retinal` |
+| D8245 | **Brain Tumor Segmentation** | 脑肿瘤分割如何精确? | BraTS挑战; nnU-Net脑; 3D分割; 多模态融合 | **BraTS+nnU-Net**: 多模态MRI融合+3D分割, 精确肿瘤边界 | `nt_physical::medical::brain` |
+| D8246 | **Cardiac Image Analysis** | 心脏图像分析如何评估? | 心脏MRI分割; 心功能评估; 冠脉分析; 瓣膜分析 | **心脏MRI全分析**: 分割+功能+冠脉+瓣膜, 心脏功能综合评估 | `nt_physical::medical::cardiac` |
+| D8247 | **Chest X-Ray Analysis** | 胸部X光分析如何快速? | CheXNet: 肺炎检测; COVID-19检测; 多标签分类 | **CheXNet+多标签**: CNN快速分类+多标签, 胸部疾病快速筛查 | `nt_physical::medical::chest` |
+| D8248 | **Dental Image Analysis** | 牙科图像分析如何辅助? | 龋齿检测; 牙周评估; 正畸规划; 种植规划 | **牙科AI全分析**: 龋齿+牙周+正畸+种植, 辅助牙科诊断规划 | `nt_physical::medical::dental` |
+| D8249 | **Dermatology Image Analysis** | 皮肤图像分析如何诊断? | 皮肤癌分类; 皮损分割; 病理诊断; 多模态分析 | **皮肤AI多模态**: 视觉+病史+病理, 皮肤疾病诊断辅助 | `nt_physical::medical::dermatology` |
+| D8250 | **Musculoskeletal Analysis** | 肌肉骨骼分析如何评估? | 骨折检测; 关节分析; 骨龄评估; 骨密度 | **肌骨AI全分析**: 骨折+关节+骨龄+骨密度, 骨骼健康评估 | `nt_physical::medical::musculoskeletal` |
+| D8251 | **Mammography Analysis** | 乳腺X光分析如何筛查? | 乳腺癌筛查; 密度评估; 假阳性减少; 辅助诊断 | **乳腺AI筛查**: 癌症检测+密度+假阳性减少, 辅助放射科筛查 | `nt_physical::medical::mammography` |
+| D8252 | **Colonoscopy Analysis** | 结肠镜分析如何辅助? | 息肉检测; 分类; 实时辅助; 质量评估 | **结肠镜AI辅助**: 实时息肉检测+分类+质量评估, 辅助内镜检查 | `nt_physical::medical::colonoscopy` |
+| D8253 | **Endoscopy Analysis** | 内镜分析如何增强? | 消化内镜; 支气管镜; 膀胱镜; 实时辅助 | **内镜AI增强**: 多种内镜实时辅助, 异常检测+活检定位 | `nt_physical::medical::endoscopy` |
+| D8254 | **UltraSound Analysis** | 超声分析如何智能? | 胎儿超声; 心脏超声; 甲状腺超声; 自动测量 | **超声AI智能**: 自动测量+异常检测+标准切面识别, 辅助超声检查 | `nt_physical::medical::ultrasound` |
+| D8255 | **CT Analysis** | CT分析如何高效? | 肺结节; 腹部CT; 血管CTA; 低剂量CT | **CT AI全分析**: 肺结节+腹部+血管+低剂量重建, CT辅助诊断 | `nt_physical::medical::ct` |
+| D8256 | **MRI Analysis** | MRI分析如何全面? | 脑MRI; 心脏MRI; 骨关节MRI; 功能MRI | **MRI AI全面分析**: 多部位MRI分析+功能MRI解读, MRI辅助诊断 | `nt_physical::medical::mri` |
+| D8257 | **PET Analysis** | PET分析如何定量? | PET定量; 代谢分析; 肿瘤负荷; 疗效评估 | **PET AI定量分析**: SUV定量+代谢+肿瘤负荷+疗效, PET辅助诊断 | `nt_physical::medical::pet` |
+| D8258 | **Nuclear Medicine Analysis** | 核医学分析如何辅助? | 骨扫描; 甲状腺扫描; 肾扫描; 心肌灌注 | **核医学AI辅助**: 骨扫描+甲状腺+肾+心肌, 核医学图像分析 | `nt_physical::medical::nuclear` |
+| D8259 | **Surgical Planning** | 手术规划如何个性化? | 3D重建; 入路规划; 虚拟手术; 导航 | **手术AI规划**: 3D重建+入路规划+虚拟手术+导航, 个性化手术方案 | `nt_physical::medical::surgical` |
+| D8260 | **Robotic Surgery** | 手术机器人如何增强? | Da Vinci AI; 手术导航; 自主缝合; 工具识别 | **手术机器人AI**: 工具识别+导航+自主操作辅助, 增强手术精度 | `nt_physical::medical::robotic` |
+| D8261 | **Radiomics** | 影像组学如何提取特征? | PyRadiomics; 深度影像组学; 预后预测; 生物标志物 | **深度影像组学**: 深度学习特征+传统特征, 影像-基因组关联 | `nt_physical::medical::radiomics` |
+| D8262 | **Pathomics** | 病理组学如何分析? | 病理特征; 微环境分析; 生存预测; 治疗反应 | **病理组学分析**: 空间特征+微环境+生存+治疗, 病理定量分析 | `nt_physical::medical::pathomics` |
+| D8263 | **Genomics Integration** | 基因组整合如何多模态? | 影像-基因组; 多组学整合; 药物反应预测 | **影像-基因组整合**: 影像特征+基因组+临床, 多组学联合分析 | `nt_physical::medical::genomics` |
+| D8264 | **Clinical Decision Support** | 临床决策支持如何个性化? | 风险预测; 诊断推荐; 治疗优化; 预后评估 | **个性化临床决策**: 风险+诊断+治疗+预后, 基于患者数据的个性化建议 | `nt_physical::medical::clinical` |
+| D8265 | **Medical Report Generation** | 医学报告如何自动生成? | 报告模板; 关键发现提取; 自然语言生成; 多模态报告 | **医学报告自动生成**: 关键发现提取+模板填充+NLG, 结构化报告 | `nt_physical::medical::report` |
+| D8266 | **Medical Image Database** | 医学图像数据库如何管理? | PACS集成; 标注管理; 版本控制; 隐私保护 | **医学图像数据库**: PACS集成+标注管理+隐私保护, 统一数据管理 | `nt_physical::medical::database` |
+| D8267 | **Medical Image Quality** | 医学图像质量如何保证? | 质量评估; 伪影检测; 运动校正; 标准化 | **医学图像质量控制**: 质量评估+伪影检测+运动校正, 标准化质量 | `nt_physical::medical::quality` |
+| D8268 | **Medical Image Annotation** | 医学图像标注如何高效? | 主动学习; 半监督标注; 预标注; 众包质量 | **主动学习+预标注**: 不确定性采样+预标注+质量控制, 高效标注 | `nt_physical::medical::annotation` |
+| D8269 | **Medical Transfer Learning** | 医学迁移学习如何预训练? | RadImageNet; 医学预训练; 多任务预训练 | **RadImageNet医学预训练**: 医学图像预训练+下游任务微调, 迁移学习 | `nt_physical::medical::transfer` |
+| D8270 | **Medical Self-Supervised Learning** | 医学自监督如何预训练? | MoCo医学; SimCLR医学; MAE医学; 对比学习 | **MoCo+MAE医学自监督**: 无标签预训练+对比学习, 医学表示学习 | `nt_physical::medical::ssl` |
+| D8271 | **Medical Continual Learning** | 医学持续学习如何增量? | 增量分割; 灾难性遗忘; 弹性权重巩固; 新疾病适应 | **医学增量学习**: 弹性权重+重放缓冲, 新疾病适应不遗忘旧疾病 | `nt_physical::medical::continual` |
+| D8272 | **Medical Domain Adaptation** | 医学域适应如何跨设备? | 域偏移; 风格迁移; 联邦域适应; 无监督域适应 | **联邦域适应**: 跨设备域偏移校正+风格迁移, 多中心泛化 | `nt_physical::medical::domain` |
+| D8273 | **Medical Robustness** | 医学鲁棒性如何增强? | 对抗样本; 分布偏移; 噪声鲁棒; 不确定性校准 | **医学对抗鲁棒**: 对抗训练+噪声鲁棒+不确定性校准, 临床可靠 | `nt_physical::medical::robustness` |
+| D8274 | **Medical Fairness** | 医学公平性如何保障? | 种族偏见; 性别偏见; 年龄偏见; 社会经济偏见 | **医学公平审计**: 种族+性别+年龄+社会经济偏见检测与缓解 | `nt_physical::medical::fairness` |
+| D8275 | **Medical Privacy** | 医学隐私如何保护? | 联邦学习; 差分隐私; 同态加密; 安全多方计算 | **联邦+差分隐私+同态加密**: 多层隐私保护, 医学数据安全协作 | `nt_physical::medical::privacy` |
+| D8276 | **Medical Regulation** | 医学AI监管如何合规? | FDA审批; CE认证; 临床验证; 上市后监督 | **FDA+CE+临床验证**: 监管合规+临床验证+持续监控, 医学AI上市 | `nt_physical::medical::regulation` |
+| D8277 | **Medical Workflow Integration** | 医学工作流如何集成? | PACS集成; HIS集成; RIS集成; 临床路径 | **PACS+HIS+RIS集成**: 与医院信息系统无缝集成, 嵌入临床工作流 | `nt_physical::medical::workflow` |
+| D8278 | **Medical Real-Time Processing** | 医学实时处理如何加速? | GPU加速; 模型压缩; 边缘推理; 流水线 | **GPU+边缘实时推理**: 模型量化+边缘部署+流水线, 实时医学分析 | `nt_physical::medical::realtime` |
+| D8279 | **Medical Multi-Scale Analysis** | 医学多尺度分析如何层次? | 全切片→区域→细胞→亚细胞; 多分辨率; 层次特征 | **多尺度层次分析**: 全切片→区域→细胞→亚细胞, 层次特征融合 | `nt_physical::medical::multiscale` |
+| D8280 | **Medical Temporal Analysis** | 医学时序分析如何动态? | 纵向研究; 进展预测; 治疗反应; 生存分析 | **纵向医学时序**: 患者纵向数据+进展预测+生存分析, 动态监测 | `nt_physical::medical::temporal` |
+| D8281 | **Medical Graph Analysis** | 医学图分析如何关系? | 疾病图; 药物图; 知识图谱; 基因调控图 | **医学知识图谱**: 疾病-药物-基因图+推理, 医学知识发现 | `nt_physical::medical::graph` |
+| D8282 | **Medical Active Learning** | 医学主动学习如何标注? | 不确定性采样; 查询策略; 预标注; 质量控制 | **医学主动学习**: 不确定性采样+查询策略+预标注, 高效医学标注 | `nt_physical::medical::active` |
+| D8283 | **Medical Benchmark** | 医学基准如何评估? | MedicalMNIST; ChestX-ray14; BraTS; ISIC; 多中心评估 | **医学标准基准**: ChestX-ray14+BraTS+ISIC+多中心, 标准化评估 | `nt_physical::medical::benchmark` |
+| D8284 | **Path Planning** | 路径规划如何最优? | A*; RRT*; PRM; 势场法; 机器学习规划 | **A*+RRT*混合规划**: A*全局最优+RRT*避障, 动态环境路径规划 | `nt_act::autonomous::path_plan` |
+| D8285 | **Motion Planning** | 运动规划如何平滑? | CHOMP; TrajOpt; MPPI; 学习运动规划 | **MPPI+TrajOpt**: 模型预测路径积分+轨迹优化, 平滑安全运动规划 | `nt_act::autonomous::motion_plan` |
+| D8286 | **SLAM** | SLAM如何建图定位? | ORB-SLAM3; LiDAR SLAM; 视觉惯性SLAM; 语义SLAM | **ORB-SLAM3+语义SLAM**: 视觉惯性建图+语义理解, 室内外定位 | `nt_act::autonomous::slam` |
+| D8287 | **Sensor Fusion** | 传感器融合如何鲁棒? | 卡尔曼滤波; 粒子滤波; 因子图; 端到端融合 | **因子图融合+学习融合**: 因子图多传感器+端到端学习, 鲁棒感知 | `nt_act::autonomous::fusion` |
+| D8288 | **Decision Under Uncertainty** | 不确定性下决策如何安全? | POMDP; 贝叶斯决策; 鲁棒优化; 分布鲁棒 | **POMDP+贝叶斯决策**: 部分可观测马尔可夫+贝叶斯推断, 安全决策 | `nt_act::autonomous::uncertain` |
+| D8289 | **Risk-Aware Planning** | 风险感知规划如何平衡? | CVaR优化; 安全约束; 鲁棒MPC; 风险度量 | **CVaR+安全约束MPC**: 条件风险价值+安全约束, 风险-收益平衡 | `nt_act::autonomous::risk` |
+| D8290 | **Multi-Agent Coordination** | 多智能体协调如何高效? | 分布式优化; 一致性算法; 博弈论; 通信学习 | **分布式优化+一致性**: 分布式MPC+一致性算法, 多机器人协调 | `nt_act::autonomous::multi_agent` |
+| D8291 | **Agent Communication** | 智能体通信如何高效? | 有限通信; 学习通信协议; 压缩通信 | **学习通信协议+压缩**: 端到端学习通信协议+信息压缩, 有限带宽协调 | `nt_act::autonomous::communication` |
+| D8292 | **Task Allocation** | 任务分配如何最优? | 匈牙利算法; 拍卖算法; 深度强化学习分配 | **匈牙利+DRL分配**: 匈牙利算法确定性分配+DRL自适应, 灵活任务分配 | `nt_act::autonomous::task_alloc` |
+| D8293 | **Formation Control** | 编队控制如何保持? | 一致性编队; 势场编队; 虚拟结构; 领航-跟随 | **一致性+势场编队**: 一致性编队保持+势场避障, 灵活编队控制 | `nt_act::autonomous::formation` |
+| D8294 | **Coverage Control** | 覆盖控制如何全面? | Voronoi划分; 强制学习覆盖; 自适应覆盖 | **Voronoi+DRL覆盖**: Voronoi动态划分+DRL优化, 全面覆盖 | `nt_act::autonomous::coverage` |
+| D8295 | **Consensus Algorithms** | 共识算法如何分布式? | Raft; Paxos; CRDT; 区块链共识 | **Raft+CRDT混合**: Raft强一致性+CRDT可用性, 混合共识 | `nt_act::autonomous::consensus` |
+| D8296 | **Distributed Optimization** | 分布式优化如何收敛? | ADMM; 分布式梯度; 交替优化; 异步优化 | **ADMM+分布式梯度**: 交替方向乘子法+异步更新, 分布式优化 | `nt_act::autonomous::dist_opt` |
+| D8297 | **Collision Avoidance** | 碰撞避免如何实时? | 势场法; VFH; DRL避障; 弹性带 | **VFH+DRL实时避障**: 速度场+DRL学习, 实时动态障碍物避让 | `nt_act::autonomous::collision` |
+| D8298 | **Trajectory Optimization** | 轨迹优化如何高效? | MPC; iLQR; DDP; CEM; 学习优化 | **MPC+DDP**: 模型预测控制+差分动态规划, 高效轨迹优化 | `nt_act::autonomous::trajectory` |
+| D8299 | **State Estimation** | 状态估计如何准确? | EKF; UKF; 粒子滤波; 因子图 | **UKF+因子图**: 无迹卡尔曼+因子图优化, 非线性状态估计 | `nt_act::autonomous::state_est` |
+| D8300 | **Odometry** | 里程计如何精确? | 视觉里程计; LiDAR里程计; 惯性里程计; 融合里程计 | **视觉-惯性融合里程计**: 视觉+惯性紧耦合, 精确运动估计 | `nt_act::autonomous::odometry` |
+| D8301 | **Mapping** | 建图如何稠密? | 稠密建图; 体素地图; 语义建图; 高斯泼溅 | **高斯泼溅建图**: 3D高斯泼溅实时建图, 渲染质量+实时性 | `nt_act::autonomous::mapping` |
+| D8302 | **Localization** | 定位如何精确? | NDT匹配; ICP; 视觉定位; 语义定位 | **NDT+语义定位**: 正态分布变换匹配+语义信息, 室内外精确定位 | `nt_act::autonomous::localization` |
+| D8303 | **Perception Pipeline** | 感知管线如何端到端? | 检测→跟踪→预测→规划; 端到端感知; BEV感知 | **BEV端到端感知**: 鸟瞰图统一感知+时空融合, 端到端驾驶 | `nt_act::autonomous::perception` |
+| D8304 | **Object Tracking** | 目标跟踪如何持续? | DeepSORT; ByteTrack; BoT-SORT; 多目标跟踪 | **ByteTrack+BoT-SORT**: 两阶段匹配+重识别, 鲁棒多目标跟踪 | `nt_act::autonomous::tracking` |
+| D8305 | **Prediction** | 行为预测如何准确? | 轨迹预测; 意图预测; 交互预测; 场景预测 | **意图+轨迹联合预测**: 意图识别+轨迹预测+交互建模, 多模态预测 | `nt_act::autonomous::prediction` |
+| D8306 | **Scene Understanding** | 场景理解如何全面? | 语义分割; 实例分割; 场景图; 3D重建 | **语义+实例+场景图**: 2D/3D全场景理解, 语义+实例+关系 | `nt_act::autonomous::scene` |
+| D8307 | **Simulation** | 仿真如何真实? | CARLA; Sumo; 仿真到真实; 数字孪生 | **CARLA+数字孪生**: 高保真仿真+数字孪生, 安全测试验证 | `nt_act::autonomous::simulation` |
+| D8308 | **Sim-to-Real Transfer** | 仿真到真实如何迁移? | 域随机化; 域适应; 风格迁移; 渐进式迁移 | **域随机化+渐进迁移**: 仿真域随机化+渐进真实环境, 缩小域差距 | `nt_act::autonomous::sim2real` |
+| D8309 | **Reinforcement Learning** | 强化学习如何训练? | SAC; PPO; DQN; 模型学习; 离线RL | **SAC+PPO+离线RL**: 连续控制SAC+离散PPO+离线预训练, 策略学习 | `nt_act::autonomous::rl` |
+| D8310 | **Imitation Learning** | 模仿学习如何高效? | DAgger; GAIL; 行为克隆; 对抗模仿 | **DAgger+GAIL**: 数据聚合+生成对抗模仿, 从专家演示学习 | `nt_act::autonomous::imitation` |
+| D8311 | **Safety Verification** | 安全验证如何保证? | 形式化验证; 安全监控; 紧急制动; 安全层 | **形式化验证+安全层**: 形式化证明+运行时监控+安全层, 多重安全 | `nt_act::autonomous::safety` |
+| D8312 | **Explainability** | 可解释性如何建立信任? | 注意力可视化; 决策解释; 反事实解释; 规则提取 | **注意力+反事实解释**: 注意力可视化+反事实推理, 可理解决策 | `nt_act::autonomous::explain` |
+| D8313 | **Robustness** | 鲁棒性如何增强? | 对抗训练; 分布偏移; 极端场景; 模型集成 | **对抗训练+分布偏移**: 对抗样本训练+分布鲁棒优化, 极端场景鲁棒 | `nt_act::autonomous::robust` |
+| D8314 | **Adaptation** | 自适应如何在线? | 在线学习; 元学习; 迁移学习; 持续学习 | **在线+元学习**: 在线策略更新+元学习快速适应, 新环境快速适应 | `nt_act::autonomous::adaptation` |
+| D8315 | **Human-in-the-Loop** | 人在回路如何交互? | 语音指令; 手势控制; 意图理解; 信任校准 | **语音+手势+意图**: 多模态人机交互+意图理解, 自然交互 | `nt_act::autonomous::human_loop` |
+| D8316 | **Multi-Modal Perception** | 多模态感知如何融合? | 视觉+LiDAR+雷达+超声; 早期/晚期/中间融合 | **中间融合+自适应**: 特征级融合+注意力加权, 自适应多模态感知 | `nt_act::autonomous::multimodal` |
+| D8317 | **Weather Robustness** | 天气鲁棒性如何增强? | 雨/雪/雾/夜间; 数据增强; 领域适应 | **天气增强+领域适应**: 极端天气数据增强+领域适应, 全天候驾驶 | `nt_act::autonomous::weather` |
+| D8318 | **Edge Computing** | 边缘计算如何部署? | 模型压缩; 量化; 蒸馏; 边缘-云协同 | **边缘推理+云协同**: 模型量化+边缘部署+云端更新, 实时低延迟 | `nt_act::autonomous::edge` |
+| D8319 | **OTA Updates** | 空中更新如何安全? | 安全更新; 版本控制; 回滚; A/B测试 | **安全OTA+版本控制**: 签名验证+版本管理+回滚, 安全持续更新 | `nt_act::autonomous::ota` |
+| D8320 | **Logging & Diagnostics** | 日志诊断如何全面? | 传感器日志; 决策日志; 异常检测; 回放分析 | **全链路日志**: 传感器→感知→决策→执行全链路, 异常检测+回放 | `nt_act::autonomous::logging` |
+| D8321 | **Fleet Management** | 车队管理如何高效? | 调度优化; 路径规划; 状态监控; 预测维护 | **智能车队管理**: 调度+路径+监控+维护, 车队效率优化 | `nt_act::autonomous::fleet` |
+| D8322 | **Regulation Compliance** | 法规合规如何保障? | ISO 26262; SOTIF; UN R155/R156; 数据记录 | **ISO 26262+SOTIF**: 功能安全+预期功能安全+法规合规, 合规驾驶 | `nt_act::autonomous::regulation` |
+| D8323 | **Ethical Decision Making** | 伦理决策如何权衡? | 电车难题; 利益相关者; 伦理框架; 透明决策 | **伦理框架+透明决策**: 伦理原则+利益相关者+透明记录, 负责任决策 | `nt_act::autonomous::ethics` |
+| D8324 | **Liability Assessment** | 责任如何判定? | 事故重建; 黑匣子; 责任分配; 保险 | **黑匣子+事故重建**: 完整记录+事故重建+责任判定, 法律合规 | `nt_act::autonomous::liability` |
+| D8325 | **Public Trust** | 公众信任如何建立? | 透明度; 安全记录; 沟通; 教育 | **透明度+安全记录**: 安全数据公开+透明沟通+公众教育, 建立信任 | `nt_act::autonomous::trust` |
+| D8326 | **Infrastructure** | 基础设施如何配套? | V2X通信; 智能道路; 充电网络; 高精地图 | **V2X+智能道路**: 车路协同+高精地图+充电网络, 基础设施配套 | `nt_act::autonomous::infrastructure` |
+| D8327 | **Cybersecurity** | 网络安全如何保障? | 入侵检测; 安全认证; 加密通信; OTA安全 | **车载网络安全**: 入侵检测+安全认证+加密, 防网络攻击 | `nt_act::autonomous::cybersec` |
+| D8328 | **Data Management** | 数据管理如何高效? | 数据采集; 标注; 版本控制; 隐私保护 | **数据管理平台**: 采集+标注+版本+隐私, 高效数据管理 | `nt_act::autonomous::data` |
+| D8329 | **Benchmarking** | 基准测试如何标准? | nuScenes; Waymo; KITTI; CARLA挑战 | **Waymo+nuScenes基准**: 标准化评估+公开排行榜, 可比性基准 | `nt_act::autonomous::benchmark` |
+| D8330 | **Open Source Ecosystem** | 开源生态如何建设? | Autoware; Apollo; CARLA; nuScenes | **Autoware+CARLA生态**: 开源平台+仿真+数据集, 生态建设 | `nt_act::autonomous::opensource` |
+| D8331 | **V2X Communication** | 车路协同如何通信? | C-V2X; DSRC; 5G-V2X; 边缘计算 | **5G-V2X+边缘计算**: C-V2X通信+边缘计算, 车路云协同 | `nt_act::autonomous::v2x` |
+| D8332 | **HD Map** | 高精地图如何维护? | 众包更新; 实时更新; 语义地图; 压缩存储 | **众包+实时更新**: 众包采集+实时更新+语义丰富, 高精地图维护 | `nt_act::autonomous::hdmap` |
+| D8333 | **Robust Perception** | 鲁棒感知如何全天候? | 多传感器冗余; 天气适应; 故障检测; 降级模式 | **多传感器冗余+降级**: 冗余感知+故障检测+降级模式, 全天候安全 | `nt_act::autonomous::robust_perc` |
+| D8334 | **End-to-End Driving** | 端到端驾驶如何实现? | UniAD; VAD; 端到端感知规划; 模块化对比 | **UniAD+VAD端到端**: 端到端感知-预测-规划, 简化模块化管线 | `nt_act::autonomous::e2e` |
+| D8335 | **Weather Forecasting** | 天气预报如何精准? | Pangu-Weather; GraphCast; FourCastNet; GenCast | **GraphCast+GenCast**: 图神经网络+生成式, 全球中期天气预报 | `nt_world::climate::forecast` |
+| D8336 | **Climate Modeling** | 气候建模如何高效? | Earth system models; 降尺度; 参数化; 混合建模 | **ML+物理混合建模**: 物理约束+神经网络参数化, 高效气候模拟 | `nt_world::climate::model` |
+| D8337 | **Extreme Event Prediction** | 极端事件如何预测? | 极端降水; 热浪; 干旱; 台风; 早期预警 | **极端事件专用模型**: 极端值理论+深度学习, 提前预警极端天气 | `nt_world::climate::extreme` |
+| D8338 | **Downscaling** | 降尺度如何高分辨率? | 统计降尺度; 动力降尺度; ML降尺度; 超分辨率 | **ML超分辨率降尺度**: 神经网络超分, 从粗网格到精细区域预报 | `nt_world::climate::downscale` |
+| D8339 | **Renewable Energy Forecasting** | 可再生能源预测如何准确? | 风电预测; 光伏预测; 功率曲线; 不确定性量化 | **风电+光伏预测**: 时空预测+不确定性量化, 支持电网调度 | `nt_world::climate::renewable` |
+| D8340 | **Carbon Cycle Modeling** | 碳循环建模如何精确? | 碳通量; 碳汇; 人为排放; 反馈机制 | **碳循环ML建模**: 神经网络碳通量+碳汇估算, 碳循环预测 | `nt_world::climate::carbon` |
+| D8341 | **Ecosystem Dynamics** | 生态系统动态如何模拟? | 物种分布; 生态网络; 物候学; 生物多样性 | **生态网络ML**: 物种分布+生态网络+物候学, 生态系统预测 | `nt_world::climate::ecosystem` |
+| D8342 | **Ocean Modeling** | 海洋建模如何耦合? | 海洋环流; 海平面; 海洋酸化; 海冰 | **海洋ML建模**: 海洋环流+海平面+酸化, 海洋系统预测 | `nt_world::climate::ocean` |
+| D8343 | **Cryosphere Modeling** | 冰冻圈建模如何预测? | 冰盖; 冰川; 冻土; 积雪 | **冰冻圈ML建模**: 冰盖+冰川+冻土, 冰冻圈变化预测 | `nt_world::climate::cryo` |
+| D8344 | **Atmospheric Chemistry** | 大气化学如何模拟? | 臭氧; 气溶胶; 污染物; 化学传输 | **大气化学ML**: 臭氧+气溶胶+污染物, 大气化学模拟 | `nt_world::climate::atmo_chem` |
+| D8345 | **Agricultural Impact** | 农业影响如何评估? | 作物产量; 水资源; 病虫害; 适应策略 | **农业气候影响**: 作物+水资源+病虫害, 气候适应评估 | `nt_world::climate::agri` |
+| D8346 | **Health Impact** | 健康影响如何预测? | 热应激; 传染病; 空气质量; 脆弱人群 | **气候健康影响**: 热应激+传染病+空气质量, 健康风险预测 | `nt_world::climate::health` |
+| D8347 | **Economic Impact** | 经济影响如何量化? | 损失估计; 保险; 适应投资; 损失与损害 | **气候经济损失**: 损失估计+保险+适应投资, 经济影响量化 | `nt_world::climate::economic` |
+| D8348 | **Sea Level Rise** | 海平面上升如何预测? | 冰盖融化; 热膨胀; 区域差异; 沿海脆弱性 | **海平面上升预测**: 冰盖+热膨胀+区域差异, 沿海风险评估 | `nt_world::climate::sealevel` |
+| D8349 | **Wildfire Prediction** | 野火如何预测? | 火险天气; 可燃物; 点火源; 火行为 | **野火预测系统**: 火险天气+可燃物+火行为, 野火风险预警 | `nt_world::climate::wildfire` |
+| D8350 | **Flood Prediction** | 洪水如何预测? | 暴雨洪水; 融雪洪水; 风暴潮; 城市内涝 | **洪水预测系统**: 暴雨+融雪+风暴潮, 洪水风险预警 | `nt_world::climate::flood` |
+| D8351 | **Drought Monitoring** | 干旱如何监测? | 降水异常; 土壤湿度; 蒸散发; 干旱指数 | **干旱监测系统**: 降水+土壤+蒸散发, 实时干旱监测预警 | `nt_world::climate::drought` |
+| D8352 | **Tropical Cyclone Forecast** | 热带气旋如何预测? | 路径预测; 强度预测; 风暴潮; 降水预报 | **热带气旋AI预测**: 路径+强度+风暴潮, 飓风季预报 | `nt_world::climate::cyclone` |
+| D8353 | **Climate Attribution** | 气候归因如何分析? | 极端事件归因; 人为信号; 概率归因; 影响归因 | **极端事件归因**: 人为信号检测+概率归因, 气候变化归因分析 | `nt_world::climate::attribution` |
+| D8354 | **Climate Data Assimilation** | 气候数据同化如何融合? | 卡尔曼滤波; 4D-Var; 集合卡尔曼; ML数据同化 | **ML+卡尔曼数据同化**: 神经网络增强数据同化, 观测-模型融合 | `nt_world::climate::assimilation` |
+| D8355 | **Climate Emulation** | 气候模型替代如何加速? | ML替代模型; PDE求解器; 神经算子; 混合建模 | **神经算子气候替代**: FNO/DeepONet替代物理模型, 加速模拟 | `nt_world::climate::emulation` |
+| D8356 | **Climate Uncertainty** | 气候不确定性如何量化? | 集合预测; 贝叶斯深度学习; 不确定性传播; 情景分析 | **贝叶斯深度学习+集合**: 不确定性量化+集合预测, 气候预测可信度 | `nt_world::climate::uncertainty` |
+| D8357 | **Climate Mitigation** | 气候减缓如何优化? | 碳捕获; 可再生能源; 能效; 负排放技术 | **碳捕获+可再生能源优化**: ML优化碳捕获+能源调度, 减缓路径 | `nt_world::climate::mitigation` |
+| D8358 | **Climate Adaptation** | 气候适应如何规划? | 脆弱性评估; 适应路径; 弹性建设; 预警系统 | **脆弱性评估+预警**: ML脆弱性评估+早期预警, 适应规划支持 | `nt_world::climate::adaptation` |
+| D8359 | **Climate Policy Support** | 气候政策如何支持? | 情景分析; 成本效益; 协同效益; 公平转型 | **情景+成本效益分析**: ML支持政策情景+成本效益, 决策支持 | `nt_world::climate::policy` |
+| D8360 | **Paleoclimate Reconstruction** | 古气候如何重建? | 代用指标; 数据同化; 重建方法; 校准 | **代用指标+数据同化**: ML代用指标解释+同化重建, 古气候分析 | `nt_world::climate::paleo` |
+| D8361 | **Climate Model Evaluation** | 气候模型如何评估? | CMIP6评估; 诊断指标; 偏差分析; 不确定性 | **CMIP6+诊断指标**: 标准化评估+偏差诊断, 模型比较 | `nt_world::climate::eval` |
+| D8362 | **Carbon Monitoring** | 碳监测如何实时? | 卫星碳监测; 通量反演; 碳账本; MRV | **卫星+通量反演**: 卫星CO2监测+通量反演, 实时碳监测 | `nt_world::climate::carbon_mon` |
+| D8363 | **Methane Detection** | 甲烷如何检测? | 卫星甲烷; 传感器网络; 漏点定位; 排放清单 | **卫星+传感器甲烷**: 卫星检测+地面传感器, 甲烷泄漏定位 | `nt_world::climate::methane` |
+| D8364 | **Climate Services** | 气候服务如何提供? | 定制化预报; 风险评估; 决策支持; 用户界面 | **定制气候服务**: 针对性预报+风险+决策, 用户友好气候服务 | `nt_world::climate::services` |
+| D8365 | **Climate Digital Twin** | 气候数字孪生如何构建? | 地球系统数字孪生; 区域数字孪生; 可交互 | **地球+区域数字孪生**: 地球系统+区域精细, 可交互气候数字孪生 | `nt_world::climate::digital_twin` |
+| D8366 | **Climate Prediction API** | 气候预测API如何设计? | 标准化接口; 实时流; 不确定性; 情景查询 | **气候预测API**: 标准化接口+实时流+不确定性, 可集成气候服务 | `nt_world::climate::api` |
+| D8367 | **Climate Data Sharing** | 气候数据如何共享? | FAIR原则; 开放数据; 标准格式; 互操作 | **FAIR气候数据**: FAIR原则+开放数据+标准格式, 全球共享 | `nt_world::climate::data_share` |
+| D8368 | **Climate Education** | 气候教育如何普及? | 可视化; 交互式; 游戏化; 本地化 | **气候可视化教育**: 交互式可视化+游戏化, 气候知识普及 | `nt_world::climate::education` |
+| D8369 | **Climate Finance** | 气候金融如何评估? | 绿色债券; 碳市场; 气候风险; 转型金融 | **气候金融评估**: 绿色债券+碳市场+风险, 气候投资决策 | `nt_world::climate::finance` |
+| D8370 | **Climate Justice** | 气候正义如何保障? | 公平分配; 损失损害; 技术转让; 能力建设 | **气候正义框架**: 公平分配+损失损害+技术转让, 正义保障 | `nt_world::climate::justice` |
+| D8371 | **Space Climate** | 太空气候如何监测? | 太阳活动; 空间天气; 太阳风暴; 辐射 | **太阳活动监测**: 太阳活动+空间天气, 太空气候预警 | `nt_world::climate::space` |
+| D8372 | **Urban Climate** | 城市气候如何缓解? | 热岛效应; 城市通风; 绿色基础设施; 建筑节能 | **城市热岛缓解**: 绿色基础设施+通风+节能, 城市气候适应 | `nt_world::climate::urban` |
+| D8373 | **Marine Ecosystem** | 海洋生态系统如何保护? | 珊瑚白化; 渔业管理; 海洋保护区; 生物多样性 | **珊瑚+渔业保护**: 珊瑚监测+渔业管理, 海洋生态系统保护 | `nt_world::climate::marine` |
+| D8374 | **Terrestrial Ecosystem** | 陆地生态系统如何管理? | 森林管理; 草地退化; 土地利用; 造林 | **森林+草地管理**: 森林碳汇+草地恢复, 陆地生态系统管理 | `nt_world::climate::terrestrial` |
+| D8375 | **Freshwater Systems** | 淡水系统如何保护? | 湖泊; 河流; 地下水; 水质 | **湖泊+河流保护**: 水质监测+地下水管理, 淡水系统保护 | `nt_world::climate::freshwater` |
+| D8376 | **Biodiversity Monitoring** | 生物多样性如何监测? | 物种监测; eDNA; 声学监测; 卫星遥感 | **eDNA+声学+卫星**: 多源生物多样性监测, 物种多样性评估 | `nt_world::climate::biodiversity` |
+| D8377 | **Soil Carbon** | 土壤碳如何估算? | 土壤碳库; 碳通量; 农业土壤; 碳封存 | **土壤碳ML估算**: 土壤碳库+碳通量, 农业碳封存评估 | `nt_world::climate::soil` |
+| D8378 | **Climate Health Nexus** | 气候健康交叉如何研究? | 热应激; 传染病媒介; 空气质量; 脆弱人群 | **气候健康交叉研究**: 热应激+传染病+空气, 健康风险评估 | `nt_world::climate::health_nexus` |
+| D8379 | **Climate Migration** | 气候迁移如何预测? | 人口流动; 脆弱性; 容纳能力; 政策响应 | **气候迁移预测**: 人口流动+脆弱性+政策, 气候迁移风险 | `nt_world::climate::migration` |
+| D8380 | **Climate Food Security** | 气候粮食安全如何保障? | 作物产量; 供应链; 饮食多样; 营养安全 | **气候粮食安全**: 产量+供应链+营养, 粮食系统韧性 | `nt_world::climate::food` |
+| D8381 | **Climate Energy System** | 气候能源系统如何转型? | 电网灵活性; 储能; 需求响应; 氢能 | **能源系统转型**: 电网+储能+需求响应+氢能, 气候能源优化 | `nt_world::climate::energy` |
+| D8382 | **Climate Materials** | 气候材料如何创新? | 低碳材料; 可回收; 生物基; 耐久性 | **气候材料创新**: 低碳+可回收+生物基, 材料气候影响 | `nt_world::climate::materials` |
+| D8383 | **Climate Governance** | 气候治理如何协调? | 国际协定; 国家政策; 地方行动; 企业承诺 | **气候治理协调**: 国际+国家+地方+企业, 多层级治理 | `nt_world::climate::governance` |
+| D8384 | **Climate Communication** | 气候沟通如何有效? | 叙事框架; 可信度; 行动导向; 本地化 | **气候有效沟通**: 叙事+可信度+行动+本地化, 气候知识传播 | `nt_world::climate::communication` |
+| D8385 | **Climate Resilience** | 气候韧性如何建设? | 弹性评估; 适应能力; 恢复力; 转型能力 | **气候韧性建设**: 弹性+适应+恢复+转型, 社会韧性评估 | `nt_world::climate::resilience` |
+| D8386 | **Property Prediction** | 材料属性如何预测? | GNoME; Matformer; CGCNN; 材料图网络 | **GNoME图网络**: 材料图+注意力, 预测稳定材料+属性 | `nt_world::materials::property` |
+| D8387 | **Materials Discovery** | 材料发现如何加速? | 高通量计算; 实验室自动化; 逆设计; 主动学习 | **高通量+主动学习**: 计算筛选+主动学习实验, 加速发现 | `nt_world::materials::discovery` |
+| D8388 | **Crystal Structure Prediction** | 晶体结构如何预测? | USPEX; CALYPSO; 基于进化; 机器学习力场 | **ML力场+CSP**: 机器学习势函数+进化算法, 晶体结构预测 | `nt_world::materials::crystal` |
+| D8389 | **Molecular Design** | 分子设计如何优化? | 分子生成; 强化学习设计; 多目标优化; 约束生成 | **RL分子生成**: 强化学习+约束优化, 多目标分子设计 | `nt_world::materials::molecular` |
+| D8390 | **High-Throughput Screening** | 高通量筛选如何高效? | 虚拟筛选; 自动化实验; 数据驱动; 主动学习 | **虚拟+自动化筛选**: 虚拟预筛选+自动化验证, 高通量材料筛选 | `nt_world::materials::hts` |
+| D8391 | **Inverse Design** | 逆设计如何实现? | 目标属性→结构; 生成模型; 条件生成; 约束优化 | **条件生成逆设计**: 属性条件生成+约束优化, 逆向材料设计 | `nt_world::materials::inverse` |
+| D8392 | **Materials Informatics** | 材料信息学如何整合? | 数据标准; 数据库; 数据共享; 可重复性 | **材料数据标准**: FAIR数据+标准化+共享, 材料信息学平台 | `nt_world::materials::informatics` |
+| D8393 | **Materials Database** | 材料数据库如何构建? | Materials Project; AFLOW; NOMAD; JARVIS | **统一材料数据库**: Materials Project+AFLOW+NOMAD, 集成查询 | `nt_world::materials::database` |
+| D8394 | **Force Fields** | 力场如何机器学习? | MACE; NequIP; Allegro; 分子动力学 | **MACE+NequIP等变力场**: 等变神经网络力场, 接近DFT精度 | `nt_world::materials::forcefield` |
+| D8395 | **Phase Stability** | 相稳定性如何预测? | 凸包分析; 相图; 亚稳态; 动力学稳定 | **凸包+相图分析**: 热力学稳定性+亚稳态, 相稳定性预测 | `nt_world::materials::phase` |
+| D8396 | **Electronic Structure** | 电子结构如何计算? | DFT; GW近似; 机器学习; 量子蒙特卡洛 | **DFT+ML混合**: DFT精确+ML加速, 电子结构高效计算 | `nt_world::materials::electronic` |
+| D8397 | **Mechanical Properties** | 力学属性如何预测? | 弹性; 硬度; 断裂韧性; 疲劳 | **ML力学预测**: 弹性+硬度+韧性+疲劳, 力学属性预测 | `nt_world::materials::mechanical` |
+| D8398 | **Thermal Properties** | 热学属性如何预测? | 热导率; 比热容; 热膨胀; 相变 | **ML热学预测**: 热导率+比热+热膨胀, 热学属性预测 | `nt_world::materials::thermal` |
+| D8399 | **Optical Properties** | 光学属性如何预测? | 介电函数; 吸收光谱; 折射率; 发光 | **ML光学预测**: 介电+吸收+折射+发光, 光学属性预测 | `nt_world::materials::optical` |
+| D8400 | **Magnetic Properties** | 磁学属性如何预测? | 铁磁; 反铁磁; 磁各向异性; 自旋排列 | **ML磁学预测**: 铁磁+反铁磁+磁各向异性, 磁学属性预测 | `nt_world::materials::magnetic` |
+| D8401 | **Catalysis Design** | 催化剂如何设计? | 活性位点; 反应路径; 吸附能; 高通量筛选 | **活性位点+反应路径ML**: ML活性预测+反应路径, 催化剂设计 | `nt_world::materials::catalysis` |
+| D8402 | **Battery Materials** | 电池材料如何优化? | 正极; 负极; 电解质; 界面 | **电池材料ML**: 正极+负极+电解质+界面, 电池材料优化 | `nt_world::materials::battery` |
+| D8403 | **Solar Cell Materials** | 太阳能材料如何设计? | 钙钛矿; 有机光伏; 效率; 稳定性 | **钙钛矿+有机ML**: 钙钛矿+有机光伏, 效率+稳定性优化 | `nt_world::materials::solar` |
+| D8404 | **Thermoelectric Materials** | 热电材料如何优化? | ZT值; 电导率; 热导率; 功率因子 | **热电ML优化**: ZT值+电导+热导, 热电材料高效设计 | `nt_world::materials::thermoelectric` |
+| D8405 | **Superconductor Materials** | 超导材料如何发现? | 临界温度; 高压超导; 机理; 设计 | **超导ML发现**: 临界温度预测+高压超导, 超导材料探索 | `nt_world::materials::superconductor` |
+| D8406 | **Polymer Design** | 聚合物如何设计? | 单体选择; 共聚; 加工性; 功能性 | **聚合物ML设计**: 单体+共聚+加工+功能, 聚合物性能预测 | `nt_world::materials::polymer` |
+| D8407 | **Alloy Design** | 合金如何设计? | 高熵合金; 固溶强化; 相图; 性能 | **高熵合金ML**: 固溶+相图+性能, 合金成分优化 | `nt_world::materials::alloy` |
+| D8408 | **Ceramic Design** | 陶瓷如何优化? | 致密化; 力学性能; 热学性能; 功能陶瓷 | **陶瓷ML优化**: 致密化+力学+热学+功能, 陶瓷材料设计 | `nt_world::materials::ceramic` |
+| D8409 | **Biomaterials** | 生物材料如何设计? | 生物相容性; 降解; 细胞响应; 组织工程 | **生物材料ML**: 生物相容+降解+细胞, 生物材料设计 | `nt_world::materials::biomaterial` |
+| D8410 | **Coating Design** | 涂层如何设计? | 耐磨; 耐腐蚀; 热障; 功能涂层 | **涂层ML设计**: 耐磨+耐腐蚀+热障+功能, 涂层性能预测 | `nt_world::materials::coating` |
+| D8411 | **Composite Materials** | 复合材料如何优化? | 界面; 纤维取向; 增强机制; 多尺度 | **复合材料ML**: 界面+纤维+增强+多尺度, 复合材料设计 | `nt_world::materials::composite` |
+| D8412 | **Nanomaterials** | 纳米材料如何控制? | 粒径; 形貌; 表面; 组装 | **纳米材料ML控制**: 粒径+形貌+表面+组装, 纳米材料设计 | `nt_world::materials::nano` |
+| D8413 | **2D Materials** | 二维材料如何发现? | 石墨烯; 过渡金属硫化物; MXene; 异质结 | **2D材料ML发现**: 石墨烯+TMD+MXene, 二维材料预测 | `nt_world::materials::2d` |
+| D8414 | **Topological Materials** | 拓扑材料如何识别? | 拓扑不变量; 能带结构; 表面态; 对称性 | **拓扑材料ML识别**: 能带+对称性+拓扑不变量, 拓扑材料预测 | `nt_world::materials::topological` |
+| D8415 | **Materials Segmentation** | 材料如何分割? | SEM图像; EBSD; 相分割; 缺陷检测 | **SEM+EBSD材料分割**: 显微图像+相分割+缺陷, 材料表征 | `nt_world::materials::segmentation` |
+| D8416 | **Materials Synthesis** | 材料合成如何优化? | 合成参数; 产率; 纯度; 可重复性 | **合成参数ML优化**: 参数优化+产率+纯度, 合成条件优化 | `nt_world::materials::synthesis` |
+| D8417 | **Materials Characterization** | 材料表征如何自动化? | XRD; TEM; SEM; Raman; 光谱分析 | **XRD+Raman自动表征**: 光谱自动解析+相识别, 材料表征自动化 | `nt_world::materials::characterization` |
+| D8418 | **Materials Manufacturing** | 材料制造如何控制? | 工艺参数; 质量控制; 缺陷预防; 可追溯 | **制造参数ML控制**: 参数优化+质量+缺陷, 制造过程控制 | `nt_world::materials::manufacturing` |
+| D8419 | **Materials Recycling** | 材料回收如何优化? | 分选; 分离; 再生; 级联利用 | **回收ML优化**: 分选+分离+再生+级联, 材料循环利用 | `nt_world::materials::recycling` |
+| D8420 | **Materials Sustainability** | 材料可持续如何评估? | 生命周期; 碳足迹; 环境影响; 循环经济 | **LCA+碳足迹ML**: 生命周期+碳足迹+环境, 可持续材料评估 | `nt_world::materials::sustainability` |
+| D8421 | **Materials Safety** | 材料安全如何评估? | 毒性; 暴露风险; 环境持久性; 生物累积 | **毒性ML评估**: 毒性+暴露+持久性+累积, 材料安全预测 | `nt_world::materials::safety` |
+| D8422 | **Materials Cost** | 材料成本如何优化? | 原材料; 加工; 规模; 替代 | **成本ML优化**: 原材料+加工+规模+替代, 材料成本预测 | `nt_world::materials::cost` |
+| D8423 | **Materials Scalability** | 材料可扩展性如何评估? | 规模化生产; 质量一致性; 成本效益 | **可扩展性评估**: 规模+质量+成本, 材料产业化评估 | `nt_world::materials::scalability` |
+| D8424 | **Materials Transfer Learning** | 材料迁移学习如何跨域? | 跨材料迁移; 多任务学习; 基础模型 | **材料基础模型**: 预训练+跨材料迁移, 通用材料表示 | `nt_world::materials::transfer` |
+| D8425 | **Materials Active Learning** | 材料主动学习如何标注? | 不确定性采样; 采集函数; 实验设计 | **材料主动学习**: 不确定性采样+采集函数, 高效实验设计 | `nt_world::materials::active` |
+| D8426 | **Materials Generative Models** | 材料生成模型如何设计? | 生成对抗; 变分自编码; 扩散模型; 流匹配 | **扩散+流匹配生成**: 扩散模型+流匹配, 材料结构生成 | `nt_world::materials::generative` |
+| D8427 | **Materials Optimization** | 材料多目标如何优化? | Pareto最优; 贝叶斯优化; 约束优化; 鲁棒优化 | **贝叶斯+Pareto优化**: 贝叶斯采集+Pareto前沿, 多目标材料优化 | `nt_world::materials::optimization` |
+| D8428 | **Materials Uncertainty** | 材料不确定性如何量化? | 集成学习; MC Dropout; 贝叶斯; 预测区间 | **贝叶斯+集成不确定性**: 贝叶斯深度学习+集成, 材料预测不确定性 | `nt_world::materials::uncertainty` |
+| D8429 | **Materials Explainability** | 材料可解释性如何建立? | 注意力可视化; SHAP; 物理约束; 反事实 | **注意力+SHAP+物理约束**: 材料预测可解释性, 物理理解 | `nt_world::materials::explain` |
+| D8430 | **Materials Benchmark** | 材料基准如何评估? | MatBench; OQMD; AFLOW; Materials Project | **MatBench标准基准**: 标准化评估+公开排行榜, 材料ML比较 | `nt_world::materials::benchmark` |
+| D8431 | **Materials Workflow** | 材料工作流如何自动化? | 端到端管线; 实验-计算-ML闭环; 自主实验室 | **自主实验室闭环**: 实验→计算→ML→决策, 材料研发自动化 | `nt_world::materials::workflow` |
+| D8432 | **Materials Data Standards** | 材料数据标准如何统一? | CIF; JSON-Materials; 可重复; FAIR | **材料数据标准化**: CIF+JSON+FAIR, 统一数据格式 | `nt_world::materials::data_std` |
+| D8433 | **Materials Visualization** | 材料可视化如何直观? | 结构可视化; 属性映射; 相图; 能带 | **材料结构可视化**: 3D结构+属性映射+相图+能带, 直观材料分析 | `nt_world::materials::visualization` |
+| D8434 | **Materials Collaboration** | 材料协作如何高效? | 数据共享; 知识图谱; 社区; 版本控制 | **材料知识图谱+协作**: 知识图谱+数据共享+版本, 材料协作平台 | `nt_world::materials::collaboration` |
+| D8435 | **Materials Prediction Challenge** | 材料预测挑战如何应对? | 数据稀缺; 分布偏移; 多保真度; 跨尺度 | **多保真度+跨尺度**: 多保真度学习+跨尺度建模, 材料预测挑战 | `nt_world::materials::challenges` |
+| D8436 | **Materials Future Directions** | 材料未来方向如何规划? | 自主实验; 通用模型; 实时预测; 全流程 | **材料研发4.0**: 自主实验+通用模型+实时预测, 材料研发未来 | `nt_world::materials::future` |
+| D8437 | **Protein Structure Prediction** | 蛋白质结构如何预测? | AlphaFold2; RoseTTAFold; ESMFold; Boltz-1 | **AlphaFold2+Boltz-1**: 多序列比对+结构模块, 高精度蛋白质结构 | `nt_world::bio::protein_struct` |
+| D8438 | **Protein Design** | 蛋白质如何设计? | RFdiffusion; ProteinMPNN; 分子动力学设计; 生成模型 | **RFdiffusion+ProteinMPNN**: 扩散生成+序列设计, 蛋白质从头设计 | `nt_world::bio::protein_design` |
+| D8439 | **Gene Regulatory Networks** | 基因调控网络如何建模? | SCENIC; GENIE3; 图神经网络; 因果推断 | **SCENIC+图网络**: 转录因子结合+图网络, 基因调控网络推断 | `nt_world::bio::grn` |
+| D8440 | **Pathway Analysis** | 通路分析如何系统? | GSEA; 通路富集; 网络分析; 动态模拟 | **GSEA+网络分析**: 通路富集+网络+动态模拟, 系统通路分析 | `nt_world::bio::pathway` |
+| D8441 | **Single-Cell Analysis** | 单细胞分析如何深入? | scRNA-seq; scATAC-seq; 空间转录组; 多组学 | **scRNA+多组学**: 单细胞RNA+ATAC+空间, 单细胞多组学分析 | `nt_world::bio::singlecell` |
+| D8442 | **Spatial Transcriptomics** | 空间转录组如何映射? | MERFISH; Visium; 10x空间; 图卷积 | **MERFISH+Visium**: 空间分辨转录本+图卷积, 组织空间图谱 | `nt_world::bio::spatial` |
+| D8443 | **Drug-Target Interaction** | 药物靶点如何预测? | 绑定亲和力; 虚拟筛选; 图网络; 生成模型 | **图网络+生成模型**: 图神经网络+生成式, 药物靶点预测 | `nt_world::bio::dti` |
+| D8444 | **Molecular Docking** | 分子对接如何精确? | AutoDock; 对接打分; 构象搜索; 深度对接 | **AutoDock+深度对接**: 对接+ML打分+构象, 高精度分子对接 | `nt_world::bio::docking` |
+| D8445 | **Protein-Ligand Binding** | 蛋白配体结合如何预测? | 分子动力学; 自由能计算; ML力场; 结合模式 | **ML力场+自由能**: 机器学习力场+自由能计算, 结合亲和力预测 | `nt_world::bio::binding` |
+| D8446 | **Protein-Protein Interaction** | 蛋白蛋白互作如何预测? | 接口预测; 复合物结构; 图网络; 进化信息 | **图网络+进化**: 图神经网络+进化信息, PPI预测 | `nt_world::bio::ppi` |
+| D8447 | **Genome Assembly** | 基因组组装如何完成? | 长读长; HiFi; 组装算法; 质量评估 | **HiFi+长读长组装**: PacBio HiFi+组装算法, 高质量基因组组装 | `nt_world::bio::genome` |
+| D8448 | **Variant Calling** | 变异检测如何准确? | GATK; DeepVariant; 长读长变异; 结构变异 | **DeepVariant+长读长**: 深度学习+长读长, 精确变异检测 | `nt_world::bio::variant` |
+| D8449 | **Epigenomics** | 表观基因组如何分析? | 甲基化; 组蛋白修饰; 染色质可及性; 整合分析 | **甲基化+组蛋白+可及性**: 多层表观组学+整合, 表观调控分析 | `nt_world::bio::epigenomics` |
+| D8450 | **Metagenomics** | 宏基因组如何分析? | 物种组成; 功能注释; 代谢网络; 群落动态 | **物种+功能+代谢**: 物种组成+功能注释+代谢网络, 微生物组分析 | `nt_world::bio::metagenomics` |
+| D8451 | **Proteomics** | 蛋白质组如何分析? | 质谱; 定量蛋白质组; 翻译后修饰; 互作网络 | **质谱+定量+修饰**: 质谱定量+翻译后修饰+互作, 蛋白质组分析 | `nt_world::bio::proteomics` |
+| D8452 | **Metabolomics** | 代谢组如何分析? | 代谢物鉴定; 通路分析; 脂质组; 流量分析 | **代谢物+通路+脂质**: 代谢物鉴定+通路+脂质组, 代谢组分析 | `nt_world::bio::metabolomics` |
+| D8453 | **Multi-Omics Integration** | 多组学如何整合? | 数据融合; 网络整合; 因果推断; 机器学习 | **网络+因果+ML**: 多组学网络整合+因果推断, 系统生物学 | `nt_world::bio::multiomics` |
+| D8454 | **Drug Discovery Pipeline** | 药物发现管线如何自动化? | 靶点→先导物→优化→临床; AI全流程 | **AI药物发现全流程**: 靶点→先导物→优化→临床预测, 自动化管线 | `nt_world::bio::drug_pipe` |
+| D8455 | **Molecular Generation** | 分子如何生成? | SMILES生成; 3D生成; 可合成性; 多目标 | **SMILES+3D分子生成**: SMILES/图生成+3D构象+可合成性, 分子生成 | `nt_world::bio::mol_gen` |
+| D8456 | **ADMET Prediction** | ADMET如何预测? | 吸收; 分布; 代谢; 排泄; 毒性 | **ADMET全预测**: 吸收+分布+代谢+排泄+毒性, 类药性预测 | `nt_world::bio::admet` |
+| D8457 | **Clinical Trial Design** | 临床试验如何优化? | 患者分层; 终点预测; 适应性设计; 预测模型 | **患者分层+适应性**: ML患者分层+终点预测+适应性, 临床试验优化 | `nt_world::bio::clinical` |
+| D8458 | **Cell Line Analysis** | 细胞系如何分析? | 药敏数据; 基因表达; 突变特征; 耐药机制 | **药敏+基因+突变**: 药敏数据+基因表达+突变, 细胞系药物反应 | `nt_world::bio::cellline` |
+| D8459 | **Phylogenetics** | 系统发育如何构建? | 序列比对; 进化树; 分子钟; 选择压力 | **序列+分子钟**: 多序列比对+分子钟+选择压力, 进化分析 | `nt_world::bio::phylogeny` |
+| D8460 | **CRISPR Guide Design** | CRISPR引导如何设计? | 靶点选择; 脱靶预测; 效率预测; PAM设计 | **CRISPR AI设计**: 靶点+脱靶+效率+PAM, CRISPR guide优化 | `nt_world::bio::crispr` |
+| D8461 | **RNA Structure Prediction** | RNA结构如何预测? | 二级结构; 三级结构; 假结; 分子动力学 | **RNA结构ML**: 二级+三级+假结, RNA结构预测 | `nt_world::bio::rna` |
+| D8462 | **Antibody Design** | 抗体如何设计? | CDR设计; 亲和力成熟; 免疫原性; 可开发性 | **CDR+亲和力ML**: CDR序列+亲和力+免疫原性, 抗体设计优化 | `nt_world::bio::antibody` |
+| D8463 | **Peptide Design** | 肽如何设计? | 序列优化; 环肽; 细胞穿透; 稳定性 | **肽ML设计**: 序列+环肽+穿透+稳定性, 肽药物设计 | `nt_world::bio::peptide` |
+| D8464 | **Synthetic Biology** | 合成生物学如何设计? | 基因回路; 代谢工程; 细胞工厂; 标准化 | **基因回路+代谢ML**: 基因回路设计+代谢优化, 合成生物学 | `nt_world::bio::synbio` |
+| D8465 | **Cell Biology Imaging** | 细胞生物成像如何分析? | 细胞分割; 器官追踪; 表型分析; 高通量 | **细胞分割+追踪**: 细胞分割+器官追踪+表型, 高通量细胞分析 | `nt_world::bio::cell_img` |
+| D8466 | **Drug Repurposing** | 药物重定位如何发现? | 网络药理学; 知识图谱; 相似性; 临床数据 | **网络药理学+知识图谱**: 网络分析+图推理, 药物重定位发现 | `nt_world::bio::repurpose` |
+| D8467 | **Biomarker Discovery** | 生物标志物如何发现? | 特征选择; 多组学; 验证; 临床转化 | **多组学特征选择**: 特征选择+验证+转化, 生物标志物发现 | `nt_world::bio::biomarker` |
+| D8468 | **Genetic Epidemiology** | 遗传流行病学如何分析? | GWAS; eQTL; 孟德尔随机化; 多基因风险 | **GWAS+eQTL+MR**: 全基因组+表达QTL+MR, 遗传流行病学 | `nt_world::bio::gen_epi` |
+| D8469 | **Systems Biology** | 系统生物学如何模拟? | 代谢网络; 信号通路; 基因网络; 多尺度 | **网络+多尺度模拟**: 代谢+信号+基因网络, 系统生物学模拟 | `nt_world::bio::sysbio` |
+| D8470 | **Drug Safety** | 药物安全如何评估? | 肝毒性; 心脏毒性; 药物相互作用; 药物警戒 | **AI药物安全**: 肝/心脏毒性+相互作用+警戒, 药物安全评估 | `nt_world::bio::drug_safety` |
+| D8471 | **Precision Medicine** | 精准医学如何实现? | 基因分型; 药物基因组学; 个性化治疗; 预后 | **基因分型+药物基因组**: 个体化基因组+治疗, 精准医学 | `nt_world::bio::precision` |
+| D8472 | **Infectious Disease** | 传染病如何建模? | 传播动力学; 疫苗设计; 耐药性; 监测 | **传播动力学+疫苗AI**: 传播模型+疫苗设计+耐药, 传染病预测 | `nt_world::bio::infectious` |
+| D8473 | **Neurodegenerative Disease** | 神经退行性疾病如何研究? | 蛋白聚集; 神经影像; 药物靶点; 生物标志物 | **蛋白聚集+神经影像**: 聚集预测+影像+标志物, 神经退行研究 | `nt_world::bio::neurodegen` |
+| D8474 | **Cancer Biology** | 癌症生物学如何分析? | 突变特征; 免疫微环境; 克隆演化; 治疗反应 | **突变+免疫+克隆**: 突变特征+免疫微环境+克隆, 癌症生物学 | `nt_world::bio::cancer` |
+| D8475 | **Developmental Biology** | 发育生物学如何建模? | 细胞命运; 谱系追踪; 形态发生; 类器官 | **细胞命运+谱系**: 细胞命运图谱+谱系追踪, 发育生物学建模 | `nt_world::bio::dev_bio` |
+| D8476 | **Microbiome Analysis** | 微生物组如何分析? | 物种组成; 功能预测; 互作网络; 健康关联 | **物种+功能+互作**: 物种组成+功能预测+互作, 微生物组分析 | `nt_world::bio::microbiome` |
+| D8477 | **Plant Biology** | 植物生物学如何研究? | 基因组; 转录组; 表型; 逆境响应 | **植物多组学**: 基因组+转录组+表型, 植物生物学研究 | `nt_world::bio::plant` |
+| D8478 | **Evolutionary Biology** | 进化生物学如何计算? | 选择压力; 进化速率; 适应性进化; 基因组比较 | **选择压力+速率分析**: dN/dS+进化速率+适应性, 进化生物学 | `nt_world::bio::evolution` |
+| D8479 | **Biomedical NLP** | 生物医学NLP如何处理? | 文献挖掘; 命名实体; 关系抽取; 问答 | **生物医学文献挖掘**: NER+关系抽取+问答, 生物医学NLP | `nt_world::bio::bio_nlp` |
+| D8480 | **Protein Language Model** | 蛋白质语言模型如何训练? | ESM; ProtTrans; 进化信息; 多任务 | **ESM+ProtTrans**: 预训练蛋白质语言模型+进化, 蛋白质表示学习 | `nt_world::bio::prot_lm` |
+| D8481 | **Genomic Foundation Model** | 基因组基础模型如何构建? | DNABERT; Nucleotide Transformer; 多任务; 跨物种 | **DNABERT+NT**: 基因组预训练+多任务+跨物种, 基因组基础模型 | `nt_world::bio::genome_fm` |
+| D8482 | **Biological Knowledge Graph** | 生物知识图谱如何构建? | 药物-疾病; 基因-疾病; 蛋白互作; 文献知识 | **药物-基因-疾病图**: 多源知识融合+推理, 生物知识图谱 | `nt_world::bio::bio_kg` |
+| D8483 | **Biological Simulation** | 生物模拟如何高效? | 分子动力学; 元胞自动机; Agent-based; 多尺度 | **ML加速分子动力学**: 机器学习力场+多尺度, 生物模拟加速 | `nt_world::bio::bio_sim` |
+| D8484 | **Biological Data Standards** | 生物数据标准如何统一? | FAIR原则; 数据格式; 共享协议; 可重复 | **生物数据FAIR化**: FAIR原则+标准格式+共享, 生物数据标准化 | `nt_world::bio::bio_std` |
+| D8485 | **Biological Ethics** | 生物伦理如何审查? | 基因编辑; 合成生物; 数据隐私; 知情同意 | **生物伦理审查**: 基因编辑+合成生物+数据隐私, 生物伦理治理 | `nt_world::bio::bio_ethics` |
+| D8486 | **Biological Benchmark** | 生物基准如何评估? | CASP; CAFA; 挑战赛; 标准数据集 | **CASP+CAFA基准**: 结构预测+功能预测, 生物ML标准评估 | `nt_world::bio::bio_bench` |
+| D8487 | **Biological Open Source** | 生物开源工具如何整合? | Biopython; scikit-learn生物; Galaxy; Bioconda | **Biopython+Galaxy集成**: 开源工具链+平台, 生物开源整合 | `nt_world::bio::bio_oss` |
+| D8488 | **Portfolio Optimization** | 投资组合如何优化? | 均值-方差; Black-Litterman; 风险平价; ML优化 | **ML+风险平价**: 机器学习预测+风险平价+Black-Litterman, 组合优化 | `nt_world::finance::portfolio` |
+| D8489 | **Risk Management** | 风险管理如何量化? | VaR; CVaR; 压力测试; 情景分析; 机器学习 | **VaR+CVaR+ML**: 风险价值+条件风险+ML预测, 量化风险管理 | `nt_world::finance::risk` |
+| D8490 | **Algorithmic Trading** | 算法交易如何策略化? | 统计套利; 做市; 动量; ML预测 | **统计套利+ML**: 统计套利+机器学习预测, 算法交易策略 | `nt_world::finance::algo_trade` |
+| D8491 | **Market Microstructure** | 市场微观结构如何分析? | 订单簿; 价差; 流动性; 高频数据 | **订单簿+流动性ML**: 订单簿动态+流动性+高频, 微观结构分析 | `nt_world::finance::microstructure` |
+| D8492 | **Fraud Detection** | 欺诈检测如何实时? | 异常检测; 图网络; 实时流; 可解释性 | **图网络+异常检测**: 图神经网络+异常检测, 实时欺诈检测 | `nt_world::finance::fraud` |
+| D8493 | **Credit Scoring** | 信用评分如何公平? | 替代数据; 可解释模型; 公平性; 增强 | **替代数据+公平性**: 替代数据+可解释+公平性, 信用评分 | `nt_world::finance::credit` |
+| D8494 | **Sentiment Analysis** | 情感分析如何金融化? | 新闻情感; 社交媒体; 舆情; 情绪指标 | **金融情感分析**: 新闻+社交+舆情, 金融情感指标 | `nt_world::finance::sentiment` |
+| D8495 | **News Impact** | 新闻影响如何量化? | 事件研究; 情感冲击; 信息传播; 市场反应 | **事件研究+情感冲击**: 新闻事件+情感+传播, 新闻影响量化 | `nt_world::finance::news` |
+| D8496 | **Quantitative Factors** | 量化因子如何挖掘? | 因子库; 因子挖掘; 因子正交; 因子衰减 | **因子挖掘+正交化**: 因子库+自动挖掘+正交, 量化因子研究 | `nt_world::finance::factors` |
+| D8497 | **Options Pricing** | 期权定价如何精确? | Black-Scholes; 蒙特卡洛; 随机波动率; ML定价 | **ML+随机波动率**: 机器学习+随机波动率, 期权定价优化 | `nt_world::finance::options` |
+| D8498 | **Yield Curve** | 收益率曲线如何建模? | Nelson-Siegel; 参数化; ML预测; 利率期限结构 | **Nelson-Siegel+ML**: 参数化+机器学习, 收益率曲线建模 | `nt_world::finance::yield` |
+| D8499 | **Credit Risk** | 信用风险如何建模? | PD; LGD; EAD; 违约概率; 信用迁移 | **PD+LGD+ML**: 违约概率+损失给付+ML预测, 信用风险建模 | `nt_world::finance::credit_risk` |
+| D8500 | **Market Prediction** | 市场预测如何有效? | 随机游走; 异常检测; 因子模型; 深度学习 | **因子+深度学习**: 因子模型+深度学习, 市场预测 | `nt_world::finance::market_pred` |
+| D8501 | **Risk Parity** | 风险平价如何配置? | 风险预算; 等风险贡献; 动态调整 | **风险平价+动态调整**: 等风险贡献+动态再平衡, 风险平价组合 | `nt_world::finance::risk_parity` |
+| D8502 | **Factor Investing** | 因子投资如何实施? | 价值; 动量; 质量; 低波动; 因子择时 | **多因子+择时**: 价值+动量+质量+低波动+ML择时, 因子投资 | `nt_world::finance::factor_inv` |
+| D8503 | **Smart Beta** | Smart Beta如何优化? | 规则化因子; 超额收益; 风险控制; 交易成本 | **Smart Beta+优化**: 规则化因子+超额收益+成本, Smart Beta策略 | `nt_world::finance::smart_beta` |
+| D8504 | **Risk Budgeting** | 风险预算如何分配? | 风险贡献; 边际风险; 风险分解; 动态预算 | **风险预算+动态**: 风险贡献+边际风险+动态, 风险预算管理 | `nt_world::finance::risk_budget` |
+| D8505 | **Performance Attribution** | 业绩归因如何分析? | Brinson归因; 风格归因; 因子归因; 多期归因 | **Brinson+因子归因**: 风格+因子+多期, 业绩归因分析 | `nt_world::finance::attribution` |
+| D8506 | **Backtesting** | 回测如何真实? | 历史数据; 交易成本; 滑点; 过拟合 | **回测+防过拟合**: 历史+成本+滑点+交叉验证, 真实回测 | `nt_world::finance::backtest` |
+| D8507 | **Execution Algorithms** | 执行算法如何最优? | VWAP; TWAP; 最小冲击; 智能路由 | **VWAP+智能路由**: 成交量加权+最小冲击+智能, 最优执行 | `nt_world::finance::execution` |
+| D8508 | **Liquidity Management** | 流动性如何管理? | 流动性预测; 冲击成本; 最优交易; 流动性监控 | **流动性预测+冲击**: 流动性预测+冲击建模+最优, 流动性管理 | `nt_world::finance::liquidity` |
+| D8509 | **Counterparty Risk** | 交易对手风险如何评估? | 信用估值调整; 资金估值调整; 违约概率; 信用衍生品 | **CVA+DVA+PD**: 信用估值+违约概率, 交易对手风险评估 | `nt_world::finance::counterparty` |
+| D8510 | **Regulatory Compliance** | 监管合规如何保障? | 巴塞尔III; 风险加权; 压力测试; 合规报告 | **巴塞尔III+合规**: 风险加权+压力测试+报告, 监管合规 | `nt_world::finance::compliance` |
+| D8511 | **High-Frequency Trading** | 高频交易如何加速? | 低延迟; FPGA; 直连; 共置 | **低延迟+FPGA**: FPGA加速+共置+直连, 高频交易优化 | `nt_world::finance::hft` |
+| D8512 | **Dark Pool** | 暗池如何交易? | 暗池类型; 信息不对称; 最优执行; 监管 | **暗池+最优执行**: 暗池类型+信息+执行, 暗池交易 | `nt_world::finance::dark_pool` |
+| D8513 | **Derivatives Pricing** | 衍生品定价如何准确? | 期权; 互换; 信用衍生品; ML定价 | **ML衍生品定价**: 机器学习+Monte Carlo, 衍生品定价 | `nt_world::finance::derivatives` |
+| D8514 | **Interest Rate Modeling** | 利率建模如何动态? | 短期利率; 利率期限结构; 随机模型; ML | **利率ML建模**: 短期利率+期限结构+ML, 利率动态建模 | `nt_world::finance::interest` |
+| D8515 | **FX Risk** | 外汇风险如何对冲? | 远期; 期权; 货币互换; 动态对冲 | **外汇对冲+动态**: 远期+期权+互换+动态, 外汇风险管理 | `nt_world::finance::fx` |
+| D8516 | **Commodity Risk** | 商品风险如何管理? | 期货套保; 期权; 基差风险; 供应链 | **商品套保+基差**: 期货+期权+基差+供应链, 商品风险管理 | `nt_world::finance::commodity` |
+| D8517 | **Climate Finance Risk** | 气候金融风险如何评估? | 转型风险; 物理风险; 有序转型; 气候压力测试 | **转型+物理风险**: 气候情景+压力测试+转型, 气候金融风险 | `nt_world::finance::climate_risk` |
+| D8518 | **ESG Investing** | ESG投资如何评估? | ESG评分; 可持续性; 影响力投资; 绿色金融 | **ESG评分+影响力**: ESG指标+可持续+影响力, ESG投资 | `nt_world::finance::esg` |
+| D8519 | **Robo-Advisory** | 智能投顾如何个性化? | 风险偏好; 资产配置; 再平衡; 税务优化 | **个性化+智能配置**: 风险偏好+配置+再平衡+税务, 智能投顾 | `nt_world::finance::robo` |
+| D8520 | **InsurTech** | 保险科技如何创新? | 风险定价; 理赔自动化; 欺诈检测; 个性化保单 | **AI保险**: 风险定价+理赔+欺诈+个性化, 保险科技 | `nt_world::finance::insurtech` |
+| D8521 | **RegTech** | 监管科技如何自动化? | 合规报告; 反洗钱; 交易监控; 监管沙盒 | **RegTech自动化**: 合规+反洗钱+监控+沙盒, 监管科技 | `nt_world::finance::regtech` |
+| D8522 | **Wealth Management** | 财富管理如何增值? | 资产配置; 税务规划; 遗产规划; 家族办公室 | **智能财富管理**: 资产+税务+遗产+家族, 财富管理优化 | `nt_world::finance::wealth` |
+| D8523 | **Market Making** | 做市如何报价? | 价差管理; 库存管理; 风险控制; 动态报价 | **动态做市**: 价差+库存+风险+报价, 做市策略优化 | `nt_world::finance::market_make` |
+| D8524 | **Statistical Arbitrage** | 统计套利如何盈利? | 协整; 配对交易; 因子模型; ML信号 | **协整+ML信号**: 协整+配对+因子+ML, 统计套利策略 | `nt_world::finance::stat_arb` |
+| D8525 | **Event-Driven Strategies** | 事件驱动策略如何捕捉? | 并购; 分拆; 分红; 业绩公告 | **事件驱动+ML**: 并购+分拆+分红+公告, 事件驱动策略 | `nt_world::finance::event` |
+| D8526 | **Volatility Trading** | 波动率交易如何策略? | 隐含波动率; 波动率微笑; VIX; 波动率套利 | **隐含+VIX+ML**: 隐含波动率+VIX+ML, 波动率交易 | `nt_world::finance::vol` |
+| D8527 | **Risk-Adjusted Returns** | 风险调整收益如何衡量? | 夏普比率; 索提诺; 卡尔马; 信息比率 | **多风险指标**: 夏普+索提诺+卡尔马+信息比率, 风险调整评估 | `nt_world::finance::risk_adj` |
+| D8528 | **Tail Risk** | 尾部风险如何管理? | 极值理论; 压力测试; 尾部对冲; 尾部风险预算 | **EVT+压力测试**: 极值理论+压力+尾部对冲, 尾部风险管理 | `nt_world::finance::tail` |
+| D8529 | **Correlation Modeling** | 相关性如何动态建模? | DCC-GARCH; Copula; 时变相关; 网络相关 | **DCC-GARCH+Copula**: 动态条件相关+Copula, 相关性建模 | `nt_world::finance::correlation` |
+| D8530 | **Factor Model** | 因子模型如何构建? | Fama-French; Barra; 机器学习因子; 非线性因子 | **Fama-French+ML因子**: 传统+机器学习因子, 因子模型 | `nt_world::finance::factor_model` |
+| D8531 | **Market Regime** | 市场状态如何识别? | 隐马尔可夫; 状态切换; ML状态识别; 波动率聚类 | **HMM+ML状态**: 隐马尔可夫+ML, 市场状态识别 | `nt_world::finance::regime` |
+| D8532 | **Portfolio Rebalancing** | 组合再平衡如何优化? | 交易成本; 税务; 阈值; 动态再平衡 | **成本+税务优化**: 交易成本+税务+阈值, 智能再平衡 | `nt_world::finance::rebalance` |
+| D8533 | **Alpha Generation** | Alpha如何产生? | 因子挖掘; 另类数据; ML信号; 信号组合 | **另类数据+ML**: 因子+另类+ML+组合, Alpha生成 | `nt_world::finance::alpha` |
+| D8534 | **Signal Combination** | 信号如何组合? | 多信号融合; 动态权重; 风险预算; 成本敏感 | **多信号+动态权重**: 信号融合+动态+风险, 信号组合 | `nt_world::finance::signal` |
+| D8535 | **Cost Optimization** | 交易成本如何优化? | 佣金; 价差; 冲击成本; 延迟 | **成本最小化**: 佣金+价差+冲击+延迟, 交易成本优化 | `nt_world::finance::cost` |
+| D8536 | **Latency Optimization** | 延迟如何降低? | 网络; 硬件; 软件; 共置 | **低延迟全链路**: 网络+硬件+软件+共置, 延迟优化 | `nt_world::finance::latency` |
+| D8537 | **Market Data** | 市场数据如何处理? | 实时数据; 历史数据; 另类数据; 数据质量 | **数据管线+质量**: 实时+历史+另类+质量, 市场数据处理 | `nt_world::finance::data` |
+| D8538 | **Financial NLP** | 金融NLP如何专业? | 金融文本; 简报; 年报; 监管文件 | **金融NLP**: 金融文本+简报+年报+监管, 金融文档分析 | `nt_world::finance::fin_nlp` |
+| D8539 | **Robotic Manipulation** | 机器人操作如何灵巧? | 抓取规划; 力控制; 手眼协调; 学习操作 | **抓取+力控制+学习**: 抓取规划+力控制+DRL学习, 灵巧操作 | `nt_act::robotics::manipulation` |
+| D8540 | **Locomotion** | 机器人运动如何行走? | 步态规划; 平衡控制; 能效; 全地形 | **步态+平衡+能效**: 步态规划+平衡+能效优化, 双足/四足运动 | `nt_act::robotics::locomotion` |
+| D8541 | **Human-Robot Interaction** | 人机交互如何自然? | 语音; 手势; 意图理解; 情感识别 | **多模态HRI**: 语音+手势+意图+情感, 自然人机交互 | `nt_act::robotics::hri` |
+| D8542 | **Skill Learning** | 技能学习如何高效? | 模仿学习; 强化学习; 元学习; 技能库 | **模仿+强化+元学习**: 多源学习+技能库, 机器人技能获取 | `nt_act::robotics::skill` |
+| D8543 | **Sim-to-Real Transfer** | 仿真到真实如何迁移? | 域随机化; 系统识别; 渐进迁移; 真实感渲染 | **域随机化+渐进迁移**: 仿真增强+渐进真实, sim2real迁移 | `nt_act::robotics::sim2real` |
+| D8544 | **Tactile Sensing** | 触觉感知如何丰富? | 力/力矩传感器; 触觉阵列; 滑觉检测; 材料识别 | **力+触觉阵列**: 力矩+触觉+滑觉+材料, 触觉感知 | `nt_act::robotics::tactile` |
+| D8545 | **Multi-Robot Systems** | 多机器人如何协调? | 分布式规划; 通信; 任务分配; 编队 | **分布式规划+编队**: 分布式+通信+分配+编队, 多机器人协调 | `nt_act::robotics::multi` |
+| D8546 | **Swarm Robotics** | 群体机器人如何涌现? | 群体智能; 自组织; 鲁棒性; 可扩展 | **群体智能+自组织**: 蚁群+涌现+鲁棒, 群体机器人 | `nt_act::robotics::swarm` |
+| D8547 | **Mobile Robot Navigation** | 移动机器人导航如何安全? | 路径规划; 避障; 动态环境; 语义导航 | **安全导航+语义**: 路径规划+避障+语义, 安全导航 | `nt_act::robotics::nav` |
+| D8548 | **Aerial Robotics** | 无人机如何自主? | UAV规划; 编队飞行; 避障; 搜救 | **UAV自主规划**: 路径+编队+避障+搜救, 无人机自主 | `nt_act::robotics::aerial` |
+| D8549 | **Underwater Robotics** | 水下机器人如何探索? | 水下SLAM; 声学感知; 水下通信; 采样 | **水下SLAM+声学**: 水下建图+声学感知, 水下探索 | `nt_act::robotics::underwater` |
+| D8550 | **Space Robotics** | 太空机器人如何作业? | 在轨操作; 着陆; 采样; 维修 | **太空在轨操作**: 在轨+着陆+采样+维修, 太空机器人 | `nt_act::robotics::space` |
+| D8551 | **Soft Robotics** | 软体机器人如何控制? | 柔性执行器; 形状记忆; 充气结构; 建模 | **柔性执行器+建模**: 形状记忆+充气+建模, 软体机器人控制 | `nt_act::robotics::soft` |
+| D8552 | **Grasping** | 抓取如何鲁棒? | 力闭合; 接触点; 抓取规划; 深度学习抓取 | **力闭合+深度学习**: 接触点优化+DRL抓取, 鲁棒抓取 | `nt_act::robotics::grasp` |
+| D8553 | **Assembly** | 装配如何自动化? | 精密装配; 力引导; 视觉伺服; 序列规划 | **力引导+视觉伺服**: 力控制+视觉引导+序列规划, 精密装配 | `nt_act::robotics::assembly` |
+| D8554 | **Welding** | 焊接如何质量? | 路径规划; 参数优化; 质量检测; 实时控制 | **路径+参数+质量**: 路径规划+参数优化+质量检测, 智能焊接 | `nt_act::robotics::welding` |
+| D8555 | **Painting** | 喷涂如何均匀? | 路径规划; 涂层厚度; 颜色匹配; 效率 | **路径+厚度+颜色**: 路径规划+涂层均匀+颜色匹配, 智能喷涂 | `nt_act::robotics::painting` |
+| D8556 | **Bin Picking** | 料箱拾取如何识别? | 点云分割; 6D位姿; 碰撞检测; 抓取规划 | **点云+6D位姿**: 点云分割+位姿估计+抓取, 料箱拾取 | `nt_act::robotics::binpick` |
+| D8557 | **Sorting** | 分拣如何快速? | 视觉识别; 气动吸盘; 传送带; 实时决策 | **视觉+气动分拣**: 视觉识别+气动执行+实时, 高速分拣 | `nt_act::robotics::sorting` |
+| D8558 | **Palletizing** | 码垛如何优化? | 路径规划; 重量分布; 效率; 柔性 | **路径+重量优化**: 码垛路径+重量分布+柔性, 高效码垛 | `nt_act::robotics::pallet` |
+| D8559 | **Pick and Place** | 取放如何精确? | 速度优化; 精度; 力控制; 柔性 | **速度+精度+力**: 速度优化+精度保证+力控制, 精确取放 | `nt_act::robotics::pickplace` |
+| D8560 | **Mobile Manipulation** | 移动操作如何集成? | 导航+操作; 避障; 平台稳定; 协调 | **导航+操作集成**: 移动平台+操作臂+协调, 移动操作 | `nt_act::robotics::mobile_manip` |
+| D8561 | **Reconfigurable Robotics** | 可重构机器人如何变形? | 模块化; 自重构; 拓扑规划; 协调 | **模块化自重构**: 模块组合+自重构+拓扑规划, 可重构机器人 | `nt_act::robotics::reconfig` |
+| D8562 | **Cooperative Manipulation** | 协作操作如何双臂? | 双臂协调; 力共享; 任务分配; 柔性 | **双臂协调+力共享**: 双臂协作+力分配+任务, 协作操作 | `nt_act::robotics::cooperative` |
+| D8563 | **Agricultural Robotics** | 农业机器人如何作业? | 作物识别; 精准喷洒; 采摘; 除草 | **作物识别+精准**: 视觉识别+精准喷洒+采摘, 智能农业 | `nt_act::robotics::agri` |
+| D8564 | **Construction Robotics** | 建筑机器人如何施工? | 3D打印; 砌砖; 测量; 安装 | **3D打印+砌砖**: 建筑3D打印+砌砖+测量, 建筑机器人 | `nt_act::robotics::construction` |
+| D8565 | **Medical Robotics** | 医疗机器人如何辅助? | 手术辅助; 康复; 护理; 药物配送 | **手术+康复辅助**: 手术导航+康复训练+护理, 医疗机器人 | `nt_act::robotics::medical` |
+| D8566 | **Service Robotics** | 服务机器人如何交互? | 导航; 语音; 任务执行; 个性化 | **导航+语音+任务**: 服务导航+语音交互+任务, 服务机器人 | `nt_act::robotics::service` |
+| D8567 | **Logistics Robotics** | 物流机器人如何高效? | 拣选; 分拣; 包装; 仓储管理 | **拣选+分拣+包装**: 自动拣选+分拣+包装, 物流机器人 | `nt_act::robotics::logistics` |
+| D8568 | **Cleaning Robotics** | 清洁机器人如何智能? | 路径规划; 避障; 识别脏污; 自清洁 | **路径+脏污识别**: 路径规划+脏污检测+自清洁, 智能清洁 | `nt_act::robotics::cleaning` |
+| D8569 | **Security Robotics** | 安防机器人如何巡逻? | 巡逻路径; 异常检测; 人脸识别; 报警 | **巡逻+异常检测**: 路径规划+异常检测+报警, 安防机器人 | `nt_act::robotics::security` |
+| D8570 | **Entertainment Robotics** | 娱乐机器人如何互动? | 表情识别; 动作生成; 个性化; 情感响应 | **表情+动作+情感**: 表情识别+动作生成+情感, 娱乐机器人 | `nt_act::robotics::entertainment` |
+| D8571 | **Educational Robotics** | 教育机器人如何教学? | 编程教育; STEM; 个性化学习; 协作 | **编程+STEM+个性化**: 编程教学+STEM+个性化, 教育机器人 | `nt_act::robotics::education` |
+| D8572 | **Exoskeleton** | 外骨骼如何助力? | 力辅助; 步态分析; 意图识别; 能效 | **力辅助+意图识别**: 力辅助+步态+意图, 智能外骨骼 | `nt_act::robotics::exoskeleton` |
+| D8573 | **Prosthetics** | 假肢如何自然? | 肌电控制; 意图识别; 触觉反馈; 自适应 | **肌电+意图+触觉**: 肌电信号+意图+触觉反馈, 智能假肢 | `nt_act::robotics::prosthetics` |
+| D8574 | **Teleoperation** | 遥操作如何实时? | 力反馈; 延迟补偿; 安全; 临场感 | **力反馈+延迟补偿**: 力反馈+延迟+安全, 实时遥操作 | `nt_act::robotics::teleop` |
+| D8575 | **Force Control** | 力控制如何柔顺? | 阻抗控制; 导纳控制; 力传感; 自适应 | **阻抗+导纳控制**: 阻抗+导纳+力传感, 柔顺力控制 | `nt_act::robotics::force_ctrl` |
+| D8576 | **Visual Servoing** | 视觉伺服如何精确? | 位置伺服; 图像伺服; 特征跟踪; 实时 | **位置+图像伺服**: 位置+图像+特征跟踪, 精确视觉伺服 | `nt_act::robotics::vservo` |
+| D8577 | **SLAM for Robotics** | 机器人SLAM如何鲁棒? | 视觉SLAM; LiDAR SLAM; 融合SLAM; 语义SLAM | **视觉+LiDAR融合SLAM**: 多传感器融合+语义, 鲁棒机器人SLAM | `nt_act::robotics::slam` |
+| D8578 | **Perception for Robotics** | 机器人感知如何全面? | 检测; 分割; 6D位姿; 点云 | **检测+分割+6D位姿**: 目标检测+语义分割+位姿, 全面机器人感知 | `nt_act::robotics::perception` |
+| D8579 | **Planning for Robotics** | 机器人规划如何高效? | 运动规划; 任务规划; 行为树; 决策树 | **运动+任务规划**: 运动规划+任务规划+行为树, 高效机器人规划 | `nt_act::robotics::planning` |
+| D8580 | **Control for Robotics** | 机器人控制如何稳定? | PID; MPC; 自适应控制; 学习控制 | **PID+MPC+学习**: PID+MPC+自适应+学习, 稳定机器人控制 | `nt_act::robotics::control` |
+| D8581 | **Robot Learning** | 机器人学习如何泛化? | 模仿学习; 强化学习; 元学习; 迁移学习 | **模仿+强化+元+迁移**: 多源学习+泛化, 机器人学习 | `nt_act::robotics::learning` |
+| D8582 | **Robot Safety** | 机器人安全如何保障? | 碰撞检测; 安全区域; 力限制; 紧急停止 | **碰撞检测+安全区域**: 碰撞检测+安全区域+力限制, 机器人安全 | `nt_act::robotics::safety` |
+| D8583 | **Robot Calibration** | 机器人标定如何精确? | 运动学标定; 力标定; 视觉标定; 在线标定 | **运动学+视觉标定**: 运动学+视觉+在线, 精确机器人标定 | `nt_act::robotics::calibration` |
+| D8584 | **Robot Modeling** | 机器人建模如何准确? | 运动学; 动力学; 摩擦; 柔性 | **运动学+动力学**: 运动学+动力学+摩擦, 准确机器人建模 | `nt_act::robotics::modeling` |
+| D8585 | **Robot Simulation** | 机器人仿真如何真实? | 物理引擎; 渲染; 传感器模型; 并行 | **物理引擎+渲染**: 物理+渲染+传感器, 真实机器人仿真 | `nt_act::robotics::simulation` |
+| D8586 | **Robot Benchmarking** | 机器人基准如何评估? | 操作基准; 导航基准; 感知基准; 效率基准 | **操作+导航+感知基准**: 标准化评估+排行榜, 机器人基准 | `nt_act::robotics::benchmark` |
+| D8587 | **Robot Hardware** | 机器人硬件如何选型? | 电机; 传感器; 执行器; 结构 | **电机+传感器选型**: 电机+传感器+执行器, 硬件选型指南 | `nt_act::robotics::hardware` |
+| D8588 | **Robot Middleware** | 机器人中间件如何集成? | ROS2; DDS; 通信; 协调 | **ROS2+DDS集成**: ROS2+DDS+通信+协调, 机器人中间件 | `nt_act::robotics::middleware` |
+| D8589 | **Robot Ecosystem** | 机器人生态如何建设? | 开源; 社区; 标准化; 工具链 | **开源+社区+标准**: 开源平台+社区+标准化, 机器人生态 | `nt_act::robotics::ecosystem` |
+| D8590 | **Fairness** | 公平性如何量化度量? | demographic parity; equalized odds; counterfactual fairness | **多维公平度量**: demographic parity+equalized odds+counterfactual, 统一公平评估 | `nt_shield::fairness::measure` |
+| D8591 | **Accountability** | 问责如何追溯决策? | decision logging; audit trail; blame assignment | **决策日志+审计链**: 完整决策记录+审计追溯+责任分配, 可问责决策 | `nt_shield::fairness::accountability` |
+| D8592 | **Transparency** | 透明度如何提升? | model cards; data sheets; decision reports | **模型卡+数据表**: 标准化模型卡+数据表+决策报告, 提升透明度 | `nt_shield::fairness::transparency` |
+| D8593 | **Bias Detection** | 偏见如何自动检测? | 统计测试; 对抗测试; 公平性指标 | **统计+对抗检测**: 统计测试+对抗测试+公平性指标, 自动偏见检测 | `nt_shield::fairness::detect` |
+| D8594 | **Bias Mitigation** | 偏见如何缓解? | 预处理; 训练中; 后处理; 对抗去偏 | **多阶段去偏**: 预处理+训练中+后处理+对抗, 系统偏见缓解 | `nt_shield::fairness::mitigate` |
+| D8595 | **Explainability** | 可解释性如何实现? | LIME; SHAP; 注意力; 反事实 | **多解释器集成**: LIME+SHAP+注意力+反事实, 多层次可解释性 | `nt_shield::fairness::explain` |
+| D8596 | **Interpretability** | 可解释性如何建立信任? | 规则提取; 特征重要性; 决策边界 | **规则提取+特征重要性**: 规则+特征+边界, 建立用户信任 | `nt_shield::fairness::interpret` |
+| D8597 | **Privacy Preservation** | 隐私如何保护? | 差分隐私; 联邦学习; 同态加密; 安全多方计算 | **差分隐私+联邦+同态**: 多层隐私保护, 数据安全利用 | `nt_shield::fairness::privacy` |
+| D8598 | **Ethical Considerations** | 伦理如何审查? | 伦理框架; 利益相关者; 风险评估; 透明决策 | **伦理框架+利益相关者**: 伦理原则+风险+透明, 负责任AI决策 | `nt_shield::fairness::ethics` |
+| D8599 | **Regulatory Compliance** | 合规如何保障? | GDPR; CCPA; EU AI Act; ISO 42001 | **GDPR+EU AI Act**: 隐私+AI法规+ISO, 多法规合规保障 | `nt_shield::fairness::compliance` |
+| D8600 | **Model Robustness** | 模型鲁棒性如何增强? | 对抗训练; 分布鲁棒; 模型集成 | **对抗+分布鲁棒**: 对抗训练+分布鲁棒优化, 增强模型鲁棒性 | `nt_shield::fairness::robustness` |
+| D8601 | **Data Governance** | 数据治理如何实施? | 数据质量; 数据血缘; 数据目录; 数据生命周期 | **质量+血缘+目录**: 数据质量+血缘+目录+生命周期, 完整数据治理 | `nt_shield::fairness::data_gov` |
+| D8602 | **Model Monitoring** | 模型监控如何持续? | 漂移检测; 性能监控; 公平性监控; 告警 | **漂移+公平性监控**: 漂移检测+性能+公平性+告警, 持续模型监控 | `nt_shield::fairness::monitor` |
+| D8603 | **Incident Response** | 事件响应如何快速? | 检测; 分类; 修复; 复盘 | **检测+分类+修复+复盘**: 快速检测+分类+修复+复盘, AI事件响应 | `nt_shield::fairness::incident` |
+| D8604 | **Stakeholder Engagement** | 利益相关者如何参与? | 需求收集; 反馈循环; 透明沟通; 持续参与 | **需求+反馈+沟通**: 需求收集+反馈循环+透明, 利益相关者参与 | `nt_shield::fairness::stakeholder` |
+| D8605 | **Risk Assessment** | 风险如何评估? | 风险矩阵; 影响分析; 概率评估; 缓解计划 | **风险矩阵+影响分析**: 风险矩阵+影响+概率+缓解, 系统风险评估 | `nt_shield::fairness::risk` |
+| D8606 | **Impact Assessment** | 影响如何评估? | 社会影响; 经济影响; 环境影响; 长期影响 | **社会+经济+环境**: 多维度影响评估, AI系统影响评估 | `nt_shield::fairness::impact` |
+| D8607 | **Consent Management** | 同意如何管理? | 知情同意; 撤回同意; 同意记录; 最小化 | **知情同意+撤回**: 知情同意+撤回+记录+最小化, 同意管理 | `nt_shield::fairness::consent` |
+| D8608 | **Data Minimization** | 数据最小化如何实施? | 必要数据; 保留期限; 匿名化; 删除 | **必要+保留+匿名化**: 必要数据+保留期限+匿名化, 数据最小化 | `nt_shield::fairness::minimize` |
+| D8609 | **Purpose Limitation** | 目的限制如何保障? | 目的明确; 目的绑定; 目的变更; 透明 | **目的明确+绑定**: 目的明确+绑定+变更控制, 目的限制 | `nt_shield::fairness::purpose` |
+| D8610 | **Human Oversight** | 人类监督如何实施? | 干预机制; 否决权; 监督层级; 紧急停止 | **干预+否决+监督**: 干预机制+否决权+监督层级, 人类监督 | `nt_shield::fairness::oversight` |
+| D8611 | **Audit Trail** | 审计追踪如何完整? | 决策日志; 操作日志; 变更日志; 访问日志 | **决策+操作+变更+访问**: 完整审计日志, 可追溯审计追踪 | `nt_shield::fairness::audit_trail` |
+| D8612 | **Model Versioning** | 模型版本如何管理? | 版本控制; 回滚; A/B测试; 灰度发布 | **版本+回滚+A/B**: 版本控制+回滚+A/B+灰度, 模型版本管理 | `nt_shield::fairness::versioning` |
+| D8613 | **Fairness Metrics** | 公平性指标如何选择? | 群体公平; 个体公平; 反事实公平; 因果公平 | **多维公平指标**: 群体+个体+反事实+因果, 公平性指标体系 | `nt_shield::fairness::metrics` |
+| D8614 | **Bias Audit** | 偏见审计如何系统化? | 定期审计; 自动审计; 第三方审计; 报告 | **定期+自动+第三方**: 定期+自动+第三方审计+报告, 系统化偏见审计 | `nt_shield::fairness::bias_audit` |
+| D8615 | **Fairness-Aware Learning** | 公平感知学习如何实现? | 公平约束; 对抗去偏; 因果公平; 多目标 | **公平约束+对抗+因果**: 公平约束+对抗+因果, 公平感知学习 | `nt_shield::fairness::fair_learn` |
+| D8616 | **Disparate Impact** | 差异影响如何检测? | 统计测试; 影响比; 间接歧视; 系统性偏见 | **统计测试+影响比**: 统计测试+影响比+间接歧视, 差异影响检测 | `nt_shield::fairness::disparate` |
+| D8617 | **Subgroup Fairness** | 子群体公平如何保障? | 子群体分析; 细粒度公平; 长尾公平 | **子群体+细粒度**: 子群体分析+细粒度+长尾, 子群体公平 | `nt_shield::fairness::subgroup` |
+| D8618 | **Intersectional Fairness** | 交叉公平如何评估? | 交叉属性; 多维度公平; 联合分析 | **交叉属性+多维度**: 交叉属性+多维度+联合, 交叉公平评估 | `nt_shield::fairness::intersectional` |
+| D8619 | **Temporal Fairness** | 时间公平如何动态? | 时间漂移; 动态公平; 持续公平 | **时间漂移+动态**: 时间漂移+动态+持续, 时间公平 | `nt_shield::fairness::temporal` |
+| D8620 | **Geographic Fairness** | 地理公平如何保障? | 区域差异; 本地化公平; 全球公平 | **区域差异+本地化**: 区域+本地化+全球, 地理公平 | `nt_shield::fairness::geographic` |
+| D8621 | **Age Fairness** | 年龄公平如何实施? | 年龄分组; 代际公平; 代内公平 | **年龄分组+代际**: 年龄分组+代际+代内, 年龄公平 | `nt_shield::fairness::age` |
+| D8622 | **Gender Fairness** | 性别公平如何保障? | 性别偏见; 性别中立; 性别平衡 | **性别偏见+中立**: 性别偏见检测+中立+平衡, 性别公平 | `nt_shield::fairness::gender` |
+| D8623 | **Racial Fairness** | 种族公平如何维护? | 种族偏见; 种族中立; 种族平衡 | **种族偏见+中立**: 种族偏见检测+中立+平衡, 种族公平 | `nt_shield::fairness::racial` |
+| D8624 | **Disability Fairness** | 残障公平如何保障? | 残障偏见; 无障碍设计; 辅助技术 | **残障偏见+无障碍**: 残障偏见检测+无障碍+辅助, 残障公平 | `nt_shield::fairness::disability` |
+| D8625 | **Socioeconomic Fairness** | 社会经济公平如何实施? | 经济偏见; 收入公平; 机会公平 | **经济偏见+收入+机会**: 经济偏见检测+收入+机会, 社会经济公平 | `nt_shield::fairness::socioeconomic` |
+| D8626 | **Federated Fairness** | 联邦公平如何跨机构? | 联邦公平; 跨机构公平; 聚合公平 | **联邦+跨机构**: 联邦公平+跨机构+聚合, 联邦公平 | `nt_shield::fairness::federated` |
+| D8627 | **Streaming Fairness** | 流式公平如何实时? | 实时公平; 流式公平; 在线公平 | **实时+流式+在线**: 实时+流式+在线公平, 流式公平 | `nt_shield::fairness::streaming` |
+| D8628 | **Reinforcement Learning Fairness** | 强化学习公平如何保障? | 状态公平; 奖励公平; 策略公平 | **状态+奖励+策略公平**: 状态+奖励+策略, 强化学习公平 | `nt_shield::fairness::rl` |
+| D8629 | **Generative Model Fairness** | 生成模型公平如何实现? | 生成偏见; 多样性; 表示公平 | **生成偏见+多样性+表示**: 生成偏见+多样性+表示, 生成模型公平 | `nt_shield::fairness::gen` |
+| D8630 | **Multi-Modal Fairness** | 多模态公平如何统一? | 跨模态公平; 模态公平; 融合公平 | **跨模态+模态+融合**: 跨模态+模态+融合公平, 多模态公平 | `nt_shield::fairness::multimodal` |
+| D8631 | **Transfer Learning Fairness** | 迁移学习公平如何保障? | 迁移偏见; 域公平; 任务公平 | **迁移偏见+域+任务**: 迁移偏见+域+任务公平, 迁移学习公平 | `nt_shield::fairness::transfer` |
+| D8632 | **Graph Fairness** | 图公平如何建模? | 图偏见; 节点公平; 边公平; 社区公平 | **图偏见+节点+边+社区**: 图偏见+节点+边+社区公平, 图公平 | `nt_shield::fairness::graph` |
+| D8633 | **Knowledge Graph Fairness** | 知识图谱公平如何检测? | KG偏见; 实体公平; 关系公平 | **KG偏见+实体+关系**: 知识图谱偏见+实体+关系公平 | `nt_shield::fairness::kg` |
+| D8634 | **Privacy-Utility Tradeoff** | 隐私-效用权衡如何优化? | 差分隐私epsilon; 效用度量; 自适应隐私 | **差分隐私+效用度量**: 隐私epsilon+效用+自适应, 隐私-效用优化 | `nt_shield::fairness::priv_util` |
+| D8635 | **Differential Privacy in Practice** | 差分隐私实践如何实施? | 机构敏感度; 组合定理; 预算分配 | **机构+组合+预算**: 机构敏感度+组合+预算分配, 差分隐私实践 | `nt_shield::fairness::dp_practice` |
+| D8636 | **Federated Learning Privacy** | 联邦学习隐私如何保护? | 安全聚合; 差分隐私; 同态加密 | **安全聚合+差分隐私+同态**: 安全聚合+差分隐私+同态加密, 联邦隐私 | `nt_shield::fairness::fl_privacy` |
+| D8637 | **Model Inversion Protection** | 模型反演如何防御? | 输出扰动; 推理限制; 联邦推理 | **输出扰动+推理限制+联邦**: 输出扰动+推理限制+联邦, 模型反演防御 | `nt_shield::fairness::invert_protect` |
+| D8638 | **Membership Inference Defense** | 成员推断如何防御? | 正则化; 对抗训练; 差分隐私 | **正则化+对抗+差分隐私**: 正则化+对抗+差分隐私, 成员推断防御 | `nt_shield::fairness::mem_protect` |
+| D8639 | **Fair Lending** | 公平借贷如何实施? | 信用公平; 贷款公平; 利率公平 | **信用+贷款+利率公平**: 信用+贷款+利率公平, 公平借贷 | `nt_shield::fairness::lending` |
+| D8640 | **Fair Hiring** | 公平招聘如何保障? | 招聘公平; 简历筛选公平; 面试公平 | **招聘+简历+面试公平**: 招聘+简历+面试公平, 公平招聘 | `nt_shield::fairness::hiring` |
+| D8641 | **Fair Policing** | 公平执法如何实施? | 预测警务公平; 人脸识别公平; 执法公平 | **预测+识别+执法公平**: 预测+识别+执法公平, 公平执法 | `nt_shield::fairness::policing` |
+
+### 0.N 前沿研究吸收决策 (Deep Absorption Batch 2026-09-09)
+
+> 从量子计算/神经形态/最优传输/TDA/元学习/自组织/进化计算/概率编程/图信号处理/知识蒸馏吸收中提炼。
+
+#### 量子计算与ML决策
+
+| D8642 | **Quantum Neural Networks** | 量子神经网络如何实现? | Quantum NN (2026): 变分量子线路+参数化门+量子态演化; NISQ时代可行 | **量子NN**: 变分量子线路; 与 D621 量子感知协同 | `nt_core::quantum::qnn` |
+| D8643 | **Variational Quantum Circuits** | 变分量子线路如何优化? | VQC (2026): 参数化量子门+经典优化器; 梯度估计; 量子误差缓解 | **VQC**: 参数化线路优化; 与 D8642 量子NN协同 | `nt_core::quantum::vqc` |
+| D8644 | **Quantum Kernel Methods** | 量子核方法如何实现? | Quantum Kernels (2026): 量子特征映射+量子核矩阵; SVM量子增强 | **量子核方法**: 量子特征映射; 与 D8642 量子NN协同 | `nt_core::quantum::qkernel` |
+| D8645 | **Quantum Generative Models** | 量子生成模型如何实现? | Quantum Generative (2026): 量子GAN+量子VAE; 量子态采样; 合成数据 | **量子生成**: 量子GAN+VAE; 与 D8642 量子NN协同 | `nt_core::quantum::qgen` |
+| D8646 | **Quantum Approximate Optimization** | QAOA如何优化组合问题? | QAOA (2026): 量子近似优化; 组合优化; MaxCut; 量子优势验证 | **QAOA**: 组合优化近似; 与 D8642 量子NN协同 | `nt_core::quantum::qaoa` |
+| D8647 | **Hybrid Quantum-Classical Models** | 混合量子-经典如何协同? | Hybrid QC (2026): 量子特征提取+经典分类; 参数高效; NISQ适配 | **混合模型**: 量子提取+经典分类; 与 D8642 量子NN协同 | `nt_core::quantum::hybrid` |
+| D8648 | **Quantum Error Mitigation** | 量子误差如何缓解? | Error Mitigation (2026): 零噪声外推+概率误差消除+量子纠错码 | **量子误差缓解**: ZNE+PEC; 与 D8642 量子NN协同 | `nt_core::quantum::error_mit` |
+| D8649 | **Amplitude Encoding** | 振幅编码如何实现? | Amplitude Encoding (2026): 对数级量子比特; 指数压缩; 解码复杂度 | **振幅编码**: 对数级压缩; 与 D8642 量子NN协同 | `nt_core::quantum::amp_encode` |
+| D8650 | **Quantum GANs** | 量子GAN如何生成数据? | Quantum GAN (2026): 量子判别器+经典生成器; FID改进; 训练稳定性 | **量子GAN**: 量子判别器+经典生成器; 与 D8645 量子生成协同 | `nt_core::quantum::qgan` |
+| D8651 | **Variational Quantum Eigensolver** | VQE如何求解化学问题? | VQE (2026): 量子化学模拟; 分子基态能量; 变分原理 | **VQE**: 量子化学模拟; 与 D8643 VQC协同 | `nt_core::quantum::vqe` |
+| D8652 | **Quantum Annealing** | 组合优化如何量子加速? | Quantum Annealing (2026): D-Wave退火机; 离散优化; 隧穿效应 | **量子退火**: 组合优化加速; 与 D8646 QAOA协同 | `nt_core::quantum::qanneal` |
+| D8653 | **Quantum Walk Algorithms** | 量子行走如何加速搜索? | Quantum Walks (2026): 指数加速图搜索; 格搜索; PageRank量子版 | **量子行走**: 指数加速搜索; 与 D8642 量子NN协同 | `nt_core::quantum::qwalk` |
+| D8654 | **Quantum Transfer Learning** | 量子迁移学习如何实现? | Quantum Transfer (2026): 量子预训练+经典微调; 跨域适应; 少样本 | **量子迁移**: 量子预训练+经典微调; 与 D8642 量子NN协同 | `nt_core::quantum::qtransfer` |
+| D8655 | **Quantum Attention Mechanisms** | 量子注意力如何实现? | Quantum Attention (2026): 量子多头注意力; 叠加态并行; O(log n)复杂度 | **量子注意力**: 叠加态并行注意力; 与 D8642 量子NN协同 | `nt_core::quantum::qattention` |
+| D8656 | **Quantum Convolutional Networks** | 量子卷积网络如何实现? | QCNN (2026): 量子卷积层+池化层; 局部连接; 图像分类 | **量子卷积**: 量子卷积+池化; 与 D8642 量子NN协同 | `nt_core::quantum::qconv` |
+| D8657 | **Quantum Recurrent Networks** | 量子循环网络如何实现? | QRNN (2026): 量子状态演化; 序列建模; 量子LSTM | **量子循环**: 量子状态演化序列建模; 与 D8642 量子NN协同 | `nt_core::quantum::qrnn` |
+| D8658 | **Quantum Graph Networks** | 量子图网络如何实现? | QGNN (2026): 量子图卷积; 量子消息传递; 分子属性预测 | **量子图网络**: 量子消息传递; 与 D8642 量子NN协同 | `nt_core::quantum::qgnn` |
+| D8659 | **Quantum Reinforcement Learning** | 量子强化学习如何实现? | Quantum RL (2026): 量子策略梯度; 量子值函数; 探索加速 | **量子RL**: 量子策略梯度; 与 D8642 量子NN协同 | `nt_core::quantum::qrl` |
+| D8660 | **Quantum Federated Learning** | 量子联邦学习如何实现? | Quantum FL (2026): 量子安全聚合; 隐私保护; 分布式量子训练 | **量子联邦**: 量子安全聚合; 与 D8642 量子NN协同 | `nt_core::quantum::qfl` |
+| D8661 | **Quantum Contrastive Learning** | 量子对比学习如何实现? | Quantum Contrastive (2026): 量子正负样本对; 量子InfoNCE; 无监督学习 | **量子对比**: 量子InfoNCE; 与 D8642 量子NN协同 | `nt_core::quantum::qcontrast` |
+| D8662 | **Quantum Autoencoders** | 量子自编码器如何实现? | Quantum Autoencoder (2026): 量子编码-解码; 数据压缩; 降维 | **量子自编码**: 量子编码-解码压缩; 与 D8642 量子NN协同 | `nt_core::quantum::qautoenc` |
+| D8663 | **Quantum Few-Shot Learning** | 量子少样本如何实现? | Quantum Few-Shot (2026): 量子原型网络; 量子MAML; 快速适应 | **量子少样本**: 量子原型+MAML; 与 D8642 量子NN协同 | `nt_core::quantum::qfewshot` |
+| D8664 | **Quantum Neural Architecture Search** | 量子神经架构搜索如何实现? | QNAS (2026): 量子搜索空间; 量子进化算法; 自动架构设计 | **QNAS**: 量子搜索空间+进化; 与 D8642 量子NN协同 | `nt_core::quantum::qnas` |
+| D8665 | **Quantum Knowledge Distillation** | 量子知识蒸馏如何实现? | Quantum KD (2026): 量子教师-学生; 量子特征蒸馏; 模型压缩 | **量子蒸馏**: 量子教师-学生; 与 D8642 量子NN协同 | `nt_core::quantum::qkd` |
+| D8666 | **Quantum Meta-Learning** | 量子元学习如何实现? | Quantum Meta (2026): 量子MAML; 量子任务分布; 快速适应 | **量子元学习**: 量子MAML; 与 D8642 量子NN协同 | `nt_core::quantum::qmeta` |
+| D8667 | **Quantum Continual Learning** | 量子持续学习如何实现? | Quantum Continual (2026): 量子弹性权重; 量子回放; 灾难性遗忘缓解 | **量子持续**: 量子弹性权重+回放; 与 D8642 量子NN协同 | `nt_core::quantum::qcontinual` |
+| D8668 | **Quantum Adversarial Training** | 量子对抗训练如何实现? | Quantum Adv (2026): 量子FGSM; 量子PGD; 鲁棒性认证 | **量子对抗**: 量子FGSM+PGD; 与 D8642 量子NN协同 | `nt_core::quantum::qadv` |
+| D8669 | **Quantum Anomaly Detection** | 量子异常检测如何实现? | Quantum Anomaly (2026): 量子OCC; 量子隔离森林; 异常评分 | **量子异常**: 量子OCC+隔离森林; 与 D8642 量子NN协同 | `nt_core::quantum::qanomaly` |
+| D8670 | **Quantum Time Series** | 量子时间序列如何实现? | Quantum TS (2026): 量子LSTM; 量子Transformer; 序列预测 | **量子时间序列**: 量子LSTM+Transformer; 与 D8642 量子NN协同 | `nt_core::quantum::qts` |
+| D8671 | **Quantum NLP** | 量子NLP如何实现? | Quantum NLP (2026): 量子词嵌入; 量子语义; 文本分类 | **量子NLP**: 量子词嵌入+语义; 与 D8642 量子NN协同 | `nt_core::quantum::qnlp` |
+| D8672 | **Quantum Computer Vision** | 量子计算机视觉如何实现? | Quantum CV (2026): 量子图像处理; 量子目标检测; 量子分割 | **量子视觉**: 量子图像处理+检测; 与 D8642 量子NN协同 | `nt_core::quantum::qcv` |
+| D8673 | **Quantum Speech Recognition** | 量子语音识别如何实现? | Quantum Speech (2026): 量子声学模型; 量子解码器; 语音转文本 | **量子语音**: 量子声学+解码; 与 D8642 量子NN协同 | `nt_core::quantum::qspeech` |
+| D8674 | **Quantum Recommendation Systems** | 量子推荐系统如何实现? | Quantum RecSys (2026): 量子协同过滤; 量子矩阵分解; 推荐加速 | **量子推荐**: 量子协同过滤+矩阵分解; 与 D8642 量子NN协同 | `nt_core::quantum::qrecsys` |
+| D8675 | **Quantum Drug Discovery** | 量子药物发现如何实现? | Quantum Drug (2026): 量子分子模拟; 量子虚拟筛选; 药物设计 | **量子药物**: 量子分子模拟+筛选; 与 D8651 VQE协同 | `nt_core::quantum::qdrug` |
+| D8676 | **Quantum Materials Science** | 量子材料科学如何实现? | Quantum Materials (2026): 量子材料模拟; 晶体结构预测; 属性优化 | **量子材料**: 量子材料模拟; 与 D8651 VQE协同 | `nt_core::quantum::qmaterials` |
+| D8677 | **Quantum Climate Modeling** | 量子气候建模如何实现? | Quantum Climate (2026): 量子气候模拟; 大气动力学; 预测加速 | **量子气候**: 量子气候模拟; 与 D8642 量子NN协同 | `nt_core::quantum::qclimate` |
+| D8678 | **Quantum Financial Modeling** | 量子金融建模如何实现? | Quantum Finance (2026): 量子期权定价; 量子风险分析; 投资组合优化 | **量子金融**: 量子定价+风险分析; 与 D8642 量子NN协同 | `nt_core::quantum::qfinance` |
+| D8679 | **Quantum Logistics Optimization** | 量子物流优化如何实现? | Quantum Logistics (2026): 量子路径规划; 量子调度; 供应链优化 | **量子物流**: 量子路径+调度; 与 D8646 QAOA协同 | `nt_core::quantum::qlogistics` |
+| D8680 | **Quantum Energy Optimization** | 量子能源优化如何实现? | Quantum Energy (2026): 量子电网优化; 能源调度; 可再生能源集成 | **量子能源**: 量子电网+调度; 与 D8646 QAOA协同 | `nt_core::quantum::qenergy` |
+| D8681 | **Quantum Network Optimization** | 量子网络优化如何实现? | Quantum Network (2026): 量子路由; 量子负载均衡; 网络拓扑优化 | **量子网络**: 量子路由+负载均衡; 与 D8646 QAOA协同 | `nt_core::quantum::qnetwork` |
+| D8682 | **Quantum Traffic Optimization** | 量子交通优化如何实现? | Quantum Traffic (2026): 量子信号控制; 量子路径规划; 拥堵预测 | **量子交通**: 量子信号+路径规划; 与 D8646 QAOA协同 | `nt_core::quantum::qtraffic` |
+| D8683 | **Quantum Protein Folding** | 量子蛋白质折叠如何实现? | Quantum Protein (2026): 量子折叠预测; 能量最小化; 结构优化 | **量子折叠**: 量子折叠预测; 与 D8651 VQE协同 | `nt_core::quantum::qprotein` |
+| D8684 | **Quantum Genomics** | 量子基因组学如何实现? | Quantum Genomics (2026): 量子序列比对; 基因注释; 变异检测 | **量子基因组**: 量子序列比对; 与 D8642 量子NN协同 | `nt_core::quantum::qgenomics` |
+| D8685 | **Quantum Proteomics** | 量子蛋白质组学如何实现? | Quantum Proteomics (2026): 量子质谱分析; 蛋白质鉴定; 定量分析 | **量子蛋白质组**: 量子质谱分析; 与 D8642 量子NN协同 | `nt_core::quantum::qproteomics` |
+| D8686 | **Quantum Metabolomics** | 量子代谢组学如何实现? | Quantum Metabolomics (2026): 量子代谢物检测; 通路分析; 生物标记物 | **量子代谢组**: 量子代谢物检测; 与 D8642 量子NN协同 | `nt_core::quantum::qmetabolomics` |
+| D8687 | **Quantum Microscopy** | 量子显微镜如何实现? | Quantum Microscopy (2026): 量子成像; 超分辨率; 量子增强检测 | **量子显微**: 量子成像+超分辨; 与 D8642 量子NN协同 | `nt_core::quantum::qmicroscopy` |
+| D8688 | **Quantum Sensing** | 量子传感如何实现? | Quantum Sensing (2026): 量子磁力计; 量子陀螺仪; 超精密测量 | **量子传感**: 量子磁力+陀螺仪; 与 D8642 量子NN协同 | `nt_core::quantum::qsensing` |
+| D8689 | **Quantum Communication** | 量子通信如何实现? | Quantum Comm (2026): 量子密钥分发; 量子隐形传态; 安全通信 | **量子通信**: 量子密钥+隐形传态; 与 D8642 量子NN协同 | `nt_core::quantum::qcomm` |
+| D8690 | **Quantum Simulation** | 量子模拟如何实现? | Quantum Sim (2026): 量子系统模拟; 材料属性; 化学反应 | **量子模拟**: 量子系统模拟; 与 D8651 VQE协同 | `nt_core::quantum::qsim` |
+| D8691 | **Quantum Optimization** | 量子优化如何实现? | Quantum Opt (2026): 量子退火; QAOA; 变分优化; 组合优化 | **量子优化**: 退火+QAOA+变分; 与 D8646 QAOA协同 | `nt_core::quantum::qopt` |
+| D8692 | **Quantum Machine Learning Survey** | 量子ML综述如何实现? | QML Survey (2026): NISQ算法; 量子优势; 应用场景; 挑战 | **量子ML综述**: NISQ算法+优势+应用; 与 D8642 量子NN协同 | `nt_core::quantum::qsurvey` |
+
+#### 神经形态计算决策
+
+| D8693 | **Spiking Neural Networks** | 脉冲神经网络如何实现? | SNN (2026): 脉冲编码; 事件驱动; 低功耗推理; 生物可解释 | **SNN**: 脉冲编码+事件驱动; 与 D829 边缘部署+D176 资源预算协同 | `nt_physical::snn` |
+| D8694 | **Membrane Potential Models** | 膜电位模型如何实现? | Membrane Potential (2026): LIF; Izhikevich; Hodgkin-Huxley; 生物精确 | **膜电位模型**: LIF+Izhikevich; 与 D8693 SNN协同 | `nt_physical::membrane` |
+| D8695 | **Event-Driven Processing** | 事件驱动处理如何实现? | Event-Driven (2026): 异步脉冲; 稀疏激活; 低延迟; 节能 | **事件驱动**: 异步脉冲+稀疏激活; 与 D8693 SNN协同 | `nt_physical::event_driven` |
+| D8696 | **Synaptic Plasticity** | 突触可塑性如何实现? | Synaptic Plasticity (2026): 长时增强; 长时抑制; 突触权重更新 | **突触可塑性**: LTP+LTD; 与 D8693 SNN协同 | `nt_physical::synaptic` |
+| D8697 | **Spike-Timing Dependent Plasticity** | STDP如何实现? | STDP (2026): 时间依赖可塑性; 脉冲时序; 无监督学习 | **STDP**: 时间依赖可塑性; 与 D8696 突触可塑性协同 | `nt_physical::stdp` |
+| D8698 | **Intel Loihi Architecture** | Loihi架构如何实现? | Loihi (2026): Intel神经形态芯片; 128核; 片上学习; 低功耗 | **Loihi**: 128核+片上学习; 与 D8693 SNN协同 | `nt_physical::loihi` |
+| D8699 | **IBM TrueNorth Architecture** | TrueNorth架构如何实现? | TrueNorth (2026): IBM神经形态芯片; 100万神经元; 事件驱动 | **TrueNorth**: 100万神经元; 与 D8693 SNN协同 | `nt_physical::truenorth` |
+| D8700 | **SpiNNaker Architecture** | SpiNNaker架构如何实现? | SpiNNaker (2026): 曼彻斯特神经形态; 百万核; 实时仿真 | **SpiNNaker**: 百万核+实时仿真; 与 D8693 SNN协同 | `nt_physical::spinnaker` |
+| D8701 | **BrainScaleS Architecture** | BrainScaleS架构如何实现? | BrainScaleS (2026): 海德堡神经形态; 模拟加速; 1000x实时 | **BrainScaleS**: 模拟加速1000x; 与 D8693 SNN协同 | `nt_physical::brainscales` |
+| D8702 | **Neuromorphic Hardware Survey** | 神经形态硬件综述如何实现? | Neuro HW Survey (2026): Loihi/TrueNorth/SpiNNaker/BrainScaleS对比 | **神经形态综述**: 多芯片对比; 与 D8693 SNN协同 | `nt_physical::neuro_hw_survey` |
+| D8703 | **Bio-Plausible Learning** | 生物可塑学习如何实现? | Bio-Learning (2026): 反向传播替代; 局部学习规则; 脉冲时间依赖 | **生物可塑学习**: 局部学习+脉冲时间; 与 D8697 STDP协同 | `nt_physical::bio_learning` |
+| D8704 | **Surrogate Gradient Learning** | 代理梯度学习如何实现? | Surrogate Gradient (2026): 可微脉冲近似; 梯度估计; SNN训练 | **代理梯度**: 可微脉冲近似; 与 D8693 SNN协同 | `nt_physical::surrogate` |
+| D8705 | **Neuromorphic Vision** | 神经形态视觉如何实现? | Neuro Vision (2026): 事件相机; 动态视觉传感器; 低延迟检测 | **神经形态视觉**: 事件相机+DVS; 与 D8693 SNN协同 | `nt_physical::neuro_vision` |
+| D8706 | **Neuromorphic Auditory Processing** | 神经形态听觉如何实现? | Neuro Auditory (2026): 脉冲音频编码; 声源定位; 语音识别 | **神经形态听觉**: 脉冲音频编码; 与 D8693 SNN协同 | `nt_physical::neuro_auditory` |
+| D8707 | **Event Cameras** | 事件相机如何实现? | Event Cameras (2026): 异步像素; 高动态范围; 低延迟; 高帧率 | **事件相机**: 异步像素+高动态; 与 D8705 神经形态视觉协同 | `nt_physical::event_camera` |
+| D8708 | **Neuromorphic Control Systems** | 神经形态控制系统如何实现? | Neuro Control (2026): 实时闭环; 低延迟反馈; 机器人控制 | **神经形态控制**: 实时闭环+低延迟; 与 D8693 SNN协同 | `nt_physical::neuro_control` |
+| D8709 | **Neuromorphic Robotics** | 神经形态机器人如何实现? | Neuro Robotics (2026): 事件驱动感知; 脉冲运动控制; 仿生机器人 | **神经形态机器人**: 事件驱动+脉冲控制; 与 D8693 SNN协同 | `nt_physical::neuro_robotics` |
+| D8710 | **Neuromorphic Edge Computing** | 神经形态边缘计算如何实现? | Neuro Edge (2026): 超低功耗推理; 实时处理; 嵌入式部署 | **神经形态边缘**: 超低功耗+实时; 与 D829 边缘部署协同 | `nt_physical::neuro_edge` |
+| D8711 | **Neuromorphic Signal Processing** | 神经形态信号处理如何实现? | Neuro Signal (2026): 脉冲滤波; 事件驱动变换; 实时处理 | **神经形态信号**: 脉冲滤波+事件驱动; 与 D8693 SNN协同 | `nt_physical::neuro_signal` |
+| D8712 | **Neuromorphic Learning Algorithms** | 神经形态学习算法如何实现? | Neuro Learning (2026): STDP+代理梯度+本地规则; 片上学习 | **神经形态学习**: STDP+代理梯度+本地规则; 与 D8697 STDP协同 | `nt_physical::neuro_learning` |
+| D8713 | **Neuromorphic Network Architectures** | 神经形态网络架构如何实现? | Neuro Arch (2026): 脉冲层; 脉冲池化; 脉冲残差连接 | **神经形态架构**: 脉冲层+池化+残差; 与 D8693 SNN协同 | `nt_physical::neuro_arch` |
+| D8714 | **Neuromorphic Optimization** | 神经形态优化如何实现? | Neuro Opt (2026): 脉冲梯度下降; 代理损失; 训练加速 | **神经形态优化**: 脉冲梯度+代理损失; 与 D8693 SNN协同 | `nt_physical::neuro_opt` |
+| D8715 | **Neuromorphic Compression** | 神经形态压缩如何实现? | Neuro Compress (2026): 脉冲稀疏编码; 事件压缩; 存储优化 | **神经形态压缩**: 脉冲稀疏+事件压缩; 与 D8693 SNN协同 | `nt_physical::neuro_compress` |
+| D8716 | **Neuromorphic Security** | 神经形态安全如何实现? | Neuro Security (2026): 脉冲对抗攻击; 鲁棒性; 侧信道防护 | **神经形态安全**: 脉冲攻击+鲁棒性; 与 D8693 SNN协同 | `nt_physical::neuro_security` |
+| D8717 | **Neuromorphic Benchmarking** | 神经形态基准测试如何实现? | Neuro Benchmark (2026): 功耗指标; 延迟指标; 准确率指标 | **神经形态基准**: 功耗+延迟+准确率; 与 D8693 SNN协同 | `nt_physical::neuro_benchmark` |
+| D8718 | **Neuromorphic Simulation** | 神经形态仿真如何实现? | Neuro Sim (2026): GPU加速SNN; 大规模仿真; 实时性 | **神经形态仿真**: GPU加速+大规模; 与 D8693 SNN协同 | `nt_physical::neuro_sim` |
+| D8719 | **Neuromorphic Materials** | 神经形态材料如何实现? | Neuro Materials (2026): 忆阻器; 相变存储; 量子点; 突触器件 | **神经形态材料**: 忆阻器+相变存储; 与 D8693 SNN协同 | `nt_physical::neuro_materials` |
+| D8720 | **Neuromorphic Energy Efficiency** | 神经形态能效如何实现? | Neuro Energy (2026): 事件驱动节能; 稀疏激活; 动态功耗管理 | **神经形态能效**: 事件驱动+稀疏激活; 与 D8693 SNN协同 | `nt_physical::neuro_energy` |
+| D8721 | **Neuromorphic Scalability** | 神经形态可扩展性如何实现? | Neuro Scale (2026): 多芯片互联; 分布式SNN; 水平扩展 | **神经形态可扩展**: 多芯片互联+分布式; 与 D8693 SNN协同 | `nt_physical::neuro_scale` |
+| D8722 | **Neuromorphic Fault Tolerance** | 神经形态容错如何实现? | Neuro Fault (2026): 脉冲冗余; 优雅降级; 自修复 | **神经形态容错**: 脉冲冗余+自修复; 与 D8693 SNN协同 | `nt_physical::neuro_fault` |
+| D8723 | **Neuromorphic Plasticity Rules** | 神经形态可塑性规则如何实现? | Neuro Plasticity (2026): STDP变体; 三因子学习; 奖励调制 | **神经形态可塑性**: STDP变体+三因子; 与 D8697 STDP协同 | `nt_physical::neuro_plasticity` |
+| D8724 | **Neuromorphic Attention Mechanisms** | 神经形态注意力如何实现? | Neuro Attention (2026): 脉冲注意力; 事件驱动聚焦; 显著性检测 | **神经形态注意力**: 脉冲注意力+事件聚焦; 与 D8693 SNN协同 | `nt_physical::neuro_attention` |
+| D8725 | **Neuromorphic Memory Systems** | 神经形态记忆系统如何实现? | Neuro Memory (2026): 脉冲关联记忆; 事件缓冲; 短期/长期记忆 | **神经形态记忆**: 脉冲关联+事件缓冲; 与 D8693 SNN协同 | `nt_physical::neuro_memory` |
+| D8726 | **Neuromorphic Decision Making** | 神经形态决策如何实现? | Neuro Decision (2026): 脉冲积分-发放; 阈值决策; 置信度积累 | **神经形态决策**: 脉冲积分+阈值决策; 与 D8693 SNN协同 | `nt_physical::neuro_decision` |
+| D8727 | **Neuromorphic Pattern Recognition** | 神经形态模式识别如何实现? | Neuro Pattern (2026): 脉冲模式匹配; 动态时间规整; 实时识别 | **神经形态模式**: 脉冲模式匹配+DTW; 与 D8693 SNN协同 | `nt_physical::neuro_pattern` |
+| D8728 | **Neuromorphic Anomaly Detection** | 神经形态异常检测如何实现? | Neuro Anomaly (2026): 事件异常评分; 脉冲偏差检测; 实时预警 | **神经形态异常**: 事件异常+脉冲偏差; 与 D8693 SNN协同 | `nt_physical::neuro_anomaly` |
+| D8729 | **Neuromorphic Feature Extraction** | 神经形态特征提取如何实现? | Neuro Feature (2026): 脉冲特征编码; 事件特征; 层级特征 | **神经形态特征**: 脉冲编码+事件特征; 与 D8693 SNN协同 | `nt_physical::neuro_feature` |
+| D8730 | **Neuromorphic Clustering** | 神经形态聚类如何实现? | Neuro Cluster (2026): 脉冲竞争学习; 自组织映射; 实时聚类 | **神经形态聚类**: 脉冲竞争+自组织; 与 D8693 SNN协同 | `nt_physical::neuro_cluster` |
+| D8731 | **Neuromorphic Regression** | 神经形态回归如何实现? | Neuro Regression (2026): 脉冲回归; 连续值预测; 时间序列 | **神经形态回归**: 脉冲回归+连续预测; 与 D8693 SNN协同 | `nt_physical::neuro_regression` |
+| D8732 | **Neuromorphic Classification** | 神经形态分类如何实现? | Neuro Classification (2026): 脉冲分类; 多类别; 层级分类 | **神经形态分类**: 脉冲分类+多类别; 与 D8693 SNN协同 | `nt_physical::neuro_classification` |
+| D8733 | **Neuromorphic Generation** | 神经形态生成如何实现? | Neuro Generation (2026): 脉冲生成网络; 事件驱动采样; 合成数据 | **神经形态生成**: 脉冲生成+事件采样; 与 D8693 SNN协同 | `nt_physical::neuro_generation` |
+| D8734 | **Neuromorphic Sequence Modeling** | 神经形态序列建模如何实现? | Neuro Sequence (2026): 脉冲RNN; 事件驱动序列; 时间编码 | **神经形态序列**: 脉冲RNN+事件序列; 与 D8693 SNN协同 | `nt_physical::neuro_sequence` |
+| D8735 | **Neuromorphic Transfer Learning** | 神经形态迁移学习如何实现? | Neuro Transfer (2026): 脉冲预训练; 跨任务迁移; 少样本适应 | **神经形态迁移**: 脉冲预训练+迁移; 与 D8693 SNN协同 | `nt_physical::neuro_transfer` |
+| D8736 | **Neuromorphic Online Learning** | 神经形态在线学习如何实现? | Neuro Online (2026): 流式脉冲学习; 实时适应; 增量更新 | **神经形态在线**: 流式脉冲+实时适应; 与 D8693 SNN协同 | `nt_physical::neuro_online` |
+| D8737 | **Neuromorphic Federated Learning** | 神经形态联邦学习如何实现? | Neuro FL (2026): 分布式脉冲学习; 隐私保护; 边缘协同 | **神经形态联邦**: 分布式脉冲+隐私; 与 D8693 SNN协同 | `nt_physical::neuro_fl` |
+| D8738 | **Neuromorphic Continual Learning** | 神经形态持续学习如何实现? | Neuro Continual (2026): 脉冲弹性权重; 灾难性遗忘缓解; 增量学习 | **神经形态持续**: 脉冲弹性权重+增量; 与 D8693 SNN协同 | `nt_physical::neuro_continual` |
+| D8739 | **Neuromorphic Meta-Learning** | 神经形态元学习如何实现? | Neuro Meta (2026): 脉冲MAML; 快速适应; 任务间迁移 | **神经形态元学习**: 脉冲MAML+快速适应; 与 D8693 SNN协同 | `nt_physical::neuro_meta` |
+| D8740 | **Neuromorphic Adversarial Robustness** | 神经形态对抗鲁棒性如何实现? | Neuro Adv (2026): 脉冲对抗训练; 鲁棒性认证; 防御机制 | **神经形态对抗**: 脉冲对抗训练+认证; 与 D8693 SNN协同 | `nt_physical::neuro_adv` |
+| D8741 | **Neuromorphic Interpretability** | 神经形态可解释性如何实现? | Neuro XAI (2026): 脉冲可视化; 神经元激活分析; 决策解释 | **神经形态可解释**: 脉冲可视化+激活分析; 与 D8693 SNN协同 | `nt_physical::neuro_xai` |
+| D8742 | **Neuromorphic Hardware-Software Co-Design** | 神经形态软硬协同如何实现? | Neuro Co-Design (2026): 编译器优化; 指令集设计; 内存管理 | **神经形态协同**: 编译器+指令集+内存; 与 D8693 SNN协同 | `nt_physical::neuro_codesign` |
+| D8743 | **Neuromorphic Application Survey** | 神经形态应用综述如何实现? | Neuro App Survey (2026): 视觉/听觉/控制/机器人/边缘应用 | **神经形态应用综述**: 多领域应用; 与 D8693 SNN协同 | `nt_physical::neuro_app_survey` |
+
+#### 最优传输决策
+
+| D8744 | **Wasserstein Distances** | Wasserstein距离如何计算? | Wasserstein (2026): 地球移动距离; 分布比较; 梯度计算 | **Wasserstein距离**: 地球移动距离; 与 D8745 Sinkhorn协同 | `nt_core::optimal_transport::wasserstein` |
+| D8745 | **Sinkhorn Algorithm** | Sinkhorn算法如何实现? | Sinkhorn (2026): 熵正则化; 迭代缩放; GPU加速; 线性复杂度 | **Sinkhorn**: 熵正则化+迭代缩放; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::sinkhorn` |
+| D8746 | **Entropic Regularization** | 熵正则化如何实现? | Entropic Reg (2026): 平滑传输; 计算效率; 正则化强度选择 | **熵正则化**: 平滑传输+计算效率; 与 D8745 Sinkhorn协同 | `nt_core::optimal_transport::entropic` |
+| D8747 | **Unbalanced Optimal Transport** | 非平衡最优传输如何实现? | Unbalanced OT (2026): 质量不守恒; KL正则化; 部分匹配 | **非平衡OT**: 质量不守恒+KL正则; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::unbalanced` |
+| D8748 | **Multi-Marginal Optimal Transport** | 多边际最优传输如何实现? | Multi-Marginal OT (2026): 多分布对齐; 联合分布; 超立方体 | **多边际OT**: 多分布对齐+联合分布; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::multi_marginal` |
+| D8749 | **Graph Optimal Transport** | 图最优传输如何实现? | Graph OT (2026): 图结构约束; 测地距离; 图Wasserstein | **图OT**: 图结构+测地距离; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::graph_ot` |
+| D8750 | **Domain Adaptation via OT** | 域适应如何通过OT实现? | OT DA (2026): 分布对齐; 传输映射; 无监督域适应 | **OT域适应**: 分布对齐+传输映射; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_da` |
+| D8751 | **Generative Modeling with OT** | 生成模型如何使用OT? | OT Generative (2026): Wasserstein GAN; 传输正则化; 训练稳定 | **OT生成**: Wasserstein GAN+传输正则; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_gen` |
+| D8752 | **Color Transfer via OT** | 颜色迁移如何通过OT实现? | Color Transfer (2026): 颜色分布对齐; 直方图匹配; 图像风格迁移 | **OT颜色迁移**: 颜色分布对齐+直方图; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::color_transfer` |
+| D8753 | **Point Cloud Registration via OT** | 点云配准如何通过OT实现? | Point Cloud OT (2026): 3D点对齐; 形状匹配; ICP替代 | **OT点云配准**: 3D点对齐+形状匹配; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::pointcloud` |
+| D8754 | **Image Retrieval via OT** | 图像检索如何通过OT实现? | Image Retrieval OT (2026): 视觉词袋; 传输距离; 相似度度量 | **OT图像检索**: 视觉词袋+传输距离; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::img_retrieval` |
+| D8755 | **Document Classification via OT** | 文档分类如何通过OT实现? | Doc Classification OT (2026): 词嵌入传输; 文档距离; 文本分类 | **OT文档分类**: 词嵌入传输+文档距离; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::doc_class` |
+| D8756 | **Speech Recognition via OT** | 语音识别如何通过OT实现? | Speech OT (2026): 声学特征对齐; DTW替代; 语音匹配 | **OT语音识别**: 声学特征对齐+DTW替代; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::speech` |
+| D8757 | **Time Series Alignment via OT** | 时间序列对齐如何通过OT实现? | TS Alignment OT (2026): 序列对齐; 动态时间规整; 模式匹配 | **OT时间序列**: 序列对齐+DTW替代; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ts_align` |
+| D8758 | **Single-Cell RNA Sequencing via OT** | 单细胞RNA测序如何通过OT实现? | scRNA OT (2026): 细胞轨迹推断; 发育路径; 伪时间分析 | **OT scRNA**: 细胞轨迹+伪时间; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::scrna` |
+| D8759 | **Medical Image Segmentation via OT** | 医学图像分割如何通过OT实现? | Medical OT (2026): 解剖结构对齐; 形状先验; 跨模态配准 | **OT医学图像**: 解剖对齐+形状先验; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::medical_img` |
+| D8760 | **Natural Language Processing via OT** | NLP如何通过OT实现? | NLP OT (2026): 语义对齐; 翻译评估; 文档摘要 | **OT NLP**: 语义对齐+翻译评估; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::nlp` |
+| D8761 | **Computer Vision via OT** | 计算机视觉如何通过OT实现? | CV OT (2026): 目标检测; 图像分割; 物体跟踪 | **OT CV**: 目标检测+分割+跟踪; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::cv` |
+| D8762 | **Reinforcement Learning via OT** | 强化学习如何通过OT实现? | RL OT (2026): 策略分布对齐; 奖励塑形; 探索加速 | **OT RL**: 策略分布对齐+奖励塑形; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::rl` |
+| D8763 | **Fairness via OT** | 公平性如何通过OT实现? | Fairness OT (2026): 传输公平; 群体公平; 个体公平 | **OT公平性**: 传输公平+群体/个体公平; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::fairness` |
+| D8764 | **Privacy via OT** | 隐私如何通过OT实现? | Privacy OT (2026): 差分隐私传输; 隐私预算; 安全聚合 | **OT隐私**: 差分隐私传输+预算; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::privacy` |
+| D8765 | **Robustness via OT** | 鲁棒性如何通过OT实现? | Robust OT (2026): 分布鲁棒优化; 最坏情况传输; 鲁棒学习 | **OT鲁棒性**: 分布鲁棒+最坏情况; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::robust` |
+| D8766 | **Optimal Transport Networks** | 最优传输网络如何实现? | OT Networks (2026): 传输网络设计; 流优化; 容量规划 | **OT网络**: 传输网络+流优化; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_network` |
+| D8767 | **Optimal Transport Flows** | 最优传输流如何实现? | OT Flows (2026): 连续流; 动态传输; 时间依赖传输 | **OT流**: 连续流+动态传输; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_flows` |
+| D8768 | **Optimal Transport Barycenters** | 最优传输重心如何实现? | OT Barycenters (2026): Wasserstein重心; 分布平均; 形状平均 | **OT重心**: Wasserstein重心+分布平均; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::barycenter` |
+| D8769 | **Optimal Transport Morphing** | 最优传输变形如何实现? | OT Morphing (2026): 形状插值; 动画生成; 平滑变形 | **OT变形**: 形状插值+动画生成; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::morphing` |
+| D8770 | **Optimal Transport Interpolation** | 最优传输插值如何实现? | OT Interpolation (2026): 分布插值; 混合分布; 渐变效果 | **OT插值**: 分布插值+混合分布; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::interpolation` |
+| D8771 | **Optimal Transport Projection** | 最优传输投影如何实现? | OT Projection (2026): 分布投影; 约束优化; 可行域映射 | **OT投影**: 分布投影+约束优化; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::projection` |
+| D8772 | **Optimal Transport Clustering** | 最优传输聚类如何实现? | OT Clustering (2026): Wasserstein聚类; 传输成本聚类; 层级聚类 | **OT聚类**: Wasserstein聚类+传输成本; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::clustering` |
+| D8773 | **Optimal Transport Classification** | 最优传输分类如何实现? | OT Classification (2026): 传输距离分类; 最近传输中心; 文本/图像分类 | **OT分类**: 传输距离+最近中心; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::classification` |
+| D8774 | **Optimal Transport Regression** | 最优传输回归如何实现? | OT Regression (2026): 传输回归; 分布回归; 量子回归 | **OT回归**: 传输回归+分布回归; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::regression` |
+| D8775 | **Optimal Transport Anomaly Detection** | 最优传输异常检测如何实现? | OT Anomaly (2026): 传输距离异常; 分布偏差检测; 实时预警 | **OT异常**: 传输距离异常+偏差检测; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::anomaly` |
+| D8776 | **Optimal Transport Recommendation** | 最优传输推荐如何实现? | OT RecSys (2026): 用户-物品传输; 偏好对齐; 冷启动 | **OT推荐**: 用户-物品传输+偏好对齐; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::recsys` |
+| D8777 | **Optimal Transport Generative Adversarial** | 最优传输GAN如何实现? | OT-GAN (2026): Wasserstein距离; 梯度惩罚; 训练稳定 | **OT-GAN**: Wasserstein距离+梯度惩罚; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_gan` |
+| D8778 | **Optimal Transport Variational Autoencoder** | 最优传输VAE如何实现? | OT-VAE (2026): 传输正则化; 后验对齐; 解码质量 | **OT-VAE**: 传输正则化+后验对齐; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_vae` |
+| D8779 | **Optimal Transport Normalizing Flows** | 最优传输流如何实现? | OT-NF (2026): 传输流; 密度估计; 采样效率 | **OT-NF**: 传输流+密度估计; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_nf` |
+| D8780 | **Optimal Transport Diffusion Models** | 最优传输扩散如何实现? | OT-Diffusion (2026): 传输调度; 去噪过程; 采样加速 | **OT扩散**: 传输调度+去噪加速; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::ot_diffusion` |
+| D8781 | **Optimal Transport for Climate** | 最优传输气候如何实现? | OT Climate (2026): 气候模式对齐; 极端事件分析; 预测 | **OT气候**: 气候模式对齐+极端分析; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::climate` |
+| D8782 | **Optimal Transport for Finance** | 最优传输金融如何实现? | OT Finance (2026): 风险度量; 投资组合; 期权定价 | **OT金融**: 风险度量+投资组合; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::finance` |
+| D8783 | **Optimal Transport for Materials** | 最优传输材料如何实现? | OT Materials (2026): 材料属性预测; 结构优化; 相变分析 | **OT材料**: 属性预测+结构优化; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::materials` |
+| D8784 | **Optimal Transport for Energy** | 最优传输能源如何实现? | OT Energy (2026): 能源分配优化; 电网调度; 储能管理 | **OT能源**: 能源分配+电网调度; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::energy` |
+| D8785 | **Optimal Transport for Transportation** | 最优传输交通如何实现? | OT Transport (2026): 路径优化; 物流调度; 供需匹配 | **OT交通**: 路径优化+物流调度; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::transport` |
+| D8786 | **Optimal Transport for Social Networks** | 最优传输社交网络如何实现? | OT Social (2026): 社区检测; 信息传播; 影响力分析 | **OT社交**: 社区检测+信息传播; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::social` |
+| D8787 | **Optimal Transport for Robotics** | 最优传输机器人如何实现? | OT Robotics (2026): 路径规划; 抓取优化; 避障 | **OT机器人**: 路径规划+抓取优化; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::robotics` |
+| D8788 | **Optimal Transport for Healthcare** | 最优传输医疗如何实现? | OT Healthcare (2026): 疾病轨迹; 治疗方案; 药物发现 | **OT医疗**: 疾病轨迹+治疗方案; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::healthcare` |
+| D8789 | **Optimal Transport for Education** | 最优传输教育如何实现? | OT Education (2026): 学习路径; 知识追踪; 个性化推荐 | **OT教育**: 学习路径+知识追踪; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::education` |
+| D8790 | **Optimal Transport for Agriculture** | 最优传输农业如何实现? | OT Agriculture (2026): 作物分配; 土壤分析; 产量预测 | **OT农业**: 作物分配+土壤分析; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::agriculture` |
+| D8791 | **Optimal Transport for Manufacturing** | 最优传输制造如何实现? | OT Manufacturing (2026): 生产调度; 质量控制; 供应链 | **OT制造**: 生产调度+质量控制; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::manufacturing` |
+| D8792 | **Optimal Transport for Entertainment** | 最优传输娱乐如何实现? | OT Entertainment (2026): 内容推荐; 游戏平衡; 个性化体验 | **OT娱乐**: 内容推荐+游戏平衡; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::entertainment` |
+| D8793 | **Optimal Transport for Sports** | 最优传输体育如何实现? | OT Sports (2026): 球员评估; 战术分析; 比赛预测 | **OT体育**: 球员评估+战术分析; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::sports` |
+| D8794 | **Optimal Transport Survey** | 最优传输综述如何实现? | OT Survey (2026): 理论+算法+应用; 教程+基准; 开源工具 | **OT综述**: 理论+算法+应用; 与 D8744 Wasserstein协同 | `nt_core::optimal_transport::survey` |
+
+#### 拓扑数据分析决策
+
+| D8795 | **Persistent Homology** | 持久同调如何计算? | Persistent Homology (2026): 单纯复形; 贝蒂数; 持续图; 多尺度拓扑 | **持久同调**: 单纯复形+贝蒂数; 与 D8796 Mapper协同 | `nt_core::tda::persistent` |
+| D8796 | **Mapper Algorithm** | Mapper算法如何实现? | Mapper (2026): 拓扑骨架; 覆盖空间; 可视化; 探索性分析 | **Mapper**: 拓扑骨架+覆盖空间; 与 D8795 持久同调协同 | `nt_core::tda::mapper` |
+| D8797 | **Topological Features for ML** | 拓扑特征如何用于ML? | Topo Features (2026): 持续图特征; Betti数; 拓扑描述符 | **拓扑特征**: 持续图+Betti数; 与 D8795 持久同调协同 | `nt_core::tda::topo_features` |
+| D8798 | **Persistence Diagrams** | 持续图如何计算? | Persistence Diagrams (2026): 出生-死亡对; 持续性; 稳定性 | **持续图**: 出生-死亡对+持续性; 与 D8795 持久同调协同 | `nt_core::tda::persistence_diag` |
+| D8799 | **Topological Autoencoders** | 拓扑自编码器如何实现? | Topo Autoencoder (2026): 拓扑正则化; 降维; 特征学习 | **拓扑自编码**: 拓扑正则化+降维; 与 D8795 持久同调协同 | `nt_core::tda::topo_autoenc` |
+| D8800 | **Topological Loss Functions** | 拓扑损失函数如何实现? | Topo Loss (2026): 拓扑约束损失; 持续图损失; 形状保持 | **拓扑损失**: 拓扑约束+持续图损失; 与 D8795 持久同调协同 | `nt_core::tda::topo_loss` |
+| D8801 | **Topological Clustering** | 拓扑聚类如何实现? | Topo Clustering (2026): 拓扑DBSCAN; 持续聚类; 密度聚类 | **拓扑聚类**: 拓扑DBSCAN+持续聚类; 与 D8795 持久同调协同 | `nt_core::tda::topo_cluster` |
+| D8802 | **Topological Classification** | 拓扑分类如何实现? | Topo Classification (2026): 拓扑特征分类; 持续图分类; 形状分类 | **拓扑分类**: 拓扑特征+持续图分类; 与 D8795 持久同调协同 | `nt_core::tda::topo_class` |
+| D8803 | **Topological Regression** | 拓扑回归如何实现? | Topo Regression (2026): 拓扑特征回归; 持续图回归; 形状回归 | **拓扑回归**: 拓扑特征+持续图回归; 与 D8795 持久同调协同 | `nt_core::tda::topo_regression` |
+| D8804 | **Topological Anomaly Detection** | 拓扑异常检测如何实现? | Topo Anomaly (2026): 拓扑异常评分; 持续图偏差; 异常模式 | **拓扑异常**: 拓扑异常评分+持续图偏差; 与 D8795 持久同调协同 | `nt_core::tda::topo_anomaly` |
+| D8805 | **Topological Time Series Analysis** | 拓扑时间序列分析如何实现? | Topo TS (2026): 时间延迟嵌入; 拓扑特征; 动态系统 | **拓扑时间序列**: 时间延迟嵌入+拓扑特征; 与 D8795 持久同调协同 | `nt_core::tda::topo_ts` |
+| D8806 | **Topological Image Analysis** | 拓扑图像分析如何实现? | Topo Image (2026): 拓扑特征提取; 形状分析; 纹理分类 | **拓扑图像**: 拓扑特征+形状分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_image` |
+| D8807 | **Topological Graph Analysis** | 拓扑图分析如何实现? | Topo Graph (2026): 图拓扑特征; 社区检测; 网络分析 | **拓扑图**: 图拓扑特征+社区检测; 与 D8795 持久同调协同 | `nt_core::tda::topo_graph` |
+| D8808 | **Topological Signal Processing** | 拓扑信号处理如何实现? | Topo Signal (2026): 拓扑滤波; 信号降噪; 特征增强 | **拓扑信号**: 拓扑滤波+降噪; 与 D8795 持久同调协同 | `nt_core::tda::topo_signal` |
+| D8809 | **Topological Dimensionality Reduction** | 拓扑降维如何实现? | Topo DR (2026): 拓扑PCA; 持续同调降维; 流形学习 | **拓扑降维**: 拓扑PCA+持续降维; 与 D8795 持久同调协同 | `nt_core::tda::topo_dr` |
+| D8810 | **Topological Data Integration** | 拓扑数据集成如何实现? | Topo Integration (2026): 多源拓扑融合; 跨尺度对齐; 数据整合 | **拓扑集成**: 多源融合+跨尺度对齐; 与 D8795 持久同调协同 | `nt_core::tda::topo_integration` |
+| D8811 | **Topological Feature Selection** | 拓扑特征选择如何实现? | Topo Feature Selection (2026): 拓扑重要性; 持续性过滤; 冗余消除 | **拓扑特征选择**: 拓扑重要性+持续性过滤; 与 D8795 持久同调协同 | `nt_core::tda::topo_feat_select` |
+| D8812 | **Topological Model Selection** | 拓扑模型选择如何实现? | Topo Model Selection (2026): 拓扑交叉验证; 持续性选择; 超参优化 | **拓扑模型选择**: 拓扑交叉验证+持续性选择; 与 D8795 持久同调协同 | `nt_core::tda::topo_model_select` |
+| D8813 | **Topological Ensemble Methods** | 拓扑集成方法如何实现? | Topo Ensemble (2026): 拓扑Bagging; 拓扑Boosting; 鲁棒集成 | **拓扑集成**: 拓扑Bagging+Boosting; 与 D8795 持久同调协同 | `nt_core::tda::topo_ensemble` |
+| D8814 | **Topological Deep Learning** | 拓扑深度学习如何实现? | Topo DL (2026): 拓扑神经网络; 持续图嵌入; 形状理解 | **拓扑深度学习**: 拓扑神经网络+持续图嵌入; 与 D8795 持久同调协同 | `nt_core::tda::topo_dl` |
+| D8815 | **Topological Reinforcement Learning** | 拓扑强化学习如何实现? | Topo RL (2026): 拓扑状态空间; 持续图奖励; 策略学习 | **拓扑RL**: 拓扑状态空间+持续图奖励; 与 D8795 持久同调协同 | `nt_core::tda::topo_rl` |
+| D8816 | **Topological Generative Models** | 拓扑生成模型如何实现? | Topo Generative (2026): 拓扑GAN; 持续图生成; 形状合成 | **拓扑生成**: 拓扑GAN+持续图生成; 与 D8795 持久同调协同 | `nt_core::tda::topo_gen` |
+| D8817 | **Topological Drug Discovery** | 拓扑药物发现如何实现? | Topo Drug (2026): 分子拓扑特征; 药物筛选; 属性预测 | **拓扑药物**: 分子拓扑+药物筛选; 与 D8795 持久同调协同 | `nt_core::tda::topo_drug` |
+| D8818 | **Topological Materials Science** | 拓扑材料科学如何实现? | Topo Materials (2026): 材料拓扑; 相变分析; 属性预测 | **拓扑材料**: 材料拓扑+相变分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_materials` |
+| D8819 | **Topological Neuroscience** | 拓扑神经科学如何实现? | Topo Neuro (2026): 脑网络拓扑; 功能连接; 认知分析 | **拓扑神经**: 脑网络拓扑+功能连接; 与 D8795 持久同调协同 | `nt_core::tda::topo_neuro` |
+| D8820 | **Topological Ecology** | 拓扑生态学如何实现? | Topo Ecology (2026): 生态网络拓扑; 物种多样性; 生态系统分析 | **拓扑生态**: 生态网络拓扑+多样性; 与 D8795 持久同调协同 | `nt_core::tda::topo_ecology` |
+| D8821 | **Topological Epidemiology** | 拓扑流行病学如何实现? | Topo Epi (2026): 传播网络拓扑; 疫情分析; 干预评估 | **拓扑流行病**: 传播网络拓扑+疫情分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_epi` |
+| D8822 | **Topological Climate Science** | 拓扑气候科学如何实现? | Topo Climate (2026): 气候模式拓扑; 极端事件; 预测 | **拓扑气候**: 气候模式拓扑+极端事件; 与 D8795 持久同调协同 | `nt_core::tda::topo_climate` |
+| D8823 | **Topological Finance** | 拓扑金融如何实现? | Topo Finance (2026): 金融网络拓扑; 风险分析; 市场预测 | **拓扑金融**: 金融网络拓扑+风险分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_finance` |
+| D8824 | **Topological Social Networks** | 拓扑社交网络如何实现? | Topo Social (2026): 社交网络拓扑; 社区检测; 信息传播 | **拓扑社交**: 社交网络拓扑+社区检测; 与 D8795 持久同调协同 | `nt_core::tda::topo_social` |
+| D8825 | **Topological Robotics** | 拓扑机器人如何实现? | Topo Robotics (2026): 配置空间拓扑; 路径规划; 避障 | **拓扑机器人**: 配置空间拓扑+路径规划; 与 D8795 持久同调协同 | `nt_core::tda::topo_robotics` |
+| D8826 | **Topological Computer Vision** | 拓扑计算机视觉如何实现? | Topo CV (2026): 形状拓扑; 图像分割; 目标检测 | **拓扑视觉**: 形状拓扑+分割检测; 与 D8795 持久同调协同 | `nt_core::tda::topo_cv` |
+| D8827 | **Topological NLP** | 拓扑NLP如何实现? | Topo NLP (2026): 文档拓扑; 语义分析; 主题建模 | **拓扑NLP**: 文档拓扑+语义分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_nlp` |
+| D8828 | **Topological Speech Processing** | 拓扑语音处理如何实现? | Topo Speech (2026): 语音拓扑; 声学分析; 识别 | **拓扑语音**: 语音拓扑+声学分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_speech` |
+| D8829 | **Topological Music Analysis** | 拓扑音乐分析如何实现? | Topo Music (2026): 音乐拓扑; 和声分析; 风格分类 | **拓扑音乐**: 音乐拓扑+和声分析; 与 D8795 持久同调协同 | `nt_core::tda::topo_music` |
+| D8830 | **Topological Video Analysis** | 拓扑视频分析如何实现? | Topo Video (2026): 视频拓扑; 动作识别; 场景理解 | **拓扑视频**: 视频拓扑+动作识别; 与 D8795 持久同调协同 | `nt_core::tda::topo_video` |
+| D8831 | **Topological 3D Point Clouds** | 拓扑3D点云如何实现? | Topo Point Cloud (2026): 3D拓扑; 点云分类; 形状检索 | **拓扑3D**: 3D拓扑+点云分类; 与 D8795 持久同调协同 | `nt_core::tda::topo_3d` |
+| D8832 | **Topological Mesh Processing** | 拓扑网格处理如何实现? | Topo Mesh (2026): 网格拓扑; 简化; 平滑; 修复 | **拓扑网格**: 网格拓扑+简化平滑; 与 D8795 持久同调协同 | `nt_core::tda::topo_mesh` |
+| D8833 | **Topological Manifold Learning** | 拓扑流形学习如何实现? | Topo Manifold (2026): 流形拓扑; 降维; 嵌入 | **拓扑流形**: 流形拓扑+降维嵌入; 与 D8795 持久同调协同 | `nt_core::tda::topo_manifold` |
+| D8834 | **Topological Optimization** | 拓扑优化如何实现? | Topo Optimization (2026): 拓扑约束优化; 结构优化; 材料分布 | **拓扑优化**: 拓扑约束+结构优化; 与 D8795 持久同调协同 | `nt_core::tda::topo_optimization` |
+| D8835 | **Topological Statistical Testing** | 拓扑统计检验如何实现? | Topo Testing (2026): 拓扑假设检验; 持续图检验; 显著性分析 | **拓扑统计**: 拓扑假设检验+持续图检验; 与 D8795 持久同调协同 | `nt_core::tda::topo_testing` |
+| D8836 | **Topological Bayesian Inference** | 拓扑贝叶斯推断如何实现? | Topo Bayesian (2026): 拓扑先验; 持续图后验; 贝叶斯拓扑 | **拓扑贝叶斯**: 拓扑先验+持续图后验; 与 D8795 持久同调协同 | `nt_core::tda::topo_bayesian` |
+| D8837 | **Topological Causal Inference** | 拓扑因果推断如何实现? | Topo Causal (2026): 拓扑因果; 持续图因果; 干预分析 | **拓扑因果**: 拓扑因果+持续图因果; 与 D8795 持久同调协同 | `nt_core::tda::topo_causal` |
+| D8838 | **Topological Active Learning** | 拓扑主动学习如何实现? | Topo Active (2026): 拓扑采样; 持续图查询; 标签效率 | **拓扑主动学习**: 拓扑采样+持续图查询; 与 D8795 持久同调协同 | `nt_core::tda::topo_active` |
+| D8839 | **Topological Semi-Supervised Learning** | 拓扑半监督学习如何实现? | Topo Semi-Supervised (2026): 拓扑标签传播; 图正则; 少标签 | **拓扑半监督**: 拓扑标签传播+图正则; 与 D8795 持久同调协同 | `nt_core::tda::topo_semi` |
+| D8840 | **Topological Transfer Learning** | 拓扑迁移学习如何实现? | Topo Transfer (2026): 拓扑预训练; 跨域迁移; 特征复用 | **拓扑迁移**: 拓扑预训练+跨域迁移; 与 D8795 持久同调协同 | `nt_core::tda::topo_transfer` |
+| D8841 | **Topological Meta-Learning** | 拓扑元学习如何实现? | Topo Meta (2026): 拓扑MAML; 快速适应; 任务间迁移 | **拓扑元学习**: 拓扑MAML+快速适应; 与 D8795 持久同调协同 | `nt_core::tda::topo_meta` |
+| D8842 | **Topological Continual Learning** | 拓扑持续学习如何实现? | Topo Continual (2026): 拓扑弹性权重; 灾难性遗忘缓解; 增量学习 | **拓扑持续**: 拓扑弹性权重+增量; 与 D8795 持久同调协同 | `nt_core::tda::topo_continual` |
+| D8843 | **Topological Adversarial Robustness** | 拓扑对抗鲁棒性如何实现? | Topo Adv (2026): 拓扑对抗训练; 鲁棒性认证; 防御 | **拓扑对抗**: 拓扑对抗训练+认证; 与 D8795 持久同调协同 | `nt_core::tda::topo_adv` |
+| D8844 | **Topological Interpretability** | 拓扑可解释性如何实现? | Topo XAI (2026): 拓扑可视化; 持续图解释; 决策解释 | **拓扑可解释**: 拓扑可视化+持续图解释; 与 D8795 持久同调协同 | `nt_core::tda::topo_xai` |
+| D8845 | **Topological Data Analysis Survey** | 拓扑数据分析综述如何实现? | TDA Survey (2026): 理论+算法+应用; 教程+基准; 开源工具 | **TDA综述**: 理论+算法+应用; 与 D8795 持久同调协同 | `nt_core::tda::survey` |
+
+#### 元学习决策
+
+| D8846 | **MAML** | MAML如何实现? | MAML (2026): 模型无关元学习; 二阶梯度; 快速适应; few-shot | **MAML**: 二阶梯度+快速适应; 与 D8847 Proto协同 | `nt_core::meta::maml` |
+| D8847 | **Prototypical Networks** | 原型网络如何实现? | ProtoNets (2026): 类原型; 欧氏距离; 少样本分类; 计算高效 | **原型网络**: 类原型+欧氏距离; 与 D8846 MAML协同 | `nt_core::meta::proto` |
+| D8848 | **Reptile** | Reptile如何实现? | Reptile (2026): 一阶元学习; 无二阶梯度; 计算高效; 随机梯度 | **Reptile**: 一阶+计算高效; 与 D8846 MAML协同 | `nt_core::meta::reptile` |
+| D8849 | **Task-Agnostic Meta-Learning** | 任务无关元学习如何实现? | Task-Agnostic (2026): 元表示学习; 跨任务泛化; 无任务特定训练 | **任务无关元学习**: 元表示+跨任务泛化; 与 D8846 MAML协同 | `nt_core::meta::task_agnostic` |
+| D8850 | **Gradient-Based Meta-Learning** | 梯度元学习如何实现? | Gradient Meta (2026): MAML/Reptile/Meta-SGD; 梯度适应; 快速收敛 | **梯度元学习**: MAML/Reptile/Meta-SGD; 与 D8846 MAML协同 | `nt_core::meta::gradient` |
+| D8851 | **Metric-Based Meta-Learning** | 度量元学习如何实现? | Metric Meta (2026): 原型网络/匹配网络/关系网络; 距离度量; 分类 | **度量元学习**: 原型/匹配/关系网络; 与 D8847 Proto协同 | `nt_core::meta::metric` |
+| D8852 | **Meta-RL** | 元强化学习如何实现? | Meta-RL (2026): 元策略; 快速适应; 多任务RL; 内在奖励 | **Meta-RL**: 元策略+快速适应; 与 D8846 MAML协同 | `nt_core::meta::meta_rl` |
+| D8853 | **Fast Adaptation** | 快速适应如何实现? | Fast Adaptation (2026): 元学习适应; 少样本微调; 参数高效 | **快速适应**: 元学习+少样本微调; 与 D8846 MAML协同 | `nt_core::meta::fast_adapt` |
+| D8854 | **Few-Shot Generation** | 少样本生成如何实现? | Few-Shot Gen (2026): 少样本图像生成; 文本生成; 音乐生成 | **少样本生成**: 少样本图像/文本/音乐; 与 D8846 MAML协同 | `nt_core::meta::fewshot_gen` |
+| D8855 | **Meta-Learning for Drug Discovery** | 药物发现元学习如何实现? | Meta Drug (2026): 少样本药物设计; 分子生成; 属性预测 | **元学习药物**: 少样本药物设计; 与 D8846 MAML协同 | `nt_core::meta::meta_drug` |
+| D8856 | **Meta-Learning for Robotics** | 机器人元学习如何实现? | Meta Robotics (2026): 元策略; 快速适应; 多任务机器人 | **元学习机器人**: 元策略+快速适应; 与 D8846 MAML协同 | `nt_core::meta::meta_robotics` |
+| D8857 | **Meta-Learning for NLP** | NLP元学习如何实现? | Meta NLP (2026): 少样本文本分类; 情感分析; 命名实体识别 | **元学习NLP**: 少样本文本分类; 与 D8846 MAML协同 | `nt_core::meta::meta_nlp` |
+| D8858 | **Meta-Learning for Computer Vision** | 计算机视觉元学习如何实现? | Meta CV (2026): 少样本图像分类; 目标检测; 分割 | **元学习CV**: 少样本图像分类; 与 D8846 MAML协同 | `nt_core::meta::meta_cv` |
+| D8859 | **Meta-Learning for Speech** | 语音元学习如何实现? | Meta Speech (2026): 少样本说话人识别; 语音合成; 语音识别 | **元学习语音**: 少样本说话人识别; 与 D8846 MAML协同 | `nt_core::meta::meta_speech` |
+| D8860 | **Meta-Learning for Time Series** | 时间序列元学习如何实现? | Meta TS (2026): 少样本预测; 异常检测; 分类 | **元学习时间序列**: 少样本预测; 与 D8846 MAML协同 | `nt_core::meta::meta_ts` |
+| D8861 | **Meta-Learning for Anomaly Detection** | 异常检测元学习如何实现? | Meta Anomaly (2026): 少样本异常检测; 新类别异常; 零样本异常 | **元学习异常**: 少样本异常检测; 与 D8846 MAML协同 | `nt_core::meta::meta_anomaly` |
+| D8862 | **Meta-Learning for Recommender Systems** | 推荐系统元学习如何实现? | Meta RecSys (2026): 冷启动推荐; 少样本用户; 跨域推荐 | **元学习推荐**: 冷启动+少样本用户; 与 D8846 MAML协同 | `nt_core::meta::meta_recsys` |
+| D8863 | **Meta-Learning for Knowledge Graphs** | 知识图谱元学习如何实现? | Meta KG (2026): 少样本关系推理; 链接预测; 实体对齐 | **元学习KG**: 少样本关系推理; 与 D8846 MAML协同 | `nt_core::meta::meta_kg` |
+| D8864 | **Meta-Learning for Neural Architecture Search** | NAS元学习如何实现? | Meta NAS (2026): 元架构搜索; 快速NAS; 架构迁移 | **元学习NAS**: 元架构搜索+快速NAS; 与 D8846 MAML协同 | `nt_core::meta::meta_nas` |
+| D8865 | **Meta-Learning for Hyperparameter Optimization** | 超参优化元学习如何实现? | Meta HPO (2026): 元超参搜索; 快速HPO; 超参迁移 | **元学习HPO**: 元超参搜索+快速HPO; 与 D8846 MAML协同 | `nt_core::meta::meta_hpo` |
+| D8866 | **Meta-Learning for Curriculum Learning** | 课程学习元学习如何实现? | Meta Curriculum (2026): 元课程设计; 任务排序; 训练加速 | **元学习课程**: 元课程设计+任务排序; 与 D8846 MAML协同 | `nt_core::meta::meta_curriculum` |
+| D8867 | **Meta-Learning for Active Learning** | 主动学习元学习如何实现? | Meta Active (2026): 元采样策略; 标签效率; 查询选择 | **元学习主动学习**: 元采样策略+标签效率; 与 D8846 MAML协同 | `nt_core::meta::meta_active` |
+| D8868 | **Meta-Learning for Continual Learning** | 持续学习元学习如何实现? | Meta Continual (2026): 元遗忘缓解; 增量适应; 灾难性遗忘 | **元学习持续**: 元遗忘缓解+增量适应; 与 D8846 MAML协同 | `nt_core::meta::meta_continual` |
+| D8869 | **Meta-Learning for Multi-Task Learning** | 多任务元学习如何实现? | Meta Multi-Task (2026): 元任务共享; 负迁移缓解; 任务关系 | **元学习多任务**: 元任务共享+负迁移缓解; 与 D8846 MAML协同 | `nt_core::meta::meta_multitask` |
+| D8870 | **Meta-Learning for Domain Adaptation** | 域适应元学习如何实现? | Meta DA (2026): 元域适应; 快速域迁移; 少样本域适应 | **元学习域适应**: 元域适应+快速域迁移; 与 D8846 MAML协同 | `nt_core::meta::meta_da` |
+| D8871 | **Meta-Learning for Transfer Learning** | 迁移学习元学习如何实现? | Meta Transfer (2026): 元迁移策略; 跨域泛化; 迁移效率 | **元学习迁移**: 元迁移策略+跨域泛化; 与 D8846 MAML协同 | `nt_core::meta::meta_transfer` |
+| D8872 | **Meta-Learning for Federated Learning** | 联邦学习元学习如何实现? | Meta FL (2026): 元联邦学习; 跨设备适应; 隐私保护 | **元学习联邦**: 元联邦+跨设备适应; 与 D8846 MAML协同 | `nt_core::meta::meta_fl` |
+| D8873 | **Meta-Learning for Self-Supervised Learning** | 自监督元学习如何实现? | Meta SSL (2026): 元预训练; 少样本微调; 表示学习 | **元学习自监督**: 元预训练+少样本微调; 与 D8846 MAML协同 | `nt_core::meta::meta_ssl` |
+| D8874 | **Meta-Learning for Contrastive Learning** | 对比学习元学习如何实现? | Meta Contrastive (2026): 元对比学习; 少样本表示; 相似度学习 | **元学习对比**: 元对比+少样本表示; 与 D8846 MAML协同 | `nt_core::meta::meta_contrast` |
+| D8875 | **Meta-Learning for Generative Models** | 生成模型元学习如何实现? | Meta Generative (2026): 元GAN; 元VAE; 少样本生成 | **元学习生成**: 元GAN/VAE+少样本生成; 与 D8846 MAML协同 | `nt_core::meta::meta_gen` |
+| D8876 | **Meta-Learning for Attention Mechanisms** | 注意力元学习如何实现? | Meta Attention (2026): 元注意力; 快速注意力适应; 跨任务 | **元学习注意力**: 元注意力+快速适应; 与 D8846 MAML协同 | `nt_core::meta::meta_attention` |
+| D8877 | **Meta-Learning for Loss Functions** | 损失函数元学习如何实现? | Meta Loss (2026): 元损失学习; 任务自适应损失; 自动损失设计 | **元学习损失**: 元损失+任务自适应; 与 D8846 MAML协同 | `nt_core::meta::meta_loss` |
+| D8878 | **Meta-Learning for Optimizers** | 优化器元学习如何实现? | Meta Optimizer (2026): 元优化器; 学习率适应; 梯度变换 | **元学习优化器**: 元优化器+学习率适应; 与 D8846 MAML协同 | `nt_core::meta::meta_optimizer` |
+| D8879 | **Meta-Learning for Regularization** | 正则化元学习如何实现? | Meta Regularization (2026): 元正则; 过拟合缓解; 泛化增强 | **元学习正则化**: 元正则+过拟合缓解; 与 D8846 MAML协同 | `nt_core::meta::meta_regularization` |
+| D8880 | **Meta-Learning for Data Augmentation** | 数据增强元学习如何实现? | Meta Augmentation (2026): 元增强策略; 合成数据; 鲁棒性 | **元学习增强**: 元增强+合成数据; 与 D8846 MAML协同 | `nt_core::meta::meta_augmentation` |
+| D8881 | **Meta-Learning for Pruning** | 剪枝元学习如何实现? | Meta Pruning (2026): 元剪枝; 结构化剪枝; 模型压缩 | **元学习剪枝**: 元剪枝+结构化; 与 D8846 MAML协同 | `nt_core::meta::meta_pruning` |
+| D8882 | **Meta-Learning for Quantization** | 量化元学习如何实现? | Meta Quantization (2026): 元量化; 混合精度; 推理加速 | **元学习量化**: 元量化+混合精度; 与 D8846 MAML协同 | `nt_core::meta::meta_quantization` |
+| D8883 | **Meta-Learning for Knowledge Distillation** | 知识蒸馏元学习如何实现? | Meta KD (2026): 元蒸馏; 自适应蒸馏; 模型压缩 | **元学习蒸馏**: 元蒸馏+自适应; 与 D8846 MAML协同 | `nt_core::meta::meta_kd` |
+| D8884 | **Meta-Learning for Neural Architecture** | 神经架构元学习如何实现? | Meta Architecture (2026): 元架构设计; 快速架构搜索; 架构复用 | **元学习架构**: 元架构+快速搜索; 与 D8846 MAML协同 | `nt_core::meta::meta_architecture` |
+| D8885 | **Meta-Learning for Multi-Modal** | 多模态元学习如何实现? | Meta Multi-Modal (2026): 元跨模态; 少样本多模态; 模态对齐 | **元学习多模态**: 元跨模态+少样本多模态; 与 D8846 MAML协同 | `nt_core::meta::meta_multimodal` |
+| D8886 | **Meta-Learning for Graph Neural Networks** | 图神经网络元学习如何实现? | Meta GNN (2026): 元图学习; 少样本图分类; 图迁移 | **元学习GNN**: 元图学习+少样本图分类; 与 D8846 MAML协同 | `nt_core::meta::meta_gnn` |
+| D8887 | **Meta-Learning for Sequence Models** | 序列模型元学习如何实现? | Meta Sequence (2026): 元序列学习; 少样本序列分类; 序列迁移 | **元学习序列**: 元序列+少样本序列分类; 与 D8846 MAML协同 | `nt_core::meta::meta_sequence` |
+| D8888 | **Meta-Learning for Anomaly Detection** | 异常检测元学习如何实现? | Meta Anomaly (2026): 元异常; 少样本异常; 零样本异常 | **元学习异常**: 元异常+少样本异常; 与 D8846 MAML协同 | `nt_core::meta::meta_anomaly_det` |
+| D8889 | **Meta-Learning for Reinforcement Learning** | 强化学习元学习如何实现? | Meta RL (2026): 元策略; 快速适应; 多任务RL | **元学习RL**: 元策略+快速适应; 与 D8846 MAML协同 | `nt_core::meta::meta_rl_det` |
+| D8890 | **Meta-Learning for Imitation Learning** | 模仿学习元学习如何实现? | Meta Imitation (2026): 元模仿; 少样本模仿; 跨任务模仿 | **元学习模仿**: 元模仿+少样本模仿; 与 D8846 MAML协同 | `nt_core::meta::meta_imitation` |
+| D8891 | **Meta-Learning for Planning** | 规划元学习如何实现? | Meta Planning (2026): 元规划; 快速规划; 跨场景规划 | **元学习规划**: 元规划+快速规划; 与 D8846 MAML协同 | `nt_core::meta::meta_planning` |
+| D8892 | **Meta-Learning for Reasoning** | 推理元学习如何实现? | Meta Reasoning (2026): 元推理; 快速推理; 跨域推理 | **元学习推理**: 元推理+快速推理; 与 D8846 MAML协同 | `nt_core::meta::meta_reasoning` |
+| D8893 | **Meta-Learning for Decision Making** | 决策元学习如何实现? | Meta Decision (2026): 元决策; 快速决策; 跨场景决策 | **元学习决策**: 元决策+快速决策; 与 D8846 MAML协同 | `nt_core::meta::meta_decision` |
+| D8894 | **Meta-Learning for Perception** | 感知元学习如何实现? | Meta Perception (2026): 元感知; 快速感知适应; 跨模态感知 | **元学习感知**: 元感知+快速适应; 与 D8846 MAML协同 | `nt_core::meta::meta_perception` |
+| D8895 | **Meta-Learning for Language Understanding** | 语言理解元学习如何实现? | Meta Language (2026): 元语言理解; 少样本理解; 跨语言迁移 | **元学习语言**: 元理解+少样本理解; 与 D8846 MAML协同 | `nt_core::meta::meta_language` |
+| D8896 | **Meta-Learning Survey** | 元学习综述如何实现? | Meta Survey (2026): 理论+算法+应用; 教程+基准; 开源工具 | **元学习综述**: 理论+算法+应用; 与 D8846 MAML协同 | `nt_core::meta::survey` |
+
+#### 自组织系统决策
+
+| D8897 | **Self-Organizing Maps** | 自组织映射如何实现? | SOM (2026): Kohonen映射; 竞争学习; 拓扑保持; 降维可视化 | **SOM**: Kohonen映射+竞争学习; 与 D8898 竞争学习协同 | `nt_core::self_org::som` |
+| D8898 | **Competitive Learning** | 竞争学习如何实现? | Competitive Learning (2026): 赢者通吃; 侧抑制; 特征发现 | **竞争学习**: 赢者通吃+侧抑制; 与 D8897 SOM协同 | `nt_core::self_org::competitive` |
+| D8899 | **Emergent Behavior** | 涌现行为如何实现? | Emergent Behavior (2026): 复杂系统; 自组织; 非线性动力学 | **涌现行为**: 复杂系统+自组织; 与 D8897 SOM协同 | `nt_core::self_org::emergent` |
+| D8900 | **Swarm Intelligence** | 群体智能如何实现? | Swarm Intelligence (2026): 粒子群优化; 蚁群优化; 群体决策 | **群体智能**: PSO+ACO; 与 D8897 SOM协同 | `nt_core::self_org::swarm` |
+| D8901 | **Artificial Immune Systems** | 人工免疫系统如何实现? | AIS (2026): 免疫网络; 克隆选择; 负选择; 异常检测 | **AIS**: 免疫网络+克隆选择; 与 D8897 SOM协同 | `nt_core::self_org::ais` |
+| D8902 | **Cellular Automata** | 元胞自动机如何实现? | Cellular Automata (2026): 规则系统; 格子自动机; 复杂行为 | **元胞自动机**: 规则系统+格子自动机; 与 D8897 SOM协同 | `nt_core::self_org::cellular` |
+| D8903 | **Stigmergy** | 涌现协作如何实现? | Stigmergy (2026): 间接通信; 环境标记; 群体协调 | **涌现协作**: 间接通信+环境标记; 与 D8900 群体智能协同 | `nt_core::self_org::stigmergy` |
+| D8904 | **Collective Intelligence** | 集体智能如何实现? | Collective Intelligence (2026): 群体决策; 众包; 智慧涌现 | **集体智能**: 群体决策+众包; 与 D8900 群体智能协同 | `nt_core::self_org::collective` |
+| D8905 | **Ant Colony Optimization** | 蚁群优化如何实现? | ACO (2026): 信息素路径; 正反馈; 组合优化 | **ACO**: 信息素路径+正反馈; 与 D8900 群体智能协同 | `nt_core::self_org::aco` |
+| D8906 | **Particle Swarm Optimization** | 粒子群优化如何实现? | PSO (2026): 速度-位置更新; 全局搜索; 函数优化 | **PSO**: 速度-位置+全局搜索; 与 D8900 群体智能协同 | `nt_core::self_org::pso` |
+| D8907 | **Bee Algorithm** | 蜜蜂算法如何实现? | Bee Algorithm (2026): 采蜜行为; 招募机制; 搜索优化 | **蜜蜂算法**: 采蜜+招募+搜索; 与 D8900 群体智能协同 | `nt_core::self_org::bee` |
+| D8908 | **Firefly Algorithm** | 萤火虫算法如何实现? | Firefly (2026): 亮度吸引; 距离衰减; 全局优化 | **萤火虫算法**: 亮度吸引+距离衰减; 与 D8900 群体智能协同 | `nt_core::self_org::firefly` |
+| D8909 | **Cuckoo Search** | 布谷鸟搜索如何实现? | Cuckoo Search (2026): 莱维飞行; 寄生繁殖; 全局搜索 | **布谷鸟搜索**: 莱维飞行+寄生繁殖; 与 D8900 群体智能协同 | `nt_core::self_org::cuckoo` |
+| D8910 | **Grey Wolf Optimizer** | 灰狼优化如何实现? | GWO (2026): 等级制度; 包围猎物; 全局优化 | **灰狼优化**: 等级制度+包围猎物; 与 D8900 群体智能协同 | `nt_core::self_org::gwo` |
+| D8911 | **Whale Optimization** | 鲸鱼优化如何实现? | WOA (2026): 气泡网捕食; 螺旋更新; 全局搜索 | **鲸鱼优化**: 气泡网+螺旋更新; 与 D8900 群体智能协同 | `nt_core::self_org::woa` |
+| D8912 | **Gravitational Search** | 引力搜索如何实现? | GSA (2026): 万有引力; 质量吸引; 加速度更新 | **引力搜索**: 万有引力+质量吸引; 与 D8900 群体智能协同 | `nt_core::self_org::gsa` |
+| D8913 | **Bacterial Foraging** | 细菌觅食如何实现? | BFO (2026): 趋化; 群聚; 繁殖; 淘汰 | **细菌觅食**: 趋化+群聚+繁殖; 与 D8900 群体智能协同 | `nt_core::self_org::bfo` |
+| D8914 | **Self-Organizing Feature Maps** | 自组织特征映射如何实现? | SOFM (2026): 拓扑保持; 降维; 聚类 | **SOFM**: 拓扑保持+降维聚类; 与 D8897 SOM协同 | `nt_core::self_org::sofm` |
+| D8915 | **Growing Neural Gas** | 增长神经气体如何实现? | GNG (2026): 自适应拓扑; 节点增长; 拓扑学习 | **GNG**: 自适应拓扑+节点增长; 与 D8897 SOM协同 | `nt_core::self_org::gng` |
+| D8916 | **Adaptive Resonance Theory** | 自适应共振理论如何实现? | ART (2026): 稳定-可塑平衡; 类别学习; 增量学习 | **ART**: 稳定-可塑平衡+增量; 与 D8897 SOM协同 | `nt_core::self_org::art` |
+| D8917 | **Learning Vector Quantization** | 学习向量量化如何实现? | LVQ (2026): 监督竞争学习; 原型调整; 分类 | **LVQ**: 监督竞争+原型调整; 与 D8897 SOM协同 | `nt_core::self_org::lvq` |
+| D8918 | **Neural Gas** | 神经气体如何实现? | Neural Gas (2026): 拓扑学习; 竞争学习; 无监督聚类 | **神经气体**: 拓扑学习+竞争; 与 D8897 SOM协同 | `nt_core::self_org::neural_gas` |
+| D8919 | **Hierarchical SOM** | 层级SOM如何实现? | HSOM (2026): 多层级映射; 层级聚类; 复杂结构 | **HSOM**: 多层级+层级聚类; 与 D8897 SOM协同 | `nt_core::self_org::hsom` |
+| D8920 | **Temporal SOM** | 时序SOM如何实现? | TSOM (2026): 时序数据映射; 动态模式; 序列聚类 | **TSOM**: 时序映射+动态模式; 与 D8897 SOM协同 | `nt_core::self_org::tsom` |
+| D8921 | **Fuzzy SOM** | 模糊SOM如何实现? | FSOM (2026): 模糊聚类; 软分配; 不确定性处理 | **FSOM**: 模糊聚类+软分配; 与 D8897 SOM协同 | `nt_core::self_org::fsom` |
+| D8922 | **Deep SOM** | 深度SOM如何实现? | DeepSOM (2026): 深度特征+SOM; 层级表示; 复杂数据 | **DeepSOM**: 深度特征+层级; 与 D8897 SOM协同 | `nt_core::self_org::deep_som` |
+| D8923 | **Generative Self-Organization** | 生成式自组织如何实现? | Gen SO (2026): 自组织生成网络; 涌现生成; 无监督合成 | **生成式自组织**: 涌现生成+无监督; 与 D8897 SOM协同 | `nt_core::self_org::gen_so` |
+| D8924 | **Self-Organizing Incremental** | 自组织增量如何实现? | SOI (2026): 增量学习; 动态拓扑; 在线适应 | **自组织增量**: 增量+动态拓扑; 与 D8897 SOM协同 | `nt_core::self_org::soi` |
+| D8925 | **Self-Organizing Clustering** | 自组织聚类如何实现? | SO Cluster (2026): 无监督聚类; 拓扑聚类; 层级聚类 | **自组织聚类**: 无监督+拓扑聚类; 与 D8897 SOM协同 | `nt_core::self_org::so_cluster` |
+| D8926 | **Self-Organizing Classification** | 自组织分类如何实现? | SO Class (2026): 监督SOM; 原型分类; 决策边界 | **自组织分类**: 监督SOM+原型分类; 与 D8897 SOM协同 | `nt_core::self_org::so_class` |
+| D8927 | **Self-Organizing Regression** | 自组织回归如何实现? | SO Regression (2026): 自组织回归; 连续值预测; 非线性 | **自组织回归**: 自组织+连续预测; 与 D8897 SOM协同 | `nt_core::self_org::so_regression` |
+| D8928 | **Self-Organizing Anomaly Detection** | 自组织异常检测如何实现? | SO Anomaly (2026): 拓扑异常; 密度异常; 实时检测 | **自组织异常**: 拓扑异常+密度异常; 与 D8897 SOM协同 | `nt_core::self_org::so_anomaly` |
+| D8929 | **Self-Organizing Optimization** | 自组织优化如何实现? | SO Opt (2026): 自组织优化; 拓扑优化; 群体优化 | **自组织优化**: 自组织+拓扑优化; 与 D8897 SOM协同 | `nt_core::self_org::so_opt` |
+| D8930 | **Swarm Robotics** | 群体机器人如何实现? | Swarm Robotics (2026): 分布式控制; 涌现行为; 群体协作 | **群体机器人**: 分布式控制+涌现行为; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_robotics` |
+| D8931 | **Swarm Intelligence for Optimization** | 群体智能优化如何实现? | Swarm Opt (2026): PSO/ACO/GA混合; 全局搜索; 约束优化 | **群体智能优化**: PSO/ACO/GA混合; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_opt` |
+| D8932 | **Collective Decision Making** | 集体决策如何实现? | Collective Decision (2026): 共识算法; 投票机制; 群体智慧 | **集体决策**: 共识算法+投票; 与 D8904 集体智能协同 | `nt_core::self_org::collective_decision` |
+| D8933 | **Swarm foraging** | 群体觅食如何实现? | Swarm Foraging (2026): 信息素引导; 资源发现; 群体搜索 | **群体觅食**: 信息素+资源发现; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_foraging` |
+| D8934 | **Swarm Coverage** | 群体覆盖如何实现? | Swarm Coverage (2026): 分布式覆盖; 区域监控; 均匀分布 | **群体覆盖**: 分布式覆盖+区域监控; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_coverage` |
+| D8935 | **Swarm Assembly** | 群体组装如何实现? | Swarm Assembly (2026): 分布式组装; 形状形成; 结构构建 | **群体组装**: 分布式组装+形状形成; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_assembly` |
+| D8936 | **Swarm Coordination** | 群体协调如何实现? | Swarm Coordination (2026): 分布式协调; 任务分配; 冲突解决 | **群体协调**: 分布式协调+任务分配; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_coord` |
+| D8937 | **Swarm Communication** | 群体通信如何实现? | Swarm Comm (2026): 信息素通信; 视觉通信; 声学通信 | **群体通信**: 信息素+视觉+声学; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_comm` |
+| D8938 | **Swarm Navigation** | 群体导航如何实现? | Swarm Nav (2026): 分布式导航; 避障; 路径规划 | **群体导航**: 分布式导航+避障; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_nav` |
+| D8939 | **Swarm Task Allocation** | 群体任务分配如何实现? | Swarm Task (2026): 自适应分配; 负载均衡; 动态调整 | **群体任务分配**: 自适应+负载均衡; 与 D8900 群体智能协同 | `nt_core::self_org::swarm_task` |
+| D8940 | **Artificial Immune Network** | 人工免疫网络如何实现? | AIN (2026): 免疫网络; 抗体-抗原; 自我-非我识别 | **免疫网络**: 抗体-抗原+自我-非我; 与 D8901 AIS协同 | `nt_core::self_org::ain` |
+| D8941 | **Clonal Selection Algorithm** | 克隆选择算法如何实现? | CLONALG (2026): 克隆扩增; 高频变异; 亲和力成熟 | **CLONALG**: 克隆扩增+高频变异; 与 D8901 AIS协同 | `nt_core::self_org::clonalg` |
+| D8942 | **Negative Selection** | 负选择如何实现? | Negative Selection (2026): 自我-非我; 异常检测; 免疫耐受 | **负选择**: 自我-非我+异常检测; 与 D8901 AIS协同 | `nt_core::self_org::neg_select` |
+| D8943 | **Danger Theory** | 危险理论如何实现? | Danger Theory (2026): 危险信号; 免疫激活; 异常响应 | **危险理论**: 危险信号+免疫激活; 与 D8901 AIS协同 | `nt_core::self_org::danger` |
+| D8944 | **Immune Network Learning** | 免疫网络学习如何实现? | Immune Network (2026): 网络动态; 抗体选择; 记忆 | **免疫网络学习**: 网络动态+抗体选择; 与 D8901 AIS协同 | `nt_core::self_org::immune_net` |
+| D8945 | **Cellular Automata for Optimization** | 元胞自动机优化如何实现? | CA Opt (2026): 元胞规则; 涌现优化; 复杂搜索 | **元胞自动机优化**: 元胞规则+涌现优化; 与 D8902 细胞自动机协同 | `nt_core::self_org::ca_opt` |
+| D8946 | **Self-Organizing Systems Survey** | 自组织系统综述如何实现? | SO Survey (2026): 理论+算法+应用; 教程+基准; 开源工具 | **自组织综述**: 理论+算法+应用; 与 D8897 SOM协同 | `nt_core::self_org::survey` |
+| D8947 | **Self-Organizing for Robotics** | 自组织机器人如何实现? | SO Robotics (2026): 自组织控制; 涌现行为; 适应性 | **自组织机器人**: 自组织控制+涌现行为; 与 D8897 SOM协同 | `nt_core::self_org::so_robotics` |
+
+#### 进化计算决策
+
+| D8948 | **Genetic Algorithms** | 遗传算法如何实现? | GA (2026): 选择+交叉+变异; 适应度评估; 种群进化 | **GA**: 选择+交叉+变异; 与 D8949 GP协同 | `nt_core::evolution::ga` |
+| D8949 | **Genetic Programming** | 遗传编程如何实现? | GP (2026): 树形程序; 语法约束; 程序进化; 符号回归 | **GP**: 树形程序+语法约束; 与 D8948 GA协同 | `nt_core::evolution::gp` |
+| D8950 | **Evolutionary Strategies** | 进化策略如何实现? | ES (2026): CMA-ES; 重组+突变; 连续优化; 梯度自由 | **ES**: CMA-ES+重组突变; 与 D8948 GA协同 | `nt_core::evolution::es` |
+| D8951 | **Differential Evolution** | 差分进化如何实现? | DE (2026): 差分变异; 指数交叉; 连续优化; 参数自适应 | **DE**: 差分变异+指数交叉; 与 D8948 GA协同 | `nt_core::evolution::de` |
+| D8952 | **Multi-Objective Optimization** | 多目标优化如何实现? | MOO (2026): Pareto前沿; 非支配排序; 拥挤距离; 超体积 | **MOO**: Pareto+非支配排序; 与 D8948 GA协同 | `nt_core::evolution::moo` |
+| D8953 | **NSGA-II** | NSGA-II如何实现? | NSGA-II (2026): 非支配排序遗传算法; 拥挤比较; 多目标 | **NSGA-II**: 非支配排序+拥挤; 与 D8952 MOO协同 | `nt_core::evolution::nsga2` |
+| D8954 | **Neuroevolution** | 神经进化如何实现? | Neuroevolution (2026): 进化网络拓扑; 权重优化; ENA | **神经进化**: 进化拓扑+权重; 与 D8948 GA协同 | `nt_core::evolution::neuroevo` |
+| D8955 | **Quality-Diversity Algorithms** | 质量-多样性算法如何实现? | QD (2026): MAP-Elites; 多样性保持; 质量优化; 行为描述 | **QD**: MAP-Elites+多样性; 与 D8948 GA协同 | `nt_core::evolution::qd` |
+| D8956 | **NEAT** | NEAT如何实现? | NEAT (2026): 增量复杂度; 拓扑创新; 物种形成; 精英主义 | **NEAT**: 增量复杂度+创新; 与 D8954 神经进化协同 | `nt_core::evolution::neat` |
+| D8957 | **CoNEAT** | CoNEAT如何实现? | CoNEAT (2026): 协同进化网络; 多任务; 拓扑共享 | **CoNEAT**: 协同进化+多任务; 与 D8956 NEAT协同 | `nt_core::evolution::coneat` |
+| D8958 | **CPPN** | CPPN如何实现? | CPPN (2026): 复杂性有界遗传编程; 间接编码; 规律搜索 | **CPPN**: 复杂性有界+间接编码; 与 D8949 GP协同 | `nt_core::evolution::cppn` |
+| D8959 | **Grammatical Evolution** | 语法进化如何实现? | GE (2026): BNF语法; 映射函数; 程序生成; 约束满足 | **语法进化**: BNF语法+映射; 与 D8949 GP协同 | `nt_core::evolution::ge` |
+| D8960 | **Cartesian GP** | 笛卡尔GP如何实现? | CGP (2026): 有向图; 节点函数; 基因型-表现型; 模块化 | **CGP**: 有向图+节点函数; 与 D8949 GP协同 | `nt_core::evolution::cgp` |
+| D8961 | **Linear GP** | 线性GP如何实现? | LGP (2026): 线性程序; 寄存器机; 微指令; 流水线 | **LGP**: 线性程序+寄存器机; 与 D8949 GP协同 | `nt_core::evolution::lgp` |
+| D8962 | **Strongly-Typed GP** | 强类型GP如何实现? | STGP (2026): 类型约束; 安全操作; 语义正确性 | **STGP**: 类型约束+安全操作; 与 D8949 GP协同 | `nt_core::evolution::stgp` |
+| D8963 | **Multi-Objective Evolutionary** | 多目标进化如何实现? | MOEA (2026): NSGA-III; MOEA/D; 参考点; 分解方法 | **MOEA**: NSGA-III+MOEA/D; 与 D8952 MOO协同 | `nt_core::evolution::moea` |
+| D8964 | **Constraint Handling** | 约束处理如何实现? | Constraint (2026): 罚函数; 可行性规则; 多目标转换 | **约束处理**: 罚函数+可行性规则; 与 D8948 GA协同 | `nt_core::evolution::constraint` |
+| D8965 | **Niching Methods** | 小生境方法如何实现? | Niching (2026): 共享函数; 清除; 适应度地形; 多峰优化 | **小生境**: 共享+清除+多峰; 与 D8948 GA协同 | `nt_core::evolution::niching` |
+| D8966 | **Island Models** | 岛屿模型如何实现? | Island Model (2026): 多种群; 迁移策略; 并行进化 | **岛屿模型**: 多种群+迁移; 与 D8948 GA协同 | `nt_core::evolution::island` |
+| D8967 | **Adaptive Mutation** | 自适应变异如何实现? | Adaptive Mutation (2026): 变异率调整; 进化阶段; 局部搜索 | **自适应变异**: 变异率+进化阶段; 与 D8948 GA协同 | `nt_core::evolution::adapt_mutation` |
+| D8968 | **Crossover Operators** | 交叉算子如何实现? | Crossover (2026): 单点/两点/均匀/算术; 问题依赖; 搜索空间 | **交叉算子**: 单点/两点/均匀; 与 D8948 GA协同 | `nt_core::evolution::crossover` |
+| D8969 | **Selection Operators** | 选择算子如何实现? | Selection (2026): 锦标赛/轮盘赌/排序; 选择压力; 多样性 | **选择算子**: 锦标赛/轮盘赌; 与 D8948 GA协同 | `nt_core::evolution::selection` |
+| D8970 | **Elitism** | 精英主义如何实现? | Elitism (2026): 精英保留; 适应度排序; 收敛加速 | **精英主义**: 精英保留+适应度排序; 与 D8948 GA协同 | `nt_core::evolution::elitism` |
+| D8971 | **Fitness Sharing** | 适应度共享如何实现? | Fitness Sharing (2026): 共享函数; 多样性保持; 小生境 | **适应度共享**: 共享函数+多样性; 与 D8965 小生境协同 | `nt_core::evolution::fitness_share` |
+| D8972 | **Evolutionary Deep Learning** | 进化深度学习如何实现? | Evo DL (2026): 进化网络架构; 进化超参; 进化训练 | **进化深度学习**: 进化架构+超参; 与 D8948 GA协同 | `nt_core::evolution::evo_dl` |
+| D8973 | **Evolutionary Reinforcement Learning** | 进化强化学习如何实现? | Evo RL (2026): 进化策略; 进化策略搜索; 梯度自由 | **进化RL**: 进化策略+搜索; 与 D8948 GA协同 | `nt_core::evolution::evo_rl` |
+| D8974 | **Evolutionary Neural Architecture Search** | 进化NAS如何实现? | Evo NAS (2026): 进化架构搜索; 拓扑进化; 性能评估 | **进化NAS**: 进化架构搜索; 与 D8948 GA协同 | `nt_core::evolution::evo_nas` |
+| D8975 | **Evolutionary Feature Selection** | 进化特征选择如何实现? | Evo Feature (2026): 二进制编码; 特征子集; 降维 | **进化特征选择**: 二进制编码+特征子集; 与 D8948 GA协同 | `nt_core::evolution::evo_feature` |
+| D8976 | **Evolutionary Clustering** | 进化聚类如何实现? | Evo Cluster (2026): 进化K-means; 聚类优化; 指标优化 | **进化聚类**: 进化K-means+指标优化; 与 D8948 GA协同 | `nt_core::evolution::evo_cluster` |
+| D8977 | **Evolutionary Scheduling** | 进化调度如何实现? | Evo Schedule (2026): 作业车间; 排序优化; 约束调度 | **进化调度**: 作业车间+排序优化; 与 D8948 GA协同 | `nt_core::evolution::evo_schedule` |
+| D8978 | **Evolutionary Routing** | 进化路由如何实现? | Evo Route (2026): 路径优化; TSP变体; 多目标路由 | **进化路由**: 路径优化+TSP; 与 D8948 GA协同 | `nt_core::evolution::evo_route` |
+| D8979 | **Evolutionary Portfolio** | 进化投资组合如何实现? | Evo Portfolio (2026): 投资组合优化; 风险收益; 多目标 | **进化投资组合**: 投资组合+风险收益; 与 D8948 GA协同 | `nt_core::evolution::evo_portfolio` |
+| D8980 | **Evolutionary Drug Design** | 进化药物设计如何实现? | Evo Drug (2026): 分子进化; 药效团; 构效关系 | **进化药物**: 分子进化+药效团; 与 D8948 GA协同 | `nt_core::evolution::evo_drug` |
+| D8981 | **Evolutionary Materials** | 进化材料如何实现? | Evo Materials (2026): 材料进化; 成分优化; 属性预测 | **进化材料**: 材料进化+成分优化; 与 D8948 GA协同 | `nt_core::evolution::evo_materials` |
+| D8982 | **Evolutionary Robotics** | 进化机器人如何实现? | Evo Robotics (2026): 形态进化; 控制进化; 体脑协同 | **进化机器人**: 形态+控制进化; 与 D8948 GA协同 | `nt_core::evolution::evo_robotics` |
+| D8983 | **Evolutionary Game Theory** | 进化博弈论如何实现? | Evo Game (2026): 策略进化; 纳什均衡; 群体动力学 | **进化博弈**: 策略进化+纳什均衡; 与 D8948 GA协同 | `nt_core::evolution::evo_game` |
+| D8984 | **Evolutionary Programming** | 进化编程如何实现? | EP (2026): 有限状态机; 行为进化; 突变为主 | **进化编程**: 有限状态机+行为进化; 与 D8948 GA协同 | `nt_core::evolution::ep` |
+| D8985 | **Evolution Strategies** | 进化策略综述如何实现? | ES Survey (2026): CMA-ES; 自适应; 大规模优化 | **进化策略综述**: CMA-ES+自适应; 与 D8950 ES协同 | `nt_core::evolution::es_survey` |
+| D8986 | **Differential Evolution Variants** | 差分进化变体如何实现? | DE Variants (2026): 自适应DE; 混合DE; 大规模DE | **DE变体**: 自适应+混合+大规模; 与 D8951 DE协同 | `nt_core::evolution::de_variants` |
+| D8987 | **Multi-Objective Survey** | 多目标优化综述如何实现? | MOO Survey (2026): 理论+算法+应用; 基准测试 | **MOO综述**: 理论+算法+应用; 与 D8952 MOO协同 | `nt_core::evolution::moo_survey` |
+| D8988 | **Neuroevolution Survey** | 神经进化综述如何实现? | Neuro Survey (2026): 拓扑+权重+架构; 比较+基准 | **神经进化综述**: 拓扑+权重+架构; 与 D8954 神经进化协同 | `nt_core::evolution::neuro_survey` |
+| D8989 | **Quality-Diversity Survey** | 质量-多样性综述如何实现? | QD Survey (2026): MAP-Elites变体; 应用+基准 | **QD综述**: MAP-Elites变体+应用; 与 D8955 QD协同 | `nt_core::evolution::qd_survey` |
+| D8990 | **Open-Ended Evolution** | 开放式进化如何实现? | Open-Ended (2026): 无止境创新; 涌现复杂性; 人工生命 | **开放式进化**: 无止境创新+涌现; 与 D8948 GA协同 | `nt_core::evolution::open_ended` |
+| D8991 | **Quality-Diversity for RL** | QD-RL如何实现? | QD-RL (2026): 行为多样性; 策略探索; 多样性策略 | **QD-RL**: 行为多样性+策略探索; 与 D8955 QD协同 | `nt_core::evolution::qd_rl` |
+| D8992 | **Quality-Diversity for Control** | QD-控制如何实现? | QD-Control (2026): 控制策略进化; 运动控制; 机器人控制 | **QD-控制**: 控制策略+运动控制; 与 D8955 QD协同 | `nt_core::evolution::qd_control` |
+| D8993 | **Evolutionary AutoML** | 进化AutoML如何实现? | Evo AutoML (2026): 进化模型选择; 进化超参; 自动化 | **进化AutoML**: 进化模型选择+超参; 与 D8948 GA协同 | `nt_core::evolution::evo_automl` |
+| D8994 | **Evolutionary Image Processing** | 进化图像处理如何实现? | Evo Image (2026): 进化滤波器; 图像分割; 特征提取 | **进化图像**: 进化滤波器+分割; 与 D8948 GA协同 | `nt_core::evolution::evo_image` |
+| D8995 | **Evolutionary Text Processing** | 进化文本处理如何实现? | Evo Text (2026): 进化规则; 文本分类; 信息抽取 | **进化文本**: 进化规则+分类; 与 D8948 GA协同 | `nt_core::evolution::evo_text` |
+| D8996 | **Evolutionary Signal Processing** | 进化信号处理如何实现? | Evo Signal (2026): 进化滤波器; 信号分类; 特征提取 | **进化信号**: 进化滤波器+分类; 与 D8948 GA协同 | `nt_core::evolution::evo_signal` |
+| D8997 | **Evolutionary Systems Design** | 进化系统设计如何实现? | Evo Design (2026): 进化架构; 系统优化; 拓扑设计 | **进化设计**: 进化架构+系统优化; 与 D8948 GA协同 | `nt_core::evolution::evo_design` |
+| D8998 | **Evolutionary Computation Survey** | 进化计算综述如何实现? | Evo Survey (2026): 理论+算法+应用; 教程+基准; 开源工具 | **进化计算综述**: 理论+算法+应用; 与 D8948 GA协同 | `nt_core::evolution::survey` |
+
+#### 概率编程决策
+
+| D8999 | **Stan** | Stan如何实现? | Stan (2026): HMC采样; NUTS; 贝叶斯建模; 统计推理 | **Stan**: HMC+NUTS+贝叶斯; 与 D9000 Pyro协同 | `nt_core::prob_prog::stan` |
+| D9000 | **Pyro** | Pyro如何实现? | Pyro (2026): 变分推断; 概率编程; 深度生成模型; PPL | **Pyro**: 变分推断+深度生成; 与 D8999 Stan协同 | `nt_core::prob_prog::pyro` |
+| D9001 | **Edward** | Edward如何实现? | Edward (2026): TensorFlow概率; 变分推断; 深度生成模型 | **Edward**: TF概率+变分推断; 与 D9000 Pyro协同 | `nt_core::prob_prog::edward` |
+| D9002 | **Bayesian Inference** | 贝叶斯推断如何实现? | Bayesian Inference (2026): 后验计算; 先验; 似然; MCMC | **贝叶斯推断**: 后验+先验+MCMC; 与 D8999 Stan协同 | `nt_core::prob_prog::bayesian` |
+| D9003 | **Variational Inference** | 变分推断如何实现? | VI (2026): ELBO优化; 平均场; 重参数化; 随机梯度 | **变分推断**: ELBO+平均场+重参数化; 与 D9000 Pyro协同 | `nt_core::prob_prog::vi` |
+| D9004 | **Program Synthesis** | 程序合成如何实现? | Program Synthesis (2026): 概率程序合成; 示例引导; 类型约束 | **程序合成**: 概率合成+示例引导; 与 D8999 Stan协同 | `nt_core::prob_prog::synthesis` |
+| D9005 | **Probabilistic Circuits** | 概率电路如何实现? | Prob Circuits (2026): 和积网络; 可解释推理; 精确推断 | **概率电路**: 和积网络+精确推断; 与 D8999 Stan协同 | `nt_core::prob_prog::circuits` |
+| D9006 | **Scalable Bayesian DL** | 可扩展贝叶斯深度学习如何实现? | Scalable BDL (2026): MC Dropout; 深度集成; 后验近似 | **可扩展BDL**: MC Dropout+深度集成; 与 D9000 Pyro协同 | `nt_core::prob_prog::scalable_bdl` |
+| D9007 | **Probabilistic Programming Languages** | 概率编程语言如何实现? | PPL (2026): Stan/Pyro/Edward/Turing; 领域特定; 推断后端 | **PPL**: Stan/Pyro/Edward/Turing; 与 D8999 Stan协同 | `nt_core::prob_prog::ppl` |
+| D9008 | **MCMC Methods** | MCMC方法如何实现? | MCMC (2026): Metropolis-Hastings; Gibbs采样; HMC; NUTS | **MCMC**: MH+Gibbs+HMC+NUTS; 与 D8999 Stan协同 | `nt_core::prob_prog::mcmc` |
+| D9009 | **Expectation Propagation** | 期望传播如何实现? | EP (2026): 近似推断; 分布匹配; 迭代更新 | **期望传播**: 近似推断+分布匹配; 与 D9003 VI协同 | `nt_core::prob_prog::ep` |
+| D9010 | **Message Passing Inference** | 消息传递推断如何实现? | MPI (2026): 和积算法; 置信传播; 图模型推断 | **消息传递**: 和积算法+置信传播; 与 D9005 概率电路协同 | `nt_core::prob_prog::mpi` |
+| D9011 | **Amortized Inference** | 摊销推断如何实现? | Amortized (2026): 编码器-解码器; VAE; 快速后验 | **摊销推断**: 编码器-解码器+VAE; 与 D9003 VI协同 | `nt_core::prob_prog::amortized` |
+| D9012 | **Normalizing Flows** | 正规化流如何实现? | NF (2026): 可逆变换; 密度估计; 复杂后验 | **正规化流**: 可逆变换+密度估计; 与 D9003 VI协同 | `nt_core::prob_prog::nf` |
+| D9013 | **Bayesian Neural Networks** | 贝叶斯神经网络如何实现? | BNN (2026): 权重不确定性; 推断; 预测分布 | **BNN**: 权重不确定性+推断; 与 D9006 可扩展BDL协同 | `nt_core::prob_prog::bnn` |
+| D9014 | **Deep Probabilistic Models** | 深度概率模型如何实现? | Deep Prob (2026): VAE; GAN; Flow; 深度生成模型 | **深度概率模型**: VAE+GAN+Flow; 与 D9000 Pyro协同 | `nt_core::prob_prog::deep_prob` |
+| D9015 | **Gaussian Processes** | 高斯过程如何实现? | GP (2026): 核函数; 后验预测; 超参优化; 不确定性 | **高斯过程**: 核函数+后验预测; 与 D9002 贝叶斯协同 | `nt_core::prob_prog::gp` |
+| D9016 | **Hierarchical Bayesian Models** | 层级贝叶斯模型如何实现? | Hier Bayes (2026): 多层先验; 组效应; 收缩估计 | **层级贝叶斯**: 多层先验+组效应; 与 D9002 贝叶斯协同 | `nt_core::prob_prog::hier_bayes` |
+| D9017 | **Bayesian Optimization** | 贝叶斯优化如何实现? | BO (2026): 采集函数; 代理模型; 全局优化; 超参搜索 | **贝叶斯优化**: 采集函数+代理模型; 与 D9002 贝叶斯协同 | `nt_core::prob_prog::bo` |
+| D9018 | **Probabilistic programming for Robotics** | 概率编程机器人如何实现? | Prob Rob (2026): 状态估计; SLAM; 路径规划; 决策 | **概率编程机器人**: 状态估计+SLAM; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_rob` |
+| D9019 | **Probabilistic programming for Finance** | 概率编程金融如何实现? | Prob Finance (2026): 风险建模; 期权定价; 投资组合 | **概率编程金融**: 风险建模+期权定价; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_finance` |
+| D9020 | **Probabilistic programming for Healthcare** | 概率编程医疗如何实现? | Prob Health (2026): 疾病模型; 治疗效果; 临床试验 | **概率编程医疗**: 疾病模型+治疗效果; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_health` |
+| D9021 | **Probabilistic programming for Climate** | 概率编程气候如何实现? | Prob Climate (2026): 气候模型; 不确定性量化; 预测 | **概率编程气候**: 气候模型+不确定性; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_climate` |
+| D9022 | **Probabilistic programming for NLP** | 概率编程NLP如何实现? | Prob NLP (2026): 主题模型; 语义分析; 文档理解 | **概率编程NLP**: 主题模型+语义分析; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_nlp` |
+| D9023 | **Probabilistic programming for CV** | 概率编程CV如何实现? | Prob CV (2026): 目标检测; 图像分割; 场景理解 | **概率编程CV**: 目标检测+图像分割; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_cv` |
+| D9024 | **Probabilistic programming for Time Series** | 概率编程时间序列如何实现? | Prob TS (2026): 状态空间模型; 动态系统; 预测 | **概率编程时间序列**: 状态空间+动态系统; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_ts` |
+| D9025 | **Probabilistic programming for Causal** | 概率编程因果如何实现? | Prob Causal (2026): 因果推断; 干预分析; 反事实 | **概率编程因果**: 因果推断+干预分析; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_causal` |
+| D9026 | **Probabilistic programming for Survival** | 概率编程生存分析如何实现? | Prob Survival (2026): 生存模型; 风险函数; 删失数据 | **概率编程生存**: 生存模型+风险函数; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_survival` |
+| D9027 | **Probabilistic programming for Spatial** | 概率编程空间如何实现? | Prob Spatial (2026): 空间统计; 地理加权; 点过程 | **概率编程空间**: 空间统计+地理加权; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_spatial` |
+| D9028 | **Probabilistic programming for Network** | 概率编程网络如何实现? | Prob Network (2026): 网络模型; 社区检测; 链接预测 | **概率编程网络**: 网络模型+社区检测; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_network` |
+| D9029 | **Probabilistic programming for Optimization** | 概率编程优化如何实现? | Prob Opt (2026): 贝叶斯优化; 概率约束; 鲁棒优化 | **概率编程优化**: 贝叶斯优化+概率约束; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_opt` |
+| D9030 | **Probabilistic programming for Decision** | 概率编程决策如何实现? | Prob Decision (2026): 决策分析; 效用理论; 风险决策 | **概率编程决策**: 决策分析+效用理论; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_decision` |
+| D9031 | **Probabilistic programming for Anomaly** | 概率编程异常检测如何实现? | Prob Anomaly (2026): 异常评分; 密度估计; 偏差检测 | **概率编程异常**: 异常评分+密度估计; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_anomaly` |
+| D9032 | **Probabilistic programming for Recommender** | 概率编程推荐如何实现? | Prob Rec (2026): 矩阵分解; 用户建模; 冷启动 | **概率编程推荐**: 矩阵分解+用户建模; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_rec` |
+| D9033 | **Probabilistic programming for Knowledge Graphs** | 概率编程知识图谱如何实现? | Prob KG (2026): 关系推理; 链接预测; 实体对齐 | **概率编程KG**: 关系推理+链接预测; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_kg` |
+| D9034 | **Probabilistic programming for Reinforcement Learning** | 概率编程RL如何实现? | Prob RL (2026): 贝叶斯RL; 模型-based RL; 探索 | **概率编程RL**: 贝叶斯RL+模型-based; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_rl` |
+| D9035 | **Probabilistic programming for Imitation Learning** | 概率编程模仿学习如何实现? | Prob Imitation (2026): 行为克隆; 逆强化学习; 模仿 | **概率编程模仿**: 行为克隆+逆RL; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_imitation` |
+| D9036 | **Probabilistic programming for Meta-Learning** | 概率编程元学习如何实现? | Prob Meta (2026): 贝叶斯元学习; 任务分布; 快速适应 | **概率编程元学习**: 贝叶斯元学习+任务分布; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_meta` |
+| D9037 | **Probabilistic programming for Continual Learning** | 概率编程持续学习如何实现? | Prob Continual (2026): 遗忘缓解; 增量适应; 贝叶斯更新 | **概率编程持续**: 遗忘缓解+贝叶斯更新; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_continual` |
+| D9038 | **Probabilistic programming for Active Learning** | 概率编程主动学习如何实现? | Prob Active (2026): 信息增益; 不确定性采样; 查询选择 | **概率编程主动学习**: 信息增益+不确定性; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_active` |
+| D9039 | **Probabilistic programming for Transfer Learning** | 概率编程迁移学习如何实现? | Prob Transfer (2026): 先验迁移; 跨域泛化; 迁移效率 | **概率编程迁移**: 先验迁移+跨域泛化; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_transfer` |
+| D9040 | **Probabilistic programming for Federated Learning** | 概率编程联邦学习如何实现? | Prob FL (2026): 分布式贝叶斯; 隐私保护; 联邦推断 | **概率编程联邦**: 分布式贝叶斯+隐私; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_fl` |
+| D9041 | **Probabilistic programming for Adversarial** | 概率编程对抗如何实现? | Prob Adv (2026): 鲁棒推断; 对抗训练; 不确定性量化 | **概率编程对抗**: 鲁棒推断+对抗训练; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_adv` |
+| D9042 | **Probabilistic programming for Interpretability** | 概率编程可解释如何实现? | Prob XAI (2026): 后验解释; 特征重要性; 决策解释 | **概率编程可解释**: 后验解释+特征重要性; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_xai` |
+| D9043 | **Probabilistic programming for Fairness** | 概率编程公平性如何实现? | Prob Fair (2026): 公平推断; 群体公平; 个体公平 | **概率编程公平**: 公平推断+群体公平; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_fair` |
+| D9044 | **Probabilistic programming for Privacy** | 概率编程隐私如何实现? | Prob Privacy (2026): 差分隐私推断; 隐私预算; 安全聚合 | **概率编程隐私**: 差分隐私推断+预算; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_privacy` |
+| D9045 | **Probabilistic programming for Efficiency** | 概率编程效率如何实现? | Prob Efficiency (2026): 近似推断; 采样优化; 计算加速 | **概率编程效率**: 近似推断+采样优化; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_efficiency` |
+| D9046 | **Probabilistic programming for Scalability** | 概率编程可扩展如何实现? | Prob Scale (2026): 大规模推断; 分布式计算; GPU加速 | **概率编程可扩展**: 大规模+分布式+GPU; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_scale` |
+| D9047 | **Probabilistic programming for Usability** | 概率编程易用性如何实现? | Prob Usability (2026): 声明式建模; 自动推断; 用户接口 | **概率编程易用性**: 声明式+自动推断; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_usability` |
+| D9048 | **Probabilistic programming for Verification** | 概率编程验证如何实现? | Prob Verify (2026): 模型检查; 后验校准; 预测评估 | **概率编程验证**: 模型检查+后验校准; 与 D8999 Stan协同 | `nt_core::prob_prog::prob_verify` |
+| D9049 | **Probabilistic Programming Survey** | 概率编程综述如何实现? | PP Survey (2026): 理论+语言+应用; 教程+基准; 开源工具 | **概率编程综述**: 理论+语言+应用; 与 D8999 Stan协同 | `nt_core::prob_prog::survey` |
+
+#### 图信号处理决策
+
+| D9050 | **Graph Fourier Transform** | 图傅里叶变换如何实现? | GFT (2026): 拉普拉斯特征; 频域分析; 图信号变换 | **GFT**: 拉普拉斯特征+频域; 与 D9051 谱图协同 | `nt_core::gsp::gft` |
+| D9051 | **Spectral Graph Theory** | 谱图理论如何实现? | Spectral Graph (2026): 拉普拉斯; 特征值; 图结构分析 | **谱图理论**: 拉普拉斯+特征值; 与 D9050 GFT协同 | `nt_core::gsp::spectral` |
+| D9052 | **Graph Wavelets** | 图小波如何实现? | Graph Wavelets (2026): 多尺度分析; 局部化; 时频分析 | **图小波**: 多尺度+局部化; 与 D9050 GFT协同 | `nt_core::gsp::wavelets` |
+| D9053 | **Graph Filtering** | 图滤波如何实现? | Graph Filter (2026): 频域滤波; 时域滤波; 图卷积 | **图滤波**: 频域+时域+图卷积; 与 D9050 GFT协同 | `nt_core::gsp::filter` |
+| D9054 | **Signal Recovery on Graphs** | 图上信号恢复如何实现? | Signal Recovery (2026): 压缩感知; 采样恢复; 信号重建 | **信号恢复**: 压缩感知+采样恢复; 与 D9050 GFT协同 | `nt_core::gsp::recovery` |
+| D9055 | **Denoising on Graphs** | 图上降噪如何实现? | Graph Denoise (2026): 频域降噪; 图滤波; 平滑约束 | **图降噪**: 频域+图滤波+平滑; 与 D9050 GFT协同 | `nt_core::gsp::denoise` |
+| D9056 | **Multi-Resolution Graph Analysis** | 多分辨率图分析如何实现? | Multi-Res (2026): 层级分析; 粗化-细化; 多尺度表示 | **多分辨率**: 层级+粗化细化; 与 D9052 图小波协同 | `nt_core::gsp::multi_res` |
+| D9057 | **Graph Signal Reconstruction** | 图信号重建如何实现? | Graph Reconstruction (2026): 采样定理; 插值; 重建算法 | **图信号重建**: 采样定理+插值; 与 D9054 信号恢复协同 | `nt_core::gsp::reconstruct` |
+| D9058 | **Graph Sampling Theory** | 图采样理论如何实现? | Graph Sampling (2026): 采样集选择; 混叠; 重建条件 | **图采样**: 采样集+混叠+重建; 与 D9054 信号恢复协同 | `nt_core::gsp::sampling` |
+| D9059 | **Graph Compressed Sensing** | 图压缩感知如何实现? | Graph CS (2026): 稀疏信号; 测量矩阵; 重建算法 | **图压缩感知**: 稀疏+测量+重建; 与 D9054 信号恢复协同 | `nt_core::gsp::cs` |
+| D9060 | **Graph Convolutional Networks** | 图卷积网络如何实现? | GCN (2026): 谱图卷积; 空域图卷积; 节点分类 | **GCN**: 谱+空域图卷积; 与 D9050 GFT协同 | `nt_core::gsp::gcn` |
+| D9061 | **Graph Attention Networks** | 图注意力网络如何实现? | GAT (2026): 多头注意力; 邻域聚合; 节点表示 | **GAT**: 多头注意力+邻域聚合; 与 D9060 GCN协同 | `nt_core::gsp::gat` |
+| D9062 | **Graph Neural Networks** | 图神经网络如何实现? | GNN (2026): 消息传递; 图级/节点级/边级任务 | **GNN**: 消息传递+多级任务; 与 D9060 GCN协同 | `nt_core::gsp::gnn` |
+| D9063 | **Graph Signal Processing for Biology** | 图信号处理生物如何实现? | GSP Bio (2026): 基因网络; 蛋白质网络; 脑网络 | **GSP生物**: 基因+蛋白质+脑网络; 与 D9050 GFT协同 | `nt_core::gsp::bio` |
+| D9064 | **Graph Signal Processing for Social** | 图信号处理社交如何实现? | GSP Social (2026): 社交网络; 信息传播; 影响力 | **GSP社交**: 社交网络+信息传播; 与 D9050 GFT协同 | `nt_core::gsp::social` |
+| D9065 | **Graph Signal Processing for Traffic** | 图信号处理交通如何实现? | GSP Traffic (2026): 交通网络; 流量预测; 路径优化 | **GSP交通**: 交通网络+流量预测; 与 D9050 GFT协同 | `nt_core::gsp::traffic` |
+| D9066 | **Graph Signal Processing for Power** | 图信号处理电力如何实现? | GSP Power (2026): 电网分析; 故障检测; 负荷预测 | **GSP电力**: 电网分析+故障检测; 与 D9050 GFT协同 | `nt_core::gsp::power` |
+| D9067 | **Graph Signal Processing for Sensor** | 图信号处理传感如何实现? | GSP Sensor (2026): 传感器网络; 数据融合; 异常检测 | **GSP传感**: 传感器网络+数据融合; 与 D9050 GFT协同 | `nt_core::gsp::sensor` |
+| D9068 | **Graph Signal Processing for Image** | 图信号处理图像如何实现? | GSP Image (2026): 图像滤波; 分割; 特征提取 | **GSP图像**: 图像滤波+分割; 与 D9050 GFT协同 | `nt_core::gsp::image` |
+| D9069 | **Graph Signal Processing for Video** | 图信号处理视频如何实现? | GSP Video (2026): 视频分析; 动作识别; 场景理解 | **GSP视频**: 视频分析+动作识别; 与 D9050 GFT协同 | `nt_core::gsp::video` |
+| D9070 | **Graph Signal Processing for Text** | 图信号处理文本如何实现? | GSP Text (2026): 文档网络; 语义分析; 主题建模 | **GSP文本**: 文档网络+语义分析; 与 D9050 GFT协同 | `nt_core::gsp::text` |
+| D9071 | **Graph Signal Processing for Speech** | 图信号处理语音如何实现? | GSP Speech (2026): 语音网络; 声学分析; 识别 | **GSP语音**: 语音网络+声学分析; 与 D9050 GFT协同 | `nt_core::gsp::speech` |
+| D9072 | **Graph Signal Processing for Finance** | 图信号处理金融如何实现? | GSP Finance (2026): 金融网络; 风险传播; 市场分析 | **GSP金融**: 金融网络+风险传播; 与 D9050 GFT协同 | `nt_core::gsp::finance` |
+| D9073 | **Graph Signal Processing for Climate** | 图信号处理气候如何实现? | GSP Climate (2026): 气候网络; 模式分析; 预测 | **GSP气候**: 气候网络+模式分析; 与 D9050 GFT协同 | `nt_core::gsp::climate` |
+| D9074 | **Graph Signal Processing for Materials** | 图信号处理材料如何实现? | GSP Materials (2026): 材料网络; 属性预测; 结构分析 | **GSP材料**: 材料网络+属性预测; 与 D9050 GFT协同 | `nt_core::gsp::materials` |
+| D9075 | **Graph Signal Processing for Neuroscience** | 图信号处理神经科学如何实现? | GSP Neuro (2026): 脑网络; 功能连接; 认知分析 | **GSP神经**: 脑网络+功能连接; 与 D9050 GFT协同 | `nt_core::gsp::neuro` |
+| D9076 | **Graph Signal Processing for Epidemiology** | 图信号处理流行病学如何实现? | GSP Epi (2026): 传播网络; 疫情分析; 干预评估 | **GSP流行病**: 传播网络+疫情分析; 与 D9050 GFT协同 | `nt_core::gsp::epi` |
+| D9077 | **Graph Signal Processing for Robotics** | 图信号处理机器人如何实现? | GSP Robot (2026): 机器人网络; 协作感知; 路径规划 | **GSP机器人**: 机器人网络+协作感知; 与 D9050 GFT协同 | `nt_core::gsp::robot` |
+| D9078 | **Graph Signal Processing for Smart Cities** | 图信号处理智慧城市如何实现? | GSP Smart (2026): 城市网络; 交通优化; 资源管理 | **GSP智慧城市**: 城市网络+交通优化; 与 D9050 GFT协同 | `nt_core::gsp::smart` |
+| D9079 | **Graph Signal Processing for IoT** | 图信号处理IoT如何实现? | GSP IoT (2026): IoT网络; 数据融合; 异常检测 | **GSP IoT**: IoT网络+数据融合; 与 D9050 GFT协同 | `nt_core::gsp::iot` |
+| D9080 | **Graph Signal Processing for Blockchain** | 图信号处理区块链如何实现? | GSP Blockchain (2026): 区块链网络; 交易分析; 欺诈检测 | **GSP区块链**: 区块链网络+交易分析; 与 D9050 GFT协同 | `nt_core::gsp::blockchain` |
+| D9081 | **Graph Signal Processing for Cybersecurity** | 图信号处理网络安全如何实现? | GSP Security (2026): 网络入侵; 攻击检测; 威胁分析 | **GSP安全**: 网络入侵+攻击检测; 与 D9050 GFT协同 | `nt_core::gsp::security` |
+| D9082 | **Graph Signal Processing for Autonomous** | 图信号处理自动驾驶如何实现? | GSP Auto (2026): 车联网; 路径规划; 避障 | **GSP自动驾驶**: 车联网+路径规划; 与 D9050 GFT协同 | `nt_core::gsp::auto` |
+| D9083 | **Graph Signal Processing for Agriculture** | 图信号处理农业如何实现? | GSP Agri (2026): 农业网络; 作物监测; 精准农业 | **GSP农业**: 农业网络+作物监测; 与 D9050 GFT协同 | `nt_core::gsp::agri` |
+| D9084 | **Graph Signal Processing for Education** | 图信号处理教育如何实现? | GSP Edu (2026): 学习网络; 知识追踪; 个性化 | **GSP教育**: 学习网络+知识追踪; 与 D9050 GFT协同 | `nt_core::gsp::edu` |
+| D9085 | **Graph Signal Processing for Sports** | 图信号处理体育如何实现? | GSP Sports (2026): 体育网络; 战术分析; 比赛预测 | **GSP体育**: 体育网络+战术分析; 与 D9050 GFT协同 | `nt_core::gsp::sports` |
+| D9086 | **Graph Signal Processing for Entertainment** | 图信号处理娱乐如何实现? | GSP Ent (2026): 娱乐网络; 内容推荐; 用户行为 | **GSP娱乐**: 娱乐网络+内容推荐; 与 D9050 GFT协同 | `nt_core::gsp::entertainment` |
+| D9087 | **Graph Signal Processing for Manufacturing** | 图信号处理制造如何实现? | GSP Mfg (2026): 制造网络; 质量控制; 供应链 | **GSP制造**: 制造网络+质量控制; 与 D9050 GFT协同 | `nt_core::gsp::mfg` |
+| D9088 | **Graph Signal Processing for Logistics** | 图信号处理物流如何实现? | GSP Log (2026): 物流网络; 路径优化; 调度 | **GSP物流**: 物流网络+路径优化; 与 D9050 GFT协同 | `nt_core::gsp::log` |
+| D9089 | **Graph Signal Processing for Energy** | 图信号处理能源如何实现? | GSP Energy (2026): 能源网络; 调度优化; 储能管理 | **GSP能源**: 能源网络+调度优化; 与 D9050 GFT协同 | `nt_core::gsp::energy` |
+| D9090 | **Graph Signal Processing for Water** | 图信号处理水务如何实现? | GSP Water (2026): 水务网络; 水质监测; 泄漏检测 | **GSP水务**: 水务网络+水质监测; 与 D9050 GFT协同 | `nt_core::gsp::water` |
+| D9091 | **Graph Signal Processing for Waste** | 图信号处理废物如何实现? | GSP Waste (2026): 废物网络; 回收优化; 垃圾分类 | **GSP废物**: 废物网络+回收优化; 与 D9050 GFT协同 | `nt_core::gsp::waste` |
+| D9092 | **Graph Signal Processing for Buildings** | 图信号处理建筑如何实现? | GSP Build (2026): 建筑网络; 能耗优化; 设备管理 | **GSP建筑**: 建筑网络+能耗优化; 与 D9050 GFT协同 | `nt_core::gsp::build` |
+| D9093 | **Graph Signal Processing for Healthcare** | 图信号处理医疗如何实现? | GSP Health (2026): 医疗网络; 疾病传播; 患者分析 | **GSP医疗**: 医疗网络+疾病传播; 与 D9050 GFT协同 | `nt_core::gsp::health` |
+| D9094 | **Graph Signal Processing for Genomics** | 图信号处理基因组学如何实现? | GSP Geno (2026): 基因网络; 表达分析; 变异检测 | **GSP基因组**: 基因网络+表达分析; 与 D9050 GFT协同 | `nt_core::gsp::geno` |
+| D9095 | **Graph Signal Processing for Proteomics** | 图信号处理蛋白质组学如何实现? | GSP Proteo (2026): 蛋白质网络; 交互分析; 功能预测 | **GSP蛋白质组**: 蛋白质网络+交互分析; 与 D9050 GFT协同 | `nt_core::gsp::proteo` |
+| D9096 | **Graph Signal Processing for Metabolomics** | 图信号处理代谢组学如何实现? | GSP Metabo (2026): 代谢网络; 通路分析; 生物标记 | **GSP代谢组**: 代谢网络+通路分析; 与 D9050 GFT协同 | `nt_core::gsp::metabo` |
+| D9097 | **Graph Signal Processing for Ecology** | 图信号处理生态学如何实现? | GSP Ecol (2026): 生态网络; 物种互动; 生态系统 | **GSP生态**: 生态网络+物种互动; 与 D9050 GFT协同 | `nt_core::gsp::ecol` |
+| D9098 | **Graph Signal Processing for Archaeology** | 图信号处理考古学如何实现? | GSP Arch (2026): 遗址网络; 年代分析; 文化传播 | **GSP考古**: 遗址网络+年代分析; 与 D9050 GFT协同 | `nt_core::gsp::arch` |
+| D9099 | **Graph Signal Processing for Linguistics** | 图信号处理语言学如何实现? | GSP Ling (2026): 语言网络; 语义关系; 语法分析 | **GSP语言学**: 语言网络+语义关系; 与 D9050 GFT协同 | `nt_core::gsp::ling` |
+| D9100 | **Graph Signal Processing Survey** | 图信号处理综述如何实现? | GSP Survey (2026): 理论+算法+应用; 教程+基准; 开源工具 | **GSP综述**: 理论+算法+应用; 与 D9050 GFT协同 | `nt_core::gsp::survey` |
+
+#### 知识蒸馏决策
+
+| D9101 | **Teacher-Student Frameworks** | 教师-学生框架如何实现? | Teacher-Student (2026): 大模型→小模型; 软标签; 特征模仿 | **教师-学生**: 大→小+软标签+特征; 与 D9102 特征蒸馏协同 | `nt_core::kd::teacher_student` |
+| D9102 | **Feature Distillation** | 特征蒸馏如何实现? | Feature KD (2026): 中间层特征匹配; 注意力转移; 表示学习 | **特征蒸馏**: 中间层匹配+注意力转移; 与 D9101 教师-学生协同 | `nt_core::kd::feature` |
+| D9103 | **Relation Distillation** | 关系蒸馏如何实现? | Relation KD (2026): 样本关系; 标签关系; 知识图谱蒸馏 | **关系蒸馏**: 样本+标签+知识图谱; 与 D9101 教师-学生协同 | `nt_core::kd::relation` |
+| D9104 | **Attention Distillation** | 注意力蒸馏如何实现? | Attention KD (2026): 注意力图转移; 暗知识; 特征重要性 | **注意力蒸馏**: 注意力图+暗知识; 与 D9102 特征蒸馏协同 | `nt_core::kd::attention` |
+| D9105 | **Self-Distillation** | 自蒸馏如何实现? | Self-KD (2026): 自身知识; 深层→浅层; 集成自蒸馏 | **自蒸馏**: 自身知识+深→浅; 与 D9101 教师-学生协同 | `nt_core::kd::self` |
+| D9106 | **Online Distillation** | 在线蒸馏如何实现? | Online KD (2026): 同步训练; 互学习; DML | **在线蒸馏**: 同步训练+互学习; 与 D9101 教师-学生协同 | `nt_core::kd::online` |
+| D9107 | **Cross-Modal Distillation** | 跨模态蒸馏如何实现? | Cross-Modal KD (2026): 跨模态知识; 图像→文本; 多模态对齐 | **跨模态蒸馏**: 跨模态知识+多模态对齐; 与 D9101 教师-学生协同 | `nt_core::kd::cross_modal` |
+| D9108 | **Multi-Teacher Distillation** | 多教师蒸馏如何实现? | Multi-Teacher KD (2026): 多教师集成; 知识融合; 加权聚合 | **多教师蒸馏**: 多教师集成+知识融合; 与 D9101 教师-学生协同 | `nt_core::kd::multi_teacher` |
+| D9109 | **Knowledge Distillation Survey** | 知识蒸馏综述如何实现? | KD Survey (2026): 理论+方法+应用; 基准+工具 | **KD综述**: 理论+方法+应用; 与 D9101 教师-学生协同 | `nt_core::kd::survey` |
+
+### 域级缺陷范围索引
 
 ### 域级缺陷范围索引
 

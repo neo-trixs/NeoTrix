@@ -58,6 +58,9 @@ pub mod nt_world_dsh_explore;
 pub mod nt_world_agent_reach;
 pub mod nt_world_semantic_extract;
 
+// 资产测绘系统
+pub mod asset_map;
+
 // 主体库管理
 pub mod asset_registry;
 

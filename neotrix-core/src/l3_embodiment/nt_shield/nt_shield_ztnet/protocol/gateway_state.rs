@@ -1,0 +1,1 @@
+// Stub: gateway_state

@@ -23,7 +23,7 @@ impl MediaSource for YouTubeSource {
                 Some(MediaItem {
                     id: v["videoId"].as_str()?.to_string(),
                     title: v["title"].as_str()?.to_string(),
-                    artist: v["author"].as_str()?.unwrap_or("Unknown").to_string(),
+                    artist: v["author"].as_str().map_or("Unknown", |s| s).to_string(),
                     album: String::new(),
                     duration: v["lengthSeconds"].as_i64().map(|s| std::time::Duration::from_secs(s as u64)),
                     cover_url: v["videoThumbnails"][0]["url"].as_str().map(String::from),

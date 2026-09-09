@@ -1,3 +1,9 @@
+pub mod engine;
+pub mod registry;
+
+pub use engine::FeedEngine;
+pub use registry::FeedRegistry;
+
 pub struct FeedParser;
 
 impl FeedParser {

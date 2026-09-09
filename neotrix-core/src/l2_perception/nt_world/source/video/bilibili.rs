@@ -30,7 +30,7 @@ impl MediaSource for BilibiliSource {
                 let title = v["title"].as_str()?.replace("<em class=\"keyword\">", "").replace("</em>", "");
                 let author = v["author"].as_str()?.to_string();
                 let duration = v["duration"].as_str()?.split(':').try_fold(0u64, |acc, s| {
-                    let n: u64 = s.parse().map_err(|_| "")?;
+                    let n: u64 = s.parse().map_err(|_| ())?;
                     Ok::<u64, ()>(acc * 60 + n)
                 }).ok().map(|s| std::time::Duration::from_secs(s));
                 let pic = v["pic"].as_str()?.strip_prefix("//").map(|p| format!("https://{}", p));

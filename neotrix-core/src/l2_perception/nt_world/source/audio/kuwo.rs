@@ -10,10 +10,16 @@ impl KuwoSource {
     async fn get_csrf_token() -> String {
         let client = reqwest::Client::new();
         if let Ok(resp) = client.get("https://www.kuwo.cn/").send().await {
-            if let Ok(cookies) = resp.cookies().collect::<Result<Vec<_>, _>>() {
-                for cookie in cookies {
-                    if cookie.name() == "kw_token" {
-                        return cookie.value().to_string();
+            // Parse cookies from set-cookie header
+            if let Some(cookie_header) = resp.headers().get("set-cookie") {
+                if let Ok(cookie_str) = cookie_header.to_str() {
+                    for part in cookie_str.split(';') {
+                        let part = part.trim();
+                        if let Some((name, value)) = part.split_once('=') {
+                            if name.trim() == "kw_token" {
+                                return value.trim().to_string();
+                            }
+                        }
                     }
                 }
             }
@@ -47,8 +53,8 @@ impl MediaSource for KuwoSource {
             let data: Vec<MediaItem> = list.iter().filter_map(|s| {
                 let id = s["rid"].as_i64()?.to_string();
                 let title = s["name"].as_str()?.to_string();
-                let artist = s["artist"].as_str()?.unwrap_or("Unknown").to_string();
-                let album = s["album"].as_str()?.unwrap_or("").to_string();
+                let artist = s["artist"].as_str().map_or("Unknown", |s| s).to_string();
+                let album = s["album"].as_str().map_or("", |s| s).to_string();
                 let duration = s["duration"].as_i64().map(|s| std::time::Duration::from_secs(s as u64));
                 let cover_url = s["pic"].as_str().map(|s| s.to_string());
                 Some(MediaItem { id, title, artist, album, duration, cover_url, media_type: MediaType::Audio, qualities: vec![Quality::Flac24bit, Quality::Flac, Quality::High, Quality::Standard] })

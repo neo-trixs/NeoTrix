@@ -1,0 +1,1 @@
+// Stub: resource_desc

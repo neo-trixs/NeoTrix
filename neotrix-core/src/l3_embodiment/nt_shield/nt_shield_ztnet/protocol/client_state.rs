@@ -1,0 +1,1 @@
+// Stub: client_state

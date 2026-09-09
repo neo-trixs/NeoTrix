@@ -6,13 +6,13 @@ pub struct MultiLyricSource;
 impl MultiLyricSource {
     pub fn new() -> Self { Self }
 
-    /// 解析 LRC 时间轴
-    fn parse_lrc_time(time_str: &str) -> Option<i64> {
+    /// 解析 LRC 时间轴 → Duration
+    fn parse_lrc_time(time_str: &str) -> Option<std::time::Duration> {
         let parts: Vec<&str> = time_str.split(':').collect();
         if parts.len() == 2 {
-            let min = parts[0].parse::<i64>().ok()?;
+            let min = parts[0].parse::<u64>().ok()?;
             let sec = parts[1].parse::<f64>().ok()?;
-            Some(min * 60000 + (sec * 1000.0) as i64)
+            Some(std::time::Duration::from_millis(min * 60000 + (sec * 1000.0) as u64))
         } else {
             None
         }
@@ -88,23 +88,16 @@ impl MediaSource for MultiLyricSource {
                     if let Some(close) = stripped.find(']') {
                         let time_str = &stripped[..close];
                         let text = stripped[close + 1..].trim().to_string();
-                        if let Some(time_ms) = Self::parse_lrc_time(time_str) {
-                            return Some(LyricLine { time_ms, text });
+                        if let Some(timestamp) = Self::parse_lrc_time(time_str) {
+                            return Some(LyricLine { timestamp: Some(timestamp), text });
                         }
                     }
                 }
                 None
             }).collect();
-            Ok(Lyric { title, artist, lines, source: "multi_lyric".into() })
+            Ok(Lyric { title: Some(title), artist: Some(artist), lines, source: "multi_lyric".into() })
         })
     }
-}
-
-/// 歌词行
-#[derive(Debug, Clone)]
-pub struct LyricLine {
-    pub time_ms: i64,
-    pub text: String,
 }
 
 /// 歌词中的单个字
@@ -112,13 +105,4 @@ pub struct LyricLine {
 pub struct LyricWord {
     pub time_ms: i64,
     pub text: String,
-}
-
-/// 歌词
-#[derive(Debug, Clone)]
-pub struct Lyric {
-    pub title: String,
-    pub artist: String,
-    pub lines: Vec<LyricLine>,
-    pub source: String,
 }

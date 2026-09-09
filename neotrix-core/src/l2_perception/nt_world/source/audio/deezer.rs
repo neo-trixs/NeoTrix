@@ -22,8 +22,8 @@ impl MediaSource for DeezerSource {
             let data: Vec<MediaItem> = list.iter().filter_map(|s| {
                 let id = s["id"].as_i64()?.to_string();
                 let title = s["title"].as_str()?.to_string();
-                let artist = s["artist"]["name"].as_str()?.unwrap_or("Unknown").to_string();
-                let album = s["album"]["title"].as_str()?.unwrap_or("").to_string();
+                let artist = s["artist"]["name"].as_str().map_or("Unknown", |s| s).to_string();
+                let album = s["album"]["title"].as_str().map_or("", |s| s).to_string();
                 let duration = s["duration"].as_i64().map(|s| std::time::Duration::from_secs(s as u64));
                 let cover_url = s["album"]["cover_medium"].as_str().map(String::from);
                 Some(MediaItem { id, title, artist, album, duration, cover_url, media_type: MediaType::Audio, qualities: vec![Quality::Flac, Quality::High, Quality::Standard] })

@@ -36,8 +36,8 @@ pub fn classify_intent(query: &str) -> SearchIntent {
             .replace("album", "")
             .trim()
             .to_string();
-        let (name, artist) = split_name_artist(&cleaned);
-        return SearchIntent::Album { name, artist };
+        let (_name, _artist) = split_name_artist(&cleaned);
+        return SearchIntent::Album { name: _name.unwrap_or_default(), artist: _artist };
     }
 
     if q.contains("歌手") || q.contains("singer") || q.contains("artist") {

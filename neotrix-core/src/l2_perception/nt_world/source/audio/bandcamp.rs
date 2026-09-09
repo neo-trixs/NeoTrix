@@ -1,6 +1,5 @@
 use crate::l2_perception::nt_world::source::types::*;
 use crate::l2_perception::nt_world::source::engine::MediaSource;
-use scraper::{Html, Selector};
 
 pub struct BandcampSource;
 
@@ -34,8 +33,8 @@ impl MediaSource for BandcampSource {
             let data: Vec<MediaItem> = items.iter().filter_map(|s| {
                 let id = s["id"].as_i64()?.to_string();
                 let title = s["title"].as_str()?.to_string();
-                let artist = s["band_name"].as_str()?.unwrap_or("Unknown").to_string();
-                let url_str = s["url"].as_str()?;
+                let artist = s["band_name"].as_str().map_or("Unknown", |s| s).to_string();
+                let _url_str = s["url"].as_str()?;
                 Some(MediaItem { id, title, artist, album: String::new(), duration: None, cover_url: None, media_type: MediaType::Audio, qualities: vec![Quality::High, Quality::Standard] })
             }).collect();
             let total = data.len();

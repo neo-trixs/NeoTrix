@@ -1,5 +1,6 @@
 use super::offline_index::OfflineIndex;
 use super::types::*;
+use super::engine::MediaSource;
 
 pub struct OfflineDownloader {
     index: OfflineIndex,
@@ -24,7 +25,7 @@ impl OfflineDownloader {
 
         for source in sources {
             match source.play_url(item, quality).await {
-                Ok(view_source) => {
+                Ok(_view_source) => {
                     let local_path = format!("/tmp/neotrix_offline/{}_{}", item.id, quality.label());
                     self.index.add(item.clone(), local_path.clone());
                     return Ok(local_path);

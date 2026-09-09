@@ -52,6 +52,14 @@ pub struct NtxStats {
     pub time_entries: usize,
 }
 
+/// 压缩率统计
+#[derive(Debug, Clone, Default)]
+pub struct CompressionStats {
+    pub uncompressed_size: u64,
+    pub compressed_size: u64,
+    pub ratio: f64,  // compressed / uncompressed
+}
+
 /// NTX 文件核心结构
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -467,6 +475,40 @@ impl NtxFile {
         }
     }
 
+    /// 获取压缩率统计
+    pub fn compression_stats(&self) -> CompressionStats {
+        let mut uncompressed_size = 0u64;
+        let mut compressed_size = 0u64;
+
+        // 计算帧段压缩率
+        for frame in &self.frames {
+            let encoded = frame.encode_bytes();
+            uncompressed_size += frame.payload.len() as u64;
+            compressed_size += encoded.len() as u64;
+        }
+
+        // 计算向量段压缩率
+        if let Some(seg) = &self.vec_segment {
+            for entry in seg.entries() {
+                uncompressed_size += (entry.vector.len() * 4) as u64;  // f32 = 4 bytes
+            }
+            // 向量段未压缩, compressed = uncompressed
+            compressed_size += uncompressed_size;
+        }
+
+        let ratio = if uncompressed_size > 0 {
+            compressed_size as f64 / uncompressed_size as f64
+        } else {
+            1.0
+        };
+
+        CompressionStats {
+            uncompressed_size,
+            compressed_size,
+            ratio,
+        }
+    }
+
     pub fn path(&self) -> &Path { &self.path }
     pub fn header(&self) -> &NtxHeader { &self.header }
     pub fn toc(&self) -> &NtxToc { &self.toc }
@@ -474,6 +516,25 @@ impl NtxFile {
     pub fn close(mut self) -> std::io::Result<()> {
         self.commit()?;
         Ok(())
+    }
+
+    // ── Drop 实现 ──────────────────────────────────────
+
+    /// Drop: 刷新写缓冲区 + 尝试提交
+    fn drop(&mut self) {
+        // 尝试刷新写缓冲区
+        if !self.write_buffer.is_empty() {
+            if let Err(e) = self.flush_write_buffer() {
+                eprintln!("[NTX] Drop: 刷新写缓冲区失败: {}", e);
+            }
+        }
+
+        // 尝试提交
+        if self.dirty && !self.read_only {
+            if let Err(e) = self.commit() {
+                eprintln!("[NTX] Drop: 提交失败: {}", e);
+            }
+        }
     }
 
     // ── 段读写内部方法 ──────────────────────────────

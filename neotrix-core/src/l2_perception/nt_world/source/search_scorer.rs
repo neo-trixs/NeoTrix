@@ -33,7 +33,7 @@ pub fn fuzzy_match(text: &str, query: &str) -> f64 {
         .filter(|qw| {
             text_words
                 .iter()
-                .any(|tw| tw.contains(qw) || qw.contains(tw))
+                .any(|tw| tw.contains(qw.as_ref()) || qw.contains(tw.as_ref()))
         })
         .count();
 

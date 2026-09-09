@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Feed 源健康状态
 #[derive(Debug, Clone)]
@@ -42,7 +42,8 @@ impl FeedEngine {
     /// 并发拉取多个 Feed
     pub async fn fetch_all(&mut self) -> Vec<FeedResult> {
         let mut results = Vec::new();
-        for url in &self.feeds {
+        let feeds: Vec<String> = self.feeds.clone();
+        for url in &feeds {
             let start = Instant::now();
             match self.fetch_one(url).await {
                 Ok(content) => {

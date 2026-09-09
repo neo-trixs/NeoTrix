@@ -1,5 +1,4 @@
 use super::types::*;
-use super::playback::PlaybackState;
 
 pub struct NowPlaying {
     item: Option<MediaItem>,

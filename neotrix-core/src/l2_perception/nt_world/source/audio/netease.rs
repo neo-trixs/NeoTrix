@@ -36,8 +36,8 @@ impl MediaSource for NeteaseSource {
             let data: Vec<MediaItem> = songs.iter().filter_map(|s| {
                 let id = s["id"].as_i64()?.to_string();
                 let title = s["name"].as_str()?.to_string();
-                let artist = s["artists"][0]["name"].as_str()?.unwrap_or("Unknown").to_string();
-                let album = s["album"]["name"].as_str()?.unwrap_or("").to_string();
+                let artist = s["artists"][0]["name"].as_str().map_or("Unknown", |s| s).to_string();
+                let album = s["album"]["name"].as_str().map_or("", |s| s).to_string();
                 let duration = s["duration"].as_i64().map(|ms| std::time::Duration::from_millis(ms as u64));
                 Some(MediaItem { id, title, artist, album, duration, cover_url: None, media_type: MediaType::Audio, qualities: vec![Quality::Flac, Quality::High, Quality::Standard] })
             }).collect();

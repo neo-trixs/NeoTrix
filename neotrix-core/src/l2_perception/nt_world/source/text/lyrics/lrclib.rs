@@ -55,15 +55,15 @@ impl MediaSource for LrclibSource {
                 let text = line.split(']').nth(1)?.trim().to_string();
                 let parts: Vec<&str> = time_part.split(':').collect();
                 if parts.len() == 2 {
-                    let min: i64 = parts[0].parse().ok()?;
+                    let min: u64 = parts[0].parse().ok()?;
                     let sec: f64 = parts[1].parse().ok()?;
-                    let time_ms = min * 60000 + (sec * 1000.0) as i64;
-                    Some(LyricLine { time_ms, text })
+                    let time_ms = min * 60000 + (sec * 1000.0) as u64;
+                    Some(LyricLine { timestamp: Some(std::time::Duration::from_millis(time_ms)), text })
                 } else {
                     None
                 }
             }).collect();
-            Ok(Lyric { title, artist, lines, source: "lrclib".into() })
+            Ok(Lyric { title: Some(title), artist: Some(artist), lines, source: "lrclib".into() })
         })
     }
 }

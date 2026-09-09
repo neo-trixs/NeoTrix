@@ -37,8 +37,8 @@ impl MediaSource for QQMusicSource {
             let data: Vec<MediaItem> = list.iter().filter_map(|s| {
                 let id = s["songmid"].as_str()?.to_string();
                 let title = s["songname"].as_str()?.to_string();
-                let artist = s["singer"][0]["name"].as_str()?.unwrap_or("Unknown").to_string();
-                let album = s["albumname"].as_str()?.unwrap_or("").to_string();
+                let artist = s["singer"][0]["name"].as_str().map_or("Unknown", |s| s).to_string();
+                let album = s["albumname"].as_str().map_or("", |s| s).to_string();
                 let duration = s["interval"].as_i64().map(|s| std::time::Duration::from_secs(s as u64));
                 let cover_url = s["albumid"].as_i64().map(|id| {
                     format!("https://y.gtimg.cn/music/photo_new/T002R300x300M000{}.jpg", id)

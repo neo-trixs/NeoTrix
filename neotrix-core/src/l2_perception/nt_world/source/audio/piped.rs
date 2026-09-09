@@ -24,7 +24,7 @@ impl MediaSource for PipedSource {
             let data: Vec<MediaItem> = list[start..end].iter().filter_map(|s| {
                 let id = s["url"].as_str()?.trim_start_matches("/watch?v=").to_string();
                 let title = s["title"].as_str()?.to_string();
-                let artist = s["uploaderName"].as_str()?.unwrap_or("Unknown").to_string();
+                let artist = s["uploaderName"].as_str().map_or("Unknown", |s| s).to_string();
                 let duration = s["duration"].as_i64().map(|s| std::time::Duration::from_secs(s as u64));
                 Some(MediaItem { id, title, artist, album: String::new(), duration, cover_url: None, media_type: MediaType::Audio, qualities: vec![Quality::High, Quality::Standard] })
             }).collect();

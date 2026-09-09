@@ -22,8 +22,8 @@ impl MediaSource for JioSaavnSource {
             let data: Vec<MediaItem> = songs.iter().filter_map(|s| {
                 let id = s["id"].as_str()?.to_string();
                 let title = s["title"].as_str()?.to_string();
-                let artist = s["description"].as_str()?.unwrap_or("Unknown").to_string();
-                let album = s["album"].as_str()?.unwrap_or("").to_string();
+                let artist = s["description"].as_str().map_or("Unknown", |s| s).to_string();
+                let album = s["album"].as_str().map_or("", |s| s).to_string();
                 let duration = s["duration"].as_str().and_then(|d| d.parse::<u64>().ok()).map(|s| std::time::Duration::from_secs(s));
                 Some(MediaItem { id, title, artist, album, duration, cover_url: None, media_type: MediaType::Audio, qualities: vec![Quality::High, Quality::Standard] })
             }).collect();

@@ -72,9 +72,9 @@ impl MediaSource for GeniusSource {
             let cleaned = raw.replace("<br>", "\n").replace("<br/>", "\n");
             let stripped: String = cleaned.chars().filter(|c| *c != '<' && *c != '>').collect();
             let lines: Vec<LyricLine> = stripped.lines().enumerate().map(|(i, line)| {
-                LyricLine { time_ms: (i as i64) * 4000, text: line.trim().to_string() }
+                LyricLine { timestamp: Some(std::time::Duration::from_millis((i as u64) * 4000)), text: line.trim().to_string() }
             }).filter(|l| !l.text.is_empty()).collect();
-            Ok(Lyric { title, artist, lines, source: "genius".into() })
+            Ok(Lyric { title: Some(title), artist: Some(artist), lines, source: "genius".into() })
         })
     }
 }

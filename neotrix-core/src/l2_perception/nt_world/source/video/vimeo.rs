@@ -27,7 +27,7 @@ impl MediaSource for VimeoSource {
             let data: Vec<MediaItem> = data_list.iter().filter_map(|v| {
                 let id = v["uri"].as_str()?.trim_start_matches("/videos/").to_string();
                 let title = v["name"].as_str()?.to_string();
-                let author = v["user"]["name"].as_str()?.unwrap_or("Unknown").to_string();
+                let author = v["user"]["name"].as_str().map_or("Unknown", |s| s).to_string();
                 let duration = v["duration"].as_i64().map(|s| std::time::Duration::from_secs(s as u64));
                 let cover = v["pictures"]["sizes"].as_array()?.last()?.get("link")?.as_str().map(String::from);
                 Some(MediaItem {
