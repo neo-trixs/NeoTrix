@@ -14,6 +14,7 @@ pub mod search_aggregator;
 pub mod search_cache;
 pub mod playback_retry;
 pub mod playback_history;
+pub mod search_normalizer;
 
 pub use types::*;
 pub use engine::MediaEngine;
@@ -30,3 +31,4 @@ pub use search_aggregator::SearchAggregator;
 pub use search_cache::SearchCache;
 pub use playback_retry::PlaybackRetry;
 pub use playback_history::PlaybackHistory;
+pub use search_normalizer::SearchNormalizer;
