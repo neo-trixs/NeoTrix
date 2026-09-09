@@ -2,9 +2,6 @@ use super::planner::PlannerNode;
 use super::state_graph::StateGraph;
 use super::state_graph::ArtifactState;
 use crate::l5_cognition::nt_mind::nt_mind::goal_loop::priority::{PriorityEngine, MoscowClass};
-use crate::l5_cognition::nt_mind::experiment::{Hypothesis, ExperimentDesigner};
-use crate::l5_cognition::nt_mind::ux_review::UxReviewEngine;
-use crate::l5_cognition::nt_mind::nt_mind::core::CapabilityVector;
 
 #[test]
 fn test_priority_engine_feeds_goal_loop() {

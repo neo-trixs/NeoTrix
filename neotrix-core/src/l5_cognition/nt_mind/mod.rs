@@ -2,7 +2,6 @@ pub mod nt_mind;
 pub mod nt_mind_background_loop;
 pub mod nt_mind_benchmark;
 pub mod nt_mind_hook;
-pub mod nt_mind_knowledge_pipeline;
 pub mod nt_mind_skill_engine;
 
 pub mod evolution;

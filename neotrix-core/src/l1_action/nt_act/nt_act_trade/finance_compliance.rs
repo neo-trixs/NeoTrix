@@ -273,8 +273,8 @@ impl Default for FinanceEngine {
 impl FinanceEngine {
     /// Review contract for compliance and risk (FT05)
     pub fn review_contract(
-        contract: &super::nt_trade_full_cycle::Contract,
-        policy: &super::nt_trade_full_cycle::CompanyPolicy,
+        contract: &super::full_cycle::Contract,
+        policy: &super::full_cycle::CompanyPolicy,
     ) -> ContractReview {
         let mut findings = Vec::new();
         let mut risk_score = 0.0;
@@ -369,7 +369,7 @@ impl FinanceEngine {
     }
 
     /// Review Letter of Credit for soft clauses
-    pub fn review_lc(lc_text: &str, contract: &super::nt_trade_full_cycle::Contract) -> LcReview {
+    pub fn review_lc(lc_text: &str, contract: &super::full_cycle::Contract) -> LcReview {
         // Simplified LC review - in production would parse MT700 format
         let soft_clauses = Self::detect_soft_clauses(lc_text);
         let discrepancies = Self::check_discrepancies(lc_text, contract);
@@ -428,7 +428,7 @@ impl FinanceEngine {
         clauses
     }
 
-    fn check_discrepancies(_lc_text: &str, _contract: &super::nt_trade_full_cycle::Contract) -> Vec<Discrepancy> {
+    fn check_discrepancies(_lc_text: &str, _contract: &super::full_cycle::Contract) -> Vec<Discrepancy> {
         let discrepancies = Vec::new();
         // Simplified - would check actual documents against LC terms
         discrepancies
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_contract_review_approved() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_contract_review_low_deposit() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-2".into(),
@@ -681,7 +681,7 @@ mod tests {
 
     #[test]
     fn test_lc_review_soft_clause() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem};
+        use super::super::full_cycle::{Contract, ContractItem};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -733,7 +733,7 @@ mod tests {
 
     #[test]
     fn test_settlement_calculation() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -773,7 +773,7 @@ mod tests {
 
     #[test]
     fn test_lc_review_no_soft_clauses() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem};
+        use super::super::full_cycle::{Contract, ContractItem};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -853,7 +853,7 @@ mod tests {
 
     #[test]
     fn test_contract_review_forbidden_country() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
+        use super::super::full_cycle::{Contract, ContractItem, CompanyPolicy, RiskControl};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -909,7 +909,7 @@ mod tests {
 
     #[test]
     fn test_settlement_multi_currency() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem};
+        use super::super::full_cycle::{Contract, ContractItem};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),

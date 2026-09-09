@@ -1,6 +1,6 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l2_perception::nt_world::nt_world_exploration_engine::{ExplorationEngine, ExplorationConfig};
-use crate::l5_cognition::nt_mind::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
+use crate::l5_cognition::nt_mind::nt_mind_background_loop::knowledge_pipeline::KnowledgeAbsorptionPipeline;
 
 pub struct ExploreCmd;
 

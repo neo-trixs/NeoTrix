@@ -65,6 +65,10 @@ path = "src/bin/experience.rs"
 name = "neotrix-geoint"
 path = "src/bin/geoint.rs"
 
+[[bin]]
+name = "model-download"
+path = "src/bin/model_download.rs"
+
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
 neotrix-sysctl = { path = "../crates/neotrix-sysctl" }

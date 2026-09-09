@@ -5,7 +5,7 @@
 //! 契约: recovery_verify / pattern_learn / known_trap_promote
 //! 核心: 验证修复结果、学习成功模式、晋升重复失败为已知陷阱
 
-use crate::l5_cognition::nt_mind::nt_mind_repair::{
+use super::repair::{
     RecoveryVerifier, VerifyResult, VerificationInput, RepairHistory, FixResult,
     PatternUpdate,
 };
@@ -51,7 +51,7 @@ impl RecoveryVerifyService {
                 cb(pu);
             }
         }
-        if let Some(ref trap) = result.known_trap_promoted {
+        if let Some(trap) = &result.known_trap_promoted {
             for cb in &self.trap_callbacks {
                 cb(trap);
             }
@@ -71,7 +71,7 @@ impl Default for RecoveryVerifyService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::l5_cognition::nt_mind::nt_mind_repair::{FixResult, RepairPlan, RiskAssessment, RiskLevel};
+    use super::super::repair::{FixResult, RepairPlan, RiskAssessment, RiskLevel};
 
     #[test]
     fn test_recovery_verify_service() {
@@ -108,14 +108,14 @@ mod tests {
         };
         let verify = VerificationInput {
             tests_pass: true,
-            health: crate::l5_cognition::nt_mind::nt_mind_repair::HealthReport {
+            health: super::super::repair::HealthReport {
                 healthy: true, dimensions: std::collections::HashMap::new(), alerts: vec![],
             },
         };
         let history = RepairHistory { same_pattern_count: 0, total_attempts: 1 };
 
         let result = svc.verify_recovery(&fix, &verify, &history);
-        assert_eq!(result.verdict, crate::l5_cognition::nt_mind::nt_mind_repair::VerifyVerdict::Recovered);
+        assert_eq!(result.verdict, super::super::repair::VerifyVerdict::Recovered);
         assert!(pattern_received.load(Ordering::SeqCst), "pattern callback should be called");
         assert!(!trap_received.load(Ordering::SeqCst), "trap callback should NOT be called for success");
     }

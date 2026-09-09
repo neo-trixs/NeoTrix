@@ -5,6 +5,7 @@ pub mod repair;
 pub mod recovery_verify;
 pub mod memory_bank;
 
+pub use repair::RiskLevel;
 pub use cleanup_engine::*;
 pub use guardian::*;
 pub use distiller::*;

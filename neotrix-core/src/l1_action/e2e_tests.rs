@@ -184,7 +184,7 @@ fn test_cat6_security_e2e() {
 
 #[test]
 fn test_l5_trade_orchestrator_integration() {
-    use crate::l5_cognition::nt_mind::nt_mind::nt_trade_orchestrator::*;
+    use crate::l1_action::nt_act::nt_act_trade::orchestrator::*;
     
     let orchestrator = TradeOrchestrator::new();
     

@@ -236,7 +236,7 @@ use crate::core::nt_core_self_constitution::ConstitutionLoader;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
-use crate::l5_cognition::nt_mind::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
+use crate::l5_cognition::nt_mind::nt_mind_background_loop::knowledge_pipeline::KnowledgeAbsorptionPipeline;
 use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;

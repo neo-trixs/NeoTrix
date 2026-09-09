@@ -380,7 +380,7 @@ impl Default for ProductionEngine {
 impl ProductionEngine {
     pub fn create_production_order(
         contract_id: &str,
-        product_spec: &super::nt_trade_full_cycle::ProductSpec,
+        product_spec: &super::full_cycle::ProductSpec,
     ) -> ProductionOrder {
         ProductionOrder {
             production_order_id: format!("PO-{}", uuid::Uuid::new_v4().simple()),
@@ -534,8 +534,8 @@ impl LogisticsEngine {
     }
 
     pub fn declare_customs(
-        contract: &super::nt_trade_full_cycle::Contract,
-        product_spec: &super::nt_trade_full_cycle::ProductSpec,
+        contract: &super::full_cycle::Contract,
+        product_spec: &super::full_cycle::ProductSpec,
         _booking: &BookingConfirmation,
     ) -> CustomsDeclaration {
         CustomsDeclaration {
@@ -683,11 +683,11 @@ mod tests {
 
     #[test]
     fn test_production_order_creation() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![BomItem {
                 item_id: "1".into(),
                 name: "Steel".into(),
@@ -723,11 +723,11 @@ mod tests {
 
     #[test]
     fn test_progress_report() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![],
             routing: vec![],
             packaging: PackagingSpec {
@@ -750,11 +750,11 @@ mod tests {
 
     #[test]
     fn test_inspection_report() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![],
             routing: vec![],
             packaging: PackagingSpec {
@@ -804,7 +804,7 @@ mod tests {
 
     #[test]
     fn test_customs_declaration() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem, ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{Contract, ContractItem, ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -823,7 +823,7 @@ mod tests {
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![],
             routing: vec![],
             packaging: PackagingSpec {
@@ -867,7 +867,7 @@ mod tests {
 
     #[test]
     fn test_bill_of_lading_issuance() {
-        use super::super::nt_trade_full_cycle::{Contract, ContractItem, ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{Contract, ContractItem, ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let contract = Contract {
             contract_id: "CONTRACT-1".into(),
@@ -882,7 +882,7 @@ mod tests {
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![],
             routing: vec![],
             packaging: PackagingSpec { package_type: "carton".into(), dimensions_cm: (30.0, 20.0, 15.0), gross_weight_kg: 10.0, net_weight_kg: 8.0, marks: vec![] },
@@ -928,11 +928,11 @@ mod tests {
 
     #[test]
     fn test_milestone_dependencies() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![],
             routing: vec![],
             packaging: PackagingSpec { package_type: "carton".into(), dimensions_cm: (30.0, 20.0, 15.0), gross_weight_kg: 10.0, net_weight_kg: 8.0, marks: vec![] },
@@ -986,11 +986,11 @@ mod tests {
 
     #[test]
     fn test_production_order_material_status() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![
                 BomItem { item_id: "1".into(), name: "Steel".into(), qty: 100.0, unit: "kg".into(), supplier: Some("A".into()), lead_time_days: 7 },
                 BomItem { item_id: "2".into(), name: "Motor".into(), qty: 1.0, unit: "PCS".into(), supplier: Some("B".into()), lead_time_days: 21 },

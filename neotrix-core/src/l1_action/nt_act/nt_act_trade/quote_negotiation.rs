@@ -266,8 +266,8 @@ impl NegotiationEngine {
 /// Entry point for the Quote & Negotiation sub-skill
 pub fn execute_quote_negotiation(
     requirement: RequirementConfirmation,
-    product_spec: super::nt_trade_full_cycle::ProductSpec,
-    market_env: super::nt_trade_full_cycle::MarketEnvironment,
+    product_spec: super::full_cycle::ProductSpec,
+    market_env: super::full_cycle::MarketEnvironment,
 ) -> (Vec<QuoteSheet>, Vec<NegotiationRecord>) {
     // Generate initial quote
     let cost_breakdown = calculate_cost_breakdown(&product_spec, &market_env);
@@ -324,8 +324,8 @@ pub fn execute_quote_negotiation(
 }
 
 fn calculate_cost_breakdown(
-    spec: &super::nt_trade_full_cycle::ProductSpec,
-    market: &super::nt_trade_full_cycle::MarketEnvironment,
+    spec: &super::full_cycle::ProductSpec,
+    market: &super::full_cycle::MarketEnvironment,
 ) -> CostBreakdown {
     let material: f64 = spec.bom.iter().map(|b| b.qty * 10.0).sum(); // simplified
     let labor = spec.routing.iter().map(|r| r.duration_hours * 25.0).sum::<f64>();
@@ -439,11 +439,11 @@ mod tests {
 
     #[test]
     fn test_cost_breakdown() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, MarketEnvironment};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, MarketEnvironment};
 
         let spec = ProductSpec {
             spec_id: "test".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![BomItem {
                 item_id: "1".into(),
                 name: "Steel".into(),
@@ -458,7 +458,7 @@ mod tests {
                 work_center: "WC1".into(),
                 duration_hours: 2.0,
             }],
-            packaging: super::super::nt_trade_full_cycle::PackagingSpec {
+            packaging: super::super::full_cycle::PackagingSpec {
                 package_type: "carton".into(),
                 dimensions_cm: (30.0, 20.0, 15.0),
                 gross_weight_kg: 10.0,
@@ -603,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_execute_quote_negotiation_integration() {
-        use super::super::nt_trade_full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec, MarketEnvironment, IntentLevel};
+        use super::super::full_cycle::{ProductSpec, BomItem, RoutingStep, PackagingSpec, MarketEnvironment, IntentLevel};
 
         let req = RequirementConfirmation {
             confirmed: true,
@@ -615,7 +615,7 @@ mod tests {
 
         let spec = ProductSpec {
             spec_id: "spec-1".into(),
-            product_type: super::super::nt_trade_full_cycle::ProductType::Machinery,
+            product_type: super::super::full_cycle::ProductType::Machinery,
             bom: vec![BomItem { item_id: "1".into(), name: "Steel".into(), qty: 100.0, unit: "kg".into(), supplier: None, lead_time_days: 7 }],
             routing: vec![RoutingStep { step_id: "1".into(), name: "Cutting".into(), work_center: "WC1".into(), duration_hours: 8.0 }],
             packaging: PackagingSpec { package_type: "carton".into(), dimensions_cm: (30.0, 20.0, 15.0), gross_weight_kg: 10.0, net_weight_kg: 8.0, marks: vec![] },

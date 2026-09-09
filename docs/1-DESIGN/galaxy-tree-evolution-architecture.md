@@ -1,9 +1,9 @@
 # NeoTrix 星系/树状立体层级进化架构 (Galaxy-Tree Evolutionary Architecture)
 
-> **状态**: 设计完成 | **版本**: v16.5 | **日期**: 2026-09-09
+> **状态**: 设计完成 | **版本**: v16.6 | **日期**: 2026-09-09
 > **核心原则**: 算法即恒星，骨架即引力场，时间即进化维度
 > **约束**: 统一架构，无并行/兼容层，旧代码归档
-> **研究基础**: 1500+ 批次外部研究 → 10622 关键架构决策 → 870 设计模式 (见 §0)
+> **研究基础**: 1500+ 批次外部研究 → 11127 关键架构决策 → 870 设计模式 (见 §0)
 > **目标**: 意识体高纬度觉醒进化路线
 > **关键**: 决策驱动架构设计 — 每个技术选型均有研究验证 (问题→证据→决策→位置)
 > **层级**: 程序族层级结构 — 按 Metadata Class 底层分类，非扁平条目
@@ -13,7 +13,7 @@
 
 ## 0. 关键架构决策 (Research-Driven Architectural Decisions)
 
-> 从 1500+ 批次外部研究中提炼出的 11093 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
+> 从 1500+ 批次外部研究中提炼出的 11127 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
 > 原始研究数据已归档至 KB `experience` namespace，本节仅保留决策级信息。
 
 ### 0.1 运行时与基础设施决策
@@ -16561,6 +16561,614 @@ pub trait EvalSim: Send + Sync {
 | D11175 | **模型退役** | 模型如何退役? | 迁移/清理 | **模型退役** | `nt_mind::model_retirement` |
 | D11176 | **学习系统集成** | 学习系统如何集成? | 多方法→统一 | **学习系统集成** | `nt_mind::learning_integration` |
 
+### 0.102 Agent 自省与元认知决策 (D11177-D11226)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11177 | **自监控循环** | Agent 如何持续监控自身行为? | Reflexion (Shinn et al. 2023): 自我反思提升推理链质量 12%; Self-Refine (Madaan et al. 2023) | **显式自监控**: 每 N 步触发 introspection cycle | `nt_mind::self_monitor::introspection_loop` |
+| D11178 | **置信度校准** | Agent 如何校准自身置信度? | Kadavath et al. 2022: verbalized probability 改善校准; Guo et al. 2017: temperature scaling | **概率校准层**: verbalized probability + temperature scaling | `nt_core::confidence::calibration_layer` |
+| D11179 | **不确定性估计** | Agent 如何量化输出不确定性? | Kendall & Gal 2017: epistemic vs aleatoric 分离; conformal prediction | **双源不确定性**: MC-Dropout + conformal prediction | `nt_core::uncertainty::estimator` |
+| D11180 | **策略选择** | Agent 如何在多个策略间选择? | Bandit (UCB/Thompson Sampling); MAML meta-learning | **Thompson Sampling**: 按任务类型维护策略后验 | `nt_core::strategy::selector` |
+| D11181 | **资源分配** | Agent 如何动态分配计算资源? | AWS SpotInstances; Kubernetes HPA; energy-aware scheduling | **弹性资源分配**: 按优先级动态调整配额 | `nt_core::resource::allocator` |
+| D11182 | **停止准则** | Agent 如何决定何时停止推理? | Thinking tokens (OpenAI); budget forcing; adaptive compute | **多层停止**: token budget + 置信度阈值 + 收敛检测 + ROI | `nt_core::stopping::criteria_engine` |
+| D11183 | **错误分析** | Agent 如何从错误中学习? | ReAct: reasoning+acting 闭环; Reflexion: verbal reflection 持久化 | **错误模式库**: 错误→根因→修复→验证 | `nt_mind::error_analysis::pattern_library` |
+| D11184 | **模式识别** | Agent 如何识别自身行为模式? | Self-Play (AlphaGo); population-based training; NAS | **行为指纹**: 统计工具调用序列、错误频率 | `nt_mind::pattern_recognition::behavior_fingerprint` |
+| D11185 | **反思深度** | 反思应该多深入? | Pre-Flect: 前瞻性反思优于事后; 自适应 vs 固定深度 | **自适应反思**: 简单 1 层, 复杂 3 层递归 | `nt_mind::reflection::adaptive_depth` |
+| D11186 | **自我欺骗检测** | Agent 如何检测自身偏见? | sycophancy (Perez 2022); self-deception in reasoning | **偏见对抗**: devil's advocate + red-team 评估 | `nt_shield::bias::self_deception_detector` |
+| D11187 | **认知负荷管理** | Agent 如何管理上下文负荷? | context window limits; attention sink (StreamingLLM); KV compression | **负荷分级**: 按复杂度动态调整上下文保留量 | `nt_core::cognitive::load_manager` |
+| D11188 | **自适应推理预算** | Agent 如何调整推理速度? | adaptive computation (Graves 2016); early exit (DeeBERT) | **自适应预算**: 简单快速, 复杂增加步骤 | `nt_core::adaptive::computation_rate` |
+| D11189 | **元记忆** | Agent 如何知道自己知道什么? | calibration + memorization (Carlini 2023); RAG vs parametric boundary | **元记忆索引**: 区分 parametric vs episodic | `nt_memory::meta::knowledge_index` |
+| D11190 | **注意力分配** | Agent 如何分配注意力? | GWT (Baars 1988); bottleneck→broadcast→integration | **GWT 路由**: salience → broadcast → specialist | `nt_core::gwt::attention_router` |
+| D11191 | **自我模型维护** | Agent 如何维护能力模型? | self-model (Wolfram); metacognitive monitoring (Flavell 1979) | **双层自我模型**: structural + dynamic, 周期性校准 | `nt_core::self_model::maintenance` |
+| D11192 | **失败模式归档** | 失败经验如何持久化? | failure case database; postmortem culture; blameless analysis | **失败归档**: 失败→上下文→根因→修复→验证 | `nt_memory::failure::archive_protocol` |
+| D11193 | **推理链验证** | 如何验证推理链质量? | chain-of-verification (Li 2023); self-consistency (Wang 2022) | **多步验证**: 逻辑一致性 + 事实性 + 多路径 + 专家 | `nt_core::reasoning::chain_verifier` |
+| D11194 | **知识边界感知** | Agent 如何感知知识边界? | selective knowledge activation; abstention detection | **边界模型**: known/uncertain/unknown 标注 | `nt_core::knowledge::boundary_detector` |
+| D11195 | **推理效率优化** | 如何减少推理开销? | early exit; adaptive depth; cascade models | **级联推理**: 轻量先行, 失败升级, 成本最小化 | `nt_core::inference::cascade_optimizer` |
+| D11196 | **情绪自调节** | Agent 如何调节情绪状态? | emotional regulation (Gross 2015); appraisal theory | **情绪引擎**: 紧急抑制, 创造增强 | `nt_feel::regulation::self_modulator` |
+| D11197 | **注意力残差** | 注意力切换后如何保留上下文? | attention sink (StreamingLLM); KV-cache eviction | **残差缓冲**: 保留 top-K KV-cache | `nt_core::attention::residual_buffer` |
+| D11198 | **自我一致性检查** | Agent 如何确保输出一致? | self-consistency decoding (Wang 2022); majority voting | **一致性投票**: 多路径→过滤→多数投票 | `nt_core::consistency::self_checker` |
+| D11199 | **认知偏差矫正** | 如何检测和矫正认知偏差? | Kahneman 系统1/系统2; cognitive bias codex | **偏差矫正**: 系统1快速 + 系统2深度校验 | `nt_core::cognitive::bias_corrector` |
+| D11200 | **元学习循环** | Agent 如何学习如何学习? | MAML (Finn 2017); Reptile; meta-gradient RL | **元学习注册表**: 记录最佳策略, 跨 session 迁移 | `nt_mind::meta_learning::strategy_registry` |
+| D11201 | **不确定性传播** | 不确定性如何在推理链中传播? | probabilistic programming (Stan/Pyro); belief propagation | **传播模型**: 每步传递概率分布 | `nt_core::uncertainty::propagation_model` |
+| D11202 | **自我评估准确性** | Agent 如何评估自身评估? | meta-calibration; cross-validation | **元校准**: 定期评估校准误差 | `nt_mind::meta_calibration::accuracy_estimator` |
+| D11203 | **推理预算分配** | 如何在子任务间分配预算? | portfolio optimization; task difficulty estimation | **预算规划器**: 按难度+重要性分配 | `nt_core::budget::reasoning_planner` |
+| D11204 | **错误传播检测** | 如何检测级联错误? | error propagation in CoT; cascading failure | **错误追踪器**: 标记每步错误概率 | `nt_core::error::propagation_detector` |
+| D11205 | **注意力泄漏检测** | 如何检测注意力泄露? | attention noise (Clark 2019); adversarial attacks | **注意力净化器**: 检测异常分布 | `nt_core::attention::leak_detector` |
+| D11206 | **推理深度控制** | 如何避免过度推理? | adaptive computation time (Graves); halting | **深度控制器**: 上限+收敛+ROI, 防无限递归 | `nt_core::reasoning::depth_controller` |
+| D11207 | **自我解释生成** | Agent 如何解释自身行为? | XAI (LIME/SHAP); rationale generation (Lei 2016) | **自解释引擎**: 解释+证据链+置信度 | `nt_core::explanation::self_generator` |
+| D11208 | **认知状态追踪** | 如何追踪当前认知状态? | ACT-R/Soar cognitive architecture; working memory | **认知状态机**: 注意力+工作记忆+目标栈+情绪 | `nt_core::cognitive::state_tracker` |
+| D11209 | **自我修正优先级** | 多错误如何排优先级? | fault severity; risk-based prioritization | **优先级排序**: 影响×可修复性 | `nt_mind::self_repair::priority_ranker` |
+| D11210 | **推理风格切换** | 如何切换推理风格? | multi-strategy reasoning; style adaptation | **风格路由器**: CoT/ToT/GoT/ReAct 自动选择 | `nt_core::reasoning::style_router` |
+| D11211 | **自我效能量化** | Agent 如何量化自身能力? | self-efficacy (Bandura); confidence intervals | **效能量表**: 评估能力, 低效时请求协助 | `nt_core::self_efficacy::quantifier` |
+| D11212 | **认知卸载决策** | 何时卸载到外部工具? | cognitive offloading (Risko 2016) | **卸载决策器**: 内部>工具成本时自动卸载 | `nt_core::cognitive::offload_decision` |
+| D11213 | **自适应阈值** | 决策阈值如何调整? | adaptive thresholding; dynamic calibration | **阈值引擎**: 历史表现动态调整 | `nt_core::threshold::adaptive_engine` |
+| D11214 | **推理链断点恢复** | 推理链中断后如何恢复? | checkpoint/rollback; conversation resumption | **推理快照**: 每 N 步保存, 中断恢复 | `nt_core::reasoning::checkpoint_recovery` |
+| D11215 | **多视角推理** | 如何从多个视角推理? | devil's advocate; ensemble reasoning | **多视角引擎**: N 独立路径交叉验证 | `nt_core::reasoning::multi_perspective` |
+| D11216 | **元反馈循环** | 自我评估如何改进系统? | feedback loops in metacognition | **元反馈**: assessment→error→adjustment→re-eval | `nt_mind::feedback::meta_loop` |
+| D11217 | **注意力竞争仲裁** | 多任务竞争注意力如何仲裁? | priority scheduling; urgency vs importance | **仲裁器**: 紧急度×重要性×可延迟性 | `nt_core::attention::contention_arbiter` |
+| D11218 | **自我知识更新** | Agent 如何更新能力模型? | online meta-learning; continual calibration | **知识更新器**: EMA 平滑 | `nt_mind::self_knowledge::updater` |
+| D11219 | **推理成本感知** | Agent 如何感知推理成本? | token economics; API cost tracking | **成本追踪器**: 实时 token/延迟/能耗 | `nt_core::cost::reasoning_tracker` |
+| D11220 | **自我对齐检测** | 输出是否与目标对齐? | alignment tax; reward hacking detection | **对齐检测器**: 检测 reward hacking | `nt_shield::alignment::self_detector` |
+| D11221 | **认知负载预测** | 如何预测任务认知负载? | task complexity estimation; load prediction | **负载预测**: 任务→预估 token/时间 | `nt_core::cognitive::load_predictor` |
+| D11222 | **推理链剪枝** | 如何剪枝低质量分支? | beam search pruning; quality-based filtering | **剪枝器**: 实时评估, 低分终止 | `nt_core::reasoning::chain_pruner` |
+| D11223 | **自我修复路由** | 内部故障如何自愈? | MAPE-K loop; self-healing systems | **自愈路由**: 故障→根因→修复→验证 | `nt_repair::self_heal::router` |
+| D11224 | **推理状态持久化** | 推理状态如何持久化? | checkpoint/restore (CRIU); durable execution | **状态持久化**: 序列化到 KB, 跨 session | `nt_core::reasoning::state_persistence` |
+| D11225 | **自我测试设计** | Agent 如何设计自我测试? | self-testing; metacognitive testing | **测试生成器**: 自动生成测试验证输出 | `nt_mind::self_test::generator` |
+| D11226 | **推理退化检测** | 如何检测推理质量退化? | model degradation; drift detection | **退化检测器**: 监控趋势, 退化触发校准 | `nt_core::degradation::reasoning_detector` |
+
+
+### 0.103 多 Agent 协作决策 (D11227-D11276)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11227 | **通信协议** | 多 Agent 间如何通信? | A2A (Google 2025); MCP (Anthropic) | **双层协议**: A2A 高层, MCP tool-level | `nt_nexus::communication::protocol` |
+| D11228 | **消息传递模式** | 选择哪种消息传递? | pub/sub; request/reply; event-driven; CRDT | **混合模式**: 关键 request/reply, 广播 pub/sub | `nt_nexus::messaging::mode_router` |
+| D11229 | **共享状态管理** | 多 Agent 如何共享状态? | shared memory; tuple spaces; Linda | **分层状态**: local + shared(CRDT) + global(Raft) | `nt_nexus::state::shared_manager` |
+| D11230 | **任务分配** | 如何在 Agent 间分配任务? | contract net (Smith 1980); auction-based | **合同网**: 公告→投标→评估→授标 | `nt_act::task_allocation::contract_net` |
+| D11231 | **负载均衡** | 如何平衡 Agent 负载? | consistent hashing; power of two choices | **两选一**: 随机选两个, 低负载优先 | `nt_act::load_balance::two_choice` |
+| D11232 | **冲突解决** | Agent 间冲突如何解决? | CRDT merge; last-writer-wins; domain-specific | **CRDT优先+域规则**: 自动合并+规则仲裁 | `nt_nexus::conflict::resolver` |
+| D11233 | **层级组织** | 多 Agent 采用何种结构? | hierarchical; holonic (Koestler); fractal | **分形层级**: coordinator→specialist→worker | `nt_nexus::organization::hierarchy` |
+| D11234 | **群体智能** | 如何利用群体智能? | swarm (Bonabeau); ACO; PSO | **蜂群协作**: ACO 搜索+PSO 优化 | `nt_core::swarm::intelligence_engine` |
+| D11235 | **涌现行为** | 如何引导有益涌现? | emergence; stigmergy; self-organization | **受控涌现**: 简单规则+反馈+监控 | `nt_core::emergence::guided_stigmergy` |
+| D11236 | **信任机制** | Agent 间如何建立信任? | trust models (Beth 1994); reputation systems | **贝叶斯信任**: 历史交互+推荐经验 | `nt_nexus::trust::bayesian_model` |
+| D11237 | **声誉系统** | 如何管理 Agent 声誉? | PageRank; EigenTrust; subjective logic | **分布式声誉**: 成功率+一致性+主观逻辑 | `nt_nexus::reputation::distributed_system` |
+| D11238 | **激励对齐** | 如何对齐 Agent 激励? | mechanism design; auction theory; tokenomics | **激励机制**: 奖励+加分+惩罚, 纳什均衡 | `nt_act::incentive::alignment_mechanism` |
+| D11239 | **共识达成** | 多 Agent 如何达成共识? | BFT; PBFT; proof-of-stake; voting | **PBFT 共识**: f < n/3 拜占庭容错 | `nt_nexus::consensus::bft_engine` |
+| D11240 | **角色分工** | 多 Agent 如何定义角色? | team topology; role-based; specialization | **角色注册表**: specialist/analyst/coordinator | `nt_nexus::roles::registry` |
+| D11241 | **协同规划** | 多 Agent 如何协同规划? | distributed planning (SHOP2); MAPF | **分层规划**: 全局→子任务→并行执行 | `nt_act::planning::collaborative` |
+| D11242 | **信息融合** | 多 Agent 信息如何融合? | Dempster-Shafer; Bayesian fusion | **贝叶斯融合**: 多源→后验→综合 | `nt_core::fusion::bayesian_combiner` |
+| D11243 | **协作记忆** | 多 Agent 如何共享记忆? | shared episodic memory; distributed recall | **协作记忆**: 共享+隔离, 选择性共享 | `nt_memory::collaborative::shared_episodic` |
+| D11244 | **协调开销** | 如何最小化协调开销? | coordination cost theory; stigmergic | **最小化协调**: 优先 stigmergy | `nt_nexus::coordination::overhead_minimizer` |
+| D11245 | **故障隔离** | 单 Agent 故障如何隔离? | bulkhead pattern; circuit breaker | **隔离舱**: 独立边界, 故障不扩散 | `nt_shield::fault::isolation_bulkhead` |
+| D11246 | **协作质量** | 如何评估协作质量? | team effectiveness (Hackman); metrics | **质量评分**: 完成度×效率×创新性×满意度 | `nt_meta::collaboration::quality_scorer` |
+| D11247 | **动态重组** | 团队如何动态重组? | self-organizing teams; adaptive structure | **重组引擎**: 任务变化→结构调整 | `nt_nexus::organization::dynamic_reconfigure` |
+| D11248 | **协议版本** | 协作协议如何版本管理? | protocol versioning; backward compatibility | **版本协商**: 连接时协商最高兼容 | `nt_nexus::protocol::version_negotiator` |
+| D11249 | **多 Agent 推理** | 多 Agent 如何协同推理? | distributed reasoning; multi-agent deliberation | **协同推理**: 分解→分配→推理→合成 | `nt_core::reasoning::collaborative` |
+| D11250 | **协作学习** | 多 Agent 如何从协作中学习? | collaborative learning; MARL | **联邦学习**: 本地学习+全局聚合 | `nt_mind::collaborative::federated_learner` |
+| D11251 | **资源竞争** | 多 Agent 资源竞争如何解决? | auction allocation; priority queues | **公平调度**: 加权队列+优先级提升 | `nt_act::resource::fair_scheduler` |
+| D11252 | **信任衰减** | 长期不协作后信任如何衰减? | trust decay; recency weighting | **指数衰减**: 时间衰减, 最近权重最高 | `nt_nexus::trust::decay_model` |
+| D11253 | **多 Agent 安全** | 多 Agent 系统如何保证安全? | SMPC; zero-knowledge proofs | **安全多方计算**: 不泄露本地数据 | `nt_shield::multi_agent::secure_computation` |
+| D11254 | **协作可解释性** | 协作决策如何解释? | collaborative XAI; joint transparency | **协作解释**: 追踪贡献, 联合解释 | `nt_meta::collaboration::explanation_generator` |
+| D11255 | **任务依赖管理** | 多 Agent 任务间依赖如何管理? | DAG scheduling; dependency resolution | **DAG 调度**: 依赖图→拓扑排序→并行 | `nt_act::scheduling::dag_executor` |
+| D11256 | **协作中断恢复** | 协作中断后如何恢复? | check-pointing; state recovery | **快照恢复**: 周期性保存, 中断恢复 | `nt_nexus::collaboration::snapshot_recovery` |
+| D11257 | **多模态协作** | 不同模态 Agent 如何协作? | multi-modal fusion; cross-modal alignment | **跨模态对齐**: 共享语义空间 | `nt_nexus::multimodal::alignment_hub` |
+| D11258 | **协作负载预测** | 如何预测协作负载? | workload prediction; time series forecasting | **负载预测**: 历史→时间序列→预测 | `nt_act::load::collaborative_predictor` |
+| D11259 | **多 Agent 调度** | 多 Agent 任务如何调度? | job/open/flow shop scheduling | **自适应调度**: 混合调度+动态到达 | `nt_act::scheduling::adaptive_scheduler` |
+| D11260 | **协作知识图谱** | 多 Agent 如何共建知识图谱? | collaborative KG construction; ontology alignment | **协作构建**: 提取→对齐→合并→全局 | `nt_memory::knowledge_graph::collaborative_builder` |
+| D11261 | **协作反馈** | 多 Agent 如何相互反馈? | peer feedback; multi-agent critique | **对等反馈**: 相互评审+加权综合 | `nt_mind::feedback::peer_review_engine` |
+| D11262 | **协作搜索** | 多 Agent 如何协作搜索? | multi-agent search; federated search | **分布式搜索**: 独立→去重→排序→综合 | `nt_world::search::collaborative_retrieval` |
+| D11263 | **多 Agent 缓存** | 如何管理多 Agent 缓存? | distributed caching; cache coherence | **分布式缓存**: 共享+本地, 写时广播 | `nt_memory::cache::distributed_coherence` |
+| D11264 | **协作验证** | 多 Agent 输出如何交叉验证? | cross-validation; ensemble verification | **交叉验证共识**: 独立→一致→仲裁 | `nt_core::verification::cross_agent_validator` |
+| D11265 | **多 Agent 延迟** | 如何最小化协作延迟? | low-latency communication; async patterns | **低延迟**: 异步+预取+本地缓存 | `nt_nexus::latency::optimization` |
+| D11266 | **协作公平性** | 如何确保协作公平? | fair division; envy-free allocation | **公平分配**: 加权分配任务和资源 | `nt_nexus::fairness::allocation_engine` |
+| D11267 | **多 Agent 加密** | 协作数据如何加密? | E2E encryption; homomorphic encryption | **端到端加密**: 传输+同态加密 | `nt_shield::encryption::collaborative_e2e` |
+| D11268 | **协作审计** | 协作过程如何审计? | audit trail; tamper-evident logs | **审计日志**: 区块链式防篡改 | `nt_shield::audit::collaborative_trail` |
+| D11269 | **多 Agent 可扩展性** | 系统如何扩展? | horizontal scaling; sharding | **水平扩展**: 分片+自动发现+一致性哈希 | `nt_nexus::scaling::horizontal_engine` |
+| D11270 | **协作性能基准** | 如何基准测试协作性能? | multi-agent benchmarking; latency/throughput | **基准套件**: 标准化场景+指标 | `nt_eval::collaboration::benchmark_suite` |
+| D11271 | **多 Agent 调试** | 多 Agent 系统如何调试? | distributed tracing (Jaeger); causal analysis | **分布式追踪**: OpenTelemetry+因果关联 | `nt_meta::debugging::distributed_tracer` |
+| D11272 | **协作配置管理** | 多 Agent 配置如何管理? | distributed configuration; feature flags | **配置中心**: 集中+本地+实时推送 | `nt_nexus::config::distributed_manager` |
+| D11273 | **多 Agent 部署** | 多 Agent 如何部署? | rolling deployment; canary release | **渐进式部署**: 金丝雀→监控→全量 | `nt_ops::deployment::multi_agent_rolling` |
+| D11274 | **协作监控** | 如何监控多 Agent 健康? | health check; heartbeat; circuit breaker | **健康聚合**: 心跳+评分+异常隔离 | `nt_ops::monitoring::collaborative_health` |
+| D11275 | **多 Agent 升级** | 协作协议如何升级? | rolling upgrade; version negotiation | **滚动升级**: 渐进+向后兼容 | `nt_ops::upgrade::collaborative_rolling` |
+| D11276 | **协作灾难恢复** | 多 Agent 如何灾难恢复? | multi-region replication; backup/restore | **多区域复制**: 跨区域+RPO<1min | `nt_ops::disaster_recovery::multi_agent` |
+
+
+### 0.104 知识表示与推理决策 (D11277-D11326)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11277 | **本体构建** | 如何构建领域本体? | OWL 2 (W3C); Protege editor; ontology design patterns | **RDF/OWL 本体**: OWL 2 DL 核心+RDF 实例 | `nt_memory::ontology::core_builder` |
+| D11278 | **分类体系** | 如何设计分类体系? | SKOS (W3C); faceted classification; folksonomy | **混合分类**: SKOS+面分类法, 多维度映射 | `nt_memory::taxonomy::faceted_system` |
+| D11279 | **语义网络** | 如何构建语义网络? | ConceptNet 5.8M; TransE/RotatE; neural-symbolic | **嵌入式语义网络**: 离散关系+连续嵌入 | `nt_memory::semantic::embedding_network` |
+| D11280 | **逻辑推理** | 如何实现一阶逻辑推理? | Prolog; Datalog; resolution; SMT solvers (Z3/CVC5) | **混合推理**: Datalog 查询+Z3 约束+Prolog 递归 | `nt_core::reasoning::logic_engine` |
+| D11281 | **规则推理** | 如何实现基于规则的推理? | CLIPS/Jess; forward/backward chaining; Rete algorithm | **Rete 网络**: 前向链+模式匹配优化 | `nt_core::reasoning::rule_engine` |
+| D11282 | **概率推理** | 如何实现概率推理? | Bayesian networks; Markov logic; probabilistic programming | **概率编程**: Stan+Pyro+变分推断 | `nt_core::reasoning::probabilistic_engine` |
+| D11283 | **类比推理** | 如何实现类比推理? | structure mapping (Gentner); LLM analogical prompting | **结构映射引擎**: 两域深层类比 | `nt_core::reasoning::analogical_engine` |
+| D11284 | **因果推理** | 如何实现因果推理? | Pearl causal hierarchy; Do-calculus; SCM | **三层因果**: 关联→干预→反事实 | `nt_core::reasoning::causal_engine` |
+| D11285 | **空间推理** | 如何实现空间推理? | qualitative spatial (RCC8); spatial ontologies | **混合空间**: 定性拓扑+定量几何 | `nt_core::reasoning::spatial_engine` |
+| D11286 | **常识知识** | 如何获取和表示常识? | ConceptNet; ATOMIC; LLM commonsense | **常识注入**: ConceptNet/ATOMIC+LLM 补充 | `nt_memory::commonsense::injector` |
+| D11287 | **物理直觉** | Agent 是否需要物理直觉? | intuitive physics (Battaglia); MuJoCo; neural physics | **物理直觉模块**: 学习预测器+可选仿真 | `nt_core::intuition::physics_engine` |
+| D11288 | **社会理解** | 如何理解社会交互? | theory of mind (ToM); social signal processing | **ToM 推理器**: 推断信念/意图/情感 | `nt_core::social::theory_of_mind` |
+| D11289 | **知识图谱补全** | 如何补全 KG 缺失关系? | TransE/RotatE; relation extraction; link prediction | **嵌入式补全**: 嵌入→链接预测→抽取验证 | `nt_memory::kg::completion_engine` |
+| D11290 | **知识冲突解决** | 知识冲突如何解决? | belief revision (AGM); source reliability | **AGM 信念修正**: 可靠性+时效+一致性 | `nt_memory::conflict::agm_resolver` |
+| D11291 | **本体对齐** | 不同本体如何对齐? | ontology alignment (OAEI); entity matching | **自动对齐**: 嵌入+规则+人工验证 | `nt_memory::ontology::alignment_engine` |
+| D11292 | **知识蒸馏** | 如何从大模型蒸馏知识? | knowledge distillation (Hinton 2015); self-distillation | **多层蒸馏**: response+feature+relation | `nt_mind::distillation::knowledge_distiller` |
+| D11293 | **时序推理** | 如何处理时序知识? | temporal logic (Allen intervals); time-aware embeddings | **时序 KG**: Allen 代数+时间嵌入 | `nt_memory::temporal::reasoning_engine` |
+| D11294 | **不确定性知识** | 如何表示不确定知识? | Dempster-Shafer; fuzzy logic; probabilistic logic | **混合不确定性**: 粗糙集+模糊集+DS | `nt_core::uncertainty::representation` |
+| D11295 | **知识推理链** | 如何构建知识推理链? | CoT with knowledge; knowledge-grounded reasoning | **知识引导推理**: 检索→链→验证→结论 | `nt_core::reasoning::knowledge_grounded` |
+| D11296 | **概念组合** | 如何组合概念产生新知识? | conceptual blending (Fauconnier); compositional semantics | **概念混合引擎**: Fauconnier 整合网络 | `nt_core::reasoning::conceptual_blender` |
+| D11297 | **知识迁移** | 跨域知识如何迁移? | transfer learning; domain adaptation; KG alignment | **知识迁移网**: 实体对齐+关系映射 | `nt_mind::transfer::cross_domain` |
+| D11298 | **语义解析** | 自然语言如何映射到形式表示? | AMR parsing; semantic parsing; LLM-based | **混合解析**: AMR 深层+LLM 灵活映射 | `nt_core::parsing::semantic_parser` |
+| D11299 | **知识验证** | 如何验证知识正确性? | fact checking; KB validation; consistency checking | **多层验证**: 内部一致+外部核查+审计 | `nt_memory::validation::knowledge_verifier` |
+| D11300 | **KG 嵌入** | 如何学习 KG 嵌入? | TransE/RotatE/ComplEx; temporal embeddings | **关系感知嵌入**: RotatE+时间感知+对比学习 | `nt_memory::kg::embedding_learner` |
+| D11301 | **多跳推理** | 如何实现多跳推理? | multi-hop QA (HotpotQA); GNN; path reasoning | **GNN 多跳**: 消息传递+路径推理 | `nt_core::reasoning::multi_hop` |
+| D11302 | **知识库问答** | 如何回答 KB 查询? | KBQA (LC-QuAD); semantic parsing; embedding | **混合 KBQA**: 语义解析+嵌入检索 | `nt_memory::kbqa::hybrid_answerer` |
+| D11303 | **本体推理** | 如何在本体上推理? | OWL 2 DL; SPARQL; DL-lite; existential rules | **混合本体推理**: OWL+SPARQL+规则 | `nt_core::reasoning::ontology_reasoner` |
+| D11304 | **知识发现** | 如何从数据中发现新知识? | KG completion; rule mining; pattern discovery | **规则挖掘引擎**: 自动发现 If-Then 规则 | `nt_mind::discovery::rule_miner` |
+| D11305 | **图推理** | 如何在图结构上推理? | GCN/GAT; graph transformers; message passing | **图推理引擎**: GAT+Transformer+消息传递 | `nt_core::reasoning::graph_reasoner` |
+| D11306 | **联合表示学习** | 如何联合学习知识和表示? | joint embedding; multi-task learning; contrastive | **联合表示**: KG+文本+视觉联合嵌入 | `nt_memory::representation::joint_learner` |
+| D11307 | **递归推理** | 如何实现递归深度推理? | recursive neural networks; tree-LSTM | **递归合成引擎**: 自底向上递归语义合成 | `nt_core::reasoning::recursive_composer` |
+| D11308 | **反事实推理** | 如何进行反事实推理? | counterfactual reasoning (Pearl); SCM | **反事实引擎**: SCM+引渡推理 | `nt_core::reasoning::counterfactual` |
+| D11309 | **知识浓缩** | 如何压缩知识同时保留推理能力? | knowledge compression; core set selection | **知识浓缩器**: 核心集选择+规则压缩 | `nt_mind::compression::knowledge_concentrator` |
+| D11310 | **神经符号推理** | 符号推理如何与神经网络结合? | neural-symbolic; DeepProbLog; Neural Theorem Prover | **神经符号混合**: 神经感知+符号决策 | `nt_core::reasoning::neuro_symbolic` |
+| D11311 | **KG 自动生成** | 如何自动生成知识图谱? | OpenIE; distant supervision; LLM-based extraction | **LLM 驱动抽取**: GPT-4+远程监督+去噪 | `nt_memory::kg::auto_generator` |
+| D11312 | **语义相似度** | 如何计算语义相似度? | SBERT; cross-encoder; learned similarity | **分层语义匹配**: 双塔粗筛+交叉精排 | `nt_core::similarity::semantic_matcher` |
+| D11313 | **KG 对齐** | 多源 KG 如何对齐? | entity alignment; relation matching; attribute matching | **多层对齐**: 实体+关系+属性匹配 | `nt_memory::kg::multi_source_aligner` |
+| D11314 | **概率知识表示** | 如何表示概率性知识? | probabilistic soft logic; Markov logic | **概率软逻辑**: 连续值+Markov 逻辑 | `nt_core::uncertainty::probabilistic_kb` |
+| D11315 | **KG 解释** | 如何解释 KG 推理? | explainable KG reasoning; path explanation | **推理路径解释**: 关键路径→自然语言解释 | `nt_meta::explanation::kg_reasoning_explainer` |
+| D11316 | **跨语言知识** | 如何处理跨语言知识? | multilingual KGs; cross-lingual embeddings | **跨语言对齐**: 多语言嵌入+翻译嵌入 | `nt_memory::multilingual::cross_lingual_kg` |
+| D11317 | **KG 增量更新** | KG 如何增量更新? | incremental KG maintenance; change detection | **增量更新**: 变更检测→影响分析→局部更新 | `nt_memory::kg::incremental_updater` |
+| D11318 | **KG 压缩** | 如何压缩大规模 KG? | KG summarization; community detection | **图谱摘要**: 社区检测+重要性+层次压缩 | `nt_memory::kg::summarizer` |
+| D11319 | **推理一致性** | 如何确保跨模块推理一致? | belief fusion; consistency checking | **一致性守护**: 全图检查+冲突标记修正 | `nt_core::consistency::cross_module_checker` |
+| D11320 | **推理验证** | 如何验证推理链逻辑有效性? | formal verification; model checking; proof assistants | **形式化验证**: Coq/Lean 形式化验证 | `nt_core::verification::formal_proof_checker` |
+| D11321 | **推理效率** | 如何加速知识推理? | caching inference; incremental reasoning | **增量推理缓存**: 缓存中间结果, 增量重算 | `nt_core::inference::incremental_cache` |
+| D11322 | **KG 质量** | 如何评估 KG 质量? | completeness; accuracy; consistency; freshness | **质量评估**: 4 维度自动+采样人工 | `nt_memory::quality::kg_assessor` |
+| D11323 | **KG 安全** | 如何保护 KG 安全? | access control; privacy preservation | **访问控制+差分隐私**: RBAC+差分隐私 | `nt_shield::kg_security::access_control` |
+| D11324 | **KG 部署** | KG 如何生产部署? | distributed graph DBs; replication; query optimization | **分布式图数据库**: JanusGraph+分片+优化 | `nt_ops::kg_deploy::distributed_store` |
+| D11325 | **KG 监控** | 如何监控 KG 健康? | data freshness; query latency; storage growth | **健康仪表盘**: 新鲜度/延迟/存储实时监控 | `nt_ops::kg_monitor::health_dashboard` |
+| D11326 | **KG 迁移** | 如何迁移 KG? | schema migration; data migration; backward compatibility | **零停机迁移**: 双写→验证→切换→清理 | `nt_ops::kg_migration::zero_downtime` |
+
+### 0.105 语言理解与生成决策 (D11327-D11376)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11327 | **语法解析** | 如何实现高效语法解析? | BERT-based parsing; chart parsing; neural dependency | **增量神经解析**: 增量+BERT+CRF, 多语言 | `nt_core::parsing::incremental_parser` |
+| D11328 | **语义解释** | 如何从语法树生成语义表示? | AMR parsing; SRL; abstract meaning representation | **AMR 解析**: SRL+AMR, 深层语义 | `nt_core::parsing::semantic_interpreter` |
+| D11329 | **语用理解** | 如何理解言外之意? | speech acts (Searle); implicature (Grice) | **语用推理**: 言语行为+合作原则+礼貌理论 | `nt_core::pragmatics::inference_engine` |
+| D11330 | **语篇理解** | 如何理解长文本语篇结构? | RST (Mann & Thompson); centering theory | **RST 解析**: 修辞结构+向心理论 | `nt_core::discourse::rst_parser` |
+| D11331 | **指代消解** | 如何解决文本中的指代? | neural coreference; span-based; end-to-end | **端到端指代消解**: SpanBERT+注意力评分 | `nt_core::coreference::e2e_resolver` |
+| D11332 | **连贯性评估** | 如何评估文本连贯性? | coherence metrics; discourse coherence | **实体连贯性评分**: 实体网格+话题连续性 | `nt_core::coherence::entity_scorer` |
+| D11333 | **文本生成** | 如何生成高质量文本? | decoding strategies; control codes; guided generation | **控制解码**: nucleus sampling+控制码+引导 | `nt_core::generation::controlled_decoder` |
+| D11334 | **摘要生成** | 如何生成摘要? | extractive vs abstractive; faithfulness | **混合摘要**: 抽取初选+生成重写+事实性 | `nt_core::generation::hybrid_summarizer` |
+| D11335 | **释义生成** | 如何生成释义? | paraphrase generation (PAWS); semantic equivalence | **语义保持释义**: 对抗+语义约束 | `nt_core::generation::paraphraser` |
+| D11336 | **机器翻译** | 如何实现高质量翻译? | Transformer-based MT; document-level MT | **文档级翻译**: 段落上下文+术语一致性 | `nt_core::translation::document_level_mt` |
+| D11337 | **风格迁移** | 如何改变文本风格? | style transfer; attribute control; non-parallel | **无并行迁移**: 解耦内容+属性分类器引导 | `nt_core::style::transfer_engine` |
+| D11338 | **正式度控制** | 如何控制文本正式度? | formality (Finegrained); register awareness | **正式度滑块**: 5 级正式度可控 | `nt_core::style::formality_controller` |
+| D11339 | **受众适应** | 如何适应不同受众? | audience modeling; readability metrics | **受众建模**: 画像→可读性→复杂度自适应 | `nt_core::audience::adaptation_engine` |
+| D11340 | **多轮对话** | 如何维持多轮对话连贯? | dialogue state tracking (DST); persona consistency | **记忆增强对话**: DST+人格一致+长期记忆 | `nt_core::dialogue::multi_turn_manager` |
+| D11341 | **对话生成** | 如何生成自然对话? | neural dialogue (DialoGPT); persona-based | **知识引导对话**: 知识检索+人格+多样性 | `nt_core::dialogue::knowledge_ground_generator` |
+| D11342 | **情感文本分析** | 如何分析文本情感? | ABSA; document-level sentiment; emotion detection | **多粒度情感**: 方面级+文档级+情绪检测 | `nt_core::sentiment::multi_granularity` |
+| D11343 | **文本蕴含** | 如何判断文本蕴含关系? | NLI; RTE; textual entailment | **NLI 引擎**: 蕴含/矛盾/中性三分类 | `nt_core::inference::nli_engine` |
+| D11344 | **关键词提取** | 如何提取关键词? | TF-IDF; TextRank; BERT-based | **混合关键词**: TextRank+BERT+实体链接 | `nt_core::extraction::keyword_hybrid` |
+| D11345 | **命名实体识别** | 如何识别命名实体? | BiLSTM-CRF; nested NER; few-shot NER | **嵌套 NER**: BiLSTM-CRF+SpanBERT+少样本 | `nt_core::extraction::nested_ner` |
+| D11346 | **关系抽取** | 如何抽取实体关系? | distant supervision; document-level RE | **远程监督**: 远程标注+噪声过滤+少样本 | `nt_core::extraction::distant_re` |
+| D11347 | **事件抽取** | 如何抽取事件? | event extraction (ACE); temporal ordering | **ACE 事件**: 触发词+论元角色+时序排序 | `nt_core::extraction::event_extractor` |
+| D11348 | **文本分类** | 如何实现文本分类? | zero-shot (NLI-based); few-shot (PET) | **提示分类**: NLI 零样本+PET 少样本 | `nt_core::classification::prompt_classifier` |
+| D11349 | **信息检索** | 如何实现语义检索? | dense retrieval (DPR); sparse (BM25); ColBERT | **混合检索**: BM25+DPR+ColBERT 融合 | `nt_core::retrieval::hybrid_retriever` |
+| D11350 | **问答系统** | 如何构建问答系统? | extractive QA; generative QA; multi-hop QA | **混合问答**: 抽取+生成+多跳推理 | `nt_core::qa::hybrid_qa_engine` |
+| D11351 | **文本纠错** | 如何纠正文本错误? | GEC (Grammatical Error Correction); spelling | **GEC 纠错**: T5/BART 序列到序列+规则 | `nt_core::correction::gec_engine` |
+| D11352 | **语言检测** | 如何检测文本语言? | fastText langid; CLD3; character n-gram | **快速检测**: fastText 主力, CLD3 备用 | `nt_core::detection::language_detector` |
+| D11353 | **文本去重** | 如何检测重复文本? | MinHash LSH; SimHash; near-duplicate | **分层去重**: MinHash+SimHash+语义去重 | `nt_core::dedup::multi_level_detector` |
+| D11354 | **摘要评估** | 如何评估摘要质量? | ROUGE/BERTScore; faithfulness (FactCC) | **多维评估**: ROUGE+BERTScore+FactCC | `nt_eval::summarization::multi_dimension_eval` |
+| D11355 | **生成评估** | 如何评估生成文本? | perplexity; BLEU; G-Eval (LLM-based) | **LLM 评估**: G-Eval+自动指标+人类校准 | `nt_eval::generation::llm_judge` |
+| D11356 | **对话评估** | 如何评估对话系统? | response quality; coherence; engagement | **多维评估**: 相关性+连贯性+参与度 | `nt_eval::dialogue::multi_aspect_evaluator` |
+| D11357 | **风格分析** | 如何分析文本风格? | authorship attribution; genre classification | **风格指纹**: 作者归属+体裁分类 | `nt_core::style::fingerprint_analyzer` |
+| D11358 | **多语言理解** | 如何实现跨语言理解? | mBERT/XLM-R; cross-lingual transfer | **XLM-R 多语言**: 零样本跨语言迁移 | `nt_core::multilingual::xlm_r_engine` |
+| D11359 | **代码理解** | 如何理解源代码? | CodeBERT; code summarization; program synthesis | **CodeBERT**: 代码嵌入+摘要+合成 | `nt_core::code::code_understanding` |
+| D11360 | **数学语言理解** | 如何理解数学语言? | mathematical reasoning; formal verification | **数学推理器**: 符号计算+形式化验证 | `nt_core::math::mathematical_reasoner` |
+| D11361 | **表格理解** | 如何理解表格数据? | TableNet; TaPEx; table QA | **表格问答**: TableNet 结构+TaPEx 执行 | `nt_core::table::table_understanding` |
+| D11362 | **长文本理解** | 如何理解超长文本? | Longformer; BigBird; streaming attention | **流式长文本**: 滑动窗口+稀疏注意力 | `nt_core::long_text::streaming_understanding` |
+| D11363 | **摘要压缩** | 如何压缩文本保留核心信息? | compression-based; information bottleneck | **信息瓶颈压缩**: 关键保留+冗余消除 | `nt_core::compression::information_bottleneck` |
+| D11364 | **生成控制** | 如何精确控制生成内容? | controllable generation (CTRL); plug-and-play | **插件式控制**: CTRL+PPLM+提示工程 | `nt_core::generation::plug_and_play_control` |
+| D11365 | **生成多样性** | 如何保证生成多样性? | diverse beam search; nucleus; DPP | **多样性解码**: DPP 核化+nucleus+多样束搜索 | `nt_core::generation::diversity_decoder` |
+| D11366 | **生成一致性** | 如何保证生成一致性? | self-consistency (Wang); factual grounding | **一致性解码**: 多路径+一致性+事实性锚定 | `nt_core::generation::consistency_decoder` |
+| D11367 | **文本安全** | 如何确保生成安全? | toxicity detection; bias mitigation; safety classifiers | **安全过滤器**: 毒性+偏见+安全分类器 | `nt_shield::text_safety::toxicity_filter` |
+| D11368 | **生成可解释性** | 如何解释文本生成? | rationale extraction; attention visualization | **生成解释器**: 注意力可视化+推理链提取 | `nt_meta::explanation::generation_explainer` |
+| D11369 | **文本个性化** | 如何个性化文本生成? | user modeling; memory-augmented generation | **个性化生成器**: 用户画像+偏好记忆+风格 | `nt_core::personalization::response_generator` |
+| D11370 | **多文档摘要** | 如何生成多文档摘要? | multi-document summarization; query-focused | **多文档摘要**: 聚类主题+查询聚焦 | `nt_core::summarization::multi_doc_summarizer` |
+| D11371 | **摘要自动评估** | 如何自动化评估摘要? | auto-eval (BERTScore/ROUGE); LLM-as-judge | **自动评估管线**: BERTScore+LLM+无参考 | `nt_eval::summarization::auto_eval_pipeline` |
+| D11372 | **生成约束** | 如何满足生成约束? | constrained decoding; grammar-guided | **约束解码**: 语法+语义+长度/格式控制 | `nt_core::generation::constrained_decoder` |
+| D11373 | **确定性生成** | 如何保证生成可重复? | temperature=0; seed control; deterministic | **确定性生成**: 种子+温度=0+贪心 | `nt_core::generation::deterministic_engine` |
+| D11374 | **流式生成** | 如何实现流式文本生成? | streaming generation; token-level streaming | **流式引擎**: 逐 token 输出+自适应缓冲 | `nt_core::generation::streaming_engine` |
+| D11375 | **批量生成** | 如何高效批量生成? | batch inference; continuous batching; speculative | **批量优化**: 连续批处理+推测解码 | `nt_core::generation::batch_optimizer` |
+| D11376 | **成本感知生成** | 如何控制生成成本? | token budgeting; model routing; caching | **成本感知**: 轻量模型先行+缓存+预算 | `nt_core::generation::cost_aware_engine` |
+
+
+### 0.106 视觉理解与生成决策 (D11377-D11426)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11377 | **目标检测** | 如何实现高效目标检测? | YOLOv8/YOLOv9; DETR; RT-DETR | **混合检测**: YOLOv8 实时+DETR 端到端 | `nt_core::vision::detection::hybrid_detector` |
+| D11378 | **实例分割** | 如何实现实例分割? | Mask R-CNN; SOLOv2; SAM | **SAM 分割**: 零样本分割+Mask R-CNN 精细 | `nt_core::vision::segmentation::sam_segmenter` |
+| D11379 | **语义分割** | 如何实现语义分割? | U-Net; DeepLab v3+; SegFormer | **全景分割**: SegFormer 语义+实例融合 | `nt_core::vision::segmentation::panoptic_engine` |
+| D11380 | **场景理解** | 如何理解场景整体? | scene graph generation; 3D reconstruction; NeRF | **场景图生成**: 检测+关系推理+3D 重建 | `nt_core::vision::scene::graph_generator` |
+| D11381 | **空间推理** | 如何进行视觉空间推理? | spatial reasoning (CLEVR); visual relationship | **视觉空间推理**: 2D 关系+3D 深度+空间推理 | `nt_core::vision::spatial::reasoning_engine` |
+| D11382 | **深度估计** | 如何估计图像深度? | MiDaS; DPT; monocular depth estimation | **单目深度**: MiDaS/DPT+可选立体匹配 | `nt_core::vision::depth::monocular_estimator` |
+| D11383 | **图像生成** | 如何生成高质量图像? | Stable Diffusion; DALL-E 3; SDXL; FLUX | **多模型生成**: SDXL+FLUX+DALL-E 3 按需路由 | `nt_core::vision::generation::multi_model_generator` |
+| D11384 | **风格迁移** | 如何实现图像风格迁移? | neural style transfer (NST); AdaIN; stylegan | **自适应风格迁移**: AdaIN 实时+StyleGAN 高质量 | `nt_core::vision::style::adaptive_transfer` |
+| D11385 | **图像编辑** | 如何实现图像编辑? | InstructPix2Pix; ControlNet; img2img | **指令编辑**: InstructPix2Pix+ControlNet | `nt_core::vision::editing::instruction_editor` |
+| D11386 | **图像修复** | 如何修复损坏图像? | inpainting (LaMa); denoising (DiffIR); super-resolution | **修复管线**: LaMa+DiffIR+Real-ESRGAN | `nt_core::vision::restoration::repair_pipeline` |
+| D11387 | **视频理解** | 如何理解视频内容? | VideoMAE; TimeSformer; video captioning | **视频理解**: VideoMAE+TimeSformer+字幕 | `nt_core::vision::video::understanding_engine` |
+| D11388 | **动作识别** | 如何识别视频动作? | SlowFast; Video Swin Transformer; I3D | **SlowFast**: 慢路径空间+快路径时序 | `nt_core::vision::video::action_recognizer` |
+| D11389 | **时序定位** | 如何定位视频中动作? | temporal action detection; moment retrieval | **时序检测**: 边界回归+分类 | `nt_core::vision::video::temporal_localizer` |
+| D11390 | **视频生成** | 如何生成视频? | Stable Video Diffusion; Sora-like; temporal consistency | **时序一致性生成**: SVD+时序约束 | `nt_core::vision::video::generation_engine` |
+| D11391 | **图像分类** | 如何实现图像分类? | ViT; ConvNeXt; CLIP zero-shot | **CLIP 零样本分类**: CLIP+ViT 自适应路由 | `nt_core::vision::classification::clip_classifier` |
+| D11392 | **目标跟踪** | 如何实现目标跟踪? | SOT; MOT; TransT | **Transformer 跟踪**: TransT+ByteTrack | `nt_core::vision::tracking::transformer_tracker` |
+| D11393 | **图像检索** | 如何实现图像检索? | CLIP; DINOv2; CBIR | **语义检索**: CLIP+DINOv2+倒排索引 | `nt_core::vision::retrieval::semantic_image_search` |
+| D11394 | **图像质量评估** | 如何评估图像质量? | BRISQUE; NIQE; MUSIQ; LPIPS | **多指标评估**: BRISQUE+LPIPS+MUSIQ | `nt_eval::vision::quality::multi_metric_evaluator` |
+| D11395 | **OCR** | 如何识别图像文字? | Tesseract; PaddleOCR; CRNN | **混合 OCR**: PaddleOCR 中文+Tesseract 多语言 | `nt_core::vision::ocr::hybrid_ocr_engine` |
+| D11396 | **人脸识别** | 如何识别人脸? | ArcFace; FaceNet; anti-spoofing | **ArcFace 识别**: 度量学习+活体检测 | `nt_core::vision::face::arcface_detector` |
+| D11397 | **姿态估计** | 如何估计人体姿态? | OpenPose; MediaPipe; HRNet | **MediaPipe 姿态**: 实时 2D/3D 估计 | `nt_core::vision::pose::mediapipe_estimator` |
+| D11398 | **图像描述** | 如何生成图像描述? | BLIP-2; LLaVA; caption generation | **LLaVA 视觉问答**: 多模态理解+描述 | `nt_core::vision::caption::llava_engine` |
+| D11399 | **视觉问答** | 如何回答图像问题? | VQA; GPT-4V; LLaVA | **多模态问答**: LLaVA+GPT-4V+知识增强 | `nt_core::vision::vqa::multimodal_qa` |
+| D11400 | **生成控制** | 如何精确控制图像生成? | ControlNet; IP-Adapter; T2I-Adapter | **ControlNet 控制**: 边缘/深度/姿态条件 | `nt_core::vision::generation::controlnet_controller` |
+| D11401 | **超分辨率** | 如何提升图像分辨率? | Real-ESRGAN; SwinIR; ESRGAN | **Real-ESRGAN**: 盲超分+退化建模+面部增强 | `nt_core::vision::restoration::super_resolution` |
+| D11402 | **图像去噪** | 如何去除图像噪声? | DnCNN; CBDNet; diffusion denoising | **扩散去噪**: 去噪扩散+盲/非盲去噪 | `nt_core::vision::restoration::diffusion_denoiser` |
+| D11403 | **图像配准** | 如何对齐多幅图像? | SIFT/ORB; deep learning registration | **深度学习配准**: 特征匹配+可变形深度配准 | `nt_core::vision::registration::deep_aligner` |
+| D11404 | **视觉异常检测** | 如何检测视觉异常? | anomaly detection (MVTec); few-shot | **无监督异常**: MVTec+少样本+重建 | `nt_core::vision::anomaly::unsupervised_detector` |
+| D11405 | **三维重建** | 如何从图像重建 3D? | NeRF; 3D Gaussian Splatting; photogrammetry | **高斯溅射**: 3DGS+NeRF+深度先验 | `nt_core::vision::3d::gaussian_reconstructor` |
+| D11406 | **图像嵌入** | 如何学习图像嵌入? | CLIP; DINOv2; SigLIP; contrastive learning | **对比学习嵌入**: CLIP+DINOv2+SigLIP | `nt_core::vision::embedding::contrastive_learner` |
+| D11407 | **视觉定位** | 如何定位图像中的物体? | visual grounding; phrase grounding | **视觉定位**: 短语定位+指代表达 | `nt_core::vision::grounding::phrase_localizer` |
+| D11408 | **图像安全** | 如何检测不安全图像? | NSFW detection; content moderation | **内容安全**: NSFW+暴力/仇恨/自残分类 | `nt_shield::vision_safety::nsfw_detector` |
+| D11409 | **图像水印** | 如何添加/检测水印? | watermarking (StegaStamp); invisible watermark | **不可见水印**: 频域嵌入+检测+提取 | `nt_shield::vision_watermark::invisible_embedder` |
+| D11410 | **图像压缩** | 如何高效压缩图像? | learned compression (ELIC); JPEG XL | **学习压缩**: ELIC+JPEG XL, 率失真优化 | `nt_core::vision::compression::learned_codec` |
+| D11411 | **视觉 SLAM** | 如何实现视觉 SLAM? | ORB-SLAM3; DSO; learned feature tracking | **ORB-SLAM3**: 特征点+深度学习特征 | `nt_core::vision::slam::orb_slam3_engine` |
+| D11412 | **图像增强** | 如何增强图像质量? | retinex-based; learned enhancement | **学习增强**: Retinex+深度学习自适应增强 | `nt_core::vision::enhancement::learned_enhancer` |
+| D11413 | **视觉导航** | 如何实现视觉导航? | visual navigation (NavNet); embodied navigation | **视觉语言导航**: 语言+视觉→动作 | `nt_core::vision::navigation::vision_language_navigator` |
+| D11414 | **合成数据** | 如何生成合成训练数据? | synthetic data; domain randomization | **合成数据管线**: 扩散生成+域随机化 | `nt_core::vision::synthetic::data_generator` |
+| D11415 | **视觉解释** | 如何解释视觉模型? | Grad-CAM; attention visualization | **视觉解释器**: 热力图+注意力+概念瓶颈 | `nt_meta::explanation::vision_explainer` |
+| D11416 | **视频编辑** | 如何编辑视频? | video inpainting; text-guided editing | **文本引导编辑**: 文本指令+时序一致性 | `nt_core::vision::video::text_guided_editor` |
+| D11417 | **图像去模糊** | 如何去除图像模糊? | deblurring (DeblurGAN-v2); motion deblurring | **去模糊引擎**: DeblurGAN-v2+扩散模型 | `nt_core::vision::restoration::deblurring_engine` |
+| D11418 | **视觉预训练** | 如何预训练视觉模型? | MAE; DINO; contrastive learning | **MAE 自监督**: Masked Autoencoder+DINO | `nt_core::vision::pretraining::mae_pretrainer` |
+| D11419 | **数据增强** | 如何增强视觉数据? | RandAugment; mixup; cutmix; TTA | **自适应增强**: RandAugment+mixup+TTA | `nt_core::vision::augmentation::adaptive_augmenter` |
+| D11420 | **半监督分割** | 如何半监督分割? | FixMatch; Mean Teacher; consistency | **FixMatch 半监督**: 伪标签+一致性正则化 | `nt_core::vision::segmentation::semi_supervised` |
+| D11421 | **大规模图像检索** | 如何大规模图像检索? | FAISS; product quantization; HNSW | **FAISS 近似检索**: HNSW+产品量化+GPU | `nt_core::vision::retrieval::faiss_indexer` |
+| D11422 | **JPEG 修复** | 如何增强压缩图像? | JPEG artifact removal; learned enhancement | **JPEG 修复**: GAN 去伪影+学习增强 | `nt_core::vision::restoration::jpeg_artifact_remover` |
+| D11423 | **视觉时序分析** | 如何分析视觉时序? | action segmentation; video transformers | **时序视觉**: Video Transformer+动作分割 | `nt_core::vision::video::temporal_analyzer` |
+| D11424 | **多尺度处理** | 如何处理多尺度图像? | FPN; multi-scale detection; scale-space | **FPN 多尺度**: 特征金字塔+全尺度覆盖 | `nt_core::vision::multi_scale::fpn_engine` |
+| D11425 | **视觉模型蒸馏** | 如何蒸馏视觉模型? | knowledge distillation; feature distillation | **视觉蒸馏**: 响应+特征+注意力迁移, 4×压缩 | `nt_core::vision::distillation::visual_kd` |
+| D11426 | **视觉模型压缩** | 如何压缩视觉模型? | pruning; quantization; NAS; mobile architectures | **MobileNet 适配**: 深度可分离+剪枝+量化 | `nt_core::vision::compression::mobile_optimizer` |
+
+
+### 0.107 音频理解与生成决策 (D11427-D11476)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11427 | **语音识别** | 如何实现高质量语音识别? | Whisper; Conformer; streaming ASR; multilingual | **Whisper 多语言**: Whisper+Conformer 流式 | `nt_core::audio::asr::whisper_engine` |
+| D11428 | **说话人识别** | 如何识别说话人? | ECAPA-TDNN; x-vector; speaker verification | **ECAPA-TDNN**: 说话人嵌入+验证+分离 | `nt_core::audio::speaker::ecapa_identifier` |
+| D11429 | **语音情感检测** | 如何检测语音情感? | emotion recognition (IEMOCAP); prosody analysis | **韵律情感**: 韵律+语义+多模态融合 | `nt_core::audio::emotion::prosody_detector` |
+| D11430 | **音乐理解** | 如何理解音乐内容? | music tagging (MERT); chord recognition; beat tracking | **MERT 音乐理解**: 表示学习+和弦+节拍 | `nt_core::audio::music::mert_understander` |
+| D11431 | **音乐流派分类** | 如何分类音乐流派? | genre classification; MFCC; deep learning | **MFCC+深度学习**: 877 种流派分类 | `nt_core::audio::music::genre_classifier` |
+| D11432 | **音乐情绪分析** | 如何分析音乐情绪? | valence-arousal model; mood classification | **维度情绪**: valence-arousal 连续+离散分类 | `nt_core::audio::music::mood_analyzer` |
+| D11433 | **声音事件检测** | 如何检测环境声音? | AudioSet; DCASE; sound event detection | **AudioSet 检测**: 527 种声音事件 | `nt_core::audio::event::audioset_detector` |
+| D11434 | **环境声音分类** | 如何分类环境声音? | environmental sound; ESC-50; urban sound | **ESC-50 分类**: ESC-50+UrbanSound8K | `nt_core::audio::environment::esc_classifier` |
+| D11435 | **语音合成** | 如何实现自然语音合成? | VITS; Bark; tortoise-tts; Coqui TTS | **VITS 合成**: VITS+Bark+Tortoise 按需路由 | `nt_core::audio::tts::vits_synthesizer` |
+| D11436 | **语音克隆** | 如何克隆说话人声音? | few-shot voice cloning; adapter-based | **少样本克隆**: 3 秒音频即可克隆 | `nt_core::audio::tts::voice_cloner` |
+| D11437 | **音乐生成** | 如何生成音乐? | MusicGen (Meta); AudioCraft; symbolic → audio | **MusicGen 生成**: 文本到音乐+风格控制 | `nt_core::audio::music::musicgen_generator` |
+| D11438 | **音效设计** | 如何生成音效? | AudioLDM; text-to-audio; sound design | **AudioLDM 音效**: 文本到音效+环境音 | `nt_core::audio::sfx::audioldm_designer` |
+| D11439 | **语音增强** | 如何增强语音质量? | speech enhancement (DCCRN); denoising | **DCCRN 增强**: 深度复数卷积+降噪 | `nt_core::audio::enhancement::dccrn_engine` |
+| D11440 | **语音分离** | 如何分离混合语音? | speaker separation (SepFormer); cocktail party | **SepFormer 分离**: Transformer 分离+盲分离 | `nt_core::audio::separation::sepformer_engine` |
+| D11441 | **音频嵌入** | 如何学习音频嵌入? | CLAP; contrastive audio-visual; music embeddings | **CLAP 嵌入**: 音频-文本对比学习 | `nt_core::audio::embedding::clap_learner` |
+| D11442 | **音频检索** | 如何实现音频检索? | audio fingerprinting; semantic search | **语义检索**: CLAP+指纹匹配 | `nt_core::audio::retrieval::semantic_audio_search` |
+| D11443 | **语音活动检测** | 如何检测语音活动? | VAD (Silero); voice activity; endpoint detection | **Silero VAD**: 轻量级 VAD+端点检测 | `nt_core::audio::vad::silero_detector` |
+| D11444 | **音频质量评估** | 如何评估音频质量? | PESQ; POLQA; MOS prediction | **PESQ+MOS**: 客观+主观预测 | `nt_eval::audio::quality::pesq_evaluator` |
+| D11445 | **音频安全** | 如何检测不安全音频? | audio content moderation; deepfake detection | **音频安全**: 深度伪造+仇恨言论检测 | `nt_shield::audio_safety::deepfake_detector` |
+| D11446 | **音频水印** | 如何添加音频水印? | audio watermarking (WD-E); spread spectrum | **频域水印**: 扩频嵌入+不可感知+鲁棒 | `nt_shield::audio_watermark::spread_spectrum_embedder` |
+| D11447 | **音频压缩** | 如何高效压缩音频? | Opus; AAC; learned audio codecs | **Opus 压缩**: 低延迟+学习编解码器 | `nt_core::audio::compression::opus_codec` |
+| D11448 | **音频流处理** | 如何流式处理音频? | streaming ASR; real-time inference | **流式处理**: 分块+缓冲+实时输出 | `nt_core::audio::streaming::real_time_processor` |
+| D11449 | **音乐转录** | 如何转录音乐? | automatic music transcription (AMT); piano transcription | **AMT 转录**: 钢琴转录+多乐器转录 | `nt_core::audio::music::amt_transcriber` |
+| D11450 | **音频降噪** | 如何去除音频噪声? | speech enhancement (DNS); noise suppression | **DNS 降噪**: 微软 DNS Challenge 冠军方案 | `nt_core::audio::enhancement::dns_denoiser` |
+| D11451 | **音频编解码器** | 如何学习音频编解码器? | EnCodec (Meta); SoundStream; neural codecs | **EnCodec 编解码器**: 残差向量量化+低码率 | `nt_core::audio::codec::encodec_engine` |
+| D11452 | **音频超分辨率** | 如何提升音频质量? | audio super-resolution; bandwidth extension | **音频超分**: 从低码率恢复高频 | `nt_core::audio::enhancement::super_resolution` |
+| D11453 | **音频情感合成** | 如何合成带情感的语音? | emotional TTS; style transfer for speech | **情感 TTS**: 情感控制+韵律迁移 | `nt_core::audio::tts::emotional_synthesizer` |
+| D11454 | **音频场景分类** | 如何分类音频场景? | acoustic scene classification; DCASE | **场景分类**: DCASE 任务+多标签场景 | `nt_core::audio::environment::scene_classifier` |
+| D11455 | **音频指纹** | 如何生成音频指纹? | Chromapitch; Shazam-like fingerprinting | **音频指纹**: 时频指纹+快速匹配 | `nt_core::audio::fingerprint::chromapitch` |
+| D11456 | **音频可视化** | 如何可视化音频内容? | spectrogram analysis; visual sound separation | **音频可视化**: 梅尔谱图+时频分析 | `nt_core::audio::visualization::spectrogram_analyzer` |
+| D11457 | **音频生成评估** | 如何评估音频生成质量? | FAD (Fréchet Audio Distance); IS; MOS | **FAD+IS+MOS**: 多指标音频质量评估 | `nt_eval::audio::generation::fad_evaluator` |
+| D11458 | **音频上下文学习** | 如何实现音频上下文学习? | in-context learning for audio; prompt-based | **音频 ICL**: 提示驱动音频理解+少样本 | `nt_core::audio::icl::prompt_audio_learner` |
+| D11459 | **音频多模态对齐** | 如何对齐音频和其他模态? | audio-visual alignment; audio-text alignment | **多模态对齐**: 音频-视觉-文本共享空间 | `nt_core::audio::multimodal::alignment_hub` |
+| D11460 | **音频数据增强** | 如何增强音频数据? | SpecAugment; time stretching; pitch shifting | **SpecAugment**: 频谱增强+时间拉伸+音高变换 | `nt_core::audio::augmentation::specaugment` |
+| D11461 | **音频模型压缩** | 如何压缩音频模型? | knowledge distillation; pruning; quantization | **音频蒸馏**: 蒸馏+剪枝+量化, 移动端部署 | `nt_core::audio::compression::model_compressor` |
+| D11462 | **音频异常检测** | 如何检测音频异常? | anomaly detection in audio; fault detection | **音频异常**: 机械故障+异常声音检测 | `nt_core::audio::anomaly::audio_anomaly_detector` |
+| D11463 | **音频翻译** | 如何实现音频到音频翻译? | speech-to-speech translation; voice conversion | **语音翻译**: 端到端语音翻译+声音转换 | `nt_core::audio::translation::speech_to_speech` |
+| D11464 | **音频少样本学习** | 如何实现音频少样本学习? | few-shot audio classification; prototypical networks | **少样本音频**: 原型网络+度量学习 | `nt_core::audio::fewshot::prototypical_learner` |
+| D11465 | **音频持续学习** | 如何实现音频持续学习? | continual learning for audio; catastrophic forgetting | **持续音频学习**: 弹性权重巩固+经验回放 | `nt_core::audio::continual::elastic_weight` |
+| D11466 | **音频联邦学习** | 如何实现音频联邦学习? | federated audio learning; privacy-preserving | **联邦音频**: 本地训练+全局聚合+隐私保护 | `nt_core::audio::federated::federated_learner` |
+| D11467 | **音频神经渲染** | 如何神经渲染音频? | neural audio synthesis; differentiable DSP | **神经音频渲染**: 可微 DSP+神经网络合成 | `nt_core::audio::rendering::neural_renderer` |
+| D11468 | **音频知识蒸馏** | 如何蒸馏音频模型? | teacher-student; feature-based distillation | **音频蒸馏**: 教师-学生+特征蒸馏 | `nt_core::audio::distillation::audio_kd` |
+| D11469 | **音频模型解释** | 如何解释音频模型? | attention visualization; saliency maps | **音频解释**: 注意力图+显著性图+因果分析 | `nt_meta::explanation::audio_explainer` |
+| D11470 | **音频模型鲁棒性** | 如何提升音频模型鲁棒性? | adversarial training; data augmentation; noise robustness | **音频鲁棒性**: 对抗训练+增强+噪声鲁棒 | `nt_core::audio::robustness::adversarial_trainer` |
+| D11471 | **音频模型部署** | 如何部署音频模型? | edge deployment; ONNX optimization; TensorRT | **边缘部署**: ONNX+TensorRT+量化, 实时推理 | `nt_ops::audio_deploy::edge_optimizer` |
+| D11472 | **音频模型监控** | 如何监控音频模型? | drift detection; performance monitoring | **音频监控**: 漂移检测+性能监控+自动告警 | `nt_ops::audio_monitor::drift_detector` |
+| D11473 | **音频模型更新** | 如何更新音频模型? | online learning; continual adaptation | **持续更新**: 在线学习+持续适应+增量训练 | `nt_ops::audio_update::online_adapter` |
+| D11474 | **音频隐私保护** | 如何保护音频隐私? | voice anonymization; differential privacy; federated | **音频隐私**: 声音匿名化+差分隐私+联邦 | `nt_shield::audio_privacy::voice_anonymizer` |
+| D11475 | **音频版权检测** | 如何检测音频版权? | music copyright detection; audio fingerprinting | **版权检测**: 音频指纹+版权匹配+水印验证 | `nt_shield::audio_copyright::copyright_detector` |
+| D11476 | **音频多语言支持** | 如何支持多语言音频? | multilingual ASR; cross-lingual TTS | **多语言音频**: 多语言 ASR+跨语言 TTS | `nt_core::audio::multilingual::multilingual_engine` |
+
+### 0.108 具身认知与机器人决策 (D11477-D11526)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11477 | **传感器运动学习** | 如何实现传感器运动学习? | sensorimotor learning; robotic manipulation | **传感器运动**: 视觉-运动策略+触觉反馈 | `nt_physical::sensorimotor::learning_engine` |
+| D11478 | **抓取操作** | 如何实现机器人抓取? | grasp detection (GraspNet); dexterous manipulation | **GraspNet 抓取**: 6-DoF 抓取检测+灵巧操作 | `nt_physical::manipulation::grasp_detector` |
+| D11479 | **运动规划** | 如何实现运动规划? | motion planning (RRT*); trajectory optimization | **RRT* 规划**: 快速随机树+轨迹优化 | `nt_physical::locomotion::motion_planner` |
+| D11480 | **导航** | 如何实现机器人导航? | SLAM; visual navigation; semantic mapping | **语义 SLAM**: ORB-SLAM+语义地图+路径规划 | `nt_physical::navigation::semantic_slam` |
+| D11481 | **路径规划** | 如何实现路径规划? | A*; D* Lite; lattice planning | **混合规划**: A* 全局+D* Lite 动态+安全走廊 | `nt_physical::planning::hybrid_planner` |
+| D11482 | **避障** | 如何实现实时避障? | artificial potential fields; dynamic window approach | **动态避障**: DWA+人工势场+深度学习预测 | `nt_physical::obstacle::dynamic_avoider` |
+| D11483 | **人机交互** | 如何实现人机交互? | HRI (human-robot interaction); social robotics | **社会机器人**: 意图识别+情感响应+安全交互 | `nt_physical::hri::social_robot` |
+| D11484 | **手势识别** | 如何识别手势? | gesture recognition (MediaPipe); hand tracking | **手势识别**: MediaPipe 手部+动态手势分类 | `nt_physical::gesture::mediapipe_recognizer` |
+| D11485 | **社会机器人** | 如何实现社会机器人? | social robotics; emotion recognition; empathy | **社会机器人**: 情感识别+同理心+社交规范 | `nt_physical::social::emotion_social_robot` |
+| D11486 | **Sim-to-Real 迁移** | 如何实现 Sim-to-Real 迁移? | domain randomization; curriculum learning | **Sim-to-Real**: 域随机化+课程学习+对抗适应 | `nt_physical::transfer::sim_to_real` |
+| D11487 | **域适应** | 如何实现域适应? | domain adaptation; feature alignment; adversarial | **域适应**: 对抗学习+特征对齐+自监督 | `nt_physical::adaptation::domain_adapter` |
+| D11488 | **课程学习** | 如何实现课程学习? | curriculum learning; self-paced learning | **课程学习**: 难度递增+自步学习+自动课程 | `nt_physical::curriculum::auto_curriculum` |
+| D11489 | **模仿学习** | 如何从演示中学习? | imitation learning (DAgger); behavioral cloning | **DAgger 模仿学习**: 交互式专家+行为克隆 | `nt_physical::imitation::dagger_learner` |
+| D11490 | **强化学习** | 如何实现机器人强化学习? | RL (PPO/SAC); sim-to-real RL; safe RL | **安全 RL**: PPO/SAC+约束RL+安全层 | `nt_physical::rl::safe_rl_engine` |
+| D11491 | **多模态感知** | 如何融合多模态传感? | vision-tactile fusion; proprioception; audio | **多模态融合**: 视觉+触觉+本体感觉+音频 | `nt_physical::perception::multimodal_fusion` |
+| D11492 | **触觉感知** | 如何实现触觉感知? | tactile sensing (GelSight); force estimation | **触觉感知**: GelSight 视觉触觉+力估计 | `nt_physical::tactile::gelsight_sensor` |
+| D11493 | **精细操作** | 如何实现精细操作? | in-hand manipulation; dexterous control | **灵巧操作**: 手内操作+手指协调+触觉反馈 | `nt_physical::manipulation::dexterous_control` |
+| D11494 | **双足行走** | 如何实现双足行走? | bipedal locomotion; reinforcement learning | **双足行走**: RL 步态学习+全身控制 | `nt_physical::locomotion::bipedal_walker` |
+| D11495 | **四足运动** | 如何实现四足运动? | quadruped locomotion; ANYmal; dynamic walking | **四足运动**: ANYmal 风格 RL+动态步行 | `nt_physical::locomotion::quadruped_runner` |
+| D11496 | **无人机导航** | 如何实现无人机导航? | UAV navigation; obstacle avoidance; swarm | **无人机导航**: 自主导航+避障+蜂群协调 | `nt_physical::uav::autonomous_navigator` |
+| D11497 | **机械臂控制** | 如何实现机械臂控制? | robot arm control (Franka); impedance control | **阻抗控制**: Franka 阻抗控制+力矩反馈 | `nt_physical::arm::impedance_controller` |
+| D11498 | **装配任务** | 如何实现装配任务? | assembly tasks; peg-in-hole; tolerance | **装配任务**: 插入+拧紧+容差处理 | `nt_physical::assembly::precision_assembler` |
+| D11499 | **移动操作** | 如何实现移动操作? | mobile manipulation; base-arm coordination | **移动操作**: 底盘+机械臂协调+导航抓取 | `nt_physical::mobile::coordinated_manipulator` |
+| D11500 | **场景理解** | 如何理解操作场景? | scene understanding; object affordance | **场景理解**: 物体检测+可供性推理+场景图 | `nt_physical::scene::affordance_reasoner` |
+| D11501 | **任务规划** | 如何实现任务规划? | task planning (PDDL); hierarchical task network | **PDDL 规划**: 分层任务网络+时序规划 | `nt_physical::planning::pddl_planner` |
+| D11502 | **故障恢复** | 如何实现故障恢复? | failure recovery; replanning; fault detection | **故障恢复**: 检测→诊断→重规划→执行 | `nt_physical::recovery::adaptive_replanner` |
+| D11503 | **安全约束** | 如何保证操作安全? | safety constraints; constrained optimization | **安全约束**: 力矩限制+碰撞检测+紧急停止 | `nt_physical::safety::constraint_enforcer` |
+| D11504 | **人机协作** | 如何实现人机协作? | collaborative robotics (cobots); shared workspace | **协作机器人**: 共享空间+意图预测+安全共存 | `nt_physical::collaborative::cobot_coordinator` |
+| D11505 | **遥操作** | 如何实现遥操作? | teleoperation; haptic feedback; latency compensation | **遥操作**: 力反馈+延迟补偿+自主辅助 | `nt_physical::teleoperation::haptic_operator` |
+| D11506 | **物体识别** | 如何识别操作物体? | 6D pose estimation; point cloud recognition | **6D 姿态估计**: 点云识别+位姿估计+分割 | `nt_physical::recognition::6d_pose_estimator` |
+| D11507 | **材料识别** | 如何识别材料属性? | material recognition; texture analysis; tactile | **材料识别**: 视觉纹理+触觉感知+材质分类 | `nt_physical::material::texture_identifier` |
+| D11508 | **自适应抓取** | 如何自适应抓取? | adaptive grasping; uncertainty-aware manipulation | **自适应抓取**: 不确定性感知+自适应抓取力 | `nt_physical::grasp::adaptive_gripper` |
+| D11509 | **多物体操作** | 如何操作多个物体? | multi-object manipulation; clutter resolution | **多物体操作**: 杂乱场景+优先级排序+协调 | `nt_physical::multi_object::clutter_handler` |
+| D11510 | **操作学习** | 如何从少量数据学习操作? | few-shot manipulation; robot learning from demo | **少样本操作**: 演示学习+模拟预训练+微调 | `nt_physical::learning::fewshot_manipulator` |
+| D11511 | **长期自主** | 如何实现长期自主? | long-term autonomy; continual learning; memory | **长期自主**: 持续学习+记忆管理+自适应 | `nt_physical::autonomy::long_term_agent` |
+| D11512 | **多机器人协调** | 如何协调多机器人? | multi-robot coordination; task allocation; swarm | **多机器人**: 任务分配+路径协调+蜂群 | `nt_physical::multi_robot::swarm_coordinator` |
+| D11513 | **语义导航** | 如何实现语义导航? | semantic navigation; goal-oriented; map understanding | **语义导航**: 语义地图+目标导向+场景理解 | `nt_physical::navigation::semantic_navigator` |
+| D11514 | **动态环境适应** | 如何适应动态环境? | dynamic environment; change detection; replanning | **动态适应**: 环境变化检测+实时重规划 | `nt_physical::adaptation::dynamic_adapter` |
+| D11515 | **人机对话交互** | 如何实现人机对话交互? | HRI dialogue; grounded language understanding | **对话交互**: 语言理解+指代消解+动作执行 | `nt_physical::hri::dialogue_interactor` |
+| D11516 | **操作技能库** | 如何管理操作技能? | skill library; skill primitives; composition | **技能库**: 基元技能+组合技能+学习注册 | `nt_physical::skill::primitives_library` |
+| D11517 | **安全验证** | 如何验证操作安全? | safety verification; formal methods; testing | **安全验证**: 形式化方法+仿真测试+运行时监控 | `nt_physical::verification::safety_verifier` |
+| D11518 | **能耗优化** | 如何优化机器人能耗? | energy-efficient planning; power management | **能耗优化**: 能效路径规划+功率管理+回收 | `nt_physical::energy::efficient_planner` |
+| D11519 | **多模态交互** | 如何实现多模态交互? | multimodal HRI; gesture + voice + gaze | **多模态交互**: 手势+语音+注视融合交互 | `nt_physical::interaction::multimodal_hri` |
+| D11520 | **操作鲁棒性** | 如何提升操作鲁棒性? | robust manipulation; uncertainty estimation | **操作鲁棒性**: 不确定性估计+自适应控制 | `nt_physical::robustness::uncertainty_aware` |
+| D11521 | **机器人自省** | 机器人如何自省自身状态? | robot self-monitoring; internal model; body schema | **自省系统**: 内部模型+身体图式+状态监控 | `nt_physical::introspection::self_monitor` |
+| D11522 | **操作泛化** | 如何泛化到新物体/场景? | generalization; domain randomization; foundation models | **操作泛化**: 基础模型+域随机化+少样本迁移 | `nt_physical::generalization::foundation_manipulator` |
+| D11523 | **机器人迁移学习** | 如何实现跨机器人迁移? | cross-embodiment transfer; teacher-student | **跨体迁移**: 教师-学生+仿真-真实+多形态 | `nt_physical::transfer::cross_embodiment` |
+| D11524 | **操作数据集** | 如何构建操作数据集? | robot datasets (Bridge, RT-X); data collection | **操作数据集**: Bridge 数据+RT-X 标准化+采集 | `nt_physical::dataset::bridge_dataset` |
+| D11525 | **机器人基准测试** | 如何基准测试机器人? | robot benchmarking; standardized tasks; evaluation | **机器人基准**: 标准化任务+评估指标+排行榜 | `nt_physical::benchmark::standardized_evaluator` |
+
+
+### 0.109 科学发现与推理决策 (D11527-D11576)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11527 | **假设生成** | 如何自动生成科学假设? | hypothesis generation (SciReasoner); NLP-driven | **假设生成器**: 文献挖掘+知识图谱+LLM 推理 | `nt_core::science::hypothesis_generator` |
+| D11528 | **实验设计** | 如何设计科学实验? | experimental design (DoE); active learning | **DoE 实验设计**: 正交设计+主动学习+贝叶斯优化 | `nt_core::science::experiment_designer` |
+| D11529 | **数据分析** | 如何分析科学数据? | statistical analysis; ML-based data analysis | **智能数据分析**: 自动统计+ML 异常检测+可视化 | `nt_core::science::data_analyzer` |
+| D11530 | **文献综述** | 如何自动化文献综述? | literature review (LitLLM); systematic review | **LitLLM 综述**: 系统综述+证据综合+差距发现 | `nt_core::science::literature_reviewer` |
+| D11531 | **知识综合** | 如何综合多源知识? | knowledge synthesis; evidence integration | **知识综合**: 多源证据+冲突解决+置信度加权 | `nt_core::science::knowledge_synthesizer` |
+| D11532 | **模式发现** | 如何从数据中发现模式? | pattern discovery; anomaly detection; clustering | **模式发现**: 聚类+异常检测+关联规则挖掘 | `nt_core::science::pattern_discoverer` |
+| D11533 | **数学推理** | 如何实现数学推理? | mathematical reasoning (AlphaProof); theorem proving | **数学推理**: AlphaProof 风格+符号+神经混合 | `nt_core::math::reasoning_engine` |
+| D11534 | **定理证明** | 如何自动证明定理? | theorem proving (Lean4); proof search; automation | **Lean4 证明**: 自动证明搜索+强化学习引导 | `nt_core::math::theorem_prover` |
+| D11535 | **形式化验证** | 如何进行形式化验证? | formal verification (Coq/Isabelle); model checking | **形式化验证**: Coq/Isabelle+模型检查+SAT/SMT | `nt_core::math::formal_verifier` |
+| D11536 | **科学仿真** | 如何进行科学仿真? | scientific simulation; physics-informed neural networks | **PINN 仿真**: 物理信息神经网络+PDE 求解 | `nt_core::science::simulation_engine` |
+| D11537 | **科学建模** | 如何构建科学模型? | model building; equation discovery; symbolic regression | **方程发现**: 符号回归+稀疏建模+自动方程推导 | `nt_core::science::model_builder` |
+| D11538 | **预测建模** | 如何进行科学预测? | predictive modeling; time series forecasting; uncertainty | **预测引擎**: 时间序列+不确定性量化+集成预测 | `nt_core::science::prediction_engine` |
+| D11539 | **优化求解** | 如何求解优化问题? | optimization (Bayesian); constraint satisfaction | **贝叶斯优化**: 约束满足+多目标+全局优化 | `nt_core::science::optimizer` |
+| D11540 | **科学知识图谱** | 如何构建科学 KG? | scientific KG; citation analysis; entity extraction | **科学 KG**: 引文分析+实体抽取+关系建模 | `nt_core::science::scientific_kg` |
+| D11541 | **科学方法论** | 如何实现科学方法论推理? | scientific method; falsification; evidence-based | **方法论推理**: 假设→实验→验证→结论 闭环 | `nt_core::science::methodology_reasoner` |
+| D11542 | **生物信息学** | 如何分析生物数据? | bioinformatics; protein structure; genomics | **生物信息**: AlphaFold 蛋白质+基因组分析 | `nt_core::science::bioinformatics_engine` |
+| D11543 | **化学推理** | 如何进行化学推理? | molecular design; retrosynthesis; drug discovery | **化学推理**: 分子设计+逆合成+药物发现 | `nt_core::science::chemistry_reasoner` |
+| D11544 | **物理推理** | 如何进行物理推理? | physics simulation; conservation laws; mechanics | **物理推理**: 守恒定律+力学分析+能量建模 | `nt_core::science::physics_reasoner` |
+| D11545 | **材料科学** | 如何分析材料属性? | materials discovery; property prediction; crystal structure | **材料发现**: 晶体结构预测+属性建模+逆向设计 | `nt_core::science::materials_scientist` |
+| D11546 | **气候科学** | 如何分析气候数据? | climate modeling; weather prediction; earth system | **气候建模**: 地球系统+天气预测+碳循环 | `nt_core::science::climate_modeler` |
+| D11547 | **科学代码生成** | 如何生成科学代码? | scientific code generation; numerical methods | **科学代码生成**: 数值方法+自动微分+优化 | `nt_core::science::code_generator` |
+| D11548 | **实验验证** | 如何验证实验结果? | experiment validation; reproducibility; statistical rigor | **实验验证**: 重复性检验+统计显著性+置信区间 | `nt_core::science::experiment_validator` |
+| D11549 | **科学可视化** | 如何可视化科学数据? | scientific visualization; data plotting; 3D rendering | **科学可视化**: 多维数据+3D 渲染+交互式探索 | `nt_core::science::visualization_engine` |
+| D11550 | **科学问答** | 如何回答科学问题? | science QA; fact verification; evidence-based | **科学 QA**: 事实核查+证据链+不确定性 | `nt_core::science::science_qa_engine` |
+| D11551 | **跨学科推理** | 如何跨学科推理? | interdisciplinary reasoning; analogical transfer | **跨学科**: 类比迁移+知识融合+创新发现 | `nt_core::science::interdisciplinary_reasoner` |
+| D11552 | **科学伦理** | 如何确保科学伦理? | research ethics; data governance; responsible AI | **科学伦理**: 伦理审查+数据治理+负责任 AI | `nt_core::science::ethics_checker` |
+| D11553 | **科学传播** | 如何传播科学知识? | science communication; plain language; visualization | **科学传播**: 通俗化+可视化+多渠道传播 | `nt_core::science::communication_engine` |
+| D11554 | **科学协作** | 如何支持科学协作? | collaborative research; shared experiments; knowledge sharing | **科学协作**: 共享实验+知识共享+协作分析 | `nt_core::science::collaboration_platform` |
+| D11555 | **科学数据管理** | 如何管理科学数据? | data management; metadata; provenance tracking | **数据管理**: 元数据+溯源+版本控制+FAIR 原则 | `nt_core::science::data_manager` |
+| D11556 | **科学模型评估** | 如何评估科学模型? | model evaluation; A/B testing; validation metrics | **模型评估**: 交叉验证+A/B 测试+验证指标 | `nt_core::science::model_evaluator` |
+| D11557 | **科学创新发现** | 如何发现创新点? | innovation discovery; gap analysis; novelty detection | **创新发现**: 文献差距分析+新颖性检测+组合创新 | `nt_core::science::innovation_discoverer` |
+| D11558 | **科学推理链** | 如何构建科学推理链? | scientific reasoning chain; evidence → conclusion | **推理链**: 证据→假设→推理→结论→验证 | `nt_core::science::reasoning_chain` |
+| D11559 | **科学不确定性** | 如何处理科学不确定性? | uncertainty quantification; sensitivity analysis | **不确定性量化**: 贝叶斯推断+敏感性分析+置信区间 | `nt_core::science::uncertainty_quantifier` |
+| D11560 | **科学自动化** | 如何自动化科学流程? | automated science; self-driving labs; AI scientists | **自驱动实验室**: AI 科学家+自动化实验+闭环优化 | `nt_core::science::automated_lab` |
+| D11561 | **科学知识库** | 如何构建科学知识库? | scientific knowledge base; structured knowledge | **科学知识库**: 结构化知识+文献挖掘+知识融合 | `nt_core::science::knowledge_base` |
+| D11562 | **科学推理加速** | 如何加速科学推理? | GPU acceleration; distributed computing; approximate | **推理加速**: GPU 加速+分布式计算+近似推理 | `nt_core::science::inference_accelerator` |
+| D11563 | **科学可解释性** | 如何解释科学发现? | explainable science; causal reasoning; mechanism | **科学解释**: 因果推理+机制发现+可解释模型 | `nt_core::science::explainability_engine` |
+| D11564 | **科学基准测试** | 如何基准测试科学系统? | scientific benchmarking; evaluation frameworks | **科学基准**: 标准化评估+可复现基准+排行榜 | `nt_core::science::benchmark_suite` |
+| D11565 | **科学元分析** | 如何进行科学元分析? | meta-analysis; systematic review; effect size | **元分析**: 效应量聚合+异质性分析+发表偏差 | `nt_core::science::meta_analysis` |
+| D11566 | **科学假设验证** | 如何验证科学假设? | hypothesis testing; experimental design; statistics | **假设验证**: 统计检验+效应量+置信区间 | `nt_core::science::hypothesis_tester` |
+| D11567 | **科学知识蒸馏** | 如何蒸馏科学知识? | knowledge distillation; concept extraction | **知识蒸馏**: 概念抽取+规则提取+简化模型 | `nt_core::science::knowledge_distiller` |
+| D11568 | **科学模型压缩** | 如何压缩科学模型? | model compression; approximation; reduced order | **模型压缩**: 降阶模型+近似+稀疏化 | `nt_core::science::model_compressor` |
+| D11569 | **科学部署** | 如何部署科学系统? | deployment; serving; scalability; monitoring | **科学部署**: 微服务+容器化+监控+自动扩展 | `nt_core::science::deployment_manager` |
+| D11570 | **科学安全** | 如何确保科学安全? | safety in research; biosecurity; dual-use concerns | **科学安全**: 双重用途审查+生物安全+伦理 | `nt_core::science::safety_officer` |
+| D11571 | **科学质量控制** | 如何控制科学质量? | quality control; peer review; reproducibility | **质量控制**: 同行评审+重复性检查+自动化审核 | `nt_core::science::quality_controller` |
+| D11572 | **科学项目管理** | 如何管理科学项目? | project management; milestone tracking; resource allocation | **项目管理**: 里程碑追踪+资源分配+风险评估 | `nt_core::science::project_manager` |
+| D11573 | **科学创新评估** | 如何评估科学创新? | innovation assessment; impact analysis; novelty scoring | **创新评估**: 影响力分析+新颖性评分+技术就绪度 | `nt_core::science::innovation_assessor` |
+| D11574 | **科学知识图谱更新** | 如何更新科学 KG? | KG updating; incremental knowledge; versioning | **增量更新**: 新文献→实体抽取→关系更新→版本 | `nt_core::science::kg_updater` |
+| D11575 | **科学推理验证** | 如何验证科学推理? | reasoning verification; logical consistency; evidence | **推理验证**: 逻辑一致性+证据充分性+可重复性 | `nt_core::science::reasoning_verifier` |
+| D11576 | **科学发现管道** | 如何构建发现管道? | discovery pipeline; automated research; integration | **发现管道**: 文献→假设→实验→验证→发布 | `nt_core::science::discovery_pipeline` |
+
+
+### 0.110 创造力智能决策 (D11577-D11626)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11577 | **故事叙述** | 如何生成引人入胜的故事? | narrative generation (StoryGen); plot planning | **StoryGen 叙事**: 情节规划+角色弧线+张力控制 | `nt_core::creative::storytelling_engine` |
+| D11578 | **叙事生成** | 如何生成长篇叙事? | long-form narrative; coherence maintenance; world-building | **长篇叙事**: 连贯性维护+世界构建+主题发展 | `nt_core::creative::narrative_generator` |
+| D11579 | **情节规划** | 如何规划故事情节? | plot planning; story structure (3-act); dramatic arc | **情节规划**: 三幕结构+戏剧弧线+转折点设计 | `nt_core::creative::plot_planner` |
+| D11580 | **音乐作曲** | 如何创作音乐? | music composition (MuseNet); melody generation | **MuseNet 作曲**: 旋律生成+和声编排+风格模仿 | `nt_core::creative::music_composer` |
+| D11581 | **艺术创作** | 如何生成艺术作品? | art generation (DALL-E); style synthesis | **艺术生成**: DALL-E 风格+风格合成+构图设计 | `nt_core::creative::art_generator` |
+| D11582 | **设计生成** | 如何自动生成设计? | design generation; layout optimization; aesthetic | **设计生成**: 布局优化+美学评分+自动排版 | `nt_core::creative::design_generator` |
+| D11583 | **幽默理解** | 如何理解幽默? | humor detection; joke generation; irony recognition | **幽默理解**: 笑话生成+讽刺识别+语境幽默 | `nt_core::creative::humor_engine` |
+| D11584 | **创造力评估** | 如何评估创造力? | creativity evaluation (torrance test); novelty scoring | **创造力评估**: 新颖性+价值性+惊喜度评分 | `nt_core::creative::creativity_evaluator` |
+| D11585 | **美学判断** | 如何进行美学判断? | aesthetic judgment; visual quality assessment | **美学判断**: 视觉美学评分+构图分析+和谐度 | `nt_core::creative::aesthetic_judge` |
+| D11586 | **跨模态创造力** | 如何实现跨模态创造? | cross-modal creativity; style transfer; multimodal | **跨模态创造**: 风格迁移+多模态融合+创新组合 | `nt_core::creative::cross_modal_creator` |
+| D11587 | **跨学科灵感** | 如何从跨学科获取灵感? | interdisciplinary inspiration; analogical reasoning | **跨学科灵感**: 类比推理+知识融合+创新发现 | `nt_core::creative::interdisciplinary_inspirer` |
+| D11588 | **创意写作** | 如何进行创意写作? | creative writing; poetry generation; dialogue | **创意写作**: 诗歌生成+对话创作+修辞运用 | `nt_core::creative::creative_writer` |
+| D11589 | **视觉设计** | 如何进行视觉设计? | visual design; color theory; typography | **视觉设计**: 色彩理论+排版+视觉层次 | `nt_core::creative::visual_designer` |
+| D11590 | **音乐编曲** | 如何进行音乐编曲? | music arrangement; orchestration; genre blending | **音乐编曲**: 配器法+流派融合+风格混搭 | `nt_core::creative::music_arranger` |
+| D11591 | **游戏设计** | 如何进行游戏设计? | game design; level generation; procedural content | **游戏设计**: 关卡生成+程序化内容+平衡性 | `nt_core::creative::game_designer` |
+| D11592 | **角色设计** | 如何设计角色? | character design; backstory; motivation; arc | **角色设计**: 背景故事+动机+弧线+视觉设计 | `nt_core::creative::character_designer` |
+| D11593 | **世界构建** | 如何构建虚构世界? | world-building; lore creation; consistency | **世界构建**: 设定创造+一致性维护+扩展性 | `nt_core::creative::world_builder` |
+| D11594 | **创意推荐** | 如何推荐创意内容? | creative recommendation; taste modeling; diversity | **创意推荐**: 品味建模+多样性+新颖性 | `nt_core::creative::creative_recommender` |
+| D11595 | **创意协作** | 如何支持创意协作? | collaborative creativity; brainstorming; co-creation | **创意协作**: 头脑风暴+共同创作+创意融合 | `nt_core::creative::creative_collaborator` |
+| D11596 | **创意迭代** | 如何迭代改进创意? | iterative refinement; feedback integration; A/B testing | **创意迭代**: 反馈整合+A/B 测试+渐进改进 | `nt_core::creative::creative_iterator` |
+| D11597 | **叙事一致性** | 如何保持叙事一致性? | narrative consistency; character consistency; world rules | **叙事一致性**: 角色一致+世界规则+时间线 | `nt_core::creative::narrative_consistency` |
+| D11598 | **创意约束** | 如何在约束下创造? | constrained creativity; prompt engineering; style control | **创意约束**: 提示工程+风格控制+约束满足 | `nt_core::creative::constrained_creator` |
+| D11599 | **创意评估基准** | 如何评估创意系统? | creative evaluation benchmark; Turing test for creativity | **创意基准**: 新颖性+多样性+质量+人类评估 | `nt_core::creative::evaluation_benchmark` |
+| D11600 | **创意模型训练** | 如何训练创意模型? | creative model training; RLHF; reinforcement learning | **创意训练**: RLHF+奖励建模+人类偏好 | `nt_core::creative::training_pipeline` |
+| D11601 | **创意数据集** | 如何构建创意数据集? | creative datasets; artistic data; literary data | **创意数据集**: 艺术数据+文学数据+音乐数据 | `nt_core::creative::dataset_builder` |
+| D11602 | **创意安全** | 如何确保创意安全? | creative safety; content filtering; bias in creativity | **创意安全**: 内容过滤+偏见检测+安全创作 | `nt_core::creative::safety_filter` |
+| D11603 | **创意部署** | 如何部署创意系统? | creative deployment; real-time generation; serving | **创意部署**: 实时生成+流式输出+缓存 | `nt_core::creative::deployment_pipeline` |
+| D11604 | **创意版权** | 如何处理创意版权? | copyright; intellectual property; attribution | **版权处理**: 版权检测+归属标注+IP 保护 | `nt_core::creative::copyright_handler` |
+| D11605 | **创意个性化** | 如何个性化创意输出? | personalized creativity; user preference; style adaptation | **个性化创意**: 用户偏好+风格适配+持续学习 | `nt_core::creative::personalized_creator` |
+| D11606 | **创意多语言** | 如何支持多语言创意? | multilingual creativity; cross-cultural; translation | **多语言创意**: 跨文化理解+多语言生成+本地化 | `nt_core::creative::multilingual_creator` |
+| D11607 | **创意解释** | 如何解释创意选择? | creative explanation; design rationale; style rationale | **创意解释**: 设计理由+风格解释+决策追溯 | `nt_core::creative::creative_explainer` |
+| D11608 | **创意评估自动化** | 如何自动化评估创意? | automated creativity evaluation; metric design | **自动化评估**: 新颖性度量+质量度量+人类校准 | `nt_core::creative::auto_evaluator` |
+| D11609 | **创意进化** | 如何进化创意系统? | creative evolution; genetic algorithms; aesthetic selection | **创意进化**: 遗传算法+美学选择+变异探索 | `nt_core::creative::creative_evolver` |
+| D11610 | **创意多模态** | 如何多模态创意? | multimodal creation; text-to-image-to-music | **多模态创意**: 文本→图像→音乐跨模态创造 | `nt_core::creative::multimodal_creator` |
+| D11611 | **创意风格学习** | 如何学习创意风格? | style learning; few-shot style; style transfer | **风格学习**: 少样本风格+风格迁移+风格混合 | `nt_core::creative::style_learner` |
+| D11612 | **创意反馈循环** | 如何构建创意反馈循环? | feedback loops; human-in-the-loop; iterative design | **反馈循环**: 人类在环+迭代设计+持续改进 | `nt_core::creative::feedback_loop` |
+| D11613 | **创意工具集成** | 如何集成创意工具? | creative tool integration; pipeline composition | **工具集成**: 管线组合+工具链+工作流自动化 | `nt_core::creative::tool_integration` |
+| D11614 | **创意质量控制** | 如何控制创意质量? | quality control; review process; curation | **质量控制**: 审核流程+策展+质量门禁 | `nt_core::creative::quality_controller` |
+| D11615 | **创意趋势分析** | 如何分析创意趋势? | trend analysis; style prediction; cultural analysis | **趋势分析**: 风格预测+文化分析+趋势发现 | `nt_core::creative::trend_analyzer` |
+| D11616 | **创意社区** | 如何支持创意社区? | creative community; sharing; collaboration; curation | **创意社区**: 分享平台+协作工具+策展系统 | `nt_core::creative::community_platform` |
+| D11617 | **创意商业化** | 如何实现创意商业化? | commercialization; licensing; value assessment | **商业化**: 许可管理+价值评估+市场匹配 | `nt_core::creative::commercializer` |
+| D11618 | **创意教育** | 如何支持创意教育? | creative education; skill development; tutorials | **创意教育**: 技能发展+教程系统+学习路径 | `nt_core::creative::education_engine` |
+| D11619 | **创意可访问性** | 如何提高创意可访问性? | accessibility; inclusive design; universal creativity | **可访问性**: 包容设计+通用创意+无障碍 | `nt_core::creative::accessibility_engine` |
+| D11620 | **创意保存** | 如何保存创意作品? | digital preservation; archiving; metadata | **创意保存**: 数字保存+归档+元数据管理 | `nt_core::creative::preservation_engine` |
+| D11621 | **创意伦理** | 如何确保创意伦理? | creative ethics; cultural sensitivity; representation | **创意伦理**: 文化敏感性+代表性+伦理审查 | `nt_core::creative::ethics_checker` |
+| D11622 | **创意基准测试** | 如何基准测试创意系统? | creative benchmarking; Turing test; human evaluation | **创意基准**: 图灵测试+人类评估+自动指标 | `nt_core::creative::benchmark_suite` |
+
+
+### 0.111 伦理与社会智能决策 (D11627-D11676)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11627 | **道德推理** | 如何实现道德推理? | moral reasoning (Kohlberg); ethical frameworks; dilemma | **道德推理**: 康德+功利主义+美德伦理多框架 | `nt_core::ethics::moral_reasoner` |
+| D11628 | **伦理困境** | 如何处理伦理困境? | ethical dilemma resolution; trolley problem; trade-offs | **困境解决**: 多伦理框架+价值权衡+透明决策 | `nt_core::ethics::dilemma_resolver` |
+| D11629 | **价值对齐** | 如何实现价值对齐? | value alignment (RLHF); constitutional AI; human values | **价值对齐**: RLHF+宪法 AI+人类价值嵌入 | `nt_core::ethics::value_aligner` |
+| D11630 | **社会规范** | 如何理解和遵循社会规范? | social norms; cultural awareness; normative reasoning | **社会规范**: 文化感知+规范推理+行为约束 | `nt_core::ethics::norm_understander` |
+| D11631 | **文化敏感性** | 如何确保文化敏感性? | cultural sensitivity; cross-cultural; localization | **文化敏感**: 跨文化理解+本地化+文化适配 | `nt_core::ethics::cultural_sensitivity` |
+| D11632 | **偏见检测** | 如何检测和缓解偏见? | bias detection; fairness metrics; debiasing | **偏见检测**: 统计公平性+去偏方法+持续监控 | `nt_core::ethics::bias_detector` |
+| D11633 | **公平性** | 如何确保 AI 公平性? | fairness (demographic parity; equal opportunity) | **公平性**: 多公平性指标+约束优化+审计 | `nt_core::ethics::fairness_enforcer` |
+| D11634 | **问责制** | 如何实现 AI 问责制? | accountability; audit trails; decision logging | **问责制**: 决策日志+审计追踪+责任链 | `nt_core::ethics::accountability_tracker` |
+| D11635 | **透明度** | 如何确保 AI 透明度? | transparency; explainability; open documentation | **透明度**: 决策解释+模型文档+开源透明 | `nt_core::ethics::transparency_engine` |
+| D11636 | **可解释性** | 如何实现 AI 可解释性? | XAI (LIME/SHAP); attention visualization; rationale | **可解释性**: LIME/SHAP+注意力可视化+推理链 | `nt_core::ethics::explainability_engine` |
+| D11637 | **隐私保护** | 如何保护数据隐私? | privacy (differential privacy; federated learning) | **隐私保护**: 差分隐私+联邦学习+数据脱敏 | `nt_shield::privacy::differential_protector` |
+| D11638 | **同意管理** | 如何管理数据同意? | consent management; GDPR compliance; data governance | **同意管理**: GDPR 合规+数据治理+同意追踪 | `nt_shield::privacy::consent_manager` |
+| D11639 | **数据主权** | 如何保障数据主权? | data sovereignty; data localization; cross-border | **数据主权**: 本地化存储+跨境合规+数据分类 | `nt_shield::privacy::data_sovereignty` |
+| D11640 | **AI 安全** | 如何确保 AI 安全? | AI safety; alignment; catastrophic risk; red-teaming | **AI 安全**: 对齐研究+红队测试+安全边界 | `nt_shield::ai_safety::alignment_engine` |
+| D11641 | **鲁棒安全** | 如何确保 AI 鲁棒安全? | adversarial robustness; certified defense; provable | **鲁棒安全**: 对抗训练+认证防御+可证明安全 | `nt_shield::ai_safety::robust_defender` |
+| D11642 | **社会影响评估** | 如何评估 AI 社会影响? | social impact assessment; stakeholder analysis | **影响评估**: 利益相关者分析+社会影响+风险评估 | `nt_core::ethics::impact_assessor` |
+| D11643 | **伦理审查** | 如何进行伦理审查? | ethics review board; IRB; compliance checking | **伦理审查**: 审查委员会+合规检查+持续监督 | `nt_core::ethics::review_board` |
+| D11644 | **负责任 AI** | 如何实现负责任 AI? | responsible AI; AI principles; governance framework | **负责任 AI**: 原则+治理框架+实施指南 | `nt_core::ethics::responsible_ai` |
+| D11645 | **AI 治理** | 如何实现 AI 治理? | AI governance; policy; regulation; standards | **AI 治理**: 政策制定+法规遵从+标准实施 | `nt_core::ethics::governance_framework` |
+| D11646 | **公平审计** | 如何进行公平审计? | fairness audit; bias audit; algorithmic audit | **公平审计**: 算法审计+偏差审计+持续监控 | `nt_core::ethics::fairness_auditor` |
+| D11647 | **数据伦理** | 如何确保数据伦理? | data ethics; data quality; informed consent | **数据伦理**: 数据质量+知情同意+目的限制 | `nt_core::ethics::data_ethics` |
+| D11648 | **AI 伦理培训** | 如何进行 AI 伦理培训? | AI ethics training; awareness; best practices | **伦理培训**: 意识培训+最佳实践+案例学习 | `nt_core::ethics::training_program` |
+| D11649 | **伦理风险评估** | 如何评估伦理风险? | ethics risk assessment; harm analysis; mitigation | **风险评估**: 危害分析+风险量化+缓解策略 | `nt_core::ethics::risk_assessor` |
+| D11650 | **包容性设计** | 如何实现包容性设计? | inclusive design; accessibility; universal design | **包容性设计**: 无障碍+通用设计+多元包容 | `nt_core::ethics::inclusive_designer` |
+| D11651 | **AI 权利** | 如何考虑 AI 权利? | AI rights; moral status; consciousness; personhood | **AI 权利**: 意识评估+道德地位+权利框架 | `nt_core::ethics::rights_framework` |
+| D11652 | **环境伦理** | 如何考虑环境伦理? | environmental ethics; sustainability; carbon footprint | **环境伦理**: 碳足迹+可持续性+能源效率 | `nt_core::ethics::environmental_ethics` |
+| D11653 | **军事伦理** | 如何考虑军事 AI 伦理? | autonomous weapons; military AI ethics; lethal systems | **军事伦理**: 自主武器审查+人道约束+国际法 | `nt_core::ethics::military_ethics` |
+| D11654 | **医疗伦理** | 如何考虑医疗 AI 伦理? | medical AI ethics; patient privacy; clinical validation | **医疗伦理**: 患者隐私+临床验证+知情同意 | `nt_core::ethics::medical_ethics` |
+| D11655 | **金融伦理** | 如何考虑金融 AI 伦理? | financial AI ethics; algorithmic trading; credit scoring | **金融伦理**: 算法交易审查+信贷公平性+透明 | `nt_core::ethics::financial_ethics` |
+| D11656 | **教育伦理** | 如何考虑教育 AI 伦理? | educational AI ethics; student privacy; assessment | **教育伦理**: 学生隐私+评估公平+个性化伦理 | `nt_core::ethics::education_ethics` |
+| D11657 | **AI 透明度报告** | 如何生成透明度报告? | transparency report; disclosure; public reporting | **透明度报告**: 决策披露+公开报告+年度审计 | `nt_core::ethics::transparency_reporter` |
+| D11658 | **伦理合规监控** | 如何监控伦理合规? | compliance monitoring; policy enforcement; alerts | **合规监控**: 策略执行+自动告警+持续审计 | `nt_core::ethics::compliance_monitor` |
+| D11659 | **伦理影响跟踪** | 如何跟踪伦理影响? | impact tracking; outcome monitoring; feedback loops | **影响跟踪**: 结果监控+反馈循环+持续改进 | `nt_core::ethics::impact_tracker` |
+| D11660 | **伦理知识库** | 如何构建伦理知识库? | ethics knowledge base; case studies; best practices | **伦理知识库**: 案例研究+最佳实践+指南 | `nt_core::ethics::knowledge_base` |
+| D11661 | **伦理推理加速** | 如何加速伦理推理? | fast ethical reasoning; real-time compliance | **伦理推理**: 实时合规+快速评估+自动化决策 | `nt_core::ethics::fast_reasoner` |
+| D11662 | **伦理可解释性** | 如何解释伦理决策? | ethical explanation; decision rationale; audit trail | **伦理解释**: 决策理由+审计追踪+公开解释 | `nt_core::ethics::ethical_explainer` |
+| D11663 | **伦理基准测试** | 如何基准测试伦理系统? | ethics benchmark; evaluation framework; metrics | **伦理基准**: 评估框架+指标体系+排行榜 | `nt_core::ethics::benchmark_suite` |
+| D11664 | **伦理部署** | 如何部署伦理系统? | ethics deployment; integration; monitoring; updates | **伦理部署**: 集成+监控+更新+持续改进 | `nt_core::ethics::deployment_pipeline` |
+| D11665 | **伦理评估自动化** | 如何自动化伦理评估? | automated ethics evaluation; policy checking | **自动化评估**: 策略检查+合规验证+持续审计 | `nt_core::ethics::auto_evaluator` |
+| D11666 | **伦理持续改进** | 如何持续改进伦理实践? | continuous improvement; learning from incidents | **持续改进**: 事故学习+经验积累+制度优化 | `nt_core::ethics::continuous_improver` |
+| D11667 | **伦理多语言** | 如何支持多语言伦理? | multilingual ethics; cross-cultural; international | **多语言伦理**: 跨文化伦理+国际标准+本地化 | `nt_core::ethics::multilingual_ethics` |
+| D11668 | **伦理社区参与** | 如何支持伦理社区参与? | community engagement; public consultation; participatory | **社区参与**: 公众咨询+参与式设计+利益相关者 | `nt_core::ethics::community_engagement` |
+| D11669 | **伦理教育培训** | 如何进行伦理教育培训? | ethics training; professional development; certification | **教育培训**: 专业发展+认证体系+持续教育 | `nt_core::ethics::training_platform` |
+| D11670 | **伦理工具集成** | 如何集成伦理工具? | ethics tool integration; pipeline composition | **工具集成**: 管线组合+工具链+工作流 | `nt_core::ethics::tool_integration` |
+| D11671 | **伦理反馈循环** | 如何构建伦理反馈循环? | ethics feedback loops; incident reporting; learning | **反馈循环**: 事故报告+学习机制+制度改进 | `nt_core::ethics::feedback_loop` |
+| D11672 | **伦理案例研究** | 如何进行伦理案例研究? | ethics case studies; analysis; best practices | **案例研究**: 分析+最佳实践+指南制定 | `nt_core::ethics::case_studies` |
+| D11673 | **伦理标准制定** | 如何制定伦理标准? | ethics standards; policy development; governance | **标准制定**: 政策开发+治理框架+实施指南 | `nt_core::ethics::standards_developer` |
+| D11674 | **伦理跨学科** | 如何进行跨学科伦理? | interdisciplinary ethics; philosophy + CS + law | **跨学科伦理**: 哲学+计算机+法律融合 | `nt_core::ethics::interdisciplinary_ethics` |
+| D11675 | **伦理创新** | 如何推动伦理创新? | ethics innovation; new approaches; emerging tech | **伦理创新**: 新方法+新兴技术+前瞻性思考 | `nt_core::ethics::ethics_innovator` |
+| D11676 | **伦理未来展望** | 如何展望伦理未来? | future ethics; long-term thinking; speculative ethics | **未来伦理**: 长期思考+推测伦理+技术预见 | `nt_core::ethics::future_ethics` |
+
+
+### 0.105 语言理解与生成决策 (D11327-D11376)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D11327 | **语法解析** | 如何实现高效语法解析? | BERT-based parsing; chart parsing; neural dependency | **增量神经解析**: 增量+BERT+CRF, 多语言 | `nt_core::parsing::incremental_parser` |
+| D11328 | **语义解释** | 如何从语法树生成语义表示? | AMR parsing; SRL; abstract meaning representation | **AMR 解析**: SRL+AMR, 深层语义 | `nt_core::parsing::semantic_interpreter` |
+| D11329 | **语用理解** | 如何理解言外之意? | speech acts (Searle); implicature (Grice) | **语用推理**: 言语行为+合作原则+礼貌理论 | `nt_core::pragmatics::inference_engine` |
+| D11330 | **语篇理解** | 如何理解长文本语篇结构? | RST (Mann & Thompson); centering theory | **RST 解析**: 修辞结构+向心理论 | `nt_core::discourse::rst_parser` |
+| D11331 | **指代消解** | 如何解决文本中的指代? | neural coreference; span-based; end-to-end | **端到端指代消解**: SpanBERT+注意力评分 | `nt_core::coreference::e2e_resolver` |
+| D11332 | **连贯性评估** | 如何评估文本连贯性? | coherence metrics; discourse coherence | **实体连贯性评分**: 实体网格+话题连续性 | `nt_core::coherence::entity_scorer` |
+| D11333 | **文本生成** | 如何生成高质量文本? | decoding strategies; control codes; guided generation | **控制解码**: nucleus sampling+控制码+引导 | `nt_core::generation::controlled_decoder` |
+| D11334 | **摘要生成** | 如何生成摘要? | extractive vs abstractive; faithfulness | **混合摘要**: 抽取初选+生成重写+事实性 | `nt_core::generation::hybrid_summarizer` |
+| D11335 | **释义生成** | 如何生成释义? | paraphrase generation (PAWS); semantic equivalence | **语义保持释义**: 对抗+语义约束 | `nt_core::generation::paraphraser` |
+| D11336 | **机器翻译** | 如何实现高质量翻译? | Transformer-based MT; document-level MT | **文档级翻译**: 段落上下文+术语一致性 | `nt_core::translation::document_level_mt` |
+| D11337 | **风格迁移** | 如何改变文本风格? | style transfer; attribute control; non-parallel | **无并行迁移**: 解耦内容+属性分类器引导 | `nt_core::style::transfer_engine` |
+| D11338 | **正式度控制** | 如何控制文本正式度? | formality (Finegrained); register awareness | **正式度滑块**: 5 级正式度可控 | `nt_core::style::formality_controller` |
+| D11339 | **受众适应** | 如何适应不同受众? | audience modeling; readability metrics | **受众建模**: 画像→可读性→复杂度自适应 | `nt_core::audience::adaptation_engine` |
+| D11340 | **多轮对话** | 如何维持多轮对话连贯? | dialogue state tracking (DST); persona consistency | **记忆增强对话**: DST+人格一致+长期记忆 | `nt_core::dialogue::multi_turn_manager` |
+| D11341 | **对话生成** | 如何生成自然对话? | neural dialogue (DialoGPT); persona-based | **知识引导对话**: 知识检索+人格+多样性 | `nt_core::dialogue::knowledge_ground_generator` |
+| D11342 | **情感文本分析** | 如何分析文本情感? | ABSA; document-level sentiment; emotion detection | **多粒度情感**: 方面级+文档级+情绪检测 | `nt_core::sentiment::multi_granularity` |
+| D11343 | **文本蕴含** | 如何判断文本蕴含关系? | NLI; RTE; textual entailment | **NLI 引擎**: 蕴含/矛盾/中性三分类 | `nt_core::inference::nli_engine` |
+| D11344 | **关键词提取** | 如何提取关键词? | TF-IDF; TextRank; BERT-based | **混合关键词**: TextRank+BERT+实体链接 | `nt_core::extraction::keyword_hybrid` |
+| D11345 | **命名实体识别** | 如何识别命名实体? | BiLSTM-CRF; nested NER; few-shot NER | **嵌套 NER**: BiLSTM-CRF+SpanBERT+少样本 | `nt_core::extraction::nested_ner` |
+| D11346 | **关系抽取** | 如何抽取实体关系? | distant supervision; document-level RE | **远程监督**: 远程标注+噪声过滤+少样本 | `nt_core::extraction::distant_re` |
+| D11347 | **事件抽取** | 如何抽取事件? | event extraction (ACE); temporal ordering | **ACE 事件**: 触发词+论元角色+时序排序 | `nt_core::extraction::event_extractor` |
+| D11348 | **文本分类** | 如何实现文本分类? | zero-shot (NLI-based); few-shot (PET) | **提示分类**: NLI 零样本+PET 少样本 | `nt_core::classification::prompt_classifier` |
+| D11349 | **信息检索** | 如何实现语义检索? | dense retrieval (DPR); sparse (BM25); ColBERT | **混合检索**: BM25+DPR+ColBERT 融合 | `nt_core::retrieval::hybrid_retriever` |
+| D11350 | **问答系统** | 如何构建问答系统? | extractive QA; generative QA; multi-hop QA | **混合问答**: 抽取+生成+多跳推理 | `nt_core::qa::hybrid_qa_engine` |
+| D11351 | **文本纠错** | 如何纠正文本错误? | GEC (Grammatical Error Correction); spelling | **GEC 纠错**: T5/BART 序列到序列+规则 | `nt_core::correction::gec_engine` |
+| D11352 | **语言检测** | 如何检测文本语言? | fastText langid; CLD3; character n-gram | **快速检测**: fastText 主力, CLD3 备用 | `nt_core::detection::language_detector` |
+| D11353 | **文本去重** | 如何检测重复文本? | MinHash LSH; SimHash; near-duplicate | **分层去重**: MinHash+SimHash+语义去重 | `nt_core::dedup::multi_level_detector` |
+| D11354 | **摘要评估** | 如何评估摘要质量? | ROUGE/BERTScore; faithfulness (FactCC) | **多维评估**: ROUGE+BERTScore+FactCC | `nt_eval::summarization::multi_dimension_eval` |
+| D11355 | **生成评估** | 如何评估生成文本? | perplexity; BLEU; G-Eval (LLM-based) | **LLM 评估**: G-Eval+自动指标+人类校准 | `nt_eval::generation::llm_judge` |
+| D11356 | **对话评估** | 如何评估对话系统? | response quality; coherence; engagement | **多维评估**: 相关性+连贯性+参与度 | `nt_eval::dialogue::multi_aspect_evaluator` |
+| D11357 | **风格分析** | 如何分析文本风格? | authorship attribution; genre classification | **风格指纹**: 作者归属+体裁分类 | `nt_core::style::fingerprint_analyzer` |
+| D11358 | **多语言理解** | 如何实现跨语言理解? | mBERT/XLM-R; cross-lingual transfer | **XLM-R 多语言**: 零样本跨语言迁移 | `nt_core::multilingual::xlm_r_engine` |
+| D11359 | **代码理解** | 如何理解源代码? | CodeBERT; code summarization; program synthesis | **CodeBERT**: 代码嵌入+摘要+合成 | `nt_core::code::code_understanding` |
+| D11360 | **数学语言理解** | 如何理解数学语言? | mathematical reasoning; formal verification | **数学推理器**: 符号计算+形式化验证 | `nt_core::math::mathematical_reasoner` |
+| D11361 | **表格理解** | 如何理解表格数据? | TableNet; TaPEx; table QA | **表格问答**: TableNet 结构+TaPEx 执行 | `nt_core::table::table_understanding` |
+| D11362 | **长文本理解** | 如何理解超长文本? | Longformer; BigBird; streaming attention | **流式长文本**: 滑动窗口+稀疏注意力 | `nt_core::long_text::streaming_understanding` |
+| D11363 | **摘要压缩** | 如何压缩文本保留核心信息? | compression-based; information bottleneck | **信息瓶颈压缩**: 关键保留+冗余消除 | `nt_core::compression::information_bottleneck` |
+| D11364 | **生成控制** | 如何精确控制生成内容? | controllable generation (CTRL); plug-and-play | **插件式控制**: CTRL+PPLM+提示工程 | `nt_core::generation::plug_and_play_control` |
+| D11365 | **生成多样性** | 如何保证生成多样性? | diverse beam search; nucleus; DPP | **多样性解码**: DPP 核化+nucleus+多样束搜索 | `nt_core::generation::diversity_decoder` |
+| D11366 | **生成一致性** | 如何保证生成一致性? | self-consistency (Wang); factual grounding | **一致性解码**: 多路径+一致性+事实性锚定 | `nt_core::generation::consistency_decoder` |
+| D11367 | **文本安全** | 如何确保生成安全? | toxicity detection; bias mitigation; safety classifiers | **安全过滤器**: 毒性+偏见+安全分类器 | `nt_shield::text_safety::toxicity_filter` |
+| D11368 | **生成可解释性** | 如何解释文本生成? | rationale extraction; attention visualization | **生成解释器**: 注意力可视化+推理链提取 | `nt_meta::explanation::generation_explainer` |
+| D11369 | **文本个性化** | 如何个性化文本生成? | user modeling; memory-augmented generation | **个性化生成器**: 用户画像+偏好记忆+风格 | `nt_core::personalization::response_generator` |
+| D11370 | **多文档摘要** | 如何生成多文档摘要? | multi-document summarization; query-focused | **多文档摘要**: 聚类主题+查询聚焦 | `nt_core::summarization::multi_doc_summarizer` |
+| D11371 | **摘要自动评估** | 如何自动化评估摘要? | auto-eval (BERTScore/ROUGE); LLM-as-judge | **自动评估管线**: BERTScore+LLM+无参考 | `nt_eval::summarization::auto_eval_pipeline` |
+| D11372 | **生成约束** | 如何满足生成约束? | constrained decoding; grammar-guided | **约束解码**: 语法+语义+长度/格式控制 | `nt_core::generation::constrained_decoder` |
+| D11373 | **确定性生成** | 如何保证生成可重复? | temperature=0; seed control; deterministic decoding | **确定性生成**: 种子+温度=0+贪心 | `nt_core::generation::deterministic_engine` |
+| D11374 | **流式生成** | 如何实现流式文本生成? | streaming generation; token-level streaming | **流式引擎**: 逐 token 输出+自适应缓冲 | `nt_core::generation::streaming_engine` |
+| D11375 | **批量生成** | 如何高效批量生成? | batch inference; continuous batching; speculative | **批量优化**: 连续批处理+推测解码 | `nt_core::generation::batch_optimizer` |
+| D11376 | **成本感知生成** | 如何控制生成成本? | token budgeting; model routing; caching | **成本感知**: 轻量模型先行+缓存+预算 | `nt_core::generation::cost_aware_engine` |
+
 ### 域级缺陷范围索引
 
 ### 域级缺陷范围索引
@@ -16889,4 +17497,4 @@ pub trait EvalSim: Send + Sync {
 
 ---
 
-*Version: v16.3 | 2026-09-09 | 511 new decisions (D9645-D10155) across 10 categories | 9561 total decisions | 15281+ lines*
+*Version: v16.6 | 2026-09-09 | 545 new decisions (D11177-D11676) across 10 categories | 11127 total decisions | 17500+ lines*

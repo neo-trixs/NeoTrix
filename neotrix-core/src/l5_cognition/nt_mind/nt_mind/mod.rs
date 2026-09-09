@@ -191,19 +191,9 @@ pub use goal_loop::{GoalLoop, GoalState, GoalConfig, GoalTracker, GoalIterationR
 pub mod skill_tree;
 
 // ============================================================================
-// Domain 8: 外贸全流程 (Foreign Trade Full Cycle) — Keystone Skill
+// Domain 8: 外贸全流程 (Foreign Trade Full Cycle) — moved to nt_act::nt_act_trade
 // ============================================================================
-pub mod nt_trade_full_cycle;
-pub mod nt_trade_quote_negotiation;
-pub mod nt_trade_production_logistics;
-pub mod nt_trade_finance_compliance;
-pub mod nt_trade_mock_adapters;
-pub mod nt_trade_orchestrator;
-
-// Re-exports for foreign trade
-// Old FT01-FT17 types are superseded by orchestrator's FT01-FT26
-// Keep sub-skill types for internal use only
-pub use nt_trade_full_cycle::{
+pub use crate::l1_action::nt_act::nt_act_trade::{
     TradeStateMachine, TradeCapabilitySpec, TradeResult,
     InquiryDetail, IntentLevel, ProductSpec, ProductType,
     BomItem, RoutingStep, PackagingSpec, CompanyPolicy, RiskControl,
@@ -215,14 +205,10 @@ pub use nt_trade_full_cycle::{
     TaxRefundClaim, RiskAlert, RiskLevel, ActionRecommendation, Lesson,
     KnowledgeDelta, KnowledgeOperation,
     execute_trade_full_cycle, register_trade_full_cycle_capability, capability_spec,
-};
-pub use nt_trade_quote_negotiation::{
     NegotiationStrategy, ObjectionCategory, RequirementConfirmation, ConfirmedItem,
     QuoteGenerator, CostBreakdown, QuoteSheet as QNQuoteSheet, NegotiationEngine,
     Concession, CompetitorData, NegotiationRecord, Objection, ObjectionSeverity,
     execute_quote_negotiation, register_quote_negotiation_capability,
-};
-pub use nt_trade_production_logistics::{
     ProductionOrder, BomRequirement, MaterialStatus, RoutingRequirement, RoutingStatus,
     ProductionSchedule, SupplierOrder, SupplierOrderItem, SupplierOrderStatus,
     ProductionMilestone, ProgressReport, DailyProgress, ScheduleDeviation, MilestoneDelay,
@@ -233,8 +219,6 @@ pub use nt_trade_production_logistics::{
     BillOfLading as PLBillOfLading, BlType, BlStatus,
     ProductionEngine, LogisticsEngine, CargoInfo, BookingRequirements,
     register_production_logistics_capability,
-};
-pub use nt_trade_finance_compliance::{
     ContractReview, ContractFinding, FindingSeverity, PaymentProof as FCPaymentProof,
     PaymentType, PaymentStatus, RiskFlag, LcReview as FCLcReview,
     SoftClause, Discrepancy, LcRecommendation, CollectionRecord as FCCollectionRecord,
@@ -242,23 +226,18 @@ pub use nt_trade_finance_compliance::{
     SettlementRecord as FCSettlementRecord, VerificationStatus,
     TaxRefundClaim as FCTaxRefundClaim, RefundDocument, RefundStatus,
     FinanceEngine, register_finance_compliance_capability,
+    MockErpSystem, MockBankSystem, MockCustomsSystem, MockShippingSystem,
+    TradeIntegrationHarness, MockOrder, MockOrderStatus, MockLc, MockLcStatus,
+    MockPayment, MockDeclaration, MockCustomsStatus, MockShipment, MockShipmentStatus,
+    MockContainer,
+    TradePhase, TradeGroup, TradeContext, TradeEvent,
+    BuyerProfile, Quotation, QuotationItem, Contract,
+    ProductionStatus, LogisticsInfo, PaymentInfo, SettlementInfo,
+    TradeOrchestrator,
 };
 pub use skill_tree::{
     SkillNode, SkillTreeRegistry, Tier, UpgradeCondition, NodeEffect,
     RuneColor, RuneSlot, Rune, Runeword, ModuleRunes, RuneSystem,
     AscendancyRouter, WeaponSetKind, SwitchRecord,
     SkillTreeConfig,
-};
-
-pub use nt_trade_mock_adapters::{
-    MockErpSystem, MockBankSystem, MockCustomsSystem, MockShippingSystem,
-    TradeIntegrationHarness, MockOrder, MockOrderStatus, MockLc, MockLcStatus,
-    MockPayment, MockDeclaration, MockCustomsStatus, MockShipment, MockShipmentStatus,
-    MockContainer,
-};
-pub use nt_trade_orchestrator::{
-    TradePhase, TradeGroup, TradeContext, TradeEvent,
-    BuyerProfile, Quotation, QuotationItem, Contract,
-    ProductionStatus, LogisticsInfo, PaymentInfo, SettlementInfo,
-    TradeOrchestrator,
 };

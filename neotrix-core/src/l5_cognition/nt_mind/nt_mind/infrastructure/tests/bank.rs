@@ -1,9 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::neotrix::nt_world_model::TaskType;
-    use crate::l5_cognition::nt_mind::{
-        ReasoningBank, ReasoningMemory,
-    };
+    use crate::nt_mind::infrastructure::ReasoningBank;
+    use crate::nt_mind::infrastructure::ReasoningMemory;
     use crate::l5_cognition::nt_mind::nt_mind::self_edit::MicroEdit;
     use crate::l5_cognition::nt_mind::nt_mind::memory::MemoryTier;
 

@@ -92,7 +92,7 @@ pub use crate::l3_embodiment::nt_shield::nt_shield_stealth_net;
 pub use crate::l5_cognition::nt_mind::{
     nt_mind_background_loop,
     nt_mind_benchmark,
-    nt_mind_hook, nt_mind_knowledge_pipeline,
+    nt_mind_hook,
     nt_mind_skill_engine,
 };
 pub use crate::l5_cognition::nt_mind::evolution;

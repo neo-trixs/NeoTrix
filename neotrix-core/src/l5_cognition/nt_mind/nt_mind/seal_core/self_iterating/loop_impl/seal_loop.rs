@@ -1179,10 +1179,12 @@ impl SelfIteratingBrain {
 
 #[cfg(test)]
 mod tests {
-    use crate::l5_cognition::nt_mind::{
-        AttentionRouter, KnowledgeSource, MemoryTrace, Modality, ReasoningMemory,
-        SelfIteratingBrain,
-    };
+    use crate::nt_mind::infrastructure::AttentionRouter;
+    use crate::nt_mind::infrastructure::Modality;
+    use crate::nt_mind::infrastructure::MemoryTrace;
+    use crate::nt_mind::infrastructure::ReasoningMemory;
+    use crate::nt_mind::infrastructure::KnowledgeSource;
+    use crate::SelfIteratingBrain;
     use crate::l5_cognition::nt_mind::nt_mind::element::registry::RegistryState;
     use crate::neotrix::nt_world_model::TaskType;
     use crate::neotrix::nt_core_error::NeoTrixResult;

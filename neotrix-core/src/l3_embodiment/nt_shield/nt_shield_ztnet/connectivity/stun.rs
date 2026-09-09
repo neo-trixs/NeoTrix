@@ -4,6 +4,7 @@
 
 use bytes::{Bytes, BufMut};
 use std::net::SocketAddr;
+use super::turn::encode_xor_address;
 
 /// STUN消息类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
