@@ -6,18 +6,16 @@ use md5::Digest as _;
 type Aes128CbcEnc = cbc::Encryptor<Aes128>;
 
 /// Kugou Eapi 加密
-pub fn kugou_eapi_encrypt(url: &str, params: &str) -> String {
+pub fn kugou_eapi_encrypt(_url: &str, params: &str) -> String {
     let secret = format!("{:x}", Md5::digest(params.as_bytes()));
     let key = secret.as_bytes();
     let plaintext = params.as_bytes();
     let padded = pkcs7_pad(plaintext, 16);
     let mut buf = padded.clone();
-    // ECB mode: encrypt each block independently
-    let cipher = aes::Aes128::new_from_slice(key).expect("valid key");
-    for chunk in buf.chunks_mut(16) {
-        let block = cipher::generic_array::GenericArray::from_mut_slice(chunk);
-        cipher.encrypt_block(block);
-    }
+    // ECB mode: encrypt each block independently using cbc with zero iv
+    let zero_iv = [0u8; 16];
+    let encryptor = Aes128CbcEnc::new(key.into(), &zero_iv.into());
+    encryptor.encrypt_padded_mut::<cipher::block_padding::NoPadding>(&mut buf, padded.len());
     let hex_str = hex::encode(&buf);
     let verify = format!("{:x}", Md5::digest(hex_str.as_bytes()));
     format!(
@@ -70,12 +68,10 @@ fn aes128_cbc_encrypt(plaintext: &[u8], key: &[u8], iv: &[u8]) -> Vec<u8> {
 fn aes128_ecb_encrypt(plaintext: &[u8], key: &[u8]) -> Vec<u8> {
     let padded = pkcs7_pad(plaintext, 16);
     let mut buf = padded.clone();
-    // ECB mode: encrypt each block independently
-    let cipher = aes::Aes128::new_from_slice(key).expect("valid key");
-    for chunk in buf.chunks_mut(16) {
-        let block = cipher::generic_array::GenericArray::from_mut_slice(chunk);
-        cipher.encrypt_block(block);
-    }
+    // ECB mode: encrypt each block independently using cbc with zero iv
+    let zero_iv = [0u8; 16];
+    let encryptor = Aes128CbcEnc::new(key.into(), &zero_iv.into());
+    encryptor.encrypt_padded_mut::<cipher::block_padding::NoPadding>(&mut buf, padded.len());
     buf
 }
 
