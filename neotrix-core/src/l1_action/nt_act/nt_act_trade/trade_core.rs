@@ -111,10 +111,27 @@ impl Default for CostBreakdown {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct CostCalculator {
     components: Vec<Box<dyn CostComponent>>,
     margin_strategy: MarginStrategy,
+}
+
+impl std::fmt::Debug for CostCalculator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CostCalculator")
+            .field("components", &self.components.len())
+            .field("margin_strategy", &self.margin_strategy)
+            .finish()
+    }
+}
+
+impl Clone for CostCalculator {
+    fn clone(&self) -> Self {
+        Self {
+            components: Vec::new(),
+            margin_strategy: self.margin_strategy.clone(),
+        }
+    }
 }
 
 impl Default for CostCalculator {
@@ -413,10 +430,27 @@ pub trait RiskRule: Send + Sync {
     fn evaluate(&self, context: &dyn std::any::Any) -> Option<RiskFinding>;
 }
 
-#[derive(Debug, Clone)]
 pub struct RiskAssessor {
     rules: Vec<Box<dyn RiskRule>>,
     weights: HashMap<String, f64>,
+}
+
+impl std::fmt::Debug for RiskAssessor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RiskAssessor")
+            .field("rules", &self.rules.len())
+            .field("weights", &self.weights)
+            .finish()
+    }
+}
+
+impl Clone for RiskAssessor {
+    fn clone(&self) -> Self {
+        Self {
+            rules: Vec::new(), // Rules are not cloneable, start fresh
+            weights: self.weights.clone(),
+        }
+    }
 }
 
 impl Default for RiskAssessor {
@@ -517,6 +551,18 @@ pub struct Milestone {
     pub actual_date: Option<String>,
     pub status: MilestoneStatus,
     pub dependencies: Vec<String>,
+}
+
+impl Milestone {
+    pub fn new(name: &str, planned_date: &str, dependencies: Vec<&str>) -> Self {
+        Self {
+            name: name.into(),
+            planned_date: planned_date.into(),
+            actual_date: None,
+            status: MilestoneStatus::Pending,
+            dependencies: dependencies.into_iter().map(String::from).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

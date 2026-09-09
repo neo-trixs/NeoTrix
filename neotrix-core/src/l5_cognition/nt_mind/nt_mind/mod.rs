@@ -206,34 +206,45 @@ pub use crate::l1_action::nt_act::nt_act_trade::{
     KnowledgeDelta, KnowledgeOperation,
     execute_trade_full_cycle, register_trade_full_cycle_capability, capability_spec,
     NegotiationStrategy, ObjectionCategory, RequirementConfirmation, ConfirmedItem,
-    QuoteGenerator, CostBreakdown, QuoteSheet as QNQuoteSheet, NegotiationEngine,
+    QuoteGenerator, CostBreakdown, NegotiationEngine,
     Concession, CompetitorData, NegotiationRecord, Objection, ObjectionSeverity,
     execute_quote_negotiation, register_quote_negotiation_capability,
     ProductionOrder, BomRequirement, MaterialStatus, RoutingRequirement, RoutingStatus,
     ProductionSchedule, SupplierOrder, SupplierOrderItem, SupplierOrderStatus,
     ProductionMilestone, ProgressReport, DailyProgress, ScheduleDeviation, MilestoneDelay,
-    ProductionAlert, AlertLevel, InspectionReport as PLInspectionReport,
-    CiqCertificate as PLCiqCertificate, BookingConfirmation as PLBookingConfirmation,
-    PackingList as PLPackingList, PackingItem as PLPackingItem,
-    CustomsDeclaration as PLCustomsDeclaration, CustomsStatus, RiskLevel as PLRiskLevel,
-    BillOfLading as PLBillOfLading, BlType, BlStatus,
+    ProductionAlert, AlertLevel, CustomsStatus, BlType, BlStatus,
     ProductionEngine, LogisticsEngine, CargoInfo, BookingRequirements,
     register_production_logistics_capability,
-    ContractReview, ContractFinding, FindingSeverity, PaymentProof as FCPaymentProof,
-    PaymentType, PaymentStatus, RiskFlag, LcReview as FCLcReview,
-    SoftClause, Discrepancy, LcRecommendation, CollectionRecord as FCCollectionRecord,
+    ContractReview, ContractFinding, FindingSeverity, PaymentType, PaymentStatus, RiskFlag,
+    SoftClause, Discrepancy, LcRecommendation,
     CollectionDocument, DocumentStatus, CollectionStatus,
-    SettlementRecord as FCSettlementRecord, VerificationStatus,
-    TaxRefundClaim as FCTaxRefundClaim, RefundDocument, RefundStatus,
+    VerificationStatus, RefundDocument, RefundStatus,
     FinanceEngine, register_finance_compliance_capability,
     MockErpSystem, MockBankSystem, MockCustomsSystem, MockShippingSystem,
     TradeIntegrationHarness, MockOrder, MockOrderStatus, MockLc, MockLcStatus,
     MockPayment, MockDeclaration, MockCustomsStatus, MockShipment, MockShipmentStatus,
     MockContainer,
-    TradePhase, TradeGroup, TradeContext, TradeEvent,
-    BuyerProfile, Quotation, QuotationItem, Contract,
-    ProductionStatus, LogisticsInfo, PaymentInfo, SettlementInfo,
     TradeOrchestrator,
+};
+// Conflicting types from submodules: import directly with aliases
+pub use crate::l1_action::nt_act::nt_act_trade::full_cycle::QuoteSheet as QNQuoteSheet;
+pub use crate::l1_action::nt_act::nt_act_trade::production_logistics::{
+    InspectionReport as PLInspectionReport, CiqCertificate as PLCiqCertificate,
+    BookingConfirmation as PLBookingConfirmation, PackingList as PLPackingList,
+    PackingItem as PLPackingItem, CustomsDeclaration as PLCustomsDeclaration,
+    BillOfLading as PLBillOfLading,
+};
+pub use crate::l1_action::nt_act::nt_act_trade::trade_core::RiskLevel as PLRiskLevel;
+pub use crate::l1_action::nt_act::nt_act_trade::finance_compliance::{
+    PaymentProof as FCPaymentProof, LcReview as FCLcReview,
+    CollectionRecord as FCCollectionRecord, SettlementRecord as FCSettlementRecord,
+    TaxRefundClaim as FCTaxRefundClaim,
+};
+// Orchestrator-local types (distinct from full_cycle equivalents)
+pub use crate::l1_action::nt_act::nt_act_trade::orchestrator::{
+    TradePhase26 as TradePhase, TradeGroup, OrchTradeContext as TradeContext, TradeEvent,
+    OrchBuyerProfile as BuyerProfile, Quotation, QuotationItem, OrchContract as Contract,
+    ProductionStatus, LogisticsInfo, PaymentInfo, SettlementInfo,
 };
 pub use skill_tree::{
     SkillNode, SkillTreeRegistry, Tier, UpgradeCondition, NodeEffect,

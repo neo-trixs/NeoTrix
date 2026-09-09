@@ -14,53 +14,57 @@
 //!   G6 结算 (FT21-FT24): 尾款 → 结汇 → 退税 → 核销
 //!   G7 复盘 (FT25-FT26): 订单复盘 → 经验吸收
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 
-use crate::l1_action::nt_io::nt_io_messaging::{MessagingBridge, MessagingRouter, MessagingRegistry, Channel};
-use crate::l1_action::nt_act::nt_act_media::{ContentGenerator, ScheduleEngine, SocialAnalytics, Platform};
-use crate::l1_action::nt_memory::nt_memory_lead::{LeadManager, Lead, LeadSource, LeadQuality};
-use crate::l1_action::nt_act::nt_act_trade::quote_negotiation::{
-    QuoteGenerator, CostBreakdown, NegotiationEngine,
-    Concession, ObjectionCategory,
-};
-use crate::l1_action::nt_act::nt_act_trade::production_logistics::{
-    ProductionEngine, LogisticsEngine, ProductionOrder,
-    BomRequirement, DailyProgress, ProductionSchedule,
-    CiqCertificate, CiqStatus,
-    BookingConfirmation as PLBookingConfirmation, PackingList as PLPackingList,
-    CustomsDeclaration as PLCustomsDeclaration, BillOfLading as PLBillOfLading,
+use crate::l1_action::nt_act::nt_act_media::{
+    ContentGenerator, Platform, ScheduleEngine, SocialAnalytics,
 };
 use crate::l1_action::nt_act::nt_act_trade::finance_compliance::{
-    FinanceEngine, PaymentType,
-    TaxRefundClaim as FCTaxRefundClaim, RefundDocument,
+    FinanceEngine, PaymentType, RefundDocument, TaxRefundClaim as FCTaxRefundClaim,
 };
+use crate::l1_action::nt_act::nt_act_trade::production_logistics::{
+    BillOfLading as PLBillOfLading, BomRequirement, BookingConfirmation as PLBookingConfirmation,
+    CiqCertificate, CiqStatus, CustomsDeclaration as PLCustomsDeclaration, DailyProgress,
+    LogisticsEngine, PackingList as PLPackingList, ProductionEngine, ProductionOrder,
+    ProductionSchedule,
+};
+use crate::l1_action::nt_act::nt_act_trade::quote_negotiation::{
+    ObjectionCategory, QuoteGenerator,
+};
+use crate::l1_action::nt_act::nt_act_trade::trade_core::{
+    Concession, CostBreakdown, NegotiationEngine,
+};
+use crate::l1_action::nt_io::nt_io_messaging::{
+    Channel, MessagingBridge, MessagingRegistry, MessagingRouter,
+};
+use crate::l1_action::nt_memory::nt_memory_lead::{Lead, LeadManager, LeadQuality, LeadSource};
 
 // ════════════════════════════════════════════════════════════════
 // 全链路状态机
 // ════════════════════════════════════════════════════════════════
 
-/// 外贸全链路阶段 (FT01-FT26)
+/// 外贸全链路阶段 (FT01-FT26) — 区分 full_cycle::TradePhase (FT01-FT17)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TradePhase {
+pub enum TradePhase26 {
     // ── G1: 获客运营 ──
-    Ft01SocialMediaContent,          // 社交媒体内容创作与发布
-    Ft02InquiryCapture,              // 询盘捕获 (多渠道统一入口)
-    Ft03LeadQualification,           // 询盘资质评分与分级
-    Ft04FollowUpNurturing,           // 跟进培育 (WhatsApp/Email)
-    Ft05CommunicationEngagement,     // 沟通互动 (建立信任)
+    Ft01SocialMediaContent,      // 社交媒体内容创作与发布
+    Ft02InquiryCapture,          // 询盘捕获 (多渠道统一入口)
+    Ft03LeadQualification,       // 询盘资质评分与分级
+    Ft04FollowUpNurturing,       // 跟进培育 (WhatsApp/Email)
+    Ft05CommunicationEngagement, // 沟通互动 (建立信任)
 
     // ── G2: 报价谈判 ──
-    Ft06RequirementConfirmation,     // 需求确认
-    Ft07DetailedQuotation,           // 详细报价
-    Ft08NegotiationObjectionHandling,// 谈判异议处理
-    Ft09ContractReviewSigning,       // 合同审核签署
+    Ft06RequirementConfirmation,      // 需求确认
+    Ft07DetailedQuotation,            // 详细报价
+    Ft08NegotiationObjectionHandling, // 谈判异议处理
+    Ft09ContractReviewSigning,        // 合同审核签署
 
     // ── G3: 收款 ──
-    Ft10PaymentArrangement,          // 付款方式协商
-    Ft11PaymentCollection,           // 收款确认
+    Ft10PaymentArrangement, // 付款方式协商
+    Ft11PaymentCollection,  // 收款确认
 
     // ── G4: 生产 ──
     Ft12ProductionOrderMaterialPrep, // 生产下单备料
@@ -69,153 +73,175 @@ pub enum TradePhase {
     Ft15FinalQualityCheck,           // 出货前终检
 
     // ── G5: 物流 ──
-    Ft16InspectionCertification,     // 检验检疫证书
-    Ft17BookingPackingList,          // 订舱装箱
-    Ft18CustomsClearance,            // 报关清关
-    Ft19BillOfLadingManagement,      // 提单管理
-    Ft20ShipmentTracking,            // 运输跟踪
+    Ft16InspectionCertification, // 检验检疫证书
+    Ft17BookingPackingList,      // 订舱装箱
+    Ft18CustomsClearance,        // 报关清关
+    Ft19BillOfLadingManagement,  // 提单管理
+    Ft20ShipmentTracking,        // 运输跟踪
 
     // ── G6: 结算 ──
-    Ft21FinalPaymentCollection,      // 尾款收取
-    Ft22SettlementVerification,      // 结汇核销
-    Ft23TaxRefundDeclaration,        // 退税申报
-    Ft24AccountReconciliation,       // 账务核对
+    Ft21FinalPaymentCollection, // 尾款收取
+    Ft22SettlementVerification, // 结汇核销
+    Ft23TaxRefundDeclaration,   // 退税申报
+    Ft24AccountReconciliation,  // 账务核对
 
     // ── G7: 复盘 ──
-    Ft25OrderReview,                 // 订单复盘
-    Ft26ExperienceAbsorption,        // 经验吸收入库
+    Ft25OrderReview,          // 订单复盘
+    Ft26ExperienceAbsorption, // 经验吸收入库
 }
 
-impl TradePhase {
-    pub fn all() -> Vec<TradePhase> {
+impl TradePhase26 {
+    pub fn all() -> Vec<TradePhase26> {
         vec![
-            TradePhase::Ft01SocialMediaContent,
-            TradePhase::Ft02InquiryCapture,
-            TradePhase::Ft03LeadQualification,
-            TradePhase::Ft04FollowUpNurturing,
-            TradePhase::Ft05CommunicationEngagement,
-            TradePhase::Ft06RequirementConfirmation,
-            TradePhase::Ft07DetailedQuotation,
-            TradePhase::Ft08NegotiationObjectionHandling,
-            TradePhase::Ft09ContractReviewSigning,
-            TradePhase::Ft10PaymentArrangement,
-            TradePhase::Ft11PaymentCollection,
-            TradePhase::Ft12ProductionOrderMaterialPrep,
-            TradePhase::Ft13ProductionTrackingAlerting,
-            TradePhase::Ft14QualityInspectionRelease,
-            TradePhase::Ft15FinalQualityCheck,
-            TradePhase::Ft16InspectionCertification,
-            TradePhase::Ft17BookingPackingList,
-            TradePhase::Ft18CustomsClearance,
-            TradePhase::Ft19BillOfLadingManagement,
-            TradePhase::Ft20ShipmentTracking,
-            TradePhase::Ft21FinalPaymentCollection,
-            TradePhase::Ft22SettlementVerification,
-            TradePhase::Ft23TaxRefundDeclaration,
-            TradePhase::Ft24AccountReconciliation,
-            TradePhase::Ft25OrderReview,
-            TradePhase::Ft26ExperienceAbsorption,
+            TradePhase26::Ft01SocialMediaContent,
+            TradePhase26::Ft02InquiryCapture,
+            TradePhase26::Ft03LeadQualification,
+            TradePhase26::Ft04FollowUpNurturing,
+            TradePhase26::Ft05CommunicationEngagement,
+            TradePhase26::Ft06RequirementConfirmation,
+            TradePhase26::Ft07DetailedQuotation,
+            TradePhase26::Ft08NegotiationObjectionHandling,
+            TradePhase26::Ft09ContractReviewSigning,
+            TradePhase26::Ft10PaymentArrangement,
+            TradePhase26::Ft11PaymentCollection,
+            TradePhase26::Ft12ProductionOrderMaterialPrep,
+            TradePhase26::Ft13ProductionTrackingAlerting,
+            TradePhase26::Ft14QualityInspectionRelease,
+            TradePhase26::Ft15FinalQualityCheck,
+            TradePhase26::Ft16InspectionCertification,
+            TradePhase26::Ft17BookingPackingList,
+            TradePhase26::Ft18CustomsClearance,
+            TradePhase26::Ft19BillOfLadingManagement,
+            TradePhase26::Ft20ShipmentTracking,
+            TradePhase26::Ft21FinalPaymentCollection,
+            TradePhase26::Ft22SettlementVerification,
+            TradePhase26::Ft23TaxRefundDeclaration,
+            TradePhase26::Ft24AccountReconciliation,
+            TradePhase26::Ft25OrderReview,
+            TradePhase26::Ft26ExperienceAbsorption,
         ]
     }
 
     pub fn group(&self) -> TradeGroup {
         match self {
-            TradePhase::Ft01SocialMediaContent
-            | TradePhase::Ft02InquiryCapture
-            | TradePhase::Ft03LeadQualification
-            | TradePhase::Ft04FollowUpNurturing
-            | TradePhase::Ft05CommunicationEngagement => TradeGroup::Acquisition,
+            TradePhase26::Ft01SocialMediaContent
+            | TradePhase26::Ft02InquiryCapture
+            | TradePhase26::Ft03LeadQualification
+            | TradePhase26::Ft04FollowUpNurturing
+            | TradePhase26::Ft05CommunicationEngagement => TradeGroup::Acquisition,
 
-            TradePhase::Ft06RequirementConfirmation
-            | TradePhase::Ft07DetailedQuotation
-            | TradePhase::Ft08NegotiationObjectionHandling
-            | TradePhase::Ft09ContractReviewSigning => TradeGroup::Negotiation,
+            TradePhase26::Ft06RequirementConfirmation
+            | TradePhase26::Ft07DetailedQuotation
+            | TradePhase26::Ft08NegotiationObjectionHandling
+            | TradePhase26::Ft09ContractReviewSigning => TradeGroup::Negotiation,
 
-            TradePhase::Ft10PaymentArrangement
-            | TradePhase::Ft11PaymentCollection => TradeGroup::Payment,
+            TradePhase26::Ft10PaymentArrangement | TradePhase26::Ft11PaymentCollection => {
+                TradeGroup::Payment
+            }
 
-            TradePhase::Ft12ProductionOrderMaterialPrep
-            | TradePhase::Ft13ProductionTrackingAlerting
-            | TradePhase::Ft14QualityInspectionRelease
-            | TradePhase::Ft15FinalQualityCheck => TradeGroup::Production,
+            TradePhase26::Ft12ProductionOrderMaterialPrep
+            | TradePhase26::Ft13ProductionTrackingAlerting
+            | TradePhase26::Ft14QualityInspectionRelease
+            | TradePhase26::Ft15FinalQualityCheck => TradeGroup::Production,
 
-            TradePhase::Ft16InspectionCertification
-            | TradePhase::Ft17BookingPackingList
-            | TradePhase::Ft18CustomsClearance
-            | TradePhase::Ft19BillOfLadingManagement
-            | TradePhase::Ft20ShipmentTracking => TradeGroup::Logistics,
+            TradePhase26::Ft16InspectionCertification
+            | TradePhase26::Ft17BookingPackingList
+            | TradePhase26::Ft18CustomsClearance
+            | TradePhase26::Ft19BillOfLadingManagement
+            | TradePhase26::Ft20ShipmentTracking => TradeGroup::Logistics,
 
-            TradePhase::Ft21FinalPaymentCollection
-            | TradePhase::Ft22SettlementVerification
-            | TradePhase::Ft23TaxRefundDeclaration
-            | TradePhase::Ft24AccountReconciliation => TradeGroup::Settlement,
+            TradePhase26::Ft21FinalPaymentCollection
+            | TradePhase26::Ft22SettlementVerification
+            | TradePhase26::Ft23TaxRefundDeclaration
+            | TradePhase26::Ft24AccountReconciliation => TradeGroup::Settlement,
 
-            TradePhase::Ft25OrderReview
-            | TradePhase::Ft26ExperienceAbsorption => TradeGroup::Review,
+            TradePhase26::Ft25OrderReview | TradePhase26::Ft26ExperienceAbsorption => {
+                TradeGroup::Review
+            }
         }
     }
 
     pub fn to_str(&self) -> &'static str {
         match self {
-            TradePhase::Ft01SocialMediaContent => "FT01",
-            TradePhase::Ft02InquiryCapture => "FT02",
-            TradePhase::Ft03LeadQualification => "FT03",
-            TradePhase::Ft04FollowUpNurturing => "FT04",
-            TradePhase::Ft05CommunicationEngagement => "FT05",
-            TradePhase::Ft06RequirementConfirmation => "FT06",
-            TradePhase::Ft07DetailedQuotation => "FT07",
-            TradePhase::Ft08NegotiationObjectionHandling => "FT08",
-            TradePhase::Ft09ContractReviewSigning => "FT09",
-            TradePhase::Ft10PaymentArrangement => "FT10",
-            TradePhase::Ft11PaymentCollection => "FT11",
-            TradePhase::Ft12ProductionOrderMaterialPrep => "FT12",
-            TradePhase::Ft13ProductionTrackingAlerting => "FT13",
-            TradePhase::Ft14QualityInspectionRelease => "FT14",
-            TradePhase::Ft15FinalQualityCheck => "FT15",
-            TradePhase::Ft16InspectionCertification => "FT16",
-            TradePhase::Ft17BookingPackingList => "FT17",
-            TradePhase::Ft18CustomsClearance => "FT18",
-            TradePhase::Ft19BillOfLadingManagement => "FT19",
-            TradePhase::Ft20ShipmentTracking => "FT20",
-            TradePhase::Ft21FinalPaymentCollection => "FT21",
-            TradePhase::Ft22SettlementVerification => "FT22",
-            TradePhase::Ft23TaxRefundDeclaration => "FT23",
-            TradePhase::Ft24AccountReconciliation => "FT24",
-            TradePhase::Ft25OrderReview => "FT25",
-            TradePhase::Ft26ExperienceAbsorption => "FT26",
+            TradePhase26::Ft01SocialMediaContent => "FT01",
+            TradePhase26::Ft02InquiryCapture => "FT02",
+            TradePhase26::Ft03LeadQualification => "FT03",
+            TradePhase26::Ft04FollowUpNurturing => "FT04",
+            TradePhase26::Ft05CommunicationEngagement => "FT05",
+            TradePhase26::Ft06RequirementConfirmation => "FT06",
+            TradePhase26::Ft07DetailedQuotation => "FT07",
+            TradePhase26::Ft08NegotiationObjectionHandling => "FT08",
+            TradePhase26::Ft09ContractReviewSigning => "FT09",
+            TradePhase26::Ft10PaymentArrangement => "FT10",
+            TradePhase26::Ft11PaymentCollection => "FT11",
+            TradePhase26::Ft12ProductionOrderMaterialPrep => "FT12",
+            TradePhase26::Ft13ProductionTrackingAlerting => "FT13",
+            TradePhase26::Ft14QualityInspectionRelease => "FT14",
+            TradePhase26::Ft15FinalQualityCheck => "FT15",
+            TradePhase26::Ft16InspectionCertification => "FT16",
+            TradePhase26::Ft17BookingPackingList => "FT17",
+            TradePhase26::Ft18CustomsClearance => "FT18",
+            TradePhase26::Ft19BillOfLadingManagement => "FT19",
+            TradePhase26::Ft20ShipmentTracking => "FT20",
+            TradePhase26::Ft21FinalPaymentCollection => "FT21",
+            TradePhase26::Ft22SettlementVerification => "FT22",
+            TradePhase26::Ft23TaxRefundDeclaration => "FT23",
+            TradePhase26::Ft24AccountReconciliation => "FT24",
+            TradePhase26::Ft25OrderReview => "FT25",
+            TradePhase26::Ft26ExperienceAbsorption => "FT26",
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TradeGroup {
-    Acquisition,    // 获客运营
-    Negotiation,    // 报价谈判
-    Payment,        // 收款
-    Production,     // 生产
-    Logistics,      // 物流
-    Settlement,     // 结算
-    Review,         // 复盘
+    Acquisition, // 获客运营
+    Negotiation, // 报价谈判
+    Payment,     // 收款
+    Production,  // 生产
+    Logistics,   // 物流
+    Settlement,  // 结算
+    Review,      // 复盘
+}
+
+impl std::fmt::Display for TradeGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Acquisition => write!(f, "获客运营"),
+            Self::Negotiation => write!(f, "报价谈判"),
+            Self::Payment => write!(f, "收款"),
+            Self::Production => write!(f, "生产"),
+            Self::Logistics => write!(f, "物流"),
+            Self::Settlement => write!(f, "结算"),
+            Self::Review => write!(f, "复盘"),
+        }
+    }
+}
+
+impl std::fmt::Display for TradePhase26 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 // ════════════════════════════════════════════════════════════════
 // 编排上下文
 // ════════════════════════════════════════════════════════════════
 
-/// 全链路上下文 — 贯穿整个贸易周期
+/// 全链路上下文 — 贯穿整个贸易周期 (orchestrator 专用，区分 full_cycle::TradeContext)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TradeContext {
+pub struct OrchTradeContext {
     pub order_id: String,
-    pub current_phase: TradePhase,
+    pub current_phase: TradePhase26,
 
     // ── 获客层 (L1 lead + messaging) ──
     pub lead: Option<Lead>,
     pub conversations: Vec<String>, // conversation IDs
 
     // ── 谈判层 ──
-    pub buyer_profile: Option<BuyerProfile>,
+    pub buyer_profile: Option<OrchBuyerProfile>,
     pub quotation: Option<Quotation>,
-    pub contract: Option<Contract>,
+    pub contract: Option<OrchContract>,
 
     // ── 生产物流层 ──
     pub production_status: Option<ProductionStatus>,
@@ -231,8 +257,9 @@ pub struct TradeContext {
     pub events: Vec<TradeEvent>,
 }
 
+/// Buyer profile (orchestrator 专用，区分 full_cycle::BuyerProfile)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BuyerProfile {
+pub struct OrchBuyerProfile {
     pub name: String,
     pub company: String,
     pub country: String,
@@ -259,8 +286,9 @@ pub struct QuotationItem {
     pub amount: f64,
 }
 
+/// Contract (orchestrator 专用，区分 full_cycle::Contract)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Contract {
+pub struct OrchContract {
     pub contract_number: String,
     pub signed_at: Option<u64>,
     pub terms: String,
@@ -305,7 +333,7 @@ pub struct SettlementInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TradeEvent {
-    pub phase: TradePhase,
+    pub phase: TradePhase26,
     pub action: String,
     pub result: String,
     pub timestamp: u64,
@@ -345,7 +373,7 @@ pub struct TradeOrchestrator {
     /// Notable 子技能: 财务合规 (G3, G6)
     pub finance_engine: FinanceEngine,
     /// 活跃交易上下文
-    pub active_trades: HashMap<String, TradeContext>,
+    pub active_trades: HashMap<String, OrchTradeContext>,
 }
 
 impl Default for TradeOrchestrator {
@@ -361,22 +389,28 @@ impl TradeOrchestrator {
         let messaging = MessagingBridge::new(router);
         Self {
             messaging,
-            content_gen: ContentGenerator::new(crate::l1_action::nt_act::nt_act_media::ContentStrategy {
-                name: "Foreign Trade Marketing".into(),
-                target_platforms: vec![Platform::LinkedIn, Platform::Instagram, Platform::Alibaba],
-                content_pillars: vec![],
-                posting_frequency: crate::l1_action::nt_act::nt_act_media::PostingFrequency {
-                    posts_per_week: 5,
-                    best_times: vec![(9, 0), (14, 0)],
+            content_gen: ContentGenerator::new(
+                crate::l1_action::nt_act::nt_act_media::ContentStrategy {
+                    name: "Foreign Trade Marketing".into(),
+                    target_platforms: vec![
+                        Platform::LinkedIn,
+                        Platform::Instagram,
+                        Platform::Alibaba,
+                    ],
+                    content_pillars: vec![],
+                    posting_frequency: crate::l1_action::nt_act::nt_act_media::PostingFrequency {
+                        posts_per_week: 5,
+                        best_times: vec![(9, 0), (14, 0)],
+                    },
+                    hashtag_strategy: crate::l1_action::nt_act::nt_act_media::HashtagStrategy {
+                        branded: vec![],
+                        industry: vec!["#manufacturing".into(), "#export".into(), "#trade".into()],
+                        max_per_post: 10,
+                    },
+                    tone_of_voice: "Professional".into(),
+                    target_audience: "B2B buyers".into(),
                 },
-                hashtag_strategy: crate::l1_action::nt_act::nt_act_media::HashtagStrategy {
-                    branded: vec![],
-                    industry: vec!["#manufacturing".into(), "#export".into(), "#trade".into()],
-                    max_per_post: 10,
-                },
-                tone_of_voice: "Professional".into(),
-                target_audience: "B2B buyers".into(),
-            }),
+            ),
             schedule: ScheduleEngine::new(),
             analytics: SocialAnalytics::new(),
             leads: LeadManager::new(),
@@ -387,10 +421,6 @@ impl TradeOrchestrator {
                 incoterms: "FOB".into(),
                 currency: "USD".into(),
                 validity_days: 30,
-                cost_breakdown: CostBreakdown {
-                    material: 0.0, labor: 0.0, overhead: 0.0, packaging: 0.0,
-                    logistics: 0.0, certification: 0.0, contingency: 0.0, total: 0.0,
-                },
             },
             negotiation_engine: NegotiationEngine::default(),
             production_engine: ProductionEngine::default(),
@@ -405,7 +435,11 @@ impl TradeOrchestrator {
     // ════════════════════════════════════════════════════════════════
 
     /// FT01: 社交媒体内容创作与发布
-    pub fn create_social_content(&self, platform: Platform, body: &str) -> crate::l1_action::traits::Post {
+    pub fn create_social_content(
+        &self,
+        platform: Platform,
+        body: &str,
+    ) -> crate::l1_action::traits::Post {
         crate::l1_action::traits::Post {
             id: uuid::Uuid::new_v4().to_string(),
             platform: format!("{:?}", platform).to_lowercase(),
@@ -440,7 +474,9 @@ impl TradeOrchestrator {
         template_id: &str,
         vars: &HashMap<String, String>,
     ) -> Result<String, String> {
-        let lead = self.leads.get_lead(lead_id)
+        let lead = self
+            .leads
+            .get_lead(lead_id)
             .ok_or_else(|| format!("Lead {} not found", lead_id))?;
         let to = match channel {
             Channel::WhatsApp => lead.whatsapp.as_deref().unwrap_or(""),
@@ -450,7 +486,9 @@ impl TradeOrchestrator {
         if to.is_empty() {
             return Err(format!("No {:?} contact for lead {}", channel, lead_id));
         }
-        self.messaging.send_template(channel, template_id, to, vars).map_err(|e| format!("{:?}", e))
+        self.messaging
+            .send_template(channel, template_id, to, vars)
+            .map_err(|e| format!("{:?}", e))
     }
 
     /// FT05: 沟通互动
@@ -476,14 +514,22 @@ impl TradeOrchestrator {
 
     /// 创建新交易上下文
     pub fn start_trade(&mut self, lead_id: &str) -> Result<String, String> {
-        let lead = self.leads.get_lead(lead_id)
+        let lead = self
+            .leads
+            .get_lead(lead_id)
             .ok_or_else(|| format!("Lead {} not found", lead_id))?
             .clone();
-        let order_id = format!("ORD-{}", uuid::Uuid::new_v4().to_string()[..8].to_uppercase());
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let ctx = TradeContext {
+        let order_id = format!(
+            "ORD-{}",
+            uuid::Uuid::new_v4().to_string()[..8].to_uppercase()
+        );
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let ctx = OrchTradeContext {
             order_id: order_id.clone(),
-            current_phase: TradePhase::Ft06RequirementConfirmation,
+            current_phase: TradePhase26::Ft06RequirementConfirmation,
             lead: Some(lead),
             conversations: Vec::new(),
             buyer_profile: None,
@@ -502,14 +548,19 @@ impl TradeOrchestrator {
     }
 
     /// 推进到下一阶段
-    pub fn advance_phase(&mut self, order_id: &str) -> Result<&TradeContext, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn advance_phase(&mut self, order_id: &str) -> Result<&OrchTradeContext, String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        let phases = TradePhase::all();
+        let phases = TradePhase26::all();
         if let Some(idx) = phases.iter().position(|p| *p == ctx.current_phase) {
             if idx + 1 < phases.len() {
                 ctx.current_phase = phases[idx + 1];
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
                 ctx.updated_at = now;
                 ctx.events.push(TradeEvent {
                     phase: ctx.current_phase,
@@ -519,47 +570,92 @@ impl TradeOrchestrator {
                 });
             }
         }
-        self.active_trades.get(order_id).ok_or_else(|| "Not found".into())
+        self.active_trades
+            .get(order_id)
+            .ok_or_else(|| "Not found".into())
     }
 
     /// 获取漏斗统计
-    pub fn pipeline_summary(&self) -> HashMap<crate::l1_action::nt_memory::nt_memory_lead::LeadStage, usize> {
+    pub fn pipeline_summary(
+        &self,
+    ) -> HashMap<crate::l1_action::nt_memory::nt_memory_lead::LeadStage, usize> {
         self.leads.pipeline_summary()
     }
 
     /// 活跃交易统计
-    pub fn active_trade_count(&self) -> usize { self.active_trades.len() }
+    pub fn active_trade_count(&self) -> usize {
+        self.active_trades.len()
+    }
 
     // ════════════════════════════════════════════════════════════════
     // G2: 报价谈判 (FT06-FT09)
     // ════════════════════════════════════════════════════════════════
 
     /// FT06: 需求确认
-    pub fn confirm_requirements(&mut self, order_id: &str, requirements: &[String]) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn confirm_requirements(
+        &mut self,
+        order_id: &str,
+        requirements: &[String],
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        ctx.buyer_profile = Some(BuyerProfile {
-            name: ctx.buyer_profile.as_ref().map(|b| b.name.clone()).unwrap_or_default(),
-            company: ctx.buyer_profile.as_ref().map(|b| b.company.clone()).unwrap_or_default(),
-            country: ctx.buyer_profile.as_ref().map(|b| b.country.clone()).unwrap_or_default(),
-            language: ctx.buyer_profile.as_ref().map(|b| b.language.clone()).unwrap_or_default(),
-            channel: ctx.buyer_profile.as_ref().map(|b| b.channel.clone()).unwrap_or_default(),
-            first_contact: ctx.buyer_profile.as_ref().map(|b| b.first_contact).unwrap_or(0),
+        ctx.buyer_profile = Some(OrchBuyerProfile {
+            name: ctx
+                .buyer_profile
+                .as_ref()
+                .map(|b| b.name.clone())
+                .unwrap_or_default(),
+            company: ctx
+                .buyer_profile
+                .as_ref()
+                .map(|b| b.company.clone())
+                .unwrap_or_default(),
+            country: ctx
+                .buyer_profile
+                .as_ref()
+                .map(|b| b.country.clone())
+                .unwrap_or_default(),
+            language: ctx
+                .buyer_profile
+                .as_ref()
+                .map(|b| b.language.clone())
+                .unwrap_or_default(),
+            channel: ctx
+                .buyer_profile
+                .as_ref()
+                .map(|b| b.channel.clone())
+                .unwrap_or_default(),
+            first_contact: ctx
+                .buyer_profile
+                .as_ref()
+                .map(|b| b.first_contact)
+                .unwrap_or(0),
         });
-        ctx.conversations.push(format!("FT06_RequirementConfirmation:{}", requirements.join(",")));
+        ctx.conversations.push(format!(
+            "FT06_RequirementConfirmation:{}",
+            requirements.join(",")
+        ));
         ctx.quotation = None;
         ctx.contract = None;
         ctx.production_status = None;
         ctx.logistics = None;
         ctx.payment = None;
         ctx.settlement = None;
-        ctx.current_phase = TradePhase::Ft07DetailedQuotation;
+        ctx.current_phase = TradePhase26::Ft07DetailedQuotation;
         Ok(())
     }
 
     /// FT07: 详细报价
-    pub fn generate_quotation(&mut self, order_id: &str, items: &[QuotationItem]) -> Result<Quotation, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn generate_quotation(
+        &mut self,
+        order_id: &str,
+        items: &[QuotationItem],
+    ) -> Result<Quotation, String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         let total: f64 = items.iter().map(|i| i.amount).sum();
         let quotation = Quotation {
@@ -576,31 +672,50 @@ impl TradeOrchestrator {
     }
 
     /// FT08: 谈判异议处理
-    pub fn handle_objection(&mut self, order_id: &str, objection: &ObjectionCategory, _concession: &Concession) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn handle_objection(
+        &mut self,
+        order_id: &str,
+        objection: &ObjectionCategory,
+        _concession: &Concession,
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         // TODO: convert ObjectionCategory to Objection type
         // self.negotiation_engine.handle_objection(objection);
-        ctx.conversations.push(format!("FT08_Objection:{:?}", objection));
+        ctx.conversations
+            .push(format!("FT08_Objection:{:?}", objection));
         // TODO: implement is_resolved check
         // if self.negotiation_engine.is_resolved() {
-        //     ctx.current_phase = TradePhase::Ft09ContractReviewSigning;
+        //     ctx.current_phase = TradePhase26::Ft09ContractReviewSigning;
         // }
         Ok(())
     }
 
     /// FT09: 合同审核签署
-    pub fn review_and_sign_contract(&mut self, order_id: &str, terms: &str) -> Result<Contract, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn review_and_sign_contract(
+        &mut self,
+        order_id: &str,
+        terms: &str,
+    ) -> Result<OrchContract, String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        let contract = Contract {
+        let contract = OrchContract {
             contract_number: format!("CON-{:06}", ctx.events.len() + 1),
-            signed_at: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+            signed_at: Some(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            ),
             terms: terms.to_string(),
         };
         ctx.contract = Some(contract.clone());
         ctx.conversations.push("FT09_ContractSigned".into());
-        ctx.current_phase = TradePhase::Ft10PaymentArrangement;
+        ctx.current_phase = TradePhase26::Ft10PaymentArrangement;
         Ok(contract)
     }
 
@@ -609,34 +724,48 @@ impl TradeOrchestrator {
     // ════════════════════════════════════════════════════════════════
 
     /// FT10: 付款方式协商
-    pub fn arrange_payment(&mut self, order_id: &str, method: PaymentType, lc_number: Option<String>) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn arrange_payment(
+        &mut self,
+        order_id: &str,
+        method: PaymentType,
+        lc_number: Option<String>,
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         ctx.payment = Some(PaymentInfo {
             method: format!("{:?}", method),
             total_amount: ctx.quotation.as_ref().map_or(0.0, |q| q.total_amount),
             paid_amount: 0.0,
-            currency: ctx.quotation.as_ref().map_or_else(|| "USD".to_string(), |q| q.currency.clone()),
+            currency: ctx
+                .quotation
+                .as_ref()
+                .map_or_else(|| "USD".to_string(), |q| q.currency.clone()),
             lc_number,
             status: "Pending".to_string(),
         });
-        ctx.conversations.push(format!("FT10_PaymentArrangement:{:?}", method));
-        ctx.current_phase = TradePhase::Ft11PaymentCollection;
+        ctx.conversations
+            .push(format!("FT10_PaymentArrangement:{:?}", method));
+        ctx.current_phase = TradePhase26::Ft11PaymentCollection;
         Ok(())
     }
 
     /// FT11: 收款确认
     pub fn confirm_payment(&mut self, order_id: &str, paid_amount: f64) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         if let Some(payment) = ctx.payment.as_mut() {
             payment.paid_amount = paid_amount;
             if paid_amount >= payment.total_amount {
                 payment.status = "Paid".into();
-                ctx.current_phase = TradePhase::Ft12ProductionOrderMaterialPrep;
+                ctx.current_phase = TradePhase26::Ft12ProductionOrderMaterialPrep;
             }
         }
-        ctx.conversations.push(format!("FT11_PaymentConfirmed:{}", paid_amount));
+        ctx.conversations
+            .push(format!("FT11_PaymentConfirmed:{}", paid_amount));
         Ok(())
     }
 
@@ -645,8 +774,14 @@ impl TradeOrchestrator {
     // ════════════════════════════════════════════════════════════════
 
     /// FT12: 生产下单备料
-    pub fn create_production_order(&mut self, order_id: &str, materials: &[BomRequirement]) -> Result<ProductionOrder, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn create_production_order(
+        &mut self,
+        order_id: &str,
+        materials: &[BomRequirement],
+    ) -> Result<ProductionOrder, String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         // TODO: ProductionEngine::create_production_order is a static method
         // let order = ProductionEngine::create_production_order(order_id, materials);
@@ -671,13 +806,19 @@ impl TradeOrchestrator {
             issues: Vec::new(),
         });
         ctx.conversations.push("FT12_ProductionOrderCreated".into());
-        ctx.current_phase = TradePhase::Ft13ProductionTrackingAlerting;
+        ctx.current_phase = TradePhase26::Ft13ProductionTrackingAlerting;
         Ok(order)
     }
 
     /// FT13: 生产跟踪预警
-    pub fn track_production(&mut self, order_id: &str, progress: &DailyProgress) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn track_production(
+        &mut self,
+        order_id: &str,
+        progress: &DailyProgress,
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         // TODO: ProductionEngine.track_progress() method not yet implemented
         // self.production_engine.track_progress(progress)?;
@@ -687,33 +828,40 @@ impl TradeOrchestrator {
             eta: progress.eta,
             issues: progress.issues.clone(),
         });
-        ctx.conversations.push(format!("FT13_Progress:{:.1}%", progress.progress_pct * 100.0));
+        ctx.conversations.push(format!(
+            "FT13_Progress:{:.1}%",
+            progress.progress_pct * 100.0
+        ));
         // TODO: DailyProgress.is_complete field not yet available
         // if progress.is_complete {
-        //     ctx.current_phase = TradePhase::Ft14QualityInspectionRelease;
+        //     ctx.current_phase = TradePhase26::Ft14QualityInspectionRelease;
         // }
         Ok(())
     }
 
     /// FT14: 质量检验放行
     pub fn quality_inspect(&mut self, order_id: &str) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
-        ctx.current_phase = TradePhase::Ft15FinalQualityCheck;
+        ctx.current_phase = TradePhase26::Ft15FinalQualityCheck;
         ctx.conversations.push("FT14_QualityInspection".into());
         Ok(())
     }
 
     /// FT15: 出货前终检
     pub fn final_quality_check(&mut self, order_id: &str) -> Result<bool, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         ctx.conversations.push("FT15_FinalQualityCheck".into());
         // TODO: ProductionEngine.final_check() method not yet implemented
         // let passed = self.production_engine.final_check();
         let passed = true;
         if passed {
-            ctx.current_phase = TradePhase::Ft16InspectionCertification;
+            ctx.current_phase = TradePhase26::Ft16InspectionCertification;
         }
         Ok(passed)
     }
@@ -724,7 +872,9 @@ impl TradeOrchestrator {
 
     /// FT16: 检验检疫证书
     pub fn apply_inspection_cert(&mut self, order_id: &str) -> Result<CiqCertificate, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         // TODO: LogisticsEngine.apply_inspection_cert() method not yet implemented
         // let cert = self.logistics_engine.apply_inspection_cert()?;
@@ -737,7 +887,11 @@ impl TradeOrchestrator {
             weight_kg: 1.0,
             status: CiqStatus::Issued,
             issue_date: chrono::Utc::now().date_naive().to_string(),
-            expiry_date: Some((chrono::Utc::now() + chrono::Duration::days(365)).date_naive().to_string()),
+            expiry_date: Some(
+                (chrono::Utc::now() + chrono::Duration::days(365))
+                    .date_naive()
+                    .to_string(),
+            ),
         };
         ctx.conversations.push("FT16_InspectionCertApplied".into());
         ctx.logistics = Some(LogisticsInfo {
@@ -749,13 +903,20 @@ impl TradeOrchestrator {
             eta: None,
             status: "Certified".into(),
         });
-        ctx.current_phase = TradePhase::Ft17BookingPackingList;
+        ctx.current_phase = TradePhase26::Ft17BookingPackingList;
         Ok(cert)
     }
 
     /// FT17: 订舱装箱
-    pub fn book_and_pack(&mut self, order_id: &str, booking: &PLBookingConfirmation, packing_list: &PLPackingList) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn book_and_pack(
+        &mut self,
+        order_id: &str,
+        booking: &PLBookingConfirmation,
+        packing_list: &PLPackingList,
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         self.logistics_engine.book_and_pack(booking, packing_list)?;
         ctx.logistics = Some(LogisticsInfo {
@@ -767,54 +928,75 @@ impl TradeOrchestrator {
             eta: None,
             status: "Booked".into(),
         });
-        ctx.conversations.push("FT17_BookingPackingListCompleted".into());
-        ctx.current_phase = TradePhase::Ft18CustomsClearance;
+        ctx.conversations
+            .push("FT17_BookingPackingListCompleted".into());
+        ctx.current_phase = TradePhase26::Ft18CustomsClearance;
         Ok(())
     }
 
     /// FT18: 报关清关
-    pub fn customs_clearance(&mut self, order_id: &str, declaration: &PLCustomsDeclaration) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn customs_clearance(
+        &mut self,
+        order_id: &str,
+        declaration: &PLCustomsDeclaration,
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         self.logistics_engine.customs_clearance(declaration)?;
         ctx.conversations.push("FT18_CustomsCleared".into());
-        ctx.current_phase = TradePhase::Ft19BillOfLadingManagement;
+        ctx.current_phase = TradePhase26::Ft19BillOfLadingManagement;
         Ok(())
     }
 
     /// FT19: 提单管理
-    pub fn manage_bill_of_lading(&mut self, order_id: &str, bl: &PLBillOfLading) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn manage_bill_of_lading(
+        &mut self,
+        order_id: &str,
+        bl: &PLBillOfLading,
+    ) -> Result<(), String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         self.logistics_engine.manage_bl(bl)?;
-        ctx.logistics = Some(ctx.logistics.as_ref().map(|l| LogisticsInfo {
-            vessel: l.vessel.clone(),
-            bl_number: Some(bl.bl_number.clone()),
-            pol: l.pol.clone(),
-            pod: l.pod.clone(),
-            etd: l.etd,
-            eta: l.eta,
-            status: "Bill of Lading issued".into(),
-        }).unwrap_or_else(|| LogisticsInfo {
-            vessel: None,
-            bl_number: Some(bl.bl_number.clone()),
-            pol: "Port of Loading".into(),
-            pod: "Port of Discharge".into(),
-            etd: None,
-            eta: None,
-            status: "Bill of Lading issued".into(),
-        }));
+        ctx.logistics = Some(
+            ctx.logistics
+                .as_ref()
+                .map(|l| LogisticsInfo {
+                    vessel: l.vessel.clone(),
+                    bl_number: Some(bl.bl_number.clone()),
+                    pol: l.pol.clone(),
+                    pod: l.pod.clone(),
+                    etd: l.etd,
+                    eta: l.eta,
+                    status: "Bill of Lading issued".into(),
+                })
+                .unwrap_or_else(|| LogisticsInfo {
+                    vessel: None,
+                    bl_number: Some(bl.bl_number.clone()),
+                    pol: "Port of Loading".into(),
+                    pod: "Port of Discharge".into(),
+                    etd: None,
+                    eta: None,
+                    status: "Bill of Lading issued".into(),
+                }),
+        );
         ctx.conversations.push("FT19_BillOfLadingManaged".into());
-        ctx.current_phase = TradePhase::Ft20ShipmentTracking;
+        ctx.current_phase = TradePhase26::Ft20ShipmentTracking;
         Ok(())
     }
 
     /// FT20: 运输跟踪
     pub fn track_shipment(&mut self, order_id: &str) -> Result<String, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         let tracking = self.logistics_engine.track_shipment()?;
-        ctx.conversations.push(format!("FT20_ShipmentTrack:{}", tracking));
+        ctx.conversations
+            .push(format!("FT20_ShipmentTrack:{}", tracking));
         Ok(tracking)
     }
 
@@ -824,20 +1006,24 @@ impl TradeOrchestrator {
 
     /// FT21: 尾款收取
     pub fn collect_final_payment(&mut self, order_id: &str) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         if let Some(payment) = ctx.payment.as_mut() {
             payment.paid_amount = payment.total_amount;
             payment.status = "Paid".into();
         }
-        ctx.current_phase = TradePhase::Ft22SettlementVerification;
+        ctx.current_phase = TradePhase26::Ft22SettlementVerification;
         ctx.conversations.push("FT21_FinalPaymentCollected".into());
         Ok(())
     }
 
     /// FT22: 结汇核销
     pub fn verify_settlement(&mut self, order_id: &str) -> Result<SettlementInfo, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         let record = self.finance_engine.verify_settlement()?;
         let settlement = SettlementInfo {
@@ -852,22 +1038,30 @@ impl TradeOrchestrator {
     }
 
     /// FT23: 退税申报
-    pub fn declare_tax_refund(&mut self, order_id: &str, claim: &FCTaxRefundClaim) -> Result<RefundDocument, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+    pub fn declare_tax_refund(
+        &mut self,
+        order_id: &str,
+        claim: &FCTaxRefundClaim,
+    ) -> Result<RefundDocument, String> {
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         let doc = self.finance_engine.declare_tax_refund(claim)?;
         ctx.conversations.push("FT23_TaxRefundDeclared".into());
-        ctx.current_phase = TradePhase::Ft24AccountReconciliation;
+        ctx.current_phase = TradePhase26::Ft24AccountReconciliation;
         Ok(doc)
     }
 
     /// FT24: 账务核对
     pub fn reconcile_accounts(&mut self, order_id: &str) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         self.finance_engine.reconcile_accounts()?;
         ctx.conversations.push("FT24_AccountsReconciled".into());
-        ctx.current_phase = TradePhase::Ft25OrderReview;
+        ctx.current_phase = TradePhase26::Ft25OrderReview;
         Ok(())
     }
 
@@ -877,24 +1071,28 @@ impl TradeOrchestrator {
 
     /// FT25: 订单复盘
     pub fn review_order(&mut self, order_id: &str) -> Result<OrderReview, String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         let review = OrderReview {
             order_id: ctx.order_id.clone(),
             phases_completed: ctx.events.len() as u32,
-            total_phases: TradePhase::all().len() as u32,
-            success: ctx.current_phase == TradePhase::Ft26ExperienceAbsorption,
+            total_phases: TradePhase26::all().len() as u32,
+            success: ctx.current_phase == TradePhase26::Ft26ExperienceAbsorption,
             lessons_learned: Vec::new(),
             recommendations: Vec::new(),
         };
         ctx.conversations.push("FT25_OrderReviewed".into());
-        ctx.current_phase = TradePhase::Ft26ExperienceAbsorption;
+        ctx.current_phase = TradePhase26::Ft26ExperienceAbsorption;
         Ok(review)
     }
 
     /// FT26: 经验吸收入库
     pub fn absorb_experience(&mut self, order_id: &str) -> Result<(), String> {
-        let ctx = self.active_trades.get_mut(order_id)
+        let ctx = self
+            .active_trades
+            .get_mut(order_id)
             .ok_or_else(|| format!("Trade {} not found", order_id))?;
         // 将交易经验转换为知识库条目
         let _experience_text = format!(
@@ -905,7 +1103,7 @@ impl TradeOrchestrator {
         );
         // 写入 KB (实际实现会使用 KB 写入函数)
         ctx.conversations.push("FT26_ExperienceAbsorbed".into());
-        ctx.current_phase = TradePhase::Ft25OrderReview; // 重置或标记完成
+        ctx.current_phase = TradePhase26::Ft25OrderReview; // 重置或标记完成
         Ok(())
     }
 }
@@ -920,7 +1118,7 @@ mod tests {
 
     #[test]
     fn test_trade_phases_count() {
-        assert_eq!(TradePhase::all().len(), 26);
+        assert_eq!(TradePhase26::all().len(), 26);
     }
 
     #[test]
@@ -943,7 +1141,7 @@ mod tests {
 
         // 推进阶段
         let ctx = orch.advance_phase(&order_id).unwrap();
-        assert_eq!(ctx.current_phase, TradePhase::Ft07DetailedQuotation);
+        assert_eq!(ctx.current_phase, TradePhase26::Ft07DetailedQuotation);
     }
 
     #[test]
@@ -961,12 +1159,27 @@ mod tests {
 
     #[test]
     fn test_trade_groups() {
-        assert_eq!(TradePhase::Ft01SocialMediaContent.group(), TradeGroup::Acquisition);
-        assert_eq!(TradePhase::Ft07DetailedQuotation.group(), TradeGroup::Negotiation);
-        assert_eq!(TradePhase::Ft12ProductionOrderMaterialPrep.group(), TradeGroup::Production);
-        assert_eq!(TradePhase::Ft17BookingPackingList.group(), TradeGroup::Logistics);
-        assert_eq!(TradePhase::Ft21FinalPaymentCollection.group(), TradeGroup::Settlement);
-        assert_eq!(TradePhase::Ft25OrderReview.group(), TradeGroup::Review);
+        assert_eq!(
+            TradePhase26::Ft01SocialMediaContent.group(),
+            TradeGroup::Acquisition
+        );
+        assert_eq!(
+            TradePhase26::Ft07DetailedQuotation.group(),
+            TradeGroup::Negotiation
+        );
+        assert_eq!(
+            TradePhase26::Ft12ProductionOrderMaterialPrep.group(),
+            TradeGroup::Production
+        );
+        assert_eq!(
+            TradePhase26::Ft17BookingPackingList.group(),
+            TradeGroup::Logistics
+        );
+        assert_eq!(
+            TradePhase26::Ft21FinalPaymentCollection.group(),
+            TradeGroup::Settlement
+        );
+        assert_eq!(TradePhase26::Ft25OrderReview.group(), TradeGroup::Review);
     }
 
     #[test]
@@ -979,12 +1192,12 @@ mod tests {
             vec!["widget".into()],
         );
         let order_id = orch.start_trade(&lead_id).unwrap();
-        
+
         let result = orch.confirm_requirements(&order_id, &["spec A".into(), "spec B".into()]);
         assert!(result.is_ok());
-        
+
         let ctx = orch.active_trades.get(&order_id).unwrap();
-        assert_eq!(ctx.current_phase, TradePhase::Ft07DetailedQuotation);
+        assert_eq!(ctx.current_phase, TradePhase26::Ft07DetailedQuotation);
         assert!(ctx.conversations.iter().any(|c| c.contains("FT06")));
     }
 
@@ -998,14 +1211,25 @@ mod tests {
             vec!["machinery".into()],
         );
         let order_id = orch.start_trade(&lead_id).unwrap();
-        orch.confirm_requirements(&order_id, &["spec A".into()]).unwrap();
-        
+        orch.confirm_requirements(&order_id, &["spec A".into()])
+            .unwrap();
+
         let items = vec![
-            QuotationItem { product: "Widget A".into(), quantity: 100, unit_price: 50.0, amount: 5000.0 },
-            QuotationItem { product: "Widget B".into(), quantity: 200, unit_price: 25.0, amount: 5000.0 },
+            QuotationItem {
+                product: "Widget A".into(),
+                quantity: 100,
+                unit_price: 50.0,
+                amount: 5000.0,
+            },
+            QuotationItem {
+                product: "Widget B".into(),
+                quantity: 200,
+                unit_price: 25.0,
+                amount: 5000.0,
+            },
         ];
         let quotation = orch.generate_quotation(&order_id, &items).unwrap();
-        
+
         assert_eq!(quotation.total_amount, 10000.0);
         assert_eq!(quotation.currency, "USD");
         assert_eq!(quotation.incoterm, "FOB");
@@ -1014,14 +1238,32 @@ mod tests {
     #[test]
     fn test_g3_payment_arrangement() {
         let mut orch = TradeOrchestrator::new();
-        let lead_id = orch.capture_inquiry(LeadSource::Alibaba, "Buyer", "Inquiry", vec!["product".into()]);
+        let lead_id = orch.capture_inquiry(
+            LeadSource::Alibaba,
+            "Buyer",
+            "Inquiry",
+            vec!["product".into()],
+        );
         let order_id = orch.start_trade(&lead_id).unwrap();
         orch.confirm_requirements(&order_id, &[]).unwrap();
-        orch.generate_quotation(&order_id, &[QuotationItem { product: "A".into(), quantity: 10, unit_price: 100.0, amount: 1000.0 }]).unwrap();
-        
-        let result = orch.arrange_payment(&order_id, PaymentType::LetterOfCredit, Some("LC12345".into()));
+        orch.generate_quotation(
+            &order_id,
+            &[QuotationItem {
+                product: "A".into(),
+                quantity: 10,
+                unit_price: 100.0,
+                amount: 1000.0,
+            }],
+        )
+        .unwrap();
+
+        let result = orch.arrange_payment(
+            &order_id,
+            PaymentType::LetterOfCredit,
+            Some("LC12345".into()),
+        );
         assert!(result.is_ok());
-        
+
         let ctx = orch.active_trades.get(&order_id).unwrap();
         assert!(ctx.payment.is_some());
         let payment = ctx.payment.as_ref().unwrap();
@@ -1032,44 +1274,86 @@ mod tests {
     #[test]
     fn test_g3_payment_confirmation() {
         let mut orch = TradeOrchestrator::new();
-        let lead_id = orch.capture_inquiry(LeadSource::Alibaba, "Buyer", "Inquiry", vec!["product".into()]);
+        let lead_id = orch.capture_inquiry(
+            LeadSource::Alibaba,
+            "Buyer",
+            "Inquiry",
+            vec!["product".into()],
+        );
         let order_id = orch.start_trade(&lead_id).unwrap();
         orch.confirm_requirements(&order_id, &[]).unwrap();
-        orch.generate_quotation(&order_id, &[QuotationItem { product: "A".into(), quantity: 10, unit_price: 100.0, amount: 1000.0 }]).unwrap();
-        orch.arrange_payment(&order_id, PaymentType::LetterOfCredit, None).unwrap();
-        
+        orch.generate_quotation(
+            &order_id,
+            &[QuotationItem {
+                product: "A".into(),
+                quantity: 10,
+                unit_price: 100.0,
+                amount: 1000.0,
+            }],
+        )
+        .unwrap();
+        orch.arrange_payment(&order_id, PaymentType::LetterOfCredit, None)
+            .unwrap();
+
         // Partial payment
         orch.confirm_payment(&order_id, 500.0).unwrap();
         let ctx = orch.active_trades.get(&order_id).unwrap();
         assert_eq!(ctx.payment.as_ref().unwrap().paid_amount, 500.0);
-        
+
         // Full payment
         orch.confirm_payment(&order_id, 1000.0).unwrap();
         let ctx = orch.active_trades.get(&order_id).unwrap();
         assert_eq!(ctx.payment.as_ref().unwrap().paid_amount, 1000.0);
-        assert_eq!(ctx.current_phase, TradePhase::Ft12ProductionOrderMaterialPrep);
+        assert_eq!(
+            ctx.current_phase,
+            TradePhase26::Ft12ProductionOrderMaterialPrep
+        );
     }
 
     #[test]
     fn test_g4_production_flow() {
         let mut orch = TradeOrchestrator::new();
-        let lead_id = orch.capture_inquiry(LeadSource::Alibaba, "Buyer", "Inquiry", vec!["product".into()]);
+        let lead_id = orch.capture_inquiry(
+            LeadSource::Alibaba,
+            "Buyer",
+            "Inquiry",
+            vec!["product".into()],
+        );
         let order_id = orch.start_trade(&lead_id).unwrap();
         orch.confirm_requirements(&order_id, &[]).unwrap();
-        orch.generate_quotation(&order_id, &[QuotationItem { product: "A".into(), quantity: 10, unit_price: 100.0, amount: 1000.0 }]).unwrap();
-        orch.arrange_payment(&order_id, PaymentType::TT, None).unwrap();
+        orch.generate_quotation(
+            &order_id,
+            &[QuotationItem {
+                product: "A".into(),
+                quantity: 10,
+                unit_price: 100.0,
+                amount: 1000.0,
+            }],
+        )
+        .unwrap();
+        orch.arrange_payment(&order_id, PaymentType::Deposit, None)
+            .unwrap();
         orch.confirm_payment(&order_id, 1000.0).unwrap();
-        
+
         // Create production order
-        let materials = vec![
-            BomRequirement { material: "Steel".into(), quantity: 50.0, unit: "kg".into() },
-        ];
+        let materials = vec![BomRequirement {
+            item_id: "M1".into(),
+            name: "Steel".into(),
+            required_qty: 50.0,
+            allocated_qty: 0.0,
+            supplier: None,
+            expected_arrival: None,
+            status: MaterialStatus::Pending,
+        }];
         let order = orch.create_production_order(&order_id, &materials).unwrap();
         assert!(!order.order_id.is_empty());
-        
+
         let ctx = orch.active_trades.get(&order_id).unwrap();
-        assert_eq!(ctx.current_phase, TradePhase::Ft13ProductionTrackingAlerting);
-        
+        assert_eq!(
+            ctx.current_phase,
+            TradePhase26::Ft13ProductionTrackingAlerting
+        );
+
         // Track production
         let progress = DailyProgress {
             date: "2024-01-15".into(),
@@ -1084,7 +1368,7 @@ mod tests {
             issues: vec!["Delay in raw material".into()],
         };
         orch.track_production(&order_id, &progress).unwrap();
-        
+
         let ctx = orch.active_trades.get(&order_id).unwrap();
         assert_eq!(ctx.production_status.as_ref().unwrap().progress_pct, 0.5);
     }
@@ -1092,54 +1376,100 @@ mod tests {
     #[test]
     fn test_g5_logistics_flow() {
         let mut orch = TradeOrchestrator::new();
-        let lead_id = orch.capture_inquiry(LeadSource::Alibaba, "Buyer", "Inquiry", vec!["product".into()]);
+        let lead_id = orch.capture_inquiry(
+            LeadSource::Alibaba,
+            "Buyer",
+            "Inquiry",
+            vec!["product".into()],
+        );
         let order_id = orch.start_trade(&lead_id).unwrap();
         orch.confirm_requirements(&order_id, &[]).unwrap();
-        orch.generate_quotation(&order_id, &[QuotationItem { product: "A".into(), quantity: 10, unit_price: 100.0, amount: 1000.0 }]).unwrap();
-        orch.arrange_payment(&order_id, PaymentType::TT, None).unwrap();
+        orch.generate_quotation(
+            &order_id,
+            &[QuotationItem {
+                product: "A".into(),
+                quantity: 10,
+                unit_price: 100.0,
+                amount: 1000.0,
+            }],
+        )
+        .unwrap();
+        orch.arrange_payment(&order_id, PaymentType::Deposit, None)
+            .unwrap();
         orch.confirm_payment(&order_id, 1000.0).unwrap();
-        orch.create_production_order(&order_id, &[BomRequirement { material: "Steel".into(), quantity: 50.0, unit: "kg".into() }]).unwrap();
-        
+        orch.create_production_order(
+            &order_id,
+            &[BomRequirement {
+                item_id: "M1".into(),
+                name: "Steel".into(),
+                required_qty: 50.0,
+                allocated_qty: 0.0,
+                supplier: None,
+                expected_arrival: None,
+                status: MaterialStatus::Pending,
+            }],
+        )
+        .unwrap();
+
         // Apply inspection cert
         let cert = orch.apply_inspection_cert(&order_id).unwrap();
-        assert!(!cert.certificate_number.is_empty());
-        
+        assert!(!cert.certificate_no.is_empty());
+
         // Book and pack
         let booking = PLBookingConfirmation {
-            booking_number: "BK001".into(),
+            booking_id: "BK-001".into(),
+            booking_ref: "BK001".into(),
             vessel: "MSC SHANGHAI".into(),
             voyage: "2412E".into(),
-            pol: "Shanghai".into(),
-            pod: "Los Angeles".into(),
-            etd: Some(1705296000),
-            eta: Some(1707888000),
-            bl_number: Some("B/L123456".into()),
+            port_of_loading: "Shanghai".into(),
+            port_of_discharge: "Los Angeles".into(),
+            eto: "2024-01-15".into(),
+            eta: "2024-02-15".into(),
+            container_no: Some("B/L123456".into()),
+            container_type: "40HQ".into(),
+            packing_list: PLPackingList {
+                items: vec![PackingItem {
+                    product: "Widget A".into(),
+                    description: "Widget A x 10".into(),
+                    qty: 10,
+                    ctns: 1,
+                    cbm: 0.25,
+                    gross_kg: 50.0,
+                    net_kg: 45.0,
+                }],
+                total_ctns: 1,
+                total_cbm: 0.25,
+                total_gross_kg: 50.0,
+                total_net_kg: 45.0,
+            },
+            status: BookingStatus::Confirmed,
         };
-        let packing_list = PLPackingList {
-            pl_number: "PL001".into(),
-            items: vec!["Widget A x 10".into()],
-            total_weight_kg: 500.0,
-            total_volume_cbm: 2.5,
-            package_count: 10,
-        };
-        orch.book_and_pack(&order_id, &booking, &packing_list).unwrap();
-        
+        orch.book_and_pack(&order_id, &booking).unwrap();
+
         let ctx = orch.active_trades.get(&order_id).unwrap();
-        assert_eq!(ctx.logistics.as_ref().unwrap().vessel, Some("MSC SHANGHAI".into()));
-        assert_eq!(ctx.current_phase, TradePhase::Ft18CustomsClearance);
+        assert_eq!(
+            ctx.logistics.as_ref().unwrap().vessel,
+            Some("MSC SHANGHAI".into())
+        );
+        assert_eq!(ctx.current_phase, TradePhase26::Ft18CustomsClearance);
     }
 
     #[test]
     fn test_g7_review_and_absorb() {
         let mut orch = TradeOrchestrator::new();
-        let lead_id = orch.capture_inquiry(LeadSource::Alibaba, "Buyer", "Inquiry", vec!["product".into()]);
+        let lead_id = orch.capture_inquiry(
+            LeadSource::Alibaba,
+            "Buyer",
+            "Inquiry",
+            vec!["product".into()],
+        );
         let order_id = orch.start_trade(&lead_id).unwrap();
         orch.confirm_requirements(&order_id, &[]).unwrap();
-        
+
         let review = orch.review_order(&order_id).unwrap();
         assert_eq!(review.order_id, order_id);
         assert_eq!(review.total_phases, 26);
-        
+
         let result = orch.absorb_experience(&order_id);
         assert!(result.is_ok());
     }
