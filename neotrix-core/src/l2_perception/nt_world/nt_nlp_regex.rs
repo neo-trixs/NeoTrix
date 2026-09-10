@@ -31,6 +31,7 @@ pub struct InfoExtractor {
     /// IP地址正则
     ip_regex: Regex,
     /// 中文姓名正则
+    #[allow(dead_code)]
     name_regex: Regex,
 }
 

@@ -35,6 +35,12 @@ impl MutationOps {
         Self { config }
     }
 
+    pub fn config(&self) -> &MutationConfig { &self.config }
+
+    pub fn set_mutation_rate(&mut self, rate: f32) {
+        self.config.mutation_rate = rate;
+    }
+
     /// Apply mutation to a genome
     pub fn mutate(&self, genome: &mut AgentGenome, rng: &mut SimulationRng) {
         for i in 0..genome.traits.len() {

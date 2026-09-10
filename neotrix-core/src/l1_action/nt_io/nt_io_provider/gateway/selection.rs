@@ -1,4 +1,5 @@
 use crate::neotrix::nt_io_http_factory::proxy_from_env;
+use std::sync::Arc;
 use std::time::Instant;
 
 use super::super::factory::{create_provider, ProviderConfig};

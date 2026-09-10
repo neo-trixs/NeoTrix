@@ -135,16 +135,6 @@ pub fn absorb_zim_file(
         );
 
         stats.ingested += 1;
-
-        if stats.ingested % config.batch_size == 0 {
-            let _ = tx.commit();
-            let new_tx = db
-                .transaction()
-                .map_err(|e| format!("Failed to restart transaction: {}", e))?;
-            // Note: can't reassign tx in this scope, but the auto-commit on drop handles it
-            // For true batching, the caller should use absorb_zim_batch
-            drop(new_tx);
-        }
     }
 
     tx.commit().map_err(|e| format!("Failed to commit: {}", e))?;

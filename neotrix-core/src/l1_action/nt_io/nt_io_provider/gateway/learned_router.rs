@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Learned Router Module — LLMRouter 风格的学习型路由器
 //!
 //! 参考 ulab-uiuc/LLMRouter: KNN, SVM, MLP, MF, Elo, Graph, Hybrid 等 16+ 策略

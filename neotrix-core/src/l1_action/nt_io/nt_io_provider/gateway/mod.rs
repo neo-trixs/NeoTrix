@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use super::account_pool::{AccountPool, AccountPoolConfig};
 use super::generation_classifier::{GenerationAnalytics, GenerationClassifier};

@@ -119,6 +119,10 @@ impl MemoryStream {
         &self.nodes[start..]
     }
 
+    pub fn recent_importance_sum(&self, n: usize) -> f32 {
+        self.recent(n).iter().map(|node| node.importance).sum()
+    }
+
     pub fn by_kind(&self, kind: &MemoryKind) -> Vec<&MemoryNode> {
         self.nodes.iter().filter(|n| &n.kind == kind).collect()
     }

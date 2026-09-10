@@ -269,10 +269,8 @@ impl WorldSim {
                 // Decide action (mutable borrow of self)
                 let action = self.decide_action_by_id(agent_id, &observation, &time_mods);
 
-                // Constitutional check
-                let (compliance, _violated) = self.constitutional.evaluate(
-                    &format!("{:?}", action), &observation.time_of_day, tick
-                );
+                // Constitutional check (M10: type-safe)
+                let (compliance, _violated) = self.constitutional.evaluate_action(&action, tick);
 
                 // Action cost check
                 let can_afford = {
@@ -328,6 +326,50 @@ impl WorldSim {
                     });
                 }
 
+                // M5: GraphMemory — record action as node + temporal edge
+                if let Some(gm) = self.graph_memories.get_mut(agent_id) {
+                    let node_id = gm.add_node(
+                        crate::agents::graph_memory::NodeKind::Event,
+                        &format!("{:?}", action),
+                        tick,
+                        compliance as f32,
+                    );
+                    // Connect to previous action if exists
+                    if let Some(prev_id) = gm.nodes().last().map(|n| n.id) {
+                        if prev_id != node_id {
+                            gm.add_edge(prev_id, node_id, crate::agents::graph_memory::EdgeKind::Temporal, 0.8, tick);
+                        }
+                    }
+                    // Social edges for Talk/Trade
+                    match action {
+                        AgentAction::Talk { ref target_id, .. } | AgentAction::Trade { ref target_id, .. } => {
+                            let person_id = gm.add_node(
+                                crate::agents::graph_memory::NodeKind::Person,
+                                target_id,
+                                tick,
+                                0.5,
+                            );
+                            gm.add_edge(node_id, person_id, crate::agents::graph_memory::EdgeKind::Social, 0.7, tick);
+                        }
+                        _ => {}
+                    }
+                }
+
+                // M6: SpatialMemory — record visit at current position
+                if let Some(sm) = self.spatial_memories.get_mut(agent_id) {
+                    if let Some(agent) = self.agents.iter().find(|a| &a.core.id == agent_id) {
+                        let biome = "plain".to_string();
+                        let danger = if compliance < 0.3 { 0.5 } else { 0.1 };
+                        sm.visit(
+                            [agent.core.position.x, agent.core.position.y],
+                            &biome,
+                            vec![],
+                            danger,
+                            tick,
+                        );
+                    }
+                }
+
                 // Record action
                 if let Some(agent) = self.agents.iter_mut().find(|a| &a.core.id == agent_id) {
                     agent.record_action(&action);
@@ -374,7 +416,40 @@ impl WorldSim {
                 awareness.learn();
             }
 
-            // 9. Personality drift: apply accumulated drift
+            // 9. Planning: regenerate goals from current state
+            let agent_ids: Vec<String> = self.agents.iter().map(|a| a.core.id.clone()).collect();
+            for agent_id in &agent_ids {
+                if let Some(agent) = self.agents.iter().find(|a| &a.core.id == agent_id) {
+                    let nearby_count = self.spatial_grid.query_radius(agent.core.position, 100.0).len();
+                    let has_rels = self.relationships.neighbors(agent_id).len() > 0;
+                    if let Some(planning) = self.planning.get_mut(agent_id) {
+                        planning.generate_survival_goals(agent.core.hunger, agent.core.energy, agent.core.health, self.tick);
+                        planning.generate_social_goals(nearby_count, has_rels, self.tick);
+                        planning.generate_exploration_goals(self.tick);
+                        planning.consolidate();
+                    }
+                }
+            }
+
+            // 10. Reflection: trigger when importance accumulates
+            for agent_id in &agent_ids {
+                let recent_importance = self.memory_streams.get(agent_id)
+                    .map(|ms| ms.recent_importance_sum(20))
+                    .unwrap_or(0.0);
+                if let Some(reflection) = self.reflections.get_mut(agent_id) {
+                    if reflection.on_new_memory(recent_importance) {
+                        let ms = self.memory_streams.get(agent_id).unwrap();
+                        let insights = reflection.reflect(ms, agent_id, self.tick);
+                        if let Some(ms) = self.memory_streams.get_mut(agent_id) {
+                            for insight in insights {
+                                ms.add(insight);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 11. Personality drift: apply accumulated drift
             for agent in &mut self.agents {
                 if let Some(pd) = self.personality_drift.get_mut(&agent.core.id) {
                     let new_p = pd.drift(&agent.personality, agent.core.age);
@@ -382,10 +457,10 @@ impl WorldSim {
                 }
             }
 
-            // 10. Constitutional decay
+            // 12. Constitutional decay
             self.constitutional.decay();
 
-            // 11. Convergence detection
+            // 13. Convergence detection
             let alive_count = self.agents.iter().filter(|a| a.core.alive).count();
             let mean_fitness = self.agents.iter().filter(|a| a.core.alive).map(|a| a.core.health as f64).sum::<f64>()
                 / alive_count.max(1) as f64;
@@ -443,7 +518,36 @@ impl WorldSim {
     }
 
     fn decide_action(&mut self, agent: &SimAgent, obs: &AgentObservation, time_mods: &TimeModifiers) -> AgentAction {
-        // Priority: eat if hungry → rest if tired → socialize if others nearby → explore
+        // === M1: PlanningStack goal-driven decisions ===
+        if let Some(planning) = self.planning.get(&agent.core.id) {
+            // Generate goals from current state
+            let has_rels = self.relationships.neighbors(&agent.core.id).len() > 0;
+            // We need to temporarily borrow planning mutably for goal generation,
+            // but we're in an immutable borrow context. Use a two-phase approach:
+            // Phase 1: check if there's already an active goal with an action
+            if let Some(action) = planning.next_action() {
+                let planned = action.clone();
+                // Validate the planned action is still sensible
+                match &planned {
+                    AgentAction::Eat { resource_id } => {
+                        if obs.nearby_resources.iter().any(|r| &r.id == resource_id) {
+                            return planned;
+                        }
+                    }
+                    AgentAction::Rest => {
+                        if agent.core.energy < 50.0 { return planned; }
+                    }
+                    AgentAction::Talk { target_id, .. } => {
+                        if obs.nearby_agents.iter().any(|a| &a.id == target_id) {
+                            return planned;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // === Survival priority (hard constraints) ===
         if agent.core.hunger > 60.0 {
             if let Some(res) = obs.nearby_resources.iter()
                 .filter(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
@@ -461,30 +565,75 @@ impl WorldSim {
             return AgentAction::Rest;
         }
 
-        if !obs.nearby_agents.is_empty() && self.rng.next_f32() < time_mods.social_activity {
-            let target = &obs.nearby_agents[0];
-            return AgentAction::Talk {
-                target_id: target.id.clone(),
-                message: "hello".to_string(),
-            };
+        // === M3: TheoryOfMind social decisions ===
+        if !obs.nearby_agents.is_empty() {
+            if let Some(tom) = self.theory_of_mind.get(&agent.core.id) {
+                let target = &obs.nearby_agents[0];
+                let threat = tom.threat_of(&target.id);
+                let coop = tom.cooperativeness_of(&target.id);
+
+                // High threat → flee
+                if threat > 0.6 {
+                    let flee_dir = Vec2::new(
+                        agent.core.position.x - target.distance,
+                        agent.core.position.y,
+                    ).normalize();
+                    return AgentAction::Explore { direction: flee_dir };
+                }
+
+                // High cooperativeness → prefer trade/talk
+                if coop > 0.6 && self.rng.next_f32() < time_mods.social_activity * 1.5 {
+                    return AgentAction::Talk {
+                        target_id: target.id.clone(),
+                        message: "hello".to_string(),
+                    };
+                }
+            }
+
+            // Default social: talk if personality favors it
+            if agent.personality.sociability > 0.6 && self.rng.next_f32() < time_mods.social_activity {
+                let target = &obs.nearby_agents[0];
+                return AgentAction::Talk {
+                    target_id: target.id.clone(),
+                    message: "hello".to_string(),
+                };
+            }
         }
 
-        // Emotion modulation on exploration vs rest decision
+        // === M2: Personality bias ===
+        let roll = self.rng.next_f32();
+        if agent.personality.aggression > 0.7 && roll < 0.2 {
+            if let Some(target) = obs.nearby_agents.first() {
+                return AgentAction::Attack { target_id: target.id.clone() };
+            }
+        }
+        if agent.personality.curiosity > 0.7 && roll < 0.4 {
+            let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
+            return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+        }
+        if agent.personality.cooperativeness > 0.7 && roll < 0.3 {
+                if let Some(target) = obs.nearby_agents.first() {
+                    return AgentAction::Trade {
+                        target_id: target.id.clone(),
+                        item: "berries".to_string(),
+                        amount: 1,
+                    };
+                }
+        }
+
+        // === Emotion modulation ===
         let dominant = self.emotion.dominant_emotion();
         match dominant {
             Some(EmotionType::Anxiety) | Some(EmotionType::Fatigue) => {
-                // Anxiety/fatigue: bias toward rest
                 if self.rng.next_f32() < 0.5 {
                     return AgentAction::Rest;
                 }
             }
             Some(EmotionType::Curiosity) | Some(EmotionType::Joy) | Some(EmotionType::Wonder) => {
-                // Positive emotions: bias toward exploration
                 let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
                 return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
             }
             Some(EmotionType::Frustration) => {
-                // Frustration: random direction (break out of loops)
                 if self.rng.next_f32() < 0.3 {
                     let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
                     return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
@@ -493,6 +642,15 @@ impl WorldSim {
             _ => {}
         }
 
+        // === M8: ActionAwareness explore signal ===
+        if let Some(awareness) = self.action_awareness.get(&agent.core.id) {
+            if awareness.should_explore() {
+                let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
+                return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+            }
+        }
+
+        // === Default: explore ===
         AgentAction::Explore { direction: Vec2::new(
             self.rng.range_f32(-1.0, 1.0),
             self.rng.range_f32(-1.0, 1.0),
@@ -610,7 +768,7 @@ impl WorldSim {
             genome.traits[2] = a.personality.sociability;
             genome.traits[3] = a.personality.curiosity;
             genome.traits[4] = a.personality.cooperativeness;
-            genome.traits[5] = a.memory.events.len() as f32 / 100.0;
+            genome.traits[5] = a.recent_actions.len() as f32 / 20.0;
             genome.traits[6] = self.relationships.neighbors(&a.core.id).len() as f32 / 10.0;
             genome.traits[7] = self.phi_bridge.get_state(&a.core.id)
                 .map(|s| s.consciousness_level() as f32).unwrap_or(0.1);
@@ -625,6 +783,25 @@ impl WorldSim {
         // 3. Selection
         let resource_mod = self.clock.season_resource_modifier();
         let result = self.selection.select(genomes, resource_mod);
+
+        // M9: ConvergenceDetector → mutation rate modulation
+        let base_mutation_rate = self.mutator.config().mutation_rate;
+        let adjusted_rate = match self.convergence.state() {
+            crate::consciousness::convergence::ConvergenceState::Converged => {
+                // Converged: increase mutation to escape local optima
+                (base_mutation_rate * 2.0).min(0.5)
+            }
+            crate::consciousness::convergence::ConvergenceState::Diverged => {
+                // Diverged: decrease mutation to stabilize
+                (base_mutation_rate * 0.5).max(0.01)
+            }
+            crate::consciousness::convergence::ConvergenceState::Exploiting => {
+                // Exploiting: slight increase
+                (base_mutation_rate * 1.3).min(0.3)
+            }
+            crate::consciousness::convergence::ConvergenceState::Exploring => base_mutation_rate,
+        };
+        self.mutator.set_mutation_rate(adjusted_rate);
 
         // 4. Mutation + Breeding
         let offspring = self.mutator.breed(

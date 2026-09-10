@@ -30,12 +30,12 @@ pub struct IntelligentRouter {
 }
 
 #[derive(Debug, Clone)]
-struct RouteDecision {
-    provider: String,
-    complexity: f64,
-    latency: Duration,
-    success: bool,
-    timestamp: Instant,
+pub struct RouteDecision {
+    pub provider: String,
+    pub complexity: f64,
+    pub latency: Duration,
+    pub success: bool,
+    pub timestamp: Instant,
 }
 
 impl IntelligentRouter {

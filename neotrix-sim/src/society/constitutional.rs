@@ -51,6 +51,31 @@ impl ConstitutionalFeedback {
         (score.max(0.0), violated)
     }
 
+    /// Type-safe evaluation using AgentAction enum directly
+    pub fn evaluate_action(&mut self, action: &crate::agents::sim_agent::AgentAction, tick: u64) -> (f32, Vec<String>) {
+        let mut score = 1.0f32;
+        let mut violated = Vec::new();
+
+        for rule in &mut self.rules {
+            let violates = match rule.id.as_str() {
+                "no_harm" => matches!(action, crate::agents::sim_agent::AgentAction::Attack { .. }),
+                "share_resources" => false, // trade is positive
+                "explore" => false, // handled by planning
+                "cooperate" => false, // steal not in action set
+                "self_preserve" => false, // checked separately
+                _ => false,
+            };
+            if violates {
+                score -= rule.weight * 0.3;
+                rule.violations += 1;
+                self.violation_history.push((rule.id.clone(), tick, rule.weight));
+                violated.push(rule.id.clone());
+            }
+        }
+
+        (score.max(0.0), violated)
+    }
+
     /// Get feedback penalty for a rule (increases with repeated violations)
     pub fn rule_penalty(&self, rule_id: &str) -> f32 {
         self.rules.iter()

@@ -131,67 +131,12 @@ pub struct SimAgent {
     pub id: u64,
     pub core: AgentCore,
     pub skills: Vec<String>,
-    pub memory: AgentMemory,
     pub personality: Personality,
     pub recent_actions: Vec<String>,
     pub last_action: AgentAction,
     pub phi: f32,
     /// Maslow needs (CivSim pattern): [physiological, safety, love, esteem, self_actualization]
     pub needs: [f32; 5],
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AgentMemory {
-    pub events: Vec<MemoryEvent>,
-    pub max_events: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryEvent {
-    pub description: String,
-    pub importance: f32,
-    pub tick: u64,
-    pub associated_agents: Vec<String>,
-}
-
-impl AgentMemory {
-    pub fn new() -> Self {
-        Self {
-            events: Vec::new(),
-            max_events: 100,
-        }
-    }
-
-    pub fn record(&mut self, event: MemoryEvent) {
-        if self.events.len() >= self.max_events {
-            if let Some(min_idx) = self
-                .events
-                .iter()
-                .enumerate()
-                .min_by(|a, b| {
-                    a.1.importance
-                        .partial_cmp(&b.1.importance)
-                        .unwrap()
-                })
-                .map(|(i, _)| i)
-            {
-                self.events.remove(min_idx);
-            }
-        }
-        self.events.push(event);
-    }
-
-    pub fn recent(&self, n: usize) -> &[MemoryEvent] {
-        let start = self.events.len().saturating_sub(n);
-        &self.events[start..]
-    }
-
-    pub fn by_agent(&self, agent_id: &str) -> Vec<&MemoryEvent> {
-        self.events
-            .iter()
-            .filter(|e| e.associated_agents.iter().any(|a| a == agent_id))
-            .collect()
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,7 +183,6 @@ impl SimAgent {
             id,
             core: AgentCore::new(&id.to_string(), position),
             skills: Vec::new(),
-            memory: AgentMemory::new(),
             personality: Personality::default(),
             recent_actions: Vec::new(),
             last_action: AgentAction::Rest,
@@ -259,7 +203,6 @@ impl SimAgent {
             id: numeric_id,
             core: AgentCore::new(string_id, position),
             skills: Vec::new(),
-            memory: AgentMemory::new(),
             personality: Personality::default(),
             recent_actions: Vec::new(),
             last_action: AgentAction::Rest,
@@ -360,22 +303,6 @@ mod tests {
         core2.energy = 0.0;
         core2.metabolize(0.0, 0.0);
         assert!(!core2.alive);
-    }
-
-    #[test]
-    fn agent_memory_eviction() {
-        let mut mem = AgentMemory::new();
-        mem.max_events = 3;
-        for i in 0..5 {
-            mem.record(MemoryEvent {
-                description: format!("event {i}"),
-                importance: i as f32,
-                tick: i,
-                associated_agents: vec![],
-            });
-        }
-        assert_eq!(mem.events.len(), 3);
-        assert_eq!(mem.events[0].description, "event 2");
     }
 
     #[test]

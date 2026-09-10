@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 /// 模块化网关 — 组件化架构，支持热插拔中间件
 pub struct ModularGateway {

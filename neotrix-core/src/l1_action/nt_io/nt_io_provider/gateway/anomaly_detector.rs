@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::RwLock;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// 异常检测器 — 基于统计方法检测 provider 异常
 pub struct AnomalyDetector {

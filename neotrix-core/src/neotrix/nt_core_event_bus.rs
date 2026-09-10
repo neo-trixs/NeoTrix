@@ -459,7 +459,7 @@ impl ActorContext {
 }
 
 /// Internal envelope pairing a message with its oneshot response channel.
-struct ActorEnvelope<M: ActorMessage> {
+pub struct ActorEnvelope<M: ActorMessage> {
     msg: M,
     response_tx: oneshot::Sender<M::Response>,
 }
