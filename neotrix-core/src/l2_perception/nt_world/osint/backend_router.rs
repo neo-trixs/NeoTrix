@@ -4,8 +4,10 @@
 use super::{OsintTarget, OsintConfig};
 use super::dns::DnsFindings;
 use super::http::HttpFindings;
+use super::fofa::FofaFindings;
 use super::dns::investigate as dns_investigate;
 use super::http::investigate as http_investigate;
+use super::fofa::investigate as fofa_investigate;
 use reqwest::Client;
 use std::pin::Pin;
 use std::future::Future;
@@ -183,6 +185,25 @@ pub fn default_http_backends() -> Vec<Backend> {
     ]
 }
 
+pub fn default_fofa_backends() -> Vec<Backend> {
+    vec![
+        Backend {
+            name: "fofa-native".into(),
+            probe: |target, client| Box::pin(async move {
+                let config = OsintConfig::default();
+                let result = fofa_investigate(target, client, &config).await?;
+                Ok(Box::new(FofaBackendResult(result)) as Box<dyn BackendResult>)
+            }),
+        },
+        Backend {
+            name: "fofa-fallback".into(),
+            probe: |_target, _client| Box::pin(async move {
+                Ok(Box::new(SimpleFofaResult) as Box<dyn BackendResult>)
+            }),
+        },
+    ]
+}
+
 #[derive(Debug)]
 struct DnsBackendResult(DnsFindings);
 impl BackendResult for DnsBackendResult {
@@ -208,5 +229,17 @@ impl BackendResult for SimpleDnsResult {
 #[derive(Debug)]
 struct SimpleHttpResult;
 impl BackendResult for SimpleHttpResult {
+    fn findings_count(&self) -> usize { 0 }
+}
+
+#[derive(Debug)]
+struct FofaBackendResult(FofaFindings);
+impl BackendResult for FofaBackendResult {
+    fn findings_count(&self) -> usize { self.0.assets.len() }
+}
+
+#[derive(Debug)]
+struct SimpleFofaResult;
+impl BackendResult for SimpleFofaResult {
     fn findings_count(&self) -> usize { 0 }
 }

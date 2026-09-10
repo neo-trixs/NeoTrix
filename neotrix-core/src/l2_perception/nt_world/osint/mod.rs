@@ -330,7 +330,7 @@ impl OsintReport {
 
         if let Some(ref fofa) = self.fofa {
             for r in &fofa.assets {
-                if let Ok(id) = Self::write_with_evidence(kb, &format!("fofa: {}", r.url), NodeType::Source, r.title.as_deref().or(Some("FOFA result")), Some(&r.url), domain_hint, &run_id) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("fofa: {}", r.host), NodeType::Source, Some(&r.product), Some(&r.host), domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
@@ -347,7 +347,7 @@ impl OsintReport {
 
         if let Some(ref censys) = self.censys {
             for r in &censys.services {
-                if let Ok(id) = Self::write_with_evidence(kb, &format!("censys: {}", censys.ip), NodeType::Source, r.product.as_deref().or(Some("Censys service")), None, domain_hint, &run_id) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("censys: {}", censys.ip), NodeType::Source, Some(&r.service_name), None, domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
