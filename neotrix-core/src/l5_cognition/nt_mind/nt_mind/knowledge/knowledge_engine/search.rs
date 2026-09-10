@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use log::warn;
 use super::graph::KnowledgeEngine;
 use super::types::{
     KnowledgeEntry, SourceType,
@@ -31,7 +32,7 @@ impl LiteratureSearcher {
         match crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&url) {
             Ok((text, _host)) => self.parse_arxiv_response(&text, query),
             Err(e) => {
-                eprintln!("[LitSearch] arXiv error: {}", e);
+                warn!("[LitSearch] arXiv error: {}", e);
                 Vec::new()
             }
         }
@@ -77,7 +78,7 @@ impl LiteratureSearcher {
         match crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&url) {
             Ok((text, _host)) => self.parse_s2_response(&text),
             Err(e) => {
-                eprintln!("[LitSearch] Semantic Scholar error: {}", e);
+                warn!("[LitSearch] Semantic Scholar error: {}", e);
                 Vec::new()
             }
         }
@@ -109,7 +110,7 @@ impl LiteratureSearcher {
         match crate::l1_action::nt_memory::nt_memory_kb::nt_http::fetch_safe_http(&search_url) {
             Ok((text, _host)) => self.parse_wiki_search(&text),
             Err(e) => {
-                eprintln!("[LitSearch] Wikipedia error: {}", e);
+                warn!("[LitSearch] Wikipedia error: {}", e);
                 Vec::new()
             }
         }

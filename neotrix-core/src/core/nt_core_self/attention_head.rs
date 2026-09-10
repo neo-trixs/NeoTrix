@@ -179,6 +179,10 @@ pub struct AttentionHead {
     pub focus: Vec<String>,
     pub decay_rate: f64,
     pub priority: u8,
+    /// 剩余预算份额 ∈ [0.0, 1.0]，1.0 表示预算充足 (Cost-Aware Routing, Axiom A1)
+    pub budget_remaining: f64,
+    /// 路由到此域的预估算力成本 ∈ [0.0, 1.0]
+    pub compute_cost: f64,
 }
 
 impl AttentionHead {
@@ -192,6 +196,8 @@ impl AttentionHead {
             focus: Vec::new(),
             decay_rate: 0.1,
             priority: 5,
+            budget_remaining: 1.0,
+            compute_cost: 0.5,
         }
     }
 
@@ -216,6 +222,25 @@ impl AttentionHead {
 
     pub fn is_activated(&self, threshold: f64) -> bool {
         self.activation >= threshold
+    }
+
+    /// 设置剩余预算份额 ∈ [0.0, 1.0] (Cost-Aware Routing, Axiom A1)
+    #[allow(dead_code)]
+    pub fn set_budget(&mut self, remaining: f64) {
+        self.budget_remaining = remaining.clamp(0.0, 1.0);
+    }
+
+    /// 预算是否临界 (< 0.2) — 临界时强制 System1Direct 省算力
+    #[allow(dead_code)]
+    pub fn is_budget_critical(&self) -> bool {
+        self.budget_remaining < 0.2
+    }
+
+    /// 成本感知显著性: salience × budget_remaining (Axiom A1 + A2)
+    /// 预算越紧，显著性衰减越快，低价值域自动降权
+    #[allow(dead_code)]
+    pub fn cost_aware_salience(&self, novelty: f64, coherence: f64) -> f64 {
+        self.salience(novelty, coherence) * self.budget_remaining
     }
 }
 
@@ -302,6 +327,8 @@ pub struct AttentionManager {
     pub rule_intensity: RuleIntensity,
     /// Ascendancy 当前专精 (Weapon Set)
     pub weapon_set: WeaponSet,
+    /// 全局剩余预算份额 ∈ [0.0, 1.0], 1.0 表示预算充足 (Cost-Aware Routing, Axiom A1)
+    pub budget_remaining: f64,
 }
 
 impl AttentionManager {
@@ -316,6 +343,7 @@ impl AttentionManager {
             global_threshold: threshold,
             rule_intensity: RuleIntensity::default(),
             weapon_set: WeaponSet::Acquisition,
+            budget_remaining: 1.0,
         }
     }
 
@@ -328,6 +356,17 @@ impl AttentionManager {
     pub fn set_intensity(&mut self, intensity: RuleIntensity) {
         self.rule_intensity = intensity;
         self.global_threshold = intensity.attention_threshold();
+    }
+
+    /// 设置全局预算份额 ∈ [0.0, 1.0] (Cost-Aware Routing, Axiom A1)
+    /// 同步更新所有 head 的 budget_remaining
+    #[allow(dead_code)]
+    pub fn set_budget(&mut self, remaining: f64) {
+        let clamped = remaining.clamp(0.0, 1.0);
+        self.budget_remaining = clamped;
+        for head in &mut self.heads {
+            head.budget_remaining = clamped;
+        }
     }
 
     pub fn from_task_type(threshold: f64, task: &str) -> Self {
@@ -434,6 +473,13 @@ impl AttentionManager {
     /// 架构/重写类 +0.25, 实现/修复类基线 0.4, 探索/只读类 -0.2;
     /// 多步骤连接词每步 +0.08 (封顶 +0.24)。
     pub fn estimate_task_difficulty(task: &str) -> f64 {
+        Self::estimate_task_difficulty_with_budget(task, 1.0)
+    }
+
+    /// 预算感知难度估计: 当 budget < 0.2 时, 难度膨胀 1.5× (Cost-Aware Routing, Axiom A1)
+    /// 预算紧张时将简单任务推入中等难度区间, 促使路由选择更快路径
+    #[allow(dead_code)]
+    pub fn estimate_task_difficulty_with_budget(task: &str, budget: f64) -> f64 {
         let t = task.to_lowercase();
         let mut d = 0.4f64;
         if ["architect", "design", "rewrite", "架构", "重构", "设计"].iter().any(|k| t.contains(k)) {
@@ -447,12 +493,26 @@ impl AttentionManager {
             .map(|k| t.matches(k).count())
             .sum::<usize>();
         d += (steps as f64 * 0.08).min(0.24);
+        // 预算临界时膨胀难度 → 迫使路由选择 System1Direct
+        if budget < 0.2 {
+            d = (d * 1.5).clamp(0.0, 1.0);
+        }
         d.clamp(0.0, 1.0)
     }
 
     /// 难度 → 思考模式路由。低难度直通省算力, 高难度强制深思,
     /// 中间带由 RuleIntensity 折中 (Lite 偏直通 / Ultra 偏深思)。
+    /// 预算临界 (< 0.2) 时强制 System1Direct, 无论难度多高 (Cost-Aware Routing, Axiom A1)。
     pub fn allocate_compute(&self, difficulty: f64) -> ComputeAllocation {
+        // 预算临界: 强制直通, 跳过所有深思分支
+        if self.budget_remaining < 0.2 {
+            return ComputeAllocation {
+                mode: ThinkingMode::System1Direct,
+                budget_share: 0.1,
+                difficulty,
+                reason: "budget critical — forced System1 direct to conserve compute",
+            };
+        }
         if difficulty < 0.35 {
             ComputeAllocation {
                 mode: ThinkingMode::System1Direct,

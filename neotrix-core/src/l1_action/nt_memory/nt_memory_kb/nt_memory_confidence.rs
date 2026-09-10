@@ -423,6 +423,12 @@ impl ConfidenceStore {
         Ok(map.get(node_id).cloned())
     }
 
+    /// Convenience: look up confidence by string node ID (parses as UUID).
+    pub fn get_confidence_by_str(&self, node_id: &str) -> Result<Option<EpistemicConfidence>, String> {
+        let uuid = Uuid::parse_str(node_id).map_err(|e| format!("Invalid UUID: {}", e))?;
+        self.get_confidence(&uuid)
+    }
+
     pub fn get_confidence_batch(
         &self,
         node_ids: &[Uuid],
@@ -1196,6 +1202,9 @@ mod tests {
             ),
             freshness: std::sync::RwLock::new(
                 crate::l1_action::nt_memory::nt_memory_kb::nt_memory_sweep_20260815::FreshnessLedger::new(),
+            ),
+            lifecycle: std::sync::RwLock::new(
+                crate::l1_action::nt_memory::nt_memory_kb::nt_memory_lifecycle::MemoryLifecycle::default(),
             ),
         };
 

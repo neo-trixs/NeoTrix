@@ -5,6 +5,8 @@ use crate::core::nt_core_hcube::coord::HyperCoord;
 use crate::core::nt_core_hcube::cube::CubeEntry;
 use crate::core::nt_core_harness::HarnessAdapter;
 
+use log::info;
+
 use super::hypercube_bridge::HyperCubeBridge;
 
 use crate::neotrix::nt_world_crawl::config::{CrawlTopic, SeedEntry};
@@ -521,7 +523,7 @@ mod tests {
         let before = router.bridge.hypercube.cell_count();
         router.seed_knowledge();
         let after = router.bridge.hypercube.cell_count();
-        eprintln!("cell_count: before={} after={}", before, after);
+        info!("cell_count: before={} after={}", before, after);
         assert!(after >= 10, "expected >= 10, got {}", after);
     }
 

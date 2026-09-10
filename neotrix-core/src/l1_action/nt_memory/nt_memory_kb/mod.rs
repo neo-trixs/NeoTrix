@@ -77,6 +77,7 @@ pub mod nt_memory_write_guard;
 pub mod nt_memory_snapshot;
 pub mod nt_memory_zim_absorber;
 pub mod nt_memory_brain;
+pub mod nt_memory_lifecycle;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
@@ -173,6 +174,9 @@ pub struct KnowledgeBase {
     /// A1 时效账本 (recall absorb, R-P79): 追踪节点最后更新时刻 + 应遗忘标记,
     /// 检索时过滤 "自信但过期" 的陈旧事实, 减少 agent 被误导决策。
     pub freshness: RwLock<nt_memory_sweep_20260815::FreshnessLedger>,
+    /// Unified memory lifecycle orchestrator — coordinates ForgettingCurve,
+    /// FreshnessLedger, and ConfidenceStore decay into a single interface.
+    pub lifecycle: RwLock<nt_memory_lifecycle::MemoryLifecycle>,
     /// 吸收文本毒化扫描器 (L3 self_poison trait 抽象, 消除 L1→L3 直接依赖)。
     pub absorb_scanner: RwLock<Option<Box<dyn crate::core::nt_core_traits::AbsorbTextScanner>>>,
     /// 可验证回放收据发射器 (L3 AgentReceipt trait 抽象, 消除 L1→L3 直接依赖)。
@@ -233,6 +237,7 @@ impl KnowledgeBase {
             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
             temporal_ledger: Mutex::new(temporal_ledger),
             freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
+            lifecycle: RwLock::new(nt_memory_lifecycle::MemoryLifecycle::default()),
             absorb_scanner: RwLock::new(None),
             receipt_emitter: RwLock::new(None),
         }

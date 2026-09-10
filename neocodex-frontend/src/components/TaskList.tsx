@@ -44,6 +44,10 @@ export function saveTodoState(msgId: string, done: boolean[]): void {
   } catch {
     /* localStorage 不可用/满时静默降级为会话内状态 */
   }
+  // 尝试持久化到后端 KB（localStorage 为 fallback）
+  import('@tauri-apps/api/core').then(({ invoke }) =>
+    invoke('domain_call', { domain: 'kb', action: 'update_node', args: { id: `todo:${msgId}`, data: { done } } })
+  ).catch(() => { /* 后端不可用时静默降级 */ })
 }
 
 export function TaskList(props: { content: string; messageId: string }) {

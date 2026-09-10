@@ -1,5 +1,6 @@
 use std::time::Instant;
 use std::sync::{LazyLock, Mutex};
+use log::info;
 use serde::{Serialize, Deserialize};
 use chrono::Datelike;
 
@@ -535,7 +536,7 @@ impl AlwaysOnEngine {
             task.last_run = Some(chrono::Utc::now());
             task.run_count += 1;
             let output = format!("[always_on] executed task: {} (run #{})", desc, task.run_count);
-            eprintln!("{}", output);
+            info!("{}", output);
 
             task.last_output = Some(output.clone());
             task.state = AlwaysOnState::Idle;

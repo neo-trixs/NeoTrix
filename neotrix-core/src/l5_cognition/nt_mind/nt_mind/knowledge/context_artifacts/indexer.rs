@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use log::warn;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 use super::store::{ArtifactBuilder, ArtifactStore};
@@ -42,7 +43,7 @@ impl ArtifactIndexer {
             };
 
             if !Path::new(&path).exists() {
-                eprintln!("[warn] Artifact source path not found: {}", path);
+                warn!("[warn] Artifact source path not found: {}", path);
                 continue;
             }
 

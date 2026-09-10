@@ -4,6 +4,7 @@
 //! The consciousness entity trains itself through self-play,
 //! evolving difficulty and strategy via constellation progression.
 
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════
@@ -361,7 +362,7 @@ impl BackgroundLoopHandle {
             let mut daemon = match GAME_DAEMON.lock() {
                 Ok(guard) => guard,
                 Err(poisoned) => {
-                    eprintln!("[bg] game_training: lock poisoned: {}", poisoned);
+                    warn!("[bg] game_training: lock poisoned: {}", poisoned);
                     poisoned.into_inner()
                 }
             };

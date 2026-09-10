@@ -4,6 +4,8 @@ use crate::l5_cognition::nt_mind::nt_mind::evolution::dispatch_self_test::Dispat
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest;
 use crate::l5_cognition::act_facade::recipe_refactor;
 
+use log::info;
+
 
 /// GoldStandard 连续未达意识双阈值的升级门限 (tick 数; 默认 600s/tick ≈ 50min 持续无意识)。
 const GOLD_MISS_ESCALATE: usize = 5;
@@ -61,7 +63,7 @@ impl BackgroundLoopHandle {
         // MetaCognitionBridge: full scan → analyze → plan cycle (P0 dead infra fix)
         if let Some(ref mut mc) = self.metacognition {
             let result = mc.run_full_cycle();
-            eprintln!(
+            info!(
                 "[bg] metacognition: iter={} modules={} plans={} alerts={}",
                 result.iteration,
                 result.model_snapshot.modules.len(),
@@ -77,7 +79,7 @@ impl BackgroundLoopHandle {
             let level = aw.current.consciousness_level;
             let health = aw.current.health;
             let is_conscious = level >= 0.7;
-            eprintln!(
+            info!(
                 "[bg] awareness: l={:.3}, phi={:.4}, coh={:.4}",
                 level, phi, coherence
             );
@@ -95,7 +97,7 @@ impl BackgroundLoopHandle {
             let gs_report = self.gold_standard.as_mut().map(|gs| {
                 let state = &[phi, coherence, level, health];
                 let r = gs.evaluate(state, &[]);
-                eprintln!(
+                info!(
                     "[bg] gold_standard: phi={:.4} coh={:.4} conscious={} streak={}",
                     r.phi, r.coherence, r.is_conscious_like, r.detection_streak
                 );

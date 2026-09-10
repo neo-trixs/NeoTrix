@@ -1,5 +1,7 @@
 use super::*;
 
+use log::info;
+
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_cleanup(&mut self) {
         let engine = match self.cleanup_engine.as_mut() {
@@ -74,7 +76,7 @@ impl BackgroundLoopHandle {
 
     pub(crate) async fn handle_crystallization(&mut self) {
         if self.config.enable_auto_crystallize {
-            eprintln!("[bg] crystallization: {}", self.auto_crystallizer.summary());
+            info!("[bg] crystallization: {}", self.auto_crystallizer.summary());
         }
     }
 

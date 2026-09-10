@@ -971,26 +971,25 @@ impl GraphRagStore {
         let mut searcher = CommunityAwareSearch::new(detector);
         searcher.detect(&kb_nodes, &kb_edges);
 
-        let hierarchy = match searcher.hierarchy() {
-            Some(h) => h,
-            None => return Vec::new(),
-        };
-
-        // Use finest level (level 0) for community membership
-        let level0 = match hierarchy.levels.first() {
-            Some(l) if !l.is_empty() => l,
-            _ => return Vec::new(),
-        };
+        // Use unified get_communities() — single fact source for all community detection
+        let results = searcher.get_communities();
+        if results.is_empty() {
+            return Vec::new();
+        }
 
         // Precompute centrality once
         let centrality = self.compute_centrality();
 
-        // Convert Leiden communities to GraphRAG Community structs
-        let mut communities: Vec<Community> = level0
-            .iter()
-            .map(|c| {
-                let label = c.id.0 as usize;
-                self.build_community_summary(label, &c.members, &centrality)
+        // Convert unified CommunityResults to GraphRAG Community structs
+        let mut communities: Vec<Community> = results
+            .into_iter()
+            .map(|r| {
+                let entity_ids: Vec<String> = searcher
+                    .hierarchy()
+                    .and_then(|h| h.get_community(r.community_id))
+                    .map(|c| c.members.clone())
+                    .unwrap_or_default();
+                self.build_community_summary(r.community_id.0 as usize, &entity_ids, &centrality)
             })
             .collect();
 

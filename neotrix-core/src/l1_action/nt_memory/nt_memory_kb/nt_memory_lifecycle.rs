@@ -1,0 +1,173 @@
+//! # Memory Lifecycle Orchestrator
+//!
+//! Unifies the three forgetting mechanisms into a single coordinator:
+//! 1. **ForgettingCurve** (Ebbinghaus) — marks nodes in DB via `should_forget()` metadata
+//! 2. **FreshnessLedger** (staleness tracking) — filters stale docs from in-memory index
+//! 3. **ConfidenceStore::apply_decay** — reduces recency confidence over time
+//!
+//! Before this module, each mechanism ran independently with no coordination,
+//! leading to inconsistent retention decisions across subsystems.
+
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use rusqlite::Connection;
+
+use super::nt_memory_brain::ForgettingCurve;
+use super::nt_memory_confidence::{ConfidenceStore, DecayConfig};
+use super::nt_memory_sweep_20260815::FreshnessLedger;
+
+/// Unified memory lifecycle orchestrator.
+///
+/// Composes all three forgetting mechanisms and provides a single interface
+/// for retention decisions. Each mechanism operates on its own data store
+/// but the orchestrator coordinates their execution order.
+#[derive(Debug, Clone)]
+pub struct MemoryLifecycle {
+    /// Ebbinghaus forgetting curve — time-based retention decay
+    pub forgetting_curve: ForgettingCurve,
+    /// Staleness tracking — clock-tick based freshness ledger
+    pub freshness: FreshnessLedger,
+    /// Confidence decay configuration — for `ConfidenceStore::apply_decay()`
+    pub decay_config: DecayConfig,
+    /// Default staleness threshold (ticks) for FreshnessLedger
+    pub staleness_after: u64,
+}
+
+impl Default for MemoryLifecycle {
+    fn default() -> Self {
+        Self {
+            forgetting_curve: ForgettingCurve::default(),
+            freshness: FreshnessLedger::new(),
+            decay_config: DecayConfig::default(),
+            staleness_after: 100,
+        }
+    }
+}
+
+impl MemoryLifecycle {
+    pub fn new(
+        forgetting_curve: ForgettingCurve,
+        decay_config: DecayConfig,
+        staleness_after: u64,
+    ) -> Self {
+        Self {
+            forgetting_curve,
+            freshness: FreshnessLedger::new(),
+            decay_config,
+            staleness_after,
+        }
+    }
+
+    /// Unified retention decision — checks all three mechanisms.
+    ///
+    /// A node is retained if ALL of:
+    /// - ForgettingCurve says it should NOT be forgotten
+    /// - FreshnessLedger says it is NOT stale
+    /// - ConfidenceStore has NOT decayed it below threshold
+    ///
+    /// Returns `true` if the node should be retained (i.e., NOT forgotten).
+    pub fn should_retain(
+        &self,
+        node_id: &str,
+        last_access: i64,
+        access_count: i64,
+        confidence_store: &ConfidenceStore,
+        now: i64,
+    ) -> bool {
+        // 1. ForgettingCurve: time-based retention
+        if self.forgetting_curve.should_forget(last_access, access_count, now) {
+            return false;
+        }
+
+        // 2. FreshnessLedger: clock-tick staleness
+        if self.freshness.should_forget(node_id) {
+            return false;
+        }
+
+        // 3. ConfidenceStore: confidence-based retention
+        if let Ok(Some(conf)) = confidence_store.get_confidence_by_str(node_id) {
+            if conf.aggregate() < self.decay_config.min_confidence {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Run all three forgetting mechanisms in sequence.
+    ///
+    /// Execution order:
+    /// 1. ForgettingCurve marks stale nodes in DB metadata
+    /// 2. ConfidenceStore decay reduces recency scores
+    /// 3. FreshnessLedger tracks staleness for index filtering
+    ///
+    /// Returns `(nodes_marked_by_curve, confidences_decayed)`.
+    pub fn update_all(
+        &mut self,
+        conn: &Connection,
+        confidence_store: &ConfidenceStore,
+    ) -> Result<(usize, u64), String> {
+        // 1. ForgettingCurve: mark nodes that should be forgotten in DB
+        let marked = self.forgetting_curve.update_freshness(conn)?;
+
+        // 2. ConfidenceStore: decay recency confidence for old records
+        let lambda = self.decay_config.lambda_general;
+        let older_than = self.decay_config.auto_archive_days;
+        let decayed = confidence_store.apply_decay(lambda, older_than)?;
+
+        // 3. FreshnessLedger: tick the clock (staleness is checked on read via is_stale())
+        self.freshness.tick();
+
+        Ok((marked, decayed))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_lifecycle_default() {
+        let lifecycle = MemoryLifecycle::default();
+        assert_eq!(lifecycle.staleness_after, 100);
+        assert_eq!(lifecycle.forgetting_curve.forget_threshold, 0.1);
+    }
+
+    #[test]
+    fn test_should_retain_fresh_node() {
+        let lifecycle = MemoryLifecycle::default();
+        let store = ConfidenceStore::new(DecayConfig::default());
+
+        // Fresh node: just accessed, high access count → should retain
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        assert!(lifecycle.should_retain("node1", now, 10, &store, now));
+    }
+
+    #[test]
+    fn test_should_forget_very_old_node() {
+        let lifecycle = MemoryLifecycle::default();
+        let store = ConfidenceStore::new(DecayConfig::default());
+
+        // Very old node: last accessed long ago, low access count → should forget
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        assert!(!lifecycle.should_retain("node2", 0, 1, &store, now));
+    }
+
+    #[test]
+    fn test_update_all_returns_counts() {
+        let mut lifecycle = MemoryLifecycle::default();
+        let conn = Connection::open_in_memory().unwrap();
+        super::super::nt_memory_schema::initialize(&conn).unwrap();
+        let store = ConfidenceStore::new(DecayConfig::default());
+
+        let (marked, _decayed) = lifecycle.update_all(&conn, &store).unwrap();
+        // With empty DB, nothing to mark
+        assert_eq!(marked, 0);
+    }
+}

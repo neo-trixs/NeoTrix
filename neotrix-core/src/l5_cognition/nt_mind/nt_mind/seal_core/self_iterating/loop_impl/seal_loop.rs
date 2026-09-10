@@ -13,6 +13,7 @@ use super::super::super::cortex_memory::{MemoryTrace, DimensionTag, Modality};
 use super::super::super::knowledge_chain::{KnowledgeChain, ChainRunResult};
 use super::super::super::sleep::{SleepEngine};
 use super::super::super::stats::IterationResult;
+use log::{error, warn};
 use super::super::super::stagnation::StagnationSignal;
 use super::super::pipeline::kernel_iterate_pipeline;
 use super::super::recursive_depth_reward::RecursiveDepthReward;
@@ -764,7 +765,7 @@ impl SelfIteratingBrain {
                     valid_tasks += 1;
                 }
                 Err(e) => {
-                    eprintln!("任务 '{}' 执行失败: {}", task, e);
+                    error!("任务 '{}' 执行失败: {}", task, e);
                 }
             }
         }
@@ -1085,7 +1086,7 @@ impl SelfIteratingBrain {
         if let Some(ref engine) = self.reasoning_engine {
             if let Ok(json) = engine.e8_state_json() {
                 if let Err(e) = crate::core::nt_core_state::save("e8_state", &json) {
-                    eprintln!("[warn] 保存 E8 状态到 KB 失败: {}", e);
+                    warn!("[warn] 保存 E8 状态到 KB 失败: {}", e);
                 }
             }
             // Persist E8 transition matrix to KB for cross-session learning
@@ -1119,7 +1120,7 @@ impl SelfIteratingBrain {
         if let Some(ref mut engine) = self.reasoning_engine {
             if let Some(json) = crate::core::nt_core_state::load("e8_state") {
                 if let Err(e) = engine.load_e8_state_json(&json) {
-                    eprintln!("[warn] 加载 E8 状态失败: {}", e);
+                    warn!("[warn] 加载 E8 状态失败: {}", e);
                 }
             }
         }

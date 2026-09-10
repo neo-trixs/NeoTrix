@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use log::warn;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -179,7 +180,7 @@ impl KnowledgeMiner {
                     results.push(knowledge);
                 }
                 Err(e) => {
-                    eprintln!("[KnowledgeMiner] Failed to mine {}: {}", url, e);
+                    warn!("[KnowledgeMiner] Failed to mine {}: {}", url, e);
                 }
             }
         }

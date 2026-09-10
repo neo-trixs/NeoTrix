@@ -113,6 +113,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       const existing = JSON.parse(storageGet('neotrix:prefs') || '{}')
       storageSet('neotrix:prefs', JSON.stringify({ ...existing, density, motion, fontSize, messageWidth }))
     } catch { /* 持久化失败静默 */ }
+    // 尝试持久化到后端 app_state（localStorage 为 fallback）
+    import('../api/domain-client').then(({ domainCall }) =>
+      domainCall('app', 'save_state', { key: 'appearance', value: { density, motion, fontSize, messageWidth } })
+    ).catch(() => { /* 后端不可用时静默降级为 localStorage */ })
   }
 
   const setDensity = (d: 'comfortable' | 'compact') => {
@@ -142,6 +146,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     try {
       storageSet('neotrix:input-prefs', JSON.stringify({ enter, restoreLastSession: restore }))
     } catch { /* 持久化失败静默 */ }
+    // 尝试持久化到后端 app_state（localStorage 为 fallback）
+    import('../api/domain-client').then(({ domainCall }) =>
+      domainCall('app', 'save_state', { key: 'input_prefs', value: { enter, restoreLastSession: restore } })
+    ).catch(() => { /* 后端不可用时静默降级为 localStorage */ })
   }
 
   const setEnterBehavior = (v: 'send' | 'newline') => {

@@ -1,3 +1,4 @@
+// DEPRECATED: Use Chat.tsx instead. This is a prototype.
 /* ════════════════════════════════════════════
    routes/ChatShellProto.tsx — 「意识体在侧」交互原型 v2
    本轮补齐 (对标 Claude/Codex/Osaurus):

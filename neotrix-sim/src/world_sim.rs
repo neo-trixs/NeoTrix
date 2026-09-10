@@ -1452,7 +1452,7 @@ impl WorldSim {
             let social = self.relationships.neighbors(&agent.core.id).len() as f32 / 10.0;
             let exploration = agent.recent_actions.iter()
                 .filter(|a| a.contains("Explore"))
-                .count() as f32 / 20.0_f32.max(1.0);
+                .count() as f32 / (20.0_f32).max(1.0);
             let cognition = self.phi_bridge.get_state(&agent.core.id)
                 .map(|s| s.consciousness_level() as f32).unwrap_or(0.1);
             let economy = self.economy.total_trades as f32 / 100.0;
