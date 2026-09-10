@@ -577,10 +577,6 @@ pub const FOFA_FIXTURE_JSON: &str = r#"{
 
 #[cfg(test)]
 mod tests {
-}
-
-#[cfg(test)]
-mod tests {
     use super::*;
 
     #[test]
