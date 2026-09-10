@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+use std::sync::{Mutex, RwLock};
 
 use super::account_pool::{AccountPool, AccountPoolConfig};
 use super::generation_classifier::{GenerationAnalytics, GenerationClassifier};
@@ -16,6 +15,8 @@ use super::agent_routing::AgentRoutingTable;
 #[cfg(test)]
 use super::provider_swap::ProviderSwapManager;
 
+mod anomaly_detector;
+mod auto_recovery;
 mod circuit_breaker;
 mod challenge;
 mod consistent_hash;
@@ -26,6 +27,8 @@ mod keyless;
 mod learned_router;
 mod market_router;
 mod ml_predictor;
+mod modular_gateway;
+mod plugin_hot_reload;
 mod plugin_system;
 pub mod pool_health;
 mod registry;
@@ -37,11 +40,19 @@ mod state;
 #[cfg(feature = "stealth-net")]
 mod stealth_middleware;
 mod subgrid;
-mod auto_recovery;
 
+pub use anomaly_detector::*;
+pub use auto_recovery::*;
+pub use circuit_breaker::*;
 pub use coordinator::*;
+pub use intelligent_router::*;
 pub use market_router::*;
+pub use ml_predictor::*;
+pub use modular_gateway::*;
+pub use plugin_hot_reload::*;
+pub use plugin_system::*;
 pub use registry::*;
+pub use consistent_hash::*;
 pub use response_cache::*;
 pub use response_healer::*;
 pub use state::*;
@@ -108,6 +119,16 @@ pub struct GatewayV2 {
     /// Cumora 吸收 (COORDINATION.md §2/§3a): 双脑并发门 —
     /// big (Frontier/Strong) 与 triage (support) 独立 cap, 防雪崩。
     pub tiered_semaphore: Mutex<TieredSemaphore>,
+    /// Plugin System — 请求/响应中间件钩子
+    pub plugin_manager: RwLock<PluginManager>,
+    /// Intelligent Router — 基于请求特征的智能路由
+    pub intelligent_router: RwLock<IntelligentRouter>,
+    /// Auto Recovery — provider 健康监控 + 自动恢复
+    pub auto_recovery: RwLock<AutoRecovery>,
+    /// ML Predictor — 延迟/成功率预测
+    pub ml_predictor: RwLock<MLPredictor>,
+    /// Anomaly Detector — 统计异常检测
+    pub anomaly_detector: RwLock<AnomalyDetector>,
 }
 
 impl GatewayV2 {
@@ -138,6 +159,11 @@ impl GatewayV2 {
             account_pool: Mutex::new(AccountPool::new(AccountPoolConfig::default())),
             adaptive_pacer: Mutex::new(AdaptivePacer::new(50)),
             tiered_semaphore: Mutex::new(TieredSemaphore::default()),
+            plugin_manager: RwLock::new(PluginManager::new()),
+            intelligent_router: RwLock::new(IntelligentRouter::new()),
+            auto_recovery: RwLock::new(AutoRecovery::default()),
+            ml_predictor: RwLock::new(MLPredictor::new()),
+            anomaly_detector: RwLock::new(AnomalyDetector::default()),
         }
     }
 
