@@ -155,3 +155,56 @@ pub struct CognitionSnapshot {
     pub agent_count: usize,
     pub last_update: chrono::DateTime<chrono::Utc>,
 }
+
+/// 会话恢复管理器 trait — L5 认知层合约, L1 实现
+pub trait SessionRecovery: Send + Sync {
+    /// 创建快照
+    fn create_snapshot(
+        &mut self,
+        e8_states: &[u8],
+        topics: &[String],
+        bank_state: &str,
+    ) -> Result<SessionSnapshot, String>;
+
+    /// 是否需要创建快照
+    fn should_snapshot(&self) -> bool;
+
+    /// 构建会话交接数据
+    fn build_handoff(&self) -> Option<String>;
+
+    /// 恢复最新会话
+    fn recover_latest(&self) -> Result<Option<SessionSnapshot>, String>;
+}
+
+/// 会话快照数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionSnapshot {
+    pub session_id: String,
+    pub e8_state_sequence: Vec<u8>,
+    pub message_count: u64,
+    pub active_topics: Vec<String>,
+    pub created_at: u64,
+}
+
+/// 用户画像蒸馏引擎 trait — L5 认知层合约, L1 实现
+pub trait UserDistillation: Send + Sync {
+    /// 处理消息并更新用户画像
+    fn process_message(&mut self, message: &str, is_user: bool) -> DistillationResult;
+
+    /// 获取用户领域偏好
+    fn get_domain_preferences(&self) -> Vec<(String, f64)>;
+
+    /// 获取用户任务偏好
+    fn get_task_preferences(&self) -> Vec<(String, f64)>;
+
+    /// 获取用户画像摘要
+    fn get_profile_summary(&self) -> String;
+}
+
+/// 蒸馏结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistillationResult {
+    pub nodes_created: usize,
+    pub edges_created: usize,
+    pub avatar_confidence: f64,
+}

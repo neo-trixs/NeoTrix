@@ -9,6 +9,12 @@ pub mod personality_drift;
 pub mod reflection;
 pub mod action_costs;
 
+// Fusion Adapters (External Model Integration)
+pub mod goal_outcome_feedback;
+pub mod intention_commitment;
+pub mod thought_generation;
+pub mod social_learning;
+
 pub use sim_agent::*;
 pub use action_awareness::*;
 pub use planning::*;

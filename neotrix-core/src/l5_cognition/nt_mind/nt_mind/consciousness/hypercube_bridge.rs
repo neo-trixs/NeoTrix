@@ -95,7 +95,7 @@ impl HyperCubeBridge {
     /// (0..8, 即 analyze_gaps/sparse_topics 检视的维度), 使真实知识
     /// 直接影响缺口分析驱动的好奇心爬取。
     fn coord_from_kb_node(node: &crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::KnowledgeNode) -> HyperCoord {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType as Kt;
+        use crate::core::nt_core_kb_types::NodeType as Kt;
         let axis = match node.node_type {
             // 代码理解 (0)
             Kt::CodeSnippet | Kt::Repository | Kt::Tool => DimensionAxis::CodeUnderstanding,
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn test_ingest_from_kb_populates_hypercube() {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType;
+        use crate::core::nt_core_kb_types::NodeType;
         // B1 测试隔离: 用内存 KB 而非 open(None) (生产路径会被并行锁+污染)
         let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),
@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn test_frontier_seed_flows_into_hypercube() {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType;
+        use crate::core::nt_core_kb_types::NodeType;
         // 内存 KB 跑完整 seed → 验证前沿模型节点入库 → ingest 映射到 SystemDesign 轴
         let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),

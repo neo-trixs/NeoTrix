@@ -5,14 +5,14 @@ use crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::Capabili
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_save(&mut self) {
         let b = self.brain.read().await;
-        if let Err(e) = b.brain.save() { eprintln!("[bg] save: {}", e); }
+        if let Err(e) = b.brain.save() { log::error!("[bg] save: {}", e); }
         if let Err(e) = self.goal_loop.save() { log::warn!("[background] save goal_loop: {}", e); }
     }
 
     pub(crate) async fn handle_consolidate(&mut self) {
         let mut b = self.brain.write().await;
         let r = b.consolidate_memories();
-        eprintln!("[bg] consolidated: {} merge, {} prune, {} replay",
+        log::info!("[bg] consolidated: {} merge, {} prune, {} replay",
             r.merged_count, r.pruned_count, r.replayed_count);
         // Persist any pending memory orchestrator entries to KB.
         // Currently a no-op until a DualTrackEntry producer is wired in;
@@ -21,7 +21,7 @@ impl BackgroundLoopHandle {
         if let Some(kb_inner) = kb {
             let count = b.persist_pending_entries(&kb_inner);
             if count > 0 {
-                eprintln!("[bg] persisted {} memory orchestrator entries", count);
+                log::info!("[bg] persisted {} memory orchestrator entries", count);
             }
             if let Some(ref mut engine) = b.reasoning_engine {
                 engine.kb = Some(kb_inner);
@@ -64,7 +64,7 @@ impl BackgroundLoopHandle {
             }
             let report = self.dream.run_consolidation_cycle();
             self.dream.prune_low_coherence(DreamConfig::default().merge_threshold);
-            eprintln!(
+            log::info!(
                 "[bg-dream] replayed={} merged={} abstracted={} pred={} novelty={:.2} coherence_gain={:.2}",
                 report.sequences_replayed, report.patterns_merged,
                 report.abstractions_formed, report.predictions_generated,
@@ -91,7 +91,7 @@ impl BackgroundLoopHandle {
             let panel = crate::core::nt_core_gate::JudgePanel::default_panel();
             let decision = GateDecision::check_path(&registry.cloned_specs(), &input, &panel);
             if !decision.allows_autonomous() {
-                eprintln!("[bg] gate blocked goal pursuit: level={:?} action={:?} verdict={:?} reason={}",
+                log::warn!("[bg] gate blocked goal pursuit: level={:?} action={:?} verdict={:?} reason={}",
                     decision.level, decision.action, decision.verdict, decision.reason);
                 return; // 阻断本轮 goal pursuit
             }
@@ -109,7 +109,7 @@ impl BackgroundLoopHandle {
         // 让 meta_agent 不是死代码而是生产路径上的真实消费者。
         if let Some(ref agent) = self.meta_agent {
             if let Ok(CapabilityOutcome::Count(n)) = agent.capability_consolidate() {
-                eprintln!("[bg-agent] memory consolidate: nodes={}", n);
+                log::info!("[bg-agent] memory consolidate: nodes={}", n);
             }
         }
 
@@ -119,7 +119,7 @@ impl BackgroundLoopHandle {
         if let Some(ref bridge) = self.dialogue_bridge {
             let outcome = bridge.absorb_pending(&mut b);
             if outcome.absorbed > 0 {
-                eprintln!(
+                log::info!(
                     "[bg-agent] dialogue absorb: {} experiences -> brain (critic_accepted={}, score_delta={:+.4})",
                     outcome.absorbed, outcome.critic_accepted, outcome.score_delta
                 );
@@ -143,7 +143,7 @@ impl BackgroundLoopHandle {
             if let Some(ref tree) = self.consciousness_tree {
                 let branch_stimuli = crate::l5_cognition::nt_mind::nt_mind::evolution::agent_capability::tree_branch_stimuli(tree);
                 if !branch_stimuli.is_empty() {
-                    eprintln!(
+                    log::info!(
                         "[bg-meta] tree-control: {} branch signals -> attention",
                         branch_stimuli.len(),
                     );
@@ -159,7 +159,7 @@ impl BackgroundLoopHandle {
             };
             if let Some(executor) = self.agent_executor.as_ref() {
                 if let Some((agent, outcome)) = shell.dispatch_and_execute(executor, exec_task) {
-                    eprintln!(
+                    log::info!(
                         "[bg-meta] dispatched={} -> {}",
                         agent,
                         outcome.summary(),
@@ -167,14 +167,14 @@ impl BackgroundLoopHandle {
                     // P1: 每次派单后把行为统计落盘 KB — 学习跨会话累积。
                     if let Some(ref kb_ref) = self.kb {
                         if let Err(e) = shell.learner.persist(kb_ref) {
-                            eprintln!("[bg-meta] route_learner persist failed: {}", e);
+                            log::error!("[bg-meta] route_learner persist failed: {}", e);
                         }
                     }
                     // P4: MAGE 四子图共进化循环同步落盘 — 同一 reward 驱动的图谱 +
                     // 任务级搜索 bandit 跨会话存活 (append-only, 重启后继续累积)。
                     if let Some(ref kb_ref) = self.kb {
                         if let Err(e) = shell.persist_coevo(kb_ref) {
-                            eprintln!("[bg-meta] coevolution loop persist failed: {}", e);
+                            log::error!("[bg-meta] coevolution loop persist failed: {}", e);
                         }
                     }
                     // P6: 派单经验回读 — coevo 经验子图 → 大脑吸收闭环 (R-P79)。
@@ -183,7 +183,7 @@ impl BackgroundLoopHandle {
                     if let Some(ref bridge) = self.dialogue_bridge {
                         let absorb = bridge.absorb_dispatch_experiences(&mut b, &mut shell.coevo);
                         if absorb.absorbed > 0 {
-                            eprintln!(
+                            log::info!(
                                 "[bg-agent] dispatch absorb: {} experiences -> brain (critic_accepted={}, score_delta={:+.4})",
                                 absorb.absorbed, absorb.critic_accepted, absorb.score_delta
                             );
@@ -191,7 +191,7 @@ impl BackgroundLoopHandle {
                         // 水位推进后落盘, 防止重启后重复吸收同一批经验。
                         if let Some(ref kb_ref) = self.kb {
                             if let Err(e) = shell.persist_coevo(kb_ref) {
-                                eprintln!("[bg-meta] coevolution watermark persist failed: {}", e);
+                                log::error!("[bg-meta] coevolution watermark persist failed: {}", e);
                             }
                         }
                     }
@@ -199,7 +199,7 @@ impl BackgroundLoopHandle {
                     // 检查派单拓扑, 当前组织不足则改边 (域→档案), 并落盘 playbook。
                     let repairs = shell.audit_and_repair_topology();
                     if !repairs.is_empty() {
-                        eprintln!(
+                        log::info!(
                             "[bg-meta] topology repair x{} (revision={}): {}",
                             repairs.len(),
                             shell.topology.revision,
@@ -207,7 +207,7 @@ impl BackgroundLoopHandle {
                         );
                         if let Some(ref kb_ref) = self.kb {
                             if let Err(e) = shell.persist_topology(kb_ref) {
-                                eprintln!("[bg-meta] dispatch_topology persist failed: {}", e);
+                                log::error!("[bg-meta] dispatch_topology persist failed: {}", e);
                             }
                         }
                     }
@@ -221,7 +221,7 @@ impl BackgroundLoopHandle {
             let mut brain = self.brain.write().await;
             if let Some(ref mut wm) = self.nt_world_model {
                 let r = pano.run_cycle(&mut brain, &mut self.goal_loop, wm);
-                eprintln!("[bg] prediction: cycle={}, anomaly={}", r.cycle, r.anomaly);
+                log::info!("[bg] prediction: cycle={}, anomaly={}", r.cycle, r.anomaly);
             }
         }
     }
@@ -272,7 +272,7 @@ impl BackgroundLoopHandle {
             let w = WeaknessAnalyzer::new().analyze(&m);
             let r = gd.detect_gaps(&m, &w.weaknesses);
             if r.high_priority_count > 0 {
-                eprintln!("[bg] gaps: {} total, {} high", r.total_gaps, r.high_priority_count);
+                log::info!("[bg] gaps: {} total, {} high", r.total_gaps, r.high_priority_count);
             }
         }
     }
@@ -280,7 +280,7 @@ impl BackgroundLoopHandle {
     pub(crate) async fn handle_world_sense(&mut self) {
         if let Some(ref mut wc) = self.world_consciousness {
             wc.refresh_self_awareness();
-            eprintln!("[bg] world_sense: active={} status={}", wc.active, wc.consciousness_status().len());
+            log::info!("[bg] world_sense: active={} status={}", wc.active, wc.consciousness_status().len());
         }
     }
 
@@ -303,7 +303,7 @@ impl BackgroundLoopHandle {
         if self.always_on.enabled {
             if let Ok(r) = self.always_on.full_cycle() {
                 if r.tasks_executed > 0 {
-                    eprintln!("[bg] always_on: scanned={}, done={}", r.scan_count, r.tasks_executed);
+                    log::info!("[bg] always_on: scanned={}, done={}", r.scan_count, r.tasks_executed);
                     if let Err(e) = self.always_on.save() { log::warn!("[background] save always_on: {}", e); }
                 }
             }
@@ -313,7 +313,7 @@ impl BackgroundLoopHandle {
     pub(crate) async fn handle_nt_act_voice_tick(&mut self) {
         if let Some(ref mut vi) = self.nt_act_voice_input {
             if vi.is_active() && vi.is_continuous() {
-                if let Some(t) = vi.poll_transcription() { eprintln!("[voice] {}", t); }
+                if let Some(t) = vi.poll_transcription() { log::info!("[voice] {}", t); }
             }
         }
     }
@@ -353,7 +353,7 @@ impl BackgroundLoopHandle {
                 let mut b = self.brain.write().await;
                 let outcome = bridge.absorb_research_query(&mut b, q, 5);
                 if outcome.absorbed > 0 {
-                    eprintln!(
+                    log::info!(
                         "[bg-research] query={} absorbed={} nodes -> brain (critic_accepted={}, score_delta={:+.4})",
                         q, outcome.absorbed, outcome.critic_accepted, outcome.score_delta
                     );
@@ -379,7 +379,7 @@ impl BackgroundLoopHandle {
             let mut brain = crate::l5_cognition::nt_mind::nt_mind::self_iterating::ReasoningBrain::new();
             let mut bank = crate::l5_cognition::nt_mind::nt_mind::memory::ReasoningBank::new(100);
             if let Ok(r) = chain.run_chain(&mut brain, &mut bank) {
-                eprintln!("[bg] knowledge chain: discovered={}, mined={}, absorbed={}",
+                log::info!("[bg] knowledge chain: discovered={}, mined={}, absorbed={}",
                     r.discovered, r.mined, r.absorbed);
                 // ── SEAL 微迭代 (R-P79: 吸收即进化, 禁止延期死代码) ──
                 // 爬取数据吸收进 KB 后, 触发一次 SelfIteratingBrain 微迭代,
@@ -389,7 +389,7 @@ impl BackgroundLoopHandle {
                     let task = format!("knowledge_chain_absorb_d{}_m{}_a{}", r.discovered, r.mined, r.absorbed);
                     match b.run_seal_loop_pipeline(&task, None, Some(r.total_reward)) {
                         Ok(reward) => {
-                            eprintln!("[bg] knowledge chain -> seal micro-iteration: reward={:.3}", reward);
+                            log::info!("[bg] knowledge chain -> seal micro-iteration: reward={:.3}", reward);
                         }
                         Err(e) => {
                             log::debug!("[bg] knowledge chain seal micro-iteration skipped: {}", e);
@@ -403,7 +403,7 @@ impl BackgroundLoopHandle {
     pub(crate) async fn handle_knowledge_aging(&mut self) {
         let r = self.knowledge_aging.run_aging_cycle();
         if r.stale_count > 0 {
-            eprintln!("[bg] aging: {} stale, {} expired", r.stale_count, r.expired_count);
+            log::info!("[bg] aging: {} stale, {} expired", r.stale_count, r.expired_count);
             for url in r.rescans_needed.iter().take(3) {
                 if let Some(ref mut ev) = self.self_evolver {
                     if crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver::is_url(url) {

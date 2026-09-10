@@ -4,6 +4,9 @@ use super::nt_memory_store as store;
 use super::nt_memory_types::*;
 use super::KnowledgeBase;
 
+#[allow(unused_imports)]
+use log::{info, warn, error, debug};
+
 pub struct KBIngester {
     kb: KnowledgeBase,
     log: Vec<String>,
@@ -24,11 +27,11 @@ impl KBIngester {
     pub fn concept(&self, title: &str, summary: &str, domain: &str) -> String {
         let conn = match self.kb.conn.lock() {
             Ok(c) => c,
-            Err(_) => { eprintln!("concept {}: lock poisoned", title); return String::new(); }
+            Err(_) => { log::warn!("concept {}: lock poisoned", title); return String::new(); }
         };
         match store::insert_or_get_node(&conn, title, NodeType::Concept, Some(summary), None, Some(domain)) {
             Ok(id) => id,
-            Err(e) => { self.kb.mark_bm25_dirty(); eprintln!("concept {}: {}", title, e); String::new() }
+            Err(e) => { self.kb.mark_bm25_dirty(); log::error!("concept {}: {}", title, e); String::new() }
         }
     }
 
@@ -36,11 +39,11 @@ impl KBIngester {
     pub fn article(&self, title: &str, summary: &str, url: &str, domain: &str) -> String {
         let conn = match self.kb.conn.lock() {
             Ok(c) => c,
-            Err(_) => { eprintln!("article {}: lock poisoned", title); return String::new(); }
+            Err(_) => { log::warn!("article {}: lock poisoned", title); return String::new(); }
         };
         match store::insert_or_get_node(&conn, title, NodeType::Article, Some(summary), Some(url), Some(domain)) {
             Ok(id) => id,
-            Err(e) => { self.kb.mark_bm25_dirty(); eprintln!("article {}: {}", title, e); String::new() }
+            Err(e) => { self.kb.mark_bm25_dirty(); log::error!("article {}: {}", title, e); String::new() }
         }
     }
 
@@ -48,11 +51,11 @@ impl KBIngester {
     pub fn theory(&self, title: &str, summary: &str, domain: &str) -> String {
         let conn = match self.kb.conn.lock() {
             Ok(c) => c,
-            Err(_) => { eprintln!("theory {}: lock poisoned", title); return String::new(); }
+            Err(_) => { log::warn!("theory {}: lock poisoned", title); return String::new(); }
         };
         match store::insert_or_get_node(&conn, title, NodeType::Theory, Some(summary), None, Some(domain)) {
             Ok(id) => id,
-            Err(e) => { self.kb.mark_bm25_dirty(); eprintln!("theory {}: {}", title, e); String::new() }
+            Err(e) => { self.kb.mark_bm25_dirty(); log::error!("theory {}: {}", title, e); String::new() }
         }
     }
 
@@ -76,17 +79,17 @@ impl KBIngester {
 
     /// Insert a repo via GitHub API.
     pub fn repo(&self, owner: &str, repo: &str) -> usize {
-        self.kb.ingest_github(owner, repo).unwrap_or_else(|e| { eprintln!("  repo {}/{} failed: {}", owner, repo, e); 0 })
+        self.kb.ingest_github(owner, repo).unwrap_or_else(|e| { log::error!("  repo {}/{} failed: {}", owner, repo, e); 0 })
     }
 
     /// Insert a paper via ArXiv.
     pub fn arxiv(&self, id: &str) -> usize {
-        self.kb.ingest_arxiv(id).unwrap_or_else(|e| { eprintln!("  arxiv {} failed: {}", id, e); 0 })
+        self.kb.ingest_arxiv(id).unwrap_or_else(|e| { log::error!("  arxiv {} failed: {}", id, e); 0 })
     }
 
     /// Insert a Wikipedia topic.
     pub fn wikipedia(&self, topic: &str) -> usize {
-        self.kb.ingest_wikipedia(topic).unwrap_or_else(|e| { eprintln!("  wiki {} failed: {}", topic, e); 0 })
+        self.kb.ingest_wikipedia(topic).unwrap_or_else(|e| { log::error!("  wiki {} failed: {}", topic, e); 0 })
     }
 
     /// Wire an edge between two nodes (looked up by title).
@@ -126,7 +129,7 @@ impl KBIngester {
     /// Get KB stats.
     pub fn stats(&self) -> KnowledgeStats {
         self.kb.stats().unwrap_or_else(|e| {
-            eprintln!("[neotrix] WARNING: KBIngester::stats() failed: {}", e);
+            log::warn!("[neotrix] WARNING: KBIngester::stats() failed: {}", e);
             KnowledgeStats::default()
         })
     }

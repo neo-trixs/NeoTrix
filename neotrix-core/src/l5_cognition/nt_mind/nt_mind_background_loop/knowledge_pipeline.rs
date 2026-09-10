@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::{extract_html_content, is_safe_fetch_url};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType;
+use crate::core::nt_core_kb_types::NodeType;
 
 // ============================================================
 // 源类型 (使用唯一名避免冲突)

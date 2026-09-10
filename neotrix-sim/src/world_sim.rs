@@ -32,6 +32,10 @@ use crate::society::culture::Culture;
 use crate::society::theory_of_mind::TheoryOfMind;
 use crate::society::constitutional::ConstitutionalFeedback;
 use crate::agents::event_reactive::EventReactiveSystem;
+use crate::agents::goal_outcome_feedback::GoalOutcomeFeedback;
+use crate::agents::intention_commitment::IntentionCommitment;
+use crate::agents::thought_generation::ThoughtGeneration;
+use crate::agents::social_learning::SocialLearning;
 use serde::{Serialize, Deserialize};
 
 /// Configuration for the simulation world
@@ -40,6 +44,7 @@ pub struct WorldSimConfig {
     pub world_width: f32,
     pub world_height: f32,
     pub initial_agents: usize,
+    pub min_agents: usize,
     pub max_agents: usize,
     pub seed: u64,
     pub ticks_per_hour: u64,
@@ -53,6 +58,7 @@ impl Default for WorldSimConfig {
             world_width: 1000.0,
             world_height: 1000.0,
             initial_agents: 10,
+            min_agents: 5,
             max_agents: 50,
             seed: 42,
             ticks_per_hour: 100,
@@ -115,6 +121,11 @@ pub struct WorldSim {
     pub convergence: ConvergenceDetector,
     pub dual_repr: DualRepresentation,
     pub event_reactive: EventReactiveSystem,
+    // Fusion Adapters
+    pub goal_outcome_feedback: GoalOutcomeFeedback,
+    pub intention_commitment: IntentionCommitment,
+    pub thought_generation: ThoughtGeneration,
+    pub social_learning: SocialLearning,
 }
 
 impl WorldSim {
@@ -200,6 +211,10 @@ impl WorldSim {
             convergence: ConvergenceDetector::default_new(),
             dual_repr: DualRepresentation::new(16),
             event_reactive: EventReactiveSystem::new(),
+            goal_outcome_feedback: GoalOutcomeFeedback::new(),
+            intention_commitment: IntentionCommitment::new(),
+            thought_generation: ThoughtGeneration::new(),
+            social_learning: SocialLearning::new(),
         }
     }
 
@@ -577,51 +592,42 @@ impl WorldSim {
         }
     }
 
+    /// Unified decision pipeline: evaluate layers in priority order, first non-None wins.
     fn decide_action(&mut self, agent: &SimAgent, obs: &AgentObservation, time_mods: &TimeModifiers) -> AgentAction {
-        // === M1: PlanningStack goal-driven decisions ===
-        if let Some(planning) = self.planning.get(&agent.core.id) {
-            // Generate goals from current state
-            // We need to temporarily borrow planning mutably for goal generation,
-            // but we're in an immutable borrow context. Use a two-phase approach:
-            // Phase 1: check if there's already an active goal with an action
-            if let Some(action) = planning.next_action() {
-                let planned = action.clone();
-                // Validate the planned action is still sensible
-                match &planned {
-                    AgentAction::Eat { resource_id } => {
-                        if obs.nearby_resources.iter().any(|r| &r.id == resource_id) {
-                            return planned;
-                        }
-                    }
-                    AgentAction::Rest => {
-                        if agent.core.energy < 50.0 { return planned; }
-                    }
-                    AgentAction::Talk { target_id, .. } => {
-                        if obs.nearby_agents.iter().any(|a| &a.id == target_id) {
-                            return planned;
-                        }
-                    }
-                    _ => {}
-                }
-            }
+        if let Some(action) = self.layer_survival(agent, obs) {
+            return action;
         }
+        if let Some(action) = self.layer_goals(agent, obs) {
+            return action;
+        }
+        if let Some(action) = self.layer_social(agent, obs, time_mods) {
+            return action;
+        }
+        if let Some(action) = self.layer_personality(agent, obs, time_mods) {
+            return action;
+        }
+        self.layer_default(agent)
+    }
 
-        // === Survival priority (hard constraints) ===
+    /// Layer 1 — Hard constraints: survival needs, terrain hazards, economy prices.
+    /// These override all other considerations — an starving or freezing agent cannot pursue goals.
+    fn layer_survival(&mut self, agent: &SimAgent, obs: &AgentObservation) -> Option<AgentAction> {
+        // Hunger: eat nearby food or explore searching for it
         if agent.core.hunger > 60.0 {
             if let Some(res) = obs.nearby_resources.iter()
                 .filter(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
                 .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
             {
-                return AgentAction::Eat { resource_id: res.id.clone() };
+                return Some(AgentAction::Eat { resource_id: res.id.clone() });
             }
-            return AgentAction::Explore { direction: Vec2::new(
+            return Some(AgentAction::Explore { direction: Vec2::new(
                 self.rng.range_f32(-1.0, 1.0),
                 self.rng.range_f32(-1.0, 1.0),
-            )};
+            )});
         }
 
+        // Low energy: prefer flat terrain when resting
         if agent.core.energy < 30.0 {
-            // Heightmap: prefer flat terrain when resting
             let height = self.heightmap.height_at(agent.core.position.x, agent.core.position.y);
             let candidate_positions = [
                 Vec2::new(agent.core.position.x + 20.0, agent.core.position.y),
@@ -638,21 +644,13 @@ impl WorldSim {
                 .copied()
                 .unwrap_or(agent.core.position);
             if (height - self.heightmap.height_at(flat_pos.x, flat_pos.y)).abs() > 0.01 {
-                return AgentAction::Move { target: flat_pos };
+                return Some(AgentAction::Move { target: flat_pos });
             }
-            return AgentAction::Rest;
+            return Some(AgentAction::Rest);
         }
 
-        // === Heightmap + Biome: terrain-aware exploration ===
-        let _current_biome = self.biome_map.biome_at(
-            agent.core.position.x,
-            agent.core.position.y,
-            self.config.world_width,
-            self.config.world_height,
-        );
+        // Mountain hazard: flee to lower terrain when low on energy
         let is_mountain = self.heightmap.is_mountain(agent.core.position.x, agent.core.position.y);
-
-        // Mountain: cautious — prefer moving to safer terrain
         if is_mountain && agent.core.energy < 60.0 {
             let candidates = [
                 Vec2::new(agent.core.position.x + 30.0, agent.core.position.y),
@@ -666,12 +664,12 @@ impl WorldSim {
                 ha.partial_cmp(&hb).unwrap()
             }) {
                 if self.heightmap.height_at(safe_pos.x, safe_pos.y) < self.heightmap.config().mountain_level {
-                    return AgentAction::Move { target: *safe_pos };
+                    return Some(AgentAction::Move { target: *safe_pos });
                 }
             }
         }
 
-        // Economy: check food market prices when hungry
+        // Economy: buy food when cheap and very hungry
         if agent.core.hunger > 70.0 {
             if let Some(&food_price) = self.economy.market_prices.get(&crate::society::economy::ResourceType::Food) {
                 if food_price < 2.0 {
@@ -679,25 +677,59 @@ impl WorldSim {
                         .filter(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
                         .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
                     {
-                        return AgentAction::Eat { resource_id: res.id.clone() };
+                        return Some(AgentAction::Eat { resource_id: res.id.clone() });
                     }
                 }
             }
         }
 
-        // Culture: check norms for social decisions
+        None
+    }
+
+    /// Layer 2 — Goal-driven: PlanningStack active goals.
+    /// Validates that planned actions are still feasible given current observation.
+    fn layer_goals(&mut self, agent: &SimAgent, obs: &AgentObservation) -> Option<AgentAction> {
+        let planning = self.planning.get(&agent.core.id)?;
+        let action = planning.next_action()?;
+        let planned = action.clone();
+
+        // Validate the planned action is still sensible
+        match &planned {
+            AgentAction::Eat { resource_id } => {
+                if obs.nearby_resources.iter().any(|r| &r.id == resource_id) {
+                    return Some(planned);
+                }
+            }
+            AgentAction::Rest => {
+                if agent.core.energy < 50.0 { return Some(planned); }
+            }
+            AgentAction::Talk { target_id, .. } => {
+                if obs.nearby_agents.iter().any(|a| &a.id == target_id) {
+                    return Some(planned);
+                }
+            }
+            _ => {}
+        }
+
+        None
+    }
+
+    /// Layer 3 — Social: TheoryOfMind threat assessment + Culture norms + sociability.
+    /// Social decisions are only made when survival and goals don't dominate.
+    fn layer_social(&mut self, agent: &SimAgent, obs: &AgentObservation, time_mods: &TimeModifiers) -> Option<AgentAction> {
+        // Culture: cooperativeness norm may prompt greeting
         let cooperativeness_norm = self.culture.compliance_with("cooperativeness");
         if agent.personality.cooperativeness > cooperativeness_norm && agent.core.hunger < 40.0 {
             if !obs.nearby_agents.is_empty() && self.rng.next_f32() < time_mods.social_activity {
                 let target = &obs.nearby_agents[0];
-                return AgentAction::Talk {
+                return Some(AgentAction::Talk {
                     target_id: target.id.clone(),
                     message: "greeting".to_string(),
-                };
+                });
             }
         }
 
-        // M3: TheoryOfMind social decisions ===
+        // TheoryOfMind: threat assessment and cooperativeness
         if !obs.nearby_agents.is_empty() {
             if let Some(tom) = self.theory_of_mind.get(&agent.core.id) {
                 let target = &obs.nearby_agents[0];
@@ -710,90 +742,99 @@ impl WorldSim {
                         agent.core.position.x - target.distance,
                         agent.core.position.y,
                     ).normalize();
-                    return AgentAction::Explore { direction: flee_dir };
+                    return Some(AgentAction::Explore { direction: flee_dir });
                 }
 
                 // High cooperativeness → prefer trade/talk
                 if coop > 0.6 && self.rng.next_f32() < time_mods.social_activity * 1.5 {
-                    return AgentAction::Talk {
+                    return Some(AgentAction::Talk {
                         target_id: target.id.clone(),
                         message: "hello".to_string(),
-                    };
+                    });
                 }
             }
 
             // Default social: talk if personality favors it
             if agent.personality.sociability > 0.6 && self.rng.next_f32() < time_mods.social_activity {
                 let target = &obs.nearby_agents[0];
-                return AgentAction::Talk {
+                return Some(AgentAction::Talk {
                     target_id: target.id.clone(),
                     message: "hello".to_string(),
-                };
+                });
             }
         }
 
-        // === M2: Personality bias ===
+        None
+    }
+
+    /// Layer 4 — Personality + Emotion: trait-driven impulses, emotion modulation,
+    /// ActionAwareness signals, and DualRepresentation cycle-breaking.
+    fn layer_personality(&mut self, agent: &SimAgent, obs: &AgentObservation, _time_mods: &TimeModifiers) -> Option<AgentAction> {
+        // Personality bias: aggression, curiosity, cooperativeness
         let roll = self.rng.next_f32();
         if agent.personality.aggression > 0.7 && roll < 0.2 {
             if let Some(target) = obs.nearby_agents.first() {
-                return AgentAction::Attack { target_id: target.id.clone() };
+                return Some(AgentAction::Attack { target_id: target.id.clone() });
             }
         }
         if agent.personality.curiosity > 0.7 && roll < 0.4 {
             let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
-            return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+            return Some(AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) });
         }
         if agent.personality.cooperativeness > 0.7 && roll < 0.3 {
-                if let Some(target) = obs.nearby_agents.first() {
-                    return AgentAction::Trade {
-                        target_id: target.id.clone(),
-                        item: "berries".to_string(),
-                        amount: 1,
-                    };
-                }
+            if let Some(target) = obs.nearby_agents.first() {
+                return Some(AgentAction::Trade {
+                    target_id: target.id.clone(),
+                    item: "berries".to_string(),
+                    amount: 1,
+                });
+            }
         }
 
-        // === Emotion modulation ===
+        // Emotion modulation
         let dominant = self.emotion.dominant_emotion();
         match dominant {
             Some(EmotionType::Anxiety) | Some(EmotionType::Fatigue) => {
                 if self.rng.next_f32() < 0.5 {
-                    return AgentAction::Rest;
+                    return Some(AgentAction::Rest);
                 }
             }
             Some(EmotionType::Curiosity) | Some(EmotionType::Joy) | Some(EmotionType::Wonder) => {
                 let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
-                return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+                return Some(AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) });
             }
             Some(EmotionType::Frustration) => {
                 if self.rng.next_f32() < 0.3 {
                     let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
-                    return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+                    return Some(AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) });
                 }
             }
             _ => {}
         }
 
-        // === M8: ActionAwareness explore signal ===
+        // ActionAwareness: periodic exploration signal
         if let Some(awareness) = self.action_awareness.get(&agent.core.id) {
             if awareness.should_explore() {
                 let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
-                return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+                return Some(AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) });
             }
         }
 
-        // === DualRepresentation: detect repeated action patterns ===
+        // DualRepresentation: break repeated action cycles
         let prev_action_label = format!("{:?}_{}", agent.core.id, self.tick.saturating_sub(1));
         let similar = self.dual_repr.similar_to(&prev_action_label, 3);
         if let Some((_, sim_score)) = similar.first() {
             if *sim_score > 0.9 && self.rng.next_f32() < 0.4 {
-                // High similarity to past actions — force exploration to break cycle
                 let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
-                return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+                return Some(AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) });
             }
         }
 
-        // === Default: explore ===
+        None
+    }
+
+    /// Layer 5 — Default: random exploration when no higher-priority layer fires.
+    fn layer_default(&mut self, _agent: &SimAgent) -> AgentAction {
         AgentAction::Explore { direction: Vec2::new(
             self.rng.range_f32(-1.0, 1.0),
             self.rng.range_f32(-1.0, 1.0),
@@ -860,7 +901,76 @@ impl WorldSim {
             AgentAction::Trade { target_id, item, amount } => {
                 let agent_id_owned = agent_id.to_string();
                 let target_id_owned = target_id.clone();
-                // Economy: execute trade between agents
+                // Build dynamic inventories from nearby resources for both agents
+                let agent_inv = {
+                    let agent = &self.agents[idx];
+                    let mut inv = crate::society::economy::Inventory::new();
+                    let nearby: Vec<&crate::environment::terrain::resources::ResourceNode> = self.resources.nodes.iter()
+                        .filter(|r| !r.depleted)
+                        .filter(|r| {
+                            let dx = r.position.0 - agent.core.position.x;
+                            let dy = r.position.1 - agent.core.position.y;
+                            (dx * dx + dy * dy).sqrt() < 150.0
+                        })
+                        .collect();
+                    for r in &nearby {
+                        match r.resource_type {
+                            crate::environment::terrain::resources::ResourceType::Berries
+                            | crate::environment::terrain::resources::ResourceType::Fish
+                            | crate::environment::terrain::resources::ResourceType::Meat => {
+                                inv.add(crate::society::economy::ResourceType::Food, r.amount * 0.3);
+                            }
+                            crate::environment::terrain::resources::ResourceType::Wood => {
+                                inv.add(crate::society::economy::ResourceType::Wood, r.amount * 0.3);
+                            }
+                            crate::environment::terrain::resources::ResourceType::Stone
+                            | crate::environment::terrain::resources::ResourceType::Ore => {
+                                inv.add(crate::society::economy::ResourceType::Stone, r.amount * 0.2);
+                            }
+                            crate::environment::terrain::resources::ResourceType::Water => {
+                                inv.add(crate::society::economy::ResourceType::Water, r.amount * 0.3);
+                            }
+                            _ => {}
+                        }
+                    }
+                    inv
+                };
+                let target_inv = {
+                    if let Some(target_agent) = self.agents.iter().find(|a| &a.core.id == &target_id_owned) {
+                        let mut inv = crate::society::economy::Inventory::new();
+                        let nearby: Vec<&crate::environment::terrain::resources::ResourceNode> = self.resources.nodes.iter()
+                            .filter(|r| !r.depleted)
+                            .filter(|r| {
+                                let dx = r.position.0 - target_agent.core.position.x;
+                                let dy = r.position.1 - target_agent.core.position.y;
+                                (dx * dx + dy * dy).sqrt() < 150.0
+                            })
+                            .collect();
+                        for r in &nearby {
+                            match r.resource_type {
+                                crate::environment::terrain::resources::ResourceType::Berries
+                                | crate::environment::terrain::resources::ResourceType::Fish
+                                | crate::environment::terrain::resources::ResourceType::Meat => {
+                                    inv.add(crate::society::economy::ResourceType::Food, r.amount * 0.3);
+                                }
+                                crate::environment::terrain::resources::ResourceType::Wood => {
+                                    inv.add(crate::society::economy::ResourceType::Wood, r.amount * 0.3);
+                                }
+                                crate::environment::terrain::resources::ResourceType::Stone
+                                | crate::environment::terrain::resources::ResourceType::Ore => {
+                                    inv.add(crate::society::economy::ResourceType::Stone, r.amount * 0.2);
+                                }
+                                crate::environment::terrain::resources::ResourceType::Water => {
+                                    inv.add(crate::society::economy::ResourceType::Water, r.amount * 0.3);
+                                }
+                                _ => {}
+                            }
+                        }
+                        inv
+                    } else {
+                        crate::society::economy::Inventory::new()
+                    }
+                };
                 let offer = crate::society::economy::TradeOffer {
                     from: agent_id_owned.clone(),
                     to: target_id_owned.clone(),
@@ -869,13 +979,23 @@ impl WorldSim {
                     want: crate::society::economy::ResourceType::Wood,
                     want_amount: *amount as f32 * 0.5,
                 };
-                let mut buyer_inv = crate::society::economy::Inventory::new();
-                let mut seller_inv = crate::society::economy::Inventory::new();
-                buyer_inv.add(crate::society::economy::ResourceType::Wood, 5.0);
-                seller_inv.add(crate::society::economy::ResourceType::Food, 5.0);
-                let _trade_ok = self.economy.execute_trade(offer, &mut buyer_inv, &mut seller_inv);
-                // Relationship update for trade
+                let mut buyer_inv = agent_inv;
+                let mut seller_inv = target_inv;
+                let trade_ok = self.economy.execute_trade(offer, &mut buyer_inv, &mut seller_inv);
                 self.relationships.update_interaction(&agent_id_owned, &target_id_owned, 0.15, self.tick);
+                if trade_ok {
+                    self.bus.emit(
+                        SimEvent::EconomyTransaction {
+                            buyer: agent_id_owned,
+                            seller: target_id_owned,
+                            item: item.clone(),
+                            amount: *amount,
+                        },
+                        EventPriority::Normal,
+                        self.clock.current,
+                        "world_sim",
+                    ).await;
+                }
             }
             AgentAction::Build { position, structure_type } => {
                 let struct_type = match structure_type.as_str() {
@@ -894,6 +1014,43 @@ impl WorldSim {
                     agent_id,
                     self.tick,
                 );
+            }
+            AgentAction::Harvest { resource_id } => {
+                if let Some(res) = self.resources.nodes.iter_mut().find(|r| &r.id == resource_id) {
+                    let available = res.amount;
+                    let harvested = res.harvest(30.0);
+                    if harvested > 0.0 {
+                        let agent = &mut self.agents[idx];
+                        let nutrition = res.resource_type.nutrition_value();
+                        let energy_gain = res.resource_type.energy_value();
+                        if nutrition > 0.0 {
+                            agent.core.eat(harvested * nutrition / 30.0);
+                        } else {
+                            agent.core.energy = (agent.core.energy + energy_gain * harvested / 30.0).min(100.0);
+                        }
+                        self.bus.emit(
+                            SimEvent::AgentActed {
+                                agent_id: agent_id.to_string(),
+                                action: "harvest".to_string(),
+                                result: format!("harvested {:.1} from {}", harvested, resource_id),
+                            },
+                            EventPriority::Normal,
+                            self.clock.current,
+                            "world_sim",
+                        ).await;
+                        if res.depleted {
+                            self.bus.emit(
+                                SimEvent::ResourceDepleted {
+                                    resource_id: res.id.clone(),
+                                    position: res.position,
+                                },
+                                EventPriority::Normal,
+                                self.clock.current,
+                                "world_sim",
+                            ).await;
+                        }
+                    }
+                }
             }
             _ => {}
         }

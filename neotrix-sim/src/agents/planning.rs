@@ -225,6 +225,10 @@ impl PlanningStack {
         &self.goals
     }
 
+    pub fn goals_mut(&mut self) -> &mut [Goal] {
+        &mut self.goals
+    }
+
     pub fn active_count(&self) -> usize {
         self.goals.iter().filter(|g| g.status == GoalStatus::Active).count()
     }

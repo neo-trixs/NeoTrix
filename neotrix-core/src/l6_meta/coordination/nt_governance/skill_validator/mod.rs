@@ -189,7 +189,7 @@ impl SkillValidator {
         }
 
         // Name matches directory
-        let dir_name = self.plugin_root.file_name().unwrap().to_string_lossy();
+        let dir_name = self.plugin_root.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         if let Some(name) = plugin.get("name").and_then(|v| v.as_str()) {
             if name != dir_name {
                 report.add_finding(ValidationFinding {
@@ -211,8 +211,8 @@ impl SkillValidator {
             return; // Skills optional
         }
 
-        for entry in std::fs::read_dir(&skills_dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-            let entry = entry.unwrap();
+        for entry in std::fs::read_dir(&skills_dir).unwrap_or_default() {
+            let Ok(entry) = entry else { continue };
             let skill_dir = entry.path();
             if !skill_dir.is_dir() { continue; }
             
@@ -222,7 +222,7 @@ impl SkillValidator {
                     rule_id: "SKILL-001".to_string(),
                     category: RuleCategory::SkillFrontmatter,
                     severity: Severity::Error,
-                    message: format!("Skill '{}' missing SKILL.md", skill_dir.file_name().unwrap().to_string_lossy()),
+                    message: format!("Skill '{}' missing SKILL.md", skill_dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()),
                     file: Some(skill_md.clone()),
                     line: None,
                     suggestion: Some("Create SKILL.md with frontmatter".to_string()),
@@ -321,8 +321,8 @@ impl SkillValidator {
         let refs_dir = skill_dir.join("references");
         if !refs_dir.exists() { return; }
         
-        for entry in std::fs::read_dir(&refs_dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-            let entry = entry.unwrap();
+        for entry in std::fs::read_dir(&refs_dir).unwrap_or_default() {
+            let Ok(entry) = entry else { continue };
             let path = entry.path();
             if path.extension().map_or(false, |e| e == "md") {
                 // Check for reference chains (file referencing another file in references/)
@@ -362,8 +362,8 @@ impl SkillValidator {
         // .claude-plugin only contains plugin.json
         let claude_plugin = self.plugin_root.join(".claude-plugin");
         if claude_plugin.exists() {
-            for entry in std::fs::read_dir(&claude_plugin).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-                let entry = entry.unwrap();
+            for entry in std::fs::read_dir(&claude_plugin).unwrap_or_default() {
+                let Ok(entry) = entry else { continue };
                 if entry.file_name() != "plugin.json" && entry.file_name() != "marketplace.json" {
                     report.add_finding(ValidationFinding {
                         rule_id: "STRUCT-CLAUDE-PLUGIN".to_string(),
@@ -383,8 +383,8 @@ impl SkillValidator {
         let commands_dir = self.plugin_root.join("commands");
         if !commands_dir.exists() { return; }
         
-        for entry in std::fs::read_dir(&commands_dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-            let entry = entry.unwrap();
+        for entry in std::fs::read_dir(&commands_dir).unwrap_or_default() {
+            let Ok(entry) = entry else { continue };
             let path = entry.path();
             if path.extension().map_or(false, |e| e == "md") {
                 // Check frontmatter has allowed-tools
@@ -486,8 +486,8 @@ impl SkillValidator {
         // Check plugins/*/.codex-plugin/
         let plugins_dir = self.plugin_root.join("plugins");
         if plugins_dir.exists() {
-            for entry in std::fs::read_dir(&plugins_dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-                let entry = entry.unwrap();
+            for entry in std::fs::read_dir(&plugins_dir).unwrap_or_default() {
+                let Ok(entry) = entry else { continue };
                 let plugin_dir = entry.path();
                 let codex_plugin = plugin_dir.join(".codex-plugin");
                 if codex_plugin.exists() {
@@ -495,7 +495,7 @@ impl SkillValidator {
                         rule_id: "SIDECAR-CODEX-PLUGIN".to_string(),
                         category: RuleCategory::Sidecars,
                         severity: Severity::Error,
-                        message: format!("Plugin {} has .codex-plugin sidecar", plugin_dir.file_name().unwrap().to_string_lossy()),
+                        message: format!("Plugin {} has .codex-plugin sidecar", plugin_dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()),
                         file: Some(codex_plugin),
                         line: None,
                         suggestion: Some("Remove .codex-plugin, use marketplace.json".to_string()),
@@ -544,8 +544,8 @@ impl SkillValidator {
         let dependabot = self.plugin_root.join(".github").join("dependabot.yml");
         if dependabot.exists() {
             // Simplified: just check common locations
-            for entry in std::fs::read_dir(&self.plugin_root).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-                let entry = entry.unwrap();
+            for entry in std::fs::read_dir(&self.plugin_root).unwrap_or_default() {
+                let Ok(entry) = entry else { continue };
                 if entry.path().join("pyproject.toml").exists() || entry.path().join("uv.lock").exists() {
                     dirs.push(entry.path());
                 }

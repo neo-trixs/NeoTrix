@@ -25,6 +25,7 @@ pub enum MemoryKind {
     Reflection,
     Plan,
     Social,
+    Thought,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
