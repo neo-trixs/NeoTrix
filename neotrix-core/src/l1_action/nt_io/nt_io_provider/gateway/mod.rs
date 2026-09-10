@@ -16,62 +16,31 @@ use super::agent_routing::AgentRoutingTable;
 #[cfg(test)]
 use super::provider_swap::ProviderSwapManager;
 
-mod adaptive_breaker;
-mod cache_dedup;
-mod cache_router;
 mod challenge;
-mod complexity_router;
 mod coordinator;
-mod entropy_engine;
 mod execution;
-mod fingerprint_rotator;
-mod fingerprint_synth;
-mod h2_multiplexer;
-mod header_analyzer;
 mod keyless;
+mod learned_router;
 mod market_router;
-mod multi_endpoint;
 pub mod pool_health;
-mod preemptive_rotator;
-mod protocol_reflection;
-mod refusal_detector;
 mod registry;
 mod reliability;
 mod response_cache;
 mod response_healer;
 mod selection;
-mod session_pool;
 mod state;
 #[cfg(feature = "stealth-net")]
 mod stealth_middleware;
 mod subgrid;
-mod token_frame;
-mod warp_rotator;
 
-pub use adaptive_breaker::*;
-pub use cache_dedup::*;
-pub use cache_router::*;
-pub use complexity_router::*;
 pub use coordinator::*;
-pub use entropy_engine::*;
-pub use fingerprint_rotator::*;
-pub use fingerprint_synth::*;
-pub use h2_multiplexer::*;
-pub use header_analyzer::*;
 pub use market_router::*;
-pub use multi_endpoint::*;
-pub use preemptive_rotator::*;
-pub use protocol_reflection::*;
-pub use refusal_detector::*;
 pub use registry::*;
 pub use response_cache::*;
 pub use response_healer::*;
-pub use session_pool::*;
 pub use state::*;
 #[cfg(feature = "stealth-net")]
 pub use stealth_middleware::*;
-pub use token_frame::*;
-pub use warp_rotator::*;
 
 /// 识别配额耗尽错误 — 与瞬时限速 (429) 区分 (freellmapi/aimux 模式)。
 /// 覆盖常见 provider 配额/信用耗尽措辞。命中后应熔断 provider 而非重试。

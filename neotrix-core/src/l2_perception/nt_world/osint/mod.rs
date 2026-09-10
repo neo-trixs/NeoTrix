@@ -206,10 +206,10 @@ impl OsintReport {
         if let Some(ref v) = self.vuln { n += v.vulnerabilities.len(); }
         if let Some(ref nw) = self.network { n += nw.services.len(); }
         if let Some(ref dk) = self.dark { n += dk.results.len(); }
-        if let Some(ref f) = self.fofa { n += f.results.len(); }
+        if let Some(ref f) = self.fofa { n += f.assets.len(); }
         if let Some(ref s) = self.shodan { n += s.services.len(); }
-        if let Some(ref c) = self.censys { n += c.results.len(); }
-        if let Some(ref z) = self.zoomeye { n += z.hosts.len(); }
+        if let Some(ref c) = self.censys { n += c.services.len(); }
+        if let Some(ref z) = self.zoomeye { n += z.host.len(); }
         n
     }
 }
@@ -329,7 +329,7 @@ impl OsintReport {
         }
 
         if let Some(ref fofa) = self.fofa {
-            for r in &fofa.results {
+            for r in &fofa.assets {
                 if let Ok(id) = Self::write_with_evidence(kb, &format!("fofa: {}", r.url), NodeType::Source, r.title.as_deref().or(Some("FOFA result")), Some(&r.url), domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
@@ -338,24 +338,24 @@ impl OsintReport {
 
         if let Some(ref shodan) = self.shodan {
             for svc in &shodan.services {
-                let name = svc.service.as_deref().unwrap_or("unknown");
-                if let Ok(id) = Self::write_with_evidence(kb, &format!("shodan: {}:{}/{}", svc.host, svc.port, name), NodeType::Source, svc.banner.as_deref(), None, domain_hint, &run_id) {
+                let name = svc.product.as_deref().unwrap_or("unknown");
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("shodan: {}", svc.port), NodeType::Source, svc.banner.as_deref(), None, domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
         }
 
         if let Some(ref censys) = self.censys {
-            for r in &censys.results {
-                if let Ok(id) = Self::write_with_evidence(kb, &format!("censys: {}", r.ip), NodeType::Source, r.service.as_deref().or(Some("Censys result")), None, domain_hint, &run_id) {
+            for r in &censys.services {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("censys: {}", censys.ip), NodeType::Source, r.product.as_deref().or(Some("Censys service")), None, domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
         }
 
         if let Some(ref zoomeye) = self.zoomeye {
-            for h in &zoomeye.hosts {
-                if let Ok(id) = Self::write_with_evidence(kb, &format!("zoomeye: {}", h.ip), NodeType::Source, h.service.as_deref().or(Some("ZoomEye host")), None, domain_hint, &run_id) {
+            for svc in &zoomeye.services {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("zoomeye: {}", zoomeye.ip), NodeType::Source, svc.product.as_deref().or(Some("ZoomEye service")), None, domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
@@ -386,7 +386,7 @@ impl std::fmt::Display for OsintReport {
         if let Some(ref v) = self.vuln { write!(f, "{}", v)?; }
         if let Some(ref n) = self.network { write!(f, "{}", n)?; }
         if let Some(ref d) = self.dark { write!(f, "{}", d)?; }
-        if let Some(ref f) = self.fofa { write!(f, "{}", f)?; }
+        if let Some(ref fofa) = self.fofa { write!(f, "{}", fofa)?; }
         if let Some(ref s) = self.shodan { write!(f, "{}", s)?; }
         if let Some(ref c) = self.censys { write!(f, "{}", c)?; }
         if let Some(ref z) = self.zoomeye { write!(f, "{}", z)?; }
