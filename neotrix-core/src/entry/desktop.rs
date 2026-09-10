@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use neotrix::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
-use neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::neotrix::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
+use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
 
 use neotrix::cli::commands::registry::default_registry;
 
@@ -11,7 +11,7 @@ use neotrix::cli::commands::registry::default_registry;
 /// Kept behind a free function so the loop can be triggered from the TUI
 /// without holding the mutex across the whole command.
 pub(crate) async fn step_evolution(agent: &mut NeoCodexAgent) {
-    neotrix::nt_io_neocodex::EvolutionLoop::step(agent);
+    neotrix::neotrix::nt_io_neocodex::EvolutionLoop::step(agent);
 }
 
 

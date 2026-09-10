@@ -6,7 +6,7 @@
 //! 输出: 每项 ns/op + 吞吐 (MB/s) + B/记录。
 
 use std::time::Instant;
-use neotrix::l1_action::nt_memory::nt_memory_kb::pack::{GeoPoint, PackDecoder, PackEncoder};
+use neotrix::neotrix::nt_memory_kb::nt_memory_pack::{GeoPoint, PackDecoder, PackEncoder};
 
 fn sample_points(n: usize) -> Vec<GeoPoint> {
     (0..n)

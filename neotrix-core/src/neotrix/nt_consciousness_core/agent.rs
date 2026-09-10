@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
-use super::probes::{ProbeEngine, Gap, GapType, GapSeverity};
-use super::patches::{PatchGenerator, Patch, PatchAction};
+use super::probes::{ProbeEngine, Gap, GapSeverity};
+use super::patches::{PatchGenerator, Patch};
 use super::convergence::ConvergenceChecker;
 use super::state::StateSnapshot;
 
@@ -37,7 +37,7 @@ pub struct IterationAgent {
 }
 
 /// 漏洞注册表
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GapRegistry {
     /// 按维度分组的漏洞
     pub gaps_by_dimension: HashMap<String, Vec<Gap>>,
@@ -259,8 +259,8 @@ impl IterationAgent {
 
         // 计算平均耗时
         if self.stats.total_cycles > 0 {
-            self.stats.avg_cycle_duration_ms = 
-                start_time.elapsed().as_millis() as u64 / self.stats.total_cycles;
+            self.stats.avg_cycle_duration_ms =
+                start_time.elapsed().as_millis() as u64 / self.stats.total_cycles as u64;
         }
 
         self.generate_report()
@@ -371,7 +371,7 @@ impl IterationAgent {
     }
 
     /// 生成报告
-    fn generate_report(self) -> IterationReport {
+    fn generate_report(&self) -> IterationReport {
         let proof = ConvergenceProof {
             consecutive_no_gap_cycles: self.checker.consecutive_no_gap,
             covered_dimensions: self.gap_registry.dimensions().len() as u32,
@@ -382,11 +382,11 @@ impl IterationAgent {
         };
 
         IterationReport {
-            stats: self.stats,
-            final_state: self.state_snapshot,
-            gap_registry: self.gap_registry,
-            meta_patterns: self.meta_patterns,
-            patch_history_summary: self.patch_history.into_iter().rev().take(100).collect(),
+            stats: self.stats.clone(),
+            final_state: self.state_snapshot.clone(),
+            gap_registry: self.gap_registry.clone(),
+            meta_patterns: self.meta_patterns.clone(),
+            patch_history_summary: self.patch_history.iter().rev().take(100).cloned().collect(),
             convergence_proof: proof,
         }
     }

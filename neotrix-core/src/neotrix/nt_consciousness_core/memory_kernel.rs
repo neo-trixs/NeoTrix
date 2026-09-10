@@ -7,8 +7,11 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use md5::Md5;
+use md5::Digest;
 
 /// 记忆内核
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryKernel {
     /// 成功记录
     pub successes: Vec<SuccessRecord>,
@@ -75,7 +78,10 @@ impl MemoryKernel {
             output: output.to_string(),
             technique: technique.map(|t| t.to_string()),
             timestamp: chrono::Utc::now().to_rfc3339(),
-            hash: format!("{:x}", md5::compute(input.as_bytes())),
+            hash: {
+                let result = Md5::digest(input.as_bytes());
+                result.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+            },
         };
 
         self.successes.push(record);

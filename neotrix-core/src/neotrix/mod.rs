@@ -14,6 +14,11 @@ pub use crate::l4_emotion;
 pub use crate::l5_cognition::{nt_core, nt_mind};
 pub use crate::l6_meta::{nt_meta, nt_repair, nt_nexus};
 
+// ─── Crate-root modules (re-exported for binary-crate entry/* files) ────
+pub use crate::agent;
+pub use crate::cli;
+pub use crate::core;
+
 // ─── 经验 → 能力树迭代目标桥 ──────────────────────────────────────────
 pub mod nt_capability_bridge;
 
@@ -24,6 +29,9 @@ pub mod ffi;
 // ─── Infrastructure ─────────────────────────────────────────────────────
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
+
+// ─── 意识核心 ──────────────────────────────────────────────────────────
+pub mod nt_consciousness_core;
 
 // ─── Standalone modules at neotrix level ────────────────────────────────
 pub mod nt_shanhai_geo;
@@ -42,8 +50,8 @@ pub use nt_core_capability_tree::{
 // L1 Action — nt_io re-exports
 pub use crate::l1_action::nt_io::nt_io_standalone::{
     format_kernel_output, text_to_vector, verify_answer, KernelStats, ReasoningKernel,
-    ReasoningMethod, ReasoningOutput, SelfConsistencyResult, StageInfo, Vector, EVOLUTION,
-    KERNEL_DIM,
+    ReasoningMethod, ReasoningOutput, SelfConsistencyResult, StandaloneEngine, StageInfo, Vector,
+    EVOLUTION, KERNEL_DIM,
 };
 pub use crate::l1_action::nt_io::nt_io_provider::types::{
     LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role,
@@ -99,8 +107,8 @@ pub use crate::l5_cognition::nt_mind::evolution;
 pub use crate::l5_cognition::nt_mind::foundation;
 
 // L6 Meta — re-exports
-pub use crate::l6_meta::nt_meta::nt_core_intra_reflection;
-pub use crate::l6_meta::nt_repair::{
+pub use crate::l6_meta::coordination::nt_core_intra_reflection;
+pub use crate::l6_meta::healing::{
     nt_mind_consciousness_gold_standard, nt_mind_consciousness_monitor,
 };
 
@@ -127,7 +135,7 @@ pub use crate::l3_embodiment::nt_shield::nt_shield_audit::{
 pub use crate::l2_perception::nt_world::nt_world_scrape::{
     AntiDetect, BrowserScraper, RequestScraper, ScrapeResult, ScraperConfig,
 };
-pub use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::{
+pub use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
     ConsciousnessGoldStandard, ConsciousnessLevel, DetectionTrend, E8HexagramState,
     GoldStandardReport,
 };

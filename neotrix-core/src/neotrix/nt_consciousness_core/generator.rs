@@ -2,7 +2,7 @@
 //! 
 //! 内容生成、方案生成、创新生成
 
-use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 内容生成器

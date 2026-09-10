@@ -16,7 +16,11 @@ pub struct SemanticVersion {
 impl SemanticVersion {
     /// 创建新版本
     pub fn new(major: u32, minor: u32, patch: u32) -> Self {
-        Self { major, minor, patch }
+        Self {
+            major,
+            minor,
+            patch,
+        }
     }
 
     /// 解析版本字符串
@@ -28,7 +32,11 @@ impl SemanticVersion {
         let major = parts[0].parse().ok()?;
         let minor = parts[1].parse().ok()?;
         let patch = parts[2].parse().ok()?;
-        Some(Self { major, minor, patch })
+        Some(Self {
+            major,
+            minor,
+            patch,
+        })
     }
 
     /// 检查是否兼容
@@ -38,15 +46,27 @@ impl SemanticVersion {
 
     /// 升级版本
     pub fn bump_major(&self) -> Self {
-        Self { major: self.major + 1, minor: 0, patch: 0 }
+        Self {
+            major: self.major + 1,
+            minor: 0,
+            patch: 0,
+        }
     }
 
     pub fn bump_minor(&self) -> Self {
-        Self { major: self.major, minor: self.minor + 1, patch: 0 }
+        Self {
+            major: self.major,
+            minor: self.minor + 1,
+            patch: 0,
+        }
     }
 
     pub fn bump_patch(&self) -> Self {
-        Self { major: self.major, minor: self.minor, patch: self.patch + 1 }
+        Self {
+            major: self.major,
+            minor: self.minor,
+            patch: self.patch + 1,
+        }
     }
 }
 
@@ -125,12 +145,15 @@ impl VersionManager {
         publisher: &str,
         changelog: &str,
     ) {
-        let history = self.histories.entry(capability_id.to_string()).or_insert_with(|| VersionHistory {
-            capability_id: capability_id.to_string(),
-            versions: Vec::new(),
-            current: version.clone(),
-            last_updated: Instant::now(),
-        });
+        let history = self
+            .histories
+            .entry(capability_id.to_string())
+            .or_insert_with(|| VersionHistory {
+                capability_id: capability_id.to_string(),
+                versions: Vec::new(),
+                current: version.clone(),
+                last_updated: Instant::now(),
+            });
 
         // 检查版本是否已存在
         if history.versions.iter().any(|v| v.version == version) {
@@ -169,7 +192,10 @@ impl VersionManager {
     /// 检查版本兼容性
     pub fn check_compatibility(&self, capability_id: &str, required: &SemanticVersion) -> bool {
         if let Some(history) = self.histories.get(capability_id) {
-            history.versions.iter().any(|v| v.version.is_compatible(required))
+            history
+                .versions
+                .iter()
+                .any(|v| v.version.is_compatible(required))
         } else {
             false
         }
@@ -235,7 +261,9 @@ impl VersionManager {
     /// 获取所有活跃版本
     pub fn get_active_versions(&self, capability_id: &str) -> Vec<&CapabilityVersion> {
         if let Some(history) = self.histories.get(capability_id) {
-            history.versions.iter()
+            history
+                .versions
+                .iter()
                 .filter(|v| v.status == VersionStatus::Active)
                 .collect()
         } else {

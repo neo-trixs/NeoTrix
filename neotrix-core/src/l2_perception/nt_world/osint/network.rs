@@ -46,19 +46,7 @@ impl std::fmt::Display for NetworkFindings {
     }
 }
 
-const COMMON_PORTS: &[(u16, &str, &str)] = &[
-    (21, "FTP", "tcp"), (22, "SSH", "tcp"), (23, "Telnet", "tcp"),
-    (25, "SMTP", "tcp"), (53, "DNS", "tcp"), (80, "HTTP", "tcp"),
-    (110, "POP3", "tcp"), (143, "IMAP", "tcp"), (443, "HTTPS", "tcp"),
-    (445, "SMB", "tcp"), (993, "IMAPS", "tcp"), (995, "POP3S", "tcp"),
-    (1433, "MSSQL", "tcp"), (1521, "Oracle", "tcp"), (2049, "NFS", "tcp"),
-    (2375, "Docker", "tcp"), (2376, "Docker-TLS", "tcp"),
-    (3306, "MySQL", "tcp"), (3389, "RDP", "tcp"), (5432, "PostgreSQL", "tcp"),
-    (5900, "VNC", "tcp"), (6379, "Redis", "tcp"), (6443, "Kubernetes", "tcp"),
-    (8080, "HTTP-Alt", "tcp"), (8443, "HTTPS-Alt", "tcp"),
-    (9000, "PHP-FPM", "tcp"), (9090, "Prometheus", "tcp"),
-    (27017, "MongoDB", "tcp"),
-];
+use crate::l2_perception::nt_world::port_service::PORT_SERVICE_MAP as PORT_LIST;
 
 fn scan_port(host: &str, port: u16, timeout: Duration) -> bool {
     let addr = format!("{host}:{port}");
@@ -112,7 +100,7 @@ pub async fn investigate(target: &OsintTarget, _client: &Client, config: &OsintC
     // Port scanning (only if active is enabled)
     if config.enable_active {
         let timeout = Duration::from_secs(3);
-        for (port, service, protocol) in COMMON_PORTS {
+        for (port, service, protocol) in PORT_LIST {
             if findings.services.len() >= 50 { break; } // limit
             for ip in &findings.ip_addresses {
                 if scan_port(ip, *port, timeout) {
@@ -180,15 +168,15 @@ mod tests {
 
     #[test]
     fn test_common_ports_length() {
-        assert!(COMMON_PORTS.len() > 20);
+        assert!(PORT_LIST.len() > 20);
     }
 
     #[test]
     fn test_common_ports_include_web() {
-        assert!(COMMON_PORTS.iter().any(|(p, _, _)| *p == 80));
-        assert!(COMMON_PORTS.iter().any(|(p, _, _)| *p == 443));
-        assert!(COMMON_PORTS.iter().any(|(p, _, _)| *p == 22));
-        assert!(COMMON_PORTS.iter().any(|(p, _, _)| *p == 3306));
+        assert!(PORT_LIST.iter().any(|(p, _, _)| *p == 80));
+        assert!(PORT_LIST.iter().any(|(p, _, _)| *p == 443));
+        assert!(PORT_LIST.iter().any(|(p, _, _)| *p == 22));
+        assert!(PORT_LIST.iter().any(|(p, _, _)| *p == 3306));
     }
 
     #[test]

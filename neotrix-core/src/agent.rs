@@ -446,8 +446,23 @@ pub mod workflow {
 
 pub mod tool {
     pub mod mcp {
-        //! Re-export from the canonical MCP registry module.
-//         pub use crate::neotrix::// nt_agent_mcp_registry::*;
+        //! MCP tool definitions (stub)
+        #[derive(Debug, Clone, Default)]
+        pub struct McpToolDef {
+            pub name: String,
+            pub description: String,
+            pub input_schema: serde_json::Value,
+            pub transport: McpTransport,
+            pub server_name: String,
+            pub schema_version: Option<String>,
+        }
+        #[derive(Debug, Clone, Default)]
+        pub enum McpTransport {
+            #[default]
+            Stdio,
+            Sse,
+            Local { command: String, args: Vec<String> },
+        }
     }
 
     use std::sync::{Arc, RwLock};

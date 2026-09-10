@@ -5,8 +5,8 @@
 //! Usage: cargo run -p neotrix --bin neotrix-shanhai-link
 
 #![forbid(unsafe_code)]
-use neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::nt_shanhai_geo::{infer_shanhai_links, shanhai_edge_count};
+use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
+use neotrix::neotrix::nt_shanhai_geo::{infer_shanhai_links, shanhai_edge_count};
 use rusqlite::Connection;
 
 fn open_kb() -> Connection {

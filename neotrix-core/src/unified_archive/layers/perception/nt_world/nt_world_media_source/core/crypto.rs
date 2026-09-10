@@ -1,13 +1,13 @@
 use aes::Aes128;
 use cipher::{BlockEncryptMut, KeyIvInit};
-use md5::Digest;
+use md5::{Md5, Digest};
 
 type Aes128CbcEnc = cbc::Encryptor<Aes128>;
 type Aes128EcbEnc = ecb::Encryptor<Aes128>;
 
 /// Kugou Eapi 加密
 pub fn kugou_eapi_encrypt(url: &str, params: &str) -> String {
-    let secret = format!("{:x}", md5::compute(params.as_bytes()));
+    let secret = format!("{:x}", Md5::digest(params.as_bytes()));
     let key = secret.as_bytes();
     let plaintext = params.as_bytes();
     let padded = pkcs7_pad(plaintext, 16);
@@ -15,7 +15,7 @@ pub fn kugou_eapi_encrypt(url: &str, params: &str) -> String {
     let encryptor = Aes128EcbEnc::new(key.into());
     encryptor.encrypt_padded_mut::<cipher::block_padding::NoPadding>(&mut buf, padded.len());
     let hex_str = hex::encode(&buf);
-    let verify = format!("{:x}", md5::compute(hex_str.as_bytes()));
+    let verify = format!("{:x}", Md5::digest(hex_str.as_bytes()));
     format!(
         "https://trackercdn.kugou.com/i/v2/?cmd=25&pid=1&behavior=play&eapi={}&verify={}",
         urlencoding::encode(&hex_str),
@@ -37,7 +37,7 @@ pub fn netease_weapi_encrypt(params: &str) -> String {
 /// Netease Eapi 加密
 pub fn netease_eapi_encrypt(url: &str, params: &str) -> String {
     let message = format!("nobody{}use{}", url, params);
-    let digest = format!("{:x}", md5::compute(message.as_bytes()));
+    let digest = format!("{:x}", Md5::digest(message.as_bytes()));
     let text = format!("{}{}{}{}{}{}{}", "nobody", url, "use", digest, "md5", "forever", params);
     let key = b"e82ckenh8dichen8";
     let encrypted = aes128_ecb_encrypt(text.as_bytes(), key);

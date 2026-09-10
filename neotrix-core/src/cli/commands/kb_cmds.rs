@@ -1485,7 +1485,7 @@ mod tests {
     fn test_absorb_map_dry_run() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             seed_node(&conn, "u_2", "paper", "Attention Is All You Need", "https://arxiv.org/abs/1706.03762");
             drop(conn);
@@ -1502,7 +1502,7 @@ mod tests {
     fn test_absorb_map_apply_writes_metadata() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 
@@ -1524,7 +1524,7 @@ mod tests {
     fn test_snapshot_then_diff_reports_added_node() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 
@@ -1556,7 +1556,7 @@ mod tests {
     fn test_snapshot_roundtrip_via_diff_same_db() {
         with_temp_home(|| {
             let conn = Connection::open(kb_path()).unwrap();
-            crate::l1_action::nt_memory::nt_memory_kb::schema::initialize(&conn).unwrap();
+            crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
             seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
             drop(conn);
 

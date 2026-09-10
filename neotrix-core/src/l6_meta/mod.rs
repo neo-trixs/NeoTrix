@@ -12,11 +12,7 @@ pub mod memory;
 pub mod healing;
 pub mod evolution;
 
-// 向后兼容别名
 pub use coordination as nt_meta;
 pub use coordination as nt_governance;
-pub use memory as nt_memory;
-pub use memory as nt_nexus;
 pub use healing as nt_repair;
-pub use evolution as nt_mind;
-pub use evolution as nt_act;
+pub use memory as nt_nexus;

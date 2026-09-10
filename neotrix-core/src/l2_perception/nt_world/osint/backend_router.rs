@@ -1,11 +1,14 @@
 // 有序后端路由 (来自 agent-reach 吸收: R-P82)
 // 每个平台 = 首选 + 备选的有序后端列表, 真实探测可用性, doctor 体检
 
-use crate::l2_perception::nt_world::nt_world_osint::{OsintTarget, OsintConfig};
-use crate::l2_perception::nt_world::nt_world_osint::dns::DnsFindings;
-use crate::l2_perception::nt_world::nt_world_osint::http::HttpFindings;
-use crate::l2_perception::nt_world::nt_world_osint::dns::investigate as dns_investigate;
-use crate::l2_perception::nt_world::nt_world_osint::http::investigate as http_investigate;
+use super::{OsintTarget, OsintConfig};
+use super::dns::DnsFindings;
+use super::http::HttpFindings;
+use super::fofa::FofaFindings;
+use super::dns::investigate as dns_investigate;
+use super::http::investigate as http_investigate;
+use super::fofa::investigate as fofa_investigate;
+use super::fofa::FofaFindings;
 use reqwest::Client;
 use std::pin::Pin;
 use std::future::Future;

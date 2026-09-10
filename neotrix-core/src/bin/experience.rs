@@ -44,11 +44,11 @@ use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
-use neotrix::nt_memory_kb::nt_field_ledger;
-use neotrix::nt_memory_kb::nt_memory_schema;
-use neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
-use neotrix::nt_memory_kb::KnowledgeBase;
-use crate::l5_cognition::nt_mind::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
+use neotrix::neotrix::nt_memory_kb::nt_field_ledger;
+use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
+use neotrix::neotrix::nt_memory_kb::nt_memory_pipeline::AbsorbEntry;
+use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
+use neotrix::foundation::guardian::{MapeGate, MapeGateConfig, MetricEval};
 use neotrix::core::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };

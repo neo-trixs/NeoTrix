@@ -372,7 +372,7 @@ mod tests {
     }
 
     #[test]
-    test_distill_knowledge() {
+    fn test_distill_knowledge() {
         let mut distiller = KnowledgeDistiller::new(DistillerConfig::default());
         let knowledge = distiller.distill(0, "这是一个重要的概念定义", "test_source");
         

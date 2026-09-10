@@ -26,6 +26,7 @@ pub mod nt_world_jepa;
 pub mod nt_world_model_v2;
 
 // 单文件模块
+pub mod port_service;
 pub mod nt_world_code_search;
 pub mod nt_world_e8;
 pub mod nt_world_github_absorber;

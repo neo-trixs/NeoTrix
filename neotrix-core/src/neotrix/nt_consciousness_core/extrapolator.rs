@@ -83,7 +83,7 @@ impl Extrapolator {
             let sum_xy: f64 = self.data_points.iter().enumerate()
                 .map(|(i, p)| i as f64 * p.value).sum();
             let sum_x2: f64 = (0..self.data_points.len() as u64)
-                .map(|i| i as f64 * i as f64).sum::<u64>() as f64;
+                .map(|i| i as f64 * i as f64).sum::<f64>();
 
             let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x);
             let intercept = (sum_y - slope * sum_x) / n;

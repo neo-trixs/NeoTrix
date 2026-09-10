@@ -4,7 +4,7 @@
 //! 
 //! 参考: 意识涌现网络 (CEN), IIT, GWT
 
-use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 涌现引擎

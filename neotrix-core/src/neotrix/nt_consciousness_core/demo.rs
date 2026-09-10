@@ -2,11 +2,15 @@
 //! 
 //! 展示迭代验证引擎的完整运行流程
 
-use crate::nt_consciousness_core::{
+use super::{
     IterationAgent,
-    probes::*,
-    patches::*,
     state::StateSnapshot,
+    agent::GapRegistry,
+    probes::{ProbeEngine, LogicProbe, ImplProbe, BoundaryProbe, ConsistencyProbe,
+             PerformanceProbe, SecurityProbe, EvolutionProbe, ConsciousnessProbe, IntegrationProbe},
+    patches::{PatchGenerator, LogicPatchGenerator, ImplPatchGenerator, BoundaryPatchGenerator,
+              ConsistencyPatchGenerator, PerformancePatchGenerator, SecurityPatchGenerator,
+              EvolutionPatchGenerator, ConsciousnessPatchGenerator, IntegrationPatchGenerator},
 };
 
 /// 运行迭代验证演示

@@ -79,7 +79,6 @@ pub use neotrix::nt_mind;
 pub use neotrix::nt_mind::nt_mind::{
     ReasoningBrain, SelfIteratingBrain, SelfEvolver,
 };
-pub use neotrix::nt_world_model;
 
 pub use core::{
     CapabilityVector, KnowledgeSource, SelfEdit, MicroEdit,

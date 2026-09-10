@@ -53,6 +53,11 @@ impl McpRegistry {
     pub fn search(&self, _query: &str) -> Vec<McpToolInfo> { Vec::new() }
     pub fn publish(&mut self, _name: &str, _command: &str, _args: &[String], _desc: &str) -> usize { 0 }
     pub fn as_native_tools(&self) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> { Vec::new() }
+    pub fn tool_count(&self) -> usize { 0 }
+    pub fn server_count(&self) -> usize { 0 }
+    pub fn list_servers(&self) -> Vec<String> { Vec::new() }
+    pub fn register_stdio(&mut self, _server: &str, _cmd: &str, _args: &[&str], _tools: Vec<crate::agent::tool::mcp::McpToolDef>) {}
+    pub fn recommend_tools(&self, _query: &str) -> Vec<McpToolInfo> { Vec::new() }
 }
 pub struct McpDiscovery;
 impl McpDiscovery {
@@ -590,7 +595,7 @@ mod tests {
         // 执行行为在 gateway 单测 (test_execute_plan_wires_governed_path) 覆盖;
         // 这里验证 CLI 层校验门控 + 命令形状 (避免 subprocess MCP 依赖)。
         let mut registry = McpRegistry::new();
-        registry.publish("echo-server", "echo", &["hello"], "test echo server");
+        registry.publish("echo-server", "echo", &["hello".to_string()], "test echo server");
         set_mcp_registry(registry);
         let cmd = McpCmd;
         // 未知工具应被 plan() 校验拒绝

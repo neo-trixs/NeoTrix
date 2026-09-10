@@ -111,7 +111,7 @@ impl SvafGate {
             Some(c) => c,
             None => return 0.5,
         };
-        let _query_vec = match nt_memory_embed::embed_text(&config, &text) {
+        let query_vec = match nt_memory_embed::embed_text(&config, &text) {
             Ok(v) => v,
             _ => return 0.5,
         };
@@ -127,8 +127,9 @@ impl SvafGate {
 
         if all.is_empty() { return 1.0; }
         let max_sim: f64 = all.iter()
-            .fold(0.0_f64, |a, _b| a.max(0.0));
-        1.0 - max_sim
+            .map(|(_id, vec)| nt_memory_embed::cosine_similarity(&query_vec, vec))
+            .fold(0.0_f64, |a, b| a.max(b));
+        (1.0 - max_sim).clamp(0.0, 1.0)
     }
 
     fn coherence_score(&self, content: &str) -> f64 {

@@ -117,54 +117,6 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     registry.register(Box::new(
         crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
     ));
-    registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
-        ),
-    ));
-    registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
-    ));
-    registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
-        ),
-    ));
-    registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
-    ));
-    registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
-        ),
-    ));
-    registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
-    ));
-    registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
-        ),
-    ));
-    registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
-    ));
-    registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
-        ),
-    ));
-    registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
-    ));
-    registry.register(Box::new(
-        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
-            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
-        ),
-    ));
-    registry.register(Box::new(
-        crate::l1_action::nt_memory::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
-    ));
     // 2026-08-15 sweep absorption batch (Phase D): 编排治理 / harness / 感知 / 多模态 / 元数据
     // registry.register(Box::new(
     //     crate::l1_action::nt_act::nt_act_orchestrator::arbiter_mediation::ArbiterMediator::new(),

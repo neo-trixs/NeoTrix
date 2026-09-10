@@ -2,10 +2,10 @@
 //!
 //! 实时监控所有能力的健康状态和性能指标
 
+use crate::core::nt_core_capability::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use crate::core::nt_core_capability::*;
 
 /// 监控事件
 #[derive(Debug, Clone)]
@@ -92,17 +92,20 @@ impl MonitorDashboard {
         self.events.push(event.clone());
 
         // 更新指标
-        let metrics = self.metrics.entry(event.capability_id.clone()).or_insert_with(|| PerformanceMetrics {
-            call_count: 0,
-            success_count: 0,
-            failure_count: 0,
-            avg_latency_ms: 0.0,
-            max_latency_ms: 0,
-            min_latency_ms: u64::MAX,
-            p95_latency_ms: 0,
-            success_rate: 1.0,
-            throughput_qps: 0.0,
-        });
+        let metrics = self
+            .metrics
+            .entry(event.capability_id.clone())
+            .or_insert_with(|| PerformanceMetrics {
+                call_count: 0,
+                success_count: 0,
+                failure_count: 0,
+                avg_latency_ms: 0.0,
+                max_latency_ms: 0,
+                min_latency_ms: u64::MAX,
+                p95_latency_ms: 0,
+                success_rate: 1.0,
+                throughput_qps: 0.0,
+            });
 
         match event.event_type {
             EventType::Call => metrics.call_count += 1,
@@ -119,7 +122,10 @@ impl MonitorDashboard {
 
     /// 记录延迟
     pub fn record_latency(&mut self, capability_id: &str, latency_ms: u64) {
-        let history = self.latency_history.entry(capability_id.to_string()).or_insert_with(Vec::new);
+        let history = self
+            .latency_history
+            .entry(capability_id.to_string())
+            .or_insert_with(Vec::new);
         history.push(latency_ms);
 
         // 保持最近1000个样本
@@ -146,40 +152,51 @@ impl MonitorDashboard {
 
     /// 获取所有能力状态
     pub fn get_all_status(&self) -> Vec<CapabilityStatusReport> {
-        self.registry.list_all().iter().map(|meta| {
-            let health = self.registry.get(&meta.id)
-                .map(|cap| cap.health())
-                .unwrap_or(CapabilityHealth {
-                    state: CapabilityState::Disabled,
-                    success_rate: 0.0,
-                    avg_latency_ms: 0,
-                    last_called: None,
-                    call_count: 0,
-                });
+        self.registry
+            .list_all()
+            .iter()
+            .map(|meta| {
+                let health = self
+                    .registry
+                    .get(&meta.id)
+                    .map(|cap| cap.health())
+                    .unwrap_or(CapabilityHealth {
+                        state: CapabilityState::Disabled,
+                        success_rate: 0.0,
+                        avg_latency_ms: 0.0,
+                        last_called: None,
+                        call_count: 0,
+                    });
 
-            let metrics = self.metrics.get(&meta.id).cloned().unwrap_or(PerformanceMetrics {
-                call_count: 0,
-                success_count: 0,
-                failure_count: 0,
-                avg_latency_ms: 0.0,
-                max_latency_ms: 0,
-                min_latency_ms: 0,
-                p95_latency_ms: 0,
-                success_rate: 0.0,
-                throughput_qps: 0.0,
-            });
+                let metrics = self
+                    .metrics
+                    .get(&meta.id)
+                    .cloned()
+                    .unwrap_or(PerformanceMetrics {
+                        call_count: 0,
+                        success_count: 0,
+                        failure_count: 0,
+                        avg_latency_ms: 0.0,
+                        max_latency_ms: 0,
+                        min_latency_ms: 0,
+                        p95_latency_ms: 0,
+                        success_rate: 0.0,
+                        throughput_qps: 0.0,
+                    });
 
-            CapabilityStatusReport {
-                meta: meta.clone(),
-                health,
-                metrics,
-            }
-        }).collect()
+                CapabilityStatusReport {
+                    meta: meta.clone(),
+                    health,
+                    metrics,
+                }
+            })
+            .collect()
     }
 
     /// 获取特定能力状态
     pub fn get_status(&self, capability_id: &str) -> Option<CapabilityStatusReport> {
-        self.get_all_status().into_iter()
+        self.get_all_status()
+            .into_iter()
             .find(|s| s.meta.id == capability_id)
     }
 
@@ -212,7 +229,7 @@ impl MonitorDashboard {
 
 /// 能力状态报告
 #[derive(Debug, Clone)]
-pub struct CapabilityStatusReportReport {
+pub struct CapabilityStatusReport {
     /// 元数据
     pub meta: CapabilityMeta,
     /// 健康状态

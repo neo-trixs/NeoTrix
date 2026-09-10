@@ -34,7 +34,7 @@ use crate::l1_action::nt_act::nt_act_trade::quote_negotiation::{
     ObjectionCategory, QuoteGenerator,
 };
 use crate::l1_action::nt_act::nt_act_trade::trade_core::{
-    Concession, CostBreakdown, NegotiationEngine,
+    Concession, NegotiationEngine,
 };
 use crate::l1_action::nt_io::nt_io_messaging::{
     Channel, MessagingBridge, MessagingRegistry, MessagingRouter,
@@ -421,6 +421,14 @@ impl TradeOrchestrator {
                 incoterms: "FOB".into(),
                 currency: "USD".into(),
                 validity_days: 30,
+                cost_breakdown: crate::l1_action::nt_act::nt_act_trade::quote_negotiation::CostBreakdown {
+                    material: 0.0,
+                    labor: 0.0,
+                    overhead: 0.0,
+                    packaging: 0.0,
+                    logistics: 0.0,
+                    certification: 0.0,
+                },
             },
             negotiation_engine: NegotiationEngine::default(),
             production_engine: ProductionEngine::default(),

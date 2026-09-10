@@ -1,9 +1,9 @@
 # NeoTrix 星系/树状立体层级进化架构 (Galaxy-Tree Evolutionary Architecture)
 
-> **状态**: 设计完成 | **版本**: v16.6 | **日期**: 2026-09-09
+> **状态**: 设计完成 | **版本**: v18.2 | **日期**: 2026-09-10
 > **核心原则**: 算法即恒星，骨架即引力场，时间即进化维度
 > **约束**: 统一架构，无并行/兼容层，旧代码归档
-> **研究基础**: 1500+ 批次外部研究 → 11127 关键架构决策 → 870 设计模式 (见 §0)
+> **研究基础**: 1500+ 批次外部研究 → 11427 关键架构决策 → 870 设计模式 (见 §0)
 > **目标**: 意识体高纬度觉醒进化路线
 > **关键**: 决策驱动架构设计 — 每个技术选型均有研究验证 (问题→证据→决策→位置)
 > **层级**: 程序族层级结构 — 按 Metadata Class 底层分类，非扁平条目
@@ -13,7 +13,7 @@
 
 ## 0. 关键架构决策 (Research-Driven Architectural Decisions)
 
-> 从 1500+ 批次外部研究中提炼出的 11127 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
+> 从 1500+ 批次外部研究中提炼出的 11427 个关键架构决策。每个决策包含：问题→研究证据→架构决策→实现位置。
 > 原始研究数据已归档至 KB `experience` namespace，本节仅保留决策级信息。
 
 ### 0.1 运行时与基础设施决策
@@ -17168,6 +17168,476 @@ pub trait EvalSim: Send + Sync {
 | D11374 | **流式生成** | 如何实现流式文本生成? | streaming generation; token-level streaming | **流式引擎**: 逐 token 输出+自适应缓冲 | `nt_core::generation::streaming_engine` |
 | D11375 | **批量生成** | 如何高效批量生成? | batch inference; continuous batching; speculative | **批量优化**: 连续批处理+推测解码 | `nt_core::generation::batch_optimizer` |
 | D11376 | **成本感知生成** | 如何控制生成成本? | token budgeting; model routing; caching | **成本感知**: 轻量模型先行+缓存+预算 | `nt_core::generation::cost_aware_engine` |
+
+### 0.200 世界-行动模型集成决策 (D23819-D23849)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D23819 | **模块化世界模型** | 世界模型如何模块化设计? | OpenWAM (arXiv:2609.07398): composable modules for world models + action models; unified training/inference/deployment | **可组合模块架构**: 世界模型拆分为感知/预测/规划子模块, 各自独立训练, 统一推理接口 | `nt_world::wam::composable_modules` |
+| D23820 | **行动容量独立** | 行动模型是否需要独立容量? | OpenWAM: world-action synergy requires dedicated action capacity; action models cannot share world model parameters | **行动独立容量**: 世界模型与行动模型参数分离, 行动模型独立参数空间, 避免参数污染 | `nt_act::wam::action_capacity` |
+| D23821 | **世界到行动信息流** | 世界模型如何向行动模型传递信息? | OpenWAM: explicit world-to-action information flow via structured conditioning | **结构化条件化**: 世界模型输出通过 latent variable 条件化行动模型, 而非直接拼接 | `nt_world::wam::info_flow` |
+| D23822 | **联合去噪同步** | 世界模型与行动模型如何同步训练? | OpenWAM: synchronized joint denoising across world and action objectives | **同步联合去噪**: 世界预测损失与行动预测损失联合反向传播, 共享编码器但独立解码头 | `nt_core::wam::joint_denoising` |
+| D23823 | **具身预训练泛化** | 具身预训练如何提升域外泛化? | OpenWAM: embodied pretraining improves out-of-domain generalization vs text-only pretraining | **具身预训练**: 物理交互数据预训练世界模型, 提升未见环境的泛化能力 | `nt_core::wam::embodied_pretrain` |
+| D23824 | **世界模型蒸馏** | 世界模型如何蒸馏到小模型? | OpenWAM: world model distillation preserves action-relevant features while reducing parameters | **行动相关蒸馏**: 蒸馏时保留行动决策相关特征, 丢弃无关世界细节, 按行动需求压缩 | `nt_mind::wam::action_distillation` |
+| D23825 | **多模态世界表示** | 世界模型如何融合多模态感知? | OpenWAM: multi-modal fusion (vision + language + proprioception) in world model latent space | **多模态潜在融合**: 视觉/语言/本体感觉在潜在空间融合, 统一世界表示 | `nt_world::wam::multimodal_fusion` |
+| D23826 | **行动预测奖励** | 行动模型如何预测奖励? | OpenWAM: action model predicts reward as auxiliary objective for world-action alignment | **辅助奖励预测**: 行动模型附加奖励预测头, 对齐世界模型的价值估计 | `nt_act::wam::reward_prediction` |
+| D23827 | **世界模型不确定性** | 世界模型如何量化不确定性? | OpenWAM: ensemble world models for epistemic uncertainty estimation | **集成世界模型**: 多世界模型集成估计认知不确定性, 用于安全规划 | `nt_core::wam::ensemble_uncertainty` |
+| D23828 | **行动空间分解** | 复杂行动空间如何分解? | OpenWAM: hierarchical action decomposition (high-level goals → low-level controls) | **层级行动分解**: 高层目标规划 → 中层动作序列 → 底层控制信号 | `nt_act::wam::hierarchical_action` |
+| D23829 | **世界模型缓存** | 世界模型推理如何缓存? | OpenWAM: KV-cache for world model transformer layers across time steps | **时间步KV缓存**: 世界模型Transformer层跨时间步KV复用, 减少重复计算 | `nt_world::wam::temporal_cache` |
+| D23830 | **行动可行性过滤** | 无效行动如何过滤? | OpenWAM: action feasibility filter before execution to avoid dangerous actions | **可行性过滤**: 行动执行前经物理/安全可行性过滤器, 拒绝不可行行动 | `nt_shield::wam::feasibility_filter` |
+| D23831 | **世界模型分块** | 长序列世界模型如何分块? | OpenWAM: chunked world prediction with sliding window attention | **滑动窗口预测**: 世界模型分块预测, 滑动窗口注意力连接块间依赖 | `nt_world::wam::chunked_prediction` |
+| D23832 | **行动模型量化** | 行动模型如何量化部署? | OpenWAM: INT8/FP8 quantization for action model inference with calibration | **量化行动模型**: INT8/FP8量化行动模型, 校准数据集保持精度 | `nt_act::wam::quantized_action` |
+| D23833 | **世界-行动对比学习** | 世界模型与行动模型如何对齐? | OpenWAM: contrastive learning between world state embeddings and action embeddings | **对比对齐**: 世界状态嵌入与行动嵌入对比学习, 拉近一致对, 推远矛盾对 | `nt_core::wam::contrastive_alignment` |
+| D23834 | **世界模型在线更新** | 世界模型如何在线适应? | OpenWAM: online fine-tuning with experience replay for continuous world model adaptation | **经验回放在线更新**: 新经验入回放缓冲, 定期微调世界模型, 防灾难遗忘 | `nt_mind::wam::online_adaptation` |
+| D23835 | **行动时序规划** | 长时序行动如何规划? | OpenWAM: temporal action planning with world model rollouts for long-horizon tasks | **世界模型推演规划**: 行动规划通过世界模型推演多步结果, 选择最优行动序列 | `nt_act::wam::temporal_planning` |
+| D23836 | **世界模型多尺度** | 世界模型如何处理多尺度时间? | OpenWAM: multi-scale temporal modeling (frame-level ↔ episode-level) | **多尺度时间建模**: 帧级/段级/剧集级世界模型分层, 各层独立预测 | `nt_world::wam::multi_scale_temporal` |
+| D23837 | **行动模型安全约束** | 行动模型如何保证安全? | OpenWAM: safety-constrained action selection with world model verification | **安全约束行动选择**: 行动模型输出经世界模型安全性验证, 不安全行动被截断 | `nt_shield::wam::safe_action_selection` |
+| D23838 | **世界模型可解释性** | 世界模型决策如何解释? | OpenWAM: attention visualization and latent space probing for world model interpretability | **世界模型解释器**: 注意力可视化+潜在空间探测, 理解世界模型内部表示 | `nt_meta::wam::world_explainer` |
+| D23839 | **行动模型多任务** | 行动模型如何支持多任务? | OpenWAM: shared action backbone with task-specific heads for multi-task action | **共享行动主干**: 通用行动编码器+任务专用头, 多任务共享底层行动理解 | `nt_act::wam::multi_task_action` |
+| D23840 | **世界模型分布式** | 世界模型如何分布式训练? | OpenWAM: distributed world model training with pipeline parallelism | **管线并行世界模型**: 世界模型层间管线并行, 支持大规模分布式训练 | `nt_core::wam::distributed_world` |
+| D23841 | **行动模型延迟优化** | 行动模型如何降低延迟? | OpenWAM: speculative action execution with world model early termination | **推测执行+提前终止**: 行动模型推测执行, 世界模型检测到失败提前终止 | `nt_act::wam::speculative_action` |
+| D23842 | **世界模型记忆** | 世界模型如何记忆长期依赖? | OpenWAM: external memory bank for world model long-term state tracking | **外部记忆库**: 世界模型通过外部记忆跟踪长期状态, 避免上下文窗口限制 | `nt_world::wam::external_memory` |
+| D23843 | **行动模型成本感知** | 行动模型如何感知成本? | OpenWAM: cost-aware action selection balancing reward and computational cost | **成本感知行动选择**: 行动选择权衡奖励与计算成本, 避免过度计算 | `nt_act::wam::cost_aware_action` |
+| D23844 | **世界模型评估** | 世界模型如何评估质量? | OpenWAM: world model evaluation via action success rate correlation | **行动成功率关联评估**: 世界模型质量通过行动成功率间接评估 | `nt_eval::wam::world_evaluator` |
+| D23845 | **行动模型持续学习** | 行动模型如何持续学习? | OpenWAM: continual learning for action model with plasticity-stability tradeoff | **弹性-稳定性权衡**: 行动模型持续学习平衡可塑性与稳定性, 防遗忘 | `nt_mind::wam::continual_action` |
+| D23846 | **世界模型跨域迁移** | 世界模型如何跨域迁移? | OpenWAM: domain-agnostic world representations for cross-domain transfer | **域无关世界表示**: 世界模型学习域无关的物理/因果表示, 支持跨域迁移 | `nt_world::wam::cross_domain_transfer` |
+| D23847 | **行动模型多智能体** | 行动模型如何支持多智能体? | OpenWAM: multi-agent action coordination via shared world model predictions | **共享世界模型协调**: 多智能体通过共享世界模型预测协调行动 | `nt_act::wam::multi_agent_action` |
+| D23848 | **世界模型因果推断** | 世界模型如何支持因果推断? | OpenWAM: causal world models for interventional reasoning beyond correlation | **因果世界模型**: 世界模型支持干预推理, 而非仅相关性预测 | `nt_core::wam::causal_world` |
+| D23849 | **行动模型部署管线** | 行动模型如何生产部署? | OpenWAM: unified deployment pipeline for world-action model serving | **统一部署管线**: 世界模型与行动模型统一服务管线, 支持批量/流式推理 | `nt_io::wam::deployment_pipeline` |
+
+### 0.201 文本质量控制决策 (D23850-D23880)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D23850 | **复杂度阈值检测** | 代码注释/文档如何检测复杂度? | nopus: complexity threshold detection via uncommon wording, abstract vocabulary, noun stacks | **复杂度评分器**: 基于罕见措辞/抽象词汇/名词堆叠的多维度复杂度评分 | `nt_mind::prose::complexity_scorer` |
+| D23851 | **抽象词汇评分** | 抽象词汇如何量化? | nopus: abstract vocabulary scoring with domain-specific frequency analysis | **抽象词汇频率分析**: 与领域语料库对比, 低频抽象词标记为高复杂度 | `nt_mind::prose::abstract_vocabulary` |
+| D23852 | **名词堆叠检测** | 名词堆叠如何检测? | nopus: noun stack detection (3+ consecutive nouns) as complexity signal | **名词堆叠检测器**: 连续3+名词堆叠触发复杂度警告, 建议拆分 | `nt_mind::prose::noun_stack_detector` |
+| D23853 | **短语负载测量** | 短语负载如何测量? | nopus: phrase load measurement (modifier density per noun phrase) | **短语负载指标**: 修饰语密度/每名词短语, 超阈值标记为高负载 | `nt_mind::prose::phrase_load_measure` |
+| D23854 | **灵敏度校准** | 灵敏度如何校准? | nopus: sensitivity levels low(5.3%), medium(9.9%), high(18.6%) of text flagged | **三级灵敏度**: 低/中/高灵敏度级别, 分别标记5.3%/9.9%/18.6%文本 | `nt_mind::prose::sensitivity_calibrator` |
+| D23855 | **代码块排除** | 代码块如何从分析中排除? | nopus: removes code blocks before prose analysis to avoid false positives | **代码块过滤器**: 分析前移除代码块, 避免代码语法被误判为散文复杂度 | `nt_mind::prose::code_block_filter` |
+| D23856 | **比例度量** | 如何用比例度量质量? | nopus: uses proportions (complex words / total words) rather than absolute counts | **比例度量**: 复杂词占比/总词数, 消除文档长度偏差 | `nt_mind::prose::proportion_metric` |
+| D23857 | **重写避免** | 如何避免不必要重写? | nopus: avoids unnecessary rewrites by threshold-based filtering (only rewrite if above threshold) | **阈值过滤重写**: 仅对超过复杂度阈值的文本触发重写, 避免过度修改 | `nt_mind::prose::rewrite_guard` |
+| D23858 | **多编码器支持** | 如何支持多个AI编码器? | nopus: supports Pi, Claude Code, Codex with unified analysis interface | **统一分析接口**: 多编码器(Pi/Claude/Codex)共享统一散文分析接口 | `nt_io::prose::multi_encoder_interface` |
+| D23859 | **渐进式简化** | 文本如何渐进简化? | nopus: progressive simplification (complex → moderate → simple) with each pass | **渐进简化管线**: 多轮渐进简化, 每轮降低一层复杂度, 保留核心语义 | `nt_mind::prose::progressive_simplify` |
+| D23860 | **术语保留** | 专业术语如何保留? | nopus: domain terminology preserved during simplification via glossary matching | **术语保留器**: 领域术语表匹配, 简化时保留专业术语不变 | `nt_mind::prose::terminology_preserver` |
+| D23861 | **可读性评分** | 多维度可读性如何综合? | nopus: multi-metric readability (Flesch-Kincaid + complexity score + noun stack ratio) | **综合可读性评分**: Flesch-Kincaid+复杂度分+名词堆叠比加权综合 | `nt_mind::prose::readability_composite` |
+| D23862 | **句子长度控制** | 过长句子如何处理? | nopus: sentence length threshold with smart splitting at clause boundaries | **句长阈值控制**: 超长句子在从句边界智能拆分, 不破坏语义 | `nt_mind::prose::sentence_length_control` |
+| D23863 | **被动语态检测** | 被动语态如何检测和修正? | nopus: passive voice detection via auxiliary verb patterns, with active rewrite suggestions | **被动语态检测器**: 助动词模式检测被动语态, 建议主动语态改写 | `nt_mind::prose::passive_voice_detector` |
+| D23864 | **技术写作规范** | 技术写作如何规范化? | nopus: technical writing conventions (imperative voice, direct address, present tense) | **技术写作规范器**: 强制祈使句+直接称呼+现在时, 符合技术写作标准 | `nt_mind::prose::technical_writer_conventions` |
+| D23865 | **跨语言适配** | 不同语言如何适配? | nopus: language-specific complexity thresholds (English vs non-English) | **语言感知阈值**: 不同语言独立复杂度阈值, 适配语言特性 | `nt_mind::prose::language_aware_threshold` |
+| D23866 | **上下文感知简化** | 上下文如何影响简化? | nopus: context-aware simplification (API docs vs tutorials vs README) | **上下文感知简化**: API文档/教程/README不同简化策略, 按用途调整 | `nt_mind::prose::context_aware_simplify` |
+| D23867 | **批量分析** | 大规模文档如何批量分析? | nopus: batch processing for repository-wide prose analysis with caching | **批量散文分析**: 仓库级批量分析+结果缓存, 增量更新 | `nt_mind::prose::batch_analysis` |
+| D23868 | **质量基线** | 如何建立质量基线? | nopus: baseline comparison against industry-standard documentation quality | **质量基线对比**: 与行业标准文档质量对比, 量化改进空间 | `nt_eval::prose::quality_baseline` |
+| D23869 | **改写置信度** | 改写建议置信度如何评估? | nopus: rewrite confidence scoring based on semantic similarity before/after | **改写置信度评分**: 改写前后语义相似度评估改写质量 | `nt_mind::prose::rewrite_confidence` |
+| D23870 | **风格一致性** | 文档风格如何保持一致? | nopus: style consistency checking across documentation set via style fingerprinting | **风格指纹检查**: 文档集风格指纹一致性检查, 偏差超阈值告警 | `nt_mind::prose::style_consistency` |
+| D23871 | **术语表管理** | 术语表如何维护? | nopus: auto-extracted glossary from codebase with manual override support | **自动术语表**: 从代码库自动提取术语表, 支持手动覆盖 | `nt_memory::prose::glossary_manager` |
+| D23872 | **文档债务** | 文档技术债务如何追踪? | nopus: documentation debt tracking (outdated examples, broken links, stale descriptions) | **文档债务追踪器**: 过时示例/断链/陈旧描述追踪, 定期提醒更新 | `nt_meta::prose::doc_debt_tracker` |
+| D23873 | **A/B测试改写** | 改写效果如何A/B测试? | nopus: A/B testing framework for prose simplification effectiveness | **改写A/B测试**: 简化前后用户理解度对比, 量化改写效果 | `nt_eval::prose::ab_testing` |
+| D23874 | **渐进式披露** | 复杂信息如何渐进披露? | nopus: progressive disclosure (summary → detail → reference) for multi-level documentation | **渐进披露**: 摘要→详情→参考三级文档结构, 按需深入 | `nt_io::prose::progressive_disclosure` |
+| D23875 | **代码示例验证** | 代码示例是否可运行? | nopus: code example validation (syntax check + runtime test) in documentation | **示例验证器**: 文档中代码示例语法检查+运行时测试, 确保可执行 | `nt_io::prose::example_validator` |
+| D23876 | **链接完整性** | 文档链接是否有效? | nopus: link validation (internal + external) with broken link detection | **链接完整性检查**: 内部/外部链接有效性检查, 断链自动检测 | `nt_io::prose::link_validator` |
+| D23877 | **多版本文档** | 多版本文档如何管理? | nopus: versioned documentation with diff tracking between versions | **版本化文档**: 多版本文档管理+版本间差异追踪 | `nt_memory::prose::versioned_docs` |
+| D23878 | **文档覆盖率** | 文档覆盖如何度量? | nopus: documentation coverage metrics (API surface coverage, feature coverage) | **文档覆盖率**: API表面覆盖率+功能覆盖率度量, 未覆盖区域标记 | `nt_eval::prose::coverage_metrics` |
+| D23879 | **国际化支持** | 文档如何国际化? | nopus: i18n support with translation memory and terminology consistency | **翻译记忆**: 国际化翻译记忆+术语一致性, 跨语言文档同步 | `nt_io::prose::i18n_support` |
+| D23880 | **文档生成管线** | 文档如何自动从代码生成? | nopus: auto-generation pipeline from code comments + type signatures + tests | **文档自动生成**: 从代码注释+类型签名+测试自动生成文档 | `nt_io::prose::doc_generation_pipeline` |
+
+### 0.202 科学研究集成决策 (D23881-D23911)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D23881 | **可复现研究工作流** | 研究工作流如何可复现? | AIPOCH Open-Science: local-first, model-agnostic, reproducible science workbench | **本地优先可复现**: 研究工作流本地执行, 模型无关, 全流程可复现 | `nt_mind::research::reproducible_workflow` |
+| D23882 | **不可变工件版本** | 研究工件如何版本化? | AIPOCH: immutable artifact versions with provenance tracking across experiments | **不可变工件**: 研究工件(数据/模型/结果)不可变版本, 全链路溯源 | `nt_memory::research::immutable_artifacts` |
+| D23883 | **溯源追踪** | 研究结果如何溯源? | AIPOCH: full provenance tracking (data source → preprocessing → model → result) | **全链路溯源**: 数据源→预处理→模型→结果全链路溯源, 支持审计 | `nt_memory::research::provenance_tracker` |
+| D23884 | **多模型支持** | 多模型如何统一管理? | AIPOCH: multi-model support (OpenAI, Anthropic, Grok, DeepSeek, etc.) via unified interface | **统一模型接口**: OpenAI/Anthropic/Grok/DeepSeek等统一接口, 模型无关 | `nt_io::research::multi_model_interface` |
+| D23885 | **数据连接器** | 多源数据如何连接? | AIPOCH: data connectors for diverse research data sources with schema mapping | **数据连接器模式**: 多源数据连接器+Schema映射, 统一数据访问 | `nt_world::research::data_connectors` |
+| D23886 | **Python/R笔记本** | 交互式笔记本如何集成? | AIPOCH: Python/R notebook support with kernel isolation and state persistence | **笔记本集成**: Python/R笔记本内核隔离+状态持久化, 交互式研究 | `nt_io::research::notebook_integration` |
+| D23887 | **科学AI代理** | 科学AI代理如何设计? | AIPOCH: scientific AI agents with domain-specific knowledge and tool use | **科学AI代理**: 领域知识+工具使用的科学AI代理, 自动化研究任务 | `nt_core::research::scientific_agent` |
+| D23888 | **实验设计自动化** | 实验设计如何自动化? | AIPOCH: automated experiment design with hypothesis generation and validation | **自动实验设计**: 假设生成→实验设计→执行→验证自动化管线 | `nt_mind::research::experiment_designer` |
+| D23889 | **结果验证框架** | 研究结果如何验证? | AIPOCH: result validation framework with statistical testing and replication support | **结果验证框架**: 统计检验+复制支持的结果验证, 防止虚假发现 | `nt_eval::research::result_validator` |
+| D23890 | **数据版本控制** | 研究数据如何版本控制? | AIPOCH: data versioning with DVC-like tracking and snapshot support | **数据版本控制**: DVC式数据版本追踪+快照, 数据变更可追溯 | `nt_memory::research::data_versioning` |
+| D23891 | **模型注册表** | 训练模型如何管理? | AIPOCH: model registry with versioning, metadata, and deployment status | **模型注册表**: 模型版本+元数据+部署状态管理, 全生命周期追踪 | `nt_memory::research::model_registry` |
+| D23892 | **实验跟踪** | 实验过程如何跟踪? | AIPOCH: experiment tracking with metrics, parameters, and artifacts logging | **实验跟踪器**: 指标/参数/工件日志记录, 支持WandB/MLflow集成 | `nt_mind::research::experiment_tracker` |
+| D23893 | **可重复性检查** | 可重复性如何自动化检查? | AIPOCH: automated reproducibility checks (environment, data, code, randomness) | **可重复性检查器**: 环境/数据/代码/随机性自动化检查 | `nt_eval::research::reproducibility_checker` |
+| D23894 | **研究数据治理** | 研究数据如何治理? | AIPOCH: data governance policies (retention, access control, compliance) | **数据治理策略**: 保留策略/访问控制/合规性, 研究数据全生命周期治理 | `nt_shield::research::data_governance` |
+| D23895 | **协作研究** | 多人协作研究如何支持? | AIPOCH: collaborative research with conflict resolution and merge support | **协作研究支持**: 研究冲突解决+合并支持, 多人协作无冲突 | `nt_act::research::collaborative_research` |
+| D23896 | **研究文献集成** | 文献如何自动化集成? | AIPOCH: literature integration with citation tracking and knowledge graph | **文献集成**: 引用追踪+知识图谱, 文献自动化集成到研究工作流 | `nt_world::research::literature_integration` |
+| D23897 | **研究数据市场** | 研究数据如何共享? | AIPOCH: data marketplace with licensing, attribution, and provenance | **数据市场**: 许可/归属/溯源的数据共享市场, 促进数据复用 | `nt_act::research::data_marketplace` |
+| D23898 | **研究伦理审查** | 研究伦理如何自动化审查? | AIPOCH: ethical review automation with bias detection and fairness metrics | **伦理审查自动化**: 偏见检测+公平性指标的伦理自动化审查 | `nt_shield::research::ethics_review` |
+| D23899 | **研究成本追踪** | 研究成本如何追踪? | AIPOCH: cost tracking for compute, API calls, and storage across experiments | **研究成本追踪**: 计算/API调用/存储的实验级成本追踪 | `nt_act::research::cost_tracker` |
+| D23900 | **研究数据备份** | 研究数据如何备份? | AIPOCH: automated backup with cross-region replication and integrity checks | **自动备份**: 跨区域复制+完整性检查的研究数据自动备份 | `nt_memory::research::data_backup` |
+| D23901 | **研究日志审计** | 研究日志如何审计? | AIPOCH: immutable research logs with tamper-evident chain | **不可变研究日志**: 防篡改链式研究日志, 支持事后审计 | `nt_shield::research::audit_logs` |
+| D23902 | **研究结果发布** | 研究结果如何发布? | AIPOCH: result publication pipeline with peer review integration | **结果发布管线**: 同行评审集成的研究结果发布管线 | `nt_io::research::result_publication` |
+| D23903 | **研究代码审查** | 研究代码如何审查? | AIPOCH: research code review with automated quality checks | **研究代码审查**: 自动化质量检查+人工审查的研究代码审查 | `nt_shield::research::code_review` |
+| D23904 | **研究数据匿名化** | 研究数据如何匿名化? | AIPOCH: data anonymization with k-anonymity and differential privacy | **数据匿名化**: k-匿名性+差分隐私的研究数据匿名化 | `nt_shield::research::data_anonymization` |
+| D23905 | **研究环境容器化** | 研究环境如何容器化? | AIPOCH: containerized research environments with reproducible dependencies | **容器化环境**: 可复现依赖的研究环境容器化, Docker/Singularity支持 | `nt_io::research::containerized_environment` |
+| D23906 | **研究数据可视化** | 研究数据如何可视化? | AIPOCH: interactive data visualization with plotly/ggplot2 integration | **交互式可视化**: plotly/ggplot2集成的交互式研究数据可视化 | `nt_io::research::data_visualization` |
+| D23907 | **研究元数据管理** | 研究元数据如何管理? | AIPOCH: metadata management with schema evolution and backward compatibility | **元数据管理**: Schema演进+向后兼容的研究元数据管理 | `nt_memory::research::metadata_management` |
+| D23908 | **研究工作流编排** | 复杂研究工作流如何编排? | AIPOCH: workflow orchestration with DAG execution and failure recovery | **工作流编排**: DAG执行+故障恢复的研究工作流编排 | `nt_act::research::workflow_orchestration` |
+| D23909 | **研究数据格式转换** | 多格式数据如何转换? | AIPOCH: format conversion with lossless transformation and validation | **格式转换器**: 无损转换+验证的多格式数据转换 | `nt_world::research::format_converter` |
+| D23910 | **研究权限管理** | 研究权限如何管理? | AIPOCH: role-based access control with audit trail for research data | **RBAC权限管理**: 基于角色的访问控制+审计追踪 | `nt_shield::research::access_control` |
+| D23911 | **研究数据生命周期** | 研究数据生命周期如何管理? | AIPOCH: data lifecycle management (ingestion → processing → archival → deletion) | **数据生命周期管理**: 摄入→处理→归档→删除全生命周期管理 | `nt_memory::research::data_lifecycle` |
+
+### 0.203 程序图架构决策 (D23912-D23942)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D23912 | **程序图三元组** | 程序知识如何表示? | Procedural Graphs (arXiv:2609.09153): (procedure, relation, procedure) triplets for procedural knowledge | **程序三元组**: (过程, 关系, 过程)三元组表示程序知识, 支持图推理 | `nt_core::proc_graph::triplet_representation` |
+| D23913 | **自演化图拓扑** | 图拓扑如何自演化? | Procedural Graphs: LLM refiner edits graph topology from failed/successful trajectories | **LLM图编辑器**: 从失败/成功轨迹中LLM编辑图拓扑, 自动演化 | `nt_mind::proc_graph::topology_evolution` |
+| D23914 | **失败轨迹对比** | 失败与成功轨迹如何对比? | Procedural Graphs: contrast failed vs successful trajectories to identify critical edges | **轨迹对比分析**: 失败/成功轨迹对比, 识别关键边和失败模式 | `nt_mind::proc_graph::trajectory_contrast` |
+| D23915 | **最小骨架引导** | 程序图如何从最小骨架构建? | Procedural Graphs: builds from minimal skeleton, matches or surpasses hand-designed ones | **最小骨架引导**: 从最小骨架开始, 通过执行轨迹自动扩展为完整图 | `nt_mind::proc_graph::skeleton_bootstrap` |
+| D23916 | **基于验证的图编辑** | 图编辑如何基于验证? | Procedural Graphs: validation-based graph editing with execution feedback | **验证驱动编辑**: 执行反馈驱动图编辑, 验证通过的边保留, 失败的边修剪 | `nt_mind::proc_graph::validation_editing` |
+| D23917 | **图匹配算法** | 程序图如何匹配查询? | Procedural Graphs: graph matching via subgraph isomorphism + semantic similarity | **图匹配引擎**: 子图同构+语义相似度的程序图匹配 | `nt_core::proc_graph::graph_matching` |
+| D23918 | **图压缩存储** | 程序图如何压缩存储? | Procedural Graphs: graph compression via redundant edge removal and merge | **图压缩器**: 冗余边删除+节点合并的图压缩存储 | `nt_memory::proc_graph::graph_compression` |
+| D23919 | **图可视化** | 程序图如何可视化? | Procedural Graphs: interactive graph visualization with zoom and filtering | **交互式可视化**: 缩放+过滤的程序图交互式可视化 | `nt_io::proc_graph::graph_visualization` |
+| D23920 | **图版本控制** | 程序图如何版本化? | Procedural Graphs: graph versioning with diff tracking between versions | **图版本控制**: 版本间差异追踪的程序图版本化 | `nt_memory::proc_graph::graph_versioning` |
+| D23921 | **图查询语言** | 如何查询程序图? | Procedural Graphs: graph query language for procedural pattern matching | **图查询语言**: 程序模式匹配的图查询语言 | `nt_core::proc_graph::query_language` |
+| D23922 | **图学习优化** | 程序图如何学习优化? | Procedural Graphs: reinforcement learning on graph structure for optimization | **图结构强化学习**: 基于强化学习的图结构优化 | `nt_mind::proc_graph::rl_optimization` |
+| D23923 | **图迁移学习** | 程序图如何跨域迁移? | Procedural Graphs: transfer learning across procedural domains via shared subgraphs | **跨域迁移**: 通过共享子图实现程序图跨域迁移学习 | `nt_mind::proc_graph::cross_domain_transfer` |
+| D23924 | **图异常检测** | 程序图异常如何检测? | Procedural Graphs: anomaly detection in execution traces via graph deviation | **轨迹异常检测**: 通过图偏差检测执行轨迹异常 | `nt_meta::proc_graph::anomaly_detection` |
+| D23925 | **图补全推理** | 缺失图边如何补全? | Procedural Graphs: link prediction for missing edges in procedural graphs | **链接预测补全**: 缺失边的链接预测, 补全不完整程序图 | `nt_core::proc_graph::link_prediction` |
+| D23926 | **图分割并行** | 大图如何分割并行? | Procedural Graphs: graph partitioning for parallel execution on subgraphs | **图分割并行**: 大图分割为子图并行执行 | `nt_act::proc_graph::graph_partitioning` |
+| D23927 | **图缓存策略** | 程序图结果如何缓存? | Procedural Graphs: result caching at graph node level for repeated execution | **节点级缓存**: 图节点级结果缓存, 避免重复执行 | `nt_memory::proc_graph::node_cache` |
+| D23928 | **图安全约束** | 程序图如何保证安全? | Procedural Graphs: safety constraints on graph edges (forbidden transitions) | **边安全约束**: 禁止转换边的安全约束, 防止危险程序路径 | `nt_shield::proc_graph::edge_safety` |
+| D23929 | **图评估指标** | 程序图质量如何评估? | Procedural Graphs: graph quality metrics (coverage, efficiency, robustness) | **图质量指标**: 覆盖率/效率/鲁棒性的图质量评估 | `nt_eval::proc_graph::quality_metrics` |
+| D23930 | **图解释器** | 程序图决策如何解释? | Procedural Graphs: graph explanation via path highlighting and counterfactual | **图解释器**: 路径高亮+反事实的图决策解释 | `nt_meta::proc_graph::graph_explainer` |
+| D23931 | **图合并策略** | 多图如何合并? | Procedural Graphs: graph merging with conflict resolution for multi-source knowledge | **图合并器**: 冲突解决的多源知识图合并 | `nt_memory::proc_graph::graph_merging` |
+| D23932 | **图蒸馏压缩** | 大图如何蒸馏? | Procedural Graphs: graph distillation preserving critical paths while removing redundancy | **图蒸馏**: 保留关键路径+去除冗余的图蒸馏压缩 | `nt_mind::proc_graph::graph_distillation` |
+| D23933 | **图实时更新** | 程序图如何实时更新? | Procedural Graphs: online graph updates with incremental path recalculation | **增量实时更新**: 增量路径重计算的在线图更新 | `nt_act::proc_graph::online_update` |
+| D23934 | **图多粒度** | 程序图如何支持多粒度? | Procedural Graphs: multi-granularity graphs (coarse ↔ fine) with drill-down | **多粒度图**: 粗↔细粒度图, 支持下钻探索 | `nt_core::proc_graph::multi_granularity` |
+| D23935 | **图知识蒸馏** | 图知识如何蒸馏到LLM? | Procedural Graphs: distilling graph knowledge into LLM prompts for zero-shot execution | **图到提示蒸馏**: 程序图知识蒸馏到LLM提示, 支持零样本执行 | `nt_mind::proc_graph::knowledge_to_prompt` |
+| D23936 | **图并发控制** | 多代理并发如何控制? | Procedural Graphs: concurrent graph access with locking and conflict detection | **并发图访问**: 锁+冲突检测的多代理并发图访问 | `nt_act::proc_graph::concurrent_access` |
+| D23937 | **图质量门禁** | 图变更如何通过质量门禁? | Procedural Graphs: quality gate for graph mutations (must pass test suite) | **图质量门禁**: 图变更必须通过测试套件的质量门禁 | `nt_shield::proc_graph::mutation_gate` |
+| D23938 | **图监控告警** | 程序图健康如何监控? | Procedural Graphs: graph health monitoring (coverage decay, path failure rate) | **图健康监控**: 覆盖率衰减/路径失败率的图健康监控 | `nt_meta::proc_graph::health_monitor` |
+| D23939 | **图回滚策略** | 图变更如何回滚? | Procedural Graphs: graph rollback with snapshot-based recovery | **图快照回滚**: 基于快照的图变更回滚恢复 | `nt_repair::proc_graph::graph_rollback` |
+| D23940 | **图审计日志** | 图变更如何审计? | Procedural Graphs: immutable audit log for all graph mutations | **图变更审计**: 所有图变更的不可变审计日志 | `nt_shield::proc_graph::audit_log` |
+| D23941 | **图联邦学习** | 多方图如何联邦学习? | Procedural Graphs: federated graph learning without sharing raw trajectories | **联邦图学习**: 不共享原始轨迹的多方图联邦学习 | `nt_core::proc_graph::federated_learning` |
+| D23942 | **图演化速度** | 图演化速度如何控制? | Procedural Graphs: evolution velocity control (slow for stable domains, fast for new) | **演化速度控制**: 稳定域慢演化, 新域快演化的自适应速度 | `nt_mind::proc_graph::evolution_velocity` |
+
+### 0.204 反向蒸馏模式决策 (D23943-D23973)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D23943 | **弱到强泛化** | 弱模型如何训练强模型? | OPRD (arXiv:2609.08798): weak-to-strong generalization where stronger models learn from weaker supervisors | **弱到强蒸馏**: 强模型从弱监督器学习, 通过反向策略梯度放大 | `nt_mind::distill::weak_to_strong` |
+| D23944 | **在策教师评估** | 教师策略如何在学生轨迹上评估? | OPRD: evaluates teacher's policy shift on student rollouts, not teacher's own distribution | **学生轨迹评估**: 教师策略在学生 rollout 分布上评估, 而非教师分布 | `nt_mind::distill::on_policy_teacher` |
+| D23945 | **验证器驱动策略梯度** | 验证器如何驱动策略梯度? | OPRD: verifier-driven policy gradient amplifies along teacher direction | **验证器放大梯度**: 验证器驱动的策略梯度沿教师方向放大 | `nt_core::distill::verifier_gradient` |
+| D23946 | **教师引导加速** | 教师引导如何加速而非重定向? | OPRD: teacher guidance accelerates rather than redirects student optimization | **加速不重定向**: 教师引导加速学生优化方向, 不改变学生自身学习路径 | `nt_mind::distill::teacher_acceleration` |
+| D23947 | **容量排序无关性** | 模型容量排序是否影响蒸馏? | OPRD: capacity ordering independence — weaker-to-strong works regardless of size ratio | **容量无关蒸馏**: 弱→强蒸馏不受容量比影响, 任意大小关系可用 | `nt_mind::distill::capacity_ordering` |
+| D23948 | **反向KL散度** | 反向KL散度如何使用? | OPRD: reverse KL divergence for teacher policy evaluation on student rollouts | **反向KL评估**: 教师策略在学生 rollout 上的反向KL散度评估 | `nt_core::distill::reverse_kl` |
+| D23949 | **策略分布偏移** | 策略分布偏移如何处理? | OPRD: policy shift measurement between teacher train distribution and student rollout | **偏移度量**: 教师训练分布与学生 rollout 间偏移度量 | `nt_mind::distill::policy_shift` |
+| D23950 | **梯度方向一致性** | 梯度方向如何保持一致? | OPRD: gradient direction consistency check between teacher and student optimization | **梯度一致性检查**: 教师与学生优化间梯度方向一致性验证 | `nt_core::distill::gradient_consistency` |
+| D23951 | **多教师蒸馏** | 多个教师如何联合蒸馏? | OPRD: multi-teacher distillation with weighted teacher aggregation | **多教师加权聚合**: 多教师策略加权聚合, 自适应教师贡献权重 | `nt_mind::distill::multi_teacher` |
+| D23952 | **蒸馏温度调度** | 蒸馏温度如何调度? | OPRD: adaptive temperature scheduling for teacher-student alignment | **自适应温度调度**: 蒸馏温度自适应调整, 平衡教师指导与学生自主 | `nt_mind::distill::temperature_schedule` |
+| D23953 | **蒸馏早停** | 蒸馏何时停止? | OPRD: early stopping based on student performance plateau on teacher's distribution | **分布性能早停**: 学生在教师分布上性能平台期时停止蒸馏 | `nt_mind::distill::early_stopping` |
+| D23954 | **蒸馏正则化** | 蒸馏如何正则化? | OPRD: regularization to prevent teacher overfitting to student distribution | **教师正则化**: 防止教师过拟合学生分布的蒸馏正则化 | `nt_core::distill::regularization` |
+| D23955 | **蒸馏质量度量** | 蒸馏质量如何度量? | OPRD: quality metrics (policy agreement rate, reward improvement, KL divergence) | **蒸馏质量指标**: 策略一致率/奖励改善/KL散度的蒸馏质量评估 | `nt_eval::distill::quality_metrics` |
+| D23956 | **在线蒸馏** | 在线蒸馏如何实现? | OPRD: online distillation with continuous teacher-student interaction | **在线蒸馏**: 持续师生交互的在线蒸馏, 实时知识传递 | `nt_mind::distill::online_distillation` |
+| D23957 | **蒸馏安全约束** | 蒸馏过程如何保证安全? | OPRD: safety constraints during distillation to prevent capability regression | **蒸馏安全约束**: 蒸馏过程安全约束, 防止能力退化 | `nt_shield::distill::safety_constraint` |
+| D23958 | **蒸馏数据选择** | 蒸馏数据如何选择? | OPRD: data selection strategy for teacher rollouts (diversity + difficulty) | **蒸馏数据选择**: 多样性+难度的教师 rollout 数据选择策略 | `nt_mind::distill::data_selection` |
+| D23959 | **蒸馏课程学习** | 蒸馏课程如何设计? | OPRD: curriculum learning for distillation (easy → hard examples) | **蒸馏课程学习**: 从易到难的蒸馏课程设计 | `nt_mind::distill::curriculum_learning` |
+| D23960 | **蒸馏多模态** | 多模态蒸馏如何实现? | OPRD: multi-modal distillation with modality-specific teacher guidance | **多模态蒸馏**: 模态专用教师指导的多模态蒸馏 | `nt_mind::distill::multimodal_distill` |
+| D23961 | **蒸馏量化感知** | 量化如何影响蒸馏? | OPRD: quantization-aware distillation preserving teacher knowledge in low-bit models | **量化感知蒸馏**: 低位模型中保留教师知识的量化感知蒸馏 | `nt_mind::distill::quantization_aware` |
+| D23962 | **蒸馏知识图谱** | 蒸馏知识如何结构化? | OPRD: knowledge graph distillation from teacher's internal representations | **知识图谱蒸馏**: 教师内部表示的知识图谱蒸馏 | `nt_mind::distill::knowledge_graph_distill` |
+| D23963 | **蒸馏错误放大** | 教师错误如何处理? | OPRD: error amplification detection and correction during reverse distillation | **错误放大检测**: 反向蒸馏中教师错误放大检测与纠正 | `nt_meta::distill::error_detection` |
+| D23964 | **蒸馏多任务** | 多任务蒸馏如何实现? | OPRD: multi-task distillation with task-specific teacher heads | **多任务蒸馏**: 任务专用教师头的多任务蒸馏 | `nt_mind::distill::multi_task_distill` |
+| D23965 | **蒸馏弹性权重** | 弹性权重合并如何使用? | OPRD: elastic weight consolidation during distillation for catastrophic forgetting prevention | **弹性权重合并**: 蒸馏中弹性权重合并防灾难遗忘 | `nt_mind::distill::ewc_distill` |
+| D23966 | **蒸馏验证集** | 蒸馏验证集如何构建? | OPRD: validation set construction from teacher's failure modes | **失败模式验证集**: 从教师失败模式构建蒸馏验证集 | `nt_eval::distill::failure_validation` |
+| D23967 | **蒸馏多轮迭代** | 多轮蒸馏如何进行? | OPRD: iterative distillation with progressive teacher complexity increase | **迭代渐进蒸馏**: 逐步增加教师复杂度的迭代蒸馏 | `nt_mind::distill::iterative_distillation` |
+| D23968 | **蒸馏模型选择** | 蒸馏目标模型如何选择? | OPRD: model selection for distillation target based on capacity-performance tradeoff | **容量-性能权衡**: 基于容量-性能权衡的蒸馏目标模型选择 | `nt_mind::distill::model_selection` |
+| D23969 | **蒸馏评估自动化** | 蒸馏效果如何自动评估? | OPRD: automated evaluation pipeline for distillation quality assurance | **蒸馏评估管线**: 蒸馏质量保证的自动化评估管线 | `nt_eval::distill::auto_evaluation` |
+| D23970 | **蒸馏部署优化** | 蒸馏模型如何优化部署? | OPRD: deployment optimization for distilled models (quantization + pruning + caching) | **蒸馏部署优化**: 量化+剪枝+缓存的蒸馏模型部署优化 | `nt_io::distill::deploy_optimization` |
+| D23971 | **蒸馏监控告警** | 蒸馏过程如何监控? | OPRD: distillation monitoring with quality regression alerts | **蒸馏监控**: 质量回归告警的蒸馏过程监控 | `nt_meta::distill::distill_monitor` |
+| D23972 | **蒸馏回滚策略** | 蒸馏失败如何回滚? | OPRD: rollback strategy with checkpoint-based recovery for failed distillation | **蒸馏回滚**: 基于检查点的蒸馏失败回滚恢复 | `nt_repair::distill::distill_rollback` |
+| D23973 | **蒸馏文档生成** | 蒸馏结果如何文档化? | OPRD: automated documentation generation for distillation experiments | **蒸馏文档生成**: 蒸馏实验的自动文档生成 | `nt_io::distill::distill_documentation` |
+
+### 0.205 空间索引模式决策 (D23974-D24004)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D23974 | **矢量切片生成** | GeoJSON如何生成矢量瓦片? | geojson-vt: slice GeoJSON into vector tiles on the fly in browser | **浏览器端切片**: GeoJSON在浏览器端实时切片为矢量瓦片, 无服务器依赖 | `nt_world::spatial::geojson_vt_slice` |
+| D23975 | **按需简化** | 矢量瓦片如何按需简化? | geojson-vt: on-demand simplification with zoom-level appropriate detail | **按需简化**: 按缩放级别自动简化, 高缩放保留细节, 低缩放简化 | `nt_world::spatial::on_demand_simplify` |
+| D23976 | **零拷贝访问** | 矢量瓦片如何零拷贝? | geojson-vt: zero-copy alternative with getTileRaw for performance | **零拷贝访问**: getTileRaw直接引用原始数据, 零拷贝高性能访问 | `nt_world::spatial::zero_copy_tile` |
+| D23977 | **渐进式加载** | 大数据集如何渐进加载? | geojson-vt: progressive loading with tile priority (nearby first) | **渐进式加载**: 按距离优先级渐进加载瓦片, 近处先加载 | `nt_world::spatial::progressive_loading` |
+| D23978 | **缩放级别缓存** | 不同缩放级别如何缓存? | geojson-vt: zoom-level caching with tile pyramid structure | **瓦片金字塔缓存**: 缩放级别瓦片金字塔缓存, 避免重复计算 | `nt_memory::spatial::tile_pyramid_cache` |
+| D23979 | **瓦片边界处理** | 瓦片边界如何处理? | geojson-vt: tile boundary clipping with buffer zone for seamless rendering | **边界缓冲裁剪**: 瓦片边界缓冲区裁剪, 确保无缝渲染 | `nt_world::spatial::boundary_clip` |
+| D23980 | **坐标系统转换** | 坐标系统如何转换? | geojson-vt: coordinate system transformation (WGS84 ↔ Web Mercator) | **坐标系统转换**: WGS84↔Web Mercator坐标转换, 支持多投影 | `nt_world::spatial::coord_transform` |
+| D23981 | **属性简化** | 要素属性如何简化? | geojson-vt: attribute simplification at low zoom levels to reduce tile size | **属性简化**: 低缩放级别属性简化, 减少瓦片大小 | `nt_world::spatial::attribute_simplify` |
+| D23982 | **瓦片索引结构** | 瓦片索引如何组织? | geojson-vt: quadtree-based tile index for spatial queries | **四叉树索引**: 基于四叉树的瓦片空间索引, 支持快速查询 | `nt_world::spatial::quadtree_index` |
+| D23983 | **增量更新** | 瓦片如何增量更新? | geojson-vt: incremental tile updates when source data changes | **增量瓦片更新**: 源数据变更时增量更新受影响瓦片 | `nt_world::spatial::incremental_update` |
+| D23984 | **瓦片预热** | 瓦片如何预热加载? | geojson-vt: tile preloading based on viewport prediction | **预测预加载**: 基于视口预测的瓦片预加载 | `nt_world::spatial::predictive_preload` |
+| D23985 | **内存瓦片缓存** | 内存中瓦片如何缓存? | geojson-vt: in-memory tile cache with LRU eviction | **LRU瓦片缓存**: 内存LRU瓦片缓存, 自动驱逐低频瓦片 | `nt_memory::spatial::lru_tile_cache` |
+| D23986 | **瓦片压缩** | 瓦片如何压缩? | geojson-vt: gzip compression for tile transfer with client-side decompression | **gzip瓦片压缩**: 传输gzip压缩, 客户端解压 | `nt_io::spatial::tile_compression` |
+| D23987 | **矢量瓦片格式** | 矢量瓦片如何标准化? | geojson-vt: MVT (Mapbox Vector Tile) format compatibility | **MVT兼容**: 兼容Mapbox Vector Tile标准格式 | `nt_io::spatial::mvt_compatibility` |
+| D23988 | **瓦片渲染优化** | 瓦片渲染如何优化? | geojson-vt: batch rendering with instanced draw calls for tile features | **批量渲染**: 实例化绘制调用的瓦片批量渲染 | `nt_io::spatial::batch_render` |
+| D23989 | **瓦片错误恢复** | 瓦片加载失败如何恢复? | geojson-vt: fallback tile generation for failed loads | **瓦片回退生成**: 加载失败时生成降级回退瓦片 | `nt_repair::spatial::tile_fallback` |
+| D23990 | **瓦片统计监控** | 瓦片性能如何监控? | geojson-vt: tile rendering statistics (load time, size, feature count) | **瓦片性能统计**: 加载时间/大小/要素数的瓦片统计监控 | `nt_meta::spatial::tile_stats` |
+| D23991 | **多源瓦片合并** | 多源数据如何合并瓦片? | geojson-vt: multi-source tile merging with z-order priority | **多源瓦片合并**: Z-order优先级的多源数据瓦片合并 | `nt_world::spatial::multi_source_merge` |
+| D23992 | **瓦片切片算法** | 切片算法如何优化? | geojson-vt: optimized clipper with bounding box pre-filtering | **优化裁剪器**: 边界框预过滤的优化切片裁剪器 | `nt_world::spatial::optimized_clipper` |
+| D23993 | **瓦片异步加载** | 瓦片如何异步加载? | geojson-vt: async tile loading with request deduplication | **异步去重加载**: 异步瓦片加载+请求去重 | `nt_world::spatial::async_tile_load` |
+| D23994 | **瓦片LRU策略** | 瓦片缓存策略如何选择? | geojson-vt: LRU vs LFU vs adaptive cache policies comparison | **自适应缓存策略**: LRU/LFU/自适应缓存策略按工作负载选择 | `nt_memory::spatial::adaptive_cache_policy` |
+| D23995 | **瓦片预计算** | 预计算瓦片如何管理? | geojson-vt: precomputed tile pyramid for static datasets | **预计算瓦片金字塔**: 静态数据集预计算瓦片金字塔 | `nt_memory::spatial::precomputed_pyramid` |
+| D23996 | **瓦片版本控制** | 瓦片版本如何管理? | geojson-vt: tile versioning with ETag-based cache validation | **ETag版本控制**: 基于ETag的瓦片版本+缓存验证 | `nt_memory::spatial::tile_versioning` |
+| D23997 | **瓦片安全约束** | 瓦片访问如何控制? | geojson-vt: tile access control with region-based restrictions | **区域访问控制**: 基于区域的瓦片访问控制 | `nt_shield::spatial::tile_access_control` |
+| D23998 | **瓦片A/B测试** | 瓦片策略如何A/B测试? | geojson-vt: A/B testing framework for tile loading strategies | **瓦片A/B测试**: 瓦片加载策略的A/B测试框架 | `nt_eval::spatial::tile_ab_testing` |
+| D23999 | **瓦片国际化** | 多语言瓦片如何支持? | geojson-vt: i18n support with language-specific tile labels | **多语言瓦片**: 语言专用标签的多语言瓦片支持 | `nt_io::spatial::tile_i18n` |
+| D24000 | **瓦片无障碍** | 瓦片如何无障碍访问? | geojson-vt: accessibility support with screen reader tile descriptions | **瓦片无障碍**: 屏幕阅读器描述的瓦片无障碍访问 | `nt_io::spatial::tile_accessibility` |
+| D24001 | **瓦片离线支持** | 瓦片如何离线使用? | geojson-vt: Service Worker caching for offline tile access | **Service Worker离线**: Service Worker缓存支持瓦片离线访问 | `nt_io::spatial::tile_offline` |
+| D24002 | **瓦片API设计** | 瓦片API如何设计? | geojson-vt: RESTful tile API with standard CRUD operations | **RESTful瓦片API**: 标准CRUD操作的瓦片RESTful API | `nt_io::spatial::tile_api` |
+| D24003 | **瓦片监控告警** | 瓦片系统如何监控? | geojson-vt: health monitoring with tile availability and latency metrics | **瓦片健康监控**: 可用性+延迟指标的瓦片系统健康监控 | `nt_meta::spatial::tile_health` |
+| D24004 | **瓦片演化策略** | 瓦片格式如何演化? | geojson-vt: backward-compatible format evolution with migration support | **向后兼容演化**: 格式向后兼容演化+迁移支持 | `nt_memory::spatial::tile_evolution` |
+
+### 0.206 代码上下文优化决策 (D24005-D24035)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D24005 | **确定性调用图排名** | 调用图如何确定性排名? | ripwire: ranked deterministic call graph for coding agents with reproducible results | **确定性调用图排名**: 可复现的确定性调用图排名, 消除随机性 | `nt_core::context::deterministic_callgraph` |
+| D24006 | **爆炸半径计算** | 代码变更爆炸半径如何计算? | ripwire: blast radius calculation showing affected files and functions | **爆炸半径计算**: 变更影响的文件和函数爆炸半径可视化 | `nt_core::context::blast_radius` |
+| D24007 | **测试识别** | 应运行哪些测试? | ripwire: tests-to-run identification based on call graph analysis | **测试识别器**: 基于调用图分析的应运行测试识别 | `nt_core::context::test_identifier` |
+| D24008 | **质量差测量** | 代码质量差如何测量? | ripwire: quality delta measurement before and after changes | **质量差测量**: 变更前后代码质量差量化 | `nt_eval::context::quality_delta` |
+| D24009 | **Token预算管理** | 上下文Token如何预算管理? | ripwire: token budget management with priority-based context selection | **Token预算管理**: 基于优先级的上下文选择Token预算管理 | `nt_core::context::token_budget` |
+| D24010 | **签名压缩** | 代码签名如何压缩? | ripwire: signatures at 74.7% fewer bytes than bodies for efficient context | **74.7%签名压缩**: 代码签名比代码体少74.7%字节, 高效上下文 | `nt_core::context::signature_compress` |
+| D24011 | **猜测标签化** | 推理猜测如何标签化? | ripwire: every guess labelled, every loss published for transparency | **猜测标签化**: 所有推理猜测标注, 所有损失公开, 完全透明 | `nt_meta::context::guess_labelling` |
+| D24012 | **文件级排名** | 文件重要性如何排名? | ripwire: strict file@10 ranking at 58.3% vs 40.0% best competitor | **文件级排名**: 基于调用图的文件重要性top-10排名, 58.3%准确率 | `nt_core::context::file_ranking` |
+| D24013 | **调用图缓存** | 调用图如何缓存? | ripwire: incremental call graph cache with file-level invalidation | **增量调用图缓存**: 文件级失效的增量调用图缓存 | `nt_memory::context::callgraph_cache` |
+| D24014 | **调用图增量更新** | 调用图如何增量更新? | ripwire: incremental updates on file change (not full recompute) | **增量调用图更新**: 文件变更时增量更新, 避免全量重算 | `nt_core::context::incremental_callgraph` |
+| D24015 | **跨语言调用图** | 多语言项目如何构建调用图? | ripwire: cross-language call graph construction (Rust + JS + Python) | **跨语言调用图**: Rust/JS/Python多语言调用图构建 | `nt_core::context::cross_lang_callgraph` |
+| D24016 | **调用图可视化** | 调用图如何可视化? | ripwire: interactive call graph visualization with dependency highlighting | **交互式调用图可视化**: 依赖高亮的交互式调用图可视化 | `nt_io::context::callgraph_visualization` |
+| D24017 | **调用图查询** | 调用图如何查询? | ripwire: call graph query API (ancestors, descendants, siblings) | **调用图查询API**: 祖先/后代/兄弟的调用图查询 | `nt_core::context::callgraph_query` |
+| D24018 | **质量基线建立** | 代码质量基线如何建立? | ripwire: quality baseline establishment with historical comparison | **质量基线建立**: 历史对比的代码质量基线建立 | `nt_eval::context::quality_baseline` |
+| D24019 | **调用图压缩存储** | 调用图如何压缩存储? | ripwire: compressed call graph storage with shared prefix encoding | **共享前缀压缩**: 共享前缀编码的调用图压缩存储 | `nt_memory::context::callgraph_compression` |
+| D24020 | **上下文优先级** | 上下文项如何排优先级? | ripwire: priority-based context selection (dependencies > tests > docs) | **上下文优先级**: 依赖>测试>文档的上下文优先级排序 | `nt_core::context::context_priority` |
+| D24021 | **调用图安全** | 调用图如何保证安全? | ripwire: security annotation on call graph edges (unsafe, FFI, system) | **调用图安全标注**: 不安全/FFI/系统调用边的安全标注 | `nt_shield::context::callgraph_security` |
+| D24022 | **调用图版本对比** | 调用图版本如何对比? | ripwire: call graph diff between versions showing structural changes | **调用图差异**: 版本间调用图差异对比, 显示结构变更 | `nt_meta::context::callgraph_diff` |
+| D24023 | **上下文裁剪** | 上下文如何智能裁剪? | ripwire: intelligent context pruning based on relevance scoring | **智能上下文裁剪**: 基于相关性评分的智能上下文裁剪 | `nt_core::context::intelligent_pruning` |
+| D24024 | **调用图索引** | 调用图如何索引? | ripwire: indexed call graph with O(1) ancestor/descendant queries | **O(1)调用图索引**: O(1)复杂度的祖先/后代查询索引 | `nt_core::context::callgraph_index` |
+| D24025 | **质量趋势监控** | 质量趋势如何监控? | ripwire: quality trend monitoring with regression detection | **质量趋势监控**: 质量趋势监控+回归检测 | `nt_meta::context::quality_trend` |
+| D24026 | **调用图并行构建** | 大项目调用图如何并行构建? | ripwire: parallel call graph construction with work-stealing | **并行调用图构建**: 工作窃取的大项目并行调用图构建 | `nt_core::context::parallel_callgraph` |
+| D24027 | **上下文摘要** | 上下文如何智能摘要? | ripwire: context summarization for token-efficient representation | **上下文摘要**: Token高效的上下文智能摘要 | `nt_mind::context::context_summary` |
+| D24028 | **调用图持久化** | 调用图如何持久化? | ripwire: persistent call graph storage with incremental updates | **持久化调用图**: 增量更新的调用图持久化存储 | `nt_memory::context::persistent_callgraph` |
+| D24029 | **调用图验证** | 调用图正确性如何验证? | ripwire: call graph validation against compilation and test results | **调用图验证**: 编译和测试结果验证调用图正确性 | `nt_eval::context::callgraph_validation` |
+| D24030 | **上下文缓存策略** | 上下文缓存策略如何选择? | ripwire: context caching with LRU and priority-based eviction | **上下文缓存策略**: LRU+优先级驱逐的上下文缓存 | `nt_memory::context::context_cache` |
+| D24031 | **调用图分布式** | 分布式项目调用图如何构建? | ripwire: distributed call graph across multiple repositories | **分布式调用图**: 跨多仓库的分布式调用图构建 | `nt_core::context::distributed_callgraph` |
+| D24032 | **质量报告生成** | 质量报告如何自动生成? | ripwire: automated quality report generation with actionable insights | **质量报告生成**: 可操作洞察的自动质量报告生成 | `nt_io::context::quality_report` |
+| D24033 | **调用图监控** | 调用图健康如何监控? | ripwire: call graph health monitoring (freshness, coverage, accuracy) | **调用图健康监控**: 新鲜度/覆盖率/准确性的调用图健康监控 | `nt_meta::context::callgraph_health` |
+| D24034 | **调用图回滚** | 调用图变更如何回滚? | ripwire: call graph rollback with snapshot-based recovery | **调用图回滚**: 基于快照的调用图变更回滚 | `nt_repair::context::callgraph_rollback` |
+| D24035 | **调用图A/B测试** | 调用图策略如何A/B测试? | ripwire: A/B testing for call graph ranking strategies | **调用图A/B测试**: 调用图排名策略的A/B测试 | `nt_eval::context::callgraph_ab_testing` |
+
+### 0.207 环境重建决策 (D24036-D24066)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D24036 | **工作空间恢复** | 工作空间如何从轨迹恢复? | Terminal-Universe (arXiv:2609.04148): reconstruct environments from tool-execution history in trajectories | **轨迹驱动恢复**: 从工具执行历史重建工作空间环境 | `nt_world::env::trajectory_reconstruct` |
+| D24037 | **文件操作重放** | 文件操作如何重放? | Terminal-Universe: replay file operations to restore workspace before agent modified it | **文件操作重放**: 按顺序重放文件操作, 恢复代理修改前的工作空间 | `nt_world::env::file_replay` |
+| D24038 | **缺失文件补全** | 缺失文件如何补全? | Terminal-Universe: missing file completion from trajectory artifacts and context | **缺失文件补全**: 从轨迹工件和上下文补全缺失文件 | `nt_world::env::missing_file_completion` |
+| D24039 | **任务合成** | 新任务如何从恢复环境合成? | Terminal-Universe: synthesize new tasks from recovered workspace state | **任务合成**: 从恢复的工作空间状态合成新任务 | `nt_mind::env::task_synthesis` |
+| D24040 | **跨工作空间查询** | 跨工作空间如何查询? | Terminal-Universe: cross-workspace queries spanning multiple codebases | **跨工作空间查询**: 跨多代码库的工作空间查询 | `nt_world::env::cross_workspace_query` |
+| D24041 | **轨迹去重** | 重复轨迹如何去重? | Terminal-Universe: trajectory deduplication with semantic similarity detection | **轨迹去重**: 语义相似度检测的轨迹去重 | `nt_memory::env::trajectory_dedup` |
+| D24042 | **环境快照** | 工作空间快照如何管理? | Terminal-Universe: workspace snapshots for point-in-time recovery | **工作空间快照**: 时间点恢复的工作空间快照管理 | `nt_memory::env::workspace_snapshot` |
+| D24043 | **环境差异对比** | 环境差异如何对比? | Terminal-Universe: environment diff between trajectory states | **环境差异对比**: 轨迹状态间的环境差异对比 | `nt_meta::env::environment_diff` |
+| D24044 | **环境版本控制** | 环境状态如何版本控制? | Terminal-Universe: versioned environment states with branching support | **环境版本控制**: 支持分支的环境状态版本控制 | `nt_memory::env::environment_versioning` |
+| D24045 | **环境依赖解析** | 环境依赖如何解析? | Terminal-Universe: dependency resolution from trajectory package manager calls | **依赖解析**: 从轨迹包管理器调用解析环境依赖 | `nt_world::env::dependency_resolution` |
+| D24046 | **环境隔离** | 环境如何隔离? | Terminal-Universe: isolated environment instances with namespace separation | **环境隔离**: 命名空间分离的隔离环境实例 | `nt_shield::env::environment_isolation` |
+| D24047 | **环境监控** | 环境健康如何监控? | Terminal-Universe: environment health monitoring with drift detection | **环境健康监控**: 环境漂移检测的健康监控 | `nt_meta::env::environment_health` |
+| D24048 | **环境迁移** | 环境如何迁移? | Terminal-Universe: environment migration across machines with portability | **环境迁移**: 跨机器可移植的环境迁移 | `nt_act::env::environment_migration` |
+| D24049 | **环境模板** | 环境模板如何管理? | Terminal-Universe: environment templates for common development setups | **环境模板**: 常见开发设置的环境模板管理 | `nt_memory::env::environment_template` |
+| D24050 | **环境恢复验证** | 环境恢复如何验证? | Terminal-Universe: post-restoration validation (compilation + test + functional) | **恢复后验证**: 编译+测试+功能的恢复后验证 | `nt_eval::env::restoration_validation` |
+| D24051 | **环境时间线** | 环境变化如何追踪? | Terminal-Universe: environment timeline with change history and rollback points | **环境时间线**: 变更历史+回滚点的环境时间线 | `nt_memory::env::environment_timeline` |
+| D24052 | **环境并行恢复** | 多环境如何并行恢复? | Terminal-Universe: parallel environment restoration with resource management | **并行环境恢复**: 资源管理的多环境并行恢复 | `nt_act::env::parallel_restoration` |
+| D24053 | **环境安全约束** | 环境恢复如何保证安全? | Terminal-Universe: safety constraints during restoration (no system file modification) | **恢复安全约束**: 恢复过程中系统文件不修改的安全约束 | `nt_shield::env::restoration_safety` |
+| D24054 | **环境缓存** | 恢复结果如何缓存? | Terminal-Universe: restoration result caching with dependency-aware invalidation | **恢复缓存**: 依赖感知失效的恢复结果缓存 | `nt_memory::env::restoration_cache` |
+| D24055 | **环境成本追踪** | 环境恢复成本如何追踪? | Terminal-Universe: cost tracking for environment restoration (compute + storage) | **恢复成本追踪**: 计算+存储的环境恢复成本追踪 | `nt_act::env::restoration_cost` |
+| D24056 | **环境质量评估** | 环境恢复质量如何评估? | Terminal-Universe: quality metrics for restored environments (completeness + correctness) | **恢复质量指标**: 完整性+正确性的环境恢复质量评估 | `nt_eval::env::restoration_quality` |
+| D24057 | **环境文档生成** | 环境信息如何文档化? | Terminal-Universe: automated environment documentation from restored state | **环境文档生成**: 从恢复状态自动环境文档生成 | `nt_io::env::environment_docs` |
+| D24058 | **环境多租户** | 多租户环境如何隔离? | Terminal-Universe: multi-tenant environment isolation with resource quotas | **多租户隔离**: 资源配额的多租户环境隔离 | `nt_shield::env::multi_tenant` |
+| D24059 | **环境监控告警** | 环境异常如何告警? | Terminal-Universe: environment anomaly detection with alerting pipeline | **环境异常告警**: 检测+告警管线的环境异常告警 | `nt_meta::env::environment_alerting` |
+| D24060 | **环境回滚策略** | 环境恢复失败如何回滚? | Terminal-Universe: rollback strategy with checkpoint-based recovery | **环境回滚**: 基于检查点的环境恢复失败回滚 | `nt_repair::env::environment_rollback` |
+| D24061 | **环境审计日志** | 环境操作如何审计? | Terminal-Universe: immutable audit log for all environment operations | **环境审计**: 所有环境操作的不可变审计日志 | `nt_shield::env::environment_audit` |
+| D24062 | **环境A/B测试** | 环境策略如何A/B测试? | Terminal-Universe: A/B testing for environment restoration strategies | **环境A/B测试**: 环境恢复策略的A/B测试 | `nt_eval::env::environment_ab_testing` |
+| D24063 | **环境联邦学习** | 多方环境如何联邦? | Terminal-Universe: federated environment learning without sharing raw workspaces | **联邦环境学习**: 不共享原始工作空间的多方环境联邦 | `nt_core::env::federated_environment` |
+| D24064 | **环境渐进恢复** | 大环境如何渐进恢复? | Terminal-Universe: progressive restoration (critical files first, then optional) | **渐进恢复**: 关键文件优先, 可选文件后恢复的渐进策略 | `nt_world::env::progressive_restoration` |
+| D24065 | **环境预测恢复** | 环境需求如何预测? | Terminal-Universe: predictive restoration based on task requirements | **预测恢复**: 基于任务需求的预测性环境恢复 | `nt_mind::env::predictive_restoration` |
+| D24066 | **环境演化追踪** | 环境如何演化? | Terminal-Universe: environment evolution tracking with trend analysis | **环境演化追踪**: 趋势分析的环境演化追踪 | `nt_meta::env::environment_evolution` |
+
+### 0.208 代理编排模式决策 (D24067-D24097)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D24067 | **并行代理舰队** | 多代理如何并行管理? | Trendshift/Orca: fleet of parallel agents with load balancing and failure recovery | **代理舰队管理**: 负载均衡+故障恢复的并行代理舰队 | `nt_act::orchestration::agent_fleet` |
+| D24068 | **技能蒸馏** | 会话技能如何蒸馏? | Trendshift/Autoharness: self-learning skill layer distilled from successful sessions | **会话技能蒸馏**: 从成功会话中蒸馏自学习技能层 | `nt_mind::orchestration::skill_distillation` |
+| D24069 | **自学习技能层** | 技能如何自学习? | Autoharness: self-learning skill layer for Claude Code with experience accumulation | **自学习技能层**: 经验积累的自学习技能层, 持续改进 | `nt_mind::orchestration::self_learning_skills` |
+| D24070 | **AI网关** | AI流量如何路由? | Trendshift/Bifrost: enterprise AI gateway with traffic management | **AI网关**: 企业级AI流量管理网关, 负载均衡+限流 | `nt_io::orchestration::ai_gateway` |
+| D24071 | **行动前控制** | 代理行动前如何控制? | Trendshift/Busbar: control what AI can do before it acts with policy enforcement | **行动前控制**: 策略执行的行动前控制, AI行动前验证 | `nt_shield::orchestration::pre_action_control` |
+| D24072 | **代理工作流** | 代理工作流如何编排? | Trendshift/Open-flow: agent-first workflows with declarative orchestration | **声明式工作流**: 代理优先的声明式工作流编排 | `nt_act::orchestration::declarative_workflow` |
+| D24073 | **代理状态管理** | 代理状态如何管理? | Orca: isolated agent state with snapshot and restore capabilities | **代理状态隔离**: 隔离代理状态+快照+恢复能力 | `nt_memory::orchestration::agent_state` |
+| D24074 | **代理通信** | 代理间如何通信? | Orca: inter-agent communication with message queues and event streams | **代理通信**: 消息队列+事件流的代理间通信 | `nt_act::orchestration::agent_communication` |
+| D24075 | **代理监控** | 代理健康如何监控? | Orca: agent health monitoring with heartbeat and performance metrics | **代理健康监控**: 心跳+性能指标的代理健康监控 | `nt_meta::orchestration::agent_monitoring` |
+| D24076 | **代理故障恢复** | 代理故障如何恢复? | Orca: agent failure recovery with checkpoint-based restart | **代理故障恢复**: 基于检查点的代理故障恢复重启 | `nt_repair::orchestration::agent_recovery` |
+| D24077 | **代理资源管理** | 代理资源如何管理? | Orca: resource management (CPU/GPU/memory) with quota enforcement | **代理资源管理**: CPU/GPU/内存的资源配额管理 | `nt_act::orchestration::resource_management` |
+| D24078 | **代理调度** | 代理如何调度? | Orca: priority-based agent scheduling with preemption support | **优先级调度**: 支持抢占的优先级代理调度 | `nt_act::orchestration::agent_scheduling` |
+| D24079 | **代理隔离** | 代理如何隔离? | Orca: namespace-based agent isolation with resource limits | **命名空间隔离**: 基于命名空间的代理隔离+资源限制 | `nt_shield::orchestration::agent_isolation` |
+| D24080 | **代理认证** | 代理如何认证? | Bifrost: API key management with rate limiting and scope control | **代理认证**: API密钥管理+限流+范围控制 | `nt_shield::orchestration::agent_auth` |
+| D24081 | **代理限流** | 代理请求如何限流? | Bifrost: rate limiting with sliding window and burst tolerance | **代理限流**: 滑动窗口+突发容忍的代理请求限流 | `nt_shield::orchestration::agent_rate_limit` |
+| D24082 | **代理缓存** | 代理结果如何缓存? | Bifrost: response caching with semantic deduplication | **代理响应缓存**: 语义去重的代理响应缓存 | `nt_memory::orchestration::agent_cache` |
+| D24083 | **代理负载均衡** | 代理负载如何均衡? | Bifrost: load balancing with health-aware routing and failover | **代理负载均衡**: 健康感知路由+故障转移的负载均衡 | `nt_act::orchestration::agent_load_balance` |
+| D24084 | **代理日志** | 代理行为如何日志记录? | Bifrost: structured logging with trace correlation and audit trail | **结构化日志**: 追踪关联+审计追踪的结构化代理日志 | `nt_meta::orchestration::agent_logging` |
+| D24085 | **代理配置管理** | 代理配置如何管理? | Bifrost: centralized configuration with hot reload and version control | **集中配置管理**: 热重载+版本控制的集中代理配置 | `nt_memory::orchestration::agent_config` |
+| D24086 | **代理部署** | 代理如何部署? | Open-flow: declarative agent deployment with Kubernetes integration | **声明式部署**: Kubernetes集成的声明式代理部署 | `nt_io::orchestration::agent_deploy` |
+| D24087 | **代理版本控制** | 代理版本如何管理? | Open-flow: versioned agent artifacts with rollback support | **代理版本控制**: 支持回滚的版本化代理工件 | `nt_memory::orchestration::agent_versioning` |
+| D24088 | **代理测试** | 代理如何测试? | Autoharness: automated agent testing with scenario replay | **代理自动测试**: 场景重放的代理自动化测试 | `nt_eval::orchestration::agent_testing` |
+| D24089 | **代理文档生成** | 代理文档如何生成? | Open-flow: auto-generated agent documentation from configuration | **代理文档生成**: 从配置自动生成代理文档 | `nt_io::orchestration::agent_docs` |
+| D24090 | **代理安全扫描** | 代理安全如何扫描? | Bifrost: security scanning for agent configurations and permissions | **代理安全扫描**: 配置和权限的代理安全扫描 | `nt_shield::orchestration::agent_security_scan` |
+| D24091 | **代理成本分析** | 代理成本如何分析? | Bifrost: cost analysis per agent with budget alerts | **代理成本分析**: 每代理成本分析+预算告警 | `nt_act::orchestration::agent_cost_analysis` |
+| D24092 | **代理性能基准** | 代理性能如何基准测试? | Orca: performance benchmarking with throughput and latency metrics | **代理性能基准**: 吞吐量+延迟指标的代理性能基准 | `nt_eval::orchestration::agent_benchmark` |
+| D24093 | **代理兼容性** | 代理兼容性如何保证? | Bifrost: backward compatibility testing for agent interfaces | **代理兼容性测试**: 接口向后兼容性测试 | `nt_eval::orchestration::agent_compatibility` |
+| D24094 | **代理多租户** | 多租户代理如何隔离? | Bifrost: multi-tenant agent isolation with per-tenant quotas | **多租户隔离**: 每租户配额的多租户代理隔离 | `nt_shield::orchestration::multi_tenant_agents` |
+| D24095 | **代理灰度发布** | 代理如何灰度发布? | Open-flow: canary deployment with traffic splitting for agent versions | **代理灰度发布**: 流量分割的代理版本金丝雀部署 | `nt_io::orchestration::canary_deployment` |
+| D24096 | **代理回滚策略** | 代理发布失败如何回滚? | Open-flow: instant rollback with traffic shift for failed agent deployments | **代理即时回滚**: 失败部署的流量即时转移回滚 | `nt_repair::orchestration::agent_rollback` |
+| D24097 | **代理监控告警** | 代理异常如何告警? | Bifrost: anomaly detection with automated alerting and escalation | **代理异常告警**: 自动告警+升级的代理异常检测 | `nt_meta::orchestration::agent_alerting` |
+
+### 0.209 通用模型适配器决策 (D24098-D24118)
+
+| # | 决策领域 | 问题 | 研究证据 | 架构决策 | 实现位置 |
+|---|---------|------|---------|---------|---------|
+| D24098 | **模型无关接口** | 如何设计模型无关接口? | Universal Model Adapter: model-agnostic interface design with unified API surface | **统一模型接口**: 模型无关的统一API表面, 抽象层屏蔽模型差异 | `nt_io::adapter::model_agnostic_api` |
+| D24099 | **提供商抽象层** | 多提供商如何统一? | Universal Model Adapter: provider abstraction layer with pluggable backends | **可插拔提供商层**: 可插拔后端的提供商抽象层, OpenAI/Anthropic/本地模型统一 | `nt_io::adapter::provider_abstraction` |
+| D24100 | **能力发现** | 模型能力如何自动发现? | Universal Model Adapter: capability discovery via model introspection and benchmarking | **能力自动发现**: 模型自省+基准测试的能力自动发现 | `nt_core::adapter::capability_discovery` |
+| D24101 | **成本感知路由** | 模型如何按成本路由? | Universal Model Adapter: cost-aware routing selecting cheapest capable model | **成本感知路由**: 选择最便宜可用模型的成本感知路由 | `nt_core::adapter::cost_aware_routing` |
+| D24102 | **降级策略** | 模型不可用如何降级? | Universal Model Adapter: ordered fallback chain with automatic failover | **有序降级链**: 自动故障转移的有序降级链 | `nt_repair::adapter::fallback_chain` |
+| D24103 | **模型版本管理** | 多版本模型如何管理? | Universal Model Adapter: model version management with traffic splitting | **模型版本管理**: 流量分割的多版本模型管理 | `nt_memory::adapter::model_versioning` |
+| D24104 | **请求转换** | 请求如何跨模型转换? | Universal Model Adapter: request transformation with format normalization | **请求格式转换**: 格式归一化的跨模型请求转换 | `nt_io::adapter::request_transform` |
+| D24105 | **响应归一化** | 响应如何归一化? | Universal Model Adapter: response normalization to unified output schema | **响应归一化**: 统一输出Schema的响应归一化 | `nt_io::adapter::response_normalize` |
+| D24106 | **流式适配** | 流式响应如何适配? | Universal Model Adapter: streaming adaptation with buffer management and chunk transformation | **流式适配**: 缓冲管理+块转换的流式响应适配 | `nt_io::adapter::streaming_adapt` |
+| D24107 | **错误适配** | 错误如何跨模型统一? | Universal Model Adapter: error normalization with provider-specific error mapping | **错误归一化**: 提供商特定错误映射的错误归一化 | `nt_io::adapter::error_normalize` |
+| D24108 | **重试策略** | 模型调用失败如何重试? | Universal Model Adapter: retry with exponential backoff and provider-specific limits | **自适应重试**: 指数退避+提供商限制的自适应重试 | `nt_repair::adapter::retry_strategy` |
+| D24109 | **速率限制** | 多提供商速率如何管理? | Universal Model Adapter: per-provider rate limiting with token bucket | **提供商速率限制**: 令牌桶的每提供商速率限制 | `nt_shield::adapter::rate_limiting` |
+| D24110 | **模型缓存** | 模型响应如何缓存? | Universal Model Adapter: semantic response caching with embedding-based dedup | **语义响应缓存**: 基于嵌入去重的语义响应缓存 | `nt_memory::adapter::model_cache` |
+| D24111 | **模型监控** | 模型性能如何监控? | Universal Model Adapter: latency/throughput/error monitoring per model | **模型性能监控**: 每模型延迟/吞吐/错误监控 | `nt_meta::adapter::model_monitoring` |
+| D24112 | **模型A/B测试** | 模型如何A/B测试? | Universal Model Adapter: A/B testing with traffic splitting and metric comparison | **模型A/B测试**: 流量分割+指标对比的模型A/B测试 | `nt_eval::adapter::model_ab_testing` |
+| D24113 | **模型负载均衡** | 模型负载如何均衡? | Universal Model Adapter: load balancing across model instances with health checks | **模型负载均衡**: 健康检查的模型实例负载均衡 | `nt_act::adapter::model_load_balance` |
+| D24114 | **模型安全扫描** | 模型输出如何安全扫描? | Universal Model Adapter: output safety scanning with content moderation | **输出安全扫描**: 内容审核的模型输出安全扫描 | `nt_shield::adapter::output_safety` |
+| D24115 | **模型成本追踪** | 模型成本如何追踪? | Universal Model Adapter: per-request cost tracking with budget alerts | **模型成本追踪**: 每请求成本追踪+预算告警 | `nt_act::adapter::cost_tracking` |
+| D24116 | **模型文档生成** | 模型接口如何文档化? | Universal Model Adapter: auto-generated OpenAPI spec from adapter configuration | **模型文档生成**: 从适配器配置自动生成OpenAPI规范 | `nt_io::adapter::model_docs` |
+| D24117 | **模型回滚策略** | 模型切换如何回滚? | Universal Model Adapter: instant model rollback with traffic shift | **模型即时回滚**: 流量即时转移的模型回滚 | `nt_repair::adapter::model_rollback` |
+| D24118 | **模型演化追踪** | 模型接口如何演化? | Universal Model Adapter: backward-compatible interface evolution with deprecation notices | **向后兼容演化**: 弃用通知的向后兼容接口演化 | `nt_memory::adapter::interface_evolution` |
+| D24119 | **循环潜在推理** | 如何在小模型中实现高效推理? | BDH-CQ (778↑): 150M参数循环潜在推理, ARC-AGI-1基准突破 | **循环潜在状态机**: 嵌入空间递归迭代, 避免显式CoT长度爆炸; 150M参数实现10B级推理能力 | `nt_core::recurrent_reasoning::latent_loop` |
+| D24120 | **推理成本前沿** | 如何优化推理的计算成本? | BDH-CQ: 固定计算预算下精度最大化, 潜在空间迭代替代token生成 | **计算预算感知路由**: 按任务复杂度分配推理迭代次数; 简单任务1轮, 复杂任务5-10轮 | `nt_core::recurrent_reasoning::budget_router` |
+| D24121 | **ARC-AGI策略** | 如何攻克抽象推理基准? | BDH-CQ: 潜在空间模式匹配 + 组合泛化, 非符号推理 | **抽象模式库**: 预训练抽象关系嵌入, 推理时检索+组合; 避免逐token生成的组合爆炸 | `nt_core::recurrent_reasoning::pattern_library` |
+| D24122 | **循环展开深度** | 递归推理展开多少轮最优? | BDH-CQ: 自适应展开, 验证信号早停; 平均3.2轮/任务 | **早停验证器**: 每轮输出经验证模块评分, 达阈值即停; 防止过度推理浪费计算 | `nt_core::recurrent_reasoning::early_stop` |
+| D24123 | **潜在空间正则化** | 如何防止潜在空间退化? | BDH-CQ: KL散度锚定 + 周期性重建损失; 信息瓶颈控制 | **双正则化**: KL锚定防止后验坍缩 + 重建损失保持解码能力; 信息瓶颈控制压缩率 | `nt_core::recurrent_reasoning::regularizer` |
+| D24124 | **循环梯度流** | 递归结构如何保持梯度稳定? | BDH-CQ: 梯度裁剪 + 残差连接 + 层归一化; 支持20+步展开 | **稳定梯度管线**: 残差连接 + Pre-LN + 梯度裁剪; 架构约束保证Lipschitz连续 | `nt_core::recurrent_reasoning::gradient_stability` |
+| D24125 | **小模型蒸馏** | 如何从大模型蒸馏推理能力? | BDH-CQ: 潜在空间蒸馏(非logit蒸馏), 保留结构化推理模式 | **潜在空间蒸馏**: 对齐大模型潜在表示而非输出分布; 保留推理过程结构 | `nt_core::recurrent_reasoning::latent_distill` |
+| D24126 | **循环缓存** | 推理状态如何高效缓存? | BDH-CQ: KV缓存复用 + 潜在状态压缩; 推理速度提升3.8× | **增量推理缓存**: 潜在状态delta压缩存储; 相似查询复用前缀计算 | `nt_core::recurrent_reasoning::incremental_cache` |
+| D24127 | **多任务泛化** | 循环推理如何跨任务泛化? | BDH-CQ: 任务条件潜在空间, 共享推理核心 + 任务特化头 | **条件潜在路由**: 共享循环核心 + 任务嵌入条件化; 零样本新任务适配 | `nt_core::recurrent_reasoning::conditional_routing` |
+| D24128 | **推理可解释性** | 潜在推理过程如何可视化? | BDH-CQ: 潜在轨迹PCA降维 + 注意力热图; 推理路径可追溯 | **推理轨迹日志**: 每轮潜在状态快照 + PCA投影; 支持推理过程回放和分析 | `nt_core::recurrent_reasoning::trajectory_log` |
+| D24129 | **循环安全约束** | 递归推理如何防止无限循环? | BDH-CQ: 硬性迭代上限 + 收敛检测 + 资源监控 | **三重循环守卫**: 硬上限(10轮) + 收敛检测(连续2轮变化<ε) + token预算; 违反即终止 | `nt_core::recurrent_reasoning::loop_guard` |
+| D24130 | **混合精度推理** | 小模型如何利用混合精度加速? | BDH-CQ: INT8量化 + FP16潜在状态; 推理吞吐提升2.1× | **感知量化**: 注意力层FP16保持精度, FFN层INT8加速; 动态精度切换 | `nt_core::recurrent_reasoning::mixed_precision` |
+| D24131 | **循环并行化** | 多个推理循环如何并行? | BDH-CQ: 独立查询并行展开, 共享潜在空间批处理 | **查询级并行**: 独立推理任务并行执行; 共享嵌入层批处理提升GPU利用率 | `nt_core::recurrent_reasoning::query_parallel` |
+| D24132 | **推理状态压缩** | 长推理链状态如何压缩? | BDH-CQ: 潜在状态从2048维压缩至512维, 信息保留率97.3% | **自编码压缩器**: 变分自编码器压缩潜在状态; 重建损失<0.5%信息丢失 | `nt_core::recurrent_reasoning::state_compressor` |
+| D24133 | **跨模态循环** | 循环推理如何处理多模态输入? | BDH-CQ: 模态特定编码器 + 统一潜在空间 + 跨模态注意力 | **多模态融合循环**: 各模态独立编码→投影至共享潜在→循环推理→模态解码 | `nt_core::recurrent_reasoning::multimodal_loop` |
+| D24134 | **推理蒸馏管线** | 如何批量蒸馏推理模式? | BDH-CQ: 教师轨迹采样→潜在对齐→学生训练→验证 | **四阶段蒸馏**: 轨迹采样(1000+路径)→潜在对齐(KL+MSE)→学生训练→验证筛选 | `nt_core::recurrent_reasoning::distill_pipeline` |
+| D24135 | **循环鲁棒性** | 推理循环如何抵抗噪声输入? | BDH-CQ: 输入去噪预处理 + 推理过程注意力聚焦 | **去噪感知推理**: 输入层噪声检测→去噪→循环推理; 10%噪声下精度仅降1.2% | `nt_core::recurrent_reasoning::robust_inference` |
+| D24136 | **推理状态持久化** | 循环状态如何跨会话持久化? | BDH-CQ: 潜在状态序列化 + 版本化快照 + 增量加载 | **状态快照链**: 每轮状态哈希链接, 支持任意轮次恢复; 增量加载减少启动延迟 | `nt_core::recurrent_reasoning::state_persistence` |
+| D24137 | **循环评估基准** | 如何评估循环推理质量? | BDH-CQ: 准确率+迭代效率+收敛速度+泛化度四维评估 | **四维推理评估**: 精度(accuracy)×效率(iterations)×速度(convergence)×泛化(generalization) | `nt_core::recurrent_reasoning::evaluation_harness` |
+| D24138 | **循环进化** | 推理循环架构如何自进化? | BDH-CQ: NAS搜索循环深度/宽度, 进化算法优化超参数 | **架构进化搜索**: 循环深度[1-10]+潜在维度[256-4096]+学习率联合搜索; Pareto最优选择 | `nt_core::recurrent_reasoning::architecture_search` |
+| D24139 | **Agent后训练路由** | 如何路由Agent到最优训练策略? | NeoHorse-1 (377↑): 路由harness选择后训练方法, 结构化反馈循环 | **训练策略路由器**: 按任务特征选择SFT/DPO/RLHF; 性能提升12% vs 固定策略 | `nt_mind::post_training::strategy_router` |
+| D24140 | **结构化反馈循环** | 如何从Agent执行中提取训练信号? | NeoHorse-1: 执行轨迹→质量评分→偏好对→DPO训练 | **轨迹偏好提取器**: 自动从执行日志构建偏好对(成功/失败轨迹), 无需人工标注 | `nt_mind::post_training::feedback_extractor` |
+| D24141 | **课程蒸馏** | 如何设计渐进式蒸馏课程? | NeoHorse-1: 简单→复杂任务序列, 动态难度调整 | **自适应课程**: 随着能力提升动态增加任务复杂度; 保持80%成功率的学习区间 | `nt_mind::post_training::curriculum_engine` |
+| D24142 | **递归自改进** | Agent如何递归改进自身策略? | NeoHorse-1 + Prime Agent (51↑): 递归子Agent + 自我评估 + 策略更新 | **递归改进环**: 执行→评估→分析→改进→验证; 每轮自我提升3-5% | `nt_mind::post_training::recursive_improvement` |
+| D24143 | **后训练数据选择** | 如何选择最有效的训练数据? | NeoHorse-1: 数据质量评分 + 多样性采样 + 冗余过滤 | **数据质量门控**: 按信息增益排序, 去冗余(余弦<0.9), 优先高质量样本 | `nt_mind::post_training::data_selector` |
+| D24144 | **多目标优化** | 后训练如何平衡多目标? | NeoHorse-1: 帕累托前沿搜索, 精度/安全/效率权衡 | **帕累托训练**: 同时优化准确率+安全性+推理速度; 用户可配置权重向量 | `nt_mind::post_training::pareto_optimizer` |
+| D24145 | **训练稳定性** | 后训练如何保持稳定性? | NeoHorse-1: 梯度监控 + KL散度约束 + 回滚机制 | **稳定训练三件套**: 梯度范数监控→KL散度锚定→异常检测自动回滚 | `nt_mind::post_training::stability_guard` |
+| D24146 | **在线后训练** | 如何实现持续在线学习? | NeoHorse-1: 流式数据→增量训练→A/B验证→部署 | **在线学习管线**: 流式偏好数据→增量DPO→shadow部署→流量验证→正式上线 | `nt_mind::post_training::online_learner` |
+| D24147 | **后训练评估** | 如何评估后训练效果? | NeoHorse-1: 多维评估(准确率/鲁棒性/泛化性/安全性) | **后训练仪表盘**: 四维雷达图 + 回归测试 + A/B对比; 自动检测性能退化 | `nt_mind::post_training::evaluation_dashboard` |
+| D24148 | **安全后训练** | 后训练如何注入安全约束? | NeoHorse-1: 安全偏好对 + 红队测试 + 安全评分 | **安全DPO**: 安全偏好对(安全/不安全轨迹) + 红队自动测试 + 安全阈值门控 | `nt_mind::post_training::safety_training` |
+| D24149 | **跨域后训练** | 不同域的后训练如何迁移? | NeoHorse-1: 域适配层 + 共享表示 + 域特化头 | **域适配后训练**: 共享底层表示 + 域特化适配层; 少量目标域数据即可迁移 | `nt_mind::post_training::domain_adapter` |
+| D24150 | **后训练元学习** | 如何学习如何后训练? | NeoHorse-1 + Apodex: 元控制器选择训练超参数 | **元训练控制器**: MAML-style元学习, 从历史训练中学习最优超参数配置 | `nt_mind::post_training::meta_controller` |
+| D24151 | **合成数据增强** | 后训练数据不足如何增强? | NeoHorse-1: LLM生成合成偏好对 + 质量过滤 | **合成偏好生成**: 教师模型生成轨迹→质量评分→过滤→加入训练集; 扩充10×数据 | `nt_mind::post_training::synthetic_augment` |
+| D24152 | **后训练版本管理** | 模型版本如何管理? | NeoHorse-1: 模型注册表 + 版本标签 + 回滚支持 | **模型版本库**: Git-like版本管理, 每次训练自动标签, 支持一键回滚 | `nt_mind::post_training::version_registry` |
+| D24153 | **分布式后训练** | 大规模后训练如何分布? | NeoHorse-1: 数据并行 + 梯度累积 + 混合精度 | **分布式训练框架**: DeepSpeed ZeRO-3 + 混合精度(FP16+BF16) + 梯度累积 | `nt_mind::post_training::distributed_trainer` |
+| D24154 | **后训练监控** | 训练过程如何实时监控? | NeoHorse-1: loss曲线 + 梯度范数 + KL散度 + 偏好对齐度 | **训练监控面板**: 实时loss/梯度/KL/偏好对齐度; 异常自动告警+可选暂停 | `nt_mind::post_training::training_monitor` |
+| D24155 | **后训练成本控制** | 后训练成本如何优化? | NeoHorse-1: 数据子集选择 + 早停 + 精度-成本权衡 | **成本感知训练**: 数据重要性采样(减30%数据) + 早停(减20%轮次) + 精度-成本Pareto | `nt_mind::post_training::cost_controller` |
+| D24156 | **后训练可复现** | 训练结果如何保证可复现? | NeoHorse-1: 种子固定 + 环境快照 + 数据版本化 | **可复现训练**: 固定随机种子 + Docker环境快照 + 数据版本哈希 + 训练日志完整记录 | `nt_mind::post_training::reproducibility` |
+| D24157 | **后训练A/B测试** | 新训练策略如何验证? | NeoHorse-1: Shadow部署 + 流量分割 + 指标对比 | **训练策略A/B**: Shadow模式运行新模型→5%流量测试→指标对比→自动决策 | `nt_mind::post_training::ab_tester` |
+| D24158 | **后训练联邦学习** | 多方数据如何联邦后训练? | NeoHorse-1: 联邦DPO + 差分隐私 + 安全聚合 | **联邦后训练**: 本地DPO训练→安全聚合→全局模型更新; 差分隐私保护数据 | `nt_mind::post_training::federated_trainer` |
+| D24159 | **统一多模态架构** | 理解和生成如何统一? | SenseNova-U1 (199↑): NEO-unify架构, 统一理解和生成 | **NEO-unify统一头**: 单一Transformer处理理解+生成; 共享表示层+双头解码 | `nt_core::multimodal::neo_unify` |
+| D24160 | **跨模态对齐** | 不同模态如何对齐? | SenseNova-U1: 对比学习+生成损失联合优化 | **双损失对齐**: InfoNCE对比损失(对齐) + 重建损失(生成); 动态权重平衡 | `nt_core::multimodal::cross_modal_align` |
+| D24161 | **视觉语言融合** | 视觉和语言如何深度融合? | SenseNova-U1: 交叉注意力+门控融合 | **门控交叉融合**: 视觉→语言交叉注意力 + 语言→视觉交叉注意力; 门控控制信息流 | `nt_core::multimodal::vl_fusion` |
+| D24162 | **多模态编解码** | 统一架构如何编解码? | SenseNova-U1: 共享编码器 + 条件解码器 + 模态路由 | **共享编码条件解码**: 统一编码器处理所有模态, 解码器按目标模态条件化 | `nt_core::multimodal::unified_codec` |
+| D24163 | **模态缺失处理** | 缺失模态如何鲁棒处理? | SenseNova-U1: 模态 dropout + 部分注意力 + 推断补全 | **鲁棒多模态**: 训练时随机模态dropout(20%) + 推断时部分注意力 + 缺失模态推断补全 | `nt_core::multimodal::missing_modality` |
+| D24164 | **多模态指令跟随** | 统一架构如何执行多模态指令? | SenseNova-U1: 指令嵌入 + 模态路由 + 执行计划 | **指令驱动多模态**: 自然语言指令→模态路由→执行计划→多模态输出 | `nt_core::multimodal::instruction_follow` |
+| D24165 | **多模态上下文学习** | 统一架构如何做少样本学习? | SenseNova-U1: 多模态提示 + 示例选择 + 内适应 | **多模态ICL**: 视觉/文本/音频示例嵌入→上下文组装→统一推理 | `nt_core::multimodal::few_shot_learner` |
+| D24166 | **多模态安全** | 统一架构如何保证安全? | SenseNova-U1: 输入验证 + 输出审核 + 跨模态一致性检查 | **三重多模态安全**: 输入模态验证→统一输出审核→跨模态一致性验证(防注入) | `nt_core::multimodal::multimodal_safety` |
+| D24167 | **多模态缓存** | 多模态表示如何缓存? | SenseNova-U1: 模态感知缓存 + 语义去重 + 分层存储 | **模态感知缓存**: 视觉特征独立缓存 + 语义哈希去重 + 热/温/冷分层 | `nt_core::multimodal::multimodal_cache` |
+| D24168 | **视觉语言动作模型** | VLA如何集成到统一架构? | SmolVLA (166↑): 视觉-语言-动作三模态模型, 机器人控制 | **VLA集成层**: 视觉编码+语言理解+动作生成统一; 机器人控制作为特殊模态 | `nt_core::multimodal::vla_integration` |
+| D24169 | **多模态流式处理** | 统一架构如何流式处理? | SenseNova-U1: 流式编码 + 增量解码 + 延迟-质量权衡 | **流式多模态**: 视频流/音频流增量处理; 可配置延迟-质量权衡(实时/标准/高质量) | `nt_core::multimodal::streaming_processor` |
+| D24170 | **多模态量化** | 统一模型如何量化部署? | SenseNova-U1: 模态感知量化 + 混合精度 | **模态感知量化**: 视觉层INT8 + 语言层INT4 + 动作层FP16; 精度损失<1% | `nt_core::multimodal::multimodal_quantize` |
+| D24171 | **多模态蒸馏** | 统一模型如何蒸馏? | SenseNova-U1: 特征对齐蒸馏 + 输出分布蒸馏 | **双层蒸馏**: 特征层对齐(教师-学生中间层) + 输出层分布匹配(KL散度) | `nt_core::multimodal::multimodal_distill` |
+| D24172 | **多模态检索增强** | 统一架构如何检索增强? | SenseNova-U1: 跨模态检索 + 上下文注入 + 知识融合 | **跨模态RAG**: 视觉/文本查询→跨模态检索→上下文注入→统一推理 | `nt_core::multimodal::multimodal_rag` |
+| D24173 | **多模态评估** | 统一架构如何评估? | SenseNova-U1: 多维评估(理解/生成/对齐/安全/效率) | **多模态仪表盘**: 五维评估 + 跨模态一致性分数 + 基准测试套件 | `nt_core::multimodal::evaluation_suite` |
+| D24174 | **多模态微调** | 统一架构如何高效微调? | SenseNova-U1: LoRA + 适配器 + 冻结策略 | **高效多模态微调**: 冻结编码器 + LoRA微调解码器 + 模态适配器(每模态独立) | `nt_core::multimodal::efficient_finetune` |
+| D24175 | **多模态并行** | 统一架构如何并行推理? | SenseNova-U1: 模态并行 + 流水线并行 + 动态批处理 | **三重并行**: 模态并行(不同模态独立) + 流水线并行(层间) + 动态批处理(变长输入) | `nt_core::multimodal::multimodal_parallel` |
+| D24176 | **多模态部署** | 统一模型如何部署? | SenseNova-U1: TensorRT-ONNX + 容器化 + 边缘适配 | **多模态部署套件**: ONNX导出→TensorRT优化→Docker容器→边缘设备适配 | `nt_core::multimodal::deployment_suite` |
+| D24177 | **多模态可观测** | 统一架构如何观测? | SenseNova-U1: 模态路由追踪 + 注意力可视化 + 性能剖析 | **多模态可观测**: 模态路由决策日志 + 注意力热图 + 延迟分解 + 吞吐监控 | `nt_core::multimodal::observability` |
+| D24178 | **多模态版本管理** | 多模态模型如何版本管理? | SenseNova-U1: 模型卡 + 版本标签 + 回滚支持 | **多模态版本库**: 模型卡(能力/限制/基准) + 语义版本 + 一键回滚 + A/B对比 | `nt_core::multimodal::model_registry` |
+| D24179 | **语音生成基础** | 语音生成如何构建基础模型? | AuK (179↑): 语音生成和编辑基础模型, 统一理解+生成 | **语音基础架构**: 自回归生成 + 非自回归编辑统一; 共享表示+条件解码 | `nt_feel::speech::foundation_model` |
+| D24180 | **语音编辑** | 语音如何精确编辑? | AuK: 语音修复+替换+插入+删除, 原子级操作 | **原子语音编辑**: 修复(repair)/替换(replace)/插入(insert)/删除(delete)四操作; 精确到音素级 | `nt_feel::speech::atomic_editor` |
+| D24181 | **实时语音交互** | 语音如何支持实时交互? | VoiceMem (179↑): 双脑流式记忆, 实时交互模式 | **双脑流式架构**: 生成脑(语音合成) + 记忆脑(上下文追踪)并行; 延迟<200ms | `nt_feel::speech::dual_brain_stream` |
+| D24182 | **语音情感个性化** | 语音如何注入情感? | AuK + VoiceMem: 情感条件生成 + 说话人嵌入 | **情感条件生成**: 情感标签→条件嵌入→自回归生成; 支持11种情感+强度控制 | `nt_feel::speech::emotional_conditioning` |
+| D24183 | **流式语音记忆** | 语音上下文如何流式管理? | VoiceMem: 双脑协作 + 流式KV缓存 + 上下文窗口 | **流式语音KV**: 双脑共享KV缓存 + 滑动窗口(10s) + 关键信息永久保留 | `nt_feel::speech::streaming_memory` |
+| D24184 | **语音噪声鲁棒** | 语音如何抵抗噪声? | AuK: 噪声自适应编码 + 鲁棒注意力 | **噪声自适应**: 输入层噪声检测→自适应编码→鲁棒注意力; 15dB SNR下仍可用 | `nt_feel::speech::noise_robust` |
+| D24185 | **多说话人语音** | 多说话人如何管理? | AuK: 说话人嵌入 + 说话人一致性 + 切换 | **多说话人管理**: 说话人嵌入向量 + 跨句一致性约束 + 平滑切换 | `nt_feel::speech::multi_speaker` |
+| D24186 | **语音流式合成** | 流式语音如何合成? | VoiceMem: chunk-based合成 + 拼接平滑 + 延迟控制 | **流式合成管线**: chunk(100ms)→合成→重叠拼接→平滑; 端到端延迟<150ms | `nt_feel::speech::streaming_synthesis` |
+| D24187 | **语音质量评估** | 语音质量如何评估? | AuK: MOS预测 + 韵律评估 + 自然度评分 | **语音质量仪表盘**: MOS预估 + 韵律F0跟踪 + 自然度(UVL) + 情感准确率 | `nt_feel::speech::quality_evaluator` |
+| D24188 | **语音克隆** | 说话人如何克隆? | AuK: 少样本说话人适应 + 音色迁移 | **零样本克隆**: 3秒参考音频→说话人嵌入→条件生成; 无需微调 | `nt_feel::speech::zero_shot_clone` |
+| D24189 | **语音隐私** | 语音数据如何保护? | AuK + VoiceMem: 本地处理 + 差分隐私 + 语音脱敏 | **语音隐私三件套**: 本地推理(不上传) + 差分隐私噪声 + 说话人匿名化 | `nt_feel::speech::voice_privacy` |
+| D24190 | **语音延迟优化** | 语音延迟如何优化? | VoiceMem: 预测生成 + 流式解码 + GPU缓存 | **低延迟管线**: 预测性预生成(50ms) + 流式解码 + KV缓存复用; P95延迟<100ms | `nt_feel::speech::latency_optimizer` |
+| D24191 | **语音多语言** | 多语言语音如何支持? | AuK: 多语言编码器 + 语言路由 + 零样本跨语言 | **多语言语音**: 统一编码器处理多语言 + 语言ID路由 + 跨语言克隆 | `nt_feel::speech::multilingual` |
+| D24192 | **语音情感分析** | 语音情感如何分析? | VoiceMem: 情感特征提取 + 多模态情感融合 | **语音情感分析**: F0+能量+语速→情感特征→多模态融合→11种情感分类 | `nt_feel::speech::emotion_analysis` |
+| D24193 | **语音对话管理** | 语音对话如何管理? | VoiceMem: 对话状态机 + 话轮检测 + 意图识别 | **语音对话管理**: 状态机驱动 + VAD话轮检测 + ASR意图识别 → 响应生成 | `nt_feel::speech::dialogue_manager` |
+| D24194 | **语音降噪** | 语音降噪如何实现? | AuK: 深度降噪 + 回声消除 + 增强 | **语音增强管线**: 深度降噪(UNet) + 回声消除(AEC) + 增强(波束成形) | `nt_feel::speech::audio_enhancement` |
+| D24195 | **语音离线** | 离线语音如何支持? | AuK: 模型压缩 + 量化 + 边缘部署 | **离线语音套件**: INT4量化(3×压缩) + ONNX导出 + 边缘设备推理 | `nt_feel::speech::offline_suite` |
+| D24196 | **语音情感生成** | 语音情感如何生成? | AuK: 情感条件 + 韵律控制 + 风格迁移 | **情感语音生成**: 情感标签→韵律F0曲线→自回归生成; 支持强度渐变 | `nt_feel::speech::emotional_generation` |
+| D24197 | **语音流式识别** | 流式语音如何识别? | VoiceMem: 流式ASR + 增量解码 + 缓存复用 | **流式ASR**: CTC+Attention增量解码 + KV缓存 + 端点检测; 实时因子<0.3 | `nt_feel::speech::streaming_recognition` |
+| D24198 | **语音跨模态** | 语音如何与其他模态交互? | AuK + VoiceMem: 语音-文本-视觉跨模态融合 | **跨模态语音**: 语音→文本(ASR) + 语音→情感 + 语音→动作; 统一表示空间 | `nt_feel::speech::cross_modal_fusion` |
+| D24199 | **文档智能转换** | 文档如何智能转换? | SmolDocling (174↑): 超紧凑视觉语言文档转换 | **紧凑VLM管线**: 256M参数VLM + 文档布局检测 + 内容提取; 10×更快于大模型 | `nt_memory::document::compact_vlm` |
+| D24200 | **文档布局理解** | 文档布局如何理解? | SmolDocling: 视觉编码器 + 布局解析 + 结构化输出 | **布局解析器**: 视觉编码→布局检测(表格/图片/文本块)→结构化JSON输出 | `nt_memory::document::layout_parser` |
+| D24201 | **表格提取** | 表格如何精确提取? | SmolDocling: 表格检测 + 单元格识别 + 结构化表示 | **表格提取器**: 表格区域检测→行列分割→单元格OCR→结构化输出(CSV/JSON) | `nt_memory::document::table_extractor` |
+| D24202 | **文档OCR增强** | OCR如何增强? | PaddleOCR: 渐进训练 + 文字检测 + 方向矫正 | **渐进OCR**: 低分辨率→超分→检测→方向矫正→识别; 渐进提升质量 | `nt_memory::document::progressive_ocr` |
+| D24203 | **文档解析器** | 复杂文档如何解析? | MinerU: 多格式解析 + 视觉增强 + 布局保持 | **多格式解析器**: PDF/Word/PPT统一解析 + 视觉辅助(表格/公式) + 布局保持 | `nt_memory::document::multi_format_parser` |
+| D24204 | **文档语义理解** | 文档语义如何理解? | SmolDocling: 语义编码 + 上下文推理 + 关系提取 | **文档语义编码**: 文本+视觉→统一语义→实体/关系/事件提取 | `nt_memory::document::semantic_encoder` |
+| D24205 | **文档版本对比** | 文档版本如何对比? | SmolDocling: 差异检测 + 变更追踪 + 语义对比 | **文档差异引擎**: 布局差异+文本差异+语义差异; 可视化变更追踪 | `nt_memory::document::diff_engine` |
+| D24206 | **文档多语言** | 多语言文档如何处理? | SmolDocling + PaddleOCR: 多语言识别 + 混合语言处理 | **多语言文档**: 多语言OCR引擎 + 语言自动检测 + 混合语言文档解析 | `nt_memory::document::multilingual_doc` |
+| D24207 | **文档安全扫描** | 文档内容如何安全扫描? | SmolDocling: 内容审核 + 敏感信息检测 + 脱敏 | **文档安全扫描**: PII检测 + 敏感信息分类 + 自动脱敏(姓名/地址/证件号) | `nt_memory::document::security_scanner` |
+| D24208 | **文档索引** | 文档如何高效索引? | SmolDocling: 全文索引 + 语义索引 + 元数据索引 | **三层文档索引**: BM25全文 + 语义向量 + 元数据(类型/日期/作者) | `nt_memory::document::triple_index` |
+| D24209 | **文档摘要生成** | 文档如何自动摘要? | SmolDocling: 分层摘要 + 关键信息提取 + 多粒度 | **分层摘要**: 文档级摘要→章节级摘要→段落级摘要; 可配置粒度 | `nt_memory::document::hierarchical_summary` |
+| D24210 | **文档问答** | 文档如何支持问答? | SmolDocling: 段落检索 + 上下文注入 + 答案生成 | **文档问答管线**: 查询→段落检索(Top-k)→上下文注入→答案生成+引用 | `nt_memory::document::doc_qa` |
+| D24211 | **文档格式转换** | 文档格式如何转换? | SmolDocling: 布局保持 + 格式映射 + 质量验证 | **智能格式转换**: 语义保持的格式映射(MD↔HTML↔DOCX) + 布局验证 | `nt_memory::document::format_converter` |
+| D24212 | **文档视觉理解** | 文档视觉元素如何理解? | SmolDocling: 图片理解 + 图表解析 + 公式识别 | **视觉元素理解**: 图片→描述 + 图表→数据 + 公式→LaTeX; 视觉语言统一 | `nt_memory::document::visual_understanding` |
+| D24213 | **文档引用滑窗** | 长文档如何高效处理? | SmolDocling: 参考滑动窗口注意力 + 分块处理 | **滑动窗口注意力**: 512 token窗口 + 步长256 + 跨块注意力; 长文档分块处理 | `nt_memory::document::sliding_window` |
+| D24214 | **文档结构化输出** | 文档如何输出结构化数据? | SmolDocling: JSON/XML输出 + Schema验证 + 字段映射 | **结构化输出**: 预定义Schema(JSON)→文档解析→字段填充→Schema验证 | `nt_memory::document::structured_output` |
+| D24215 | **文档批量处理** | 批量文档如何处理? | SmolDocling: 并行解析 + 流式处理 + 进度追踪 | **批量文档管线**: 并行解析(10+并发) + 流式处理(内存高效) + 进度追踪 | `nt_memory::document::batch_processor` |
+| D24216 | **文档缓存** | 文档解析结果如何缓存? | SmolDocling: 内容哈希 + 增量解析 + 缓存分层 | **文档缓存**: 内容SHA256→缓存键 + 变更检测→增量解析 + 热/冷分层 | `nt_memory::document::parse_cache` |
+| D24217 | **文档质量评估** | 文档解析质量如何评估? | SmolDocling: 精度/召回/F1 + 完整性 + 一致性 | **文档质量仪表盘**: 字段级精度+召回+F1 + 结构完整性 + 语义一致性 | `nt_memory::document::quality_evaluator` |
+| D24218 | **文档增量更新** | 文档变更如何增量处理? | SmolDocling: 差异检测 + 增量索引 + 原子更新 | **增量文档更新**: 差异检测→仅变更部分重新解析→增量索引更新→原子发布 | `nt_memory::document::incremental_update` |
+| D24219 | **具身AI闭环** | 具身AI如何闭环自进化? | Zetta (150↑): 闭环harness, 自进化物理智能 | **闭环进化harness**: 执行→评估→分析→改进→执行; 持续物理智能提升 | `nt_physical::embodied::closed_loop_harness` |
+| D24220 | **运行时评论家** | 具身AI如何自我评估? | Zetta: 运行时critic + 即时反馈 + 行为修正 | **运行时critic网络**: 并行评估网络→即时奖励信号→行为策略更新 | `nt_physical::embodied::runtime_critic` |
+| D24221 | **物理智能恢复** | 具身AI失败后如何恢复? | Zetta: 恢复策略 + 状态回滚 + 安全降级 | **物理恢复三件套**: 检测失败→安全停止→状态回滚→恢复策略→重试 | `nt_physical::embodied::recovery_manager` |
+| D24222 | **动作频率治理** | 动作执行频率如何控制? | Zetta: 频率控制 + 节能模式 + 任务优先级 | **动作频率治理**: 高频(10Hz控制)/中频(1Hz规划)/低频(0.1Hz决策); 节能模式自动降频 | `nt_physical::embodied::frequency_governor` |
+| D24223 | **具身安全约束** | 具身AI如何保证安全? | Zetta: 安全层 + 碰撞检测 + 紧急停止 | **具身安全层**: 安全包络(safe envelope) + 实时碰撞检测 + 硬件紧急停止 | `nt_physical::embodied::safety_layer` |
+| D24224 | **具身仿真迁移** | 仿真到现实如何迁移? | Zetta: sim-to-real + domain随机化 + 自适应 | **仿真迁移管线**: 仿真训练→域随机化→现实微调→持续自适应 | `nt_physical::embodied::sim_to_real` |
+| D24225 | **具身技能学习** | 具身技能如何学习? | Zetta: 模仿学习 + 强化学习 + 技能组合 | **技能学习管线**: 演示→模仿学习→强化优化→技能库→组合执行 | `nt_physical::embodied::skill_learner` |
+| D24226 | **具身多感官** | 多感官如何融合? | Zetta: 视觉+触觉+力觉+本体感觉融合 | **多感官融合**: 视觉(相机)+触觉(力传感器)+力觉(力矩)+本体(IMU)→统一表示 | `nt_physical::embodied::multisensory_fusion` |
+| D24227 | **具身导航** | 具身导航如何实现? | Zetta: SLAM + 路径规划 + 动态避障 | **具身导航栈**: SLAM建图→A*路径规划→DWA动态避障→安全走廊 | `nt_physical::embodied::navigation_stack` |
+| D24228 | **具身操作** | 操作任务如何执行? | Zetta: 抓取规划 + 力控制 + 柔顺操作 | **操作规划**: 点云→抓取位姿→轨迹规划→力控制→柔顺执行 | `nt_physical::embodied::manipulation` |
+| D24229 | **具身通信** | 多机器人如何协作? | Zetta: 分布式共识 + 任务分配 + 冲突解决 | **多机协作**: 任务DAG→分布式分配→共识执行→冲突检测→解决 | `nt_physical::embodied::multi_robot` |
+| D24230 | **具身能源管理** | 能源如何管理? | Zetta: 电池监控 + 节能调度 + 充电规划 | **能源管理**: 电量预测→任务优先级调整→节能模式→自动充电规划 | `nt_physical::embodied::power_management` |
+| D24231 | **具身故障诊断** | 具身故障如何诊断? | Zetta: 传感器融合 + 异常检测 + 根因分析 | **故障诊断链**: 传感器异常→多源融合→异常检测→根因分析→修复建议 | `nt_physical::embodied::fault_diagnosis` |
+| D24232 | **具身远程控制** | 远程控制如何实现? | Zetta: 低延迟视频 + 遥操作 + 安全边界 | **远程控制栈**: 低延迟视频编码(<30ms) + 力反馈遥操作 + 安全边界限制 | `nt_physical::embodied::teleoperation` |
+| D24233 | **具身模型更新** | 具身模型如何更新? | Zetta: 增量学习 + 灾难性遗忘防护 + 版本管理 | **增量更新**: 增量微调(新任务) + EWC防遗忘 + 模型版本管理+回滚 | `nt_physical::embodied::incremental_update` |
+| D24234 | **具身任务规划** | 具身任务如何规划? | Zetta: 分层规划 + 任务分解 + 资源分配 | **分层任务规划**: 顶层(目标)→中层(子任务)→底层(动作); 资源感知调度 | `nt_physical::embodied::hierarchical_planner` |
+| D24235 | **具身感知融合** | 多传感器感知如何融合? | Zetta: 早期融合+晚期融合+自适应融合 | **三重感知融合**: 早期(特征级)+晚期(决策级)+自适应(任务驱动) | `nt_physical::embodied::perception_fusion` |
+| D24236 | **具身环境建图** | 环境如何建图? | Zetta: 3D点云 + 语义地图 + 动态更新 | **语义建图**: 3D点云→语义分割→拓扑图+度量图→动态更新 | `nt_physical::embodied::semantic_mapping` |
+| D24237 | **具身姿态估计** | 机器人姿态如何估计? | Zetta: 视觉惯性里程计 + 关节编码器融合 | **多源姿态**: VIO(视觉惯性)+关节编码器+IMU→卡尔曼滤波→6DoF姿态 | `nt_physical::embodied::pose_estimation` |
+| D24238 | **具身任务评估** | 具身任务如何评估? | Zetta: 成功率+效率+安全性+鲁棒性四维评估 | **具身评估仪表盘**: 成功率×效率×安全性×鲁棒性; 任务级+步骤级评估 | `nt_physical::embodied::task_evaluator` |
 
 ### 域级缺陷范围索引
 

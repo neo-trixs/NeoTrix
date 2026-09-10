@@ -9,7 +9,7 @@ use super::state::StateSnapshot;
 use super::agent::GapRegistry;
 
 /// 漏洞类型
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GapType {
     // 逻辑维度
     IncompleteReasoningChain,
@@ -541,29 +541,7 @@ impl fmt::Display for GapSeverity {
     }
 }
 
-impl Ord for GapSeverity {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let self_val = match self {
-            GapSeverity::Low => 0,
-            GapSeverity::Medium => 1,
-            GapSeverity::High => 2,
-            GapSeverity::Critical => 3,
-        };
-        let other_val = match other {
-            GapSeverity::Low => 0,
-            GapSeverity::Medium => 1,
-            GapSeverity::High => 2,
-            GapSeverity::Critical => 3,
-        };
-        self_val.cmp(&other_val)
-    }
-}
 
-impl PartialOrd for GapSeverity {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 #[cfg(test)]
 mod tests {

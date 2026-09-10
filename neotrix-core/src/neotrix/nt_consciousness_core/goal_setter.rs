@@ -2,7 +2,7 @@
 //! 
 //! 自主设定目标、优先级排序、动态调整
 
-use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 目标设定器

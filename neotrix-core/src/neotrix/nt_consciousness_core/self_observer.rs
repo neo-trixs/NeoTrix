@@ -221,7 +221,7 @@ impl SelfObserver {
             ]),
         };
 
-        self.observations.push(obslection.clone());
+        self.observations.push(observation.clone());
         self.trim_observations();
 
         observation

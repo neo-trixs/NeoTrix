@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use neotrix::nt_mind::self_iterating::SelfIteratingBrain;
-use neotrix::nt_mind::KnowledgeSource as V1KnowledgeSource;
-use neotrix::nt_mind::goal_loop::{GoalLoop, GoalState};
+use neotrix::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::nt_mind::nt_mind::KnowledgeSource as V1KnowledgeSource;
+use neotrix::nt_mind::nt_mind::goal_loop::{GoalLoop, GoalState};
 use neotrix::agent::skills::SkillsEngine;
 use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
 use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
-use neotrix::agent::tool::mcp::McpRegistry;
+use neotrix::cli::commands::agent_cmds::McpRegistry;
 use neotrix::core::nt_core_cap::FIELD_NAMES;
 
 use super::print_brain_stats;
@@ -124,7 +124,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("  <text>         - Reason with current task");
         }
         "/status" => {
-            let mut bridge = neotrix::nt_mind::thinking_bridge::ThinkingBridge::new(".");
+            let mut bridge = neotrix::neotrix::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             bridge.run_reflection_cycle();
             let mot = bridge.compute_motivation();
             bridge.evaluate_cognitive_health();
@@ -149,7 +149,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("╰──────────────────────────────────────────────────────╯");
         }
         "/evo" => {
-            let mut bridge = neotrix::nt_mind::thinking_bridge::ThinkingBridge::new(".");
+            let mut bridge = neotrix::neotrix::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             let evo = bridge.run_full_evolution_cycle();
             println!("{}", evo);
             let health = bridge.evolution_summary();
@@ -161,7 +161,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             }
         }
         "/think" => {
-            let mut bridge = neotrix::nt_mind::thinking_bridge::ThinkingBridge::new(".");
+            let mut bridge = neotrix::neotrix::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge::new(".");
             let result = bridge.run_reflection_cycle();
             let grade_label = result.trace.as_ref().map(|t| t.grade.label()).unwrap_or("?");
             let profile = bridge.attention_profile_summary();
@@ -216,7 +216,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
             println!("Absorbed {} knowledge sources", sources.len());
         }
         "/evolve" => {
-            let task_type = neotrix::nt_world_model::TaskType::General;
+                    let task_type = neotrix::core::TaskType::General;
             let result = brain.iterate(task_type);
             println!("Evolution: {:.3} → {:.3} (improved: {})",
                 result.score_before, result.score_after, result.improved);
@@ -255,7 +255,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     let mode_str = parts.get(2).copied();
                     #[cfg(feature = "stealth-net")]
                     {
-                        use neotrix::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
+                        use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
                         let client = ProxyClient::new();
                         if let Some(m) = mode_str {
                             if let Some(mode) = DaemonMode::from_str(m) {
@@ -283,8 +283,8 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 Some("status") | None => {
                     #[cfg(feature = "stealth-net")]
                     {
-                        use neotrix::nt_shield_stealth_net::proxy_control::ProxyClient;
-                        use neotrix::nt_shield_stealth_net::local_proxy::TorManager;
+                        use neotrix::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient;
+                        use neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager;
                         println!("\n╭─ NeoTrix 代理状态 ───────────────────────────────╮");
                         let tor = TorManager::socks5_reachable().await;
                         println!("│ Tor SOCKS5 :9050 :  {}                     │",
@@ -379,7 +379,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                     println!("╭─ MCP Registry ─────────────────────────╮");
                     println!("│ Servers: {}  Tools: {}             │", mcp.server_count(), mcp.tool_count());
                     for s in mcp.list_servers() {
-                        println!("│   {} [{}] {} tools        │", s.name, s.transport.transport_type(), s.tools.len());
+                        println!("│   {}                                │", s);
                     }
                     println!("╰─────────────────────────────────────────╯");
                     println!("Usage: /mcp status           - Show server health");
@@ -389,8 +389,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 Some("status") => {
                     println!("╭─ MCP Server Status ─────────────────────╮");
                     for s in mcp.list_servers() {
-                        let icon = if s.healthy { "healthy" } else { "down" };
-                        println!("│ {:20} │ {} │ {} ms │", s.name, icon, s.latency_ms);
+                        println!("│ {:40} │", s);
                     }
                     println!("╰──────────────────────────────────────────╯");
                 }
@@ -402,7 +401,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 }
                 Some("search") => {
                     let query = parts.get(2).unwrap_or(&"");
-                    let matches = mcp.recommend_tools(query, 5);
+                    let matches = mcp.recommend_tools(query);
                     if matches.is_empty() {
                         println!("No tools matching '{}'", query);
                     } else {
@@ -454,7 +453,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                 Some(_) if parts.len() >= 2 => {
                     let description = parts[1..].join(" ");
                     let score_before = brain.brain.evaluate_capability(
-                        neotrix::nt_world_model::TaskType::General);
+                        neotrix::core::TaskType::General);
                     goal_loop.start_goal(brain, &description, None);
                     println!("🎯 Goal started: {}", description);
                     println!("   Score before: {:.3}", score_before);
@@ -631,7 +630,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _s
                         Err(e) => eprintln!("Reasoning error: {}", e),
                     }
                 } else {
-                    let task_type = neotrix::nt_world_model::TaskType::General;
+            let task_type = neotrix::core::TaskType::General;
                     let result = brain.iterate(task_type);
                     println!("Learned: {:.3} → {:.3}", result.score_before, result.score_after);
                 }

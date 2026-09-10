@@ -19,7 +19,7 @@ pub use full_cycle::{
     ActionRecommendation, BomItem, BuyerProfile, CompanyPolicy, Contract, ContractItem,
     InquiryDetail, IntentLevel, KnowledgeDelta, KnowledgeOperation, Lesson, MarketEnvironment,
     PackagingSpec, ProductSpec, ProductType, QuoteSheet, RiskAlert, RiskControl, RoutingStep,
-    Schedule, TradeAlertLevel, TradeCapabilitySpec, TradeContext, TradePhase, TradePhaseGroup,
+    Schedule, TradeCapabilitySpec, TradeContext, TradePhase, TradePhaseGroup,
     TradeResult, TradeStateMachine, LogisticsDocSet, FinanceDocSet,
 };
 

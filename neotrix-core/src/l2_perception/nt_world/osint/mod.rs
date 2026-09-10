@@ -7,6 +7,7 @@ pub mod social;
 pub mod vuln;
 pub mod network;
 pub mod dark;
+pub mod fofa;
 pub mod backend_router;
 pub mod sweep;
 pub mod self_curriculum;
@@ -96,6 +97,15 @@ impl OsintTarget {
         let domain = e.split('@').nth(1).map(|d| d.to_string());
         OsintTarget { email: Some(e), domain, ..Default::default() }
     }
+    /// 返回目标的主标识符 (单一事实源): domain > ip > email > url > username > "unknown"
+    pub fn primary_label(&self) -> String {
+        self.domain.clone()
+            .or_else(|| self.ip.clone())
+            .or_else(|| self.email.clone())
+            .or_else(|| self.url.clone())
+            .or_else(|| self.username.clone())
+            .unwrap_or_else(|| "unknown".into())
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -148,13 +158,7 @@ impl OsintReport {
 
 impl OsintReport {
     fn run_id(&self) -> String {
-        let target = self
-            .target
-            .domain
-            .clone()
-            .or_else(|| self.target.username.clone())
-            .or_else(|| self.target.email.clone())
-            .unwrap_or_else(|| "unknown".into());
+        let target = self.target.primary_label();
         let now = chrono::Utc::now().timestamp();
         format!("osint-{}", hex::encode(Sha256::digest(format!("{}|{}", target, now).as_bytes())).chars().take(16).collect::<String>())
     }
@@ -302,6 +306,8 @@ pub struct DoctorReport {
     pub _dns_latency: u64,
     pub http_ok: bool,
     pub _http_latency: u64,
+    pub fofa_ok: bool,
+    pub _fofa_latency: u64,
 }
 
 impl std::fmt::Display for DoctorReport {
@@ -314,6 +320,7 @@ impl std::fmt::Display for DoctorReport {
         if let Some(ref i) = self.target.ip { writeln!(f, "  IP:         {}", i)?; }
         writeln!(f, "  DNS:    {} ({}ms)", if self.dns_ok { "✓" } else { "✗" }, self._dns_latency)?;
         writeln!(f, "  HTTP:   {} ({}ms)", if self.http_ok { "✓" } else { "✗" }, self._http_latency)?;
+        writeln!(f, "  FOFA:   {} ({}ms)", if self.fofa_ok { "✓" } else { "✗" }, self._fofa_latency)?;
         writeln!(f, "═══════════════════════════════════════════════════")
     }
 }
@@ -398,12 +405,21 @@ pub async fn doctor_osint(target: OsintTarget, _config: OsintConfig) -> DoctorRe
     if http_router.probe_and_select(&target, &client).await.is_ok() { http_ok = true }
     _http_latency = start.elapsed().as_millis() as u64;
 
+    let mut fofa_ok = false;
+    let mut _fofa_latency = 0u64;
+    let mut fofa_router = backend_router::BackendRouter::new(backend_router::default_fofa_backends());
+    let start = std::time::Instant::now();
+    if fofa_router.probe_and_select(&target, &client).await.is_ok() { fofa_ok = true }
+    _fofa_latency = start.elapsed().as_millis() as u64;
+
     DoctorReport {
         target,
         dns_ok,
         _dns_latency,
         http_ok,
         _http_latency,
+        fofa_ok,
+        _fofa_latency,
     }
 }
 
