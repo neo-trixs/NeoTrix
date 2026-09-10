@@ -27,9 +27,9 @@ use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::NodeType;
+
+use crate::core::nt_core_kb_types::NodeType;
 use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
 use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorber;
 pub use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorbReport;
@@ -233,9 +233,9 @@ impl OsintReport {
             }
             for a in &dns.a_records {
                 graph.add_asset(asset_model::OsintAsset {
-                    id: format!("ip-{}", a),
+                    id: format!("ip-{}", a.value),
                     asset_type: asset_model::AssetType::Ip,
-                    value: a.clone(),
+                    value: a.value.clone(),
                     source: "dns".into(),
                     confidence: 1.0,
                     ..Default::default()
@@ -302,7 +302,7 @@ impl OsintReport {
     }
 
     fn write_with_evidence(
-        kb: &KnowledgeBase,
+        kb: &dyn crate::core::nt_core_traits::KnowledgeSink,
         title: &str,
         node_type: NodeType,
         summary: Option<&str>,
@@ -310,7 +310,7 @@ impl OsintReport {
         domain_hint: Option<&str>,
         run_id: &str,
     ) -> Result<String, String> {
-        let id = kb.insert_or_get_node(title, node_type, summary, url, domain_hint)?;
+        let id = kb.sink_node(title, node_type, summary, url, domain_hint)?;
         let fingerprint = format!("{}|{}|{}", title, summary.unwrap_or(""), url.unwrap_or(""));
         let sha256 = hex::encode(Sha256::digest(fingerprint.as_bytes()));
         let meta = serde_json::json!({
@@ -325,7 +325,7 @@ impl OsintReport {
         Ok(id)
     }
 
-    pub fn write_to_kb(&self, kb: &KnowledgeBase) -> Vec<(String, NodeType)> {
+    pub fn write_to_kb(&self, kb: &dyn crate::core::nt_core_traits::KnowledgeSink) -> Vec<(String, NodeType)> {
         let mut written = Vec::new();
         let run_id = self.run_id();
         let domain_hint: Option<&str> = self.target.domain.as_deref()

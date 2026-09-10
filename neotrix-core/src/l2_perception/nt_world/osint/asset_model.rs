@@ -66,17 +66,17 @@ pub struct AssetGraph {
 
 impl AssetGraph {
     pub fn new() -> Self { Self::default() }
-    
+
     /// 添加资产
     pub fn add_asset(&mut self, asset: OsintAsset) {
         self.assets.insert(asset.id.clone(), asset);
     }
-    
+
     /// 添加关系
     pub fn add_relation(&mut self, relation: AssetRelation) {
         self.relations.push(relation);
     }
-    
+
     /// 查找相关资产
     pub fn find_related(&self, asset_id: &str, relation_type: &RelationType) -> Vec<&OsintAsset> {
         self.relations.iter()
@@ -84,14 +84,14 @@ impl AssetGraph {
             .filter_map(|r| self.assets.get(&r.target_id))
             .collect()
     }
-    
+
     /// 计算攻击面评分
     pub fn attack_surface_score(&self) -> f64 {
         let domain_count = self.assets.values().filter(|a| a.asset_type == AssetType::Domain).count() as f64;
         let ip_count = self.assets.values().filter(|a| a.asset_type == AssetType::Ip).count() as f64;
         let port_count = self.assets.values().filter(|a| a.asset_type == AssetType::Port).count() as f64;
         let vuln_count = self.assets.values().filter(|a| a.asset_type == AssetType::Vulnerability).count() as f64;
-        
+
         // 攻击面 = 域名数 * 1.0 + IP数 * 0.8 + 端口数 * 0.5 + 漏洞数 * 2.0
         (domain_count * 1.0 + ip_count * 0.8 + port_count * 0.5 + vuln_count * 2.0) / 10.0
     }
