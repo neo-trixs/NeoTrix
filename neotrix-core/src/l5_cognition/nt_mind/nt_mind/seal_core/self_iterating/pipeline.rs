@@ -70,9 +70,7 @@ use crate::core::nt_core_self_review::SelfReviewGate;
 use crate::make_stage;
 use crate::l5_cognition::nt_mind::foundation::memory_bank::MemoryTier;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::{PerformanceEvaluator, ExecutionFeedback};
-use crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate;
-use crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate;
-use crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox;
+use crate::l5_cognition::nt_mind::foundation::seal_pipeline::{L1OracleGate, L1SemanticEntropyGate, L1ActionSandbox, OracleGateContract, SemanticEntropyGateContract, ActionSandboxContract};
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::consciousness_bridge::ConsciousnessBridge;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
@@ -2635,9 +2633,7 @@ impl BrainStage for OracleGateStage {
         10
     }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::neotrix::nt_act_autonomy::OracleGate;
-
-        let gate = brain._oracle_gate.get_or_insert_with(OracleGate::new);
+        let gate = brain._oracle_gate.get_or_insert_with(L1OracleGate::new_gate);
 
         let entropy = brain.entropy_crisis_level;
         let reward = brain._reward;
@@ -3093,9 +3089,9 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(
             crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new(),
         ));
-        registry.register(Box::new(OracleGate::new()));
-        registry.register(Box::new(SemanticEntropyGate::new()));
-        registry.register(Box::new(ActionSandbox::new()));
+        registry.register(Box::new(L1OracleGate::new_gate()));
+        registry.register(Box::new(L1SemanticEntropyGate::new_gate()));
+        registry.register(Box::new(L1ActionSandbox::new_sandbox()));
         registry.register(Box::new(
             crate::core::nt_core_consciousness_review::ConsciousnessReview::new(),
         ));

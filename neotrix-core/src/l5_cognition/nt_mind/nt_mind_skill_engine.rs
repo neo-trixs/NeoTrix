@@ -12,9 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::ProceduralMemoryRecord;
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::{skill_upsert, SkillRecord};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::kb_facade::{ProceduralMemoryRecord, skill_upsert, SkillRecord, KnowledgeBase};
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, HookContext, HookResult};
 
 /// A single skill entry parsed from a markdown file with YAML frontmatter.
@@ -1631,7 +1629,7 @@ impl SkillEngine {
     /// 把当前内存索引同步到 KB `skills_index` 表 (UCN Phase 1 写通)。
     /// 返回本次真正写入/更新的条数; 内容未变化 (content_hash 相同) 被去重跳过。
     pub fn sync_to_kb_index(&self, conn: &rusqlite::Connection) -> Result<usize, String> {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::skill_content_hash;
+        use crate::l5_cognition::kb_facade::skill_content_hash;
         use std::collections::HashSet;
 
         let mut written = 0usize;

@@ -2,6 +2,7 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 use chrono::Datelike;
+use log::warn;
 use rusqlite::Connection;
 use serde_json::Value;
 
@@ -18,7 +19,7 @@ fn http_client() -> &'static reqwest::blocking::Client {
                 .no_proxy()
                 .build()
                 .unwrap_or_else(|e| {
-                    eprintln!("WARN: HTTP client init failed: {}", e);
+                    warn!("HTTP client init failed: {}", e);
                     reqwest::blocking::Client::new()
                 })
         })
@@ -36,7 +37,7 @@ fn browser_client() -> &'static reqwest::blocking::Client {
                 .no_proxy()
                 .build()
                 .unwrap_or_else(|e| {
-                    eprintln!("WARN: HTTP client init failed: {}", e);
+                    warn!("HTTP client init failed: {}", e);
                     reqwest::blocking::Client::new()
                 })
         })

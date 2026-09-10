@@ -29,7 +29,7 @@ use crate::cli::shield_enforcer::global_shield;
 use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
 use crate::core::nt_core_reasoning::ContextBuilder;
-use crate::l1_action::nt_io::nt_io_standalone::ReasoningKernel;
+use crate::l5_cognition::io_facade::ReasoningKernel;
 use crate::l5_cognition::nt_core::nt_core_parallel::isolation::{IntentIsolator, AtomicDecomposer};
 use crate::l5_cognition::nt_mind::nt_mind::infrastructure::code_review::CodeReviewEngine;
 

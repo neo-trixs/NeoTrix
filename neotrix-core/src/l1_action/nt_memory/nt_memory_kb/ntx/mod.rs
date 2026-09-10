@@ -7,6 +7,8 @@
 //! - 单文件便携 (零依赖分享)
 //! - Zstd 压缩 (30-50% 节省)
 
+use log::{error, warn};
+
 pub mod format;
 pub mod frames;
 pub mod wal;
@@ -531,14 +533,14 @@ impl NtxFile {
         // 尝试刷新写缓冲区
         if !self.write_buffer.is_empty() {
             if let Err(e) = self.flush_write_buffer() {
-                eprintln!("[NTX] Drop: 刷新写缓冲区失败: {}", e);
+                error!("[NTX] Drop: 刷新写缓冲区失败: {}", e);
             }
         }
 
         // 尝试提交
         if self.dirty && !self.read_only {
             if let Err(e) = self.commit() {
-                eprintln!("[NTX] Drop: 提交失败: {}", e);
+                error!("[NTX] Drop: 提交失败: {}", e);
             }
         }
     }
@@ -600,7 +602,7 @@ impl NtxFile {
             let mut len_buf = [0u8; 4];
             if file.read_exact(&mut len_buf).is_err() {
                 errors += 1;
-                eprintln!("[NTX] load_frames: 帧 {} 长度读取失败", i);
+                warn!("[NTX] load_frames: 帧 {} 长度读取失败", i);
                 continue;
             }
             let len = u32::from_le_bytes(len_buf) as usize;
@@ -608,14 +610,14 @@ impl NtxFile {
 
             if len > MAX_FRAME_SIZE {
                 errors += 1;
-                eprintln!("[NTX] load_frames: 帧 {} 大小异常 ({} bytes, 上限 {} bytes)", i, len, MAX_FRAME_SIZE);
+                warn!("[NTX] load_frames: 帧 {} 大小异常 ({} bytes, 上限 {} bytes)", i, len, MAX_FRAME_SIZE);
                 continue;
             }
 
             let mut buf = vec![0u8; len];
             if file.read_exact(&mut buf).is_err() {
                 errors += 1;
-                eprintln!("[NTX] load_frames: 帧 {} 数据读取失败", i);
+                warn!("[NTX] load_frames: 帧 {} 数据读取失败", i);
                 continue;
             }
             total_bytes_read += len as u64;
@@ -625,21 +627,21 @@ impl NtxFile {
                     // 帧校验和验证
                     if !frame.verify() {
                         errors += 1;
-                        eprintln!("[NTX] load_frames: 帧 {} 校验和验证失败", i);
+                        warn!("[NTX] load_frames: 帧 {} 校验和验证失败", i);
                         continue;
                     }
                     frames.push(frame);
                 },
                 Err(e) => {
                     errors += 1;
-                    eprintln!("[NTX] load_frames: 帧 {} 解码失败: {}", i, e);
+                    warn!("[NTX] load_frames: 帧 {} 解码失败: {}", i, e);
                 }
             }
         }
 
         // 最终大小验证
         if total_bytes_read > desc.length {
-            eprintln!("[NTX] load_frames: 段大小不匹配: 实际读取 {} > 段长度 {}", total_bytes_read, desc.length);
+            warn!("[NTX] load_frames: 段大小不匹配: 实际读取 {} > 段长度 {}", total_bytes_read, desc.length);
         }
 
         // 段完整性验证: SHA-256 校验
@@ -649,13 +651,13 @@ impl NtxFile {
             let mut segment_data = vec![0u8; desc.length as usize];
             if file.read_exact(&mut segment_data).is_ok() {
                 if !desc.verify(&segment_data) {
-                    eprintln!("[NTX] load_frames: 段 SHA-256 校验失败");
+                    warn!("[NTX] load_frames: 段 SHA-256 校验失败");
                 }
             }
         }
 
         if errors > 0 {
-            eprintln!("[NTX] load_frames: {} / {} 帧加载失败", errors, count);
+            warn!("[NTX] load_frames: {} / {} 帧加载失败", errors, count);
         }
         Ok(frames)
     }

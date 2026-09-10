@@ -17,7 +17,7 @@ pub use seal_core::self_iterating;
 pub use seal_core::stats;
 pub use seal_core::model_router;
 pub use seal_core::multi_brain;
-pub use crate::l1_action::nt_memory::nt_memory_kb::bm25;
+pub use crate::l5_cognition::kb_facade::bm25;
 pub use seal_core::embedding;
 
 // ============================================================================
@@ -191,9 +191,9 @@ pub use goal_loop::{GoalLoop, GoalState, GoalConfig, GoalTracker, GoalIterationR
 pub mod skill_tree;
 
 // ============================================================================
-// Domain 8: 外贸全流程 (Foreign Trade Full Cycle) — moved to nt_act::nt_act_trade
+// Domain 8: 外贸全流程 (Foreign Trade Full Cycle) — re-export via ACT facade
 // ============================================================================
-pub use crate::l1_action::nt_act::nt_act_trade::{
+pub use crate::l5_cognition::act_facade::{
     TradeStateMachine, TradeCapabilitySpec, TradeResult,
     InquiryDetail, IntentLevel, ProductSpec, ProductType,
     BomItem, RoutingStep, PackagingSpec, CompanyPolicy, RiskControl,
@@ -225,25 +225,13 @@ pub use crate::l1_action::nt_act::nt_act_trade::{
     MockPayment, MockDeclaration, MockCustomsStatus, MockShipment, MockShipmentStatus,
     MockContainer,
     TradeOrchestrator,
-};
-// Conflicting types from submodules: import directly with aliases
-pub use crate::l1_action::nt_act::nt_act_trade::full_cycle::QuoteSheet as QNQuoteSheet;
-pub use crate::l1_action::nt_act::nt_act_trade::production_logistics::{
-    InspectionReport as PLInspectionReport, CiqCertificate as PLCiqCertificate,
-    BookingConfirmation as PLBookingConfirmation, PackingList as PLPackingList,
-    PackingItem as PLPackingItem, CustomsDeclaration as PLCustomsDeclaration,
-    BillOfLading as PLBillOfLading,
-};
-pub use crate::l1_action::nt_act::nt_act_trade::trade_core::RiskLevel as PLRiskLevel;
-pub use crate::l1_action::nt_act::nt_act_trade::finance_compliance::{
-    PaymentProof as FCPaymentProof, LcReview as FCLcReview,
-    CollectionRecord as FCCollectionRecord, SettlementRecord as FCSettlementRecord,
-    TaxRefundClaim as FCTaxRefundClaim,
-};
-// Orchestrator-local types (distinct from full_cycle equivalents)
-pub use crate::l1_action::nt_act::nt_act_trade::orchestrator::{
-    TradePhase26 as TradePhase, TradeGroup, OrchTradeContext as TradeContext, TradeEvent,
-    OrchBuyerProfile as BuyerProfile, Quotation, QuotationItem, OrchContract as Contract,
+    QNQuoteSheet,
+    PLInspectionReport, PLCiqCertificate, PLBookingConfirmation, PLPackingList,
+    PLPackingItem, PLCustomsDeclaration, PLBillOfLading,
+    PLRiskLevel,
+    FCPaymentProof, FCLcReview, FCCollectionRecord, FCSettlementRecord, FCTaxRefundClaim,
+    TradePhase, TradeGroup, TradeContext, TradeEvent,
+    BuyerProfile, Quotation, QuotationItem, Contract,
     ProductionStatus, LogisticsInfo, PaymentInfo, SettlementInfo,
 };
 pub use skill_tree::{

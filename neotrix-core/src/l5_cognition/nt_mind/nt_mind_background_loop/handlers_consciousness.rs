@@ -2,7 +2,7 @@ use super::*;
 use crate::nt_mind::infrastructure::ConsciousnessBridge;
 use crate::l5_cognition::nt_mind::nt_mind::evolution::dispatch_self_test::DispatchControlPlaneSelfTest;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest;
-use crate::l1_action::nt_act::nt_act_code::recipe_refactor;
+use crate::l5_cognition::act_facade::recipe_refactor;
 
 
 /// GoldStandard 连续未达意识双阈值的升级门限 (tick 数; 默认 600s/tick ≈ 50min 持续无意识)。
@@ -1502,7 +1502,7 @@ impl BackgroundLoopHandle {
             use crate::l3_embodiment::nt_shield::nt_shield_audit::{
                 write_guard_check_result, CheckStatus,
             };
-            use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::{
+            use crate::l5_cognition::kb_facade::{
                 scan_write_guard_evidence,
             };
             let stats = scan_write_guard_evidence(kb);

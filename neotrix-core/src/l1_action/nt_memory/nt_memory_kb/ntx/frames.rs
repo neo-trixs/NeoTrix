@@ -3,6 +3,7 @@
 //! 每条知识 = 一个 KnowledgeFrame, 支持 raw/zstd/lz4 压缩。
 
 use std::io::{Read, Write};
+use log::warn;
 use serde::{Serialize, Deserialize};
 use super::format::{crc32, Compression};
 
@@ -110,7 +111,7 @@ impl KnowledgeFrame {
         // 验证校验和一致性
         let computed = crc32(&self.payload);
         if self.checksum != 0 && self.checksum != computed {
-            eprintln!("[NTX] 帧 {} 校验和不匹配: 存储={}, 计算={}", self.frame_id, self.checksum, computed);
+            warn!("[NTX] 帧 {} 校验和不匹配: 存储={}, 计算={}", self.frame_id, self.checksum, computed);
         }
         buf.extend_from_slice(&self.checksum.to_le_bytes());
         buf.extend_from_slice(&self.timestamp.to_le_bytes());

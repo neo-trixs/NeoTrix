@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::LazyLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use log::warn;
 use rusqlite::Connection;
 use uuid::Uuid;
 
@@ -18,7 +19,7 @@ fn http_client() -> &'static reqwest::blocking::Client {
                 .no_proxy()
                 .build()
                 .unwrap_or_else(|e| {
-                    eprintln!("WARN: HTTP client init failed: {}", e);
+                    warn!("HTTP client init failed: {}", e);
                     reqwest::blocking::Client::new()
                 })
         })

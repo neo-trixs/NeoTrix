@@ -3,6 +3,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::core::nt_core_kb_types::{KnowledgeNode, KnowledgeEdge, NodeType, RelationType};
+use super::nt_memory_community::{CommunityAwareSearch, CommunityDetector, CommunityHierarchy};
+
 static ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 fn generate_id() -> String {
@@ -46,6 +49,95 @@ pub struct RelationEdge {
     pub evidence: String,
     pub confidence: f64,
     pub created_at: u64,
+}
+
+// ─── Type Bridge: EntityNode ↔ KnowledgeNode ─────────────────────────
+
+impl From<EntityNode> for KnowledgeNode {
+    fn from(e: EntityNode) -> Self {
+        KnowledgeNode {
+            id: e.id,
+            node_type: NodeType::from_str(&e.entity_type),
+            title: e.name,
+            summary: None,
+            content: None,
+            url: None,
+            domain: None,
+            language: "en".to_string(),
+            confidence: e.confidence,
+            importance: 0.5,
+            recall_weight: 1.0,
+            created_at: e.created_at as i64,
+            updated_at: e.created_at as i64,
+            access_count: 0,
+            metadata: Some(serde_json::json!({
+                "source_node_id": e.source_node_id,
+                "properties": e.properties,
+            })),
+            temporal: None,
+            supersedes: None,
+            source_episode: Some(e.source_node_id),
+        }
+    }
+}
+
+impl From<KnowledgeNode> for EntityNode {
+    fn from(k: KnowledgeNode) -> Self {
+        let source_node_id = k.source_episode
+            .or_else(|| k.metadata.as_ref().and_then(|m| m.get("source_node_id").and_then(|v| v.as_str().map(String::from))))
+            .unwrap_or_default();
+        let properties = k.metadata.as_ref()
+            .and_then(|m| m.get("properties"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        EntityNode {
+            id: k.id,
+            name: k.title,
+            entity_type: k.node_type.as_str().to_string(),
+            source_node_id,
+            confidence: k.confidence,
+            properties,
+            created_at: k.created_at as u64,
+        }
+    }
+}
+
+// ─── Type Bridge: RelationEdge ↔ KnowledgeEdge ───────────────────────
+
+impl From<RelationEdge> for KnowledgeEdge {
+    fn from(r: RelationEdge) -> Self {
+        KnowledgeEdge {
+            id: r.id,
+            source_id: r.source_entity,
+            target_id: r.target_entity,
+            relation_type: RelationType::from_str(&r.relation_type),
+            weight: r.weight,
+            description: Some(r.evidence),
+            created_at: r.created_at as i64,
+            metadata: Some(serde_json::json!({
+                "confidence": r.confidence,
+            })),
+        }
+    }
+}
+
+impl From<KnowledgeEdge> for RelationEdge {
+    fn from(k: KnowledgeEdge) -> Self {
+        let confidence = k.metadata.as_ref()
+            .and_then(|m| m.get("confidence"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0);
+        RelationEdge {
+            id: k.id,
+            source_entity: k.source_id,
+            target_entity: k.target_id,
+            relation_type: k.relation_type.as_str().to_string(),
+            weight: k.weight,
+            evidence: k.description.unwrap_or_default(),
+            confidence,
+            created_at: k.created_at as u64,
+        }
+    }
 }
 
 // ─── Entity Graph ────────────────────────────────────────────────────
@@ -215,6 +307,10 @@ pub struct GraphRagStore {
     global_summaries: Vec<GlobalSummary>,
     change_log: Vec<IncrementalChange>,
     lightrag_index: LightRagIndex,
+    /// Unified community detector (delegates to `CommunityAwareSearch` hierarchical Leiden
+    /// instead of reimplementing label propagation). Set via `set_community_detector()`.
+    #[serde(skip)]
+    community_detector: Option<std::sync::Arc<std::sync::RwLock<super::nt_memory_community::CommunityAwareSearch>>>,
 }
 
 impl GraphRagStore {
@@ -226,7 +322,18 @@ impl GraphRagStore {
             global_summaries: Vec::new(),
             change_log: Vec::new(),
             lightrag_index: LightRagIndex::new(),
+            community_detector: None,
         }
+    }
+
+    /// Inject the unified community detector. When set, `community_summary()` delegates
+    /// to `CommunityAwareSearch::get_communities()` (hierarchical Leiden) instead of
+    /// running its own label propagation algorithm.
+    pub fn set_community_detector(
+        &mut self,
+        detector: std::sync::Arc<std::sync::RwLock<super::nt_memory_community::CommunityAwareSearch>>,
+    ) {
+        self.community_detector = Some(detector);
     }
 
     pub fn config(&self) -> &GraphRagConfig {
@@ -856,63 +963,34 @@ impl GraphRagStore {
             return Vec::new();
         }
 
-        // Label propagation algorithm for community detection
-        let entity_ids: Vec<String> = self.graph.entities.keys().cloned().collect();
-        let mut labels: HashMap<String, usize> = HashMap::new();
-        for (i, eid) in entity_ids.iter().enumerate() {
-            labels.insert(eid.clone(), i);
-        }
+        // Bridge to KB types and run Leiden via CommunityAwareSearch (single fact source)
+        let kb_nodes: Vec<KnowledgeNode> = self.graph.entities.values().cloned().map(Into::into).collect();
+        let kb_edges: Vec<KnowledgeEdge> = self.graph.relations.values().cloned().map(Into::into).collect();
 
-        for _iter in 0..20 {
-            let mut changed = false;
-            for eid in &entity_ids {
-                let mut label_weights: HashMap<usize, f64> = HashMap::new();
-                if let Some(adj) = self.graph.adjacency.get(eid) {
-                    for (_, target, edge_id) in adj {
-                        if let Some(&neighbor_label) = labels.get(target) {
-                            let w = self
-                                .graph
-                                .relations
-                                .get(edge_id)
-                                .map(|r| r.weight)
-                                .unwrap_or(1.0);
-                            *label_weights.entry(neighbor_label).or_insert(0.0) += w;
-                        }
-                    }
-                }
-                if label_weights.is_empty() {
-                    continue;
-                }
-                let best_label = label_weights
-                    .into_iter()
-                    .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(l, _)| l);
-                if let Some(bl) = best_label {
-                    if labels.get(eid) != Some(&bl) {
-                        labels.insert(eid.clone(), bl);
-                        changed = true;
-                    }
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
+        let detector = CommunityDetector::new(1.0, 20, 3);
+        let mut searcher = CommunityAwareSearch::new(detector);
+        searcher.detect(&kb_nodes, &kb_edges);
 
-        // Group by label
-        let mut community_map: HashMap<usize, Vec<String>> = HashMap::new();
-        for (eid, label) in &labels {
-            community_map.entry(*label).or_default().push(eid.clone());
-        }
+        let hierarchy = match searcher.hierarchy() {
+            Some(h) => h,
+            None => return Vec::new(),
+        };
+
+        // Use finest level (level 0) for community membership
+        let level0 = match hierarchy.levels.first() {
+            Some(l) if !l.is_empty() => l,
+            _ => return Vec::new(),
+        };
 
         // Precompute centrality once
         let centrality = self.compute_centrality();
 
-        // Build Community structs with rich summaries
-        let mut communities: Vec<Community> = community_map
-            .into_iter()
-            .map(|(label, members)| {
-                self.build_community_summary(label, &members, &centrality)
+        // Convert Leiden communities to GraphRAG Community structs
+        let mut communities: Vec<Community> = level0
+            .iter()
+            .map(|c| {
+                let label = c.id.0 as usize;
+                self.build_community_summary(label, &c.members, &centrality)
             })
             .collect();
 

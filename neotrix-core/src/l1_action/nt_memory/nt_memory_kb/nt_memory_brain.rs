@@ -87,15 +87,32 @@ impl SynapticPlasticity {
                 let new_weight = (current_weight + delta).min(self.max_weight);
 
                 if new_weight > current_weight {
-                    // 使用 UPSERT 更新边权重
-                    conn.execute(
-                        "INSERT INTO edges (source_id, target_id, relation_type, weight, created_at, updated_at)
-                         VALUES (?1, ?2, 'related', ?3, ?4, ?4)
-                         ON CONFLICT(source_id, target_id) DO UPDATE SET
-                         weight = ?3, updated_at = ?4",
-                        rusqlite::params![src, tgt, new_weight, now],
-                    )
-                    .map_err(|e| format!("Edge upsert: {}", e))?;
+                    // 先检查边是否存在，再更新或插入
+                    let edge_exists: bool = conn
+                        .query_row(
+                            "SELECT COUNT(*) > 0 FROM edges WHERE source_id = ?1 AND target_id = ?2",
+                            rusqlite::params![src, tgt],
+                            |r| r.get(0),
+                        )
+                        .unwrap_or(false);
+
+                    if edge_exists {
+                        // 更新现有边权重
+                        conn.execute(
+                            "UPDATE edges SET weight = ?1, updated_at = ?2 WHERE source_id = ?3 AND target_id = ?4",
+                            rusqlite::params![new_weight, now, src, tgt],
+                        )
+                        .map_err(|e| format!("Edge update: {}", e))?;
+                    } else {
+                        // 插入新边
+                        let edge_id = uuid::Uuid::new_v4().to_string();
+                        conn.execute(
+                            "INSERT INTO edges (id, source_id, target_id, relation_type, weight, created_at, updated_at)
+                             VALUES (?1, ?2, ?3, 'related', ?4, ?5, ?5)",
+                            rusqlite::params![edge_id, src, tgt, new_weight, now],
+                        )
+                        .map_err(|e| format!("Edge insert: {}", e))?;
+                    }
                     strengthened += 1;
                 }
             }
@@ -553,11 +570,17 @@ impl MemoryConsolidation {
         &self,
         conn: &Connection,
     ) -> Result<usize, String> {
+        let seven_days_ago = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64
+            - 7 * 86400; // 7 days in seconds
+
         let pruned = conn
             .execute(
                 "DELETE FROM nodes WHERE importance < 0.2 AND access_count < 2
-                 AND updated_at < datetime('now', '-7 days')",
-                [],
+                 AND updated_at < ?1",
+                rusqlite::params![seven_days_ago],
             )
             .map_err(|e| format!("Prune: {}", e))?;
 

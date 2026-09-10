@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use log::info;
 use serde_json::Value;
 
 use super::KnowledgeBase;
@@ -744,7 +745,7 @@ mod tests {
         let path = match path {
             Some(p) => Path::new(p),
             None => {
-                eprintln!("Skipping test: assets/knowledge_data.json not found");
+                info!("Skipping test: assets/knowledge_data.json not found");
                 return;
             }
         };
@@ -762,7 +763,7 @@ mod tests {
         let kb = match super::super::KnowledgeBase::open(Some(tmp)) {
             Ok(kb) => kb,
             Err(e) => {
-                eprintln!("Skipping test: cannot open KB: {}", e);
+                info!("Skipping test: cannot open KB: {}", e);
                 return;
             }
         };
@@ -771,7 +772,7 @@ mod tests {
         assert!(report.imported > 0, "should import at least 1 entry");
         assert!(report.imported <= 250, "at most 250 entries");
         assert!(report.errors.is_empty(), "errors: {:?}", report.errors);
-        eprintln!(
+        info!(
             "Imported {} knowledge assets, {} edges created",
             report.imported, report.edges_created,
         );

@@ -19,8 +19,7 @@ use super::KnowledgeBase;
 
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
-use crate::l3_embodiment::nt_shield::nt_shield::self_poison::scan_absorb_text;
-use crate::l3_embodiment::nt_shield::nt_shield::receipt::AgentReceipt;
+use crate::core::nt_core_traits::{AbsorbTextScanner, ReceiptEmitter};
 
 use serde::{Deserialize, Serialize};
 
@@ -245,7 +244,16 @@ impl KnowledgeBase {
 
         // 自毒化防火墙 (EVOMAL): 吸收边界前置扫描 — 拒绝"检索内容被固化为含 payload 的 skill 模板"。
         // fail-closed: 命中 Blocked 直接拒绝写入, 不产生可验证收据 (拒绝即无痕)。
-        let verdict = scan_absorb_text(&entry.title, &entry.summary, &entry.content);
+        // 使用 trait 抽象 (消除了 L1→L3 直接依赖)。
+        let verdict = {
+            let scanner_guard = self.absorb_scanner.read().map_err(|e| format!("KB lock: {}", e))?;
+            if let Some(ref scanner) = *scanner_guard {
+                scanner.scan(&entry.title, &entry.summary, &entry.content)
+            } else {
+                // 默认: 无扫描器时不阻断 (兼容未注入 L3 实现的场景)
+                crate::core::nt_core_traits::AbsorbVerdict { blocked: false, reasons: Vec::new() }
+            }
+        };
         if verdict.is_blocked() {
             return Err(format!(
                 "self_poison firewall: absorb_core blocked entry '{}' (signals: {}). \
@@ -316,12 +324,20 @@ impl KnowledgeBase {
             tx.commit().map_err(|e| e.to_string())?;
             // 4. 可验证回放收据: 成功写节点后, 以节点 id 为 run_id,
             //    正文为 input, 摘要为 output 签发票 (事后可回放校验不可篡改)。
-            let receipt = AgentReceipt::emit(
-                &node.id,
-                node.content.as_deref().unwrap_or(""),
-                node.summary.as_deref().unwrap_or(""),
-            );
-            (node.id.clone(), true, Some(receipt.signature))
+            // 使用 trait 抽象 (消除了 L1→L3 直接依赖)。
+            let receipt_sig = {
+                let emitter_guard = self.receipt_emitter.read().map_err(|e| format!("KB lock: {}", e))?;
+                if let Some(ref emitter) = *emitter_guard {
+                    Some(emitter.emit_receipt(
+                        &node.id,
+                        node.content.as_deref().unwrap_or(""),
+                        node.summary.as_deref().unwrap_or(""),
+                    ))
+                } else {
+                    None
+                }
+            };
+            (node.id.clone(), true, receipt_sig)
         };
 
         // 4. 域枢纽 BelongsTo 边 (幂等 upsert)
@@ -404,7 +420,7 @@ impl KnowledgeBase {
             _ => self.hybrid_rerank_search(query, limit)?,
         };
 
-        // 图溯源: 取命中节点的域 → 域枢纽 → shortest_path
+        // 图溯源: 取命中节点的域 → 域枢纽 → weighted_shortest_path
         let mut graph_path: Option<GraphPath> = None;
         if let Some(top) = results.first() {
             if let Some(domain) = &top.node.domain {
@@ -414,11 +430,22 @@ impl KnowledgeBase {
                     .map_err(|e| e.to_string())?
                     .is_some()
                 {
-                    let path = super::nt_memory_graph::shortest_path(&conn, &top.node.id, &hid, 3)
-                        .map_err(|e| e.to_string())?;
-                    if let Some(p) = path {
-                        if p.nodes.len() > 1 {
-                            graph_path = Some(p);
+                    // 使用加权最短路径替代 BFS
+                    let cache = self.graph_cache.read().map_err(|e| format!("Cache lock: {}", e))?;
+                    if let Some((node_ids, edges, cost)) = super::nt_memory_graph_cache::weighted_shortest_path(&cache, &top.node.id, &hid) {
+                        if node_ids.len() > 1 {
+                            // 转换为 GraphPath 格式
+                            let mut nodes = Vec::new();
+                            for nid in &node_ids {
+                                if let Some(node) = nt_memory_store::get_node(&conn, nid)? {
+                                    nodes.push(node);
+                                }
+                            }
+                            graph_path = Some(GraphPath {
+                                nodes,
+                                edges,
+                                total_distance: cost,
+                            });
                         }
                     }
                 }

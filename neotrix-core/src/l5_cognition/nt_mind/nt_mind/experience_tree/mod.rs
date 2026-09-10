@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::kb_facade::KnowledgeBase;
 use crate::core::nt_core_knowledge::{AbsorptionRecord, KnowledgeSource};
 
 // ============================================================================

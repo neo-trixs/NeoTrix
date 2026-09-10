@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use log::{debug, info};
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -130,7 +131,7 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
         pb.cmp(&pa).then(b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal))
     });
     #[cfg(feature = "full")]
-    eprintln!("[search_fts] q={} rows={} first10={:?}", query, results.len(),
+    debug!("[search_fts] q={} rows={} first10={:?}", query, results.len(),
         results.iter().take(10).map(|r| format!("{}|{:.2}|{:?}", r.node.title, r.score, r.matched_on)).collect::<Vec<_>>());
     Ok(results)
 }
@@ -320,7 +321,7 @@ pub fn hybrid_search(
         fused.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     }
     #[cfg(feature = "full")]
-    eprintln!("[hybrid] fused={} first5={:?}", fused.len(),
+    debug!("[hybrid] fused={} first5={:?}", fused.len(),
         fused.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
 
     // Fetch full node data for fused IDs
@@ -1590,7 +1591,7 @@ mod materialized_neighbors_tests {
         }
         latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let p95 = latencies[(QUERIES as f64 * 0.95) as usize];
-        eprintln!(
+        info!(
             "[bench] 10K 向量, dim={DIM}: median={:.3}ms p95={:.3}ms (queries={QUERIES})",
             latencies[QUERIES / 2], p95
         );
@@ -1605,7 +1606,7 @@ mod materialized_neighbors_tests {
         }
         hit_lat.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let hit_p95 = hit_lat[(QUERIES as f64 * 0.95) as usize];
-        eprintln!("[bench] 缓存命中路径 p95={:.4}ms", hit_p95);
+        info!("[bench] 缓存命中路径 p95={:.4}ms", hit_p95);
         assert!(hit_p95 < p95, "缓存命中应快于全扫描");
     }
 }

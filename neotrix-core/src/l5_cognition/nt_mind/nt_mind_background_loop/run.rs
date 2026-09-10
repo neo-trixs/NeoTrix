@@ -445,7 +445,7 @@ impl BackgroundLoop {
         // 语义: set 走 effect 可回滚 (coeffect operations are effects), 前置条件
         // k∉dom(σ) 防重复提供; 消费方 NT-MEMORY/CLI 插件注入时读取该表。
         if let Some(ref kb_ref) = kb {
-            use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_coeffect::{
+            use crate::l5_cognition::kb_facade::{
                 persist_bindings, CoeffectBinding, CoeffectRegistry, CoeffectTx,
             };
             if let Ok(conn) = kb_ref.raw_conn() {

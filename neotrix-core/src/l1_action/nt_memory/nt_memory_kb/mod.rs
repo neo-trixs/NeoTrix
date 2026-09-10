@@ -1,5 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
+use log::{warn, error};
+
 pub mod bm25;
 pub mod ntx;
 pub mod spill_storage;
@@ -171,6 +173,10 @@ pub struct KnowledgeBase {
     /// A1 时效账本 (recall absorb, R-P79): 追踪节点最后更新时刻 + 应遗忘标记,
     /// 检索时过滤 "自信但过期" 的陈旧事实, 减少 agent 被误导决策。
     pub freshness: RwLock<nt_memory_sweep_20260815::FreshnessLedger>,
+    /// 吸收文本毒化扫描器 (L3 self_poison trait 抽象, 消除 L1→L3 直接依赖)。
+    pub absorb_scanner: RwLock<Option<Box<dyn crate::core::nt_core_traits::AbsorbTextScanner>>>,
+    /// 可验证回放收据发射器 (L3 AgentReceipt trait 抽象, 消除 L1→L3 直接依赖)。
+    pub receipt_emitter: RwLock<Option<Box<dyn crate::core::nt_core_traits::ReceiptEmitter>>>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -227,6 +233,8 @@ impl KnowledgeBase {
             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
             temporal_ledger: Mutex::new(temporal_ledger),
             freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
+            absorb_scanner: RwLock::new(None),
+            receipt_emitter: RwLock::new(None),
         }
     }
 
@@ -389,11 +397,11 @@ impl KnowledgeBase {
 
     /// Open a clone connection to the same DB (for sharing across subsystems)
     pub fn clone_connection(&self) -> Self {        Self::open(Some(self.db_path.clone())).unwrap_or_else(|e| {
-            eprintln!("[neotrix] WARNING: clone_connection: KB::open({}) failed: {}. Trying default path.", self.db_path.display(), e);
+            warn!("[neotrix] clone_connection: KB::open({}) failed: {}. Trying default path.", self.db_path.display(), e);
             Self::open(None).unwrap_or_else(|e| {
-                eprintln!("[neotrix] WARNING: clone_connection: default path also failed: {}. Creating in-memory KB.", e);
+                warn!("[neotrix] clone_connection: default path also failed: {}. Creating in-memory KB.", e);
                 let Ok(conn) = Connection::open_in_memory() else {
-                    eprintln!("[neotrix] FATAL: cannot create in-memory SQLite database");
+                    error!("[neotrix] FATAL: cannot create in-memory SQLite database");
                     std::process::abort();
                 };
                 let _ = nt_memory_schema::initialize(&conn);

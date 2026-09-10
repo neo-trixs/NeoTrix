@@ -214,6 +214,63 @@ pub trait SecurityCheckRegistry: Send + Sync {
     fn run_all_checks(&self) -> Result<Vec<String>, Vec<String>>;
 }
 
+// ════════════════════════════════════════════════════════════════
+// L3 Shield 抽象 — 避免 L1→L3 直接依赖
+// ════════════════════════════════════════════════════════════════
+
+/// SecretRiskLevel — 脱敏风险等级 (与 l3_embodiment::nt_shield::redaction::RiskLevel 同构)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecretRiskLevel {
+    Safe,
+    Suspicious,
+    Dangerous,
+}
+
+/// SecretScanner — 密钥/PII 扫描抽象
+/// L1 模块通过此 trait 执行凭据泄漏检测，而非直接依赖 L3 Redactor。
+pub trait SecretScanner: Send + Sync {
+    /// 分析文本风险等级 + 命中的规则描述
+    fn analyze(&self, text: &str) -> (SecretRiskLevel, Vec<String>);
+    /// 是否安全 (无可脱敏内容)
+    fn is_safe(&self, text: &str) -> bool;
+}
+
+/// PropagationGuardLike — 心智病毒传播防护抽象
+/// L1 模块通过此 trait 执行传播防护，而非直接依赖 L3 PropagationGuard。
+pub trait PropagationGuardLike: Send + Sync {
+    /// 是否启用
+    fn is_enabled(&self) -> bool;
+    /// 加固系统提示 (一句话防线)
+    fn harden_system_prompt(&self, prompt: &str) -> String;
+}
+
+/// AbsorbVerdict — 吸收毒化扫描结果
+#[derive(Debug)]
+pub struct AbsorbVerdict {
+    pub blocked: bool,
+    pub reasons: Vec<String>,
+}
+
+impl AbsorbVerdict {
+    pub fn is_blocked(&self) -> bool {
+        self.blocked
+    }
+}
+
+/// AbsorbTextScanner — 吸收文本毒化扫描抽象
+/// L1 模块通过此 trait 执行吸收前毒化扫描，而非直接依赖 L3 self_poison。
+pub trait AbsorbTextScanner: Send + Sync {
+    /// 扫描待吸收文本 (标题/摘要/正文), 返回判定结果
+    fn scan(&self, title: &str, summary: &Option<String>, content: &Option<String>) -> AbsorbVerdict;
+}
+
+/// ReceiptEmitter — 可验证回放收据生成抽象
+/// L1 模块通过此 trait 生成收据，而非直接依赖 L3 AgentReceipt。
+pub trait ReceiptEmitter: Send + Sync {
+    /// 为一次运行/吸收动作生成签名收据, 返回签名字符串
+    fn emit_receipt(&self, run_id: &str, input: &str, output: &str) -> String;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

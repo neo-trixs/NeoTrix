@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use log::{warn, info};
 use rusqlite::Connection;
 use serde_json;
 use uuid::Uuid;
@@ -389,7 +390,7 @@ pub fn ingest_session_resources(conn: &Connection) -> Result<String, String> {
     // 114 GB offline archive is connected (Dark Forest), not inert. No-op if unmounted.
     // This runs in production (ingest_session_resources is called at startup) → T3 wiring.
     if let Err(e) = register_cortex_brain(conn, std::path::Path::new(CORTEX_ROOT)) {
-        eprintln!("[cortex] register skipped: {e}");
+        warn!("[cortex] register skipped: {e}");
     }
 
     Ok(ingester.report())
@@ -600,7 +601,7 @@ fn copy_resumable(src: &std::path::Path, dest: &std::path::Path) -> Result<u64, 
         }
         offset += n as u64;
         write_progress(&prog, offset)?;
-        eprintln!(
+        info!(
             "[corpus migrate] 校验通过 {:.1} / {:.1} GB",
             offset as f64 / 1e9,
             size as f64 / 1e9

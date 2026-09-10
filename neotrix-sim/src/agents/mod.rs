@@ -8,6 +8,7 @@ pub mod event_reactive;
 pub mod personality_drift;
 pub mod reflection;
 pub mod action_costs;
+pub mod pheromone;
 
 // Fusion Adapters (External Model Integration)
 pub mod goal_outcome_feedback;
@@ -21,3 +22,4 @@ pub use planning::*;
 pub use event_reactive::*;
 pub use personality_drift::*;
 pub use action_costs::*;
+pub use pheromone::*;

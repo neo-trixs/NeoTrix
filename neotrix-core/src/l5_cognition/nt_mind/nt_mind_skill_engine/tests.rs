@@ -594,7 +594,7 @@ low"#;
 
     #[test]
     fn test_sync_to_kb_index_write_through_and_dedup() {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::skill_list_all;
+        use crate::l5_cognition::kb_facade::skill_list_all;
 
         let dir = setup_temp_dir();
         let skills_dir = dir.path().join("skills");
@@ -633,8 +633,8 @@ low"#;
 
     #[test]
     fn test_load_all_auto_syncs_to_kb() {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_unify::skill_list_all;
-        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+        use crate::l5_cognition::kb_facade::skill_list_all;
+        use crate::l5_cognition::kb_facade::KnowledgeBase;
 
         let dir = setup_temp_dir();
         let skills_dir = dir.path().join("skills");

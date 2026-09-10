@@ -14,6 +14,7 @@ pub mod society;
 pub mod foundation;
 pub mod world_sim;
 pub mod bridge;
+pub mod safety;
 
 use std::time::{Duration, Instant};
 

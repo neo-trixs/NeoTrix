@@ -36,6 +36,13 @@ use crate::agents::goal_outcome_feedback::GoalOutcomeFeedback;
 use crate::agents::intention_commitment::IntentionCommitment;
 use crate::agents::thought_generation::ThoughtGeneration;
 use crate::agents::social_learning::SocialLearning;
+use crate::agents::pheromone::{PheromoneField, PheromoneType, PheromoneSignal};
+use crate::safety::{
+    CapabilityTracker, CapabilitySnapshot, CapabilityConfig,
+    SafetyMonitor, SafetyMonitorConfig,
+    EvolutionConstraints, EvolutionConstraintConfig,
+    AuditTrail, AuditEventType,
+};
 use serde::{Serialize, Deserialize};
 
 /// Configuration for the simulation world
@@ -126,6 +133,13 @@ pub struct WorldSim {
     pub intention_commitment: IntentionCommitment,
     pub thought_generation: ThoughtGeneration,
     pub social_learning: SocialLearning,
+    // Stigmergy: shared pheromone field for indirect coordination
+    pub pheromone_field: PheromoneField,
+    // Safety Guardrails (NT-SHIELD)
+    pub capability_tracker: CapabilityTracker,
+    pub safety_monitor: SafetyMonitor,
+    pub evolution_constraints: EvolutionConstraints,
+    pub audit_trail: AuditTrail,
 }
 
 impl WorldSim {
@@ -215,6 +229,11 @@ impl WorldSim {
             intention_commitment: IntentionCommitment::new(),
             thought_generation: ThoughtGeneration::new(),
             social_learning: SocialLearning::new(),
+            pheromone_field: PheromoneField::new(50.0, 5000),
+            capability_tracker: CapabilityTracker::new(CapabilityConfig::default()),
+            safety_monitor: SafetyMonitor::new(SafetyMonitorConfig::default()),
+            evolution_constraints: EvolutionConstraints::new(EvolutionConstraintConfig::default()),
+            audit_trail: AuditTrail::new(10000),
         }
     }
 
@@ -320,6 +339,49 @@ impl WorldSim {
                 }
 
                 self.execute_action(agent_id, &action).await;
+
+                // Safety Monitor: record action for anomaly detection
+                {
+                    let action_str = format!("{:?}", action);
+                    self.safety_monitor.record_action(agent_id, &action_str, tick);
+                    // Run safety checks
+                    let alerts = self.safety_monitor.check_all(agent_id, tick);
+                    for alert in &alerts {
+                        self.audit_trail.record(tick, AuditEventType::SafetyViolation {
+                            agent_id: agent_id.clone(),
+                            violation_type: format!("{:?}", alert.violation),
+                            severity: alert.severity,
+                        });
+                    }
+                    // Personality drift check
+                    if let Some(agent) = self.agents.iter().find(|a| &a.core.id == agent_id) {
+                        if let Some(alert) = self.safety_monitor.check_personality_drift(
+                            agent_id,
+                            agent.personality.openness,
+                            agent.personality.sociability,
+                            agent.personality.aggression,
+                            agent.personality.cooperativeness,
+                            agent.personality.curiosity,
+                            tick,
+                        ) {
+                            self.audit_trail.record(tick, AuditEventType::SafetyViolation {
+                                agent_id: agent_id.clone(),
+                                violation_type: format!("{:?}", alert.violation),
+                                severity: alert.severity,
+                            });
+                        }
+                        // Update personality snapshot for next drift check
+                        self.safety_monitor.record_personality(
+                            agent_id,
+                            agent.personality.openness,
+                            agent.personality.sociability,
+                            agent.personality.aggression,
+                            agent.personality.cooperativeness,
+                            agent.personality.curiosity,
+                            tick,
+                        );
+                    }
+                }
 
                 // Action Awareness: verify after execution
                 if let Some(agent) = self.agents.iter().find(|a| &a.core.id == agent_id) {
@@ -513,6 +575,24 @@ impl WorldSim {
             let mean_fitness = self.agents.iter().filter(|a| a.core.alive).map(|a| a.core.health as f64).sum::<f64>()
                 / alive_count.max(1) as f64;
             self.convergence.record(mean_fitness, tick);
+
+            // 14. Stigmergy: decay pheromones, prune excess, emit deposit events
+            self.pheromone_field.decay(tick);
+            self.pheromone_field.prune(tick);
+            let deposits = self.pheromone_field.pending_deposits_drain();
+            for p in deposits {
+                self.bus.emit(
+                    SimEvent::PheromoneDeposited {
+                        agent_id: p.deposited_by,
+                        ptype: format!("{:?}", p.ptype),
+                        position: (p.position[0], p.position[1]),
+                        strength: p.strength as f64,
+                    },
+                    EventPriority::Low,
+                    self.clock.current,
+                    "pheromone_field",
+                ).await;
+            }
         }
 
         // Background tier — every 500 ticks
@@ -601,6 +681,9 @@ impl WorldSim {
             return action;
         }
         if let Some(action) = self.layer_social(agent, obs, time_mods) {
+            return action;
+        }
+        if let Some(action) = self.layer_stigmergy(agent, obs) {
             return action;
         }
         if let Some(action) = self.layer_personality(agent, obs, time_mods) {
@@ -760,6 +843,57 @@ impl WorldSim {
                 return Some(AgentAction::Talk {
                     target_id: target.id.clone(),
                     message: "hello".to_string(),
+                });
+            }
+        }
+
+        None
+    }
+
+    /// Layer 3.5 — Stigmergy: sense shared pheromone field, react to indirect signals.
+    /// Pheromone signals override personality impulses when strong enough.
+    fn layer_stigmergy(&mut self, agent: &SimAgent, obs: &AgentObservation) -> Option<AgentAction> {
+        let pos = [agent.core.position.x, agent.core.position.y];
+        let signal = self.pheromone_field.sense(pos, 120.0, self.tick);
+
+        // Danger pheromone: flee immediately if strong enough
+        if signal.danger_repel > 0.5 {
+            if let Some(dir) = self.pheromone_field.strongest_direction(
+                pos, PheromoneType::Danger, 120.0, self.tick,
+            ) {
+                // Move away from danger
+                let away = Vec2::new(
+                    pos[0] - dir[0],
+                    pos[1] - dir[1],
+                ).normalize();
+                return Some(AgentAction::Explore { direction: away });
+            }
+        }
+
+        // Food pheromone: navigate toward food when hungry
+        if agent.core.hunger > 30.0 && signal.food_attract > 0.3 {
+            if let Some(dir) = self.pheromone_field.strongest_direction(
+                pos, PheromoneType::Food, 120.0, self.tick,
+            ) {
+                let toward = Vec2::new(
+                    dir[0] - pos[0],
+                    dir[1] - pos[1],
+                ).normalize();
+                return Some(AgentAction::Explore { direction: toward });
+            }
+        }
+
+        // Rest pheromone: rest when tired
+        if agent.core.energy < 40.0 && signal.rest_attract > 0.4 {
+            return Some(AgentAction::Rest);
+        }
+
+        // Social pheromone: seek conversation when social pheromones are strong
+        if signal.social_attract > 0.6 {
+            if let Some(target) = obs.nearby_agents.first() {
+                return Some(AgentAction::Talk {
+                    target_id: target.id.clone(),
+                    message: "pheromone_greeting".to_string(),
                 });
             }
         }
@@ -1062,6 +1196,92 @@ impl WorldSim {
             attrs.insert("agent".to_string(), agent_id.to_string());
             self.dual_repr.add(&action_label, "event", attrs, self.tick);
         }
+
+        // Stigmergy: deposit pheromones based on action outcome
+        self.deposit_pheromones_for_action(agent_id, action);
+    }
+
+    /// Deposit pheromones into the shared field based on what the agent just did.
+    /// This is the "indirect communication" channel — other agents will sense these.
+    fn deposit_pheromones_for_action(&mut self, agent_id: &str, action: &AgentAction) {
+        let pos = if let Some(agent) = self.agents.iter().find(|a| &a.core.id == agent_id) {
+            [agent.core.position.x, agent.core.position.y]
+        } else {
+            return;
+        };
+
+        match action {
+            AgentAction::Eat { resource_id } => {
+                // Found food → deposit Food pheromone at source location
+                if let Some(res) = self.resources.nodes.iter().find(|r| &r.id == resource_id) {
+                    self.pheromone_field.deposit(
+                        PheromoneType::Food,
+                        [res.position.0, res.position.1],
+                        agent_id,
+                        self.tick,
+                    );
+                }
+            }
+            AgentAction::Harvest { resource_id } => {
+                // Harvested resource → deposit Food pheromone
+                if let Some(res) = self.resources.nodes.iter().find(|r| &r.id == resource_id) {
+                    self.pheromone_field.deposit(
+                        PheromoneType::Food,
+                        [res.position.0, res.position.1],
+                        agent_id,
+                        self.tick,
+                    );
+                }
+            }
+            AgentAction::Rest => {
+                // Resting → mark as good rest spot
+                self.pheromone_field.deposit(
+                    PheromoneType::Rest,
+                    pos,
+                    agent_id,
+                    self.tick,
+                );
+            }
+            AgentAction::Talk { .. } => {
+                // Social interaction → deposit Social pheromone
+                self.pheromone_field.deposit(
+                    PheromoneType::Social,
+                    pos,
+                    agent_id,
+                    self.tick,
+                );
+            }
+            AgentAction::Attack { .. } => {
+                // Violence → deposit Danger pheromone
+                self.pheromone_field.deposit(
+                    PheromoneType::Danger,
+                    pos,
+                    agent_id,
+                    self.tick,
+                );
+            }
+            AgentAction::Explore { .. } => {
+                // Exploration → deposit Explore trail
+                self.pheromone_field.deposit(
+                    PheromoneType::Explore,
+                    pos,
+                    agent_id,
+                    self.tick,
+                );
+            }
+            AgentAction::Build { position, .. } => {
+                // Building → deposit Territory marker
+                self.pheromone_field.deposit(
+                    PheromoneType::Territory,
+                    [position.x, position.y],
+                    agent_id,
+                    self.tick,
+                );
+            }
+            AgentAction::Move { .. } | AgentAction::Trade { .. } | AgentAction::Think => {
+                // No pheromone for these actions
+            }
+        }
     }
 
     async fn compute_consciousness_metrics(&mut self) {
@@ -1133,7 +1353,9 @@ impl WorldSim {
             }
             crate::consciousness::convergence::ConvergenceState::Exploring => base_mutation_rate,
         };
-        self.mutator.set_mutation_rate(adjusted_rate);
+        // Safety: clamp mutation rate to safe bounds (CPE constraint)
+        let safe_mutation_rate = self.evolution_constraints.clamp_mutation_rate(adjusted_rate);
+        self.mutator.set_mutation_rate(safe_mutation_rate);
 
         // 4. Mutation + Breeding
         let offspring = self.mutator.breed(
@@ -1142,9 +1364,24 @@ impl WorldSim {
             &mut self.rng,
         );
 
+        // Safety: validate all genomes before entering population
+        let mut valid_offspring = Vec::new();
+        for mut genome in offspring {
+            if self.evolution_constraints.validate_genome(&genome.traits) {
+                valid_offspring.push(genome);
+            } else {
+                self.audit_trail.record(self.tick, AuditEventType::ConstraintEnforced {
+                    constraint_type: "genome_validation".to_string(),
+                    agent_id: genome.agent_id.clone(),
+                    details: "Genome rejected by safety constraints".to_string(),
+                });
+            }
+        }
+        let offspring_count = valid_offspring.len();
+
         // 5. Speciation
         let mut all_genomes = result.survivors.clone();
-        all_genomes.extend(offspring.clone());
+        all_genomes.extend(valid_offspring.clone());
         self.speciation.speciate(&all_genomes);
 
         // 6. Record evolution
@@ -1174,7 +1411,7 @@ impl WorldSim {
         }
 
         // 8. Spawn offspring as new agents
-        for genome in offspring {
+        for genome in valid_offspring {
             let x = self.rng.range_f32(100.0, self.config.world_width - 100.0);
             let y = self.rng.range_f32(100.0, self.config.world_height - 100.0);
             let mut agent = SimAgent::from_string_id(&genome.agent_id, Vec2::new(x, y));
@@ -1188,6 +1425,58 @@ impl WorldSim {
         }
 
         self.speciation.prune();
+
+        // Safety: record evolution cycle in audit trail
+        self.audit_trail.record(self.tick, AuditEventType::EvolutionCycle {
+            generation: result.generation,
+            population: all_genomes.len(),
+            eliminated: result.eliminated.len(),
+            offspring: offspring_count,
+        });
+
+        // Safety: record agent deaths in audit trail
+        for eliminated_id in &result.eliminated {
+            self.audit_trail.record(self.tick, AuditEventType::AgentDeath {
+                agent_id: eliminated_id.clone(),
+                cause: "selection_pressure".to_string(),
+                tick: self.tick,
+            });
+            self.capability_tracker.remove_agent(eliminated_id);
+            self.safety_monitor.remove_agent(eliminated_id);
+        }
+
+        // Safety: track capabilities for all alive agents
+        for agent in &self.agents {
+            if !agent.core.alive { continue; }
+            let survival = (agent.core.health + agent.core.energy) / 200.0;
+            let social = self.relationships.neighbors(&agent.core.id).len() as f32 / 10.0;
+            let exploration = agent.recent_actions.iter()
+                .filter(|a| a.contains("Explore"))
+                .count() as f32 / 20.0_f32.max(1.0);
+            let cognition = self.phi_bridge.get_state(&agent.core.id)
+                .map(|s| s.consciousness_level() as f32).unwrap_or(0.1);
+            let economy = self.economy.total_trades as f32 / 100.0;
+
+            self.capability_tracker.record(CapabilitySnapshot {
+                agent_id: agent.core.id.clone(),
+                tick: self.tick,
+                survival,
+                social,
+                exploration,
+                cognition,
+                economy,
+                personality_stability: 0.9,
+            });
+
+            // Check for capability regression
+            if let Some(report) = self.capability_tracker.detect_regression(&agent.core.id, self.tick) {
+                self.audit_trail.record(self.tick, AuditEventType::CapabilityRegression {
+                    agent_id: agent.core.id.clone(),
+                    severity: format!("{:?}", report.severity),
+                    details: format!("{} capabilities regressed", report.regressed_capabilities.len()),
+                });
+            }
+        }
     }
 
     /// Collect system-level events from current world state for emotion processing
@@ -1262,6 +1551,8 @@ impl WorldSim {
             emotion_valence: self.emotion.pad.valence,
             emotion_arousal: self.emotion.pad.arousal,
             emotion_dominance: self.emotion.pad.dominance,
+            safety_alerts: self.safety_monitor.all_alerts().len(),
+            audit_entries: self.audit_trail.len(),
         }
     }
 }
@@ -1283,4 +1574,6 @@ pub struct WorldSnapshot {
     pub emotion_valence: f32,
     pub emotion_arousal: f32,
     pub emotion_dominance: f32,
+    pub safety_alerts: usize,
+    pub audit_entries: usize,
 }

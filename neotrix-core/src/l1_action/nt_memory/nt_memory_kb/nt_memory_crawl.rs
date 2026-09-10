@@ -1,5 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use log::warn;
 use rusqlite::Connection;
 
 use super::nt_memory_store as store;
@@ -695,7 +696,7 @@ fn fetch_and_ingest_url(conn: &Connection, url: &str) -> Result<(usize, usize), 
 
 /// 单一 HTML→文本 原语：提取标题、剥离 script/style/tag、解码常见实体、归一空白。
 /// 所有吸收器 (UnifiedAbsorber / KnowledgeAbsorptionPipeline / MemoryCrawl) 统一委托此处。
-pub(crate) fn extract_html_content(html: &str) -> (String, String) {
+pub fn extract_html_content(html: &str) -> (String, String) {
     let title = if let Some(start) = html.find("<title>") {
         let start = start + 7;
         if let Some(end) = html[start..].find("</title>") {
@@ -920,9 +921,9 @@ pub fn ingest_geo_cities(
         match std::fs::read_to_string(&cache_path) {
             Ok(body) => match serde_json::from_str::<serde_json::Value>(&body) {
                 Ok(v) if v.is_array() => data = Some(v),
-                _ => eprintln!("[geo] cache parse failed, falling back to network"),
+                _ => warn!("[geo] cache parse failed, falling back to network"),
             },
-            Err(e) => eprintln!("[geo] cache read failed: {}, falling back to network", e),
+            Err(e) => warn!("[geo] cache read failed: {}, falling back to network", e),
         }
     }
 

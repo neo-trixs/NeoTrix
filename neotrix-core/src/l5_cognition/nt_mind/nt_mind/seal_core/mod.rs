@@ -14,7 +14,7 @@ pub mod self_edit;
 pub mod self_iterating;
 pub mod stats;
 
-pub use crate::l1_action::nt_memory::nt_memory_kb::bm25;
+pub use crate::l5_cognition::kb_facade::bm25;
 
 // Cross-domain surface: re-export nt_mind scope so internal super:: refs resolve at domain level
 pub use super::*;

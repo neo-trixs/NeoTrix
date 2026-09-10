@@ -11,7 +11,7 @@ use super::super::super::sleep::{SleepEngine, SleepStats};
 use crate::neotrix::nt_world_model::TaskType;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
-use crate::l1_action::nt_act::nt_act_crypto::CryptoAgent;
+use crate::l5_cognition::act_facade::CryptoAgent;
 use super::super::super::stagnation::StagnationDetector;
 use super::super::checkpoint::CheckpointManager;
 use super::super::pipeline::{BrainPipeline, BrainSnapshot, AutonomyLevel, PermissionLevel, StageResult, seal_pipeline};

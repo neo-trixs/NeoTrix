@@ -5,6 +5,8 @@ pub mod repair;
 pub mod recovery_verify;
 pub mod memory_bank;
 pub mod l1_wrappers;
+pub mod knowledge_store;
+pub mod seal_pipeline;
 
 pub use repair::RiskLevel;
 pub use cleanup_engine::*;
@@ -14,3 +16,5 @@ pub use repair::*;
 pub use recovery_verify::*;
 pub use memory_bank::*;
 pub use l1_wrappers::*;
+pub use knowledge_store::*;
+pub use seal_pipeline::*;

@@ -508,7 +508,7 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_crawl_queue(&mut self) {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::{claim_next_crawl_url, mark_crawl_complete};
+        use crate::l5_cognition::nt_mind::foundation::knowledge_store::{KbKnowledgeStore, KnowledgeStore};
         if self.kb_pipeline.kb.is_none() {
             log::warn!("[bg] crawl_queue: kb not attached");
             return;
@@ -538,8 +538,8 @@ impl BackgroundLoopHandle {
                 let kb = match self.kb_pipeline.kb.as_ref() {
                     Some(kb) => kb, None => break,
                 };
-                let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
-                match claim_next_crawl_url(&conn) {
+                let store = KbKnowledgeStore { kb: (**kb).clone() };
+                match store.claim_next_crawl_url() {
                     Ok(Some(item)) => (item.id, item.url),
                     _ => break,
                 }
@@ -553,8 +553,8 @@ impl BackgroundLoopHandle {
                     let kb = match self.kb_pipeline.kb.as_ref() {
                         Some(kb) => kb, None => break,
                     };
-                    let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
-                    let _ = mark_crawl_complete(&conn, &id, true, None);
+                    let store = KbKnowledgeStore { kb: (**kb).clone() };
+                    let _ = store.mark_crawl_complete(&id, true, None);
                 }
                 Err(e) => {
                     log::warn!("[bg] crawl failed: {}: {:?}", url, e);
@@ -562,7 +562,7 @@ impl BackgroundLoopHandle {
                         Some(kb) => kb, None => break,
                     };
                     let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
-                    let _ = mark_crawl_complete(&conn, &id, false, Some(&e));
+                    let _ = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::mark_crawl_complete(&conn, &id, false, Some(&e));
                 }
             }
             processed += 1;
@@ -596,8 +596,7 @@ impl BackgroundLoopHandle {
 
     /// Seed the crawl queue when nearly empty — runs daily.
     pub(crate) async fn handle_seed_crawl_queue(&mut self) {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::count_nodes_by_domain;
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::enqueue_seed_urls;
+        use crate::l5_cognition::nt_mind::foundation::knowledge_store::{KbKnowledgeStore, KnowledgeStore};
         if self.kb_pipeline.kb.is_none() {
             log::warn!("[bg] seed_crawl: kb not attached");
             return;
@@ -606,11 +605,8 @@ impl BackgroundLoopHandle {
             Some(kb) => kb,
             None => { log::warn!("[bg] seed_crawl: kb disappeared"); return; }
         };
-        let conn = match kb.conn.lock() {
-            Ok(c) => c,
-            Err(e) => { log::warn!("[bg] seed_crawl lock: {}", e); return; }
-        };
-        let domains = count_nodes_by_domain(&conn).unwrap_or_default();
+        let store = KbKnowledgeStore { kb: (**kb).clone() };
+        let domains = store.count_nodes_by_domain().unwrap_or_default();
         let seed_count = domains.len();
         if seed_count == 0 {
             let seed_info: [(&str, i64, &str); 5] = [
@@ -626,11 +622,10 @@ impl BackgroundLoopHandle {
             let refs: Vec<(&str, i64, &str)> = enqueued.iter().enumerate()
                 .map(|(i, url)| (url.as_str(), seed_info[i].1, seed_info[i].2))
                 .collect();
-            match enqueue_seed_urls(&conn, &refs) {
+            match store.enqueue_seed_urls(&refs) {
                 Ok(n) => log::info!("[bg] seed_crawl: enqueued {} Wikipedia seed topics", n),
                 Err(e) => log::warn!("[bg] seed_crawl: enqueue failed: {}", e),
             }
-            drop(conn);
             kb.rebuild_bm25();
             log::info!("[bg] seed_crawl: BM25 rebuilt after seeding");
         } else {

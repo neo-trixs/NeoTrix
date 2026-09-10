@@ -879,6 +879,36 @@ impl CommunityAwareSearch {
         results
     }
 
+    // ── Get All Communities ─────────────────────────────────────
+
+    /// Returns all detected communities across all hierarchy levels as `CommunityResult`s.
+    /// This is the unified community detection interface used by both the community module
+    /// and GraphRagStore (replacing GraphRagStore's internal label propagation).
+    pub fn get_communities(&self) -> Vec<CommunityResult> {
+        let hierarchy = match self.hierarchy.as_ref() {
+            Some(h) => h,
+            None => return Vec::new(),
+        };
+        let mut results: Vec<CommunityResult> = Vec::new();
+        for level_comms in &hierarchy.levels {
+            for community in level_comms {
+                results.push(CommunityResult {
+                    community_id: community.id,
+                    level: community.level,
+                    summary: community
+                        .summary
+                        .clone()
+                        .unwrap_or_else(|| {
+                            format!("Community #{} ({} members)", community.id, community.members.len())
+                        }),
+                    score: community.modularity_score,
+                    member_count: community.members.len(),
+                });
+            }
+        }
+        results
+    }
+
     // ── Fusion ────────────────────────────────────────────────────
 
     /// Weighted fusion of community and entity results.

@@ -32,6 +32,8 @@ pub mod browser_security;
 pub mod redaction;
 pub mod nt_shield_secret_collector;
 pub mod nt_shield_skill_router;
+/// Core trait implementations — 将 L3 具体类型适配为 core trait 抽象接口
+pub mod core_traits_impl;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

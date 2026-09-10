@@ -14,6 +14,8 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use log::warn;
+
 const USER_AGENT: &str = "NeoTrix/0.19 (nt_http)";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
@@ -51,7 +53,7 @@ pub(crate) fn shared_blocking_client() -> &'static reqwest::blocking::Client {
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
                 .unwrap_or_else(|e| {
-                    eprintln!("[nt_http] WARNING: Failed to build blocking client: {e}");
+                    warn!("[nt_http] Failed to build blocking client: {e}");
                     reqwest::blocking::Client::new()
                 })
         })

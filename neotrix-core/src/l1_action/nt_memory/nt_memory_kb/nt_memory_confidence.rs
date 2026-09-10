@@ -606,25 +606,44 @@ pub fn search_with_confidence(
             consensus_weight,
             recency_weight,
         } => {
-            for u in &mut uncertain {
-                let w = source_weight + grounding_weight + consensus_weight + recency_weight;
-                if w > 0.0 {
-                    let _ = (u.confidence.source_confidence * source_weight
+            // 计算加权分数并存储在元数据中，用于排序
+            let w = source_weight + grounding_weight + consensus_weight + recency_weight;
+            if w > 0.0 {
+                for u in &mut uncertain {
+                    let weighted_score = (u.confidence.source_confidence * source_weight
                         + u.confidence.grounding_confidence * grounding_weight
                         + u.confidence.consensus_confidence * consensus_weight
                         + u.confidence.recency_confidence * recency_weight)
                         / w;
+                    // 临时存储加权分数到 confidence 的 recency 字段
+                    // (recency_confidence 在排序后不再需要)
+                    u.confidence.recency_confidence = weighted_score;
                 }
             }
         }
     }
 
-    uncertain.sort_by(|a, b| {
-        b.confidence
-            .aggregate()
-            .partial_cmp(&a.confidence.aggregate())
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // 根据策略选择排序方式
+    match strategy {
+        RetrievalStrategy::ConfidenceWeighted { .. } => {
+            // 使用加权分数排序 (存储在 recency_confidence 中)
+            uncertain.sort_by(|a, b| {
+                b.confidence
+                    .recency_confidence
+                    .partial_cmp(&a.confidence.recency_confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        _ => {
+            // 使用聚合分数排序
+            uncertain.sort_by(|a, b| {
+                b.confidence
+                    .aggregate()
+                    .partial_cmp(&a.confidence.aggregate())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+    }
 
     uncertain.truncate(limit);
     Ok(uncertain)

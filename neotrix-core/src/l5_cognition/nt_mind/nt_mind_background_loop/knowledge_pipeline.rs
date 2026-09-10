@@ -5,7 +5,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::{extract_html_content, is_safe_fetch_url};
+use crate::l5_cognition::nt_mind::foundation::knowledge_store::{KnowledgeStore, L1KnowledgeStore};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::core::nt_core_kb_types::NodeType;
 
@@ -110,7 +110,8 @@ impl KnowledgeAbsorptionPipeline {
     }
 
     pub fn absorb_url(&mut self, url: &str) -> Result<AbsorptionReport, String> {
-        if !is_safe_fetch_url(url) {
+        let store = L1KnowledgeStore;
+        if !store.is_safe_fetch_url(url) {
             return Err(format!("URL rejected (SSRF guard): {}", url));
         }
         if let Some(cached) = self.cached_report(url) {
@@ -125,7 +126,8 @@ impl KnowledgeAbsorptionPipeline {
     }
 
     pub async fn absorb_url_async(&mut self, url: &str) -> Result<AbsorptionReport, String> {
-        if !is_safe_fetch_url(url) {
+        let store = L1KnowledgeStore;
+        if !store.is_safe_fetch_url(url) {
             return Err(format!("URL rejected (SSRF guard): {}", url));
         }
         if let Some(cached) = self.cached_report(url) {
@@ -165,7 +167,8 @@ impl KnowledgeAbsorptionPipeline {
 
     /// 提取 → 插入 → 记录来源 (同步/异步共用)
     fn finish_absorb(&mut self, url: &str, content: &str, domain: &str) -> Result<AbsorptionReport, String> {
-        let summary = extract_html_content(content).1;
+        let store = L1KnowledgeStore;
+        let summary = store.extract_html_content(content).1;
         let summary_short = if summary.len() > 5000 {
             format!("{}...", summary.chars().take(5000).collect::<String>())
         } else {

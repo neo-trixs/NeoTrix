@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
+use log::{warn, error};
+
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
@@ -114,7 +116,7 @@ fn load_master_key() -> [u8; 32] {
             let mut key = [0u8; 32];
             rand::rngs::OsRng.fill_bytes(&mut key);
             let hex_key = hex::encode(key);
-            eprintln!("[neotrix] NEOTRIX_VAULT_KEY not set. Generated ephemeral key: {}", hex_key);
+            warn!("[neotrix] NEOTRIX_VAULT_KEY not set. Generated ephemeral key: {}", hex_key);
             key
         }
     }
@@ -125,10 +127,10 @@ static CIPHER: LazyLock<Aes256Gcm> = LazyLock::new(|| {
     match Aes256Gcm::new_from_slice(&key) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[neotrix] WARNING: AES-256-GCM key init failed: {}. Using zero key (encryption will fail).", e);
+            warn!("[neotrix] AES-256-GCM key init failed: {}. Using zero key (encryption will fail).", e);
             // Zero key will still produce a valid cipher; encrypt/decrypt will return errors at call time
             Aes256Gcm::new_from_slice(&[0u8; 32]).unwrap_or_else(|_| {
-                eprintln!("[neotrix] FATAL: cannot create AES-256-GCM cipher even with zero key");
+                error!("[neotrix] FATAL: cannot create AES-256-GCM cipher even with zero key");
                 std::process::abort();
             })
         }

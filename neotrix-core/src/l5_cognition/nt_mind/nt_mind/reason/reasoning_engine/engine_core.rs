@@ -35,9 +35,8 @@ use crate::l5_cognition::nt_mind::nt_mind::distillation::{AntiPattern, Strategic
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::model_router::ModelRouter;
 use crate::l5_cognition::nt_mind::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
 use crate::l5_cognition::nt_mind::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep, ControlTrainer, SftReport, CsppoReport};
-use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::l5_cognition::kb_facade::{KnowledgeBase, SearchResult};
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::SearchResult;
 // use crate::l5_cognition::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use crate::neotrix::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
@@ -1294,7 +1293,7 @@ impl ReasoningEngine {
             .map(|r| r.winner.to_string())
             .unwrap_or_default();
         if let Some(ref kb) = self.kb {
-            use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::ConversationRecord;
+            use crate::l5_cognition::kb_facade::ConversationRecord;
             let record = ConversationRecord {
                 id: format!("conv-{}", self.llm_call_count),
                 session_id: String::new(),
@@ -1712,7 +1711,7 @@ impl ReasoningEngine {
             // 一致性分数越高 → 推理越可信 → 奖励加成。对齐主流推理模型的
             // self-consistency / majority vote 机制 (R-P79 生产接线)。
             let sc = {
-                use crate::l1_action::nt_io::nt_io_standalone::{
+                use crate::l5_cognition::io_facade::{
                     ReasoningKernel, text_to_vector,
                 };
                 let kernel = ReasoningKernel::new(self.current_state.mode.0 as usize % 19);

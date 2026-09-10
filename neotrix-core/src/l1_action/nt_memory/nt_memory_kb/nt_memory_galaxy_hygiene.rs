@@ -637,7 +637,7 @@ mod tests {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let db_path = std::path::PathBuf::from(&home).join(".neotrix").join("knowledge.db");
         let Ok(conn) = Connection::open(&db_path) else {
-            eprintln!("无法打开真实 KB: {}", db_path.display());
+            log::info!("无法打开真实 KB: {}", db_path.display());
             return;
         };
         let hubs = galaxy_list_hubs(&conn);

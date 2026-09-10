@@ -30,8 +30,7 @@ use super::nt_io_provider::generation_classifier::{GenerationClassifier, TaskTyp
 use super::nt_io_provider::types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
 };
-use crate::l3_embodiment::nt_shield::nt_shield_propagation_guard::PropagationGuard;
-use crate::l3_embodiment::nt_shield::nt_shield::redaction::Redactor;
+use crate::core::nt_core_traits::{PropagationGuardLike, SecretScanner, SecretRiskLevel};
 use crate::cli::approval::{ActionType, PendingAction};
 use crate::core::nt_core_traits::{NativeTool, ToolOutput};
 
@@ -223,11 +222,13 @@ pub struct AgentLoop {
     /// 输出样式 (NT-IO output_style 骨架接线)。默认 Plain 原样透传。
     style: OutputStyleId,
     /// 心智病毒传播防护 (NT-SHIELD propagation_guard 骨架接线)。
-    guard: Option<PropagationGuard>,
+    guard: Option<Box<dyn PropagationGuardLike>>,
     /// 多模态预处理 (NT-IO multimodal_transform 骨架接线)。
     multimodal: Option<std::sync::Arc<MultimodalTransform>>,
     /// 样式注册表 (单实例惰性共享)。
     style_registry: Option<std::sync::Arc<OutputStyleRegistry>>,
+    /// 密钥/PII 扫描器 (NT-SHIELD redaction 抽象, R-P42 强化现有节点)。
+    secret_scanner: Option<Box<dyn SecretScanner>>,
     /// G27 最近一次最终输出的治理报告 (观测杠杆: 每次 emit_final 可见纪律合规)。
     last_governance: Option<GovernanceReport>,
 }
@@ -253,6 +254,7 @@ impl AgentLoop {
             guard: None,
             multimodal: None,
             style_registry: None,
+            secret_scanner: None,
             last_governance: None,
         }
     }
@@ -267,7 +269,12 @@ impl AgentLoop {
         self
     }
 
-    pub fn with_propagation_guard(mut self, guard: PropagationGuard) -> Self {
+    pub fn with_secret_scanner(mut self, scanner: Box<dyn SecretScanner>) -> Self {
+        self.secret_scanner = Some(scanner);
+        self
+    }
+
+    pub fn with_propagation_guard(mut self, guard: Box<dyn PropagationGuardLike>) -> Self {
         // 加固系统提示: 论文结论 — 一句话防线 → 近完全免疫。
         if guard.is_enabled() {
             if let Some(first) = self.messages.first_mut() {
@@ -853,15 +860,16 @@ impl AgentLoop {
         // 经工具参数泄漏给外部服务或写入日志。对应 sonarqube-cli
         // "detect secrets before they leak" 的 pre-tool-use hook 语义。
         let args_text = args.to_string();
-        // 使用 L1 NT-SHIELD Redactor (强化现有节点, R-P42): 检测并阻断凭据泄漏
-        let redactor = Redactor::new();
-        let (risk, hits) = redactor.analyze(&args_text);
-        if risk == crate::l3_embodiment::nt_shield::nt_shield::redaction::RiskLevel::Dangerous {
-            return Err(format!(
-                "[secret-guard] tool '{}' blocked: potential credential leak in args ({})",
-                name,
-                hits.join(", ")
-            ));
+        // 使用 SecretScanner trait (抽象 L3 Redactor, 消除 L1→L3 直接依赖)
+        if let Some(ref scanner) = self.secret_scanner {
+            let (risk, hits) = scanner.analyze(&args_text);
+            if risk == SecretRiskLevel::Dangerous {
+                return Err(format!(
+                    "[secret-guard] tool '{}' blocked: potential credential leak in args ({})",
+                    name,
+                    hits.join(", ")
+                ));
+            }
         }
         self.tools
             .iter()

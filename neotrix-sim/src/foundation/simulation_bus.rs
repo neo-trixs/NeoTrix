@@ -77,6 +77,10 @@ pub enum SimEvent {
     // Safety events
     AgentNearDeath { agent_id: String, energy: f64 },
     EnvironmentHazard { position: (f32, f32), hazard_type: String },
+
+    // Stigmergy events
+    PheromoneDeposited { agent_id: String, ptype: String, position: (f32, f32), strength: f64 },
+    PheromoneSensed { agent_id: String, dominant_type: String, signal_strength: f64 },
 }
 
 /// Event record with metadata
