@@ -8,6 +8,9 @@ pub mod vuln;
 pub mod network;
 pub mod dark;
 pub mod fofa;
+pub mod censys;
+pub mod shodan;
+pub mod zoomeye;
 pub mod backend_router;
 pub mod sweep;
 pub mod self_curriculum;
@@ -31,6 +34,30 @@ pub use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorbRe
 use rusqlite::Connection;
 
 // GitHubAbsorbReport is re-exported from nt_world_github_absorber (single fact source)
+
+/// OSINT 模块声明式宏 — 一次定义，自动生成 dispatch
+///
+/// 用法:
+/// ```ignore
+/// osint_modules!(target, client, config, report, [
+///     dns::investigate       => dns:       |t| t.domain.is_some(),
+///     shodan::investigate    => shodan:    |t| t.domain.is_some() || t.ip.is_some(),
+/// ]);
+/// ```
+macro_rules! osint_modules {
+    ($target:expr, $client:expr, $config:expr, $report:expr,
+     [ $( $mod:path => $field:ident : $gate:expr ),* $(,)? ]
+    ) => {{
+        $(
+            if ($gate)(& $target) {
+                match $mod(& $target, & $client, & $config).await {
+                    Ok(f) => { $report.$field = Some(f); }
+                    Err(e) => { $report.errors.push(format!("{}: {}", stringify!($mod), e)); }
+                }
+            }
+        )*
+    }};
+}
 
 #[derive(Debug, Clone)]
 pub struct OsintConfig {
@@ -74,6 +101,29 @@ impl Default for OsintConfig {
             enable_active: true,
         }
     }
+}
+
+/// OSINT Source trait — 所有 OSINT 调查源必须实现此 trait
+pub trait OsintSource: Send + Sync {
+    /// 调查结果类型
+    type Findings: Send + Sync;
+    
+    /// 源名称
+    fn name(&self) -> &'static str;
+    
+    /// 是否需要 API key
+    fn needs_api_key(&self) -> bool;
+    
+    /// 优先级 (越高越优先)
+    fn priority(&self) -> u8;
+    
+    /// 执行调查
+    fn investigate(
+        &self,
+        target: &OsintTarget,
+        client: &Client,
+        config: &OsintConfig,
+    ) -> impl std::future::Future<Output = Result<Self::Findings, String>> + Send;
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -120,6 +170,10 @@ pub struct OsintReport {
     pub vuln: Option<vuln::VulnFindings>,
     pub network: Option<network::NetworkFindings>,
     pub dark: Option<dark::DarkFindings>,
+    pub fofa: Option<fofa::FofaFindings>,
+    pub shodan: Option<shodan::ShodanFindings>,
+    pub censys: Option<censys::CensysFindings>,
+    pub zoomeye: Option<zoomeye::ZoomEyeFindings>,
     pub started_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
     pub errors: Vec<String>,
@@ -152,6 +206,10 @@ impl OsintReport {
         if let Some(ref v) = self.vuln { n += v.vulnerabilities.len(); }
         if let Some(ref nw) = self.network { n += nw.services.len(); }
         if let Some(ref dk) = self.dark { n += dk.results.len(); }
+        if let Some(ref f) = self.fofa { n += f.results.len(); }
+        if let Some(ref s) = self.shodan { n += s.services.len(); }
+        if let Some(ref c) = self.censys { n += c.results.len(); }
+        if let Some(ref z) = self.zoomeye { n += z.hosts.len(); }
         n
     }
 }
@@ -270,6 +328,39 @@ impl OsintReport {
             }
         }
 
+        if let Some(ref fofa) = self.fofa {
+            for r in &fofa.results {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("fofa: {}", r.url), NodeType::Source, r.title.as_deref().or(Some("FOFA result")), Some(&r.url), domain_hint, &run_id) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        if let Some(ref shodan) = self.shodan {
+            for svc in &shodan.services {
+                let name = svc.service.as_deref().unwrap_or("unknown");
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("shodan: {}:{}/{}", svc.host, svc.port, name), NodeType::Source, svc.banner.as_deref(), None, domain_hint, &run_id) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        if let Some(ref censys) = self.censys {
+            for r in &censys.results {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("censys: {}", r.ip), NodeType::Source, r.service.as_deref().or(Some("Censys result")), None, domain_hint, &run_id) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        if let Some(ref zoomeye) = self.zoomeye {
+            for h in &zoomeye.hosts {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("zoomeye: {}", h.ip), NodeType::Source, h.service.as_deref().or(Some("ZoomEye host")), None, domain_hint, &run_id) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
         written
     }
 }
@@ -295,6 +386,10 @@ impl std::fmt::Display for OsintReport {
         if let Some(ref v) = self.vuln { write!(f, "{}", v)?; }
         if let Some(ref n) = self.network { write!(f, "{}", n)?; }
         if let Some(ref d) = self.dark { write!(f, "{}", d)?; }
+        if let Some(ref f) = self.fofa { write!(f, "{}", f)?; }
+        if let Some(ref s) = self.shodan { write!(f, "{}", s)?; }
+        if let Some(ref c) = self.censys { write!(f, "{}", c)?; }
+        if let Some(ref z) = self.zoomeye { write!(f, "{}", z)?; }
         writeln!(f, "═══════════════════════════════════════════════════")
     }
 }
@@ -338,51 +433,21 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
     let mut report = OsintReport::new(target);
     let client = default_client();
 
-    if report.target.domain.is_some() {
-        match dns::investigate(&report.target, &client, &config).await {
-            Ok(dns) => report.dns = Some(dns),
-            Err(e) => report.errors.push(format!("dns: {e}")),
-        }
-
-        match http::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.http = Some(f),
-            Err(e) => report.errors.push(format!("http: {e}")),
-        }
-        match url::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.url_history = Some(f),
-            Err(e) => report.errors.push(format!("url: {e}")),
-        }
-        match vuln::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.vuln = Some(f),
-            Err(e) => report.errors.push(format!("vuln: {e}")),
-        }
-        match network::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.network = Some(f),
-            Err(e) => report.errors.push(format!("network: {e}")),
-        }
-        match dark::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.dark = Some(f),
-            Err(e) => report.errors.push(format!("dark: {e}")),
-        }
-    }
-
-    if report.target.username.is_some() || report.target.email.is_some() {
-        match person::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.person = Some(f),
-            Err(e) => report.errors.push(format!("person: {e}")),
-        }
-        match social::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.social = Some(f),
-            Err(e) => report.errors.push(format!("social: {e}")),
-        }
-    }
-
-    if report.target.email.is_some() {
-        match credential::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.credential = Some(f),
-            Err(e) => report.errors.push(format!("credential: {e}")),
-        }
-    }
+    osint_modules!(report.target, client, config, report, [
+        dns::investigate       => dns:           |t: &OsintTarget| t.domain.is_some(),
+        http::investigate      => http:          |t: &OsintTarget| t.domain.is_some(),
+        url::investigate       => url_history:   |t: &OsintTarget| t.domain.is_some(),
+        vuln::investigate      => vuln:          |t: &OsintTarget| t.domain.is_some(),
+        network::investigate   => network:       |t: &OsintTarget| t.domain.is_some(),
+        dark::investigate      => dark:          |t: &OsintTarget| t.domain.is_some(),
+        fofa::investigate      => fofa:          |t: &OsintTarget| t.domain.is_some(),
+        shodan::investigate    => shodan:        |t: &OsintTarget| t.domain.is_some() || t.ip.is_some(),
+        censys::investigate    => censys:        |t: &OsintTarget| t.ip.is_some(),
+        zoomeye::investigate   => zoomeye:       |t: &OsintTarget| t.domain.is_some() || t.ip.is_some(),
+        person::investigate    => person:        |t: &OsintTarget| t.username.is_some() || t.email.is_some(),
+        social::investigate    => social:        |t: &OsintTarget| t.username.is_some() || t.email.is_some(),
+        credential::investigate => credential:  |t: &OsintTarget| t.email.is_some(),
+    ]);
 
     report.completed_at = Some(Utc::now());
     report

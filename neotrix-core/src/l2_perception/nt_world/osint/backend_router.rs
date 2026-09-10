@@ -8,7 +8,6 @@ use super::fofa::FofaFindings;
 use super::dns::investigate as dns_investigate;
 use super::http::investigate as http_investigate;
 use super::fofa::investigate as fofa_investigate;
-use super::fofa::FofaFindings;
 use reqwest::Client;
 use std::pin::Pin;
 use std::future::Future;
