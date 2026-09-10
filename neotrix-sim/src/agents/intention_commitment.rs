@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::agents::planning::{Goal, GoalStatus, GoalType, PlanningStack};
+use crate::agents::planning::{GoalStatus, GoalType, PlanningStack};
 use crate::agents::sim_agent::AgentAction;
 
 /// Tracks a single committed intention for an agent

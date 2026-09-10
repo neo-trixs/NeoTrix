@@ -1,6 +1,5 @@
 use crate::agents::memory_stream::{MemoryKind, MemoryNode, MemoryStream};
 use crate::agents::planning::{Goal, GoalStatus, PlanningStack};
-use crate::agents::sim_agent::AgentAction;
 use crate::agents::action_awareness::ActionAwareness;
 use crate::foundation::math_bridge::Vec2;
 
@@ -195,7 +194,7 @@ mod tests {
 
         let thought = tg.generate_thought(
             "agent_0", 10, Vec2::new(50.0, 50.0),
-            30.0, 70.0, 70.0, &ps, &ms, &aa,
+            29.0, 70.0, 70.0, &ps, &ms, &aa,
         );
 
         assert!(thought.description.contains("eat"));

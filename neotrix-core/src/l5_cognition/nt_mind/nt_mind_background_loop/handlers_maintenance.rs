@@ -468,13 +468,10 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_avatar_auto_distill(&mut self) {
+        use crate::l5_cognition::nt_mind::foundation::l1_wrappers::UserDistillation;
         if let Some(ref mut eng) = self.avatar_engine {
-            #[allow(clippy::mut_mutex_lock)]
-            if let Ok(mut e) = eng.lock() {
-                let _snapshot = e.auto_distill();
-                log::info!("[bg] avatar auto_distill: edition={}, confidence={:.2}, msgs={}",
-                    e.avatar.edition, e.avatar.confidence, e.avatar.total_messages_processed);
-            }
+            let result = eng.auto_distill();
+            log::info!("[bg] avatar auto_distill: {}", &result[..result.len().min(100)]);
         }
     }
 
@@ -496,6 +493,7 @@ impl BackgroundLoopHandle {
     }
 
     pub(crate) async fn handle_session_recovery(&mut self) {
+        use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecovery;
         if let Some(ref mut sr) = self.session_recovery {
             let snap = sr.create_snapshot(&[], &[], "auto-snapshot");
             if let Ok(s) = snap {

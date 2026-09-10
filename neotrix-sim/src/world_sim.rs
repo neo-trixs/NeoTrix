@@ -436,7 +436,7 @@ impl WorldSim {
                         AgentAction::Rest => {
                             agent.core.rest(5.0);
                         }
-                        AgentAction::Talk { target_id, message } => {
+                        AgentAction::Talk { target_id, message: _ } => {
                             self.relationships.update_interaction(&resp.agent_id, target_id, 0.1, tick);
                         }
                         _ => {}
@@ -1017,7 +1017,6 @@ impl WorldSim {
             }
             AgentAction::Harvest { resource_id } => {
                 if let Some(res) = self.resources.nodes.iter_mut().find(|r| &r.id == resource_id) {
-                    let available = res.amount;
                     let harvested = res.harvest(30.0);
                     if harvested > 0.0 {
                         let agent = &mut self.agents[idx];

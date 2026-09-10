@@ -31,7 +31,7 @@ impl CliCommand for ExploreCmd {
                 let config = ExplorationConfig::default();
                 let mut engine = ExplorationEngine::new(config);
                 if let Some(kb) = try_open_kb() {
-                    engine.attach_kb(kb.into());
+                    engine.attach_kb(Box::new(kb) as Box<dyn crate::core::nt_core_traits::KnowledgeSink>);
                 }
                 let report = engine.run_cycle();
                 CommandOutput::ok(&format!(

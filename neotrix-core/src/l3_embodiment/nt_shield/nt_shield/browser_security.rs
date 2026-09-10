@@ -833,8 +833,12 @@ pub fn create_browser_security_self_test() -> Box<dyn crate::core::nt_core_self_
 /// SecurityAudit trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查接口
 impl crate::core::nt_core_traits::SecurityAudit for BrowserSecurityScanner {
     fn scan_browser_security(&self, url: &str) -> Result<String, String> {
-        let results = self.run_scan();
-        let findings: Vec<String> = results.iter().map(|r| format!("{}: {}", r.vuln_type as u8, r.description)).collect();
+        let mut results = Vec::new();
+        for check in &self.checks {
+            let check_results = check.check(&self.config.target_url, &self.config);
+            results.extend(check_results);
+        }
+        let findings: Vec<String> = results.iter().map(|r| format!("{}: {}", r.vuln_type.clone() as u8, r.description)).collect();
         if findings.is_empty() {
             Ok(format!("Browser security scan passed for {}", url))
         } else {

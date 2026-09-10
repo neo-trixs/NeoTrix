@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::agents::sim_agent::{AgentAction, Personality};
-use crate::agents::action_awareness::ActionAwareness;
 use crate::society::culture::Culture;
 
 /// Record of an observed action from another agent
@@ -30,7 +29,7 @@ pub struct SocialLearning {
     action_patterns: HashMap<String, HashMap<String, u32>>,
     /// agent_id -> (trait_name -> adjustment)
     personality_adjustments: HashMap<String, Vec<(String, f32)>>,
-    max_pattern_history: usize,
+    _max_pattern_history: usize,
     learning_rate: f32,
     mimicry_threshold: f32,
 }
@@ -40,7 +39,7 @@ impl SocialLearning {
         Self {
             action_patterns: HashMap::new(),
             personality_adjustments: HashMap::new(),
-            max_pattern_history: 50,
+            _max_pattern_history: 50,
             learning_rate: 0.1,
             mimicry_threshold: 0.6,
         }
@@ -203,8 +202,8 @@ impl SocialLearning {
     }
 
     /// Get action pattern stats for an observer
-    pub fn pattern_stats(&self, observer_id: &str) -> &HashMap<String, u32> {
-        self.action_patterns.get(observer_id).unwrap_or(&HashMap::new())
+    pub fn pattern_stats(&self, observer_id: &str) -> Option<&HashMap<String, u32>> {
+        self.action_patterns.get(observer_id)
     }
 
     pub fn len(&self) -> usize {

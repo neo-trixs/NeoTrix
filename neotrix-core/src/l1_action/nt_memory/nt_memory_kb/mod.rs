@@ -3053,6 +3053,7 @@ impl neotrix_types::knowledge_access::KnowledgeAccess for KnowledgeBase {
     fn search(&self, query: &str, limit: usize) -> Result<Vec<neotrix_types::knowledge_access::KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_search::search_fts(&conn, query, limit)
+            .map(|results| results.into_iter().map(|sr| sr.node).collect())
             .map_err(|e| format!("search: {}", e))
     }
 
@@ -3074,7 +3075,7 @@ impl neotrix_types::knowledge_access::KnowledgeAccess for KnowledgeBase {
 
     fn embedding_dim(&self) -> usize {
         self.embedding_config.read().ok()
-            .and_then(|c| c.as_ref().map(|c| c.dim))
+            .and_then(|c| c.as_ref().map(|c| c.dimension))
             .unwrap_or(384)
     }
 }

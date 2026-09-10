@@ -13,7 +13,7 @@
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
 use crate::neotrix::nt_act_code::PipelineAutoFixer;
 use crate::l5_cognition::nt_mind::evolution::self_diagnose::{
-    ActionExecutor, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
+    ActionExecutor, ActionPlan, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
     PriorityQueue, PrioritizedIssue, RepairCircuitBreaker, SelfDiagnose,
 };
 use crate::core::nt_core_iit_phi::IITPhiCalculator;
@@ -1607,7 +1607,7 @@ impl crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::EvolutionLo
                 m
             }).unwrap_or_default(),
             health_score: snap.map(|s| {
-                let total = s.total_files.max(1) as f64;
+                let _total = s.total_files.max(1) as f64;
                 (1.0 - (s.unsafe_count as f64 / 10.0).min(1.0))
                     * (1.0 - (s.unwrap_count as f64 / 50.0).min(1.0))
                     * (1.0 - (s.todo_count as f64 / 10.0).min(1.0))
@@ -1627,17 +1627,17 @@ impl crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::EvolutionLo
                 },
                 score: di.composite_score,
                 plan: match &di.action {
-                    self_diagnose::ActionPlan::AddTestStub { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::AddTestStub { file: file.clone() },
-                    self_diagnose::ActionPlan::RunCargoFix => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::RunCargoFix,
-                    self_diagnose::ActionPlan::RemoveTodo { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::RemoveTodo { file: file.clone() },
-                    self_diagnose::ActionPlan::SplitLargeFile { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::SplitLargeFile { file: file.clone() },
-                    self_diagnose::ActionPlan::ReviewUnsafe { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ReviewUnsafe { file: file.clone() },
-                    self_diagnose::ActionPlan::ReplaceUnwrap { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ReplaceUnwrap { file: file.clone() },
-                    self_diagnose::ActionPlan::HumanDecision { reason, options } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::HumanDecision { reason: reason.clone(), options: options.clone() },
-                    self_diagnose::ActionPlan::NoAction { reason } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::NoAction { reason: reason.clone() },
-                    self_diagnose::ActionPlan::AutoFix(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::AutoFix(s.clone()),
-                    self_diagnose::ActionPlan::ManualReview(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ManualReview(s.clone()),
-                    self_diagnose::ActionPlan::Skip(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::Skip(s.clone()),
+                    ActionPlan::AddTestStub { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::AddTestStub { file: file.clone() },
+                    ActionPlan::RunCargoFix => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::RunCargoFix,
+                    ActionPlan::RemoveTodo { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::RemoveTodo { file: file.clone() },
+                    ActionPlan::SplitLargeFile { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::SplitLargeFile { file: file.clone() },
+                    ActionPlan::ReviewUnsafe { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ReviewUnsafe { file: file.clone() },
+                    ActionPlan::ReplaceUnwrap { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ReplaceUnwrap { file: file.clone() },
+                    ActionPlan::HumanDecision { reason, options } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::HumanDecision { reason: reason.clone(), options: options.clone() },
+                    ActionPlan::NoAction { reason } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::NoAction { reason: reason.clone() },
+                    ActionPlan::AutoFix(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::AutoFix(s.clone()),
+                    ActionPlan::ManualReview(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ManualReview(s.clone()),
+                    ActionPlan::Skip(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::Skip(s.clone()),
                 },
             }
         }).collect();

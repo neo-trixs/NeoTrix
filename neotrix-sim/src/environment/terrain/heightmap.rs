@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 /// Simple 2D value noise (replaceable with Perlin later)
 #[derive(Debug, Clone)]
 pub struct ValueNoise {
-    seed: u64,
+    _seed: u64,
     grid_size: usize,
     values: Vec<Vec<f32>>,
 }
@@ -24,7 +24,7 @@ impl ValueNoise {
                 values[i][j] = (state as f32 / u64::MAX as f32) * 2.0 - 1.0;
             }
         }
-        Self { seed, grid_size, values }
+        Self { _seed: seed, grid_size, values }
     }
 
     /// Sample noise at (x, y) with bilinear interpolation

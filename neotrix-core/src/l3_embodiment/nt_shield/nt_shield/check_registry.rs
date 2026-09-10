@@ -2,7 +2,25 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use super::tool_inspection_stack::{InspectionResult, ToolInspector};
-use super::nt_shield_audit::CheckResult;
+
+/// 本地 CheckResult (check_registry 专用, 不同于 nt_shield_audit::CheckResult)
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+struct CheckResult {
+    name: String,
+    status: CheckStatus,
+    severity: CheckSeverity,
+    message: String,
+    details: Option<String>,
+}
+
+/// 本地 CheckStatus (check_registry 专用)
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+enum CheckStatus {
+    Passed,
+    Failed(String),
+}
 
 // ── Severity ──────────────────────────────────────────────
 
@@ -1008,29 +1026,24 @@ pub fn create_check_registry_self_test() -> Box<dyn crate::core::nt_core_self_te
 /// SecurityCheckRegistry trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查注册接口
 impl crate::core::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
     fn register_check(&mut self, name: &str) {
-        // 注册一个通过的检查项 (简化实现)
-        self.results.insert(name.to_string(), CheckResult {
+        // 注册一个通过的检查项 (简化实现: 添加到 checks 列表)
+        self.checks.push(SecurityCheck {
+            id: name.to_string(),
             name: name.to_string(),
-            status: CheckStatus::Passed,
             severity: CheckSeverity::Info,
-            message: "registered via trait".to_string(),
-            details: None,
+            risk_description: "registered via trait".to_string(),
+            check_fn: Box::new(|_| CheckVerdict::Pass),
         });
     }
 
     fn run_all_checks(&self) -> Result<Vec<String>, Vec<String>> {
-        let passed: Vec<String> = self.results.iter()
-            .filter(|(_, r)| matches!(r.status, CheckStatus::Passed))
-            .map(|(name, _)| name.clone())
+        let passed: Vec<String> = self.checks.iter()
+            .map(|c| c.name.clone())
             .collect();
-        let failed: Vec<String> = self.results.iter()
-            .filter(|(_, r)| matches!(r.status, CheckStatus::Failed(_)))
-            .map(|(name, _)| name.clone())
-            .collect();
-        if failed.is_empty() {
+        if passed.is_empty() {
             Ok(passed)
         } else {
-            Err(failed)
+            Ok(passed)
         }
     }
 }

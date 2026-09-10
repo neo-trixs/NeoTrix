@@ -211,8 +211,7 @@ impl SkillValidator {
             return; // Skills optional
         }
 
-        for entry in std::fs::read_dir(&skills_dir).unwrap_or_default() {
-            let Ok(entry) = entry else { continue };
+        for entry in std::fs::read_dir(&skills_dir).into_iter().flatten().filter_map(|e| e.ok()) {
             let skill_dir = entry.path();
             if !skill_dir.is_dir() { continue; }
             
@@ -321,8 +320,7 @@ impl SkillValidator {
         let refs_dir = skill_dir.join("references");
         if !refs_dir.exists() { return; }
         
-        for entry in std::fs::read_dir(&refs_dir).unwrap_or_default() {
-            let Ok(entry) = entry else { continue };
+        for entry in std::fs::read_dir(&refs_dir).into_iter().flatten().filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().map_or(false, |e| e == "md") {
                 // Check for reference chains (file referencing another file in references/)
@@ -362,8 +360,7 @@ impl SkillValidator {
         // .claude-plugin only contains plugin.json
         let claude_plugin = self.plugin_root.join(".claude-plugin");
         if claude_plugin.exists() {
-            for entry in std::fs::read_dir(&claude_plugin).unwrap_or_default() {
-                let Ok(entry) = entry else { continue };
+            for entry in std::fs::read_dir(&claude_plugin).into_iter().flatten().filter_map(|e| e.ok()) {
                 if entry.file_name() != "plugin.json" && entry.file_name() != "marketplace.json" {
                     report.add_finding(ValidationFinding {
                         rule_id: "STRUCT-CLAUDE-PLUGIN".to_string(),
@@ -383,8 +380,7 @@ impl SkillValidator {
         let commands_dir = self.plugin_root.join("commands");
         if !commands_dir.exists() { return; }
         
-        for entry in std::fs::read_dir(&commands_dir).unwrap_or_default() {
-            let Ok(entry) = entry else { continue };
+        for entry in std::fs::read_dir(&commands_dir).into_iter().flatten().filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().map_or(false, |e| e == "md") {
                 // Check frontmatter has allowed-tools
@@ -486,8 +482,7 @@ impl SkillValidator {
         // Check plugins/*/.codex-plugin/
         let plugins_dir = self.plugin_root.join("plugins");
         if plugins_dir.exists() {
-            for entry in std::fs::read_dir(&plugins_dir).unwrap_or_default() {
-                let Ok(entry) = entry else { continue };
+            for entry in std::fs::read_dir(&plugins_dir).into_iter().flatten().filter_map(|e| e.ok()) {
                 let plugin_dir = entry.path();
                 let codex_plugin = plugin_dir.join(".codex-plugin");
                 if codex_plugin.exists() {
@@ -544,8 +539,7 @@ impl SkillValidator {
         let dependabot = self.plugin_root.join(".github").join("dependabot.yml");
         if dependabot.exists() {
             // Simplified: just check common locations
-            for entry in std::fs::read_dir(&self.plugin_root).unwrap_or_default() {
-                let Ok(entry) = entry else { continue };
+            for entry in std::fs::read_dir(&self.plugin_root).into_iter().flatten().filter_map(|e| e.ok()) {
                 if entry.path().join("pyproject.toml").exists() || entry.path().join("uv.lock").exists() {
                     dirs.push(entry.path());
                 }

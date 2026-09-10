@@ -225,8 +225,7 @@ impl SkillValidator {
             return;
         }
         
-        for entry in std::fs::read_dir(skills_dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-            let entry = entry.unwrap();
+        for entry in std::fs::read_dir(skills_dir).into_iter().flatten() {
             let skill_dir = entry.path();
             if skill_dir.is_dir() {
                 self.validate_skill(&skill_dir);

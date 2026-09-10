@@ -145,7 +145,6 @@ impl GraphMemory {
                 }
             }
         }
-        None
     }
 
     pub fn nodes_by_kind(&self, kind: &NodeKind) -> Vec<&MemNode> {

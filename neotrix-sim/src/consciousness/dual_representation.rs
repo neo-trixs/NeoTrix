@@ -25,7 +25,7 @@ pub struct DualRepresentation {
     numeric: Vec<NumericVector>,
     label_to_id: HashMap<String, u64>,
     next_id: u64,
-    embedding_size: usize,
+    _embedding_size: usize,
 }
 
 impl DualRepresentation {
@@ -35,7 +35,7 @@ impl DualRepresentation {
             numeric: Vec::new(),
             label_to_id: HashMap::new(),
             next_id: 0,
-            embedding_size,
+            _embedding_size: embedding_size,
         }
     }
 

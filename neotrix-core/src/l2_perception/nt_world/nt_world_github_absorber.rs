@@ -19,11 +19,10 @@ fn http_client() -> Option<&'static reqwest::blocking::Client> {
 
 /// 下载文件到本地路径 (L1 nt_http 依赖集中点)
 fn download_to_file_l1(
-    url: &str,
-    dest: &std::path::Path,
     options: &crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions,
 ) -> Result<std::path::PathBuf, String> {
-    crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file(url, dest, options)
+    crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file(options)
+        .map(|r| r.path)
 }
 
 fn github_token() -> Option<String> {
@@ -373,7 +372,7 @@ impl GitHubAbsorber {
         );
         let tarball_path = dest.join(format!("{}-{}.tar.gz", repo, branch_fs));
         let proxy = crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env();
-        let result = download_to_file_l1(&url, &tarball_path, &DownloadOptions {
+        let result = download_to_file_l1(&DownloadOptions {
             url: &url,
             dest: &tarball_path,
             user_agent: Some("NeoTrix/0.19 (nt_http; +https://neotrix.dev)"),
@@ -389,7 +388,7 @@ impl GitHubAbsorber {
         // 解压 tarball (flate2 + tar 已在依赖中)
         let extract_dir = dest.join(format!("{}-{}-src", repo, branch_fs));
         std::fs::create_dir_all(&extract_dir).map_err(|e| format!("mkdir: {e}"))?;
-        let f = std::fs::File::open(&result.path).map_err(|e| format!("open tarball: {e}"))?;
+        let f = std::fs::File::open(&result).map_err(|e| format!("open tarball: {e}"))?;
         let gz = flate2::read::GzDecoder::new(f);
         let mut archive = tar::Archive::new(gz);
         archive
@@ -400,7 +399,7 @@ impl GitHubAbsorber {
             .unpack(&extract_dir)
             .map_err(|e| format!("unpack: {e}"))?;
 
-        Ok((result.path, extract_dir))
+        Ok((result, extract_dir))
     }
 
     /// Refresh an absorbed repo — checks GitHub pushed_at vs stored, re-absorbs if newer.

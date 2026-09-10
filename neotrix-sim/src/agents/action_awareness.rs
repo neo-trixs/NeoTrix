@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn discrepancy_history_bounded() {
         let mut aa = ActionAwareness::new();
-        let mut agent = make_agent(50.0, 50.0, 50.0, 80.0);
+        let agent = make_agent(50.0, 50.0, 50.0, 80.0);
         for i in 0..120 {
             // Move creates position discrepancy when agent doesn't actually move
             aa.predict(&AgentAction::Move { target: Vec2::new(200.0, 200.0) }, &agent);

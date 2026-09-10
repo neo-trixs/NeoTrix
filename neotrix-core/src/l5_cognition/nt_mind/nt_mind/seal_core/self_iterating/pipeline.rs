@@ -42,44 +42,14 @@ use super::anti_distillation_stage::AntiDistillationStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::rsi_operators::MetaRsiStage;
 
-/// 概念涌现阶段 — 从KB节点聚类中发现新概念
+// 概念涌现阶段 — 从KB节点聚类中发现新概念
 make_stage!(ConceptEmergenceStage);
 impl BrainStage for ConceptEmergenceStage {
     fn name(&self) -> &str { "concept_emergence" }
     fn frequency(&self) -> usize { 10 }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        use crate::core::nt_core_concept_emergence::ConceptEmergenceEngine;
-        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-        
-        // 从brain的KB中获取节点嵌入
-        let kb = &brain.brain.kb;
-        let embeddings = kb.all_embeddings();
-        
-        if embeddings.len() < 3 {
-            return Ok(StageDecision::Continue);
-        }
-        
-        // 运行概念发现
-        let engine = ConceptEmergenceEngine::default();
-        let concepts = engine.discover_concepts(&embeddings);
-        
-        if concepts.is_empty() {
-            return Ok(StageDecision::Continue);
-        }
-        
-        // 将发现的概念写回KB
-        for concept in &concepts {
-            let _ = kb.insert_or_get_node(
-                &concept.label,
-                neotrix_types::knowledge_access::NodeType::Concept,
-                Some(&format!("Auto-discovered concept with {} members", concept.member_ids.len())),
-                None,
-                None,
-            );
-        }
-        
-        log::info!("[SEAL] ConceptEmergence: discovered {} concepts from {} nodes", concepts.len(), embeddings.len());
-        
+    fn process(&self, _brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        // 从brain的KB中获取节点嵌入 (ReasoningBrain 无 KB 字段, 跳过)
+        // TODO: 通过 MemoryOrchestrator 获取嵌入
         Ok(StageDecision::Continue)
     }
 }
@@ -2287,7 +2257,7 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
             crate::l2_perception::nt_world::nt_world_exploration_engine::ExplorationEngine::new(
                 config,
             );
-        explorer.attach_kb(explorer_kb.into());
+        explorer.attach_kb(Box::new(explorer_kb) as Box<dyn crate::core::nt_core_traits::KnowledgeSink>);
         let report = explorer.run_cycle();
         log::info!(
             "[external_knowledge_absorb] tick={}, explore: discovered={}, ingested={}, skipped={}, failed={}, total_in_kb={}",

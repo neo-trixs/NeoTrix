@@ -4,13 +4,13 @@
 //! 比对历史版本检测变更，并写入 FTS5 全文索引。本模块以 trait 定义
 //! 检测 + 索引契约，提供 stub 实现 (C1 接入点)。
 
-use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use crate::core::nt_core_traits::KnowledgeSink;
+use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// 当前 Unix 时间戳 (秒)。
+#[allow(dead_code)]
 fn now_ts() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -90,7 +90,7 @@ impl SiteChangeMonitor for WorldMonitor {
         true
     }
 
-    fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, content: &str) -> Result<String, String> {
+    fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, _content: &str) -> Result<String, String> {
         if url.trim().is_empty() {
             return Err("url must not be empty".to_string());
         }

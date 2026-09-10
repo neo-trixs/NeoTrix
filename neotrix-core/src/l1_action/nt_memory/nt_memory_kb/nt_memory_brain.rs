@@ -301,7 +301,7 @@ impl AssociativeRecall {
         for _ in 0..self.iterations {
             let mut new_scores: HashMap<String, f64> = HashMap::new();
 
-            for (node, &score) in &scores {
+            for (node, &_score) in &scores {
                 let neighbors = adj.get(node).map(|v| v.as_slice()).unwrap_or(&[]);
                 let neighbor_sum: f64 = neighbors
                     .iter()
@@ -474,16 +474,22 @@ impl ContradictionDetector {
                     .query_row(
                         "SELECT COALESCE(metadata, '{}') FROM nodes WHERE id = ?1",
                         [id_a],
-                        |r| r.get(0),
+                        |r| r.get::<_, Option<String>>(0),
                     )
+                    .ok()
+                    .flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok())
                     .unwrap_or(serde_json::Value::Null);
 
                 let meta_b: serde_json::Value = conn
                     .query_row(
                         "SELECT COALESCE(metadata, '{}') FROM nodes WHERE id = ?1",
                         [id_b],
-                        |r| r.get(0),
+                        |r| r.get::<_, Option<String>>(0),
                     )
+                    .ok()
+                    .flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok())
                     .unwrap_or(serde_json::Value::Null);
 
                 if let Some(result) =

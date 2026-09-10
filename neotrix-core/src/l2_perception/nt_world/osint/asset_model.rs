@@ -23,6 +23,12 @@ pub enum AssetType {
     Onion,
 }
 
+impl Default for AssetType {
+    fn default() -> Self {
+        AssetType::Domain
+    }
+}
+
 /// 统一资产实体
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OsintAsset {

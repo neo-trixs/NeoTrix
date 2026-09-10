@@ -19,7 +19,6 @@ impl Default for LocalEmbeddingProvider {
     }
 }
 
-#[async_trait::async_trait]
 impl neotrix_types::knowledge_access::EmbeddingProvider for LocalEmbeddingProvider {
     async fn embed(&self, text: &str) -> Result<Vec<f32>, String> {
         let results = local_embed_texts(&[text], self.dim);

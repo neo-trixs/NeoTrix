@@ -17,13 +17,13 @@ use crate::l5_cognition::nt_mind::evolution::evolution_daemon::{EvolutionDaemon,
 use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipeline;
 use crate::neotrix::nt_act_voice::VoiceInput;
-use crate::l1_action::nt_io::nt_io_user_avatar::DistillationEngine;
+use crate::l5_cognition::nt_mind::foundation::l1_wrappers::DistillationEngineWrapper;
 use crate::l5_cognition::nt_mind::nt_mind::self_evolver::SelfEvolver;
 use crate::core::nt_core_scheduler::SchedulerEngine;
 use crate::l5_cognition::nt_mind::nt_mind::curiosity_drive::CuriosityDrive;
 use crate::l5_cognition::nt_mind::nt_mind::knowledge_aging::KnowledgeAging;
 use crate::l5_cognition::nt_mind::nt_mind::auto_crystallizer::AutoCrystallizer;
-use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
+use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrapper;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 // AgentDiscovery not defined — field removed from BackgroundLoop
@@ -92,7 +92,7 @@ pub bbrain: Option<BMonitor>,
     #[cfg(feature = "stealth-net")]
     pub proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
     pub nt_act_voice_input: Option<VoiceInput>,
-    pub avatar_engine: Option<std::sync::Mutex<DistillationEngine>>,
+    pub avatar_engine: Option<DistillationEngineWrapper>,
     pub scheduler: Option<SchedulerEngine>,
     pub handles: Vec<JoinHandle<()>>,
     /// Broadcasts shutdown signal to all handler tasks.
@@ -104,7 +104,7 @@ pub bbrain: Option<BMonitor>,
     pub started: bool,
     pub always_on: AlwaysOnEngine,
     pub plugin_registry: PluginRegistry,
-    pub session_recovery: Option<SessionRecoveryManager>,
+    pub session_recovery: Option<SessionRecoveryWrapper>,
     pub consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     pub fep_iit_bridge: Option<()>,
@@ -163,7 +163,7 @@ impl BackgroundLoop {
             #[cfg(feature = "stealth-net")]
             proxy_client: None,
             nt_act_voice_input: Some(VoiceInput::new()),
-            avatar_engine: Some(std::sync::Mutex::new(DistillationEngine::new())),
+            avatar_engine: Some(DistillationEngineWrapper::new()),
             scheduler: Some(crate::core::nt_core_scheduler::default_scheduler(
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
             )),
@@ -174,7 +174,7 @@ impl BackgroundLoop {
             config: BackgroundConfig::default(),
             brain,
             started: false,
-            session_recovery: Some(SessionRecoveryManager::new("bg-loop")),
+            session_recovery: Some(SessionRecoveryWrapper::new("bg-loop")),
             consciousness_runtime: Some(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()),
             consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
             fep_iit_bridge: None, // nt_core_fep_iit module not found

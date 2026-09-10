@@ -237,7 +237,7 @@ use crate::l5_cognition::nt_mind::foundation::cleanup_engine::{CleanupEngine, Cl
 use crate::l5_cognition::nt_mind::nt_mind_skill_engine::SkillEngine;
 use crate::l5_cognition::nt_mind::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
 use crate::l5_cognition::nt_mind::nt_mind_background_loop::knowledge_pipeline::KnowledgeAbsorptionPipeline;
-use crate::l1_action::nt_io::nt_io_session_recovery::SessionRecoveryManager;
+use crate::l5_cognition::nt_mind::foundation::l1_wrappers::SessionRecoveryWrapper;
 use crate::neotrix::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
 use crate::l5_cognition::nt_mind::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
@@ -923,7 +923,7 @@ pub struct BackgroundLoopHandle {
     gold_standard: Option<ConsciousnessGoldStandard>,
     gap_detector: Option<KnowledgeGapDetector>,
     nt_act_voice_input: Option<VoiceInput>,
-    avatar_engine: Option<std::sync::Mutex<crate::l1_action::nt_io::nt_io_user_avatar::DistillationEngine>>,
+    avatar_engine: Option<DistillationEngineWrapper>,
     self_evolver: Option<SelfEvolver>,
     curiosity_drive: CuriosityDrive,
     knowledge_aging: KnowledgeAging,
@@ -945,7 +945,7 @@ pub struct BackgroundLoopHandle {
     /// 入站归一 → capability 路由 → digest 合并出站。周期 flush 清出超窗摘要。
 //     session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter,
     kb_pipeline: KnowledgeAbsorptionPipeline,
-    session_recovery: Option<SessionRecoveryManager>,
+    session_recovery: Option<SessionRecoveryWrapper>,
     event_bus: Option<EventBus>,
     metacognition: Option<MetaCognitionBridge>,
     world_consciousness: Option<crate::neotrix::nt_world_sense::WorldConsciousness>,

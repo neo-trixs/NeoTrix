@@ -161,13 +161,6 @@ mod tests {
         }
     }
 
-    fn signal_achievement(v: f32) -> ExperienceSignal {
-        ExperienceSignal {
-            achievement: v,
-            ..ExperienceSignal::default()
-        }
-    }
-
     #[test]
     fn no_drift_before_interval() {
         let mut drift = PersonalityDrift::new(DriftConfig::default()).with_interval(10);

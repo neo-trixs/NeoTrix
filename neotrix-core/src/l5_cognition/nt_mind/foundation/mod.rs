@@ -4,6 +4,7 @@ pub mod distiller;
 pub mod repair;
 pub mod recovery_verify;
 pub mod memory_bank;
+pub mod l1_wrappers;
 
 pub use repair::RiskLevel;
 pub use cleanup_engine::*;
@@ -12,3 +13,4 @@ pub use distiller::*;
 pub use repair::*;
 pub use recovery_verify::*;
 pub use memory_bank::*;
+pub use l1_wrappers::*;
