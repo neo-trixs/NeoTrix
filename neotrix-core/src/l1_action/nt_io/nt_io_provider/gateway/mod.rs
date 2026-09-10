@@ -19,6 +19,7 @@ mod anomaly_detector;
 mod auto_recovery;
 mod circuit_breaker;
 mod challenge;
+mod benchmark_types;
 mod consistent_hash;
 mod coordinator;
 mod execution;

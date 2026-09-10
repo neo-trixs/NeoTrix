@@ -124,7 +124,8 @@ impl GraphMemory {
         queue.push_back((from, 0u32));
         visited.insert(from);
 
-        while let ((id, depth)) = queue.pop_front()? {
+        loop {
+            let (id, depth) = queue.pop_front()?;
             if id == to {
                 let mut path = vec![to];
                 let mut cur = to;
@@ -193,6 +194,7 @@ impl GraphMemory {
 
     pub fn node_count(&self) -> usize { self.nodes.len() }
     pub fn edge_count(&self) -> usize { self.edges.len() }
+    pub fn last_node_id(&self) -> Option<u64> { self.nodes.last().map(|n| n.id) }
 }
 
 #[cfg(test)]

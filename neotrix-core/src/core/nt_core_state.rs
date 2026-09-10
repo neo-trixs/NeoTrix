@@ -25,20 +25,24 @@ pub const NS: &str = "state";
 pub const DUAL_WRITE_FILE: bool = false;
 
 /// 全局懒加载连接 (生产路径): ~/.neotrix/knowledge.db, WAL + schema 初始化一次。
-static CONN: OnceLock<Mutex<Connection>> = OnceLock::new();
+static CONN: OnceLock<Result<Mutex<Connection>, String>> = OnceLock::new();
 
-fn global_conn() -> &'static Mutex<Connection> {
+fn global_conn() -> Result<&'static Mutex<Connection>, String> {
     CONN.get_or_init(|| {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let db_path = PathBuf::from(home).join(".neotrix").join("knowledge.db");
         if let Some(parent) = db_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let conn = Connection::open(&db_path).expect("open KB state connection");
+        let conn = Connection::open(&db_path)
+            .map_err(|e| format!("open KB state connection at {}: {e}", db_path.display()))?;
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
-        kv::schema_initialize(&conn).expect("initialize KB schema for state");
-        Mutex::new(conn)
+        kv::schema_initialize(&conn)
+            .map_err(|e| format!("initialize KB schema for state: {e}"))?;
+        Ok(Mutex::new(conn))
     })
+    .as_ref()
+    .map_err(|e| e.clone())
 }
 
 /// legacy 文件路径 (迁移前布局): ~/.neotrix/{name}.json。
@@ -61,7 +65,7 @@ fn file_save(name: &str, json: &str) -> Result<(), String> {
 
 /// 生产路径: 写 KB + (DUAL_WRITE_FILE) legacy 文件。使用全局连接。
 pub fn save(name: &str, json: &str) -> Result<(), String> {
-    let guard = global_conn()
+    let guard = global_conn()?
         .lock()
         .map_err(|_| "state conn poisoned".to_string())?;
     save_with(&guard, name, json)
@@ -78,7 +82,14 @@ pub fn save_with(conn: &Connection, name: &str, json: &str) -> Result<(), String
 
 /// 生产路径: KB 优先, 未命中回退 legacy 文件。
 pub fn load(name: &str) -> Option<String> {
-    match global_conn().lock() {
+    let conn = match global_conn() {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("state KB init failed: {e}; falling back to file");
+            return file_load(name);
+        }
+    };
+    match conn.lock() {
         Ok(guard) => load_with(&guard, name),
         Err(_) => file_load(name),
     }
@@ -98,7 +109,7 @@ pub fn load_with(conn: &Connection, name: &str) -> Option<String> {
 
 /// 生产路径: 删除 KB 状态 (翻转期/测试清理)。
 pub fn delete(name: &str) -> Result<bool, String> {
-    let guard = global_conn()
+    let guard = global_conn()?
         .lock()
         .map_err(|_| "state conn poisoned".to_string())?;
     kv::kv_delete(&guard, NS, name)

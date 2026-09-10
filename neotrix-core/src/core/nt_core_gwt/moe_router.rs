@@ -739,3 +739,143 @@ mod tests {
         assert_eq!(balancer.total_selections(), 5);
     }
 }
+
+/// Cost-aware MoE router — extends MoERouter with per-expert token cost weights.
+///
+/// Implements the Cost-Aware Routing axiom (Spotify Portal Shunt): not all tasks
+/// need the strongest model. Routes tasks to the cheapest capable expert by
+/// combining salience scores with token cost penalties.
+///
+/// Score formula: `score[j] = salience[j] - lambda * cost[j]`
+/// where `lambda` controls the cost-sensitivity tradeoff.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostAwareMoeRouter {
+    pub base_router: MoERouter,
+    /// Per-expert token cost (higher = more expensive)
+    pub expert_costs: [f64; MODULE_COUNT],
+    /// Cost sensitivity: 0.0 = ignore cost, 1.0 = maximize cost savings
+    pub lambda: f64,
+    /// Budget ceiling: total token cost cannot exceed this per routing round
+    pub budget_ceiling: f64,
+}
+
+impl CostAwareMoeRouter {
+    pub fn new(embed_dim: usize, expert_costs: [f64; MODULE_COUNT], lambda: f64) -> Self {
+        Self {
+            base_router: MoERouter::new(embed_dim),
+            expert_costs,
+            lambda,
+            budget_ceiling: f64::INFINITY,
+        }
+    }
+
+    pub fn with_budget(mut self, ceiling: f64) -> Self {
+        self.budget_ceiling = ceiling;
+        self
+    }
+
+    /// Route task to top-K experts, balancing salience vs cost.
+    ///
+    /// Returns `(selected_experts, adjusted_scores, total_cost)`.
+    pub fn route(
+        &mut self,
+        task_embedding: &[f64],
+        top_k: usize,
+    ) -> (Vec<usize>, [f64; MODULE_COUNT], f64) {
+        let gate_probs = self.base_router.gate.forward(task_embedding);
+        let route_weights = &self.base_router.route_weights;
+
+        let mut cost_adjusted = [0.0; MODULE_COUNT];
+        for j in 0..MODULE_COUNT {
+            let mut route_sum = 0.0;
+            for i in 0..MODULE_COUNT {
+                route_sum += gate_probs[i] * route_weights.weights[i][j];
+            }
+            let salience = gate_probs[j] + route_sum;
+            cost_adjusted[j] = salience - self.lambda * self.expert_costs[j];
+        }
+
+        let mut indices: Vec<usize> = (0..MODULE_COUNT).collect();
+        indices.sort_by(|&a, &b| cost_adjusted[b].total_cmp(&cost_adjusted[a]));
+
+        // Greedy budget fill: pick top experts until budget exhausted
+        let mut selected = Vec::with_capacity(top_k);
+        let mut total_cost = 0.0;
+        let k = top_k.min(MODULE_COUNT);
+        for &idx in &indices {
+            if selected.len() >= k {
+                break;
+            }
+            if total_cost + self.expert_costs[idx] <= self.budget_ceiling {
+                total_cost += self.expert_costs[idx];
+                selected.push(idx);
+            }
+        }
+
+        // Record selection for REINFORCE updates
+        self.base_router.last_selected = selected.clone();
+        (selected, cost_adjusted, total_cost)
+    }
+
+    /// Update costs based on actual token usage observed after execution.
+    pub fn update_costs(&mut self, actual_costs: &[f64; MODULE_COUNT], alpha: f64) {
+        for i in 0..MODULE_COUNT {
+            self.expert_costs[i] =
+                self.expert_costs[i] * (1.0 - alpha) + actual_costs[i] * alpha;
+        }
+    }
+}
+
+#[cfg(test)]
+mod cost_aware_tests {
+    use super::*;
+
+    fn dummy_costs() -> [f64; MODULE_COUNT] {
+        let mut costs = [0.0; MODULE_COUNT];
+        for i in 0..MODULE_COUNT {
+            costs[i] = (i as f64 + 1.0) * 0.1;
+        }
+        costs
+    }
+
+    fn dummy_embedding() -> Vec<f64> {
+        vec![0.5; 64]
+    }
+
+    #[test]
+    fn test_cost_aware_routes_within_budget() {
+        let mut router = CostAwareMoeRouter::new(64, dummy_costs(), 0.5).with_budget(0.3);
+        let (selected, _, total_cost) = router.route(&dummy_embedding(), 3);
+        assert!(!selected.is_empty());
+        assert!(total_cost <= 0.3 + 1e-9);
+    }
+
+    #[test]
+    fn test_cost_aware_penalizes_expensive_experts() {
+        let costs = dummy_costs();
+        let mut router = CostAwareMoeRouter::new(64, costs, 1.0);
+        let (selected, _, _) = router.route(&dummy_embedding(), 3);
+        // With high lambda, cheapest experts should be preferred
+        for &idx in &selected {
+            assert!(costs[idx] < 0.5, "expensive expert {idx} should be penalized");
+        }
+    }
+
+    #[test]
+    fn test_cost_aware_zero_lambda_ignores_cost() {
+        let costs = dummy_costs();
+        let mut router = CostAwareMoeRouter::new(64, costs, 0.0);
+        let (selected, _, _) = router.route(&dummy_embedding(), 3);
+        // Should behave like base router (no cost penalty)
+        assert_eq!(selected.len(), 3);
+    }
+
+    #[test]
+    fn test_update_costs_moves_average() {
+        let mut router = CostAwareMoeRouter::new(64, dummy_costs(), 0.5);
+        let before = router.expert_costs[0];
+        let actual = [0.5; MODULE_COUNT];
+        router.update_costs(&actual, 0.1);
+        assert!((router.expert_costs[0] - (before * 0.9 + 0.5 * 0.1)).abs() < 1e-9);
+    }
+}

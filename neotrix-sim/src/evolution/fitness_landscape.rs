@@ -4,7 +4,6 @@
 
 use serde::{Serialize, Deserialize};
 use crate::foundation::math_bridge::SimulationRng;
-use std::collections::HashMap;
 
 /// Agent trait vector for fitness evaluation
 #[derive(Debug, Clone, Serialize, Deserialize)]

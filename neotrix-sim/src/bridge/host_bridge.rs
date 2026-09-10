@@ -1,7 +1,6 @@
 use super::trait_defs::*;
 use crate::agents::SimAgent;
 use crate::consciousness::ConsciousnessState;
-use crate::world_sim::EvolutionRecord;
 use crate::foundation::SimEvent;
 use crate::world_sim::WorldSnapshot;
 

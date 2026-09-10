@@ -86,7 +86,7 @@ impl Speciation {
             }
             // Update centroid (average of members)
             if !sp.member_ids.is_empty() {
-                let n = sp.member_ids.len() as f32;
+                let _n = sp.member_ids.len() as f32;
                 let member_genomes: Vec<&AgentGenome> = population.iter()
                     .filter(|g| sp.member_ids.contains(&g.agent_id))
                     .collect();

@@ -123,18 +123,7 @@ fn perfect_out_shuffle(arr: &[f64]) -> Vec<f64> {
     result
 }
 
-fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
-    let norm_b: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-    if norm_a == 0.0 && norm_b == 0.0 {
-        return 1.0;
-    }
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-    dot / (norm_a * norm_b)
-}
+use crate::core::nt_core_math::cosine_similarity_f64;
 
 #[cfg(test)]
 mod tests {

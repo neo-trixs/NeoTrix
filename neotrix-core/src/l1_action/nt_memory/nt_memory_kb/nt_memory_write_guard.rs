@@ -6,9 +6,7 @@
 //! 删除/批量重建要求审批 (Tier3/Tier4)。守卫是纯函数 (无 I/O), 便于单元测试;
 //! 证据记录是唯一副作用。
 
-use std::collections::BTreeMap;
-
-use serde::{Deserialize, Serialize};
+pub use neotrix_types::write_guard_types::{WriteGuardVerdict, WriteGuardEvidence};
 
 /// 守卫证据落盘命名空间 (kv_store)。
 pub const WRITE_GUARD_NS: &str = "write_guard";
@@ -21,32 +19,6 @@ pub const PROTECTED_NAMESPACES: &[&str] = &[
     "dispatch_topology",
     "route_learner",
 ];
-
-/// 写前检查裁决 — Allow 放行 / RequiresApproval 需人工 / Reject 硬阻断。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum WriteGuardVerdict {
-    Allow,
-    RequiresApproval,
-    Reject(Vec<String>),
-}
-
-impl WriteGuardVerdict {
-    pub fn is_allowed(&self) -> bool {
-        matches!(self, WriteGuardVerdict::Allow)
-    }
-
-    pub fn requires_approval(&self) -> bool {
-        matches!(self, WriteGuardVerdict::RequiresApproval)
-    }
-
-    pub fn reasons(&self) -> Vec<String> {
-        match self {
-            WriteGuardVerdict::Reject(rs) => rs.clone(),
-            WriteGuardVerdict::RequiresApproval => vec!["需要人工审批 (force 未置位)".into()],
-            WriteGuardVerdict::Allow => Vec::new(),
-        }
-    }
-}
 
 /// 写前确定性检查 (纯函数, 无 I/O)。action 支持:
 /// `node:create` / `node:update` / `edge:upsert` / `node:delete` / `edge:delete`
@@ -187,32 +159,8 @@ pub fn record_write_evidence(
 // 形成 "守卫拦截 → 证据 → 审计可查 → 自检可见" 的可审计闭环。
 // ────────────────────────────────────────────────────────────────
 
-/// 一条 write_guard 证据的结构化视图 (从 kv_store 反序列化)。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct WriteGuardEvidence {
-    pub key: String,
-    pub action: String,
-    pub verdict: WriteGuardVerdict,
-    pub executed: bool,
-    pub ts_ms: u64,
-}
-
 /// write_guard 命名空间证据聚合统计 (NT-SHIELD 审计输入)。
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct WriteGuardStats {
-    /// 证据总数。
-    pub total: usize,
-    /// 放行 (Allow) 的裁决数。
-    pub allowed: usize,
-    /// 需人工审批 (RequiresApproval) 数。
-    pub requires_approval: usize,
-    /// 硬阻断 (Reject) 数。
-    pub rejected: usize,
-    /// 被拒操作的 action 分布。
-    pub rejected_actions: BTreeMap<String, usize>,
-    /// 异常清单: 被拒/需审批的写操作仍标记 executed。
-    pub anomalies: Vec<String>,
-}
+pub use neotrix_types::write_guard_types::WriteGuardStats;
 
 /// 把一条 kv_store `write_guard` 条目解析为结构化证据; 解析失败返回 None。
 pub fn parse_write_evidence(key: &str, raw: &str) -> Option<WriteGuardEvidence> {

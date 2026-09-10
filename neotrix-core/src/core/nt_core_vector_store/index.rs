@@ -8,21 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::types::*;
 
-pub fn hamming_distance(a: &[u8], b: &[u8]) -> u64 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x ^ y).count_ones() as u64)
-        .sum()
-}
-
-pub fn cosine_similarity(a: &[u8], b: &[u8]) -> f64 {
-    let hd = hamming_distance(a, b);
-    let dim = (a.len().min(b.len()) * 8) as f64;
-    if dim == 0.0 {
-        return 0.0;
-    }
-    1.0 - 2.0 * hd as f64 / dim
-}
+pub use crate::core::nt_core_math::{hamming_distance, cosine_similarity_bytes as cosine_similarity};
 
 pub fn euclidean_distance(a: &[u8], b: &[u8]) -> f64 {
     let hd = hamming_distance(a, b);

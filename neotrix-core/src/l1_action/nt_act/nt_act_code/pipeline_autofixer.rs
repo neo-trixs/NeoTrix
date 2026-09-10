@@ -8,7 +8,7 @@
 use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter, ActionPlan};
 use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
 use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
-use crate::l5_cognition::nt_mind::evolution::self_diagnose::{EvolutionLoopProvider, ActionPlan as DiagnoseActionPlan};
+use crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::{EvolutionLoopProvider, DiagnoseActionPlan};
 
 
 

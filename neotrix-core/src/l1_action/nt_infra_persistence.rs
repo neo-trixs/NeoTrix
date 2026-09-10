@@ -80,19 +80,31 @@ lazy_static::lazy_static! {
 }
 
 pub fn persistence_save() -> Result<(), String> {
-    GLOBAL_PERSISTENCE.lock().unwrap().save()
+    GLOBAL_PERSISTENCE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .save()
 }
 
 pub fn persistence_load() -> Result<(), String> {
-    GLOBAL_PERSISTENCE.lock().unwrap().load()
+    GLOBAL_PERSISTENCE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .load()
 }
 
 pub fn persistence_upsert(entry: PersistedEntry) {
-    GLOBAL_PERSISTENCE.lock().unwrap().upsert(entry);
+    GLOBAL_PERSISTENCE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .upsert(entry);
 }
 
 pub fn persistence_count() -> usize {
-    GLOBAL_PERSISTENCE.lock().unwrap().count()
+    GLOBAL_PERSISTENCE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .count()
 }
 
 #[cfg(test)]

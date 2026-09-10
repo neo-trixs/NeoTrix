@@ -57,7 +57,6 @@ pub mod nt_core_hcube;
 pub mod l4_cognition;
 pub mod nt_game;
 pub mod nt_core_rule_memory;
-pub mod nt_core_dao_engine;
 pub mod nt_core_meaning;
 pub mod nt_core_paradigm;
 pub mod nt_core_aura;
@@ -185,7 +184,6 @@ pub mod nt_core_telemetry;
 pub mod nt_core_vector_store;
 pub mod nt_core_deploy;
 pub mod nt_core_deploy_cache;
-pub mod nt_core_agent_patterns;
 pub mod nt_core_bounded_collections;
 pub mod nt_core_source_edit;
 // Formal verification proof harnesses

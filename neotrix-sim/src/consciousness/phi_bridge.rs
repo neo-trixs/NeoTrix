@@ -119,7 +119,7 @@ impl PhiBridge {
         phi.clamp(0.0, 1.0)
     }
 
-    pub fn compute_coherence(&self, agent_id: &str, recent_actions: &[String]) -> f64 {
+    pub fn compute_coherence(&self, _agent_id: &str, recent_actions: &[String]) -> f64 {
         if recent_actions.len() < 2 {
             return 0.5;
         }

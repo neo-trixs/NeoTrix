@@ -682,7 +682,14 @@ impl BackgroundLoop {
             },
             kb,
             nexus_weaver: {
-                let kb_ref = kb_for_nexus.clone().unwrap_or_else(|| Arc::new(KnowledgeBase::open(None).unwrap_or_else(|_| KnowledgeBase::open(None).unwrap())));
+                let kb_ref = kb_for_nexus.clone().unwrap_or_else(|| {
+                    Arc::new(
+                        KnowledgeBase::open(None).unwrap_or_else(|e| {
+                            log::warn!("[bg-meta] nexus KB open failed, creating temp: {}", e);
+                            KnowledgeBase::open(None).expect("nexus KB fallback must succeed")
+                        }),
+                    )
+                });
                 crate::l5_cognition::nt_mind::nt_mind::experience_tree::NexusWeaverScheduler::new(kb_ref)
             },
             emotion_restored: std::sync::atomic::AtomicBool::new(false),

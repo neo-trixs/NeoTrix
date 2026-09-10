@@ -280,7 +280,7 @@ mod tests {
                 speed: 0.5,
                 amplitude: 5.0,
                 frequency: 1.0,
-                unit: crate::l2_perception::nt_core_self::dynamic_params::ParamUnit::Degrees,
+                unit: crate::core::nt_core_self::dynamic_params::ParamUnit::Degrees,
                 valid: true,
             },
         ];

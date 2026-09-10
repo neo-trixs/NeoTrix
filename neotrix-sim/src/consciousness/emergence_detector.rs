@@ -112,7 +112,7 @@ impl EmergenceDetector {
 
     fn detect_trade_network(
         &mut self,
-        relationships: &RelationshipSummary,
+        _relationships: &RelationshipSummary,
         economy: &EconomySummary,
         agent_count: usize,
         tick: u64,

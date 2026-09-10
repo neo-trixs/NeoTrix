@@ -242,6 +242,133 @@ pub struct GuardrailResult {
     pub suggestions: Vec<String>,
 }
 
+/// 治理宪法 — 定义不可违反的原则，带严重性分级
+///
+/// 超越基础 Principle：每个 GovernancePrinciple 附带 Severity 等级和
+/// 运行时检查函数，可在 action 执行前拦截违规。
+/// 区别于 nt_consciousness_core::Constitution（进化门控），本结构用于
+/// 运行时治理审计。
+pub struct GovernanceConstitution {
+    principles: Vec<GovernancePrinciple>,
+}
+
+/// 原则严重性 — 决定违规处置
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Severity {
+    /// 违规直接拒绝，不执行
+    Critical,
+    /// 违规记录警告，允许继续但标记
+    Warning,
+    /// 违规降低信任分，累积触发降级
+    Advisory,
+}
+
+/// 可执行治理原则 — 带运行时检查闭包
+pub struct GovernancePrinciple {
+    pub id: String,
+    pub description: String,
+    pub severity: Severity,
+    /// 返回 true = 合规，false = 违规
+    check: Box<dyn Fn(&str) -> bool + Send + Sync>,
+}
+
+impl std::fmt::Debug for GovernancePrinciple {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GovernancePrinciple")
+            .field("id", &self.id)
+            .field("description", &self.description)
+            .field("severity", &self.severity)
+            .finish()
+    }
+}
+
+/// 治理检查结果
+#[derive(Debug, Clone)]
+pub struct GovernanceCheck {
+    pub action: String,
+    pub passed: bool,
+    pub violations: Vec<GovernanceViolation>,
+    pub trust_delta: f64,
+}
+
+/// 违规记录
+#[derive(Debug, Clone)]
+pub struct GovernanceViolation {
+    pub principle_id: String,
+    pub description: String,
+    pub severity: Severity,
+}
+
+impl GovernanceConstitution {
+    pub fn new() -> Self {
+        Self {
+            principles: Vec::new(),
+        }
+    }
+
+    pub fn add_principle(
+        &mut self,
+        id: impl Into<String>,
+        description: impl Into<String>,
+        severity: Severity,
+        check: impl Fn(&str) -> bool + Send + Sync + 'static,
+    ) {
+        self.principles.push(GovernancePrinciple {
+            id: id.into(),
+            description: description.into(),
+            severity,
+            check: Box::new(check),
+        });
+    }
+
+    /// 检查 action 是否符合所有治理原则
+    pub fn check_action(&self, action: &str) -> GovernanceCheck {
+        let mut violations = Vec::new();
+        let mut trust_delta = 0.0;
+
+        for p in &self.principles {
+            if !(p.check)(action) {
+                trust_delta -= match p.severity {
+                    Severity::Critical => 0.5,
+                    Severity::Warning => 0.1,
+                    Severity::Advisory => 0.02,
+                };
+                violations.push(GovernanceViolation {
+                    principle_id: p.id.clone(),
+                    description: p.description.clone(),
+                    severity: p.severity.clone(),
+                });
+            }
+        }
+
+        let passed = violations
+            .iter()
+            .all(|v| v.severity != Severity::Critical);
+
+        GovernanceCheck {
+            action: action.to_string(),
+            passed,
+            violations,
+            trust_delta,
+        }
+    }
+
+    /// 返回所有 Critical 原则的 id（用于审计）
+    pub fn critical_principle_ids(&self) -> Vec<&str> {
+        self.principles
+            .iter()
+            .filter(|p| p.severity == Severity::Critical)
+            .map(|p| p.id.as_str())
+            .collect()
+    }
+}
+
+impl Default for GovernanceConstitution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,5 +395,52 @@ mod tests {
         let input = CapabilityInput::Text("测试护栏".into());
         let result = cap.execute(input);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn governance_constitution_allows_compliant_action() {
+        let mut c = GovernanceConstitution::new();
+        c.add_principle("P1", "禁止删除系统文件", Severity::Critical, |action| {
+            !action.contains("rm -rf /")
+        });
+        let check = c.check_action("echo hello");
+        assert!(check.passed);
+        assert!(check.violations.is_empty());
+    }
+
+    #[test]
+    fn governance_constitution_blocks_critical_violation() {
+        let mut c = GovernanceConstitution::new();
+        c.add_principle("P1", "禁止删除系统文件", Severity::Critical, |action| {
+            !action.contains("rm -rf /")
+        });
+        let check = c.check_action("rm -rf /");
+        assert!(!check.passed);
+        assert_eq!(check.violations.len(), 1);
+        assert_eq!(check.violations[0].severity, Severity::Critical);
+    }
+
+    #[test]
+    fn governance_constitution_advisory_does_not_block() {
+        let mut c = GovernanceConstitution::new();
+        c.add_principle("P1", "建议优化", Severity::Advisory, |action| {
+            !action.contains("TODO")
+        });
+        let check = c.check_action("write code TODO fix later");
+        assert!(check.passed);
+        assert!(!check.violations.is_empty());
+        assert!(check.trust_delta < 0.0);
+    }
+
+    #[test]
+    fn governance_constitution_critical_ids() {
+        let mut c = GovernanceConstitution::new();
+        c.add_principle("P1", "desc", Severity::Critical, |_| true);
+        c.add_principle("P2", "desc", Severity::Warning, |_| true);
+        c.add_principle("P3", "desc", Severity::Critical, |_| true);
+        let ids = c.critical_principle_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"P1"));
+        assert!(ids.contains(&"P3"));
     }
 }

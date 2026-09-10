@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::l5_cognition::nt_mind::nt_mind_benchmark::{OriEvalCase, OriEvalReport, OriEvalSuite};
+use super::benchmark_types::{OriEvalCase, OriEvalReport, OriEvalSuite};
 
 use super::super::provider_catalog::lookup_provider;
 use super::*;

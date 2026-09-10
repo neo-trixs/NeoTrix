@@ -6,6 +6,9 @@ use std::path::Path;
 use super::abduction::{AbductiveHypothesis, AbductiveReasoningEngine};
 use super::domain_transition::{CoTLength, E8DomainTransitionModel, E8TaskType};
 
+/// TODO(fusion-plan-215): Consider merging trajectory analysis into `E8EwhrBridge` —
+/// this bridge handles domain transitions + abduction, while E8EwhrBridge handles
+/// trajectory analysis. The overlap is in E8 state prediction.
 pub struct E8AbductionBridge {
     pub transition_model: E8DomainTransitionModel,
     pub abductive_engine: AbductiveReasoningEngine,

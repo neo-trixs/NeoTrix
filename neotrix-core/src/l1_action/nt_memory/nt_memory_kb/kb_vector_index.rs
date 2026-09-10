@@ -6,22 +6,7 @@
 use instant_distance::{Builder, Search};
 use rusqlite::Connection;
 
-/// f32 向量包装，实现 Point trait 用于 HNSW
-#[derive(Clone)]
-pub struct FloatVec(pub Vec<f32>);
-
-impl instant_distance::Point for FloatVec {
-    fn distance(&self, other: &Self) -> f32 {
-        let dot: f32 = self.0.iter().zip(other.0.iter()).map(|(a, b)| a * b).sum();
-        let na: f32 = self.0.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let nb: f32 = other.0.iter().map(|y| y * y).sum::<f32>().sqrt();
-        if na * nb > 0.0 {
-            1.0 - dot / (na * nb)
-        } else {
-            1.0
-        }
-    }
-}
+pub use crate::core::nt_core_vector_store::float_vec::{FloatVec, bytes_to_f32s};
 
 /// HNSW 向量索引
 pub struct KbVectorIndex {
@@ -51,9 +36,7 @@ impl KbVectorIndex {
 
         for (nid, blob) in &rows {
             if blob.len() != dim * 4 { continue; }
-            let vec: Vec<f32> = blob.chunks_exact(4)
-                .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-                .collect();
+            let vec = bytes_to_f32s(blob);
             points.push(FloatVec(vec));
             values.push(nid.clone());
         }
@@ -81,10 +64,7 @@ impl KbVectorIndex {
             )
             .map_err(|e| e.to_string())?;
 
-        let vec: Vec<f32> = blob
-            .chunks_exact(4)
-            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-            .collect();
+        let vec = bytes_to_f32s(&blob);
 
         let query = FloatVec(vec);
         let mut search = Search::default();

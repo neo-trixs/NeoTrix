@@ -3,24 +3,9 @@ use std::sync::Mutex;
 
 use instant_distance::{Builder, Search};
 
+use super::float_vec::{FloatVec, bytes_to_f32s};
 use super::store::VectorStore;
 use super::types::{DistanceMetric, IndexConfig, SearchResult, VectorRecord};
-
-#[derive(Clone)]
-struct FloatVec(Vec<f32>);
-
-impl instant_distance::Point for FloatVec {
-    fn distance(&self, other: &Self) -> f32 {
-        let dot: f32 = self.0.iter().zip(other.0.iter()).map(|(a, b)| a * b).sum();
-        let na: f32 = self.0.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let nb: f32 = other.0.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if na * nb > 0.0 {
-            1.0 - dot / (na * nb)
-        } else {
-            1.0
-        }
-    }
-}
 
 struct Inner {
     records: Vec<VectorRecord>,
@@ -56,13 +41,6 @@ impl HnswVectorStore {
         let values: Vec<usize> = (0..inner.records.len()).collect();
         inner.hnsw = Some(Builder::default().build(points, values));
     }
-}
-
-fn bytes_to_f32s(bytes: &[u8]) -> Vec<f32> {
-    bytes
-        .chunks_exact(4)
-        .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect()
 }
 
 fn hamming_distance_u8(a: &[u8], b: &[u8]) -> u64 {

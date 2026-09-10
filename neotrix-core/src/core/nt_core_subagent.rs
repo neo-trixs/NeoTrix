@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Once;
+
+static SUBAGENT_REGISTRY_DEPRECATED: Once = Once::new();
 
 /// 计算 agent 的 E8 模式：显式 e8Mode 优先 → domain 字段 → name 前缀（`nt-scout` → `NT-SCOUT`）。
 pub fn e8_mode_for(def: &SubAgentDef) -> u8 {
@@ -272,6 +275,8 @@ pub struct AgentScanReport {
     pub errors: Vec<String>,
 }
 
+/// TODO(fusion-plan-215): Merge into `CapabilityRegistry` — SubAgentRegistry is a redundant
+/// registry that overlaps with capability-based agent management.
 pub struct SubAgentRegistry {
     agents: HashMap<String, SubAgentDef>,
     source_dirs: Vec<PathBuf>,
@@ -280,6 +285,11 @@ pub struct SubAgentRegistry {
 
 impl SubAgentRegistry {
     pub fn new() -> Self {
+        SUBAGENT_REGISTRY_DEPRECATED.call_once(|| {
+            tracing::warn!(
+                "SubAgentRegistry is deprecated — merge into CapabilityRegistry (fusion-plan-215)"
+            );
+        });
         let user_dir = dirs::home_dir()
             .unwrap_or_default()
             .join(".neotrix")

@@ -64,7 +64,10 @@ impl InfraBreaker {
 
     /// 记录调用结果
     pub fn record_result(&mut self, success: bool) {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
         match self.inner.state {
             BreakerState::Closed => {
                 self.recent_results.push(success);
@@ -173,15 +176,24 @@ lazy_static::lazy_static! {
 }
 
 pub fn breaker_allow(capability_id: &str) -> bool {
-    GLOBAL_BREAKERS.lock().unwrap().allow(capability_id)
+    GLOBAL_BREAKERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .allow(capability_id)
 }
 
 pub fn breaker_record(capability_id: &str, success: bool) {
-    GLOBAL_BREAKERS.lock().unwrap().record_result(capability_id, success);
+    GLOBAL_BREAKERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .record_result(capability_id, success);
 }
 
 pub fn breaker_states() -> HashMap<String, BreakerState> {
-    GLOBAL_BREAKERS.lock().unwrap().states()
+    GLOBAL_BREAKERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .states()
 }
 
 #[cfg(test)]

@@ -133,16 +133,7 @@ impl ConceptEmergenceEngine {
     }
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if na * nb > 0.0 {
-        dot / (na * nb)
-    } else {
-        0.0
-    }
-}
+use crate::core::nt_core_math::cosine_similarity_f32_f32;
 
 fn compute_centroid(vectors: &[&Vec<f32>], dim: usize) -> Vec<f32> {
     if vectors.is_empty() {

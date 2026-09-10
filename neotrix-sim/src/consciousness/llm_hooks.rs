@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+
 use std::collections::HashMap;
 
 pub type LlmPromptFn = Box<dyn Fn(&str, &str) -> String + Send + Sync>;

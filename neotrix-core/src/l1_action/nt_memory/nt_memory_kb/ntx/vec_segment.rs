@@ -302,16 +302,7 @@ pub struct SearchResult {
 }
 
 /// 余弦距离 (1 - cosine_similarity)
-pub fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
-    assert_eq!(a.len(), b.len());
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 1.0;
-    }
-    1.0 - dot / (norm_a * norm_b)
-}
+pub use crate::core::nt_core_vector_store::float_vec::cosine_distance;
 
 #[cfg(test)]
 mod tests {

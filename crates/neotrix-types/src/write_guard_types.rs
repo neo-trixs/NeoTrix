@@ -1,24 +1,48 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// 写前检查裁决 — Allow 放行 / RequiresApproval 需人工 / Reject 硬阻断。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WriteGuardVerdict {
     Allow,
-    Warn { reasons: Vec<String> },
-    Deny { reasons: Vec<String> },
+    RequiresApproval,
+    Reject(Vec<String>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl WriteGuardVerdict {
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, WriteGuardVerdict::Allow)
+    }
+
+    pub fn requires_approval(&self) -> bool {
+        matches!(self, WriteGuardVerdict::RequiresApproval)
+    }
+
+    pub fn reasons(&self) -> Vec<String> {
+        match self {
+            WriteGuardVerdict::Reject(rs) => rs.clone(),
+            WriteGuardVerdict::RequiresApproval => vec!["需要人工审批 (force 未置位)".into()],
+            WriteGuardVerdict::Allow => Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct WriteGuardStats {
-    pub nodes_checked: usize,
-    pub edges_checked: usize,
-    pub verdict: WriteGuardVerdict,
+    pub total: usize,
+    pub allowed: usize,
+    pub requires_approval: usize,
+    pub rejected: usize,
+    pub rejected_actions: std::collections::BTreeMap<String, usize>,
+    pub anomalies: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WriteGuardEvidence {
-    pub field: String,
-    pub issue: String,
-    pub severity: u8,
+    pub key: String,
+    pub action: String,
+    pub verdict: WriteGuardVerdict,
+    pub executed: bool,
+    pub ts_ms: u64,
 }
 
 #[cfg(test)]
@@ -34,23 +58,21 @@ mod tests {
     }
 
     #[test]
-    fn test_verdict_deny_roundtrip() {
-        let v = WriteGuardVerdict::Deny { reasons: vec!["bad".into()] };
+    fn test_verdict_reject_roundtrip() {
+        let v = WriteGuardVerdict::Reject(vec!["bad".into()]);
         let json = serde_json::to_string(&v).unwrap();
         let back: WriteGuardVerdict = serde_json::from_str(&json).unwrap();
         match back {
-            WriteGuardVerdict::Deny { reasons } => assert_eq!(reasons, vec!["bad"]),
-            _ => panic!("expected Deny"),
+            WriteGuardVerdict::Reject(rs) => assert_eq!(rs, vec!["bad"]),
+            _ => panic!("expected Reject"),
         }
     }
 
     #[test]
-    fn test_write_guard_stats_creation() {
-        let stats = WriteGuardStats {
-            nodes_checked: 10,
-            edges_checked: 5,
-            verdict: WriteGuardVerdict::Allow,
-        };
-        assert_eq!(stats.nodes_checked, 10);
+    fn test_verdict_requires_approval() {
+        let v = WriteGuardVerdict::RequiresApproval;
+        assert!(!v.is_allowed());
+        assert!(v.requires_approval());
+        assert_eq!(v.reasons().len(), 1);
     }
 }

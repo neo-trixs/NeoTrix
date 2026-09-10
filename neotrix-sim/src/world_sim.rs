@@ -1,7 +1,7 @@
 // WorldSim - Main simulation loop that ties all subsystems together
 // The consciousness evolution arena: environment → agents → selection → evolution → repeat
 
-use crate::foundation::simulation_bus::{SimulationBus, SimTime, SimEvent, EventPriority, Season};
+use crate::foundation::simulation_bus::{SimulationBus, SimEvent, EventPriority};
 use crate::foundation::sim_time::{SimClock, TimeModifiers};
 use crate::foundation::math_bridge::{Vec2, SpatialGrid, SimulationRng};
 use crate::foundation::tick_schedule::{TickSchedule, TickTier};
@@ -17,20 +17,21 @@ use crate::agents::reflection::ReflectionEngine;
 use crate::agents::action_costs::{ActionCostTable, ActionBudget};
 use crate::agents::personality_drift::PersonalityDrift;
 use std::collections::HashMap;
-use crate::consciousness::phi_bridge::{PhiBridge, ConsciousnessState, InteractionRecord};
-use crate::consciousness::coherence_tracker::{CoherenceTracker, GlobalCoherence};
-use crate::consciousness::convergence::{ConvergenceDetector, ConvergenceState};
+use crate::consciousness::phi_bridge::{PhiBridge, InteractionRecord};
+use crate::consciousness::coherence_tracker::CoherenceTracker;
+use crate::consciousness::convergence::ConvergenceDetector;
 use crate::consciousness::dual_representation::DualRepresentation;
 use crate::evolution::fitness_landscape::{FitnessLandscape, LandscapeConfig, AgentGenome};
-use crate::evolution::selection_pressure::{SelectionPressure, SelectionConfig, SelectionResult};
+use crate::evolution::selection_pressure::{SelectionPressure, SelectionConfig};
 use crate::evolution::mutation_ops::{MutationOps, MutationConfig};
 use crate::evolution::speciation::{Speciation, SpeciationConfig};
 use crate::feel::{EmotionEngine, SystemEvent, EmotionType};
 use crate::society::relationship_graph::RelationshipGraph;
-use crate::society::economy::{Economy, Inventory, ResourceType, TradeOffer};
+use crate::society::economy::Economy;
 use crate::society::culture::Culture;
 use crate::society::theory_of_mind::TheoryOfMind;
 use crate::society::constitutional::ConstitutionalFeedback;
+use crate::agents::event_reactive::EventReactiveSystem;
 use serde::{Serialize, Deserialize};
 
 /// Configuration for the simulation world
@@ -113,6 +114,7 @@ pub struct WorldSim {
     pub constitutional: ConstitutionalFeedback,
     pub convergence: ConvergenceDetector,
     pub dual_repr: DualRepresentation,
+    pub event_reactive: EventReactiveSystem,
 }
 
 impl WorldSim {
@@ -136,7 +138,7 @@ impl WorldSim {
         let w = heightmap.config().width;
         let h = heightmap.config().height;
         let temperature: Vec<Vec<f32>> = (0..h).map(|y| {
-            (0..w).map(|x| {
+            (0..w).map(|_x| {
                 let ny = y as f32 / h as f32;
                 0.3 + 0.4 * (1.0 - ny) + rng.range_f32(-0.1, 0.1)
             }).collect()
@@ -197,6 +199,7 @@ impl WorldSim {
             constitutional: ConstitutionalFeedback::new(),
             convergence: ConvergenceDetector::default_new(),
             dual_repr: DualRepresentation::new(16),
+            event_reactive: EventReactiveSystem::new(),
         }
     }
 
@@ -335,7 +338,7 @@ impl WorldSim {
                         compliance as f32,
                     );
                     // Connect to previous action if exists
-                    if let Some(prev_id) = gm.nodes().last().map(|n| n.id) {
+                    if let Some(prev_id) = gm.last_node_id() {
                         if prev_id != node_id {
                             gm.add_edge(prev_id, node_id, crate::agents::graph_memory::EdgeKind::Temporal, 0.8, tick);
                         }
@@ -521,7 +524,6 @@ impl WorldSim {
         // === M1: PlanningStack goal-driven decisions ===
         if let Some(planning) = self.planning.get(&agent.core.id) {
             // Generate goals from current state
-            let has_rels = self.relationships.neighbors(&agent.core.id).len() > 0;
             // We need to temporarily borrow planning mutably for goal generation,
             // but we're in an immutable borrow context. Use a two-phase approach:
             // Phase 1: check if there's already an active goal with an action
@@ -691,7 +693,7 @@ impl WorldSim {
             AgentAction::Rest => {
                 self.agents[idx].core.rest(5.0);
             }
-            AgentAction::Talk { target_id, message } => {
+            AgentAction::Talk { target_id, message: _message } => {
                 let agent_id = agent_id.to_string();
                 let target_id = target_id.clone();
                 self.relationships.update_interaction(&agent_id, &target_id, 0.1, self.tick);

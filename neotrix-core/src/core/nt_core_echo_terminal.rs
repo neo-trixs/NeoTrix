@@ -15,7 +15,10 @@
 //! Layer: L2 (Perception) → L4 (Cognition) — terminal observation as learning signal
 
 use std::collections::VecDeque;
+use std::sync::Once;
 use std::time::Instant;
+
+static ECHO_PRM_BRIDGE_DEPRECATED: Once = Once::new();
 
 /// A single terminal observation from tool/command execution
 #[derive(Debug, Clone)]
@@ -399,6 +402,9 @@ impl EchoBatchReport {
 
 /// Adapter: ECHO signal → PRM scoring bridge
 /// Enables ECHO terminal observations to be used as PRM training data
+///
+/// TODO(fusion-plan-215): Merge into `MetaGoalBridge` — EchoPrmBridge is a thin adapter
+/// that overlaps with meta-goal planning signal aggregation.
 #[derive(Debug, Clone)]
 pub struct EchoPrmBridge {
     pub echo: EchoController,
@@ -409,6 +415,11 @@ pub struct EchoPrmBridge {
 
 impl Default for EchoPrmBridge {
     fn default() -> Self {
+        ECHO_PRM_BRIDGE_DEPRECATED.call_once(|| {
+            tracing::warn!(
+                "EchoPrmBridge is deprecated — merge into MetaGoalBridge (fusion-plan-215)"
+            );
+        });
         Self {
             echo: EchoController::default(),
             signal_buffer: VecDeque::new(),

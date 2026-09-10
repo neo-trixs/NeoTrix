@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::l1_action::nt_memory::nt_memory_spatial::types::{
+use crate::l2_perception::nt_sense::nt_memory_spatial::types::{
     SpatialEntry, SpatialQuery, geohash_encode,
 };
 
@@ -127,7 +127,7 @@ impl SpatialStore for MemorySpatialStore {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use crate::l1_action::nt_memory::nt_memory_spatial::types::{BoundingBox, GeoPoint, SpatialGeometry};
+    use crate::l2_perception::nt_sense::nt_memory_spatial::types::{BoundingBox, GeoPoint, SpatialGeometry};
 
     fn make_entry(id: &str, lat: f64, lng: f64, tags: Vec<&str>) -> SpatialEntry {
         SpatialEntry {

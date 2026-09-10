@@ -11,6 +11,9 @@ use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 pub use crate::core::nt_core_kernel_types::{EVOLUTION, KERNEL_DIM, ReasoningMethod, Vector};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Once;
+
+static METHOD_REGISTRY_DEPRECATED: Once = Once::new();
 
 /// 统一推理轨迹 — 覆盖所有 4 处原定义的用例
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +66,9 @@ pub enum TraceSource {
 }
 
 /// Method ↔ Stage ↔ Hexagram 统一注册表
+///
+/// TODO(fusion-plan-215): Merge into `ReasoningStrategyRegistry` — MethodRegistry is a redundant
+/// registry that overlaps with reasoning strategy management.
 #[derive(Debug, Clone)]
 pub struct MethodRegistry {
     /// method -> (stage_range, preferred_hexagrams)
@@ -89,6 +95,11 @@ impl Default for MethodRegistry {
 
 impl MethodRegistry {
     pub fn new() -> Self {
+        METHOD_REGISTRY_DEPRECATED.call_once(|| {
+            tracing::warn!(
+                "MethodRegistry is deprecated — merge into ReasoningStrategyRegistry (fusion-plan-215)"
+            );
+        });
         let mut registry = Self {
             method_map: HashMap::new(),
             stage_methods: vec![Vec::new(); EVOLUTION.len()],

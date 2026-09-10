@@ -30,8 +30,8 @@ pub mod ffi;
 pub mod nt_core_error;
 pub mod nt_core_event_bus;
 
-// ─── 意识核心 ──────────────────────────────────────────────────────────
-pub mod nt_consciousness_core;
+// ─── 意识核心 (已迁移至 l5_cognition/nt_core/) ────────────────────────
+pub use crate::l5_cognition::nt_core::nt_consciousness_core;
 
 // ─── Standalone modules at neotrix level ────────────────────────────────
 pub mod nt_shanhai_geo;

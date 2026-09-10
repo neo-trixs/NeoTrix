@@ -228,7 +228,7 @@ impl SimAgent {
 
     /// Update Maslow needs each tick (CivSim pattern).
     /// Lower-level needs decay faster; satisfying lower needs enables higher ones.
-    pub fn update_needs(&mut self, dt: f32) {
+    pub fn update_needs(&mut self, _dt: f32) {
         // Physiological: decays with hunger, restored by eating
         self.needs[0] = (1.0 - self.core.hunger / 100.0).max(0.0);
         // Safety: decays with low health, restored by resting
