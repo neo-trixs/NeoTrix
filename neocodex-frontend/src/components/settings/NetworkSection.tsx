@@ -86,10 +86,10 @@ export function NetworkSection() {
     setLoading(true)
     setError(null)
     try {
-      const { call } = await import('../../api/adapter')
+      const { invoke } = await import('@tauri-apps/api/core')
       const [status, health] = await Promise.all([
-        call<ProxyPoolStatus>('proxy_pool_status').catch(() => null),
-        call<ProviderHealthStatus[]>('provider_status').catch(() => []),
+        invoke<ProxyPoolStatus>('proxy_pool_status').catch(() => null),
+        invoke<ProviderHealthStatus[]>('provider_status').catch(() => []),
       ])
       setProxyStatus(status)
       setProviderHealth(health)

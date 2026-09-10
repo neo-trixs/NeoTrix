@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════
-   api/kb.ts — KB 文档级 CRUD 命令入口
-   契约镜像 src-tauri/commands/kb_cmds.rs B2 段:
-   KbDocSummary / KbDocIngestResult
-   kb_doc_ingest / kb_doc_list / kb_doc_delete / kb_doc_reindex
+   api/kb.ts — KB 文档级 CRUD
+   所有操作走 domain plugin (kb domain)
    ════════════════════════════════════════════ */
-import { enhancedInvoke as call } from './adapter'
+import * as domain from './domain'
 
 export interface KbDocSummary {
   doc_id: string
@@ -25,17 +23,17 @@ export interface KbDocIngestResult {
 }
 
 export function kbDocIngest(title: string, text: string, library?: string): Promise<KbDocIngestResult> {
-  return call('kb_doc_ingest', { title, text, library: library ?? null })
+  return domain.kb.docIngest(title, title, 'document', text, library) as Promise<KbDocIngestResult>
 }
 
 export function kbDocList(): Promise<KbDocSummary[]> {
-  return call('kb_doc_list', {})
+  return domain.kb.docList() as Promise<KbDocSummary[]>
 }
 
 export function kbDocDelete(docId: string): Promise<number> {
-  return call('kb_doc_delete', { doc_id: docId })
+  return domain.kb.docDelete(docId).then(() => 1)
 }
 
 export function kbDocReindex(docId: string): Promise<number> {
-  return call('kb_doc_reindex', { doc_id: docId })
+  return domain.kb.docReindex().then(r => r.reindexed)
 }

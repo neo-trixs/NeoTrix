@@ -231,13 +231,13 @@ mod tests {
 
     #[test]
     fn resource_distribution_generate() {
-        let hm = super::heightmap::Heightmap::generate(
+        let hm = super::super::heightmap::Heightmap::generate(
             42,
-            super::heightmap::HeightmapConfig::default(),
+            super::super::heightmap::HeightmapConfig::default(),
         );
         let temp = vec![vec![0.5f32; 128]; 128];
         let moist = vec![vec![0.5f32; 128]; 128];
-        let bm = super::biome::BiomeMap::generate(&hm, &temp, &moist);
+        let bm = super::super::biome::BiomeMap::generate(&hm, &temp, &moist);
         let dist = ResourceDistribution::generate(99, 25.6, 25.6, &bm);
         assert!(dist.total_nodes() > 0);
     }

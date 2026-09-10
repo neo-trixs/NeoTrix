@@ -260,7 +260,8 @@ impl ChainExecutor {
             // 执行步骤
             self.state.current_step = Some(step_id.clone());
 
-            // TODO: executors field not yet implemented on ChainExecutor
+            // executors field not yet implemented on ChainExecutor
+            tracing::warn!("ChainExecutor.executors not yet implemented; using placeholder");
             {
                 let start = std::time::Instant::now();
                 // Placeholder: pass through current input as output
@@ -346,7 +347,8 @@ impl ChainExecutor {
         for step_id in completed_steps {
             let step = self.chain.steps.iter().find(|s| s.id == step_id);
             if let Some(_step) = step {
-                // TODO: executors field not yet implemented on ChainExecutor
+            // executors field not yet implemented on ChainExecutor
+            tracing::warn!("ChainExecutor.executors not yet implemented; using placeholder");
                 if let Some(result) = self.results.get(&step_id) {
                     if let Some(ref _output) = result.output {
                         // let _ = executor.rollback(&step.config, output);

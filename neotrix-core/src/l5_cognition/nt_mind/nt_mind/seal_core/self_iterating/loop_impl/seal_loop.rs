@@ -697,7 +697,8 @@ impl SelfIteratingBrain {
                 ));
             }
             // JIT-Agent test-benching / yoyo-gasp bench 旁路 (吸收源 l4 yoyo-gasp/gasp)。
-            // TODO(E3): wire `nt_mind_yoyo_gasp` / `nt_mind_gasp` 作为 JIT bench backend。
+            // JIT bench backend not yet wired (nt_mind_yoyo_gasp / nt_mind_gasp)
+            tracing::warn!("JIT bench backend not yet wired");
         }
 
         // ── (b) 运行回归测试 (scope 内 BenchmarkGate 作为实际回归执行体) ──

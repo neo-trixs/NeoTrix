@@ -72,7 +72,6 @@ export async function checkAllApis(): Promise<ApiHealthReport> {
     
     // 模型池
     checkApi('model_pool.status', () => modelPool.getModelPoolStatus()),
-    checkApi('model_pool.list', () => modelPool.listModels()),
     
     // 代理池
     checkApi('proxy_pool.status', () => proxyPool.getProxyPoolStatus()),
@@ -82,7 +81,7 @@ export async function checkAllApis(): Promise<ApiHealthReport> {
     checkApi('im.channels', () => im.listChannels()),
     
     // 市场
-    checkApi('market.status', () => market.getMarketStatus()),
+    checkApi('market.status', () => market.marketStatus()),
   ])
 
   const ok = results.filter(r => r.status === 'ok').length

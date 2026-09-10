@@ -825,7 +825,7 @@ impl BackgroundLoopHandle {
 
 }
 
-// TODO: Commented out - tests call non-existent methods on BackgroundLoop
+// Commented out - tests call non-existent methods on BackgroundLoop
 // #[cfg(test)]
 // mod tests {
 //     use super::*;

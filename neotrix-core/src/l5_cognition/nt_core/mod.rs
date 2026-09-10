@@ -6,9 +6,7 @@ pub use crate::core::l7_capability::*;
 
 // 子目录模块
 pub mod reasoning;
-pub mod knowledge;
 pub mod visual;
-pub mod io_skills;
 pub mod info_theory;
 pub mod safety;
 pub mod cuda;

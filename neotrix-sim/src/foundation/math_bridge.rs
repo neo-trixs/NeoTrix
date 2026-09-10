@@ -229,7 +229,7 @@ impl AABB {
 /// Spatial hash grid for efficient neighbor queries
 pub struct SpatialGrid {
     cell_size: f32,
-    cells: std::collections::HashMap<(i32, i32), Vec<String>>,
+    cells: std::collections::HashMap<(i32, i32), Vec<(String, Vec2)>>,
 }
 
 impl SpatialGrid {
@@ -250,7 +250,7 @@ impl SpatialGrid {
         self.cells
             .entry((cx, cy))
             .or_default()
-            .push(id.to_string());
+            .push((id.to_string(), pos));
     }
 
     pub fn query_radius(&self, pos: Vec2, radius: f32) -> Vec<&str> {
@@ -259,12 +259,17 @@ impl SpatialGrid {
         let min_cy = ((pos.y - radius) / self.cell_size).floor() as i32;
         let max_cy = ((pos.y + radius) / self.cell_size).floor() as i32;
 
+        let r2 = radius * radius;
         let mut result = Vec::new();
         for cx in min_cx..=max_cx {
             for cy in min_cy..=max_cy {
                 if let Some(cell) = self.cells.get(&(cx, cy)) {
-                    for id in cell {
-                        result.push(id.as_str());
+                    for (id, cell_pos) in cell {
+                        let dx = pos.x - cell_pos.x;
+                        let dy = pos.y - cell_pos.y;
+                        if dx * dx + dy * dy <= r2 {
+                            result.push(id.as_str());
+                        }
                     }
                 }
             }

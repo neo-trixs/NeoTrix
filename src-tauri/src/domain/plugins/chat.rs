@@ -238,6 +238,8 @@ impl DomainPlugin for ChatPlugin {
             ActionSpec { name: "regenerate".into(), description: "重新生成".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "side_chat_get".into(), description: "获取副对话".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "side_chat_send".into(), description: "发送副对话消息".into(), params: vec![], returns: "Value".into() },
+            ActionSpec { name: "edit_message".into(), description: "编辑消息".into(), params: vec![], returns: "Value".into() },
+            ActionSpec { name: "delete_message".into(), description: "删除消息".into(), params: vec![], returns: "Value".into() },
         ]
     }
 
@@ -319,6 +321,37 @@ impl DomainPlugin for ChatPlugin {
             }
             "side_chat_get" | "side_chat_send" => {
                 Ok(serde_json::json!({ "ok": true, "messages": [] }))
+            }
+            "edit_message" => {
+                let session_id = args.get("session_id").and_then(|v| v.as_str()).unwrap_or("default");
+                let index = args.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                let mut messages = self.get_messages(session_id)?;
+                if index < messages.len() {
+                    messages[index]["content"] = serde_json::json!(content);
+                    let json = serde_json::to_string(&messages).unwrap_or_default();
+                    let conn = self.open_db()?;
+                    conn.execute(
+                        "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
+                        rusqlite::params![json, chrono::Utc::now().timestamp(), session_id],
+                    ).ok();
+                }
+                Ok(serde_json::json!({ "ok": true, "index": index }))
+            }
+            "delete_message" => {
+                let session_id = args.get("session_id").and_then(|v| v.as_str()).unwrap_or("default");
+                let index = args.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let mut messages = self.get_messages(session_id)?;
+                if index < messages.len() {
+                    messages.remove(index);
+                    let json = serde_json::to_string(&messages).unwrap_or_default();
+                    let conn = self.open_db()?;
+                    conn.execute(
+                        "UPDATE sessions SET messages = ?1, updated_at = ?2 WHERE id = ?3",
+                        rusqlite::params![json, chrono::Utc::now().timestamp(), session_id],
+                    ).ok();
+                }
+                Ok(serde_json::json!({ "ok": true, "index": index }))
             }
             _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
         }

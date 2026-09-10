@@ -4,14 +4,18 @@
 use crate::foundation::simulation_bus::{SimulationBus, SimTime, SimEvent, EventPriority, Season};
 use crate::foundation::sim_time::{SimClock, TimeModifiers};
 use crate::foundation::math_bridge::{Vec2, SpatialGrid, SimulationRng};
+use crate::foundation::tick_schedule::{TickSchedule, TickTier};
 use crate::environment::terrain::{Heightmap, HeightmapConfig, BiomeMap, ResourceDistribution};
 use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation, NearbyAgent, NearbyResource};
+use crate::agents::action_awareness::ActionAwareness;
+use std::collections::HashMap;
 use crate::consciousness::phi_bridge::{PhiBridge, ConsciousnessState, InteractionRecord};
 use crate::consciousness::coherence_tracker::{CoherenceTracker, GlobalCoherence};
 use crate::evolution::fitness_landscape::{FitnessLandscape, LandscapeConfig, AgentGenome};
 use crate::evolution::selection_pressure::{SelectionPressure, SelectionConfig, SelectionResult};
 use crate::evolution::mutation_ops::{MutationOps, MutationConfig};
 use crate::evolution::speciation::{Speciation, SpeciationConfig};
+use crate::feel::{EmotionEngine, SystemEvent, EmotionType};
 use crate::society::relationship_graph::RelationshipGraph;
 use crate::society::economy::{Economy, Inventory, ResourceType, TradeOffer};
 use crate::society::culture::Culture;
@@ -63,6 +67,7 @@ pub struct WorldSim {
     pub config: WorldSimConfig,
     pub bus: SimulationBus,
     pub clock: SimClock,
+    pub schedule: TickSchedule,
     pub heightmap: Heightmap,
     pub biome_map: BiomeMap,
     pub resources: ResourceDistribution,
@@ -78,7 +83,9 @@ pub struct WorldSim {
     pub economy: Economy,
     pub culture: Culture,
     pub rng: SimulationRng,
+    pub emotion: EmotionEngine,
     pub evolution_history: Vec<EvolutionRecord>,
+    pub action_awareness: HashMap<String, ActionAwareness>,
     pub tick: u64,
 }
 
@@ -131,6 +138,7 @@ impl WorldSim {
             config: config.clone(),
             bus: SimulationBus::new(10000),
             clock: SimClock::new(config.ticks_per_hour),
+            schedule: TickSchedule::new(),
             heightmap,
             biome_map,
             resources,
@@ -146,80 +154,125 @@ impl WorldSim {
             economy: Economy::new(),
             culture: Culture::new(),
             rng: SimulationRng::new(config.seed.wrapping_add(1)),
+            emotion: EmotionEngine::new(),
             evolution_history: Vec::new(),
+            action_awareness: HashMap::new(),
             tick: 0,
         }
     }
 
-    /// Run one simulation tick
+    /// Run one simulation tick using multi-timescale schedule
     pub async fn tick(&mut self) {
-        self.tick += 1;
+        self.schedule.advance();
+        let tick = self.schedule.current_tick();
+        self.tick = tick;
 
-        // 1. Advance time
-        let time_events = self.clock.tick();
-        for (event, priority) in time_events {
-            self.bus.emit(event, priority, self.clock.current, "clock").await;
-        }
-
-        // 2. Update resources (regeneration)
-        let season_mod = self.clock.season_resource_modifier();
-        self.resources.regenerate_all(season_mod);
-
-        // 3. Update spatial grid
-        self.spatial_grid.clear();
-        for agent in &self.agents {
-            if agent.core.alive {
-                self.spatial_grid.insert(&agent.core.id, agent.core.position);
+        // Reflex tier — every tick
+        if self.schedule.should_run(TickTier::Reflex) {
+            // 1. Advance time
+            let time_events = self.clock.tick();
+            for (event, priority) in time_events {
+                self.bus.emit(event, priority, self.clock.current, "clock").await;
             }
-        }
 
-        // 3.5. Metabolism for all agents
-        let time_mods = TimeModifiers::from_clock(&self.clock);
-        for agent in &mut self.agents {
-            if agent.core.alive {
-                let energy_cost = 0.5 * time_mods.perception;
-                agent.core.metabolize(energy_cost, 0.3);
-            }
-        }
+            // 2. Update resources (regeneration)
+            let season_mod = self.clock.season_resource_modifier();
+            self.resources.regenerate_all(season_mod);
 
-        // 4. Agent perception + decision + action
-        let time_mods = TimeModifiers::from_clock(&self.clock);
-        let agent_ids: Vec<String> = self.agents.iter().map(|a| a.core.id.clone()).collect();
-
-        for agent_id in &agent_ids {
-            // Build observation first (immutable borrow)
-            let observation = {
-                let idx = self.agents.iter().position(|a| &a.core.id == agent_id);
-                if let Some(idx) = idx {
-                    if !self.agents[idx].core.alive { continue; }
-                    let nearby = self.spatial_grid.query_radius(self.agents[idx].core.position, 100.0);
-                    self.build_observation(&self.agents[idx], &nearby)
-                } else {
-                    continue;
+            // 3. Update spatial grid
+            self.spatial_grid.clear();
+            for agent in &self.agents {
+                if agent.core.alive {
+                    self.spatial_grid.insert(&agent.core.id, agent.core.position);
                 }
-            };
+            }
 
-            // Decide action (mutable borrow of self)
-            let action = self.decide_action_by_id(agent_id, &observation, &time_mods);
-            self.execute_action(agent_id, &action).await;
-
-            // Record action
-            if let Some(agent) = self.agents.iter_mut().find(|a| &a.core.id == agent_id) {
-                agent.record_action(&action);
+            // 4. Metabolism for all agents
+            let time_mods = TimeModifiers::from_clock(&self.clock);
+            for agent in &mut self.agents {
+                if agent.core.alive {
+                    let energy_cost = 0.5 * time_mods.perception;
+                    agent.core.metabolize(energy_cost, 0.3);
+                }
             }
         }
 
-        // 5. Compute consciousness metrics (periodic)
-        if self.tick % self.config.phi_compute_interval == 0 {
+        // Fast tier — every 5 ticks
+        if self.schedule.should_run(TickTier::Fast) {
+            // 5. Agent perception + decision + action
+            let time_mods = TimeModifiers::from_clock(&self.clock);
+            let agent_ids: Vec<String> = self.agents.iter().map(|a| a.core.id.clone()).collect();
+
+            for agent_id in &agent_ids {
+                // Build observation first (immutable borrow)
+                let observation = {
+                    let idx = self.agents.iter().position(|a| &a.core.id == agent_id);
+                    if let Some(idx) = idx {
+                        if !self.agents[idx].core.alive { continue; }
+                        let nearby = self.spatial_grid.query_radius(self.agents[idx].core.position, 100.0);
+                        self.build_observation(&self.agents[idx], &nearby)
+                    } else {
+                        continue;
+                    }
+                };
+
+                // Decide action (mutable borrow of self)
+                let action = self.decide_action_by_id(agent_id, &observation, &time_mods);
+
+                // Action Awareness: predict before execution
+                {
+                    let agent = self.agents.iter().find(|a| &a.core.id == agent_id).cloned();
+                    if let Some(agent) = agent {
+                        self.action_awareness
+                            .entry(agent_id.clone())
+                            .or_insert_with(ActionAwareness::new)
+                            .predict(&action, &agent);
+                    }
+                }
+
+                self.execute_action(agent_id, &action).await;
+
+                // Action Awareness: verify after execution
+                if let Some(agent) = self.agents.iter().find(|a| &a.core.id == agent_id) {
+                    if let Some(awareness) = self.action_awareness.get_mut(agent_id) {
+                        awareness.verify(agent, tick);
+                    }
+                }
+
+                // Record action
+                if let Some(agent) = self.agents.iter_mut().find(|a| &a.core.id == agent_id) {
+                    agent.record_action(&action);
+                }
+            }
+        }
+
+        // Medium tier — every 20 ticks
+        if self.schedule.should_run(TickTier::Medium) {
+            // 6. Consciousness metrics (phi, coherence)
             self.compute_consciousness_metrics().await;
         }
 
-        // 6. Evolution cycle (periodic)
-        if self.tick % self.config.evolution_interval == 0 {
+        // Slow tier — every 100 ticks
+        if self.schedule.should_run(TickTier::Slow) {
+            // 7. Emotion update from world events
+            {
+                let events = self.collect_world_events();
+                self.emotion.process_events(&events);
+            }
+
+            // 8. Action Awareness: learn periodically
+            for awareness in self.action_awareness.values_mut() {
+                awareness.learn();
+            }
+        }
+
+        // Background tier — every 500 ticks
+        if self.schedule.should_run(TickTier::Background) {
+            // 9. Evolution cycle
             self.evolution_cycle().await;
         }
 
-        // 7. Cleanup dead agents
+        // Cleanup — every tick
         self.agents.retain(|a| a.core.alive);
     }
 
@@ -230,7 +283,7 @@ impl WorldSim {
                     .map(|a| NearbyAgent {
                         id: a.core.id.clone(),
                         distance: agent.core.position.distance_to(&a.core.position),
-                        relationship: agent.relationship_with(&a.core.id),
+                        relationship: self.relationships.sentiment_between(&agent.core.id, &a.core.id),
                         apparent_health: a.core.health / 100.0,
                     })
             })
@@ -288,6 +341,30 @@ impl WorldSim {
                 target_id: target.id.clone(),
                 message: "hello".to_string(),
             };
+        }
+
+        // Emotion modulation on exploration vs rest decision
+        let dominant = self.emotion.dominant_emotion();
+        match dominant {
+            Some(EmotionType::Anxiety) | Some(EmotionType::Fatigue) => {
+                // Anxiety/fatigue: bias toward rest
+                if self.rng.next_f32() < 0.5 {
+                    return AgentAction::Rest;
+                }
+            }
+            Some(EmotionType::Curiosity) | Some(EmotionType::Joy) | Some(EmotionType::Wonder) => {
+                // Positive emotions: bias toward exploration
+                let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
+                return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+            }
+            Some(EmotionType::Frustration) => {
+                // Frustration: random direction (break out of loops)
+                if self.rng.next_f32() < 0.3 {
+                    let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
+                    return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+                }
+            }
+            _ => {}
         }
 
         AgentAction::Explore { direction: Vec2::new(
@@ -390,7 +467,7 @@ impl WorldSim {
             genome.traits[3] = a.personality.curiosity;
             genome.traits[4] = a.personality.cooperativeness;
             genome.traits[5] = a.memory.events.len() as f32 / 100.0;
-            genome.traits[6] = a.relationships.len() as f32 / 10.0;
+            genome.traits[6] = self.relationships.neighbors(&a.core.id).len() as f32 / 10.0;
             genome.traits[7] = self.phi_bridge.get_state(&a.core.id)
                 .map(|s| s.consciousness_level() as f32).unwrap_or(0.1);
             genome
@@ -460,6 +537,59 @@ impl WorldSim {
         self.speciation.prune();
     }
 
+    /// Collect system-level events from current world state for emotion processing
+    fn collect_world_events(&self) -> Vec<SystemEvent> {
+        let mut events = Vec::new();
+
+        // Population pressure: agent deaths signal resource scarcity
+        let alive = self.agents.iter().filter(|a| a.core.alive).count();
+        let total = self.agents.len().max(1);
+        let mortality = 1.0 - (alive as f32 / total as f32);
+        if mortality > 0.1 {
+            events.push(SystemEvent::GoalBlocked { attempts: (mortality * 10.0) as u32 });
+        }
+
+        // Resource depletion → anxiety
+        let depleted_ratio = if self.resources.total_nodes() > 0 {
+            self.resources.depleted_nodes() as f32 / self.resources.total_nodes() as f32
+        } else {
+            0.0
+        };
+        if depleted_ratio > 0.3 {
+            events.push(SystemEvent::ErrorRate { rate: depleted_ratio });
+        }
+
+        // Mean phi → curiosity/interest
+        if let Some(global) = self.coherence_tracker.current() {
+            if global.mean_phi > 0.5 {
+                events.push(SystemEvent::NoveltyDetected { score: global.mean_phi as f32 });
+            }
+            // Consensus → resonance
+            if global.mean_coherence > 0.6 {
+                events.push(SystemEvent::ConsensusReached { agreement: global.mean_coherence as f32 });
+            }
+        }
+
+        // Low average health → fatigue
+        let mean_health: f32 = self.agents.iter()
+            .filter(|a| a.core.alive)
+            .map(|a| a.core.health)
+            .sum::<f32>()
+            .max(0.01)
+            / alive.max(1) as f32;
+        if mean_health < 40.0 {
+            events.push(SystemEvent::BatteryLow { level: mean_health / 100.0 });
+        }
+
+        // Social interactions happened this tick (from phi_bridge)
+        let social_count = self.relationships.total_relationships();
+        if social_count > 5 {
+            events.push(SystemEvent::PeerConnected { id: "community".into() });
+        }
+
+        events
+    }
+
     /// Get current simulation state for observation
     pub fn snapshot(&self) -> WorldSnapshot {
         WorldSnapshot {
@@ -474,6 +604,11 @@ impl WorldSim {
             resources_depleted: self.resources.depleted_nodes(),
             total_relationships: self.relationships.total_relationships(),
             total_trades: self.economy.total_trades,
+            emotion_dominant: self.emotion.dominant_emotion()
+                .map(|e| format!("{:?}", e)).unwrap_or_else(|| "Neutral".into()),
+            emotion_valence: self.emotion.pad.valence,
+            emotion_arousal: self.emotion.pad.arousal,
+            emotion_dominance: self.emotion.pad.dominance,
         }
     }
 }
@@ -491,4 +626,8 @@ pub struct WorldSnapshot {
     pub resources_depleted: usize,
     pub total_relationships: usize,
     pub total_trades: u64,
+    pub emotion_dominant: String,
+    pub emotion_valence: f32,
+    pub emotion_arousal: f32,
+    pub emotion_dominance: f32,
 }

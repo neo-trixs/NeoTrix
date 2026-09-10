@@ -1,14 +1,13 @@
-import { enhancedInvoke as call } from './adapter'
+/* ════════════════════════════════════════════
+   api/memory.ts — KB 记忆 + API Key
+   记忆操作走 domain plugin (memory domain)
+   API Key 操作走直接 invoke
+   ════════════════════════════════════════════ */
+import { invoke } from '@tauri-apps/api/core'
+import * as domain from './domain'
 import type { MemoryStats } from './types'
 
-/* ════════════════════════════════════════════
-   api/memory.ts — KB 记忆（stats/export/clear）+ API Key
-   对应 memory_mgr_cmds.rs / chat_cmds.rs
-   B6 强化 (2026-08-25): MemoryEntry/MemoryTimelineEntry 类型化
-   （镜像 memory_mgr_cmds.rs:12/45），unknown[] → 强类型返回
-   ════════════════════════════════════════════ */
-
-/* ── KB 记忆 ── */
+/* ── KB 记忆（domain plugin） ── */
 
 /** 镜像 memory_mgr_cmds.rs:12 MemoryEntry */
 export interface MemoryEntry {
@@ -34,42 +33,42 @@ export interface MemoryTimelineEntry {
 }
 
 export function memoryStats(): Promise<MemoryStats> {
-  return call('memory_stats', {})
+  return domain.memory.stats() as Promise<MemoryStats>
 }
 
 export function memoryExport(format?: string): Promise<string> {
-  return call('memory_export', { format: format ?? null })
+  return domain.memory.export(format) as Promise<string>
 }
 
 export function memoryImport(content: string, format?: string): Promise<number> {
-  return call('memory_import', { content, format: format ?? 'json' })
+  return domain.memory.import(content).then(r => r.imported)
 }
 
 export function memoryClear(kind?: string | null): Promise<number> {
-  return call('memory_clear', { kind: kind ?? null })
+  return domain.memory.clear(kind) as Promise<number>
 }
 
 export function memoryList(category?: string): Promise<MemoryEntry[]> {
-  return call('memory_list', { category: category ?? null })
+  return domain.memory.list(category) as Promise<MemoryEntry[]>
 }
 
 export function memorySearch(query: string, kind?: string | null): Promise<MemoryEntry[]> {
-  return call('memory_search', { query, kind: kind ?? null })
+  return domain.memory.search(query) as Promise<MemoryEntry[]>
 }
 
 export function memoryTimeline(days?: number): Promise<MemoryTimelineEntry[]> {
-  return call('memory_timeline', { days: days ?? null })
+  return domain.memory.timeline(days) as Promise<MemoryTimelineEntry[]>
 }
 
-/* ── API Key ── */
+/* ── API Key（直接 invoke，非 domain plugin） ── */
 export function saveApiKey(key: string): Promise<void> {
-  return call('save_api_key', { key })
+  return invoke('save_api_key', { key })
 }
 
 export function hasApiKey(): Promise<boolean> {
-  return call('has_api_key', {})
+  return invoke('has_api_key', {})
 }
 
 export function deleteApiKey(): Promise<void> {
-  return call('delete_api_key', {})
+  return invoke('delete_api_key', {})
 }

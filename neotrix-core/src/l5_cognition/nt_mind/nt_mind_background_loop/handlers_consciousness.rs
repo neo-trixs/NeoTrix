@@ -186,7 +186,8 @@ impl BackgroundLoopHandle {
                     let _ = kb.kv_set("consciousness", "blind_spots", &spots_json.to_string());
 
                     // L6 Self intra-reflection: analyze reasoning quality
-                    // TODO: brain not available in this scope — need to obtain from self.bbrain
+                    // brain not available in this scope — need to obtain from self.bbrain
+                    tracing::warn!("L6 intra-reflection skipped: brain not available in this scope");
                     // if let Some(ref engine) = brain.reasoning_engine {
                     //     let trace: Vec<String> = engine
                     //         .state_trajectory
@@ -254,8 +255,8 @@ impl BackgroundLoopHandle {
     /// L10 超越层 T3 接线: 意识核心快照 ↔ 能力网共振 → 建议落盘 + goal 入队。
     /// 依赖文件缺失时静默跳过 (能力网未初始化是合法状态, 不视为错误)。
     async fn run_transcendent_tick(&mut self) {
-        use crate::l6_meta::nt_nexus::evolution_harness::EvolutionHarness;
-        use crate::l6_meta::nt_nexus::transcendent_loop::LoopConfig;
+        use crate::l6_meta::memory::evolution_harness::EvolutionHarness;
+        use crate::l6_meta::memory::transcendent_loop::LoopConfig;
 
         let Some(ref kb) = self.kb else { return };
         // 能力网注册表 (RegistryExport 格式, 与 handle_capability_auto_evolve 一致)
@@ -264,7 +265,7 @@ impl BackgroundLoopHandle {
             Ok(j) => j,
             Err(_) => return, // 能力网未初始化 → 静默跳过
         };
-        let (infos, _problems) = EvolutionHarness::infos_from_registry_export(&json);
+        let (infos, _problems): (Vec<_>, Vec<_>) = EvolutionHarness::infos_from_registry_export(&json);
         if infos.is_empty() {
             return;
         }
@@ -504,7 +505,7 @@ impl BackgroundLoopHandle {
             // H1 修复: 增量注入 — 树内 fruits 从不清理, 全量克隆会让历史果实每 tick
             // 重新注入 SEAL (pipeline.rs:901 只清 brain 副本), 同一 trace 反复进
             // process buffer → 学习被重复污染。只注入 produced_at_cycle 比上次更新的果实。
-            // TODO: _consciousness_fruits field not available on BMonitor
+            // _consciousness_fruits field not available on BMonitor — using tree.fruits directly
             {
                 let new_fruits: Vec<_> = tree
                     .fruits
@@ -617,7 +618,8 @@ impl BackgroundLoopHandle {
                             .as_secs() as i64,
                     },
                 );
-                // TODO: _last_consciousness_quality and _consciousness_critique_count not available on BMonitor
+                // _last_consciousness_quality and _consciousness_critique_count not available on BMonitor
+                tracing::warn!("Consciousness quality tracking skipped: BMonitor fields not available");
                 // if let Some(b) = self.bbrain.as_mut() {
                 //     if let Ok(mut brain) = b.try_write() {
                 //         brain._last_consciousness_quality = c.overall_quality;
@@ -655,7 +657,8 @@ impl BackgroundLoopHandle {
         // 写锁窗口只覆盖 drain 本身, KB 写在锁外执行 (短临界区)。
         // kb 缺失时不排空 — 数据留缓冲等下次 tick (cap 64 兜底防无界)。
         if let Some(ref kb) = self.kb {
-            // TODO: _constitution_gate not available on BMonitor
+            // _constitution_gate not available on BMonitor
+            tracing::warn!("ConstitutionGate decisions skipped: BMonitor._constitution_gate not available");
             let decisions: Vec<serde_json::Value> = Vec::new();
             // if let Some(b) = self.bbrain.as_mut() {
             //     if let Ok(mut brain) = b.try_write() {
@@ -702,7 +705,8 @@ impl BackgroundLoopHandle {
         );
 
         // ── Phase 3: FEPIITBridge — compute unified consciousness score ──
-        // TODO: fep_iit_bridge type is Option<()> (stub); need real FepIitBridge type
+        // fep_iit_bridge type is Option<()> (stub); need real FepIitBridge type
+        tracing::warn!("FEP-IIT bridge skipped: type is stub (Option<()>)");
         // if let Some(ref fep_iit) = self.fep_iit_bridge {
         //     if let Some(ref monitor) = self.awareness {
         //         let report = monitor.get_report();
@@ -770,7 +774,8 @@ impl BackgroundLoopHandle {
                     }
                 }
             }
-            // TODO: fep_iit_bridge is Option<()> (stub); need real FepIitBridge type
+            // fep_iit_bridge is Option<()> (stub); need real FepIitBridge type
+            tracing::warn!("FEP-IIT bridge persistence skipped: type is stub (Option<()>)");
             // if let Some(ref fep_iit) = self.fep_iit_bridge {
             //     if let Some(ref kb) = self.kb {
             //         if let Ok(stats) = kb.stats() {
@@ -911,11 +916,13 @@ impl BackgroundLoopHandle {
                 .and_then(|m| m.latest())
                 .unwrap_or(0.5);
             // BMonitor observation (method not available on BMonitor)
-            // TODO: implement observe_from_metrics on BMonitor
+            // observe_from_metrics not available on BMonitor
+            tracing::warn!("BMonitor.observe_from_metrics skipped: method not implemented");
             // if let Some(b) = self.bbrain.as_ref() {
             //     b.observe_from_metrics(phi, coherence, load);
             // }
-            // TODO: implement latest_report on BMonitor
+            // latest_report not available on BMonitor
+            tracing::warn!("BMonitor.latest_report skipped: method not implemented");
             // if let Some(b) = self.bbrain.as_ref() {
             //     if let Some(report) = b.latest_report() {
             //         let trend = b.health_trend();
@@ -1576,8 +1583,8 @@ impl BackgroundLoopHandle {
         // evolution_harness::self_test 内部自建实例运行闭环, 可用作架构审计
         // registry 的检测件 (T1 impl + T2 注册 + T3 handle_awareness 接线齐全)。
         self_tests.register(Box::new(
-            crate::l6_meta::nt_nexus::evolution_harness::EvolutionHarness::new(
-                crate::l6_meta::nt_nexus::transcendent_loop::LoopConfig::default(),
+            crate::l6_meta::memory::evolution_harness::EvolutionHarness::new(
+                crate::l6_meta::memory::transcendent_loop::LoopConfig::default(),
             ),
         ));
         self_tests.register(Box::new(ConsciousnessBridge::new()));
@@ -1686,7 +1693,7 @@ impl BackgroundLoopHandle {
         }
 
         // BMonitor (direct field, not Option)
-        // TODO: self_test not available on Arc<RwLock<BMonitor>>
+        // self_test not available on Arc<RwLock<BMonitor>>
         // if let Some(b) = self.bbrain.as_ref() {
         //     match b.self_test() {
         //         Ok(()) => log::info!("[SELF-TEST] BMonitor ✅ pass"),
@@ -1850,7 +1857,8 @@ impl BackgroundLoopHandle {
             let passed = results.iter().filter(|r| r.passed).count();
             let pass_rate = passed as f64 / total as f64;
             if let Some(ref kb) = self.kb {
-                // TODO: _last_consciousness_quality not available on BMonitor
+                // _last_consciousness_quality not available on BMonitor
+                tracing::warn!("Consciousness quality not available on BMonitor; using 0.0");
                 let quality = 0.0_f64;
                 let pair_json = calibration_pair_json(quality, pass_rate, total);
                 if let Err(e) = kb.field_stage(
@@ -1916,7 +1924,7 @@ impl BackgroundLoopHandle {
         let mut results: Vec<crate::core::nt_core_self_test::SelfTestResult> = Vec::new();
 
         // NT-CORE: 意识核心检测件
-        // TODO: self_test not available on Arc<RwLock<BMonitor>>
+        // self_test not available on Arc<RwLock<BMonitor>>
         // if let Some(b) = self.bbrain.as_ref() {
         //     match b.self_test() {
         //         Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass(
@@ -1983,7 +1991,8 @@ impl BackgroundLoopHandle {
             }
         }
         if let Some(ref b) = self.fep_iit_bridge {
-            // TODO: fep_iit_bridge type does not implement SelfTest; skip for now
+            // fep_iit_bridge type does not implement SelfTest; skip for now
+            tracing::warn!("FEP-IIT bridge SelfTest skipped: type does not implement SelfTest");
             let _ = b;
         }
         // NT-SHIELD: 检查注册表
@@ -2017,7 +2026,7 @@ impl BackgroundLoopHandle {
         //     )
         // });
         let meta_ok =
-            crate::l6_meta::nt_nexus::meta_observer::MetaObserverSelfTest
+            crate::l6_meta::memory::meta_observer::MetaObserverSelfTest
                 .self_test()
                 .is_ok();
         results.push(if meta_ok {

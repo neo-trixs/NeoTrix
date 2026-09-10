@@ -195,9 +195,9 @@ mod tests {
 
     #[test]
     fn biome_map_lookup() {
-        let hm = super::heightmap::Heightmap::generate(
+        let hm = super::super::heightmap::Heightmap::generate(
             42,
-            super::heightmap::HeightmapConfig::default(),
+            super::super::heightmap::HeightmapConfig::default(),
         );
         let temp = vec![vec![0.5f32; 128]; 128];
         let moist = vec![vec![0.5f32; 128]; 128];

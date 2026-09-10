@@ -75,7 +75,7 @@ async fn test_test_flakiness_monitoring() {
     assert!(findings.is_empty(), "Should return empty when no flakiness file");
 }
 
-// TODO: Commented out - tests call non-existent methods on BackgroundLoop
+// Commented out - tests call non-existent methods on BackgroundLoop
 // #[tokio::test]
 // async fn test_background_loop_has_system_health_heal_handler() {
 //     let brain = Arc::new(RwLock::new(SelfIteratingBrain::new()));
@@ -85,7 +85,7 @@ async fn test_test_flakiness_monitoring() {
 //     bg.handle_system_health_heal().await;
 // }
 
-// TODO: These tests require methods that don't exist yet on BackgroundLoop
+// These tests require methods that don't exist yet on BackgroundLoop
 // #[tokio::test]
 // async fn test_self_heal_actions_dry_run() {
 //     let brain = Arc::new(RwLock::new(SelfIteratingBrain::new()));
@@ -141,7 +141,7 @@ async fn test_healer_registry_integration() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-// TODO: These tests access private fields and test non-existent types
+// These tests access private fields and test non-existent types
 // #[tokio::test]
 // async fn test_self_heal_loop_from_self_audit() {
 //     use crate::l6_meta::nt_repair::// nt_mind_self_heal::{SelfHealLoop, HealableDetector};
@@ -161,7 +161,7 @@ async fn test_healer_registry_integration() {
 //     assert!(!loop_h.detectors[0].is_broken(), "Detector should be healed after closed loop");
 // }
 
-// TODO: Commented out - accesses private fields and non-existent types
+// Commented out - accesses private fields and non-existent types
 // #[tokio::test]
 // async fn test_unhealable_failure_surfaces() {
 //     use crate::l6_meta::nt_repair::// nt_mind_self_heal::SelfHealLoop;

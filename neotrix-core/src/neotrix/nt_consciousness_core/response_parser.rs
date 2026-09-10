@@ -76,7 +76,7 @@ impl ResponseParser {
             }
             serde_json::Value::Object(map) => {
                 // 检查是否是推理内容
-                let is_reasoning = map.get("type")
+                let _is_reasoning = map.get("type")
                     .or_else(|| map.get("role"))
                     .or_else(|| map.get("name"))
                     .map(|v| {

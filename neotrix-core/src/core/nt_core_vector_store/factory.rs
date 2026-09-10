@@ -1,15 +1,18 @@
 use super::store::{BruteForceVectorStore, IvfVectorStore, VectorStore};
+use super::store_hnsw::HnswVectorStore;
 use super::types::IndexConfig;
 
 pub enum StoreBackend {
     IVF,
     BruteForce,
+    Hnsw,
 }
 
 pub fn create_store(backend: StoreBackend, config: IndexConfig) -> Box<dyn VectorStore> {
     match backend {
         StoreBackend::IVF => Box::new(IvfVectorStore::new(config)),
         StoreBackend::BruteForce => Box::new(BruteForceVectorStore::new(config)),
+        StoreBackend::Hnsw => Box::new(HnswVectorStore::new(config)),
     }
 }
 

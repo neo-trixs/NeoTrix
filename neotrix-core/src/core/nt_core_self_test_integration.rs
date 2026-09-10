@@ -322,7 +322,7 @@ pub fn register_lightweight_modules(registry: &mut SelfTestRegistry) {
     //     crate::l6_meta::nt_repair::nt_mind_causal_trace::CausalTraceSelfTest,
     // ));
     registry.register(Box::new(
-        crate::l6_meta::nt_nexus::meta_observer::MetaObserverSelfTest,
+        crate::l6_meta::memory::meta_observer::MetaObserverSelfTest,
     ));
     registry.register(Box::new(
         crate::core::nt_core_self_constitution::GovernanceConstitutionSelfTest,

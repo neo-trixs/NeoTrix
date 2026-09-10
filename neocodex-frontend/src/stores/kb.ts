@@ -114,12 +114,27 @@ function mockDataSource(): KbDataSource {
 /* ── 响应式 store ── */
 
 import { kbDocList, kbDocIngest, kbDocDelete, type KbDocSummary as TauriDoc } from '../api/kb'
+import * as domain from '../api/domain'
 
 const dataSource: KbDataSource = mockDataSource()
 
 /** 真实后端数据源 (B2 接线): 库 = 文档 metadata.library 聚合 (v1 虚拟分组) */
 const tauriDataSource: KbDataSource = {
   async listLibraries() {
+    try {
+      const result = await domain.kb.libraryList() as any
+      if (result && result.ok && result.libraries) {
+        return result.libraries.map((lib: any) => ({
+          id: lib.id,
+          name: lib.name,
+          description: lib.description,
+          docCount: lib.doc_count || 0,
+          chunkCount: lib.chunk_count || 0,
+          updatedAt: (lib.updated_at || 0) * 1000,
+        }))
+      }
+    } catch { /* fallback to doc aggregation */ }
+    // Fallback: aggregate from doc_list
     const docs = await kbDocList()
     const groups = new Map<string, KbLibrary>()
     for (const d of docs) {
@@ -136,13 +151,25 @@ const tauriDataSource: KbDataSource = {
     }
     return [...groups.values()]
   },
-  // v1 限制: 分组为派生视图 — create/rename/delete 仅作用于文档层,
-  // 空组不持久化 (诚实标注, 待 kb_library 表后再实体化)
-  async createLibrary(name) {
-    return { id: `lib-${name}`, name, description: '(虚拟分组 — 入库第一个文档后固化)', docCount: 0, chunkCount: 0, updatedAt: Date.now() }
+  async createLibrary(name, description) {
+    try {
+      const result = await domain.kb.libraryCreate(name, description) as any
+      if (result && result.ok) {
+        return { id: result.id, name, description, docCount: 0, chunkCount: 0, updatedAt: Date.now() }
+      }
+    } catch { /* fallback */ }
+    return { id: `lib-${name}`, name, description, docCount: 0, chunkCount: 0, updatedAt: Date.now() }
   },
-  async renameLibrary() { /* v1: 派生分组无实体 */ },
-  async deleteLibrary() { /* v1: 派生分组无实体 */ },
+  async renameLibrary(id, name) {
+    try {
+      await domain.kb.libraryRename(id, name)
+    } catch { /* v1: fallback no-op */ }
+  },
+  async deleteLibrary(id) {
+    try {
+      await domain.kb.libraryDelete(id)
+    } catch { /* v1: fallback no-op */ }
+  },
   async listDocs(libraryId) {
     const lib = libraryId.replace(/^lib-/, '')
     const docs = await kbDocList()

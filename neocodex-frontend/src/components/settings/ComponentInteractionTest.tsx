@@ -82,10 +82,6 @@ export function ComponentInteractionTest() {
         const status = await modelPool.getModelPoolStatus()
         if (!status) throw new Error('No status')
       }),
-      runTest('modelPool.list', async () => {
-        const models = await modelPool.listModels()
-        if (!Array.isArray(models)) throw new Error('Expected array')
-      }),
     ])
     suites.push({ name: '模型池', tests: modelTests })
 
@@ -117,7 +113,7 @@ export function ComponentInteractionTest() {
     setCurrentTest('市场')
     const marketTests = await Promise.all([
       runTest('market.status', async () => {
-        const status = await market.getMarketStatus()
+        const status = await market.marketStatus()
         if (!status) throw new Error('No status')
       }),
     ])

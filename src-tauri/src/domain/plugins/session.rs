@@ -200,6 +200,121 @@ impl SessionPlugin {
             .filter(|s| s.name.to_lowercase().contains(&q) || s.id.to_lowercase().contains(&q))
             .collect())
     }
+
+    fn rename(&self, id: &str, name: &str) -> Result<(), DomainError> {
+        let conn = self.open_db()?;
+        let n = conn.execute(
+            "UPDATE sessions SET name = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![name, chrono::Utc::now().timestamp(), id],
+        )
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("重命名失败: {}", e), recoverable: true })?;
+        if n == 0 {
+            return Err(DomainError { code: "NOT_FOUND".into(), message: format!("Session not found: {}", id), recoverable: true });
+        }
+        Ok(())
+    }
+
+    fn archive(&self, id: &str) -> Result<(), DomainError> {
+        let conn = self.open_db()?;
+        // Move to archived_sessions table
+        conn.execute_batch(&format!(
+            "CREATE TABLE IF NOT EXISTS archived_sessions (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL, messages TEXT NOT NULL DEFAULT '[]',
+                project TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT OR REPLACE INTO archived_sessions SELECT * FROM sessions WHERE id = '{}';
+            DELETE FROM sessions WHERE id = '{}';",
+            id, id
+        ))
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("归档失败: {}", e), recoverable: true })?;
+        Ok(())
+    }
+
+    fn restore(&self, id: &str) -> Result<(), DomainError> {
+        let conn = self.open_db()?;
+        conn.execute_batch(&format!(
+            "INSERT OR REPLACE INTO sessions SELECT * FROM archived_sessions WHERE id = '{}';
+            DELETE FROM archived_sessions WHERE id = '{}';",
+            id, id
+        ))
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("恢复失败: {}", e), recoverable: true })?;
+        Ok(())
+    }
+
+    fn list_archived(&self) -> Result<Vec<SessionInfo>, DomainError> {
+        let conn = self.open_db()?;
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS archived_sessions (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL, messages TEXT NOT NULL DEFAULT '[]',
+                project TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0
+            );"
+        );
+        let mut stmt = conn
+            .prepare("SELECT id, name, created_at, updated_at, messages, project, sort_order FROM archived_sessions ORDER BY updated_at DESC")
+            .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?;
+        let rows = stmt.query_map([], |row| {
+            let id: String = row.get(0)?;
+            let name: String = row.get(1)?;
+            let created: i64 = row.get(2)?;
+            let updated: i64 = row.get(3)?;
+            let messages: String = row.get(4)?;
+            let project: String = row.get(5)?;
+            let sort_order: i64 = row.get(6)?;
+            let message_count = serde_json::from_str::<serde_json::Value>(&messages)
+                .map(|v| v.as_array().map(|a| a.len()).unwrap_or(0))
+                .unwrap_or(0);
+            Ok(SessionInfo { id, name, message_count, created_at: created, updated_at: updated, project, sort_order })
+        })
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("查询失败: {}", e), recoverable: true })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("解析行失败: {}", e), recoverable: true })?);
+        }
+        Ok(out)
+    }
+
+    fn tag(&self, id: &str, tag: &str) -> Result<Vec<String>, DomainError> {
+        let conn = self.open_db()?;
+        // Store tags in app_state as JSON array
+        let key = format!("session_tags:{}", id);
+        let existing: String = conn.query_row(
+            "SELECT value FROM app_state WHERE key = ?1",
+            rusqlite::params![key],
+            |r| r.get(0),
+        ).unwrap_or_else(|_| "[]".to_string());
+        let mut tags: Vec<String> = serde_json::from_str(&existing).unwrap_or_default();
+        if !tags.contains(&tag.to_string()) {
+            tags.push(tag.to_string());
+        }
+        let json = serde_json::to_string(&tags).unwrap_or_default();
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            rusqlite::params![key, json],
+        )
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("打标失败: {}", e), recoverable: true })?;
+        Ok(tags)
+    }
+
+    fn untag(&self, id: &str, tag: &str) -> Result<Vec<String>, DomainError> {
+        let conn = self.open_db()?;
+        let key = format!("session_tags:{}", id);
+        let existing: String = conn.query_row(
+            "SELECT value FROM app_state WHERE key = ?1",
+            rusqlite::params![key],
+            |r| r.get(0),
+        ).unwrap_or_else(|_| "[]".to_string());
+        let mut tags: Vec<String> = serde_json::from_str(&existing).unwrap_or_default();
+        tags.retain(|t| t != tag);
+        let json = serde_json::to_string(&tags).unwrap_or_default();
+        conn.execute(
+            "INSERT INTO app_state (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            rusqlite::params![key, json],
+        )
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("取消打标失败: {}", e), recoverable: true })?;
+        Ok(tags)
+    }
 }
 
 impl DomainPlugin for SessionPlugin {

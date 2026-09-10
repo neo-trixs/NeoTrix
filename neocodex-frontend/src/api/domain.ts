@@ -126,6 +126,8 @@ export const session = {
   rename: (id: string, name: string) => call<void>('session', 'rename', { id, name }),
   listArchived: () => call<Session[]>('session', 'list_archived'),
   clear: (id: string) => call<void>('session', 'clear', { id }),
+  tag: (id: string, tag: string) => call<string[]>('session', 'tag', { id, tag }),
+  untag: (id: string, tag: string) => call<string[]>('session', 'untag', { id, tag }),
 }
 
 export interface Session {
@@ -152,6 +154,10 @@ export const chat = {
   clear: (sessionId: string) => call<void>('chat', 'clear', { session_id: sessionId }),
   regenerate: (sessionId: string, messageIndex: number) =>
     call<void>('chat', 'regenerate', { session_id: sessionId, message_index: messageIndex }),
+  editMessage: (sessionId: string, index: number, content: string) =>
+    call<void>('chat', 'edit_message', { session_id: sessionId, index, content }),
+  deleteMessage: (sessionId: string, index: number) =>
+    call<void>('chat', 'delete_message', { session_id: sessionId, index }),
   sideChat: {
     get: (sessionId: string) => call<SideChatMessage[]>('chat', 'side_chat_get', { session_id: sessionId }),
     send: (sessionId: string, content: string) =>
@@ -236,12 +242,26 @@ export const kb = {
     call<string | null>('kb', 'kv_get', { namespace, key }),
   kvList: (namespace: string) =>
     call<[string, string][]>('kb', 'kv_list', { namespace }),
+  docIngest: (id: string, label: string, kind: string, data: string, library?: string) =>
+    call<{ id: string }>('kb', 'doc_ingest', { id, label, kind, data, library }),
+  docList: (limit?: number) =>
+    call<KbDoc[]>('kb', 'doc_list', { limit }),
+  docDelete: (id: string) => call<void>('kb', 'doc_delete', { id }),
+  docReindex: () => call<{ reindexed: number }>('kb', 'doc_reindex'),
+  libraryCreate: (name: string, description: string) =>
+    call<{ id: string }>('kb', 'library_create', { name, description }),
+  libraryList: () => call<KbLibrary[]>('kb', 'library_list'),
+  libraryRename: (id: string, name: string) =>
+    call<void>('kb', 'library_rename', { id, name }),
+  libraryDelete: (id: string) => call<void>('kb', 'library_delete', { id }),
 }
 
 export interface KbResult { id: string; label: string; score: number }
 export interface KbNode { id: string; label: string; kind: string }
 export interface KbGraph { nodes: KbNode[]; edges: unknown[] }
 export interface KbStats { node_count: number; edge_count: number }
+export interface KbDoc { id: string; label: string; kind: string; created_at: number }
+export interface KbLibrary { id: string; name: string; description: string; doc_count: number; chunk_count: number; created_at: number; updated_at: number }
 
 /**
  * 文件域操作
@@ -353,6 +373,8 @@ export const memory = {
   clear: (kind?: string) => call<number>('memory', 'clear', { kind }),
   stats: () => call<MemoryStats>('memory', 'stats'),
   timeline: (days?: number) => call<TimelineEntry[]>('memory', 'timeline', { days }),
+  export: (format?: string) => call<{ memories: MemoryEntry[]; exported_at: string; count: number }>('memory', 'export', { format }),
+  import: (content: string) => call<{ imported: number }>('memory', 'import', { content }),
 }
 
 export interface MemoryEntry { id: string; kind: string; content: string }

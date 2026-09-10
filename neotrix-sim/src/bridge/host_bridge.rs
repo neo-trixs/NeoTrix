@@ -176,7 +176,7 @@ mod tests {
     use crate::consciousness::ConsciousnessState;
 
     fn mock_consciousness() -> ConsciousnessState {
-        ConsciousnessState::default()
+        ConsciousnessState::new("test_agent")
     }
 
     fn mock_snapshot() -> WorldSnapshot {
@@ -192,6 +192,10 @@ mod tests {
             resources_depleted: 5,
             total_relationships: 12,
             total_trades: 3,
+            emotion_dominant: "Neutral".into(),
+            emotion_valence: 0.0,
+            emotion_arousal: 0.0,
+            emotion_dominance: 0.0,
         }
     }
 
@@ -231,9 +235,10 @@ mod tests {
     #[test]
     fn test_report_buffering() {
         let mut bridge = HostBridge::new(3, 20);
+        let snap = mock_snapshot();
         for _ in 0..2 {
             bridge.build_report(
-                mock_snapshot(),
+                &snap,
                 mock_consciousness(),
                 0.5,
                 Vec::new(),
@@ -242,7 +247,7 @@ mod tests {
         }
         assert!(!bridge.should_absorb());
         bridge.build_report(
-            mock_snapshot(),
+            &snap,
             mock_consciousness(),
             0.5,
             Vec::new(),

@@ -286,6 +286,17 @@ impl FeelEngine {
         self.snapshots.len()
     }
 
+    // -- KB persistence --------------------------------------------------------
+
+    /// 持久化情感状态到 KB (文件存储)
+    pub fn persist_state(&self, kb_path: &std::path::Path) -> Result<(), String> {
+        let state = self.report();
+        let json = serde_json::to_string(&state).map_err(|e| e.to_string())?;
+        let path = kb_path.join("emotion_state.json");
+        std::fs::write(&path, &json).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     // -- Attention routing (ConsciousnessTree integration) --------------------
 
     /// Produce an attention signal that the ConsciousnessTree consumes to

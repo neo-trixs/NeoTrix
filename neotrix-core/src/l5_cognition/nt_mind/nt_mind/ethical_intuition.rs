@@ -197,7 +197,8 @@ impl EthicalIntuition {
 
         // 更新冲突类型校准参数
         // 简化：统计准确率
-        // TODO: 实现更复杂的校准算法（Platt scaling / Isotonic regression）
+        // 校准算法待实现（Platt scaling / Isotonic regression）
+        tracing::warn!("Calibration algorithm not yet implemented (Platt scaling / Isotonic regression)");
     }
 
     fn analyze_mapping(&self, case: &EthicalCase) -> String {

@@ -326,6 +326,15 @@ impl PhysicalEmbodiment {
             violations: self.safety_kernel.violations.iter().filter(|v| !v.resolved).count(),
         }
     }
+
+    /// 持久化具身状态到 KB (文件存储)
+    pub fn persist_state(&self, kb_path: &std::path::Path) -> Result<(), String> {
+        let snapshot = self.snapshot();
+        let json = serde_json::to_string(&snapshot).map_err(|e| e.to_string())?;
+        let path = kb_path.join("physical_state.json");
+        std::fs::write(&path, &json).map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 /// 物理具身状态快照

@@ -4,7 +4,7 @@
    SkillInfo { name, path, description, line_count, domain }
    skill_list / skill_get / skill_search
    ════════════════════════════════════════════ */
-import { call } from './client'
+import { invoke } from '@tauri-apps/api/core'
 
 export interface SkillInfo {
   name: string
@@ -20,13 +20,13 @@ export interface SkillListResult {
 }
 
 export function skillList(): Promise<SkillListResult> {
-  return call('skill_list')
+  return invoke('skill_list')
 }
 
 export function skillGet(name: string): Promise<SkillInfo> {
-  return call('skill_get', { name })
+  return invoke('skill_get', { name })
 }
 
 export function skillSearch(query: string): Promise<SkillInfo[]> {
-  return call('skill_search', { query })
+  return invoke('skill_search', { query })
 }

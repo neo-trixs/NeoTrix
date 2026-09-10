@@ -338,7 +338,7 @@ impl OsintReport {
 
         if let Some(ref shodan) = self.shodan {
             for svc in &shodan.services {
-                let name = svc.product.as_deref().unwrap_or("unknown");
+                let _name = svc.product.as_deref().unwrap_or("unknown");
                 if let Ok(id) = Self::write_with_evidence(kb, &format!("shodan: {}", svc.port), NodeType::Source, svc.banner.as_deref(), None, domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }

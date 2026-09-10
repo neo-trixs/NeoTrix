@@ -15,4 +15,4 @@ pub mod evolution;
 pub use coordination as nt_meta;
 pub use coordination as nt_governance;
 pub use healing as nt_repair;
-pub use memory as nt_nexus;
+pub mod nt_nexus;

@@ -1,4 +1,4 @@
-import { enhancedInvoke as call } from './adapter'
+import { invoke } from '@tauri-apps/api/core'
 import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInfo } from './types'
 
 /* ════════════════════════════════════════════
@@ -9,41 +9,41 @@ import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInf
 /** 截图（内存内联返回 data_base64）：默认走后端临时文件生命周期，前端零磁盘往返。
  *  传 path 则沿旧语义写盘（data_base64=None）。 */
 export function screenshotAndSave(path?: string | null): Promise<ScreenCapture> {
-  return call('computer_screenshot_and_save', { path: path ?? null })
+  return invoke('computer_screenshot_and_save', { path: path ?? null })
 }
 
 export function screenCapture(path?: string): Promise<ScreenCapture> {
-  return call('computer_screen_capture', { path: path ?? null })
+  return invoke('computer_screen_capture', { path: path ?? null })
 }
 
 export function screenList(): Promise<DisplayInfo[]> {
-  return call('computer_screen_list', {})
+  return invoke('computer_screen_list', {})
 }
 
 export function getWindowList(): Promise<WindowInfo[]> {
-  return call('computer_get_window_list', {})
+  return invoke('computer_get_window_list', {})
 }
 
 export function getFrontmostApp(): Promise<FrontmostApp> {
-  return call('computer_get_frontmost_app', {})
+  return invoke('computer_get_frontmost_app', {})
 }
 
 export function mousePosition(): Promise<MousePosition> {
-  return call('computer_mouse_position', {})
+  return invoke('computer_mouse_position', {})
 }
 
 export function mouseMove(x: number, y: number): Promise<void> {
-  return call('computer_mouse_move', { x, y })
+  return invoke('computer_mouse_move', { x, y })
 }
 
 export function mouseClick(button?: string | null): Promise<void> {
-  return call('computer_mouse_click', { button: button ?? null })
+  return invoke('computer_mouse_click', { button: button ?? null })
 }
 
 export function keyboardType(text: string): Promise<void> {
-  return call('computer_keyboard_type', { text })
+  return invoke('computer_keyboard_type', { text })
 }
 
 export function keyboardPress(key: string, modifiers?: string[]): Promise<void> {
-  return call('computer_keyboard_press', { key, modifiers: modifiers ?? null })
+  return invoke('computer_keyboard_press', { key, modifiers: modifiers ?? null })
 }

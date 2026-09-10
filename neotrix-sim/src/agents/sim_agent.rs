@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -132,7 +131,6 @@ pub struct SimAgent {
     pub id: u64,
     pub core: AgentCore,
     pub skills: Vec<String>,
-    pub relationships: HashMap<String, f32>,
     pub memory: AgentMemory,
     pub personality: Personality,
     pub recent_actions: Vec<String>,
@@ -240,7 +238,6 @@ impl SimAgent {
             id,
             core: AgentCore::new(&id.to_string(), position),
             skills: Vec::new(),
-            relationships: HashMap::new(),
             memory: AgentMemory::new(),
             personality: Personality::default(),
             recent_actions: Vec::new(),
@@ -262,7 +259,6 @@ impl SimAgent {
             id: numeric_id,
             core: AgentCore::new(string_id, position),
             skills: Vec::new(),
-            relationships: HashMap::new(),
             memory: AgentMemory::new(),
             personality: Personality::default(),
             recent_actions: Vec::new(),
@@ -281,11 +277,10 @@ impl SimAgent {
         self.core.alive
     }
 
-    /// Composite fitness: energy + health + social + needs satisfaction
+    /// Composite fitness: energy + health + needs satisfaction
     pub fn fitness(&self) -> f64 {
         let needs_avg = (self.needs[0] + self.needs[1] + self.needs[2] + self.needs[3] + self.needs[4]) / 5.0;
-        let social = self.relationships.len() as f32 / 10.0;
-        ((self.core.energy + self.core.health) / 200.0 + needs_avg * 0.3 + social.min(1.0) * 0.2) as f64
+        ((self.core.energy + self.core.health) / 200.0 + needs_avg * 0.3) as f64
     }
 
     /// Update Maslow needs each tick (CivSim pattern).
@@ -295,9 +290,8 @@ impl SimAgent {
         self.needs[0] = (1.0 - self.core.hunger / 100.0).max(0.0);
         // Safety: decays with low health, restored by resting
         self.needs[1] = (self.core.health / 100.0).max(0.0);
-        // Love/belonging: grows with relationships
-        let social_score = self.relationships.len() as f32 / 10.0;
-        self.needs[2] = social_score.min(1.0);
+        // Love/belonging: managed externally via RelationshipGraph
+        // self.needs[2] is set by WorldSim using relationship_graph data
         // Esteem: grows with fitness and skills
         self.needs[3] = (self.skills.len() as f32 / 5.0 + self.fitness() as f32 * 0.5).min(1.0);
         // Self-actualization: grows with phi and curiosity
@@ -314,16 +308,6 @@ impl SimAgent {
         }
     }
 
-    /// Update relationship with another agent
-    pub fn update_relationship(&mut self, other_id: &str, delta: f32) {
-        let current = self.relationships.get(other_id).copied().unwrap_or(0.0);
-        self.relationships
-            .insert(other_id.to_string(), (current + delta).clamp(-1.0, 1.0));
-    }
-
-    pub fn relationship_with(&self, other_id: &str) -> f32 {
-        self.relationships.get(other_id).copied().unwrap_or(0.0)
-    }
 }
 
 #[cfg(test)]
@@ -376,19 +360,6 @@ mod tests {
         core2.energy = 0.0;
         core2.metabolize(0.0, 0.0);
         assert!(!core2.alive);
-    }
-
-    #[test]
-    fn agent_relationships() {
-        let mut agent = SimAgent::new(1, Vec2::zero());
-        agent.update_relationship("b", 0.3);
-        assert!((agent.relationship_with("b") - 0.3).abs() < 1e-6);
-
-        agent.update_relationship("b", 0.8);
-        assert!((agent.relationship_with("b") - 1.0).abs() < 1e-6); // clamped
-
-        agent.update_relationship("b", -2.0);
-        assert!((agent.relationship_with("b") - (-1.0)).abs() < 1e-6);
     }
 
     #[test]

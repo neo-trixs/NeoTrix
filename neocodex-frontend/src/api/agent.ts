@@ -1,84 +1,46 @@
 /**
- * Agent API — Agent 状态与配置
- * 
- * 通过 domain_call('agent', action, args) 调用后端 AgentPlugin。
+ * Agent API — 意识核心与模型管理
+ * 所有调用走 domain.ts typed helpers
  */
-import { domainCall } from './domain-client'
 
-export interface AgentStatus {
-  running: boolean
-  provider: string
-  model: string
-  uptime_secs: number
-  tasks_completed: number
+import * as domain from './domain'
+
+export async function getAgentStatus() {
+  return domain.agent.status()
 }
 
-export interface ProviderConfig {
-  name: string
-  api_key?: string
-  base_url?: string
-  models: string[]
+export async function startAgent(task: string) {
+  return domain.agent.start(task)
 }
 
-/**
- * 获取 Agent 状态
- */
-export async function getStatus(): Promise<AgentStatus> {
-  return domainCall<AgentStatus>('agent', 'status')
+export async function stopAgent() {
+  return domain.agent.stop()
 }
 
-/**
- * 启动 Agent
- */
-export async function start(): Promise<void> {
-  await domainCall('agent', 'start')
+export async function setProvider(name: string) {
+  return domain.agent.setProvider(name)
 }
 
-/**
- * 停止 Agent
- */
-export async function stop(): Promise<void> {
-  await domainCall('agent', 'stop')
+export async function testProvider(name: string) {
+  return domain.agent.testProvider(name)
 }
 
-/**
- * 设置 Provider
- */
-export async function setProvider(name: string): Promise<void> {
-  await domainCall('agent', 'set_provider', { name })
+export async function fetchModels(baseUrl: string, apiKey: string) {
+  return domain.agent.fetchModels(baseUrl, apiKey)
 }
 
-/**
- * 测试 Provider
- */
-export async function testProvider(config: ProviderConfig): Promise<boolean> {
-  return domainCall<boolean>('agent', 'test_provider', config)
+export async function getProviderConfig() {
+  return domain.agent.providerConfig()
 }
 
-/**
- * 获取 Provider 配置
- */
-export async function getConfig(): Promise<ProviderConfig> {
-  return domainCall<ProviderConfig>('agent', 'config')
+export async function addCustomProvider(config: Record<string, unknown>) {
+  return domain.agent.addCustomProvider(config)
 }
 
-/**
- * 获取健康报告
- */
-export async function getHealth(): Promise<any> {
-  return domainCall('agent', 'health')
+export async function getAppVersion() {
+  return domain.agent.appVersion()
 }
 
-/**
- * 设置项目
- */
-export async function setProject(path: string): Promise<void> {
-  await domainCall('agent', 'set_project', { path })
-}
-
-/**
- * 获取当前项目
- */
-export async function getProject(): Promise<string> {
-  return domainCall<string>('agent', 'get_project')
+export async function getAgentHealth() {
+  return domain.agent.health()
 }

@@ -1,4 +1,4 @@
-import { enhancedInvoke as call } from './adapter'
+import { invoke } from '@tauri-apps/api/core'
 
 /* ════════════════════════════════════════════
    api/harness.ts — Harness 统一网关前端 SDK

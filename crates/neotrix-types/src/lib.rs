@@ -6,6 +6,9 @@
 #![deny(dead_code)]
 
 pub mod core;
+pub mod knowledge_access;
+pub mod search_backend;
+pub mod write_guard_types;
 pub use core::self_measure;
 pub use core::self_model;
 

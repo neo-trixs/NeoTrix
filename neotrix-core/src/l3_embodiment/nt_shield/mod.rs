@@ -1,5 +1,9 @@
 //! L3 Embodiment Layer - Shield Modules
 
+use crate::neotrix::nt_core_event_bus::EventBus;
+use crate::core::nt_core_event::CoreEvent;
+use std::sync::Arc;
+
 pub mod nt_shield;
 
 pub mod nt_shield_agentic_scan;
@@ -26,3 +30,30 @@ pub mod nt_shield_ztnet;
 pub mod nt_shield_threat_detection;
 pub mod nt_shield_adversarial;
 pub mod nt_shield_osint;
+
+/// Shield 域事件发布器
+pub struct ShieldEventPublisher {
+    bus: Arc<EventBus>,
+}
+
+impl ShieldEventPublisher {
+    pub fn new(bus: Arc<EventBus>) -> Self {
+        Self { bus }
+    }
+    
+    pub fn intrusion_detected(&self, source_ip: &str, rule: &str, severity: &str) {
+        let _ = self.bus.emit(CoreEvent::ShieldIntrusionDetected {
+            source_ip: source_ip.to_string(),
+            rule: rule.to_string(),
+            severity: severity.to_string(),
+        });
+    }
+    
+    pub fn audit_completed(&self, dimensions: u32, findings: u32, score: f64) {
+        let _ = self.bus.emit(CoreEvent::ShieldAuditCompleted {
+            dimensions,
+            findings,
+            score,
+        });
+    }
+}

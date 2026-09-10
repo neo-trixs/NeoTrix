@@ -269,4 +269,12 @@ impl ComputerVisionPipeline {
     pub fn stats(&self) -> &CVStats {
         &self.stats
     }
+
+    /// 持久化感知状态到 KB (文件存储)
+    pub fn persist_state(&self, kb_path: &std::path::Path) -> Result<(), String> {
+        let json = serde_json::to_string(&self.stats).map_err(|e| e.to_string())?;
+        let path = kb_path.join("sense_state.json");
+        std::fs::write(&path, &json).map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }

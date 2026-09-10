@@ -4,7 +4,7 @@
    Workflow { id,name,description,version,steps,created_at,updated_at,tags }
    workflow_list / workflow_run / workflow_run_status / workflow_run_cancel
    ════════════════════════════════════════════ */
-import { call } from './client'
+import { invoke } from '@tauri-apps/api/core'
 
 export interface WorkflowStep {
   id: string
@@ -37,17 +37,17 @@ export interface WorkflowRun {
 }
 
 export function workflowList(): Promise<Workflow[]> {
-  return call('workflow_list')
+  return invoke('workflow_list')
 }
 
 export function workflowRun(workflowId: string): Promise<string> {
-  return call('workflow_run', { workflow_id: workflowId })
+  return invoke('workflow_run', { workflow_id: workflowId })
 }
 
 export function workflowRunStatus(runId: string): Promise<WorkflowRun> {
-  return call('workflow_run_status', { run_id: runId })
+  return invoke('workflow_run_status', { run_id: runId })
 }
 
 export function workflowRunCancel(runId: string): Promise<void> {
-  return call('workflow_run_cancel', { run_id: runId })
+  return invoke('workflow_run_cancel', { run_id: runId })
 }
