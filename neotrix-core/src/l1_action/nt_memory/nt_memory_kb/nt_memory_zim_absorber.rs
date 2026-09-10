@@ -94,7 +94,7 @@ pub fn absorb_zim_file(
         }
 
         let content: Vec<u8> = match zim.entry_content(&entry) {
-            Ok(Some(c)) => c.into(),
+            Ok(Some(c)) => c.to_vec().unwrap_or_default(),
             _ => {
                 stats.errors += 1;
                 continue;

@@ -54,9 +54,10 @@ impl SpatialMemory {
         tick: u64,
     ) -> u64 {
         self.current_position = position;
-        // Check if already known
+        // Check if already known — merge radius much smaller than cell_size
+        let merge_threshold = self.cell_size * 0.1;
         if let Some(existing) = self.locations.iter_mut().find(|l| {
-            Self::dist(l.position, position) < self.cell_size
+            Self::dist(l.position, position) < merge_threshold
         }) {
             existing.visit_count += 1;
             existing.last_visit_tick = tick;
@@ -76,7 +77,7 @@ impl SpatialMemory {
 
         // Connect to nearby locations
         let nearby: Vec<u64> = self.locations.iter()
-            .filter(|l| Self::dist(l.position, position) < self.cell_size * 3.0)
+            .filter(|l| Self::dist(l.position, position) < self.cell_size)
             .map(|l| l.id)
             .collect();
 

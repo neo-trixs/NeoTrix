@@ -9,9 +9,18 @@ use crate::environment::terrain::{Heightmap, HeightmapConfig, BiomeMap, Resource
 use crate::environment::structures::{StructureManager, StructureType};
 use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation, NearbyAgent, NearbyResource};
 use crate::agents::action_awareness::ActionAwareness;
+use crate::agents::memory_stream::MemoryStream;
+use crate::agents::graph_memory::GraphMemory;
+use crate::agents::spatial_memory::SpatialMemory;
+use crate::agents::planning::PlanningStack;
+use crate::agents::reflection::ReflectionEngine;
+use crate::agents::action_costs::{ActionCostTable, ActionBudget};
+use crate::agents::personality_drift::PersonalityDrift;
 use std::collections::HashMap;
 use crate::consciousness::phi_bridge::{PhiBridge, ConsciousnessState, InteractionRecord};
 use crate::consciousness::coherence_tracker::{CoherenceTracker, GlobalCoherence};
+use crate::consciousness::convergence::{ConvergenceDetector, ConvergenceState};
+use crate::consciousness::dual_representation::DualRepresentation;
 use crate::evolution::fitness_landscape::{FitnessLandscape, LandscapeConfig, AgentGenome};
 use crate::evolution::selection_pressure::{SelectionPressure, SelectionConfig, SelectionResult};
 use crate::evolution::mutation_ops::{MutationOps, MutationConfig};
@@ -20,6 +29,8 @@ use crate::feel::{EmotionEngine, SystemEvent, EmotionType};
 use crate::society::relationship_graph::RelationshipGraph;
 use crate::society::economy::{Economy, Inventory, ResourceType, TradeOffer};
 use crate::society::culture::Culture;
+use crate::society::theory_of_mind::TheoryOfMind;
+use crate::society::constitutional::ConstitutionalFeedback;
 use serde::{Serialize, Deserialize};
 
 /// Configuration for the simulation world
@@ -89,6 +100,19 @@ pub struct WorldSim {
     pub action_awareness: HashMap<String, ActionAwareness>,
     pub structures: StructureManager,
     pub tick: u64,
+    // Cross-domain integration: new subsystems
+    pub memory_streams: HashMap<String, MemoryStream>,
+    pub graph_memories: HashMap<String, GraphMemory>,
+    pub spatial_memories: HashMap<String, SpatialMemory>,
+    pub planning: HashMap<String, PlanningStack>,
+    pub reflections: HashMap<String, ReflectionEngine>,
+    pub action_costs: ActionCostTable,
+    pub action_budgets: HashMap<String, ActionBudget>,
+    pub personality_drift: HashMap<String, PersonalityDrift>,
+    pub theory_of_mind: HashMap<String, TheoryOfMind>,
+    pub constitutional: ConstitutionalFeedback,
+    pub convergence: ConvergenceDetector,
+    pub dual_repr: DualRepresentation,
 }
 
 impl WorldSim {
@@ -161,6 +185,18 @@ impl WorldSim {
             action_awareness: HashMap::new(),
             structures: StructureManager::new(50.0),
             tick: 0,
+            memory_streams: HashMap::new(),
+            graph_memories: HashMap::new(),
+            spatial_memories: HashMap::new(),
+            planning: HashMap::new(),
+            reflections: HashMap::new(),
+            action_costs: ActionCostTable::new(),
+            action_budgets: HashMap::new(),
+            personality_drift: HashMap::new(),
+            theory_of_mind: HashMap::new(),
+            constitutional: ConstitutionalFeedback::new(),
+            convergence: ConvergenceDetector::default_new(),
+            dual_repr: DualRepresentation::new(16),
         }
     }
 
@@ -207,6 +243,17 @@ impl WorldSim {
             let agent_ids: Vec<String> = self.agents.iter().map(|a| a.core.id.clone()).collect();
 
             for agent_id in &agent_ids {
+                // Initialize per-agent subsystems on first encounter
+                let pos = self.agents.iter().find(|a| &a.core.id == agent_id).map(|a| [a.core.position.x, a.core.position.y]).unwrap_or([0.0, 0.0]);
+                self.memory_streams.entry(agent_id.clone()).or_insert_with(|| MemoryStream::new(200));
+                self.graph_memories.entry(agent_id.clone()).or_insert_with(|| GraphMemory::new(500));
+                self.spatial_memories.entry(agent_id.clone()).or_insert_with(|| SpatialMemory::new(pos));
+                self.planning.entry(agent_id.clone()).or_insert_with(PlanningStack::new);
+                self.reflections.entry(agent_id.clone()).or_insert_with(ReflectionEngine::new);
+                self.action_budgets.entry(agent_id.clone()).or_insert_with(ActionBudget::new);
+                self.personality_drift.entry(agent_id.clone()).or_insert_with(|| PersonalityDrift::new(Default::default()));
+                self.theory_of_mind.entry(agent_id.clone()).or_insert_with(|| TheoryOfMind::new(50));
+
                 // Build observation first (immutable borrow)
                 let observation = {
                     let idx = self.agents.iter().position(|a| &a.core.id == agent_id);
@@ -222,6 +269,24 @@ impl WorldSim {
                 // Decide action (mutable borrow of self)
                 let action = self.decide_action_by_id(agent_id, &observation, &time_mods);
 
+                // Constitutional check
+                let (compliance, _violated) = self.constitutional.evaluate(
+                    &format!("{:?}", action), &observation.time_of_day, tick
+                );
+
+                // Action cost check
+                let can_afford = {
+                    let agent = self.agents.iter().find(|a| &a.core.id == agent_id);
+                    agent.map(|a| self.action_costs.can_afford(&action, a.core.energy, a.core.health))
+                        .unwrap_or(false)
+                };
+
+                if !can_afford || compliance < 0.3 {
+                    // Can't afford or unconstitutional — rest instead
+                    self.execute_action(agent_id, &AgentAction::Rest).await;
+                    continue;
+                }
+
                 // Action Awareness: predict before execution
                 {
                     let agent = self.agents.iter().find(|a| &a.core.id == agent_id).cloned();
@@ -233,6 +298,11 @@ impl WorldSim {
                     }
                 }
 
+                // Record budget
+                if let Some(budget) = self.action_budgets.get_mut(agent_id) {
+                    budget.record_action(&action, &self.action_costs);
+                }
+
                 self.execute_action(agent_id, &action).await;
 
                 // Action Awareness: verify after execution
@@ -242,9 +312,45 @@ impl WorldSim {
                     }
                 }
 
+                // Record action in memory streams
+                if let Some(ms) = self.memory_streams.get_mut(agent_id) {
+                    ms.add(crate::agents::memory_stream::MemoryNode {
+                        id: 0,
+                        kind: crate::agents::memory_stream::MemoryKind::Event,
+                        agent_id: agent_id.clone(),
+                        created_tick: tick,
+                        last_accessed_tick: tick,
+                        description: format!("{:?}", action),
+                        importance: compliance as f32,
+                        keywords: vec![],
+                        citations: vec![],
+                        embedding: None,
+                    });
+                }
+
                 // Record action
                 if let Some(agent) = self.agents.iter_mut().find(|a| &a.core.id == agent_id) {
                     agent.record_action(&action);
+                }
+
+                // Theory of Mind: observe other agents
+                if let Some(tom) = self.theory_of_mind.get_mut(agent_id) {
+                    for obs_agent in &observation.nearby_agents {
+                        let positive = obs_agent.relationship > 0.0;
+                        tom.observe_interaction(&obs_agent.id, true, positive, tick);
+                    }
+                }
+
+                // Personality drift: record experience
+                if let Some(pd) = self.personality_drift.get_mut(agent_id) {
+                    let signal = crate::agents::personality_drift::ExperienceSignal {
+                        social_success: observation.nearby_agents.len() as f32 * 0.1,
+                        exploration_reward: if matches!(action, AgentAction::Explore { .. }) { 0.2 } else { 0.0 },
+                        survival_stress: if compliance < 0.5 { 0.3 } else { 0.0 },
+                        achievement: if compliance > 0.8 { 0.1 } else { 0.0 },
+                        novelty_exposure: 0.1,
+                    };
+                    pd.record(signal);
                 }
             }
         }
@@ -267,6 +373,23 @@ impl WorldSim {
             for awareness in self.action_awareness.values_mut() {
                 awareness.learn();
             }
+
+            // 9. Personality drift: apply accumulated drift
+            for agent in &mut self.agents {
+                if let Some(pd) = self.personality_drift.get(&agent.core.id) {
+                    let new_p = pd.drift(&agent.personality, agent.core.age);
+                    agent.personality = new_p;
+                }
+            }
+
+            // 10. Constitutional decay
+            self.constitutional.decay();
+
+            // 11. Convergence detection
+            let alive_count = self.agents.iter().filter(|a| a.core.alive).count();
+            let mean_fitness = self.agents.iter().filter(|a| a.core.alive).map(|a| a.core.health as f64).sum::<f64>()
+                / alive_count.max(1) as f64;
+            self.convergence.record(mean_fitness, tick);
         }
 
         // Background tier — every 500 ticks

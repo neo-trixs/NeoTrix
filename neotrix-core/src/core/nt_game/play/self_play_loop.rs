@@ -439,6 +439,7 @@ mod tests {
             max_turns: 5,
             buffer_capacity: 32,
             seed: 99,
+            learning_rate: 1e-4,
         };
         let mut loop_ = SelfPlayLoop::new(config);
 
