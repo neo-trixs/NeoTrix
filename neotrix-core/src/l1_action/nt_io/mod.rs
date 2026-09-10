@@ -51,6 +51,9 @@ pub mod nt_io_telemetry;
 
 pub mod nt_io_user_avatar;
 
+// 上下文沙箱 — 工具输出压缩层
+pub mod context_sandbox;
+
 pub mod nt_io_messaging;
 pub mod nt_io_context_mgmt;
 pub mod nt_l1_error;

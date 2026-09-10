@@ -15,48 +15,66 @@ use super::agent_routing::AgentRoutingTable;
 #[cfg(test)]
 use super::provider_swap::ProviderSwapManager;
 
+// ── Routing ──────────────────────────────────────────────────
+mod consistent_hash;
+mod intelligent_router;
+mod learned_router;
+mod market_router;
+mod selection;
+mod subgrid;
+
+// ── Resilience ───────────────────────────────────────────────
 mod anomaly_detector;
 mod auto_recovery;
 mod circuit_breaker;
-mod challenge;
-mod benchmark_types;
-mod consistent_hash;
-mod coordinator;
-mod execution;
-mod intelligent_router;
-mod keyless;
-mod learned_router;
-mod market_router;
-mod ml_predictor;
-mod modular_gateway;
-mod plugin_hot_reload;
-mod plugin_system;
-pub mod pool_health;
-mod registry;
 mod reliability;
 mod response_cache;
 mod response_healer;
-mod selection;
+
+// ── Execution ────────────────────────────────────────────────
+mod coordinator;
+mod execution;
+mod keyless;
+mod modular_gateway;
 mod state;
+
+// ── Observability ────────────────────────────────────────────
+mod ml_predictor;
+mod plugin_hot_reload;
+mod plugin_system;
+
+// ── Types & Registry ─────────────────────────────────────────
+mod benchmark_types;
+pub mod pool_health;
+mod registry;
+
+// ── Feature-gated ────────────────────────────────────────────
+mod challenge;
 #[cfg(feature = "stealth-net")]
 mod stealth_middleware;
-mod subgrid;
 
+// ── Re-exports ───────────────────────────────────────────────
+// Routing
+pub use consistent_hash::*;
+pub use intelligent_router::*;
+pub use market_router::*;
+// Resilience
 pub use anomaly_detector::*;
 pub use auto_recovery::*;
 pub use circuit_breaker::*;
-pub use coordinator::*;
-pub use intelligent_router::*;
-pub use market_router::*;
-pub use ml_predictor::*;
-pub use modular_gateway::*;
-pub use plugin_hot_reload::*;
-pub use plugin_system::*;
-pub use registry::*;
-pub use consistent_hash::*;
 pub use response_cache::*;
 pub use response_healer::*;
+// Execution
+pub use coordinator::*;
+pub use modular_gateway::*;
 pub use state::*;
+// Observability
+pub use ml_predictor::*;
+pub use plugin_hot_reload::*;
+pub use plugin_system::*;
+// Types & Registry
+pub use registry::*;
+// Feature-gated
 #[cfg(feature = "stealth-net")]
 pub use stealth_middleware::*;
 

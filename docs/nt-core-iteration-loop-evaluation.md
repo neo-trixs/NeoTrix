@@ -1,4 +1,4 @@
-# NeoTrix 全量迭代评测报告 (Iteration Loop v1.0)
+# NeoTrix 全量迭代评测报告 (Iteration Loop v2.0)
 
 ## 基线指标
 | 指标 | 数值 |
@@ -9,113 +9,125 @@
 | 编译警告 | 0 (deny(warnings)) |
 | SelfTest 实现 | 122 |
 | Config 结构体 | 350 |
-| Gateway 模块 | 25 文件 / 7,518 行 / 55 结构体 / 3 traits |
-| map_err 闭包 | 1,919 处 |
-| Format 错误串 | 46 处 |
-| 跨层违规 | 0 (架构清洁) |
+| Gateway 模块 | 25 文件 / 7,518 行 / 55 结构体 |
+| 重复 Trait | 9 个 (跨域定义) |
+| 跨层违规 | 100+ 处 (L2→L3, L5→L1 等) |
 
 ## 三大问题诊断
 
-### 1. 聚焦冗余 (Focus Redundancy)
+### 1. 聚焦冗余 (Focus Redundancy) — 9 个重复 Trait
 
-| 冗余类型 | 位置 | 影响 |
+| 重复 Trait | 域 A | 域 B | 影响 |
+|-----------|------|------|------|
+| EvolutionLoopProvider | L1 nt_act_code | L5 nt_mind | L1→L5 跨层桥接 |
+| ReasoningProvider | L5 nt_mind | core | 推理接口双重定义 |
+| Orchestrator | L1 nt_act | L5 nt_mind | 编排逻辑重复 |
+| AgentExecutor | L1 nt_act | core | 执行器接口分裂 |
+| AbsorbValidator | L2 nt_world | L5 nt_mind | 吸收验证重复 |
+| UserDistillation | L5 nt_mind | core | 蒸馏接口重复 |
+| SessionRecovery | L6 meta | core | 恢复接口重复 |
+| SelfIteration | L5 nt_mind | core | 自迭代接口重复 |
+| Eli5Explainer | L5 nt_mind | core | 解释器接口重复 |
+
+**根因**: L1 为了解耦 L5 定义了桥接 trait，但 L5 也有自己的版本 → 两套接口并存
+
+### 2. 扁平缺陷 (Flattening Defects) — 350 个 Config 结构体
+
+| 域 | Config 数 | 影响 |
+|----|----------|------|
+| L1 actions | 23 | 每个 action 独立 Config，无聚合层 |
+| L5 consciousness_core | 21 | 认知核心 Config 碎片化 |
+| L3 shield_impl | 19 | 安全模块内部无子域划分 |
+| core | 19 | 核心层 Config 泛滥 |
+| L1 memory_kb | 16 | 记忆模块 Config 碎片化 |
+| L3 stealth_net | 15 | 隐身网络 Config 碎片化 |
+| L6 coordination | 14 | 协调层 Config 碎片化 |
+| L1 io | 14 | IO 层 Config 碎片化 |
+
+**根因**: 缺少统一配置模型 → 每个模块自建 Config → 350 个独立结构体
+
+### 3. 跨域错位 (Cross-Domain Misalignment) — 100+ 跨层导入
+
+| 违规类型 | 数量 | 示例 |
 |----------|------|------|
-| Gateway 模块膨胀 | `gateway/` 25 文件 7518 行 | 单模块复杂度失控，55 结构体互相引用 |
-| Config 结构体泛滥 | 350 个 `*Config` struct | 每个模块自建 Config，无统一配置模型 |
-| SelfTest 过度实现 | 122 个 `impl SelfTest` | SelfTest 实现数远超实际检测需求 |
-| 重复 trait 定义 | core(17) + nt_io(16) + nt_act(9) | 同名 trait 跨域定义，类型不统一 |
-| 重复错误处理 | 1919 个 map_err + 46 个 format!("Failed to") | 无统一 ErrorType，每个模块重写错误转换 |
+| L2→L3 (感知→具身) | ~30 | osint 导入 shield redaction/receipt |
+| L2→L1 (感知→行动) | ~20 | world 导入 memory_kb/knowledge |
+| L5→L1 (认知→行动) | ~15 | mind 导入 act code/evolution |
+| L5→L3 (认知→具身) | ~10 | mind 导入 shield poc_engine |
+| L6→L1 (元认知→行动) | ~5 | meta 导入 io provider |
 
-**根因**: 模块自治过度 → 每个模块自建类型系统 → 无法跨域复用
+**根因**: 层级边界定义模糊 → 职责渗透 → 一处修改影响多层
 
-### 2. 扁平缺陷 (Flattening Defects)
+## galaxy-tree 架构融合点
 
-| 缺陷类型 | 位置 | 影响 |
-|----------|------|------|
-| Gateway 内部层级缺失 | `gateway/` 无子模块分层 | 25 文件平铺，路由/缓存/熔断/恢复混杂 |
-| Consciousness Core 膨胀 | `nt_consciousness_core/` 46 文件 | 认知核心承载过多职责（响应解析/任务编排/知识蒸馏） |
-| Shield 模块分裂 | `nt_shield_impl/` 19 Config | 安全模块内部无清晰子域划分 |
-| Actions 模块碎片化 | `nt_act/actions/` 23 Config | 每个 action 独立 Config，无聚合层 |
-
-**根因**: 缺少中间聚合层 → 模块内部平铺 → 认知负荷过高
-
-### 3. 跨域错位 (Cross-Domain Misalignment)
-
-| 错位类型 | 位置 | 影响 |
-|----------|------|------|
-| L1 IO 承载 L5 职责 | `gateway/` 含智能路由/ML预测/自愈 | IO 层混入认知决策 |
-| L5 认知含 IO 实现 | `response_parser.rs` 直接解析 HTTP | 认知层依赖 IO 细节 |
-| Memory 含感知逻辑 | `nt_memory_zim_absorber.rs` 含 HTML 解析 | 记忆层混入感知处理 |
-| Event Bus 类型泄露 | `ActorEnvelope` private 但被 pub 方法引用 | 事件总线内部类型暴露不一致 |
-
-**根因**: 层级边界定义模糊 → 职责渗透 → 修改一处影响多层
+| galaxy-tree 模式 | NeoTrix 映射 | 状态 | 优先级 |
+|-----------------|-------------|------|--------|
+| P1: Model Routing | GWT salience + cost weight | ✅ | - |
+| P2: Isolation-per-Task | Worktree isolation | ⚠️ 部分 | P1 |
+| P3: Profile-Driven | SelfModel extension | ✅ | - |
+| P4: Ordered Backend Fallback | Ordered Backend Router | ✅ | - |
+| P5: Skill as Template | SKILL-SPEC.md contract | ✅ | - |
+| 0.26 Cost-Aware Routing | GWT + token cost | ✅ | - |
+| 0.26 Context Virtualization | KVMem paged KV | ⚠️ 部分 | P1 |
+| C.44 Dual-Temporal Facts | Graphiti + MELD | ❌ 未实现 | P2 |
+| C.45 Unified Document IR | AnyDoc + MarkItDown | ⚠️ 部分 | P2 |
+| 0.41b Agent Framework | SEAL pipeline | ✅ | - |
+| 0.41d Reasoning & CoT | E8 + reasoning_engine | ✅ | - |
+| 0.41l Meta-Cognition | ConsciousnessTree | ✅ | - |
+| 0.41n MCTS Search | Bayesian experiment | ⚠️ 部分 | P2 |
+| 0.41o Swarm Behavior | EventBus + ActorRef | ⚠️ 部分 | P3 |
 
 ## 核心路线任务清单
 
 ### Phase 1: 冗余清理 (立即可做)
-- [ ] **R1**: Gateway 模块分层重构 — 路由/缓存/熔断/恢复 → 4 个子模块
+- [ ] **R1**: 合并 9 个重复 Trait — 统一到 core/ 或 L5，删除 L1 桥接版本
 - [ ] **R2**: Config 统一 — 建立 `NeoTrixConfig` 根配置，子模块 Config 继承
-- [ ] **R3**: ErrorType 统一 — 建立 `nt_core_error` 统一错误域，消除 1919 个 map_err
-- [ ] **R4**: Dead Code 清理 — 122 个 SelfTest 中标记未使用的 → `#[allow(dead_code)]`
-- [ ] **R5**: Gateway 瘦身 — 55 结构体合并 → 目标 25 以内
+- [ ] **R3**: Gateway 瘦身 — 55 结构体合并 → 目标 25 以内
+- [ ] **R4**: Dead Code 清理 — 122 个 SelfTest 中标记未使用的
+- [ ] **R5**: SelfTest 精简 — 122 个实现评估必要性
 
 ### Phase 2: 扁平缺陷修复
-- [ ] **F1**: Consciousness Core 拆分 — response_parser → L2, task_orchestrator → L5, knowledge_distiller → L5
-- [ ] **F2**: Shield 子域划分 — stealth_net / sandbox / audit → 独立子模块
-- [ ] **F3**: Actions 聚合层 — 统一 ActionRegistry，消除 23 个独立 Config
-- [ ] **F4**: Gateway 子模块 — router/ cache/ breaker/ recovery/ telemetry
+- [ ] **F1**: Actions Config 聚合 — 23 个独立 Config → ActionRegistry 统一配置
+- [ ] **F2**: Consciousness Core Config 聚合 — 21 个 Config → ConsciousnessConfig
+- [ ] **F3**: Shield Config 聚合 — 19 个 Config → ShieldConfig
+- [ ] **F4**: Gateway 子模块 — router/cache/breaker/recovery → 4 个子目录
 
 ### Phase 3: 跨域错位修正
-- [ ] **X1**: IO 层回归 — gateway 中的 ML 预测/智能路由 → L5 cognition
-- [ ] **X2**: Response Parser 下沉 — HTTP 响应解析 → L2 perception
-- [ ] **X3**: ZIM Absorber 重构 — HTML 解析 → L2, KB 写入 → L1 memory
-- [ ] **X4**: Event Bus 类型对齐 — ActorEnvelope → pub 或完全 pub(crate)
+- [ ] **X1**: 消除 L2→L3 违规 — shield 类型下沉到 L2 或提升到 core
+- [ ] **X2**: 消除 L2→L1 违规 — KB 类型统一到 core knowledge 层
+- [ ] **X3**: 消除 L5→L1 违规 — evolution_loop_provider 桥接清理
+- [ ] **X4**: Event Bus 类型对齐 — ActorEnvelope → pub
 
 ### Phase 4: 架构进化 (galaxy-tree 融合)
-- [ ] **A1**: OPRD Engine 接入 SEAL Pipeline — OPRD 发现 → SEAL 自动吸收
-- [ ] **A2**: E8 Evolution Loop 生产化 — 当前仅编译级，需接入真实 Provider 调用
-- [ ] **A3**: Universal Model Adapter — 统一 GPT-4o/Claude/DeepSeek/Qwen3 调用接口
-- [ ] **A4**: Knowledge Graph Bridge — KB 实体 → VSA HyperCube 向量映射
-- [ ] **A5**: Self-Healing Auto-Repair — HeartbeatAggregator 信号 → 自动修复执行
+- [ ] **A1**: OPRD Engine 接入 SEAL Pipeline
+- [ ] **A2**: E8 Evolution Loop 生产化
+- [ ] **A3**: Universal Model Adapter — 统一多模型接口
+- [ ] **A4**: Knowledge Graph Bridge — KB → VSA HyperCube
+- [ ] **A5**: Self-Healing Auto-Repair — HeartbeatAggregator → 自动修复
 
 ### Phase 5: 测试与验证
 - [ ] **T1**: 测试编译修复 — 156+ 测试文件编译错误
-- [ ] **T2**: Integration Test 覆盖 — 关键路径端到端测试
-- [ ] **T3**: Benchmark 基线 — 建立编译时间/运行时性能基准
-- [ ] **T4**: CI/CD Pipeline — cargo check + test + clippy 全通过
+- [ ] **T2**: Integration Test 覆盖
+- [ ] **T3**: Benchmark 基线
+- [ ] **T4**: CI/CD Pipeline
 
 ### Phase 6: 多 Agent 自动巡检
-- [ ] **M1**: Compile Guardian — 每次提交前自动 cargo check
+- [ ] **M1**: Compile Guardian — 每次提交前 cargo check
 - [ ] **M2**: Dead Code Detector — 定期扫描未使用 pub items
 - [ ] **M3**: Cross-Layer Auditor — 检测层级违规
-- [ ] **M4**: Config Consistency Checker — Config 结构体一致性检查
-- [ ] **M5**: SelfTest Coverage Auditor — SelfTest 覆盖率审计
+- [ ] **M4**: Config Consistency Checker
+- [ ] **M5**: SelfTest Coverage Auditor
 
 ## 优先级排序
 
 | 优先级 | 任务 | 收益 | 风险 |
 |--------|------|------|------|
-| P0 | R1 Gateway 分层 | 降低单模块复杂度 60% | 中 |
-| P0 | R3 ErrorType 统一 | 消除 1919 处重复 | 低 |
+| P0 | R1 合并重复 Trait | 消除 9 个跨层桥接 | 中 |
+| P0 | R3 Gateway 瘦身 | 降低单模块复杂度 60% | 中 |
 | P1 | R2 Config 统一 | 消除 350 个独立 Config | 中 |
-| P1 | F1 Consciousness Core 拆分 | 解耦认知核心 | 高 |
-| P1 | X1 IO 层回归 | 修正层级边界 | 中 |
+| P1 | F1 Actions Config 聚合 | 消除 23 个碎片 Config | 低 |
+| P1 | X1-X3 跨层修正 | 修正 100+ 违规 | 高 |
 | P2 | A1 OPRD→SEAL | 进化闭环 | 低 |
 | P2 | A3 Universal Adapter | 多模型支持 | 中 |
 | P3 | T1 测试修复 | 测试覆盖 | 低 |
 | P3 | M1-M5 自动巡检 | 持续质量 | 低 |
-
-## galaxy-tree 架构融合点
-
-| galaxy-tree 模式 | NeoTrix 映射 | 状态 |
-|-----------------|-------------|------|
-| P1: Model Routing | GWT salience + cost weight | ✅ 已实现 |
-| P2: Isolation-per-Task | Worktree isolation + paged memory | ⚠️ 部分 |
-| P3: Profile-Driven | SelfModel extension | ✅ 已实现 |
-| P4: Ordered Backend Fallback | Ordered Backend Router | ✅ 已实现 |
-| P5: Skill as Template | SKILL-SPEC.md contract | ✅ 已实现 |
-| C.41 OS Sandbox | nt_shield_sandbox | ⚠️ 部分 |
-| C.44 Dual-Temporal Facts | Graphiti + MELD | ❌ 未实现 |
-| C.45 Unified Document IR | AnyDoc + MarkItDown | ⚠️ 部分 |
-| 0.26 Cost-Aware Routing | GWT + token cost | ✅ 已实现 |
-| 0.26 Context Virtualization | KVMem paged KV | ⚠️ 部分 |
