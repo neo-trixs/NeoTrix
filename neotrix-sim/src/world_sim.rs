@@ -316,7 +316,7 @@ impl WorldSim {
                 if let Some(ms) = self.memory_streams.get_mut(agent_id) {
                     ms.add(crate::agents::memory_stream::MemoryNode {
                         id: 0,
-                        kind: crate::agents::memory_stream::MemoryKind::Event,
+                        kind: crate::agents::memory_stream::MemoryKind::Observation,
                         agent_id: agent_id.clone(),
                         created_tick: tick,
                         last_accessed_tick: tick,
@@ -376,7 +376,7 @@ impl WorldSim {
 
             // 9. Personality drift: apply accumulated drift
             for agent in &mut self.agents {
-                if let Some(pd) = self.personality_drift.get(&agent.core.id) {
+                if let Some(pd) = self.personality_drift.get_mut(&agent.core.id) {
                     let new_p = pd.drift(&agent.personality, agent.core.age);
                     agent.personality = new_p;
                 }

@@ -43,7 +43,7 @@ impl std::fmt::Display for ZimAbsorbStats {
 }
 
 pub fn absorb_zim_file(
-    db: &rusqlite::Connection,
+    db: &mut rusqlite::Connection,
     zim_path: &Path,
     config: &ZimAbsorbConfig,
 ) -> Result<ZimAbsorbStats, String> {
@@ -84,7 +84,7 @@ pub fn absorb_zim_file(
         }
         stats.scanned += 1;
 
-        let path = entry.url;
+        let path = entry.url.clone();
 
         if let Some(ref prefix) = config.url_prefix_filter {
             if !path.starts_with(prefix) {
@@ -119,7 +119,7 @@ pub fn absorb_zim_file(
             &text
         };
 
-        let title = entry.title;
+        let title = entry.title.clone();
         let node_id = format!("zimid://{}/{}", uuid, path);
 
         let _ = tx.execute(
