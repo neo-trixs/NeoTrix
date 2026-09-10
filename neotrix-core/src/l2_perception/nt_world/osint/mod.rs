@@ -17,6 +17,8 @@ pub mod self_curriculum;
 pub mod api_registry;
 pub mod metadata;
 pub mod repo_reverse_prompt;
+pub mod asset_model;
+pub mod auto_patrol;
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -211,6 +213,84 @@ impl OsintReport {
         if let Some(ref c) = self.censys { n += c.services.len(); }
         if let Some(ref z) = self.zoomeye { n += z.host.len(); }
         n
+    }
+
+    /// 将所有 findings 转换为统一资产图
+    pub fn to_asset_graph(&self) -> asset_model::AssetGraph {
+        let mut graph = asset_model::AssetGraph::new();
+
+        // DNS → Domain + Ip 资产
+        if let Some(ref dns) = self.dns {
+            for sub in &dns.subdomains {
+                graph.add_asset(asset_model::OsintAsset {
+                    id: sub.name.clone(),
+                    asset_type: asset_model::AssetType::Domain,
+                    value: sub.name.clone(),
+                    source: "dns".into(),
+                    confidence: 1.0,
+                    ..Default::default()
+                });
+            }
+            for a in &dns.a_records {
+                graph.add_asset(asset_model::OsintAsset {
+                    id: format!("ip-{}", a),
+                    asset_type: asset_model::AssetType::Ip,
+                    value: a.clone(),
+                    source: "dns".into(),
+                    confidence: 1.0,
+                    ..Default::default()
+                });
+            }
+        }
+
+        // Network → Port + Service 资产
+        if let Some(ref net) = self.network {
+            for svc in &net.services {
+                graph.add_asset(asset_model::OsintAsset {
+                    id: format!("port-{}-{}", svc.host, svc.port),
+                    asset_type: asset_model::AssetType::Port,
+                    value: svc.port.to_string(),
+                    source: "network".into(),
+                    confidence: 1.0,
+                    ..Default::default()
+                });
+            }
+        }
+
+        // Vuln → Vulnerability 资产
+        if let Some(ref vuln) = self.vuln {
+            for v in &vuln.vulnerabilities {
+                graph.add_asset(asset_model::OsintAsset {
+                    id: v.id.clone(),
+                    asset_type: asset_model::AssetType::Vulnerability,
+                    value: v.id.clone(),
+                    properties: [("summary".into(), v.summary.clone())].into(),
+                    source: "vuln".into(),
+                    confidence: 0.9,
+                    ..Default::default()
+                });
+            }
+        }
+
+        // Shodan/Censys/ZoomEye → Service 资产
+        for (name, findings) in [
+            ("shodan", self.shodan.as_ref().map(|s| (s.ip.clone(), s.services.len()))),
+            ("censys", self.censys.as_ref().map(|c| (c.ip.clone(), c.services.len()))),
+            ("zoomeye", self.zoomeye.as_ref().map(|z| (z.ip.clone(), z.services.len()))),
+        ] {
+            if let Some((ip, count)) = findings {
+                graph.add_asset(asset_model::OsintAsset {
+                    id: format!("{}-{}", name, ip),
+                    asset_type: asset_model::AssetType::Service,
+                    value: format!("{} services on {}", count, ip),
+                    source: name.into(),
+                    confidence: 0.8,
+                    ..Default::default()
+                });
+            }
+        }
+
+        graph
     }
 }
 
