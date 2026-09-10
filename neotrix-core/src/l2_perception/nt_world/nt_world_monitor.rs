@@ -6,7 +6,7 @@
 
 use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use crate::core::nt_core_traits::KnowledgeSink;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -45,7 +45,7 @@ pub trait SiteChangeMonitor {
     fn index_fts5(&self, url: &str, content: &str) -> bool;
     /// C2 接线: 将抓取内容作为 `Source` 节点写入 KB 并触发 FTS5 索引。
     /// 返回新节点 id。
-    fn index_fts5_to_kb(&self, kb: &KnowledgeBase, url: &str, content: &str) -> Result<String, String>;
+    fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, content: &str) -> Result<String, String>;
 }
 
 /// 默认 stub 实现
@@ -90,7 +90,7 @@ impl SiteChangeMonitor for WorldMonitor {
         true
     }
 
-    fn index_fts5_to_kb(&self, kb: &KnowledgeBase, url: &str, content: &str) -> Result<String, String> {
+    fn index_fts5_to_kb(&self, kb: &dyn KnowledgeSink, url: &str, content: &str) -> Result<String, String> {
         if url.trim().is_empty() {
             return Err("url must not be empty".to_string());
         }
@@ -100,29 +100,13 @@ impl SiteChangeMonitor for WorldMonitor {
             .and_then(|s| s.split('/').next())
             .unwrap_or(url)
             .to_string();
-        let now = now_ts();
-        let node = KnowledgeNode {
-            id: Uuid::new_v4().to_string(),
-            node_type: NodeType::Source,
-            title: url.to_string(),
-            summary: Some(format!("Monitored page snapshot ({})", host)),
-            content: Some(content.to_string()),
-            url: Some(url.to_string()),
-            domain: Some(host),
-            language: "en".to_string(),
-            confidence: 0.9,
-            importance: 0.5,
-            recall_weight: 1.0,
-            created_at: now,
-            updated_at: now,
-            access_count: 0,
-            metadata: None,
-            temporal: None,
-            supersedes: None,
-            source_episode: None,
-        };
-        kb.insert_node(&node)?;
-        Ok(node.id)
+        kb.sink_node(
+            url,
+            NodeType::Source,
+            Some(&format!("Monitored page snapshot ({})", host)),
+            Some(url),
+            Some(&host),
+        )
     }
 }
 

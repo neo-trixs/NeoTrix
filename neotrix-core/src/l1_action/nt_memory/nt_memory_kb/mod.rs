@@ -74,6 +74,7 @@ pub mod nt_absorb_mapper;
 pub mod nt_memory_write_guard;
 pub mod nt_memory_snapshot;
 pub mod nt_memory_zim_absorber;
+pub mod nt_memory_brain;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
@@ -2980,6 +2981,60 @@ impl EvolutionPatternType {
     }
 }
 
+/// KnowledgeSink trait 实现 — 打通 L2 感知层对 L1 知识层的写入接口
+impl crate::core::nt_core_traits::KnowledgeSink for KnowledgeBase {
+    fn sink_node(
+        &self,
+        title: &str,
+        node_type: crate::core::nt_core_kb_types::NodeType,
+        summary: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+    ) -> Result<String, String> {
+        self.insert_or_get_node(title, node_type, summary, url, domain)
+    }
+
+    fn sink_edge(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: crate::core::nt_core_kb_types::RelationType,
+        weight: f64,
+        description: Option<&str>,
+    ) -> Result<(), String> {
+        self.upsert_edge(source_id, target_id, relation_type, weight, description)
+    }
+
+    fn sink_edge_with_metadata(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: crate::core::nt_core_kb_types::RelationType,
+        weight: f64,
+        description: Option<&str>,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<(), String> {
+        self.upsert_edge_with_metadata(source_id, target_id, relation_type, weight, description, metadata)
+    }
+
+    fn edge_exists(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: crate::core::nt_core_kb_types::RelationType,
+    ) -> Result<bool, String> {
+        KnowledgeBase::edge_exists(self, source_id, target_id, relation_type)
+    }
+
+    fn update_node_metadata(
+        &self,
+        node_id: &str,
+        metadata: &serde_json::Value,
+    ) -> Result<(), String> {
+        self.update_node_metadata(node_id, metadata)
+    }
+}
+
 impl crate::core::l7_capability::nt_core_antidistil::AntiDistilStore for KnowledgeBase {
     fn store_trace_data(&self, data: &serde_json::Value) -> Result<(), String> {
         KnowledgeBase::store_trace_data(self, data)
@@ -2987,6 +3042,40 @@ impl crate::core::l7_capability::nt_core_antidistil::AntiDistilStore for Knowled
 
     fn get_trace_data(&self, limit: usize) -> Result<Vec<serde_json::Value>, String> {
         KnowledgeBase::get_trace_data(self, limit)
+    }
+}
+
+impl neotrix_types::knowledge_access::KnowledgeAccess for KnowledgeBase {
+    fn get_node(&self, id: &str) -> Result<Option<neotrix_types::knowledge_access::KnowledgeNode>, String> {
+        KnowledgeBase::get_node(self, id)
+    }
+
+    fn search(&self, query: &str, limit: usize) -> Result<Vec<neotrix_types::knowledge_access::KnowledgeNode>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_search::search_fts(&conn, query, limit)
+            .map_err(|e| format!("search: {}", e))
+    }
+
+    fn nodes_by_type(&self, node_type: neotrix_types::knowledge_access::NodeType, limit: usize) -> Result<Vec<neotrix_types::knowledge_access::KnowledgeNode>, String> {
+        KnowledgeBase::search_by_type(self, &node_type, limit)
+    }
+
+    fn edges_for_node(&self, node_id: &str) -> Result<Vec<neotrix_types::knowledge_access::KnowledgeEdge>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_store::get_edges_for_node(&conn, node_id)
+            .map_err(|e| format!("edges_for_node: {}", e))
+    }
+
+    async fn embed_text(&self, text: &str) -> Result<Vec<f32>, String> {
+        let config = self.embedding_config.read().map_err(|e| format!("embedding_config read: {}", e))?.clone();
+        let config = config.ok_or_else(|| "No embedding configuration available".to_string())?;
+        nt_memory_embed::embed_text(&config, text)
+    }
+
+    fn embedding_dim(&self) -> usize {
+        self.embedding_config.read().ok()
+            .and_then(|c| c.as_ref().map(|c| c.dim))
+            .unwrap_or(384)
     }
 }
 

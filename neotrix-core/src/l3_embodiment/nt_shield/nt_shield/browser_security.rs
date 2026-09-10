@@ -824,3 +824,26 @@ mod tests {
         assert_eq!(scanner.results.len(), results.len());
     }
 }
+
+/// 创建 BrowserSecurityScanner 的 SelfTest 实例 (供 L5 注册，避免 L5 直接依赖 L3 类型)
+pub fn create_browser_security_self_test() -> Box<dyn crate::core::nt_core_self_test::SelfTest> {
+    Box::new(BrowserSecurityScanner::new(BrowserSecurityConfig::default()))
+}
+
+/// SecurityAudit trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查接口
+impl crate::core::nt_core_traits::SecurityAudit for BrowserSecurityScanner {
+    fn scan_browser_security(&self, url: &str) -> Result<String, String> {
+        let results = self.run_scan();
+        let findings: Vec<String> = results.iter().map(|r| format!("{}: {}", r.vuln_type as u8, r.description)).collect();
+        if findings.is_empty() {
+            Ok(format!("Browser security scan passed for {}", url))
+        } else {
+            Ok(format!("Browser security findings for {}: {}", url, findings.join("; ")))
+        }
+    }
+
+    fn scan_reasoning_trace(&self, _text: &str, _context: &str) -> Result<crate::core::nt_core_traits::ReasoningTraceReport, String> {
+        // BrowserSecurityScanner 专注于浏览器安全，不处理推理轨迹
+        Err("BrowserSecurityScanner does not support reasoning trace scanning".into())
+    }
+}

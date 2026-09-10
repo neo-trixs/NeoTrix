@@ -633,13 +633,22 @@ impl KnowledgeGapDetector {
 
     /// Load existing gap reports from KB to avoid duplicates
     fn load_existing_gap_reports(&self, kb: &KnowledgeBase) -> Vec<KnowledgeGap> {
-        let conn = kb.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let conn = match kb.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
+        let mut stmt = match conn.prepare(
             "SELECT description FROM knowledge_gap_reports WHERE status != 'resolved'"
-        ).unwrap();
-        let rows = stmt.query_map([], |row| {
+        ) {
+            Ok(s) => s,
+            Err(_) => return vec![],
+        };
+        let rows = match stmt.query_map([], |row| {
             Ok(row.get::<_, String>(0)?)
-        }).unwrap();
+        }) {
+            Ok(r) => r,
+            Err(_) => return vec![],
+        };
 
         rows.filter_map(|r| r.ok())
             .map(|desc| KnowledgeGap {
@@ -663,11 +672,14 @@ impl KnowledgeGapDetector {
 
     /// Scan for missing abstraction layers in KB (building_block → pattern → architecture → case_study)
     fn scan_abstraction_gaps(&self, kb: &KnowledgeBase, id: &mut usize) -> Vec<KnowledgeGap> {
-        let conn = kb.conn.lock().unwrap();
+        let conn = match kb.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return vec![],
+        };
         let mut gaps = Vec::new();
 
         // Query abstraction level distribution per domain
-        let mut stmt = conn.prepare(
+        let mut stmt = match conn.prepare(
             "SELECT json_extract(metadata, '$.categories') as domain, 
                     json_extract(metadata, '$.abstraction') as abstraction, 
                     COUNT(*) as count
@@ -675,14 +687,20 @@ impl KnowledgeGapDetector {
              JOIN node_dimensions nd ON n.id = nd.node_id
              WHERE n.url LIKE 'bytebytego://%' OR n.url LIKE 'easytier://%'
              GROUP BY domain, abstraction"
-        ).unwrap();
+        ) {
+            Ok(s) => s,
+            Err(_) => return gaps,
+        };
 
-        let rows = stmt.query_map([], |row| {
+        let rows = match stmt.query_map([], |row| {
             let domain: String = row.get(0)?;
             let abstraction: String = row.get(1)?;
             let count: usize = row.get(2)?;
             Ok((domain, abstraction, count))
-        }).unwrap();
+        }) {
+            Ok(r) => r,
+            Err(_) => return gaps,
+        };
 
         let mut domain_abstractions: HashMap<String, HashMap<String, usize>> = HashMap::new();
         for row in rows.flatten() {

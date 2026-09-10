@@ -98,6 +98,58 @@ pub trait SessionProvider {
 /// KnowledgeProvider re-export (defined in knowledge.rs)
 pub use super::nt_core_knowledge::KnowledgeProvider;
 
+/// KnowledgeSink — 知识写入抽象 (L2 感知层对 L1 知识层的写入接口)
+///
+/// L2 模块通过此 trait 写入知识，而非直接依赖 L1 KnowledgeBase 具体类型。
+/// 实现者: L1 KnowledgeBase (via blanket or manual impl).
+pub trait KnowledgeSink: Send + Sync {
+    /// 插入或获取节点，返回节点 ID
+    fn sink_node(
+        &self,
+        title: &str,
+        node_type: crate::core::nt_core_kb_types::NodeType,
+        summary: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+    ) -> Result<String, String>;
+
+    /// 插入或更新边
+    fn sink_edge(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: crate::core::nt_core_kb_types::RelationType,
+        weight: f64,
+        description: Option<&str>,
+    ) -> Result<(), String>;
+
+    /// 插入带元数据的边
+    fn sink_edge_with_metadata(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: crate::core::nt_core_kb_types::RelationType,
+        weight: f64,
+        description: Option<&str>,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<(), String>;
+
+    /// 检查边是否存在
+    fn edge_exists(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: crate::core::nt_core_kb_types::RelationType,
+    ) -> Result<bool, String>;
+
+    /// 更新节点元数据
+    fn update_node_metadata(
+        &self,
+        node_id: &str,
+        metadata: &serde_json::Value,
+    ) -> Result<(), String>;
+}
+
 /// SealResult — SEAL 自迭代循环的结果
 #[derive(Debug, Clone)]
 pub struct SealResult {
@@ -133,6 +185,33 @@ pub trait SkillRunner: Send + Sync {
 /// EngineProvider — 推理引擎抽象
 pub trait EngineProvider: Send + Sync {
     fn reason(&mut self, prompt: &str) -> Result<String, String>;
+}
+
+/// SecurityAudit — 安全审计抽象 (L5 认知层对 L3 具身层的安全检查接口)
+///
+/// L5 模块通过此 trait 触发安全扫描，而非直接依赖 L3 具体类型。
+pub trait SecurityAudit: Send + Sync {
+    /// 执行浏览器安全扫描，返回扫描结果摘要
+    fn scan_browser_security(&self, url: &str) -> Result<String, String>;
+    /// 执行推理轨迹防护扫描
+    fn scan_reasoning_trace(&self, text: &str, context: &str) -> Result<ReasoningTraceReport, String>;
+}
+
+/// 推理轨迹防护扫描报告
+#[derive(Debug, Clone, Default)]
+pub struct ReasoningTraceReport {
+    pub session_binding_missing: usize,
+    pub pii_findings: Vec<String>,
+    pub injection_findings: Vec<String>,
+    pub divergence_suspected: bool,
+}
+
+/// SecurityCheckRegistry — 安全检查注册表抽象
+pub trait SecurityCheckRegistry: Send + Sync {
+    /// 注册一个安全检查项
+    fn register_check(&mut self, name: &str);
+    /// 运行所有已注册的安全检查，返回通过/失败
+    fn run_all_checks(&self) -> Result<Vec<String>, Vec<String>>;
 }
 
 #[cfg(test)]

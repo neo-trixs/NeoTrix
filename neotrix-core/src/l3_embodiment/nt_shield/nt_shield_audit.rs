@@ -1505,3 +1505,26 @@ mod tests {
         assert_eq!(check.confidence, 1.0);
     }
 }
+
+/// 创建 ReasoningTraceGuard 的 SecurityAudit 实例 (供 L5 使用，避免 L5 直接依赖 L3 类型)
+pub fn create_reasoning_trace_auditor() -> Box<dyn crate::core::nt_core_traits::SecurityAudit> {
+    Box::new(ReasoningTraceGuard::default())
+}
+
+/// SecurityAudit trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查接口
+impl crate::core::nt_core_traits::SecurityAudit for ReasoningTraceGuard {
+    fn scan_browser_security(&self, _url: &str) -> Result<String, String> {
+        // ReasoningTraceGuard 专注于推理轨迹防护，不处理浏览器安全
+        Err("ReasoningTraceGuard does not support browser security scanning".into())
+    }
+
+    fn scan_reasoning_trace(&self, text: &str, context: &str) -> Result<crate::core::nt_core_traits::ReasoningTraceReport, String> {
+        let report = self.scan_protected(text, context);
+        Ok(crate::core::nt_core_traits::ReasoningTraceReport {
+            session_binding_missing: report.session_binding_missing,
+            pii_findings: report.pii_findings,
+            injection_findings: report.injection_findings,
+            divergence_suspected: report.divergence_suspected,
+        })
+    }
+}

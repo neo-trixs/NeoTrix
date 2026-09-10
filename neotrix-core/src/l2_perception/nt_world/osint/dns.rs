@@ -14,6 +14,12 @@ pub struct DnsRecord {
     pub source: String,
 }
 
+impl std::fmt::Display for DnsRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DnsFindings {
     pub subdomains: Vec<DnsRecord>,

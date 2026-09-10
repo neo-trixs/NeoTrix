@@ -91,43 +91,5 @@ pub struct PerceptionSnapshot {
 ///
 /// L2 模块通过此 trait 写入知识，而非直接依赖 L1 KnowledgeBase 具体类型。
 /// 实现者: L1 KnowledgeBase (via blanket or manual impl).
-pub trait KnowledgeSink: Send + Sync {
-    /// 插入或获取节点，返回节点 ID
-    fn sink_node(
-        &self,
-        title: &str,
-        node_type: crate::core::nt_core_kb_types::NodeType,
-        summary: Option<&str>,
-        url: Option<&str>,
-        domain: Option<&str>,
-    ) -> Result<String, String>;
-
-    /// 插入或更新边
-    fn sink_edge(
-        &self,
-        source_id: &str,
-        target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
-        weight: f64,
-        description: Option<&str>,
-    ) -> Result<(), String>;
-
-    /// 插入带元数据的边
-    fn sink_edge_with_metadata(
-        &self,
-        source_id: &str,
-        target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
-        weight: f64,
-        description: Option<&str>,
-        metadata: Option<serde_json::Value>,
-    ) -> Result<(), String>;
-
-    /// 检查边是否存在
-    fn edge_exists(
-        &self,
-        source_id: &str,
-        target_id: &str,
-        relation_type: crate::core::nt_core_kb_types::RelationType,
-    ) -> Result<bool, String>;
-}
+/// Trait 定义在 core/nt_core_traits，此处 re-export 供 L2 引用。
+pub use crate::core::nt_core_traits::KnowledgeSink;

@@ -12,9 +12,8 @@
 use std::collections::HashMap;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-
 use crate::core::nt_core_kb_types::NodeType;
+use crate::core::nt_core_traits::KnowledgeSink;
 
 /// 探索数据源类型
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -101,7 +100,7 @@ impl Default for ExplorationConfig {
 
 pub struct ExplorationEngine {
     pub config: ExplorationConfig,
-    pub kb: Option<KnowledgeBase>,
+    pub kb: Option<Box<dyn KnowledgeSink>>,
     discovered: Vec<ExplorationEntry>,
     ingested_urls: HashMap<String, i64>,  // URL → 上次摄入时间
     total_cycles: usize,
@@ -118,7 +117,7 @@ impl ExplorationEngine {
         }
     }
 
-    pub fn attach_kb(&mut self, kb: KnowledgeBase) {
+    pub fn attach_kb(&mut self, kb: Box<dyn KnowledgeSink>) {
         self.kb = Some(kb);
     }
 
@@ -306,13 +305,13 @@ impl ExplorationEngine {
                 } else {
                     format!("Auto-discovered via {}: {}", entry.source.label(), entry.summary)
                 };
-                let node_id = kb.insert_or_get_node(
+                let node_id = kb.sink_node(
                     &entry.title,
                     NodeType::Concept,
                     Some(&summary),
                     Some(&entry.url),
                     Some(domain),
-                ).map_err(|e| format!("KB insert_or_get_node: {e}"))?;
+                ).map_err(|e| format!("KB sink_node: {e}"))?;
                 log::info!("[exploration] {} → KB node {}", entry.title, node_id);
             }
             None => {

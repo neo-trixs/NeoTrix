@@ -742,7 +742,9 @@ impl NtxFile {
     /// 写向量段并返回 (offset, len)
     fn write_vec_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
         let offset = self.file.seek(SeekFrom::End(0))?;
-        let seg = self.vec_segment.as_ref().unwrap();
+        let seg = self.vec_segment.as_ref().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "vec_segment not initialized")
+        })?;
         seg.write_to(&mut self.file)?;
         let len = self.segment_len(seg)?;
         Ok((offset, len))
@@ -751,7 +753,9 @@ impl NtxFile {
     /// 写图谱段并返回 (offset, len)
     fn write_graph_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
         let offset = self.file.seek(SeekFrom::End(0))?;
-        let seg = self.graph_segment.as_ref().unwrap();
+        let seg = self.graph_segment.as_ref().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "graph_segment not initialized")
+        })?;
         seg.write_to(&mut self.file)?;
         let len = self.segment_len(seg)?;
         Ok((offset, len))
@@ -760,7 +764,9 @@ impl NtxFile {
     /// 写时间索引段并返回 (offset, len)
     fn write_time_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
         let offset = self.file.seek(SeekFrom::End(0))?;
-        let seg = self.time_segment.as_ref().unwrap();
+        let seg = self.time_segment.as_ref().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "time_segment not initialized")
+        })?;
         seg.write_to(&mut self.file)?;
         let len = self.segment_len(seg)?;
         Ok((offset, len))
@@ -769,7 +775,9 @@ impl NtxFile {
     /// 写 Lex 段并返回 (offset, len)
     fn write_lex_segment_and_len(&mut self) -> std::io::Result<(u64, u64)> {
         let offset = self.file.seek(SeekFrom::End(0))?;
-        let seg = self.lex_segment.as_ref().unwrap();
+        let seg = self.lex_segment.as_ref().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "lex_segment not initialized")
+        })?;
         seg.write_to(&mut self.file)?;
         let len = self.segment_len(seg)?;
         Ok((offset, len))

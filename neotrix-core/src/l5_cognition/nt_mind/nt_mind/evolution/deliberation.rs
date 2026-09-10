@@ -208,7 +208,9 @@ impl DeliberationEngine {
             status: SessionStatus::InProgress,
         };
 
-        self.active_sessions.write().unwrap().insert(session_id.clone(), session);
+        if let Ok(mut sessions) = self.active_sessions.write() {
+            sessions.insert(session_id.clone(), session);
+        }
         Ok(session_id)
     }
 
@@ -225,7 +227,7 @@ impl DeliberationEngine {
         rebuts: Vec<String>,
         supports: Vec<String>,
     ) -> Result<String, String> {
-        let mut sessions = self.active_sessions.write().unwrap();
+        let mut sessions = self.active_sessions.write().map_err(|e| format!("Lock poisoned: {}", e))?;
         let session = sessions.get_mut(session_id).ok_or("会话不存在")?;
         
         if session.status != SessionStatus::InProgress {
@@ -258,7 +260,9 @@ impl DeliberationEngine {
             round: session.rounds.len() - 1,
         };
 
-        session.rounds.last_mut().unwrap().arguments.push(arg_id.clone());
+        if let Some(round) = session.rounds.last_mut() {
+            round.arguments.push(arg_id.clone());
+        }
         session.graph.nodes.insert(arg_id.clone(), node);
 
         // 自动添加边

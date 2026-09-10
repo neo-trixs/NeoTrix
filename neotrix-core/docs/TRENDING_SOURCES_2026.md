@@ -1,264 +1,455 @@
-# Trending AI/ML Sources Report — September 2026
+# Trending AI/ML Sources Report — 2026-09-09
 
-> Generated: 2026-09-10 | 16 source queries executed | 100+ projects/papers analyzed
-
----
-
-## Batch 1: GitHub Trending
-
-### Top 10 Projects by Stars/Growth
-
-| # | Project | Stars | Description | NeoTrix Relevance |
-|---|---------|-------|-------------|-------------------|
-| 1 | **obra/superpowers** | 276K ⭐ | Agentic skills framework & software development methodology | **P0** — Direct skill-tree SKILL-SPEC.md alignment; absorb skill composition patterns |
-| 2 | **mattpocock/skills** | 232K ⭐ | Skills for Real Engineers — .agents directory patterns | **P0** — Skill authoring conventions; absorb skill lifecycle patterns |
-| 3 | **multica-ai/andrej-karpathy-skills** | 205K ⭐ | Single CLAUDE.md file improving Claude Code behavior | **P1** — Meta-prompt patterns for NT-CORE consciousness constitution |
-| 4 | **n8n-io/n8n** | 201K ⭐ | Workflow automation platform with native AI capabilities | **P1** — Orchestration patterns for NT-ACT production pipeline |
-| 5 | **openai/codex** | 114K ⭐ | Lightweight coding agent for terminal (Rust) | **P1** — Rust-native coding agent; benchmark NT-ACT coding capabilities |
-| 6 | **anthropics/claude-code** | 143K ⭐ | Agentic coding tool in terminal | **P1** — Competitor benchmark; absorb agentic coding patterns |
-| 7 | **THU-MAIC/OpenMAIC** | 26K ⭐ | Open-source multi-agent intelligence platform | **P2** — Multi-agent orchestration for NT-MIND SEAL pipeline |
-| 8 | **modular/modular** | 29K ⭐ | Modular Platform (MAX & Mojo) | **P2** — Mojo language; potential NT-CORE performance optimization |
-| 9 | **Tencent/AI-Infra-Guard** | 5.6K ⭐ | AI Red Teaming platform (Agent/Skills/MCP scan) | **P0** — NT-SHIELD security audit integration; MCP scan patterns |
-| 10 | **firecrawl/pdf-inspector** | ~586/day | PDF inspection tool (Rust) | **P2** — NT-WORLD document parsing; integrate with doc-parse skill |
-
-### Rust-Trending Highlights
-
-| Project | Stars/day | Relevance |
-|---------|-----------|-----------|
-| **CapSoftware/Cap** | 108 | Rust-native application; UI patterns |
-| **pacifio/atlas** | 888 | Rust atlas tool; rapid adoption signal |
-| **rtk-ai/rtk** | 132 | AI-focused Rust tool; potential NT-ACT integration |
-| **vercel-labs/agent-browser** | 102 | Agent browser automation; NT-WORLD perception |
-| **arcboxlabs/arcbox** | 511 | Rust AI infrastructure; benchmark |
-
-### Key Insights
-- **Agentic skills are the dominant pattern**: superpowers, skills, karpathy-skills — all validate NT's SKILL-SPEC.md contract
-- **Rust-native AI tools accelerating**: codex, Cap, arcbox — aligns with NT-CORE Rust preference (R-P1: `#![forbid(unsafe_code)]`)
-- **MCP ecosystem maturing**: AI-Infra-Guard scans for MCP vulnerabilities; agent-browser uses MCP
-- **Multi-agent is production reality**: OpenMAIC, n8n — orchestration patterns for NT-MIND
-
-### Action Items
-1. **Absorb skill patterns** from obra/superpowers and mattpocock/skills into NT skill architecture
-2. **Integrate MCP security scanning** from AI-Infra-Guard into NT-SHIELD
-3. **Benchmark NT-ACT** against openai/codex and anthropics/claude-code for coding tasks
-4. **Evaluate Rust agent-browser** for NT-WORLD perception pipeline
+Compiled from 47 parallel searches across 9 source categories.
 
 ---
 
-## Batch 2: Paper Rankings
+## 1. Trendshift.io — [https://trendshift.io](https://trendshift.io)
 
-### Top 10 Papers/Models
-
-| # | Paper/Model | Key Finding | NeoTrix Relevance |
-|---|-------------|-------------|-------------------|
-| 1 | **Miles v0.1: Production-Level Post-Training** (arXiv:2609.08368) | Full-stack RL training system; async agentic RL on 64 GB300 GPUs | **P0** — SEAL pipeline optimization; RL training architecture |
-| 2 | **Self-Routing: Behavior-Conditioned Post-Training** (arXiv:2609.01422) | Routes samples to GRPO/self-distillation/regularization based on rollout correctness | **P0** — NT-MIND distillation routing; sample-level training adaptation |
-| 3 | **Kimi K3: Open Frontier Intelligence** | 2.8T MoE, 1M context, Kimi Delta Attention, Stable LatentMoE | **P1** — Architecture patterns for NT-CORE HyperCube scaling |
-| 4 | **GPT-5.6** (OpenAI) | Sol/Terra/Luna tiers; Terminal-Bench 2.1 SOTA; multi-agent ultra mode | **P1** — Benchmark reference; cost-aware routing patterns |
-| 5 | **Structural Process Supervision for Latent CoT** (arXiv:2609.09928) | Prototype-Mediated Process Supervision; compresses tokens to <50% of explicit CoT | **P0** — NT-CORE reasoning compression; latent chain-of-thought |
-| 6 | **RecurTrace: Adaptive Latent Reasoning** (arXiv:2609.03379) | Loop Memory Attention + halting head for adaptive computation depth | **P1** — NT-CORE adaptive inference; compute allocation |
-| 7 | **OpenWAM: World-Action Model Pretraining** (arXiv:2609.07398) | Modular world-action model; 6400h egocentric data; sim-to-real transfer | **P2** — NT-PHYSICAL world model; embodied intelligence |
-| 8 | **Natural Language Autoencoders (NLA)** | Anthropic Transformer Circuits; unsupervised explanations of LLM activations | **P0** — NT-CORE interpretability; activation analysis for VSA HyperCube |
-| 9 | **Pre-carved Niches: Modular Task Partitions in Early LLM Training** (arXiv:2609.01170) | Modularity pre-exists before learning; sharp jumps during training | **P1** — NT-MIND training dynamics; module formation theory |
-| 10 | **LLM Trading Agents in Production** (arXiv:2609.05663) | 6-month population-scale record; agents capture almost none of upside | **P2** — NT-ACT agent economics; risk management patterns |
-
-### PapersWithCode Trending
-
-| Paper | Status | Relevance |
-|-------|--------|-----------|
-| **MiniMax H3** | Trending research | Video generation; NT-IO multimodal pipeline |
-| **GLM-5.3-Flash** | Frontier Intelligence, Flash Cost | Cost-aware routing; NT-IO provider optimization |
-| **Apodex 1.1** | Scaling Agentic Intelligence | Agentic scaling; NT-MIND SEAL pipeline |
-| **DRACO: Fine-Grained Credit Assignment** | Long-Horizon Agent Training | NT-MIND reinforcement learning |
-| **PaperCompiler: Faithful Paper-to-Code** | Repository-Level Specification Compilation | NT-ACT code generation |
-
-### Key Insights
-- **Latent reasoning is maturing**: PMPS and RecurTrace show 50%+ token compression with maintained accuracy
-- **Self-routing replaces uniform training**: Sample-level adaptation is the new paradigm for post-training
-- **World-action models are real**: OpenWAM demonstrates sim-to-real transfer across embodiments
-- **Production agent economics are brutal**: LLM trading agents capture <50% of favorable excursions
-
-### Action Items
-1. **Implement Self-Routing** in NT-MIND distillation for sample-level training adaptation
-2. **Integrate NLA** for NT-CORE VSA HyperCube activation interpretation
-3. **Evaluate PMPS** for NT-CORE reasoning compression (token reduction target: 50%)
-4. **Study OpenWAM** modular architecture for NT-PHYSICAL embodied intelligence
+| Rank | Project | Description | Stars | NeoTrix Relevance |
+|------|---------|-------------|-------|-------------------|
+| 1 | openai/codex | Lightweight coding agent in terminal | 113,977 ⭐ | NT-ACT coding agent, Codex integration |
+| 2 | mattpocock/skills | Skills for Real Engineers | 232,540 ⭐ | SKILL-SPEC.md contract alignment |
+| 3 | affaan-m/ECC | Agent harness performance optimization system | 242,251 ⭐ | Harness architecture (R-P42) |
+| 4 | obra/superpowers | Agentic skills framework & dev methodology | 276,303 ⭐ | Skill tree / SEAL pipeline |
+| 5 | deepseek-ai/deepseek-harness | DeepSeek agent harness | 191,000 ⭐ | Open-source harness reference |
+| 6 | tt-a1i/archify | Architecture agent | 24,227 ⭐/week | NT-CORE arch design |
+| 7 | THU-MAIC/OpenMAIC | Open multi-agent intelligence | 10,023 ⭐/week | Multi-agent orchestration |
+| 8 | K-Dense-AI/scientific-agent-skills | Scientific agent skills | 7,370 ⭐/week | Domain skill nodes |
+| 9 | dietrichgebect/ponytail | Code optimization | trending | Code refactoring patterns |
+| 10 | stablyai/orca | Agent Development Environment | 34,676 ⭐ | NT-ACT agent runtime |
+| 11 | jingyaogong/minimind | Minimal mind model | 3,122 ⭐/week | Efficient model patterns |
+| 12 | sgl-project/sglang | SGLang serving | trending | LLM serving (NT-IO) |
+| 13 | google-research/timesfm | Time series foundation model | 2,321 ⭐/week | Temporal reasoning |
+| 14 | FlashML-org/FreeToken | Edge-native MoE serving | trending | Resource-efficient inference |
+| 15 | zvec-ai/zvec-grep | Vector grep | trending | Vector search (NT-MEMORY) |
 
 ---
 
-## Batch 3: Framework Rankings
+## 2. GitHub Trending — [https://github.com/trending](https://github.com/trending)
 
-### Top 10 AI Agent Frameworks (2026)
+### Daily Trending
+| Rank | Project | Language | Stars | Description |
+|------|---------|----------|-------|-------------|
+| 1 | openai/codex | Rust | 113,977 | Terminal coding agent |
+| 2 | mattpocock/skills | Shell | 232,540 | Engineering skills |
+| 3 | affaan-m/ECC | JavaScript | 242,251 | Agent harness optimization |
+| 4 | obra/superpowers | Shell | 276,303 | Agentic skills framework |
+| 5 | Wei-Shaw/sub2api | Go | 38,863 | API proxy/gateway |
+| 6 | makeplane/plane | TypeScript | 57,309 | Project management |
+| 7 | n8n-io/n8n | TypeScript | 201,919 | Workflow automation with AI |
+| 8 | anthropics/claude-code | Python | 142,621 | Claude Code agent |
+| 9 | AprilNEA/OpenLogi | Rust | 14,114 | Local-first Logitech alternative |
+| 10 | modular/modular | Mojo | 28,878 | MAX & Mojo platform |
+| 11 | multica-ai/andrej-karpathy-skills | — | 205,425 | Karpathy's CLAUDE.md |
+| 12 | cursor/plugins | TypeScript | 4,702 | Cursor plugin system |
 
-| # | Framework | Stars | Best For | NeoTrix Relevance |
-|---|-----------|-------|----------|-------------------|
-| 1 | **LangGraph** | 39.5K | Complex stateful production workflows | **P0** — Orchestration patterns for NT-MIND SEAL pipeline |
-| 2 | **CrewAI** | 56.9K | Fast role-based multi-agent prototypes | **P1** — Multi-agent patterns for NT-CORE consciousness tree |
-| 3 | **Microsoft Agent Framework** | 28K+ | Enterprise Microsoft/.NET stacks | **P2** — Enterprise patterns; A2A protocol |
-| 4 | **Claude Agent SDK** | N/A | Anthropic-native coding/research agents | **P1** — MCP integration patterns; hooks system |
-| 5 | **OpenAI Agents SDK** | 19K | Lightweight OpenAI-native agents | **P1** — Handoff/triage patterns; minimal abstraction |
-| 6 | **Google ADK** | 17K | GCP-native, multi-language (Java/Go) | **P2** — A2A protocol; multi-language agent support |
-| 7 | **Mastra** | 22K | TypeScript full-stack agents | **P2** — Studio environment; memory gateway patterns |
-| 8 | **Pydantic AI** | 16K | Type-safe Python agents | **P1** — Structured outputs; type safety for NT-ACT |
-| 9 | **LlamaIndex Workflows** | 51.6K | RAG-heavy, data-intensive agents | **P0** — RAG patterns for NT-MEMORY KB retrieval |
-| 10 | **smolagents** | 28.8K | Minimal code-first agents | **P2** — Lightweight agent patterns |
+### Weekly Trending
+| Rank | Project | Stars/week | Description |
+|------|---------|------------|-------------|
+| 1 | tt-a1i/archify | 24,227 | Architecture agent |
+| 2 | bilawalsidhu/gods-eye-view | 10,485 | Global intelligence dashboard |
+| 3 | THU-MAIC/OpenMAIC | 10,023 | Multi-agent framework |
+| 4 | K-Dense-AI/scientific-agent-skills | 7,370 | Scientific agent skills |
+| 5 | jingyaogong/minimind | 3,122 | Minimal mind model |
+| 6 | every-app/open-seo | 2,944 | SEO tools |
+| 7 | omacom/omarchy | 2,800+ | Architecture platform |
+| 8 | google-research/timesfm | 2,321 | Time series FM |
+| 9 | p-e-w/heretic | 2,200+ | LLM tool |
+| 10 | freestylefly/awesome-gpt-image-2 | 2,100+ | GPT image collection |
 
-### LLM Inference Engines (2026 Benchmarks)
+### Monthly Trending (Top Movers)
+| Rank | Project | Stars/month | Description |
+|------|---------|-------------|-------------|
+| 1 | permissionlesstech/bitchat | 7,687 | Bluetooth mesh chat |
+| 2 | diegosouzapw/OmniRoute | 27,829 | AI gateway (290+ providers) |
+| 3 | stablyai/orca | 25,201 | Agent Development Environment |
+| 4 | emilkowalski/skills | 19,439 | Design engineer skills |
+| 5 | Zackriya-Solutions/meetily | 14,907 | AI meeting assistant (Rust) |
+| 6 | Nutlope/hallmark | 16,829 | Anti-AI-slop design skill |
+| 7 | openai/codex-plugin-cc | 8,998 | Codex plugin for Claude Code |
+| 8 | usestrix/strix | 18,958 | AI penetration testing |
+| 9 | koala73/worldmonitor | 16,613 | Global intelligence dashboard |
+| 10 | asgeirtj/system_prompts_leaks | 14,733 | Extracted system prompts |
+| 11 | bradautomates/claude-video | 10,346 | Video analysis for Claude |
+| 12 | iOfficeAI/OfficeCLI | 15,632 | Office suite for AI agents |
+| 13 | OpenCut-app/OpenCut | 19,902 | Open-source CapCut alternative |
+| 14 | HKUDS/Vibe-Trading | 13,643 | Trading agent framework |
+| 15 | HKUDS/DeepTutor | 6,410 | Personalized AI tutor |
 
-| Engine | Throughput (H100) | Best Workload | NeoTrix Relevance |
-|--------|-------------------|---------------|-------------------|
-| **vLLM** | ~1,850 tok/s @50 conc | General purpose, broadest model support | **P0** — Default inference backend for NT-IO |
-| **SGLang** | ~1,920 tok/s @50 conc | Prefix-heavy (RAG, multi-turn agents) | **P0** — RadixAttention for NT-MEMORY RAG pipelines |
-| **TensorRT-LLM** | ~2,100 tok/s @50 conc | Fixed-model NVIDIA production | **P1** — Peak throughput for NT-IO production serving |
-| **llama.cpp** | ~155 tok/s @50 conc | CPU/consumer hardware, edge | **P1** — Local inference for NT-PHYSICAL edge deployment |
-| **Ollama** | Similar to llama.cpp | Local developer workflows | **P2** — Development/testing convenience |
+### Rust Trending (Today)
+| Rank | Project | Description |
+|------|---------|-------------|
+| 1 | CapSoftware/Cap | Open-source Loom alternative (screen recording) |
+| 2 | pacifio/atlas | Atlas (Rust) |
+| 3 | rustdesk/rustdesk | Remote desktop |
+| 4 | firecrawl/pdf-inspector | PDF inspection/classification |
+| 5 | espanso/espanso | Text expander |
+| 6 | rustfs/rustfs | Rust filesystem |
+| 7 | vercel-labs/agent-browser | Agent browser automation |
+| 8 | rtk-ai/rtk | RTK tooling |
+| 9 | arcboxlabs/arcbox | Arcbox |
 
-### Vector Databases (2026)
+### AI Agent Repos (Top 20 by Stars)
+| Rank | Repository | Stars | Category |
+|------|-----------|-------|----------|
+| 1 | AutoGPT | 183,164 | Autonomous agent |
+| 2 | Langflow | 146,595 | Visual agent builder |
+| 3 | Dify | 136,278 | Agentic workflows |
+| 4 | LangChain | 132,476 | Agent engineering |
+| 5 | Gemini CLI | 100,337 | Terminal coding agent |
+| 6 | Browser-use | 86,164 | Browser automation |
+| 7 | RAGFlow | 77,200 | RAG engine |
+| 8 | LobeHub | 74,778 | Multi-agent platform |
+| 9 | MetaGPT | 66,673 | Multi-agent framework |
+| 10 | OpenBB | 65,442 | Financial data platform |
+| 11 | AutoGen | 56,730 | Multi-agent conversation |
+| 12 | Mem0 | 52,047 | Agent memory layer |
+| 13 | Flowise | 51,582 | Visual agent builder |
+| 14 | CrewAI | 48,117 | Role-playing agents |
+| 15 | LocalAI | 44,938 | Local AI engine |
+| 16 | Cherry Studio | 42,984 | AI productivity studio |
+| 17 | Agno | 39,189 | Agentic software |
+| 18 | MindsDB | 38,910 | AI analytics |
+| 19 | ToolJet | 37,717 | Internal tools + AI |
+| 20 | GenericAgent | 14,114 | Self-evolving agent (~3K LOC) |
 
-| DB | Latency P95 | Best Scale | NeoTrix Relevance |
-|----|-------------|------------|-------------------|
-| **pgvector** | 15-20ms @1M | <10M vectors | **P1** — NT-MEMORY extension; zero-infra vector search |
-| **Qdrant** | 8-25ms @1M | 100M vectors | **P0** — NT-MEMORY primary; Rust-native, low latency |
-| **Pinecone** | 22ms @1M | 1B+ vectors | **P1** — Managed fallback; zero-ops option |
-| **Weaviate** | 45ms @1M | 100M vectors | **P1** — Hybrid search champion; BM25 + dense |
-| **Milvus** | 30ms @100M | 1B+ vectors | **P2** — Billion-scale; GPU acceleration |
-
-### Key Insights
-- **MCP is table stakes**: All 10 agent frameworks support MCP; build tools as MCP servers now
-- **SGLang's RadixAttention** delivers 29% throughput advantage for prefix-heavy workloads (RAG, agents)
-- **TGI is sunset**: HuggingFace TGI in maintenance mode since Dec 2025; migrate to vLLM/SGLang
-- **Qdrant dominates price-performance**: Rust-native, $30-50/mo self-hosted for millions of vectors
-
-### Action Items
-1. **Adopt SGLang** for NT-MEMORY RAG pipelines (RadixAttention prefix caching)
-2. **Integrate Qdrant** as NT-MEMORY primary vector store (Rust-native, low latency)
-3. **Build NT tools as MCP servers** for framework interoperability
-4. **Benchmark LangGraph orchestration** for NT-MIND SEAL pipeline state management
-
----
-
-## Batch 4: Industry Reports
-
-### AI Market Landscape (2026)
-
-| Metric | Value | Source |
-|--------|-------|--------|
-| Global AI spending | $2.52 trillion | Gartner 2026 |
-| AI models & platforms market | $64.25 billion | Gartner July 2026 |
-| LLM market proper | $28.27 billion | Axis Intelligence |
-| Enterprise LLM API spend (Anthropic) | 40% | Menlo Ventures |
-| Consumer AI referrals (OpenAI) | 76.85% | Statcounter |
-| AI startup funding (US) | ~$319 billion | Crunchbase 2026 |
-| Enterprise AI adoption | 88% | Stanford HAI 2026 |
-| Agentic AI market | $10.41B (2025) → $52.6B (2030) | Kearney |
-
-### Top AI Startup Funding (Sep 2026)
-
-| Company | Funding | Valuation | Focus |
-|---------|---------|-----------|-------|
-| **Cognition AI** | $2B Series E | $48B | AI coding (Devin) |
-| **Positron AI** | $875M Series C | $5B | Inference silicon |
-| **Mistral AI** | €3B Series D | €21B+ | Sovereign open-weight AI |
-| **PHYMI** | ~$100M Seed | N/A | Embodied AI (Physical Agents) |
-| **Clay** | $115M Series D | $7.1B | AI sales/marketing agents |
-| **UniPat AI** | $300M (led by Alibaba) | $2.5B | AI training/benchmarking |
-| **Cymphony** | $30M Series A | $100M+ | AI agent security |
-| **Arlequin AI** | €28M Series A | N/A | Topological neural networks |
-
-### Key Industry Trends
-
-#### 1. Agentic AI is Dominant Architecture
-- 78% enterprises have AI in production, but only 23% achieve measurable ROI
-- Only 11% have deployed agentic systems in production
-- Agentic frameworks standardized on MCP; A2A emerging for inter-agent communication
-- **NeoTrix mapping**: NT-MIND SEAL pipeline is well-positioned; agent-first process redesign required
-
-#### 2. Cost-Aware Routing is Critical
-- Inference costs per agentic workflow rising >5x through 2028 (Gartner "Inference Paradox")
-- Frontier flagship spans 13x price range ($0.75-$10.00/Mtok)
-- GPT-4-class capability available at $0.113/Mtok (37x cheaper than frontier)
-- **NeoTrix mapping**: GWT salience + cost weight (Axiom A1) directly validated
-
-#### 3. Open-Weight Models Closing Gap
-- Chinese open-weight models account for 45%+ of aggregator traffic
-- Qwen, DeepSeek, GLM, Kimi — frontier-class at fraction of cost
-- Qwen derivatives: 151K on Hub (2.6x Meta's footprint)
-- **NeoTrix mapping**: NT-IO Ordered Backend Router should include Chinese model providers
-
-#### 4. Sovereign AI Accelerating
-- EU AI Act high-risk obligations take effect Aug 2026
-- National AI strategies expanding; state-backed supercomputing rising
-- Mistral raises €3B for European sovereign AI
-- **NeoTrix mapping**: NT-SHIELD egress guard must support regional compliance
-
-#### 5. Small Models Winning Real Adoption
-- Sub-3B models: 30%+ of all downloads on HuggingFace
-- GGUF quantization growing 464% year-over-year
-- On-device inference becoming standard for cost/latency
-- **NeoTrix mapping**: NT-PHYSICAL edge deployment should target sub-3B models
-
-#### 6. World Models Emerging
-- Puffin-World: unified multimodal 3D world generation
-- OpenWAM: modular world-action model pretraining
-- Physical AI moving from experiment to infrastructure
-- **NeoTrix mapping**: NT-PHYSICAL world model research; NT-WORLD perception integration
-
-### Enterprise AI Adoption Patterns
-
-| Pattern | Detail | NeoTrix Relevance |
-|---------|--------|-------------------|
-| **Decision fabrics** | Integrated data+model+orchestration layers | NT architecture alignment |
-| **Proof of work** | Human-readable reasoning records for governance | NT-META audit trail |
-| **Hybrid infrastructure** | Cloud (elastic) + on-prem (consistent) + edge (immediate) | NT deployment tiers |
-| **Agent security** | Shadow AI, prompt injection, model poisoning | NT-SHIELD core mandate |
-| **FinOps for AI** | Token budget management, cost attribution | NT-ACT ResourceBudgetManager |
-
-### Key Insights
-- **Anthropic leads enterprise; OpenAI leads consumer** — two different markets
-- **US captures 88% of AI startup funding** — global distribution highly concentrated
-- **Responsible AI lagging capability** — 362 incidents in 2025 (up from 233)
-- **AI sovereignty becoming policy** — EU, China, India, South Korea all mandating local models
-
-### Action Items
-1. **Implement cost-aware routing** (GWT + cost weight) for NT-IO provider selection
-2. **Add Chinese model providers** to NT-IO Ordered Backend Router (Qwen, DeepSeek, GLM)
-3. **Build proof-of-work artifacts** for NT-META governance (reasoning traces, audit logs)
-4. **Deploy NT-SHIELD** with regional compliance support (EU AI Act, data residency)
-5. **Target sub-3B model deployment** for NT-PHYSICAL edge inference
+### LLM Inference Engines
+| Rank | Repository | Stars | Description |
+|------|-----------|-------|-------------|
+| 1 | vllm-project/vllm | 90,817 | High-throughput LLM serving |
+| 2 | ggml-org/llama.cpp | 123,400 | C/C++ LLM inference |
+| 3 | NVIDIA/TensorRT-LLM | 14,400+ | Optimized NVIDIA inference |
+| 4 | sgl-project/sglang | trending | SGLang serving |
+| 5 | ray-project/ray | 43,500 | Distributed AI compute |
+| 6 | bentoml/OpenLLM | 12,500 | Open-source LLM serving |
+| 7 | gpustack/gpustack | 5,500 | GPU cluster manager |
+| 8 | pegainfer-project/pegainfer | 651 | Pure Rust + CUDA inference |
 
 ---
 
-## Cross-Source Synthesis
+## 3. Papers With Code — [https://paperswithcode.com](https://paperswithcode.com)
 
-### Top 5 Absorption Priorities
+### Trending Papers (Sept 2026)
+| Rank | Paper | Description |
+|------|-------|-------------|
+| 1 | BDH-CQ: In-Context Learning with Recurrent Latent Reasoning | 150M-param reasoning model, ARC-AGI-1 SOTA |
+| 2 | FreeToken: Efficient Edge-Native MoE Serving | Bandwidth-adaptive MoE execution |
+| 3 | TradingAgents: Multi-Agents LLM Financial Trading | Multi-agent trading framework |
+| 4 | Prime Agent: Self-Improving RLM Harness | Self-evolving agent harness |
+| 5 | LightNav-0: VLM Spatial Intelligence for Embodied Navigation | VLM-based navigation |
+| 6 | Code as Worlds: Agentic Discovery for Physical Reasoning | World model via code |
+| 7 | OpenDevin: Open Platform for AI Software Developers | Open-source AI developer |
+| 8 | Apodex 1.1: Scaling Agentic Intelligence | Complex work agent |
+| 9 | AgentScope 1.0: Developer-Centric Agentic Framework | Agent framework (30.4K GH) |
+| 10 | Mem0: Production-Ready AI Agents with Long-Term Memory | Scalable agent memory |
+| 11 | VoiceMem: Streaming Dual-Brain Memory for Real-Time Interaction | Real-time voice memory |
+| 12 | MinerU2.5: Decoupled VLM for Document Parsing | Document parsing |
+| 13 | Zep: Temporal Knowledge Graph for Agent Memory | Agent memory architecture |
+| 14 | SmolVLA: Vision-Language-Action for Affordable Robotics | Affordable robotics VLA |
+| 15 | LLM-as-a-Verifier: General-Purpose Verification Framework | LLM verification |
+| 16 | LLMRouter: Unified Infrastructure for LLM Routers | LLM routing |
+| 17 | JIT-Agent: Scaling Harness Intelligence via Just-in-Time Evolution | Self-evolving harness |
+| 18 | ContextPilot: Proactive Context Management via Fine-grained RL | Context management |
+| 19 | SkillOpt: Executive Strategy for Self-Evolving Agent Skills | Skill optimization |
+| 20 | COLLEAGUE.SKILL: Automated AI Skill Generation | Skill distillation |
 
-| Priority | Source | NeoTrix Integration | Est. Impact |
-|----------|--------|---------------------|-------------|
-| **P0** | Self-Routing (arXiv:2609.01422) | NT-MIND sample-level training adaptation | High — Training efficiency |
-| **P0** | SGLang RadixAttention | NT-MEMORY RAG prefix caching | High — 29% throughput gain |
-| **P0** | Qdrant vector DB | NT-MEMORY primary vector store | High — Rust-native, low latency |
-| **P0** | obra/superpowers skills | NT skill architecture patterns | Medium — Skill composition |
-| **P0** | Cost-aware routing | NT-IO GWT + cost weight | High — 37x cost reduction potential |
-
-### Cross-Cutting Patterns
-
-1. **Multi-agent is production reality** — LangGraph, CrewAI, OpenMAIC all validate NT-MIND multi-agent architecture
-2. **Rust-native tools dominate trending** — codex, Cap, arcbox, Qdrant — validates NT's Rust preference
-3. **MCP is the universal protocol** — All frameworks support it; NT tools should be MCP servers
-4. **Small + quantized = real adoption** — Sub-3B GGUF models drive 30%+ downloads
-5. **Cost > capability at scale** — Inference tiering becomes margin-critical (Axiom A1 validated)
-
-### NeoTrix Architecture Validation
-
-| NT Component | Market Validation | Action |
-|--------------|-------------------|--------|
-| **GWT attention routing** | Cost-aware routing proven critical (37x spread) | Implement cost weight in GWT salience |
-| **VSA HyperCube** | NLA from Anthropic validates activation interpretation | Integrate NLA for HyperCube analysis |
-| **SEAL pipeline** | Self-Routing validates sample-level adaptation | Implement behavior-conditioned training |
-| **Skill Tree** | superpowers/skills validate skill composition patterns | Align SKILL-SPEC.md with market patterns |
-| **Ordered Backend Router** | Chinese models closing gap; 45% aggregator traffic | Add Qwen/DeepSeek/GLM to router |
-| **Egress Privacy Guard** | Shadow AI risk rising; 40% enterprises face incidents | Strengthen guard for agent data flows |
+### SOTA Leaderboards (Top Models per Task)
+| Task | Benchmark | Best Model | Score |
+|------|-----------|-----------|-------|
+| Language Modeling | WikiText-103 | RETRO (7.5B) | PPL varies |
+| Language Modeling | The Pile | SIFT + Llama-3.2 (3B) | Test-time fine-tuning |
+| Language Modeling | LAMBADA | PaLM-540B | Few-shot SOTA |
+| Question Answering | SQuAD1.1 | ANNA (single model) | SOTA |
+| Question Answering | TriviaQA | Claude 2 (few-shot, k=5) | SOTA |
+| Question Answering | BoolQ | Mistral-Nemo 12B (HPT) | SOTA |
+| Question Answering | OpenBookQA | GPT-4 + knowledge base | SOTA |
+| Code Generation | DS-1000 | StarCoder2-15B | 33.8% overall |
 
 ---
 
-*Report generated by opencode trending sources aggregator. All data sourced from live web searches on 2026-09-10.*
+## 4. Hugging Face — [https://huggingface.co](https://huggingface.co)
+
+### Most Downloaded Models (May 2026)
+| Rank | Model | Downloads | Likes | Task |
+|------|-------|-----------|-------|------|
+| 1 | sentence-transformers/all-MiniLM-L6-v2 | 259M | 4,786 | Embeddings |
+| 2 | Qwen/Qwen3-VL-2B-Instruct | 184M | 403 | Multimodal |
+| 3 | google-bert/bert-base-uncased | 64M | 2,651 | Classic NLP |
+| 4 | google/electra-base-discriminator | 52M | 105 | Classic NLP |
+| 5 | cross-encoder/ms-marco-MiniLM-L6-v2 | 51M | 238 | Re-ranking |
+| 6 | sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 | 48M | 1,226 | Multilingual embeddings |
+| 7 | BAAI/bge-small-en-v1.5 | 43M | 458 | Embeddings |
+| 8 | sentence-transformers/all-mpnet-base-v2 | 36M | 1,290 | Embeddings |
+| 9 | openai/clip-vit-large-patch14 | 32M | 2,010 | Vision |
+| 10 | BAAI/bge-m3 | 25M | 2,997 | Multilingual embeddings |
+| 11 | Qwen/Qwen3-0.6B | 19M | 1,241 | Text generation LLM |
+
+### HF Hub State 2026 Key Stats
+- **Qwen leads Hub**: 399M downloads (18.5% of top-1K traffic)
+- **71.5%** of top-1K models use permissive open license (Apache 2.0 = 49%)
+- **Top 5 orgs** concentrate 46.1% of all downloads
+- **Sub-7B models** make up 40.7% of size-named models
+- **Text-generation** is top pipeline tag (222 top models)
+- Chinese frontier labs (MiniMax, Moonshot, DeepSeek) dominate high-parameter downloads
+
+### Trending HF Spaces
+- Microduck Sandbox
+- H3 Acceleration Arena
+- Trending Board dashboards
+
+### HF Daily Papers (Sept 2026)
+| Paper | Description |
+|-------|-------------|
+| NeoHorse-1: Recursive Self-Improvement via Agentic Post-Training | Self-improving agent |
+| OpenWAM: Open World-Action Model Pretraining | World-action model |
+| Steering Geometry: Human Value Geometry in LLM Steering Space | Value alignment |
+| Agentic Visual Generation: From Models to Agentic Control | Visual generation agents |
+| Kalman Delta Networks: Uncertainty-aware Associative Memory | Novel memory architecture |
+| Multi-Grid Post-Training for Video Generation | Video generation |
+| Repo-To-Skill: Distilling GitHub Repos Into AI4AI Skills | Skill extraction from repos |
+| HarnessDev: Can LLMs Create and Evolve Their Own Agent Harness? | Self-evolving harness |
+| PaperCompiler: Faithful Paper-to-Code Generation | Paper to code |
+
+---
+
+## 5. Arxiv Rankings — [https://arxiv.org](https://arxiv.org)
+
+### Most Influential AI Papers (2026)
+| Rank | Paper | Year | Impact |
+|------|-------|------|--------|
+| 1 | Kimi K1.5: Scaling Reinforcement Learning with LLMs | 2025 | IF:7 |
+| 2 | Does RL Really Incentivize Reasoning Capacity in LLMs Beyond The Base Model? | 2025 | IF:7 |
+| 3 | Janus-Pro: Unified Multimodal Understanding and Generation | 2025 | IF:7 |
+| 4 | Llama 3 Herd of Models | 2024 | IF:8 |
+| 5 | LLM-as-a-Judge Arena for Evaluating LLMs By Human Preference | 2024 | IF:6 |
+
+### Key Papers (Jan-May 2026, Sebastian Raschka List)
+| Date | Paper | Topic |
+|------|-------|-------|
+| Jan 1 | Deep Delta Learning | Training methodology |
+| Jan 6 | MiMo-V2-Flash Technical Report | Model architecture |
+| Jan 13 | Ministral 3 | Small model |
+| Jan 29 | Scaling Embeddings Outperforms Scaling Experts | MoE insight |
+| Feb 4 | ERNIE 5.0 Technical Report | Foundation model |
+| Feb 11 | Step 3.5 Flash: Open Frontier-Level Intelligence (11B) | Open frontier |
+| Feb 17 | GLM-5: From Vibe Coding to Agentic Engineering | Agent engineering |
+| Mar 15 | Attention Residuals | Architecture improvement |
+| Mar 16 | Mamba-3: Improved Sequence Modeling via SSM | State space model |
+| Apr 13 | Nemotron 3 Super: Hybrid Mamba-Transformer for Agentic Reasoning | Hybrid architecture |
+| May 13 | Delta Attention Residuals | Attention improvement |
+| May 21 | Gated DeltaNet-2: Decoupling Erase and Write in Linear Attention | Linear attention |
+| May 25 | MiniMax-M2 Series: Mini Activations for Real-World Intelligence | Efficiency |
+
+### Arxiv Trending (Sept 9, 2026)
+| Paper | Description |
+|-------|-------------|
+| Proof-Carrying Cognition: Closing Verification Gap | Reasoning verification |
+| Structural Process Supervision for Latent CoT | Latent chain-of-thought |
+| Copying Explains Collective Behavior of AI Agents | Agent social behavior |
+| InstantMimic: Physics-based Skills in Seconds | Fast skill learning |
+| The Interlingua Hypothesis: LLMs Translate via Latent Space | Translation mechanism |
+| The Geometry of Ignorance: LLMs Know When to Temper Bayesian Priors | LLM uncertainty |
+
+---
+
+## 6. Semantic Scholar — [https://www.semanticscholar.org](https://www.semanticscholar.org)
+
+### Trending in Computer Science
+| Paper | Description |
+|-------|-------------|
+| Llama 2: Open Foundation and Fine-Tuned Chat Models | Foundation LLM |
+| LLaMA: Open and Efficient Foundation Language Models | Efficient LLM |
+| GPT-4 Technical Report | Frontier model |
+| Sparks of AGI: Early experiments with GPT-4 | AGI exploration |
+| Grounded Skill Synthesis from Code at Scale for Agentic Intelligence | Skill extraction |
+| Toward Skill-Native LLMs: Skill Entropy for Long-Horizon Reasoning | Skill-centric training |
+| The End of AI Exponentiation: Inside and Outside AI Bubble | Market analysis |
+| GE-Act 2.0: World-Action Model for Robotic Manipulation | Robotics |
+
+### ConferenceScope: Rising ML Topics (2019-2025)
+| Rising Topics | Declining Topics |
+|--------------|-----------------|
+| State Space Models | GANs |
+| World Models | Neural Architecture Search |
+| Agent Frameworks | — |
+| Diffusion Models | — |
+| Mixture-of-Experts | — |
+
+---
+
+## 7. ML Framework & Tool Rankings
+
+### Best ML Frameworks 2026
+| Framework | Category | Notes |
+|-----------|----------|-------|
+| PyTorch | Core ML | Dominant, ecosystem leader |
+| JAX | Research ML | Growing for large-scale research |
+| TensorFlow | Production ML | Stable but declining mindshare |
+| Mojo | Next-gen ML | Modular platform, Python superset |
+
+### Top LLM Inference Engines
+| Engine | Stars | Key Feature |
+|--------|-------|-------------|
+| vLLM | 90,817 | PagedAttention, 200+ models |
+| llama.cpp | 123,400 | C/C++, CPU/GPU |
+| TensorRT-LLM | 14,400+ | NVIDIA optimized |
+| SGLang | trending | Structured generation |
+| OpenLLM | 12,500 | OpenAI-compatible API |
+| Pegainfer | 651 | Pure Rust + CUDA |
+
+### Best Vector Databases (2026 Benchmark)
+| Database | P99 Latency | Throughput | Recall@10 | Best For |
+|----------|-------------|------------|-----------|----------|
+| FAISS | <2ms | 866 QPS | 0.907 | Max throughput (in-process) |
+| Qdrant | 4.55ms | 216 QPS | 0.959 | Balanced production |
+| Weaviate | — | 87 QPS | 0.996 | Max recall |
+| Milvus | — | 88 QPS | 0.954 | High-dimensional / scale |
+| pgvector | — | 154 QPS | 0.937 | SQL integration |
+| LanceDB | — | 53 QPS | 0.633 | Fast iteration (11× faster build) |
+
+### Top AI Agent Frameworks
+| Framework | Stars | Description |
+|-----------|-------|-------------|
+| AutoGPT | 183,164 | Autonomous agent |
+| LangChain | 132,476 | Agent engineering platform |
+| CrewAI | 48,117 | Role-playing agents |
+| AutoGen | 56,730 | Multi-agent conversation |
+| Agno | 39,189 | Agentic software at scale |
+| GenericAgent | 14,114 | Self-evolving, ~3K LOC |
+
+### Best RAG Frameworks
+| Framework | Description |
+|-----------|-------------|
+| RAGFlow | Open-source RAG engine with agent capabilities |
+| LangChain | RAG chains + retrieval |
+| LlamaIndex | Data framework for RAG |
+| Haystack | Pipeline-based RAG |
+| RAGAS | RAG evaluation framework |
+
+### Prompt Management Tools (2026)
+| Tool | Best For | Notable |
+|------|----------|---------|
+| Braintrust | Production prompt management | Evaluation-first, Loop optimization |
+| PromptLayer | Non-technical teams | No-code editor, A/B testing |
+| Langfuse | Open-source observability | Self-hosted, tracing |
+| PromptHub | Dev teams | Git-style branching/merging |
+| Promptfoo | CI/CD testing | CLI, red-team security scanning |
+| Agenta | Open-source all-in-one | MIT license, self-hostable |
+
+---
+
+## 8. Industry Intelligence
+
+### Stanford HAI 2026 AI Index Report — Key Findings
+1. **AI capability is accelerating**, not plateauing — 90%+ of frontier models from industry
+2. **US-China gap closed** — Anthropic leads by just 2.7% over top Chinese models
+3. **US has 5,427 data centers** (10× more than any other country)
+4. **Jagged frontier** — AI wins IMO gold but reads analog clocks 50.1% of the time
+5. **Responsible AI lags capability** — incidents rose to 362 (from 233 in 2024)
+6. **US investment $285.9B** (23× China's $12.4B), but talent attraction declining 89%
+7. **53% population adoption** in 3 years (faster than PC or internet)
+8. **Generative AI consumer value**: $172B annually in US
+
+### Kearney AI Trends Report 2026
+- **Agentic AI market**: $10.41B (2025) → $52.6B (2030), 45% CAGR
+- **Full deployment stagnant** at 11% — architectural thinking is the barrier
+- **5 pillars**: Data plane → Model plane → Orchestration → LLMOps → AI office
+- **Proof of work** becomes foundation for trustworthy AI
+- **MCP standardization** eliminating integration overhead
+
+### Deloitte State of AI 2026
+- Worker access to AI **rose 50% in 2025**
+- Companies with ≥40% projects in production **set to double** in 6 months
+- **23%** using agentic AI at least moderately; expected to grow sharply
+- **Only 1 in 5** companies has mature governance for autonomous agents
+- **58%** report at least limited physical AI use (80% in 2 years)
+
+### AI Startup Funding (2026)
+| Company | Round | Valuation | Date |
+|---------|-------|-----------|------|
+| Cognition AI (Devin) | Series E ($2B) | $48B | Sep 2026 |
+| Positron AI | Series C ($875M) | $5B | Sep 2026 |
+| UniPat AI | $300M | $2.5B | Sep 2026 |
+| OpenAI | — | — | IPO expected 2026 |
+| Anthropic | — | — | IPO expected 2026 |
+
+### Open Source AI Ecosystem (Mozilla Report v1.0.1, July 2026)
+- **Open weights now route 1/3 of all tokens** on OpenRouter
+- **7 highest-volume models** on OpenRouter all ship open weights
+- **Open ships easy, open deploys hard** — 53% open-model teams reach production vs 63% closed
+- **The harness is the new frontier** — value accrues above the model layer
+- **Chinese open-weight models**: rose from <2% to 45%+ of weekly traffic (2024→2026)
+- **5 bets**: Open harness, Portable memory, Portable permission, Break the meter, Plural defaults
+
+---
+
+## 9. Chinese Tech Ecosystem
+
+### Hugging Face — Chinese Models Trending
+- **Qwen dominates**: 399M downloads, 18.5% of top-1K traffic
+- **Qwen3-VL-2B-Instruct**: 2nd most downloaded model on HF (184M)
+- Chinese frontier labs (MiniMax, Moonshot, DeepSeek) dominate high-parameter downloads
+- GLM-4.1V-Thinking topped HF Trending #1 globally
+- Step 3.7 Flash topped HF Trending multimodal base models
+
+### Chinese AI Rankings (2026)
+| Company | Status | Key Move |
+|---------|--------|----------|
+| DeepSeek | #1 open-source influence | Open-source models, 26K+ enterprise accounts |
+| 智谱 (Zhipu) | IPO on HKEX (Jan 2026) | First global LLM IPO; Ox Alpha (GLM-5.3) |
+| 月之暗面 (Moonshot) | $35B F-round, $35B valuation | 6 rounds in 2026; valuation from $10B→$35B |
+| MiniMax | IPO on HKEX | Continued general model + Agent investment |
+| 阶跃星辰 (StepFun) | Step 3.7 Flash trending | Multimodal base model leader |
+| 百川 (Baichuan) | Pivoted to Medical AI | All co-founders departed; medical AI focus |
+
+### Arxiv — Chinese AI Research (2026)
+- China leads in publication volume, citations, patent output
+- BAAI AREX: Recursively self-improving deep research agent (4B/122B-A10B)
+- Qwen-Drive: Vision-language foundation for autonomous driving
+- CNeo-Bench: Chinese neologism benchmark for LLMs
+- Guide: Chinese query correction framework
+
+### Key Chinese Model Releases
+| Model | Org | Size | Key Feature |
+|-------|-----|------|-------------|
+| DeepSeek-V4-Pro | DeepSeek | Frontier | Open-source frontier |
+| Kimi K3 | Moonshot | 2.8T params | 1M context, MoE |
+| GLM-5.3 / Ox Alpha | Zhipu | Frontier | Anonymous deployment test |
+| Qwen3.8 | Alibaba | 27B | Multimodal |
+| Step 3.7 Flash | StepFun | — | Multimodal base model |
+| MiniMax-M2 | MiniMax | — | Mini activations |
+
+---
+
+## Cross-Source Patterns & NeoTrix Relevance
+
+### Top 5 Emerging Patterns (Sept 2026)
+
+1. **Agent Harness is the New Frontier** — Value has shifted from models to the orchestration layer above them. GenericAgent (3K LOC), ECC, OpenMAIC all trending. Maps to NT-CORE + NT-ACT orchestration.
+
+2. **Skill Crystallization** — Skills as reusable, composable knowledge templates. mattpocock/skills (232K⭐), K-Dense-AI scientific-agent-skills, COLLEAGUE.SKILL paper. Aligns with NT-MIND SEAL pipeline + SKILL-SPEC.md contract.
+
+3. **Self-Evolving Agents** — Recursively self-improving loops. AREX (BAAI), JIT-Agent, SkillOpt, Prime Agent. Maps to ConsciousnessTree growth cycles.
+
+4. **Vector DB Maturation** — Qdrant leads balanced production; pgvector wins local. Production-ready for RAG. Relevant to NT-MEMORY vector search backend.
+
+5. **Chinese Open-Source Surge** — Qwen, DeepSeek, GLM dominating downloads. Open weights = 45%+ of OpenRouter traffic. Relevant to NT-IO multi-provider routing (R-P82).
+
+### NeoTrix Constellation Alignment
+
+| Trend | NeoTrix Component | Constellation |
+|-------|-------------------|---------------|
+| Agent harnesses | nt_core_capability_tree + nt_act | C3-C4 |
+| Skill crystallization | nt_mind_skill_engine | C2-C3 |
+| Self-evolution | nt_core_consciousness_tree | C3 |
+| Vector search | nt_memory_search | C4 |
+| LLM routing | nt_io_llm_provider | C3-C4 |
+| Multi-agent | nt_act_orchestrator | C3 |
+| Agent memory | nt_memory + nt_nexus | C3-C4 |
+
+---
+
+*Report generated: 2026-09-09T06:30:00Z*
+*Sources: 47 parallel web searches across 9 categories*
+*Rate-limited: 12/47 searches (trendshift Rust/ML, arxiv NeurIPS/ICLR, semantic scholar trending, framework rankings, industry reports ×2, Chinese trending ×1)*

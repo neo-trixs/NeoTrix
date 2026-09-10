@@ -219,21 +219,35 @@ impl KNNRouter {
 
 impl LearnedRouter for KNNRouter {
     fn route(&self, features: &RouteFeatures, candidates: &[CandidateModel]) -> RouteDecision {
-        let history = self.history.read().unwrap();
+        let history = match self.history.read() {
+            Ok(h) => h,
+            Err(_) => {
+                // RwLock poisoned, fall back to first candidate
+                return RouteDecision {
+                    selected_model: candidates.first().map(|c| c.name.clone()).unwrap_or_default(),
+                    confidence: 0.0,
+                    fallback_chain: candidates.iter().map(|c| c.name.clone()).collect(),
+                    expected_quality: 0.0,
+                    expected_cost: 0.0,
+                    expected_latency_ms: 0.0,
+                    pareto_score: 0.0,
+                };
+            }
+        };
         if history.is_empty() {
             // 冷启动: 回退 capability_score 排序
             let mut scored: Vec<_> = candidates.iter()
                 .map(|c| (c.name.clone(), c.quality_score * self.alpha - c.avg_cost_per_1k * self.beta))
                 .collect();
-            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             return RouteDecision {
-                selected_model: scored[0].0.clone(),
+                selected_model: scored.first().map(|(n, _)| n.clone()).unwrap_or_default(),
                 confidence: 0.5,
                 fallback_chain: scored.iter().map(|(n, _)| n.clone()).collect(),
-                expected_quality: candidates.iter().find(|c| c.name == scored[0].0).map(|c| c.quality_score).unwrap_or(0.5),
-                expected_cost: candidates.iter().find(|c| c.name == scored[0].0).map(|c| c.avg_cost_per_1k).unwrap_or(0.0),
-                expected_latency_ms: candidates.iter().find(|c| c.name == scored[0].0).map(|c| c.avg_latency_ms).unwrap_or(1000.0),
-                pareto_score: scored[0].1,
+                expected_quality: candidates.iter().find(|c| c.name == scored.first().map(|(n, _)| n.as_str()).unwrap_or("")).map(|c| c.quality_score).unwrap_or(0.5),
+                expected_cost: candidates.iter().find(|c| c.name == scored.first().map(|(n, _)| n.as_str()).unwrap_or("")).map(|c| c.avg_cost_per_1k).unwrap_or(0.0),
+                expected_latency_ms: candidates.iter().find(|c| c.name == scored.first().map(|(n, _)| n.as_str()).unwrap_or("")).map(|c| c.avg_latency_ms).unwrap_or(1000.0),
+                pareto_score: scored.first().map(|(_, s)| *s).unwrap_or(0.0),
             };
         }
 
@@ -246,7 +260,7 @@ impl LearnedRouter for KNNRouter {
                 (h_model.clone(), sim, *h_reward)
             })
             .collect();
-        sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Top-K 投票
         let k = self.k.min(sims.len());

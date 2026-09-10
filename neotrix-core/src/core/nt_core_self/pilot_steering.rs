@@ -113,23 +113,28 @@ impl PilotSupervisor {
 
     /// 创建 supervisor 并启动 worker 任务
     pub fn launch_worker(&mut self, task_id: String) {
-        let mut state = self.worker_state.lock().unwrap();
-        *state = WorkerState::Running {
-            task_id,
-            started_at: Instant::now(),
-        };
-        self.consecutive_failures = 0;
+        if let Ok(mut state) = self.worker_state.lock() {
+            *state = WorkerState::Running {
+                task_id,
+                started_at: Instant::now(),
+            };
+            self.consecutive_failures = 0;
+        }
     }
 
     /// 记录 worker 执行轨迹点
     pub fn record_trace(&self, point: TracePoint) {
-        let mut traces = self.traces.lock().unwrap();
-        traces.push(point);
+        if let Ok(mut traces) = self.traces.lock() {
+            traces.push(point);
+        }
     }
 
     /// 评估当前状态并做出决策
     pub fn evaluate(&mut self) -> SupervisorDecision {
-        let state = self.worker_state.lock().unwrap().clone();
+        let state = match self.worker_state.lock() {
+            Ok(s) => s.clone(),
+            Err(_) => return SupervisorDecision::Continue,
+        };
 
         match state {
             WorkerState::Idle => SupervisorDecision::Continue,

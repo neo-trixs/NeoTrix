@@ -2,6 +2,39 @@ use serde::Deserialize;
 use rusqlite::{params, Connection};
 use std::sync::OnceLock;
 
+/// 本地 hash-kernel 嵌入提供者，实现 EmbeddingProvider trait。
+pub struct LocalEmbeddingProvider {
+    dim: usize,
+}
+
+impl LocalEmbeddingProvider {
+    pub fn new(dim: usize) -> Self {
+        Self { dim }
+    }
+}
+
+impl Default for LocalEmbeddingProvider {
+    fn default() -> Self {
+        Self::new(384)
+    }
+}
+
+#[async_trait::async_trait]
+impl neotrix_types::knowledge_access::EmbeddingProvider for LocalEmbeddingProvider {
+    async fn embed(&self, text: &str) -> Result<Vec<f32>, String> {
+        let results = local_embed_texts(&[text], self.dim);
+        results.into_iter().next().ok_or_else(|| "Empty embedding result".to_string())
+    }
+
+    fn dim(&self) -> usize {
+        self.dim
+    }
+
+    fn name(&self) -> &str {
+        "local_hash_kernel"
+    }
+}
+
 /// Embedding backend mode.
 ///
 /// - `Http`: 调用 OpenAI 兼容远程服务 (MiniLM local server / 云端 API)。

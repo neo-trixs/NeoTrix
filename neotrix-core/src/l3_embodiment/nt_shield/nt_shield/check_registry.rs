@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use super::tool_inspection_stack::{InspectionResult, ToolInspector};
+use super::nt_shield_audit::CheckResult;
 
 // ── Severity ──────────────────────────────────────────────
 
@@ -996,5 +997,40 @@ tool_patterns = ["webfetch", "websearch"]
         assert_eq!(format!("{}", ToolSource::User), "user");
         assert_eq!(format!("{}", ToolSource::Mcp), "mcp");
         assert_eq!(format!("{}", ToolSource::Plugin), "plugin");
+    }
+}
+
+/// 创建 CheckRegistry 的 SelfTest 实例 (供 L5 注册，避免 L5 直接依赖 L3 类型)
+pub fn create_check_registry_self_test() -> Box<dyn crate::core::nt_core_self_test::SelfTest> {
+    Box::new(CheckRegistry::new())
+}
+
+/// SecurityCheckRegistry trait 实现 — 打通 L5 认知层对 L3 具身层的安全检查注册接口
+impl crate::core::nt_core_traits::SecurityCheckRegistry for CheckRegistry {
+    fn register_check(&mut self, name: &str) {
+        // 注册一个通过的检查项 (简化实现)
+        self.results.insert(name.to_string(), CheckResult {
+            name: name.to_string(),
+            status: CheckStatus::Passed,
+            severity: CheckSeverity::Info,
+            message: "registered via trait".to_string(),
+            details: None,
+        });
+    }
+
+    fn run_all_checks(&self) -> Result<Vec<String>, Vec<String>> {
+        let passed: Vec<String> = self.results.iter()
+            .filter(|(_, r)| matches!(r.status, CheckStatus::Passed))
+            .map(|(name, _)| name.clone())
+            .collect();
+        let failed: Vec<String> = self.results.iter()
+            .filter(|(_, r)| matches!(r.status, CheckStatus::Failed(_)))
+            .map(|(name, _)| name.clone())
+            .collect();
+        if failed.is_empty() {
+            Ok(passed)
+        } else {
+            Err(failed)
+        }
     }
 }

@@ -11,10 +11,19 @@ use serde::{Deserialize, Serialize};
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 
-// ── HTTP Client ──
+// ── HTTP Client (L1 dependency centralized here) ──
 
 fn http_client() -> Option<&'static reqwest::blocking::Client> {
     Some(crate::l1_action::nt_memory::nt_memory_kb::nt_http::shared_blocking_client())
+}
+
+/// 下载文件到本地路径 (L1 nt_http 依赖集中点)
+fn download_to_file_l1(
+    url: &str,
+    dest: &std::path::Path,
+    options: &crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions,
+) -> Result<std::path::PathBuf, String> {
+    crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file(url, dest, options)
 }
 
 fn github_token() -> Option<String> {
@@ -348,9 +357,7 @@ impl GitHubAbsorber {
         repo: &str,
         dest: &std::path::Path,
     ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_http::{
-            download_to_file, DownloadOptions,
-        };
+        use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
 
         // 默认分支: 用 repo 元数据 default_branch (branches.first() 是字母序首个,
         // 会误选 "bak-feat/..." 之类特性分支 — project-nomad 实证缺陷)。
@@ -366,7 +373,7 @@ impl GitHubAbsorber {
         );
         let tarball_path = dest.join(format!("{}-{}.tar.gz", repo, branch_fs));
         let proxy = crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env();
-        let result = download_to_file(&DownloadOptions {
+        let result = download_to_file_l1(&url, &tarball_path, &DownloadOptions {
             url: &url,
             dest: &tarball_path,
             user_agent: Some("NeoTrix/0.19 (nt_http; +https://neotrix.dev)"),

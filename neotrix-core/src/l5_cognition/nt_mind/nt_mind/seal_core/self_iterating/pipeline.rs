@@ -41,6 +41,48 @@ use super::skillopt::{
 use super::anti_distillation_stage::AntiDistillationStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::rsi_operators::MetaRsiStage;
+
+/// 概念涌现阶段 — 从KB节点聚类中发现新概念
+make_stage!(ConceptEmergenceStage);
+impl BrainStage for ConceptEmergenceStage {
+    fn name(&self) -> &str { "concept_emergence" }
+    fn frequency(&self) -> usize { 10 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::core::nt_core_concept_emergence::ConceptEmergenceEngine;
+        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+        
+        // 从brain的KB中获取节点嵌入
+        let kb = &brain.brain.kb;
+        let embeddings = kb.all_embeddings();
+        
+        if embeddings.len() < 3 {
+            return Ok(StageDecision::Continue);
+        }
+        
+        // 运行概念发现
+        let engine = ConceptEmergenceEngine::default();
+        let concepts = engine.discover_concepts(&embeddings);
+        
+        if concepts.is_empty() {
+            return Ok(StageDecision::Continue);
+        }
+        
+        // 将发现的概念写回KB
+        for concept in &concepts {
+            let _ = kb.insert_or_get_node(
+                &concept.label,
+                neotrix_types::knowledge_access::NodeType::Concept,
+                Some(&format!("Auto-discovered concept with {} members", concept.member_ids.len())),
+                None,
+                None,
+            );
+        }
+        
+        log::info!("[SEAL] ConceptEmergence: discovered {} concepts from {} nodes", concepts.len(), embeddings.len());
+        
+        Ok(StageDecision::Continue)
+    }
+}
 use super::hyperarchive::{HyperAgentArchive, SelectionConfig};
 use super::hypercore::HyperMetaAgent;
 use super::hypercore::SafetyCheckResult;
@@ -62,8 +104,6 @@ use crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate;
 use crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate;
 use crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::consciousness_bridge::ConsciousnessBridge;
-use crate::l3_embodiment::nt_shield::nt_shield::browser_security::{BrowserSecurityScanner, BrowserSecurityConfig};
-use crate::l3_embodiment::nt_shield::nt_shield::check_registry::CheckRegistry;
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;
 use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
 
@@ -372,6 +412,8 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(MemoryConsolidationStage::new()),
             Box::new(CacheCleanupStage::new()),
             Box::new(ExternalKnowledgeAbsorbStage::new()),
+            // 概念涌现: 从KB节点聚类中发现新概念 (freq 10)
+            Box::new(ConceptEmergenceStage::new()),
             // 外置大脑消化闭环: SEAL 调度自主把冷 corpus 转化为 live 能力 (R-P79)
             Box::new(ExternalBrainDigestStage::new()),
             Box::new(ConvergenceCheckStage::new()),
@@ -3093,10 +3135,8 @@ impl BrainStage for SelfTestStage {
         // ));
         registry.register(Box::new(crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
         registry.register(Box::new(ConsciousnessBridge::new()));
-        registry.register(Box::new(BrowserSecurityScanner::new(
-            BrowserSecurityConfig::default(),
-        )));
-        registry.register(Box::new(CheckRegistry::new()));
+        registry.register(crate::l3_embodiment::nt_shield::nt_shield::browser_security::create_browser_security_self_test());
+        registry.register(crate::l3_embodiment::nt_shield::nt_shield::check_registry::create_check_registry_self_test());
         registry.register(Box::new(
             crate::core::nt_core_telemetry::TelemetryStore::new(100),
         ));

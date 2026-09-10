@@ -7,7 +7,7 @@ use crate::foundation::math_bridge::{Vec2, SpatialGrid, SimulationRng};
 use crate::foundation::tick_schedule::{TickSchedule, TickTier};
 use crate::environment::terrain::{Heightmap, HeightmapConfig, BiomeMap, ResourceDistribution};
 use crate::environment::structures::{StructureManager, StructureType};
-use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation, NearbyAgent, NearbyResource};
+use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation, NearbyAgent, NearbyResource, Threat};
 use crate::agents::action_awareness::ActionAwareness;
 use crate::agents::memory_stream::MemoryStream;
 use crate::agents::graph_memory::GraphMemory;
@@ -539,14 +539,41 @@ impl WorldSim {
             })
             .collect();
 
+        // Query biome_map for actual terrain type at agent position
+        let biome = self.biome_map.biome_at(
+            agent.core.position.x,
+            agent.core.position.y,
+            self.config.world_width,
+            self.config.world_height,
+        );
+        let terrain_type = format!("{:?}", biome);
+
+        // Query heightmap and emit mountain threat if elevated
+        let height = self.heightmap.height_at(agent.core.position.x, agent.core.position.y);
+        let mut threats: Vec<Threat> = vec![];
+        if self.heightmap.is_mountain(agent.core.position.x, agent.core.position.y) {
+            threats.push(Threat {
+                threat_type: "mountain".to_string(),
+                position: agent.core.position,
+                severity: (height - self.heightmap.config().mountain_level) / (1.0 - self.heightmap.config().mountain_level).max(0.01),
+            });
+        }
+        if self.heightmap.is_water(agent.core.position.x, agent.core.position.y) {
+            threats.push(Threat {
+                threat_type: "water".to_string(),
+                position: agent.core.position,
+                severity: 0.3,
+            });
+        }
+
         AgentObservation {
             position: agent.core.position,
             nearby_agents,
             nearby_resources,
-            terrain_type: "plain".to_string(),
+            terrain_type,
             time_of_day: format!("{}", self.clock.day_phase()),
             season: format!("{:?}", self.clock.current.season),
-            threats: vec![],
+            threats,
         }
     }
 
@@ -594,10 +621,83 @@ impl WorldSim {
         }
 
         if agent.core.energy < 30.0 {
+            // Heightmap: prefer flat terrain when resting
+            let height = self.heightmap.height_at(agent.core.position.x, agent.core.position.y);
+            let candidate_positions = [
+                Vec2::new(agent.core.position.x + 20.0, agent.core.position.y),
+                Vec2::new(agent.core.position.x - 20.0, agent.core.position.y),
+                Vec2::new(agent.core.position.x, agent.core.position.y + 20.0),
+                Vec2::new(agent.core.position.x, agent.core.position.y - 20.0),
+            ];
+            let flat_pos = candidate_positions.iter()
+                .min_by(|a, b| {
+                    let ha = self.heightmap.height_at(a.x, a.y).abs();
+                    let hb = self.heightmap.height_at(b.x, b.y).abs();
+                    ha.partial_cmp(&hb).unwrap()
+                })
+                .copied()
+                .unwrap_or(agent.core.position);
+            if (height - self.heightmap.height_at(flat_pos.x, flat_pos.y)).abs() > 0.01 {
+                return AgentAction::Move { target: flat_pos };
+            }
             return AgentAction::Rest;
         }
 
-        // === M3: TheoryOfMind social decisions ===
+        // === Heightmap + Biome: terrain-aware exploration ===
+        let _current_biome = self.biome_map.biome_at(
+            agent.core.position.x,
+            agent.core.position.y,
+            self.config.world_width,
+            self.config.world_height,
+        );
+        let is_mountain = self.heightmap.is_mountain(agent.core.position.x, agent.core.position.y);
+
+        // Mountain: cautious — prefer moving to safer terrain
+        if is_mountain && agent.core.energy < 60.0 {
+            let candidates = [
+                Vec2::new(agent.core.position.x + 30.0, agent.core.position.y),
+                Vec2::new(agent.core.position.x - 30.0, agent.core.position.y),
+                Vec2::new(agent.core.position.x, agent.core.position.y + 30.0),
+                Vec2::new(agent.core.position.x, agent.core.position.y - 30.0),
+            ];
+            if let Some(safe_pos) = candidates.iter().min_by(|a, b| {
+                let ha = self.heightmap.height_at(a.x, a.y);
+                let hb = self.heightmap.height_at(b.x, b.y);
+                ha.partial_cmp(&hb).unwrap()
+            }) {
+                if self.heightmap.height_at(safe_pos.x, safe_pos.y) < self.heightmap.config().mountain_level {
+                    return AgentAction::Move { target: *safe_pos };
+                }
+            }
+        }
+
+        // Economy: check food market prices when hungry
+        if agent.core.hunger > 70.0 {
+            if let Some(&food_price) = self.economy.market_prices.get(&crate::society::economy::ResourceType::Food) {
+                if food_price < 2.0 {
+                    if let Some(res) = obs.nearby_resources.iter()
+                        .filter(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
+                        .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
+                    {
+                        return AgentAction::Eat { resource_id: res.id.clone() };
+                    }
+                }
+            }
+        }
+
+        // Culture: check norms for social decisions
+        let cooperativeness_norm = self.culture.compliance_with("cooperativeness");
+        if agent.personality.cooperativeness > cooperativeness_norm && agent.core.hunger < 40.0 {
+            if !obs.nearby_agents.is_empty() && self.rng.next_f32() < time_mods.social_activity {
+                let target = &obs.nearby_agents[0];
+                return AgentAction::Talk {
+                    target_id: target.id.clone(),
+                    message: "greeting".to_string(),
+                };
+            }
+        }
+
+        // M3: TheoryOfMind social decisions ===
         if !obs.nearby_agents.is_empty() {
             if let Some(tom) = self.theory_of_mind.get(&agent.core.id) {
                 let target = &obs.nearby_agents[0];
@@ -682,6 +782,17 @@ impl WorldSim {
             }
         }
 
+        // === DualRepresentation: detect repeated action patterns ===
+        let prev_action_label = format!("{:?}_{}", agent.core.id, self.tick.saturating_sub(1));
+        let similar = self.dual_repr.similar_to(&prev_action_label, 3);
+        if let Some((_, sim_score)) = similar.first() {
+            if *sim_score > 0.9 && self.rng.next_f32() < 0.4 {
+                // High similarity to past actions — force exploration to break cycle
+                let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
+                return AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) };
+            }
+        }
+
         // === Default: explore ===
         AgentAction::Explore { direction: Vec2::new(
             self.rng.range_f32(-1.0, 1.0),
@@ -728,12 +839,16 @@ impl WorldSim {
                 let target_id = target_id.clone();
                 self.relationships.update_interaction(&agent_id, &target_id, 0.1, self.tick);
                 self.phi_bridge.record_interaction(InteractionRecord {
-                    agent_a: agent_id,
-                    agent_b: target_id,
+                    agent_a: agent_id.clone(),
+                    agent_b: target_id.clone(),
                     interaction_type: "talk".to_string(),
                     timestamp: self.tick,
                     success: true,
                 });
+                // Culture: spread meme from conversation
+                let meme = self.culture.create_meme(&_message, &agent_id, self.tick);
+                let meme_id = meme.id.clone();
+                self.culture.spread_meme(&meme_id, &target_id, 0.5);
             }
             AgentAction::Explore { direction } => {
                 let agent = &mut self.agents[idx];
@@ -741,6 +856,26 @@ impl WorldSim {
                 agent.core.position = agent.core.position + dir;
                 agent.core.position.x = agent.core.position.x.clamp(0.0, self.config.world_width);
                 agent.core.position.y = agent.core.position.y.clamp(0.0, self.config.world_height);
+            }
+            AgentAction::Trade { target_id, item, amount } => {
+                let agent_id_owned = agent_id.to_string();
+                let target_id_owned = target_id.clone();
+                // Economy: execute trade between agents
+                let offer = crate::society::economy::TradeOffer {
+                    from: agent_id_owned.clone(),
+                    to: target_id_owned.clone(),
+                    offer: crate::society::economy::ResourceType::Food,
+                    offer_amount: *amount as f32,
+                    want: crate::society::economy::ResourceType::Wood,
+                    want_amount: *amount as f32 * 0.5,
+                };
+                let mut buyer_inv = crate::society::economy::Inventory::new();
+                let mut seller_inv = crate::society::economy::Inventory::new();
+                buyer_inv.add(crate::society::economy::ResourceType::Wood, 5.0);
+                seller_inv.add(crate::society::economy::ResourceType::Food, 5.0);
+                let _trade_ok = self.economy.execute_trade(offer, &mut buyer_inv, &mut seller_inv);
+                // Relationship update for trade
+                self.relationships.update_interaction(&agent_id_owned, &target_id_owned, 0.15, self.tick);
             }
             AgentAction::Build { position, structure_type } => {
                 let struct_type = match structure_type.as_str() {
@@ -761,6 +896,15 @@ impl WorldSim {
                 );
             }
             _ => {}
+        }
+
+        // DualRepresentation: encode every executed action as a dual node
+        {
+            let action_label = format!("{:?}_{}", agent_id, self.tick);
+            let mut attrs = std::collections::HashMap::new();
+            attrs.insert("action".to_string(), format!("{:?}", action));
+            attrs.insert("agent".to_string(), agent_id.to_string());
+            self.dual_repr.add(&action_label, "event", attrs, self.tick);
         }
     }
 

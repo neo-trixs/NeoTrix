@@ -4,18 +4,9 @@
 //! 统一解析为规范化节点树。本模块以 trait 定义格式解析契约，提供 stub
 //! 实现 (C1 接入点)，后续接入真实解析器 (C2-C4)。
 
-use crate::core::nt_core_kb_types::{KnowledgeNode, NodeType};
+use crate::core::nt_core_kb_types::NodeType;
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
-use uuid::Uuid;
-
-/// 当前 Unix 时间戳 (秒)。
-fn now_ts() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
+use crate::core::nt_core_traits::KnowledgeSink;
 
 /// 支持的开放文档格式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,7 +34,7 @@ pub trait OdsParserAdapter {
     fn parse(&self, content: &str) -> Vec<OdsNode>;
     /// C2 接线: 将解析出的节点树写入 KB (Article 节点) 并触发 FTS5 索引。
     /// 返回成功写入的节点 id 列表。
-    fn ingest_nodes(&self, kb: &KnowledgeBase, content: &str) -> Result<Vec<String>, String>;
+    fn ingest_nodes(&self, kb: &dyn KnowledgeSink, content: &str) -> Result<Vec<String>, String>;
 }
 
 /// 默认 stub 实现
@@ -77,33 +68,19 @@ impl OdsParserAdapter for OdsAdapter {
         }
     }
 
-    fn ingest_nodes(&self, kb: &KnowledgeBase, content: &str) -> Result<Vec<String>, String> {
+    fn ingest_nodes(&self, kb: &dyn KnowledgeSink, content: &str) -> Result<Vec<String>, String> {
         let nodes = self.parse(content);
         let mut ids = Vec::with_capacity(nodes.len());
         for n in &nodes {
-            let now = now_ts();
-            let node = KnowledgeNode {
-                id: Uuid::new_v4().to_string(),
-                node_type: NodeType::Article,
-                title: if n.path.is_empty() { "ods:root".into() } else { n.path.clone() },
-                summary: Some(format!("ODS parsed node ({})", n.kind)),
-                content: Some(n.body.clone()),
-                url: None,
-                domain: Some("ods".to_string()),
-                language: "en".to_string(),
-                confidence: 0.9,
-                importance: 0.5,
-                recall_weight: 1.0,
-                created_at: now,
-                updated_at: now,
-                access_count: 0,
-                metadata: None,
-                temporal: None,
-                supersedes: None,
-                source_episode: None,
-            };
-            kb.insert_node(&node)?;
-            ids.push(node.id);
+            let title = if n.path.is_empty() { "ods:root" } else { &n.path };
+            let node_id = kb.sink_node(
+                title,
+                NodeType::Article,
+                Some(&format!("ODS parsed node ({})", n.kind)),
+                None,
+                Some("ods"),
+            )?;
+            ids.push(node_id);
         }
         Ok(ids)
     }

@@ -1,8 +1,5 @@
 use super::*;
 use crate::nt_mind::infrastructure::ConsciousnessBridge;
-use crate::l3_embodiment::nt_shield::nt_shield::browser_security::BrowserSecurityScanner;
-use crate::l3_embodiment::nt_shield::nt_shield::browser_security::BrowserSecurityConfig;
-use crate::l3_embodiment::nt_shield::nt_shield::check_registry::CheckRegistry;
 use crate::l5_cognition::nt_mind::nt_mind::evolution::dispatch_self_test::DispatchControlPlaneSelfTest;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngineSelfTest;
 use crate::l1_action::nt_act::nt_act_code::recipe_refactor;
@@ -1424,19 +1421,24 @@ impl BackgroundLoopHandle {
         // ── P0 加密 CoT 生命周期守卫 (2608.09867, T3 生产接线) ──
         // 对会话产生的推理文本做四项防护扫描; 发现异常 → 记录审计 + 告警。
         {
-            use crate::l3_embodiment::nt_shield::nt_shield_audit::ReasoningTraceGuard;
-            let guard = ReasoningTraceGuard::default();
+            let auditor = crate::l3_embodiment::nt_shield::nt_shield_audit::create_reasoning_trace_auditor();
             let sample = "converge_check over architecture snapshot";
-            let report = guard.scan_protected(sample, "architecture audit complete");
-            if report.session_binding_missing > 0
-                || !report.pii_findings.is_empty()
-                || !report.injection_findings.is_empty()
-                || report.divergence_suspected
-            {
-                log::warn!(
-                    "[bg] reasoning_trace_guard: binding_missing={} pii={:?} injection={:?} divergence={}",
-                    report.session_binding_missing, report.pii_findings, report.injection_findings, report.divergence_suspected
-                );
+            match auditor.scan_reasoning_trace(sample, "architecture audit complete") {
+                Ok(report) => {
+                    if report.session_binding_missing > 0
+                        || !report.pii_findings.is_empty()
+                        || !report.injection_findings.is_empty()
+                        || report.divergence_suspected
+                    {
+                        log::warn!(
+                            "[bg] reasoning_trace_guard: binding_missing={} pii={:?} injection={:?} divergence={}",
+                            report.session_binding_missing, report.pii_findings, report.injection_findings, report.divergence_suspected
+                        );
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[bg] reasoning_trace_guard scan failed: {}", e);
+                }
             }
         }
 
@@ -1588,12 +1590,8 @@ impl BackgroundLoopHandle {
             ),
         ));
         self_tests.register(Box::new(ConsciousnessBridge::new()));
-        self_tests.register(Box::new(BrowserSecurityScanner::new(
-            BrowserSecurityConfig::default(),
-        )));
-        self_tests.register(Box::new(
-            CheckRegistry::new(),
-        ));
+        self_tests.register(crate::l3_embodiment::nt_shield::nt_shield::browser_security::create_browser_security_self_test());
+        self_tests.register(crate::l3_embodiment::nt_shield::nt_shield::check_registry::create_check_registry_self_test());
         // ── P0 加密 CoT 生命周期守卫 (2608.09867, T2 注册) ──
         // CohGuard 会话绑定校验 + ReasoningTraceGuard 四项防护。T3 接线:
         // handle_architecture_audit 下方 scan_protected 消费 (生产路径)。
@@ -1997,7 +1995,7 @@ impl BackgroundLoopHandle {
         }
         // NT-SHIELD: 检查注册表
         let shield_ok =
-            CheckRegistry::new()
+            crate::l3_embodiment::nt_shield::nt_shield::check_registry::create_check_registry_self_test()
                 .self_test()
                 .is_ok();
         results.push(if shield_ok {
@@ -2080,9 +2078,6 @@ impl BackgroundLoopHandle {
 mod f2_calibration_tests {
     use super::*;
 use crate::nt_mind::infrastructure::ConsciousnessBridge;
-use crate::l3_embodiment::nt_shield::nt_shield::browser_security::BrowserSecurityScanner;
-use crate::l3_embodiment::nt_shield::nt_shield::browser_security::BrowserSecurityConfig;
-use crate::l3_embodiment::nt_shield::nt_shield::check_registry::CheckRegistry;
 
 
     #[test]

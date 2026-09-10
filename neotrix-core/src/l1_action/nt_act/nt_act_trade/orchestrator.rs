@@ -535,7 +535,7 @@ impl TradeOrchestrator {
         );
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| format!("system time error: {}", e))?
             .as_secs();
         let ctx = OrchTradeContext {
             order_id: order_id.clone(),
@@ -569,7 +569,7 @@ impl TradeOrchestrator {
                 ctx.current_phase = phases[idx + 1];
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .map_err(|e| format!("system time error: {}", e))?
                     .as_secs();
                 ctx.updated_at = now;
                 ctx.events.push(TradeEvent {
@@ -718,7 +718,7 @@ impl TradeOrchestrator {
             signed_at: Some(
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .map_err(|e| format!("system time error: {}", e))?
                     .as_secs(),
             ),
             terms: terms.to_string(),

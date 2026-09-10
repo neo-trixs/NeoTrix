@@ -1596,6 +1596,62 @@ impl EvolutionLoopProvider for EvolutionLoop {
     }
 }
 
+impl crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::EvolutionLoopProvider for EvolutionLoop {
+    fn get_snapshot(&self) -> crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::ProjectSnapshot {
+        let snap = self.last_snapshot.as_ref();
+        crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::ProjectSnapshot {
+            modules: snap.map(|s| {
+                let mut m: Vec<String> = Vec::new();
+                m.extend(s.large_files.iter().cloned());
+                m.extend(s.modules_without_tests.iter().cloned());
+                m
+            }).unwrap_or_default(),
+            health_score: snap.map(|s| {
+                let total = s.total_files.max(1) as f64;
+                (1.0 - (s.unsafe_count as f64 / 10.0).min(1.0))
+                    * (1.0 - (s.unwrap_count as f64 / 50.0).min(1.0))
+                    * (1.0 - (s.todo_count as f64 / 10.0).min(1.0))
+            }).unwrap_or(1.0),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    fn self_diagnose(&mut self) -> (Vec<String>, Vec<crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::PrioritizedIssue>) {
+        let (items, pq) = Self::self_diagnose(self);
+        let l1_issues: Vec<crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::PrioritizedIssue> = pq.into_vec().into_iter().map(|di| {
+            crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::PrioritizedIssue {
+                issue: crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::Issue {
+                    issue_type: format!("{:?}", di.underlying_issue.issue_type),
+                    file: di.underlying_issue.file.clone(),
+                    description: di.underlying_issue.description.clone(),
+                },
+                score: di.composite_score,
+                plan: match &di.action {
+                    self_diagnose::ActionPlan::AddTestStub { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::AddTestStub { file: file.clone() },
+                    self_diagnose::ActionPlan::RunCargoFix => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::RunCargoFix,
+                    self_diagnose::ActionPlan::RemoveTodo { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::RemoveTodo { file: file.clone() },
+                    self_diagnose::ActionPlan::SplitLargeFile { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::SplitLargeFile { file: file.clone() },
+                    self_diagnose::ActionPlan::ReviewUnsafe { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ReviewUnsafe { file: file.clone() },
+                    self_diagnose::ActionPlan::ReplaceUnwrap { file } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ReplaceUnwrap { file: file.clone() },
+                    self_diagnose::ActionPlan::HumanDecision { reason, options } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::HumanDecision { reason: reason.clone(), options: options.clone() },
+                    self_diagnose::ActionPlan::NoAction { reason } => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::NoAction { reason: reason.clone() },
+                    self_diagnose::ActionPlan::AutoFix(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::AutoFix(s.clone()),
+                    self_diagnose::ActionPlan::ManualReview(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::ManualReview(s.clone()),
+                    self_diagnose::ActionPlan::Skip(s) => crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::DiagnoseActionPlan::Skip(s.clone()),
+                },
+            }
+        }).collect();
+        let messages: Vec<String> = items.into_iter()
+            .map(|d| format!("[{:?}] {} (score={:.2})", d.underlying_issue.issue_type, d.underlying_issue.description, d.composite_score))
+            .collect();
+        (messages, l1_issues)
+    }
+
+    fn on_fix_applied(&mut self) {
+        self.on_fix_applied()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
