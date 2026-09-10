@@ -36,9 +36,11 @@ impl ReasoningBank {
         let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
         let norm_b: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if norm_a == 0.0 && norm_b == 0.0 { return 1.0; }
-        if norm_a == 0.0 || norm_b == 0.0 { return 0.0; }
-        dot / (norm_a * norm_b)
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
+        }
     }
 
     pub fn quality_score(&self) -> f64 {

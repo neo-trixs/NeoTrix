@@ -302,7 +302,7 @@ pub struct SearchResult {
 }
 
 /// 余弦距离 (1 - cosine_similarity)
-pub use crate::core::nt_core_vector_store::float_vec::cosine_distance;
+pub use crate::core::nt_core_math::cosine_distance_f32 as cosine_distance;
 
 #[cfg(test)]
 mod tests {

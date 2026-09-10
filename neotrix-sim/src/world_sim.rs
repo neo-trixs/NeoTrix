@@ -400,6 +400,36 @@ impl WorldSim {
             }
         }
 
+        // Reflex tier — every tick: process reactive events
+        {
+            let records = {
+                let hist = self.bus.history();
+                let hist = hist.read().await;
+                hist.recent(100).to_vec()
+            };
+            let events: Vec<SimEvent> = records.iter().map(|r| r.event.clone()).collect();
+            let responses = self.event_reactive.process_events(&events, tick);
+            for resp in responses {
+                if let Some(agent) = self.agents.iter_mut().find(|a| a.core.id == resp.agent_id) {
+                    // Execute reactive action directly
+                    match &resp.action {
+                        AgentAction::Explore { direction } => {
+                            let speed = 2.0;
+                            agent.core.position.x += direction.x * speed;
+                            agent.core.position.y += direction.y * speed;
+                        }
+                        AgentAction::Rest => {
+                            agent.core.rest(5.0);
+                        }
+                        AgentAction::Talk { target_id, message } => {
+                            self.relationships.update_interaction(&resp.agent_id, target_id, 0.1, tick);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
         // Medium tier — every 20 ticks
         if self.schedule.should_run(TickTier::Medium) {
             // 6. Consciousness metrics (phi, coherence)

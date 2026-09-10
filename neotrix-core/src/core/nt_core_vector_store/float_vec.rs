@@ -1,27 +1,20 @@
 /// Shared FloatVec + cosine distance for HNSW indexing.
 
+use crate::core::nt_core_math::cosine_distance_f32;
+
 /// f32 vector wrapper implementing `instant_distance::Point` (cosine distance).
 #[derive(Clone, Debug)]
 pub struct FloatVec(pub Vec<f32>);
 
 impl instant_distance::Point for FloatVec {
     fn distance(&self, other: &Self) -> f32 {
-        cosine_distance(&self.0, &other.0)
+        cosine_distance_f32(&self.0, &other.0)
     }
 }
 
 /// Cosine distance: `1.0 - (a · b) / (‖a‖ * ‖b‖)`.
 /// Returns `1.0` for zero-norm vectors.
-pub fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if na * nb > 0.0 {
-        1.0 - dot / (na * nb)
-    } else {
-        1.0
-    }
-}
+pub use crate::core::nt_core_math::cosine_distance_f32 as cosine_distance;
 
 /// Convert little-endian byte slice to `Vec<f32>`.
 pub fn bytes_to_f32s(bytes: &[u8]) -> Vec<f32> {

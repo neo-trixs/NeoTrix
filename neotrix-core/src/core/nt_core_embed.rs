@@ -14,7 +14,7 @@ static STOP_WORDS: &[&str] = &[
     "which", "who", "whom",
 ];
 
-use crate::core::nt_core_math::cosine_similarity_f64;
+use crate::core::nt_core_math::cosine_similarity_f64 as cosine_similarity;
 
 pub struct TextEmbedder {
     vocab: HashMap<String, usize>,

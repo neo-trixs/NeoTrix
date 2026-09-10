@@ -195,15 +195,7 @@ impl VideoPromptCache {
 
     /// 计算余弦相似度
     fn cosine_similarity(&self, a: &[f64], b: &[f64]) -> f64 {
-        let dot_product: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-        let norm_a: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
-        let norm_b: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-
-        if norm_a == 0.0 || norm_b == 0.0 {
-            0.0
-        } else {
-            dot_product / (norm_a * norm_b)
-        }
+        crate::core::nt_core_math::cosine_similarity_f64(a, b)
     }
 
     /// 淘汰过期条目

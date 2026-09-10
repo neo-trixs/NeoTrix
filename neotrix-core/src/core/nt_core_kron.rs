@@ -123,7 +123,7 @@ fn perfect_out_shuffle(arr: &[f64]) -> Vec<f64> {
     result
 }
 
-use crate::core::nt_core_math::cosine_similarity_f64;
+use crate::core::nt_core_math::cosine_similarity_f64 as cosine_similarity;
 
 #[cfg(test)]
 mod tests {

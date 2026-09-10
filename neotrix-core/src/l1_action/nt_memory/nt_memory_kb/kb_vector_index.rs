@@ -28,7 +28,7 @@ impl KbVectorIndex {
             .collect();
 
         let dim = if rows.is_empty() { 384 } else { rows[0].1.len() / 4 };
-        println!("  构建索引: {} vectors × {}d", rows.len(), dim);
+        log::info!("  构建索引: {} vectors × {}d", rows.len(), dim);
 
         // 解析向量
         let mut points = Vec::with_capacity(rows.len());
@@ -44,7 +44,7 @@ impl KbVectorIndex {
         // 构建 HNSW 索引
         let t0 = std::time::Instant::now();
         let hnsw = Builder::default().build(points, values);
-        println!("  ✅ 索引构建完成 ({:.1}s)", t0.elapsed().as_secs_f64());
+        log::info!("  ✅ 索引构建完成 ({:.1}s)", t0.elapsed().as_secs_f64());
 
         Ok(Self { hnsw, dim })
     }

@@ -133,7 +133,7 @@ impl ConceptEmergenceEngine {
     }
 }
 
-use crate::core::nt_core_math::cosine_similarity_f32_f32;
+use crate::core::nt_core_math::cosine_similarity_f32_f32 as cosine_similarity;
 
 fn compute_centroid(vectors: &[&Vec<f32>], dim: usize) -> Vec<f32> {
     if vectors.is_empty() {

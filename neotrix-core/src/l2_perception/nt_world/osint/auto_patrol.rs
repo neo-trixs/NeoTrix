@@ -2,7 +2,7 @@
 //!
 //! 支持定时巡检、增量发现、异常告警。
 
-use super::{OsintConfig, OsintTarget, OsintSource};
+use super::{OsintConfig, OsintTarget};
 use serde::{Deserialize, Serialize};
 
 /// 巡检任务

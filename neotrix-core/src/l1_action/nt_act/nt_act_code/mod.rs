@@ -15,6 +15,7 @@
 pub mod ast_searcher;
 pub mod code_writer;
 pub mod edit_history;
+pub mod evolution_loop_provider;
 pub mod pattern_extractor;
 pub mod pipeline_autofixer;
 pub mod recipe_refactor;

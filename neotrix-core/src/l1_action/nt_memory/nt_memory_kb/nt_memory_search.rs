@@ -544,20 +544,7 @@ fn build_walsh_ranklist(
     scored
 }
 
-/// f64 余弦相似度 (Walsh 正交向量)。
-fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
-    if a.len() != b.len() || a.is_empty() {
-        return 0.0;
-    }
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let na: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
-    let nb: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-    if na == 0.0 || nb == 0.0 {
-        0.0
-    } else {
-        dot / (na * nb)
-    }
-}
+use crate::core::nt_core_math::cosine_similarity_f64;
 
 /// Build a proxy query embedding by averaging stored embeddings of nodes
 /// whose title or content matches query words.
