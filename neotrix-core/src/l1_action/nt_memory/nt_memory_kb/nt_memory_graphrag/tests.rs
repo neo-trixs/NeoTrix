@@ -1001,7 +1001,7 @@
         };
         let extractor = GraphExtractor::new(config);
         let text = "Apple Inc. developed the iPhone. Tim Cook works at Apple.";
-        let (entities, relations) = extractor.extract(text).unwrap();
+        let (entities, relations) = extractor.extract(text, "test_source").unwrap();
 
         assert!(!entities.is_empty(), "Should extract entities");
         let names: Vec<&str> = entities.iter().map(|e| e.name.as_str()).collect();
@@ -1014,26 +1014,32 @@
     #[test]
     fn test_merge_entities_deduplicates_by_name() {
         let entities = vec![
-            Entity {
+            EntityNode {
                 id: "1".into(),
                 name: "Apple".into(),
                 entity_type: "Organization".into(),
+                source_node_id: "test".into(),
+                confidence: 1.0,
                 properties: HashMap::new(),
-                embeddings: None,
+                created_at: 0,
             },
-            Entity {
+            EntityNode {
                 id: "2".into(),
                 name: "apple".into(),
                 entity_type: "Organization".into(),
+                source_node_id: "test".into(),
+                confidence: 1.0,
                 properties: HashMap::new(),
-                embeddings: None,
+                created_at: 0,
             },
-            Entity {
+            EntityNode {
                 id: "3".into(),
                 name: "Google".into(),
                 entity_type: "Organization".into(),
+                source_node_id: "test".into(),
+                confidence: 1.0,
                 properties: HashMap::new(),
-                embeddings: None,
+                created_at: 0,
             },
         ];
         let merged = GraphExtractor::merge_entities(&entities);

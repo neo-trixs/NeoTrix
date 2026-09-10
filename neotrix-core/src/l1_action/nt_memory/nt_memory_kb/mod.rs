@@ -186,18 +186,12 @@ impl std::fmt::Debug for KnowledgeBase {
 }
 
 impl KnowledgeBase {
-    pub fn open(path: Option<PathBuf>) -> Result<Self, String> {
-        let db_path = path.unwrap_or_else(|| {
-            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-            PathBuf::from(home).join(".neotrix").join("knowledge.db")
-        });
-        let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open KB: {}", e))?;
-        nt_memory_schema::initialize(&conn).map_err(|e| format!("Failed to initialize KB: {}", e))?;
+    /// Shared field initialization for `open()` and `_from_conn()`.
+    fn init_fields(conn: Connection, db_path: PathBuf, bm25_dirty: bool) -> Self {
         let commitment_store = EmbeddingCommitmentStore::new(10000, None);
         let confidence_store = ConfidenceStore::new(DecayConfig::default());
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
         let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
-        let db_path_str = db_path.display().to_string();
         let temporal_ledger = TemporalFactLedger::open(Some(&db_path)).unwrap_or_else(|e| {
             log::warn!(
                 "[KB] temporal ledger open failed ({}), using isolated in-memory ledger",
@@ -206,11 +200,11 @@ impl KnowledgeBase {
             TemporalFactLedger::open(Some(std::path::Path::new(":memory:")))
                 .expect("in-memory temporal ledger")
         });
-        let kb = Self {
+        Self {
             conn: Mutex::new(conn),
             db_path,
             bm25: RwLock::new(None),
-            bm25_dirty: RwLock::new(true),
+            bm25_dirty: RwLock::new(bm25_dirty),
             embedding_config: RwLock::new(None),
             fused_cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("non-zero cache capacity"))),
             adaptive: AdaptiveRetrieval::new(nt_memory_adaptive_rag::AdaptiveRagConfig::default()),
@@ -229,16 +223,24 @@ impl KnowledgeBase {
             graph_cache: RwLock::new(nt_memory_graph_cache::GraphCache::empty()),
             feedback_store: RwLock::new(FeedbackStore::new(0.05)),
             gwt_router: RwLock::new(GwtRouter::new(GwtRouterConfig::default())),
-             vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
-             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
-             temporal_ledger: Mutex::new(temporal_ledger),
-             freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
-         };
-        // 惰性 graph_cache: 启动不预构建 (28 万 edge 构建+析构拖慢启动/退出数秒,
-        // 且当前无生产查询方) — 由后台循环 rebuild_graph_cache 按需构建。
+            vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
+            retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
+            temporal_ledger: Mutex::new(temporal_ledger),
+            freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
+        }
+    }
+
+    pub fn open(path: Option<PathBuf>) -> Result<Self, String> {
+        let db_path = path.unwrap_or_else(|| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".neotrix").join("knowledge.db")
+        });
+        let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open KB: {}", e))?;
+        nt_memory_schema::initialize(&conn).map_err(|e| format!("Failed to initialize KB: {}", e))?;
+        let kb = Self::init_fields(conn, db_path.clone(), true);
+        let db_path_str = db_path.display().to_string();
         log::info!("[KB] opened at {db_path_str} — graph_cache lazy (rebuilt by background loop on demand); BM25/tech-reserve lazy");
 
-        // Warn if embeddings are not configured (semantic search disabled)
         if std::env::var("NEOTRIX_EMBEDDING_API_KEY").is_err() {
             log::warn!(
                 "[KB] NEOTRIX_EMBEDDING_API_KEY not set — semantic search disabled. \
@@ -258,47 +260,7 @@ impl KnowledgeBase {
 
     /// Build minimal KB from an existing Connection (for fallback paths).
     fn _from_conn(conn: Connection, db_path: PathBuf) -> Self {
-        let commitment_store = EmbeddingCommitmentStore::new(10000, None);
-        let confidence_store = ConfidenceStore::new(DecayConfig::default());
-        let community_search = CommunityAwareSearch::new(CommunityDetector::default());
-        let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
-        let cache = nt_memory_graph_cache::GraphCache::empty();
-        let temporal_ledger = TemporalFactLedger::open(Some(&db_path)).unwrap_or_else(|e| {
-            log::warn!(
-                "[KB] temporal ledger open failed ({}), using isolated in-memory ledger",
-                e
-            );
-            TemporalFactLedger::open(Some(std::path::Path::new(":memory:")))
-                .expect("in-memory temporal ledger")
-        });
-        Self {
-            conn: Mutex::new(conn),
-            db_path,
-            bm25: RwLock::new(None),
-            bm25_dirty: RwLock::new(false),
-            embedding_config: RwLock::new(None),
-            fused_cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("non-zero cache capacity"))),
-            adaptive: AdaptiveRetrieval::new(nt_memory_adaptive_rag::AdaptiveRagConfig::default()),
-            commitment_store: RwLock::new(commitment_store),
-            confidence_store: RwLock::new(confidence_store),
-            community_search: RwLock::new(community_search),
-            privacy: RwLock::new(privacy),
-            vector_adapter: RwLock::new(None),
-            agent_memory: RwLock::new(AgentMemory::new(nt_memory_agent_driven::MemoryConfig::default())),
-            agent_session: RwLock::new(false),
-            svaf_gate: RwLock::new(SvafGate::default()),
-            proficiency: RwLock::new(MemoryProficiency::new()),
-            graphrag_store: RwLock::new(None),
-            tech_reserve: RwLock::new(TechReserveStore::new()),
-            skills_library: RwLock::new(nt_memory_knowledge_assets::SkillsLibrary::new()),
-            feedback_store: RwLock::new(FeedbackStore::new(0.05)),
-            gwt_router: RwLock::new(GwtRouter::new(GwtRouterConfig::default())),
-vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
-             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
-             graph_cache: RwLock::new(cache),
-             temporal_ledger: Mutex::new(temporal_ledger),
-             freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
-         }
+        Self::init_fields(conn, db_path, false)
     }
 
     pub fn rebuild_skills_library(&self) -> Result<usize, String> {

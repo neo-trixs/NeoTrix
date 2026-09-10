@@ -179,49 +179,4 @@ pub fn subgraph(
     Ok((nodes, edges))
 }
 
-pub fn community_detection(
-    conn: &Connection,
-    min_community_size: usize,
-) -> rusqlite::Result<Vec<Vec<KnowledgeNode>>> {
-    let mut stmt = conn.prepare("SELECT id FROM nodes LIMIT 1000")?;
-    let all_ids: Vec<String> = stmt.query_map([], |r| r.get(0))?
-        .filter_map(|r| r.ok())
-        .collect();
 
-    let mut visited = HashSet::new();
-    let mut communities = Vec::new();
-
-    for id in &all_ids {
-        if visited.contains(id) {
-            continue;
-        }
-
-        let mut community = Vec::new();
-        let mut queue = VecDeque::new();
-        queue.push_back(id.clone());
-        visited.insert(id.clone());
-
-        while let Some(current) = queue.pop_front() {
-            if let Some(node) = super::nt_memory_store::get_node(conn, &current)? {
-                community.push(node);
-            }
-            let edges = super::nt_memory_store::get_edges_for_node(conn, &current)?;
-            for edge in &edges {
-                let neighbor = if edge.source_id == current {
-                    &edge.target_id
-                } else {
-                    &edge.source_id
-                };
-                if visited.insert(neighbor.to_string()) {
-                    queue.push_back(neighbor.to_string());
-                }
-            }
-        }
-
-        if community.len() >= min_community_size {
-            communities.push(community);
-        }
-    }
-
-    Ok(communities)
-}

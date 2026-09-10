@@ -102,50 +102,6 @@ pub struct RndResult {
     pub next_steps: Vec<String>,
 }
 
-/// 认知层核心合约
-pub trait CognitionLayer: Send + Sync {
-    /// 初始化认知层
-    fn initialize(&mut self) -> Result<(), String>;
-
-    /// 推理 — 核心 E8 推理引擎
-    fn reason(&self, task: ReasoningTask) -> Result<ReasoningResult, String>;
-
-    /// 多智能体协调 — PentestCode 13-agent 吸收
-    fn dispatch_agents(
-        &mut self,
-        tasks: Vec<AgentTask>,
-    ) -> Result<Vec<AgentResult>, String>;
-
-    /// 并行执行 — 并行调度多智能体
-    fn execute_parallel(
-        &mut self,
-        tasks: Vec<AgentTask>,
-        max_concurrency: usize,
-    ) -> Result<Vec<AgentResult>, String>;
-
-    /// 质量门禁检查 — Sentrux 吸收
-    fn check_quality(&self, path: &str) -> Result<QualitySignal, String>;
-
-    /// 规则引擎 — Sentrux 吸收
-    fn enforce_rules(
-        &self,
-        rules: &serde_json::Value,
-        path: &str,
-    ) -> Result<Vec<QualityViolation>, String>;
-
-    /// R&D 自动化 — RD-Agent 吸收
-    fn conduct_research(&mut self, task: RndTask) -> Result<RndResult, String>;
-
-    /// 知识蒸馏 — 从经验中提取模式
-    fn distill_knowledge(
-        &self,
-        experiences: &[serde_json::Value],
-    ) -> Result<serde_json::Value, String>;
-
-    /// 获取认知状态快照
-    fn snapshot(&self) -> CognitionSnapshot;
-}
-
 /// 认知状态快照
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CognitionSnapshot {
@@ -156,26 +112,6 @@ pub struct CognitionSnapshot {
     pub last_update: chrono::DateTime<chrono::Utc>,
 }
 
-/// 会话恢复管理器 trait — L5 认知层合约, L1 实现
-pub trait SessionRecovery: Send + Sync {
-    /// 创建快照
-    fn create_snapshot(
-        &mut self,
-        e8_states: &[u8],
-        topics: &[String],
-        bank_state: &str,
-    ) -> Result<SessionSnapshot, String>;
-
-    /// 是否需要创建快照
-    fn should_snapshot(&self) -> bool;
-
-    /// 构建会话交接数据
-    fn build_handoff(&self) -> Option<String>;
-
-    /// 恢复最新会话
-    fn recover_latest(&self) -> Result<Option<SessionSnapshot>, String>;
-}
-
 /// 会话快照数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionSnapshot {
@@ -184,21 +120,6 @@ pub struct SessionSnapshot {
     pub message_count: u64,
     pub active_topics: Vec<String>,
     pub created_at: u64,
-}
-
-/// 用户画像蒸馏引擎 trait — L5 认知层合约, L1 实现
-pub trait UserDistillation: Send + Sync {
-    /// 处理消息并更新用户画像
-    fn process_message(&mut self, message: &str, is_user: bool) -> DistillationResult;
-
-    /// 获取用户领域偏好
-    fn get_domain_preferences(&self) -> Vec<(String, f64)>;
-
-    /// 获取用户任务偏好
-    fn get_task_preferences(&self) -> Vec<(String, f64)>;
-
-    /// 获取用户画像摘要
-    fn get_profile_summary(&self) -> String;
 }
 
 /// 蒸馏结果

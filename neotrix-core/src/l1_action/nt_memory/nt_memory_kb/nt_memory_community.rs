@@ -721,7 +721,6 @@ pub struct WeightedResult {
 pub struct CommunityAwareSearch {
     pub detector: CommunityDetector,
     hierarchy: Option<CommunityHierarchy>,
-    query_cache: HashMap<String, Vec<CommunityResult>>,
 }
 
 impl CommunityAwareSearch {
@@ -729,7 +728,6 @@ impl CommunityAwareSearch {
         CommunityAwareSearch {
             detector,
             hierarchy: None,
-            query_cache: HashMap::new(),
         }
     }
 
@@ -944,10 +942,6 @@ impl CommunityAwareSearch {
         fused
     }
 
-    /// Clear the query cache.
-    pub fn clear_cache(&mut self) {
-        self.query_cache.clear();
-    }
 }
 
 // ─── In-Memory KB for testing / offline use ─────────────────────────

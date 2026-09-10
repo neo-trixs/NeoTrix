@@ -1917,24 +1917,6 @@ fn detect_relation(e1: &str, e2: &str, sentence: &str) -> Option<(&'static str, 
 // ─── Extraction Pipeline ─────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
-pub struct Entity {
-    pub id: String,
-    pub name: String,
-    pub entity_type: String,
-    pub properties: HashMap<String, String>,
-    pub embeddings: Option<Vec<f64>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Relation {
-    pub source_id: String,
-    pub target_id: String,
-    pub relation_type: String,
-    pub weight: f64,
-    pub properties: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone)]
 pub struct ExtractionConfig {
     pub model: String,
     pub max_entities_per_chunk: usize,
@@ -1964,10 +1946,10 @@ impl GraphExtractor {
         &self.config
     }
 
-    pub fn extract(&self, text: &str) -> Result<(Vec<Entity>, Vec<Relation>), String> {
+    pub fn extract(&self, text: &str, source_id: &str) -> Result<(Vec<EntityNode>, Vec<RelationEdge>), String> {
         let sentences = split_sentences(text);
-        let mut entities_map: HashMap<String, Entity> = HashMap::new();
-        let mut relations: Vec<Relation> = Vec::new();
+        let mut entities_map: HashMap<String, EntityNode> = HashMap::new();
+        let mut relations: Vec<RelationEdge> = Vec::new();
         let mut sentence_entity_names: Vec<Vec<String>> = Vec::new();
 
         for sentence in &sentences {
@@ -1994,12 +1976,14 @@ impl GraphExtractor {
                     let etype = infer_entity_type(&name);
                     entities_map.insert(
                         key,
-                        Entity {
+                        EntityNode {
                             id: generate_id(),
+                            name: name.clone(),
                             entity_type: etype,
-                            name,
+                            source_node_id: source_id.to_string(),
+                            confidence: self.config.confidence_threshold,
                             properties: HashMap::new(),
-                            embeddings: None,
+                            created_at: now_nanos(),
                         },
                     );
                 }
@@ -2023,12 +2007,15 @@ impl GraphExtractor {
                         {
                             let weight =
                                 (1.0 / distance.max(1.0)) * self.config.confidence_threshold.max(0.5);
-                            relations.push(Relation {
-                                source_id: e1.id.clone(),
-                                target_id: e2.id.clone(),
+                            relations.push(RelationEdge {
+                                id: generate_id(),
+                                source_entity: e1.id.clone(),
+                                target_entity: e2.id.clone(),
                                 relation_type: rel_type.to_string(),
                                 weight: (weight.max(0.0)).min(1.0),
-                                properties: HashMap::new(),
+                                evidence: String::new(),
+                                confidence: self.config.confidence_threshold,
+                                created_at: now_nanos(),
                             });
                         }
                     }
@@ -2036,7 +2023,7 @@ impl GraphExtractor {
             }
         }
 
-        let entities: Vec<Entity> = entities_map.into_values().collect();
+        let entities: Vec<EntityNode> = entities_map.into_values().collect();
         Ok((entities, relations))
     }
 
@@ -2046,7 +2033,7 @@ impl GraphExtractor {
         store: &mut GraphRagStore,
         source_id: &str,
     ) -> Result<(), String> {
-        let (entities, relations) = self.extract(text)?;
+        let (entities, relations) = self.extract(text, source_id)?;
 
         let mut entity_id_map: HashMap<String, String> = HashMap::new();
         for entity in &entities {
@@ -2059,16 +2046,7 @@ impl GraphExtractor {
             let store_id = if let Some(existing) = existing {
                 existing.id.clone()
             } else {
-                let node = EntityNode {
-                    id: entity.id.clone(),
-                    name: entity.name.clone(),
-                    entity_type: entity.entity_type.clone(),
-                    source_node_id: source_id.to_string(),
-                    confidence: self.config.confidence_threshold,
-                    properties: entity.properties.clone(),
-                    created_at: now_nanos(),
-                };
-                store.add_entity(node);
+                store.add_entity(entity.clone());
                 entity.id.clone()
             };
             entity_id_map.insert(key, store_id);
@@ -2077,11 +2055,11 @@ impl GraphExtractor {
         for relation in &relations {
             let source_key = entities
                 .iter()
-                .find(|e| e.id == relation.source_id)
+                .find(|e| e.id == relation.source_entity)
                 .map(|e| e.name.to_lowercase());
             let target_key = entities
                 .iter()
-                .find(|e| e.id == relation.target_id)
+                .find(|e| e.id == relation.target_entity)
                 .map(|e| e.name.to_lowercase());
             if let (Some(src_key), Some(tgt_key)) = (source_key, target_key) {
                 if let (Some(sid), Some(tid)) =
@@ -2104,8 +2082,8 @@ impl GraphExtractor {
         Ok(())
     }
 
-    pub fn merge_entities(entities: &[Entity]) -> Vec<Entity> {
-        let mut seen: HashMap<String, Entity> = HashMap::new();
+    pub fn merge_entities(entities: &[EntityNode]) -> Vec<EntityNode> {
+        let mut seen: HashMap<String, EntityNode> = HashMap::new();
         for entity in entities {
             let key = entity.name.to_lowercase();
             seen.entry(key).or_insert_with(|| entity.clone());

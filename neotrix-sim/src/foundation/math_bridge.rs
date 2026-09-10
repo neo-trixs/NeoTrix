@@ -313,6 +313,17 @@ impl SimulationRng {
     }
 }
 
+/// Compute cosine similarity between two f32 slices.
+/// Returns 0.0 if either vector has zero norm.
+pub fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
+    let len = a.len().min(b.len());
+    if len == 0 { return 0.0; }
+    let dot: f32 = (0..len).map(|i| a[i] * b[i]).sum();
+    let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if na == 0.0 || nb == 0.0 { 0.0 } else { (dot / (na * nb)).clamp(-1.0, 1.0) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,5 +394,20 @@ mod tests {
         for _ in 0..100 {
             assert_eq!(r1.next_f32(), r2.next_f32());
         }
+    }
+
+    #[test]
+    fn cosine_sim_identical() {
+        assert!((cosine_sim(&[1.0, 0.0], &[1.0, 0.0]) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn cosine_sim_orthogonal() {
+        assert!(cosine_sim(&[1.0, 0.0], &[0.0, 1.0]).abs() < 0.001);
+    }
+
+    #[test]
+    fn cosine_sim_zero_vector() {
+        assert_eq!(cosine_sim(&[0.0, 0.0], &[1.0, 1.0]), 0.0);
     }
 }
