@@ -16,12 +16,17 @@ use super::agent_routing::AgentRoutingTable;
 #[cfg(test)]
 use super::provider_swap::ProviderSwapManager;
 
+mod circuit_breaker;
 mod challenge;
+mod consistent_hash;
 mod coordinator;
 mod execution;
+mod intelligent_router;
 mod keyless;
 mod learned_router;
 mod market_router;
+mod ml_predictor;
+mod plugin_system;
 pub mod pool_health;
 mod registry;
 mod reliability;
@@ -32,6 +37,7 @@ mod state;
 #[cfg(feature = "stealth-net")]
 mod stealth_middleware;
 mod subgrid;
+mod auto_recovery;
 
 pub use coordinator::*;
 pub use market_router::*;

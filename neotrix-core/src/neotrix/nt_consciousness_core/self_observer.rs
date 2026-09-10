@@ -94,7 +94,7 @@ pub struct Reflection {
 }
 
 /// 反思类型 (MARS: 原则性反思 + 程序性反思)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ReflectionType {
     /// 原则性反思 (Principle Reflection)
     /// 关于"为什么"的反思

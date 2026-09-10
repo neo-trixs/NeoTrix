@@ -58,6 +58,93 @@ impl ShieldEventPublisher {
     }
 }
 
+// ── Kameo-inspired ShieldActor ────────────────────────────────────────────
+// Typed actor pattern: enum message type with per-variant response dispatch.
+// Actor holds ShieldEventPublisher for domain-specific event emission.
+
+use crate::neotrix::nt_core_event_bus::{ActorContext, ActorHandler, ActorMessage, ActorRef, spawn_actor};
+
+/// Intrusion detected by a network sensor.
+pub struct IntrusionMessage {
+    pub source: String,
+    pub details: String,
+    pub severity: String,
+}
+
+pub struct IntrusionResponse {
+    pub blocked: bool,
+    pub action_taken: String,
+}
+
+/// Audit requested.
+pub struct AuditMessage {
+    pub dimensions: u32,
+}
+
+pub struct AuditResponse {
+    pub findings: u32,
+    pub score: f64,
+}
+
+/// Union message type for Shield domain — routes to per-variant handler.
+pub enum ShieldMessage {
+    Intrusion(IntrusionMessage),
+    Audit(AuditMessage),
+}
+
+impl ActorMessage for ShieldMessage {
+    type Response = ShieldResponse;
+}
+
+/// Union response type — mirrors ShieldMessage variants.
+pub enum ShieldResponse {
+    Intrusion(IntrusionResponse),
+    Audit(AuditResponse),
+}
+
+/// Shield actor — typed message handler backed by EventBus.
+pub struct ShieldActor {
+    publisher: ShieldEventPublisher,
+}
+
+impl ShieldActor {
+    pub fn new(bus: Arc<EventBus>) -> Self {
+        Self { publisher: ShieldEventPublisher::new(bus) }
+    }
+
+    fn handle_intrusion(&self, msg: &IntrusionMessage, ctx: &mut ActorContext) -> IntrusionResponse {
+        self.publisher.intrusion_detected(&msg.source, &msg.details, &msg.severity);
+        ctx.state.insert("last_intrusion".into(), msg.source.clone());
+        IntrusionResponse {
+            blocked: true,
+            action_taken: format!("logged and blocked {}", msg.source),
+        }
+    }
+
+    fn handle_audit(&self, msg: &AuditMessage, ctx: &mut ActorContext) -> AuditResponse {
+        let findings = msg.dimensions / 2;
+        let score = 1.0 - (findings as f64 / msg.dimensions as f64);
+        self.publisher.audit_completed(msg.dimensions, findings, score);
+        ctx.state.insert("last_audit_score".into(), format!("{:.3}", score));
+        AuditResponse { findings, score }
+    }
+
+    /// Spawn ShieldActor as a typed actor processing ShieldMessage.
+    pub fn spawn(bus: Arc<EventBus>) -> ActorRef<ShieldMessage> {
+        let actor = Self::new(bus.clone());
+        spawn_actor(bus, actor)
+    }
+}
+
+impl ActorHandler<ShieldMessage> for ShieldActor {
+    fn handle(&self, msg: &ShieldMessage, ctx: &mut ActorContext) -> ShieldResponse {
+        match msg {
+            ShieldMessage::Intrusion(m) => ShieldResponse::Intrusion(self.handle_intrusion(m, ctx)),
+            ShieldMessage::Audit(m) => ShieldResponse::Audit(self.handle_audit(m, ctx)),
+        }
+    }
+}
+
 // ── FUNARCH Typestate Pattern ──
 
 pub struct Idle;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use crate::core::nt_core_dispatch::Dispatcher;
 use crate::core::nt_core_event::CoreEvent;
 
@@ -439,7 +439,11 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
 /// Each message carries its own response type — no `dyn Any` downcasting.
 pub trait ActorMessage: Send + Sync + 'static {
     type Response: Send + Sync + 'static;
-    fn handle(&self, ctx: &mut ActorContext) -> Self::Response;
+}
+
+/// Actor handler — processes a specific message type and returns a response.
+pub trait ActorHandler<M: ActorMessage>: Send + Sync + 'static {
+    fn handle(&self, msg: &M, ctx: &mut ActorContext) -> M::Response;
 }
 
 /// Actor execution context — holds the event bus and per-actor state.
@@ -460,7 +464,13 @@ struct ActorEnvelope<M: ActorMessage> {
     response_tx: oneshot::Sender<M::Response>,
 }
 
-use tokio::sync::oneshot;
+/// Error type for actor message delivery.
+pub enum ActorError<M> {
+    /// Actor mailbox full or closed — message returned.
+    MailboxFull(M),
+    /// Actor dropped without sending a response.
+    ActorDropped,
+}
 
 /// Typed actor reference — sends messages via mpsc, returns typed responses.
 pub struct ActorRef<M: ActorMessage> {
@@ -472,31 +482,28 @@ impl<M: ActorMessage> ActorRef<M> {
         Self { tx }
     }
 
-    pub async fn send(&self, msg: M) -> Result<M::Response, mpsc::error::SendError<M>> {
+    pub async fn send(&self, msg: M) -> Result<M::Response, ActorError<M>> {
         let (response_tx, response_rx) = oneshot::channel();
         let envelope = ActorEnvelope { msg, response_tx };
         self.tx.send(envelope).await.map_err(|e| {
-            mpsc::error::SendError(e.0.msg)
+            ActorError::MailboxFull(e.0.msg)
         })?;
-        response_rx.await.map_err(|_| mpsc::error::SendError({
-            // oneshot closed — actor dropped without responding
-            // Cannot recover msg, return a dummy error
-            unreachable!("actor dropped without responding")
-        }))
+        response_rx.await.map_err(|_| ActorError::ActorDropped)
     }
 }
 
 /// Spawn an actor loop that processes typed messages.
 /// Returns an `ActorRef<M>` for sending messages to the actor.
-pub fn spawn_actor<M>(bus: Arc<EventBus>, mut handler: M) -> ActorRef<M>
+pub fn spawn_actor<M, H>(bus: Arc<EventBus>, handler: H) -> ActorRef<M>
 where
     M: ActorMessage,
+    H: ActorHandler<M>,
 {
     let (tx, mut rx) = mpsc::channel::<ActorEnvelope<M>>(64);
     let mut ctx = ActorContext::new(bus);
     tokio::spawn(async move {
         while let Some(envelope) = rx.recv().await {
-            let response = envelope.msg.handle(&mut ctx);
+            let response = handler.handle(&envelope.msg, &mut ctx);
             let _ = envelope.response_tx.send(response);
         }
     });

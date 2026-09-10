@@ -6,6 +6,7 @@ use crate::foundation::sim_time::{SimClock, TimeModifiers};
 use crate::foundation::math_bridge::{Vec2, SpatialGrid, SimulationRng};
 use crate::foundation::tick_schedule::{TickSchedule, TickTier};
 use crate::environment::terrain::{Heightmap, HeightmapConfig, BiomeMap, ResourceDistribution};
+use crate::environment::structures::{StructureManager, StructureType};
 use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation, NearbyAgent, NearbyResource};
 use crate::agents::action_awareness::ActionAwareness;
 use std::collections::HashMap;
@@ -86,6 +87,7 @@ pub struct WorldSim {
     pub emotion: EmotionEngine,
     pub evolution_history: Vec<EvolutionRecord>,
     pub action_awareness: HashMap<String, ActionAwareness>,
+    pub structures: StructureManager,
     pub tick: u64,
 }
 
@@ -157,6 +159,7 @@ impl WorldSim {
             emotion: EmotionEngine::new(),
             evolution_history: Vec::new(),
             action_awareness: HashMap::new(),
+            structures: StructureManager::new(50.0),
             tick: 0,
         }
     }
@@ -425,6 +428,24 @@ impl WorldSim {
                 agent.core.position = agent.core.position + dir;
                 agent.core.position.x = agent.core.position.x.clamp(0.0, self.config.world_width);
                 agent.core.position.y = agent.core.position.y.clamp(0.0, self.config.world_height);
+            }
+            AgentAction::Build { position, structure_type } => {
+                let struct_type = match structure_type.as_str() {
+                    "shelter" => StructureType::Shelter,
+                    "farm" => StructureType::Farm,
+                    "workshop" => StructureType::Workshop,
+                    "watchtower" => StructureType::Watchtower,
+                    "market" => StructureType::Market,
+                    "wall" => StructureType::Wall,
+                    "road" => StructureType::Road,
+                    _ => StructureType::Shelter,
+                };
+                let _ = self.structures.build(
+                    struct_type,
+                    [position.x, position.y],
+                    agent_id,
+                    self.tick,
+                );
             }
             _ => {}
         }

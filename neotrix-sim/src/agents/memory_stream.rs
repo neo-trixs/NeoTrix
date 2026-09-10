@@ -1,4 +1,23 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+pub struct RetrievalWeights {
+    pub recency: f32,
+    pub relevance: f32,
+    pub importance: f32,
+    pub lexical: f32,
+}
+
+impl Default for RetrievalWeights {
+    fn default() -> Self {
+        Self {
+            recency: 0.5,
+            relevance: 3.0,
+            importance: 2.0,
+            lexical: 1.0,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MemoryKind {
@@ -149,6 +168,117 @@ impl MemoryStream {
     pub fn get(&self, id: u64) -> Option<&MemoryNode> {
         self.nodes.iter().find(|n| n.id == id)
     }
+
+    pub fn retrieve_by_text(
+        &mut self,
+        query: &str,
+        current_tick: u64,
+        top_k: usize,
+    ) -> Vec<&MemoryNode> {
+        let weights = RetrievalWeights::default();
+        let query_keywords = tokenize(query);
+        let mut scored: Vec<(usize, f32)> = self
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, node)| {
+                let s = self.dual_score(node, None, Some(&query_keywords), current_tick, &weights);
+                (i, s)
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(top_k);
+
+        let indices: Vec<usize> = scored.into_iter().map(|(i, _)| i).collect();
+        for &i in &indices {
+            self.nodes[i].last_accessed_tick = current_tick;
+        }
+        indices.iter().map(|&i| &self.nodes[i]).collect()
+    }
+
+    pub fn retrieve_with_weights(
+        &mut self,
+        query_embedding: Option<&[f32; 16]>,
+        query_text: Option<&str>,
+        current_tick: u64,
+        weights: &RetrievalWeights,
+        top_k: usize,
+    ) -> Vec<&MemoryNode> {
+        let query_keywords = query_text.map(tokenize);
+        let query_keywords_ref = query_keywords.as_deref();
+
+        let mut scored: Vec<(usize, f32)> = self
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, node)| {
+                let s = self.dual_score(node, query_embedding, query_keywords_ref, current_tick, weights);
+                (i, s)
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(top_k);
+
+        let indices: Vec<usize> = scored.into_iter().map(|(i, _)| i).collect();
+        for &i in &indices {
+            self.nodes[i].last_accessed_tick = current_tick;
+        }
+        indices.iter().map(|&i| &self.nodes[i]).collect()
+    }
+
+    fn dual_score(
+        &self,
+        node: &MemoryNode,
+        query_embedding: Option<&[f32; 16]>,
+        query_keywords: Option<&[String]>,
+        current_tick: u64,
+        weights: &RetrievalWeights,
+    ) -> f32 {
+        let age = current_tick.saturating_sub(node.last_accessed_tick);
+        let recency_score = self.recency_decay.powi(age as i32);
+
+        let relevance_score = match (query_embedding, &node.embedding) {
+            (Some(qe), Some(ne)) => cosine_sim(ne, qe),
+            _ => 0.0,
+        };
+
+        let importance_score = node.importance / 10.0;
+
+        let lexical_score = match query_keywords {
+            Some(qk) => keyword_score(&node.keywords, qk),
+            None => 0.0,
+        };
+
+        weights.recency * recency_score
+            + weights.relevance * relevance_score
+            + weights.importance * importance_score
+            + weights.lexical * lexical_score
+    }
+}
+
+fn keyword_score(memory_keywords: &[String], query_keywords: &[String]) -> f32 {
+    if query_keywords.is_empty() {
+        return 0.0;
+    }
+    let mem_set: HashSet<&str> = memory_keywords.iter().map(|s| s.as_str()).collect();
+    let query_set: HashSet<&str> = query_keywords.iter().map(|s| s.as_str()).collect();
+    let overlap = mem_set.intersection(&query_set).count();
+    let total = mem_set.union(&query_set).count();
+    if total == 0 {
+        0.0
+    } else {
+        overlap as f32 / total as f32
+    }
+}
+
+fn tokenize(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.len() >= 2)
+        .map(|w| w.to_string())
+        .collect()
 }
 
 fn cosine_sim(a: &[f32; 16], b: &[f32; 16]) -> f32 {
@@ -287,5 +417,94 @@ mod tests {
         let id = stream.add(make_node(MemoryKind::Observation, 5.0, 0, None));
         assert!(stream.get(id).is_some());
         assert!(stream.get(999).is_none());
+    }
+
+    #[test]
+    fn retrieve_by_text_finds_matching_keywords() {
+        let mut stream = MemoryStream::new(100);
+        let mut n1 = make_node(MemoryKind::Observation, 5.0, 0, None);
+        n1.keywords = vec!["rust".into(), "compiler".into()];
+        let mut n2 = make_node(MemoryKind::Observation, 5.0, 0, None);
+        n2.keywords = vec!["python".into(), "script".into()];
+        stream.add(n1);
+        stream.add(n2);
+
+        let results = stream.retrieve_by_text("rust compiler", 0, 10);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].keywords[0], "rust");
+    }
+
+    #[test]
+    fn retrieve_by_text_no_matches_returns_empty() {
+        let mut stream = MemoryStream::new(100);
+        let mut n = make_node(MemoryKind::Observation, 5.0, 0, None);
+        n.keywords = vec!["rust".into()];
+        stream.add(n);
+
+        let results = stream.retrieve_by_text("quantum physics", 0, 10);
+        assert_eq!(results.len(), 1);
+        assert_eq!(keyword_score(&results[0].keywords, &tokenize("quantum physics")), 0.0);
+    }
+
+    #[test]
+    fn custom_weights_change_ranking() {
+        let emb = [1.0f32; 16];
+        let mut stream = MemoryStream::new(100);
+        let mut n1 = make_node(MemoryKind::Observation, 5.0, 0, Some(emb));
+        n1.keywords = vec!["alpha".into(), "beta".into()];
+        let mut n2 = make_node(MemoryKind::Observation, 5.0, 0, Some(emb));
+        n2.keywords = vec!["gamma".into()];
+        stream.add(n1);
+        stream.add(n2);
+
+        let high_lexical = RetrievalWeights {
+            recency: 0.0, relevance: 0.0, importance: 0.0, lexical: 1.0,
+        };
+        let results = stream.retrieve_with_weights(
+            None, Some("alpha"), 0, &high_lexical, 10,
+        );
+        assert_eq!(results[0].keywords[0], "alpha");
+    }
+
+    #[test]
+    fn dual_score_combines_both_signals() {
+        let emb_a = [1.0f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let emb_b = [0.0f32, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut stream = MemoryStream::new(100);
+        let mut n1 = make_node(MemoryKind::Observation, 5.0, 0, Some(emb_a));
+        n1.keywords = vec!["alpha".into()];
+        let mut n2 = make_node(MemoryKind::Observation, 5.0, 0, Some(emb_b));
+        n2.keywords = vec!["beta".into()];
+        stream.add(n1);
+        stream.add(n2);
+
+        let results = stream.retrieve_with_weights(
+            Some(&emb_a), Some("alpha"), 0,
+            &RetrievalWeights::default(), 10,
+        );
+        assert_eq!(results[0].id, 0);
+    }
+
+    #[test]
+    fn tokenize_handles_punctuation_and_case() {
+        let tokens = tokenize("Hello, World! This is a TEST.");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+        assert!(tokens.contains(&"test".to_string()));
+        assert!(!tokens.iter().any(|t| t.len() < 2));
+    }
+
+    #[test]
+    fn keyword_score_partial_overlap() {
+        let mem = vec!["a".into(), "b".into(), "c".into()];
+        let query = vec!["b".into(), "c".into(), "d".into()];
+        let score = keyword_score(&mem, &query);
+        assert!((score - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn keyword_score_empty_query() {
+        let mem = vec!["a".into()];
+        assert_eq!(keyword_score(&mem, &[]), 0.0);
     }
 }

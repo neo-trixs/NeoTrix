@@ -40,6 +40,7 @@ use super::skillopt::{
 
 use super::anti_distillation_stage::AntiDistillationStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
+use super::rsi_operators::MetaRsiStage;
 use super::hyperarchive::{HyperAgentArchive, SelectionConfig};
 use super::hypercore::HyperMetaAgent;
 use super::hypercore::SafetyCheckResult;
@@ -386,6 +387,7 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(SSMUpdateStage::new()), // E8 策略学习 (mode 值更新 + ε 衰减)
             Box::new(HyperCubeOptimizeStage::new()), // HyperCube 剪枝 (freq 10)
             Box::new(MetaImprovementStage::new()), // 元改进 (freq 10)
+            Box::new(MetaRsiStage::new()),           // MetaRSI 三算子 (freq 5)
             Box::new(OpenSourceCompareStage::new()), // 开源对比 (freq 5)
             Box::new(UQCalibrationStage::new()), // 熵危机校准 (freq 20)
             Box::new(SleepStage::new()),     // 记忆巩固 (freq 100)

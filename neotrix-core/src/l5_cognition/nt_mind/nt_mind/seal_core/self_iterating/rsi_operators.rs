@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use super::pipeline::{BrainPipeline, BrainStage, StageDecision, SelfIteratingBrain};
-use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
+use super::{BrainStage, SelfIteratingBrain, StageDecision};
+use crate::neotrix::nt_core_error::NeoTrixError;
 
 // ── MetaRSI Three Operators ────────────────────────────────────────
 // Source: MetaRSI/RSI2 (arXiv:2609.06396)
@@ -57,7 +57,9 @@ impl fmt::Display for RsiOperator {
             RsiOperator::HarnessRsi { metrics } => {
                 write!(f, "HarnessRsi({} metrics)", metrics.len())
             }
-            RsiOperator::ModelRsi { architecture_changes } => {
+            RsiOperator::ModelRsi {
+                architecture_changes,
+            } => {
                 write!(f, "ModelRsi({} changes)", architecture_changes.len())
             }
         }
@@ -77,9 +79,9 @@ impl RsiOperator {
                 }
                 data.iter()
                     .flat_map(|d| {
-                        transformations.iter().map(move |t| {
-                            format!("{} [transformed by {}]", d, t)
-                        })
+                        transformations
+                            .iter()
+                            .map(move |t| format!("{} [transformed by {}]", d, t))
                     })
                     .collect()
             }
@@ -270,12 +272,7 @@ impl BrainStage for MetaRsiStage {
         }
 
         // 收集当前数据/指标/配置用于执行
-        let mut data: Vec<String> = brain
-            .brain
-            .harness_history
-            .iter()
-            .cloned()
-            .collect();
+        let mut data: Vec<String> = brain.brain.harness_history.iter().cloned().collect();
         let mut metrics: HashMap<String, f64> = HashMap::new();
         metrics.insert("reward".into(), brain._reward);
         metrics.insert("entropy".into(), brain.entropy_crisis_level);
@@ -284,12 +281,7 @@ impl BrainStage for MetaRsiStage {
             if brain.brain.capability.arr().is_empty() {
                 0.0
             } else {
-                brain
-                    .brain
-                    .capability
-                    .arr()
-                    .iter()
-                    .sum::<f64>()
+                brain.brain.capability.arr().iter().sum::<f64>()
                     / brain.brain.capability.arr().len() as f64
             },
         );
