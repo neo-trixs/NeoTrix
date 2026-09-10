@@ -62,6 +62,7 @@ pub mod benchmark_gate;
 pub mod data_synthesis;
 pub mod openspace_evolution;
 pub mod stage_contracts;
+pub mod rsi_operators;
 pub use dpo_stage::{DpoStage, DpoBuffer, PreferencePair};
 pub use sft_stage::{SftStage, SftBuffer, SupervisedExample, SftReport};
 pub use constitutional_stage::{ConstitutionalSelfCritiqueStage, ConstitutionalReport, PrincipleEvaluation, Principle};
@@ -70,6 +71,7 @@ pub use safety_stage::{SafetyCheckStage, SafetyCheckDetail, ThreatCategory};
 pub use dp_sgd_stage::DpSgdStage;
 pub use stage_contracts::ContractAwareStage;
 pub use openspace_evolution::{OpenSpaceEvolveStage, OpenSpaceStats, EvolutionTrigger};
+pub use rsi_operators::{RsiOperator, RsiOperatorChain, MetaRsiStage};
 
 // Goal contract re-exports
 pub use goal_contract::{

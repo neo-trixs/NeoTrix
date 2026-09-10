@@ -16,7 +16,7 @@ mod tests {
     struct MockBackend;
 
     impl SearchBackend for MockBackend {
-        fn search(&self, _query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
+        fn search(&self, _query: &str, _limit: usize) -> Result<Vec<SearchResult>, String> {
             Ok(vec![SearchResult {
                 id: "1".into(),
                 score: 0.9,

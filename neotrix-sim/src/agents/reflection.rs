@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn multiple_themes_sorted_by_frequency() {
-        let engine = ReflectionEngine::new();
+        let mut engine = ReflectionEngine::new();
         let mut stream = MemoryStream::new(100);
 
         stream.add(make_memory(MemoryKind::Observation, 5.0, 0, vec!["combat".into(), "rare_kw".into()]));

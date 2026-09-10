@@ -57,7 +57,6 @@ impl PlanningStack {
         });
         if self.goals.len() > self.max_goals {
             // Demote lowest-priority non-active goals
-            let len = self.goals.len();
             for g in self.goals.iter_mut().skip(self.max_goals) {
                 if g.status == GoalStatus::Active {
                     g.status = GoalStatus::Suspended;

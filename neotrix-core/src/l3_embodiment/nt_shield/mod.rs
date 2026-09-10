@@ -57,3 +57,67 @@ impl ShieldEventPublisher {
         });
     }
 }
+
+// ── FUNARCH Typestate Pattern ──
+
+pub struct Idle;
+pub struct Scanning;
+pub struct Blocking;
+pub struct Logging;
+
+pub struct ShieldStateMachine<S> {
+    state: std::marker::PhantomData<S>,
+    events: Vec<String>,
+}
+
+impl ShieldStateMachine<Idle> {
+    pub fn new() -> Self {
+        Self {
+            state: std::marker::PhantomData,
+            events: Vec::new(),
+        }
+    }
+
+    pub fn start_scan(self) -> ShieldStateMachine<Scanning> {
+        ShieldStateMachine {
+            state: std::marker::PhantomData,
+            events: self.events,
+        }
+    }
+}
+
+impl ShieldStateMachine<Scanning> {
+    pub fn detect_threat(self, threat: &str) -> ShieldStateMachine<Blocking> {
+        let mut events = self.events;
+        events.push(format!("threat detected: {}", threat));
+        ShieldStateMachine {
+            state: std::marker::PhantomData,
+            events,
+        }
+    }
+
+    pub fn no_threat(self) -> ShieldStateMachine<Idle> {
+        ShieldStateMachine {
+            state: std::marker::PhantomData,
+            events: self.events,
+        }
+    }
+}
+
+impl ShieldStateMachine<Blocking> {
+    pub fn block(self) -> ShieldStateMachine<Logging> {
+        ShieldStateMachine {
+            state: std::marker::PhantomData,
+            events: self.events,
+        }
+    }
+}
+
+impl ShieldStateMachine<Logging> {
+    pub fn log(self) -> ShieldStateMachine<Idle> {
+        ShieldStateMachine {
+            state: std::marker::PhantomData,
+            events: self.events,
+        }
+    }
+}
