@@ -270,11 +270,11 @@ impl SharpenResult {
         }
     }
 
-    /// Returns the contained `String` if `Success`, panics with message otherwise.
-    pub fn expect(self, msg: &str) -> String {
+    /// Returns the contained `String` if `Success`, `Err` with message otherwise.
+    pub fn expect(self, msg: &str) -> Result<String, String> {
         match self {
-            SharpenResult::Success(s) => s,
-            SharpenResult::AlreadyExists(_) => panic!("{}", msg),
+            SharpenResult::Success(s) => Ok(s),
+            SharpenResult::AlreadyExists(_) => Err(msg.to_string()),
         }
     }
 }

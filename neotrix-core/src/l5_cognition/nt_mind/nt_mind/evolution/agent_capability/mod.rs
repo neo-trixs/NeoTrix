@@ -1612,14 +1612,29 @@ impl DialogueAbsorbBridge {
     }
 }
 
+impl MemoryAgent {
+    /// Fallible constructor: returns `Err` if KB cannot be opened.
+    pub fn try_new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let kb = KnowledgeBase::open(None)?;
+        Ok(Self {
+            kb: std::sync::Arc::new(kb),
+        })
+    }
+}
+
 impl Default for MemoryAgent {
     fn default() -> Self {
-        Self {
-            kb: std::sync::Arc::new(
-                KnowledgeBase::open(None).unwrap_or_else(|e| {
-                    panic!("MemoryAgent default requires KB open: {}", e)
-                }),
-            ),
+        match Self::try_new() {
+            Ok(agent) => agent,
+            Err(e) => {
+                tracing::warn!("MemoryAgent default fallback: KB open failed ({e}), returning empty agent");
+                Self {
+                    kb: std::sync::Arc::new(
+                        KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:")))
+                            .expect("in-memory KB must always open"),
+                    ),
+                }
+            }
         }
     }
 }

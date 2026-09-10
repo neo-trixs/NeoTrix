@@ -15859,6 +15859,14 @@
       "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [意识体蒸馏] 本轮收敛 1 组经验为 1 条能力模式, 标记 4 条原始经验。跨域分布: NT-META:4. 意识体维度信号: 经验",
       "signal": 0.76,
       "promoted_at": 1788160929
+    },
+    {
+      "domain": "NT-WORLD",
+      "capability": "frontend_ui",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-WORLD] 聚合 6 条经验的模式: OSINT OsintSource trait 统一分发模式: 10个 investigate() 签名完全同构 → 定义 OsintSource trait (associated type Findings + name/requires_domain/requires_identity/requires_email/is_active/needs_ap [关键词: osint, run, source, findings, gates, osintreport, display, match]' 命中能力标签 'frontend_ui' 于域 World, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1789034461
     }
   ]
 }

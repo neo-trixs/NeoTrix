@@ -99,7 +99,7 @@ impl ConvergenceChecker {
     }
 
     /// 获取收敛证明
-    pub fn get_proof(&self, gap_registry: &GapRegistry, state: &StateSnapshot) -> ConvergenceProof {
+    pub fn get_proof(&self, _gap_registry: &GapRegistry, state: &StateSnapshot) -> ConvergenceProof {
         ConvergenceProof {
             consecutive_no_gap_cycles: self.consecutive_no_gap,
             covered_dimensions: self.covered_dimensions.len() as u32,

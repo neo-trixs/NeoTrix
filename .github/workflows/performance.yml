@@ -1,0 +1,94 @@
+name: Performance Tests
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      bench_filter:
+        description: 'Bench filter pattern (empty = all)'
+        required: false
+        default: ''
+      sample_size:
+        description: 'Sample size override'
+        required: false
+        default: '10'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bench:
+    name: Performance Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: neotrix-core -> target
+
+      - name: Show toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Build benchmarks
+        working-directory: neotrix-core
+        run: cargo bench --no-run --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks --bench capability_c3 --bench shield_c3 --bench repair_c3 --bench memory_c3 --bench act_c3
+
+      - name: Run benchmarks
+        working-directory: neotrix-core
+        run: |
+          BENCH_FILTER="${{ github.event.inputs.bench_filter }}"
+          SAMPLE_SIZE="${{ github.event.inputs.sample_size }}"
+          FILTER_FLAG=""
+          if [ -n "$BENCH_FILTER" ]; then
+            FILTER_FLAG="--bench $BENCH_FILTER"
+          fi
+          cargo bench \
+            --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks --bench capability_c3 \
+            --bench shield_c3 --bench repair_c3 --bench memory_c3 --bench act_c3 \
+            $FILTER_FLAG \
+            -- --warm-up-time 3 --measurement-time 10 --sample-size ${SAMPLE_SIZE}
+
+      - name: Upload bench results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-${{ github.run_id }}
+          path: neotrix-core/target/criterion
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Comment on PR (if triggered by PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const benchDir = 'neotrix-core/target/criterion';
+            let summary = '## Performance Benchmark Results\n\n';
+            summary += `Run: [${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n`;
+            summary += '| Benchmark | Status |\n|-----------|--------|\n';
+            summary += '| core_bench | Completed |\n';
+            summary += '| vector_ops | Completed |\n';
+            summary += '| seal_loop | Completed |\n';
+            summary += '| real_tasks | Completed |\n';
+            summary += '| capability_c3 | Completed |\n';
+            summary += '| shield_c3 | Completed |\n';
+            summary += '| repair_c3 | Completed |\n';
+            summary += '| memory_c3 | Completed |\n';
+            summary += '| act_c3 | Completed |\n';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

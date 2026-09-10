@@ -6,7 +6,7 @@ use super::discovery::{DiscoveryConfig, DiscoveryManager, DiscoveryResult, Distr
 use super::factory::CapabilityFactory;
 use super::versioning::{SemanticVersion, UpgradeType, VersionManager};
 use super::{
-    CapabilityError, CapabilityInput, CapabilityOutput, CapabilityRegistry, CapabilityRouter,
+    CapabilityError, CapabilityInput, CapabilityOutput, CapabilityRegistry, CapabilityRouter, Domain,
 };
 use std::sync::Arc;
 
@@ -56,17 +56,38 @@ impl ConsciousnessCapabilityIntegrator {
 
     /// 注册NT-MIND能力
     pub fn init_mind_capabilities(&mut self) {
-        // TODO: implement when mind_capability module is created
+        for cap in CapabilityFactory::create_by_domain(Domain::NtMind) {
+            let meta = cap.meta();
+            let version =
+                SemanticVersion::parse(&meta.version).unwrap_or(SemanticVersion::new(1, 0, 0));
+            self.registry.register(cap);
+            self.version_manager
+                .register_version(&meta.id, version, "system", "NT-MIND能力");
+        }
     }
 
     /// 注册NT-MEMORY能力
     pub fn init_memory_capabilities(&mut self) {
-        // TODO: implement when memory_capability module is created
+        for cap in CapabilityFactory::create_by_domain(Domain::NtMemory) {
+            let meta = cap.meta();
+            let version =
+                SemanticVersion::parse(&meta.version).unwrap_or(SemanticVersion::new(1, 0, 0));
+            self.registry.register(cap);
+            self.version_manager
+                .register_version(&meta.id, version, "system", "NT-MEMORY能力");
+        }
     }
 
     /// 注册NT-ACT能力
     pub fn init_act_capabilities(&mut self) {
-        // TODO: implement when act_capability module is created
+        for cap in CapabilityFactory::create_by_domain(Domain::NtAct) {
+            let meta = cap.meta();
+            let version =
+                SemanticVersion::parse(&meta.version).unwrap_or(SemanticVersion::new(1, 0, 0));
+            self.registry.register(cap);
+            self.version_manager
+                .register_version(&meta.id, version, "system", "NT-ACT能力");
+        }
     }
 
     /// 执行路由

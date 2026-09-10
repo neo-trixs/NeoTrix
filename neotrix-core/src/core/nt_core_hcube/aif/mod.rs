@@ -1,13 +1,11 @@
 #![forbid(unsafe_code)]
 
-pub mod belief;
 pub mod free_energy;
 pub mod generative_model;
 pub mod policy;
 
 use serde::{Deserialize, Serialize};
 
-pub use self::belief::pomdp::POMDPBeliefUpdater;
 pub use self::free_energy::FreeEnergyCalculator;
 pub use self::generative_model::GenerativeModel;
 pub use self::policy::PolicyEvaluator;
@@ -23,7 +21,6 @@ pub struct AiStepReport {
 
 pub struct FreeEnergyEngine {
     pub model: GenerativeModel,
-    pub belief_updater: POMDPBeliefUpdater,
     pub policy_evaluator: PolicyEvaluator,
     pub free_energy: FreeEnergyCalculator,
 }
@@ -32,11 +29,34 @@ impl FreeEnergyEngine {
     pub fn new(model: GenerativeModel, horizon: usize) -> Self {
         let num_states = model.num_states;
         FreeEnergyEngine {
-            belief_updater: POMDPBeliefUpdater::new(num_states),
             policy_evaluator: PolicyEvaluator::new(num_states, horizon),
             free_energy: FreeEnergyCalculator::new(),
             model,
         }
+    }
+
+    /// Inline Bayesian belief update (replaces removed POMDPBeliefUpdater).
+    fn bayesian_update(belief: &[f64], obs_idx: usize, likelihood: &[Vec<f64>]) -> Vec<f64> {
+        let num_states = belief.len();
+        let mut new_belief = vec![0.0; num_states];
+        let mut norm = 0.0;
+        for s in 0..num_states {
+            new_belief[s] = likelihood[s][obs_idx] * belief[s];
+            norm += new_belief[s];
+        }
+        if norm > 0.0 {
+            for b in new_belief.iter_mut() {
+                *b /= norm;
+            }
+        }
+        new_belief
+    }
+
+    fn belief_entropy(belief: &[f64]) -> f64 {
+        belief.iter()
+            .filter(|&&p| p > 0.0)
+            .map(|&p| -p * p.log2())
+            .sum()
     }
 
     pub fn compute_vfe(&self, belief: &[f64], observation: &[f64]) -> f64 {
@@ -60,9 +80,7 @@ impl FreeEnergyEngine {
     pub fn update_belief(&mut self, belief: &mut [f64], observation: &[f64]) {
         if observation.len() == 1 {
             let obs_idx = observation[0] as usize;
-            let new_belief =
-                self.belief_updater
-                    .update_belief(belief, obs_idx, &self.model.likelihood_matrix);
+            let new_belief = Self::bayesian_update(belief, obs_idx, &self.model.likelihood_matrix);
             for (b, nb) in belief.iter_mut().zip(new_belief.iter()) {
                 *b = *nb;
             }
@@ -91,7 +109,7 @@ impl FreeEnergyEngine {
 
         let (selected_policy, efe) = self.select_policy(belief, policies, horizon);
 
-        let new_belief = self.belief_updater.update_belief(
+        let new_belief = Self::bayesian_update(
             belief,
             observation_idx,
             &self.model.likelihood_matrix,
@@ -100,7 +118,7 @@ impl FreeEnergyEngine {
             *b = *nb;
         }
 
-        let belief_entropy = self.belief_updater.belief_entropy(belief);
+        let belief_entropy = Self::belief_entropy(belief);
 
         let policy_confidence = if !policies.is_empty() && selected_policy < policies.len() {
             1.0 - (efe / (policies.len() as f64)).max(0.0).min(1.0)

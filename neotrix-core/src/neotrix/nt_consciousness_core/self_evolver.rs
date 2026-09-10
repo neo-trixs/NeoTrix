@@ -229,7 +229,7 @@ impl SelfEvolver {
         }
 
         // 从反思中获取洞察
-        let insights: Vec<&Insight> = reflections.iter()
+        let _insights: Vec<&Insight> = reflections.iter()
             .flat_map(|r| &r.insights)
             .collect();
 

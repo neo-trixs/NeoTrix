@@ -238,13 +238,17 @@ impl ResourceRouter {
 
     /// 路由任务
     pub fn route(&mut self, cycle: u32, request: RoutingRequest) -> RoutingResult {
-        // 过滤可用资源
-        let available_resources: Vec<&ResourceEntry> = self.resource_pool.iter()
-            .filter(|r| r.availability > 0.5 && r.current_load < r.max_load)
+        // 计算每个资源的路由分数
+        let mut scored_resources: Vec<(usize, f64)> = self.resource_pool.iter()
+            .enumerate()
+            .filter(|(_, r)| r.availability > 0.5 && r.current_load < r.max_load)
+            .map(|(i, r)| {
+                let score = self.calculate_routing_score(r, &request);
+                (i, score)
+            })
             .collect();
 
-        if available_resources.is_empty() {
-            // 返回默认资源
+        if scored_resources.is_empty() {
             return RoutingResult {
                 id: format!("route_{}", uuid::Uuid::new_v4()),
                 selected_resource: ResourceEntry {
@@ -271,21 +275,10 @@ impl ResourceRouter {
             };
         }
 
-        // 计算每个资源的路由分数
-        let mut scored_resources: Vec<(&ResourceEntry, f64)> = available_resources.iter()
-            .map(|r| {
-                let score = self.calculate_routing_score(r, &request);
-                (*r, score)
-            })
-            .collect();
-
-        // 按分数排序
         scored_resources.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let (idx, score) = scored_resources[0];
+        let selected = self.resource_pool[idx].clone();
 
-        // 选择最佳资源
-        let (selected, score) = scored_resources[0];
-
-        // 记录
         let result = RoutingResult {
             id: format!("route_{}", uuid::Uuid::new_v4()),
             selected_resource: selected.clone(),
@@ -311,7 +304,6 @@ impl ResourceRouter {
         self.routing_history.push(record);
         self.trim_history();
 
-        // 更新使用统计
         let usage = self.usage_stats.entry(selected.id.clone()).or_insert_with(ResourceUsage::default);
         usage.total_requests += 1;
 

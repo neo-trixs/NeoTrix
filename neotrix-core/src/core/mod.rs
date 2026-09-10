@@ -22,7 +22,6 @@
 // ═══════════════════════════════════════════════════════════════════
 // L0 — 基底层 (Substrate)
 // ═══════════════════════════════════════════════════════════════════
-pub mod l0_substrate;
 pub mod nt_core_harness;
 
 pub mod nt_core_error;
@@ -44,7 +43,6 @@ pub mod nt_core_sense;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l3_memory;
 pub mod nt_core_bank;
-pub mod nt_core_consensus;
 pub mod nt_core_graph;
 pub mod nt_core_hcube;
  pub mod nt_core_knowledge;
@@ -151,6 +149,8 @@ pub mod nt_core_embed;
 pub mod nt_core_error_parse;
 pub mod nt_core_error_recovery;
 pub mod nt_core_event;
+pub use nt_core_event::{CoreEvent};
+pub use crate::neotrix::nt_core_event_bus::{EventBus};
 pub mod nt_core_mcp;
 pub mod nt_core_retrieval;
 pub mod nt_core_router;
@@ -261,10 +261,7 @@ pub use nt_core_trajectory_compress::{
     CompressionLevel, TrajectoryCompressionReport, TrajectoryCompressor,
 };
 
-pub use nt_core_consensus::{
-    AbductiveExplanation, AbductiveSolver, ConsensusConfig, ConsensusReport, ReflectionHead,
-    ReflectionPipeline, ReflectionResult,
-};
+// nt_core_consensus: removed (empty shell)
 pub use nt_core_e8::abduction::{
     AbductionCycleReport, AbductiveHypothesis, AbductiveReasoningEngine, AbductiveState,
     CausalEdge, CausalGraph, CausalNode,
@@ -347,9 +344,7 @@ pub use nt_core_bank::{
 pub use nt_core_cap::CapabilityVector;
 pub use nt_core_edit::{MicroEdit, ToolCall};
 pub use nt_core_graph::{EdgeRelation, HyperEdge, HyperGraph, HyperNode, HyperNodeType};
-pub use nt_core_hcube::aif::belief::{
-    FactorGraphBeliefPropagation, FactorialPOMDP, POMDPBeliefUpdater,
-};
+// nt_core_hcube::aif::belief: removed (empty shell)
 pub use nt_core_hcube::aif::{AiStepReport, FreeEnergyEngine, GenerativeModel, PolicyEvaluator};
 pub use nt_core_hcube::fhrr_vsa::{
     bind, bundle, bundle_two, cleanup, cleanup_always, encode_scalar, permute, random_vector,

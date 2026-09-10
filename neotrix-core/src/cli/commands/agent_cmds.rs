@@ -68,7 +68,9 @@ pub struct ProgrammaticCall { pub tool: String, pub args: serde_json::Value, pub
 pub struct ProgrammaticPlanner;
 impl ProgrammaticPlanner {
     pub fn new(_registry: &McpRegistry) -> Self { Self }
-    pub fn plan(&self, _calls: Vec<ProgrammaticCall>) -> Result<Plan, String> { unimplemented!() }
+    pub fn plan(&self, _calls: Vec<ProgrammaticCall>) -> Result<Plan, String> {
+        Err("ProgrammaticPlanner::plan not yet implemented".to_string())
+    }
 }
 pub struct Plan;
 impl Plan { pub fn stages(&self) -> usize { 0 } }

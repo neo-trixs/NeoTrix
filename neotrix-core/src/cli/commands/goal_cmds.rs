@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::l5_cognition::nt_mind::nt_mind::goal_loop::{GoalConfig, GoalTracker};
-use crate::core::nt_core_knowledge::TaskType;
+use crate::l2_perception::nt_world::nt_world_model::TaskType;
 
 // ====== /goal ======
 

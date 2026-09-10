@@ -85,8 +85,6 @@ impl ResponseParser {
                     })
                     .unwrap_or(false);
 
-                let target = if is_reasoning { thinking } else { reply };
-
                 // 提取 choices
                 if let Some(choices) = map.get("choices").and_then(|v| v.as_array()) {
                     for choice in choices {

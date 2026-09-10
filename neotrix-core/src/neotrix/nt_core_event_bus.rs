@@ -261,33 +261,51 @@ impl LayerId {
 
 fn filter_event_for_layer(event: &CoreEvent, layer: LayerId) -> bool {
     match (event, layer) {
-        // L1 (Body/I-O): task submission and agent feedback
+        // L1 (Body/I-O): task submission, agent feedback, NT-ACT actions, NT-IO events
         (CoreEvent::TaskSubmitted { .. }, LayerId::L1Body) => true,
         (CoreEvent::AgentFeedback { .. }, LayerId::L1Body) => true,
         (CoreEvent::AgentTeam { .. }, LayerId::L1Body) => true,
-        // L2 (World): external rewards
+        (CoreEvent::ActToolInvocation { .. }, LayerId::L1Body) => true,
+        (CoreEvent::ActGoalProgress { .. }, LayerId::L1Body) => true,
+        (CoreEvent::IoProviderSwitch { .. }, LayerId::L1Body) => true,
+        (CoreEvent::IoRequestError { .. }, LayerId::L1Body) => true,
+        // L2 (World): external rewards, NT-WORLD crawl/fetch events
         (CoreEvent::ExternalReward { .. }, LayerId::L2World) => true,
-        // L3 (Memory): goal completion and budget
+        (CoreEvent::WorldCrawlCompleted { .. }, LayerId::L2World) => true,
+        (CoreEvent::WorldFetchError { .. }, LayerId::L2World) => true,
+        // L3 (Memory): goal completion, budget, NT-MEMORY kb events
         (CoreEvent::GoalCompleted { .. }, LayerId::L3Memory) => true,
         (CoreEvent::BudgetExceeded { .. }, LayerId::L3Memory) => true,
+        (CoreEvent::MemoryKbWrite { .. }, LayerId::L3Memory) => true,
+        (CoreEvent::MemoryKbQuery { .. }, LayerId::L3Memory) => true,
         // L4 (Knowledge): system errors (data integrity)
         (CoreEvent::SystemError { component, .. }, LayerId::L4Knowledge) => component.contains("kb") || component.contains("store"),
-        // L5 (Reasoning): all events relevant to reasoning
+        // L5 (Reasoning): all events relevant to reasoning, NT-MIND events
         (CoreEvent::TaskSubmitted { .. }, LayerId::L5Reasoning) => true,
         (CoreEvent::GoalCompleted { .. }, LayerId::L5Reasoning) => true,
         (CoreEvent::ExternalReward { .. }, LayerId::L5Reasoning) => true,
-        // L6 (Self): meta-cognitive events
+        (CoreEvent::MindSealIteration { .. }, LayerId::L5Reasoning) => true,
+        (CoreEvent::MindDistillation { .. }, LayerId::L5Reasoning) => true,
+        (CoreEvent::GameTrainingUpdate { .. }, LayerId::L5Reasoning) => true,
+        (CoreEvent::GameConsciousnessFeedback { .. }, LayerId::L5Reasoning) => true,
+        // L6 (Self): meta-cognitive events, NT-CORE consciousness events
         (CoreEvent::AgentFeedback { .. }, LayerId::L6Self) => true,
         (CoreEvent::GoalCompleted { .. }, LayerId::L6Self) => true,
+        (CoreEvent::ConsciousnessShift { .. }, LayerId::L6Self) => true,
+        (CoreEvent::ConsciousnessCritique { .. }, LayerId::L6Self) => true,
         // L7 (Capability): agent team events
         (CoreEvent::AgentTeam { .. }, LayerId::L7Capability) => true,
-        // L8 (Autonomic): system errors and global halt
+        // L8 (Autonomic): system errors, global halt, NT-SHIELD security events
         (CoreEvent::SystemError { .. }, LayerId::L8Autonomic) => true,
         (CoreEvent::GlobalHalt { .. }, LayerId::L8Autonomic) => true,
         (CoreEvent::BudgetExceeded { .. }, LayerId::L8Autonomic) => true,
-        // L9 (Meta): all critical events
+        (CoreEvent::ShieldIntrusionDetected { .. }, LayerId::L8Autonomic) => true,
+        (CoreEvent::ShieldAuditCompleted { .. }, LayerId::L8Autonomic) => true,
+        // L9 (Meta): all critical events, NT-CORE boot
         (CoreEvent::GlobalHalt { .. }, LayerId::L9Meta) => true,
         (CoreEvent::SystemError { severity, .. }, LayerId::L9Meta) => severity == "critical",
+        (CoreEvent::CoreBootStarted { .. }, LayerId::L9Meta) => true,
+        (CoreEvent::ConsciousnessShift { .. }, LayerId::L9Meta) => true,
         _ => false,
     }
 }

@@ -47,7 +47,6 @@ pub mod search_analytics;
 
 pub mod audio;
 pub mod video;
-pub mod image;
 pub mod text;
 
 // ============================================================================
@@ -219,11 +218,6 @@ pub fn build_default_engine() -> MediaEngine {
     engine.add_source(Arc::new(video::youtube::YouTubeSource::new()), 12);
     engine.add_source(Arc::new(video::bilibili::BilibiliSource::new()), 13);
     engine.add_source(Arc::new(video::vimeo::VimeoSource::new()), 14);
-
-    engine.add_source(Arc::new(image::pexels::PexelsSource::new()), 15);
-    engine.add_source(Arc::new(image::unsplash::UnsplashSource::new()), 16);
-    engine.add_source(Arc::new(image::pixabay::PixabaySource::new()), 17);
-    engine.add_source(Arc::new(image::wikimedia::WikimediaSource::new()), 18);
 
     engine.add_source(Arc::new(text::document::arxiv::ArxivSource::new()), 19);
     engine.add_source(Arc::new(text::document::semantic_scholar::SemanticScholarSource::new()), 20);

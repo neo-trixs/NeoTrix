@@ -1578,7 +1578,8 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
         buf
     } else {
         std::fs::read_to_string(input).unwrap_or_else(|e| {
-            panic!("read node json {}: {}", input, e)
+            eprintln!("[absorb-node] ✗ failed to read {}: {}", input, e);
+            std::process::exit(1);
         })
     };
     let v: Value = serde_json::from_str(&raw).expect("node json is valid JSON");
@@ -1587,7 +1588,10 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
     let nodes: Vec<Value> = match v {
         Value::Array(arr) => arr,
         Value::Object(_) => vec![v],
-        _ => panic!("input must be a JSON object or array of objects"),
+        _ => {
+            eprintln!("[absorb-node] ✗ input must be a JSON object or array of objects");
+            std::process::exit(1);
+        }
     };
 
     // 3. 逐个处理
@@ -1787,13 +1791,19 @@ fn cmd_update_node_metadata(conn: &Connection, input: &str, dry_run: bool) {
             .expect("read stdin");
         buf
     } else {
-        std::fs::read_to_string(input).unwrap_or_else(|e| panic!("read {}: {}", input, e))
+        std::fs::read_to_string(input).unwrap_or_else(|e| {
+            eprintln!("[update-metadata] ✗ failed to read {}: {}", input, e);
+            std::process::exit(1);
+        })
     };
     let v: Value = serde_json::from_str(&raw).expect("update list is valid JSON");
     let updates: Vec<Value> = match v {
         Value::Array(arr) => arr,
         Value::Object(_) => vec![v],
-        _ => panic!("input must be a JSON array of {{node_id, patch}} objects"),
+        _ => {
+            eprintln!("[update-metadata] ✗ input must be a JSON array of {{node_id, patch}} objects");
+            std::process::exit(1);
+        }
     };
 
     let mut updated = 0usize;

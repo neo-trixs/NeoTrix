@@ -48,9 +48,9 @@ pub fn run_iteration_demo() {
     let report = agent.run();
 
     // 打印报告
-    println!("{}", report.stats);
+    println!("{:?}", report.stats);
     println!();
-    println!("{}", report.convergence_proof);
+    println!("{:?}", report.convergence_proof);
     println!();
 
     // 打印元模式

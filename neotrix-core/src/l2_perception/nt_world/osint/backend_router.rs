@@ -4,10 +4,8 @@
 use super::{OsintTarget, OsintConfig};
 use super::dns::DnsFindings;
 use super::http::HttpFindings;
-use super::fofa::FofaFindings;
 use super::dns::investigate as dns_investigate;
 use super::http::investigate as http_investigate;
-use super::fofa::investigate as fofa_investigate;
 use reqwest::Client;
 use std::pin::Pin;
 use std::future::Future;

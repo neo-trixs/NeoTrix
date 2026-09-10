@@ -428,6 +428,8 @@ impl TradeOrchestrator {
                     packaging: 0.0,
                     logistics: 0.0,
                     certification: 0.0,
+                    contingency: 0.0,
+                    total: 0.0,
                 },
             },
             negotiation_engine: NegotiationEngine::default(),

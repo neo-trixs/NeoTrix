@@ -5,6 +5,16 @@ pub mod feel;
 pub mod core_bridge;
 pub mod world;
 
+// NT-WORLD-SIM: consciousness evolution simulation
+pub mod agents;
+pub mod environment;
+pub mod consciousness;
+pub mod evolution;
+pub mod society;
+pub mod foundation;
+pub mod world_sim;
+pub mod bridge;
+
 use std::time::{Duration, Instant};
 
 pub const TICK_HZ: f64 = 50.0;

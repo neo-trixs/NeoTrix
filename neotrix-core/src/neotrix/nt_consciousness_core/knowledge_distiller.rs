@@ -238,7 +238,7 @@ impl KnowledgeDistiller {
 
     /// 计算置信度
     fn calculate_confidence(&self, content: &str) -> f64 {
-        let mut confidence = 0.5;
+        let mut confidence: f64 = 0.5;
         
         // 基于内容长度
         if content.len() > 50 {

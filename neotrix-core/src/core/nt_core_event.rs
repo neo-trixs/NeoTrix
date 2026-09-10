@@ -78,6 +78,99 @@ pub enum CoreEvent {
         emotion_label: String,
         attention_shift: String,
     },
+
+    // ── NT-CORE (E8引导者) ──────────────────────────────────────────────
+    #[serde(rename = "core_boot_started")]
+    CoreBootStarted { phase: String },
+    #[serde(rename = "core_consciousness_shift")]
+    ConsciousnessShift {
+        phi_before: f64,
+        phi_after: f64,
+        coherence: f64,
+    },
+
+    // ── NT-MIND (进化工匠) ─────────────────────────────────────────────
+    #[serde(rename = "mind_seal_iteration")]
+    MindSealIteration {
+        cycle: u64,
+        quality_delta: f64,
+        status: String,
+    },
+    #[serde(rename = "mind_distillation")]
+    MindDistillation {
+        source_skill: String,
+        output_crystal: String,
+    },
+
+    // ── NT-MEMORY (知识守护者) ─────────────────────────────────────────
+    #[serde(rename = "memory_kb_write")]
+    MemoryKbWrite {
+        namespace: String,
+        key: String,
+        bytes: u64,
+    },
+    #[serde(rename = "memory_kb_query")]
+    MemoryKbQuery {
+        namespace: String,
+        hit: bool,
+        latency_ms: f64,
+    },
+
+    // ── NT-WORLD (虚空探索者) ───────────────────────────────────────────
+    #[serde(rename = "world_crawl_completed")]
+    WorldCrawlCompleted {
+        source: String,
+        pages: u32,
+        errors: u32,
+    },
+    #[serde(rename = "world_fetch_error")]
+    WorldFetchError {
+        url: String,
+        status_code: u16,
+        retry: bool,
+    },
+
+    // ── NT-ACT (行动执行者) ────────────────────────────────────────────
+    #[serde(rename = "act_tool_invocation")]
+    ActToolInvocation {
+        tool_name: String,
+        success: bool,
+        duration_ms: f64,
+    },
+    #[serde(rename = "act_goal_progress")]
+    ActGoalProgress {
+        goal_id: String,
+        progress: f64,
+        milestone: String,
+    },
+
+    // ── NT-IO (界面使徒) ──────────────────────────────────────────────
+    #[serde(rename = "io_provider_switch")]
+    IoProviderSwitch {
+        from: String,
+        to: String,
+        reason: String,
+    },
+    #[serde(rename = "io_request_error")]
+    IoRequestError {
+        provider: String,
+        error: String,
+        retry_count: u32,
+    },
+
+    // ── NT-SHIELD (影卫) ──────────────────────────────────────────────
+    #[serde(rename = "shield_intrusion_detected")]
+    ShieldIntrusionDetected {
+        source_ip: String,
+        rule: String,
+        severity: String,
+    },
+    #[serde(rename = "shield_audit_completed")]
+    ShieldAuditCompleted {
+        dimensions: u32,
+        findings: u32,
+        score: f64,
+    },
 }
 
 // ── Backward-compatible type aliases ──────────────────────────────────────
@@ -317,6 +410,28 @@ impl CoreEvent {
         match self {
             Self::ConsciousnessCritique { consistency, .. } => *consistency,
             _ => 0.0,
+        }
+    }
+
+    /// Domain tag — identifies which NT-* domain originated the event.
+    pub fn domain(&self) -> &str {
+        match self {
+            Self::CoreBootStarted { .. } | Self::ConsciousnessShift { .. } => "nt_core",
+            Self::MindSealIteration { .. } | Self::MindDistillation { .. } => "nt_mind",
+            Self::MemoryKbWrite { .. } | Self::MemoryKbQuery { .. } => "nt_memory",
+            Self::WorldCrawlCompleted { .. } | Self::WorldFetchError { .. } => "nt_world",
+            Self::ActToolInvocation { .. } | Self::ActGoalProgress { .. } => "nt_act",
+            Self::IoProviderSwitch { .. } | Self::IoRequestError { .. } => "nt_io",
+            Self::ShieldIntrusionDetected { .. } | Self::ShieldAuditCompleted { .. } => "nt_shield",
+            Self::TaskSubmitted { .. } | Self::AgentFeedback { .. } | Self::AgentTeam { .. } => "nt_act",
+            Self::ExternalReward { .. } => "nt_world",
+            Self::GoalCompleted { .. } | Self::BudgetExceeded { .. } => "nt_memory",
+            Self::SystemError { .. } | Self::GlobalHalt { .. } => "nt_core",
+            Self::ConsciousnessCritique { .. } => "nt_core",
+            Self::GameSessionCreated { .. }
+            | Self::GameEpisodeCompleted { .. }
+            | Self::GameTrainingUpdate { .. }
+            | Self::GameConsciousnessFeedback { .. } => "nt_mind",
         }
     }
 }
