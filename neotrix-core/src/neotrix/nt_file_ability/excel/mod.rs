@@ -1,4 +1,4 @@
-mod tables;
+pub mod tables;
 mod xlsx_fast;
 mod xlsx_parser;
 mod excel_tool_schema;

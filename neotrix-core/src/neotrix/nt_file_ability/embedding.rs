@@ -32,7 +32,7 @@ pub fn content_similarity(
 ) -> Result<f64> {
     let a = FileAbility::open(path_a)?;
     let b = FileAbility::open(path_b)?;
-    let dim = engine.dimensions();
+    let _dim = engine.dimensions();
     let va = embed_text(&a.plain_text(), engine);
     let vb = embed_text(&b.plain_text(), engine);
     Ok(engine.similarity(&va, &vb))

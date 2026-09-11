@@ -10,9 +10,9 @@
 
 use nt_core_capability_tree::{CapabilityNode, Domain, NodeLayer};
 
-use super::crate::neotrix::nt_file_ability::config_parser::ConfigFields;
-use super::crate::neotrix::nt_file_ability::path_metadata::PathMetadata;
-use super::crate::neotrix::nt_file_ability::template_engine::{ColumnMap, TemplateType};
+use crate::neotrix::nt_file_ability::config_parser::ConfigFields;
+use crate::neotrix::nt_file_ability::path_metadata::PathMetadata;
+use crate::neotrix::nt_file_ability::template_engine::{ColumnMap, TemplateType};
 use crate::neotrix::nt_file_ability::types::TableData;
 use super::super::{config_parser, path_metadata, template_engine};
 use super::super::excel::{tables, xlsx_parser};

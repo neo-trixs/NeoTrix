@@ -60,7 +60,7 @@ impl SelfTest for ExcelSelfTest {
         }
 
         // 4. TablePresenter
-        let table = super::types::TableData {
+        let table = crate::neotrix::nt_file_ability::types::TableData {
             name: "test".into(),
             headers: vec!["A".into(), "B".into()],
             rows: vec![vec!["1".into(), "2".into()]],
@@ -124,7 +124,7 @@ mod tests {
             headers: vec!["A".into()],
             rows: vec![vec!["1".into()]],
         };
-        let chunks = super::crate::neotrix::nt_file_ability::chunk_planner::chunk_table(&table);
+        let chunks = crate::neotrix::nt_file_ability::chunk_planner::chunk_table(&table);
         assert!(!chunks.is_empty(), "chunk_table 应返回非空分块");
     }
 
