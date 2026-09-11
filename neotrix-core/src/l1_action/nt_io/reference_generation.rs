@@ -117,6 +117,7 @@ pub struct GenerationResult {
 
 /// 基于参考的生成器
 /// 实现图生图、视频生成、风格迁移等能力
+#[derive(Debug)]
 pub struct ReferenceBasedGeneration {
     /// 生成配置
     config: GenerationConfig,

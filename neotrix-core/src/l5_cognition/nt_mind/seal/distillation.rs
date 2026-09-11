@@ -98,6 +98,7 @@ pub struct DistillationResult {
 ///
 /// 核心思路：对比成功轨迹与失败轨迹的步骤模式，
 /// 提取成功特征作为模板，提取失败特征作为反模式。
+#[derive(Debug)]
 pub struct DistillationEngine {
     /// 已生成的技能模板
     templates: Vec<SkillTemplate>,

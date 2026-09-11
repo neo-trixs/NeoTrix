@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 
 /// 上下文来源信任级别
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
 #[allow(dead_code)]
 pub enum TrustLevel {
     /// 系统内部（完全信任）

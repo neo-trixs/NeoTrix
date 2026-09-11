@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 /// 工作流记忆（完整的任务执行流程）
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct WorkflowMemory {
     pub id: String,
     pub task: String,
@@ -17,6 +18,7 @@ pub struct WorkflowMemory {
 
 /// 工作流步骤
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct WorkflowStep {
     pub action: String,
     pub tool: String,
@@ -27,6 +29,7 @@ pub struct WorkflowStep {
 
 /// 子任务记忆（单个子任务的执行记录）
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct SubtaskMemory {
     pub id: String,
     pub parent_workflow: String,
@@ -39,6 +42,7 @@ pub struct SubtaskMemory {
 
 /// 函数记忆（工具/函数的使用模式）
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct FunctionMemory {
     pub function_name: String,
     pub call_count: u32,
@@ -50,6 +54,7 @@ pub struct FunctionMemory {
 
 /// 三类记忆存储
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct TripleMemoryStore {
     workflows: Vec<WorkflowMemory>,
     subtasks: Vec<SubtaskMemory>,

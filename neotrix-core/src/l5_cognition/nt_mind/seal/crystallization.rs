@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 /// 结晶状态
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum CrystallizationStatus {
     /// 模板阶段（成功 < 3 次）
     Template { success_count: u32 },
@@ -72,6 +73,7 @@ pub struct CrystallizationStats {
 
 /// 技能结晶引擎 — 监控模板成功率，自动结晶为正式技能
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct CrystallizationEngine {
     /// 待结晶模板 (template_id → success_count)
     candidates: HashMap<String, u32>,

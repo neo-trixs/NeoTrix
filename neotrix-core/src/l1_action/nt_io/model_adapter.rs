@@ -101,6 +101,7 @@ pub struct ModelAdapterConfig {
 /// 模型适配器
 /// 统一管理 LoRA、IP-Adapter、ControlNet 等模型
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct ModelAdapter {
     /// 配置
     config: ModelAdapterConfig,

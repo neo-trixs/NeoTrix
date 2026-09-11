@@ -156,6 +156,7 @@ pub struct GraphStats {
 /// 5. **审核决策** — `approve_edit` / `reject_edit` 控制进化方向
 /// 6. **反模式** — 被拒绝的编辑自动积累为反模式知识
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct ProceduralGraph {
     /// 技能节点（ID → 节点）
     nodes: HashMap<String, SkillNode>,

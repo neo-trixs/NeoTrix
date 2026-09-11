@@ -172,6 +172,7 @@ pub struct ModelState {
 
 /// 多模型路由器
 /// 统一接口适配多模型
+#[derive(Debug)]
 pub struct ModelRoutingLayer {
     /// 路由配置
     config: RoutingConfig,

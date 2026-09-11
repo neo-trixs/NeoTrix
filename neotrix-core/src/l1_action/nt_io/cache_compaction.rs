@@ -3,7 +3,7 @@
 //! 当缓存命中率高时，保留缓存相关内容；命中率低时，激进压缩。
 
 /// 缓存条目
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct CacheEntry {
     pub key: String,
@@ -16,6 +16,7 @@ pub struct CacheEntry {
 
 /// 压缩策略
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum CompactionStrategy {
     /// 保守：只压缩低命中内容
     Conservative,
@@ -27,6 +28,7 @@ pub enum CompactionStrategy {
 
 /// 压缩结果
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct CompactionResult {
     pub before_tokens: usize,
     pub after_tokens: usize,
@@ -37,6 +39,7 @@ pub struct CompactionResult {
 
 /// Cache-Aware 压缩器
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct CacheCompactor {
     entries: Vec<CacheEntry>,
     strategy: CompactionStrategy,

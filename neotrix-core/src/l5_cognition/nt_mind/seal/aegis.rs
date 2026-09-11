@@ -4,7 +4,7 @@
 
 /// 执行轨迹（Digest 输入）
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExecutionTrace {
     pub trace_id: String,
     pub task: String,
@@ -14,7 +14,7 @@ pub struct ExecutionTrace {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TraceStep {
     pub action: String,
     pub input: String,
@@ -25,7 +25,7 @@ pub struct TraceStep {
 
 /// Digest 输出（压缩轨迹）
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TraceDigest {
     pub trace_id: String,
     pub task_summary: String,
@@ -37,7 +37,7 @@ pub struct TraceDigest {
 
 /// 适应景观（Planner 输出）
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AdaptationLandscape {
     pub dimensions: Vec<AdaptationDimension>,
     pub current_position: Vec<f64>,
@@ -46,7 +46,7 @@ pub struct AdaptationLandscape {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AdaptationDimension {
     pub name: String,
     pub current_value: f64,
@@ -56,7 +56,7 @@ pub struct AdaptationDimension {
 
 /// 类型化编辑（Evolver 输出）
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TypedEdit {
     pub edit_id: String,
     pub edit_type: EditType,
@@ -67,7 +67,7 @@ pub struct TypedEdit {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum EditType {
     PromptModification,
     ToolSelectionChange,
@@ -78,7 +78,7 @@ pub enum EditType {
 
 /// Critic 评估
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CriticAssessment {
     pub edit_id: String,
     pub supported: bool,
@@ -89,6 +89,7 @@ pub struct CriticAssessment {
 
 /// AEGIS 进化引擎
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct AegisEngine {
     traces: Vec<ExecutionTrace>,
     digests: Vec<TraceDigest>,
@@ -293,6 +294,7 @@ impl AegisEngine {
 
 #[derive(Clone)]
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct AegisStats {
     pub traces: usize,
     pub digests: usize,

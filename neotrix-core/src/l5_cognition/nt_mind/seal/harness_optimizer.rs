@@ -3,10 +3,9 @@
 //! Action Fusion + ObservationPack + Online Context Compact + Evidence-Preserving Reducer。
 //! 实现 45-64% token 节省，保持 94% 质量。
 
-
-
 /// 工具调用
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct ToolCall {
     pub tool_name: String,
     pub input: String,
@@ -16,6 +15,7 @@ pub struct ToolCall {
 
 /// 融合后的动作
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct FusedAction {
     pub tools: Vec<String>,
     pub fused_input: String,
@@ -27,6 +27,7 @@ pub struct FusedAction {
 
 /// 观测包（压缩后的观测）
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct ObservationPack {
     pub tool_name: String,
     pub compressed_output: String,
@@ -38,6 +39,7 @@ pub struct ObservationPack {
 
 /// 上下文压缩结果
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct CompactionResult {
     pub before_tokens: usize,
     pub after_tokens: usize,
@@ -47,6 +49,7 @@ pub struct CompactionResult {
 
 /// Harness 优化器
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct HarnessOptimizer {
     /// 融合阈值（连续相同工具调用数量 >= 阈值时融合）
     fusion_threshold: usize,
@@ -58,6 +61,7 @@ pub struct HarnessOptimizer {
 
 /// 优化记录
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub struct OptimizationRecord {
     pub timestamp: i64,
     pub action_count: usize,
@@ -234,6 +238,9 @@ impl HarnessOptimizer {
             return (0, 0.0);
         }
         let total_savings: f64 = self.history.iter().map(|r| r.savings).sum();
-        (self.history.len(), total_savings / self.history.len() as f64)
+        (
+            self.history.len(),
+            total_savings / self.history.len() as f64,
+        )
     }
 }
