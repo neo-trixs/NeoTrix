@@ -490,7 +490,7 @@ impl SelfImprovementLoop {
     fn actions_for_dimension(
         &self,
         dimension: &ImprovementDimension,
-        issue: &DiagnosticIssue,
+        _issue: &DiagnosticIssue,
     ) -> Vec<ImprovementAction> {
         match dimension {
             ImprovementDimension::AttentionWeight => vec![ImprovementAction {
