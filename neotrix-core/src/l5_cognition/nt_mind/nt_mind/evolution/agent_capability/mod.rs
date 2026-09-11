@@ -18,7 +18,7 @@ use crate::core::nt_core_self::attention_head::{
 use crate::l5_cognition::kb_facade::KnowledgeBase;
 use crate::core::nt_core_kb_types::NodeType;
 use crate::l5_cognition::nt_mind::nt_mind::seal_core::core::PerformanceEvaluator;
-use crate::l2_perception::nt_world::nt_world_search::{SearchResult, UnifiedSearch};
+use crate::l5_cognition::l2_facade::{SearchResult, UnifiedSearch};
 use crate::l5_cognition::nt_mind::nt_mind::SelfIteratingBrain;
 use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
 use super::co_evolution::{CoEvoConfig, CoEvolutionLoop};

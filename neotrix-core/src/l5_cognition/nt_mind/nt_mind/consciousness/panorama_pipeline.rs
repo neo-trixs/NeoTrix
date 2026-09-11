@@ -6,7 +6,7 @@ use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_edit::MicroEdit;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
-use crate::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
+use crate::l5_cognition::l2_facade::WorldModelV2;
 use crate::core::nt_core_knowledge::TaskType;
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
 use crate::core::nt_core_iit_phi::PhiReport;
@@ -295,7 +295,7 @@ mod tests {
     use super::*;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
     use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
-    use crate::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
+use crate::l5_cognition::l2_facade::WorldModelV2;
 
     #[test]
     fn test_resonance_activation() {

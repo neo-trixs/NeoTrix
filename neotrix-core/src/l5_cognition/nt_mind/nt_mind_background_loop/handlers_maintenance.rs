@@ -639,7 +639,7 @@ impl BackgroundLoopHandle {
     /// ① 消费 novel_queue(外部起点采集器入队) → ingest_qidian_book;
     /// ② 离线为既有 Book 节点补世界观分类。
     pub(crate) async fn handle_novel_ingest(&mut self) {
-        use crate::l2_perception::nt_world::nt_world_novel::{drain_novel_queue, classify_unanalyzed_books};
+        use crate::l5_cognition::l2_facade::{drain_novel_queue, classify_unanalyzed_books};
         let kb = match self.kb_pipeline.kb.as_ref() {
             Some(kb) => kb,
             None => { log::warn!("[bg] novel_ingest: kb not attached"); return; }

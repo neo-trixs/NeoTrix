@@ -1195,7 +1195,7 @@ mod tests {
     use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
     use crate::l5_cognition::nt_mind::nt_mind::goal_loop::GoalLoop;
     use crate::l5_cognition::nt_mind::nt_mind::self_iterating::SelfIteratingBrain;
-    use crate::neotrix::nt_world_model_v2::WorldModelV2;
+    use crate::l5_cognition::l2_facade::WorldModelV2;
 
     #[test]
     fn test_panorama_pipeline_new() {

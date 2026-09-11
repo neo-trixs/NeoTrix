@@ -12,7 +12,7 @@ use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonit
 use self::always_on::AlwaysOnEngine;
 use crate::l5_cognition::nt_mind::foundation::cleanup_engine::CleanupEngine;
 use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
-use crate::l2_perception::nt_world::nt_world_model_v2::WorldModelV2;
+use crate::l5_cognition::l2_facade::WorldModelV2;
 use crate::l5_cognition::nt_mind::evolution::evolution_daemon::{EvolutionDaemon, EvolutionConfig};
 use crate::l5_cognition::nt_mind::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::l5_cognition::nt_mind::nt_mind::exploration_pipeline::ExplorationPipeline;
