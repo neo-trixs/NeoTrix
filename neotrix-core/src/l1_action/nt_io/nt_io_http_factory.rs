@@ -41,7 +41,6 @@ pub const CONNECT_TIMEOUT_SECS: u64 = 10;
 pub const REQUEST_TIMEOUT_SECS: u64 = 60;
 
 /// 全局异步 HTTP 客户端（惰性初始化，自带连接池）
-// TODO: inject via DI — pass reqwest::Client through subsystem constructors where feasible
 pub fn global_client() -> &'static reqwest::Client {
     static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         build_async_client_with_tls(TlsVariant::ModernH2, None)
@@ -49,8 +48,16 @@ pub fn global_client() -> &'static reqwest::Client {
     &CLIENT
 }
 
+/// 获取异步 HTTP 客户端 (DI-ready: 可从容器注入)
+pub fn resolve_async_client() -> reqwest::Client {
+    use crate::core::nt_core_di;
+    if let Some(v) = nt_core_di::resolve_global::<reqwest::Client>() {
+        return v;
+    }
+    global_client().clone()
+}
+
 /// 全局阻塞 HTTP 客户端
-// TODO: inject via DI — pass reqwest::blocking::Client through subsystem constructors
 pub fn global_blocking_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
         reqwest::blocking::Client::builder()
@@ -67,6 +74,15 @@ pub fn global_blocking_client() -> &'static reqwest::blocking::Client {
             })
     });
     &CLIENT
+}
+
+/// 获取阻塞 HTTP 客户端 (DI-ready: 可从容器注入)
+pub fn resolve_blocking_client() -> reqwest::blocking::Client {
+    use crate::core::nt_core_di;
+    if let Some(v) = nt_core_di::resolve_global::<reqwest::blocking::Client>() {
+        return v;
+    }
+    global_blocking_client().clone()
 }
 
 /// 构建自定义异步客户端

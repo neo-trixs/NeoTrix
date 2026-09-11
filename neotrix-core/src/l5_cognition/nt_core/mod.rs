@@ -23,3 +23,4 @@ pub mod nt_core_xai;
 pub mod nt_core_parallel;
 pub mod seal;
 pub mod hybrid_layer;
+pub mod persona_routing;

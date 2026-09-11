@@ -143,6 +143,7 @@ pub mod nt_core_observer_error;
 // ═══════════════════════════════════════════════════════════════════
 // 核心基础设施 (跨层共用)
 // ═══════════════════════════════════════════════════════════════════
+pub mod nt_core_di;
 pub mod nt_core_accessor;
 pub mod nt_core_axiom_tree;
 pub mod nt_core_cap;
@@ -372,6 +373,9 @@ pub use nt_core_traits::{
     SealResult, SessionProvider, ToolDef, ToolOutput, ToolProvider,
 };
 pub use nt_core_ws::WORKSPACE_MANAGER;
+
+// --- 基础设施: DI 容器 ---
+pub use nt_core_di::{Container, global_container, register_global, resolve_global};
 
 // --- 基础设施: 统一资源池 ---
 pub use nt_core_resource_pool::{

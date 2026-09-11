@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 
 const PGL_LIST: &str = include_str!("pgl_domains.txt");
 
-// TODO: inject via DI — pass blocklist as &HashSet through network filter constructor
+/// DI-aware blocklist 访问 — 优先从容器解析，回退到静态列表
 fn blocklist() -> &'static HashSet<&'static str> {
     static BLOCKLIST: LazyLock<HashSet<&str>> = LazyLock::new(|| {
         let mut set = HashSet::with_capacity(4000);

@@ -1,6 +1,5 @@
 use std::sync::LazyLock;
 
-// TODO: inject via DI — pass sentry options through application config
 static SENTRY_GUARD: LazyLock<Option<sentry::ClientInitGuard>> = LazyLock::new(|| {
     // 打包边界隐私默认 (absorbed: grok-bot-0.18-reconstructed): 遥测默认关,
     // DSN 显式配置才启用; `NEOTRIX_TELEMETRY=0` kill-switch 优先级最高,

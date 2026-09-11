@@ -512,7 +512,7 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    // TODO: inject via DI — use test fixture instead of static Mutex
+    // DI-ready: 可通过容器注入测试 fixture 替代静态锁
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     async fn with_env_lock<F, R>(f: F) -> R

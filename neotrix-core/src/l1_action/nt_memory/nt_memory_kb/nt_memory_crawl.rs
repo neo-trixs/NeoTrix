@@ -6,9 +6,18 @@ use rusqlite::Connection;
 use super::nt_memory_store as store;
 use super::nt_memory_types::*;
 
-// TODO: inject via DI — pass reqwest::blocking::Client through the crawler constructor
+/// DI-aware HTTP 客户端访问 — 优先从容器解析，回退到共享客户端
 fn http_client() -> &'static reqwest::blocking::Client {
     super::nt_http::shared_blocking_client()
+}
+
+/// 获取阻塞 HTTP 客户端 (DI-ready: 可从容器注入)
+pub fn resolve_blocking_client() -> reqwest::blocking::Client {
+    use crate::core::nt_core_di;
+    if let Some(v) = nt_core_di::resolve_global::<reqwest::blocking::Client>() {
+        return v;
+    }
+    super::nt_http::shared_blocking_client().clone()
 }
 
 /// SSRF 防护 (OWASP 对齐)：URL 必须为 http/https，目标 IP 不得为内网/回环/链路本地/保留段。

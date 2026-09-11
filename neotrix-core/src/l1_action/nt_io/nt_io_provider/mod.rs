@@ -35,13 +35,13 @@ pub mod universal_adapter;
 pub use universal_adapter::{
     UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,
     OpenAiConverter, AnthropicConverter, GeminiConverter,
-    UnifiedRequest, UnifiedResponse, Message, Tool, ToolCall,
+    UnifiedRequest, UnifiedResponse,
 };
 
 // Re-export 核心类型
 pub use types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, Tool,
-    ToolCallFunction, ToolCallInfo, Usage,
+    ToolCall, ToolCallFunction, ToolCallInfo, Usage,
 };
 
 // Re-export Token 预算引擎 (上下文压缩, AgentLoop/neocodex 共享)

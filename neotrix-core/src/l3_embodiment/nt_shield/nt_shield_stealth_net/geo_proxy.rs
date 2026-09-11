@@ -24,10 +24,24 @@ use tokio::sync::RwLock;
 /// DNS Geo 缓存: domain → (is_china, timestamp)
 /// TTL 300s，超时自动驱逐。
 const GEO_CACHE_TTL_SECS: u64 = 300;
-// TODO: inject via DI — move GEO_CACHE into a struct that implements lookup
 static GEO_CACHE: LazyLock<std::sync::Mutex<HashMap<String, (bool, Instant)>>> = LazyLock::new(|| {
     std::sync::Mutex::new(HashMap::new())
 });
+
+/// DI-aware 缓存访问 — 优先从容器解析，回退到静态缓存
+fn get_geo_cache() -> std::sync::Mutex<HashMap<String, (bool, Instant)>> {
+    use crate::core::nt_core_di;
+    if let Some(cached) = nt_core_di::resolve_global::<std::sync::Mutex<HashMap<String, (bool, Instant)>>>() {
+        return cached;
+    }
+    match GEO_CACHE.lock() {
+        Ok(m) => return std::sync::Mutex::new(m.clone()),
+        Err(e) => {
+            log::warn!("[geo] cache lock: {}", e);
+        }
+    }
+    std::sync::Mutex::new(HashMap::new())
+}
 
 fn geo_cache_get(domain: &str) -> Option<bool> {
     let mut map = match GEO_CACHE.lock() {
@@ -188,7 +202,6 @@ impl DomainRules {
 
 // ==================== 全局状态 ====================
 
-// TODO: inject via DI — pass GeoDatabase and DomainRules through stealth-net context
 pub static GLOBAL_GEO: LazyLock<Arc<RwLock<GeoDatabase>>> = LazyLock::new(|| {
     Arc::new(RwLock::new(GeoDatabase::new()))
 });
@@ -197,10 +210,18 @@ pub static GLOBAL_DOMAINS: LazyLock<Arc<RwLock<DomainRules>>> = LazyLock::new(||
 });
 
 pub fn global_geo() -> Arc<RwLock<GeoDatabase>> {
+    use crate::core::nt_core_di;
+    if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<GeoDatabase>>>() {
+        return v;
+    }
     GLOBAL_GEO.clone()
 }
 
 pub fn global_domains() -> Arc<RwLock<DomainRules>> {
+    use crate::core::nt_core_di;
+    if let Some(v) = nt_core_di::resolve_global::<Arc<RwLock<DomainRules>>>() {
+        return v;
+    }
     GLOBAL_DOMAINS.clone()
 }
 

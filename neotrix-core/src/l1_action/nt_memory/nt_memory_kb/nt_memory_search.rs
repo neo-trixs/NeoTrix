@@ -729,6 +729,302 @@ pub fn fuse_signals(
     results
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// P0: SmartVector 4-Signal Scoring
+// ═══════════════════════════════════════════════════════════════════
+// Semantic (FTS/BM25/embedding) + Temporal (freshness) + Confidence (epistemic)
+// + Relational (graph topology) fused via configurable linear weights.
+
+/// Configurable weights for the 4 SmartVector scoring signals.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmartVectorWeights {
+    /// Semantic relevance (FTS + BM25 + embedding cosine)
+    pub semantic: f64,
+    /// Temporal freshness (decay from last update)
+    pub temporal: f64,
+    /// Epistemic confidence (from ConfidenceStore aggregate)
+    pub confidence: f64,
+    /// Relational strength (graph edge density + PageRank trust)
+    pub relational: f64,
+}
+
+impl Default for SmartVectorWeights {
+    fn default() -> Self {
+        Self {
+            semantic: 0.50,
+            temporal: 0.15,
+            confidence: 0.20,
+            relational: 0.15,
+        }
+    }
+}
+
+impl SmartVectorWeights {
+    /// Normalize weights to sum to 1.0 for convex combination.
+    pub fn normalized(&self) -> Self {
+        let sum = self.semantic + self.temporal + self.confidence + self.relational;
+        if sum <= 0.0 {
+            return Self::default();
+        }
+        Self {
+            semantic: self.semantic / sum,
+            temporal: self.temporal / sum,
+            confidence: self.confidence / sum,
+            relational: self.relational / sum,
+        }
+    }
+}
+
+/// Compute temporal freshness score for a node.
+/// Uses exponential decay from `updated_at` with configurable half-life.
+/// Returns [0.0, 1.0] where 1.0 = just updated, approaching 0.0 for old nodes.
+pub fn temporal_score(updated_at: i64, now: i64, half_life_secs: i64) -> f64 {
+    if half_life_secs <= 0 {
+        return 1.0;
+    }
+    let age = now.saturating_sub(updated_at).max(0);
+    0.5_f64.powf(age as f64 / half_life_secs as f64)
+}
+
+/// Compute confidence score from ConfidenceStore aggregate.
+/// Maps the epistemic confidence [0.0, 1.0] directly.
+/// Falls back to node.confidence if ConfidenceStore lookup fails.
+pub fn confidence_score(
+    node_confidence: f64,
+    store_confidence: Option<f64>,
+) -> f64 {
+    store_confidence.unwrap_or(node_confidence).max(0.0).min(1.0)
+}
+
+/// Compute relational score from graph edge count and weights.
+/// More edges with higher weights → higher relational score.
+/// Uses logarithmic scaling to prevent degree-1000 hub domination.
+pub fn relational_score(edge_count: usize, total_weight: f64) -> f64 {
+    if edge_count == 0 {
+        return 0.0;
+    }
+    // Logarithmic degree + normalized weight component
+    let degree_component = (1.0 + edge_count as f64).ln() / 5.0; // ln(33) ≈ 3.5 for 32 edges
+    let weight_component = (total_weight / edge_count as f64).min(1.0);
+    (degree_component * 0.6 + weight_component * 0.4).min(1.0)
+}
+
+/// Result of SmartVector 4-signal scoring for a single node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmartVectorScore {
+    pub node_id: String,
+    pub fused_score: f64,
+    pub semantic: f64,
+    pub temporal: f64,
+    pub confidence: f64,
+    pub relational: f64,
+}
+
+/// SmartVector scorer — computes 4-signal scores for search results.
+pub struct SmartVectorScorer {
+    pub weights: SmartVectorWeights,
+    pub half_life_secs: i64,
+}
+
+impl Default for SmartVectorScorer {
+    fn default() -> Self {
+        Self {
+            weights: SmartVectorWeights::default(),
+            half_life_secs: 7 * 24 * 3600, // 7 days
+        }
+    }
+}
+
+impl SmartVectorScorer {
+    pub fn new(weights: SmartVectorWeights, half_life_secs: i64) -> Self {
+        Self {
+            weights: weights.normalized(),
+            half_life_secs,
+        }
+    }
+
+    /// Score a batch of search results using 4-signal fusion.
+    /// Requires a connection to query graph edges per node and ConfidenceStore lookup.
+    pub fn score_results(
+        &self,
+        results: &[SearchResult],
+        conn: &Connection,
+    ) -> Vec<SmartVectorScore> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        // Batch-fetch edge counts and weights for all node IDs
+        let node_ids: Vec<&str> = results.iter().map(|r| r.node.id.as_str()).collect();
+        let edge_map = batch_edge_stats(conn, &node_ids);
+
+        // Load ConfidenceStore if available (best-effort, non-fatal)
+        let confidence_store: Option<super::nt_memory_confidence::ConfidenceStore> =
+            load_confidence_store_from_conn(conn);
+
+        results
+            .iter()
+            .map(|r| {
+                let sem = r.score.max(0.0).min(1.0);
+                let temp = temporal_score(r.node.updated_at, now, self.half_life_secs);
+
+                let store_conf = confidence_store.as_ref().and_then(|cs| {
+                    cs.get_confidence_by_str(&r.node.id).ok().flatten()
+                }).map(|ec| ec.aggregate());
+                let conf = confidence_score(r.node.confidence, store_conf);
+
+                let (edge_count, total_weight) = edge_map.get(&r.node.id).copied().unwrap_or((0, 0.0));
+                let rel = relational_score(edge_count, total_weight);
+
+                let fused = self.weights.semantic * sem
+                    + self.weights.temporal * temp
+                    + self.weights.confidence * conf
+                    + self.weights.relational * rel;
+
+                SmartVectorScore {
+                    node_id: r.node.id.clone(),
+                    fused_score: fused,
+                    semantic: sem,
+                    temporal: temp,
+                    confidence: conf,
+                    relational: rel,
+                }
+            })
+            .collect()
+    }
+}
+
+/// Batch-fetch edge statistics for multiple nodes in one query.
+fn batch_edge_stats(
+    conn: &Connection,
+    node_ids: &[&str],
+) -> HashMap<String, (usize, f64)> {
+    if node_ids.is_empty() {
+        return HashMap::new();
+    }
+    let placeholders: Vec<String> = node_ids.iter().enumerate()
+        .map(|(i, _)| format!("?{}", i + 1))
+        .collect();
+    let sql = format!(
+        "SELECT node_id, COUNT(*) as cnt, COALESCE(SUM(weight), 0.0) as total_w FROM (
+            SELECT source_id as node_id, weight FROM edges WHERE target_id IN ({})
+            UNION ALL
+            SELECT target_id as node_id, weight FROM edges WHERE source_id IN ({})
+        ) GROUP BY node_id",
+        placeholders.join(","),
+        placeholders.join(","),
+    );
+    let mut result = HashMap::new();
+    if let Ok(mut stmt) = conn.prepare(&sql) {
+        let mut all_ids: Vec<&dyn rusqlite::types::ToSql> = Vec::with_capacity(node_ids.len() * 2);
+        for id in node_ids {
+            all_ids.push(id);
+        }
+        for id in node_ids {
+            all_ids.push(id);
+        }
+        if let Ok(rows) = stmt.query_map(all_ids.as_slice(), |row| {
+            let id: String = row.get(0)?;
+            let cnt: i64 = row.get(1)?;
+            let total_w: f64 = row.get(2)?;
+            Ok((id, cnt as usize, total_w))
+        }) {
+            for r in rows.filter_map(|r| r.ok()) {
+                result.insert(r.0, (r.1, r.2));
+            }
+        }
+    }
+    result
+}
+
+/// Best-effort load ConfidenceStore from KB conn (kv_store persistence).
+fn load_confidence_store_from_conn(
+    conn: &Connection,
+) -> Option<super::nt_memory_confidence::ConfidenceStore> {
+    let data: Option<String> = conn.query_row(
+        "SELECT value FROM kv_store WHERE namespace = 'confidence' AND key = 'store'",
+        [],
+        |row| row.get(0),
+    ).ok();
+    data.and_then(|d| serde_json::from_str(&d).ok())
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// P0: CraniMEM Gating Mechanism
+// ═══════════════════════════════════════════════════════════════════
+// Goal-conditioned input filtering for GWT salience.
+// Filters sensory events based on current active goals, preventing
+// irrelevant stimuli from consuming attention bandwidth.
+
+/// Goal-conditioned gating for sensory input.
+/// Each goal has associated keywords/topics; events are scored by
+/// relevance to active goals before entering GWT salience computation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CraniMEMGate {
+    /// Active goals with associated relevance keywords
+    pub active_goals: Vec<GoalContext>,
+    /// Minimum relevance threshold to pass the gate (0.0 = all pass)
+    pub threshold: f64,
+    /// Emergency override: when true, all events pass (e.g. system alerts)
+    pub emergency_override: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalContext {
+    pub goal_id: String,
+    pub keywords: Vec<String>,
+    pub weight: f64,
+}
+
+impl Default for CraniMEMGate {
+    fn default() -> Self {
+        Self {
+            active_goals: Vec::new(),
+            threshold: 0.1,
+            emergency_override: false,
+        }
+    }
+}
+
+impl CraniMEMGate {
+    /// Compute gating score for a sensory event description.
+    /// Returns (passed, score) — score in [0.0, 1.0], passed = score >= threshold.
+    pub fn gate_event(&self, event_description: &str) -> (bool, f64) {
+        if self.emergency_override || self.active_goals.is_empty() {
+            return (true, 1.0);
+        }
+        let desc_lower = event_description.to_lowercase();
+        let max_relevance: f64 = self.active_goals.iter().map(|g| {
+            let keyword_hits = g.keywords.iter()
+                .filter(|kw| desc_lower.contains(&kw.to_lowercase()))
+                .count();
+            if keyword_hits == 0 {
+                0.0
+            } else {
+                g.weight * (keyword_hits as f64 / g.keywords.len() as f64).min(1.0)
+            }
+        }).fold(0.0, f64::max);
+        (max_relevance >= self.threshold, max_relevance)
+    }
+
+    /// Filter a batch of sensory events, returning only those that pass the gate.
+    pub fn filter_events(&self, events: Vec<(String, f64)>) -> Vec<(String, f64)> {
+        events.into_iter()
+            .filter(|(desc, _)| self.gate_event(desc).0)
+            .collect()
+    }
+
+    /// Update active goals (called by task dispatcher / goal loop).
+    pub fn set_goals(&mut self, goals: Vec<GoalContext>) {
+        self.active_goals = goals;
+    }
+
+    /// Set emergency override (system alerts bypass gating).
+    pub fn set_emergency(&mut self, active: bool) {
+        self.emergency_override = active;
+    }
+}
 
 // ── FTS5 Optimization Configuration (absorbed from ZSTD+FTS5 180,000× pattern 2026) ──
 pub struct Fts5OptimizerConfig {

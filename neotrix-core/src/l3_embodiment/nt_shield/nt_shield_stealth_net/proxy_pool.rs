@@ -685,9 +685,13 @@ impl ResourcePool for ProxyPool {
     }
 }
 
-// TODO: inject via DI — pass Arc<ProxyPool> through proxy subsystem constructor
+/// DI-aware 代理池访问 — 优先从容器解析，回退到静态池
 pub fn global_pool() -> Arc<ProxyPool> {
     static POOL: LazyLock<Arc<ProxyPool>> = LazyLock::new(|| Arc::new(ProxyPool::new()));
+    use crate::core::nt_core_di;
+    if let Some(v) = nt_core_di::resolve_global::<Arc<ProxyPool>>() {
+        return v;
+    }
     POOL.clone()
 }
 #[cfg(test)]
