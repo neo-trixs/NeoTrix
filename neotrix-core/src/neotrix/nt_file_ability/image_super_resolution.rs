@@ -1164,6 +1164,7 @@ impl ModelRegistry {
     }
 
     /// 下载模型 (如果尚未缓存)
+    #[cfg(feature = "onnx")]
     pub fn ensure_model(
         model: &SuperResolutionModel,
         cache_dir: &Path,
