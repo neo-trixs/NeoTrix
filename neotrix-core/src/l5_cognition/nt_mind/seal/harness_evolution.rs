@@ -4,7 +4,7 @@
 
 /// 可验证环境
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct VerifiableEnvironment {
     pub id: String,
     pub name: String,
@@ -14,7 +14,7 @@ pub struct VerifiableEnvironment {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct TestCase {
     pub input: String,
     pub expected_output: String,
@@ -23,7 +23,7 @@ pub struct TestCase {
 
 /// Harness 变异
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct HarnessMutation {
     pub id: String,
     pub mutation_type: MutationType,
@@ -33,7 +33,7 @@ pub struct HarnessMutation {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub enum MutationType {
     /// 修改提示词
     PromptTweak,
@@ -49,7 +49,7 @@ pub enum MutationType {
 
 /// 变异评估结果
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct MutationEvaluation {
     pub mutation_id: String,
     pub environment_id: String,
@@ -61,7 +61,7 @@ pub struct MutationEvaluation {
 
 /// 3 轮筛选结果
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct ScreeningResult {
     pub round: u32,
     pub candidates: Vec<HarnessMutation>,
@@ -70,7 +70,7 @@ pub struct ScreeningResult {
 }
 
 /// Harness 进化引擎
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct HarnessEvolution {
     /// 可验证环境
@@ -87,7 +87,7 @@ pub struct HarnessEvolution {
     baseline_score: f64,
 }
 
-#[allow(dead_code)]
+
 impl HarnessEvolution {
     pub fn new() -> Self {
         Self {
@@ -225,7 +225,7 @@ impl HarnessEvolution {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct EvolutionStats {
     pub environments: usize,
     pub candidates: usize,

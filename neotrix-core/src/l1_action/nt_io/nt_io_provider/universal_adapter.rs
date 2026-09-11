@@ -5,7 +5,7 @@
 //!
 //! 设计原则:
 //! - 零外部依赖
-//! - 所有类型标注 `#[allow(dead_code)]` 以保留未来扩展空间
+//! - 所有类型标注 `` 以保留未来扩展空间
 //! - 中文文档注释
 
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// 模型能力描述
 ///
 /// 每个外部模型在注册时声明其能力集，适配器据此进行路由决策。
-#[allow(dead_code)]
+
 pub struct ModelCapabilities {
     /// 是否支持函数调用 / 工具调用
     pub supports_tools: bool,
@@ -34,7 +34,7 @@ pub struct ModelCapabilities {
 /// 模型配置
 ///
 /// 包含模型标识、提供商信息、端点地址及 API 密钥环境变量名。
-#[allow(dead_code)]
+
 pub struct ModelConfig {
     /// 模型 ID，如 "claude-sonnet-4-20250514" / "gpt-4o" / "qwen-max"
     pub model_id: String,
@@ -51,7 +51,7 @@ pub struct ModelConfig {
 /// 统一请求格式
 ///
 /// 所有外部调用统一转换为此结构，再由适配器序列化为各提供商特定格式。
-#[allow(dead_code)]
+
 pub struct UnifiedRequest {
     /// 对话消息列表
     pub messages: Vec<Message>,
@@ -66,7 +66,7 @@ pub struct UnifiedRequest {
 }
 
 /// 对话消息
-#[allow(dead_code)]
+
 pub struct Message {
     /// 角色: "system" / "user" / "assistant" / "tool"
     pub role: String,
@@ -75,7 +75,7 @@ pub struct Message {
 }
 
 /// 工具定义
-#[allow(dead_code)]
+
 pub struct Tool {
     /// 工具名称
     pub name: String,
@@ -88,7 +88,7 @@ pub struct Tool {
 /// 统一响应格式
 ///
 /// 从各提供商响应解析后的统一结构。
-#[allow(dead_code)]
+
 pub struct UnifiedResponse {
     /// 模型生成的文本内容
     pub content: String,
@@ -101,7 +101,7 @@ pub struct UnifiedResponse {
 }
 
 /// 工具调用
-#[allow(dead_code)]
+
 pub struct ToolCall {
     /// 调用 ID (用于后续结果回传)
     pub id: String,
@@ -114,7 +114,7 @@ pub struct ToolCall {
 /// 格式转换器 trait
 ///
 /// 各提供商实现此 trait，将 `UnifiedRequest` 转换为其原生 API 格式。
-#[allow(dead_code)]
+
 pub trait FormatConverter {
     /// 将统一请求序列化为提供商特定的 JSON payload
     fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String;
@@ -126,7 +126,7 @@ pub trait FormatConverter {
 /// OpenAI 格式转换器
 ///
 /// 适用于 OpenAI / Azure OpenAI / OpenRouter / 兼容 OpenAI 接口的提供商。
-#[allow(dead_code)]
+
 pub struct OpenAiConverter;
 
 impl FormatConverter for OpenAiConverter {
@@ -183,7 +183,7 @@ impl FormatConverter for OpenAiConverter {
 /// Anthropic 格式转换器
 ///
 /// 适用于 Claude 系列模型，使用 Anthropic Messages API 格式。
-#[allow(dead_code)]
+
 pub struct AnthropicConverter;
 
 impl FormatConverter for AnthropicConverter {
@@ -236,7 +236,7 @@ impl FormatConverter for AnthropicConverter {
 /// Gemini 格式转换器
 ///
 /// 适用于 Google Gemini / Vertex AI，使用 Google Generative Language API 格式。
-#[allow(dead_code)]
+
 pub struct GeminiConverter;
 
 impl FormatConverter for GeminiConverter {
@@ -281,7 +281,7 @@ impl FormatConverter for GeminiConverter {
 /// 通用模型适配器
 ///
 /// 管理所有已注册的外部模型，提供统一的选择、转换、调用接口。
-#[allow(dead_code)]
+
 pub struct UniversalAdapter {
     /// 已注册的模型配置列表
     models: Vec<ModelConfig>,

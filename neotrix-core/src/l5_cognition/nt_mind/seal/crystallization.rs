@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 /// 结晶状态
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub enum CrystallizationStatus {
     /// 模板阶段（成功 < 3 次）
@@ -21,7 +21,7 @@ pub enum CrystallizationStatus {
 
 /// I/O 契约 — 定义技能的输入输出规范
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct IoContract {
     /// 输入 JSON schema
     pub input_schema: String,
@@ -37,7 +37,7 @@ pub struct IoContract {
 
 /// 已结晶技能 — 从模板晋升为正式技能
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct CrystallizedSkill {
     /// 技能唯一标识
     pub id: String,
@@ -59,7 +59,7 @@ pub struct CrystallizedSkill {
 
 /// 结晶统计信息
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct CrystallizationStats {
     /// 候选模板数量
     pub candidates: usize,
@@ -72,7 +72,7 @@ pub struct CrystallizationStats {
 }
 
 /// 技能结晶引擎 — 监控模板成功率，自动结晶为正式技能
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct CrystallizationEngine {
     /// 待结晶模板 (template_id → success_count)

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 /// Provider 指标快照
-#[allow(dead_code)]
+
 pub struct ProviderMetric {
     /// Provider 唯一标识
     pub provider_id: String,
@@ -18,7 +18,7 @@ pub struct ProviderMetric {
 }
 
 /// 漂移检测结果
-#[allow(dead_code)]
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DriftStatus {
     /// 正常范围，无需干预
@@ -47,7 +47,7 @@ pub enum DriftStatus {
 /// - 使用 Z-score 检测指标偏离历史均值的程度
 /// - 双阈值机制: 轻微漂移 (告警) vs 严重漂移 (触发切换)
 /// - 滚动窗口自动清理旧数据，避免内存膨胀
-#[allow(dead_code)]
+
 pub struct DriftDetector {
     /// 指标历史记录 (全 provider 共用)
     windows: VecDeque<ProviderMetric>,
@@ -59,7 +59,7 @@ pub struct DriftDetector {
     severe_threshold: f64,
 }
 
-#[allow(dead_code)]
+
 impl DriftDetector {
     /// 创建漂移检测器
     ///

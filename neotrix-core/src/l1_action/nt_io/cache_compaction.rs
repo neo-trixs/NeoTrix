@@ -4,7 +4,7 @@
 
 /// 缓存条目
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct CacheEntry {
     pub key: String,
     pub content: String,
@@ -15,7 +15,7 @@ pub struct CacheEntry {
 }
 
 /// 压缩策略
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub enum CompactionStrategy {
     /// 保守：只压缩低命中内容
@@ -27,7 +27,7 @@ pub enum CompactionStrategy {
 }
 
 /// 压缩结果
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct CompactionResult {
     pub before_tokens: usize,
@@ -38,7 +38,7 @@ pub struct CompactionResult {
 }
 
 /// Cache-Aware 压缩器
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct CacheCompactor {
     entries: Vec<CacheEntry>,
@@ -46,7 +46,7 @@ pub struct CacheCompactor {
     max_tokens: usize,
 }
 
-#[allow(dead_code)]
+
 impl CacheCompactor {
     pub fn new(strategy: CompactionStrategy, max_tokens: usize) -> Self {
         Self {
@@ -140,7 +140,7 @@ impl CacheCompactor {
     }
 }
 
-#[allow(dead_code)]
+
 fn now_ts() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

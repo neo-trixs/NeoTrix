@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 /// 上下文节点类型
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub enum ContextNodeType {
     /// 资源节点（文档、代码）
@@ -19,7 +19,7 @@ pub enum ContextNodeType {
 }
 
 /// 上下文节点
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct ContextNode {
     pub uri: String, // e.g. "ctx://memory/experience/cycle_001"
@@ -32,14 +32,14 @@ pub struct ContextNode {
 }
 
 /// 上下文文件系统
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct ContextFileSystem {
     nodes: HashMap<String, ContextNode>,
     root: String,
 }
 
-#[allow(dead_code)]
+
 impl ContextFileSystem {
     pub fn new() -> Self {
         let mut fs = Self {

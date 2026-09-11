@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 /// 上下文源类型
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-#[allow(dead_code)]
+
 pub enum ContextSource {
     /// KB 搜索结果
     KnowledgeBase,
@@ -25,7 +25,7 @@ pub enum ContextSource {
 
 /// 上下文片段
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+
 pub struct ContextFragment {
     /// 来源
     pub source: ContextSource,
@@ -41,7 +41,7 @@ pub struct ContextFragment {
 
 /// 信息需求（Plan 阶段产出）
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+
 pub struct InformationNeed {
     /// 需求描述
     pub description: String,
@@ -53,7 +53,7 @@ pub struct InformationNeed {
 
 /// 预算分配（Optimize 阶段产出）
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+
 pub struct BudgetAllocation {
     /// 分配来源
     pub source: ContextSource,
@@ -65,7 +65,7 @@ pub struct BudgetAllocation {
 
 /// 上下文组装计划
 #[derive(Debug)]
-#[allow(dead_code)]
+
 pub struct AssemblyPlan {
     /// 信息需求列表
     pub needs: Vec<InformationNeed>,
@@ -77,7 +77,7 @@ pub struct AssemblyPlan {
 
 /// 组装结果
 #[derive(Debug)]
-#[allow(dead_code)]
+
 pub struct AssemblyResult {
     /// 选中的片段
     pub fragments: Vec<ContextFragment>,
@@ -93,7 +93,7 @@ pub struct AssemblyResult {
 
 /// 上下文组装引擎 — 五阶段上下文管理
 #[derive(Debug)]
-#[allow(dead_code)]
+
 pub struct ContextAssembler {
     /// 总 token 预算
     budget: usize,

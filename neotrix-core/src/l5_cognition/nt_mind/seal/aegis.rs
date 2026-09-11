@@ -3,7 +3,7 @@
 //! Digester→Planner→Evolver→Critic 四阶段确定性门控进化。
 
 /// 执行轨迹（Digest 输入）
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct ExecutionTrace {
     pub trace_id: String,
@@ -13,7 +13,7 @@ pub struct ExecutionTrace {
     pub total_tokens: u32,
 }
 
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct TraceStep {
     pub action: String,
@@ -24,7 +24,7 @@ pub struct TraceStep {
 }
 
 /// Digest 输出（压缩轨迹）
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct TraceDigest {
     pub trace_id: String,
@@ -36,7 +36,7 @@ pub struct TraceDigest {
 }
 
 /// 适应景观（Planner 输出）
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct AdaptationLandscape {
     pub dimensions: Vec<AdaptationDimension>,
@@ -45,7 +45,7 @@ pub struct AdaptationLandscape {
     pub potential_improvements: Vec<String>,
 }
 
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct AdaptationDimension {
     pub name: String,
@@ -55,7 +55,7 @@ pub struct AdaptationDimension {
 }
 
 /// 类型化编辑（Evolver 输出）
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct TypedEdit {
     pub edit_id: String,
@@ -66,7 +66,7 @@ pub struct TypedEdit {
     pub confidence: f64,
 }
 
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub enum EditType {
     PromptModification,
@@ -77,7 +77,7 @@ pub enum EditType {
 }
 
 /// Critic 评估
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct CriticAssessment {
     pub edit_id: String,
@@ -88,7 +88,7 @@ pub struct CriticAssessment {
 }
 
 /// AEGIS 进化引擎
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct AegisEngine {
     traces: Vec<ExecutionTrace>,
@@ -100,7 +100,7 @@ pub struct AegisEngine {
     rejected_edits: Vec<(TypedEdit, String)>,
 }
 
-#[allow(dead_code)]
+
 impl AegisEngine {
     pub fn new() -> Self {
         Self {
@@ -292,7 +292,7 @@ impl AegisEngine {
     }
 }
 
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct AegisStats {
     pub traces: usize,

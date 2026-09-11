@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 /// 上下文来源信任级别
 #[derive(Hash, Eq, PartialEq, Clone, Copy, Debug)]
-#[allow(dead_code)]
+
 pub enum TrustLevel {
     /// 系统内部（完全信任）
     System,
@@ -22,7 +22,7 @@ pub enum TrustLevel {
 
 /// 上下文请求
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct ContextRequest {
     pub source: String,
     pub trust_level: TrustLevel,
@@ -32,7 +32,7 @@ pub struct ContextRequest {
 
 /// 验证结果
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub enum ValidationResult {
     /// 允许
     Allowed,
@@ -47,7 +47,7 @@ pub enum ValidationResult {
 
 /// 上下文权限边界
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+
 pub struct ContextBoundary {
     /// 每个信任级别允许的操作
     allowed_actions: HashMap<TrustLevel, Vec<String>>,
@@ -57,7 +57,7 @@ pub struct ContextBoundary {
     history: Vec<(ContextRequest, ValidationResult)>,
 }
 
-#[allow(dead_code)]
+
 impl ContextBoundary {
     pub fn new() -> Self {
         let mut allowed_actions = HashMap::new();

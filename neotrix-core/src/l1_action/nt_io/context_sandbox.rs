@@ -179,13 +179,13 @@ impl ContextSandbox {
     }
 
     /// 获取本会话所有沙箱化输出
-    #[allow(dead_code)]
+    
     pub fn history(&self) -> &[SandboxedOutput] {
         &self.history
     }
 
     /// 所有沙箱化输出节省的总 token 数
-    #[allow(dead_code)]
+    
     pub fn total_tokens_saved(&self) -> usize {
         self.history
             .iter()
@@ -194,7 +194,7 @@ impl ContextSandbox {
     }
 
     /// 平均压缩比
-    #[allow(dead_code)]
+    
     pub fn avg_compression(&self) -> f64 {
         if self.history.is_empty() {
             return 1.0;

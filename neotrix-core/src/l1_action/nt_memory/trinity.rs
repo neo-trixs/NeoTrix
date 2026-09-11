@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use super::shared_utils::{cosine_similarity, now_ts};
 
 /// 记忆条目
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct MemoryEntry {
     pub id: String,
@@ -20,7 +20,7 @@ pub struct MemoryEntry {
 }
 
 /// 记忆类型
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub enum MemoryType {
     /// 向量记忆（语义搜索）
@@ -32,7 +32,7 @@ pub enum MemoryType {
 }
 
 /// 关系
-#[allow(dead_code)]
+
 #[derive(Clone, Debug)]
 pub struct Relation {
     pub from: String,
@@ -42,7 +42,7 @@ pub struct Relation {
 }
 
 /// Trinity 记忆存储
-#[allow(dead_code)]
+
 #[derive(Debug)]
 pub struct TrinityMemory {
     entries: Vec<MemoryEntry>,
@@ -51,7 +51,7 @@ pub struct TrinityMemory {
     next_id: u32,
 }
 
-#[allow(dead_code)]
+
 impl TrinityMemory {
     pub fn new() -> Self {
         Self {

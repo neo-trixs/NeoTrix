@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 /// 技能执行节点
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct SkillNode {
     /// 唯一标识符
@@ -28,7 +28,7 @@ pub struct SkillNode {
 }
 
 /// 技能类型枚举
-#[allow(dead_code)]
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillType {
     /// 纯工具调用
@@ -40,7 +40,7 @@ pub enum SkillType {
 }
 
 /// 执行依赖边
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct ExecutionEdge {
     /// 源技能 ID
@@ -52,7 +52,7 @@ pub struct ExecutionEdge {
 }
 
 /// 边类型枚举
-#[allow(dead_code)]
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EdgeType {
     /// 必须先执行的前置依赖
@@ -64,7 +64,7 @@ pub enum EdgeType {
 }
 
 /// 执行轨迹 — 记录一次完整的技能图执行
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct ExecutionTrace {
     /// 轨迹唯一 ID
@@ -80,7 +80,7 @@ pub struct ExecutionTrace {
 }
 
 /// 单个执行步骤
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct TraceStep {
     /// 执行的技能 ID
@@ -98,7 +98,7 @@ pub struct TraceStep {
 }
 
 /// 图拓扑编辑操作
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub enum GraphEdit {
     /// 添加节点
@@ -114,7 +114,7 @@ pub enum GraphEdit {
 }
 
 /// 被拒绝的编辑 — 保留为反模式
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct RejectedEdit {
     /// 被拒绝的编辑
@@ -126,7 +126,7 @@ pub struct RejectedEdit {
 }
 
 /// 图统计信息
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct GraphStats {
     /// 节点数
@@ -155,7 +155,7 @@ pub struct GraphStats {
 /// 4. **提议编辑** — `propose_edit` 让 LLM refiner 提议拓扑变更
 /// 5. **审核决策** — `approve_edit` / `reject_edit` 控制进化方向
 /// 6. **反模式** — 被拒绝的编辑自动积累为反模式知识
-#[allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub struct ProceduralGraph {
     /// 技能节点（ID → 节点）
