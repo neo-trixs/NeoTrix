@@ -127,6 +127,9 @@ impl MemoryLifecycle {
         // 3. FreshnessLedger: tick the clock
         let current_tick = self.freshness.tick();
 
+        // Count documents explicitly marked as should-forget in the ledger.
+        let ledger_marked = self.freshness.forget_count() as u64;
+
         Ok(ForgettingReport {
             curve_marked,
             confidence_decayed,

@@ -452,6 +452,11 @@ impl FreshnessLedger {
         self.should_forget.contains(doc_id)
     }
 
+    /// Number of documents explicitly marked as should-forget.
+    pub fn forget_count(&self) -> usize {
+        self.should_forget.len()
+    }
+
     /// 该记忆是否过期: 距上次更新超过 staleness_after 个 tick。
     pub fn is_stale(&self, doc_id: &str, staleness_after: u64) -> bool {
         match self.updated_at.get(doc_id) {
