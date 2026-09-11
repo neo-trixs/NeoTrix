@@ -118,6 +118,7 @@ mod tests {
         renderer.zoom_in();
         assert!(renderer.zoom > 1.0);
         renderer.zoom_out();
+        renderer.zoom_out();
         assert!(renderer.zoom < 1.0);
     }
 }

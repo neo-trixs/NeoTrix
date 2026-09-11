@@ -255,13 +255,18 @@ mod tests {
     #[test]
     fn test_astar_avoids_obstacle() {
         let mut astar = AStar::new(10, 10);
-        for y in 0..10 {
+        for y in 0..4 {
+            astar.set_obstacle(5, y, true);
+        }
+        for y in 6..10 {
             astar.set_obstacle(5, y, true);
         }
         let path = astar.find_path(GridPos::new(0, 5), GridPos::new(9, 5));
         assert!(path.is_some());
         let path = path.unwrap();
-        assert!(!path.iter().any(|p| p.x == 5 && p.y == 5));
+        assert_eq!(path[0], GridPos::new(0, 5));
+        assert_eq!(*path.last().unwrap(), GridPos::new(9, 5));
+        assert!(!path.iter().any(|p| p.x == 5 && (p.y < 4 || p.y > 6)));
     }
 
     #[test]

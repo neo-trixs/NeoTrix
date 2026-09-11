@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 use super::pdf_image_extract::{
     extract_pdf_images, PdfExtractedImage, PdfImageExtractConfig, PdfImageFormat,
 };
+use super::image_super_resolution::{
+    ImageSuperResolver, SuperResolutionConfig, SuperResolutionModel, SuperResolutionResult,
+};
 use super::types::{FileAbilityError, Result};
 
 /// PDF 图标增强配置
@@ -27,6 +30,8 @@ pub struct PdfIconEnhanceConfig {
     pub output_pdf: Option<PathBuf>,
     /// 是否保留原始图像备份
     pub keep_backup: bool,
+    /// 临时目录 (None = 系统临时目录)
+    pub temp_dir: Option<PathBuf>,
 }
 
 impl Default for PdfIconEnhanceConfig {
@@ -42,6 +47,7 @@ impl Default for PdfIconEnhanceConfig {
             embed_back: true,
             output_pdf: None,
             keep_backup: true,
+            temp_dir: None,
         }
     }
 }
@@ -138,7 +144,9 @@ impl PdfIconEnhancer {
         });
 
         // 创建临时目录
-        let temp_dir = std::env::temp_dir().join("neotrix_pdf_enhance");
+        let temp_dir = self.config.temp_dir.clone().unwrap_or_else(|| {
+            std::env::temp_dir().join("neotrix_pdf_enhance")
+        });
         std::fs::create_dir_all(&temp_dir).map_err(FileAbilityError::Io)?;
 
         // 阶段 1: 提取图像
@@ -158,29 +166,41 @@ impl PdfIconEnhancer {
             // 构造输出路径
             let enhanced_path = temp_dir.join(format!("enhanced_{}_{}.png", img.page, img.xref));
 
-            // TODO: 调用 image_super_resolution 进行超分
-            // 当前为占位实现
-            let enhanced_info = EnhancedImageInfo {
-                original_size: (img.width, img.height),
-                enhanced_size: (
-                    img.width * self.config.super_resolution.scale,
-                    img.height * self.config.super_resolution.scale,
-                ),
-                scale: self.config.super_resolution.scale as f32,
-                processing_time_ms: img_start.elapsed().as_millis() as u64,
-                path: enhanced_path.display().to_string(),
-            };
+            // 创建超分辨率处理器
+            let mut resolver = ImageSuperResolver::with_config(self.config.super_resolution.clone());
 
-            enhanced_images.push(enhanced_info);
-            images_enhanced += 1;
+            // 读取原始图像
+            let input_path = Path::new(&img.output_path);
+            let result = resolver.upscale(input_path, &enhanced_path);
+
+            if result.success {
+                let enhanced_info = EnhancedImageInfo {
+                    original_size: (img.width, img.height),
+                    enhanced_size: result.output_size,
+                    scale: result.actual_scale,
+                    processing_time_ms: img_start.elapsed().as_millis() as u64,
+                    path: enhanced_path.display().to_string(),
+                };
+
+                enhanced_images.push(enhanced_info);
+                images_enhanced += 1;
+            } else {
+                images_failed += 1;
+                eprintln!(
+                    "图像增强失败: page={}, xref={}, error={:?}",
+                    img.page, img.xref, result.error
+                );
+            }
         }
         let sr_time = sr_start.elapsed().as_millis() as u64;
 
         // 阶段 3: 嵌回 PDF (如果启用)
         let embed_start = std::time::Instant::now();
-        if self.config.embed_back {
+        if self.config.embed_back && images_enhanced > 0 {
             // TODO: 实现图像嵌回 PDF
-            // 当前为占位实现
+            // 当前版本只是保存增强后的图像文件
+            // 完整实现需要修改 PDF 的 XObject 流
+            eprintln!("注意: 嵌回功能尚未实现，增强后的图像已保存在临时目录");
         }
         let embed_time = embed_start.elapsed().as_millis() as u64;
 
@@ -239,8 +259,6 @@ pub fn enhance_pdf_icons_with_config(
     enhancer.enhance(pdf_path)
 }
 
-use super::image_super_resolution::SuperResolutionConfig;
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,11 +268,25 @@ mod tests {
     fn test_default_config() {
         let config = PdfIconEnhanceConfig::default();
         assert!(config.embed_back);
+        assert_eq!(config.extract.min_dimension, 32);
     }
 
     #[test]
     fn test_enhance_nonexistent_pdf() {
         let result = enhance_pdf_icons(Path::new("/nonexistent.pdf"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_enhancer_creation() {
+        let enhancer = PdfIconEnhancer::new();
+        assert!(enhancer.config().embed_back);
+        
+        let config = PdfIconEnhanceConfig {
+            embed_back: false,
+            ..Default::default()
+        };
+        let enhancer = PdfIconEnhancer::with_config(config);
+        assert!(!enhancer.config().embed_back);
     }
 }
