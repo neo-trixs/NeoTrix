@@ -163,6 +163,7 @@ pub use nt_file_ability::{
     DirExtractEntry, DirExtractReport,
     CollectionMergeRequest, MergeOutcome, MergeStrategy, collection_merge,
     SuperResolutionModel, SuperResolutionConfig, PdfIconEnhanceConfig, enhance_pdf_icons_with_config,
+    E8StateTransition, GwtAttentionRouter, VsaEmbedding,
 };
 
 pub use nt_file_ability::merge_docx;

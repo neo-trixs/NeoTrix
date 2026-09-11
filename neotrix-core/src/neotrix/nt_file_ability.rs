@@ -1342,21 +1342,21 @@ mod tests {
     #[test]
     fn test_vsa_embedding_similar_text() {
         let engine = VSAEngine::default();
-        let dim = engine.dimensions();
-        let a = embed_text("NeoTrix 自我进化知识表示", dim);
-        let b = embed_text("NeoTrix 自我进化知识表示", dim);
-        let c = embed_text("完全无关的另一段内容", dim);
+        let a = embed_text("NeoTrix 自我进化知识表示", &engine);
+        let b = embed_text("NeoTrix 自我进化知识表示", &engine);
+        let c = embed_text("完全无关的另一段内容", &engine);
         let sim_self = engine.similarity(&a, &b);
         let sim_diff = engine.similarity(&a, &c);
-        assert!(a.len() == dim);
+        assert!(a.len() == engine.dimensions());
         assert!(sim_self > 0.99, "相同文本相似度应高, 实际 {sim_self}");
         assert!(sim_diff < 0.3, "无关文本相似度应低, 实际 {sim_diff}");
     }
 
     #[test]
     fn test_vsa_embedding_deterministic() {
-        let a = embed_text("稳定输入", 512);
-        let b = embed_text("稳定输入", 512);
+        let engine = VSAEngine::new(512);
+        let a = embed_text("稳定输入", &engine);
+        let b = embed_text("稳定输入", &engine);
         assert_eq!(a, b, "嵌入应确定性可复现");
     }
 
@@ -1364,26 +1364,29 @@ mod tests {
     fn test_e8_state_transition() {
         let path = office_sample();
         let mut ab = FileAbility::open(&path).unwrap();
-        let initial = ab.e8_state();
-        assert_eq!(initial, ReasoningHexagram::new(0b001100));
+        let initial_bits = ab.e8_state_bits();
+        assert_eq!(initial_bits, 0b001100);
         // 提取 → 转换: 应产生一次转移
         let after_transform = ab.transition(FileOperation::Transform);
-        assert_ne!(initial, after_transform, "转换操作应推进 E8 状态");
+        assert_ne!(initial_bits, after_transform, "转换操作应推进 E8 状态");
         // 贪心单步必须逼近目标
-        let target = FileOperation::Transform.target_state();
+        let target_bits = FileOperation::Transform.target_state_bits();
+        let target_hex = ReasoningHexagram::new(target_bits);
+        let after_hex = ReasoningHexagram::new(after_transform);
+        let initial_hex = ReasoningHexagram::new(initial_bits);
         assert!(
-            after_transform.hamming_dist(&target) <= initial.hamming_dist(&target),
+            after_hex.hamming_dist(&target_hex) <= initial_hex.hamming_dist(&target_hex),
             "单步转移应单调逼近目标"
         );
         // 到达目标后停在目标
-        ab.e8_state = target;
+        ab.e8_state = target_hex;
         let stay = ab.transition(FileOperation::Transform);
-        assert_eq!(stay, target, "已达目标时转移应保持");
+        assert_eq!(stay, target_bits, "已达目标时转移应保持");
         // 路径: 从当前到目标, 首尾正确
-        let goal = FileOperation::Embed.target_state();
-        let path = ab.e8_path_to(goal);
-        assert_eq!(*path.first().unwrap(), target);
-        assert_eq!(*path.last().unwrap(), goal);
+        let goal_bits = FileOperation::Embed.target_state_bits();
+        let path = ab.e8_path_to(goal_bits);
+        assert_eq!(*path.first().unwrap(), target_bits);
+        assert_eq!(*path.last().unwrap(), goal_bits);
         assert!(ab.e8_mode_name().len() > 2);
     }
 
@@ -1394,7 +1397,7 @@ mod tests {
         assert_eq!(ab.kind().specialist(), SpecialistType::KnowledgeIntegrator);
         // 动态谐振路由: 任何 E8 状态都应路由到 14 专家之一
         for bits in [0u8, 1, 0b111111, 0b001100] {
-            let (t, strength, st) = route_attention(ReasoningHexagram::new(bits));
+            let (t, strength, st) = route_attention(bits, &ab, None);
             assert_eq!(
                 specialist_index(t),
                 specialist_index_inv(specialist_index(t)) as usize
@@ -1402,7 +1405,7 @@ mod tests {
             let _ = (t, strength, st);
         }
         // 谐振强度 ∈ [0,6]
-        let (_, s, _) = route_attention(ReasoningHexagram::new(0b001100));
+        let (_, s, _) = route_attention(0b001100, &ab, None);
         assert!((0..=6).contains(&s));
         // 索引逆映射闭环
         for i in 0..14 {
@@ -1679,7 +1682,7 @@ mod tests {
     #[test]
     fn test_edit_pdf_free_function_wiring() {
         // R-P79 生产接线验证: edit_pdf 自由函数 → FileParser::edit_pdf_text 端到端。
-        use super::pdfedit::{edit_pdf, PdfEdit};
+        use super::pdf::pdfedit::{edit_pdf, PdfEdit};
 
         // 构造最小 PDF (未压缩内容流)
         let mut doc = lopdf::Document::with_version("1.4");

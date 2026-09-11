@@ -1,9 +1,12 @@
 //! 动态 GWT 专家路由 (Ext-5) — E8 状态 → 谐振路由选 attention 目标。
+//!
+//! 通过 `GwtAttentionRouter` trait 抽象 NT-CORE 的专家谐振路由能力，
+//! 实现 L1 行动层 → L5 认知层的依赖倒置。
 
-use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_traits::SpecialistType;
 
 use super::core::FileAbility;
+use super::types::GwtAttentionRouter;
 
 /// 将 SpecialistType 映射到 default_specialist_states() 的索引。
 /// `nt_core_gwt::resonance::default_specialist_states()` 按 SpecialistType 枚举
@@ -49,20 +52,23 @@ pub fn pdf_enhance_salience(task_summary: &str) -> f64 {
 /// GWT 谐振路由: 用当前 E8 状态与 14 个专家默认态计算谐振强度,
 /// 选出 attention 应投给的专家 (winner-take-most by resonance_strength)。
 ///
-/// 返回 (专家, 谐振强度 0..6, 该专家默认态)。
-pub fn route_attention(e8_state: ReasoningHexagram, task_summary: Option<&str>) -> (SpecialistType, u32, ReasoningHexagram) {
-    let states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+/// 返回 (专家, 谐振强度 0..6, 该专家默认态 6-bit 值)。
+pub fn route_attention(
+    e8_state_bits: u8,
+    router: &dyn GwtAttentionRouter,
+    task_summary: Option<&str>,
+) -> (SpecialistType, u32, u8) {
+    let specialists = router.default_specialist_bits();
     let salience = task_summary.map(pdf_enhance_salience).unwrap_or(0.0);
-    let mut best: Option<(SpecialistType, u32, ReasoningHexagram)> = None;
-    for (idx, st) in states.iter().enumerate() {
-        let base = e8_state.resonance_strength(st);
+    let mut best: Option<(SpecialistType, u32, u8)> = None;
+    for (st, default_bits) in &specialists {
+        let base = router.resonance_strength(e8_state_bits, *default_bits);
         let boosted = ((base as f64) * (1.0 + salience)) as u32;
-        let t = specialist_index_inv(idx);
         if best.as_ref().is_none_or(|(_, s, _)| boosted > *s) {
-            best = Some((t, boosted, *st));
+            best = Some((*st, boosted, *default_bits));
         }
     }
-    best.unwrap_or((SpecialistType::PatternMatcher, 0, ReasoningHexagram::new(0)))
+    best.unwrap_or((SpecialistType::PatternMatcher, 0, 0))
 }
 
 /// 索引 → SpecialistType (specialist_index 逆映射)
@@ -86,17 +92,37 @@ pub fn specialist_index_inv(idx: usize) -> SpecialistType {
     }
 }
 
+impl GwtAttentionRouter for FileAbility {
+    fn default_specialist_bits(&self) -> Vec<(SpecialistType, u8)> {
+        // 委托给 NT-CORE 的默认专家态映射 (单一事实源)
+        use crate::core::nt_core_gwt::resonance::default_specialist_states;
+        default_specialist_states()
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (specialist_index_inv(i), s.0))
+            .collect()
+    }
+
+    fn resonance_strength(&self, a_bits: u8, b_bits: u8) -> u32 {
+        use crate::core::nt_core_hex::ReasoningHexagram;
+        let a = ReasoningHexagram::new(a_bits);
+        let b = ReasoningHexagram::new(b_bits);
+        a.resonance_strength(&b)
+    }
+}
+
 impl FileAbility {
-    /// 当前 E8 状态对应的 GWT 注意力投递目标
-    pub fn gwt_route(&self) -> (SpecialistType, u32, ReasoningHexagram) {
-        route_attention(self.e8_state, self.task_summary.as_deref())
+    /// 当前 E8 状态对应的 GWT 注意力投递目标 (通过 GwtAttentionRouter trait)
+    pub fn gwt_route(&self) -> (SpecialistType, u32, u8) {
+        let e8_bits = self.e8_state.0;
+        route_attention(e8_bits, self, self.task_summary.as_deref())
     }
 
     /// 该文件的静态专家偏好 (按文件大类映射)
     pub fn specialist(&self) -> SpecialistType {
         self.kind.specialist()
     }
-    
+
     /// 设置任务摘要 (用于 GWT salience 计算)
     pub fn set_task_summary(&mut self, summary: String) {
         self.task_summary = Some(summary);

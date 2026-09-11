@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 use super::pdf_image_extract::{
     extract_pdf_images, PdfImageExtractConfig, PdfImageFormat,
 };
-use super::image_super_resolution::{
+use super::super::image_super_resolution::{
     ImageSuperResolver, SuperResolutionConfig,
 };
-use super::types::{FileAbilityError, Result};
+use super::super::types::{FileAbilityError, Result};
 
 /// PDF 图标增强配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

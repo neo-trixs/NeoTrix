@@ -10,7 +10,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::types::{FileAbilityError, Result};
+use super::super::types::{FileAbilityError, Result};
 
 /// PDF 图像提取配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

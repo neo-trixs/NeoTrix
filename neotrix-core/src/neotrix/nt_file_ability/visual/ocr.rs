@@ -4,8 +4,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::core::FileAbility;
-use super::types::FileKind;
+use super::super::core::FileAbility;
+use super::super::types::FileKind;
 
 /// OCR 引擎抽象 — 图像 → 文字识别。
 ///

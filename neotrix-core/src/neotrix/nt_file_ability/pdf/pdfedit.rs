@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use super::types::{FileAbilityError, Result};
+use super::super::types::{FileAbilityError, Result};
 
 /// 单条 PDF 文本编辑 (镜像 neotrix-types PdfTextEdit)。
 #[derive(Debug, Clone)]
