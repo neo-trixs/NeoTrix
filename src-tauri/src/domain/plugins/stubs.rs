@@ -408,7 +408,7 @@ static AGENT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
         m.insert("project".into(), serde_json::json!(null));
         m.insert("provider".into(), serde_json::json!(null));
         m.insert("started_at".into(), serde_json::json!(null));
-        m
+        Mutex::new(m)
     });
 
 pub struct AgentPlugin;
@@ -797,7 +797,7 @@ static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
                 "llamacpp": { "enabled": true, "description": "llama.cpp 本地推理" },
             }),
         );
-        m
+        Mutex::new(m)
     });
 
 pub struct PluginPlugin;
@@ -1228,7 +1228,7 @@ static SECURITY_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
             "quarantine".into(),
             serde_json::json!([]),
         );
-        m
+        Mutex::new(m)
     });
 
 fn security_add_audit_event(event_type: &str, detail: &str) {
