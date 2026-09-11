@@ -1203,8 +1203,313 @@ impl ModelRegistry {
 }
 
 // ============================================================================
-// Tests
+// 模型热插拔支持
 // ============================================================================
+
+/// 模型管理器 — 支持动态加载和切换模型
+pub struct ModelManager {
+    /// 缓存目录
+    cache_dir: PathBuf,
+    /// 已加载的模型缓存路径
+    loaded_models: std::collections::HashMap<String, PathBuf>,
+}
+
+impl ModelManager {
+    /// 创建模型管理器
+    pub fn new(cache_dir: PathBuf) -> Self {
+        Self {
+            cache_dir,
+            loaded_models: std::collections::HashMap::new(),
+        }
+    }
+
+    /// 获取模型路径 (自动下载)
+    pub fn get_model_path(&mut self, model: &SuperResolutionModel) -> Result<PathBuf, SuperResolutionError> {
+        let model_id = model.model_id().to_string();
+        
+        // 检查缓存
+        if let Some(path) = self.loaded_models.get(&model_id) {
+            if path.exists() {
+                return Ok(path.clone());
+            }
+        }
+        
+        // 下载模型
+        let path = ModelRegistry::ensure_model(model, &self.cache_dir)?;
+        self.loaded_models.insert(model_id, path.clone());
+        
+        Ok(path)
+    }
+
+    /// 切换模型
+    pub fn switch_model(&mut self, new_model: &SuperResolutionModel) -> Result<(), SuperResolutionError> {
+        let _ = self.get_model_path(new_model)?;
+        eprintln!("Switched to model: {}", new_model.display_name());
+        Ok(())
+    }
+
+    /// 列出已缓存的模型
+    pub fn list_cached_models(&self) -> Vec<(String, PathBuf)> {
+        self.loaded_models
+            .iter()
+            .filter(|(_, path)| path.exists())
+            .map(|(id, path)| (id.clone(), path.clone()))
+            .collect()
+    }
+
+    /// 清除模型缓存
+    pub fn clear_cache(&mut self) -> Result<(), std::io::Error> {
+        for (_, path) in &self.loaded_models {
+            if path.exists() {
+                std::fs::remove_file(path)?;
+            }
+        }
+        self.loaded_models.clear();
+        Ok(())
+    }
+}
+
+impl Default for ModelManager {
+    fn default() -> Self {
+        let cache_dir = dirs::cache_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("neotrix")
+            .join("super_resolution");
+        Self::new(cache_dir)
+    }
+}
+
+// ============================================================================
+// 通用超分接口适配器
+// ============================================================================
+
+/// 通用超分辨率接口 — 所有超分辨率实现必须遵循
+pub trait SuperResolutionBackend {
+    /// 获取后端名称
+    fn name(&self) -> &str;
+    
+    /// 获取支持的模型列表
+    fn supported_models(&self) -> Vec<SuperResolutionModel>;
+    
+    /// 执行超分辨率处理
+    fn upscale(
+        &mut self,
+        input: &Path,
+        output: &Path,
+        model: &SuperResolutionModel,
+        scale: u32,
+    ) -> SuperResolutionResult;
+    
+    /// 检查模型是否可用
+    fn is_model_available(&self, model: &SuperResolutionModel) -> bool;
+    
+    /// 获取模型信息
+    fn model_info(&self, model: &SuperResolutionModel) -> Option<ModelMetadata>;
+}
+
+/// ONNX 后端实现
+pub struct OnnxBackend {
+    model_manager: ModelManager,
+}
+
+impl OnnxBackend {
+    /// 创建 ONNX 后端
+    pub fn new() -> Self {
+        Self {
+            model_manager: ModelManager::default(),
+        }
+    }
+    
+    /// 创建 ONNX 后端 (指定缓存目录)
+    pub fn with_cache_dir(cache_dir: PathBuf) -> Self {
+        Self {
+            model_manager: ModelManager::new(cache_dir),
+        }
+    }
+}
+
+impl SuperResolutionBackend for OnnxBackend {
+    fn name(&self) -> &str {
+        "onnx"
+    }
+    
+    fn supported_models(&self) -> Vec<SuperResolutionModel> {
+        vec![
+            SuperResolutionModel::RealEsrganGeneral,
+            SuperResolutionModel::RealEsrganAnime,
+            SuperResolutionModel::RealEsrganPhoto,
+            SuperResolutionModel::RealEsrganGeneralV3,
+            SuperResolutionModel::RealEsrgan2x,
+            SuperResolutionModel::SwinIRClassic,
+            SuperResolutionModel::SwinIRRealWorld,
+        ]
+    }
+    
+    fn upscale(
+        &mut self,
+        input: &Path,
+        output: &Path,
+        model: &SuperResolutionModel,
+        scale: u32,
+    ) -> SuperResolutionResult {
+        // 获取模型路径
+        let model_path = match self.model_manager.get_model_path(model) {
+            Ok(path) => path,
+            Err(e) => {
+                return SuperResolutionResult {
+                    success: false,
+                    input_size: (0, 0),
+                    output_size: (0, 0),
+                    actual_scale: 0.0,
+                    processing_time_ms: 0,
+                    error: Some(format!("模型加载失败: {e}")),
+                    quality_score: None,
+                };
+            }
+        };
+        
+        // 创建配置
+        let config = SuperResolutionConfig {
+            model: model.clone(),
+            scale,
+            ..Default::default()
+        };
+        
+        // 创建处理器并执行
+        let mut resolver = ImageSuperResolver::with_config(config);
+        resolver.upscale(input, output)
+    }
+    
+    fn is_model_available(&self, model: &SuperResolutionModel) -> bool {
+        model.requires_onnx() && model.download_url().is_some()
+    }
+    
+    fn model_info(&self, model: &SuperResolutionModel) -> Option<ModelMetadata> {
+        if self.is_model_available(model) {
+            Some(model.metadata())
+        } else {
+            None
+        }
+    }
+}
+
+/// 插值后端实现 (CPU)
+pub struct InterpolationBackend;
+
+impl InterpolationBackend {
+    /// 创建插值后端
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl SuperResolutionBackend for InterpolationBackend {
+    fn name(&self) -> &str {
+        "interpolation"
+    }
+    
+    fn supported_models(&self) -> Vec<SuperResolutionModel> {
+        vec![
+            SuperResolutionModel::Bicubic,
+            SuperResolutionModel::Lanczos,
+        ]
+    }
+    
+    fn upscale(
+        &mut self,
+        input: &Path,
+        output: &Path,
+        model: &SuperResolutionModel,
+        scale: u32,
+    ) -> SuperResolutionResult {
+        let config = SuperResolutionConfig {
+            model: model.clone(),
+            scale,
+            ..Default::default()
+        };
+        
+        let mut resolver = ImageSuperResolver::with_config(config);
+        resolver.upscale(input, output)
+    }
+    
+    fn is_model_available(&self, model: &SuperResolutionModel) -> bool {
+        matches!(model, SuperResolutionModel::Bicubic | SuperResolutionModel::Lanczos)
+    }
+    
+    fn model_info(&self, model: &SuperResolutionModel) -> Option<ModelMetadata> {
+        if self.is_model_available(model) {
+            Some(model.metadata())
+        } else {
+            None
+        }
+    }
+}
+
+/// 后端管理器 — 自动选择最佳后端
+pub struct BackendManager {
+    backends: Vec<Box<dyn SuperResolutionBackend>>,
+}
+
+impl BackendManager {
+    /// 创建后端管理器
+    pub fn new() -> Self {
+        let mut backends: Vec<Box<dyn SuperResolutionBackend>> = Vec::new();
+        
+        // 添加可用后端
+        backends.push(Box::new(InterpolationBackend::new()));
+        
+        #[cfg(feature = "onnx")]
+        backends.push(Box::new(OnnxBackend::new()));
+        
+        Self { backends }
+    }
+    
+    /// 执行超分辨率处理 (自动选择后端)
+    pub fn upscale(
+        &mut self,
+        input: &Path,
+        output: &Path,
+        model: &SuperResolutionModel,
+        scale: u32,
+    ) -> SuperResolutionResult {
+        // 查找支持该模型的后端
+        for backend in &mut self.backends {
+            if backend.is_model_available(model) {
+                return backend.upscale(input, output, model, scale);
+            }
+        }
+        
+        // 没有找到合适的后端
+        SuperResolutionResult {
+            success: false,
+            input_size: (0, 0),
+            output_size: (0, 0),
+            actual_scale: 0.0,
+            processing_time_ms: 0,
+            error: Some(format!("No backend supports model: {}", model.model_id())),
+            quality_score: None,
+        }
+    }
+    
+    /// 列出所有支持的模型
+    pub fn list_models(&self) -> Vec<ModelMetadata> {
+        let mut models = Vec::new();
+        for backend in &self.backends {
+            for model in backend.supported_models() {
+                if let Some(info) = backend.model_info(&model) {
+                    models.push(info);
+                }
+            }
+        }
+        models
+    }
+}
+
+impl Default for BackendManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
