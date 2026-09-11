@@ -41,8 +41,7 @@ mod state;
 
 // ── Observability ────────────────────────────────────────────
 mod ml_predictor;
-mod plugin_hot_reload;
-mod plugin_system;
+mod plugin;
 
 // ── Types & Registry ─────────────────────────────────────────
 mod benchmark_types;
@@ -72,8 +71,7 @@ pub use modular_gateway::*;
 pub use state::*;
 // Observability
 pub use ml_predictor::*;
-pub use plugin_hot_reload::*;
-pub use plugin_system::*;
+pub use plugin::*;
 // Types & Registry
 pub use registry::*;
 // Feature-gated
