@@ -8,4 +8,5 @@ pub mod aegis;
 pub mod crystallization;
 pub mod distillation;
 pub mod harness_evolution;
+pub mod harness_optimizer;
 pub mod procedural_graph;

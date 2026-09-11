@@ -32,6 +32,8 @@ pub mod browser_security;
 pub mod redaction;
 pub mod nt_shield_secret_collector;
 pub mod nt_shield_skill_router;
+/// 上下文权限边界 — 防止 CPE 攻击
+pub mod context_boundary;
 /// Core trait implementations — 将 L3 具体类型适配为 core trait 抽象接口
 pub mod core_traits_impl;
 

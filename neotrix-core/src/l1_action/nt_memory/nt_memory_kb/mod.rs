@@ -78,6 +78,7 @@ pub mod nt_memory_snapshot;
 pub mod nt_memory_zim_absorber;
 pub mod nt_memory_brain;
 pub mod nt_memory_lifecycle;
+pub(crate) mod shared_utils;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
