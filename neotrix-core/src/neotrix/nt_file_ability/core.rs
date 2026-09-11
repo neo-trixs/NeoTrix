@@ -9,7 +9,7 @@ use office_oxide::{Document, DocumentFormat};
 use crate::core::nt_core_hex::ReasoningHexagram;
 use nt_core_capability_tree::ConstellationLevel;
 
-use super::tables::{read_csv, read_xlsx_sheets_all};
+use super::excel::tables::{read_csv, read_xlsx_sheets_all};
 use super::types::{
     ContentSnapshot, FileAbilityError, FileKind, ImageMetadata, MediaMetadata, Result,
     SheetCellData, SheetCellValueType, SheetData, SheetRowData, TableData,

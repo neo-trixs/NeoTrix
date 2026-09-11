@@ -22,19 +22,19 @@ impl SelfTest for PdfIconEnhanceSelfTest {
         
         // T3: 功能验证
         // 1. 验证配置类型可以创建
-        let config = super::pdf_icon_enhance::PdfIconEnhanceConfig::default();
+        let config = super::pdf::pdf_icon_enhance::PdfIconEnhanceConfig::default();
         if !config.embed_back {
             errors.push("PdfIconEnhanceConfig.embed_back should default to true".to_string());
         }
         
         // 2. 验证增强器可以创建
-        let enhancer = super::pdf_icon_enhance::PdfIconEnhancer::new();
+        let enhancer = super::pdf::pdf_icon_enhance::PdfIconEnhancer::new();
         if !enhancer.config().embed_back {
             errors.push("PdfIconEnhancer should have embed_back=true by default".to_string());
         }
         
         // 3. 验证错误处理
-        let result = super::pdf_icon_enhance::enhance_pdf_icons(
+        let result = super::pdf::pdf_icon_enhance::enhance_pdf_icons(
             std::path::Path::new("/nonexistent.pdf")
         );
         if result.is_ok() {
@@ -121,7 +121,7 @@ impl SelfTest for PdfImageExtractSelfTest {
         
         // T3: 功能验证
         // 1. 验证配置默认值
-        let config = super::pdf_image_extract::PdfImageExtractConfig::default();
+        let config = super::pdf::pdf_image_extract::PdfImageExtractConfig::default();
         if config.min_dimension == 0 {
             errors.push("PdfImageExtractConfig.min_dimension should not be 0".to_string());
         }
@@ -130,14 +130,14 @@ impl SelfTest for PdfImageExtractSelfTest {
         }
         
         // 2. 验证错误处理
-        let result = super::pdf_image_extract::pdf_has_images(
+        let result = super::pdf::pdf_image_extract::pdf_has_images(
             std::path::Path::new("/nonexistent.pdf")
         );
         if result.is_ok() {
             errors.push("Should return error for nonexistent PDF".to_string());
         }
         
-        let result = super::pdf_image_extract::pdf_image_stats(
+        let result = super::pdf::pdf_image_extract::pdf_image_stats(
             std::path::Path::new("/nonexistent.pdf")
         );
         if result.is_ok() {

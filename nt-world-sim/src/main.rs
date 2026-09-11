@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 use neotrix_sim::world_sim::{WorldSim, WorldSimConfig};
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,19 @@ pub struct WorldMapData {
     pub tick: u64,
     pub heightmap: Vec<Vec<f32>>,
     pub biomes: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimFullState {
+    pub tick: u64,
+    pub agents: Vec<AgentInfoDto>,
+    pub day_time: f32,
+    pub weather: String,
+    pub population: usize,
+    pub alive_count: usize,
+    pub mean_fitness: f32,
+    pub food_count: usize,
+    pub species_count: usize,
 }
 
 pub struct SimState {
@@ -154,6 +167,88 @@ async fn sim_inject_action(
     Ok(format!("action '{}' queued for next tick", action))
 }
 
+#[tauri::command]
+async fn sim_get_full_state(state: State<'_, Arc<SimState>>) -> Result<SimFullState, String> {
+    let sim = state.sim.lock().await;
+    let alive: Vec<_> = sim.agents.iter().filter(|a| a.core.alive).collect();
+    let alive_count = alive.len();
+    let mean_fitness = if alive.is_empty() {
+        0.0
+    } else {
+        alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32
+    };
+
+    let food_count = sim.resources.total_nodes() - sim.resources.depleted_nodes();
+    let species_count = sim.speciation.species_count();
+    let day_time = sim.daynight.time_of_day;
+    let weather = sim.weather.display();
+
+    Ok(SimFullState {
+        tick: sim.tick,
+        agents: sim.agents.iter().map(|a| AgentInfoDto {
+            id: a.core.id.clone(),
+            x: a.core.position.x,
+            y: a.core.position.y,
+            energy: a.core.energy,
+            health: a.core.health,
+            hunger: a.core.hunger,
+            age: a.core.age,
+            alive: a.core.alive,
+        }).collect(),
+        day_time,
+        weather,
+        population: sim.agents.len(),
+        alive_count,
+        mean_fitness,
+        food_count,
+        species_count,
+    })
+}
+
+fn start_tick_loop(app: AppHandle, state: Arc<SimState>) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            let full = {
+                let mut sim = state.sim.lock().await;
+                sim.tick().await;
+                let alive: Vec<_> = sim.agents.iter().filter(|a| a.core.alive).collect();
+                let alive_count = alive.len();
+                let mean_fitness = if alive.is_empty() {
+                    0.0
+                } else {
+                    alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32
+                };
+                let food_count = sim.resources.total_nodes() - sim.resources.depleted_nodes();
+                let species_count = sim.speciation.species_count();
+                let day_time = sim.daynight.time_of_day;
+                let weather = sim.weather.display();
+                SimFullState {
+                    tick: sim.tick,
+                    agents: sim.agents.iter().map(|a| AgentInfoDto {
+                        id: a.core.id.clone(),
+                        x: a.core.position.x,
+                        y: a.core.position.y,
+                        energy: a.core.energy,
+                        health: a.core.health,
+                        hunger: a.core.hunger,
+                        age: a.core.age,
+                        alive: a.core.alive,
+                    }).collect(),
+                    day_time,
+                    weather,
+                    population: sim.agents.len(),
+                    alive_count,
+                    mean_fitness,
+                    food_count,
+                    species_count,
+                }
+            };
+            let _ = app.emit("sim-update", &full);
+        }
+    });
+}
+
 fn main() {
     let config = WorldSimConfig::default();
     let sim = WorldSim::new(config);
@@ -161,8 +256,13 @@ fn main() {
         sim: Mutex::new(sim),
     });
 
+    let state_clone = state.clone();
     tauri::Builder::default()
         .manage(state)
+        .setup(move |app| {
+            start_tick_loop(app.handle().clone(), state_clone);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             sim_get_state,
             sim_tick,
@@ -170,6 +270,7 @@ fn main() {
             sim_get_world_map,
             sim_select_agent,
             sim_inject_action,
+            sim_get_full_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -5,7 +5,7 @@ use std::path::Path;
 use office_oxide::{create, DocumentFormat};
 
 use super::core::FileAbility;
-use super::tables::{read_csv, read_xlsx_table};
+use super::excel::tables::{read_csv, read_xlsx_table};
 use super::types::{DirExtractEntry, DirExtractReport, FileAbilityError, FileKind, Result};
 
 /// 提取任何文件的纯文本
