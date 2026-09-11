@@ -98,6 +98,7 @@ neotrix-core/src/
 | **XObjectImageIterator** | Generic XObject tree traversal for PDF image extraction | `nt_file_ability/pdf_image_extract.rs` |
 | **BackendManager** | Auto-selects best SR backend (ONNX/Interpolation) | `nt_file_ability/image_super_resolution.rs` |
 | **TiledSuperResolver** | Memory-bounded tiled inference engine | `nt_file_ability/image_super_resolution.rs` |
+| **PdfEnhanceCapability** | UnifiedCapability impl routing PDF enhance via CapabilityRegistry | `nt_file_ability/capability.rs` |
 
 ### SelfModel Types (neotrix-core)
 

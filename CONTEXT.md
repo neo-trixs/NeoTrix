@@ -247,3 +247,13 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | **PdfIconEnhancer** | PDF 图标增强器：执行完整的提取→超分→嵌入管线，支持配置模型、倍数、嵌入选项。实现于 `nt_file_ability::pdf_icon_enhance`。 | "增强器", "PDF增强器" |
 | **SuperResolutionBackend** | 超分后端接口：统一所有超分辨率实现的 trait，支持 OnnxBackend/InterpolationBackend。实现于 `nt_file_ability::image_super_resolution`。 | "SR后端", "超分接口" |
 | **BackendManager** | 后端管理器：自动选择最佳后端，支持模型路由。实现于 `nt_file_ability::image_super_resolution`。 | "后端选择", "路由管理" |
+
+## Absorbed Terminology (2026-09-11, PDF能力集成)
+
+| Term | Definition | Avoid |
+|------|-----------|-------|
+| **PdfEnhanceCapability** | PDF增强能力节点：实现UnifiedCapability trait，通过CapabilityRegistry路由调用PDF图标增强管线。支持InputPath/OutputPath/Scale/Model配置。实现于 `nt_file_ability::capability`。 | "PDF能力", "增强节点" |
+| **FileEnhanceInput** | 文件增强输入类型：携带InputPath/OutputPath/Model/Scale参数，由CapabilityInput枚举包装。实现于 `nt_core_capability::mod`。 | "增强输入", "FileEnhance参数" |
+| **FileEnhanceMode** | 文件增强模式：PDF图标增强，通过CapabilityInput::FileEnhance变体传递。实现于 `nt_core_capability::mod`。 | "增强模式", "FileEnhance模式" |
+| **NtFileAbility** | 文件能力域：PDF增强能力归属的Domain枚举变体，由CapabilityRouter路由到。实现于 `nt_core_capability::mod`。 | "文件域", "NtFileAbility域" |
+| **CapabilityIntegrationPattern** | 能力集成模式：CapabilityInput枚举→Domain映射→CapabilityRouter默认路由→UnifiedCapability::execute()→EventBus监控→KB持久化的四层集成链路。 | "集成模式", "能力接线" |
