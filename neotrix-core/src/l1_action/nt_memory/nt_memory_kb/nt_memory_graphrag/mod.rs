@@ -77,6 +77,9 @@ impl From<EntityNode> for KnowledgeNode {
             temporal: None,
             supersedes: None,
             source_episode: Some(e.source_node_id),
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         }
     }
 }

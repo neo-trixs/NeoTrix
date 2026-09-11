@@ -249,6 +249,9 @@ impl<'a> ResourceIngester<'a> {
             temporal: None,
             supersedes: None,
             source_episode: Some(self.episode_id.clone()),
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
 
         insert_node(self.conn, &node).map_err(|e| format!("insert_node failed: {}", e))?;
@@ -286,6 +289,9 @@ impl<'a> ResourceIngester<'a> {
                 temporal: None,
                 supersedes: None,
                 source_episode: Some(self.episode_id.clone()),
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             };
 
             let iid = insight_node.id.clone();
@@ -371,6 +377,9 @@ fn find_node_by_title(conn: &Connection, title: &str) -> rusqlite::Result<Option
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         })),
         None => Ok(None),
     }

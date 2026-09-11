@@ -355,6 +355,9 @@ impl CommunityDataIngester {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             })?;
         }
 
@@ -388,6 +391,9 @@ impl CommunityDataIngester {
                     temporal: None,
                     supersedes: None,
                     source_episode: None,
+                    parent_id: None,
+                    depth: 0,
+                    cluster_id: None,
                 })?;
             }
             written += 1;

@@ -63,6 +63,9 @@ fn insert_person_node(conn: &Connection, title: &str, summary: &str, importance:
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(conn, &node).expect("Failed to insert person node");
     id

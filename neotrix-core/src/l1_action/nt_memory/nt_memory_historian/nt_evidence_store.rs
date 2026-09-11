@@ -53,6 +53,9 @@ impl EvidenceStore {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         let kb = self.kb.lock().map_err(|e| format!("lock: {}", e))?;
         kb.insert_node(&node).map_err(|e| format!("insert: {}", e))?;
@@ -322,6 +325,9 @@ impl EvidenceStore {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         let kb = self.kb.lock().map_err(|e| format!("lock: {}", e))?;
         kb.insert_node(&node).map_err(|e| format!("insert checkpoint: {}", e))?;
@@ -481,6 +487,9 @@ impl EvidenceStore {
                     temporal: None,
                     supersedes: None,
                     source_episode: None,
+                    parent_id: None,
+                    depth: 0,
+                    cluster_id: None,
                 };
                 let kb = self.kb.lock().map_err(|e| format!("lock: {}", e))?;
                 kb.insert_node(&node).map_err(|e| format!("insert decayed: {}", e))?;
@@ -545,6 +554,9 @@ impl EvidenceStore {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             };
             let kb = self.kb.lock().map_err(|e| format!("lock: {}", e))?;
             kb.insert_node(&node).map_err(|e| format!("insert calibrated: {}", e))?;

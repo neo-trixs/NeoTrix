@@ -132,6 +132,9 @@ impl PrivacyEnforcer {
                     temporal: None,
                     supersedes: None,
                     source_episode: None,
+                    parent_id: None,
+                    depth: 0,
+                    cluster_id: None,
                 };
                 std::fs::write(
                     format!("/tmp/neotrix_encrypted_{}", record.id),
@@ -242,6 +245,9 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         let result = enforcer.store_with_privacy(&node);
         assert!(result.is_err());
@@ -292,6 +298,9 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         let encrypted = enforcer.encrypt_record(&node).unwrap();
         assert_ne!(encrypted, "");
@@ -360,6 +369,9 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         let proof = enforcer.store_with_privacy(&node);
         assert!(proof.is_ok());

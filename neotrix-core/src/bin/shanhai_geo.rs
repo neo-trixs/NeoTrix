@@ -49,6 +49,9 @@ fn main() {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             },
         )
         .expect("Failed to insert school");
@@ -101,6 +104,9 @@ fn main() {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             },
         )
         .expect("Failed to insert peak");
@@ -151,6 +157,9 @@ fn main() {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             },
         )
         .expect("Failed to insert mapping");

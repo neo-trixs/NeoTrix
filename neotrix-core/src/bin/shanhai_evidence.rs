@@ -57,6 +57,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &qin_inscription).expect("Qin inscription node failed");
     println!("  ✅ 秦始皇昆仑石刻 (37字秦小篆, 公元前221年)");
@@ -93,6 +96,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &shimao).expect("Shimao node failed");
     println!("  ✅ 石峁遗址 (4300年前, 400万平方米)");
@@ -138,6 +144,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &mertz_detail).expect("Mertz detail node failed");
     println!("  ✅ Mertz验证：4条山脉46座山GPS间距<5%误差");
@@ -182,6 +191,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &gong_linguistics).expect("Gong linguistics node failed");
     println!("  ✅ 宫玉海比较语言学：200+组名称对应");
@@ -222,6 +234,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &zhao_volcano).expect("Zhao volcano node failed");
     println!("  ✅ 赵自强火山理论：昆仑/不周=东非火山口");
@@ -258,6 +273,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &dna_evidence).expect("DNA evidence node failed");
     println!("  ✅ DNA证据：印第安人37个基因与中国人重合");
@@ -302,6 +320,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &dayu_kunlun).expect("Dayu Kunlun node failed");
     println!("  ✅ 大禹昆仑：帝王谷6项卫星图验证全部通过");
@@ -348,6 +369,9 @@ fn main() {
         temporal: None,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     safe_insert_node(&conn, &kunlun_location).expect("Kunlun location node failed");
     println!("  ✅ 光明日报昆仑定论：巴颜喀拉山=先秦昆仑");

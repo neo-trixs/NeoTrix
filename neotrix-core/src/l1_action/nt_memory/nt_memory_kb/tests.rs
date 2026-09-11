@@ -34,6 +34,9 @@
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         kb.insert_node(&mk("s1", NodeType::Skill)).expect("insert skill");
         kb.insert_node(&mk("r1", NodeType::Repository)).expect("insert repo");

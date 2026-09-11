@@ -118,6 +118,9 @@ impl KnowledgeGraphBuilder for GraphifyBackend {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             };
             kb.insert_node(&node)?;
             node_ids.push(node_id);

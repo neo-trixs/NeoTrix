@@ -495,6 +495,9 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
             recall_weight: 1.0,
         }
     }

@@ -55,6 +55,9 @@ fn main() {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         },
     );
     println!("  ✅ 不周山=帕米尔高原论");
@@ -99,6 +102,9 @@ fn main() {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         },
     );
     println!("  ✅ 三星堆与山海经联系");
@@ -137,6 +143,9 @@ fn main() {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         },
     );
     println!("  ✅ 刘树人GIS东山经验证 (2004)");

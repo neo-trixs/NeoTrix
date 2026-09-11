@@ -108,6 +108,9 @@ impl SelfTest for MemoryAssetSelfTest {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
         if MemoryAssetKind::classify(&skill) != Some(MemoryAssetKind::Skill) {
             failures.push("memory_asset_kind: Skill classify failed".into());
@@ -150,6 +153,9 @@ mod tests {
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         }
     }
 

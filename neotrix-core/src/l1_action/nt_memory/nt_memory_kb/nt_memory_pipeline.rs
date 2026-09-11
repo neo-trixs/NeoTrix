@@ -111,6 +111,9 @@ fn ensure_hub(conn: &rusqlite::Connection, domain: &str) -> Result<String, Strin
         recall_weight: 1.0,
         supersedes: None,
         source_episode: None,
+        parent_id: None,
+        depth: 0,
+        cluster_id: None,
     };
     let tx = conn.unchecked_transaction().map_err(|e| format!("ensure_hub tx: {}", e))?;
     // insert_node_rows 内部已含 nodes + nodes_fts 双写 (last_insert_rowid), 勿重复写 FTS
@@ -315,6 +318,9 @@ impl KnowledgeBase {
                 temporal: None,
                 supersedes: None,
                 source_episode: None,
+                parent_id: None,
+                depth: 0,
+                cluster_id: None,
             };
             // 3. 写入 nodes + FTS (事务)
             let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;

@@ -53,6 +53,9 @@ pub fn sync_directory(kb: &KnowledgeBase, dir: &Path, prefix: &str) -> Result<Wi
             temporal: None,
             supersedes: None,
             source_episode: None,
+            parent_id: None,
+            depth: 0,
+            cluster_id: None,
         };
 
         match kb.insert_node(&node) {
