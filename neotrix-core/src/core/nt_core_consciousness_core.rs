@@ -1124,6 +1124,10 @@ impl ConsciousnessCoreHandle {
     /// 意识核心主入口: 人类语言 → 拆解 → 分配 → 内置/外部 → 反思补齐。
     /// 不依赖任何 CLI 命令; 调用谁 / 怎么调用全部由意识核心决定。
     pub fn process_instruction(&mut self, instruction: &str) -> TaskLoopReport {
+        // 0. 人格路由 (Phase 2: Wedge 9轨 + Prism 7路)
+        let persona_router = crate::l5_cognition::nt_core::persona_routing::PersonaRouter::new();
+        let _routed_skill = persona_router.route_to_skill(instruction);
+
         // 1. 拆解
         let tasks = decompose_instruction(instruction);
         // 2. 加载能力网 + 分配

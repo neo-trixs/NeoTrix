@@ -158,6 +158,16 @@ impl UnifiedDefenseLayer {
         std::cmp::max(input_threat, dual_threat)
     }
 
+    /// 同步输入验证 — 供 ShieldEnforcer 调用
+    pub fn validate_input(&self, input: &str) -> input_gatekeeper::ValidationResult {
+        self.input_gatekeeper.validate(input)
+    }
+
+    /// 同步输入验证 — 供 ShieldEnforcer 调用
+    pub fn validate_input(&self, input: &str) -> input_gatekeeper::ValidationResult {
+        self.input_gatekeeper.validate(input)
+    }
+
     /// 获取模块引用
     pub fn get_modules(&self) -> &HashMap<String, &dyn std::any::Any> {
         // 返回模块引用（简化实现）

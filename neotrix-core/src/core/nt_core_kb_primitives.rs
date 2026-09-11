@@ -151,7 +151,7 @@ pub fn kv_purge_namespace(conn: &Connection, namespace: &str) -> Result<usize, S
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 
-pub const SCHEMA_VERSION: i32 = 11;
+pub const SCHEMA_VERSION: i32 = 10;
 
 /// 打开默认生产 KB 原生连接 (~/.neotrix/knowledge.db) 并初始化 schema。
 /// 失败返回 None (调用方自行降级, 如内存库)。
