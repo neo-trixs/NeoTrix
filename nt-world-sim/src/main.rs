@@ -34,6 +34,8 @@ pub struct WorldMapData {
     pub height: f32,
     pub agents: Vec<AgentInfoDto>,
     pub tick: u64,
+    pub heightmap: Vec<Vec<f32>>,
+    pub biomes: Vec<Vec<String>>,
 }
 
 pub struct SimState {
@@ -101,6 +103,10 @@ async fn sim_get_agents(state: State<'_, Arc<SimState>>) -> Result<Vec<AgentInfo
 #[tauri::command]
 async fn sim_get_world_map(state: State<'_, Arc<SimState>>) -> Result<WorldMapData, String> {
     let sim = state.sim.lock().await;
+    let heightmap: Vec<Vec<f32>> = sim.heightmap.data().iter().map(|row| row.clone()).collect();
+    let biomes: Vec<Vec<String>> = sim.biome_map.data().iter().map(|row| {
+        row.iter().map(|b| format!("{:?}", b)).collect()
+    }).collect();
     Ok(WorldMapData {
         width: sim.config.world_width,
         height: sim.config.world_height,
@@ -115,6 +121,8 @@ async fn sim_get_world_map(state: State<'_, Arc<SimState>>) -> Result<WorldMapDa
             alive: a.core.alive,
         }).collect(),
         tick: sim.tick,
+        heightmap,
+        biomes,
     })
 }
 

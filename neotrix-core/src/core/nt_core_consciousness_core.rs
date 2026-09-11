@@ -1214,6 +1214,10 @@ impl ConsciousnessCoreHandle {
         config: &ExternalClosureConfig,
         on_step: &dyn Fn(HarnessStepProgress),
     ) -> TaskLoopReport {
+        // G2: GoalLock — 目标锁定 + 四轮恢复
+        let mut goal_lock = crate::l1_action::nt_act::goal_lock::GoalLock::new();
+        goal_lock.set_goal(instruction);
+
         let mut report = self.process_instruction(instruction);
         let total = report.allocations.len();
 
@@ -1231,6 +1235,29 @@ impl ConsciousnessCoreHandle {
                     output: String::new(),
                 });
                 let (executed, output) = dispatch_internal_capability(&alloc.task);
+                // G2: GoalLock — 任务失败时尝试恢复
+                if !executed {
+                    if let Some(recovered) = goal_lock.recover(instruction, &output) {
+                        let (retry_executed, retry_output) = dispatch_internal_capability(
+                            &crate::l5_cognition::nt_core::Task {
+                                id: alloc.task.id.clone(),
+                                summary: recovered,
+                                capability_tag: alloc.task.capability_tag.clone(),
+                                ..alloc.task.clone()
+                            }
+                        );
+                        if retry_executed {
+                            on_step(HarnessStepProgress {
+                                index: idx, total,
+                                kind: "internal".to_string(),
+                                capability_tag: alloc.task.capability_tag.clone(),
+                                summary: alloc.task.summary.clone(),
+                                status: "done".to_string(),
+                                output: retry_output,
+                            });
+                        }
+                    }
+                }
                 on_step(HarnessStepProgress {
                     index: idx,
                     total,

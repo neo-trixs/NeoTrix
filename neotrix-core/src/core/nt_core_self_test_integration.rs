@@ -178,6 +178,8 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     crate::l3_embodiment::nt_shield::nt_shield_oversight::register_oversight_self_tests(registry);
     // 2026-08-28 外部吸收 (arXiv:2608.23642): NT-GOVERNANCE 人类监督治理 affordance + 萎缩对策
     crate::l6_meta::coordination::nt_governance::register_human_oversight_self_tests(registry);
+    // 2026-09-11 PDF图像能力熔炼: SelfTest T2 注册
+    crate::neotrix::nt_file_ability::selftest::register_pdf_sr_self_tests(registry);
 }
 
 /// C5 自愈回路检测件 (检测异常 → 自动恢复)。纯内存, 无网络/磁盘/env IO。

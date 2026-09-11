@@ -512,6 +512,15 @@ impl crate::l5_cognition::nt_mind::nt_mind_hook::HookAction for SessionEndHook {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
+        // G3: SessionLedger — 会话结束时记录证据账本，防幻觉
+        let mut ledger = crate::l1_action::nt_memory::evidence_ledger::SessionLedger::new(session_id);
+        ledger.add_evidence(
+            crate::l1_action::nt_memory::evidence_ledger::EvidenceType::Observation,
+            &format!("Session {session_id} cycle {cycle} ended"),
+            "experience_tree_hook",
+            0.9,
+        );
+
         // 写入 pending-absorb.json 供后台循环消费
         let pending = pending_absorb_path();
         let entry = serde_json::json!({

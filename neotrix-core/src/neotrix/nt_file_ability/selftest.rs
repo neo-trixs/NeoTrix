@@ -167,6 +167,14 @@ impl SelfTest for FileAbilitySelfTest {
     }
 }
 
+/// 注册 PDF/SR SelfTest 到主 registry
+pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+    registry.register(Box::new(PdfIconEnhanceSelfTest));
+    registry.register(Box::new(ImageSuperResolutionSelfTest));
+    registry.register(Box::new(PdfImageExtractSelfTest));
+    registry.register(Box::new(FileAbilitySelfTest));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
