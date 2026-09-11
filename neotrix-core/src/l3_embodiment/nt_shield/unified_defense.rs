@@ -136,7 +136,7 @@ impl UnifiedDefenseLayer {
         &self,
         input_result: &input_gatekeeper::ValidationResult,
         dual_result: &dual_evidence::DualEvidenceResult,
-        hook_results: &[grapple_hooks::HookChainResult],
+        _hook_results: &[grapple_hooks::HookChainResult],
     ) -> ThreatLevel {
         let input_threat = match input_result.threat_level {
             input_gatekeeper::ThreatLevel::Safe => ThreatLevel::Safe,

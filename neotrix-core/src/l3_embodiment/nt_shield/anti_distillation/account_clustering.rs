@@ -45,7 +45,7 @@ impl AccountClustering {
 
     pub async fn check_cluster(
         &self,
-        account_id: &str,
+        _account_id: &str,
         metadata: &HashMap<String, String>,
     ) -> Option<DetectionSignal> {
         let mut signals = Vec::new();

@@ -181,7 +181,6 @@ impl ShieldEnforcer {
         // 8. UnifiedDefenseLayer (Phase 1 新增: 反破限/反分馏/输入验证统一层)
         // 对输入文本执行全链路防御: input_gatekeeper → slang_norm → prompt_guardian → refusal_tamper
         if let Some(input) = guardrail_input {
-            let defense_input: std::collections::HashMap<String, String> = std::collections::HashMap::new();
             let defense_result = self.unified_defense.validate_input(input);
             if !defense_result.is_safe {
                 return Err(ShieldDecision::Block(format!(
@@ -189,6 +188,7 @@ impl ShieldEnforcer {
                     defense_result.threat_level, defense_result.signals
                 )));
             }
+        }
         }
 
         Ok(())

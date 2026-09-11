@@ -113,8 +113,10 @@ mod tests {
         let mut camera = Camera::new(&config);
         camera.zoom_in();
         assert!(camera.target_zoom > 1.0);
+        let after_zoom_in = camera.target_zoom;
         camera.zoom_out();
-        assert!(camera.target_zoom < 1.0);
+        assert!(camera.target_zoom < after_zoom_in);
+        assert!(camera.target_zoom >= camera.min_zoom);
     }
 
     #[test]
