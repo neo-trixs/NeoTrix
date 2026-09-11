@@ -1,5 +1,4 @@
 use crate::agents::SimAgent;
-use crate::evolution::FitnessLandscape;
 
 #[derive(Debug, Clone)]
 pub struct HistoricalAgent {
