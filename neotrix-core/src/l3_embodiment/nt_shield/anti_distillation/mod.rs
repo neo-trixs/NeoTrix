@@ -12,8 +12,6 @@ pub mod account_clustering;
 pub mod reasoning_protector;
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Threat level for detected distillation attempts
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

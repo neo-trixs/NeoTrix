@@ -2,7 +2,6 @@
 //!
 //! action×target双证据 + 软多信号栈 + 结构/角色边界
 
-use std::collections::HashMap;
 
 /// 扫描结果
 #[derive(Debug, Clone)]

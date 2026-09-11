@@ -16,4 +16,3 @@ pub use aegis::AegisEngine;
 pub use harness_optimizer::HarnessOptimizer;
 pub use procedural_graph::ProceduralGraph;
 pub use crystallization::CrystallizationEngine;
-pub use distillation::ExperienceDistiller;

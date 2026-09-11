@@ -17,7 +17,7 @@ use image::imageops::FilterType;
 // ============================================================================
 
 /// 超分模型类型
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SuperResolutionModel {
     /// Real-ESRGAN 通用模型 (推荐，速度快)
     RealEsrganGeneral,

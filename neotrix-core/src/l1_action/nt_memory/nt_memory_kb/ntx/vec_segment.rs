@@ -189,6 +189,12 @@ impl VecSegment {
         Ok(start)
     }
 
+    /// 从文件加载 (便捷方法)
+    pub fn from_file(path: impl AsRef<std::path::Path>) -> std::io::Result<Self> {
+        let mut file = std::fs::File::open(path)?;
+        Self::read_from(&mut file)
+    }
+
     /// 读取段
     pub fn read_from(reader: &mut impl Read) -> std::io::Result<Self> {
         // Magic

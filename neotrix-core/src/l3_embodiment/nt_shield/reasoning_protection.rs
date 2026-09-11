@@ -2,7 +2,6 @@
 //!
 //! CoT轨迹保护 + 签名加密 + 上下文保留
 
-use std::collections::HashMap;
 
 /// 保护结果
 #[derive(Debug, Clone)]

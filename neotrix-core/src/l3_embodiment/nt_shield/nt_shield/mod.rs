@@ -45,7 +45,7 @@ use self::safety_kernel::{SafetyKernel, ActionRequest, ActionType, SafetyDecisio
 use self::tool_inspection_stack::{ToolInspectionStack, InspectionResult};
 use self::check_registry::{CheckRegistry, CheckVerdict, ToolSource};
 use self::browser_security::{BrowserSecurityScanner, BrowserSecurityConfig};
-use self::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
+use self::context_boundary::{ContextBoundary, ContextRequest, ValidationResult};
 
 /// 安全管理器 — 门控所有安全敏感操作
 ///

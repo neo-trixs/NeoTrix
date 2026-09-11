@@ -5,7 +5,6 @@
 //! 2. MiniBERT意图分类 (语义)
 //! 3. 黑话规范化 (语义转换)
 
-use std::collections::HashMap;
 
 /// 输入验证结果
 #[derive(Debug, Clone)]
