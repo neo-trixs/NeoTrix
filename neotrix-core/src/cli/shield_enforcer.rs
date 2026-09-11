@@ -8,6 +8,7 @@ use crate::l3_embodiment::nt_shield::nt_shield::guard::{GuardDecision, SecurityG
 use crate::l3_embodiment::nt_shield::nt_shield::guardrails::{GuardrailConfig, GuardrailSystem};
 use crate::l3_embodiment::nt_shield::nt_shield::perm_chain::{PermissionChain, PermissionMode, PermissionResult};
 use crate::l3_embodiment::nt_shield::nt_shield::policy::{ActionPolicy, PolicyDecision};
+use crate::l3_embodiment::nt_shield::unified_defense::UnifiedDefenseLayer;
 
 pub struct ShieldEnforcer {
     pub guard: SecurityGuard,
@@ -20,6 +21,8 @@ pub struct ShieldEnforcer {
     /// prefix rules before external execution. Fail-closed: unknown actions
     /// require approval. (nt_act_sandbox — production wiring for R-P79.)
     pub action_sandbox: std::sync::Mutex<crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox>,
+    /// Phase 1 新增: 统一防御层 — 整合所有反破限/反分馏/输入验证
+    pub unified_defense: UnifiedDefenseLayer,
 }
 
 #[derive(Debug)]
