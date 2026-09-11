@@ -34,8 +34,9 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
     conn.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            data_tier, temporal, supersedes, source_episode, tier, norm_title)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+            data_tier, temporal, supersedes, source_episode, tier, norm_title,
+            parent_id, depth, cluster_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
         params![
             node.id,
             node.node_type.as_str(),
@@ -58,6 +59,9 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
             node.source_episode,
             "warm",
             norm_title,
+            node.parent_id,
+            node.depth,
+            node.cluster_id,
         ],
     )?;
 
@@ -170,7 +174,7 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            supersedes
+            supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE id=?1",
     )?;
 
@@ -197,6 +201,9 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
                 temporal: None,
                 supersedes: row.get(15)?,
                 source_episode: None,
+                parent_id: row.get(16)?,
+                depth: row.get(17)?,
+                cluster_id: row.get(18)?,
             }))
         }
         None => Ok(None),
@@ -207,7 +214,7 @@ pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &N
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            supersedes
+            supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE title=?1 AND node_type=?2 AND url IS NULL LIMIT 1",
     )?;
     let mut rows = stmt.query(params![title, node_type.as_str()])?;
@@ -231,6 +238,9 @@ pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &N
             temporal: None,
             supersedes: row.get(15)?,
             source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
         })),
         None => Ok(None),
     }
@@ -244,7 +254,7 @@ pub fn find_node_by_norm_title_and_type(
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            supersedes
+            supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE norm_title=?1 AND node_type=?2 LIMIT 1",
     )?;
     let mut rows = stmt.query(params![norm_title, node_type.as_str()])?;
@@ -268,6 +278,9 @@ pub fn find_node_by_norm_title_and_type(
             temporal: None,
             supersedes: row.get(15)?,
             source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
         })),
         None => Ok(None),
     }

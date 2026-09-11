@@ -44,6 +44,7 @@ pub mod proxy_detection;
 pub mod reasoning_protection;
 pub mod anti_distillation;
 pub mod fullbreak;
+pub mod cloud_evade;
 pub mod nt_shield_ztnet;
 
 // ============================================
@@ -67,3 +68,4 @@ pub use proxy_detection::ProxyDetectionEngine;
 pub use reasoning_protection::ReasoningProtectionEngine;
 pub use anti_distillation::AntiDistillationEngine;
 pub use fullbreak::{AttackResult, AttackSurface, FullbreakEngine};
+pub use cloud_evade::{CloudEvadeEngine, EvasionResult, EvasionTechnique, ObfuscationType};

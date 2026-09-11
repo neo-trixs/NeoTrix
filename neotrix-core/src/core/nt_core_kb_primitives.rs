@@ -151,7 +151,7 @@ pub fn kv_purge_namespace(conn: &Connection, namespace: &str) -> Result<usize, S
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 
-pub const SCHEMA_VERSION: i32 = 9;
+pub const SCHEMA_VERSION: i32 = 11;
 
 /// 打开默认生产 KB 原生连接 (~/.neotrix/knowledge.db) 并初始化 schema。
 /// 失败返回 None (调用方自行降级, 如内存库)。
@@ -197,8 +197,27 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
             norm_title TEXT,
             valid_start_time INTEGER,
             valid_end_time INTEGER,
-            transaction_time INTEGER NOT NULL
+            transaction_time INTEGER NOT NULL,
+            parent_id TEXT,
+            depth INTEGER NOT NULL DEFAULT 0,
+            cluster_id TEXT
         );
+
+        CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_nodes_cluster ON nodes(cluster_id);
+        CREATE INDEX IF NOT EXISTS idx_nodes_domain_type ON nodes(domain, node_type);
+
+        CREATE TABLE IF NOT EXISTS domain_clusters (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            parent_cluster_id TEXT,
+            node_count INTEGER NOT NULL DEFAULT 0,
+            avg_confidence REAL NOT NULL DEFAULT 0.0,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cluster_parent ON domain_clusters(parent_cluster_id);
+        CREATE INDEX IF NOT EXISTS idx_cluster_name ON domain_clusters(name);
 
         CREATE TABLE IF NOT EXISTS edges (
             id TEXT PRIMARY KEY,
@@ -208,13 +227,19 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
             weight REAL DEFAULT 1.0,
             description TEXT,
             created_at INTEGER NOT NULL,
-            metadata TEXT
+            updated_at INTEGER,
+            metadata TEXT,
+            valid_start_time INTEGER,
+            valid_end_time INTEGER,
+            transaction_time INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id);
         CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_id);
         CREATE INDEX IF NOT EXISTS idx_edges_type ON edges(relation_type);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_edges_unique ON edges(source_id, target_id, relation_type);
+        CREATE INDEX IF NOT EXISTS idx_edges_valid_time ON edges(valid_start_time, valid_end_time);
+        CREATE INDEX IF NOT EXISTS idx_edges_tx_time ON edges(transaction_time);
 
         CREATE TABLE IF NOT EXISTS embeddings (
             node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
@@ -501,12 +526,71 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
         .query_row("SELECT version FROM schema_version", [], |r| r.get(0))
         .unwrap_or(0);
 
+    // ── Temporal indexes on nodes (bi-temporal fields exist since v9, indexes added v10) ──
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_nodes_valid_time ON nodes(valid_start_time, valid_end_time);
+         CREATE INDEX IF NOT EXISTS idx_nodes_tx_time ON nodes(transaction_time);",
+    )?;
+
     if version < SCHEMA_VERSION {
         // ── Migration v8 (UCN Phase 1): skills_index.content_hash ──
         // 写通去重需要内容指纹列。列可能已存在 (新库由上方 CREATE TABLE 直接建列,
         // 或旧 Python 迁移遗留) → 必须先查列存在性, 不得盲 ALTER (R-P20 schema 漂移防护)。
         if version < 8 && !table_column_exists(conn, "skills_index", "content_hash")? {
             conn.execute_batch("ALTER TABLE skills_index ADD COLUMN content_hash TEXT")?;
+        }
+
+        // ── Migration v10: edges bi-temporal columns + updated_at ──
+        if version < 10 {
+            if !table_column_exists(conn, "edges", "updated_at")? {
+                conn.execute_batch("ALTER TABLE edges ADD COLUMN updated_at INTEGER")?;
+            }
+            if !table_column_exists(conn, "edges", "valid_start_time")? {
+                conn.execute_batch("ALTER TABLE edges ADD COLUMN valid_start_time INTEGER")?;
+            }
+            if !table_column_exists(conn, "edges", "valid_end_time")? {
+                conn.execute_batch("ALTER TABLE edges ADD COLUMN valid_end_time INTEGER")?;
+            }
+            if !table_column_exists(conn, "edges", "transaction_time")? {
+                conn.execute_batch(
+                    "ALTER TABLE edges ADD COLUMN transaction_time INTEGER NOT NULL DEFAULT 0",
+                )?;
+            }
+            conn.execute_batch(
+                "CREATE INDEX IF NOT EXISTS idx_edges_valid_time ON edges(valid_start_time, valid_end_time);
+                 CREATE INDEX IF NOT EXISTS idx_edges_tx_time ON edges(transaction_time);",
+            )?;
+        }
+
+        // ── Migration v11: domain clustering + hierarchy ──
+        if version < 11 {
+            if !table_column_exists(conn, "nodes", "parent_id")? {
+                conn.execute_batch("ALTER TABLE nodes ADD COLUMN parent_id TEXT")?;
+            }
+            if !table_column_exists(conn, "nodes", "depth")? {
+                conn.execute_batch("ALTER TABLE nodes ADD COLUMN depth INTEGER NOT NULL DEFAULT 0")?;
+            }
+            if !table_column_exists(conn, "nodes", "cluster_id")? {
+                conn.execute_batch("ALTER TABLE nodes ADD COLUMN cluster_id TEXT")?;
+            }
+            conn.execute_batch(
+                "CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id);
+                 CREATE INDEX IF NOT EXISTS idx_nodes_cluster ON nodes(cluster_id);
+                 CREATE INDEX IF NOT EXISTS idx_nodes_domain_type ON nodes(domain, node_type);",
+            )?;
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS domain_clusters (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    parent_cluster_id TEXT,
+                    node_count INTEGER NOT NULL DEFAULT 0,
+                    avg_confidence REAL NOT NULL DEFAULT 0.0,
+                    updated_at INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_cluster_parent ON domain_clusters(parent_cluster_id);
+                CREATE INDEX IF NOT EXISTS idx_cluster_name ON domain_clusters(name);",
+            )?;
         }
 
         conn.execute(
@@ -548,6 +632,217 @@ pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
 
 pub fn count_edges(conn: &Connection) -> rusqlite::Result<usize> {
     conn.query_row("SELECT COUNT(*) FROM edges", [], |row| row.get(0))
+}
+
+// ─── Bi-Temporal Queries ────────────────────────────────────────────────────
+
+/// A node snapshot as of a specific transaction time.
+#[derive(Debug, Clone)]
+pub struct TemporalNode {
+    pub id: String,
+    pub node_type: String,
+    pub title: String,
+    pub summary: Option<String>,
+    pub content: Option<String>,
+    pub url: Option<String>,
+    pub domain: Option<String>,
+    pub confidence: f64,
+    pub importance: f64,
+    pub valid_start_time: Option<i64>,
+    pub valid_end_time: Option<i64>,
+    pub transaction_time: i64,
+}
+
+/// An edge snapshot as of a specific transaction time.
+#[derive(Debug, Clone)]
+pub struct TemporalEdge {
+    pub id: String,
+    pub source_id: String,
+    pub target_id: String,
+    pub relation_type: String,
+    pub weight: f64,
+    pub description: Option<String>,
+    pub valid_start_time: Option<i64>,
+    pub valid_end_time: Option<i64>,
+    pub transaction_time: i64,
+}
+
+/// Transaction-time query: what did the KB look like at a given point in time?
+/// Returns nodes whose transaction_time <= as_of (latest version visible at that time).
+pub fn nodes_as_of(conn: &Connection, as_of: i64) -> rusqlite::Result<Vec<TemporalNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain,
+                confidence, importance, valid_start_time, valid_end_time, transaction_time
+         FROM nodes
+         WHERE transaction_time <= ?1
+         ORDER BY id, transaction_time DESC",
+    )?;
+    let rows = stmt.query_map([as_of], |row| {
+        Ok(TemporalNode {
+            id: row.get(0)?,
+            node_type: row.get(1)?,
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            confidence: row.get(7)?,
+            importance: row.get(8)?,
+            valid_start_time: row.get(9)?,
+            valid_end_time: row.get(10)?,
+            transaction_time: row.get(11)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Valid-time query: what is true at a given point in valid time?
+/// Returns nodes where valid_start_time <= at_time AND (valid_end_time IS NULL OR valid_end_time > at_time).
+pub fn nodes_valid_at(conn: &Connection, at_time: i64) -> rusqlite::Result<Vec<TemporalNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain,
+                confidence, importance, valid_start_time, valid_end_time, transaction_time
+         FROM nodes
+         WHERE (valid_start_time IS NULL OR valid_start_time <= ?1)
+           AND (valid_end_time IS NULL OR valid_end_time > ?1)
+         ORDER BY id",
+    )?;
+    let rows = stmt.query_map([at_time], |row| {
+        Ok(TemporalNode {
+            id: row.get(0)?,
+            node_type: row.get(1)?,
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            confidence: row.get(7)?,
+            importance: row.get(8)?,
+            valid_start_time: row.get(9)?,
+            valid_end_time: row.get(10)?,
+            transaction_time: row.get(11)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Bi-temporal query: intersection of valid-time and transaction-time.
+/// "What was true at valid_time AND committed by transaction_time?"
+pub fn nodes_bitemporal(
+    conn: &Connection,
+    valid_at: i64,
+    as_of: i64,
+) -> rusqlite::Result<Vec<TemporalNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain,
+                confidence, importance, valid_start_time, valid_end_time, transaction_time
+         FROM nodes
+         WHERE transaction_time <= ?1
+           AND (valid_start_time IS NULL OR valid_start_time <= ?2)
+           AND (valid_end_time IS NULL OR valid_end_time > ?2)
+         ORDER BY id",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![as_of, valid_at], |row| {
+        Ok(TemporalNode {
+            id: row.get(0)?,
+            node_type: row.get(1)?,
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            confidence: row.get(7)?,
+            importance: row.get(8)?,
+            valid_start_time: row.get(9)?,
+            valid_end_time: row.get(10)?,
+            transaction_time: row.get(11)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Transaction-time query for edges.
+pub fn edges_as_of(conn: &Connection, as_of: i64) -> rusqlite::Result<Vec<TemporalEdge>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, source_id, target_id, relation_type, weight, description,
+                valid_start_time, valid_end_time, transaction_time
+         FROM edges
+         WHERE transaction_time <= ?1
+         ORDER BY id",
+    )?;
+    let rows = stmt.query_map([as_of], |row| {
+        Ok(TemporalEdge {
+            id: row.get(0)?,
+            source_id: row.get(1)?,
+            target_id: row.get(2)?,
+            relation_type: row.get(3)?,
+            weight: row.get(4)?,
+            description: row.get(5)?,
+            valid_start_time: row.get(6)?,
+            valid_end_time: row.get(7)?,
+            transaction_time: row.get(8)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Bi-temporal query for edges.
+pub fn edges_bitemporal(
+    conn: &Connection,
+    valid_at: i64,
+    as_of: i64,
+) -> rusqlite::Result<Vec<TemporalEdge>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, source_id, target_id, relation_type, weight, description,
+                valid_start_time, valid_end_time, transaction_time
+         FROM edges
+         WHERE transaction_time <= ?1
+           AND (valid_start_time IS NULL OR valid_start_time <= ?2)
+           AND (valid_end_time IS NULL OR valid_end_time > ?2)
+         ORDER BY id",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![as_of, valid_at], |row| {
+        Ok(TemporalEdge {
+            id: row.get(0)?,
+            source_id: row.get(1)?,
+            target_id: row.get(2)?,
+            relation_type: row.get(3)?,
+            weight: row.get(4)?,
+            description: row.get(5)?,
+            valid_start_time: row.get(6)?,
+            valid_end_time: row.get(7)?,
+            transaction_time: row.get(8)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Get the full history of a node across all transaction times.
+pub fn node_history(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<TemporalNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain,
+                confidence, importance, valid_start_time, valid_end_time, transaction_time
+         FROM nodes
+         WHERE id = ?1
+         ORDER BY transaction_time ASC",
+    )?;
+    let rows = stmt.query_map([node_id], |row| {
+        Ok(TemporalNode {
+            id: row.get(0)?,
+            node_type: row.get(1)?,
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            confidence: row.get(7)?,
+            importance: row.get(8)?,
+            valid_start_time: row.get(9)?,
+            valid_end_time: row.get(10)?,
+            transaction_time: row.get(11)?,
+        })
+    })?;
+    rows.collect()
 }
 
 #[cfg(test)]
@@ -627,5 +922,102 @@ mod tests {
         .unwrap();
         assert_eq!(count_nodes(&conn).unwrap(), 1);
         assert_eq!(count_edges(&conn).unwrap(), 0);
+    }
+
+    // ─── Bi-temporal tests ───────────────────────────────────────────────
+
+    fn insert_node(conn: &Connection, id: &str, title: &str, vt_start: Option<i64>, vt_end: Option<i64>, tx_time: i64) {
+        conn.execute(
+            "INSERT INTO nodes (id, node_type, title, created_at, updated_at, transaction_time, valid_start_time, valid_end_time)
+             VALUES (?1, 'test', ?2, ?3, ?3, ?3, ?4, ?5)",
+            rusqlite::params![id, title, tx_time, vt_start, vt_end],
+        )
+        .unwrap();
+    }
+
+    fn insert_edge(conn: &Connection, id: &str, src: &str, tgt: &str, vt_start: Option<i64>, vt_end: Option<i64>, tx_time: i64) {
+        conn.execute(
+            "INSERT INTO edges (id, source_id, target_id, relation_type, created_at, transaction_time, valid_start_time, valid_end_time)
+             VALUES (?1, ?2, ?3, 'related', ?4, ?4, ?5, ?6)",
+            rusqlite::params![id, src, tgt, tx_time, vt_start, vt_end],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_nodes_as_of_returns_committed() {
+        let conn = mem_conn();
+        insert_node(&conn, "n1", "v1", None, None, 100);
+        insert_node(&conn, "n1", "v2", None, None, 200);
+
+        let at_150 = nodes_as_of(&conn, 150).unwrap();
+        assert_eq!(at_150.len(), 1);
+        assert_eq!(at_150[0].title, "v1");
+
+        let at_250 = nodes_as_of(&conn, 250).unwrap();
+        assert_eq!(at_250.len(), 1);
+        assert_eq!(at_250[0].title, "v2");
+    }
+
+    #[test]
+    fn test_nodes_valid_at_filters_interval() {
+        let conn = mem_conn();
+        // Valid from t=100 to t=200
+        insert_node(&conn, "n1", "active", Some(100), Some(200), 100);
+        // Always valid (no bounds)
+        insert_node(&conn, "n2", "permanent", None, None, 100);
+
+        let at_150 = nodes_valid_at(&conn, 150).unwrap();
+        assert_eq!(at_150.len(), 2);
+
+        let at_250 = nodes_valid_at(&conn, 250).unwrap();
+        assert_eq!(at_250.len(), 1);
+        assert_eq!(at_250[0].id, "n2");
+    }
+
+    #[test]
+    fn test_nodes_bitemporal_intersection() {
+        let conn = mem_conn();
+        // Valid 100-200, committed at t=100
+        insert_node(&conn, "n1", "old", Some(100), Some(200), 100);
+        // Valid 150-300, committed at t=250
+        insert_node(&conn, "n2", "new", Some(150), Some(300), 250);
+
+        // valid_at=175, as_of=200 → only n1 (n2 not yet committed)
+        let r = nodes_bitemporal(&conn, 175, 200).unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].id, "n1");
+
+        // valid_at=175, as_of=300 → both visible
+        let r = nodes_bitemporal(&conn, 175, 300).unwrap();
+        assert_eq!(r.len(), 2);
+    }
+
+    #[test]
+    fn test_edges_bitemporal() {
+        let conn = mem_conn();
+        insert_node(&conn, "n1", "a", None, None, 100);
+        insert_node(&conn, "n2", "b", None, None, 100);
+        insert_edge(&conn, "e1", "n1", "n2", Some(100), Some(200), 150);
+
+        let r = edges_bitemporal(&conn, 150, 200).unwrap();
+        assert_eq!(r.len(), 1);
+
+        // Outside valid range
+        let r = edges_bitemporal(&conn, 250, 200).unwrap();
+        assert_eq!(r.len(), 0);
+    }
+
+    #[test]
+    fn test_node_history() {
+        let conn = mem_conn();
+        insert_node(&conn, "n1", "v1", None, None, 100);
+        insert_node(&conn, "n1", "v2", None, None, 200);
+        insert_node(&conn, "n1", "v3", None, None, 300);
+
+        let hist = node_history(&conn, "n1").unwrap();
+        assert_eq!(hist.len(), 3);
+        assert_eq!(hist[0].title, "v1");
+        assert_eq!(hist[2].title, "v3");
     }
 }
