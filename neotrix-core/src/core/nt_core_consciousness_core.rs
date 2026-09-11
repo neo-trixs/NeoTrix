@@ -1635,6 +1635,72 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 ),
             }
         }
+        // PDF 图标清晰度提升 (R-P79): 提取图像 → AI 超分 → 嵌回
+        "pdf_icon_enhance" | "pdf_enhance" => {
+            let words: Vec<&str> = task.summary.split_whitespace().collect();
+            let paths: Vec<std::path::PathBuf> = words
+                .iter()
+                .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
+                .filter(|w| w.contains('/') || w.contains('\\'))
+                .map(std::path::PathBuf::from)
+                .collect();
+            if paths.is_empty() {
+                return (
+                    false,
+                    format!("子任务 '{}' 缺少 PDF 路径, 无法增强", task.summary),
+                );
+            }
+            let src = paths[0].clone();
+            let out = paths.get(1).cloned().unwrap_or_else(|| {
+                let stem = src.file_stem().unwrap_or_default();
+                let ext = src.extension().unwrap_or_default();
+                src.with_file_name(format!("{}_enhanced.{}", stem.to_string_lossy(), ext.to_string_lossy()))
+            });
+            
+            // 解析可选参数: --scale 4 --model realesrgan
+            let mut scale: u32 = 4;
+            let mut model = "realesrgan".to_string();
+            for (i, w) in words.iter().enumerate() {
+                if *w == "--scale" && i + 1 < words.len() {
+                    scale = words[i + 1].parse().unwrap_or(4);
+                }
+                if *w == "--model" && i + 1 < words.len() {
+                    model = words[i + 1].to_string();
+                }
+            }
+            
+            let sr_model = match model.as_str() {
+                "anime" => crate::neotrix::SuperResolutionModel::RealEsrganAnime,
+                "photo" => crate::neotrix::SuperResolutionModel::RealEsrganPhoto,
+                "swinir" => crate::neotrix::SuperResolutionModel::SwinIRClassic,
+                _ => crate::neotrix::SuperResolutionModel::RealEsrganGeneral,
+            };
+            
+            let config = crate::neotrix::PdfIconEnhanceConfig {
+                super_resolution: crate::neotrix::SuperResolutionConfig {
+                    model: sr_model,
+                    scale,
+                    ..Default::default()
+                },
+                output_pdf: Some(out.clone()),
+                ..Default::default()
+            };
+            
+            match crate::neotrix::enhance_pdf_icons_with_config(&src, config) {
+                Ok(result) => (
+                    true,
+                    format!(
+                        "PDF 图标增强完成!\n  输入: {}\n  输出: {}\n  提取图像: {} 张\n  成功增强: {} 张\n  耗时: {}ms",
+                        result.input_pdf,
+                        result.output_pdf,
+                        result.images_extracted,
+                        result.images_enhanced,
+                        result.total_time_ms
+                    ),
+                ),
+                Err(e) => (false, format!("PDF 增强失败: {e}")),
+            }
+        }
         _ => (
             true,
             format!(
