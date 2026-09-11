@@ -25,6 +25,9 @@ pub struct DownloadSession {
     pub retry_count: u32,
     /// 元数据
     pub metadata: DownloadMetadata,
+    /// 进度回调 channel (可选, UI 可订阅)
+    #[serde(skip)]
+    pub progress_tx: Option<tokio::sync::mpsc::Sender<DownloadProgress>>,
 }
 
 /// 下载状态枚举
@@ -94,6 +97,7 @@ impl Default for DownloadSession {
             updated_at: now,
             retry_count: 0,
             metadata: DownloadMetadata::new(user, String::new()),
+            progress_tx: None,
         }
     }
 }

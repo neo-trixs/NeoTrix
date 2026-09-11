@@ -76,7 +76,7 @@ async fn sim_get_state(state: State<'_, Arc<SimState>>) -> Result<SimStateDto, S
 }
 
 #[tauri::command]
-async fn sim_tick(state: State<'_, Arc<SimState>>, n: u32) -> Result<SimStateDto, String> {
+async fn sim_tick(state: State<'_, Arc<SimState>>, n: u32, app: AppHandle) -> Result<SimStateDto, String> {
     let mut sim = state.sim.lock().await;
     for _ in 0..n {
         sim.tick().await;
@@ -86,7 +86,7 @@ async fn sim_tick(state: State<'_, Arc<SimState>>, n: u32) -> Result<SimStateDto
     let mean_health = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.health).sum::<f32>() / alive.len() as f32 };
     let mean_hunger = if alive.is_empty() { 0.0 } else { alive.iter().map(|a| a.core.hunger).sum::<f32>() / alive.len() as f32 };
 
-    Ok(SimStateDto {
+    let dto = SimStateDto {
         tick: sim.tick,
         agent_count: sim.agents.len(),
         alive_count: alive.len(),
@@ -95,7 +95,9 @@ async fn sim_tick(state: State<'_, Arc<SimState>>, n: u32) -> Result<SimStateDto
         mean_energy,
         mean_health,
         mean_hunger,
-    })
+    };
+    let _ = app.emit("sim-update", &dto);
+    Ok(dto)
 }
 
 #[tauri::command]
@@ -249,6 +251,20 @@ fn start_tick_loop(app: AppHandle, state: Arc<SimState>) {
     });
 }
 
+fn start_heartbeat_loop(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(500));
+        loop {
+            interval.tick().await;
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
+            let _ = app.emit("sim-heartbeat", serde_json::json!({"ts": ts}));
+        }
+    });
+}
+
 fn main() {
     let config = WorldSimConfig::default();
     let sim = WorldSim::new(config);
@@ -261,6 +277,7 @@ fn main() {
         .manage(state)
         .setup(move |app| {
             start_tick_loop(app.handle().clone(), state_clone);
+            start_heartbeat_loop(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

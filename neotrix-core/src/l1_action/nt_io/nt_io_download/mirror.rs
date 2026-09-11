@@ -8,6 +8,33 @@
 ///   https://huggingface.co/{repo}/resolve/main/{file}
 ///   → https://hf-mirror.com/{repo}/resolve/main/{file}
 
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::sync::Mutex;
+
+/// 镜像速度画像: 记录每个端点的历史吞吐量 (bytes/s)
+/// 用于 adaptive URI 选择 (aria2 --uri-selector=adaptive)
+static MIRROR_SPEED_MAP: LazyLock<Mutex<HashMap<String, f64>>> = LazyLock::new(|| {
+    Mutex::new(HashMap::new())
+});
+
+/// 记录镜像速度 (下载完成后调用)
+pub fn record_mirror_speed(endpoint: &str, bytes_per_sec: f64) {
+    if let Ok(mut map) = MIRROR_SPEED_MAP.lock() {
+        let entry = map.entry(endpoint.to_string()).or_insert(0.0);
+        // 指数移动平均: new = 0.7 * old + 0.3 * current
+        *entry = 0.7 * *entry + 0.3 * bytes_per_sec;
+    }
+}
+
+/// 获取镜像速度排名 (最快优先)
+pub fn ranked_mirrors() -> Vec<(String, f64)> {
+    let map = MIRROR_SPEED_MAP.lock().unwrap();
+    let mut pairs: Vec<_> = map.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    pairs
+}
+
 /// 镜像端点列表 (按优先级排列)
 const MIRROR_ENDPOINTS: &[&str] = &[
     "https://hf-mirror.com",
@@ -50,9 +77,20 @@ pub async fn resolve_mirror_url(client: &reqwest::Client, original_url: &str) ->
         }
     }
 
+    // 按历史速度排序镜像端点 (adaptive selector)
+    let speed_ranking = ranked_mirrors();
+    let mut sorted_endpoints: Vec<&str> = MIRROR_ENDPOINTS.to_vec();
+    if !speed_ranking.is_empty() {
+        sorted_endpoints.sort_by(|a, b| {
+            let speed_a = speed_ranking.iter().find(|(k, _)| k.contains(a.trim_start_matches("https://"))).map(|(_, v)| *v).unwrap_or(0.0);
+            let speed_b = speed_ranking.iter().find(|(k, _)| k.contains(b.trim_start_matches("https://"))).map(|(_, v)| *v).unwrap_or(0.0);
+            speed_b.partial_cmp(&speed_a).unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
     // 生成候选 URL 列表
     let mut candidates = Vec::new();
-    for endpoint in MIRROR_ENDPOINTS {
+    for endpoint in &sorted_endpoints {
         let candidate = original_url
             .replace("https://huggingface.co", endpoint)
             .replace("http://huggingface.co", endpoint);

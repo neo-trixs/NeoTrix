@@ -101,6 +101,10 @@ impl DownloadEngine {
                 session.status = DownloadStatus::Completed;
                 session.progress.percent = 100.0;
                 session.updated_at = SystemTime::now();
+                // 最终进度推送
+                if let Some(tx) = &session.progress_tx {
+                    let _ = tx.try_send(session.progress.clone());
+                }
                 Ok(())
             }
             Err(e) => {
@@ -159,6 +163,28 @@ impl DownloadEngine {
             fs::create_dir_all(parent).await.map_err(|e| {
                 DownloadError::Io(format!("create dir {}: {}", parent.display(), e))
             })?;
+        }
+
+        // 检查 .done 标记: 如果存在且大小匹配, 跳过下载
+        let done_marker = session.path.with_extension("done");
+        if session.path.exists() && done_marker.exists() {
+            if let Ok(meta) = fs::metadata(&session.path).await {
+                if let Ok(done_content) = fs::read_to_string(&done_marker).await {
+                    if let Some(done_size) = done_content.lines()
+                        .find(|l| l.starts_with("size="))
+                        .and_then(|l| l.strip_prefix("size="))
+                        .and_then(|s| s.parse::<u64>().ok())
+                    {
+                        if meta.len() >= done_size {
+                            eprintln!("[download] already complete (done marker exists)");
+                            session.progress.percent = 100.0;
+                            session.progress.downloaded = meta.len();
+                            session.progress.total = done_size;
+                            return Ok(());
+                        }
+                    }
+                }
+            }
         }
 
         // HEAD 获取文件大小
@@ -281,6 +307,10 @@ impl DownloadEngine {
                         "[download] chunk {} done: +{}MB {:.1}% {:.1}MiB/s ETA:{}",
                         i, chunk_bytes / 1024 / 1024, session.progress.percent, speed_mib, eta_str
                     );
+                    // 通过 channel 推送进度给 UI
+                    if let Some(tx) = &session.progress_tx {
+                        let _ = tx.try_send(session.progress.clone());
+                    }
                 }
                 Ok(Err(e)) => {
                     return Err(DownloadError::Network(format!("chunk {} failed: {}", i, e)));
@@ -315,6 +345,15 @@ impl DownloadEngine {
         output.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
         drop(output);
 
+        // 原子完成标记: 写 .done 文件防止半截文件被误用
+        let done_marker = session.path.with_extension("done");
+        let done_content = format!(
+            "size={}\nurl={}\nid={}\ntimestamp={}\n",
+            total_size, session.url, session.id,
+            chrono_simple_now()
+        );
+        let _ = fs::write(&done_marker, done_content).await;
+
         // 清理临时文件
         let _ = fs::remove_dir_all(&tmp_base).await;
 
@@ -338,6 +377,43 @@ impl DownloadEngine {
         }
 
         Ok(0)
+    }
+
+    /// 从 Content-Disposition header 提取文件名
+    async fn detect_filename(&self, url: &Url, dest: &Path) -> PathBuf {
+        if dest.file_name().is_some() && dest.file_stem().is_some_and(|s| !s.to_string_lossy().is_empty()) {
+            return dest.to_path_buf();
+        }
+        // 尝试从 HEAD 的 Content-Disposition 获取
+        if let Ok(resp) = self.client.head(url.clone()).send().await {
+            if let Some(cd) = resp.headers().get("content-disposition") {
+                if let Ok(cd_str) = cd.to_str() {
+                    // filename*=UTF-8''encoded_name
+                    if let Some(pos) = cd_str.find("filename*=UTF-8''") {
+                        let encoded = &cd_str[pos + 16..];
+                        if let Some(name) = encoded.split(';').next() {
+                            if let Ok(decoded) = urlencoding::decode(name) {
+                                return dest.with_file_name(decoded.as_ref());
+                            }
+                        }
+                    }
+                    // filename="name"
+                    if let Some(start) = cd_str.find("filename=\"") {
+                        let rest = &cd_str[start + 10..];
+                        if let Some(end) = rest.find('"') {
+                            return dest.with_file_name(&rest[..end]);
+                        }
+                    }
+                }
+            }
+        }
+        // fallback: 从 URL path 取最后一段
+        if let Some(name) = url.path().rsplit('/').next() {
+            if !name.is_empty() {
+                return dest.with_file_name(name);
+            }
+        }
+        dest.to_path_buf()
     }
 }
 
@@ -406,16 +482,28 @@ async fn download_chunk_to_file(
     let mut stream = response.bytes_stream();
     let mut downloaded = already;
     use futures_util::StreamExt;
+    use tokio::io::BufWriter;
+
+    let mut writer = BufWriter::with_capacity(256 * 1024, file); // 256KB buffer
 
     while let Some(chunk_result) = stream.next().await {
         let chunk = chunk_result.map_err(|e| DownloadError::Network(format!("stream error: {}", e)))?;
-        file.write_all(&chunk).await.map_err(|e| DownloadError::Io(format!("write chunk: {}", e)))?;
+        writer.write_all(&chunk).await.map_err(|e| DownloadError::Io(format!("write chunk: {}", e)))?;
         downloaded += chunk.len() as u64;
     }
 
-    file.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
+    writer.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
 
     Ok(downloaded)
+}
+
+/// 简单时间戳 (避免引入 chrono crate)
+fn chrono_simple_now() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    format!("{}", now)
 }
 
 /// 下载错误类型
