@@ -2,8 +2,6 @@
 //!
 //! 当缓存命中率高时，保留缓存相关内容；命中率低时，激进压缩。
 
-use std::collections::HashMap;
-
 /// 缓存条目
 #[allow(dead_code)]
 pub struct CacheEntry {
@@ -96,7 +94,8 @@ impl CacheCompactor {
                     }
                 }
                 CompactionStrategy::Balanced => {
-                    if entry.hit_count > 0 || kept_tokens + entry.token_count <= self.max_tokens / 2 {
+                    if entry.hit_count > 0 || kept_tokens + entry.token_count <= self.max_tokens / 2
+                    {
                         kept_tokens += entry.token_count;
                         kept += 1;
                     } else {

@@ -2,9 +2,6 @@
 //!
 //! 通过可验证环境驱动 harness 自动优化。
 
-#[allow(dead_code)]
-use std::collections::HashMap;
-
 /// 可验证环境
 #[allow(dead_code)]
 pub struct VerifiableEnvironment {

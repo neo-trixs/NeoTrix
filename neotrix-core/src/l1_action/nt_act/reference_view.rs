@@ -89,7 +89,8 @@ impl ReferenceManager {
     /// 清理过期引用
     pub fn prune(&mut self, max_age_secs: i64) {
         let now = now_ts();
-        self.references.retain(|_, r| now - r.created_at < max_age_secs);
+        self.references
+            .retain(|_, r| now - r.created_at < max_age_secs);
     }
 }
 

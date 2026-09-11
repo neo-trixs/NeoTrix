@@ -20,7 +20,7 @@ pub enum ContextNodeType {
 /// 上下文节点
 #[allow(dead_code)]
 pub struct ContextNode {
-    pub uri: String,           // e.g. "ctx://memory/experience/cycle_001"
+    pub uri: String, // e.g. "ctx://memory/experience/cycle_001"
     pub name: String,
     pub node_type: ContextNodeType,
     pub content: Option<String>,
@@ -44,8 +44,9 @@ impl ContextFileSystem {
             root: "ctx://".to_string(),
         };
         // 创建根目录
-        fs.nodes
-            .insert("ctx://".to_string(), ContextNode {
+        fs.nodes.insert(
+            "ctx://".to_string(),
+            ContextNode {
                 uri: "ctx://".to_string(),
                 name: "/".to_string(),
                 node_type: ContextNodeType::Directory,
@@ -53,7 +54,8 @@ impl ContextFileSystem {
                 children: Vec::new(),
                 metadata: HashMap::new(),
                 token_count: 0,
-            });
+            },
+        );
         fs
     }
 
@@ -99,9 +101,7 @@ impl ContextFileSystem {
 
     /// 读取节点内容
     pub fn read_node(&self, uri: &str) -> Option<(&str, usize)> {
-        self.nodes
-            .get(uri)
-            .map(|n| (n.uri.as_str(), n.token_count))
+        self.nodes.get(uri).map(|n| (n.uri.as_str(), n.token_count))
     }
 
     /// 搜索节点

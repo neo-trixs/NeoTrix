@@ -8,7 +8,7 @@ use aes_gcm::{
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 
-// use crate::l1_action::nt_io::nt_l1_error::{L1Error, L1Result};
+use crate::l3_embodiment::l1_facade::{L1Error, L1Result};
 
 const VAULT_PATH: &str = "~/.neotrix/vault.enc";
 const NONCE_LEN: usize = 12;
