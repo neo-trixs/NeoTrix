@@ -3,6 +3,7 @@
 //! 当缓存命中率高时，保留缓存相关内容；命中率低时，激进压缩。
 
 /// 缓存条目
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct CacheEntry {
     pub key: String,

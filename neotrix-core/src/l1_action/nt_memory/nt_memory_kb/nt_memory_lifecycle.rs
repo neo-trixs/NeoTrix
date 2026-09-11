@@ -8,8 +8,6 @@
 //! Before this module, each mechanism ran independently with no coordination,
 //! leading to inconsistent retention decisions across subsystems.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -188,6 +186,7 @@ impl MemoryLifecycle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn test_memory_lifecycle_default() {

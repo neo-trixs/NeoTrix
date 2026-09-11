@@ -5,7 +5,7 @@
 //! 层: L1 Action
 
 use super::shared::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct DevToolCleaner {
     config: CleanupConfig,

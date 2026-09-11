@@ -436,7 +436,7 @@ impl KnowledgeBase {
                             // 转换为 GraphPath 格式
                             let mut nodes = Vec::new();
                             for nid in &node_ids {
-                                if let Some(node) = nt_memory_store::get_node(&conn, nid)? {
+                                if let Ok(Some(node)) = nt_memory_store::get_node(&conn, nid) {
                                     nodes.push(node);
                                 }
                             }

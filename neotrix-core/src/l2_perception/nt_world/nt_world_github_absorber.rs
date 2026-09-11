@@ -10,18 +10,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use super::l1_facade::KnowledgeBase;
+use super::l1_facade::{DownloadOptions, download_to_file, shared_blocking_client, run_blocking, proxy_from_env};
 
-// ── HTTP Client (L1 dependency centralized here) ──
+// ── HTTP Client (via L1 Facade) ──
 
 fn http_client() -> Option<&'static reqwest::blocking::Client> {
-    Some(crate::l1_action::nt_memory::nt_memory_kb::nt_http::shared_blocking_client())
+    Some(shared_blocking_client())
 }
 
-/// 下载文件到本地路径 (L1 nt_http 依赖集中点)
+/// 下载文件到本地路径 (via L1 Facade)
 fn download_to_file_l1(
-    options: &crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions,
+    options: &DownloadOptions,
 ) -> Result<std::path::PathBuf, String> {
-    crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file(options)
+    download_to_file(options)
         .map(|r| r.path)
 }
 
@@ -42,7 +43,7 @@ fn github_api_get(path: &str) -> Result<serde_json::Value, String> {
     if let Some(token) = github_token() {
         req = req.header("Authorization", format!("Bearer {}", token));
     }
-    let resp = crate::l1_action::nt_memory::nt_memory_kb::nt_http::run_blocking(|| req.send())
+    let resp = run_blocking(|| req.send())
         .map_err(|e| format!("GitHub API error: {e}"))?;
     let status = resp.status();
     if !status.is_success() {
@@ -54,7 +55,7 @@ fn github_api_get(path: &str) -> Result<serde_json::Value, String> {
 
 fn github_raw(url: &str) -> Result<String, String> {
     let client = http_client().ok_or_else(|| "HTTP client not available".to_string())?;
-    let resp = crate::l1_action::nt_memory::nt_memory_kb::nt_http::run_blocking(|| {
+    let resp = run_blocking(|| {
         client
             .get(url)
             .timeout(Duration::from_secs(15))
@@ -356,7 +357,7 @@ impl GitHubAbsorber {
         repo: &str,
         dest: &std::path::Path,
     ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
+        // 使用导入的 DownloadOptions
 
         // 默认分支: 用 repo 元数据 default_branch (branches.first() 是字母序首个,
         // 会误选 "bak-feat/..." 之类特性分支 — project-nomad 实证缺陷)。
@@ -371,7 +372,7 @@ impl GitHubAbsorber {
             owner, repo, branch
         );
         let tarball_path = dest.join(format!("{}-{}.tar.gz", repo, branch_fs));
-        let proxy = crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env();
+        let proxy = proxy_from_env();
         let result = download_to_file_l1(&DownloadOptions {
             url: &url,
             dest: &tarball_path,

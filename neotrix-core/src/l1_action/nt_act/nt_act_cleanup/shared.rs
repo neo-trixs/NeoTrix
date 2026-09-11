@@ -4,7 +4,7 @@
 //! 所有 cleanup 模块应从此处导入共享类型
 
 pub use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // ═══════════════════════════════════════════════════
 // 共享枚举
@@ -508,8 +508,8 @@ pub fn scan_by_patterns(root: &Path, patterns: &[CleanupPattern]) -> Vec<ScanRes
 
             if let Ok(meta) = std::fs::metadata(path) {
                 let age_days = calculate_age_days(&meta);
-                let max_age = pattern.max_age_days.unwrap_or(i64::MAX);
-                if age_days <= max_age {
+                let max_age = pattern.max_age_days.unwrap_or(i64::MAX) as u64;
+                if (age_days as u64) <= max_age {
                     let category = match pattern.kind {
                         ScanCategory::BuildArtifacts => ScanCategory::BuildArtifacts,
                         ScanCategory::BackupFiles => ScanCategory::BackupFiles,
@@ -522,7 +522,7 @@ pub fn scan_by_patterns(root: &Path, patterns: &[CleanupPattern]) -> Vec<ScanRes
                         size_bytes: meta.len(),
                         age_days,
                         category,
-                        last_modified: get_last_modified(&meta),
+                        last_modified: get_last_modified(path),
                     });
                 }
             }

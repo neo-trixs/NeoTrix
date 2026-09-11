@@ -7,3 +7,13 @@ pub use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 pub use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_discovery_github_topics::DiscoveryPipelineConfig;
+
+// HTTP 集中门面 — nt_http 类型与函数
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file;
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadResult;
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::shared_blocking_client;
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::run_blocking;
+
+// HTTP 工厂门面 — proxy_from_env
+pub use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;
