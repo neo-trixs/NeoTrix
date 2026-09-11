@@ -431,22 +431,6 @@ impl DomainPlugin for PluginPlugin {
     }
 }
 
-// ========== Workflow Plugin ==========
-
-pub struct WorkflowPlugin;
-
-impl DomainPlugin for WorkflowPlugin {
-    fn name(&self) -> &str { "workflow" }
-    fn description(&self) -> &str { "工作流：CRUD、执行、调度" }
-    fn actions(&self) -> Vec<ActionSpec> {
-        vec!["list","create","delete","run","status","schedule","import","export"]
-            .iter().map(|a| stub_action(a)).collect()
-    }
-    fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
-        stub_call(action, &["list","create","delete","run","status","schedule","import","export"])
-    }
-}
-
 // ========== Tool Plugin ==========
 
 pub struct ToolPlugin;

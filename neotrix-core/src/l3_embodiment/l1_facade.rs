@@ -18,3 +18,10 @@ pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::{
 
 // NT-ACT 共享类型
 pub use crate::l1_action::nt_act::nt_act_cleanup::shared::*;
+
+// NT-MEMORY 共享类型
+pub use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
+pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
+
+// NT-IO 共享类型
+pub use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;

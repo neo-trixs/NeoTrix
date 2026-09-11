@@ -42,9 +42,13 @@ mod image_super_resolution;
 mod pdf_icon_enhance;
 mod capability;
 mod xlsx_fast;
+mod xlsx_parser;
 mod template_engine;
 mod config_parser;
 mod path_metadata;
+mod table_presenter;
+mod chunk_planner;
+mod excel_tool_schema;
 
 pub use core::*;
 pub use doc_parse::*;
@@ -68,9 +72,13 @@ pub use image_super_resolution::*;
 pub use pdf_icon_enhance::*;
 pub use capability::*;
 pub use xlsx_fast::*;
+pub use xlsx_parser::*;
 pub use template_engine::*;
 pub use config_parser::*;
 pub use path_metadata::*;
+pub use table_presenter::*;
+pub use chunk_planner::*;
+pub use excel_tool_schema::*;
 
 /// 构造最小 DOCX (zip 包: [Content_Types].xml + _rels/.rels + word/document.xml)。
 /// 测试辅助: 模块内 + 意识核心 dispatch 测试复用 (R-P42 复用, 不平行重造)。

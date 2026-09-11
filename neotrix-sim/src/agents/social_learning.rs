@@ -231,6 +231,7 @@ fn action_pattern_key(action: &AgentAction) -> String {
         AgentAction::Explore { .. } => "explore".to_string(),
         AgentAction::Build { .. } => "build".to_string(),
         AgentAction::Harvest { .. } => "harvest".to_string(),
+        AgentAction::Gather { .. } => "gather".to_string(),
         AgentAction::Think => "think".to_string(),
     }
 }

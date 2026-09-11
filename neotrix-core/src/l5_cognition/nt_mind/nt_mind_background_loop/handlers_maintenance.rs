@@ -676,9 +676,9 @@ impl BackgroundLoopHandle {
     ///
     /// 聚类结果供 GWT 注意力路由和知识检索使用 (域感知检索)。
     pub(crate) async fn handle_clustering(&mut self) {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_community::{CommunityDetector, CommunityAwareSearch};
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::{
-            get_all_nodes, get_all_edges, ensure_domain_cluster, update_cluster_stats,
+        use crate::l5_cognition::kb_facade::{
+            CommunityDetector, CommunityAwareSearch,
+            ensure_domain_cluster, get_all_edges, get_all_nodes, update_cluster_stats,
         };
 
         let kb = match self.kb_pipeline.kb.as_ref() {
@@ -937,7 +937,7 @@ impl BackgroundLoopHandle {
     /// L6 自我改进循环 — 采集系统指标 → 诊断瓶颈 → 生成改进方案 → 执行 → 验证。
     /// 与 SEAL pipeline 互补: SEAL 聚焦技能模板提取, 本模块聚焦系统层面参数调优。
     pub(crate) async fn handle_self_improvement(&mut self) {
-        use crate::l6_meta::coordination::self_improvement::SystemMetrics;
+        use crate::l5_cognition::l6_facade::SystemMetrics;
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;

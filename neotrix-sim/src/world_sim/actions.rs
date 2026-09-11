@@ -1,6 +1,7 @@
 use crate::foundation::simulation_bus::{SimEvent, EventPriority};
 use crate::agents::sim_agent::AgentAction;
 use crate::agents::pheromone::PheromoneType;
+use crate::navigation::astar::{AStar, GridPos};
 use super::WorldSim;
 
 impl WorldSim {
@@ -10,10 +11,49 @@ impl WorldSim {
 
         match action {
             AgentAction::Move { target } => {
-                let agent = &mut self.agents[idx];
-                let dir = (*target - agent.core.position).normalize();
+                let agent = &self.agents[idx];
+                let grid_scale = 10.0;
+                let gw = (self.config.world_width / grid_scale) as i32;
+                let gh = (self.config.world_height / grid_scale) as i32;
+
+                let start = GridPos::new(
+                    (agent.core.position.x / grid_scale).clamp(0.0, (gw - 1) as f32) as i32,
+                    (agent.core.position.y / grid_scale).clamp(0.0, (gh - 1) as f32) as i32,
+                );
+                let goal = GridPos::new(
+                    (target.x / grid_scale).clamp(0.0, (gw - 1) as f32) as i32,
+                    (target.y / grid_scale).clamp(0.0, (gh - 1) as f32) as i32,
+                );
+
+                let mut astar = AStar::new(gw, gh);
+                for x in 0..gw {
+                    for y in 0..gh {
+                        let wx = x as f32 * grid_scale + grid_scale * 0.5;
+                        let wy = y as f32 * grid_scale + grid_scale * 0.5;
+                        if self.heightmap.is_mountain(wx, wy) {
+                            astar.set_obstacle(x, y, true);
+                        }
+                    }
+                }
+
+                let move_dir = if let Some(path) = astar.find_path(start, goal) {
+                    if path.len() >= 2 {
+                        let next = &path[1];
+                        let next_world = crate::foundation::math_bridge::Vec2::new(
+                            next.x as f32 * grid_scale + grid_scale * 0.5,
+                            next.y as f32 * grid_scale + grid_scale * 0.5,
+                        );
+                        (next_world - agent.core.position).normalize()
+                    } else {
+                        (*target - agent.core.position).normalize()
+                    }
+                } else {
+                    (*target - agent.core.position).normalize()
+                };
+
                 let speed = 5.0;
-                agent.core.position = agent.core.position + dir * speed;
+                let agent = &mut self.agents[idx];
+                agent.core.position = agent.core.position + move_dir * speed;
                 agent.core.position.x = agent.core.position.x.clamp(0.0, self.config.world_width);
                 agent.core.position.y = agent.core.position.y.clamp(0.0, self.config.world_height);
             }
@@ -145,7 +185,86 @@ impl WorldSim {
                     }
                 }
             }
-            _ => {}
+            AgentAction::Attack { target_id } => {
+                let attacker_id = agent_id.to_string();
+                let target_id_owned = target_id.clone();
+                let (damage, attacker_pos, target_pos) = {
+                    let attacker = &self.agents[idx];
+                    let base_damage = 5.0 + attacker.personality.aggression * 10.0;
+                    let target = self.agents.iter().find(|a| &a.core.id == &target_id_owned);
+                    match target {
+                        Some(t) => {
+                            let defense = t.personality.cooperativeness * 5.0;
+                            let actual = (base_damage - defense).max(1.0);
+                            (actual, attacker.core.position, t.core.position)
+                        }
+                        None => return,
+                    }
+                };
+                if let Some(target) = self.agents.iter_mut().find(|a| &a.core.id == &target_id_owned) {
+                    target.core.take_damage(damage);
+                    let killed = !target.core.alive;
+                    self.relationships.update_interaction(&attacker_id, &target_id_owned, -0.3, self.tick);
+                    self.bus.emit(
+                        SimEvent::AgentActed {
+                            agent_id: attacker_id.clone(),
+                            action: "attack".to_string(),
+                            result: format!(
+                                "attacked {} for {:.1} damage{}",
+                                target_id_owned, damage,
+                                if killed { " (killed)" } else { "" }
+                            ),
+                        },
+                        EventPriority::Normal,
+                        self.clock.current,
+                        "world_sim",
+                    ).await;
+                    if killed {
+                        self.bus.emit(
+                            SimEvent::AgentActed {
+                                agent_id: target_id_owned,
+                                action: "death".to_string(),
+                                result: format!("killed by {}", attacker_id),
+                            },
+                            EventPriority::High,
+                            self.clock.current,
+                            "world_sim",
+                        ).await;
+                    }
+                }
+            }
+            AgentAction::Gather { resource_id } => {
+                if let Some(res) = self.resources.nodes.iter_mut().find(|r| &r.id == resource_id) {
+                    let gathered = res.harvest(15.0);
+                    if gathered > 0.0 {
+                        let agent = &mut self.agents[idx];
+                        agent.core.eat(gathered * 0.5);
+                        agent.core.energy = (agent.core.energy + gathered * 0.3).min(100.0);
+                        self.bus.emit(
+                            SimEvent::AgentActed {
+                                agent_id: agent_id.to_string(),
+                                action: "gather".to_string(),
+                                result: format!("gathered {:.1} from {}", gathered, resource_id),
+                            },
+                            EventPriority::Normal,
+                            self.clock.current,
+                            "world_sim",
+                        ).await;
+                        if res.depleted {
+                            self.bus.emit(
+                                SimEvent::ResourceDepleted {
+                                    resource_id: res.id.clone(),
+                                    position: res.position,
+                                },
+                                EventPriority::Normal,
+                                self.clock.current,
+                                "world_sim",
+                            ).await;
+                        }
+                    }
+                }
+            }
+            AgentAction::Think => {}
         }
 
         {
@@ -198,6 +317,16 @@ impl WorldSim {
             }
             AgentAction::Explore { .. } => {
                 self.pheromone_field.deposit(PheromoneType::Explore, pos, agent_id, self.tick);
+            }
+            AgentAction::Gather { resource_id } => {
+                if let Some(res) = self.resources.nodes.iter().find(|r| &r.id == resource_id) {
+                    self.pheromone_field.deposit(
+                        PheromoneType::Food,
+                        [res.position.0, res.position.1],
+                        agent_id,
+                        self.tick,
+                    );
+                }
             }
             AgentAction::Build { position, .. } => {
                 self.pheromone_field.deposit(

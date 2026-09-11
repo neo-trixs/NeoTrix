@@ -7,7 +7,7 @@
 
 use crate::l5_cognition::nt_mind::evolution::autofixer::AutoFixer;
 use crate::l5_cognition::nt_mind::evolution::evolution_daemon::IssueType;
-use crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
+use crate::l5_cognition::act_facade::ProjectSnapshot;
 use crate::l5_cognition::nt_mind::evolution::evolution_loop::{
     Issue,
     EXCESS_UNWRAP_THRESHOLD,

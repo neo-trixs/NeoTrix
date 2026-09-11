@@ -26,6 +26,7 @@ pub enum AgentAction {
         structure_type: String,
     },
     Explore { direction: Vec2 },
+    Gather { resource_id: String },
     Rest,
     Think,
 }

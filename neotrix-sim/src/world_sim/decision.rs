@@ -23,7 +23,7 @@ impl WorldSim {
         if let Some(action) = self.layer_stigmergy(agent, obs, &pheromone_signal) {
             return action;
         }
-        if let Some(action) = self.layer_personality(agent, obs, time_mods) {
+        if let Some(action) = self.layer_personality(agent, obs, time_mods, &pheromone_signal) {
             return action;
         }
         self.layer_default(agent)

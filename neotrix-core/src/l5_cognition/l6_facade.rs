@@ -15,3 +15,6 @@ pub use crate::l6_meta::nt_repair::nt_mind_eval_harness::EvalHarness;
 // ── memory/ ──
 pub use crate::l6_meta::memory::evolution_harness::EvolutionHarness;
 pub use crate::l6_meta::memory::transcendent_loop::LoopConfig;
+
+// ── coordination/ ──
+pub use crate::l6_meta::coordination::self_improvement::SystemMetrics;

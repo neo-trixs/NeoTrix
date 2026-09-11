@@ -64,7 +64,7 @@ pub struct Issue {
     pub cycle_discovered: u64,
 }
 
-pub use crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
+pub use crate::l5_cognition::act_facade::ProjectSnapshot;
 
 // ============================================================
 // 进化报告

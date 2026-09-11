@@ -27,6 +27,7 @@ impl ActionCostTable {
         costs.insert("attack".to_string(), ActionCost { energy: 8.0, time: 2, risk: 0.3 });
         costs.insert("build".to_string(), ActionCost { energy: 10.0, time: 5, risk: 0.15 });
         costs.insert("explore".to_string(), ActionCost { energy: 2.0, time: 2, risk: 0.1 });
+        costs.insert("gather".to_string(), ActionCost { energy: 2.0, time: 2, risk: 0.05 });
         costs.insert("think".to_string(), ActionCost { energy: 0.5, time: 1, risk: 0.0 });
         Self { costs }
     }
@@ -42,6 +43,7 @@ impl ActionCostTable {
             AgentAction::Attack { .. } => "attack",
             AgentAction::Build { .. } => "build",
             AgentAction::Explore { .. } => "explore",
+            AgentAction::Gather { .. } => "gather",
             AgentAction::Think => "think",
         };
         self.costs.get(key).cloned().unwrap_or(ActionCost { energy: 1.0, time: 1, risk: 0.0 })

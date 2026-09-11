@@ -1,63 +1,38 @@
 use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, Arc};
 use rusqlite::Connection;
 use tauri::{AppHandle, Emitter};
 use neotrix::core::nt_core_consciousness_core::{
     ConsciousTask, SolutionExecutor, AttemptOutcome,
     ExternalClosureConfig, CORE,
 };
+use neotrix::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
+use neotrix::l1_action::nt_io::nt_io_provider::types::{LlmRequest, LlmResponse, LlmError, Usage, FinishReason};
+use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+static GATEWAY: OnceLock<Arc<GatewayV2>> = OnceLock::new();
 
 pub fn set_app_handle(app: AppHandle) {
     let _ = APP_HANDLE.set(app);
 }
 
-/// LLM 池子执行器 — 实现 consciousness core 的 SolutionExecutor trait
-/// 从 config.toml + provider_pool.toml 读取模型，调用本地/远程 LLM
-struct LlmPoolExecutor {
-    endpoint: String,
-    model: String,
+/// 获取或初始化 GatewayV2
+async fn get_gateway() -> &'static GatewayV2 {
+    GATEWAY.get_or_init(|| {
+        // 同步创建一个基础 gateway，异步初始化在首次调用时完成
+        Arc::new(GatewayV2::new())
+    })
 }
 
-impl LlmPoolExecutor {
-    fn from_config() -> Self {
-        let path = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".config").join("neotrix").join("config.toml");
-        let empty_endpoint = "http://127.0.0.1:8080/v1".to_string();
-        let empty_model = "Agents-A1-4B-kimi-Preview-heretic-IQ4_NL".to_string();
-        if !path.exists() {
-            return Self { endpoint: empty_endpoint, model: empty_model };
-        }
-        let content = std::fs::read_to_string(&path).unwrap_or_default();
-        let mut endpoint = empty_endpoint;
-        let mut model = empty_model;
-        for line in content.lines() {
-            let line = line.trim();
-            if line.starts_with('#') || line.is_empty() { continue; }
-            if let Some(v) = line.strip_prefix("custom_endpoint = ") {
-                endpoint = v.trim_matches('"').trim_matches('\'').to_string();
-            } else if let Some(v) = line.strip_prefix("default_model = ") {
-                model = v.trim_matches('"').trim_matches('\'').to_string();
-            }
-        }
-        Self { endpoint, model }
-    }
+/// GatewayV2 LLM 执行器 — 实现 consciousness core 的 SolutionExecutor trait
+struct GatewayExecutor {
+    gateway: Arc<GatewayV2>,
 }
 
-impl SolutionExecutor for LlmPoolExecutor {
+impl SolutionExecutor for GatewayExecutor {
     fn attempt(&self, task: &ConsciousTask, grounding: &str, _attempt_no: u32) -> AttemptOutcome {
-        let url = format!("{}/chat/completions", self.endpoint);
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
-            .build();
-        let client = match client {
-            Ok(c) => c,
-            Err(e) => return AttemptOutcome::Failed { error: e.to_string(), tokens_used: 0 },
-        };
-
         let system_prompt = format!(
             "你是 NeoTrix 意识核心的任务执行器。当前任务: {} (域: {}, 能力: {})\n\
              上下文: {}\n\
@@ -65,32 +40,35 @@ impl SolutionExecutor for LlmPoolExecutor {
             task.summary, task.domain, task.capability_tag, grounding
         );
 
-        let body = serde_json::json!({
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": task.summary}
+        let request = LlmRequest {
+            model: String::new(), // Gateway 会自动选择
+            messages: vec![
+                neotrix::l1_action::nt_io::nt_io_provider::types::ChatMessage {
+                    role: "system".to_string(),
+                    content: system_prompt,
+                },
+                neotrix::l1_action::nt_io::nt_io_provider::types::ChatMessage {
+                    role: "user".to_string(),
+                    content: task.summary.clone(),
+                },
             ],
-            "stream": false,
-            "temperature": 0.7,
-            "max_tokens": 2048,
-        });
+            temperature: Some(0.7),
+            max_tokens: Some(2048),
+            stream: false,
+            tools: None,
+        };
 
-        let resp = client.post(&url)
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send();
-
-        match resp {
-            Ok(r) => {
-                let json: serde_json::Value = r.json().unwrap_or_default();
-                let content = json["choices"][0]["message"]["content"]
-                    .as_str()
-                    .unwrap_or("[LLM 未返回内容]");
-                let tokens = json["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32;
-                AttemptOutcome::Solved { solution: content.to_string(), tokens_used: tokens }
-            }
-            Err(e) => AttemptOutcome::Failed { error: e.to_string(), tokens_used: 0 },
+        // 使用 tokio runtime 执行异步操作
+        let rt = tokio::runtime::Handle::current();
+        match rt.block_on(self.gateway.complete_raw(&request)) {
+            Ok(response) => AttemptOutcome::Solved {
+                solution: response.content,
+                tokens_used: response.usage.total_tokens,
+            },
+            Err(e) => AttemptOutcome::Failed {
+                error: e.to_string(),
+                tokens_used: 0,
+            },
         }
     }
 }
@@ -169,8 +147,15 @@ impl ChatPlugin {
             let _ = app.emit("neocodex_stream_start", "");
         }
 
-        // 使用意识核心分解任务并路由到最佳模型
-        let executor = LlmPoolExecutor::from_config();
+        // 使用 GatewayV2 统一路由
+        let executor = {
+            let rt = tokio::runtime::Handle::current();
+            let gateway = rt.block_on(async {
+                Arc::new(create_gateway_async().await)
+            });
+            GatewayExecutor { gateway }
+        };
+        
         let config = ExternalClosureConfig {
             max_attempts: 3,
             token_budget: 4096,

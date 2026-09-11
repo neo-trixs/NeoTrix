@@ -146,6 +146,13 @@ impl ActionAwareness {
                 expected_health_delta: 0.0,
                 expected_resource_change: None,
             },
+            AgentAction::Gather { .. } => ExpectedOutcome {
+                action: action.clone(),
+                expected_position: None,
+                expected_energy_delta: -0.8,
+                expected_health_delta: 0.0,
+                expected_resource_change: None,
+            },
         };
 
         self.last_expected = Some(expected);

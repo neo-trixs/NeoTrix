@@ -66,7 +66,7 @@ fn main() {
             registry.register(Box::new(KbPlugin::new())).expect("failed to register kb");
             registry.register(Box::new(FilePlugin)).expect("failed to register file");
             registry.register(Box::new(PluginPlugin)).expect("failed to register plugin");
-            registry.register(Box::new(WorkflowPlugin)).expect("failed to register workflow");
+            registry.register(Box::new(WorkflowPluginImpl::new())).expect("failed to register workflow");
             registry.register(Box::new(ToolPlugin)).expect("failed to register tool");
             registry.register(Box::new(SystemPlugin)).expect("failed to register system");
             registry.register(Box::new(SecurityPlugin)).expect("failed to register security");
@@ -75,6 +75,7 @@ fn main() {
             registry.register(Box::new(LlamacppPlugin::new())).expect("failed to register llamacpp");
             registry.register(Box::new(GitPlugin)).expect("failed to register git");
             registry.register(Box::new(CliPlugin)).expect("failed to register cli");
+            registry.register(Box::new(WorldPlugin)).expect("failed to register world");
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {

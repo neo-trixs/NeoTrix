@@ -301,16 +301,48 @@ export interface PluginInfo {
 /**
  * 工作流域操作
  */
-export const workflow = {
-  list: () => call<WorkflowInfo[]>('workflow', 'list'),
-  create: (name: string, steps: unknown[]) => call<string>('workflow', 'create', { name, steps }),
-  delete: (id: string) => call<void>('workflow', 'delete', { id }),
-  run: (id: string) => call<string>('workflow', 'run', { id }),
-  status: (id: string) => call<WorkflowStatus>('workflow', 'status', { id }),
+export interface WorkflowStep {
+  id: string
+  kind: string
+  name: string
+  params: Record<string, unknown>
+  depends_on: string[]
+  timeout_secs: number
+  retry_count: number
 }
 
-export interface WorkflowInfo { id: string; name: string }
-export interface WorkflowStatus { id: string; running: boolean; progress: number }
+export interface Workflow {
+  id: string
+  name: string
+  description: string
+  steps: WorkflowStep[]
+  created_at: number
+  updated_at: number
+  tags: string[]
+}
+
+export interface WorkflowRun {
+  id: string
+  workflow_id: string
+  status: string
+  current_step: number
+  progress_pct: number
+  started_at: number
+  results: Record<string, unknown>
+}
+
+export const workflow = {
+  list: () => call<Workflow[]>('workflow', 'list'),
+  get: (id: string) => call<Workflow>('workflow', 'get', { id }),
+  create: (params: { name: string; description?: string; steps?: WorkflowStep[]; tags?: string[] }) =>
+    call<Workflow>('workflow', 'create', params),
+  update: (id: string, params: Partial<Workflow>) =>
+    call<Workflow>('workflow', 'update', { id, ...params }),
+  delete: (id: string) => call<void>('workflow', 'delete', { id }),
+  run: (workflowId: string) => call<WorkflowRun>('workflow', 'run', { workflow_id: workflowId }),
+  status: (runId: string) => call<WorkflowRun>('workflow', 'status', { run_id: runId }),
+  cancel: (runId: string) => call<void>('workflow', 'cancel', { run_id: runId }),
+}
 
 /**
  * 工具域操作
@@ -466,6 +498,33 @@ export const llamacpp = {
   swap: (model: string) => call<void>('llamacpp', 'swap', { model }),
   send: (prompt: string, opts?: { temperature?: number; max_tokens?: number }) =>
     call<string>('llamacpp', 'send', { prompt, ...opts }),
+}
+
+// ========== World 域 ==========
+
+export interface WorldSearchResult {
+  title: string
+  url: string
+  snippet: string
+  source: string
+}
+
+export interface WorldFetchResult {
+  url: string
+  status: number
+  content_type: string
+  text: string
+  length: number
+}
+
+export const world = {
+  webSearch: (query: string, count?: number) =>
+    call<{ query: string; count: number; results: WorldSearchResult[] }>('world', 'web_search', { query, count }),
+  fetchUrl: (url: string) =>
+    call<WorldFetchResult>('world', 'fetch_url', { url }),
+  extractContent: (url: string, format?: string) =>
+    call<{ url: string; format: string; content: string }>('world', 'extract_content', { url, format }),
+  crawlStatus: () => call<{ status: string; backends: string[] }>('world', 'crawl_status'),
 }
 
 // ========== Domain Proxy (动态调用) ==========
