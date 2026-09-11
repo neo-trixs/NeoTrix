@@ -21,6 +21,7 @@ pub mod null_normalizer;
 pub mod video_quality_scorer;
 pub mod content_moderation;
 pub mod video_audit_trail;
+pub mod self_improvement;
 
 pub use governance::*;
 pub use nt_governance::*;
@@ -52,3 +53,8 @@ pub use nt_meta_async_safety::{
 };
 pub use nt_meta_concurrency_detector::*;
 pub use quality_control::QualityGate;
+pub use self_improvement::{
+    SelfImprovementLoop, ImprovementPlan, ImprovementDimension, ImprovementAction, PlanStatus,
+    SystemMetrics, MetricTrend, TrendDirection, DiagnosticResult, DiagnosticIssue,
+    VerificationResult, LoopStats, CycleResult,
+};

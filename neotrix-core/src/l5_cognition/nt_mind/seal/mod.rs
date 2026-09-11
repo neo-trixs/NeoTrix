@@ -10,3 +10,10 @@ pub mod distillation;
 pub mod harness_evolution;
 pub mod harness_optimizer;
 pub mod procedural_graph;
+
+// Re-exports for pipeline integration
+pub use aegis::AegisEngine;
+pub use harness_optimizer::HarnessOptimizer;
+pub use procedural_graph::ProceduralGraph;
+pub use crystallization::CrystallizationEngine;
+pub use distillation::ExperienceDistiller;

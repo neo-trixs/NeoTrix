@@ -45,6 +45,7 @@ use self::safety_kernel::{SafetyKernel, ActionRequest, ActionType, SafetyDecisio
 use self::tool_inspection_stack::{ToolInspectionStack, InspectionResult};
 use self::check_registry::{CheckRegistry, CheckVerdict, ToolSource};
 use self::browser_security::{BrowserSecurityScanner, BrowserSecurityConfig};
+use self::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
 
 /// 安全管理器 — 门控所有安全敏感操作
 ///
@@ -59,6 +60,8 @@ pub struct SecurityManager {
     pub check_registry: Arc<CheckRegistry>,
     pub browser_scanner: Option<Arc<BrowserSecurityScanner>>,
     pub mcp_security: SecurityMcpToolRegistry,
+    /// 上下文权限边界 — 防止 CPE 攻击
+    pub context_boundary: ContextBoundary,
 }
 
 impl SecurityManager {
@@ -78,6 +81,7 @@ impl SecurityManager {
             check_registry: Arc::new(CheckRegistry::new()),
             browser_scanner: Some(Arc::new(browser_scanner)),
             mcp_security,
+            context_boundary: ContextBoundary::new(),
         }
     }
 
@@ -184,6 +188,11 @@ impl SecurityManager {
         let mut findings = self.audit.scan_directory(path);
         findings.extend(self.audit.scan_documents(path));
         findings
+    }
+
+    /// 验证上下文请求 — 防止 CPE 攻击 (ContextBoundary 集成)
+    pub fn validate_context(&mut self, request: &ContextRequest) -> ValidationResult {
+        self.context_boundary.validate(request)
     }
 }
 

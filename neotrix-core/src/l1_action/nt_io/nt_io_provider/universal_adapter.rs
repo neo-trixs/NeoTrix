@@ -247,7 +247,11 @@ impl FormatConverter for GeminiConverter {
             .map(|m| {
                 format!(
                     "{{\"role\":\"{}\",\"parts\":[{{\"text\":\"{}\"}}]}}",
-                    if m.role == "assistant" { "model" } else { "user" },
+                    if m.role == "assistant" {
+                        "model"
+                    } else {
+                        "user"
+                    },
                     escape_json(&m.content)
                 )
             })
@@ -401,7 +405,11 @@ impl UniversalAdapter {
 
     /// 获取模型统计: (总数, 支持工具数, 支持流式数)
     pub fn stats(&self) -> (usize, usize, usize) {
-        let with_tools = self.models.iter().filter(|m| m.capabilities.supports_tools).count();
+        let with_tools = self
+            .models
+            .iter()
+            .filter(|m| m.capabilities.supports_tools)
+            .count();
         let with_streaming = self
             .models
             .iter()

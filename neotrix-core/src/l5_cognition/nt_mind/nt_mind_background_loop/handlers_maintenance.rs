@@ -80,6 +80,17 @@ impl BackgroundLoopHandle {
         }
     }
 
+    /// Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
+    pub(crate) async fn handle_refinement(&mut self) {
+        use crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner;
+        // 创建快照用于回滚
+        let snapshot_id = self.refiner.snapshot("bg_refinement_cycle");
+        // 获取当前状态摘要
+        let (updates, snapshots, state_items) = self.refiner.stats();
+        info!("[bg] refinement: snapshot={}, updates={}, state_items={}",
+            snapshot_id, updates, state_items);
+    }
+
     pub(crate) async fn handle_scheduler_tick(&mut self) {
         if let Some(ref mut sched) = self.scheduler {
             let now = std::time::SystemTime::now()

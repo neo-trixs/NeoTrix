@@ -58,6 +58,8 @@ pub struct BackgroundConfig {
     /// 意识核心在 consciousness tick 用真实 KB 知识域分布做 EFE 动作选择,
     /// 从"响应输入"变为"主动提问/主动探索" (R-P79 生产接线)。
     pub efe_epistemic_scale: f64,
+    /// Continual Harness Refinement 周期 — 审查轨迹，应用有证据支持的状态更新
+    pub refinement_interval_secs: u64,
 }
 
 impl Default for BackgroundConfig {
@@ -103,6 +105,7 @@ impl Default for BackgroundConfig {
             kb_backup_interval_secs: 21_600,
             consciousness_interval_secs: 600,
             efe_epistemic_scale: 0.0,
+            refinement_interval_secs: 3600,
         }
     }
 }

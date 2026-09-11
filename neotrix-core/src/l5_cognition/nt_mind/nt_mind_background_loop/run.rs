@@ -711,6 +711,7 @@ impl BackgroundLoop {
             denylist: PathDenylist::default_gates(),
             readiness: LoopReadyScore::default(),
             autonomy_tier: AutonomyTier::L1,
+            refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner::new(),
         }));
 
         macro_rules! spawn_handler {
@@ -1012,6 +1013,8 @@ pub struct BackgroundLoopHandle {
     readiness: LoopReadyScore,
     /// L1-L3 自治梯度 (G9) — 由 readiness 派生
     autonomy_tier: AutonomyTier,
+    /// Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
+    refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner,
 }
 
 impl BackgroundLoopHandle {
