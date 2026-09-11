@@ -324,6 +324,12 @@ pub fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
     if na == 0.0 || nb == 0.0 { 0.0 } else { (dot / (na * nb)).clamp(-1.0, 1.0) }
 }
 
+/// Compute cosine similarity between two fixed-size 16-element vectors.
+/// Convenience wrapper for `[f32; 16]` embeddings used throughout the crate.
+pub fn cosine_sim_16(a: &[f32; 16], b: &[f32; 16]) -> f32 {
+    cosine_sim(a.as_slice(), b.as_slice())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
