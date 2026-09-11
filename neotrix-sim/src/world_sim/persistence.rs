@@ -186,6 +186,19 @@ impl PersistenceManager {
         Ok(filename)
     }
 
+    /// Save with a custom name instead of auto-generated tick name
+    pub fn save_named(&self, sim: &WorldSim, name: &str) -> Result<String, String> {
+        let snapshot = self.create_snapshot(sim);
+        let json = serde_json::to_string_pretty(&snapshot)
+            .map_err(|e| format!("Serialize error: {}", e))?;
+        std::fs::create_dir_all(&self.save_dir)
+            .map_err(|e| format!("Dir error: {}", e))?;
+        let filename = format!("{}/{}.json", self.save_dir, name);
+        std::fs::write(&filename, &json)
+            .map_err(|e| format!("Write error: {}", e))?;
+        Ok(filename)
+    }
+
     pub fn load(&self, filename: &str) -> Result<FullWorldSnapshot, String> {
         let json = std::fs::read_to_string(filename)
             .map_err(|e| format!("Read error: {}", e))?;

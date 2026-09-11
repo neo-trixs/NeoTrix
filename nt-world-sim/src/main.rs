@@ -207,6 +207,49 @@ async fn sim_get_full_state(state: State<'_, Arc<SimState>>) -> Result<SimFullSt
     })
 }
 
+#[tauri::command]
+async fn sim_save(
+    state: State<'_, Arc<SimState>>,
+    name: String,
+) -> Result<String, String> {
+    let sim = state.sim.lock().await;
+    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
+    pm.save_named(&sim, &name)
+}
+
+#[tauri::command]
+async fn sim_load(
+    state: State<'_, Arc<SimState>>,
+    name: String,
+) -> Result<serde_json::Value, String> {
+    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
+    let path = format!("saves/{}.json", name);
+    let snapshot = pm.load(&path)?;
+    let restored = pm.restore_from_snapshot(snapshot.clone())?;
+    let mut sim = state.sim.lock().await;
+    *sim = restored;
+    Ok(serde_json::to_value(&snapshot).map_err(|e| e.to_string())?)
+}
+
+#[tauri::command]
+async fn sim_list_saves() -> Result<Vec<serde_json::Value>, String> {
+    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
+    let saves = pm.list_saves();
+    Ok(saves.into_iter().map(|s| serde_json::json!({
+        "name": s.name,
+        "tick": s.tick,
+        "timestamp": s.timestamp_secs,
+        "agents": s.agent_count,
+        "size": s.file_size_bytes,
+    })).collect())
+}
+
+#[tauri::command]
+async fn sim_delete_save(name: String) -> Result<(), String> {
+    let pm = neotrix_sim::world_sim::persistence::PersistenceManager::new("saves");
+    pm.delete_save(&name)
+}
+
 fn start_tick_loop(app: AppHandle, state: Arc<SimState>) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -288,6 +331,10 @@ fn main() {
             sim_select_agent,
             sim_inject_action,
             sim_get_full_state,
+            sim_save,
+            sim_load,
+            sim_list_saves,
+            sim_delete_save,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

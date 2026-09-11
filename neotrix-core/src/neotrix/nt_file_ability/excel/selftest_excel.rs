@@ -21,7 +21,7 @@ impl SelfTest for ExcelSelfTest {
 
         // T3: 生产路径测试
         // 1. ConfigFields::parse
-        let config = super::config_parser::ConfigFields::parse("执行标准:美标,压力:150LB");
+        let config = super::super::config_parser::ConfigFields::parse("执行标准:美标,压力:150LB");
         if config.exec_std.as_deref() != Some("美标") {
             errors.push("ConfigFields::parse 执行标准解析失败".to_string());
         }
@@ -42,8 +42,8 @@ impl SelfTest for ExcelSelfTest {
             "单重kg".into(),
             "总重kg".into(),
         ];
-        let (template, _map) = super::template_engine::ColumnMap::detect(&header);
-        if template != super::template_engine::TemplateType::PurchaseRequest {
+        let (template, _map) = super::super::template_engine::ColumnMap::detect(&header);
+        if template != super::super::template_engine::TemplateType::PurchaseRequest {
             errors.push(format!(
                 "ColumnMap::detect 采购申请单模板检测失败, got {:?}",
                 template
