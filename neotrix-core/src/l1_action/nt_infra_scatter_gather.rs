@@ -48,6 +48,7 @@ pub struct GatherResult {
 /// Scatter-Gather 引擎
 pub struct ScatterGather {
     strategy: AggregateStrategy,
+    #[allow(dead_code)]
     default_timeout_ms: u64,
 }
 

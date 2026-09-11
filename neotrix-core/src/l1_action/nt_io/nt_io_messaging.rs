@@ -272,6 +272,7 @@ impl MessagingProvider for EmailProvider {
 /// 消息能力注册中心
 pub struct MessagingRegistry {
     providers: Vec<Box<dyn MessagingProvider>>,
+    #[allow(dead_code)]
     by_channel: HashMap<Channel, Vec<usize>>,
     templates: HashMap<String, MessageTemplate>,
 }

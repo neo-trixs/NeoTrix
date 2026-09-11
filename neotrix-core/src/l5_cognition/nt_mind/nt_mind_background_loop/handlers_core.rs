@@ -366,6 +366,7 @@ impl BackgroundLoopHandle {
 
     /// Log a session event to KB (obsidian-mind SessionStart/Stop pattern).
     /// Creates a node with type=Session with event type and summary.
+    #[allow(dead_code)]
     pub(crate) async fn log_session_event(&self, event_type: &str, summary: &str) {
         let Some(ref kb) = self.kb else { return };
         let title = format!("session-{}-{}", event_type, chrono::Utc::now().timestamp());

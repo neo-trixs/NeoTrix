@@ -12,6 +12,7 @@ pub struct PhysicalEmbodiment {
     motors: Vec<Motor>,
     safety_kernel: SafetyKernel,
     power_manager: PowerManager,
+    #[allow(dead_code)]
     body_schema: BodySchema,
 }
 

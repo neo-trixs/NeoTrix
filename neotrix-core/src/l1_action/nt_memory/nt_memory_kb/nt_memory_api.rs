@@ -106,6 +106,7 @@ pub struct SearchParams {
     limit: Option<usize>,
     /// 兼容字段：HTTP 公开面强制 Public clearance（C-2 加固），
     /// 客户端传入的 permission 被忽略——保留字段仅为 serde 兼容旧客户端。
+    #[allow(dead_code)]
     permission: Option<String>,
 }
 

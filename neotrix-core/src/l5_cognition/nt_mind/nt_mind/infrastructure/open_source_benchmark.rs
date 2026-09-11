@@ -15,6 +15,7 @@ struct ProjectProfile {
     domain: &'static str,
     task_types: &'static [TaskType],
     capability_profile: &'static [(usize, f64)],
+    #[allow(dead_code)]
     description: &'static str,
     url: &'static str,
     relevance: f64,

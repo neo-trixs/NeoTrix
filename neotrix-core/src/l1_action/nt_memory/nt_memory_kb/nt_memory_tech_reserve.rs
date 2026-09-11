@@ -219,6 +219,7 @@ impl TechReserveStore {
     }
 
     /// 从 entries 重建索引 (内部变更后用)
+    #[allow(dead_code)]
     fn rebuild_index(&mut self) {
         self.domain_index.clear();
         self.dimension_index.clear();

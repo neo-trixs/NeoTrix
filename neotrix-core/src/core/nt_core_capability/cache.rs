@@ -12,6 +12,7 @@ struct CacheEntry {
     /// 缓存值
     value: CapabilityOutput,
     /// 创建时间
+    #[allow(dead_code)]
     created_at: Instant,
     /// 过期时间
     expires_at: Instant,

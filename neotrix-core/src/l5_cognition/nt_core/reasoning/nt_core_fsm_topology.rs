@@ -14,6 +14,7 @@ pub struct FSMBehaviorTopologyEngine {
     states: Vec<FSMState>,
     transitions: Vec<FSMTransition>,
     predictions: Vec<BehaviorPrediction>,
+    #[allow(dead_code)]
     config: FSMConfig,
     stats: FSMStats,
 }

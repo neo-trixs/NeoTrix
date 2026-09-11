@@ -253,6 +253,7 @@ impl AoiMonitor {
 }
 
 /// `parse_geojson` 无 `&self` 时使用的默认围栏 (Tokyo 区)
+#[allow(dead_code)]
 fn self_default_fence() -> Geofence {
     Geofence {
         min_lat: 35.0,

@@ -15,6 +15,7 @@ pub struct PlanningEngine {
     plans: HashMap<String, Plan>,
     task_graph: TaskGraph,
     resource_manager: ResourceManager,
+    #[allow(dead_code)]
     config: PlanningConfig,
     stats: PlanningStats,
 }

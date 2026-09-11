@@ -76,6 +76,7 @@ impl InvariantPredictor {
     }
 
     /// 梯度下降单步 (保留供在线更新使用)
+    #[allow(dead_code)]
     fn update(&mut self, x: &[f32], y_err: f32, lr: f32) {
         for (w, v) in self.weights.iter_mut().zip(x.iter()) {
             *w -= lr * y_err * v;

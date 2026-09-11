@@ -181,6 +181,7 @@ pub enum ProviderKind {
 
 impl ProviderKind {
     /// Free-tier order: groq > gemini > cerebras > samba > openrouter > others
+    #[allow(dead_code)]
     fn free_tier_order(self) -> u8 {
         match self {
             Self::Groq => 0,

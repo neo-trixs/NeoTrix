@@ -48,6 +48,7 @@ fn calibration_pair_json(quality: f64, pass_rate: f64, total: usize) -> String {
 }
 
 /// Volition 目标向量: 认知前沿探索目标 (256B, 与候选 action 等长以供 QuantizedVSA 相似度)。
+#[allow(dead_code)]
 fn volition_goal_vector() -> Vec<u8> {
     b"EPISTEMIC_FRONTIER_EXPLORE_LOW_DENSITY_DOMAINS"
         .iter()

@@ -15,6 +15,7 @@ pub struct ComputerVisionPipeline {
     processors: Vec<ImageProcessor>,
     detectors: Vec<ObjectDetector>,
     segmenters: Vec<ImageSegmenter>,
+    #[allow(dead_code)]
     config: CVConfig,
     stats: CVStats,
 }

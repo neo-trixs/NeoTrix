@@ -19,6 +19,7 @@ impl MultiLyricSource {
     }
 
     /// 解析逐字歌词 (增强版 LRC)
+    #[allow(dead_code)]
     fn parse_enhanced_lrc(line: &str) -> Vec<LyricWord> {
         let mut words = Vec::new();
         let mut remaining = line;

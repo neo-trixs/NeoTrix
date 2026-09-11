@@ -16,6 +16,7 @@ pub struct Development3DEngine {
     objects: HashMap<String, GameObject>,
     scripts: Vec<Script>,
     assets: Vec<Asset>,
+    #[allow(dead_code)]
     config: Dev3DConfig,
     stats: Dev3DStats,
 }

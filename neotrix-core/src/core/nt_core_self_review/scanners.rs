@@ -237,6 +237,7 @@ pub(crate) fn scan_for_pattern_in_lazy_init(dir: &Path) -> usize {
 // ─── Python scanner helpers ───
 
 /// Scan Python files for a simple pattern match.
+#[allow(dead_code)]
 pub(crate) fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
     let mut count = 0usize;
     if let Ok(entries) = std::fs::read_dir(dir) {

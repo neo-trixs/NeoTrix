@@ -24,6 +24,7 @@ pub struct Game2048 {
     best: u32,
     turn: usize,
     is_terminal: bool,
+    #[allow(dead_code)]
     seed: u64,
     rng_state: u64,
 }

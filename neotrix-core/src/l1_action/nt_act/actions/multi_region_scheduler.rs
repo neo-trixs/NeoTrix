@@ -88,6 +88,7 @@ pub struct MultiRegionScheduler {
     /// 调度策略
     strategy: RegionalStrategy,
     /// 故障转移配置
+    #[allow(dead_code)]
     failover_config: FailoverConfig,
     /// 统计信息
     stats: RegionalStats,

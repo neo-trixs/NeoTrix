@@ -77,6 +77,7 @@ pub struct C2paProvenance {
     /// C2PA 声明存储
     claims: HashMap<String, C2paClaim>,
     /// 水印配置
+    #[allow(dead_code)]
     watermark_config: WatermarkConfig,
     /// 统计信息
     stats: ProvenanceStats,

@@ -378,6 +378,7 @@ impl BackgroundLoopHandle {
     }
 
     /// G18 统一会话 digest flush (novu 吸收): 周期清出超窗摘要桶, 报告会话拓扑。
+    #[allow(dead_code)]
     pub(crate) async fn handle_session_router_flush(&mut self) {
         // session_router 字段已注释, stub 实现
         log::trace!("[bg] session_router: flush skipped (disabled)");

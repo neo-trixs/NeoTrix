@@ -53,6 +53,7 @@ pub struct FeatureAnalyzer {
 
 /// 注意力可视化器
 pub struct AttentionVisualizer {
+    #[allow(dead_code)]
     attention_weights: HashMap<String, Vec<f64>>,
 }
 

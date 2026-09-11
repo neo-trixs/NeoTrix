@@ -142,6 +142,7 @@ pub enum RegionalMode {
 /// 管理视觉元素跨帧/跨镜头的一致性
 pub struct VisualConsistencyManager {
     /// 一致性修复配置
+    #[allow(dead_code)]
     fix_config: ConsistencyFixConfig,
     /// 分区控制配置
     regional_config: RegionalControlConfig,

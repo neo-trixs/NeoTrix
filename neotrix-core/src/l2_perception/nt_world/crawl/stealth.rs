@@ -12,6 +12,7 @@ const USER_AGENTS: &[&str] = &[
 
 pub struct SessionPool {
     sessions: Arc<Mutex<VecDeque<Fingerprint>>>,
+    #[allow(dead_code)]
     size: usize,
 }
 

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct SkillChainManager {
     chains: HashMap<String, SkillChain>,
     executors: HashMap<String, Box<dyn SkillExecutor>>,
+    #[allow(dead_code)]
     config: ChainConfig,
     stats: ChainStats,
 }
@@ -327,6 +328,7 @@ impl ChainExecutor {
     }
 
     /// 回滚
+    #[allow(dead_code)]
     fn rollback(&mut self) -> Result<(), String> {
         self.state.status = ChainStatus::RollingBack;
 

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 pub struct ModelRouter {
     providers: HashMap<String, Provider>,
     models: HashMap<String, ModelInfo>,
+    #[allow(dead_code)]
     routing_table: RoutingTable,
     stats: RouterStats,
 }

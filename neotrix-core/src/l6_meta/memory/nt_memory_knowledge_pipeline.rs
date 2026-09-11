@@ -15,6 +15,7 @@ pub struct KnowledgePipelineEnhanced {
     pipelines: Vec<KnowledgePipeline>,
     concepts: Vec<ConceptNode>,
     route_table: HashMap<String, String>,
+    #[allow(dead_code)]
     config: PipelineConfig,
     stats: PipelineStats,
 }

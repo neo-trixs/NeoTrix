@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct IntegrationPatternLibrary {
     patterns: Vec<IntegrationPattern>,
     active_integrations: Vec<ActiveIntegration>,
+    #[allow(dead_code)]
     config: IntegrationConfig,
 }
 

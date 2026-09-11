@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct ContextManager {
     windows: HashMap<String, ContextWindow>,
     priority_queue: Vec<ContextItem>,
+    #[allow(dead_code)]
     compression_engine: CompressionEngine,
     config: ContextConfig,
     stats: ContextStats,
@@ -183,6 +184,7 @@ pub enum ItemType {
 
 /// 压缩引擎
 pub struct CompressionEngine {
+    #[allow(dead_code)]
     compression_map: HashMap<String, String>,
 }
 

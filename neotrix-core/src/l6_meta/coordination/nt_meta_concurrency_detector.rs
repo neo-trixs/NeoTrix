@@ -14,6 +14,7 @@ pub struct ConcurrencyConflictDetector {
     monitored_files: Vec<MonitoredFile>,
     conflicts: Vec<Conflict>,
     lock_states: HashMap<String, LockState>,
+    #[allow(dead_code)]
     config: ConflictDetectorConfig,
     stats: ConflictDetectorStats,
 }

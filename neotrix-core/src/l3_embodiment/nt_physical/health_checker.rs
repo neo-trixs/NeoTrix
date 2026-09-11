@@ -30,6 +30,7 @@ pub struct HealthChecker {
     /// 组件检查结果
     results: HashMap<String, HealthCheckResult>,
     /// 最大历史记录
+    #[allow(dead_code)]
     max_history: usize,
     /// 全局健康评分
     global_score: f64,

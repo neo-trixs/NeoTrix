@@ -126,6 +126,7 @@ pub struct ProgressUpdate {
 /// 管理多任务并行、进度追踪、断点续传
 pub struct ProductionOrchestrator {
     /// 配置
+    #[allow(dead_code)]
     config: OrchestratorConfig,
     /// 工作流列表
     workflows: HashMap<String, Workflow>,

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub struct SEALPipelineEnhanced {
     stages: Vec<SEALStage>,
     failure_library: FailureLibrary,
+    #[allow(dead_code)]
     feedback_loop: FeedbackLoop,
     config: SEALConfig,
     stats: SEALStats,

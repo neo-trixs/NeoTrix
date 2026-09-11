@@ -22,6 +22,7 @@ pub enum MockOrderStatus {
 pub struct MockErpSystem {
     orders: HashMap<String, MockOrder>,
     inventory: HashMap<String, i64>,
+    #[allow(dead_code)]
     production_schedules: HashMap<String, Vec<String>>,
 }
 

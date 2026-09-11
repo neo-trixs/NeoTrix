@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct GovernanceComplianceChecker {
     rules: Vec<GovernanceRule>,
     violations: Vec<ComplianceViolation>,
+    #[allow(dead_code)]
     config: ComplianceConfig,
     stats: ComplianceStats,
 }

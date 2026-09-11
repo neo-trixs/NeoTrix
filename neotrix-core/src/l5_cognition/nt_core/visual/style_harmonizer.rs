@@ -79,6 +79,7 @@ pub struct StyleAnalysis {
 /// 风格协调器
 pub struct StyleHarmonizer {
     /// 配置
+    #[allow(dead_code)]
     config: StyleHarmonizerConfig,
     /// 协调历史
     history: Vec<StyleHarmonizationResult>,

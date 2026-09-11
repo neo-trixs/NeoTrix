@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 /// 经验树管理器
 pub struct ExperienceTreeManager {
     experiences: Vec<Experience>,
+    #[allow(dead_code)]
     branches: Vec<ExperienceBranch>,
     config: ExperienceConfig,
     stats: ExperienceStats,

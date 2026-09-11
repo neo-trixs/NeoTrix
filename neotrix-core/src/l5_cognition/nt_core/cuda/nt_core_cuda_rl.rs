@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct CUDAAgentRLOptimizer {
     strategies: Vec<RLStrategy>,
     curriculum: Vec<CurriculumItem>,
+    #[allow(dead_code)]
     optimization_history: Vec<OptimizationResult>,
     config: RLOptimizerConfig,
     stats: RLOptimizerStats,

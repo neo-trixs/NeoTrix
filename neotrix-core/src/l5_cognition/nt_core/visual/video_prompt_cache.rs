@@ -159,6 +159,7 @@ impl VideoPromptCache {
     }
 
     /// 查找相似条目
+    #[allow(dead_code)]
     fn find_similar(&mut self, query_embedding: &[f64]) -> Option<String> {
         let mut best_score = 0.0;
         let mut best_id = None;

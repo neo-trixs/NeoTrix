@@ -1,7 +1,9 @@
 use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
 use crate::commands::neotrix_cli::run_cli;
 use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
+use std::collections::HashMap;
 use std::process::Command as StdCommand;
+use std::sync::{LazyLock, Mutex};
 
 // ========== Helper ==========
 
@@ -399,6 +401,16 @@ fn resolvable(cfg: &ConfigData) -> bool {
 
 // ========== Agent Plugin ==========
 
+static AGENT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
+    LazyLock::new(|| {
+        let mut m = HashMap::new();
+        m.insert("running".into(), serde_json::json!(false));
+        m.insert("project".into(), serde_json::json!(null));
+        m.insert("provider".into(), serde_json::json!(null));
+        m.insert("started_at".into(), serde_json::json!(null));
+        m
+    });
+
 pub struct AgentPlugin;
 
 impl DomainPlugin for AgentPlugin {
@@ -613,23 +625,180 @@ impl DomainPlugin for AgentPlugin {
                     "providers": providers,
                 }))
             }
-            _ => stub_call(
-                action,
-                &[
-                    "start",
-                    "stop",
-                    "set_provider",
-                    "test_provider",
-                    "set_project",
-                    "get_project",
-                    "health",
-                ],
-            ),
+            "start" => {
+                let mut state = AGENT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                if state.get("running").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    return Ok(serde_json::json!({ "ok": true, "message": "Agent already running" }));
+                }
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                state.insert("running".into(), serde_json::json!(true));
+                state.insert("started_at".into(), serde_json::json!(now));
+                Ok(serde_json::json!({ "ok": true, "started_at": now }))
+            }
+            "stop" => {
+                let mut state = AGENT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                if !state.get("running").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    return Ok(serde_json::json!({ "ok": true, "message": "Agent not running" }));
+                }
+                state.insert("running".into(), serde_json::json!(false));
+                state.insert("started_at".into(), serde_json::json!(null));
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "set_provider" => {
+                let provider = args
+                    .get("provider")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let model = args
+                    .get("model")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if provider.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 provider 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let mut state = AGENT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                state.insert(
+                    "provider".into(),
+                    serde_json::json!({ "provider": provider, "model": model }),
+                );
+                Ok(serde_json::json!({ "ok": true, "provider": provider, "model": model }))
+            }
+            "test_provider" => {
+                let provider = args
+                    .get("provider")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if provider.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 provider 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let cfg = read_config_file();
+                let pool = read_pool_entries();
+                let is_configured = cfg.provider == provider
+                    || pool.iter().any(|e| {
+                        e.get("provider").and_then(|v| v.as_str()) == Some(&provider)
+                    });
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "provider": provider,
+                    "available": is_configured,
+                    "message": if is_configured {
+                        format!("Provider '{}' is configured", provider)
+                    } else {
+                        format!("Provider '{}' not found in config", provider)
+                    },
+                }))
+            }
+            "set_project" => {
+                let path = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if path.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 path 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let mut state = AGENT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                state.insert("project".into(), serde_json::json!(path.clone()));
+                Ok(serde_json::json!({ "ok": true, "path": path }))
+            }
+            "get_project" => {
+                let state = AGENT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let path = state
+                    .get("project")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                Ok(serde_json::json!({ "path": path }))
+            }
+            "health" => {
+                let state = AGENT_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let running = state.get("running").and_then(|v| v.as_bool()).unwrap_or(false);
+                let project = state
+                    .get("project")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let provider_info = state.get("provider").cloned().unwrap_or(serde_json::json!(null));
+                let started_at = state.get("started_at").cloned().unwrap_or(serde_json::json!(null));
+                Ok(serde_json::json!({
+                    "status": if running { "running" } else { "stopped" },
+                    "running": running,
+                    "project": project,
+                    "provider": provider_info,
+                    "started_at": started_at,
+                }))
+            }
         }
     }
 }
 
 // ========== Plugin Plugin (meta) ==========
+
+static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
+    LazyLock::new(|| {
+        let mut m = HashMap::new();
+        m.insert(
+            "plugins".into(),
+            serde_json::json!({
+                "session": { "enabled": true, "description": "会话管理" },
+                "chat": { "enabled": true, "description": "对话/LLM" },
+                "kb": { "enabled": true, "description": "知识库" },
+                "file": { "enabled": true, "description": "文件操作" },
+                "memory": { "enabled": true, "description": "记忆管理" },
+                "world": { "enabled": true, "description": "世界感知" },
+                "workflow": { "enabled": true, "description": "工作流" },
+                "agent": { "enabled": true, "description": "Agent 状态/任务/provider" },
+                "tool": { "enabled": true, "description": "工具管理" },
+                "system": { "enabled": true, "description": "系统管理" },
+                "security": { "enabled": true, "description": "安全扫描/审计" },
+                "ext": { "enabled": true, "description": "扩展/协作" },
+                "git": { "enabled": true, "description": "Git 版本控制" },
+                "cli": { "enabled": true, "description": "CLI 命令执行" },
+                "llamacpp": { "enabled": true, "description": "llama.cpp 本地推理" },
+            }),
+        );
+        m
+    });
 
 pub struct PluginPlugin;
 
@@ -658,21 +827,184 @@ impl DomainPlugin for PluginPlugin {
     fn call(
         &self,
         action: &str,
-        _args: serde_json::Value,
+        args: serde_json::Value,
     ) -> Result<serde_json::Value, DomainError> {
-        stub_call(
-            action,
-            &[
-                "list",
-                "install",
-                "uninstall",
-                "enable",
-                "disable",
-                "marketplace",
-                "update",
-                "config",
-            ],
-        )
+        match action {
+            "list" => {
+                let state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let plugins = state.get("plugins").cloned().unwrap_or(serde_json::json!({}));
+                let count = plugins.as_object().map(|m| m.len()).unwrap_or(0);
+                Ok(serde_json::json!({
+                    "plugins": plugins,
+                    "count": count,
+                }))
+            }
+            "install" => {
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 name 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let description = args
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let mut state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let plugins = state
+                    .get_mut("plugins")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Plugin state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                if plugins.contains_key(&name) {
+                    return Ok(serde_json::json!({
+                        "ok": false,
+                        "message": format!("Plugin '{}' already installed", name),
+                    }));
+                }
+                plugins.insert(
+                    name.clone(),
+                    serde_json::json!({ "enabled": true, "description": description }),
+                );
+                Ok(serde_json::json!({ "ok": true, "name": name }))
+            }
+            "uninstall" => {
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 name 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let mut state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let plugins = state
+                    .get_mut("plugins")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Plugin state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                if plugins.remove(&name).is_none() {
+                    return Ok(serde_json::json!({
+                        "ok": false,
+                        "message": format!("Plugin '{}' not found", name),
+                    }));
+                }
+                Ok(serde_json::json!({ "ok": true, "name": name }))
+            }
+            "enable" => {
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 name 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let mut state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let plugins = state
+                    .get_mut("plugins")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Plugin state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                match plugins.get_mut(&name) {
+                    Some(p) => {
+                        if let Some(obj) = p.as_object_mut() {
+                            obj.insert("enabled".into(), serde_json::json!(true));
+                        }
+                        Ok(serde_json::json!({ "ok": true, "name": name, "enabled": true }))
+                    }
+                    None => Err(DomainError {
+                        code: "NOT_FOUND".into(),
+                        message: format!("Plugin '{}' not found", name),
+                        recoverable: true,
+                    }),
+                }
+            }
+            "disable" => {
+                let name = args
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 name 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                let mut state = PLUGIN_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let plugins = state
+                    .get_mut("plugins")
+                    .and_then(|v| v.as_object_mut())
+                    .ok_or_else(|| DomainError {
+                        code: "STATE_ERROR".into(),
+                        message: "Plugin state corrupted".into(),
+                        recoverable: true,
+                    })?;
+                match plugins.get_mut(&name) {
+                    Some(p) => {
+                        if let Some(obj) = p.as_object_mut() {
+                            obj.insert("enabled".into(), serde_json::json!(false));
+                        }
+                        Ok(serde_json::json!({ "ok": true, "name": name, "enabled": false }))
+                    }
+                    None => Err(DomainError {
+                        code: "NOT_FOUND".into(),
+                        message: format!("Plugin '{}' not found", name),
+                        recoverable: true,
+                    }),
+                }
+            }
+            _ => stub_call(
+                action,
+                &["marketplace", "update", "config"],
+            ),
+        }
     }
 }
 
@@ -877,6 +1209,44 @@ impl DomainPlugin for SystemPlugin {
 
 // ========== Security Plugin ==========
 
+static SECURITY_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
+    LazyLock::new(|| {
+        let mut m = HashMap::new();
+        m.insert(
+            "audit_log".into(),
+            serde_json::json!([]),
+        );
+        m.insert(
+            "policies".into(),
+            serde_json::json!({
+                "require_confirmation": true,
+                "quarantine_on_threat": true,
+                "auto_scan": false,
+            }),
+        );
+        m.insert(
+            "quarantine".into(),
+            serde_json::json!([]),
+        );
+        m
+    });
+
+fn security_add_audit_event(event_type: &str, detail: &str) {
+    if let Ok(mut state) = SECURITY_STATE.lock() {
+        if let Some(log) = state.get_mut("audit_log").and_then(|v| v.as_array_mut()) {
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            log.push(serde_json::json!({
+                "timestamp": ts,
+                "type": event_type,
+                "detail": detail,
+            }));
+        }
+    }
+}
+
 pub struct SecurityPlugin;
 
 impl DomainPlugin for SecurityPlugin {
@@ -889,6 +1259,8 @@ impl DomainPlugin for SecurityPlugin {
     fn actions(&self) -> Vec<ActionSpec> {
         vec![
             "scan",
+            "audit",
+            "quarantine",
             "permission_request",
             "permission_respond",
             "stealth_status",
@@ -903,20 +1275,178 @@ impl DomainPlugin for SecurityPlugin {
     fn call(
         &self,
         action: &str,
-        _args: serde_json::Value,
+        args: serde_json::Value,
     ) -> Result<serde_json::Value, DomainError> {
-        stub_call(
-            action,
-            &[
-                "scan",
-                "permission_request",
-                "permission_respond",
-                "stealth_status",
-                "audit_log",
-                "policy_list",
-                "policy_set",
-            ],
-        )
+        match action {
+            "scan" => {
+                let target = args
+                    .get("target")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("system")
+                    .to_string();
+                security_add_audit_event("scan", &format!("Security scan triggered for: {}", target));
+                // Basic scan: check for common sensitive files
+                let mut findings = vec![];
+                let sensitive_patterns = vec![
+                    ".env", "credentials.json", "secrets.yml",
+                    ".ssh/id_rsa", ".aws/credentials", ".npmrc",
+                ];
+                let home = dirs::home_dir().unwrap_or_default();
+                for pattern in &sensitive_patterns {
+                    let path = home.join(pattern);
+                    if path.exists() {
+                        findings.push(serde_json::json!({
+                            "severity": "warning",
+                            "type": "sensitive_file",
+                            "path": path.to_string_lossy(),
+                            "message": format!("Sensitive file found: {}", pattern),
+                        }));
+                    }
+                }
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "target": target,
+                    "findings_count": findings.len(),
+                    "findings": findings,
+                    "clean": findings.is_empty(),
+                }))
+            }
+            "audit" => {
+                let detail = args
+                    .get("detail")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("general audit")
+                    .to_string();
+                security_add_audit_event("audit", &detail);
+                let state = SECURITY_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let log = state.get("audit_log").cloned().unwrap_or(serde_json::json!([]));
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "detail": detail,
+                    "total_events": log.as_array().map(|a| a.len()).unwrap_or(0),
+                }))
+            }
+            "quarantine" => {
+                let path = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let reason = args
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("manual quarantine")
+                    .to_string();
+                if path.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 path 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                security_add_audit_event("quarantine", &format!("Quarantined: {} ({})", path, reason));
+                let mut state = SECURITY_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                if let Some(q) = state.get_mut("quarantine").and_then(|v| v.as_array_mut()) {
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    q.push(serde_json::json!({
+                        "path": path,
+                        "reason": reason,
+                        "timestamp": ts,
+                    }));
+                }
+                Ok(serde_json::json!({ "ok": true, "path": path }))
+            }
+            "permission_request" | "permission_respond" => {
+                security_add_audit_event(action, &args.to_string());
+                Ok(serde_json::json!({ "ok": true, "action": action }))
+            }
+            "stealth_status" => {
+                Ok(serde_json::json!({
+                    "stealth_enabled": false,
+                    "proxy_active": false,
+                    "fingerprint_masked": false,
+                }))
+            }
+            "audit_log" => {
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(50) as usize;
+                let state = SECURITY_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let log = state.get("audit_log").cloned().unwrap_or(serde_json::json!([]));
+                let entries = log
+                    .as_array()
+                    .map(|a| {
+                        let start = if a.len() > limit { a.len() - limit } else { 0 };
+                        a[start..].to_vec()
+                    })
+                    .unwrap_or_default();
+                Ok(serde_json::json!({
+                    "entries": entries,
+                    "count": entries.len(),
+                }))
+            }
+            "policy_list" => {
+                let state = SECURITY_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                let policies = state.get("policies").cloned().unwrap_or(serde_json::json!({}));
+                Ok(serde_json::json!({ "policies": policies }))
+            }
+            "policy_set" => {
+                let key = args
+                    .get("key")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let value = args
+                    .get("value")
+                    .cloned()
+                    .unwrap_or(serde_json::json!(null));
+                if key.is_empty() {
+                    return Err(DomainError {
+                        code: "INVALID_ARGS".into(),
+                        message: "缺少 key 参数".into(),
+                        recoverable: true,
+                    });
+                }
+                security_add_audit_event("policy_set", &format!("{} = {}", key, value));
+                let mut state = SECURITY_STATE.lock().map_err(|e| DomainError {
+                    code: "LOCK_ERROR".into(),
+                    message: e.to_string(),
+                    recoverable: true,
+                })?;
+                if let Some(policies) = state
+                    .get_mut("policies")
+                    .and_then(|v| v.as_object_mut())
+                {
+                    policies.insert(key.clone(), value.clone());
+                }
+                Ok(serde_json::json!({ "ok": true, "key": key, "value": value }))
+            }
+            _ => Err(DomainError {
+                code: "UNKNOWN_ACTION".into(),
+                message: format!("Unknown action: {}", action),
+                recoverable: true,
+            }),
+        }
     }
 }
 

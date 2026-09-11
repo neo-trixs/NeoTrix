@@ -106,6 +106,7 @@ pub struct HuntScope {
 /// Hunt Phase 引擎
 use neotrix_types::shared::Severity;
 pub struct HuntPhase {
+    #[allow(dead_code)]
     architecture_summary: String, // 注入的 architecture.md
     scopes: Vec<HuntScope>,
     findings: Vec<HuntingFinding>,

@@ -144,6 +144,7 @@ pub struct PlatformGatewayConfig {
 #[derive(Debug)]
 pub struct PlatformGateway {
     /// 配置
+    #[allow(dead_code)]
     config: PlatformGatewayConfig,
     /// 平台配置列表
     platforms: HashMap<String, PlatformConfig>,

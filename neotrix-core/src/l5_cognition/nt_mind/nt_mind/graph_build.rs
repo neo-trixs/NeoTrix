@@ -4,6 +4,7 @@ use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ParsedItem {
+    #[allow(dead_code)]
     UseStatement { target: String, line: usize },
     Function { name: String, line: usize, calls: Vec<String> },
     StructDef { name: String, line: usize },

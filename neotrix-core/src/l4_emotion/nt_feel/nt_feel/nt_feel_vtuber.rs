@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct VTuberEmotionEngine {
     persona: CharacterPersona,
     emotion_history: Vec<EmotionReading>,
+    #[allow(dead_code)]
     voice_config: VoiceConfig,
 }
 

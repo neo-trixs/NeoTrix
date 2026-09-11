@@ -454,6 +454,7 @@ pub struct EdgarIngestReport {
 
 /// SEC EDGAR 作为有序搜索后端 (P1 第2个情报后端，免费无key)。
 pub struct EdgarBackend {
+    #[allow(dead_code)]
     fetcher: EdgarFetcher,
 }
 

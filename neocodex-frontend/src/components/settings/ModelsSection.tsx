@@ -6,6 +6,7 @@ import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { clsx } from 'clsx'
 import type { ProviderConfig, ProviderMeta } from '../../api/types'
 import type { ProviderHealthStatus, PoolSufficiencyReport } from '../../api/neocodex'
+import { llamacpp, type LlamacppModel } from '../../api/domain'
 import { ProviderIcon, CategoryBadge, FreeBadge } from '../ProviderIcon'
 import { ModelIcon, CheckIcon, ActiveDotIcon, TestTubeIcon, AlertCircleIcon } from './settingsIcons'
 
@@ -48,6 +49,14 @@ export function ModelsSection(props: Props) {
   const [discoverLoading, setDiscoverLoading] = createSignal(false)
   const [discoverResult, setDiscoverResult] = createSignal<{ discovered_count: number; registered_total: number; models: { provider: string; model_id: string; base_url: string; is_free: boolean; tier: string }[] } | null>(null)
 
+  // llamacpp local model state
+  const [llamacppModels, setLlamacppModels] = createSignal<LlamacppModel[]>([])
+  const [llamacppHealth, setLlamacppHealth] = createSignal<{ status: string; pid?: number; uptime_secs?: number } | null>(null)
+  const [llamacppLoading, setLlamacppLoading] = createSignal(true)
+  const [selectedModel, setSelectedModel] = createSignal('')
+  const [swapping, setSwapping] = createSignal(false)
+  const [llamacppError, setLlamacppError] = createSignal<string | null>(null)
+
   const fetchHealth = async () => {
     try {
       const [status, report] = await Promise.all([
@@ -72,8 +81,45 @@ export function ModelsSection(props: Props) {
     }
   }
 
+  const fetchLlamacpp = async () => {
+    try {
+      const [models, status] = await Promise.all([
+        llamacpp.models(),
+        llamacpp.health(),
+      ])
+      setLlamacppModels(models)
+      setLlamacppHealth(status)
+      if (models.length > 0 && !selectedModel()) {
+        setSelectedModel(models[0].path)
+      }
+    } catch {
+      setLlamacppError('无法连接 llamacpp 服务')
+    } finally {
+      setLlamacppLoading(false)
+    }
+  }
+
+  const handleSwapModel = async () => {
+    const model = selectedModel()
+    if (!model || swapping()) return
+    setSwapping(true)
+    setLlamacppError(null)
+    try {
+      await llamacpp.swap(model)
+      await fetchLlamacpp()
+    } catch (e) {
+      setLlamacppError(e instanceof Error ? e.message : '切换失败')
+    } finally {
+      setSwapping(false)
+    }
+  }
+
   let timer: ReturnType<typeof setInterval> | undefined
-  onMount(() => { fetchHealth(); timer = setInterval(fetchHealth, 15_000) })
+  onMount(() => {
+    fetchHealth()
+    fetchLlamacpp()
+    timer = setInterval(fetchHealth, 15_000)
+  })
   onCleanup(() => { if (timer) clearInterval(timer) })
 
   const handleProviderClick = (p: ProviderMeta) => {
@@ -234,6 +280,82 @@ export function ModelsSection(props: Props) {
                 </Show>
               </div>
             )}
+          </Show>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════
+         Llamacpp 本地模型
+         ════════════════════════════════════════ */}
+      <div class="ss-card rounded-2xl border-black/5 shadow-sm overflow-hidden">
+        <div class="ss-card-header bg-zinc-50/60 border-b border-black/5">
+          <ModelIcon />
+          Llamacpp 本地推理
+          <Show when={llamacppHealth()}>
+            <span class={clsx(
+              'ml-auto text-10px px-2 py-0.5 rounded-full font-medium border',
+              llamacppHealth()!.status === 'running'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-zinc-100 text-zinc-500 border-zinc-200'
+            )}>
+              {llamacppHealth()!.status === 'running'
+                ? `运行中 · PID ${llamacppHealth()!.pid}`
+                : '未运行'}
+            </span>
+          </Show>
+        </div>
+        <div class="ss-card-body bg-white">
+          <Show when={!llamacppLoading()} fallback={
+            <div class="text-[11px] text-zinc-400 text-center py-3">加载模型列表…</div>
+          }>
+            <Show when={llamacppModels().length > 0} fallback={
+              <div class="text-[11px] text-zinc-400 text-center py-2">暂无本地模型</div>
+            }>
+              {/* 模型选择 + 切换 */}
+              <div class="flex items-center gap-2 mb-3">
+                <select
+                  class="flex-1 text-[12px] font-mono px-2.5 py-1.5 rounded-lg border border-border-primary/50 bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-nt-io-500/40"
+                  value={selectedModel()}
+                  onChange={(e) => setSelectedModel(e.currentTarget.value)}
+                >
+                  <For each={llamacppModels()}>
+                    {(m) => <option value={m.path}>{m.name} ({(m.size / 1073741824).toFixed(1)} GB)</option>}
+                  </For>
+                </select>
+                <button
+                  class={clsx(
+                    'px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors flex-shrink-0',
+                    swapping() || !selectedModel()
+                      ? 'text-zinc-400 border-zinc-200 cursor-not-allowed'
+                      : 'text-nt-io-600 border-nt-io-200 hover:bg-nt-io-50'
+                  )}
+                  onClick={handleSwapModel}
+                  disabled={swapping() || !selectedModel()}
+                >
+                  {swapping() ? '切换中…' : '切换模型'}
+                </button>
+              </div>
+
+              {/* 错误提示 */}
+              <Show when={llamacppError()}>
+                <div class="mb-2 px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-600">
+                  {llamacppError()}
+                </div>
+              </Show>
+
+              {/* 模型列表 */}
+              <div class="grid grid-cols-1 gap-1.5">
+                <For each={llamacppModels()}>
+                  {(m) => (
+                    <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/60 text-[11px]">
+                      <span class="w-2 h-2 rounded-full flex-shrink-0 bg-zinc-300" />
+                      <span class="font-medium text-text-primary truncate min-w-0 flex-1 font-mono">{m.name}</span>
+                      <span class="text-zinc-400 font-mono w-16 text-right">{(m.size / 1073741824).toFixed(1)} GB</span>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
           </Show>
         </div>
       </div>

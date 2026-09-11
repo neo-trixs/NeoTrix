@@ -585,6 +585,7 @@ impl TiledSuperResolver {
     }
 
     /// 计算非对称 feather weight
+    #[allow(dead_code)]
     fn tile_count(&self, dimension: u32) -> u32 {
         let step = self.config.tile_size;
         let overlap = self.config.overlap;

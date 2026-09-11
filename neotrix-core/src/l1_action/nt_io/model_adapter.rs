@@ -102,6 +102,7 @@ pub struct ModelAdapterConfig {
 #[derive(Debug)]
 pub struct ModelAdapter {
     /// 配置
+    #[allow(dead_code)]
     config: ModelAdapterConfig,
     /// 已注册的适配器
     adapters: HashMap<String, AdapterConfig>,

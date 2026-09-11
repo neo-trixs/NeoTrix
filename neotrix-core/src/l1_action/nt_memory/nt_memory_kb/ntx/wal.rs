@@ -285,6 +285,7 @@ impl EmbeddedWal {
     }
 
     /// 写入单个条目
+    #[allow(dead_code)]
     fn write_entry(&mut self, file: &mut File, entry: &WalEntry) -> std::io::Result<()> {
         let bytes = entry.encode();
         let len = (bytes.len() as u32).to_le_bytes();

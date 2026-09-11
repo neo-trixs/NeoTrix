@@ -76,6 +76,7 @@ fn main() {
             registry.register(Box::new(GitPlugin)).expect("failed to register git");
             registry.register(Box::new(CliPlugin)).expect("failed to register cli");
             registry.register(Box::new(WorldPlugin)).expect("failed to register world");
+            registry.register(Box::new(ContextPlugin)).expect("failed to register context");
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {

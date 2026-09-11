@@ -126,6 +126,7 @@ pub struct BatchProductionManager {
     /// 所有流水线
     pipelines: HashMap<String, ProductionPipeline>,
     /// 任务依赖图
+    #[allow(dead_code)]
     dependency_graph: HashMap<String, Vec<String>>,
     /// 任务结果缓存
     result_cache: HashMap<String, serde_json::Value>,
