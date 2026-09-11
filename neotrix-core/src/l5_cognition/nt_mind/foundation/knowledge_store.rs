@@ -90,13 +90,13 @@ impl KnowledgeStore for KbKnowledgeStore {
         Ok(item.map(|i| CrawlQueueItem {
             id: i.id,
             url: i.url,
-            depth: i.depth,
+            depth: Some(i.depth),
             domain: i.domain,
-            priority: i.priority,
-            status: i.status,
-            discovered_at: i.discovered_at,
+            priority: Some(i.priority),
+            status: Some(i.status),
+            discovered_at: Some(i.discovered_at),
             last_attempt: i.last_attempt,
-            retry_count: i.retry_count,
+            retry_count: Some(i.retry_count),
             error_message: i.error_message,
         }))
     }

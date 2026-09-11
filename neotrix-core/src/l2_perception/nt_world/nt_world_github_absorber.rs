@@ -356,7 +356,7 @@ impl GitHubAbsorber {
         repo: &str,
         dest: &std::path::Path,
     ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-        use super::l1_facade::DownloadOptions;
+        use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
 
         // 默认分支: 用 repo 元数据 default_branch (branches.first() 是字母序首个,
         // 会误选 "bak-feat/..." 之类特性分支 — project-nomad 实证缺陷)。

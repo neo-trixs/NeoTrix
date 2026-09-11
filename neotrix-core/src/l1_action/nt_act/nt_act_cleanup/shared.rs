@@ -3,7 +3,7 @@
 //! 统一定义清理子系统的类型，消除跨模块冗余
 //! 所有 cleanup 模块应从此处导入共享类型
 
-use serde::{Deserialize, Serialize};
+pub use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 // ═══════════════════════════════════════════════════
