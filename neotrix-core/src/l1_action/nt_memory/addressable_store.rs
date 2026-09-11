@@ -75,7 +75,6 @@ impl AddressableStore {
     }
 
     /// 追加一条新观测，返回其 §id
-    #[allow(dead_code)]
     pub fn append(&mut self, tool_name: &str, input: &str, output: &str) -> String {
         let id = format!("§{:03}", self.next_id);
         let token_count =
@@ -96,7 +95,6 @@ impl AddressableStore {
     }
 
     /// 通过 §id 召回完整观测
-    #[allow(dead_code)]
     pub fn recall(&self, id: &str) -> Option<&Observation> {
         self.index
             .get(id)
@@ -104,7 +102,6 @@ impl AddressableStore {
     }
 
     /// 为指定 §id 列表创建引用（用于活动视图替代完整内容）
-    #[allow(dead_code)]
     pub fn cite(&self, ids: &[String]) -> Vec<Citation> {
         ids.iter()
             .filter_map(|id| {
@@ -118,7 +115,6 @@ impl AddressableStore {
     }
 
     /// 压缩：仅保留最近 N 条完整内容，其余替换为引用
-    #[allow(dead_code)]
     pub fn compact(&self, keep_recent: usize) -> CompactionResult {
         let total = self.observations.len();
         if keep_recent >= total {
@@ -143,25 +139,21 @@ impl AddressableStore {
     }
 
     /// 所有观测的总 token 数
-    #[allow(dead_code)]
     pub fn total_tokens(&self) -> usize {
         self.observations.iter().map(|obs| obs.token_count).sum()
     }
 
     /// 已存储观测数量
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.observations.len()
     }
 
     /// 是否为空
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.observations.is_empty()
     }
 
     /// 获取指定范围内的观测引用
-    #[allow(dead_code)]
     pub fn range(&self, start: usize, end: usize) -> Vec<&Observation> {
         let end = end.min(self.observations.len());
         self.observations
@@ -171,7 +163,6 @@ impl AddressableStore {
     }
 
     /// 获取最新一条观测
-    #[allow(dead_code)]
     pub fn latest(&self) -> Option<&Observation> {
         self.observations.last()
     }

@@ -225,20 +225,17 @@ impl AttentionHead {
     }
 
     /// 设置剩余预算份额 ∈ [0.0, 1.0] (Cost-Aware Routing, Axiom A1)
-    #[allow(dead_code)]
     pub fn set_budget(&mut self, remaining: f64) {
         self.budget_remaining = remaining.clamp(0.0, 1.0);
     }
 
     /// 预算是否临界 (< 0.2) — 临界时强制 System1Direct 省算力
-    #[allow(dead_code)]
     pub fn is_budget_critical(&self) -> bool {
         self.budget_remaining < 0.2
     }
 
     /// 成本感知显著性: salience × budget_remaining (Axiom A1 + A2)
     /// 预算越紧，显著性衰减越快，低价值域自动降权
-    #[allow(dead_code)]
     pub fn cost_aware_salience(&self, novelty: f64, coherence: f64) -> f64 {
         self.salience(novelty, coherence) * self.budget_remaining
     }
@@ -323,7 +320,6 @@ impl WeaponSet {
 /// MTRouter 历史路由条目 — 记录每次路由决策的结果 (arXiv 2604.23530)
 /// 用于 cost-aware 模型路由的历史相似度匹配
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct HistoryEntry {
     /// 任务特征哈希 (基于任务文本的确定性哈希)
     pub task_hash: u64,
@@ -354,7 +350,6 @@ pub struct AttentionManager {
     /// 全局剩余预算份额 ∈ [0.0, 1.0], 1.0 表示预算充足 (Cost-Aware Routing, Axiom A1)
     pub budget_remaining: f64,
     /// MTRouter 历史路由记录 — 环形缓冲区, 最多保留 ROUTE_HISTORY_MAX 条
-    #[allow(dead_code)]
     pub route_history: Vec<HistoryEntry>,
 }
 
@@ -388,7 +383,6 @@ impl AttentionManager {
 
     /// 设置全局预算份额 ∈ [0.0, 1.0] (Cost-Aware Routing, Axiom A1)
     /// 同步更新所有 head 的 budget_remaining
-    #[allow(dead_code)]
     pub fn set_budget(&mut self, remaining: f64) {
         let clamped = remaining.clamp(0.0, 1.0);
         self.budget_remaining = clamped;
@@ -506,7 +500,6 @@ impl AttentionManager {
 
     /// 预算感知难度估计: 当 budget < 0.2 时, 难度膨胀 1.5× (Cost-Aware Routing, Axiom A1)
     /// 预算紧张时将简单任务推入中等难度区间, 促使路由选择更快路径
-    #[allow(dead_code)]
     pub fn estimate_task_difficulty_with_budget(task: &str, budget: f64) -> f64 {
         let t = task.to_lowercase();
         let mut d = 0.4f64;
@@ -677,7 +670,6 @@ impl AttentionManager {
     // ── MTRouter 历史路由 (arXiv 2604.23530) ──────────────────────────────
 
     /// 记录一次路由决策到历史缓冲区 (环形缓冲区, 超容量淘汰最旧条目)
-    #[allow(dead_code)]
     pub fn record_route(&mut self, entry: HistoryEntry) {
         if self.route_history.len() >= ROUTE_HISTORY_MAX {
             self.route_history.remove(0);
@@ -687,7 +679,6 @@ impl AttentionManager {
 
     /// 基于任务特征向量预测最佳模型 — 在历史中查找相似任务,
     /// 返回成功率最高的模型 ID (简单余弦相似度匹配)
-    #[allow(dead_code)]
     pub fn predict_best_model(&self, task_features: &[f64]) -> Option<String> {
         if self.route_history.is_empty() || task_features.is_empty() {
             return None;
@@ -737,7 +728,6 @@ impl AttentionManager {
     }
 
     /// 查询特定 (domain, model_id) 组合在历史中的成功率 ∈ [0.0, 1.0]
-    #[allow(dead_code)]
     pub fn history_success_rate(&self, domain: &str, model_id: &str) -> f64 {
         let relevant: Vec<&HistoryEntry> = self
             .route_history
@@ -752,7 +742,6 @@ impl AttentionManager {
     }
 
     /// 查询特定域在最近 100 条记录中的平均延迟 (毫秒)
-    #[allow(dead_code)]
     pub fn recent_avg_latency(&self, domain: &str) -> u64 {
         let recent: Vec<&HistoryEntry> = self
             .route_history

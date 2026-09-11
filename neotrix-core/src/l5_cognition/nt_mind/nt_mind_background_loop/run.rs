@@ -30,7 +30,6 @@ const PENDING_ABSORPTION_INTERVAL_SECS: u64 = 60; // pending-absorb.json 检查 
 const DAILY_INTEL_INTERVAL_SECS: u64 = 86_400; // 每日例行感知检查 (cycle 1107)
 const ALWAYS_ON_INTERVAL_SECS: u64 = 120;
 const SKILL_SCAN_INTERVAL_SECS: u64 = 3600;
-#[allow(dead_code)]
 const SESSION_ROUTER_FLUSH_INTERVAL_SECS: u64 = 300;
 const HEALER_SCAN_INTERVAL_SECS: u64 = 3600;
 const AVATAR_AUTO_DISTILL_INTERVAL_SECS: u64 = 600;
@@ -357,12 +356,10 @@ impl PathDenylist {
         }
     }
 
-    #[allow(dead_code)]
     pub fn add_pattern(&mut self, pattern: impl Into<String>) {
         self.patterns.push(pattern.into());
     }
 
-    #[allow(dead_code)]
     pub fn patterns(&self) -> &[String] {
         &self.patterns
     }
@@ -922,7 +919,6 @@ impl BackgroundLoop {
 }
 
 /// Lightweight inner state for concurrent handler access.
-#[allow(dead_code)]
 pub struct BackgroundLoopHandle {
     brain: Arc<RwLock<SelfIteratingBrain>>,
     bbrain: Option<std::sync::Arc<tokio::sync::RwLock<BMonitor>>>,
@@ -939,7 +935,6 @@ pub struct BackgroundLoopHandle {
     knowledge_aging: KnowledgeAging,
     auto_crystallizer: AutoCrystallizer,
     knowledge_chain: Option<KnowledgeChain>,
-    #[allow(dead_code)]
     exploration_pipeline: Option<ExplorationPipeline>,
     always_on: AlwaysOnEngine,
     plugin_registry: PluginRegistry,
@@ -966,7 +961,6 @@ pub struct BackgroundLoopHandle {
     consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<()>,
-    #[allow(dead_code)]
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
     volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
