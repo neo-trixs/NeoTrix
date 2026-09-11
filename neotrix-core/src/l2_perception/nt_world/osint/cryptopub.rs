@@ -27,8 +27,8 @@ impl std::fmt::Display for CryptoPubFindings {
 
 pub async fn investigate(
     target: &OsintTarget,
-    client: &Client,
-    config: &OsintConfig,
+    _client: &Client,
+    _config: &OsintConfig,
 ) -> Result<CryptoPubFindings, String> {
     let address = target.url.as_ref()
         .or(target.domain.as_ref())

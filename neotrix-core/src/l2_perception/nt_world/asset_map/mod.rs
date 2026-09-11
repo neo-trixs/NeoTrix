@@ -7,3 +7,4 @@ pub mod query;
 pub mod fingerprint;
 pub mod models;
 pub mod scanner;
+pub mod asset_map_capability;

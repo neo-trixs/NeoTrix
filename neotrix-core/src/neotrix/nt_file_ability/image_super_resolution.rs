@@ -1377,7 +1377,7 @@ impl SuperResolutionBackend for OnnxBackend {
         scale: u32,
     ) -> SuperResolutionResult {
         // 获取模型路径
-        let model_path = match self.model_manager.get_model_path(model) {
+        let _model_path = match self.model_manager.get_model_path(model) {
             Ok(path) => path,
             Err(e) => {
                 return SuperResolutionResult {
