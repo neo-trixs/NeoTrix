@@ -8,8 +8,6 @@ pub mod pm_workflow;
 pub mod harness_scaffold;
 #[cfg(test)]
 pub mod group_integration_test;
-#[cfg(test)]
-pub mod pm_integration_test;
 
 use std::sync::{Arc, Mutex};
 use neotrix_types::core::CapabilityVector;

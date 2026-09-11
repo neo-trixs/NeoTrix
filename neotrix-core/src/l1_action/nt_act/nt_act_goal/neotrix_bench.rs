@@ -12,22 +12,7 @@
 //!   - 核心差异: NeoTrix 用 compile health + test coverage 替代 Phi
 //!     作为系统健康的主要度
 
-/// 项目快照 (local copy to avoid L1→L5 dependency)
-#[derive(Debug, Clone)]
-pub struct ProjectSnapshot {
-    pub total_files: usize,
-    pub total_lines: usize,
-    pub large_files: Vec<String>,
-    pub modules_without_tests: Vec<String>,
-    pub file_unsafe_hotspots: Vec<String>,
-    pub unsafe_count: usize,
-    pub unwrap_count: usize,
-    pub todo_count: usize,
-    pub compile_errors: usize,
-    pub compile_warnings: usize,
-    pub test_count: usize,
-    pub test_failures: usize,
-}
+pub use crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
 use crate::core::nt_core_cap::CapabilityVector;
 
 /// 基准维度

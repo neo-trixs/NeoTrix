@@ -1,9 +1,45 @@
 //! NeoTrix NT-ACT types
-//! 
-//! Re-exports core types from the action layer.
+//!
+//! Canonical shared types for L1 Action layer.
+//! L5 (nt_mind) and other consumers import from here instead of duplicating.
 
-// McpTransport — Mcp 传输层协议类型
-// TODO: McpTransport 定义在 neotrix::nt_act::types (legacy 目录), 待迁移至 L1
-// pub use crate::l1_action::nt_act::types::McpTransport;
+use serde::{Deserialize, Serialize};
 
-// 其他说型/结构体可根据需要续展
+/// Canonical project health snapshot — single source of truth for project metrics.
+///
+/// Used by: evolution loop (L5), bench (L1), goal generator (L1), self-diagnose (L5),
+/// evolution daemon (L5). All layers share this type via L1 (no L5→L1 dependency).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectSnapshot {
+    pub total_files: usize,
+    pub total_lines: usize,
+    pub large_files: Vec<String>,
+    pub modules_without_tests: Vec<String>,
+    pub file_unsafe_hotspots: Vec<String>,
+    pub unsafe_count: usize,
+    pub unwrap_count: usize,
+    pub todo_count: usize,
+    pub compile_errors: usize,
+    pub compile_warnings: usize,
+    pub test_count: usize,
+    pub test_failures: usize,
+}
+
+impl Default for ProjectSnapshot {
+    fn default() -> Self {
+        Self {
+            total_files: 0,
+            total_lines: 0,
+            large_files: Vec::new(),
+            modules_without_tests: Vec::new(),
+            file_unsafe_hotspots: Vec::new(),
+            unsafe_count: 0,
+            unwrap_count: 0,
+            todo_count: 0,
+            compile_errors: 0,
+            compile_warnings: 0,
+            test_count: 0,
+            test_failures: 0,
+        }
+    }
+}
