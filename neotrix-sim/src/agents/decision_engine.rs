@@ -1,6 +1,6 @@
 use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation};
 use crate::agents::stimulus::StimulusLayer;
-use crate::agents::behavior_tree::{BehaviorTree, Blackboard, BTStatus};
+use crate::agents::behavior_tree::Blackboard;
 use crate::agents::planning::goap::{GOAPPlanner, GOAPState, agent_to_world_state};
 use crate::foundation::math_bridge::Vec2;
 

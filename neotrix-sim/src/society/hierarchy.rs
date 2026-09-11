@@ -37,7 +37,7 @@ impl Hierarchy {
         }
     }
 
-    pub fn update(&mut self, agents: &[SimAgent], tick: u64) {
+    pub fn update(&mut self, agents: &[SimAgent], _tick: u64) {
         for agent in agents {
             if !agent.core.alive { continue; }
             let id = &agent.core.id;

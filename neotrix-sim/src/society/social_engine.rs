@@ -3,7 +3,7 @@ use super::faction::FactionManager;
 use super::gossip::GossipProtocol;
 use super::communication::CommunicationChannel;
 use super::norm_evolution::NormEvolution;
-use super::conflict::{ConflictManager, Conflict};
+use super::conflict::ConflictManager;
 use super::hierarchy::Hierarchy;
 use super::negotiation::Negotiation;
 use super::relationship_graph::RelationshipGraph;

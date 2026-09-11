@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::agents::sim_agent::SimAgent;
-use super::economy::ResourceType;
 use super::relationship_graph::RelationshipGraph;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]

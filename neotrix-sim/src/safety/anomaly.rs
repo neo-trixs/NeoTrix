@@ -40,6 +40,7 @@ struct BehaviorSnapshot {
     action_counts: HashMap<String, u32>,
     social_count: u32,
     resource_count: u32,
+    #[allow(dead_code)]
     tick: u64,
 }
 
@@ -65,8 +66,8 @@ impl AnomalyDetector {
         // Rebuild baseline from history
         if behaviors.len() >= 5 {
             let snapshot = behaviors.clone();
-            drop(behaviors); // release the mutable borrow
-            let baseline = self.compute_baseline(&snapshot);
+            drop(snapshot); // release the clone
+            let baseline = self.compute_baseline(&behaviors);
             self.baselines.insert(agent.id, baseline);
         }
     }
@@ -137,7 +138,6 @@ impl AnomalyDetector {
     }
 
     fn compute_baseline(&self, history: &[BehaviorSnapshot]) -> BehaviorBaseline {
-        let n = history.len() as f32;
         let mut action_totals: HashMap<String, f32> = HashMap::new();
         let mut total_social = 0.0f32;
         let mut total_resource = 0.0f32;

@@ -28,6 +28,7 @@ impl GridPos {
 struct Node {
     pos: GridPos,
     g: f32,
+    #[allow(dead_code)]
     h: f32,
     f: f32,
     _parent: Option<GridPos>,

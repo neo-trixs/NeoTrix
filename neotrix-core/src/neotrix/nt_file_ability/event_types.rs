@@ -25,10 +25,7 @@ pub enum ExcelEvent {
         duration_ms: u64,
     },
     /// 解析失败
-    XlsxParseFailed {
-        file_path: String,
-        error: String,
-    },
+    XlsxParseFailed { file_path: String, error: String },
     /// 模板检测完成
     TemplateDetected {
         file_path: String,
@@ -36,10 +33,7 @@ pub enum ExcelEvent {
         confidence: f64,
     },
     /// 配置解析完成
-    ConfigParsed {
-        raw: String,
-        fields_count: usize,
-    },
+    ConfigParsed { raw: String, fields_count: usize },
 }
 
 impl ExcelEvent {

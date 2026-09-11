@@ -1,5 +1,4 @@
 use crate::agents::SimAgent;
-use crate::foundation::math_bridge::Vec2;
 
 /// A mutation to be tested in the sandbox.
 #[derive(Debug, Clone)]

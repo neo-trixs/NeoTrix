@@ -65,6 +65,7 @@ pub enum DefenseType {
 pub struct AdversarialMemory {
     threats: Vec<ThreatEvent>,
     patterns: Vec<AttackPattern>,
+    #[allow(dead_code)]
     defenses: Vec<DefenseStrategy>,
     threat_counts: HashMap<String, HashMap<ThreatType, u32>>,
     max_threats: usize,

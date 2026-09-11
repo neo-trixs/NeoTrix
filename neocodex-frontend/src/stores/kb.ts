@@ -241,6 +241,35 @@ export function createKbStore(source: 'mock' | 'tauri' = 'tauri') {
     )
   }
 
+  // ── Node CRUD (直连 domain.kb) ──
+  async function searchNodes(query: string, limit?: number) {
+    return await domain.kb.search(query, limit)
+  }
+
+  async function getNode(id: string) {
+    return await domain.kb.get(id)
+  }
+
+  async function kvSet(namespace: string, key: string, value: string) {
+    return await domain.kb.kvSet(namespace, key, value)
+  }
+
+  async function kvGet(namespace: string, key: string) {
+    return await domain.kb.kvGet(namespace, key)
+  }
+
+  async function kvList(namespace: string) {
+    return await domain.kb.kvList(namespace)
+  }
+
+  async function graph() {
+    return await domain.kb.graph()
+  }
+
+  async function stats() {
+    return await domain.kb.stats()
+  }
+
   // ── B2 文档域 (直连 kb_doc_* 命令) ──
   const [docs, setDocs] = createSignal<KbDoc[]>([])
   const [docsLoading, setDocsLoading] = createSignal(false)
@@ -288,6 +317,13 @@ export function createKbStore(source: 'mock' | 'tauri' = 'tauri') {
     refreshDocs,
     ingestDoc,
     removeDoc,
+    searchNodes,
+    getNode,
+    kvSet,
+    kvGet,
+    kvList,
+    graph,
+    stats,
   }
 }
 

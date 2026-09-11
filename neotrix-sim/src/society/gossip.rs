@@ -147,7 +147,6 @@ impl GossipProtocol {
             let spreadable: Vec<GossipMessage> = self.messages.iter()
                 .filter(|m| m.source_agent != agent_id && m.spread_count < m.max_spread)
                 .filter(|m| {
-                    let agent_id_str = agent_id.to_string();
                     let known = self.agent_memory.get(&agent_id)
                         .map(|v| v.clone())
                         .unwrap_or_default();

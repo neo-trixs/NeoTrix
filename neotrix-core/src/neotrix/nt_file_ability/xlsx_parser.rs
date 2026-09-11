@@ -55,8 +55,8 @@
 use std::path::Path;
 
 use super::tables;
-use super::xlsx_fast;
 use super::types::{FileAbilityError, Result, TableData};
+use super::xlsx_fast;
 
 /// 解析模式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,7 +99,10 @@ pub fn parse_xlsx(path: impl AsRef<Path>) -> Result<Vec<TableData>> {
 }
 
 /// 带配置的 XLSX 解析
-pub fn parse_xlsx_with_config(path: impl AsRef<Path>, config: &ParseConfig) -> Result<Vec<TableData>> {
+pub fn parse_xlsx_with_config(
+    path: impl AsRef<Path>,
+    config: &ParseConfig,
+) -> Result<Vec<TableData>> {
     let path = path.as_ref();
 
     if !path.exists() {
@@ -110,9 +113,7 @@ pub fn parse_xlsx_with_config(path: impl AsRef<Path>, config: &ParseConfig) -> R
     }
 
     let mode = if config.mode == ParseMode::Auto {
-        let file_size = std::fs::metadata(path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
         // 大文件 (>10MB) 用快速模式避免 calamine 内存峰值
         if file_size > 10 * 1024 * 1024 {
             ParseMode::Fast
@@ -201,7 +202,8 @@ fn parse_xlsx_full_mode(path: &Path, config: &ParseConfig) -> Result<Vec<TableDa
     for table in &mut tables {
         table.headers.truncate(max_cols);
         table.rows = table
-            .rows.clone()
+            .rows
+            .clone()
             .into_iter()
             .take(max_rows)
             .map(|r| r.into_iter().take(max_cols).collect())

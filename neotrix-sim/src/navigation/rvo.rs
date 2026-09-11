@@ -76,8 +76,6 @@ impl RVOSimulator {
         for &n_idx in &neighbors {
             let neighbor = &self.agents[n_idx];
             let rel_pos = agent.position - neighbor.position;
-            let rel_vel = agent.velocity - neighbor.velocity;
-
             let dist = rel_pos.length();
             if dist < 0.01 {
                 continue;
