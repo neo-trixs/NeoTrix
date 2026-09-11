@@ -1,7 +1,7 @@
-mod visual;
 mod grounding;
 mod ocr;
+mod visual;
 
-pub use visual::*;
 pub use grounding::*;
 pub use ocr::*;
+pub use visual::*;

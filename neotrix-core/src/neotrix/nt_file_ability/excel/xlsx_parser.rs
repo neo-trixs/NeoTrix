@@ -61,8 +61,8 @@
 use std::path::Path;
 
 use super::super::excel::tables;
-use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result, TableData};
 use super::super::excel::xlsx_fast;
+use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result, TableData};
 
 /// 解析模式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

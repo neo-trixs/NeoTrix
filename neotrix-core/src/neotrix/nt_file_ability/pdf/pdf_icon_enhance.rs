@@ -7,15 +7,11 @@
 //! 聚焦冗余: 单一管线入口，避免多模块重复实现
 //! 跨域错位: 将 Python pymupdf 的 insert_image 能力映射到 Rust lopdf
 
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
-use super::pdf_image_extract::{
-    extract_pdf_images, PdfImageExtractConfig, PdfImageFormat,
-};
-use super::super::image_super_resolution::{
-    ImageSuperResolver, SuperResolutionConfig,
-};
+use super::super::image_super_resolution::{ImageSuperResolver, SuperResolutionConfig};
+use super::pdf_image_extract::{extract_pdf_images, PdfImageExtractConfig, PdfImageFormat};
 use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result};
 
 /// PDF 图标增强配置
@@ -145,9 +141,11 @@ impl PdfIconEnhancer {
         });
 
         // 创建临时目录
-        let temp_dir = self.config.temp_dir.clone().unwrap_or_else(|| {
-            std::env::temp_dir().join("neotrix_pdf_enhance")
-        });
+        let temp_dir = self
+            .config
+            .temp_dir
+            .clone()
+            .unwrap_or_else(|| std::env::temp_dir().join("neotrix_pdf_enhance"));
         std::fs::create_dir_all(&temp_dir).map_err(FileAbilityError::Io)?;
 
         // 阶段 1: 提取图像
@@ -168,7 +166,8 @@ impl PdfIconEnhancer {
             let enhanced_path = temp_dir.join(format!("enhanced_{}_{}.png", img.page, img.xref));
 
             // 创建超分辨率处理器
-            let mut resolver = ImageSuperResolver::with_config(self.config.super_resolution.clone());
+            let mut resolver =
+                ImageSuperResolver::with_config(self.config.super_resolution.clone());
 
             // 读取原始图像
             let input_path = Path::new(&img.output_path);
@@ -199,12 +198,8 @@ impl PdfIconEnhancer {
         let embed_start = std::time::Instant::now();
         if self.config.embed_back && images_enhanced > 0 {
             // 将增强后的图像嵌入回 PDF
-            match self.embed_images_to_pdf(
-                pdf_path,
-                &output_pdf,
-                &extract_result.images,
-                &temp_dir,
-            ) {
+            match self.embed_images_to_pdf(pdf_path, &output_pdf, &extract_result.images, &temp_dir)
+            {
                 Ok(_) => {
                     eprintln!("成功将 {} 张增强图像嵌入 PDF", images_enhanced);
                 }
@@ -299,7 +294,7 @@ impl PdfIconEnhancer {
                         // PDF 使用 FlateDecode 压缩的原始图像数据
                         // 这里简化处理，直接使用 PNG 数据作为流
                         stream.content = enhanced_data;
-                        
+
                         // 更新 Filter 为 DCTDecode (JPEG) 或保持不变
                         // 由于我们使用 PNG，需要解码后重新编码
                         // 这是一个简化实现，实际应该根据 PDF 规范处理
@@ -361,7 +356,7 @@ mod tests {
     fn test_enhancer_creation() {
         let enhancer = PdfIconEnhancer::new();
         assert!(enhancer.config().embed_back);
-        
+
         let config = PdfIconEnhanceConfig {
             embed_back: false,
             ..Default::default()

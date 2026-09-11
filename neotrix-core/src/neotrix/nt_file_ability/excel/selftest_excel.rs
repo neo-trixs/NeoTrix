@@ -21,7 +21,9 @@ impl SelfTest for ExcelSelfTest {
 
         // T3: 生产路径测试
         // 1. ConfigFields::parse
-        let config = crate::neotrix::nt_file_ability::config_parser::ConfigFields::parse("执行标准:美标,压力:150LB");
+        let config = crate::neotrix::nt_file_ability::config_parser::ConfigFields::parse(
+            "执行标准:美标,压力:150LB",
+        );
         if config.exec_std.as_deref() != Some("美标") {
             errors.push("ConfigFields::parse 执行标准解析失败".to_string());
         }
@@ -42,8 +44,11 @@ impl SelfTest for ExcelSelfTest {
             "单重kg".into(),
             "总重kg".into(),
         ];
-        let (template, _map) = crate::neotrix::nt_file_ability::template_engine::ColumnMap::detect(&header);
-        if template != crate::neotrix::nt_file_ability::template_engine::TemplateType::PurchaseRequest {
+        let (template, _map) =
+            crate::neotrix::nt_file_ability::template_engine::ColumnMap::detect(&header);
+        if template
+            != crate::neotrix::nt_file_ability::template_engine::TemplateType::PurchaseRequest
+        {
             errors.push(format!(
                 "ColumnMap::detect 采购申请单模板检测失败, got {:?}",
                 template
@@ -51,10 +56,11 @@ impl SelfTest for ExcelSelfTest {
         }
 
         // 3. PathMetadata
-        let meta = crate::neotrix::nt_file_ability::path_metadata::PathMetadata::from_salesperson_order(
-            "段留杰",
-            "4.01菲律宾 WSD-I-26031303",
-        );
+        let meta =
+            crate::neotrix::nt_file_ability::path_metadata::PathMetadata::from_salesperson_order(
+                "段留杰",
+                "4.01菲律宾 WSD-I-26031303",
+            );
         if meta.country.as_deref() != Some("菲律宾") {
             errors.push(format!("PathMetadata 国家提取失败, got {:?}", meta.country));
         }
@@ -65,7 +71,8 @@ impl SelfTest for ExcelSelfTest {
             headers: vec!["A".into(), "B".into()],
             rows: vec![vec!["1".into(), "2".into()]],
         };
-        let md = crate::neotrix::nt_file_ability::table_presenter::TablePresenter::new(&table).to_markdown();
+        let md = crate::neotrix::nt_file_ability::table_presenter::TablePresenter::new(&table)
+            .to_markdown();
         if !md.contains("| A | B |") {
             errors.push("TablePresenter Markdown 输出失败".to_string());
         }
@@ -151,7 +158,8 @@ mod tests {
             "key:value,key:value",
         ];
         for case in cases {
-            let config = super::crate::neotrix::nt_file_ability::config_parser::ConfigFields::parse(case);
+            let config =
+                super::crate::neotrix::nt_file_ability::config_parser::ConfigFields::parse(case);
             // 不应 panic
             let _ = config.is_empty();
         }
@@ -191,7 +199,8 @@ mod tests {
             vec!["列A".into(), "列B".into(), "列C".into()],
         ];
         for case in cases {
-            let (_, _) = super::crate::neotrix::nt_file_ability::template_engine::ColumnMap::detect(&case);
+            let (_, _) =
+                super::crate::neotrix::nt_file_ability::template_engine::ColumnMap::detect(&case);
             // 不应 panic
         }
     }

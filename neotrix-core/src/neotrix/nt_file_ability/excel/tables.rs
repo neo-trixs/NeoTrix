@@ -24,7 +24,13 @@ pub fn write_xlsx_table(path: impl AsRef<Path>, table: &TableData) -> Result<()>
         .align(HAlign::Center)
         .wrap();
     for (col, h) in table.headers.iter().enumerate() {
-        wb.sheet_set_cell_styled(sheet, 0, col, CellData::String(h.clone()), header_style.clone());
+        wb.sheet_set_cell_styled(
+            sheet,
+            0,
+            col,
+            CellData::String(h.clone()),
+            header_style.clone(),
+        );
     }
     // 数据行
     for (r, row) in table.rows.iter().enumerate() {
@@ -35,7 +41,11 @@ pub fn write_xlsx_table(path: impl AsRef<Path>, table: &TableData) -> Result<()>
     }
     // 列宽 (表头长度 + 内容最大长度, 上限 40)
     for col in 0..table.headers.len() {
-        let mut w = table.headers.get(col).map(|h| h.chars().count()).unwrap_or(8);
+        let mut w = table
+            .headers
+            .get(col)
+            .map(|h| h.chars().count())
+            .unwrap_or(8);
         for row in &table.rows {
             if let Some(c) = row.get(col) {
                 w = w.max(c.chars().count());
@@ -43,14 +53,20 @@ pub fn write_xlsx_table(path: impl AsRef<Path>, table: &TableData) -> Result<()>
         }
         wb.sheet_set_column_width(sheet, col, (w as f64).clamp(6.0, 40.0));
     }
-    wb.save(path).map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
+    wb.save(path)
+        .map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
 }
 
 /// 单元格编辑操作 (表格级编辑 API — 阶段1.5 基础能力补齐)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TableEdit {
     /// 修改单元格值 (sheet 索引, 行号 0=表头后首行, 列号 0=首列)
-    SetCell { sheet: usize, row: usize, col: usize, value: String },
+    SetCell {
+        sheet: usize,
+        row: usize,
+        col: usize,
+        value: String,
+    },
     /// 在指定行前插入一行空值 (sheet 索引, 行号)
     InsertRow { sheet: usize, row: usize },
     /// 删除一行 (sheet 索引, 行号)
@@ -59,17 +75,19 @@ pub enum TableEdit {
 
 /// 表格级编辑 — 读全表 → 应用编辑 → 重写回文件 (复用 L1 读写, 无独立实现)。
 /// 返回编辑后的表格 (可用于链式编辑或快照存储)。
-pub fn edit_xlsx_table(
-    path: impl AsRef<Path>,
-    edits: &[TableEdit],
-) -> Result<Vec<TableData>> {
+pub fn edit_xlsx_table(path: impl AsRef<Path>, edits: &[TableEdit]) -> Result<Vec<TableData>> {
     let mut tables = read_xlsx_sheets_all(&path)?;
     for edit in edits {
         match edit {
-            TableEdit::SetCell { sheet, row, col, value } => {
-                let t = tables.get_mut(*sheet).ok_or_else(|| {
-                    FileAbilityError::Parse(format!("sheet 越界: {sheet}"))
-                })?;
+            TableEdit::SetCell {
+                sheet,
+                row,
+                col,
+                value,
+            } => {
+                let t = tables
+                    .get_mut(*sheet)
+                    .ok_or_else(|| FileAbilityError::Parse(format!("sheet 越界: {sheet}")))?;
                 if *row >= t.rows.len() {
                     return Err(FileAbilityError::Parse(format!(
                         "row 越界: {row} (表 '{}' 共 {} 行)",
@@ -87,9 +105,9 @@ pub fn edit_xlsx_table(
                 t.rows[*row][*col] = value.clone();
             }
             TableEdit::InsertRow { sheet, row } => {
-                let t = tables.get_mut(*sheet).ok_or_else(|| {
-                    FileAbilityError::Parse(format!("sheet 越界: {sheet}"))
-                })?;
+                let t = tables
+                    .get_mut(*sheet)
+                    .ok_or_else(|| FileAbilityError::Parse(format!("sheet 越界: {sheet}")))?;
                 if *row > t.rows.len() {
                     return Err(FileAbilityError::Parse(format!(
                         "InsertRow 越界: {row} (共 {} 行)",
@@ -99,9 +117,9 @@ pub fn edit_xlsx_table(
                 t.rows.insert(*row, vec![String::new(); t.headers.len()]);
             }
             TableEdit::RemoveRow { sheet, row } => {
-                let t = tables.get_mut(*sheet).ok_or_else(|| {
-                    FileAbilityError::Parse(format!("sheet 越界: {sheet}"))
-                })?;
+                let t = tables
+                    .get_mut(*sheet)
+                    .ok_or_else(|| FileAbilityError::Parse(format!("sheet 越界: {sheet}")))?;
                 if *row >= t.rows.len() {
                     return Err(FileAbilityError::Parse(format!(
                         "RemoveRow 越界: {row} (共 {} 行)",
@@ -130,7 +148,13 @@ fn write_xlsx_sheets(path: impl AsRef<Path>, tables: &[TableData]) -> Result<()>
             .align(HAlign::Center)
             .wrap();
         for (col, h) in t.headers.iter().enumerate() {
-            wb.sheet_set_cell_styled(sheet, 0, col, CellData::String(h.clone()), header_style.clone());
+            wb.sheet_set_cell_styled(
+                sheet,
+                0,
+                col,
+                CellData::String(h.clone()),
+                header_style.clone(),
+            );
         }
         for (r, row) in t.rows.iter().enumerate() {
             for (col, cell) in row.iter().enumerate() {
@@ -138,7 +162,8 @@ fn write_xlsx_sheets(path: impl AsRef<Path>, tables: &[TableData]) -> Result<()>
             }
         }
     }
-    wb.save(path).map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
+    wb.save(path)
+        .map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
 }
 
 /// 单元格文本 → CellData (纯数字→Number, 公式前缀→Formula, 其余→String)
@@ -157,7 +182,12 @@ fn to_cell_data(text: &str) -> office_oxide::xlsx::write::CellData {
 }
 
 /// 写入 CSV 文件 (UTF-8, BOM 可选) — 对标 Python csv.writer
-pub fn write_csv(path: impl AsRef<Path>, table: &TableData, delimiter: char, with_bom: bool) -> Result<()> {
+pub fn write_csv(
+    path: impl AsRef<Path>,
+    table: &TableData,
+    delimiter: char,
+    with_bom: bool,
+) -> Result<()> {
     use std::io::Write;
     let mut buf = Vec::new();
     if with_bom {

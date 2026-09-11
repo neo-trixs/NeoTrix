@@ -6,9 +6,9 @@
 //! 设计 (R-P42): 复用 FileKind::Pdf / FileAbilityError，不平行重造
 //! 使用 lopdf 直接解析 PDF 对象树，提取嵌入的图像流
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result};
 
@@ -106,7 +106,7 @@ pub fn extract_pdf_images(
     config: &PdfImageExtractConfig,
 ) -> Result<PdfImageExtractResult> {
     let start = std::time::Instant::now();
-    
+
     // 检查文件存在
     if !pdf_path.exists() {
         return Err(FileAbilityError::Other(format!(
@@ -114,21 +114,21 @@ pub fn extract_pdf_images(
             pdf_path.display()
         )));
     }
-    
+
     // 创建输出目录
     std::fs::create_dir_all(output_dir).map_err(FileAbilityError::Io)?;
-    
+
     // 读取 PDF 文件
     let data = std::fs::read(pdf_path).map_err(FileAbilityError::Io)?;
-    
+
     // 使用 lopdf 解析 PDF
     let doc = lopdf::Document::load_mem(&data)
         .map_err(|e| FileAbilityError::Parse(format!("PDF 解析失败: {e}")))?;
-    
+
     let total_pages = doc.get_pages().len();
     let mut images = Vec::new();
     let mut xref_map: HashMap<u32, bool> = HashMap::new(); // 避免重复提取
-    
+
     // 使用通用遍历器
     let iterator = XObjectImageIterator::new(&doc);
     iterator.for_each_image(|xobj_dict, page_num, xref| {
@@ -137,29 +137,19 @@ pub fn extract_pdf_images(
             return Ok(true); // 继续遍历
         }
         xref_map.insert(xref, true);
-        
+
         // 提取图像信息
-        if let Some(img) = extract_image_from_xobject(
-            &doc,
-            xobj_dict,
-            page_num,
-            xref,
-            config,
-        ) {
+        if let Some(img) = extract_image_from_xobject(&doc, xobj_dict, page_num, xref, config) {
             if let Ok(img_data) = img {
                 // 保存图像文件
-                let filename = format!(
-                    "page_{}_img_{}.png",
-                    page_num + 1,
-                    xref
-                );
+                let filename = format!("page_{}_img_{}.png", page_num + 1, xref);
                 let output_path = output_dir.join(&filename);
-                
+
                 if let Err(e) = std::fs::write(&output_path, &img_data.bytes) {
                     eprintln!("保存图像失败: {e}");
                     return Ok(true); // 继续遍历
                 }
-                
+
                 images.push(PdfExtractedImage {
                     page: page_num,
                     xref,
@@ -175,7 +165,7 @@ pub fn extract_pdf_images(
         }
         Ok(true) // 继续遍历
     })?;
-    
+
     let result = PdfImageExtractResult {
         success: true,
         images: images.clone(),
@@ -183,7 +173,7 @@ pub fn extract_pdf_images(
         processing_time_ms: start.elapsed().as_millis() as u64,
         error: None,
     };
-    
+
     Ok(result)
 }
 
@@ -208,22 +198,39 @@ impl<'a> XObjectImageIterator<'a> {
     {
         for (page_num, page_id) in self.pages.iter() {
             let page_num = *page_num as usize;
-            
+
             if let Ok(page_obj) = self.doc.get_object(*page_id) {
                 if let Ok(page_dict) = page_obj.as_dict() {
                     if let Ok(resources_ref) = page_dict.get(b"Resources") {
-                        if let Ok(resources) = self.doc.get_object(resources_ref.as_reference().unwrap_or((0, 0))) {
+                        if let Ok(resources) = self
+                            .doc
+                            .get_object(resources_ref.as_reference().unwrap_or((0, 0)))
+                        {
                             if let Ok(res_dict) = resources.as_dict() {
                                 if let Ok(xobjects) = res_dict.get(b"XObject") {
-                                    if let Ok(xobj_dict) = self.doc.get_object(xobjects.as_reference().unwrap_or((0, 0))) {
+                                    if let Ok(xobj_dict) = self
+                                        .doc
+                                        .get_object(xobjects.as_reference().unwrap_or((0, 0)))
+                                    {
                                         if let Ok(xobj) = xobj_dict.as_dict() {
                                             for (_name, xobj_ref) in xobj.iter() {
-                                                if let Ok(xobj_obj) = self.doc.get_object(xobj_ref.as_reference().unwrap_or((0, 0))) {
+                                                if let Ok(xobj_obj) = self.doc.get_object(
+                                                    xobj_ref.as_reference().unwrap_or((0, 0)),
+                                                ) {
                                                     if let Ok(xobj_dict) = xobj_obj.as_dict() {
-                                                        if let Ok(subtype) = xobj_dict.get(b"Subtype") {
-                                                            if subtype.as_name().unwrap_or(b"") == b"Image" {
-                                                                let xref = xobj_ref.as_reference().unwrap_or((0, 0)).0;
-                                                                if !callback(&xobj_dict, page_num, xref)? {
+                                                        if let Ok(subtype) =
+                                                            xobj_dict.get(b"Subtype")
+                                                        {
+                                                            if subtype.as_name().unwrap_or(b"")
+                                                                == b"Image"
+                                                            {
+                                                                let xref = xobj_ref
+                                                                    .as_reference()
+                                                                    .unwrap_or((0, 0))
+                                                                    .0;
+                                                                if !callback(
+                                                                    &xobj_dict, page_num, xref,
+                                                                )? {
                                                                     return Ok(());
                                                                 }
                                                             }
@@ -260,32 +267,32 @@ fn extract_image_from_xobject(
     // 获取图像尺寸
     let width = xobj_dict.get(b"Width").ok()?.as_i64().ok()? as u32;
     let height = xobj_dict.get(b"Height").ok()?.as_i64().ok()? as u32;
-    
+
     // 过滤太小的图像
     if width < config.min_dimension || height < config.min_dimension {
         return None;
     }
-    
+
     // 获取颜色空间
     let (color_channels, has_alpha) = get_color_info(doc, xobj_dict).unwrap_or((3, false));
-    
+
     // 获取图像流数据
     let data = xobj_dict.get(b"Filter").ok();
     let filter = data.and_then(|f| f.as_name().ok()).unwrap_or(b"DCTDecode");
-    
+
     // 尝试从流中提取原始图像数据
     let stream_data = extract_stream_data(doc, xobj_dict)?;
-    
+
     // 过滤太小的图像
     if stream_data.len() < config.min_bytes {
         return None;
     }
-    
+
     // 检查是否是单色图像 (可选过滤)
     if config.filter_unicolor && is_unicolor(&stream_data, width, height, color_channels) {
         return None;
     }
-    
+
     // 转换格式
     let (bytes, format) = match filter {
         b"DCTDecode" => {
@@ -295,12 +302,12 @@ fn extract_image_from_xobject(
         b"FlateDecode" => {
             // 压缩数据，解压并转换为 PNG
             match decode_flate_data(&stream_data) {
-                Ok(decoded) => {
-                    match convert_to_png(&decoded, width, height, color_channels) {
-                        Ok(png) => (png, "png".to_string()),
-                        Err(_) => return Some(Err(FileAbilityError::Parse("图像转换失败".to_string()))),
+                Ok(decoded) => match convert_to_png(&decoded, width, height, color_channels) {
+                    Ok(png) => (png, "png".to_string()),
+                    Err(_) => {
+                        return Some(Err(FileAbilityError::Parse("图像转换失败".to_string())))
                     }
-                }
+                },
                 Err(e) => return Some(Err(FileAbilityError::Parse(format!("解压失败: {e}")))),
             }
         }
@@ -313,7 +320,7 @@ fn extract_image_from_xobject(
             (stream_data, "raw".to_string())
         }
     };
-    
+
     Some(Ok(ImageData {
         bytes,
         width,
@@ -328,13 +335,15 @@ fn extract_image_from_xobject(
 fn extract_stream_data(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<Vec<u8>> {
     // 获取流对象
     let stream_ref = dict.get(b"Stream").ok()?;
-    let stream_obj = doc.get_object(stream_ref.as_reference().unwrap_or((0, 0))).ok()?;
-    
+    let stream_obj = doc
+        .get_object(stream_ref.as_reference().unwrap_or((0, 0)))
+        .ok()?;
+
     // 尝试获取流内容
     if let Ok(stream) = stream_obj.as_stream() {
         return Some(stream.content.clone());
     }
-    
+
     None
 }
 
@@ -342,7 +351,7 @@ fn extract_stream_data(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Optio
 fn get_color_info(_doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<(u8, bool)> {
     let color_space = dict.get(b"ColorSpace").ok()?;
     let cs_name = color_space.as_name().ok()?;
-    
+
     let channels = match cs_name {
         b"DeviceGray" => 1,
         b"DeviceRGB" => 3,
@@ -384,10 +393,10 @@ fn get_color_info(_doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<(u
             }
         }
     };
-    
+
     // 检查是否有 Mask (透明度)
     let has_alpha = dict.get(b"SMask").is_ok() || dict.get(b"Mask").is_ok();
-    
+
     Some((channels, has_alpha))
 }
 
@@ -395,24 +404,20 @@ fn get_color_info(_doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<(u
 fn decode_flate_data(data: &[u8]) -> Result<Vec<u8>> {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
-    
+
     let mut decoder = ZlibDecoder::new(data);
     let mut decoded = Vec::new();
-    decoder.read_to_end(&mut decoded)
+    decoder
+        .read_to_end(&mut decoded)
         .map_err(|e| FileAbilityError::Parse(format!("FlateDecode 解压失败: {e}")))?;
-    
+
     Ok(decoded)
 }
 
 /// 将原始图像数据转换为 PNG
-fn convert_to_png(
-    data: &[u8],
-    width: u32,
-    height: u32,
-    channels: u8,
-) -> Result<Vec<u8>> {
-    use image::{ImageBuffer, Rgba, Rgb, Luma};
-    
+fn convert_to_png(data: &[u8], width: u32, height: u32, channels: u8) -> Result<Vec<u8>> {
+    use image::{ImageBuffer, Luma, Rgb, Rgba};
+
     let expected_len = (width as usize) * (height as usize) * (channels as usize);
     if data.len() < expected_len {
         return Err(FileAbilityError::Parse(format!(
@@ -421,9 +426,9 @@ fn convert_to_png(
             data.len()
         )));
     }
-    
+
     let mut output = std::io::Cursor::new(Vec::new());
-    
+
     match channels {
         1 => {
             // 灰度图
@@ -452,7 +457,7 @@ fn convert_to_png(
             )));
         }
     }
-    
+
     Ok(output.into_inner())
 }
 
@@ -461,16 +466,16 @@ fn is_unicolor(data: &[u8], width: u32, height: u32, channels: u8) -> bool {
     if channels == 0 || width == 0 || height == 0 {
         return true;
     }
-    
+
     let pixel_count = (width as usize) * (height as usize);
     if data.len() < pixel_count * (channels as usize) {
         return true;
     }
-    
+
     // 采样检查 (每 100 像素检查一个)
     let sample_step = 100.max(1);
     let first_pixel = &data[..channels as usize];
-    
+
     for i in (0..pixel_count).step_by(sample_step) {
         let offset = i * channels as usize;
         if offset + channels as usize > data.len() {
@@ -481,7 +486,7 @@ fn is_unicolor(data: &[u8], width: u32, height: u32, channels: u8) -> bool {
             return false;
         }
     }
-    
+
     true
 }
 
@@ -493,7 +498,11 @@ pub fn extract_page_images(
     config: &PdfImageExtractConfig,
 ) -> Result<Vec<PdfExtractedImage>> {
     let result = extract_pdf_images(pdf_path, output_dir, config)?;
-    Ok(result.images.into_iter().filter(|img| img.page == page).collect())
+    Ok(result
+        .images
+        .into_iter()
+        .filter(|img| img.page == page)
+        .collect())
 }
 
 /// 检测 PDF 是否包含图像
@@ -501,15 +510,15 @@ pub fn pdf_has_images(pdf_path: &Path) -> Result<bool> {
     let data = std::fs::read(pdf_path).map_err(FileAbilityError::Io)?;
     let doc = lopdf::Document::load_mem(&data)
         .map_err(|e| FileAbilityError::Parse(format!("PDF 解析失败: {e}")))?;
-    
+
     let iterator = XObjectImageIterator::new(&doc);
     let mut found = false;
-    
+
     iterator.for_each_image(|_xobj_dict, _page_num, _xref| {
         found = true;
         Ok(false) // 找到即停止
     })?;
-    
+
     Ok(found)
 }
 
@@ -518,18 +527,18 @@ pub fn pdf_image_stats(pdf_path: &Path) -> Result<PdfImageStats> {
     let data = std::fs::read(pdf_path).map_err(FileAbilityError::Io)?;
     let doc = lopdf::Document::load_mem(&data)
         .map_err(|e| FileAbilityError::Parse(format!("PDF 解析失败: {e}")))?;
-    
+
     let total_pages = doc.get_pages().len();
     let mut total_images = 0u64;
     let mut formats = Vec::new();
     let mut total_width = 0u64;
     let mut total_height = 0u64;
     let mut image_count = 0u64;
-    
+
     let iterator = XObjectImageIterator::new(&doc);
     iterator.for_each_image(|xobj_dict, _page_num, _xref| {
         total_images += 1;
-        
+
         if let Ok(width) = xobj_dict.get(b"Width") {
             if let Ok(w) = width.as_i64() {
                 total_width += w as u64;
@@ -541,7 +550,7 @@ pub fn pdf_image_stats(pdf_path: &Path) -> Result<PdfImageStats> {
             }
         }
         image_count += 1;
-        
+
         // 检查格式
         if let Ok(filter) = xobj_dict.get(b"Filter") {
             if let Ok(name) = filter.as_name() {
@@ -558,13 +567,16 @@ pub fn pdf_image_stats(pdf_path: &Path) -> Result<PdfImageStats> {
         }
         Ok(true) // 继续遍历
     })?;
-    
+
     let avg_image_size = if image_count > 0 {
-        ((total_width / image_count) as u32, (total_height / image_count) as u32)
+        (
+            (total_width / image_count) as u32,
+            (total_height / image_count) as u32,
+        )
     } else {
         (0, 0)
     };
-    
+
     Ok(PdfImageStats {
         total_images: total_images as usize,
         total_pages,
@@ -587,7 +599,7 @@ struct ImageData {
 mod tests {
     use super::*;
     use tempfile::TempDir;
-    
+
     #[test]
     fn test_default_config() {
         let config = PdfImageExtractConfig::default();
@@ -596,7 +608,7 @@ mod tests {
         assert!(config.filter_unicolor);
         assert_eq!(config.output_format, PdfImageFormat::Png);
     }
-    
+
     #[test]
     fn test_extract_nonexistent_pdf() {
         let tmp = TempDir::new().unwrap();
@@ -607,13 +619,13 @@ mod tests {
         );
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_pdf_has_images_nonexistent() {
         let result = pdf_has_images(Path::new("/nonexistent.pdf"));
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_pdf_image_stats_nonexistent() {
         let result = pdf_image_stats(Path::new("/nonexistent.pdf"));

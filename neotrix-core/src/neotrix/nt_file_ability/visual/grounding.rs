@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 const CRITICAL_IDENTIFIER_RE: &str = r"[A-Z]{2,}[A-Z0-9_-]*\d[A-Z0-9_-]*";
 
 /// 关键数字 token 模式: 可选正负/百分号前缀, 数字带千分位逗号与可选小数
-const NUMERIC_TOKEN_RE: &str = r"(?:\([0-9][0-9,]*(?:\.[0-9]+)?%?\)|[+\-−－△]?[0-9][0-9,]*(?:\.[0-9]+)?%?)";
+const NUMERIC_TOKEN_RE: &str =
+    r"(?:\([0-9][0-9,]*(?:\.[0-9]+)?%?\)|[+\-−－△]?[0-9][0-9,]*(?:\.[0-9]+)?%?)";
 
 /// 多段版本号模式 (如 2.5.1, 3.14.159) — doc7 单小数段正则的增强
 const VERSION_TOKEN_RE: &str = r"[0-9]+\.[0-9]+(?:\.[0-9]+)+";
@@ -22,13 +23,19 @@ const VERSION_TOKEN_RE: &str = r"[0-9]+\.[0-9]+(?:\.[0-9]+)+";
 pub(super) fn is_critical_numeric_token(value: &str) -> bool {
     let trimmed = value.trim().trim_matches(|c| c == '(' || c == ')');
     let digits = trimmed.chars().filter(|c| c.is_ascii_digit()).count();
-    digits >= 3 || trimmed.chars().any(|c| matches!(c, '.' | '%' | '$' | '€' | '£' | '¥'))
+    digits >= 3
+        || trimmed
+            .chars()
+            .any(|c| matches!(c, '.' | '%' | '$' | '€' | '£' | '¥'))
 }
 
 /// 数值 token 归一化: 空格/unicode 减号/括号归一, 便于跨来源比对
 pub(super) fn normalize_numeric_token(value: &str) -> String {
     let mut v = value.trim().trim_end_matches(',').to_string();
-    v = v.replace(['−', '－'], "-").replace('△', "-").replace(' ', "");
+    v = v
+        .replace(['−', '－'], "-")
+        .replace('△', "-")
+        .replace(' ', "");
     if v.starts_with("△") {
         v = format!("-{}", &v["△".len()..]);
     }
@@ -73,7 +80,10 @@ fn critical_numeric_tokens(value: &str) -> Vec<(usize, String)> {
     }
     for (pos, cap) in re.captures_iter(value).enumerate() {
         let m = cap.get(0).expect("group 0");
-        if covered.iter().any(|(s, e)| *s <= m.start() && m.end() <= *e) {
+        if covered
+            .iter()
+            .any(|(s, e)| *s <= m.start() && m.end() <= *e)
+        {
             continue;
         }
         let raw = &value[m.start()..m.end()];
@@ -151,10 +161,13 @@ pub fn ground_missing_tokens(source_text: &str, content: &str) -> GroundingRepor
         if !seen.insert(norm.clone()) {
             continue;
         }
-        let missing = !content_tokens.contains(&norm) && !compact_content.contains(&compact_numeric_text(&t));
+        let missing =
+            !content_tokens.contains(&norm) && !compact_content.contains(&compact_numeric_text(&t));
         if missing {
             // math 行保护: 输出缺失数字所在行若含 LaTeX → 判定为公式, 跳过
-            let line = content.lines().find(|l| compact_numeric_text(l).contains(&compact_numeric_text(&t)));
+            let line = content
+                .lines()
+                .find(|l| compact_numeric_text(l).contains(&compact_numeric_text(&t)));
             if let Some(line) = line {
                 if is_math_line(line) {
                     report.math_guard_skipped += 1;

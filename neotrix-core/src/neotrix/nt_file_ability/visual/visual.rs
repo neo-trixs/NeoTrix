@@ -183,7 +183,10 @@ pub fn visual_extract(
         }
     }
     if let Some(e) = last_err {
-        result.error = Some(format!("VLM call failed after {} attempts: {e}", config.retry_count + 1));
+        result.error = Some(format!(
+            "VLM call failed after {} attempts: {e}",
+            config.retry_count + 1
+        ));
         result.failed = true;
         return result;
     }

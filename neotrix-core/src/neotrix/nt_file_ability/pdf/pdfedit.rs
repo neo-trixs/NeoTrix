@@ -75,7 +75,9 @@ pub fn extract_pdf_tables(src: impl AsRef<Path>) -> Result<Vec<(u32, usize, Stri
     let data = std::fs::read(src.as_ref()).map_err(FileAbilityError::Io)?;
     let tables = neotrix_types::core::file_parser::FileParser::extract_pdf_tables(&data);
     if tables.is_empty() {
-        return Err(FileAbilityError::Other("未检测到表格形态的文本布局".to_string()));
+        return Err(FileAbilityError::Other(
+            "未检测到表格形态的文本布局".to_string(),
+        ));
     }
     Ok(tables
         .iter()

@@ -12,10 +12,10 @@
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 
-use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-use zip::ZipArchive;
+use quick_xml::Reader;
 use zip::write::SimpleFileOptions;
+use zip::ZipArchive;
 
 use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result};
 
@@ -145,7 +145,8 @@ pub fn merge_docx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
     let base = std::fs::File::open(&inputs[0]).map_err(FileAbilityError::Io)?;
     let mut base_zip = ZipArchive::new(base).map_err(|e| FileAbilityError::Parse(e.to_string()))?;
     let base_names = part_names(&base_zip);
-    let mut out_parts: std::collections::BTreeMap<String, Vec<u8>> = std::collections::BTreeMap::new();
+    let mut out_parts: std::collections::BTreeMap<String, Vec<u8>> =
+        std::collections::BTreeMap::new();
     for n in &base_names {
         if let Some(data) = read_part(&mut base_zip, n) {
             out_parts.insert(n.clone(), data);
@@ -159,7 +160,8 @@ pub fn merge_docx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
     let (mut paragraphs, _) = extract_docx_paragraphs(&base_doc);
     let mut item_count = 1usize;
     // 冲突 part 重命名映射: 旧 part 名 → 新 part 名 (跨文档累计)
-    let mut rename_map: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+    let mut rename_map: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
     // 基座 document.xml.rels 已占用 rId 集合 (冲突时重编号)
     let base_rels = out_parts
         .get("word/_rels/document.xml.rels")
@@ -198,19 +200,18 @@ pub fn merge_docx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
         // 合并该文档 document.xml.rels: 冲突 rId 重编号, Target 冲突 part 重写
         let rels_name = "word/_rels/document.xml.rels".to_string();
         if let Some(rels_bytes) = read_part(&mut z, &rels_name) {
-            let (rid_map, new_rels) = merge_rels_into(
-                &rels_bytes,
-                &mut used_rids,
-                &mut next_rid,
-                &rename_map,
-            );
+            let (rid_map, new_rels) =
+                merge_rels_into(&rels_bytes, &mut used_rids, &mut next_rid, &rename_map);
             rels_append.push_str(&new_rels);
             // 段落内 rId 引用同步替换 (r:embed / r:id)
             if !rid_map.is_empty() {
                 for p in ps.iter_mut() {
                     for (old, new) in &rid_map {
                         if p.contains(&format!("r:embed=\"{old}\"")) {
-                            *p = p.replace(&format!("r:embed=\"{old}\""), &format!("r:embed=\"{new}\""));
+                            *p = p.replace(
+                                &format!("r:embed=\"{old}\""),
+                                &format!("r:embed=\"{new}\""),
+                            );
                         }
                         if p.contains(&format!("r:id=\"{old}\"")) {
                             *p = p.replace(&format!("r:id=\"{old}\""), &format!("r:id=\"{new}\""));
@@ -412,11 +413,7 @@ fn rebuild_content_types(parts: &mut std::collections::BTreeMap<String, Vec<u8>>
         return;
     }
     let merged = if original_str.contains("</Types>") {
-        original_str.replacen(
-            "</Types>",
-            &format!("{new_overrides}</Types>"),
-            1,
-        )
+        original_str.replacen("</Types>", &format!("{new_overrides}</Types>"), 1)
     } else {
         format!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
@@ -446,7 +443,10 @@ fn guess_content_type(name: &str) -> &'static str {
 }
 
 /// 写 zip 包。
-fn write_zip<W: Write + Seek>(w: W, parts: &std::collections::BTreeMap<String, Vec<u8>>) -> std::io::Result<()> {
+fn write_zip<W: Write + Seek>(
+    w: W,
+    parts: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> std::io::Result<()> {
     let mut zw = zip::ZipWriter::new(w);
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     for (name, data) in parts {
@@ -476,7 +476,8 @@ pub fn merge_pptx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
     let base = std::fs::File::open(&inputs[0]).map_err(FileAbilityError::Io)?;
     let mut base_zip = ZipArchive::new(base).map_err(|e| FileAbilityError::Parse(e.to_string()))?;
     let base_names = part_names(&base_zip);
-    let mut out_parts: std::collections::BTreeMap<String, Vec<u8>> = std::collections::BTreeMap::new();
+    let mut out_parts: std::collections::BTreeMap<String, Vec<u8>> =
+        std::collections::BTreeMap::new();
     for n in &base_names {
         if let Some(data) = read_part(&mut base_zip, n) {
             out_parts.insert(n.clone(), data);
@@ -517,9 +518,7 @@ pub fn merge_pptx(inputs: &[std::path::PathBuf], out: &Path) -> Result<OfficeMer
             out_parts.insert(new_name, data);
             let rel_id = format!("rId{}", 100 + next_slide);
             let sld_id = (256 + next_slide) as i64;
-            sld_ids.push(format!(
-                "<p:sldId id=\"{sld_id}\" r:id=\"{rel_id}\"/>"
-            ));
+            sld_ids.push(format!("<p:sldId id=\"{sld_id}\" r:id=\"{rel_id}\"/>"));
             new_rels.push_str(&format!(
                 "    <Relationship Id=\"{rel_id}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" Target=\"slides/slide{}.xml\"/>\n",
                 next_slide
@@ -616,7 +615,10 @@ fn rebuild_presentation_xml(base_xml: &[u8], sld_ids: &[String]) -> String {
 }
 
 /// 合并 presentation.xml.rels: 追加新增 slide Relationship。
-fn merge_presentation_rels(parts: &mut std::collections::BTreeMap<String, Vec<u8>>, new_rels: &str) {
+fn merge_presentation_rels(
+    parts: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    new_rels: &str,
+) {
     let rels_name = "ppt/_rels/presentation.xml.rels".to_string();
     if new_rels.is_empty() {
         return;
@@ -624,7 +626,11 @@ fn merge_presentation_rels(parts: &mut std::collections::BTreeMap<String, Vec<u8
     let existing = parts.get(&rels_name).cloned().unwrap_or_default();
     let s = String::from_utf8_lossy(&existing).to_string();
     let merged = if s.contains("</Relationships>") {
-        s.replacen("</Relationships>", &format!("{new_rels}</Relationships>"), 1)
+        s.replacen(
+            "</Relationships>",
+            &format!("{new_rels}</Relationships>"),
+            1,
+        )
     } else {
         format!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
