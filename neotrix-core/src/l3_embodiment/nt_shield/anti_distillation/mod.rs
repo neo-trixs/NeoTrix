@@ -83,7 +83,7 @@ impl AntiDistillationEngine {
     /// Analyze a request for distillation signals
     pub async fn analyze_request(
         &self,
-        request_id: &str,
+        _request_id: &str,
         account_id: &str,
         prompt: &str,
         metadata: &HashMap<String, String>,

@@ -105,11 +105,12 @@ impl GrappleHookChain {
             HookPoint::H2DualUse => {
                 // 黑话→专业转换
                 let converted = self.convert_slang(input);
+                let activated = converted != input;
                 HookChainResult {
                     hook_point: point,
-                    activated: converted != input,
-                    output: converted,
-                    signals: if converted != input {
+                    activated,
+                    output: converted.clone(),
+                    signals: if activated {
                         vec!["Slang converted to professional".to_string()]
                     } else {
                         vec!["No slang detected".to_string()]

@@ -85,14 +85,12 @@ impl Trie {
     fn search(&self, text: &str) -> Option<(String, Domain)> {
         let mut node = &self.root;
         let mut last_match = None;
-        let mut last_match_end = 0;
 
-        for (i, char) in text.char_indices() {
+        for (_i, char) in text.char_indices() {
             if let Some(child) = node.children.get(&char) {
                 node = child;
                 if node.is_end {
                     last_match = Some((node.professional.clone().unwrap(), node.domain.unwrap()));
-                    last_match_end = i + char.len_utf8();
                 }
             } else {
                 break;
