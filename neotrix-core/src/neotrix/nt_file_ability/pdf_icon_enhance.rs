@@ -10,10 +10,10 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::pdf_image_extract::{
-    extract_pdf_images, PdfExtractedImage, PdfImageExtractConfig, PdfImageFormat,
+    extract_pdf_images, PdfImageExtractConfig, PdfImageFormat,
 };
 use super::image_super_resolution::{
-    ImageSuperResolver, SuperResolutionConfig, SuperResolutionModel, SuperResolutionResult,
+    ImageSuperResolver, SuperResolutionConfig,
 };
 use super::types::{FileAbilityError, Result};
 

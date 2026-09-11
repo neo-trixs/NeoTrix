@@ -1,3 +1,5 @@
+pub mod goap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::agents::sim_agent::AgentAction;

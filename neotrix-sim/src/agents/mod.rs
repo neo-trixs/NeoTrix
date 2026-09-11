@@ -10,6 +10,8 @@ pub mod reflection;
 pub mod action_costs;
 pub mod pheromone;
 pub mod behavior_tree;
+pub mod stimulus;
+pub mod emotional_bias;
 
 // Fusion Adapters (External Model Integration)
 pub mod goal_outcome_feedback;
