@@ -19,15 +19,15 @@ pub struct AccountClustering {
 }
 
 #[derive(Debug, Clone)]
-struct AccountInfo {
+pub struct AccountInfo {
     account_id: String,
-    creation_time: u64,
+    _creation_time: u64,
     ip_addresses: Vec<String>,
     behavioral_hash: String,
 }
 
 #[derive(Debug, Clone)]
-struct CreationWindow {
+pub struct CreationWindow {
     start_time: u64,
     end_time: u64,
     account_ids: Vec<String>,

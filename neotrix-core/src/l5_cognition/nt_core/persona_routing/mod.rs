@@ -39,7 +39,7 @@ pub struct PersonaRouter {
     current_persona: PersonaType,
     wedge_tracks: Vec<WedgeTrack>,
     prism_routes: Vec<PrismRoute>,
-    skill_registry: HashMap<String, Vec<String>>,
+    _skill_registry: HashMap<String, Vec<String>>,
 }
 
 impl PersonaRouter {

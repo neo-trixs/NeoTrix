@@ -52,14 +52,14 @@ pub struct HookChainResult {
 /// 钩链锁存引擎
 pub struct GrappleHookChain {
     hooks: Vec<HookConfig>,
-    current_session: Option<String>,
+    _current_session: Option<String>,
 }
 
 #[derive(Debug, Clone)]
-struct HookConfig {
+pub(crate) struct HookConfig {
     point: HookPoint,
-    name: String,
-    description: String,
+    _name: String,
+    _description: String,
     enabled: bool,
 }
 

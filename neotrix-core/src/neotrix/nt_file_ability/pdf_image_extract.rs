@@ -244,7 +244,7 @@ impl<'a> XObjectImageIterator<'a> {
     }
 
     /// 获取文档引用
-    fn doc(&self) -> &'a lopdf::Document {
+    fn _doc(&self) -> &'a lopdf::Document {
         self.doc
     }
 }

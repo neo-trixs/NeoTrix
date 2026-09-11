@@ -31,7 +31,7 @@ pub struct SessionLedger {
     session_id: String,
     entries: Vec<EvidenceEntry>,
     claims: Vec<Claim>,
-    claim_gates: Vec<ClaimGate>,
+    _claim_gates: Vec<ClaimGate>,
 }
 
 #[derive(Debug, Clone)]

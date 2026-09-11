@@ -54,7 +54,7 @@ pub struct HarnessOptimizer {
     /// 融合阈值（连续相同工具调用数量 >= 阈值时融合）
     fusion_threshold: usize,
     /// 压缩率目标
-    compression_target: f64,
+    _compression_target: f64,
     /// 优化历史
     history: Vec<OptimizationRecord>,
 }

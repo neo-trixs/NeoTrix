@@ -65,7 +65,7 @@ pub struct AutoInspector {
     inspection_types: Vec<InspectionType>,
     results: Vec<InspectionResult>,
     repair_queue: Vec<RepairTask>,
-    max_concurrent_agents: usize,
+    _max_concurrent_agents: usize,
 }
 
 impl AutoInspector {

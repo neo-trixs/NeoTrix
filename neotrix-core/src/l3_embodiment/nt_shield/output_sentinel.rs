@@ -47,10 +47,10 @@ struct PolicyRule {
 }
 
 #[derive(Debug, Clone)]
-enum PolicyAction {
+pub enum PolicyAction {
     Block,
     Warn,
-    Log,
+    _Log,
 }
 
 impl OutputSentinel {

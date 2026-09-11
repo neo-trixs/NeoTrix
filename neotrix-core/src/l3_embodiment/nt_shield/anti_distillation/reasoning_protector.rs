@@ -9,7 +9,7 @@
 use super::{DetectionSignal, ThreatLevel};
 
 pub struct ReasoningProtector {
-    decoy_patterns: Vec<String>,
+    _decoy_patterns: Vec<String>,
 }
 
 impl ReasoningProtector {

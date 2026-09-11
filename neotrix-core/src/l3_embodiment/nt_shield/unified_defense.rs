@@ -35,7 +35,7 @@ pub struct UnifiedDefenseLayer {
     slang_norm: SlangNormEngine,
     dual_evidence: DualEvidenceScanner,
     grapple_hooks: GrappleHookChain,
-    proxy_detection: ProxyDetectionEngine,
+    _proxy_detection: ProxyDetectionEngine,
     reasoning_protection: ReasoningProtectionEngine,
     anti_distillation: AntiDistillationEngine,
 }

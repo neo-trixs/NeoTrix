@@ -36,7 +36,7 @@ pub struct ContextNode {
 #[derive(Debug)]
 pub struct ContextFileSystem {
     nodes: HashMap<String, ContextNode>,
-    root: String,
+    _root: String,
 }
 
 

@@ -34,21 +34,21 @@ pub enum ThreatLevel {
 pub struct DualEvidenceScanner {
     action_patterns: Vec<Pattern>,
     target_patterns: Vec<Pattern>,
-    soft_signals: Vec<SoftSignal>,
+    _soft_signals: Vec<SoftSignal>,
 }
 
 #[derive(Debug, Clone)]
 struct Pattern {
-    name: String,
+    _name: String,
     regex: String,
-    weight: f64,
+    _weight: f64,
 }
 
 #[derive(Debug, Clone)]
-struct SoftSignal {
-    name: String,
-    weight: f64,
-    detect: fn(&str) -> bool,
+pub(crate) struct SoftSignal {
+    _name: String,
+    _weight: f64,
+    _detect: fn(&str) -> bool,
 }
 
 impl DualEvidenceScanner {

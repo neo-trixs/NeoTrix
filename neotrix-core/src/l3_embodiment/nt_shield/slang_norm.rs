@@ -34,7 +34,7 @@ pub struct MatchedTerm {
 /// 黑话规范化引擎
 pub struct SlangNormEngine {
     trie: Trie,
-    domain_rules: HashMap<Domain, Vec<ConversionRule>>,
+    _domain_rules: HashMap<Domain, Vec<ConversionRule>>,
 }
 
 #[derive(Debug, Clone)]

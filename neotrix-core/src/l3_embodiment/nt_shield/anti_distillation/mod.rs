@@ -60,7 +60,7 @@ impl Default for AntiDistillationConfig {
 
 /// Main anti-distillation engine
 pub struct AntiDistillationEngine {
-    config: AntiDistillationConfig,
+    _config: AntiDistillationConfig,
     extraction_detector: extraction_detector::ExtractionDetector,
     session_replay_guard: session_replay_guard::SessionReplayGuard,
     account_clustering: account_clustering::AccountClustering,

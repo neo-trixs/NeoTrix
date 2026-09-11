@@ -35,7 +35,7 @@ pub struct TraversalResult {
 /// 护栏路径穿越引擎
 pub struct GuardrailTraversalEngine {
     frames: Vec<EvaluationFrame>,
-    current_layer: TraversalLayer,
+    _current_layer: TraversalLayer,
 }
 
 impl GuardrailTraversalEngine {
