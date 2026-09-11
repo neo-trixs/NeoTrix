@@ -7,6 +7,7 @@
 //!   explore/ — 探索类 (map + cleanup)
 //!   source/  — 源类 (media_source)
 
+pub mod l1_facade;
 pub mod crawl;
 pub mod osint;
 pub mod sense;

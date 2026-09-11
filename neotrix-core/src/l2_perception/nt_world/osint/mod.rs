@@ -27,10 +27,9 @@ use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use super::l1_facade::{KnowledgeBase, CrawlCycleReport};
 
 use crate::core::nt_core_kb_types::NodeType;
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
 use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorber;
 pub use crate::l2_perception::nt_world::nt_world_github_absorber::GitHubAbsorbReport;
 use rusqlite::Connection;
@@ -1031,7 +1030,7 @@ mod nt_memory_kb_crawl {
 }
 
 mod nt_memory_kb_discovery {
-    pub use crate::l1_action::nt_memory::nt_memory_kb::nt_discovery_github_topics::DiscoveryPipelineConfig;
+    pub use super::super::l1_facade::DiscoveryPipelineConfig;
 }
 
 mod nt_memory_store {

@@ -18,6 +18,8 @@ use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
+use log::info;
+
 /// 工具层 — 映射设计文档 L1/L2/L3。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BuildLayer {
@@ -285,7 +287,7 @@ mod tests {
             .unwrap_or(false)
             != true
         {
-            eprintln!("skipped: set NT_E2E_CARGO=1 to run real-cargo layer inference");
+            info!("skipped: set NT_E2E_CARGO=1 to run real-cargo layer inference");
             return;
         }
         assert_eq!(
@@ -310,7 +312,7 @@ mod tests {
             .unwrap_or(false)
             != true
         {
-            eprintln!("skipped: set NT_E2E_CARGO=1 to run real-cargo evidence collection");
+            info!("skipped: set NT_E2E_CARGO=1 to run real-cargo evidence collection");
             return;
         }
         let runner = BuildRunner::new().with_timeout(300);

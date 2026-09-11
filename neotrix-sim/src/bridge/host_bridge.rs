@@ -195,6 +195,8 @@ mod tests {
             emotion_valence: 0.0,
             emotion_arousal: 0.0,
             emotion_dominance: 0.0,
+            safety_alerts: 0,
+            audit_entries: 0,
         }
     }
 

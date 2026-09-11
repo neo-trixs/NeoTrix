@@ -79,7 +79,7 @@ impl KnowledgeStore for L1KnowledgeStore {
 
 /// KB-backed KnowledgeStore that delegates to a KnowledgeBase instance.
 pub struct KbKnowledgeStore {
-    pub kb: crate::neotrix::nt_memory_kb::KnowledgeBase,
+    pub kb: std::sync::Arc<crate::neotrix::nt_memory_kb::KnowledgeBase>,
 }
 
 impl KnowledgeStore for KbKnowledgeStore {

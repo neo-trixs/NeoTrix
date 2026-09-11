@@ -540,7 +540,7 @@ impl BackgroundLoopHandle {
                 let kb = match self.kb_pipeline.kb.as_ref() {
                     Some(kb) => kb, None => break,
                 };
-                let store = KbKnowledgeStore { kb: (**kb).clone() };
+                let store = KbKnowledgeStore { kb: kb.clone() };
                 match store.claim_next_crawl_url() {
                     Ok(Some(item)) => (item.id, item.url),
                     _ => break,
@@ -555,7 +555,7 @@ impl BackgroundLoopHandle {
                     let kb = match self.kb_pipeline.kb.as_ref() {
                         Some(kb) => kb, None => break,
                     };
-                    let store = KbKnowledgeStore { kb: (**kb).clone() };
+                    let store = KbKnowledgeStore { kb: kb.clone() };
                     let _ = store.mark_crawl_complete(&id, true, None);
                 }
                 Err(e) => {
@@ -563,8 +563,8 @@ impl BackgroundLoopHandle {
                     let kb = match self.kb_pipeline.kb.as_ref() {
                         Some(kb) => kb, None => break,
                     };
-                    let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
-                    let _ = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::mark_crawl_complete(&conn, &id, false, Some(&e));
+                    let store = KbKnowledgeStore { kb: kb.clone() };
+                    let _ = store.mark_crawl_complete(&id, false, Some(&e));
                 }
             }
             processed += 1;
@@ -607,7 +607,7 @@ impl BackgroundLoopHandle {
             Some(kb) => kb,
             None => { log::warn!("[bg] seed_crawl: kb disappeared"); return; }
         };
-        let store = KbKnowledgeStore { kb: (**kb).clone() };
+        let store = KbKnowledgeStore { kb: kb.clone() };
         let domains = store.count_nodes_by_domain().unwrap_or_default();
         let seed_count = domains.len();
         if seed_count == 0 {

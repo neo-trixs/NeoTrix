@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
-use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+use super::l1_facade::KnowledgeBase;
 
 // ── HTTP Client (L1 dependency centralized here) ──
 
@@ -356,7 +356,7 @@ impl GitHubAbsorber {
         repo: &str,
         dest: &std::path::Path,
     ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
+        use super::l1_facade::DownloadOptions;
 
         // 默认分支: 用 repo 元数据 default_branch (branches.first() 是字母序首个,
         // 会误选 "bak-feat/..." 之类特性分支 — project-nomad 实证缺陷)。

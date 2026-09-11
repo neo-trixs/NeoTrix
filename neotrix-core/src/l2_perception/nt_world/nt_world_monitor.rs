@@ -6,7 +6,7 @@
 
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use crate::core::nt_core_traits::KnowledgeSink;
-use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
+use super::l1_facade::NodeType;
 use std::collections::HashMap;
 
 /// 当前 Unix 时间戳 (秒)。

@@ -3,7 +3,7 @@
 //! Follows dependency inversion: L5 defines the interface, L1 implements.
 //! L5 code uses this trait instead of importing L1 SEAL types directly.
 
-use std::collections::VecDeque;
+use crate::core::nt_core_self_test::SelfTest;
 
 /// Oracle decision result (L5层定义)
 #[derive(Debug, Clone)]
@@ -97,6 +97,14 @@ pub struct L1OracleGate {
     inner: crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate,
 }
 
+impl L1OracleGate {
+    pub fn new() -> Self {
+        Self {
+            inner: crate::l1_action::nt_act::nt_act_autonomy::oracle_gate::OracleGate::new(),
+        }
+    }
+}
+
 impl OracleGateContract for L1OracleGate {
     fn evaluate_failure(&mut self, attempt_count: u32, dimension: &str) -> OracleDecision {
         let decision = self.inner.evaluate_failure(attempt_count, dimension);
@@ -135,6 +143,14 @@ impl crate::core::nt_core_self_test::SelfTest for L1OracleGate {
 /// L1 implementation of SemanticEntropyGateContract
 pub struct L1SemanticEntropyGate {
     inner: crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate,
+}
+
+impl L1SemanticEntropyGate {
+    pub fn new() -> Self {
+        Self {
+            inner: crate::l1_action::nt_act::nt_act_code::semantic_entropy::SemanticEntropyGate::new(),
+        }
+    }
 }
 
 impl SemanticEntropyGateContract for L1SemanticEntropyGate {
@@ -179,6 +195,14 @@ impl crate::core::nt_core_self_test::SelfTest for L1SemanticEntropyGate {
 /// L1 implementation of ActionSandboxContract
 pub struct L1ActionSandbox {
     inner: crate::l1_action::nt_act::actions::sandbox::ActionSandbox,
+}
+
+impl L1ActionSandbox {
+    pub fn new() -> Self {
+        Self {
+            inner: crate::l1_action::nt_act::actions::sandbox::ActionSandbox::new(),
+        }
+    }
 }
 
 impl ActionSandboxContract for L1ActionSandbox {

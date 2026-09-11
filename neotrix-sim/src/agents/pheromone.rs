@@ -358,7 +358,7 @@ mod tests {
 
     #[test]
     fn pheromone_decay() {
-        let mut p = Pheromone::new(PheromoneType::Food, [10.0, 20.0], "agent_0", 0);
+        let p = Pheromone::new(PheromoneType::Food, [10.0, 20.0], "agent_0", 0);
         assert!(p.is_alive(0));
         // After many ticks, should decay
         assert!(!p.is_alive(1000));
