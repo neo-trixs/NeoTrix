@@ -11,10 +11,24 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 
 use super::nt_memory_brain::ForgettingCurve;
 use super::nt_memory_confidence::{ConfidenceStore, DecayConfig};
 use super::nt_memory_sweep_20260815::FreshnessLedger;
+
+/// Summary produced by a single `run_cycle` invocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForgettingReport {
+    /// Nodes marked in DB metadata by the ForgettingCurve.
+    pub curve_marked: usize,
+    /// Confidence entries decayed by ConfidenceStore::apply_decay.
+    pub confidence_decayed: u64,
+    /// Documents explicitly marked as should-forget in the FreshnessLedger.
+    pub ledger_marked: u64,
+    /// Current FreshnessLedger clock tick after the cycle.
+    pub current_tick: u64,
+}
 
 /// Unified memory lifecycle orchestrator.
 ///
@@ -92,6 +106,35 @@ impl MemoryLifecycle {
         }
 
         true
+    }
+
+    /// Run all three forgetting mechanisms and return a structured report.
+    ///
+    /// This is the primary entry point for periodic maintenance.
+    /// Execution order mirrors `run_forgetting_cycle` but returns a
+    /// richer `ForgettingReport` for observability.
+    pub fn run_cycle(
+        &mut self,
+        conn: &Connection,
+        confidence_store: &ConfidenceStore,
+    ) -> Result<ForgettingReport, String> {
+        // 1. ForgettingCurve: mark nodes that should be forgotten in DB
+        let curve_marked = self.forgetting_curve.update_freshness(conn)?;
+
+        // 2. ConfidenceStore: decay recency confidence for old records
+        let lambda = self.decay_config.lambda_general;
+        let older_than = self.decay_config.auto_archive_days;
+        let confidence_decayed = confidence_store.apply_decay(lambda, older_than)?;
+
+        // 3. FreshnessLedger: tick the clock
+        let current_tick = self.freshness.tick();
+
+        Ok(ForgettingReport {
+            curve_marked,
+            confidence_decayed,
+            ledger_marked: 0,
+            current_tick,
+        })
     }
 
     /// Run all three forgetting mechanisms in sequence.
