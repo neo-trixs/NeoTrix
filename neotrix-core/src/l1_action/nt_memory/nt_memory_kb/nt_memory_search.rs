@@ -427,48 +427,54 @@ pub fn hybrid_search(
         return Ok(results);
     }
 
+    // Tier 2: FTS5 title-only fallback — catches nodes missed by RRF fusion
     let remaining = limit - results.len();
-    let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, COALESCE(content, summary, ''), url, domain, language,
-            confidence, importance, created_at, updated_at, access_count, metadata
-         FROM nodes
-         WHERE title LIKE ?1
-         ORDER BY importance DESC
+    let fts_title_query: String = query.trim().split_whitespace().collect::<Vec<&str>>().join(" OR ");
+    let fts_rows = conn.prepare(
+        "SELECT n.id, n.node_type, n.title, n.summary, COALESCE(n.content, n.summary, ''), n.url, n.domain,
+                n.language, n.confidence, n.importance, n.created_at, n.updated_at,
+                n.access_count, n.metadata
+         FROM nodes n
+         JOIN nodes_fts f ON n.rowid = f.rowid
+         WHERE nodes_fts MATCH ?1
+         ORDER BY rank
          LIMIT ?2",
-    )?;
+    )
+    .and_then(|mut stmt| {
+        stmt.query_map(params![fts_title_query, remaining as i64], |row| {
+            Ok(SearchResult {
+                node: KnowledgeNode {
+                    recall_weight: 1.0,
+                    id: row.get(0)?,
+                    node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                    title: row.get(2)?,
+                    summary: row.get(3)?,
+                    content: row.get(4)?,
+                    url: row.get(5)?,
+                    domain: row.get(6)?,
+                    language: row.get(7)?,
+                    confidence: row.get(8)?,
+                    importance: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    access_count: row.get(12)?,
+                    metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                    temporal: None,
+                    supersedes: None,
+                    source_episode: None,
+                },
+                score: 0.1,
+                matched_on: vec![SearchMatchType::FtsTitle],
+                signals: None,
+            })
+        })?.collect::<Result<Vec<_>, _>>()
+    });
 
-    let pattern = format!("%{}%", query);
-    let rows = stmt.query_map(params![pattern, remaining as i64], |row| {
-        Ok(SearchResult {
-            node: KnowledgeNode {
-                recall_weight: 1.0,
-                id: row.get(0)?,
-                node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-                title: row.get(2)?,
-                summary: row.get(3)?,
-                content: row.get(4)?,
-                url: row.get(5)?,
-                domain: row.get(6)?,
-                language: row.get(7)?,
-                confidence: row.get(8)?,
-                importance: row.get(9)?,
-                created_at: row.get(10)?,
-                updated_at: row.get(11)?,
-                access_count: row.get(12)?,
-                metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
-                temporal: None,
-                supersedes: None,
-                source_episode: None,
-            },
-            score: 0.1,
-            matched_on: vec![SearchMatchType::FtsTitle],
-            signals: None,
-        })
-    })?;
-
-    for r in rows.filter_map(|r| r.ok()) {
-        if seen_ids.insert(r.node.id.clone()) {
-            results.push(r);
+    if let Ok(rows) = fts_rows {
+        for r in rows {
+            if seen_ids.insert(r.node.id.clone()) {
+                results.push(r);
+            }
         }
     }
 

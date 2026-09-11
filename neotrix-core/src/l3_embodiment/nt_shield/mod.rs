@@ -1,213 +1,41 @@
-//! L3 Embodiment Layer - Shield Modules
+//! NT-SHIELD Security Module
+//!
+//! NeoTrix安全防护模块，包含:
+//! - 统一防御层 (Unified Defense Layer)
+//! - 输入验证 (Input Gatekeeper)
+//! - 输出验证 (Output Sentinel)
+//! - 提示守护 (Prompt Guardian)
+//! - 拒答篡改 (Refusal Tamper)
+//! - 护栏穿越 (Guardrail Traversal)
+//! - 黑话规范化 (Slang Norm)
+//! - 双证据扫描 (Dual Evidence)
+//! - 钩链锁存 (Grapple Hooks)
+//! - 代理检测 (Proxy Detection)
+//! - 推理保护 (Reasoning Protection)
+//! - 反分馏 (Anti-Distillation)
 
-use crate::neotrix::nt_core_event_bus::EventBus;
-use crate::core::nt_core_event::CoreEvent;
-use std::sync::Arc;
-
-pub mod nt_shield;
-
-pub mod nt_shield_agentic_scan;
-pub mod nt_shield_audit;
-pub mod nt_shield_comm;
-pub mod nt_shield_oversight;
-pub mod nt_shield_propagation_guard;
-pub mod nt_shield_recon;
-pub mod nt_shield_sandbox;
-
-#[cfg(feature = "sandbox")]
-pub mod nt_shield_sandbox_entry;
-
-pub mod nt_shield_sentry;
-
-#[cfg(feature = "stealth-net")]
-pub mod nt_shield_stealth_net;
-
-pub mod nt_shield_traffic;
-
-pub mod nt_shield_ztnet;
-
-// 安全增强模块
-pub mod nt_shield_threat_detection;
-pub mod nt_shield_adversarial;
-pub mod nt_shield_osint;
-
-// Proxy network detection (anti-distillation defense)
+pub mod unified_defense;
+pub mod input_gatekeeper;
+pub mod output_sentinel;
+pub mod prompt_guardian;
+pub mod refusal_tamper;
+pub mod guardrail_traversal;
+pub mod slang_norm;
+pub mod dual_evidence;
+pub mod grapple_hooks;
 pub mod proxy_detection;
+pub mod reasoning_protection;
+pub mod anti_distillation;
 
-/// Shield 域事件发布器
-pub struct ShieldEventPublisher {
-    bus: Arc<EventBus>,
-}
-
-impl ShieldEventPublisher {
-    pub fn new(bus: Arc<EventBus>) -> Self {
-        Self { bus }
-    }
-    
-    pub fn intrusion_detected(&self, source_ip: &str, rule: &str, severity: &str) {
-        let _ = self.bus.emit(CoreEvent::ShieldIntrusionDetected {
-            source_ip: source_ip.to_string(),
-            rule: rule.to_string(),
-            severity: severity.to_string(),
-        });
-    }
-    
-    pub fn audit_completed(&self, dimensions: u32, findings: u32, score: f64) {
-        let _ = self.bus.emit(CoreEvent::ShieldAuditCompleted {
-            dimensions,
-            findings,
-            score,
-        });
-    }
-}
-
-// ── Kameo-inspired ShieldActor ────────────────────────────────────────────
-// Typed actor pattern: enum message type with per-variant response dispatch.
-// Actor holds ShieldEventPublisher for domain-specific event emission.
-
-use crate::neotrix::nt_core_event_bus::{ActorContext, ActorHandler, ActorMessage, ActorRef, spawn_actor};
-
-/// Intrusion detected by a network sensor.
-pub struct IntrusionMessage {
-    pub source: String,
-    pub details: String,
-    pub severity: String,
-}
-
-pub struct IntrusionResponse {
-    pub blocked: bool,
-    pub action_taken: String,
-}
-
-/// Audit requested.
-pub struct AuditMessage {
-    pub dimensions: u32,
-}
-
-pub struct AuditResponse {
-    pub findings: u32,
-    pub score: f64,
-}
-
-/// Union message type for Shield domain — routes to per-variant handler.
-pub enum ShieldMessage {
-    Intrusion(IntrusionMessage),
-    Audit(AuditMessage),
-}
-
-impl ActorMessage for ShieldMessage {
-    type Response = ShieldResponse;
-}
-
-/// Union response type — mirrors ShieldMessage variants.
-pub enum ShieldResponse {
-    Intrusion(IntrusionResponse),
-    Audit(AuditResponse),
-}
-
-/// Shield actor — typed message handler backed by EventBus.
-pub struct ShieldActor {
-    publisher: ShieldEventPublisher,
-}
-
-impl ShieldActor {
-    pub fn new(bus: Arc<EventBus>) -> Self {
-        Self { publisher: ShieldEventPublisher::new(bus) }
-    }
-
-    fn handle_intrusion(&self, msg: &IntrusionMessage, ctx: &mut ActorContext) -> IntrusionResponse {
-        self.publisher.intrusion_detected(&msg.source, &msg.details, &msg.severity);
-        ctx.state.insert("last_intrusion".into(), msg.source.clone());
-        IntrusionResponse {
-            blocked: true,
-            action_taken: format!("logged and blocked {}", msg.source),
-        }
-    }
-
-    fn handle_audit(&self, msg: &AuditMessage, ctx: &mut ActorContext) -> AuditResponse {
-        let findings = msg.dimensions / 2;
-        let score = 1.0 - (findings as f64 / msg.dimensions as f64);
-        self.publisher.audit_completed(msg.dimensions, findings, score);
-        ctx.state.insert("last_audit_score".into(), format!("{:.3}", score));
-        AuditResponse { findings, score }
-    }
-
-    /// Spawn ShieldActor as a typed actor processing ShieldMessage.
-    pub fn spawn(bus: Arc<EventBus>) -> ActorRef<ShieldMessage> {
-        let actor = Self::new(bus.clone());
-        spawn_actor(bus, actor)
-    }
-}
-
-impl ActorHandler<ShieldMessage> for ShieldActor {
-    fn handle(&self, msg: &ShieldMessage, ctx: &mut ActorContext) -> ShieldResponse {
-        match msg {
-            ShieldMessage::Intrusion(m) => ShieldResponse::Intrusion(self.handle_intrusion(m, ctx)),
-            ShieldMessage::Audit(m) => ShieldResponse::Audit(self.handle_audit(m, ctx)),
-        }
-    }
-}
-
-// ── FUNARCH Typestate Pattern ──
-
-pub struct Idle;
-pub struct Scanning;
-pub struct Blocking;
-pub struct Logging;
-
-pub struct ShieldStateMachine<S> {
-    state: std::marker::PhantomData<S>,
-    events: Vec<String>,
-}
-
-impl ShieldStateMachine<Idle> {
-    pub fn new() -> Self {
-        Self {
-            state: std::marker::PhantomData,
-            events: Vec::new(),
-        }
-    }
-
-    pub fn start_scan(self) -> ShieldStateMachine<Scanning> {
-        ShieldStateMachine {
-            state: std::marker::PhantomData,
-            events: self.events,
-        }
-    }
-}
-
-impl ShieldStateMachine<Scanning> {
-    pub fn detect_threat(self, threat: &str) -> ShieldStateMachine<Blocking> {
-        let mut events = self.events;
-        events.push(format!("threat detected: {}", threat));
-        ShieldStateMachine {
-            state: std::marker::PhantomData,
-            events,
-        }
-    }
-
-    pub fn no_threat(self) -> ShieldStateMachine<Idle> {
-        ShieldStateMachine {
-            state: std::marker::PhantomData,
-            events: self.events,
-        }
-    }
-}
-
-impl ShieldStateMachine<Blocking> {
-    pub fn block(self) -> ShieldStateMachine<Logging> {
-        ShieldStateMachine {
-            state: std::marker::PhantomData,
-            events: self.events,
-        }
-    }
-}
-
-impl ShieldStateMachine<Logging> {
-    pub fn log(self) -> ShieldStateMachine<Idle> {
-        ShieldStateMachine {
-            state: std::marker::PhantomData,
-            events: self.events,
-        }
-    }
-}
+pub use unified_defense::UnifiedDefenseLayer;
+pub use input_gatekeeper::InputGatekeeper;
+pub use output_sentinel::OutputSentinel;
+pub use prompt_guardian::PromptGuardian;
+pub use refusal_tamper::RefusalTamperEngine;
+pub use guardrail_traversal::GuardrailTraversalEngine;
+pub use slang_norm::SlangNormEngine;
+pub use dual_evidence::DualEvidenceScanner;
+pub use grapple_hooks::GrappleHookChain;
+pub use proxy_detection::ProxyDetectionEngine;
+pub use reasoning_protection::ReasoningProtectionEngine;
+pub use anti_distillation::AntiDistillationEngine;
