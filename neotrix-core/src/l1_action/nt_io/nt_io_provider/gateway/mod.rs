@@ -24,11 +24,9 @@ mod selection;
 mod subgrid;
 
 // ── Resilience ───────────────────────────────────────────────
-mod anomaly_detector;
-mod auto_recovery;
-mod circuit_breaker;
 mod drift;
 mod reliability;
+mod resilience;
 mod response_cache;
 mod response_healer;
 
@@ -59,10 +57,8 @@ pub use consistent_hash::*;
 pub use intelligent_router::*;
 pub use market_router::*;
 // Resilience
-pub use anomaly_detector::*;
-pub use auto_recovery::*;
-pub use circuit_breaker::*;
 pub use drift::*;
+pub use resilience::*;
 pub use response_cache::*;
 pub use response_healer::*;
 // Execution
