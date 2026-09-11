@@ -1137,6 +1137,30 @@ impl BackgroundLoopHandle {
                 }
             }
         }
+
+        // ── G5: AutoInspector — 多Agent自动巡检 (每N次tick执行一次) ──
+        if iteration % 5 == 0 && iteration > 0 {
+            let mut inspector = crate::l6_meta::nt_meta::auto_inspector::AutoInspector::new();
+            let results = inspector.inspect_all();
+            let mut issues_found = 0usize;
+            for result in &results {
+                if !result.passed {
+                    issues_found += result.issues.len();
+                    log::warn!(
+                        "[bg] auto-inspect {:?}: {} issues",
+                        result.inspection_type,
+                        result.issues.len()
+                    );
+                }
+            }
+            if issues_found > 0 {
+                log::info!(
+                    "[bg] auto-inspect: {} total issues found across {} inspections",
+                    issues_found,
+                    results.len()
+                );
+            }
+        }
     }
 
     /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.
