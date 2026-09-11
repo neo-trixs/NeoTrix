@@ -433,6 +433,36 @@ impl DomainPlugin for SessionPlugin {
                 let tags = self.untag(id, tag)?;
                 Ok(serde_json::json!({ "ok": true, "tags": tags }))
             }
+            "archive" => {
+                let id = args.get("id").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'id'".into(), recoverable: true })?;
+                self.archive(id)?;
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "restore" => {
+                let id = args.get("id").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'id'".into(), recoverable: true })?;
+                self.restore(id)?;
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "list_archived" => {
+                let sessions = self.list_archived()?;
+                Ok(serde_json::json!(sessions))
+            }
+            "rename" => {
+                let id = args.get("id").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'id'".into(), recoverable: true })?;
+                let name = args.get("name").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'name'".into(), recoverable: true })?;
+                self.rename(id, name)?;
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "clear" => {
+                let id = args.get("id").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'id'".into(), recoverable: true })?;
+                self.clear(id)?;
+                Ok(serde_json::json!({ "ok": true }))
+            }
             _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
         }
     }
