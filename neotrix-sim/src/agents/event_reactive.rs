@@ -30,6 +30,12 @@ pub enum EventFilter {
     DirectMention,
     /// React to high-priority events
     HighPriority,
+    /// React on a tick interval (every N ticks)
+    Time { tick_interval: u64 },
+    /// React after a duration has elapsed (ticks since subscription)
+    Timer { duration: u64 },
+    /// React when agent state transitions between specific values
+    StateChange { from: String, to: String },
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +54,8 @@ pub enum ResponseTemplate {
 pub struct EventReactiveSystem {
     subscriptions: Vec<EventSubscription>,
     max_pending_per_agent: usize,
+    /// Track last trigger tick for Time/Timer filters: (sub_index, last_triggered_tick)
+    timer_state: std::collections::HashMap<usize, u64>,
 }
 
 impl EventReactiveSystem {
@@ -55,17 +63,40 @@ impl EventReactiveSystem {
         Self {
             subscriptions: Vec::new(),
             max_pending_per_agent: 3,
+            timer_state: std::collections::HashMap::new(),
         }
     }
 
     /// Subscribe an agent to events
     pub fn subscribe(&mut self, subscription: EventSubscription) {
+        let idx = self.subscriptions.len();
         self.subscriptions.push(subscription);
+        // Initialize timer tracking for Time/Timer filters
+        if matches!(
+            self.subscriptions[idx].event_filter,
+            EventFilter::Time { .. } | EventFilter::Timer { .. }
+        ) {
+            self.timer_state.insert(idx, 0);
+        }
     }
 
     /// Remove all subscriptions for an agent
     pub fn unsubscribe_agent(&mut self, agent_id: &str) {
+        let before = self.subscriptions.len();
         self.subscriptions.retain(|s| s.agent_id != agent_id);
+        let after = self.subscriptions.len();
+        if before != after {
+            // Rebuild timer_state since indices shifted
+            self.timer_state.clear();
+            for (i, sub) in self.subscriptions.iter().enumerate() {
+                if matches!(
+                    sub.event_filter,
+                    EventFilter::Time { .. } | EventFilter::Timer { .. }
+                ) {
+                    self.timer_state.insert(i, 0);
+                }
+            }
+        }
     }
 
     /// Process events and generate reactive responses
@@ -73,8 +104,15 @@ impl EventReactiveSystem {
         let mut responses = Vec::new();
 
         for event in events {
-            for sub in &self.subscriptions {
-                if self.matches_filter(event, &sub.event_filter) {
+            for (sub_idx, sub) in self.subscriptions.iter().enumerate() {
+                if self.matches_filter(event, &sub.event_filter, tick, sub_idx) {
+                    // Update timer state for Time/Timer filters
+                    if matches!(
+                        sub.event_filter,
+                        EventFilter::Time { .. } | EventFilter::Timer { .. }
+                    ) {
+                        self.timer_state.insert(sub_idx, tick);
+                    }
                     if let Some(response) = self.generate_response(event, sub, tick) {
                         responses.push(response);
                     }
@@ -85,7 +123,7 @@ impl EventReactiveSystem {
         self.deduplicate(responses)
     }
 
-    fn matches_filter(&self, event: &SimEvent, filter: &EventFilter) -> bool {
+    fn matches_filter(&self, event: &SimEvent, filter: &EventFilter, tick: u64, sub_idx: usize) -> bool {
         match filter {
             EventFilter::AgentDeath => matches!(event, SimEvent::AgentDied { .. }),
             EventFilter::ResourceDepleted { .. } => {
@@ -100,6 +138,25 @@ impl EventReactiveSystem {
                     SimEvent::AgentDied { .. }
                     | SimEvent::AgentNearDeath { .. }
                     | SimEvent::EnvironmentHazard { .. })
+            }
+            EventFilter::Time { tick_interval } => {
+                // Match every tick_interval ticks
+                let last = self.timer_state.get(&sub_idx).copied().unwrap_or(0);
+                tick.saturating_sub(last) >= *tick_interval
+            }
+            EventFilter::Timer { duration } => {
+                // Match after duration ticks since subscription
+                let last = self.timer_state.get(&sub_idx).copied().unwrap_or(0);
+                tick.saturating_sub(last) >= *duration
+            }
+            EventFilter::StateChange { from, to } => {
+                // Match on AgentActed events where the action/result contains state info
+                match event {
+                    SimEvent::AgentActed { action, result, .. } => {
+                        action.contains(from) && result.contains(to)
+                    }
+                    _ => false,
+                }
             }
         }
     }

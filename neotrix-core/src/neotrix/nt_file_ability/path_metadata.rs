@@ -72,7 +72,7 @@ impl PathMetadata {
 
 /// 从路径中提取订单文件夹名 (含 WSD-/WZD- 的部分)
 fn extract_order_folder(path: &Path) -> Option<String> {
-    let components: Vec<&Path> = path.components().collect();
+    let components: Vec<_> = path.components().collect();
 
     for component in &components {
         let name = component.as_os_str().to_string_lossy();
@@ -129,10 +129,10 @@ fn parse_order_folder(folder: &str, meta: &mut PathMetadata) {
         }
         // 英文名 → customer
         if is_english_only(part) {
-            customer_parts.push(part);
+            customer_parts.push(*part);
         } else {
             // 中文 → country
-            country_parts.push(part);
+            country_parts.push(*part);
         }
     }
 

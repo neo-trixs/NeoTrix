@@ -31,6 +31,8 @@ pub mod merge_docx;
 mod ocr;
 mod pdfedit;
 mod selftest;
+mod selftest_excel;
+mod event_types;
 mod structured;
 mod tables;
 mod types;
@@ -49,6 +51,7 @@ mod path_metadata;
 mod table_presenter;
 mod chunk_planner;
 mod excel_tool_schema;
+mod excel_capability;
 
 pub use core::*;
 pub use doc_parse::*;
@@ -62,6 +65,8 @@ pub use merge::*;
 pub use ocr::*;
 pub use pdfedit::*;
 pub use selftest::*;
+pub use selftest_excel::*;
+pub use event_types::*;
 pub use structured::*;
 pub use tables::*;
 pub use types::*;
@@ -79,6 +84,7 @@ pub use path_metadata::*;
 pub use table_presenter::*;
 pub use chunk_planner::*;
 pub use excel_tool_schema::*;
+pub use excel_capability::*;
 
 /// 构造最小 DOCX (zip 包: [Content_Types].xml + _rels/.rels + word/document.xml)。
 /// 测试辅助: 模块内 + 意识核心 dispatch 测试复用 (R-P42 复用, 不平行重造)。

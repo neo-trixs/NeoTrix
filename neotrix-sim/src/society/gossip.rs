@@ -127,6 +127,77 @@ impl GossipProtocol {
         self.messages.iter().filter(|m| m.topic == topic).collect()
     }
 
+    pub fn propagate(
+        &mut self,
+        agents: &[crate::agents::sim_agent::SimAgent],
+        relationships: &super::relationship_graph::RelationshipGraph,
+    ) {
+        let alive_ids: Vec<u32> = agents.iter()
+            .filter(|a| a.core.alive)
+            .map(|a| a.id as u32)
+            .collect();
+
+        for &agent_id in &alive_ids {
+            let neighbors: Vec<String> = relationships.neighbors(&agent_id.to_string())
+                .iter()
+                .filter(|r| r.trust > 0.0)
+                .map(|r| r.to.clone())
+                .collect();
+
+            let spreadable: Vec<GossipMessage> = self.messages.iter()
+                .filter(|m| m.source_agent != agent_id && m.spread_count < m.max_spread)
+                .filter(|m| {
+                    let agent_id_str = agent_id.to_string();
+                    let known = self.agent_memory.get(&agent_id)
+                        .map(|v| v.clone())
+                        .unwrap_or_default();
+                    !known.contains(&m.id)
+                })
+                .cloned()
+                .collect();
+
+            for msg in spreadable {
+                if self.rng_f32() < 0.3 {
+                    let mut new_msg = msg.clone();
+                    new_msg.spread_count += 1;
+                    new_msg.reliability *= 0.9;
+                    self.messages.push(new_msg.clone());
+                    self.agent_memory.entry(agent_id).or_default().push(new_msg.id);
+                }
+            }
+
+            for neighbor_id in &neighbors {
+                if let Ok(nid) = neighbor_id.parse::<u32>() {
+                    let trust = relationships.sentiment_between(
+                        &agent_id.to_string(), neighbor_id,
+                    );
+                    if trust > 0.2 {
+                        let known = self.agent_memory.get(&agent_id)
+                            .map(|v| v.clone())
+                            .unwrap_or_default();
+                        let to_forward: Vec<GossipMessage> = self.messages.iter()
+                            .filter(|m| known.contains(&m.id) && m.spread_count < m.max_spread)
+                            .cloned()
+                            .collect();
+                        for msg in to_forward {
+                            if self.rng_f32() < trust * 0.5 {
+                                self.receive(nid, msg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn rng_f32(&self) -> f32 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        self.next_id.hash(&mut hasher);
+        (hasher.finish() % 1000) as f32 / 1000.0
+    }
+
     pub fn tick(&mut self) {
         self.decay();
     }

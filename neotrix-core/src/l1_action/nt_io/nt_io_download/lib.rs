@@ -33,6 +33,8 @@
 /// # }
 /// ```
 
+pub mod mirror;
+
 /// 重新导出关键类型供上层使用
 pub use crate::models::{DownloadSession, DownloadProgress, DownloadStatus, DownloadSource, DownloadMetadata};
 pub use crate::traits::DownloadStrategy;

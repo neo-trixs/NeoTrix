@@ -115,6 +115,43 @@ impl FactionManager {
         }
     }
 
+    pub fn update(&mut self, agents: &[crate::agents::sim_agent::SimAgent]) {
+        for agent in agents {
+            if !agent.core.alive { continue; }
+            let agent_id = agent.id as u32;
+
+            if let Some(faction_id) = self.agent_factions.get(&agent_id).cloned() {
+                if let Some(faction) = self.factions.iter_mut().find(|f| f.id == faction_id) {
+                    let dist = (
+                        (faction.territory_center.0 - agent.core.position.x).powi(2)
+                            + (faction.territory_center.1 - agent.core.position.y).powi(2)
+                    ).sqrt();
+
+                    if dist > faction.territory_radius * 1.5 {
+                        faction.remove_member(agent_id);
+                        self.agent_factions.remove(&agent_id);
+                    }
+                }
+            }
+
+            if !self.agent_factions.contains_key(&agent_id) {
+                if let Some(closest) = self.get_closest_faction(
+                    agent.core.position.x,
+                    agent.core.position.y,
+                ) {
+                    let dist = (
+                        (closest.territory_center.0 - agent.core.position.x).powi(2)
+                            + (closest.territory_center.1 - agent.core.position.y).powi(2)
+                    ).sqrt();
+
+                    if dist < closest.territory_radius * 2.0 {
+                        self.assign_agent(agent_id, &closest.id.clone());
+                    }
+                }
+            }
+        }
+    }
+
     pub fn get_closest_faction(&self, x: f32, y: f32) -> Option<&Faction> {
         self.factions.iter().min_by(|a, b| {
             let da = ((a.territory_center.0 - x).powi(2) + (a.territory_center.1 - y).powi(2)).sqrt();

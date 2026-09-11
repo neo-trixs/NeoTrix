@@ -10,6 +10,9 @@ struct GWTAttentionRouterInner {
     modules: HashMap<String, Vec<String>>,
     thresholds: HashMap<String, f32>,
     workspace: WorkspaceState,
+    /// Cost-aware thinking budget (tokens). Cheap tasks get small budgets, expensive tasks get large budgets.
+    /// Modulates salience computation: higher budget → stronger salience boost for high-complexity signals.
+    thinking_budget: u32,
 }
 
 #[derive(Clone)]
@@ -36,18 +39,21 @@ impl GWTAttentionRouterImpl {
                     active_signals: Vec::new(),
                     broadcast_history: Vec::new(),
                     resonance_map: HashMap::new(),
+                    thinking_budget: 4096,
                 },
+                thinking_budget: 4096,
             })),
         })
     }
 
     pub fn submit_signal(&self, signal: AttentionSignal) -> RoutingResponse {
         let mut inner = self.inner.write().expect("ffi rwlock poisoned");
+        let budget = inner.thinking_budget;
         let mut resonance_scores = HashMap::new();
         let mut recipients = Vec::new();
 
         for (module, keywords) in &inner.modules {
-            let resonance = compute_resonance(&signal.content, keywords, signal.salience);
+            let resonance = compute_resonance(&signal.content, keywords, signal.salience, budget);
             resonance_scores.insert(module.clone(), resonance);
             let threshold = inner.thresholds.get(module).copied().unwrap_or(0.3);
             if resonance >= threshold {
@@ -115,16 +121,45 @@ impl GWTAttentionRouterImpl {
             overlap as f32 / kw_a.len().max(kw_b.len()) as f32
         }
     }
+
+    /// Set the thinking budget (tokens) for cost-aware salience modulation.
+    /// Cheap tasks: 1024–2048 tokens. Expensive tasks: 8192–16384 tokens.
+    pub fn set_thinking_budget(&self, budget: u32) {
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
+        inner.thinking_budget = budget;
+        inner.workspace.thinking_budget = budget;
+    }
+
+    /// Get the current thinking budget.
+    pub fn get_thinking_budget(&self) -> u32 {
+        self.inner.read().expect("ffi rwlock poisoned").thinking_budget
+    }
 }
 
-fn compute_resonance(content: &str, keywords: &[String], salience: f32) -> f32 {
+/// Compute resonance with cost-aware thinking budget modulation.
+/// Higher budgets amplify salience for complex signals (multi-keyword hits),
+/// while low budgets suppress deep resonance to save tokens.
+fn compute_resonance(content: &str, keywords: &[String], salience: f32, budget: u32) -> f32 {
     if keywords.is_empty() {
         return salience * 0.5;
     }
     let lower = content.to_lowercase();
     let hits = keywords.iter().filter(|k| lower.contains(&k.to_lowercase())).count();
     let keyword_score = hits as f32 / keywords.len() as f32;
-    (keyword_score * 0.7 + salience * 0.3).clamp(0.0, 1.0)
+
+    // Budget modulation: scale factor ∈ [0.5, 1.5] based on budget tier
+    //   budget ≤ 2048  → 0.5 (cheap task: suppress deep resonance)
+    //   budget ≤ 8192  → 1.0 (normal task: neutral)
+    //   budget > 8192  → 1.5 (expensive task: amplify multi-hit resonance)
+    let budget_factor = if budget <= 2048 {
+        0.5
+    } else if budget <= 8192 {
+        1.0
+    } else {
+        1.5
+    };
+
+    (keyword_score * 0.7 * budget_factor + salience * 0.3).clamp(0.0, 1.0)
 }
 
 fn now_ms() -> i64 {
@@ -191,5 +226,26 @@ mod tests {
         let ws = router.get_workspace_state();
         assert!(ws.broadcast_history.len() <= 100, "广播历史应封顶 100: {}", ws.broadcast_history.len());
         assert!(ws.active_signals.len() <= 50, "活跃信号应封顶 50: {}", ws.active_signals.len());
+    }
+
+    #[test]
+    fn test_thinking_budget_modulates_resonance() {
+        // Cost-Aware Routing (A1): budget modulates resonance strength.
+        // Low budget → suppressed resonance; high budget → amplified resonance.
+        let router = GWTAttentionRouterImpl::init(vec!["NT-WORLD".into()]).unwrap();
+        router.register_module("NT-WORLD", vec!["crawl".into(), "fetch".into(), "parse".into()]);
+
+        // Low budget (cheap task)
+        router.set_thinking_budget(1024);
+        let lo = router.submit_signal(signal("NT-CORE", "crawl and parse", 0.5));
+        let lo_score = lo.resonance_scores.get("NT-WORLD").copied().unwrap_or(0.0);
+
+        // High budget (expensive task)
+        router.set_thinking_budget(16384);
+        let hi = router.submit_signal(signal("NT-CORE", "crawl and parse", 0.5));
+        let hi_score = hi.resonance_scores.get("NT-WORLD").copied().unwrap_or(0.0);
+
+        assert!(hi_score > lo_score, "高预算应放大谐振: lo={lo_score}, hi={hi_score}");
+        assert_eq!(router.get_thinking_budget(), 16384);
     }
 }

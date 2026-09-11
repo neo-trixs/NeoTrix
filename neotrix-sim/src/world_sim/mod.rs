@@ -6,6 +6,7 @@ pub mod observation;
 pub mod persistence;
 pub mod renderer;
 pub mod ui;
+pub mod spawn;
 
 pub use config::*;
 
@@ -38,6 +39,7 @@ use crate::society::economy::Economy;
 use crate::society::culture::Culture;
 use crate::society::theory_of_mind::TheoryOfMind;
 use crate::society::constitutional::ConstitutionalFeedback;
+use crate::society::social_engine::SocialEngine;
 use crate::agents::event_reactive::EventReactiveSystem;
 use crate::agents::goal_outcome_feedback::GoalOutcomeFeedback;
 use crate::agents::intention_commitment::IntentionCommitment;
@@ -97,6 +99,7 @@ pub struct WorldSim {
     pub safety_monitor: SafetyMonitor,
     pub evolution_constraints: EvolutionConstraints,
     pub audit_trail: AuditTrail,
+    pub social_engine: SocialEngine,
 }
 
 impl WorldSim {
@@ -135,7 +138,8 @@ impl WorldSim {
         for i in 0..config.initial_agents {
             let x = rng.range_f32(100.0, config.world_width - 100.0);
             let y = rng.range_f32(100.0, config.world_height - 100.0);
-            let agent = SimAgent::new(i as u64, Vec2::new(x, y));
+            let template = spawn::random_template(config.seed.wrapping_add(i as u64));
+            let agent = spawn::create_agent(template, Vec2::new(x, y), i as u64, config.seed);
             phi_bridge.register_agent(&agent.core.id);
             agents.push(agent);
         }
@@ -187,6 +191,7 @@ impl WorldSim {
             safety_monitor: SafetyMonitor::new(Default::default()),
             evolution_constraints: EvolutionConstraints::new(Default::default()),
             audit_trail: AuditTrail::new(10000),
+            social_engine: SocialEngine::new(),
         }
     }
 
@@ -232,6 +237,7 @@ impl WorldSim {
 
         if self.schedule.should_run(TickTier::Slow) {
             self.tick_slow_systems().await;
+            self.social_engine.tick(&self.agents, &mut self.relationships);
         }
 
         if self.schedule.should_run(TickTier::Background) {
@@ -561,6 +567,9 @@ impl WorldSim {
             emotion_dominance: self.emotion.pad.dominance,
             safety_alerts: self.safety_monitor.all_alerts().len(),
             audit_entries: self.audit_trail.len(),
+            active_conflicts: self.social_engine.get_report().active_conflicts,
+            norms_compliance: self.social_engine.get_report().norms_compliance,
+            faction_count: self.social_engine.get_report().faction_count,
         }
     }
 }

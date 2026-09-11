@@ -88,6 +88,86 @@ impl StimulusResponseSystem {
     }
 }
 
+/// Unified stimulus layer for the DecisionEngine.
+/// Builds stimuli from AgentObservation and delegates to StimulusResponseSystem.
+pub struct StimulusLayer {
+    inner: StimulusResponseSystem,
+}
+
+impl StimulusLayer {
+    pub fn new() -> Self {
+        Self {
+            inner: StimulusResponseSystem::new(),
+        }
+    }
+
+    /// Check observation for reflexive reactions. Returns an action if a
+    /// stimulus triggers a reflex, None otherwise.
+    pub fn check(&self, agent: &SimAgent, obs: &crate::agents::sim_agent::AgentObservation) -> Option<AgentAction> {
+        let stimuli = self.build_stimuli(agent, obs);
+        let reflex = self.inner.evaluate_stimuli(&stimuli, agent);
+        self.inner.reflex_to_action(&reflex)
+    }
+
+    fn build_stimuli(&self, agent: &SimAgent, obs: &crate::agents::sim_agent::AgentObservation) -> Vec<Stimulus> {
+        let mut stimuli = Vec::new();
+
+        // Low health → danger stimulus
+        if agent.core.health < 30.0 {
+            stimuli.push(Stimulus {
+                stimulus_type: StimulusType::Danger,
+                intensity: 1.0 - agent.core.health / 100.0,
+                position: agent.core.position,
+            });
+        }
+
+        // Threats in observation
+        for threat in &obs.threats {
+            stimuli.push(Stimulus {
+                stimulus_type: StimulusType::Danger,
+                intensity: threat.severity,
+                position: threat.position,
+            });
+        }
+
+        // Enemy agents nearby (hostile relationship)
+        for nearby in &obs.nearby_agents {
+            if nearby.relationship < -0.3 || nearby.apparent_health > 0.8 {
+                stimuli.push(Stimulus {
+                    stimulus_type: StimulusType::Danger,
+                    intensity: (1.0 - nearby.relationship).max(0.0),
+                    position: agent.core.position,
+                });
+            } else {
+                stimuli.push(Stimulus {
+                    stimulus_type: StimulusType::Agent,
+                    intensity: 1.0 - nearby.distance / 100.0,
+                    position: agent.core.position,
+                });
+            }
+        }
+
+        // Food resources nearby
+        for res in &obs.nearby_resources {
+            if res.resource_type.contains("Food") || res.resource_type.contains("Berries") {
+                stimuli.push(Stimulus {
+                    stimulus_type: StimulusType::Food,
+                    intensity: (1.0 - res.distance / 100.0) * (res.amount / 100.0).min(1.0),
+                    position: agent.core.position,
+                });
+            } else {
+                stimuli.push(Stimulus {
+                    stimulus_type: StimulusType::Resource,
+                    intensity: (1.0 - res.distance / 100.0) * 0.5,
+                    position: agent.core.position,
+                });
+            }
+        }
+
+        stimuli
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +204,64 @@ mod tests {
         let system = StimulusResponseSystem::new();
         assert!(system.reflex_to_action(&ReflexResponse::Fight).is_some());
         assert!(system.reflex_to_action(&ReflexResponse::None).is_none());
+    }
+
+    #[test]
+    fn stimulus_layer_low_health_flee() {
+        let layer = StimulusLayer::new();
+        let mut agent = SimAgent::new(0, Vec2::new(0.0, 0.0));
+        agent.core.health = 5.0;
+        let obs = crate::agents::sim_agent::AgentObservation {
+            position: Vec2::new(0.0, 0.0),
+            nearby_agents: vec![],
+            nearby_resources: vec![],
+            terrain_type: "Plain".to_string(),
+            time_of_day: "day".to_string(),
+            season: "Spring".to_string(),
+            threats: vec![],
+        };
+        let action = layer.check(&agent, &obs);
+        assert!(action.is_some());
+    }
+
+    #[test]
+    fn stimulus_layer_food_seeking() {
+        let layer = StimulusLayer::new();
+        let mut agent = SimAgent::new(0, Vec2::new(0.0, 0.0));
+        agent.core.hunger = 90.0;
+        agent.core.health = 80.0;
+        let obs = crate::agents::sim_agent::AgentObservation {
+            position: Vec2::new(0.0, 0.0),
+            nearby_agents: vec![],
+            nearby_resources: vec![crate::agents::sim_agent::NearbyResource {
+                id: "food_1".to_string(),
+                resource_type: "Food".to_string(),
+                distance: 5.0,
+                amount: 50.0,
+            }],
+            terrain_type: "Plain".to_string(),
+            time_of_day: "day".to_string(),
+            season: "Spring".to_string(),
+            threats: vec![],
+        };
+        let action = layer.check(&agent, &obs);
+        assert!(action.is_some());
+    }
+
+    #[test]
+    fn stimulus_layer_no_reflex_when_healthy() {
+        let layer = StimulusLayer::new();
+        let agent = SimAgent::new(0, Vec2::new(0.0, 0.0));
+        let obs = crate::agents::sim_agent::AgentObservation {
+            position: Vec2::new(0.0, 0.0),
+            nearby_agents: vec![],
+            nearby_resources: vec![],
+            terrain_type: "Plain".to_string(),
+            time_of_day: "day".to_string(),
+            season: "Spring".to_string(),
+            threats: vec![],
+        };
+        let action = layer.check(&agent, &obs);
+        assert!(action.is_none());
     }
 }

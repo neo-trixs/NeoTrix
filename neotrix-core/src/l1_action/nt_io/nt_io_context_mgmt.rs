@@ -18,6 +18,108 @@ pub struct ContextManager {
     compression_engine: CompressionEngine,
     config: ContextConfig,
     stats: ContextStats,
+    /// Paged KV virtualization state (KVMem CSA2).
+    paged_kv: PagedKvState,
+}
+
+/// Context storage strategy — dual-mode switching (KVMem CSA2).
+///
+/// For <256K tokens: use compaction (summarize/drop low-priority items).
+/// For >256K tokens: use paged KV virtualization (GPU→Host→NVMe tiered).
+/// The threshold is configurable (default 256K tokens).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ContextStrategy {
+    /// Compaction mode: summarize + drop low-priority items when window full.
+    /// Fast, low memory, suitable for short sessions (<256K tokens).
+    Compaction,
+    /// Paged KV mode: GPU→Host→NVMe tiered storage with page-level access.
+    /// Supports arbitrarily long sessions, constant GPU memory (~35 GiB).
+    PagedKv,
+}
+
+impl Default for ContextStrategy {
+    fn default() -> Self {
+        Self::Compaction
+    }
+}
+
+/// Paged KV virtualization state (KVMem arXiv:2609.04852).
+///
+/// Manages GPU→Host→NVMe tiered KV storage with page-level granularity.
+/// GPU memory stays constant regardless of workspace size.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PagedKvState {
+    /// Current strategy (auto-switched based on token count).
+    pub strategy: ContextStrategy,
+    /// Token threshold for switching from compaction to paged KV.
+    pub switch_threshold: usize,
+    /// GPU page count (constant, ~35 GiB / page_size).
+    pub gpu_pages: usize,
+    /// Host page count (spillover from GPU).
+    pub host_pages: usize,
+    /// NVMe page count (cold storage for old context).
+    pub nvme_pages: usize,
+    /// Page size in tokens (default 32, matches KVMem block-level granularity).
+    pub page_size: usize,
+    /// Current total tokens across all tiers.
+    pub total_tokens: usize,
+    /// GPU utilization (0.0 - 1.0).
+    pub gpu_utilization: f64,
+    /// Working set: Retained/Incoming/Outgoing decomposition.
+    pub working_set: WorkingSet,
+}
+
+impl Default for PagedKvState {
+    fn default() -> Self {
+        Self {
+            strategy: ContextStrategy::Compaction,
+            switch_threshold: 256_000,
+            gpu_pages: 1024, // ~32K tokens at 32 tokens/page
+            host_pages: 0,
+            nvme_pages: 0,
+            page_size: 32,
+            total_tokens: 0,
+            gpu_utilization: 0.0,
+            working_set: WorkingSet::default(),
+        }
+    }
+}
+
+/// Working set decomposition for page-level KV management (KVMem insight).
+///
+/// At each agent step, the working set is decomposed into:
+/// - **Retained**: pages still needed (GPU-resident, reused directly)
+/// - **Incoming**: new pages entering GPU
+/// - **Outgoing**: pages evicted from GPU to host/NVMe
+///
+/// Inter-step KL divergence is ~37× higher than intra-step (KVMem finding),
+/// so the working set updates once per step, not per token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkingSet {
+    /// Retained page indices (GPU-resident, no transfer needed).
+    pub retained: Vec<usize>,
+    /// Incoming page indices (must be transferred to GPU).
+    pub incoming: Vec<usize>,
+    /// Outgoing page indices (will be evicted from GPU).
+    pub outgoing: Vec<usize>,
+}
+
+impl Default for WorkingSet {
+    fn default() -> Self {
+        Self {
+            retained: Vec::new(),
+            incoming: Vec::new(),
+            outgoing: Vec::new(),
+        }
+    }
+}
+
+/// Memory tier for paged KV storage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MemoryTier {
+    Gpu,
+    Host,
+    Nvme,
 }
 
 /// 上下文配置
@@ -171,6 +273,97 @@ impl ContextManager {
                 avg_window_size: 0.0,
                 compression_ratio: 0.0,
             },
+            paged_kv: PagedKvState::default(),
+        }
+    }
+
+    /// Create a context manager with a specific paged KV configuration.
+    pub fn with_paged_kv(mut self, paged_kv: PagedKvState) -> Self {
+        self.paged_kv = paged_kv;
+        self
+    }
+
+    /// Get the current context storage strategy based on token count.
+    pub fn current_strategy(&self) -> &ContextStrategy {
+        &self.paged_kv.strategy
+    }
+
+    /// Check if the context should switch strategies based on total tokens.
+    ///
+    /// Returns `Some(strategy)` if a switch is recommended, `None` otherwise.
+    pub fn should_switch_strategy(&self) -> Option<ContextStrategy> {
+        match self.paged_kv.strategy {
+            ContextStrategy::Compaction => {
+                if self.paged_kv.total_tokens >= self.paged_kv.switch_threshold {
+                    Some(ContextStrategy::PagedKv)
+                } else {
+                    None
+                }
+            }
+            ContextStrategy::PagedKv => {
+                // Only switch back if tokens drop significantly below threshold
+                if self.paged_kv.total_tokens < self.paged_kv.switch_threshold / 2 {
+                    Some(ContextStrategy::Compaction)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Update token count and auto-switch strategy if needed.
+    pub fn update_token_count(&mut self, tokens: usize) {
+        self.paged_kv.total_tokens = tokens;
+        self.paged_kv.gpu_utilization =
+            (tokens as f64 / (self.paged_kv.gpu_pages * self.paged_kv.page_size) as f64).min(1.0);
+
+        if let Some(new_strategy) = self.should_switch_strategy() {
+            self.paged_kv.strategy = new_strategy;
+        }
+    }
+
+    /// Update the working set for paged KV mode (call once per agent step).
+    ///
+    /// Decomposes the current page set into retained/incoming/outgoing
+    /// based on which pages were accessed in the current step.
+    pub fn update_working_set(&mut self, accessed_pages: &[usize]) {
+        let retained: Vec<usize> = accessed_pages
+            .iter()
+            .filter(|&&p| self.paged_kv.working_set.retained.contains(&p))
+            .copied()
+            .collect();
+
+        let incoming: Vec<usize> = accessed_pages
+            .iter()
+            .filter(|&&p| !self.paged_kv.working_set.retained.contains(&p))
+            .copied()
+            .collect();
+
+        let outgoing: Vec<usize> = self
+            .paged_kv
+            .working_set
+            .retained
+            .iter()
+            .filter(|&&p| !accessed_pages.contains(&p))
+            .copied()
+            .collect();
+
+        self.paged_kv.working_set = WorkingSet {
+            retained,
+            incoming,
+            outgoing,
+        };
+    }
+
+    /// Get the recommended memory tier for a page based on access recency.
+    pub fn page_tier(&self, page_index: usize, last_access_step: usize, current_step: usize) -> MemoryTier {
+        let age = current_step.saturating_sub(last_access_step);
+        if self.paged_kv.working_set.retained.contains(&page_index) {
+            MemoryTier::Gpu
+        } else if age < 10 {
+            MemoryTier::Host
+        } else {
+            MemoryTier::Nvme
         }
     }
 
@@ -302,5 +495,118 @@ impl ContextManager {
     /// 获取统计信息
     pub fn stats(&self) -> &ContextStats {
         &self.stats
+    }
+}
+
+#[cfg(test)]
+mod context_strategy_tests {
+    use super::*;
+
+    fn make_manager() -> ContextManager {
+        ContextManager::new(ContextConfig::default())
+    }
+
+    #[test]
+    fn test_default_strategy_is_compaction() {
+        let mgr = make_manager();
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::Compaction));
+    }
+
+    #[test]
+    fn test_switch_to_paged_kv_above_threshold() {
+        let mut mgr = make_manager();
+        // Default threshold is 256K tokens
+        mgr.update_token_count(300_000);
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::PagedKv));
+    }
+
+    #[test]
+    fn test_stay_compaction_below_threshold() {
+        let mut mgr = make_manager();
+        mgr.update_token_count(100_000);
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::Compaction));
+    }
+
+    #[test]
+    fn test_switch_back_to_compaction_on_drop() {
+        let mut mgr = make_manager();
+        // Switch to paged KV
+        mgr.update_token_count(300_000);
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::PagedKv));
+
+        // Drop below half threshold → switch back
+        mgr.update_token_count(100_000);
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::Compaction));
+    }
+
+    #[test]
+    fn test_stay_paged_kv_above_half_threshold() {
+        let mut mgr = make_manager();
+        mgr.update_token_count(300_000);
+        // Drop to 150K (above 128K = 256K/2) → stay paged KV
+        mgr.update_token_count(150_000);
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::PagedKv));
+    }
+
+    #[test]
+    fn test_gpu_utilization_updates() {
+        let mut mgr = make_manager();
+        mgr.update_token_count(1000);
+        assert!(mgr.paged_kv.gpu_utilization > 0.0);
+    }
+
+    #[test]
+    fn test_working_set_update() {
+        let mut mgr = make_manager();
+        mgr.paged_kv.working_set.retained = vec![0, 1, 2];
+        mgr.update_working_set(&[1, 2, 3]);
+        // 1,2 retained; 3 incoming; 0 outgoing
+        assert!(mgr.paged_kv.working_set.retained.contains(&1));
+        assert!(mgr.paged_kv.working_set.retained.contains(&2));
+        assert!(mgr.paged_kv.working_set.incoming.contains(&3));
+        assert!(mgr.paged_kv.working_set.outgoing.contains(&0));
+    }
+
+    #[test]
+    fn test_page_tier_gpu_for_retained() {
+        let mut mgr = make_manager();
+        mgr.paged_kv.working_set.retained = vec![5];
+        let tier = mgr.page_tier(5, 0, 100);
+        assert!(matches!(tier, MemoryTier::Gpu));
+    }
+
+    #[test]
+    fn test_page_tier_host_for_recent() {
+        let mgr = make_manager();
+        let tier = mgr.page_tier(99, 95, 100); // age=5 < 10
+        assert!(matches!(tier, MemoryTier::Host));
+    }
+
+    #[test]
+    fn test_page_tier_nvme_for_old() {
+        let mgr = make_manager();
+        let tier = mgr.page_tier(99, 50, 100); // age=50 >= 10
+        assert!(matches!(tier, MemoryTier::Nvme));
+    }
+
+    #[test]
+    fn test_custom_threshold() {
+        let mut mgr = make_manager();
+        mgr.paged_kv.switch_threshold = 100_000;
+        mgr.update_token_count(150_000);
+        assert!(matches!(mgr.current_strategy(), ContextStrategy::PagedKv));
+    }
+
+    #[test]
+    fn test_with_paged_kv_builder() {
+        let custom_paged = PagedKvState {
+            switch_threshold: 50_000,
+            gpu_pages: 2048,
+            page_size: 64,
+            ..PagedKvState::default()
+        };
+        let mgr = make_manager().with_paged_kv(custom_paged);
+        assert_eq!(mgr.paged_kv.switch_threshold, 50_000);
+        assert_eq!(mgr.paged_kv.gpu_pages, 2048);
     }
 }

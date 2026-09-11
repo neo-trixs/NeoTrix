@@ -25,6 +25,8 @@ impl UnifiedCapability for ZeroTrustCapability {
                 avg_latency_ms: 0.0,
                 last_called: None,
             },
+            cost_weight: 0.0,
+            priority: 1.0,
         }
     }
 
@@ -80,6 +82,8 @@ impl UnifiedCapability for SecurityScanCapability {
                 avg_latency_ms: 0.0,
                 last_called: None,
             },
+            cost_weight: 0.0,
+            priority: 1.0,
         }
     }
 
@@ -142,6 +146,8 @@ impl UnifiedCapability for ThreatDetectionCapability {
                 avg_latency_ms: 0.0,
                 last_called: None,
             },
+            cost_weight: 0.0,
+            priority: 1.0,
         }
     }
 

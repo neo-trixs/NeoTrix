@@ -38,7 +38,7 @@ pub struct EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         EngineConfig {
-            chunk_count: 8,
+            chunk_count: 16,
             max_retries: 5,
             retry_base_secs: 2,
             timeout_secs: 600,
@@ -63,6 +63,9 @@ impl DownloadEngine {
             .timeout(Duration::from_secs(config.timeout_secs))
             .connect_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(config.chunk_count);
+
+        // 关键: 禁止自动解压, 避免 HuggingFace CDN 流式下载 error decoding
+        builder = builder.no_gzip().no_brotli().no_deflate();
 
         // 注入代理
         if config.enable_proxy {
@@ -114,7 +117,12 @@ impl DownloadEngine {
                 Ok(_) => return Ok(()),
                 Err(e) => {
                     if attempt < self.config.max_retries {
-                        let backoff = self.config.retry_base_secs * 2u64.pow(attempt - 1);
+                        let base = self.config.retry_base_secs * 2u64.pow(attempt - 1);
+                        let jitter = (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_nanos() % (base.max(1) as u128)) as u64;
+                        let backoff = base.saturating_add(jitter % (base / 4 + 1));
                         eprintln!("[download] attempt {} failed: {}. retry in {}s", attempt, e, backoff);
                         tokio::time::sleep(Duration::from_secs(backoff)).await;
                     } else {
@@ -132,7 +140,13 @@ impl DownloadEngine {
 
     /// 核心：下载到文件
     async fn download_to_file(&self, session: &mut DownloadSession) -> Result<(), DownloadError> {
-        let url = Url::parse(&session.url).map_err(|e| DownloadError::Network(e.to_string()))?;
+        let mut url = Url::parse(&session.url).map_err(|e| DownloadError::Network(e.to_string()))?;
+
+        // HuggingFace 镜像自动切换
+        if crate::mirror::is_huggingface_url(&session.url) {
+            let resolved = crate::mirror::resolve_mirror_url(&self.client, &session.url).await;
+            url = Url::parse(&resolved).map_err(|e| DownloadError::Network(e.to_string()))?;
+        }
 
         // 确保目标目录存在
         if let Some(parent) = session.path.parent() {
@@ -145,6 +159,17 @@ impl DownloadEngine {
         let total_size = self.get_total_size(&url).await.unwrap_or(0);
         if total_size > 0 {
             session.progress.total = total_size;
+        }
+
+        // 磁盘预分配: 防止下载中途 ENOSPC
+        if total_size > 0 && !session.path.exists() {
+            if let Some(parent) = session.path.parent() {
+                let _ = fs::create_dir_all(parent).await;
+            }
+            let _ = std::fs::File::options()
+                .write(true).create(true).truncate(false)
+                .open(&session.path)
+                .and_then(|f| f.set_len(total_size));
         }
 
         // 检查已下载的部分 (断点续传)
@@ -223,6 +248,7 @@ impl DownloadEngine {
 
         // 等待所有片完成
         let mut total_downloaded = existing_bytes;
+        let loop_start = SystemTime::now();
         for (i, handle, chunk_file) in handles {
             match handle.await {
                 Ok(Ok(chunk_bytes)) => {
@@ -231,6 +257,13 @@ impl DownloadEngine {
                         session.progress.percent = (total_downloaded as f32 / total_size as f32) * 100.0;
                     }
                     session.progress.downloaded = total_downloaded;
+                    let elapsed = loop_start.elapsed().unwrap_or_default().as_secs_f64();
+                    if elapsed > 0.0 {
+                        session.progress.speed = (total_downloaded - existing_bytes) as f64 / elapsed;
+                    }
+                    if session.progress.speed > 0.0 {
+                        session.progress.eta = Some((total_size - total_downloaded) as f64 / session.progress.speed);
+                    }
                     session.updated_at = SystemTime::now();
                     eprintln!(
                         "[download] chunk {} done: +{}MB total={:.1}%",
@@ -246,26 +279,27 @@ impl DownloadEngine {
             }
         }
 
-        // 合并临时文件到目标文件
+        // 合并临时文件到目标文件 (流式 8KB buffer, 不加载整片到内存)
         eprintln!("[download] merging {} chunks...", actual_chunks);
         let mut output = fs::File::create(&session.path).await.map_err(|e| {
             DownloadError::Io(format!("create {}: {}", session.path.display(), e))
         })?;
-
+        let mut buf = vec![0u8; 8192];
         for i in 0..actual_chunks {
             let chunk_file = tmp_base.join(format!("chunk_{:04}.tmp", i));
             let mut chunk = fs::File::open(&chunk_file).await.map_err(|e| {
                 DownloadError::Io(format!("open chunk {}: {}", chunk_file.display(), e))
             })?;
-            let mut buf = Vec::new();
-            chunk.read_to_end(&mut buf).await.map_err(|e| {
-                DownloadError::Io(format!("read chunk {}: {}", chunk_file.display(), e))
-            })?;
-            output.write_all(&buf).await.map_err(|e| {
-                DownloadError::Io(format!("write output: {}", e))
-            })?;
+            loop {
+                let n = chunk.read(&mut buf).await.map_err(|e| {
+                    DownloadError::Io(format!("read chunk {}: {}", chunk_file.display(), e))
+                })?;
+                if n == 0 { break; }
+                output.write_all(&buf[..n]).await.map_err(|e| {
+                    DownloadError::Io(format!("write output: {}", e))
+                })?;
+            }
         }
-
         output.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
         drop(output);
 
@@ -320,6 +354,7 @@ async fn download_chunk_to_file(
     }
 
     let mut req = client.request(Method::GET, url.clone());
+    req = req.header("Accept-Encoding", "identity");
 
     // Range header
     if end != 0 {
@@ -337,9 +372,11 @@ async fn download_chunk_to_file(
     let response = response.map_err(|e| DownloadError::Network(e.to_string()))?;
 
     let status = response.status();
-    let is_partial = status == 200 || status == 206;
-
-    if !is_partial {
+    // 404/403/410 是永久性失败，不重试
+    if status == 404 || status == 403 || status == 410 {
+        return Err(DownloadError::Network(format!("permanent failure: HTTP {}", status)));
+    }
+    if !(status == 200 || status == 206) {
         return Err(DownloadError::Network(format!("HTTP {}", status)));
     }
 

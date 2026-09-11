@@ -17,6 +17,8 @@ struct SEALPipelineInner {
     status: PipelineStatus,
     exploration: ExplorationResult,
     absorption: AbsorptionProgress,
+    /// Four-stage training cycle state (P0-3)
+    training_cycle_count: u64,
 }
 
 #[derive(uniffi::Object)]
@@ -63,6 +65,7 @@ impl SEALPipelineImpl {
                     failed: 0,
                     current_item: String::new(),
                 },
+                training_cycle_count: 0,
             }),
         })
     }
@@ -116,6 +119,48 @@ impl SEALPipelineImpl {
 
     pub fn get_absorption_progress(&self) -> AbsorptionProgress {
         self.inner.read().expect("ffi rwlock poisoned").absorption.clone()
+    }
+
+    /// Run a four-stage training cycle: explore → distill → test → absorb.
+    /// Returns the training cycle result with per-stage outcomes.
+    pub fn run_training_cycle(&self) -> types::TrainingCycleResult {
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
+        inner.training_cycle_count += 1;
+        let cycle_id = inner.training_cycle_count;
+
+        let config = crate::l5_cognition::nt_core::seal::training_cycle::TrainingCycleConfig::default();
+        let ctx = crate::l5_cognition::nt_core::seal::training_cycle::KBContext::default();
+        let result = crate::l5_cognition::nt_core::seal::training_cycle::run_training_cycle(
+            cycle_id,
+            &config,
+            &ctx,
+        );
+
+        // Sync training cycle results back to pipeline status
+        if result.success {
+            inner.status.cycle_count += 1;
+            inner.status.last_completed_cycle = now_ms();
+            inner.absorption.completed += 1;
+            inner.absorption.current_item = format!("training-cycle-{cycle_id}");
+        }
+
+        // Map internal result to FFI TrainingCycleResult
+        let stages_completed = result.stages.len() as u32;
+        let explore_sources_scanned = result.explore.as_ref().map_or(0, |e| e.sources_scanned);
+        let distill_patterns_extracted = result.distill.as_ref().map_or(0, |d| d.patterns.len() as u32);
+        let test_regression_pass_rate = result.test.as_ref().map_or(0.0, |t| t.regression_pass_rate as f32);
+        let absorb_kb_writes = result.absorb.as_ref().map_or(0, |a| a.kb_writes);
+
+        types::TrainingCycleResult {
+            cycle_id,
+            total_duration_ms: result.total_duration_ms,
+            success: result.success,
+            stages_completed,
+            explore_sources_scanned,
+            distill_patterns_extracted,
+            test_regression_pass_rate,
+            absorb_kb_writes,
+        }
     }
 }
 

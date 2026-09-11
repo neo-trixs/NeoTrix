@@ -9,6 +9,48 @@
 //! - 单一入口，隐藏内部实现差异
 //! - 按场景自动选择最优解析器
 //! - 统一返回 `TableData` 类型
+//!
+//! # XLSX 解析路由策略
+//!
+//! ## 双引擎设计
+//! NeoTrix 保留两套 XLSX 解析引擎，各有适用场景:
+//!
+//! ### xlsx_fast (ZIP + quick_xml)
+//! - **性能**: 0.2-0.5s/file
+//! - **功能**: 纯文本提取，无公式/日期转换
+//! - **适用**: 批量解析、模板检测、表头扫描、大文件 (>10MB)
+//! - **限制**: 单 sheet，无数值精度
+//!
+//! ### tables (calamine)
+//! - **性能**: 1-2s/file
+//! - **功能**: 完整解析，支持公式/日期/多 sheet/数值精度
+//! - **适用**: 需要数值精度、公式求值、多 sheet 的场景
+//! - **限制**: 较慢
+//!
+//! ### 路由策略 (xlsx_parser)
+//! ```text
+//! Auto 模式 (默认):
+//!   文件 > 10MB → xlsx_fast
+//!   文件 ≤ 10MB → tables
+//!
+//! Fast 模式:
+//!   始终使用 xlsx_fast
+//!
+//! Full 模式:
+//!   始终使用 tables
+//! ```
+//!
+//! ## L3 表示层 (table_presenter)
+//! 所有解析结果均可通过 TablePresenter 转换为:
+//! - **Markdown**: 供 LLM 理解和推理
+//! - **JSON**: 供 Function Calling / Structured Output
+//! - **CSV**: 最省 token (48 tokens/行 vs JSON 111 tokens/行)
+//!
+//! ## 分块策略 (chunk_planner)
+//! 当表格超过 LLM 上下文窗口时:
+//! - 按行分块 (默认，每 chunk ≤ 16K chars ≈ 4096 tokens)
+//! - 重叠 2 行 (防止边界丢失上下文)
+//! - 每个 chunk 保留表头
 
 use std::path::Path;
 
@@ -159,7 +201,7 @@ fn parse_xlsx_full_mode(path: &Path, config: &ParseConfig) -> Result<Vec<TableDa
     for table in &mut tables {
         table.headers.truncate(max_cols);
         table.rows = table
-            .rows
+            .rows.clone()
             .into_iter()
             .take(max_rows)
             .map(|r| r.into_iter().take(max_cols).collect())

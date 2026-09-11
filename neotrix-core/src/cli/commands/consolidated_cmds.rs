@@ -31,11 +31,11 @@ pub struct FileCmd;
 impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|schema|suggest|convert|extract|mergepdf|merge|editpdf <args>" }
+    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|schema|suggest|convert|extract|mergepdf|merge|editpdf|parse-xlsx|parse-contract|detect-template|parse-config <args>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格 [--schema <name>] [--sheet-mode first|preferred|all]\n  /file schema list|show <name>  列出/查看已注册领域 schema (SchemaStore)\n  /file suggest <dir> [--save <name>]  扫描表头生成 schema 初稿 (可固化)\n  /file convert <in> <out>   图像格式转换 (png/jpeg)\n  /file extract <dir>   目录级统一提取 (混合格式 → 文本/表格清单)\n  /file mergepdf <out> <in1> <in2> ...  结构级合并多个 PDF (页面按序拼接)\n  /file merge <out.docx|pptx> <in1> <in2> ...  结构级合并 Office 文档 (DOCX 段落 / PPTX 幻灯片)\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)");
+            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格 [--schema <name>] [--sheet-mode first|preferred|all]\n  /file schema list|show <name>  列出/查看已注册领域 schema (SchemaStore)\n  /file suggest <dir> [--save <name>]  扫描表头生成 schema 初稿 (可固化)\n  /file convert <in> <out>   图像格式转换 (png/jpeg)\n  /file extract <dir>   目录级统一提取 (混合格式 → 文本/表格清单)\n  /file mergepdf <out> <in1> <in2> ...  结构级合并多个 PDF (页面按序拼接)\n  /file merge <out.docx|pptx> <in1> <in2> ...  结构级合并 Office 文档 (DOCX 段落 / PPTX 幻灯片)\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)\n  /file parse-xlsx <path>   解析 Excel 文件 (自动检测模板，输出结构化数据)\n  /file parse-contract <path>  解析合同 Excel (提取合同头+产品明细)\n  /file detect-template <path>  检测 Excel 模板类型\n  /file parse-config <string>  解析配置字符串 (逗号分隔 key:value)");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -403,7 +403,103 @@ impl CliCommand for FileCmd {
                     Err(e) => CommandOutput::err(&format!("PDF 编辑失败: {e}")),
                 }
             }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest, editpdf", sub)),
+            "parse-xlsx" => {
+                // 用法: /file parse-xlsx <path> — 解析 Excel 文件 (自动检测模板，输出结构化数据)
+                if rest.len() != 1 {
+                    return CommandOutput::err("用法: /file parse-xlsx <path>");
+                }
+                let src = std::path::PathBuf::from(&rest[0]);
+                match crate::neotrix::read_xlsx_table(&src) {
+                    Ok(grid) => {
+                        let (template, map, header_idx) = match crate::neotrix::nt_file_ability::auto_detect(&grid.rows) {
+                            Some((t, m, h)) => (t, m, h),
+                            None => return CommandOutput::ok("模板: 未知 (未找到表头行)"),
+                        };
+                        let row_count = grid.rows.len().saturating_sub(header_idx + 1);
+                        let mut out = format!(
+                            "模板: {} ({})\n表头行: {} | 数据行: {}\n列映射:\n",
+                            template.name(),
+                            format!("{:?}", template),
+                            header_idx + 1,
+                            row_count,
+                        );
+                        if let Some(i) = map.serial { out.push_str(&format!("  序号: col {}\n", i)); }
+                        if let Some(i) = map.name { out.push_str(&format!("  名称: col {}\n", i)); }
+                        if let Some(i) = map.model { out.push_str(&format!("  型号: col {}\n", i)); }
+                        if let Some(i) = map.diameter { out.push_str(&format!("  口径: col {}\n", i)); }
+                        if let Some(i) = map.config { out.push_str(&format!("  配置: col {}\n", i)); }
+                        if let Some(i) = map.qty { out.push_str(&format!("  数量: col {}\n", i)); }
+                        if let Some(i) = map.unit { out.push_str(&format!("  单位: col {}\n", i)); }
+                        if let Some(i) = map.price { out.push_str(&format!("  单价: col {}\n", i)); }
+                        if let Some(i) = map.amount { out.push_str(&format!("  总价: col {}\n", i)); }
+                        if let Some(i) = map.unit_weight { out.push_str(&format!("  单重: col {}\n", i)); }
+                        if let Some(i) = map.total_weight { out.push_str(&format!("  总重: col {}\n", i)); }
+                        // 展示前3行数据
+                        let preview = grid.rows.iter().skip(header_idx + 1).take(3);
+                        out.push_str("预览 (前3行):\n");
+                        for (ri, row) in preview.enumerate() {
+                            out.push_str(&format!("  [{}] {:?}\n", ri + 1, row));
+                        }
+                        CommandOutput::ok(out.trim_end())
+                    }
+                    Err(e) => CommandOutput::err(&format!("XLSX 解析失败: {e}")),
+                }
+            }
+            "parse-contract" => {
+                // 用法: /file parse-contract <path> — 解析合同 Excel (提取合同头+产品明细)
+                CommandOutput::err("合同解析功能暂不可用 (contract_parser 模块已移除)")
+            }
+            "detect-template" => {
+                // 用法: /file detect-template <path> — 检测 Excel 模板类型
+                if rest.len() != 1 {
+                    return CommandOutput::err("用法: /file detect-template <path>");
+                }
+                let src = std::path::PathBuf::from(&rest[0]);
+                match crate::neotrix::read_xlsx_table(&src) {
+                    Ok(grid) => {
+                        match crate::neotrix::nt_file_ability::auto_detect(&grid.rows) {
+                            Some((template, map, header_idx)) => {
+                                let header = &grid.rows[header_idx];
+                                let mut out = format!(
+                                    "模板: {} (header_idx={})\n表头: {:?}\n列映射: serial={:?} name={:?} model={:?} diameter={:?} config={:?} qty={:?} unit={:?} price={:?} amount={:?} unit_weight={:?} total_weight={:?}\n",
+                                    template.name(), header_idx, header,
+                                    map.serial, map.name, map.model, map.diameter, map.config,
+                                    map.qty, map.unit, map.price, map.amount, map.unit_weight, map.total_weight,
+                                );
+                                out.push_str(&format!("数据行数: {}", grid.rows.len().saturating_sub(header_idx + 1)));
+                                CommandOutput::ok(&out)
+                            }
+                            None => CommandOutput::ok("模板: 未知 (未找到表头行)"),
+                        }
+                    }
+                    Err(e) => CommandOutput::err(&format!("XLSX 解析失败: {e}")),
+                }
+            }
+            "parse-config" => {
+                // 用法: /file parse-config <string> — 解析配置字符串 (逗号分隔 key:value)
+                if rest.is_empty() {
+                    return CommandOutput::err("用法: /file parse-config <string>\n  示例: /file parse-config \"执行标准:美标,压力:150LB,阀体:Q235\"");
+                }
+                let raw = rest.join(" ");
+                let config = crate::neotrix::nt_file_ability::ConfigFields::parse(&raw);
+                if config.is_empty() {
+                    CommandOutput::ok("解析结果: 空 (未识别到有效字段)")
+                } else {
+                    let map = config.to_map();
+                    let mut out = format!("解析结果 ({} 字段):\n", map.len());
+                    for (k, v) in &map {
+                        out.push_str(&format!("  {k}: {v}\n"));
+                    }
+                    if !config.extra.is_empty() {
+                        out.push_str("未识别字段:\n");
+                        for k in config.extra.keys() {
+                            out.push_str(&format!("  {k}\n"));
+                        }
+                    }
+                    CommandOutput::ok(out.trim_end())
+                }
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest, editpdf, parse-xlsx, parse-contract, detect-template, parse-config", sub)),
         }
     }
 }

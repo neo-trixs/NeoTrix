@@ -33,6 +33,8 @@ impl UnifiedCapability for PdfEnhanceCapability {
             tags: vec!["pdf".to_string(), "enhance".to_string(), "super-resolution".to_string()],
             status: CapabilityStatus::Healthy,
             metrics: CapabilityMetrics::default(),
+            cost_weight: 0.0,
+            priority: 1.0,
         }
     }
 

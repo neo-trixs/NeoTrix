@@ -804,7 +804,7 @@ pub struct ShareGetResponse {
 pub async fn share_get_handler(
     Path(token): Path<String>,
 ) -> Json<Result<ShareGetResponse, String>> {
-    let mgr = crate::l1_action::nt_io::nt_io_web::share::SessionShareManager::new();
+    let mgr = crate::server::session::SessionShareManager::new();
     match mgr.get(&token) {
         Ok(share) => Json(Ok(ShareGetResponse {
             session_name: share.session_name,
@@ -829,7 +829,7 @@ pub async fn share_create_handler(
         Ok(v) => v,
         Err(_) => return Json(Err("会话 JSON 解析失败".to_string())),
     };
-    let mgr = crate::l1_action::nt_io::nt_io_web::share::SessionShareManager::new();
+    let mgr = crate::server::session::SessionShareManager::new();
     match mgr.create(&req.name, json_value, req.ttl_hours) {
         Ok(share) => Json(Ok(ShareCreateResponse {
             token: share.token.clone(),

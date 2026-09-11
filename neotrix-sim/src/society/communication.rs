@@ -1,29 +1,61 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::economy::ResourceType;
+
+pub type MessageId = u64;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ThreatType {
+    Predator,
+    RivalFaction,
+    NaturalDisaster,
+    ResourceScarcity,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageContent {
+    Text(String),
+    TradeOffer {
+        resource: ResourceType,
+        amount: f32,
+        price: f32,
+    },
+    AllianceProposal {
+        target_faction: String,
+    },
+    ThreatWarning {
+        source: String,
+        threat_type: ThreatType,
+    },
+    Gossip {
+        topic: String,
+        reliability: f32,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    pub id: u64,
-    pub sender: u32,
-    pub receiver: Option<u32>,
+    pub id: MessageId,
+    pub sender: String,
     pub channel: String,
-    pub content: String,
-    pub priority: u8,
+    pub content: MessageContent,
     pub timestamp: u64,
+    pub importance: f32,
 }
 
 pub struct CommunicationChannel {
-    pub messages: Vec<Message>,
-    pub channels: HashMap<String, Vec<u64>>,
-    pub agent_inbox: HashMap<u32, Vec<u64>>,
-    pub next_id: u64,
+    pub message_queue: Vec<Message>,
+    pub channels: HashMap<String, Vec<MessageId>>,
+    pub agent_inbox: HashMap<String, Vec<MessageId>>,
+    pub next_id: MessageId,
     pub max_messages: usize,
 }
 
 impl CommunicationChannel {
     pub fn new() -> Self {
         Self {
-            messages: Vec::new(),
+            message_queue: Vec::new(),
             channels: HashMap::new(),
             agent_inbox: HashMap::new(),
             next_id: 0,
@@ -31,83 +63,97 @@ impl CommunicationChannel {
         }
     }
 
-    pub fn send(
-        &mut self,
-        sender: u32,
-        receiver: Option<u32>,
-        channel: &str,
-        content: &str,
-        priority: u8,
-        timestamp: u64,
-    ) -> u64 {
+    pub fn send(&mut self, msg: Message) {
         let id = self.next_id;
         self.next_id += 1;
 
-        let msg = Message {
-            id,
-            sender,
-            receiver,
-            channel: channel.to_string(),
-            content: content.to_string(),
-            priority,
-            timestamp,
-        };
-
-        self.messages.push(msg);
+        let mut msg = msg;
+        msg.id = id;
 
         self.channels
-            .entry(channel.to_string())
+            .entry(msg.channel.clone())
             .or_default()
             .push(id);
 
-        if let Some(recv) = receiver {
-            self.agent_inbox.entry(recv).or_default().push(id);
-        }
+        self.agent_inbox
+            .entry(msg.sender.clone())
+            .or_default()
+            .push(id);
 
-        if self.messages.len() > self.max_messages {
-            self.messages.remove(0);
-        }
+        self.message_queue.push(msg);
 
-        id
+        if self.message_queue.len() > self.max_messages {
+            self.message_queue.remove(0);
+        }
     }
 
-    pub fn receive(&self, agent_id: u32) -> Vec<&Message> {
-        let inbox = self.agent_inbox.get(&agent_id).cloned().unwrap_or_default();
-        self.messages
-            .iter()
-            .filter(|m| inbox.contains(&m.id))
-            .collect()
-    }
+    pub fn receive(&self, agent_id: &str, channel: &str) -> Vec<&Message> {
+        let channel_ids = self.channels.get(channel)
+            .cloned()
+            .unwrap_or_default();
+        let inbox_ids = self.agent_inbox.get(agent_id)
+            .cloned()
+            .unwrap_or_default();
 
-    pub fn receive_channel(&self, channel: &str) -> Vec<&Message> {
-        let ids = self.channels.get(channel).cloned().unwrap_or_default();
-        self.messages
-            .iter()
-            .filter(|m| ids.contains(&m.id))
+        self.message_queue.iter()
+            .filter(|m| {
+                channel_ids.contains(&m.id) && (m.sender == agent_id || inbox_ids.contains(&m.id))
+            })
             .collect()
     }
 
     pub fn broadcast(
         &mut self,
-        sender: u32,
+        sender: &str,
         channel: &str,
-        content: &str,
-        priority: u8,
+        content: MessageContent,
+        importance: f32,
         timestamp: u64,
-        receivers: &[u32],
-    ) -> Vec<u64> {
-        receivers
-            .iter()
-            .map(|&r| self.send(sender, Some(r), channel, content, priority, timestamp))
-            .collect()
+        receivers: &[String],
+    ) {
+        let msg = Message {
+            id: 0,
+            sender: sender.to_string(),
+            channel: channel.to_string(),
+            content,
+            timestamp,
+            importance,
+        };
+        self.send(msg);
+
+        for receiver in receivers {
+            let relay = Message {
+                id: 0,
+                sender: sender.to_string(),
+                channel: channel.to_string(),
+                content: MessageContent::Text("broadcast".to_string()),
+                timestamp,
+                importance,
+            };
+            let mut relay = relay;
+            relay.sender = sender.to_string();
+            self.agent_inbox.entry(receiver.clone()).or_default();
+        }
+    }
+
+    pub fn create_channel(&mut self, name: String) {
+        self.channels.entry(name).or_default();
     }
 
     pub fn tick(&mut self) {
-        self.messages.retain(|m| {
+        self.message_queue.retain(|m| {
             let age = (self.next_id as i64 - m.id as i64) as u64;
             age < 100
         });
     }
+
+    pub fn total_messages(&self) -> usize {
+        self.message_queue.len()
+    }
+}
+
+impl Default for CommunicationChannel {
+    fn default() -> Self { Self::new() }
 }
 
 #[cfg(test)]
@@ -115,24 +161,60 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_message_send() {
-        let mut channel = CommunicationChannel::new();
-        let id = channel.send(0, Some(1), "chat", "Hello", 1, 0);
-        assert_eq!(id, 0);
+    fn test_send_text_message() {
+        let mut ch = CommunicationChannel::new();
+        ch.send(Message {
+            id: 0,
+            sender: "alice".into(),
+            channel: "global".into(),
+            content: MessageContent::Text("hello".into()),
+            timestamp: 0,
+            importance: 0.5,
+        });
+        assert_eq!(ch.total_messages(), 1);
     }
 
     #[test]
-    fn test_message_receive() {
-        let mut channel = CommunicationChannel::new();
-        channel.send(0, Some(1), "chat", "Hello", 1, 0);
-        let msgs = channel.receive(1);
+    fn test_receive_on_channel() {
+        let mut ch = CommunicationChannel::new();
+        ch.send(Message {
+            id: 0,
+            sender: "alice".into(),
+            channel: "trade".into(),
+            content: MessageContent::TradeOffer {
+                resource: ResourceType::Food,
+                amount: 10.0,
+                price: 2.0,
+            },
+            timestamp: 0,
+            importance: 0.7,
+        });
+        let msgs = ch.receive("bob", "trade");
         assert_eq!(msgs.len(), 1);
     }
 
     #[test]
-    fn test_broadcast() {
-        let mut channel = CommunicationChannel::new();
-        let ids = channel.broadcast(0, "global", "Announcement", 2, 0, &[1, 2, 3]);
-        assert_eq!(ids.len(), 3);
+    fn test_create_channel() {
+        let mut ch = CommunicationChannel::new();
+        ch.create_channel("war_council".into());
+        assert!(ch.channels.contains_key("war_council"));
+    }
+
+    #[test]
+    fn test_threat_warning() {
+        let mut ch = CommunicationChannel::new();
+        ch.send(Message {
+            id: 0,
+            sender: "scout".into(),
+            channel: "alerts".into(),
+            content: MessageContent::ThreatWarning {
+                source: "scout".into(),
+                threat_type: ThreatType::RivalFaction,
+            },
+            timestamp: 10,
+            importance: 0.9,
+        });
+        let msgs = ch.receive("leader", "alerts");
+        assert_eq!(msgs.len(), 1);
     }
 }

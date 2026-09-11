@@ -116,6 +116,45 @@ impl PricingEngine {
         }
     }
 
+    /// Update all prices across all markets using supply/demand with scarcity multiplier.
+    pub fn update_prices_global(&mut self) {
+        for market in self.markets.values_mut() {
+            market.update_prices();
+        }
+    }
+
+    /// Get aggregate price for a resource across all markets.
+    pub fn average_price(&self, resource: &str) -> f32 {
+        let prices: Vec<f32> = self.markets.values()
+            .map(|m| m.get_price(resource))
+            .collect();
+        if prices.is_empty() {
+            return 0.0;
+        }
+        prices.iter().sum::<f32>() / prices.len() as f32
+    }
+
+    /// Scarcity multiplier: higher when supply is low relative to historical average.
+    pub fn scarcity_multiplier(&self, market: &str, resource: &str) -> f32 {
+        if let Some(m) = self.markets.get(market) {
+            let supply = m.supply.get(resource).copied().unwrap_or(10.0);
+            let base = m.base_prices.get(resource).copied().unwrap_or(10.0);
+            // Scarcity = base_price / current_supply (capped)
+            (base / supply.max(1.0)).min(5.0)
+        } else {
+            1.0
+        }
+    }
+
+    /// Demand bonus: ratio of demand to supply, clamped.
+    pub fn demand_bonus(&self, market: &str, resource: &str) -> f32 {
+        if let Some(m) = self.markets.get(market) {
+            m.get_supply_demand_ratio(resource).min(3.0)
+        } else {
+            1.0
+        }
+    }
+
     pub fn get_arbitrage_opportunities(&self, market_a: &str, market_b: &str) -> Vec<(String, f32)> {
         let ma = match self.markets.get(market_a) {
             Some(m) => m,

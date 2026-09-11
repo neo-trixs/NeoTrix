@@ -2,11 +2,14 @@ use crate::foundation::math_bridge::Vec2;
 use crate::foundation::sim_time::TimeModifiers;
 use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation};
 use crate::agents::pheromone::PheromoneSignal;
+use crate::agents::planning::goap::create_survival_plan;
+use crate::agents::behavior_tree::{BehaviorTree, Selector, Sequence, Condition, Action, Blackboard, BTStatus};
 use crate::feel::EmotionType;
 use super::WorldSim;
 
 impl WorldSim {
     /// Unified decision pipeline: evaluate layers in priority order, first non-None wins.
+    /// Layers: Survival → Goals(GOAP) → BT fallback → Social → Stigmergy → Personality → Default
     pub(crate) fn decide_action(&mut self, agent: &SimAgent, obs: &AgentObservation, time_mods: &TimeModifiers) -> AgentAction {
         let pos = [agent.core.position.x, agent.core.position.y];
         let pheromone_signal = self.pheromone_field.sense(pos, 120.0, self.tick);
@@ -15,6 +18,9 @@ impl WorldSim {
             return action;
         }
         if let Some(action) = self.layer_goals(agent, obs) {
+            return action;
+        }
+        if let Some(action) = self.layer_bt(agent, obs) {
             return action;
         }
         if let Some(action) = self.layer_social(agent, obs, time_mods) {
@@ -112,27 +118,97 @@ impl WorldSim {
         None
     }
 
-    /// Layer 2 — Goal-driven: PlanningStack active goals.
+    /// Layer 2 — Goal-driven: PlanningStack active goals, with GOAP fallback.
     fn layer_goals(&mut self, agent: &SimAgent, obs: &AgentObservation) -> Option<AgentAction> {
-        let planning = self.planning.get(&agent.core.id)?;
-        let action = planning.next_action()?;
-        let planned = action.clone();
+        if let Some(planning) = self.planning.get(&agent.core.id) {
+            if let Some(action) = planning.next_action() {
+                let planned = action.clone();
+                match &planned {
+                    AgentAction::Eat { resource_id } => {
+                        if obs.nearby_resources.iter().any(|r| &r.id == resource_id) {
+                            return Some(planned);
+                        }
+                    }
+                    AgentAction::Rest => {
+                        if agent.core.energy < 50.0 { return Some(planned); }
+                    }
+                    AgentAction::Talk { target_id, .. } => {
+                        if obs.nearby_agents.iter().any(|a| &a.id == target_id) {
+                            return Some(planned);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
 
-        match &planned {
-            AgentAction::Eat { resource_id } => {
-                if obs.nearby_resources.iter().any(|r| &r.id == resource_id) {
-                    return Some(planned);
-                }
+        if let Some(plan) = create_survival_plan(agent) {
+            if let Some(first) = plan.actions.first() {
+                return goap_action_to_agent_action(&first.name, obs);
             }
-            AgentAction::Rest => {
-                if agent.core.energy < 50.0 { return Some(planned); }
+        }
+
+        None
+    }
+
+    /// Layer 2.5 — Behavior Tree: procedural fallback when GOAP has no plan.
+    /// Builds a simple selector tree: flee-if-critical → eat-if-hungry → rest-if-tired → talk → gather
+    fn layer_bt(&mut self, agent: &SimAgent, obs: &AgentObservation) -> Option<AgentAction> {
+        // Only fire if GOAP produced nothing
+        let health = agent.core.health;
+        let energy = agent.core.energy;
+        let hunger = agent.core.hunger;
+
+        // Flee: critical health + threat nearby
+        if health < 25.0 {
+            if let Some(threat) = obs.threats.first() {
+                let away = Vec2::new(
+                    agent.core.position.x - threat.position.x,
+                    agent.core.position.y - threat.position.y,
+                ).normalize();
+                return Some(AgentAction::Explore { direction: away });
             }
-            AgentAction::Talk { target_id, .. } => {
-                if obs.nearby_agents.iter().any(|a| &a.id == target_id) {
-                    return Some(planned);
-                }
+            return Some(AgentAction::Rest);
+        }
+
+        // Eat: hungry + food nearby
+        if hunger > 70.0 {
+            if let Some(res) = obs.nearby_resources.iter()
+                .filter(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
+                .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
+            {
+                return Some(AgentAction::Eat { resource_id: res.id.clone() });
             }
-            _ => {}
+            // Hungry but no food: explore toward resources
+            return Some(AgentAction::Explore {
+                direction: Vec2::new(
+                    self.rng.range_f32(-1.0, 1.0),
+                    self.rng.range_f32(-1.0, 1.0),
+                ),
+            });
+        }
+
+        // Rest: low energy
+        if energy < 20.0 {
+            return Some(AgentAction::Rest);
+        }
+
+        // Gather: resources nearby and personality fits
+        if !obs.nearby_resources.is_empty() && agent.personality.curiosity > 0.4 {
+            if let Some(res) = obs.nearby_resources.iter()
+                .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
+            {
+                return Some(AgentAction::Gather { resource_id: res.id.clone() });
+            }
+        }
+
+        // Talk: agents nearby and sociable
+        if !obs.nearby_agents.is_empty() && agent.personality.sociability > 0.5 {
+            let target = &obs.nearby_agents[0];
+            return Some(AgentAction::Talk {
+                target_id: target.id.clone(),
+                message: "bt_greeting".to_string(),
+            });
         }
 
         None
@@ -302,5 +378,34 @@ impl WorldSim {
             self.rng.range_f32(-1.0, 1.0),
             self.rng.range_f32(-1.0, 1.0),
         )}
+    }
+}
+
+fn goap_action_to_agent_action(name: &str, obs: &AgentObservation) -> Option<AgentAction> {
+    match name {
+        "rest" => Some(AgentAction::Rest),
+        "gather_food" | "eat" => {
+            obs.nearby_resources.iter()
+                .find(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
+                .map(|r| AgentAction::Eat { resource_id: r.id.clone() })
+                .or_else(|| Some(AgentAction::Explore {
+                    direction: Vec2::new(
+                        obs.position.x.signum() * -0.5,
+                        obs.position.y.signum() * -0.5,
+                    ),
+                }))
+        }
+        "heal" => Some(AgentAction::Rest),
+        "explore" => Some(AgentAction::Explore {
+            direction: Vec2::new(1.0, 0.0),
+        }),
+        "trade" => {
+            obs.nearby_agents.first().map(|a| AgentAction::Trade {
+                target_id: a.id.clone(),
+                item: "berries".to_string(),
+                amount: 1,
+            })
+        }
+        _ => None,
     }
 }

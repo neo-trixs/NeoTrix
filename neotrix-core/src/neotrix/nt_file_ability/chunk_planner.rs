@@ -171,10 +171,7 @@ mod tests {
         let table = TableData {
             name: "test".into(),
             headers: vec!["A".into(), "B".into()],
-            rows: vec![
-                vec!["1".into(), "2".into()],
-                vec!["3".into(), "4".into()],
-            ],
+            rows: vec![vec!["1".into(), "2".into()], vec!["3".into(), "4".into()]],
         };
         let chunks = chunk_table(&table);
         assert_eq!(chunks.len(), 1);

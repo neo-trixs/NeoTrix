@@ -67,6 +67,8 @@ pub struct DownloadMetadata {
     pub source: DownloadSource,
     /// 关联的任务 ID 列表
     pub related_tasks: Vec<String>,
+    /// 可选的 SHA256 校验和 (下载完成后自动验证)
+    pub checksum: Option<String>,
 }
 
 /// 下载源类型
@@ -116,6 +118,7 @@ impl DownloadMetadata {
             description,
             source: DownloadSource::GenericURL,
             related_tasks: Vec::new(),
+            checksum: None,
         }
     }
 }

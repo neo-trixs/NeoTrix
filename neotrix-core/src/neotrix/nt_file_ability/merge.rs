@@ -571,8 +571,8 @@ fn parse_numeric(v: &str) -> Option<f64> {
     trimmed.parse::<f64>().ok()
 }
 
-/// 价格表合并 (D4) — 薄封装: 委托通用引擎 + 价格表 schema。
-/// 保持向后兼容签名; 领域知识已外置为 PRICE_TABLE_SCHEMA。
+/// ⚠️ 废弃: 请使用 `merge_tables_with_mode` 代替
+#[deprecated(since = "0.2.0", note = "使用 merge_tables_with_mode 代替")]
 pub fn consolidate_tables(
     src_dir: impl AsRef<Path>,
     output: impl AsRef<Path>,
@@ -585,12 +585,8 @@ pub fn consolidate_tables(
     merge_tables_with_mode(&PRICE_TABLE_SCHEMA, src_dir, output, mode)
 }
 
-/// 首个 sheet 专用入口 — 每个文件只取第一个 sheet 合并 (不优先"修改版")。
-///
-/// 与 [`consolidate_tables`] 的差异仅在 sheet 选择策略;
-/// 委托运行时 `SheetMode::FirstSheet`, 无需编译期哨兵变体 (R-2026-08-20 收敛)。
-///
-/// 适用: 目录文件已人工核对待确认 (如 "已核对待确认-0810"), 首个 sheet 即目标数据。
+/// ⚠️ 废弃: 请使用 `merge_tables_with_mode` 代替
+#[deprecated(since = "0.2.0", note = "使用 merge_tables_with_mode 代替")]
 pub fn consolidate_tables_first_sheet(
     src_dir: impl AsRef<Path>,
     output: impl AsRef<Path>,

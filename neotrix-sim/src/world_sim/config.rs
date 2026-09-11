@@ -63,4 +63,7 @@ pub struct WorldSnapshot {
     pub emotion_dominance: f32,
     pub safety_alerts: usize,
     pub audit_entries: usize,
+    pub active_conflicts: usize,
+    pub norms_compliance: f32,
+    pub faction_count: usize,
 }

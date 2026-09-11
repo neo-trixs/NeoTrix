@@ -23,6 +23,8 @@ impl AssetMapCapability {
                 tags: vec!["asset".into(), "scan".into(), "fingerprint".into()],
                 status: CapabilityStatus::Healthy,
                 metrics: CapabilityMetrics::default(),
+                cost_weight: 0.0,
+                priority: 1.0,
             },
             health: CapabilityHealth {
                 state: CapabilityState::Ready,

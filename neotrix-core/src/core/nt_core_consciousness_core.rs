@@ -1396,7 +1396,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
             match dir {
                 Some(d) => {
                     let out = d.join("native_consolidated.xlsx");
-                    match crate::neotrix::consolidate_tables(&d, &out) {
+                    match crate::neotrix::consolidate_tables_with_mode(&d, &out, crate::neotrix::nt_file_ability::SheetMode::AllSheets) {
                         Ok(rep) => (
                             true,
                             format!(

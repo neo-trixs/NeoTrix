@@ -197,6 +197,9 @@ mod tests {
             emotion_dominance: 0.0,
             safety_alerts: 0,
             audit_entries: 0,
+            active_conflicts: 0,
+            norms_compliance: 1.0,
+            faction_count: 0,
         }
     }
 

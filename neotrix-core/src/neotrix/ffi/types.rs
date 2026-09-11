@@ -174,6 +174,8 @@ pub struct WorkspaceState {
     pub active_signals: Vec<AttentionSignal>,
     pub broadcast_history: Vec<BroadcastEvent>,
     pub resonance_map: HashMap<String, f32>,
+    /// Cost-aware thinking budget (tokens): cheap tasks get small budgets, expensive tasks get large budgets.
+    pub thinking_budget: u32,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -318,6 +320,19 @@ pub struct AbsorptionProgress {
     pub completed: u32,
     pub failed: u32,
     pub current_item: String,
+}
+
+/// Four-stage training cycle result (explore → distill → test → absorb)
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TrainingCycleResult {
+    pub cycle_id: u64,
+    pub total_duration_ms: u64,
+    pub success: bool,
+    pub stages_completed: u32,
+    pub explore_sources_scanned: u32,
+    pub distill_patterns_extracted: u32,
+    pub test_regression_pass_rate: f32,
+    pub absorb_kb_writes: u32,
 }
 
 // ===========================================================================

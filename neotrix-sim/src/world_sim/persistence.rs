@@ -40,15 +40,136 @@ pub struct ResourceSnapshot {
     pub depleted: bool,
 }
 
+/// Metadata about a save file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveInfo {
+    pub name: String,
+    pub path: String,
+    pub tick: u64,
+    pub timestamp_secs: u64,
+    pub agent_count: usize,
+    pub file_size_bytes: u64,
+}
+
 pub struct PersistenceManager {
     save_dir: String,
+    auto_save_interval: u64,
+    max_backups: usize,
 }
 
 impl PersistenceManager {
     pub fn new(save_dir: &str) -> Self {
         Self {
             save_dir: save_dir.to_string(),
+            auto_save_interval: 1000,
+            max_backups: 5,
         }
+    }
+
+    pub fn with_config(save_dir: &str, auto_save_interval: u64, max_backups: usize) -> Self {
+        Self {
+            save_dir: save_dir.to_string(),
+            auto_save_interval,
+            max_backups,
+        }
+    }
+
+    /// Check if auto-save should trigger at the given tick
+    pub fn should_auto_save(&self, tick: u64) -> bool {
+        tick > 0 && tick % self.auto_save_interval == 0
+    }
+
+    /// Auto-save: saves and prunes old backups beyond max_backups
+    pub fn auto_save(&self, sim: &WorldSim) -> Result<String, String> {
+        if !self.should_auto_save(sim.tick) {
+            return Ok(format!("Skipped: tick {} not at interval {}", sim.tick, self.auto_save_interval));
+        }
+        let path = self.save(sim)?;
+        self.prune_backups()?;
+        Ok(path)
+    }
+
+    /// List all save files with metadata
+    pub fn list_saves(&self) -> Vec<SaveInfo> {
+        let mut saves = Vec::new();
+        let dir = std::fs::read_dir(&self.save_dir);
+        if let Ok(entries) = dir {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.extension().map_or(false, |ext| ext == "json")
+                    && path
+                        .file_name()
+                        .map_or(false, |n| n.to_string_lossy().starts_with("save_"))
+                {
+                    let metadata = std::fs::metadata(&path).ok();
+                    let file_size = metadata.as_ref().map_or(0, |m| m.len());
+                    let timestamp_secs = metadata
+                        .as_ref()
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map_or(0, |d| d.as_secs());
+
+                    // Try to read tick from JSON
+                    let tick = std::fs::read_to_string(&path)
+                        .ok()
+                        .and_then(|json| {
+                            let v: serde_json::Value = serde_json::from_str(&json).ok()?;
+                            v.get("tick")?.as_u64()
+                        })
+                        .unwrap_or(0);
+
+                    let agent_count = std::fs::read_to_string(&path)
+                        .ok()
+                        .and_then(|json| {
+                            let v: serde_json::Value = serde_json::from_str(&json).ok()?;
+                            v.get("agents")?.as_array().map(|a| a.len())
+                        })
+                        .unwrap_or(0);
+
+                    let name = path
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    saves.push(SaveInfo {
+                        name,
+                        path: path.to_string_lossy().to_string(),
+                        tick,
+                        timestamp_secs,
+                        agent_count,
+                        file_size_bytes: file_size,
+                    });
+                }
+            }
+        }
+        saves.sort_by(|a, b| b.tick.cmp(&a.tick));
+        saves
+    }
+
+    /// Delete a save file by name (without extension)
+    pub fn delete_save(&self, name: &str) -> Result<(), String> {
+        let filename = format!("{}/{}.json", self.save_dir, name);
+        if std::path::Path::new(&filename).exists() {
+            std::fs::remove_file(&filename)
+                .map_err(|e| format!("Delete error: {}", e))?;
+            Ok(())
+        } else {
+            Err(format!("Save file '{}' not found", name))
+        }
+    }
+
+    fn prune_backups(&self) -> Result<(), String> {
+        let mut saves = self.list_saves();
+        if saves.len() <= self.max_backups {
+            return Ok(());
+        }
+        // Keep the most recent max_backups, delete the rest
+        saves.sort_by(|a, b| b.tick.cmp(&a.tick));
+        let to_delete = &saves[self.max_backups..];
+        for save in to_delete {
+            let _ = std::fs::remove_file(&save.path);
+        }
+        Ok(())
     }
 
     pub fn save(&self, sim: &WorldSim) -> Result<String, String> {
@@ -258,5 +379,71 @@ mod tests {
 
         assert_eq!(loaded.resources[0].amount, 25.0);
         assert!(loaded.resources[0].depleted);
+    }
+
+    #[test]
+    fn test_auto_save_interval() {
+        let manager = PersistenceManager::with_config("/tmp/neotrix_test", 100, 5);
+        assert!(!manager.should_auto_save(0));
+        assert!(!manager.should_auto_save(50));
+        assert!(manager.should_auto_save(100));
+        assert!(!manager.should_auto_save(150));
+        assert!(manager.should_auto_save(200));
+    }
+
+    #[test]
+    fn test_list_saves() {
+        let config = WorldSimConfig::default();
+        let sim = WorldSim::new(config);
+        let manager = PersistenceManager::new("/tmp/neotrix_test_list");
+
+        let _ = std::fs::create_dir_all("/tmp/neotrix_test_list");
+        let _ = manager.save(&sim);
+        let saves = manager.list_saves();
+        assert!(!saves.is_empty());
+        assert_eq!(saves[0].tick, 0);
+    }
+
+    #[test]
+    fn test_delete_save() {
+        let config = WorldSimConfig::default();
+        let sim = WorldSim::new(config);
+        let manager = PersistenceManager::new("/tmp/neotrix_test_delete");
+
+        let _ = std::fs::create_dir_all("/tmp/neotrix_test_delete");
+        let path = manager.save(&sim).unwrap();
+        let filename = std::path::Path::new(&path)
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let result = manager.delete_save(&filename);
+        assert!(result.is_ok());
+        assert!(manager.list_saves().is_empty());
+    }
+
+    #[test]
+    fn test_delete_nonexistent_save() {
+        let manager = PersistenceManager::new("/tmp/neotrix_test_delete2");
+        let _ = std::fs::create_dir_all("/tmp/neotrix_test_delete2");
+        let result = manager.delete_save("nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_save_info_metadata() {
+        let config = WorldSimConfig::default();
+        let mut sim = WorldSim::new(config);
+        sim.tick = 42;
+        let manager = PersistenceManager::new("/tmp/neotrix_test_meta");
+
+        let _ = std::fs::create_dir_all("/tmp/neotrix_test_meta");
+        let _ = manager.save(&sim);
+        let saves = manager.list_saves();
+        assert_eq!(saves.len(), 1);
+        assert_eq!(saves[0].tick, 42);
+        assert!(saves[0].file_size_bytes > 0);
+        assert!(saves[0].agent_count > 0);
     }
 }

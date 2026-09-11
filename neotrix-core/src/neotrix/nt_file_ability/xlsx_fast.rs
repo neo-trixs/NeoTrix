@@ -71,7 +71,6 @@ fn read_shared_strings<R: Read + std::io::Seek>(
     // sharedStrings.xml 可能不存在 (无共享字符串的 XLSX)
     let ss = match archive.by_name("xl/sharedStrings.xml") {
         Ok(f) => f,
-        Ok(_) => return Ok(strings),
         Err(_) => return Ok(strings),
     };
 
@@ -107,7 +106,7 @@ fn read_shared_strings<R: Read + std::io::Seek>(
             }
             Ok(quick_xml::events::Event::Text(ref t)) => {
                 if in_t {
-                    current.push_str(&t.unescape().unwrap_or_default());
+                    current.push_str(&String::from_utf8_lossy(&t.clone().into_inner()));
                 }
             }
             Ok(quick_xml::events::Event::CData(ref t)) => {
@@ -196,7 +195,7 @@ fn read_sheet<R: Read + std::io::Seek>(
             },
             Ok(quick_xml::events::Event::Text(ref t)) => {
                 if in_v {
-                    current_value.push_str(&t.unescape().unwrap_or_default());
+                    current_value.push_str(&String::from_utf8_lossy(&t.clone().into_inner()));
                 }
             }
             Ok(quick_xml::events::Event::CData(ref t)) => {

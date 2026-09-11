@@ -13,8 +13,8 @@ pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::{
     enqueue_seed_urls, extract_html_content, is_safe_fetch_url,
 };
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::{
-    claim_next_crawl_url, count_nodes_by_domain, mark_crawl_complete,
-    ensure_domain_cluster, get_all_edges, get_all_nodes, update_cluster_stats,
+    claim_next_crawl_url, count_nodes_by_domain, ensure_domain_cluster, get_all_edges,
+    get_all_nodes, mark_crawl_complete, update_cluster_stats,
 };
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_types::{
     ConversationRecord, ProceduralMemoryRecord, SearchResult,

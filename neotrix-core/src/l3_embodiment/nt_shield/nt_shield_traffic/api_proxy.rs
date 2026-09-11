@@ -14,7 +14,7 @@ use tokio_stream::wrappers::ReceiverStream as RxStream;
 
 use super::analyzer::TrafficAnalyzer;
 use crate::l3_embodiment::l1_facade::{
-    GatewayV2, FinishReason, LlmRequest, Message, Role, Tool,
+    GatewayV2, FinishReason, LlmRequest, LlmResponse, Message, Role, Tool,
 };
 
 #[derive(Debug, Clone)]
@@ -257,7 +257,7 @@ fn to_anthropic_request(req: AnthropicRequest) -> LlmRequest {
     }
 }
 
-fn to_anthropic_response(resp: &crate::l1_action::nt_io::nt_io_provider::types::LlmResponse, model: &str) -> AnthropicResponse {
+fn to_anthropic_response(resp: &LlmResponse, model: &str) -> AnthropicResponse {
     let stop_reason = match resp.finish_reason {
         FinishReason::Stop => Some("end_turn".into()),
         FinishReason::Length => Some("max_tokens".into()),
@@ -460,10 +460,10 @@ mod tests {
 
     #[test]
     fn test_to_anthropic_response() {
-        let resp = crate::l1_action::nt_io::nt_io_provider::types::LlmResponse {
+        let resp = LlmResponse {
             content: "Hello, I'm Claude.".into(),
             finish_reason: FinishReason::Stop,
-            usage: crate::l1_action::nt_io::nt_io_provider::types::Usage {
+            usage: Usage {
                 prompt_tokens: 10,
                 completion_tokens: 5,
                 total_tokens: 15,

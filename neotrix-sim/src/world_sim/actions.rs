@@ -188,7 +188,7 @@ impl WorldSim {
             AgentAction::Attack { target_id } => {
                 let attacker_id = agent_id.to_string();
                 let target_id_owned = target_id.clone();
-                let (damage, attacker_pos, target_pos) = {
+                let (damage, _attacker_pos, _target_pos) = {
                     let attacker = &self.agents[idx];
                     let base_damage = 5.0 + attacker.personality.aggression * 10.0;
                     let target = self.agents.iter().find(|a| &a.core.id == &target_id_owned);

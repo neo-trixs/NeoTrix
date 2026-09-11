@@ -143,7 +143,7 @@ pub use crate::l6_meta::healing::nt_mind_consciousness_gold_standard::{
 
 // ─── Unified File Ability ───────────────────────────────────────────────
 pub use nt_file_ability::{
-    check_health, consolidate_tables, consolidate_tables_first_sheet,
+    check_health,
     consolidate_tables_with_mode, content_similarity,
     create_from_markdown, decode_bytes,
     detect_encoding, edit_pdf, edit_xlsx_table, embed_text, extract_text, extract_pdf_tables,

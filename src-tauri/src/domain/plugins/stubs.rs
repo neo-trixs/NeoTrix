@@ -346,6 +346,7 @@ impl DomainPlugin for AgentPlugin {
              "discover_models","probe_all_providers",
              "set_project","get_project","health",
              "pool_status","pool_add","pool_remove","pool_update_key","pool_check",
+             "pool_health",
              "add_custom_provider","app_version"].iter().map(|a| stub_action(a)).collect()
     }
     fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
@@ -408,6 +409,44 @@ impl DomainPlugin for AgentPlugin {
                 let result = handle.block_on(model_pool::model_pool_check(label))
                     .map_err(|e| DomainError { code: "POOL_ERROR".into(), message: e, recoverable: true })?;
                 Ok(serde_json::json!(result))
+            }
+            "pool_health" => {
+                let cfg = read_config_file();
+                let pool = read_pool_entries();
+                let total = 1 + pool.len();
+                let mut healthy = 0usize;
+                let mut providers = vec![];
+
+                // 主 provider
+                if !cfg.provider.is_empty() {
+                    let is_healthy = resolvable(&cfg);
+                    if is_healthy { healthy += 1; }
+                    providers.push(serde_json::json!({
+                        "name": provider_display_name(&cfg.provider),
+                        "healthy": is_healthy,
+                        "latency_ms": 0,
+                        "last_error": if is_healthy { "" } else { "not configured" },
+                    }));
+                }
+                // pool entries
+                for entry in &pool {
+                    let name = entry.get("label").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let provider = entry.get("provider").and_then(|v| v.as_str()).unwrap_or("");
+                    let base_url = entry.get("base_url").and_then(|v| v.as_str()).unwrap_or("");
+                    let is_healthy = !provider.is_empty();
+                    if is_healthy { healthy += 1; }
+                    providers.push(serde_json::json!({
+                        "name": name,
+                        "healthy": is_healthy,
+                        "latency_ms": 0,
+                        "last_error": if is_healthy { "" } else { "missing provider" },
+                    }));
+                }
+                Ok(serde_json::json!({
+                    "total": total,
+                    "healthy": healthy,
+                    "providers": providers,
+                }))
             }
             _ => stub_call(action, &["start","stop","set_provider","test_provider",
                                      "set_project","get_project","health"]),

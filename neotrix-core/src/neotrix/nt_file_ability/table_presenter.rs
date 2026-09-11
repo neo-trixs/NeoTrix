@@ -43,14 +43,14 @@ impl<'a> TablePresenter<'a> {
         let mut md = String::new();
 
         // 表头
-        md.push('| ');
+        md.push_str("| ");
         for h in &headers[..show_cols] {
             md.push_str(&format!("{} |", truncate(h, 20)));
         }
         md.push('\n');
 
         // 分隔线
-        md.push('| ');
+        md.push_str("| ");
         for _ in 0..show_cols {
             md.push_str("--- |");
         }
@@ -58,7 +58,7 @@ impl<'a> TablePresenter<'a> {
 
         // 数据行
         for row in &rows[..show_rows] {
-            md.push('| ');
+            md.push_str("| ");
             for cell in &row[..show_cols] {
                 md.push_str(&format!("{} |", truncate(cell, 20)));
             }
@@ -139,7 +139,12 @@ impl<'a> TablePresenter<'a> {
             rows.len(),
             headers.len(),
             numeric_cols,
-            headers.iter().take(10).cloned().collect::<Vec<_>>().join(", ")
+            headers
+                .iter()
+                .take(10)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         )
     }
 }

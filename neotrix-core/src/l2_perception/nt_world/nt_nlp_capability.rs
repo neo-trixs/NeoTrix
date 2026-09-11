@@ -22,6 +22,8 @@ impl NlpCapability {
                 tags: vec!["nlp".into(), "regex".into(), "similarity".into()],
                 status: CapabilityStatus::Healthy,
                 metrics: CapabilityMetrics::default(),
+                cost_weight: 0.0,
+                priority: 1.0,
             },
             health: CapabilityHealth {
                 state: CapabilityState::Ready,

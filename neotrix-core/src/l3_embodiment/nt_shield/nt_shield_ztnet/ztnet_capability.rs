@@ -104,6 +104,8 @@ impl ZtNetUnifiedCapability {
                 tags: vec!["zero-trust".into(), "network".into(), "security".into()],
                 status: CapabilityStatus::Healthy,
                 metrics: CapabilityMetrics::default(),
+                cost_weight: 0.0,
+                priority: 1.0,
             },
             health: CapabilityHealth {
                 state: CapabilityState::Ready,
@@ -128,8 +130,9 @@ impl UnifiedCapability for ZtNetUnifiedCapability {
     fn execute(&self, input: CapabilityInput) -> Result<CapabilityOutput, CapabilityError> {
         match input {
             CapabilityInput::Security(_) => Ok(CapabilityOutput::Security(SecurityOutput {
-                threats: vec![],
-                recommendations: vec!["零信任验证通过".into()],
+                decision: SecurityDecision::Allow,
+                reason: "零信任验证通过".into(),
+                details: std::collections::HashMap::new(),
             })),
             CapabilityInput::Network(net) => Ok(CapabilityOutput::Network(NetworkOutput {
                 target: net.target,

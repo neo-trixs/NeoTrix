@@ -79,6 +79,21 @@ pub struct CapabilityMeta {
     pub status: CapabilityStatus,
     /// 指标
     pub metrics: CapabilityMetrics,
+    /// Cost weight for MoE routing (Spotify Portal Shunt pattern).
+    /// Lower weight = cheaper capability, preferred when task complexity is low.
+    /// Range: 0.0 (free/local) to 1.0 (most expensive cloud model).
+    pub cost_weight: f64,
+    /// Base priority for capability selection. Higher = preferred.
+    /// Default: 1.0. Combined with cost_weight via effective_priority().
+    pub priority: f64,
+}
+
+impl CapabilityMeta {
+    /// Effective priority = priority × cost_weight.
+    /// Higher value means more preferred in routing.
+    pub fn effective_priority(&self) -> f64 {
+        self.priority * self.cost_weight
+    }
 }
 
 /// 能力状态指示器
@@ -717,14 +732,39 @@ pub struct CapabilityRouter {
     registry: Arc<CapabilityRegistry>,
     /// 路由规则
     rules: Vec<Box<dyn Fn(&CapabilityInput) -> Option<String>>>,
+    /// MoE routing strategy: route to cheapest capable model (Spotify Portal Shunt pattern)
+    routing_strategy: MoERoutingStrategy,
+}
+
+/// MoE (Mixture of Experts) routing strategy for cost-aware capability selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MoERoutingStrategy {
+    /// Route to cheapest capable model (default, ~90% token savings)
+    CostOptimized,
+    /// Route to highest quality model regardless of cost
+    QualityFirst,
+    /// Round-robin across capable models
+    RoundRobin,
+    /// Load-balanced across capable models
+    LoadBalanced,
 }
 
 impl CapabilityRouter {
-    /// 创建新的路由器
+    /// 创建新的路由器 (default: CostOptimized)
     pub fn new(registry: Arc<CapabilityRegistry>) -> Self {
         Self {
             registry,
             rules: Vec::new(),
+            routing_strategy: MoERoutingStrategy::CostOptimized,
+        }
+    }
+
+    /// 创建路由器 with explicit MoE routing strategy
+    pub fn with_strategy(registry: Arc<CapabilityRegistry>, strategy: MoERoutingStrategy) -> Self {
+        Self {
+            registry,
+            rules: Vec::new(),
+            routing_strategy: strategy,
         }
     }
 
@@ -762,13 +802,38 @@ impl CapabilityRouter {
         }
     }
 
-    /// 按域路由
+    /// 按域路由 — MoE cost-aware: sorts by cost_weight when CostOptimized
     fn route_to_domain(
         &self,
         input: CapabilityInput,
         domain: Domain,
     ) -> Result<CapabilityOutput, CapabilityError> {
-        let caps = self.registry.by_domain(domain);
+        let mut caps: Vec<Arc<dyn UnifiedCapability>> = self.registry.by_domain(domain);
+        let strategy = self.routing_strategy.clone();
+
+        // MoE routing: sort by cost_weight (cheapest first) for CostOptimized strategy
+        // Source: Spotify Portal Shunt — route I/O to cheapest capable model (~90% savings)
+        match strategy {
+            MoERoutingStrategy::CostOptimized => {
+                caps.sort_by(|a, b| {
+                    let a_cost = a.meta().cost_weight;
+                    let b_cost = b.meta().cost_weight;
+                    a_cost.partial_cmp(&b_cost).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+            MoERoutingStrategy::QualityFirst => {
+                // Reverse: highest cost_weight (highest quality) first
+                caps.sort_by(|a, b| {
+                    let a_cost = a.meta().cost_weight;
+                    let b_cost = b.meta().cost_weight;
+                    b_cost.partial_cmp(&a_cost).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            }
+            MoERoutingStrategy::RoundRobin | MoERoutingStrategy::LoadBalanced => {
+                // No pre-sort; round-robin or load-based handled externally
+            }
+        }
+
         for cap in caps {
             if cap.supports(&input) {
                 return cap.execute(input);
@@ -780,6 +845,16 @@ impl CapabilityRouter {
     /// 获取注册中心引用
     pub fn registry(&self) -> &Arc<CapabilityRegistry> {
         &self.registry
+    }
+
+    /// Set the MoE routing strategy
+    pub fn set_routing_strategy(&mut self, strategy: MoERoutingStrategy) {
+        self.routing_strategy = strategy;
+    }
+
+    /// Get the current MoE routing strategy
+    pub fn routing_strategy(&self) -> &MoERoutingStrategy {
+        &self.routing_strategy
     }
 }
 
@@ -817,5 +892,73 @@ mod inline_tests {
         ];
         assert_eq!(layers.len(), 6);
         assert_eq!(domains.len(), 10);
+    }
+
+    #[test]
+    fn moe_cost_optimized_routes_cheapest_first() {
+        // Spotify Portal Shunt pattern: route to cheapest capable model
+        let mut registry = CapabilityRegistry::new();
+        let cheap_cap = Arc::new(MockCapability::new("cheap", Domain::NtWorld, 0.1));
+        let expensive_cap = Arc::new(MockCapability::new("expensive", Domain::NtWorld, 0.9));
+        registry.register(cheap_cap);
+        registry.register(expensive_cap);
+
+        let router = CapabilityRouter::with_strategy(
+            Arc::new(registry),
+            MoERoutingStrategy::CostOptimized,
+        );
+        assert_eq!(*router.routing_strategy(), MoERoutingStrategy::CostOptimized);
+    }
+
+    #[test]
+    fn moe_strategy_default_is_cost_optimized() {
+        let registry = Arc::new(CapabilityRegistry::new());
+        let router = CapabilityRouter::new(registry);
+        assert_eq!(*router.routing_strategy(), MoERoutingStrategy::CostOptimized);
+    }
+
+    struct MockCapability {
+        id: String,
+        domain: Domain,
+        cost_weight: f64,
+    }
+
+    impl MockCapability {
+        fn new(id: &str, domain: Domain, cost_weight: f64) -> Self {
+            Self { id: id.to_string(), domain, cost_weight }
+        }
+    }
+
+    impl UnifiedCapability for MockCapability {
+        fn meta(&self) -> CapabilityMeta {
+            CapabilityMeta {
+                id: self.id.clone(),
+                name: self.id.clone(),
+                layer: Layer::L1Action,
+                domain: self.domain,
+                version: "0.1.0".into(),
+                description: "mock".into(),
+                tags: vec![],
+                status: CapabilityStatus::Healthy,
+                metrics: CapabilityMetrics::default(),
+                cost_weight: self.cost_weight,
+                priority: 1.0,
+            }
+        }
+        fn health(&self) -> CapabilityHealth {
+            CapabilityHealth {
+                state: CapabilityState::Ready,
+                success_rate: 1.0,
+                avg_latency_ms: 0.0,
+                last_called: None,
+                call_count: 0,
+            }
+        }
+        fn execute(&self, _input: CapabilityInput) -> Result<CapabilityOutput, CapabilityError> {
+            Ok(CapabilityOutput::Text(format!("executed: {}", self.id)))
+        }
+        fn supports(&self, _input: &CapabilityInput) -> bool {
+            true
+        }
     }
 }

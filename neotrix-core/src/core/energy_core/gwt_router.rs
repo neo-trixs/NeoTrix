@@ -15,6 +15,8 @@ pub struct GWTRouterImpl {
     broadcast_history: Arc<RwLock<Vec<Wisdom>>>,
     /// 注意力权重
     attention_weights: Arc<RwLock<HashMap<Layer, f64>>>,
+    /// Cost-aware thinking budget (tokens). Default 4096.
+    thinking_budget: u32,
 }
 
 impl GWTRouterImpl {
@@ -31,6 +33,7 @@ impl GWTRouterImpl {
             subscribers: Arc::new(RwLock::new(HashMap::new())),
             broadcast_history: Arc::new(RwLock::new(Vec::new())),
             attention_weights: Arc::new(RwLock::new(attention_weights)),
+            thinking_budget: 4096,
         }
     }
     
@@ -123,6 +126,21 @@ impl GWTRouterImpl {
     pub async fn clear_broadcast_history(&mut self) {
         let mut history = self.broadcast_history.write().await;
         history.clear();
+    }
+
+    /// Check if `tokens_used` is within the thinking budget.
+    pub fn within_budget(&self, tokens_used: u32) -> bool {
+        tokens_used < self.thinking_budget
+    }
+
+    /// Set the thinking budget (tokens).
+    pub fn set_thinking_budget(&mut self, budget: u32) {
+        self.thinking_budget = budget;
+    }
+
+    /// Get the current thinking budget.
+    pub fn thinking_budget(&self) -> u32 {
+        self.thinking_budget
     }
     
     /// 获取共振强度（多个层级的注意力权重乘积）

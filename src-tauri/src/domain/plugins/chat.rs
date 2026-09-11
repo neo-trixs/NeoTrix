@@ -9,6 +9,7 @@ use neotrix::core::nt_core_consciousness_core::{
 };
 use neotrix::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 use neotrix::l1_action::nt_io::nt_io_provider::types::{LlmRequest, LlmResponse, LlmError, Usage, FinishReason, ChatMessage};
+use tokio_stream::StreamExt;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static GATEWAY: OnceLock<Mutex<Option<Arc<GatewayV2>>>> = OnceLock::new();
@@ -208,6 +209,81 @@ impl ChatPlugin {
 
         Ok(combined)
     }
+
+    /// 流式 LLM 调用：通过 GatewayV2 stream_complete_with_selection 获取
+    /// mpsc::Receiver，逐 token emit neocodex_stream_token 事件，返回完整内容。
+    fn call_llm_stream(&self, content: &str) -> Result<String, DomainError> {
+        if let Some(app) = APP_HANDLE.get() {
+            let _ = app.emit("neocodex_stream_start", "");
+        }
+
+        let gateway = get_gateway();
+
+        let request = LlmRequest {
+            model: String::new(),
+            messages: vec![
+                ChatMessage {
+                    role: "system".to_string(),
+                    content: "你是一个有帮助的AI助手。请用中文回答。".to_string(),
+                },
+                ChatMessage {
+                    role: "user".to_string(),
+                    content: content.to_string(),
+                },
+            ],
+            temperature: Some(0.7),
+            max_tokens: Some(2048),
+            stream: true,
+            tools: None,
+        };
+
+        let rt = tokio::runtime::Handle::current();
+        let mut rx = rt.block_on(async {
+            gateway.stream_complete_with_selection(&request).await
+        }).map_err(|e| DomainError {
+            code: "LLM_STREAM_ERROR".into(),
+            message: format!("流式请求失败: {}", e),
+            recoverable: true,
+        })?;
+
+        let mut full_content = String::new();
+
+        // 逐 token 接收并 emit 事件
+        rt.block_on(async {
+            while let Some(result) = rx.recv().await {
+                match result {
+                    Ok(response) => {
+                        let token = response.content.clone();
+                        full_content.push_str(&token);
+                        if let Some(app) = APP_HANDLE.get() {
+                            let _ = app.emit("neocodex_stream_token", &token);
+                        }
+                    }
+                    Err(e) => {
+                        if let Some(app) = APP_HANDLE.get() {
+                            let _ = app.emit("neocodex_stream_error", e.to_string());
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+
+        // 流结束
+        if let Some(app) = APP_HANDLE.get() {
+            let _ = app.emit("neocodex_stream_end", &full_content);
+            let _ = app.emit("neocodex_stream_done", serde_json::json!({
+                "cancelled": false,
+                "elapsed_ms": 0,
+                "content": full_content,
+                "tasks_decomposed": 0,
+                "internal_executed": 0,
+                "external_gaps": 0,
+            }));
+        }
+
+        Ok(full_content)
+    }
 }
 
 impl DomainPlugin for ChatPlugin {
@@ -220,6 +296,7 @@ impl DomainPlugin for ChatPlugin {
             ActionSpec { name: "stop_stream".into(), description: "停止流式生成".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "get_session_messages".into(), description: "获取会话消息".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "send".into(), description: "发送消息".into(), params: vec![], returns: "Value".into() },
+            ActionSpec { name: "send_stream".into(), description: "发送消息（真实流式）".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "stop".into(), description: "停止生成".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "history".into(), description: "获取历史".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "compact".into(), description: "压缩上下文".into(), params: vec![], returns: "Value".into() },
@@ -230,6 +307,7 @@ impl DomainPlugin for ChatPlugin {
             ActionSpec { name: "side_chat_send".into(), description: "发送副对话消息".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "edit_message".into(), description: "编辑消息".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "delete_message".into(), description: "删除消息".into(), params: vec![], returns: "Value".into() },
+            ActionSpec { name: "provider_health".into(), description: "Provider 健康检查".into(), params: vec![], returns: "Value".into() },
         ]
     }
 
@@ -265,6 +343,37 @@ impl DomainPlugin for ChatPlugin {
                 self.add_message(session_id, assistant_msg.clone())?;
                 
                 // 返回给前端（字符串格式，适配 Promise<string>）
+                Ok(serde_json::json!(assistant_content))
+            }
+            "send_stream" => {
+                let content = args.get("content")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "缺少 content 参数".into(), recoverable: true })?;
+                let session_id = args.get("session_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default");
+
+                // 保存用户消息
+                let user_msg = serde_json::json!({
+                    "id": format!("msg-{}", chrono::Utc::now().timestamp_millis()),
+                    "content": content,
+                    "role": "user",
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                });
+                self.add_message(session_id, user_msg)?;
+
+                // 流式调用 LLM
+                let assistant_content = self.call_llm_stream(content)?;
+
+                // 保存助手消息
+                let assistant_msg = serde_json::json!({
+                    "id": format!("msg-{}", chrono::Utc::now().timestamp_millis()),
+                    "content": assistant_content,
+                    "role": "assistant",
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                });
+                self.add_message(session_id, assistant_msg)?;
+
                 Ok(serde_json::json!(assistant_content))
             }
             "stop_stream" | "stop" => {
@@ -311,6 +420,25 @@ impl DomainPlugin for ChatPlugin {
             }
             "regenerate" => {
                 Ok(serde_json::json!({ "ok": true }))
+            }
+            "provider_health" => {
+                let gw = get_gateway();
+                let status_list = gw.provider_status();
+                let mut providers = Vec::with_capacity(status_list.len());
+                for status in &status_list {
+                    let name = status.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                    let healthy = status.get("available").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let score = status.get("composite_score")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .unwrap_or(0.0);
+                    providers.push(serde_json::json!({
+                        "name": name,
+                        "healthy": healthy,
+                        "score": score,
+                    }));
+                }
+                Ok(serde_json::json!({ "providers": providers }))
             }
             "side_chat_get" | "side_chat_send" => {
                 Ok(serde_json::json!({ "ok": true, "messages": [] }))
