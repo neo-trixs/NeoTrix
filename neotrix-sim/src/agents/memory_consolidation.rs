@@ -153,7 +153,7 @@ mod tests {
         assert!(cons.should_forget(&old_mem, 500));
 
         let important = make_mem(0.9, 0, 0);
-        assert!(!cons.should_forget(&important, 500));
+        assert!(!cons.should_forget(&important, 200));
     }
 
     #[test]

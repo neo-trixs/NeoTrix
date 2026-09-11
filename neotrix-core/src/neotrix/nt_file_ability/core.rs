@@ -292,18 +292,30 @@ impl FileAbility {
     }
 
     /// XLSX 工作表名列表 (按文件内顺序)
+    #[deprecated(
+        since = "2026.9",
+        note = "统一入口已收敛到 xlsx_parser::parse_xlsx / parse_xlsx_full；此方法仅供内部测试，外部请勿调用"
+    )]
     pub fn xlsx_sheet_names(&self) -> Result<Vec<String>> {
         let doc = self.xlsx_doc()?;
         Ok(doc.worksheets.iter().map(|ws| ws.name.clone()).collect())
     }
 
     /// XLSX 工作表数量
+    #[deprecated(
+        since = "2026.9",
+        note = "统一入口已收敛到 xlsx_parser::parse_xlsx / parse_xlsx_full；此方法仅供内部测试，外部请勿调用"
+    )]
     pub fn xlsx_sheet_count(&self) -> Result<usize> {
         let doc = self.xlsx_doc()?;
         Ok(doc.worksheets.len())
     }
 
     /// 读取第 index 个工作表 (1-based, 与 Excel 一致) 的结构化数据
+    #[deprecated(
+        since = "2026.9",
+        note = "统一入口已收敛到 xlsx_parser::parse_xlsx / parse_xlsx_full；此方法仅供内部测试，外部请勿调用"
+    )]
     pub fn xlsx_sheet(&self, index: usize) -> Result<SheetData> {
         let doc = self.xlsx_doc()?;
         if index == 0 {
@@ -375,6 +387,10 @@ impl FileAbility {
     }
 
     /// 按名称读取工作表 (查找失败返回 SheetIndexOutOfRange)
+    #[deprecated(
+        since = "2026.9",
+        note = "统一入口已收敛到 xlsx_parser::parse_xlsx / parse_xlsx_full；此方法仅供内部测试，外部请勿调用"
+    )]
     pub fn xlsx_sheet_by_name(&self, name: &str) -> Result<SheetData> {
         let names = self.xlsx_sheet_names()?;
         let pos = names.iter().position(|n| n == name).ok_or_else(|| {

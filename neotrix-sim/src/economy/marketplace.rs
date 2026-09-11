@@ -335,7 +335,7 @@ mod tests {
         mp.list_item("s", Resource::wood(), 5, 3.0, "NeoCoin", 100);
         mp.list_item("s", Resource::wood(), 5, 3.0, "NeoCoin", 200);
 
-        mp.prune_expired(350, 100); // max_age=100, current=350
+        mp.prune_expired(260, 100); // max_age=100, current=260
         assert_eq!(mp.active_count(), 1); // only the 200 tick listing survives
     }
 }

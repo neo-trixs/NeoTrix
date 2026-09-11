@@ -1,12 +1,18 @@
-//! 统一 XLSX 解析入口 (L2 表格语义层)
+//! 统一 XLSX 解析入口 (L2 表格语义层) — **唯一对外入口**
 //!
-//! 整合 3 套 XLSX 解析实现，提供统一接口:
-//! - [`parse_xlsx`]: 通用解析 (自动选择轻/重型)
-//! - [`parse_xlsx_fast`]: 快速解析 (纯文本)
-//! - [`parse_xlsx_full`]: 完整解析 (公式/日期)
+//! 本模块是 XLSX 解析的唯一对外入口。所有外部调用者（CLI、Capability、merge 等）
+//! 应通过本模块提供的函数访问 XLSX 数据，**禁止直接调用** `tables::read_xlsx_sheets_all`
+//! 或 `xlsx_fast::read_xlsx_fast`（除模块内部路由外）。
+//!
+//! 对外接口:
+//! - [`parse_xlsx`]: 通用解析 (自动选择轻/重型，默认)
+//! - [`parse_xlsx_fast`]: 快速解析 (纯文本，单 sheet)
+//! - [`parse_xlsx_full`]: 完整解析 (公式/日期/多 sheet)
+//! - [`parse_xlsx_with_config`]: 带配置解析 (max_rows/max_cols 裁剪)
+//! - [`extract_xlsx_text`]: 文本提取 (用于 FileParser 兼容)
 //!
 //! 设计原则:
-//! - 单一入口，隐藏内部实现差异
+//! - **单一入口**: `FileAbility` 的 `xlsx_sheet*` 方法已标记 `#[deprecated]`，禁止外部调用
 //! - 按场景自动选择最优解析器
 //! - 统一返回 `TableData` 类型
 //!

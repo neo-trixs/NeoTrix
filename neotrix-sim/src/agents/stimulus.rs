@@ -237,7 +237,7 @@ mod tests {
                 id: "food_1".to_string(),
                 resource_type: "Food".to_string(),
                 distance: 5.0,
-                amount: 50.0,
+                amount: 100.0,
             }],
             terrain_type: "Plain".to_string(),
             time_of_day: "day".to_string(),

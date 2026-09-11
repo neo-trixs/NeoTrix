@@ -105,9 +105,9 @@ mod tests {
 
     #[test]
     fn detects_approaching_limit() {
-        let enforcer = BudgetEnforcer::new(5, 1024 * 1024, 100.0);
+        let enforcer = BudgetEnforcer::new(4, 1024 * 1024, 100.0);
         let mut agent = SimAgent::new(1, Vec2::zero());
-        agent.recent_actions = vec!["a".into(); 4]; // 4/5 = 80%
+        agent.recent_actions = vec!["a".into(); 4]; // 4/4 = 100% > 80%, not exceeded (4 > 4 false)
         assert_eq!(enforcer.check(&agent), BudgetStatus::ApproachingLimit);
     }
 

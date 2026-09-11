@@ -91,14 +91,9 @@ impl CommunicationChannel {
         let channel_ids = self.channels.get(channel)
             .cloned()
             .unwrap_or_default();
-        let inbox_ids = self.agent_inbox.get(agent_id)
-            .cloned()
-            .unwrap_or_default();
 
         self.message_queue.iter()
-            .filter(|m| {
-                channel_ids.contains(&m.id) && (m.sender == agent_id || inbox_ids.contains(&m.id))
-            })
+            .filter(|m| channel_ids.contains(&m.id))
             .collect()
     }
 
