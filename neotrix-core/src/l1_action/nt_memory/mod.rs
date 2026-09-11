@@ -14,3 +14,6 @@ pub mod nt_memory_kb;
 pub mod nt_memory_openknowledge;
 pub mod selective_memory;
 pub mod addressable_store;
+
+// Context-as-Filesystem — 基于 OpenViking 模式
+pub mod context_fs;

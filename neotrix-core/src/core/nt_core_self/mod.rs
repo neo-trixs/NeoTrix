@@ -4,6 +4,7 @@ pub mod attention_head;
 pub mod behavior_fsm;
 pub mod context_window;
 pub mod cuda_agent;
+pub mod io_contract;
 pub mod dynamic_params;
 pub mod emotion_state;
 pub mod evolution_analysis;

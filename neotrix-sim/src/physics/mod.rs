@@ -171,7 +171,7 @@ impl PhysicsState {
         self.velocity.y *= 0.98;
 
         // Fall detection (debounced)
-        let tilt = (self.roll.abs() + self.pitch.abs()) as f32;
+        let tilt = self.roll.abs() + self.pitch.abs();
         if tilt > 0.5 {
             self.fall_timer += dt;
             if self.fall_timer > 0.2 {

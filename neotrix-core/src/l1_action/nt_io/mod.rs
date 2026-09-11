@@ -58,6 +58,12 @@ pub mod nt_io_messaging;
 pub mod nt_io_context_mgmt;
 pub mod nt_l1_error;
 
+// 三拍子 Hook 系统 — 基于 Grok Build 模式
+pub mod hooks;
+
+// ACP (Agent Client Protocol) — IDE 集成协议
+pub mod acp;
+
 // L3 vendor skill modules (read-only capability branches)
 pub mod nt_io_ai_image_prompts;
 pub mod nt_io_cozyclay;
@@ -93,6 +99,9 @@ pub mod reference_generation; // 基于参考的生成 (原 reference_video_mode
 
 // 多模型路由
 pub mod model_routing;
+
+// Cache-Aware Compaction — 基于缓存命中率的智能压缩
+pub mod cache_compaction;
 
 // 向后兼容别名
 pub use platform_gateway::PlatformAdapter;

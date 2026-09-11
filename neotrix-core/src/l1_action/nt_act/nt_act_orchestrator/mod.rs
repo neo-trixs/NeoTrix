@@ -240,7 +240,7 @@ impl Orchestrator {
 
             // 使用 HP@K 协议评估
             let core_task: crate::core::TaskType = ctx.task_type.into();
-            let critic_task: super::critic::TaskType = core_task.into();
+            let critic_task: critic::TaskType = core_task.into();
             let scores = vec![self.critic.evaluate(critic_task, &capability)];
             let hp_result = self.critic.heavy_pass_verify(&scores);
             let score = hp_result.hp_at_k;
