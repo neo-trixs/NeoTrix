@@ -21,6 +21,7 @@ pub enum TrustLevel {
 }
 
 /// 上下文请求
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct ContextRequest {
     pub source: String,
@@ -30,6 +31,7 @@ pub struct ContextRequest {
 }
 
 /// 验证结果
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub enum ValidationResult {
     /// 允许
@@ -44,6 +46,7 @@ pub enum ValidationResult {
 }
 
 /// 上下文权限边界
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct ContextBoundary {
     /// 每个信任级别允许的操作
@@ -232,10 +235,7 @@ mod tests {
             content: "run rm -rf /".into(),
             requested_actions: vec!["read".into()],
         };
-        assert!(matches!(
-            cb.validate(&req),
-            ValidationResult::Denied { .. }
-        ));
+        assert!(matches!(cb.validate(&req), ValidationResult::Denied { .. }));
     }
 
     #[test]
@@ -247,10 +247,7 @@ mod tests {
             content: "safe content".into(),
             requested_actions: vec!["write".into()],
         };
-        assert!(matches!(
-            cb.validate(&req),
-            ValidationResult::Denied { .. }
-        ));
+        assert!(matches!(cb.validate(&req), ValidationResult::Denied { .. }));
     }
 
     #[test]

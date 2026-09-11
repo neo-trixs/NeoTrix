@@ -19,7 +19,7 @@ pub struct HarnessSnapshot {
 #[derive(Debug, Clone)]
 pub struct RefinementUpdate {
     pub update_id: String,
-    pub target: String,   // 要更新的配置/提示词/规则
+    pub target: String, // 要更新的配置/提示词/规则
     pub before: String,
     pub after: String,
     pub evidence: String, // 支持更新的证据
@@ -27,7 +27,7 @@ pub struct RefinementUpdate {
 }
 
 /// 精炼结果
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RefinementResult {
     pub snapshot_id: String,
     pub updates_applied: Vec<RefinementUpdate>,
@@ -36,7 +36,7 @@ pub struct RefinementResult {
 }
 
 /// Continual Harness 精炼器
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContinualRefiner {
     snapshots: Vec<HarnessSnapshot>,
     updates: Vec<RefinementUpdate>,
@@ -88,10 +88,7 @@ impl ContinualRefiner {
             } else {
                 rejected.push((
                     update.clone(),
-                    format!(
-                        "置信度 {:.2} < {:.2}",
-                        update.confidence, min_confidence
-                    ),
+                    format!("置信度 {:.2} < {:.2}", update.confidence, min_confidence),
                 ));
             }
         }

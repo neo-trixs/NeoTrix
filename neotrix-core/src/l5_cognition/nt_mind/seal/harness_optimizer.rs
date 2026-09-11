@@ -49,7 +49,7 @@ pub struct CompactionResult {
 
 /// Harness 优化器
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct HarnessOptimizer {
     /// 融合阈值（连续相同工具调用数量 >= 阈值时融合）
     fusion_threshold: usize,
