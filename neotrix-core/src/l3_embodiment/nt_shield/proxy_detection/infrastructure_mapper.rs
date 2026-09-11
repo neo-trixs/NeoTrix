@@ -9,7 +9,7 @@
 //! Detects coordinated proxy networks by finding infrastructure
 //! cycles that indicate controlled account farms.
 
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -291,7 +291,7 @@ impl InfrastructureMapper {
             // Find domains used by group accounts
             let mut group_domains: HashSet<String> = HashSet::new();
             for (_domain, ips) in domain_to_ips.iter() {
-                if !group_ips.is_intersection(ips) {
+                if !ips.intersection(&group_ips).next().is_some() {
                     continue;
                 }
                 // At least one IP in this domain's set overlaps with group IPs

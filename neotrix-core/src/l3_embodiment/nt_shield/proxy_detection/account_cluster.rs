@@ -9,7 +9,7 @@
 //! Uses a sliding-window approach with Union-Find for efficient cluster
 //! detection across large account populations.
 
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -98,9 +98,20 @@ impl UnionFind {
         self.parent.insert(old_root, new_root);
     }
 
+    fn find_read_only(&self, x: &str) -> String {
+        let mut current = x.to_string();
+        loop {
+            match self.parent.get(&current) {
+                Some(parent) if parent == &current => return current,
+                Some(parent) => current = parent.clone(),
+                None => return x.to_string(),
+            }
+        }
+    }
+
     fn get_cluster_members(&self, root: &str) -> Vec<String> {
         self.parent.iter()
-            .filter(|(_, v)| self.find(v) == root)
+            .filter(|(_, v)| self.find_read_only(v) == root)
             .map(|(k, _)| k.clone())
             .collect()
     }
@@ -108,7 +119,7 @@ impl UnionFind {
     fn clusters(&self) -> HashMap<String, Vec<String>> {
         let mut result: HashMap<String, Vec<String>> = HashMap::new();
         for key in self.parent.keys() {
-            let root = self.find(key);
+            let root = self.find_read_only(key);
             result.entry(root).or_default().push(key.clone());
         }
         result
@@ -289,7 +300,7 @@ impl AccountClusterEngine {
         }
 
         // ── Union pass 1: IP sharing ─────────────────────────────────────
-        for (ip, accounts) in ip_index.iter() {
+        for (_ip, accounts) in ip_index.iter() {
             if accounts.len() < 2 {
                 continue;
             }

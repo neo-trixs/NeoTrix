@@ -192,7 +192,7 @@ impl IpFingerprintEngine {
 
     /// Fingerprint a single IP address.
     async fn fingerprint_single(&self, ip_str: &str) -> IpFingerprint {
-        let ip = IpAddr::from_str(ip_str).ok();
+        let _ip = IpAddr::from_str(ip_str).ok();
 
         let mut fp = IpFingerprint {
             ip: ip_str.to_string(),
