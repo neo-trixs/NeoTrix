@@ -231,9 +231,9 @@ mod tests {
     use office_oxide::{create, DocumentFormat};
 
     // 跨子模块私有项访问 (拆分后保留原单文件测试语义)
-    use super::grounding::{compact_numeric_text, is_critical_numeric_token, normalize_numeric_token};
-    use super::merge::derive_source_name;
-    use super::tables::data_to_text;
+    use super::visual::grounding::{compact_numeric_text, is_critical_numeric_token, normalize_numeric_token};
+    use super::merge::merge::derive_source_name;
+    use super::excel::tables::data_to_text;
 
     fn office_sample() -> PathBuf {
         let dir = std::env::temp_dir().join("nt_file_ability_test");

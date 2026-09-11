@@ -60,9 +60,9 @@
 
 use std::path::Path;
 
-use super::tables;
-use super::types::{FileAbilityError, Result, TableData};
-use super::xlsx_fast;
+use super::super::excel::tables;
+use super::super::types::{FileAbilityError, Result, TableData};
+use super::super::excel::xlsx_fast;
 
 /// 解析模式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

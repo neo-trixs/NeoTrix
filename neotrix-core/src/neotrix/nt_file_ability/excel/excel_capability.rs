@@ -10,11 +10,12 @@
 
 use nt_core_capability_tree::{CapabilityNode, Domain, NodeLayer};
 
-use super::config_parser::ConfigFields;
-use super::path_metadata::PathMetadata;
-use super::template_engine::{ColumnMap, TemplateType};
-use super::types::TableData;
-use super::{config_parser, path_metadata, tables, template_engine, xlsx_parser};
+use super::super::config_parser::ConfigFields;
+use super::super::path_metadata::PathMetadata;
+use super::super::template_engine::{ColumnMap, TemplateType};
+use super::super::types::TableData;
+use super::super::{config_parser, path_metadata, template_engine};
+use super::super::excel::{tables, xlsx_parser};
 
 /// Excel 能力节点定义
 pub struct ExcelCapability;

@@ -15,8 +15,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::tables::{read_csv, read_xlsx_sheets_all, write_csv, write_xlsx_table};
-use super::types::{FileAbilityError, Result, TableData};
+use super::super::excel::tables::{read_csv, read_xlsx_sheets_all, write_csv, write_xlsx_table};
+use super::super::types::{FileAbilityError, Result, TableData};
 
 /// 单重/尺寸等列的补单位规则
 #[derive(Debug, Clone, Copy)]

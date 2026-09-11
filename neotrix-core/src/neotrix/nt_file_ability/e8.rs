@@ -1,8 +1,10 @@
 //! E8 状态转移 (Ext-6) — 每类操作驱动一次 E8 状态转移。
-
-use crate::core::nt_core_hex::ReasoningHexagram;
+//!
+//! 通过 `E8StateTransition` trait 抽象 NT-CORE 的 ReasoningHexagram，
+//! 实现 L1 行动层 → L5 认知层的依赖倒置。
 
 use super::core::FileAbility;
+use super::types::E8StateTransition;
 
 /// 文件能力操作 — 每类操作驱动一次 E8 状态转移
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,20 +25,20 @@ pub enum FileOperation {
 
 impl FileOperation {
     /// 该操作的目标 E8 状态 (6-bit hexagram)
-    pub fn target_state(&self) -> ReasoningHexagram {
+    pub fn target_state_bits(&self) -> u8 {
         match self {
             // 探测: 具体+分析+专注
-            Self::Detect => ReasoningHexagram::new(0b001001),
+            Self::Detect => 0b001001,
             // 提取: 具体+分析+深度
-            Self::Extract => ReasoningHexagram::new(0b001100),
+            Self::Extract => 0b001100,
             // 转换: 具体+生成+协作 (format transformation)
-            Self::Transform => ReasoningHexagram::new(0b001011),
+            Self::Transform => 0b001011,
             // 编辑: 具体+分析+协作
-            Self::Edit => ReasoningHexagram::new(0b001110),
+            Self::Edit => 0b001110,
             // 嵌入: 抽象+生成+深度 (semantic encoding)
-            Self::Embed => ReasoningHexagram::new(0b111100),
+            Self::Embed => 0b111100,
             // 审计: 抽象+分析+深度
-            Self::Audit => ReasoningHexagram::new(0b101100),
+            Self::Audit => 0b101100,
         }
     }
 
@@ -53,21 +55,17 @@ impl FileOperation {
     }
 }
 
-impl FileAbility {
-    /// 当前 E8 推理状态
-    pub fn e8_state(&self) -> ReasoningHexagram {
-        self.e8_state
+impl E8StateTransition for FileAbility {
+    fn current_bits(&self) -> u8 {
+        self.e8_state.0
     }
 
-    /// 执行一次状态转移: 将当前状态向目标状态单步推进 (flip 最近的一个差异轴)
-    ///
-    /// 返回转移后的新状态。若已到达目标, 返回原状态 (路径长度为 0)。
-    pub fn transition(&mut self, op: FileOperation) -> ReasoningHexagram {
-        let target = op.target_state();
+    fn transition_to(&mut self, target_bits: u8) {
+        use crate::core::nt_core_hex::ReasoningHexagram;
+        let target = ReasoningHexagram::new(target_bits);
         let current = self.e8_state;
         let mut best = current;
         let mut best_dist = current.hamming_dist(&target);
-        // 从 6 个邻居里选最接近目标的单步 (贪心下降)
         for n in current.neighbors() {
             let d = n.hamming_dist(&target);
             if d < best_dist {
@@ -76,16 +74,45 @@ impl FileAbility {
             }
         }
         self.e8_state = best;
-        best
     }
 
-    /// 到目标状态的完整转移路径 (E8 ReasoningPath)
-    pub fn e8_path_to(&self, target: ReasoningHexagram) -> Vec<ReasoningHexagram> {
-        crate::core::nt_core_hex::ReasoningPath::shortest(self.e8_state, target).states
+    fn path_to(&self, target_bits: u8) -> Vec<u8> {
+        use crate::core::nt_core_hex::{ReasoningHexagram, ReasoningPath};
+        let target = ReasoningHexagram::new(target_bits);
+        ReasoningPath::shortest(self.e8_state, target)
+            .states
+            .iter()
+            .map(|s| s.0)
+            .collect()
+    }
+
+    fn mode_name(&self) -> &'static str {
+        self.e8_state.mode_name()
+    }
+}
+
+impl FileAbility {
+    /// 当前 E8 推理状态的 6-bit 值 (通过 E8StateTransition trait)
+    pub fn e8_state_bits(&self) -> u8 {
+        self.e8_state.0
+    }
+
+    /// 执行一次状态转移: 将当前状态向目标状态单步推进 (flip 最近的一个差异轴)
+    ///
+    /// 返回转移后的 6-bit 状态值。若已到达目标, 返回原状态 (路径长度为 0)。
+    pub fn transition(&mut self, op: FileOperation) -> u8 {
+        let target_bits = op.target_state_bits();
+        self.transition_to(target_bits);
+        self.e8_state.0
+    }
+
+    /// 到目标状态的完整转移路径 (返回路径上各状态的 6-bit 值)
+    pub fn e8_path_to(&self, target_bits: u8) -> Vec<u8> {
+        self.path_to(target_bits)
     }
 
     /// E8 状态名称 (人类可读)
     pub fn e8_mode_name(&self) -> &'static str {
-        self.e8_state.mode_name()
+        <Self as E8StateTransition>::mode_name(self)
     }
 }

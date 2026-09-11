@@ -1,4 +1,9 @@
 //! 共享类型层 — 错误、文件大类、内容快照、表格/工作表单据、编码与结构化数据。
+//!
+//! ## 跨层解耦 trait
+//! 本模块定义 3 个 trait 抽象 NT-CORE 能力 (E8/GWT/VSA)，使 FileAbility 层
+//! 不直接依赖 L5 认知层的具体实现。NT-CORE 层实现这些 trait，FileAbility
+//! 通过 trait 对象调用，实现依赖倒置 (DIP)。
 
 use std::path::PathBuf;
 
@@ -6,6 +11,41 @@ use office_oxide::DocumentFormat;
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_traits::SpecialistType;
+
+// ─── NT-CORE 能力抽象 trait (L1→L5 解耦) ────────────────────────────────
+
+/// E8 状态转移 trait — 抽象 NT-CORE ReasoningHexagram 的状态导航能力。
+/// 由 NT-CORE 层对 ReasoningHexagram 实现，FileAbility 层通过此 trait 调用。
+pub trait E8StateTransition: Send + Sync {
+    /// 获取当前 E8 状态的 6-bit 值 (0-63)
+    fn current_bits(&self) -> u8;
+    /// 执行一次状态转移: 将当前状态向目标状态单步推进 (flip 最近差异轴)
+    fn transition_to(&mut self, target_bits: u8);
+    /// 到目标状态的完整转移路径 (返回路径上各状态的 6-bit 值)
+    fn path_to(&self, target_bits: u8) -> Vec<u8>;
+    /// 人类可读的当前推理模式名
+    fn mode_name(&self) -> &'static str;
+}
+
+/// GWT 注意力路由 trait — 抽象 NT-CORE 的专家谐振路由能力。
+/// 由 NT-CORE 层对 SpecialistType 映射实现，FileAbility 层通过此 trait 调用。
+pub trait GwtAttentionRouter: Send + Sync {
+    /// 获取 14 个专家的默认推理态 (6-bit 值)
+    fn default_specialist_bits(&self) -> Vec<(SpecialistType, u8)>;
+    /// 计算两个推理态之间的谐振强度 (0-6)
+    fn resonance_strength(&self, a_bits: u8, b_bits: u8) -> u32;
+}
+
+/// VSA 嵌入 trait — 抽象 NT-CORE 的超向量嵌入能力。
+/// 由 NT-CORE 层对 VSAEngine 实现，FileAbility 层通过此 trait 调用。
+pub trait VsaEmbedding: Send + Sync {
+    /// 嵌入 token 序列到高维超向量
+    fn embed_tokens(&self, tokens: &[&str]) -> Vec<f64>;
+    /// 计算两个超向量的余弦相似度
+    fn similarity(&self, a: &[f64], b: &[f64]) -> f64;
+    /// 向量维度
+    fn dimensions(&self) -> usize;
+}
 
 /// 统一文件能力错误
 #[derive(Debug, thiserror::Error)]

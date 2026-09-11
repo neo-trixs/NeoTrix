@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::grounding::{ground_missing_tokens, GroundingReport};
-use super::types::FileKind;
+use super::super::types::FileKind;
 
 /// 视觉理解 prompt 名称
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
