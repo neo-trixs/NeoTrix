@@ -7,7 +7,7 @@
 //! 统一枚举: 移除 SuperResolutionMode，使用 image_super_resolution::SuperResolutionModel
 
 use serde::{Serialize, Deserialize};
-use crate::neotrix::nt_file_ability::image_super_resolution::{SuperResolutionModel, ImageSuperResolver, SuperResolutionConfig};
+use crate::neotrix::nt_file_ability::{SuperResolutionModel, ImageSuperResolver, SuperResolutionConfig};
 
 // ============================================================================
 // 后处理定义

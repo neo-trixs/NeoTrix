@@ -619,9 +619,10 @@ pub fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<H
         // Fallback: LIKE only when FTS5 is unavailable
         let mut stmt = conn.prepare("SELECT id FROM nodes WHERE LOWER(title) LIKE ?1")?;
         let pattern = format!("%{}%", query_lower);
-        stmt.query_map(params![pattern], |row| row.get::<_, String>(0))?
+        let results: Vec<String> = stmt.query_map(params![pattern], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
-            .collect()
+            .collect();
+        results
     };
 
     if seed_ids.is_empty() {

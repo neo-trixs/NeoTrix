@@ -28,18 +28,38 @@ pub fn specialist_index(t: SpecialistType) -> usize {
     }
 }
 
+/// PDF 增强 salience 权重
+pub fn pdf_enhance_salience(task_summary: &str) -> f64 {
+    let lower = task_summary.to_lowercase();
+
+    // 高 salience 关键词
+    if lower.contains("pdf") && (lower.contains("增强") || lower.contains("enhance") || lower.contains("清晰")) {
+        0.9
+    } else if lower.contains("pdf") && lower.contains("图标") {
+        0.85
+    } else if lower.contains("pdf") && (lower.contains("超分") || lower.contains("super")) {
+        0.8
+    } else if lower.contains("pdf") {
+        0.5
+    } else {
+        0.0
+    }
+}
+
 /// GWT 谐振路由: 用当前 E8 状态与 14 个专家默认态计算谐振强度,
 /// 选出 attention 应投给的专家 (winner-take-most by resonance_strength)。
 ///
 /// 返回 (专家, 谐振强度 0..6, 该专家默认态)。
-pub fn route_attention(e8_state: ReasoningHexagram) -> (SpecialistType, u32, ReasoningHexagram) {
+pub fn route_attention(e8_state: ReasoningHexagram, task_summary: Option<&str>) -> (SpecialistType, u32, ReasoningHexagram) {
     let states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+    let salience = task_summary.map(pdf_enhance_salience).unwrap_or(0.0);
     let mut best: Option<(SpecialistType, u32, ReasoningHexagram)> = None;
     for (idx, st) in states.iter().enumerate() {
-        let strength = e8_state.resonance_strength(st);
+        let base = e8_state.resonance_strength(st);
+        let boosted = ((base as f64) * (1.0 + salience)) as u32;
         let t = specialist_index_inv(idx);
-        if best.as_ref().is_none_or(|(_, s, _)| strength > *s) {
-            best = Some((t, strength, *st));
+        if best.as_ref().is_none_or(|(_, s, _)| boosted > *s) {
+            best = Some((t, boosted, *st));
         }
     }
     best.unwrap_or((SpecialistType::PatternMatcher, 0, ReasoningHexagram::new(0)))
@@ -69,7 +89,7 @@ pub fn specialist_index_inv(idx: usize) -> SpecialistType {
 impl FileAbility {
     /// 当前 E8 状态对应的 GWT 注意力投递目标
     pub fn gwt_route(&self) -> (SpecialistType, u32, ReasoningHexagram) {
-        route_attention(self.e8_state)
+        route_attention(self.e8_state, None)
     }
 
     /// 该文件的静态专家偏好 (按文件大类映射)

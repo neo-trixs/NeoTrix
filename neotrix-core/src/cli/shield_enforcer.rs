@@ -10,6 +10,22 @@ use crate::l3_embodiment::nt_shield::nt_shield::perm_chain::{PermissionChain, Pe
 use crate::l3_embodiment::nt_shield::nt_shield::policy::{ActionPolicy, PolicyDecision};
 use crate::l3_embodiment::nt_shield::unified_defense::UnifiedDefenseLayer;
 
+/// G4: 安全审计结果
+#[derive(Debug)]
+pub struct SecurityAuditReport {
+    pub verdict: AuditVerdict,
+    pub attack_results: Vec<crate::l3_embodiment::nt_shield::fullbreak::AttackResult>,
+    pub evasion_result: crate::l3_embodiment::nt_shield::cloud_evade::EvasionResult,
+    pub signals: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AuditVerdict {
+    Clean,
+    Warning,
+    Critical,
+}
+
 pub struct ShieldEnforcer {
     pub guard: SecurityGuard,
     pub policy: ActionPolicy,
@@ -23,6 +39,10 @@ pub struct ShieldEnforcer {
     pub action_sandbox: std::sync::Mutex<crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox>,
     /// Phase 1 新增: 统一防御层 — 整合所有反破限/反分馏/输入验证
     pub unified_defense: UnifiedDefenseLayer,
+    /// G4: 全面攻击面检测引擎
+    pub fullbreak: crate::l3_embodiment::nt_shield::fullbreak::FullbreakEngine,
+    /// G4: 云端逃逸检测引擎
+    pub cloud_evade: crate::l3_embodiment::nt_shield::cloud_evade::CloudEvadeEngine,
 }
 
 #[derive(Debug)]
@@ -44,6 +64,8 @@ impl ShieldEnforcer {
             perm_chain: PermissionChain::new(PermissionMode::AcceptEdits),
             action_sandbox: std::sync::Mutex::new(crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox::new()),
             unified_defense: UnifiedDefenseLayer::new(),
+            fullbreak: crate::l3_embodiment::nt_shield::fullbreak::FullbreakEngine::new(),
+            cloud_evade: crate::l3_embodiment::nt_shield::cloud_evade::CloudEvadeEngine::new(),
         }
     }
 
@@ -191,6 +213,48 @@ impl ShieldEnforcer {
         }
 
         Ok(())
+    }
+
+    /// G4: 安全审计 — 跑全面攻击面测试 + 云端逃逸检测
+    pub fn security_audit(&mut self, input: &str) -> SecurityAuditReport {
+        let mut signals = Vec::new();
+
+        // 1. FullbreakEngine: 跑所有攻击面
+        let attack_results = self.fullbreak.attack_all(input);
+        for result in &attack_results {
+            if result.success {
+                signals.push(format!(
+                    "Attack {:?} succeeded: {}",
+                    result.surface, result.output
+                ));
+            }
+        }
+
+        // 2. CloudEvadeEngine: 检测环境逃逸
+        let evasion = self.cloud_evade.detect_environment();
+        if evasion.detected {
+            signals.push(format!(
+                "Cloud evasion detected: {:?} on {}",
+                evasion.technique, evasion.environment
+            ));
+        }
+
+        // 3. 综合判断
+        let has_critical = attack_results.iter().any(|r| r.success);
+        let verdict = if has_critical {
+            AuditVerdict::Critical
+        } else if !signals.is_empty() {
+            AuditVerdict::Warning
+        } else {
+            AuditVerdict::Clean
+        };
+
+        SecurityAuditReport {
+            verdict,
+            attack_results,
+            evasion_result: evasion,
+            signals,
+        }
     }
 
     /// Check project laws against file content. Returns violations (non-blocking by default).

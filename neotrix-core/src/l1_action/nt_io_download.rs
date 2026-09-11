@@ -2,7 +2,7 @@
 //!
 //! 支持：分片并发、HTTP Range 断点续传、代理、进度追踪、指数退避重试。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -150,7 +150,7 @@ impl DownloadEngine {
 
         // 临时目录
         let stem = task.dest.file_stem().and_then(|s| s.to_str()).unwrap_or("dl");
-        let tmp_dir = task.dest.parent().unwrap_or(PathBuf::from(".")).join(format!(".dl_{}", stem));
+        let tmp_dir = task.dest.parent().unwrap_or(Path::new(".")).join(format!(".dl_{}", stem));
         fs::create_dir_all(&tmp_dir).await.map_err(|e| format!("tmp dir: {}", e))?;
 
         // 并发下载各片
@@ -253,14 +253,10 @@ async fn download_chunk(
         fs::File::create(path).await.map_err(|e| format!("create: {}", e))?
     };
 
-    let mut stream = resp.bytes_stream();
-    use futures_util::StreamExt;
     let mut downloaded = already;
-    while let Some(chunk) = stream.next().await {
-        let c = chunk.map_err(|e| format!("stream: {}", e))?;
-        file.write_all(&c).await.map_err(|e| format!("write: {}", e))?;
-        downloaded += c.len() as u64;
-    }
+    let bytes = resp.bytes().await.map_err(|e| format!("stream: {}", e))?;
+    file.write_all(&bytes).await.map_err(|e| format!("write: {}", e))?;
+    downloaded += bytes.len() as u64;
     Ok(downloaded)
 }
 

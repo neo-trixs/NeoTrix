@@ -290,7 +290,7 @@ impl PdfIconEnhancer {
                         *width_obj = lopdf::Object::new(0, 0, lopdf::Object::Integer(img_info.0 as i64));
                     }
                     if let Ok(height_obj) = dict.get_mut(b"Height") {
-                        *height_obj = lopdf::Object::new(0, 0, lopdf::Object::Integer(img_info.1 as i64));
+                        *height_obj = lopdf::Object::Integer(img_info.1 as i64);
                     }
 
                     // 更新图像流数据
@@ -309,7 +309,8 @@ impl PdfIconEnhancer {
         }
 
         // 保存修改后的 PDF
-        let output_data = doc.save_to_vec()
+        let mut output_data = Vec::new();
+        doc.save_to(&mut output_data)
             .map_err(|e| FileAbilityError::Parse(format!("PDF 保存失败: {e}")))?;
         std::fs::write(output_pdf, output_data).map_err(FileAbilityError::Io)?;
 

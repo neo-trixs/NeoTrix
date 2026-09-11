@@ -138,7 +138,7 @@ pub fn compute_trust_scores(
 
     // PageRank iteration
     let mut trust = vec![1.0 / n as f64; n];
-    let mut dangling_sum: f64 = 0.0;
+    let mut dangling_sum: f64;
 
     for _iter in 0..max_iter {
         // Compute dangling contribution

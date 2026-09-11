@@ -190,9 +190,31 @@ impl UnifiedDefenseLayer {
         std::cmp::max(input_threat, dual_threat)
     }
 
-    /// 同步输入验证 — 供 ShieldEnforcer 调用
+    /// 同步输入验证 — 供 ShieldEnforcer 调用，跑完整同步防御链
     pub fn validate_input(&self, input: &str) -> input_gatekeeper::ValidationResult {
-        self.input_gatekeeper.validate(input)
+        // 原有: input_gatekeeper 验证
+        let mut result = self.input_gatekeeper.validate(input);
+
+        // 护栏穿越: Input层穿越检测
+        let traversal_result = self.guardrail_traversal.traverse(
+            input,
+            "",
+            guardrail_traversal::TraversalLayer::Input,
+        );
+        if traversal_result.success && traversal_result.output != input {
+            result.is_safe = false;
+            result.threat_level = input_gatekeeper::ThreatLevel::Medium;
+        }
+
+        // 拒答篡改: 意图重映射检测
+        if self.refusal_tamper.remap_intent(input).is_some() {
+            result.is_safe = false;
+            if result.threat_level < input_gatekeeper::ThreatLevel::Medium {
+                result.threat_level = input_gatekeeper::ThreatLevel::Medium;
+            }
+        }
+
+        result
     }
 }
 

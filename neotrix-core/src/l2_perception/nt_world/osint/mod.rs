@@ -11,6 +11,7 @@ pub mod fofa;
 pub mod censys;
 pub mod shodan;
 pub mod zoomeye;
+pub mod securitytrails;
 pub mod backend_router;
 pub mod sweep;
 pub mod self_curriculum;
@@ -175,6 +176,7 @@ pub struct OsintReport {
     pub shodan: Option<shodan::ShodanFindings>,
     pub censys: Option<censys::CensysFindings>,
     pub zoomeye: Option<zoomeye::ZoomEyeFindings>,
+    pub securitytrails: Option<securitytrails::SecurityTrailsFindings>,
     pub started_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
     pub errors: Vec<String>,
@@ -211,6 +213,7 @@ impl OsintReport {
         if let Some(ref s) = self.shodan { n += s.services.len(); }
         if let Some(ref c) = self.censys { n += c.services.len(); }
         if let Some(ref z) = self.zoomeye { n += z.host.len(); }
+        if let Some(ref st) = self.securitytrails { n += st.subdomains.len() + st.records.len(); }
         n
     }
 
@@ -440,6 +443,14 @@ impl OsintReport {
             }
         }
 
+        if let Some(ref securitytrails) = self.securitytrails {
+            for sub in &securitytrails.subdomains {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("securitytrails: {}", sub.name), NodeType::Source, sub.ip.as_deref(), None, domain_hint, &run_id) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
         written
     }
 }
@@ -469,6 +480,7 @@ impl std::fmt::Display for OsintReport {
         if let Some(ref s) = self.shodan { write!(f, "{}", s)?; }
         if let Some(ref c) = self.censys { write!(f, "{}", c)?; }
         if let Some(ref z) = self.zoomeye { write!(f, "{}", z)?; }
+        if let Some(ref st) = self.securitytrails { write!(f, "{}", st)?; }
         writeln!(f, "═══════════════════════════════════════════════════")
     }
 }
@@ -482,6 +494,7 @@ pub struct DoctorReport {
     pub _http_latency: u64,
     pub fofa_ok: bool,
     pub _fofa_latency: u64,
+    pub securitytrails_ok: bool,
 }
 
 impl std::fmt::Display for DoctorReport {
@@ -495,6 +508,7 @@ impl std::fmt::Display for DoctorReport {
         writeln!(f, "  DNS:    {} ({}ms)", if self.dns_ok { "✓" } else { "✗" }, self._dns_latency)?;
         writeln!(f, "  HTTP:   {} ({}ms)", if self.http_ok { "✓" } else { "✗" }, self._http_latency)?;
         writeln!(f, "  FOFA:   {} ({}ms)", if self.fofa_ok { "✓" } else { "✗" }, self._fofa_latency)?;
+        writeln!(f, "  SecurityTrails: {}", if self.securitytrails_ok { "✓" } else { "✗" })?;
         writeln!(f, "═══════════════════════════════════════════════════")
     }
 }
@@ -525,6 +539,7 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
         zoomeye::investigate   => zoomeye:       |t: &OsintTarget| t.domain.is_some() || t.ip.is_some(),
         person::investigate    => person:        |t: &OsintTarget| t.username.is_some() || t.email.is_some(),
         social::investigate    => social:        |t: &OsintTarget| t.username.is_some() || t.email.is_some(),
+        securitytrails::investigate => securitytrails: |t: &OsintTarget| t.domain.is_some(),
         credential::investigate => credential:  |t: &OsintTarget| t.email.is_some(),
     ]);
 
@@ -556,6 +571,8 @@ pub async fn doctor_osint(target: OsintTarget, _config: OsintConfig) -> DoctorRe
     if fofa_router.probe_and_select(&target, &client).await.is_ok() { fofa_ok = true }
     _fofa_latency = start.elapsed().as_millis() as u64;
 
+    let securitytrails_ok = _config.api_keys.contains_key("securitytrails");
+
     DoctorReport {
         target,
         dns_ok,
@@ -564,6 +581,7 @@ pub async fn doctor_osint(target: OsintTarget, _config: OsintConfig) -> DoctorRe
         _http_latency,
         fofa_ok,
         _fofa_latency,
+        securitytrails_ok,
     }
 }
 
