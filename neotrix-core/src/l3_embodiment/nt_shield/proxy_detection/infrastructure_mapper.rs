@@ -246,7 +246,7 @@ impl InfrastructureMapper {
         domain_to_ips: &HashMap<String, HashSet<String>>,
     ) -> Vec<SharedInfraGroup> {
         let mut groups = Vec::new();
-        let mut visited_ips: HashSet<&str> = HashSet::new();
+        let mut visited_ips: HashSet<String> = HashSet::new();
 
         for (ip, accounts) in ip_to_accounts.iter() {
             if visited_ips.contains(ip.as_str()) {
@@ -336,7 +336,7 @@ impl InfrastructureMapper {
 
             // Mark all IPs in this group as visited
             for visited_ip in &group_ips {
-                visited_ips.insert(visited_ip);
+                visited_ips.insert(visited_ip.clone());
             }
         }
 
