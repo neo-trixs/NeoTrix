@@ -189,7 +189,6 @@ impl ShieldEnforcer {
                 )));
             }
         }
-        }
 
         Ok(())
     }

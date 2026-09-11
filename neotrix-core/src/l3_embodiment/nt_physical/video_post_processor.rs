@@ -2,8 +2,12 @@
 //!
 //! 实现帧间色彩对齐、时序防抖、超分修复、画质增强
 //! 适用于：所有视频生成和编辑场景
+//!
+//! 设计 (R-P42): 复用 image_super_resolution 的 SuperResolutionModel
+//! 统一枚举: 移除 SuperResolutionMode，使用 image_super_resolution::SuperResolutionModel
 
 use serde::{Serialize, Deserialize};
+use crate::neotrix::nt_file_ability::image_super_resolution::SuperResolutionModel;
 
 // ============================================================================
 // 后处理定义
@@ -39,21 +43,6 @@ pub enum StabilizationMode {
     ElectronicIS,
 }
 
-/// 超分模式
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum SuperResolutionMode {
-    /// 动漫专用超分
-    Anime,
-    /// 写实超分
-    Realistic,
-    /// 通用超分
-    General,
-    /// 轻量超分
-    Light,
-    /// 高质量超分
-    HighQuality,
-}
-
 /// 后处理配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostProcessConfig {
@@ -61,8 +50,8 @@ pub struct PostProcessConfig {
     pub color_alignment_mode: ColorAlignmentMode,
     /// 时序防抖模式
     pub stabilization_mode: StabilizationMode,
-    /// 超分模式
-    pub super_resolution_mode: SuperResolutionMode,
+    /// 超分模型 (复用 image_super_resolution::SuperResolutionModel)
+    pub super_resolution_model: SuperResolutionModel,
     /// 色彩对齐强度 (0.0-1.0)
     pub color_alignment_strength: f32,
     /// 防抖强度 (0.0-1.0)
