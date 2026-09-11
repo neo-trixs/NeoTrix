@@ -488,7 +488,7 @@ fn is_unicolor(data: &[u8], width: u32, height: u32, channels: u8) -> bool {
 /// 从 PDF 单页提取图像
 pub fn extract_page_images(
     pdf_path: &Path,
-    _page: usize,
+    page: usize,
     output_dir: &Path,
     config: &PdfImageExtractConfig,
 ) -> Result<Vec<PdfExtractedImage>> {

@@ -692,7 +692,7 @@ mod onnx_engine {
         ) -> Result<image::DynamicImage, SuperResolutionError> {
             let pixels: Vec<u8> = img.pixels().flat_map(|p| [p[0], p[1], p[2]]).collect();
 
-            let tiling = TiledConfig {
+            let tiling = TilingConfig {
                 tile_size: self.tile_size,
                 overlap: self.overlap,
                 scale: self.scale,
@@ -1358,12 +1358,15 @@ impl SuperResolutionBackend for OnnxBackend {
             Err(e) => {
                 return SuperResolutionResult {
                     success: false,
+                    input_path: String::new(),
+                    output_path: String::new(),
                     input_size: (0, 0),
                     output_size: (0, 0),
                     actual_scale: 0.0,
                     processing_time_ms: 0,
+                    model_used: model.model_id().to_string(),
+                    tiles_processed: 0,
                     error: Some(format!("模型加载失败: {e}")),
-                    quality_score: None,
                 };
             }
         };
@@ -1482,12 +1485,15 @@ impl BackendManager {
         // 没有找到合适的后端
         SuperResolutionResult {
             success: false,
+            input_path: input.display().to_string(),
+            output_path: output.display().to_string(),
             input_size: (0, 0),
             output_size: (0, 0),
             actual_scale: 0.0,
             processing_time_ms: 0,
+            model_used: model.model_id().to_string(),
+            tiles_processed: 0,
             error: Some(format!("No backend supports model: {}", model.model_id())),
-            quality_score: None,
         }
     }
     

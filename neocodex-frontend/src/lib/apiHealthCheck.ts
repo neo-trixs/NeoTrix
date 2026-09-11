@@ -3,7 +3,7 @@
  * 
  * 测试每个域插件的 API 可用性和响应时间
  */
-import { domain } from '../api'
+import { domainCall, domainList } from '../api'
 import * as modelPool from '../api/model-pool'
 import * as proxyPool from '../api/proxy-pool'
 import * as im from '../api/im'
@@ -68,7 +68,7 @@ async function checkApi(
 export async function checkAllApis(): Promise<ApiHealthReport> {
   const results = await Promise.all([
     // 域系统
-    checkApi('domain.list', () => domain.list()),
+    checkApi('domain.list', () => domainList()),
     
     // 模型池
     checkApi('model_pool.status', () => modelPool.getModelPoolStatus()),
@@ -104,7 +104,7 @@ export async function checkAllApis(): Promise<ApiHealthReport> {
  * 测试单个域的 API
  */
 export async function checkDomain(domainName: string): Promise<HealthCheckResult[]> {
-  const actions = await domain.list()
+  const actions = await domainList()
     .then(domains => domains.find(d => d.name === domainName)?.actions ?? [])
     .catch(() => [])
 
@@ -112,7 +112,7 @@ export async function checkDomain(domainName: string): Promise<HealthCheckResult
   for (const action of actions) {
     const result = await checkApi(
       `${domainName}.${action.name}`,
-      () => domain.call(domainName, action.name, {}),
+      () => domainCall(domainName, action.name, {}),
       3000
     )
     results.push(result)

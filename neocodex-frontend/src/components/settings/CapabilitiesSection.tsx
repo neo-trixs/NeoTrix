@@ -4,7 +4,7 @@
    ════════════════════════════════════════════ */
 import { createSignal, onMount, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
-import { domain, errText } from '../../api'
+import { domainList, errText } from '../../api'
 import { ExpandIcon, ModelIcon, NetworkIcon, InfoIcon } from './settingsIcons'
 
 interface Capability {
@@ -44,7 +44,7 @@ export function CapabilitiesSection() {
 
   onMount(async () => {
     try {
-      const result = await domain.list()
+      const result = await domainList()
       setDomains(result.map((d: any) => ({
         name: d.name,
         actions: d.actions?.length ?? 0,

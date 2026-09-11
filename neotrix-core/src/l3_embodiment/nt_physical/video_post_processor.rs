@@ -394,7 +394,7 @@ mod tests {
         let config = PostProcessConfig {
             color_alignment_mode: ColorAlignmentMode::ColorTransfer,
             stabilization_mode: StabilizationMode::OpticalFlow,
-            super_resolution_mode: SuperResolutionMode::HighQuality,
+            super_resolution_model: SuperResolutionModel::RealEsrganGeneral,
             color_alignment_strength: 0.8,
             stabilization_strength: 0.7,
             super_resolution_scale: 4,
