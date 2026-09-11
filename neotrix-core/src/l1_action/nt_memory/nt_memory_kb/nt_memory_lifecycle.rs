@@ -181,6 +181,17 @@ impl MemoryLifecycle {
     pub fn is_marked_forget(&self, doc_id: &str) -> bool {
         self.freshness.should_forget(doc_id)
     }
+
+    /// Check if a document is stale (not updated within `staleness_after` ticks).
+    pub fn is_stale(&self, doc_id: &str) -> bool {
+        self.freshness.is_stale(doc_id, self.staleness_after)
+    }
+
+    /// Mark a document as fresh at the current clock tick (alias for `note_updated`).
+    pub fn mark_fresh(&mut self, doc_id: &str) {
+        let tick = self.freshness.tick();
+        self.freshness.note_updated(doc_id, tick);
+    }
 }
 
 #[cfg(test)]
