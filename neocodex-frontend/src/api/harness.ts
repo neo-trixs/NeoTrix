@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { call } from './client'
 
 /* ════════════════════════════════════════════
    api/harness.ts — Harness 统一网关前端 SDK

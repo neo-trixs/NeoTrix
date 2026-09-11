@@ -1,16 +1,17 @@
 /// 核心下载引擎
-/// 实现：分片下载、HTTP Range 请求、进度追踪、重试机制、代理支持
-/// 依赖：reqwest (异步 HTTP client), tokio (异任务)
+/// 实现：分片下载、HTTP Range 请求、进度追踪、重试机制、代理支持、文件写入
 
 use crate::models::{DownloadSession, DownloadProgress, DownloadSource, DownloadMetadata, DownloadStatus};
 use crate::traits::DownloadStrategy;
 use reqwest::{
-    Client, Method, RequestBuilder, Response, Url,
+    Client, Method, Response, Url,
     header::{HeaderMap, Range},
     Proxy,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use tokio::fs;
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use tokio::time::{interval, timeout};
 
 /// 下载引擎配置
@@ -30,18 +31,21 @@ pub struct EngineConfig {
     pub enable_proxy: bool,
     /// 进度报告间隔 (秒)
     pub progress_interval_secs: u64,
+    /// 单片最大字节数 (防止内存爆炸, 默认 64MB)
+    pub max_chunk_bytes: u64,
 }
 
 impl Default for EngineConfig {
     fn default() -> Self {
         EngineConfig {
-            chunk_count: 8,          // 8 路并发 (类似 aria2 默认)
-            max_retries: 5,          // 最多重试 5 次
-            retry_base_secs: 2,      // 基础延迟 2s (指数退避)
-            timeout_secs: 300,       // 单次请求超时 5分钟
-            enable_resume: true,     // 启用断点续传
-            enable_proxy: true,      // 启用代理支持
-            progress_interval_secs: 1, // 每秒报告进度
+            chunk_count: 8,
+            max_retries: 5,
+            retry_base_secs: 2,
+            timeout_secs: 600,
+            enable_resume: true,
+            enable_proxy: true,
+            progress_interval_secs: 1,
+            max_chunk_bytes: 64 * 1024 * 1024, // 64MB per chunk
         }
     }
 }
@@ -55,41 +59,50 @@ pub struct DownloadEngine {
 impl DownloadEngine {
     /// 创建新的下载引擎
     pub fn new(config: EngineConfig) -> Self {
-        let client = Client::builder()
+        let mut builder = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .connect_timeout(Duration::from_secs(30))
-            .build()
-            .expect("Failed to create reqwest client");
+            .pool_max_idle_per_host(config.chunk_count);
 
+        // 注入代理
+        if config.enable_proxy {
+            if let Some(proxy_config) = crate::proxy::from_env() {
+                if proxy_config.is_valid() {
+                    if let Ok(proxy) = proxy_config.to_reqwest() {
+                        builder = builder.proxy(proxy);
+                    }
+                }
+            }
+        }
+
+        let client = builder.build().expect("Failed to create reqwest client");
         DownloadEngine { config, client }
     }
 
-    /// 开始下载会话
+    /// 开始下载会话 — 主入口
     pub async fn download_session(&self, session: &mut DownloadSession) -> Result<(), DownloadError> {
-        // 更新状态
         session.status = DownloadStatus::Downloading;
         session.updated_at = SystemTime::now();
         session.retry_count = 0;
 
-        // 执行下载循环
         let result = self.download_loop(session).await;
 
         match result {
             Ok(_) => {
                 session.status = DownloadStatus::Completed;
+                session.progress.percent = 100.0;
                 session.updated_at = SystemTime::now();
                 Ok(())
             }
             Err(e) => {
                 session.status = DownloadStatus::Failed;
-                session.retry_count += 1;
                 session.updated_at = SystemTime::now();
                 Err(e)
             }
         }
     }
 
-    /// 下载循环 - 处理重试和进度
+    /// 下载循环 — 带重试
     async fn download_loop(&self, session: &mut DownloadSession) -> Result<(), DownloadError> {
         let mut attempt = 0;
 
@@ -97,289 +110,281 @@ impl DownloadEngine {
             attempt += 1;
             session.retry_count = attempt;
 
-            match self.download_chunk(session).await {
-                Ok(_) => return Ok(()), // 成功
+            match self.download_to_file(session).await {
+                Ok(_) => return Ok(()),
                 Err(e) => {
-                    // 记录错误并决定是否重试
                     if attempt < self.config.max_retries {
-                        // 指数退避等待
-                        let backoff = self.config.retry_base_secs * 2_u64.pow(attempt - 1);
-                        // 这里可以添加日志记录
-                        // tracing::warn!("Download attempt {} failed: {}. Retrying in {}s", attempt, e, backoff);
+                        let backoff = self.config.retry_base_secs * 2u64.pow(attempt - 1);
+                        eprintln!("[download] attempt {} failed: {}. retry in {}s", attempt, e, backoff);
                         tokio::time::sleep(Duration::from_secs(backoff)).await;
                     } else {
-                        return Err(e); // 最大重试次数耗尽
+                        return Err(e);
                     }
                 }
             }
         }
 
         Err(DownloadError::Network(format!(
-            "Max retries ({}) exceeded",
+            "max retries ({}) exceeded",
             self.config.max_retries
         )))
     }
 
-    /// 单次下载块 (片)
-    async fn download_chunk(
-        &self,
-        session: &mut DownloadSession,
-    ) -> Result<(), DownloadError> {
-        // 解析 URL
+    /// 核心：下载到文件
+    async fn download_to_file(&self, session: &mut DownloadSession) -> Result<(), DownloadError> {
         let url = Url::parse(&session.url).map_err(|e| DownloadError::Network(e.to_string()))?;
 
-        // 获取文件总大小 (通过 HEAD 请求)
-        let total_size = self.get_total_size(&url).await?;
+        // 确保目标目录存在
+        if let Some(parent) = session.path.parent() {
+            fs::create_dir_all(parent).await.map_err(|e| {
+                DownloadError::Io(format!("create dir {}: {}", parent.display(), e))
+            })?;
+        }
 
-        // 更新总大小 (如果已知)
+        // HEAD 获取文件大小
+        let total_size = self.get_total_size(&url).await.unwrap_or(0);
         if total_size > 0 {
             session.progress.total = total_size;
         }
 
-        // 计算每片大小
-        let chunk_size = if total_size > 0 {
-            total_size / self.config.chunk_count
+        // 检查已下载的部分 (断点续传)
+        let existing_bytes = if self.config.enable_resume && session.path.exists() {
+            fs::metadata(&session.path).await.map(|m| m.len()).unwrap_or(0)
         } else {
-            // 未知大小时的默认片大小
-            1_000_000 // 1MB
+            0
         };
 
-        // 如果启用断点续传，计算每片的起始偏移
-        let (chunks, start_offsets) = if self.config.enable_resume && session.progress.downloaded > 0 {
-            self.calculate_resume_chunks(total_size, chunk_size).await?
+        if existing_bytes > 0 {
+            session.progress.downloaded = existing_bytes;
+            eprintln!("[download] resuming from {} bytes", existing_bytes);
+        }
+
+        // 如果已下载完整，跳过
+        if total_size > 0 && existing_bytes >= total_size {
+            session.progress.percent = 100.0;
+            return Ok(());
+        }
+
+        // 计算分片
+        let remaining = total_size.saturating_sub(existing_bytes);
+        let chunk_size = if remaining > 0 {
+            // 每片大小 = remaining / chunk_count，但不超过 max_chunk_bytes
+            let ideal = remaining / self.config.chunk_count as u64;
+            ideal.min(self.config.max_chunk_bytes).max(1)
         } else {
-            (0..self.config.chunk_count, vec![0u64; self.config.chunk_count])
+            self.config.max_chunk_bytes
         };
 
-        // 创建下载任务
-        let mut handles = Vec::new();
-
-        for (i, (chunk_idx, start_offset)) in (0..chunks.len()).zip(start_offsets.iter()).enumerate() {
-            let session_clone = session.clone();
-            let url = url.clone();
-            let config = self.config.clone();
-
-            let handle = tokio::spawn(async move {
-                Self::download_single_chunk(
-                    &url,
-                    chunk_idx as u32,
-                    *start_offset,
-                    chunk_size,
-                    &config,
-                    &session_clone,
-                )
-                .await
-            });
-
-            handles.push(handle);
-        }
-
-        // 收集所有片的结果
-        let mut total_downloaded: u64 = 0;
-
-        for handle in handles {
-            match handle.await {
-                Ok(chunk_size) => total_downloaded += chunk_size,
-                Err(e) => {
-                    // 单个片失败，但不 necessarily 表示整体失败
-                    // 根据配置决定是重试还是忽略
-                    eprintln!("Chunk download error: {}", e);
-                }
-            }
-        }
-
-        // 更新进度
-        let percent = if session.progress.total > 0 {
-            (total_downloaded as f32 / session.progress.total as f32) * 100.0
+        // 实际并发数
+        let actual_chunks = if total_size > 0 {
+            ((remaining - 1) / chunk_size + 1).min(self.config.chunk_count as u64) as usize
         } else {
-            0.0
+            1 // 未知大小时单片下载
         };
 
-        // 这里应该调用 session 的 progress 更新方法
-        // 在实际集成中，通过消息传递或回调更新
+        eprintln!(
+            "[download] total={}MB remaining={}MB chunks={} chunk_size={}MB",
+            total_size / 1024 / 1024,
+            remaining / 1024 / 1024,
+            actual_chunks,
+            chunk_size / 1024 / 1024,
+        );
 
-        Ok(total_downloaded)
-    }
-
-    /// 下载单个片
-    async fn download_single_chunk(
-        url: &Url,
-        chunk_idx: u32,
-        start_offset: u64,
-        chunk_size: u64,
-        config: &EngineConfig,
-        session: &DownloadSession,
-    ) -> Result<u64, DownloadError> {
-        // 构建 Range header
-        let end_offset = start_offset + chunk_size - 1;
-        let range = format!("bytes={}-{}", start_offset, end_offset);
-
-        // 创建请求
-        let mut req = self
-            .client
-            .request(Method::GET, url.clone());
-
-        // 设置 Range header (断点续传)
-        req = req.header("Range", &range);
-
-        // 设置代理 (如果启用)
-        if config.enable_proxy {
-            if let Some(proxy_config) = crate::proxy::from_env() {
-                if proxy_config.is_valid() {
-                    if let Ok(proxy) = proxy_config.to_reqwest() {
-                        req = req.proxy(proxy);
-                    }
-                }
-            }
-        }
-
-        // 发送请求
-        let response = timeout(
-            Duration::from_secs(config.timeout_secs),
-            req.send(),
-        )
-        .await
-        .map_err(|_| DownloadError::Network("Request timed out".to_string()))?;
-
-        // 检查响应状态
-        let status = response.status();
-        if !status.is_success() && status.as_u16() != 206 {
-            // 服务器不支持 Range 请求，回退到完整下载
-            return self.download_full_chunk(url, chunk_size, config).await;
-        }
-
-        // 读取内容到内存 (或写入文件)
-        let bytes = response.bytes().await.map_err(|e| {
-            DownloadError::Network(format!("Failed to read response: {}", e))
+        // 临时文件目录
+        let tmp_dir = session.path.with_extension("");
+        let tmp_dir_name = tmp_dir.file_name().unwrap_or_default();
+        let tmp_base = session.path.parent().unwrap_or(Path::new(".")).join(format!(".dl_{}", tmp_dir_name.to_string_lossy()));
+        fs::create_dir_all(&tmp_base).await.map_err(|e| {
+            DownloadError::Io(format!("create tmp dir: {}", e))
         })?;
 
-        let downloaded = bytes.len() as u64;
+        // 并发下载各片
+        let mut handles = Vec::new();
 
-        // 写入到临时文件或累积
-        // 实际实现中，这里应该写入到临时文件并拼接
-        // 为演示简化：返回下载的字节数
+        for i in 0..actual_chunks {
+            let start = existing_bytes + (i as u64) * chunk_size;
+            let end = if i == actual_chunks - 1 {
+                // 最后一片：下载到末尾
+                if total_size > 0 { total_size - 1 } else { 0 } // 0 = unknown, will use full download
+            } else {
+                existing_bytes + ((i + 1) as u64) * chunk_size - 1
+            };
 
-        Ok(downloaded)
-    }
+            let chunk_file = tmp_base.join(format!("chunk_{:04}.tmp", i));
+            let url = url.clone();
+            let client = self.client.clone();
+            let timeout_secs = self.config.timeout_secs;
 
-    /// 完整下载片 (当服务器不支持 Range 时的回退方案)
-    async fn download_full_chunk(
-        &self,
-        url: &Url,
-        chunk_size: u64,
-        config: &EngineConfig,
-    ) -> Result<u64, DownloadError> {
-        let response = timeout(
-            Duration::from_secs(config.timeout_secs),
-            self.client.get(url).send(),
-        )
-        .await
-        .map_err(|_| DownloadError::Network("Request timed out".to_string()))?;
+            let handle = tokio::spawn(async move {
+                download_chunk_to_file(&client, &url, start, end, total_size, &chunk_file, timeout_secs).await
+            });
+            handles.push((i, handle, chunk_file));
+        }
 
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| DownloadError::Network(format!("Failed to read: {}", e)))?;
-
-        Ok(bytes.len() as u64)
-    }
-
-    /// 获取文件总大小 (HEAD 请求)
-    async fn get_total_size(&self, url: &Url) -> Result<u64, DownloadError> {
-        let mut req = self.client.head(url.clone());
-
-        // 添加代理 (如果启用)
-        if self.config.enable_proxy {
-            if let Some(proxy_config) = crate::proxy::from_env() {
-                if proxy_config.is_valid() {
-                    if let Ok(proxy) = proxy_config.to_reqwest() {
-                        req = req.proxy(proxy);
+        // 等待所有片完成
+        let mut total_downloaded = existing_bytes;
+        for (i, handle, chunk_file) in handles {
+            match handle.await {
+                Ok(Ok(chunk_bytes)) => {
+                    total_downloaded += chunk_bytes;
+                    if total_size > 0 {
+                        session.progress.percent = (total_downloaded as f32 / total_size as f32) * 100.0;
                     }
+                    session.progress.downloaded = total_downloaded;
+                    session.updated_at = SystemTime::now();
+                    eprintln!(
+                        "[download] chunk {} done: +{}MB total={:.1}%",
+                        i, chunk_bytes / 1024 / 1024, session.progress.percent
+                    );
+                }
+                Ok(Err(e)) => {
+                    return Err(DownloadError::Network(format!("chunk {} failed: {}", i, e)));
+                }
+                Err(e) => {
+                    return Err(DownloadError::Network(format!("chunk {} task failed: {}", i, e)));
                 }
             }
         }
 
-        let response = timeout(
-            Duration::from_secs(self.config.timeout_secs),
-            req.send(),
-        )
-        .await
-        .map_err(|_| DownloadError::Network("HEAD request timed out".to_string()))?;
+        // 合并临时文件到目标文件
+        eprintln!("[download] merging {} chunks...", actual_chunks);
+        let mut output = fs::File::create(&session.path).await.map_err(|e| {
+            DownloadError::Io(format!("create {}: {}", session.path.display(), e))
+        })?;
 
-        let headers = response.headers();
-        // 尝试获取 Content-Length
-        if let Some(len) = headers.get(reqwest::header::CONTENT_LENGTH) {
-            let len_str = std::str::from_utf8(len.as_bytes())
-                .map_err(|_| DownloadError::Network("Invalid Content-Length".to_string()))?;
-            let size: u64 = len_str
-                .parse()
-                .map_err(|_| DownloadError::Network("Failed to parse Content-Length".to_string()))?;
-            return Ok(size);
+        for i in 0..actual_chunks {
+            let chunk_file = tmp_base.join(format!("chunk_{:04}.tmp", i));
+            let mut chunk = fs::File::open(&chunk_file).await.map_err(|e| {
+                DownloadError::Io(format!("open chunk {}: {}", chunk_file.display(), e))
+            })?;
+            let mut buf = Vec::new();
+            chunk.read_to_end(&mut buf).await.map_err(|e| {
+                DownloadError::Io(format!("read chunk {}: {}", chunk_file.display(), e))
+            })?;
+            output.write_all(&buf).await.map_err(|e| {
+                DownloadError::Io(format!("write output: {}", e))
+            })?;
         }
 
-        // 如果有 Content-Range (罕见于 HEAD)
-        // 否则返回 0 (表示未知)
+        output.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
+        drop(output);
+
+        // 清理临时文件
+        let _ = fs::remove_dir_all(&tmp_base).await;
+
+        eprintln!("[download] complete: {}", session.path.display());
+        Ok(())
+    }
+
+    /// HEAD 请求获取文件大小
+    async fn get_total_size(&self, url: &Url) -> Result<u64, DownloadError> {
+        let response = timeout(
+            Duration::from_secs(30),
+            self.client.head(url.clone()).send(),
+        ).await
+        .map_err(|_| DownloadError::Network("HEAD timed out".into()))?;
+
+        let response = response.map_err(|e| DownloadError::Network(e.to_string()))?;
+
+        if let Some(len) = response.headers().get(reqwest::header::CONTENT_LENGTH) {
+            let s = std::str::from_utf8(len.as_bytes()).map_err(|_| DownloadError::Network("bad Content-Length".into()))?;
+            return s.parse().map_err(|_| DownloadError::Network("parse Content-Length failed".into()));
+        }
+
         Ok(0)
     }
+}
 
-    /// 计算断点续传的片分配
-    async fn calculate_resume_chunks(
-        &self,
-        total_size: u64,
-        chunk_size: u64,
-    ) -> Result<(Vec<u32>, Vec<u64>), DownloadError> {
-        let total_chunks = if total_size > 0 {
-            ((total_size - 1) / chunk_size) + 1
-        } else {
-            self.config.chunk_count
-        };
+/// 下载单个分片到临时文件
+async fn download_chunk_to_file(
+    client: &Client,
+    url: &Url,
+    start: u64,
+    end: u64,
+    total_size: u64,
+    chunk_path: &Path,
+    timeout_secs: u64,
+) -> Result<u64, DownloadError> {
+    // 如果已有部分数据且 total_size 已知，跳过已下载的
+    let already = if chunk_path.exists() {
+        fs::metadata(chunk_path).await.map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    };
 
-        let mut chunk_indices: Vec<u32> = (0..total_chunks).map(|i| i as u32).collect();
-        let mut start_offsets: Vec<u64> = vec![0u64; total_chunks];
+    let actual_start = start + already;
 
-        // 如果有已下载进度，跳过已完成的片
-        if session.progress.downloaded > 0 {
-            let completed_chunks = (session.progress.downloaded / chunk_size) + 1;
-            chunk_indices = chunk_indices.into_iter().skip(completed_chunks).collect();
-            start_offsets = start_offsets.into_iter()
-                .skip(completed_chunks)
-                .collect();
+    // 如果 end != 0 且 actual_start > end，这片已完成
+    if end != 0 && actual_start > end {
+        return Ok(already);
+    }
+
+    let mut req = client.request(Method::GET, url.clone());
+
+    // Range header
+    if end != 0 {
+        req = req.header("Range", format!("bytes={}-{}", actual_start, end));
+    } else if actual_start > 0 {
+        req = req.header("Range", format!("bytes={}-", actual_start));
+    }
+
+    let response = timeout(
+        Duration::from_secs(timeout_secs),
+        req.send(),
+    ).await
+    .map_err(|_| DownloadError::Network("request timed out".into()))?;
+
+    let response = response.map_err(|e| DownloadError::Network(e.to_string()))?;
+
+    let status = response.status();
+    let is_partial = status == 200 || status == 206;
+
+    if !is_partial {
+        return Err(DownloadError::Network(format!("HTTP {}", status)));
+    }
+
+    // 流式写入文件
+    let mut file = if already > 0 {
+        fs::OpenOptions::new().append(true).open(chunk_path).await.map_err(|e| {
+            DownloadError::Io(format!("open chunk for append: {}", e))
+        })?
+    } else {
+        fs::File::create(chunk_path).await.map_err(|e| {
+            DownloadError::Io(format!("create chunk: {}", e))
+        })?
+    };
+
+    let mut stream = response.bytes_stream();
+    let mut downloaded = already;
+    use futures_util::StreamExt;
+
+    while let Some(chunk_result) = stream.next().await {
+        let chunk = chunk_result.map_err(|e| DownloadError::Network(format!("stream error: {}", e)))?;
+        file.write_all(&chunk).await.map_err(|e| DownloadError::Io(format!("write chunk: {}", e)))?;
+        downloaded += chunk.len() as u64;
+    }
+
+    file.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
+
+    Ok(downloaded)
+}
+
+/// 下载错误类型
+#[derive(Debug)]
+pub enum DownloadError {
+    Network(String),
+    Io(String),
+    Cancelled,
+}
+
+impl std::fmt::Display for DownloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DownloadError::Network(msg) => write!(f, "network: {}", msg),
+            DownloadError::Io(msg) => write!(f, "io: {}", msg),
+            DownloadError::Cancelled => write!(f, "cancelled"),
         }
-
-        Ok((chunk_indices, start_offsets))
     }
 }
 
-/// 下载会话管理器
-/// 负责会话的创建、持久化和状态管理
-pub struct DownloadSessionManager {
-    /// KV store 接口 (通过 trait 依赖注入)。
-    /// 
-    /// 实际的持久化实现由外部通过 `DownloadSessionManager.save()` 提供，
-    /// 例如保存到 NeoTrix KB (`domain_nt_io` namespace) 或其他存储后端。
-    // store: Option<DownloadStore>,
-}
-
-impl DownloadSessionManager {
-    /// 创建新的下载会话
-    pub fn new(url: String, path: PathBuf, user: String) -> DownloadSession {
-        DownloadSession::new(url, path, user)
-    }
-
-    /// 持存会话到 KV store (由外部实现)
-    pub fn save(&self, _session: &DownloadSession) {
-        // TODO: 实现 KV store 持久化
-        // 例如：neotrix-experience absorb 到 KB
-    }
-
-    /// 从 KV load 会话
-    pub fn load(&self, _session_id: &str) -> Option<DownloadSession> {
-        // TODO: 从 KB load
-        None
-    }
-
-    /// 检查会话是否已存在
-    pub fn exists(&self, _session_id: &str) -> bool {
-        false
-    }
-}
+impl std::error::Error for DownloadError {}

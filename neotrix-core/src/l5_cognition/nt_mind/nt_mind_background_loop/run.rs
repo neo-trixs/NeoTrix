@@ -817,6 +817,8 @@ impl BackgroundLoop {
         spawn_handler!(ARCHITECTURE_AUDIT_INTERVAL_SECS, "architecture_audit", |h| h.handle_architecture_audit().await);
         // 43200s — 网络小说世界构建吸收 (novel_queue drain + 离线重分类), 12h cadence
         spawn_handler!(NOVEL_INGEST_INTERVAL_SECS, "novel_ingest", |h| h.handle_novel_ingest().await);
+        // 3600s — KB 域聚类巡检: 社区检测 + domain_clusters 维护 + cluster_id 分配
+        spawn_handler!(CLUSTERING_INTERVAL_SECS, "clustering", |h| h.handle_clustering().await);
         // ── Constitution hot-reload ──
         spawn_handler!(CONSTITUTION_RELOAD_INTERVAL_SECS, "constitution_reload", |h| h.handle_constitution_reload().await);
         // 缺陷1修复 (自我运转实际情况): 意识核心进化周期改为配置驱动
