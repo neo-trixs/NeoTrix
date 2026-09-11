@@ -55,6 +55,7 @@ pub enum Domain {
     NtShield,
     NtPhysical,
     NtFeel,
+    NtFileAbility,
 }
 
 /// 能力元数据
@@ -157,6 +158,8 @@ pub enum CapabilityInput {
     Nlp(NlpInput),
     /// 资产查询
     Asset(AssetInput),
+    /// 文件增强
+    FileEnhance(FileEnhanceInput),
     /// 通用KV
     Kv(HashMap<String, String>),
 }
@@ -213,6 +216,21 @@ pub struct AssetInput {
     pub limit: usize,
 }
 
+/// 文件增强输入
+#[derive(Debug, Clone)]
+pub struct FileEnhanceInput {
+    pub input_path: String,
+    pub output_path: Option<String>,
+    pub mode: FileEnhanceMode,
+}
+
+/// 文件增强模式
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileEnhanceMode {
+    PdfIconEnhance,
+    ImageSuperResolution,
+}
+
 /// 统一输出
 #[derive(Debug)]
 pub enum CapabilityOutput {
@@ -234,6 +252,8 @@ pub enum CapabilityOutput {
     Nlp(NlpOutput),
     /// 资产结果
     Asset(AssetOutput),
+    /// 文件增强结果
+    FileEnhance(FileEnhanceOutput),
     /// Web结果
     WebResult(WebResult),
     /// 爬取结果
@@ -282,6 +302,7 @@ impl Clone for CapabilityOutput {
             Self::SecurityScan(o) => Self::SecurityScan(o.clone()),
             Self::Nlp(o) => Self::Nlp(o.clone()),
             Self::Asset(o) => Self::Asset(o.clone()),
+            Self::FileEnhance(o) => Self::FileEnhance(o.clone()),
             Self::WebResult(r) => Self::WebResult(r.clone()),
             Self::CrawlResult(r) => Self::CrawlResult(r.clone()),
             Self::ParsedContent(r) => Self::ParsedContent(r.clone()),
@@ -383,6 +404,15 @@ pub struct ClassificationResult {
 pub struct AssetOutput {
     pub assets: Vec<AssetInfo>,
     pub total: usize,
+}
+
+/// 文件增强输出
+#[derive(Debug, Clone)]
+pub struct FileEnhanceOutput {
+    pub success: bool,
+    pub input_path: String,
+    pub output_path: String,
+    pub message: String,
 }
 
 /// 资产信息

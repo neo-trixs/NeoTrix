@@ -46,6 +46,11 @@ pub fn init_global_registry() -> CapabilityRegistry {
         registry.register(cap);
     }
 
+    // 注册 PDF 增强能力
+    registry.register(
+        crate::neotrix::nt_file_ability::create_pdf_enhance_capability()
+    );
+
     registry
 }
 

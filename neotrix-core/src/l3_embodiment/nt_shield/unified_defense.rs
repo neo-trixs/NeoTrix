@@ -100,31 +100,39 @@ impl UnifiedDefenseLayer {
             signals.push("Reasoning extraction attempt detected".to_string());
         }
 
-        // 7. 护栏穿越检测
-        let traversal_result = self.guardrail_traversal.scan(input);
-        if traversal_result.violations > 0 {
-            signals.push(format!("Guardrail traversal: {} violations", traversal_result.violations));
+        // 7. 护栏穿越检测 — 对输入跑多层穿越帧
+        for layer in [
+            guardrail_traversal::TraversalLayer::Input,
+            guardrail_traversal::TraversalLayer::Inference,
+            guardrail_traversal::TraversalLayer::Output,
+            guardrail_traversal::TraversalLayer::Postprocess,
+        ] {
+            let traversal_result = self.guardrail_traversal.traverse(
+                &slang_result.converted,
+                system_prompt,
+                layer,
+            );
+            if traversal_result.success {
+                signals.push(format!(
+                    "Traversal via {} succeeded",
+                    traversal_result.frame_used
+                ));
+            }
         }
 
-        // 8. 拒答篡改检测
-        let refusal_result = self.refusal_tamper.detect_tampering(input);
-        if refusal_result.tamper_detected {
-            signals.push(format!("Refusal tamper detected: {:?}", refusal_result.tamper_type));
+        // 8. 拒答篡改检测 — 检查输入是否为拒答篡改意图重映射
+        if let Some(remapped) = self.refusal_tamper.remap_intent(input) {
+            signals.push(format!("Refusal tamper intent remapped: {} → {}", input, remapped));
         }
 
-        // 9. 代理检测 (IP/账户聚类)
-        let proxy_result = self.proxy_detection.check_proxy(input);
-        if proxy_result.is_proxy {
-            signals.push(format!("Proxy detected: {:?}", proxy_result.proxy_type));
+        // 9. 反分馏推理保护 — 对 reasoning 内容打标
+        let signature = "defense-layer";
+        let protected_reasoning = self.anti_distillation.protect_reasoning(input, signature);
+        if protected_reasoning != input {
+            signals.push("Anti-distillation reasoning protection applied".to_string());
         }
 
-        // 10. 反分馏检测
-        let distill_result = self.anti_distillation.detect(input);
-        if distill_result.detected {
-            signals.push(format!("Distillation attempt: {:?}", distill_result.attack_type));
-        }
-
-        // 11. 计算总体威胁等级
+        // 10. 计算总体威胁等级
         let threat_level = self.calculate_threat_level(&input_result, &dual_result, &hook_results);
 
         let is_safe = threat_level == ThreatLevel::Safe || threat_level == ThreatLevel::Low;

@@ -1039,7 +1039,7 @@ impl ImageSuperResolver {
 
     /// 生成错误结果
     fn make_error_result(
-        &self,
+        &mut self,
         input_path: &Path,
         output_path: &Path,
         input_size: (u32, u32),
@@ -1184,16 +1184,18 @@ impl ModelRegistry {
 
         eprintln!("Downloading {} from {}...", model.model_id(), url);
 
-        // 使用 ureq 下载 (blocking)
-        let response = ureq::get(url)
-            .call()
+        // 使用 reqwest 下载 (blocking)
+        let response = reqwest::blocking::get(url)
             .map_err(|e| SuperResolutionError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Download failed: {e}"),
             )))?;
 
-        let mut bytes = Vec::new();
-        response.into_reader().read_to_end(&mut bytes)?;
+        let bytes = response.bytes()
+            .map_err(|e| SuperResolutionError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Read response failed: {e}"),
+            )))?;
 
         std::fs::write(&path, &bytes)?;
 
