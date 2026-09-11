@@ -46,6 +46,12 @@ use crate::agents::intention_commitment::IntentionCommitment;
 use crate::agents::thought_generation::ThoughtGeneration;
 use crate::agents::social_learning::SocialLearning;
 use crate::agents::pheromone::PheromoneField;
+use crate::environment::daynight::DayNightCycle;
+use crate::environment::weather::WeatherSystem;
+use crate::agents::memory_manager::MemoryManager;
+use crate::evolution::archive::EliteArchive;
+use crate::evolution::novelty::NoveltySearch;
+use crate::evolution::curriculum::Curriculum;
 use crate::safety::{
     CapabilityTracker, SafetyMonitor, EvolutionConstraints, AuditTrail,
 };
@@ -100,6 +106,12 @@ pub struct WorldSim {
     pub evolution_constraints: EvolutionConstraints,
     pub audit_trail: AuditTrail,
     pub social_engine: SocialEngine,
+    pub daynight: DayNightCycle,
+    pub weather: WeatherSystem,
+    pub memory_managers: HashMap<u64, MemoryManager>,
+    pub elite_archive: EliteArchive,
+    pub novelty_search: NoveltySearch,
+    pub curriculum: Curriculum,
 }
 
 impl WorldSim {
@@ -192,6 +204,12 @@ impl WorldSim {
             evolution_constraints: EvolutionConstraints::new(Default::default()),
             audit_trail: AuditTrail::new(10000),
             social_engine: SocialEngine::new(),
+            daynight: DayNightCycle::new(),
+            weather: WeatherSystem::new().with_seed(config.seed as u32),
+            memory_managers: HashMap::new(),
+            elite_archive: EliteArchive::new(50),
+            novelty_search: NoveltySearch::new(),
+            curriculum: Curriculum::new(),
         }
     }
 
@@ -221,6 +239,9 @@ impl WorldSim {
                     agent.core.metabolize(energy_cost, 0.3);
                 }
             }
+
+            self.daynight.tick(1.0 / self.config.ticks_per_hour as f32);
+            self.weather.tick(None);
         }
 
         if self.schedule.should_run(TickTier::Fast) {

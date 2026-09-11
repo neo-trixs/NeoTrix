@@ -123,6 +123,7 @@ impl EvolutionSandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::foundation::math_bridge::Vec2;
 
     #[test]
     fn test_mutation_returns_fitness_delta() {

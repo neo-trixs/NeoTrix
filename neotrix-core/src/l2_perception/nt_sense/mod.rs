@@ -8,6 +8,6 @@ pub mod nt_world_sense {
 // 计算机视觉模块
 pub mod nt_sense_cv;
 
-// nt_memory_spatial: moved back to L1 (spatial storage, no L2 deps)
+
 
 // nt_infra_semantic_router: moved back to L1 (infrastructure, no L2 deps)

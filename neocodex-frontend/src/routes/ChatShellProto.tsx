@@ -12,6 +12,7 @@ import { Plus, Search, PanelLeftClose, Sparkles, Settings, ChevronDown, Pin, Cop
 import { clsx } from 'clsx'
 import { Markdown } from '../components/Markdown'
 import { subscribeStream, sendMessageStream, stopStream as stopStreamRemote } from '../api'
+import { chat, session } from '../api/domain'
 import { pickAndParseDoc, type ParsedDocFile } from '../api/files'
 import { openDirectoryDialog } from '../api/fs'
 import { isTauriRuntime } from '../lib/env'
@@ -40,15 +41,50 @@ export function ChatShellProto() {
   const SELF_MODELS = ['cli-session']
   const [gatewayModels, setGatewayModels] = createSignal<string[]>(['llm7', 'pollinations'])
   const modelOptions = () => [...SELF_MODELS, ...gatewayModels().filter((m) => !SELF_MODELS.includes(m))]
-  const loadSessions = (): Session[] => {
+  const [sessions, setSessions] = createSignal<Session[]>([])
+  const [activeId, setActiveId] = createSignal<string | null>(null)
+  const [loadingSessions, setLoadingSessions] = createSignal(false)
+
+  // Load sessions from real backend
+  const loadSessions = async () => {
+    setLoadingSessions(true)
     try {
-      const raw = localStorage.getItem('neotrix-proto-sessions')
-      if (raw) return JSON.parse(raw) as Session[]
-    } catch { /* 忽略损坏数据 */ }
-    return seedSessions()
+      const backendSessions = await session.list()
+      const mapped: Session[] = backendSessions.map((s) => ({
+        id: s.id,
+        title: s.name || '新对话',
+        tags: s.tags ?? [],
+        project: s.project || DEFAULT_PROJECT,
+        messages: [],
+      }))
+      setSessions(mapped)
+      if (mapped.length > 0 && !activeId()) {
+        setActiveId(mapped[0].id)
+        await loadSessionMessages(mapped[0].id)
+      }
+    } catch {
+      // Fallback: create a local session if backend unavailable
+      const fallback: Session = { id: `s${Date.now()}`, title: '新对话', project: DEFAULT_PROJECT, messages: [] }
+      setSessions([fallback])
+      setActiveId(fallback.id)
+    } finally {
+      setLoadingSessions(false)
+    }
   }
-  const [sessions, setSessions] = createSignal<Session[]>(loadSessions())
-  const [activeId, setActiveId] = createSignal('s2')
+
+  // Load messages for a session from backend
+  const loadSessionMessages = async (sessionId: string) => {
+    try {
+      const backendMessages = await chat.history(sessionId)
+      const msgs: Msg[] = backendMessages.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }))
+      setSessions((all) => all.map((s) => (s.id === sessionId ? { ...s, messages: msgs } : s)))
+    } catch {
+      // Messages may not exist yet for new sessions
+    }
+  }
   const [draft, setDraft] = createSignal('')
   const [streaming, setStreaming] = createSignal(false)
   const [copiedId, setCopiedId] = createSignal<string | null>(null)
@@ -176,7 +212,7 @@ export function ChatShellProto() {
   let streamTimer: ReturnType<typeof setInterval> | undefined
   let unlisten: (() => void) | null = null
   createEffect(() => {
-    try { localStorage.setItem('neotrix-proto-sessions', JSON.stringify(sessions())) } catch { /* 容量满忽略 */ }
+    try { localStorage.setItem('neotrix-proto-active', activeId() ?? '') } catch { /* ignore */ }
   })
 
   // ── 标签自完善引擎 (无需人工提示的后台自省): 关键词推导+去重规范化 ──
@@ -213,6 +249,9 @@ export function ChatShellProto() {
     }
   })
   onMount(() => {
+    // Load sessions from real backend on mount
+    void loadSessions()
+
     const close = () => setOpenKebab(null)
     window.addEventListener('click', close)
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
@@ -265,8 +304,11 @@ export function ChatShellProto() {
   }
 
   const active = () => sessions().find((s) => s.id === activeId()) ?? sessions()[0]
-  const setMsgs = (fn: (m: Msg[]) => Msg[]) =>
-    setSessions((all) => all.map((s) => (s.id === activeId() ? { ...s, messages: fn(s.messages) } : s)))
+  const setMsgs = (fn: (m: Msg[]) => Msg[]) => {
+    const id = activeId()
+    if (!id) return
+    setSessions((all) => all.map((s) => (s.id === id ? { ...s, messages: fn(s.messages) } : s)))
+  }
 
   const allTags = () => {
     const set = new Set<string>()
@@ -386,25 +428,48 @@ export function ChatShellProto() {
     })
   }
 
-  function newChat(project?: string) {
-    const s: Session = { id: `s${Date.now()}`, title: '新对话', project: project ?? DEFAULT_PROJECT, messages: [] }
-    setSessions((all) => [s, ...all])
-    setCollapsedProjects((arr) => arr.filter((x) => x !== s.project))
-    setActiveId(s.id)
-    setDraft('')
+  async function newChat(project?: string) {
+    const proj = project ?? DEFAULT_PROJECT
+    try {
+      const created = await session.create('新对话')
+      const s: Session = { id: created.id, title: created.name || '新对话', project: proj, messages: [] }
+      setSessions((all) => [s, ...all])
+      setCollapsedProjects((arr) => arr.filter((x) => x !== proj))
+      setActiveId(s.id)
+      setDraft('')
+    } catch {
+      // Fallback to local session
+      const s: Session = { id: `s${Date.now()}`, title: '新对话', project: proj, messages: [] }
+      setSessions((all) => [s, ...all])
+      setCollapsedProjects((arr) => arr.filter((x) => x !== proj))
+      setActiveId(s.id)
+      setDraft('')
+    }
   }
 
-  function commitRename(id: string) {
+  async function commitRename(id: string) {
     const v = renameVal().trim()
-    if (v) setSessions((all) => all.map((x) => (x.id === id ? { ...x, title: v } : x)))
+    if (v) {
+      setSessions((all) => all.map((x) => (x.id === id ? { ...x, title: v } : x)))
+      try { await session.rename(id, v) } catch { /* backend rename failed, local updated */ }
+    }
     setRenamingId(null)
   }
 
-  function deleteSession(id: string) {
+  async function deleteSession(id: string) {
+    try {
+      await session.delete(id)
+    } catch {
+      // Continue with local removal even if backend fails
+    }
     setSessions((all) => {
       if (all.length <= 1) return all
       const rest = all.filter((x) => x.id !== id)
-      if (activeId() === id) setActiveId(rest[0].id)
+      if (activeId() === id) {
+        const nextId = rest[0]?.id ?? null
+        setActiveId(nextId)
+        if (nextId) void loadSessionMessages(nextId)
+      }
       return rest
     })
   }
@@ -414,7 +479,11 @@ export function ChatShellProto() {
     if (streaming()) return
         if (!content && !regen) return
     // 首条消息即会话标题 (Claude 式)
-    setSessions((all) => all.map((s) => (s.id === activeId() && s.title === '新对话' ? { ...s, title: content.slice(0, 18) } : s)))
+    const titleText = content.slice(0, 18)
+    setSessions((all) => all.map((s) => (s.id === activeId() && s.title === '新对话' ? { ...s, title: titleText } : s)))
+    // Persist title to backend
+    const currentId = activeId()
+    if (currentId) void session.rename(currentId, titleText).catch(() => {})
     if (!regen) {
       let annotated = content
       for (const a of attachments()) {
@@ -602,7 +671,7 @@ export function ChatShellProto() {
                                   'flex-1 min-w-0 text-left px-2.5 py-1.5 text-[13px] truncate flex items-center gap-1.5',
                                   s.id === activeId() ? 'text-text-primary font-medium' : 'text-text-muted hover:text-text-primary',
                                 )}
-                                onClick={() => { if (renamingId() !== s.id) setActiveId(s.id) }}
+                                onClick={() => { if (renamingId() !== s.id) { setActiveId(s.id); void loadSessionMessages(s.id) } }}
                                 onDblClick={() => { setRenamingId(s.id); setRenameVal(s.title) }}
                                 title={`${s.title} · ${s.project}`}
                               >
@@ -1021,7 +1090,7 @@ export function ChatShellProto() {
 <SettingRow label={prefs().lang === 'zh' ? '清空演示数据' : 'Clear Demo Data'}>
                     <button class="h-7 px-3 rounded-lg text-[12px] border border-red-200 text-red-500 hover:bg-red-50"
                       onClick={() => {
-                        ;['neotrix-proto-sessions','neotrix-proto-prefs','neotrix-proto-projects','neotrix-proto-files'].forEach((k)=>localStorage.removeItem(k))
+                        ;['neotrix-proto-prefs','neotrix-proto-projects','neotrix-proto-files','neotrix-proto-active'].forEach((k)=>localStorage.removeItem(k))
                         location.reload()
                       }}>
                       {prefs().lang === 'zh' ? '清除并重启' : 'Reset'}

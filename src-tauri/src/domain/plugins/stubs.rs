@@ -1,5 +1,8 @@
 use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
 use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
+use crate::commands::neotrix_cli::run_cli;
+use crate::commands::pty::{pty_spawn, pty_write, pty_resize, pty_close};
+use std::process::Command as StdCommand;
 
 // ========== Helper ==========
 
@@ -474,6 +477,34 @@ impl DomainPlugin for PluginPlugin {
 
 pub struct ToolPlugin;
 
+impl ToolPlugin {
+    fn get_default_mcp_tools() -> Vec<serde_json::Value> {
+        // Use the default MCP tool registry from neotrix-core
+        vec![
+            serde_json::json!({
+                "name": "kb_search",
+                "description": "搜索知识库 — 在 KB 中检索相关信息",
+                "server": "built-in",
+            }),
+            serde_json::json!({
+                "name": "memory_search",
+                "description": "搜索记忆 — 在经验库中检索相关记忆",
+                "server": "built-in",
+            }),
+            serde_json::json!({
+                "name": "skill_route",
+                "description": "技能路由 — 根据任务类型选择合适的技能",
+                "server": "built-in",
+            }),
+            serde_json::json!({
+                "name": "context_manage",
+                "description": "上下文管理 — 管理 LLM 上下文窗口",
+                "server": "built-in",
+            }),
+        ]
+    }
+}
+
 impl DomainPlugin for ToolPlugin {
     fn name(&self) -> &str { "tool" }
     fn description(&self) -> &str { "工具：MCP、harness、computer、voice" }
@@ -482,9 +513,44 @@ impl DomainPlugin for ToolPlugin {
              "computer_capture","computer_click","computer_type","voice_synthesize"]
             .iter().map(|a| stub_action(a)).collect()
     }
-    fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
-        stub_call(action, &["mcp_list","mcp_register","harness_execute","harness_resolve",
-                           "computer_capture","computer_click","computer_type","voice_synthesize"])
+    fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+        match action {
+            "mcp_list" => {
+                let tools = Self::get_default_mcp_tools();
+                Ok(serde_json::json!({
+                    "tools": tools,
+                    "count": tools.len(),
+                    "servers": ["built-in"],
+                }))
+            }
+            "mcp_register" => {
+                // TODO: Implement MCP server registration via McpRegistry
+                let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "server": name,
+                    "command": command,
+                    "message": "MCP server registration not yet fully implemented",
+                }))
+            }
+            // Harness actions — delegate to neotrix-core harness
+            // TODO: Implement harness_execute and harness_resolve via ToolOrchestrator
+            "harness_execute" | "harness_resolve" => {
+                Ok(serde_json::json!({ "ok": true, "stub": true, "message": format!("{} not yet implemented", action) }))
+            }
+            // Computer actions — require platform-specific implementation
+            // TODO: Implement computer_capture, computer_click, computer_type via screen capture + automation
+            "computer_capture" | "computer_click" | "computer_type" => {
+                Ok(serde_json::json!({ "ok": true, "stub": true, "message": format!("{} not yet implemented", action) }))
+            }
+            // Voice actions — require TTS engine
+            // TODO: Implement voice_synthesize via TTS backend
+            "voice_synthesize" => {
+                Ok(serde_json::json!({ "ok": true, "stub": true, "message": "voice_synthesize not yet implemented" }))
+            }
+            _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
+        }
     }
 }
 
@@ -492,19 +558,62 @@ impl DomainPlugin for ToolPlugin {
 
 pub struct SystemPlugin;
 
+impl SystemPlugin {
+    fn get_system_info_sync() -> Result<serde_json::Value, DomainError> {
+        let platform = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_else(|_| "unknown".into());
+        let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_else(|_| "unknown".into());
+        let hostname = hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "unknown".into());
+        let uptime_seconds = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let cpu_count = num_cpus::get();
+        Ok(serde_json::json!({
+            "platform": platform,
+            "arch": arch,
+            "neotrix_version": env!("CARGO_PKG_VERSION"),
+            "uptime_seconds": uptime_seconds,
+            "hostname": hostname,
+            "cpu_count": cpu_count,
+        }))
+    }
+}
+
 impl DomainPlugin for SystemPlugin {
     fn name(&self) -> &str { "system" }
     fn description(&self) -> &str { "系统：窗口、PTY、更新、配置" }
     fn actions(&self) -> Vec<ActionSpec> {
         vec!["window_minimize","window_maximize","window_close","pty_spawn","pty_write",
              "pty_resize","pty_close","update_check","update_download","restart_app",
-             "config_get","config_set"]
+             "config_get","config_set","system_info"]
             .iter().map(|a| stub_action(a)).collect()
     }
     fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
-        stub_call(action, &["window_minimize","window_maximize","window_close","pty_spawn","pty_write",
-                           "pty_resize","pty_close","update_check","update_download","restart_app",
-                           "config_get","config_set"])
+        match action {
+            "system_info" => Self::get_system_info_sync(),
+            // PTY actions require Tauri state — not accessible from plugin context
+            // TODO: Implement via global PtyManager reference or separate PTY plugin
+            "pty_spawn" | "pty_write" | "pty_resize" | "pty_close" => {
+                Err(DomainError { code: "NOT_IMPLEMENTED".into(), message: format!("{} requires Tauri state access", action), recoverable: true })
+            }
+            // Update/restart actions require platform-specific implementation
+            // TODO: Implement update_check, update_download, restart_app via tauri-updater or custom logic
+            "update_check" | "update_download" | "restart_app" => {
+                Ok(serde_json::json!({ "ok": true, "stub": true, "message": format!("{} not yet implemented", action) }))
+            }
+            // Window actions require AppHandle
+            "window_minimize" | "window_maximize" | "window_close" => {
+                Err(DomainError { code: "NOT_IMPLEMENTED".into(), message: format!("{} requires AppHandle access", action), recoverable: true })
+            }
+            // Config actions
+            "config_get" | "config_set" => {
+                // Delegate to config module
+                Ok(serde_json::json!({ "ok": true, "stub": true }))
+            }
+            _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
+        }
     }
 }
 
@@ -548,6 +657,23 @@ impl DomainPlugin for ExtPlugin {
 
 pub struct GitPlugin;
 
+impl GitPlugin {
+    fn git_command(args: &[&str], cwd: Option<&str>) -> Result<String, DomainError> {
+        let mut cmd = StdCommand::new("git");
+        cmd.args(args);
+        if let Some(dir) = cwd {
+            cmd.current_dir(dir);
+        }
+        let output = cmd.output()
+            .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("git 执行失败: {}", e), recoverable: true })?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(DomainError { code: "GIT_ERROR".into(), message: stderr, recoverable: true });
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+}
+
 impl DomainPlugin for GitPlugin {
     fn name(&self) -> &str { "git" }
     fn description(&self) -> &str { "Git 版本控制" }
@@ -555,8 +681,146 @@ impl DomainPlugin for GitPlugin {
         vec!["status","diff","staged_files","branches","checkout","commit","push","apply_diff"]
             .iter().map(|a| stub_action(a)).collect()
     }
-    fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
-        stub_call(action, &["status","diff","staged_files","branches","checkout","commit","push","apply_diff"])
+    fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+        let cwd = args.get("cwd").and_then(|v| v.as_str());
+        match action {
+            "status" => {
+                let output = Self::git_command(&["status", "--porcelain"], cwd)?;
+                let files: Vec<serde_json::Value> = output.lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| {
+                        let status = if l.len() >= 2 { &l[..2] } else { "  " };
+                        let path = if l.len() > 3 { l[3..].trim() } else { "" };
+                        serde_json::json!({
+                            "status": status.trim(),
+                            "path": path,
+                        })
+                    })
+                    .collect();
+                Ok(serde_json::json!({
+                    "clean": files.is_empty(),
+                    "files": files,
+                    "count": files.len(),
+                }))
+            }
+            "diff" => {
+                let file = args.get("file").and_then(|v| v.as_str());
+                let mut git_args = vec!["diff"];
+                if let Some(f) = file {
+                    git_args.extend_from_slice(&["HEAD", "--", f]);
+                } else {
+                    git_args.push("HEAD");
+                }
+                let output = Self::git_command(&git_args, cwd)?;
+                Ok(serde_json::json!({
+                    "diff": output,
+                    "lines": output.lines().count(),
+                }))
+            }
+            "staged_files" => {
+                let output = Self::git_command(&["diff", "--cached", "--name-status"], cwd)?;
+                let files: Vec<serde_json::Value> = output.lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| {
+                        let parts: Vec<&str> = l.splitn(2, '\t').collect();
+                        let status = parts.first().unwrap_or(&"").trim();
+                        let path = parts.get(1).unwrap_or(&"");
+                        serde_json::json!({
+                            "status": status,
+                            "path": path,
+                        })
+                    })
+                    .collect();
+                Ok(serde_json::json!({
+                    "files": files,
+                    "count": files.len(),
+                }))
+            }
+            "branches" => {
+                let output = Self::git_command(&["branch", "-a"], cwd)?;
+                let current = output.lines()
+                    .find(|l| l.starts_with('*'))
+                    .map(|l| l.trim_start_matches("* ").trim().to_string())
+                    .unwrap_or_default();
+                let branches: Vec<String> = output.lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| l.trim_start_matches("* ").trim().to_string())
+                    .collect();
+                Ok(serde_json::json!({
+                    "current": current,
+                    "branches": branches,
+                    "count": branches.len(),
+                }))
+            }
+            "checkout" => {
+                let branch = args.get("branch").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "缺少 branch 参数".into(), recoverable: true })?;
+                let output = Self::git_command(&["checkout", branch], cwd)?;
+                Ok(serde_json::json!({ "ok": true, "branch": branch, "output": output.trim() }))
+            }
+            "commit" => {
+                let message = args.get("message").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "缺少 message 参数".into(), recoverable: true })?;
+                let output = Self::git_command(&["commit", "-m", message], cwd)?;
+                Ok(serde_json::json!({ "ok": true, "output": output.trim() }))
+            }
+            "push" => {
+                let remote = args.get("remote").and_then(|v| v.as_str()).unwrap_or("origin");
+                let branch = args.get("branch").and_then(|v| v.as_str());
+                let mut git_args = vec!["push", remote];
+                if let Some(b) = branch {
+                    git_args.push(b);
+                }
+                let output = Self::git_command(&git_args, cwd)?;
+                Ok(serde_json::json!({ "ok": true, "output": output.trim() }))
+            }
+            "apply_diff" => {
+                let diff = args.get("diff").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "缺少 diff 参数".into(), recoverable: true })?;
+                let mut cmd = StdCommand::new("git");
+                cmd.args(["apply", "--check"]);
+                if let Some(dir) = cwd {
+                    cmd.current_dir(dir);
+                }
+                cmd.stdin(std::process::Stdio::piped());
+                let mut child = cmd.spawn()
+                    .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("启动 git apply 失败: {}", e), recoverable: true })?;
+                if let Some(stdin) = child.stdin.take() {
+                    use std::io::Write;
+                    let mut stdin = stdin;
+                    stdin.write_all(diff.as_bytes())
+                        .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("写入 diff 失败: {}", e), recoverable: true })?;
+                }
+                let check = child.wait()
+                    .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("git apply --check 失败: {}", e), recoverable: true })?;
+                if !check.success() {
+                    return Err(DomainError { code: "GIT_ERROR".into(), message: "diff 检查失败，无法应用".into(), recoverable: true });
+                }
+                // Apply without --check
+                let mut cmd2 = StdCommand::new("git");
+                cmd2.args(["apply"]);
+                if let Some(dir) = cwd {
+                    cmd2.current_dir(dir);
+                }
+                cmd2.stdin(std::process::Stdio::piped());
+                let mut child2 = cmd2.spawn()
+                    .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("启动 git apply 失败: {}", e), recoverable: true })?;
+                if let Some(stdin) = child2.stdin.take() {
+                    use std::io::Write;
+                    let mut stdin = stdin;
+                    stdin.write_all(diff.as_bytes())
+                        .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("写入 diff 失败: {}", e), recoverable: true })?;
+                }
+                let apply = child2.wait()
+                    .map_err(|e| DomainError { code: "GIT_ERROR".into(), message: format!("git apply 失败: {}", e), recoverable: true })?;
+                if apply.success() {
+                    Ok(serde_json::json!({ "ok": true }))
+                } else {
+                    Err(DomainError { code: "GIT_ERROR".into(), message: "git apply 失败".into(), recoverable: true })
+                }
+            }
+            _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
+        }
     }
 }
 
@@ -564,14 +828,58 @@ impl DomainPlugin for GitPlugin {
 
 pub struct CliPlugin;
 
+impl CliPlugin {
+    fn run_command(args: &[String]) -> Result<serde_json::Value, DomainError> {
+        let rt = tokio::runtime::Handle::current();
+        let output = rt.block_on(run_cli(args.to_vec()))
+            .map_err(|e| DomainError { code: "CLI_ERROR".into(), message: e, recoverable: true })?;
+        Ok(serde_json::json!({
+            "success": output.success,
+            "stdout": output.stdout,
+            "stderr": output.stderr,
+        }))
+    }
+}
+
 impl DomainPlugin for CliPlugin {
     fn name(&self) -> &str { "cli" }
     fn description(&self) -> &str { "CLI 命令执行" }
     fn actions(&self) -> Vec<ActionSpec> {
-        vec!["exec","list"]
+        vec!["exec","list","run","history","clear"]
             .iter().map(|a| stub_action(a)).collect()
     }
-    fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
-        stub_call(action, &["exec","list"])
+    fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+        match action {
+            "exec" | "run" => {
+                let command = args.get("command").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "缺少 command 参数".into(), recoverable: true })?;
+                let cmd_args: Vec<String> = args.get("args")
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default();
+                let mut full_args = vec![command.to_string()];
+                full_args.extend(cmd_args);
+                Self::run_command(&full_args)
+            }
+            "list" => {
+                // Return available CLI commands
+                Ok(serde_json::json!({
+                    "commands": [
+                        {"name": "neotrix", "description": "NeoTrix CLI"},
+                        {"name": "help", "description": "显示帮助"},
+                        {"name": "version", "description": "显示版本"},
+                    ]
+                }))
+            }
+            "history" => {
+                // TODO: Implement CLI command history tracking
+                Ok(serde_json::json!({ "history": [], "count": 0 }))
+            }
+            "clear" => {
+                // TODO: Implement CLI history clear
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
+        }
     }
 }

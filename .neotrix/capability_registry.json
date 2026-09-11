@@ -93,6 +93,110 @@
           "provides": ["auto_parse", "xlsx_read", "csv_read", "template_detect", "parse_config", "extract_metadata"],
           "self_test": true,
           "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::pdf_edit::pdfedit",
+          "name": "PDF 编辑",
+          "level": "L1_Composite",
+          "provides": ["pdf_edit", "pdf_page_edit", "pdf_text_edit"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::pdf_icon_enhance::PdfIconEnhancer",
+          "name": "PDF 图标增强管线",
+          "level": "L2_Orchestrator",
+          "provides": ["pdf_icon_enhance", "pdf_extract_sr_embed"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::pdf_image_extract::XObjectImageIterator",
+          "name": "PDF 图像提取",
+          "level": "L1_Composite",
+          "provides": ["pdf_image_extract", "pdf_xobject_traverse", "pdf_embedded_images"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::helpers::merge_pdfs",
+          "name": "PDF 合并",
+          "level": "L0_Primitive",
+          "provides": ["pdf_merge"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::image_super_resolution::ImageSuperResolver",
+          "name": "图像超分辨率 (12 模型)",
+          "level": "L1_Composite",
+          "provides": ["image_super_resolve", "image_upscale", "image_sr_model_select"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::merge_docx::merge_docx",
+          "name": "DOCX/PPTX 文档合并",
+          "level": "L1_Composite",
+          "provides": ["docx_merge", "pptx_merge", "office_merge"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::doc_parse::anyparse",
+          "name": "anycdoc 统一文档解析",
+          "level": "L2_Orchestrator",
+          "provides": ["doc_parse", "anyparse", "unified_doc_parse"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::visual::route_prompt",
+          "name": "视觉理解 Prompt 路由",
+          "level": "L2_Orchestrator",
+          "provides": ["visual_route", "vision_prompt_route"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::grounding::validate_tokens",
+          "name": "数值 token grounding 校验",
+          "level": "L1_Composite",
+          "provides": ["grounding_validate", "token_grounding"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::ocr::OcrEngine",
+          "name": "OCR 接口",
+          "level": "L1_Composite",
+          "provides": ["ocr_extract", "ocr_recognize"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::format_route::route_format",
+          "name": "文档格式路由",
+          "level": "L1_Composite",
+          "provides": ["format_route", "doc_format_route"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::structured::read_write",
+          "name": "JSON/YAML 结构化读写",
+          "level": "L0_Primitive",
+          "provides": ["structured_read", "structured_write", "json_yaml_rw"],
+          "self_test": false,
+          "constellation": "C2"
+        },
+        {
+          "id": "nt_file_ability::encoding::detect_encoding",
+          "name": "文本编码检测",
+          "level": "L0_Primitive",
+          "provides": ["encoding_detect", "text_encoding_detect"],
+          "self_test": false,
+          "constellation": "C2"
         }
       ]
     }

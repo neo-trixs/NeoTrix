@@ -9,9 +9,11 @@ use reqwest::{
     Proxy,
 };
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::fs;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::sync::Semaphore;
 use tokio::time::{interval, timeout};
 
 /// 下载引擎配置
@@ -62,7 +64,11 @@ impl DownloadEngine {
         let mut builder = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .connect_timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(config.chunk_count);
+            .pool_max_idle_per_host(config.chunk_count + 4)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_nodelay(true)
+            .redirect(reqwest::redirect::Policy::limited(10))
+            .user_agent("NeoTrix/1.0 (download-engine)");
 
         // 关键: 禁止自动解压, 避免 HuggingFace CDN 流式下载 error decoding
         builder = builder.no_gzip().no_brotli().no_deflate();
@@ -223,14 +229,14 @@ impl DownloadEngine {
             DownloadError::Io(format!("create tmp dir: {}", e))
         })?;
 
-        // 并发下载各片
-        let mut handles = Vec::new();
+        // Semaphore 并发控制
+        let semaphore = Arc::new(Semaphore::new(actual_chunks));
+        let mut handles = Vec::with_capacity(actual_chunks);
 
         for i in 0..actual_chunks {
             let start = existing_bytes + (i as u64) * chunk_size;
             let end = if i == actual_chunks - 1 {
-                // 最后一片：下载到末尾
-                if total_size > 0 { total_size - 1 } else { 0 } // 0 = unknown, will use full download
+                if total_size > 0 { total_size - 1 } else { 0 }
             } else {
                 existing_bytes + ((i + 1) as u64) * chunk_size - 1
             };
@@ -239,35 +245,41 @@ impl DownloadEngine {
             let url = url.clone();
             let client = self.client.clone();
             let timeout_secs = self.config.timeout_secs;
+            let permit = semaphore.clone().acquire_owned().await
+                .map_err(|e| DownloadError::Network(format!("semaphore: {}", e)))?;
 
             let handle = tokio::spawn(async move {
+                let _permit = permit; // hold until done
                 download_chunk_to_file(&client, &url, start, end, total_size, &chunk_file, timeout_secs).await
             });
             handles.push((i, handle, chunk_file));
         }
 
-        // 等待所有片完成
+        // 等待所有片完成, 实时追踪速度
         let mut total_downloaded = existing_bytes;
         let loop_start = SystemTime::now();
-        for (i, handle, chunk_file) in handles {
+        for (i, handle, _chunk_file) in handles {
             match handle.await {
                 Ok(Ok(chunk_bytes)) => {
                     total_downloaded += chunk_bytes;
+                    let elapsed = loop_start.elapsed().unwrap_or_default().as_secs_f64();
                     if total_size > 0 {
                         session.progress.percent = (total_downloaded as f32 / total_size as f32) * 100.0;
+                        session.progress.total = total_size;
                     }
                     session.progress.downloaded = total_downloaded;
-                    let elapsed = loop_start.elapsed().unwrap_or_default().as_secs_f64();
-                    if elapsed > 0.0 {
+                    if elapsed > 0.5 {
                         session.progress.speed = (total_downloaded - existing_bytes) as f64 / elapsed;
                     }
-                    if session.progress.speed > 0.0 {
+                    if session.progress.speed > 0.0 && total_size > total_downloaded {
                         session.progress.eta = Some((total_size - total_downloaded) as f64 / session.progress.speed);
                     }
                     session.updated_at = SystemTime::now();
+                    let speed_mib = session.progress.speed / 1048576.0;
+                    let eta_str = session.progress.eta.map(|e| format!("{:.0}s", e)).unwrap_or_else(|| "?".into());
                     eprintln!(
-                        "[download] chunk {} done: +{}MB total={:.1}%",
-                        i, chunk_bytes / 1024 / 1024, session.progress.percent
+                        "[download] chunk {} done: +{}MB {:.1}% {:.1}MiB/s ETA:{}",
+                        i, chunk_bytes / 1024 / 1024, session.progress.percent, speed_mib, eta_str
                     );
                 }
                 Ok(Err(e)) => {

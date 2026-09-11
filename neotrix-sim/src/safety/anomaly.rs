@@ -66,8 +66,7 @@ impl AnomalyDetector {
         // Rebuild baseline from history
         if behaviors.len() >= 5 {
             let snapshot = behaviors.clone();
-            drop(snapshot); // release the clone
-            let baseline = self.compute_baseline(&behaviors);
+            let baseline = self.compute_baseline(&snapshot);
             self.baselines.insert(agent.id, baseline);
         }
     }
