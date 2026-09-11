@@ -239,7 +239,7 @@ async fn download_chunk(
     let resp = tokio::time::timeout(
         Duration::from_secs(timeout_secs),
         req.send(),
-    ).await.map_err(|_| "timeout".into())?
+    ).await.map_err(|_| String::from("timeout"))?
      .map_err(|e| e.to_string())?;
 
     let status = resp.status();

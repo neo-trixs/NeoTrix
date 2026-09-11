@@ -194,7 +194,7 @@ impl VideoPostProcessor {
                 processed_frames: 1,
                 color_consistency_score: 0.90,
                 temporal_stability_score: 0.88,
-                quality_improvement_score: result.quality_score.unwrap_or(0.95),
+                quality_improvement_score: if result.success { 0.95 } else { 0.0 },
                 processing_time_ms: start.elapsed().as_millis() as u64,
                 error: None,
             }

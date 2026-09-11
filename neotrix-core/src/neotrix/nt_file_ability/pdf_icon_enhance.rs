@@ -287,7 +287,7 @@ impl PdfIconEnhancer {
                 if let Ok(dict) = obj.as_dict_mut() {
                     // 更新图像尺寸
                     if let Ok(width_obj) = dict.get_mut(b"Width") {
-                        *width_obj = lopdf::Object::new(0, 0, lopdf::Object::Integer(img_info.0 as i64));
+                        *width_obj = lopdf::Object::Integer(img_info.0 as i64);
                     }
                     if let Ok(height_obj) = dict.get_mut(b"Height") {
                         *height_obj = lopdf::Object::Integer(img_info.1 as i64);

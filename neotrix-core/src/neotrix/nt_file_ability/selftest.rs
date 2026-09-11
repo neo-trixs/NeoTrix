@@ -77,7 +77,7 @@ impl SelfTest for ImageSuperResolutionSelfTest {
                 errors.push(format!("Model display_name() should not be empty for {:?}", model));
             }
             
-            let tile_size = model.recommended_tile_size();
+            let _tile_size = model.recommended_tile_size();
             let overlap = model.recommended_overlap();
             
             // Lanczos 不应有 overlap
