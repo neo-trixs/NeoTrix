@@ -4,12 +4,12 @@ use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ParsedItem {
-    UseStatement { target: String, #[allow(dead_code)] line: usize },
+    UseStatement { target: String, line: usize },
     Function { name: String, line: usize, calls: Vec<String> },
     StructDef { name: String, line: usize },
     TraitDef { name: String, line: usize },
-    ImplBlock { #[allow(dead_code)] trait_name: Option<String>, #[allow(dead_code)] struct_name: String, #[allow(dead_code)] line: usize },
-    ModDecl { #[allow(dead_code)] name: String, #[allow(dead_code)] line: usize },
+    ImplBlock { trait_name: Option<String>, struct_name: String, line: usize },
+    ModDecl { name: String, line: usize },
 }
 
 pub(crate) fn parse_rust_file(content: &str) -> Vec<ParsedItem> {

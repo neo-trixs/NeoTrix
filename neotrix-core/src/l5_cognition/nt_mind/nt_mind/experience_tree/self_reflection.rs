@@ -73,7 +73,6 @@ impl ReflectionBuffer {
 /// Self-reflection engine — generates verbal reflections and updates the buffer.
 pub struct SelfReflectionEngine {
     buffer: Arc<std::sync::Mutex<ReflectionBuffer>>,
-    #[allow(dead_code)]
     kb: Option<Arc<KnowledgeBase>>,
 }
 

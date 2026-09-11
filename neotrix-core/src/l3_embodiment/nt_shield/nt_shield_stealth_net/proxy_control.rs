@@ -76,7 +76,6 @@ impl ProxyControl {
         self.mode.clone()
     }
 
-    #[allow(dead_code)]
     pub(crate) fn activity_ref(&self) -> Arc<RwLock<ActivityTracker>> {
         self.activity.clone()
     }

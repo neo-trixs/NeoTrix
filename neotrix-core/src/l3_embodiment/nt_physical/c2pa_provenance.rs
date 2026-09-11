@@ -73,7 +73,6 @@ pub enum VerificationResult {
 }
 
 /// C2PA 溯源验证器
-#[allow(dead_code)]
 pub struct C2paProvenance {
     /// C2PA 声明存储
     claims: HashMap<String, C2paClaim>,

@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 知识管线增强
-#[allow(dead_code)]
 pub struct KnowledgePipelineEnhanced {
     pipelines: Vec<KnowledgePipeline>,
     concepts: Vec<ConceptNode>,

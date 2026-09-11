@@ -11,7 +11,6 @@
 use serde::{Deserialize, Serialize};
 
 /// Sentrux 传感器 — 架构质量监控核心
-#[allow(dead_code)]
 pub struct SentruxSensor {
     rules: RulesEngine,
     baseline: Option<QualitySnapshot>,

@@ -5,7 +5,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::super::core::FileAbility;
-use super::super::super::types::FileKind;
+use crate::neotrix::nt_file_ability::types::FileKind;
 
 /// OCR 引擎抽象 — 图像 → 文字识别。
 ///

@@ -190,7 +190,6 @@ pub struct ReasoningStep {
 pub struct ControlDistiller {
     detector: TakeoverDetector,
     signal_generator: ControlSignalGenerator,
-    #[allow(dead_code)]
     gold_standard: Arc<ConsciousnessGoldStandard>,
 }
 
@@ -287,7 +286,6 @@ impl ControlDistiller {
 #[derive(Default)]
 pub struct ControlSignalGenerator {
     // 模板: control_type -> (system_prompt, few_shot_examples)
-    #[allow(dead_code)]
     templates: HashMap<ControlType, (&'static str, Vec<(&'static str, &'static str)>)>,
 }
 

@@ -16,7 +16,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::super::excel::tables::{read_csv, read_xlsx_sheets_all, write_csv, write_xlsx_table};
-use super::super::super::types::{FileAbilityError, Result, TableData};
+use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result, TableData};
 
 /// 单重/尺寸等列的补单位规则
 #[derive(Debug, Clone, Copy)]
@@ -1346,7 +1346,7 @@ fn dispatch_collection_merge(
 ) -> Result<MergeOutcome> {
     let all = |e: &str| exts.iter().all(|x| x == e);
     if all("pdf") {
-        let bytes = super::super::helpers::merge_pdfs(&req.inputs)?;
+        let bytes = crate::neotrix::nt_file_ability::helpers::merge_pdfs(&req.inputs)?;
         std::fs::write(&req.output, &bytes).map_err(FileAbilityError::Io)?;
         let pages = neotrix_types::core::file_parser::FileParser::extract_pdf_pages(&bytes).len();
         return Ok(MergeOutcome::Pdf { pages });
@@ -1387,7 +1387,7 @@ fn dispatch_collection_merge(
     let mut chunks: Vec<String> = Vec::new();
     let mut failed = 0usize;
     for p in &req.inputs {
-        match super::super::helpers::extract_text(p) {
+        match crate::neotrix::nt_file_ability::helpers::extract_text(p) {
             Ok(text) => {
                 let name = p
                     .file_name()

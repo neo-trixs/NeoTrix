@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 并发隔离测试器
-#[allow(dead_code)]
 pub struct ConcurrencyIsolationTester {
     test_sessions: Vec<TestSession>,
     isolation_configs: Vec<IsolationConfig>,

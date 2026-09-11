@@ -10,7 +10,6 @@ pub(super) const STEALTH_CONNECT_TIMEOUT_SECS: u64 = 3;
 pub(super) const STEALTH_POOL_MAX_IDLE: usize = 16;
 pub(super) const STEALTH_POOL_IDLE_TIMEOUT_SECS: u64 = 20;
 
-#[allow(dead_code)]
 pub(super) const DOH_SERVERS: &[&str] = &[
     "https://cloudflare-dns.com/dns-query",
     "https://dns.google/dns-query",

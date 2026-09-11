@@ -97,7 +97,6 @@ pub struct ImprovementRecord {
 }
 
 /// 学习循环
-#[allow(dead_code)]
 pub struct LearningLoop {
     experiences: Vec<Experience>,
     patterns: Vec<LearningPattern>,

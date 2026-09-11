@@ -41,7 +41,6 @@ impl Default for WatchdogConfig {
 }
 
 /// 构建监控器
-#[allow(dead_code)]
 pub struct BuildMonitor {
     monitor_id: String,
     monitor_type: String,

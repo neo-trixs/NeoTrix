@@ -61,10 +61,8 @@ pub struct SpatialModel {
 
 #[derive(Debug, Clone)]
 struct OccupantTrace {
-    #[allow(dead_code)] // kept for future occupant tracking analysis
     id: String,
     current_zone: Option<String>,
-    #[allow(dead_code)] // kept for temporal pattern mining
     first_seen: i64,
     last_seen: i64,
     total_visits: usize,

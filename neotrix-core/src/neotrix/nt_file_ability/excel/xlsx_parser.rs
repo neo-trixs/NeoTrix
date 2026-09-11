@@ -61,7 +61,7 @@
 use std::path::Path;
 
 use super::super::excel::tables;
-use super::super::super::types::{FileAbilityError, Result, TableData};
+use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result, TableData};
 use super::super::excel::xlsx_fast;
 
 /// 解析模式

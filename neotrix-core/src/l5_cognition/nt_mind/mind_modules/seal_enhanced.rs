@@ -9,7 +9,6 @@
 use serde::{Deserialize, Serialize};
 
 /// SEAL 管线增强版
-#[allow(dead_code)]
 pub struct SEALPipelineEnhanced {
     stages: Vec<SEALStage>,
     failure_library: FailureLibrary,

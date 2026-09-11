@@ -89,7 +89,6 @@ pub enum IssueType {
 #[derive(Debug, Clone)]
 pub struct PersistentIssueTracker {
     pub issues: Vec<IssueTrackerItem>,
-    #[allow(dead_code)] // kept for future disk persistence operations
     storage_path: String,
     counter: u64,
 }

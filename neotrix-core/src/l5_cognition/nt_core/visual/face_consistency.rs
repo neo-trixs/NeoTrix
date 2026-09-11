@@ -117,7 +117,6 @@ pub enum RegionalMode {
 // ============================================================================
 
 /// 角色一致性增强器
-#[allow(dead_code)]
 pub struct FaceConsistencyManager {
     /// 面部修复配置
     face_fix_config: FaceFixConfig,

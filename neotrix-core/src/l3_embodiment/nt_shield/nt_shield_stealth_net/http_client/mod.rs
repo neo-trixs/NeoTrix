@@ -52,7 +52,6 @@ pub struct StealthHttpClient {
     pub(super) tls_insecure: AtomicBool,
     pub(super) coordinator: RwLock<Option<Arc<RotationCoordinator>>>,
     pub(super) current_combo_arm: RwLock<ComboArm>,
-    #[allow(dead_code)]
     pub(super) global_bandit: FingerprintBandit,
     pub(super) bandits: RwLock<HashMap<String, Arc<FingerprintBandit>>>,
     pub(super) isolation_map: RwLock<HashMap<String, Arc<DynamicProxyChain>>>,

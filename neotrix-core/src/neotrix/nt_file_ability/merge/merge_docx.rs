@@ -17,7 +17,7 @@ use quick_xml::events::{BytesStart, Event};
 use zip::ZipArchive;
 use zip::write::SimpleFileOptions;
 
-use super::super::super::types::{FileAbilityError, Result};
+use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result};
 
 /// 合并后返回统计
 #[derive(Debug, Clone)]

@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::grounding::{ground_missing_tokens, GroundingReport};
-use super::super::super::types::FileKind;
+use crate::neotrix::nt_file_ability::types::FileKind;
 
 /// 视觉理解 prompt 名称
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,7 +20,6 @@ pub enum VisualPromptKind {
 
 impl VisualPromptKind {
     /// 预留: 仅供测试断言 (name 往返) 与未来日志/调试输出使用, 非生产调用路径。
-    #[allow(dead_code)]
     pub fn name(&self) -> &'static str {
         match self {
             VisualPromptKind::Document => "document",

@@ -378,12 +378,10 @@ pub struct DirExtractReport {
 }
 
 /// 统一解析结果
-#[allow(dead_code)]
 pub type ParseResult<T> = std::result::Result<T, crate::neotrix::nt_file_ability::types::ParseError>;
 
 /// 统一解析错误
 #[derive(Debug, thiserror::Error)]
-#[allow(dead_code)]
 pub enum ParseError {
     #[error("不支持的格式")]
     UnsupportedFormat,
@@ -395,7 +393,6 @@ pub enum ParseError {
 
 /// 统一文件模型 (anydoc 吸收产物)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct FileModel {
     pub format: String,
     pub title: Option<String>,

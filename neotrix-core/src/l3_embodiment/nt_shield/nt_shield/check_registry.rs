@@ -5,7 +5,6 @@ use super::tool_inspection_stack::{InspectionResult, ToolInspector};
 
 /// 本地 CheckResult (check_registry 专用, 不同于 nt_shield_audit::CheckResult)
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct CheckResult {
     name: String,
     status: CheckStatus,
@@ -16,7 +15,6 @@ struct CheckResult {
 
 /// 本地 CheckStatus (check_registry 专用)
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 enum CheckStatus {
     Passed,
     Failed(String),

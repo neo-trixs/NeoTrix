@@ -28,7 +28,6 @@ pub enum Verdict {
 
 /// 对抗性验证器
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct AdversarialValidator {
     findings: Vec<ValidatedFinding>,
 }

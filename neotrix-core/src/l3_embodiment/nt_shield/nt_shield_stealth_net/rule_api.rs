@@ -35,7 +35,6 @@ pub struct RulesApiStatus {
 }
 
 pub struct RulesApiServer {
-    #[allow(dead_code)]
     port: AtomicBool,
     ready: AtomicBool,
     rule_engine: Arc<RwLock<RuleEngine>>,

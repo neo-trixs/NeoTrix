@@ -26,7 +26,6 @@ pub const MAC1_SIZE: usize = 16;
 const UNDERLOAD_THRESHOLD: usize = 10;
 
 /// Token bucket 恢复速率 (tokens per second per IP)
-#[allow(dead_code)]
 const TOKEN_RECOVERY_RATE: usize = 20;
 
 /// Token bucket 最大容量

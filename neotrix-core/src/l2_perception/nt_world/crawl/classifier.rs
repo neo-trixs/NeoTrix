@@ -23,7 +23,6 @@ pub struct ContentClassifier {
     format_heuristics: HashMap<CrawlFormat, Vec<String>>,
     classification_count: u64,
     topic_distribution: HashMap<CrawlTopic, u64>,
-    #[allow(dead_code)]
     discovery_extractor: DiscoveryExtractor,
 }
 

@@ -42,7 +42,6 @@ pub struct HeartbeatSummary {
 pub struct ProxyHeartbeatEngine {
     pool: Arc<ProxyPool>,
     fingerprint_manager: RwLock<FingerprintManager>,
-    #[allow(dead_code)]
     heartbeat_interval: Duration,
     last_heartbeat: RwLock<Instant>,
     rotation_count: AtomicU64,

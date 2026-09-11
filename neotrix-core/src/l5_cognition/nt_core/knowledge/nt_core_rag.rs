@@ -79,7 +79,6 @@ pub struct VectorRetriever {
 }
 
 /// 重排序器
-#[allow(dead_code)]
 pub struct Reranker {
     model: String,
 }

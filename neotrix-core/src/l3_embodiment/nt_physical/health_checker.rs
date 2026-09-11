@@ -26,7 +26,6 @@ pub struct HealthCheckResult {
 }
 
 /// 健康检查器
-#[allow(dead_code)]
 pub struct HealthChecker {
     /// 组件检查结果
     results: HashMap<String, HealthCheckResult>,

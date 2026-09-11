@@ -132,7 +132,6 @@ struct HookLogEntry {
     event: HookEvent,
     action: String,
     success: bool,
-    #[allow(dead_code)]
     message: String,
     timestamp: u64,
 }

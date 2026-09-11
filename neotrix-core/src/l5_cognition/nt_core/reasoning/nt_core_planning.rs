@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 规划引擎
-#[allow(dead_code)]
 pub struct PlanningEngine {
     plans: HashMap<String, Plan>,
     task_graph: TaskGraph,

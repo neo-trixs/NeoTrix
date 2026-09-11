@@ -68,17 +68,14 @@ pub struct HotReloadManager {
 #[derive(Debug, Clone)]
 pub struct LoadedCapability {
     /// 能力元数据
-    #[allow(dead_code)]
     meta: CapabilityMeta,
     /// 加载时间
     loaded_at: Instant,
     /// 版本
     version: String,
     /// 文件路径
-    #[allow(dead_code)]
     path: Option<String>,
     /// 哈希
-    #[allow(dead_code)]
     hash: Option<String>,
 }
 

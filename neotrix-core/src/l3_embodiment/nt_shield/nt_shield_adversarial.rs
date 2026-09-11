@@ -10,7 +10,6 @@
 use serde::{Deserialize, Serialize};
 
 /// 对抗性测试框架
-#[allow(dead_code)]
 pub struct AdversarialTestFramework {
     test_suites: Vec<TestSuite>,
     attack_patterns: Vec<AttackPattern>,

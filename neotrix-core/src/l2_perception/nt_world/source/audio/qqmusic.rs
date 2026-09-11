@@ -7,7 +7,6 @@ impl QQMusicSource {
     pub fn new() -> Self { Self }
 
     /// 获取歌词
-    #[allow(dead_code)]
     async fn get_lyrics(songmid: &str) -> Option<String> {
         let url = format!(
             "https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid={}&format=json&nobase64=1",

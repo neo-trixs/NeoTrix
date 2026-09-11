@@ -36,7 +36,6 @@ pub struct StrategyLearner {
     persist_path: std::path::PathBuf,
 }
 
-#[allow(dead_code)]
 fn default_eps() -> f64 { 0.3 }
 
 impl Default for StrategyLearner {

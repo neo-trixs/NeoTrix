@@ -16,7 +16,7 @@ use super::pdf_image_extract::{
 use super::super::image_super_resolution::{
     ImageSuperResolver, SuperResolutionConfig,
 };
-use super::super::super::types::{FileAbilityError, Result};
+use crate::neotrix::nt_file_ability::types::{FileAbilityError, Result};
 
 /// PDF 图标增强配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

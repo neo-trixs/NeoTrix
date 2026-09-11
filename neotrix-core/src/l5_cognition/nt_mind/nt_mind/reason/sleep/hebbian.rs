@@ -3,7 +3,6 @@ use crate::core::nt_core_bank::ReasoningMemory;
 // // use crate::core::// nt_core_signal::core::SelectiveState;
 // // use crate::core::// nt_core_signal::select::SelectableOperator;
 
-#[allow(dead_code)]
 pub struct HebbianUpdater {
     pub forget_gate_bias: f64,
     pub input_gate_bias: f64,
@@ -63,7 +62,6 @@ impl HebbianUpdater {
         0.0
     }
 
-    #[allow(dead_code)]
     fn project_memory(&self, memory: &ReasoningMemory) -> (Vec<f64>, Vec<f64>) {
         let n = self.hidden_dim;
         if let Some(ref emb) = memory.embedding {
@@ -78,7 +76,6 @@ impl HebbianUpdater {
         }
     }
 
-    #[allow(dead_code)]
     fn pad_or_truncate(mut v: Vec<f64>, n: usize) -> Vec<f64> {
         if v.len() >= n {
             v.truncate(n);

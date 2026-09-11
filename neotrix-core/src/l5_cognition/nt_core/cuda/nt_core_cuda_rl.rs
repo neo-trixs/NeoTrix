@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// CUDA Agent RL优化器
-#[allow(dead_code)]
 pub struct CUDAAgentRLOptimizer {
     strategies: Vec<RLStrategy>,
     curriculum: Vec<CurriculumItem>,

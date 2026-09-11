@@ -584,7 +584,6 @@ pub fn with_contract_preset(stage: Box<dyn BrainStage>, preset: Vec<Box<dyn Stag
 }
 
 #[cfg(test)]
-#[allow(dead_code)] // test utilities shared across test functions
 mod tests {
     use super::*;
     use crate::make_stage;

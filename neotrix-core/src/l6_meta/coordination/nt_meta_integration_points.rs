@@ -11,7 +11,6 @@
 use serde::{Deserialize, Serialize};
 
 /// 集成点管理器
-#[allow(dead_code)]
 pub struct IntegrationPointManager {
     integration_points: Vec<IntegrationPoint>,
     modules: Vec<ModuleIntegration>,

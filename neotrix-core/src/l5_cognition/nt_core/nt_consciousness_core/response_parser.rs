@@ -162,7 +162,6 @@ impl ResponseParser {
     }
 
     /// 从纯文本提取
-    #[allow(dead_code)]
     fn extract_from_text(text: &str) -> Vec<String> {
         let mut result = Vec::new();
         

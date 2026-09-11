@@ -9,7 +9,6 @@ use crate::l5_cognition::nt_mind::nt_mind::embedding::TextEmbedder;
 // // use crate::core::// nt_core_signal::ops::cosine_similarity;
 
 pub struct LiteratureSearcher {
-    #[allow(dead_code)] // kept for future embedding-based reranking
     embedder: TextEmbedder,
 }
 

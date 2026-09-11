@@ -98,10 +98,8 @@ struct AnthropicRequest {
     #[serde(default)]
     system: Option<String>,
     #[serde(default)]
-    #[allow(dead_code)]
     metadata: Option<HashMap<String, String>>,
     #[serde(default)]
-    #[allow(dead_code)]
     stop_sequences: Vec<String>,
 }
 

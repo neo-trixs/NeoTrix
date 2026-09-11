@@ -43,7 +43,6 @@ impl RotationDomain {
 struct DomainState {
     mean_ms: f64,
     std_dev_ms: f64,
-    #[allow(dead_code)]
     phase_offset_ms: u64,
     last_rotation: Instant,
     rotation_count: AtomicU64,
