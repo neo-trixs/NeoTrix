@@ -30,8 +30,8 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 use crate::core::nt_core_second_brain::SecondBrain;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
-use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
-use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+use crate::l5_cognition::l6_facade::ConsciousnessGoldStandard;
+use crate::l5_cognition::l6_facade::ConsciousnessMonitor;
 use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 
@@ -232,7 +232,7 @@ mod tests {
         // tree.trunk.coherence 应非零 (ConsciousnessMonitor compute_coherence 起步 0.1),
         // 且 GWT resonance 激活逻辑在 handle_consciousness_tick 生效。
         // 直接验证链路源头: observe() 产生非零 coherence, 注入 tree 后非零。
-        use crate::l6_meta::nt_repair::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+        use crate::l5_cognition::l6_facade::ConsciousnessMonitor;
         use crate::core::nt_core_consciousness_tree::ConsciousnessTree;
         let mut monitor = ConsciousnessMonitor::new();
         monitor.observe();

@@ -7,7 +7,8 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 use super::bm25;
-use super::nt_memory_embed::{cosine_similarity, load_all_embeddings};
+use super::nt_memory_embed::load_all_embeddings;
+use crate::core::nt_core_math::cosine_similarity_f32;
 use super::nt_memory_types::*;
 
 pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
@@ -485,7 +486,7 @@ pub fn hybrid_search(
                 let emb_score = if let Some(emb) = embeddings.iter().find(|(id, _)| *id == r.node.id) {
                     match &student {
                         Some(s) => s.score(&query_embedding, &emb.1),
-                        None => cosine_similarity(&query_embedding, &emb.1),
+                        None => cosine_similarity_f32(&query_embedding, &emb.1),
                     }
                 } else {
                     0.0

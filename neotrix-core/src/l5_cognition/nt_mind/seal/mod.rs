@@ -4,5 +4,6 @@
 //! 技能节点构成有向图，边表示执行依赖关系，
 //! LLM refiner 可根据执行轨迹编辑图拓扑，被拒绝的编辑保留为反模式。
 
+pub mod crystallization;
 pub mod distillation;
 pub mod procedural_graph;

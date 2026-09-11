@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-utils/schema.json",
+  "identifier": "default",
+  "description": "Default permissions for NT-WORLD-SIM",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-set-size",
+    "core:window:allow-set-focus"
+  ]
+}

@@ -12,7 +12,7 @@ use crate::core::nt_core_policy::E8Policy;
 use crate::core::nt_core_ttc::EffortTier;
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_traits::SpecialistType;
-use crate::l5_cognition::traits::GoldStandardApi;
+use crate::l5_cognition::l6_facade::ConsciousnessGoldStandard;
 
 /// 控制类型 (MERA 同款)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

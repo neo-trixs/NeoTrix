@@ -2,7 +2,7 @@ use super::core::SelfIteratingBrain;
 use super::super::brain_impl::EvaluationRecord;
 use super::super::benchmark_gate::{BenchmarkGateDecision, BenchmarkSuite};
 use crate::core::nt_core_consciousness::inner_critic::CritiqueResult;
-use crate::l6_meta::nt_repair::nt_mind_eval_harness::EvalHarness;
+use crate::l5_cognition::l6_facade::EvalHarness;
 use super::super::super::core::{CapabilityVector, RewardSource};
 use super::super::super::self_edit::MicroEdit;
 use super::super::super::memory::{ReasoningMemory, ReasoningBank};

@@ -960,12 +960,6 @@ impl GraphRagStore {
         self.community_summary_with_opt(None)
     }
 
-    /// Community summary with an existing `CommunityAwareSearch` (avoids re-detection).
-    /// The Leiden hierarchy from `searcher` is the single fact source for community structure.
-    pub fn community_summary_with_searcher(&self, searcher: &CommunityAwareSearch) -> Vec<Community> {
-        self.community_summary_with_opt(Some(searcher))
-    }
-
     /// Internal: community summary with optional pre-computed searcher.
     fn community_summary_with_opt(&self, searcher: Option<&CommunityAwareSearch>) -> Vec<Community> {
         if self.graph.entities.is_empty() {

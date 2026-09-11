@@ -40,7 +40,7 @@ use crate::neotrix::nt_world_jepa::JepaWorldModel;
 // use crate::l5_cognition::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use crate::neotrix::nt_io_provider::{estimate_tokens, LlmProvider, LlmRequest};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
-use crate::l6_meta::nt_repair::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
+use crate::l5_cognition::l6_facade::ConsciousnessGoldStandard;
 use super::CognitiveEye;
 
 pub const MAX_COST_LOG: usize = 1000;
