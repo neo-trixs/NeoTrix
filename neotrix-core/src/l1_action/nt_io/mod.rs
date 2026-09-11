@@ -71,6 +71,9 @@ pub mod nt_io_show_me;
 pub mod nt_io_unslop;
 pub mod nt_io_video_shotcraft;
 
+// MCP server — 将 NT 能力暴露为 MCP 工具
+pub mod mcp_server;
+
 // 平台适配器模块 (Seedance2.0/Runtime 等多平台适配)
 pub mod platform_adapter;
 

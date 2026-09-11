@@ -6,5 +6,4 @@
 pub use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 pub use crate::l1_action::nt_memory::nt_memory_kb::NodeType;
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_crawl::CrawlCycleReport;
-pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_discovery_github_topics::DiscoveryPipelineConfig;

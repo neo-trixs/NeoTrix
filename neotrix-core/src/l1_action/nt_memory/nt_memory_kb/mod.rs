@@ -730,8 +730,8 @@ impl KnowledgeBase {
             self.record_node_fact(node);
             // A1 时效账本 (recall absorb, R-P79): 写入即刷新时刻, 避免新数据被误判陈旧。
             if let Ok(mut lc) = self.lifecycle.write() {
-                let now = lc.freshness.tick();
-                lc.freshness.note_updated(&node.id, now);
+                let now = lc.tick();
+                lc.note_updated(&node.id, now);
             }
         }
         r
@@ -800,7 +800,7 @@ impl KnowledgeBase {
             // A1 时效账本 (recall absorb, R-P79): 删除即标记应遗忘, 使仍残留在
             // 内存索引/缓存里的该 id 不再被检索返回。
             if let Ok(mut lc) = self.lifecycle.write() {
-                lc.freshness.mark_should_forget(id);
+                lc.mark_should_forget(id);
             }
         }
         r
@@ -885,8 +885,8 @@ impl KnowledgeBase {
             self.mark_bm25_dirty();
             // A1 时效账本 (recall absorb, R-P79): 更新即刷新时刻 + 撤销遗忘标记。
             if let Ok(mut lc) = self.lifecycle.write() {
-                let now = lc.freshness.tick();
-                lc.freshness.note_updated(&node.id, now);
+                let now = lc.tick();
+                lc.note_updated(&node.id, now);
             }
         }
         r
@@ -1388,7 +1388,7 @@ impl KnowledgeBase {
             };
             let retained: Vec<SearchResult> = results
                 .into_iter()
-                .filter(|r| !lc.freshness.should_forget(&r.node.id))
+                .filter(|r| !lc.is_marked_forget(&r.node.id))
                 .collect();
             retained
         };

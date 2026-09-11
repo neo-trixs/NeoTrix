@@ -43,6 +43,11 @@ pub enum ScanCategory {
     ApplicationSupport,
     LargeFile,
     OldFile,
+    BuildArtifacts,
+    BackupFiles,
+    TempFiles,
+    OldLogs,
+    Other,
 }
 
 /// 缓存类型
@@ -109,8 +114,7 @@ pub struct ScanResult {
     pub size_bytes: u64,
     pub age_days: u32,
     pub category: ScanCategory,
-    pub risk_level: RiskLevel,
-    pub description: String,
+    pub last_modified: Option<String>,
 }
 
 /// 缓存信息
