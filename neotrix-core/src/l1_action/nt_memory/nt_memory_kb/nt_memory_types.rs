@@ -104,6 +104,7 @@ pub struct KnowledgeStats {
     pub crawl_pending: i64,
     pub crawl_completed: i64,
     pub db_size_bytes: i64,
+    pub total_clusters: i64,
 }
 
 /// ConversationRecord — 外部对话进化训练数据

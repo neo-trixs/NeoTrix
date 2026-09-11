@@ -35,7 +35,7 @@ pub mod universal_adapter;
 pub use universal_adapter::{
     UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,
     OpenAiConverter, AnthropicConverter, GeminiConverter,
-    UnifiedRequest, UnifiedResponse,
+    UnifiedRequest, UnifiedResponse, ToolCall,
 };
 
 // Re-export 核心类型

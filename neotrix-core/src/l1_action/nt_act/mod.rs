@@ -48,6 +48,7 @@ pub use actions::{video_job_pipeline, video_object_storage, video_spec, video_st
 pub mod pipeline_checkpointing;
 
 pub mod nt_act_cleanup;
+pub mod goal_lock;
 
 pub mod reference_view;
 

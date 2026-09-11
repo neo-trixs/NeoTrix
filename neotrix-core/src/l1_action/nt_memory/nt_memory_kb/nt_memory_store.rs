@@ -333,7 +333,7 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
-            supersedes
+            supersedes, parent_id, depth, cluster_id
          FROM nodes WHERE url=?1 LIMIT 1",
     )?;
     let mut rows = stmt.query(params![url])?;
@@ -357,6 +357,9 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
             temporal: None,
             supersedes: row.get(15)?,
             source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
         })),
         None => Ok(None),
     }
@@ -512,6 +515,8 @@ pub fn get_stats(conn: &Connection) -> Result<KnowledgeStats, rusqlite::Error> {
         .query_row("SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name LIKE 'knowledge_%'", [], |r| r.get(0))
         .unwrap_or(0);
 
+    let total_clusters: i64 = conn.query_row("SELECT COUNT(*) FROM domain_clusters", [], |r| r.get(0)).unwrap_or(0);
+
     Ok(KnowledgeStats {
         total_nodes,
         total_edges,
@@ -520,6 +525,7 @@ pub fn get_stats(conn: &Connection) -> Result<KnowledgeStats, rusqlite::Error> {
         crawl_pending,
         crawl_completed,
         db_size_bytes: db_size,
+        total_clusters,
     })
 }
 
@@ -679,6 +685,244 @@ pub fn count_nodes_by_domain_and_type(conn: &Connection) -> rusqlite::Result<Vec
     Ok(results)
 }
 
+// ─── Domain Clusters ────────────────────────────────────────────────────────
+
+pub fn insert_cluster(conn: &Connection, cluster: &KnowledgeCluster) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO domain_clusters (id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            cluster.id,
+            cluster.name,
+            cluster.description,
+            cluster.parent_cluster_id,
+            cluster.node_count,
+            cluster.avg_confidence,
+            cluster.updated_at,
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn get_cluster(conn: &Connection, id: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
+         FROM domain_clusters WHERE id=?1",
+    )?;
+    let mut rows = stmt.query(params![id])?;
+    match rows.next()? {
+        Some(row) => Ok(Some(KnowledgeCluster {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            parent_cluster_id: row.get(3)?,
+            node_count: row.get(4)?,
+            avg_confidence: row.get(5)?,
+            updated_at: row.get(6)?,
+        })),
+        None => Ok(None),
+    }
+}
+
+pub fn get_cluster_by_name(conn: &Connection, name: &str) -> rusqlite::Result<Option<KnowledgeCluster>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
+         FROM domain_clusters WHERE name=?1",
+    )?;
+    let mut rows = stmt.query(params![name])?;
+    match rows.next()? {
+        Some(row) => Ok(Some(KnowledgeCluster {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            parent_cluster_id: row.get(3)?,
+            node_count: row.get(4)?,
+            avg_confidence: row.get(5)?,
+            updated_at: row.get(6)?,
+        })),
+        None => Ok(None),
+    }
+}
+
+pub fn list_clusters(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeCluster>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
+         FROM domain_clusters ORDER BY name",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(KnowledgeCluster {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            parent_cluster_id: row.get(3)?,
+            node_count: row.get(4)?,
+            avg_confidence: row.get(5)?,
+            updated_at: row.get(6)?,
+        })
+    })?;
+    let mut clusters = Vec::new();
+    for row in rows {
+        clusters.push(row?);
+    }
+    Ok(clusters)
+}
+
+pub fn update_cluster_stats(conn: &Connection, cluster_id: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE domain_clusters SET
+            node_count = (SELECT COUNT(*) FROM nodes WHERE cluster_id=?1),
+            avg_confidence = COALESCE((SELECT AVG(confidence) FROM nodes WHERE cluster_id=?1), 0.0),
+            updated_at = ?2
+         WHERE id=?1",
+        params![cluster_id, now()],
+    )?;
+    Ok(())
+}
+
+pub fn delete_cluster(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
+    let affected = conn.execute("DELETE FROM domain_clusters WHERE id=?1", params![id])?;
+    Ok(affected > 0)
+}
+
+pub fn get_cluster_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeCluster>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, description, parent_cluster_id, node_count, avg_confidence, updated_at
+         FROM domain_clusters WHERE parent_cluster_id=?1 ORDER BY name",
+    )?;
+    let rows = stmt.query_map(params![parent_id], |row| {
+        Ok(KnowledgeCluster {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            parent_cluster_id: row.get(3)?,
+            node_count: row.get(4)?,
+            avg_confidence: row.get(5)?,
+            updated_at: row.get(6)?,
+        })
+    })?;
+    let mut clusters = Vec::new();
+    for row in rows {
+        clusters.push(row?);
+    }
+    Ok(clusters)
+}
+
+pub fn get_nodes_in_cluster(conn: &Connection, cluster_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain, language,
+            confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
+            supersedes, parent_id, depth, cluster_id
+         FROM nodes WHERE cluster_id=?1 ORDER BY depth, title",
+    )?;
+    let rows = stmt.query_map(params![cluster_id], |row| {
+        Ok(KnowledgeNode {
+            id: row.get(0)?,
+            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            language: row.get(7)?,
+            confidence: row.get(8)?,
+            importance: row.get(9)?,
+            recall_weight: row.get(10)?,
+            created_at: row.get(11)?,
+            updated_at: row.get(12)?,
+            access_count: row.get(13)?,
+            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
+            temporal: None,
+            supersedes: row.get(15)?,
+            source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
+        })
+    })?;
+    let mut nodes = Vec::new();
+    for row in rows {
+        nodes.push(row?);
+    }
+    Ok(nodes)
+}
+
+pub fn get_node_children(conn: &Connection, parent_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain, language,
+            confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
+            supersedes, parent_id, depth, cluster_id
+         FROM nodes WHERE parent_id=?1 ORDER BY depth, title",
+    )?;
+    let rows = stmt.query_map(params![parent_id], |row| {
+        Ok(KnowledgeNode {
+            id: row.get(0)?,
+            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            language: row.get(7)?,
+            confidence: row.get(8)?,
+            importance: row.get(9)?,
+            recall_weight: row.get(10)?,
+            created_at: row.get(11)?,
+            updated_at: row.get(12)?,
+            access_count: row.get(13)?,
+            metadata: row.get::<_, Option<String>>(14)?.and_then(|m| serde_json::from_str(&m).ok()),
+            temporal: None,
+            supersedes: row.get(15)?,
+            source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
+        })
+    })?;
+    let mut nodes = Vec::new();
+    for row in rows {
+        nodes.push(row?);
+    }
+    Ok(nodes)
+}
+
+pub fn get_node_ancestors(conn: &Connection, node_id: &str) -> rusqlite::Result<Vec<KnowledgeNode>> {
+    let mut ancestors = Vec::new();
+    let mut current_id = Some(node_id.to_string());
+    // Walk up the hierarchy (max 32 levels to prevent infinite loops)
+    for _ in 0..32 {
+        let Some(id) = current_id else { break };
+        let node = get_node(conn, &id)?;
+        match node {
+            Some(n) => {
+                current_id = n.parent_id.clone();
+                if n.parent_id.is_some() {
+                    ancestors.push(n);
+                }
+            }
+            None => break,
+        }
+    }
+    ancestors.reverse();
+    Ok(ancestors)
+}
+
+pub fn get_cluster_stats(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
+    let mut stmt = conn.prepare(
+        "SELECT COALESCE(cluster_id, 'unclustered'), COUNT(*) FROM nodes GROUP BY cluster_id"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let k: String = row.get(0)?;
+        let v: usize = row.get(1)?;
+        Ok((k, v))
+    })?;
+    let mut map = HashMap::new();
+    for row in rows {
+        let (k, v) = row?;
+        map.insert(k, v);
+    }
+    Ok(map)
+}
+
 pub fn get_stale_node_count(conn: &Connection, older_than_days: i64) -> rusqlite::Result<usize> {
     let cutoff = now() - older_than_days * 86400;
     conn.query_row(
@@ -690,7 +934,7 @@ pub fn get_stale_node_count(conn: &Connection, older_than_days: i64) -> rusqlite
 
 pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
+        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
     )?;
     let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
         Ok(KnowledgeNode {
@@ -712,6 +956,9 @@ pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
             temporal: None,
             supersedes: row.get(15)?,
             source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
         })
     })?;
     let mut nodes = Vec::with_capacity(limit.min(4096));
@@ -746,7 +993,7 @@ pub fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
 
 pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes FROM nodes"
+        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, recall_weight, created_at, updated_at, access_count, metadata, supersedes, parent_id, depth, cluster_id FROM nodes"
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(KnowledgeNode {
@@ -768,6 +1015,9 @@ pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> 
             temporal: None,
             supersedes: row.get(15)?,
             source_episode: None,
+            parent_id: row.get(16)?,
+            depth: row.get(17)?,
+            cluster_id: row.get(18)?,
         })
     })?;
     let mut nodes = Vec::new();

@@ -15,7 +15,6 @@ pub mod packet;
 pub mod connectivity;
 pub mod gateway;
 pub mod policy;
-pub mod ztnet_capability;
 
 use thiserror::Error;
 
