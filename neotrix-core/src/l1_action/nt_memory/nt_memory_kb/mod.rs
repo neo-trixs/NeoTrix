@@ -1184,6 +1184,7 @@ impl KnowledgeBase {
                 created_at: row.get(10)?, updated_at: row.get(11)?, access_count: row.get(12)?,
                 metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
                 temporal: None, supersedes: None, source_episode: None,
+                parent_id: None, depth: 0, cluster_id: None,
             })
         };
         let mapped_rows = match (domain.is_empty(), min_stars) {

@@ -5,6 +5,7 @@ pub mod evolution;
 pub mod observation;
 pub mod persistence;
 pub mod renderer;
+pub mod ui;
 
 pub use config::*;
 

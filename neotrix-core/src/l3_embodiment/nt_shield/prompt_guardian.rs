@@ -35,7 +35,7 @@ pub struct PromptGuardian {
     defense_stack: Vec<Box<dyn Defense>>,
 }
 
-trait Defense {
+trait Defense: Send + Sync {
     fn apply(&self, system_prompt: &str, user_input: &str) -> (String, String);
     fn name(&self) -> &str;
 }

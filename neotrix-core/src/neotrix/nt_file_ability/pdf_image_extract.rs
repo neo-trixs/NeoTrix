@@ -132,6 +132,7 @@ pub fn extract_pdf_images(
     
     // 遍历每一页
     for (page_num, page_id) in pages.iter() {
+        let page_num = *page_num as usize;
         // 获取页面对象
         if let Ok(page_obj) = doc.get_object(*page_id) {
             if let Ok(page_dict) = page_obj.as_dict() {

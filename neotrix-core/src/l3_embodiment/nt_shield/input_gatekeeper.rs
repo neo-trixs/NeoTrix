@@ -15,7 +15,7 @@ pub struct ValidationResult {
     pub sanitized_input: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ThreatLevel {
     Safe,
     Low,
