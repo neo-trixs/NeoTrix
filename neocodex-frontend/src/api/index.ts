@@ -4,7 +4,7 @@
 
 // ===== 新架构：Domain Plugin System =====
 export * as domain from './domain';
-export { call as domainCall, list as domainList, has as domainHas } from './domain';
+export { call as domainCall, list as domainList, has as domainHas, actionCount as domainActionCount } from './domain';
 
 // ===== 新 API 模块（domain plugin 封装） =====
 export * as sessionApi from './session';

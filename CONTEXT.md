@@ -231,3 +231,19 @@ L3 厂商技能（36+）为只读能力分支，不进收编映射表。
 | Easel Python vs NeoTrix Rust | Absorb methodology (patterns) not code (scripts) |
 | castor DRM vs nt_shield security | Align: DRM restriction is consistent with security policy |
 | Easel auto-publish risk | Risk assessment gate required (R-P82同构) |
+
+## Absorbed Terminology (2026-09-11, PDF图像能力熔炼)
+
+| Term | Definition | Avoid |
+|------|-----------|-------|
+| **PdfImageExtract** | PDF 图像提取能力：从 PDF 中提取嵌入图像，支持 XObject 树遍历、格式检测、过滤。实现于 `nt_file_ability::pdf_image_extract`。 | "PDF提取", "图像提取" |
+| **XObjectImageIterator** | PDF 图像遍历器：消除重复的 XObject 树遍历代码，提供通用 `for_each_image` 接口。实现于 `nt_file_ability::pdf_image_extract`。 | "遍历器", "XObject迭代" |
+| **ImageSuperResolution** | 通用图像超分辨率能力：支持 12 种模型（Real-ESRGAN/SwinIR/ESPCN/SRCNN/Bicubic/Lanczos），Tiled 推理，HuggingFace 自动下载。实现于 `nt_file_ability::image_super_resolution`。 | "图像超分", "SR" |
+| **SuperResolutionModel** | 超分模型枚举：12 变体（RealEsrganGeneral/Anime/Photo/V3/2x/SwinIRClassic/RealWorld/Espcn/Srcnn/Bicubic/Lanczos/CustomOnnx），统一模型配置。实现于 `nt_file_ability::image_super_resolution`。 | "SR模型", "超分枚举" |
+| **TiledSuperResolver** | Tiled 超分推理引擎：内存安全的分块推理，overlap blending 防接缝，O(tile²) 内存。实现于 `nt_file_ability::image_super_resolution`。 | "分块推理", "Tiled推理" |
+| **ModelRegistry** | 模型注册表：管理所有可用模型元数据、缓存路径、HuggingFace 下载。实现于 `nt_file_ability::image_super_resolution`。 | "模型注册", "注册表" |
+| **ModelManager** | 模型管理器：支持动态加载、热插拔、缓存管理。实现于 `nt_file_ability::image_super_resolution`。 | "热插拔", "模型切换" |
+| **PdfIconEnhance** | PDF 图标清晰度提升管线：提取→超分→嵌入 三阶段管线。实现于 `nt_file_ability::pdf_icon_enhance`。 | "PDF增强", "图标提升" |
+| **PdfIconEnhancer** | PDF 图标增强器：执行完整的提取→超分→嵌入管线，支持配置模型、倍数、嵌入选项。实现于 `nt_file_ability::pdf_icon_enhance`。 | "增强器", "PDF增强器" |
+| **SuperResolutionBackend** | 超分后端接口：统一所有超分辨率实现的 trait，支持 OnnxBackend/InterpolationBackend。实现于 `nt_file_ability::image_super_resolution`。 | "SR后端", "超分接口" |
+| **BackendManager** | 后端管理器：自动选择最佳后端，支持模型路由。实现于 `nt_file_ability::image_super_resolution`。 | "后端选择", "路由管理" |

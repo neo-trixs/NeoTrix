@@ -876,6 +876,8 @@ pub enum AllocationProvider {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TaskLoopReport {
     pub instruction: String,
+    /// G1: 人格路由结果 — 由 PersonaRouter 根据输入自动路由
+    pub routed_skill: String,
     pub allocations: Vec<TaskAllocation>,
     pub internal_count: usize,
     pub external_gap_count: usize,
@@ -1124,15 +1126,29 @@ impl ConsciousnessCoreHandle {
     /// 意识核心主入口: 人类语言 → 拆解 → 分配 → 内置/外部 → 反思补齐。
     /// 不依赖任何 CLI 命令; 调用谁 / 怎么调用全部由意识核心决定。
     pub fn process_instruction(&mut self, instruction: &str) -> TaskLoopReport {
-        // 0. 人格路由 (Phase 2: Wedge 9轨 + Prism 7路)
+        // 0. 人格路由 (Phase 2: Wedge 9轨 + Prism 7路) — 路由结果影响能力分配优先级
         let persona_router = crate::l5_cognition::nt_core::persona_routing::PersonaRouter::new();
-        let _routed_skill = persona_router.route_to_skill(instruction);
+        let routed_skill = persona_router.route_to_skill(instruction);
+        let persona = persona_router.detect_persona(instruction);
 
         // 1. 拆解
         let tasks = decompose_instruction(instruction);
         // 2. 加载能力网 + 分配
         let mut registry = load_capability_registry();
-        let allocations = allocate_tasks(registry.as_ref(), &tasks);
+        let mut allocations = allocate_tasks(registry.as_ref(), &tasks);
+
+        // G1: 人格路由生效 — 按路由结果调整分配优先级
+        // Wedge路由: 优先安全/渗透类能力; Prism路由: 优先分析/设计类能力
+        let persona_tag = match persona {
+            crate::l5_cognition::nt_core::persona_routing::PersonaType::Wedge => "wedge",
+            crate::l5_cognition::nt_core::persona_routing::PersonaType::Prism => "prism",
+        };
+        for alloc in &mut allocations {
+            if alloc.task.capability_tag.to_lowercase().contains(persona_tag) {
+                // 人格匹配的任务提升优先级 (通过调整 summary 标记)
+                alloc.task.summary = format!("[PERSONA:{persona_tag}] {}", alloc.task.summary);
+            }
+        }
 
         let internal_count = allocations
             .iter()
@@ -1165,6 +1181,7 @@ impl ConsciousnessCoreHandle {
 
         TaskLoopReport {
             instruction: instruction.to_string(),
+            routed_skill,
             allocations,
             internal_count,
             external_gap_count,

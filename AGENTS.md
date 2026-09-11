@@ -93,6 +93,11 @@ neotrix-core/src/
 | **CapabilityBridge** | Bridge connecting evolution view (CapabilityTree) with runtime view (CapabilityRegistry) | `nt_core_capability_tree/src/bridge.rs` |
 | **HeartbeatAggregator** | Unified system health signal collector | `core/nt_core_heartbeat.rs` |
 | **EmotionLabel** | Unified emotion enum (11 variants) | `core/nt_core_self/emotion_state.rs` |
+| **ImageSuperResolver** | Image super-resolution engine with 12 models, tiled inference, auto-download | `nt_file_ability/image_super_resolution.rs` |
+| **PdfIconEnhancer** | PDF icon enhancement pipeline (extract→SR→embed) | `nt_file_ability/pdf_icon_enhance.rs` |
+| **XObjectImageIterator** | Generic XObject tree traversal for PDF image extraction | `nt_file_ability/pdf_image_extract.rs` |
+| **BackendManager** | Auto-selects best SR backend (ONNX/Interpolation) | `nt_file_ability/image_super_resolution.rs` |
+| **TiledSuperResolver** | Memory-bounded tiled inference engine | `nt_file_ability/image_super_resolution.rs` |
 
 ### SelfModel Types (neotrix-core)
 

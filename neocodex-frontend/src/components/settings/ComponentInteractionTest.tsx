@@ -5,7 +5,7 @@
  */
 import { createSignal, onMount, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
-import { domain } from '../../api'
+import { domainList, domainHas, domainActionCount } from '../../api'
 import * as modelPool from '../../api/model-pool'
 import * as proxyPool from '../../api/proxy-pool'
 import * as im from '../../api/im'
@@ -61,15 +61,15 @@ export function ComponentInteractionTest() {
     setCurrentTest('域系统')
     const domainTests = await Promise.all([
       runTest('domain.list', async () => {
-        const domains = await domain.list()
+        const domains = await domainList()
         if (!Array.isArray(domains)) throw new Error('Expected array')
       }),
       runTest('domain.has(session)', async () => {
-        const has = await domain.has('session')
+        const has = await domainHas('session')
         if (!has) throw new Error('Session domain not found')
       }),
       runTest('domain.actionCount(session)', async () => {
-        const count = await domain.actionCount('session')
+        const count = await domainActionCount('session')
         if (count <= 0) throw new Error('No actions')
       }),
     ])
