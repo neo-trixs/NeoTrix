@@ -392,6 +392,7 @@ impl FileAbility {
         note = "统一入口已收敛到 xlsx_parser::parse_xlsx / parse_xlsx_full；此方法仅供内部测试，外部请勿调用"
     )]
     pub fn xlsx_sheet_by_name(&self, name: &str) -> Result<SheetData> {
+        #[allow(deprecated)]
         let names = self.xlsx_sheet_names()?;
         let pos = names.iter().position(|n| n == name).ok_or_else(|| {
             FileAbilityError::SheetIndexOutOfRange {
@@ -399,6 +400,7 @@ impl FileAbility {
                 count: names.len(),
             }
         })?;
+        #[allow(deprecated)]
         self.xlsx_sheet(pos + 1)
     }
 

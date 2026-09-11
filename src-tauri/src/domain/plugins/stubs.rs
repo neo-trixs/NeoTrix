@@ -1,7 +1,6 @@
 use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
 use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
 use crate::commands::neotrix_cli::run_cli;
-use crate::commands::pty::{pty_spawn, pty_write, pty_resize, pty_close};
 use std::process::Command as StdCommand;
 
 // ========== Helper ==========
