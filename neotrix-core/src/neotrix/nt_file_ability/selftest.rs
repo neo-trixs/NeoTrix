@@ -2,6 +2,8 @@
 //!
 //! 设计 (R-P42): 复用 core SelfTest trait，标记 ConstellationLevel 成熟度
 //! Dark Forest: 模块经 SelfTest T1-T3 接线到意识树健康链
+//! T2 验证: 注册到意识树 SelfTestRegistry
+//! T3 验证: 实际功能测试（类型检查、默认值、错误处理）
 
 use crate::core::nt_core_self_test::SelfTest;
 
@@ -14,9 +16,36 @@ impl SelfTest for PdfIconEnhanceSelfTest {
     }
     
     fn self_test(&self) -> Result<(), Vec<String>> {
-        // T1: 检查模块是否存在
-        // 通过编译即证明存在
-        Ok(())
+        let mut errors = Vec::new();
+        
+        // T1: 检查模块是否存在 (通过编译即证明)
+        
+        // T3: 功能验证
+        // 1. 验证配置类型可以创建
+        let config = super::pdf_icon_enhance::PdfIconEnhanceConfig::default();
+        if !config.embed_back {
+            errors.push("PdfIconEnhanceConfig.embed_back should default to true".to_string());
+        }
+        
+        // 2. 验证增强器可以创建
+        let enhancer = super::pdf_icon_enhance::PdfIconEnhancer::new();
+        if !enhancer.config().embed_back {
+            errors.push("PdfIconEnhancer should have embed_back=true by default".to_string());
+        }
+        
+        // 3. 验证错误处理
+        let result = super::pdf_icon_enhance::enhance_pdf_icons(
+            std::path::Path::new("/nonexistent.pdf")
+        );
+        if result.is_ok() {
+            errors.push("Should return error for nonexistent PDF".to_string());
+        }
+        
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 
@@ -29,8 +58,51 @@ impl SelfTest for ImageSuperResolutionSelfTest {
     }
     
     fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        
         // T1: 检查模块是否存在
-        Ok(())
+        
+        // T3: 功能验证
+        // 1. 验证 SuperResolutionModel 枚举变体
+        use super::image_super_resolution::SuperResolutionModel;
+        let models = vec![
+            SuperResolutionModel::RealEsrganGeneral,
+            SuperResolutionModel::RealEsrganAnime,
+            SuperResolutionModel::Lanczos,
+        ];
+        
+        for model in &models {
+            let name = model.display_name();
+            if name.is_empty() {
+                errors.push(format!("Model display_name() should not be empty for {:?}", model));
+            }
+            
+            let tile_size = model.recommended_tile_size();
+            let overlap = model.recommended_overlap();
+            
+            // Lanczos 不应有 overlap
+            if matches!(model, SuperResolutionModel::Lanczos) && overlap > 0 {
+                errors.push("Lanczos should have 0 overlap".to_string());
+            }
+        }
+        
+        // 2. 验证配置默认值
+        let config = super::image_super_resolution::SuperResolutionConfig::default();
+        if config.scale == 0 {
+            errors.push("SuperResolutionConfig.scale should not be 0".to_string());
+        }
+        
+        // 3. 验证处理器可以创建
+        let resolver = super::image_super_resolution::ImageSuperResolver::new();
+        if resolver.config().scale == 0 {
+            errors.push("ImageSuperResolver should have non-zero scale".to_string());
+        }
+        
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 
@@ -43,8 +115,40 @@ impl SelfTest for PdfImageExtractSelfTest {
     }
     
     fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        
         // T1: 检查模块是否存在
-        Ok(())
+        
+        // T3: 功能验证
+        // 1. 验证配置默认值
+        let config = super::pdf_image_extract::PdfImageExtractConfig::default();
+        if config.min_dimension == 0 {
+            errors.push("PdfImageExtractConfig.min_dimension should not be 0".to_string());
+        }
+        if config.min_bytes == 0 {
+            errors.push("PdfImageExtractConfig.min_bytes should not be 0".to_string());
+        }
+        
+        // 2. 验证错误处理
+        let result = super::pdf_image_extract::pdf_has_images(
+            std::path::Path::new("/nonexistent.pdf")
+        );
+        if result.is_ok() {
+            errors.push("Should return error for nonexistent PDF".to_string());
+        }
+        
+        let result = super::pdf_image_extract::pdf_image_stats(
+            std::path::Path::new("/nonexistent.pdf")
+        );
+        if result.is_ok() {
+            errors.push("Should return error for nonexistent PDF".to_string());
+        }
+        
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 
@@ -58,6 +162,7 @@ impl SelfTest for FileAbilitySelfTest {
     
     fn self_test(&self) -> Result<(), Vec<String>> {
         // T1: 检查模块是否存在
+        // 通过编译即证明
         Ok(())
     }
 }

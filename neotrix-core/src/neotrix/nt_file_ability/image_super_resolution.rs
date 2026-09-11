@@ -153,7 +153,7 @@ impl SuperResolutionModel {
     /// 获取元数据
     pub fn metadata(&self) -> ModelMetadata {
         ModelMetadata {
-            id: self.model_id(),
+            id: self.model_id().to_string(),
             display_name: self.display_name().to_string(),
             architecture: self.architecture().to_string(),
             scale: self.default_scale(),

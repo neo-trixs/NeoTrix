@@ -190,7 +190,7 @@ pub fn extract_pdf_images(
 /// XObject 图像遍历器 — 消除重复的遍历代码
 struct XObjectImageIterator<'a> {
     doc: &'a lopdf::Document,
-    pages: std::collections::HashMap<u32, u32>,
+    pages: std::collections::BTreeMap<u32, lopdf::ObjectId>,
 }
 
 impl<'a> XObjectImageIterator<'a> {
@@ -253,8 +253,8 @@ impl<'a> XObjectImageIterator<'a> {
 fn extract_image_from_xobject(
     doc: &lopdf::Document,
     xobj_dict: &lopdf::Dictionary,
-    page: usize,
-    xref: u32,
+    _page: usize,
+    _xref: u32,
     config: &PdfImageExtractConfig,
 ) -> Option<Result<ImageData>> {
     // 获取图像尺寸
@@ -339,7 +339,7 @@ fn extract_stream_data(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Optio
 }
 
 /// 获取颜色信息
-fn get_color_info(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<(u8, bool)> {
+fn get_color_info(_doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<(u8, bool)> {
     let color_space = dict.get(b"ColorSpace").ok()?;
     let cs_name = color_space.as_name().ok()?;
     
@@ -488,7 +488,7 @@ fn is_unicolor(data: &[u8], width: u32, height: u32, channels: u8) -> bool {
 /// 从 PDF 单页提取图像
 pub fn extract_page_images(
     pdf_path: &Path,
-    page: usize,
+    _page: usize,
     output_dir: &Path,
     config: &PdfImageExtractConfig,
 ) -> Result<Vec<PdfExtractedImage>> {
