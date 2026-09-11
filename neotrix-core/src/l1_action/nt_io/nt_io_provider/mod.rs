@@ -41,7 +41,7 @@ pub use universal_adapter::{
 // Re-export 核心类型
 pub use types::{
     FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, Tool,
-    ToolCall, ToolCallFunction, ToolCallInfo, Usage,
+    ToolCallFunction, ToolCallInfo, Usage,
 };
 
 // Re-export Token 预算引擎 (上下文压缩, AgentLoop/neocodex 共享)
