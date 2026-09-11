@@ -34,16 +34,16 @@ impl PathMetadata {
         let mut meta = Self::default();
 
         // 文件名
-        meta.file_name = path
-            .file_name()
-            .map(|s| s.to_string_lossy().into_owned());
+        meta.file_name = path.file_name().map(|s| s.to_string_lossy().into_owned());
 
         // 父文件夹 → 业务员
         if let Some(parent) = path.parent() {
             if let Some(parent_name) = parent.file_name() {
                 let name = parent_name.to_string_lossy();
                 // 业务员文件夹通常是人名 (中文，2-4字)
-                if name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == ' ')
+                if name
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_' || c == ' ')
                     && name.len() <= 20
                 {
                     meta.salesperson = Some(name.into_owned());
@@ -193,7 +193,8 @@ mod tests {
 
     #[test]
     fn test_parse_guatemala() {
-        let meta = PathMetadata::from_salesperson_order("段留杰", "4.02危地马拉 Erson WSD-I-26032701");
+        let meta =
+            PathMetadata::from_salesperson_order("段留杰", "4.02危地马拉 Erson WSD-I-26032701");
         assert_eq!(meta.country.as_deref(), Some("危地马拉"));
         assert_eq!(meta.customer.as_deref(), Some("Erson"));
     }

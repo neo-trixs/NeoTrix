@@ -12,17 +12,17 @@ use std::collections::HashMap;
 /// 解析后的配置字段
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConfigFields {
-    pub exec_std: Option<String>,     // 执行标准
-    pub pressure: Option<String>,     // 压力
-    pub valve_body: Option<String>,   // 阀体
-    pub valve_stem: Option<String>,   // 阀杆
-    pub valve_plate: Option<String>,  // 阀板
-    pub valve_seat: Option<String>,   // 阀座
-    pub connection: Option<String>,   // 连接方式
-    pub drive: Option<String>,        // 驱动方式
-    pub color: Option<String>,        // 颜色
-    pub material: Option<String>,     // 材质
-    pub temperature: Option<String>,  // 温度
+    pub exec_std: Option<String>,       // 执行标准
+    pub pressure: Option<String>,       // 压力
+    pub valve_body: Option<String>,     // 阀体
+    pub valve_stem: Option<String>,     // 阀杆
+    pub valve_plate: Option<String>,    // 阀板
+    pub valve_seat: Option<String>,     // 阀座
+    pub connection: Option<String>,     // 连接方式
+    pub drive: Option<String>,          // 驱动方式
+    pub color: Option<String>,          // 颜色
+    pub material: Option<String>,       // 材质
+    pub temperature: Option<String>,    // 温度
     pub extra: HashMap<String, String>, // 未识别的字段
 }
 
@@ -152,8 +152,19 @@ impl ConfigFields {
 /// 例如 "压力PN16" → ("压力", "PN16")
 fn split_chinese_key_value(s: &str) -> Option<(String, String)> {
     let known_keys = [
-        "执行标准", "标准", "压力", "阀体", "阀杆", "阀板", "阀座",
-        "连接", "链接", "驱动", "颜色", "材质", "温度",
+        "执行标准",
+        "标准",
+        "压力",
+        "阀体",
+        "阀杆",
+        "阀板",
+        "阀座",
+        "连接",
+        "链接",
+        "驱动",
+        "颜色",
+        "材质",
+        "温度",
     ];
 
     for key in &known_keys {

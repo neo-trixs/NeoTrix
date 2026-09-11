@@ -1,19 +1,31 @@
 # RESEARCH_MOBA_V2.md — MOBA AI & microduck_rl Deep Dive for NT-WORLD-SIM
 
-> Generated: 2026-09-11 | Sources: 25 searches/fetches | For: NT-WORLD-SIM MOBA simulation
+> Generated: 2026-09-11 | Sources: 40+ searches/fetches | For: NT-WORLD-SIM MOBA simulation
+> V2 Enhancement: Added Honor of Kings Arena, Tencent full-MOBA, HRL for MOBA, reward shaping, curriculum learning, transfer learning, fog of war, LLM+RL
+
+---
+
+## Table of Contents
+
+1. [microduck_rl Deep Analysis](#1-microduck_rl--code-structure-analysis)
+2. [MOBA AI Technology Panorama](#2-moba-ai-technology-panorama)
+3. [Core Technical Schemes](#3-core-technical-schemes)
+4. [Cross-Cutting Patterns](#4-cross-cutting-patterns)
+5. [Implementation Roadmap](#5-priority-implementation-roadmap)
+6. [References](#6-references)
 
 ---
 
 ## 1. microduck_rl — Code Structure Analysis
 
-**URL**: https://github.com/pollen-robotics/microduck_rl (2.0k★, Apache 2.0)
+**URL**: https://github.com/pollen-robotics/microduck_rl (2.1k★, Apache 2.0)
 
 ### Code Structure
 
 ```
 src/mjlab_microduck/
 ├── robot/
-│   ├── microduck/                    # MJCF exports, export configs, scenes
+│   ├── microduck/                    # MJCF exports, export configs, scenes, add_backlash.py
 │   └── microduck_constants.py        # robot cfgs, HOME frame, BAM actuator cfg
 ├── actuator/friction_dr_bam.py       # BAM + friction DR + backlash encoder feedback
 ├── tasks/
@@ -21,18 +33,64 @@ src/mjlab_microduck/
 │   ├── mdp.py                        # rewards, events, observations, custom classes
 │   ├── backlash.py                   # make_backlash_variant() env-cfg wrapper
 │   └── microduck_*_env_cfg.py        # one cfg module per task family
-├── train_cli.py                      # `train` script
+├── train_cli.py                      # `train` script (identical to mjlab's)
 ├── train_hook.py                     # intercepts `train ... --hf-jobs`
 └── hf_jobs.py                        # Hugging Face Jobs submission
 ```
 
-### Key Insight
-- **Shared 61-dim observation contract** across ALL policies enables runtime hot-swapping — any policy can take over the robot at any moment
-- 14 servo joints (0-4 left leg, 5-8 neck/head, 9-13 right leg)
-- ONNX export bakes observation normalizer into graph — runtime sees normalized obs
-- 4096 parallel envs, ~1-2h training for usable gait on single GPU
+### Key Technical Details
+
+| Aspect | Detail |
+|--------|--------|
+| **RL Algorithm** | PPO via rsl_rl (RSL-RL library) |
+| **Physics Engine** | MuJoCo Warp (GPU-accelerated) via mjlab |
+| **Control Frequency** | 50 Hz (matches real robot) |
+| **Parallel Envs** | 4096 envs per training run |
+| **Training Time** | ~1-2h for usable gait on single GPU |
+| **Observation Dim** | 61-dim shared across ALL policies |
+| **Action Dim** | 14 (servo joint position targets) |
+| **Export Format** | ONNX with baked-in observation normalizer |
+| **Deployment** | Rockchip RK3566 on real robot |
+
+### Shared 61-Dim Observation Contract
+
+The observation layout is shared across every policy, enabling runtime hot-swapping:
+- **48 proprioception**: gyro(3), projected gravity(3), 14 joint pos(14), 14 joint vel(14), last action(14)
+- **13 command**: twist(3), head_pose(4), body_pose(6)
+- Envs that don't use a command slot **zero-pad** it rather than dropping it
+
+### 13 Registered Tasks
+
+| Task | Terrain | Description |
+|------|---------|-------------|
+| Velocity | Flat/Rough | Walking with velocity + head-pose commands |
+| VelStand | Flat/Rough | Walking + fall recovery |
+| StandUp | Flat/Rough | Stand from face-down/up/sitting |
+| SitStand | Flat/Rough | Commanded sit ↔ stand |
+| GroundPick | Flat/Rough | Crouch and touch ground with mouth |
+| BallKick | Flat | Kick 70mm ball forward |
+| Roulade | Flat | Forward roll over head |
+| Velocity-Rollers | Flat | Roller-skate velocity tracking |
+| Swizzle | Flat | Classic symmetric swizzle skating |
+| RollerCrouch | Flat | Crouch while gliding |
+| RollerSlope | Slope | Glide down slopes |
+| RollerStandUp | Flat | Stand up onto wheels |
+| Spin | Flat | Fast spin on rollers |
+
+### Backlash Variants
+
+Every main task has a **Backlash** twin with ±1° gear play (2° total) in each of 14 servo joints. The backlash is modeled properly for sim2real: each servo gets an unactuated `passive_<joint>_backlash` hinge, and the real encoder reads *through* the backlash.
+
+### AGENTS.md — The Distilled Playbook
+
+AGENTS.md (251 lines) documents:
+- Environment-building workflow
+- Reward-design rules learned across the project
+- Designed for AI coding agents working in the repo
+- Contains distilled lessons on sim2real transfer
 
 ### NeoTrix Mapping
+
 | microduck_rl Pattern | NT-WORLD-SIM Equivalent |
 |---|---|
 | Shared obs contract (61-dim) | **NT-SIM Agent Observation Protocol** — standardized observation space for all MOBA agents |
@@ -41,102 +99,20 @@ src/mjlab_microduck/
 | Backlash variants (passive joints) | **NT-SIM Latency Model** — input delay, packet loss as "backlash" in agent response |
 | Runtime policy hot-swapping | **NT-SIM Strategy Switching** — agents dynamically switch between lane/teamfight/objective strategies |
 | Task registration system | **NT-SIM Agent Registry** — composable agent capabilities registered at startup |
-
-### Code Pattern: Task Registration
-```python
-# microduck_rl pattern: each task registered as env-cfg module
-# NT-WORLD-SIM mapping: each MOBA behavior as composable module
-TASK_REGISTRY = {
-    "velocity_flat": MicroduckVelocityFlatEnvCfg,
-    "velocity_rough": MicroduckVelocityRoughEnvCfg,
-    "standup": MicroduckStandUpEnvCfg,
-    ...
-}
-```
-
-### Code Pattern: Domain Randomization Toggles
-```python
-# microduck_rl pattern: ENABLE_* booleans at top of env cfg
-ENABLE_FRICTION_DR = True
-ENABLE_VOLTAGE_DR = True
-ENABLE_DELAY_DR = True
-# NT-WORLD-SIM: ENABLE_LANE_DR, ENABLE_DRAFT_DR, ENABLE_PING_DR
-```
+| 4096 parallel envs | **NT-SIM Scalable Self-Play** — massive parallelism for training MOBA agents |
+| ONNX export with baked normalizer | **NT-SIM Agent Export Pipeline** — single validated path for agent deployment |
+| AGENTS.md playbook | **NT-SIM Knowledge Capture** — distilled lessons for AI coding agents |
 
 ---
 
-## 2. microduck_rl Training Environment
+## 2. MOBA AI Technology Panorama
 
-**URL**: https://github.com/pollen-robotics/microduck_rl
+### 2.1 OpenAI Five — Dota 2 (The Gold Standard)
 
-### Key Insight
-- Built on **mjlab** (MuJoCo Warp) with **PPO** (rsl_rl)
-- Policies trained at **50 Hz** — same frequency as real robot
-- Domain randomization covers: battery voltage, voltage sag, command delay, friction magnitude, terrain
-- Terrain variants: Flat/Rough for each task
-- 13 registered tasks (Velocity, VelStand, StandUp, SitStand, GroundPick, BallKick, Roulade, Roller variants, Spin)
+**URL**: https://cdn.openai.com/dota-2.pdf | https://arxiv.org/abs/1912.06680
 
-### NeoTrix Mapping
-- **NT-SIM Training Loop**: Use PPO with similar DR approach for MOBA agent training
-- **Multi-task training**: Each MOBA behavior (laning, teamfight, objective control) as separate task with shared backbone
-- **Hz matching**: Train at same tick rate as deployment (e.g., 10 Hz game tick)
+#### Architecture
 
----
-
-## 3. microduck_rl BAM Actuator Model
-
-**URL**: https://github.com/Rhoban/bam
-
-### Key Insight
-- BAM M6 model for Dynamixel XL330 servo
-- Models: **voltage control law, back-EMF, Coulomb/Stribeck/load-dependent friction**
-- `FrictionDRBamActuator` — per-env domain randomization on all actuator parameters
-- At tiny scale (~800g biped), **actuator fidelity IS the sim2real gap**
-- `BacklashEncoderBamActuator` — reads through backlash like real hardware
-
-### NeoTrix Mapping
-| BAM Concept | NT-WORLD-SIM Equivalent |
-|---|---|
-| Voltage control law | **Ability resource cost model** — mana/energy cost per ability with regen |
-| Back-EMF (resistive force) | **Cooldown dynamics** — abilities create temporary vulnerability windows |
-| Coulomb/Stribeck friction | **Cast time variability** — animation canceling, input buffering |
-| Load-dependent friction | **Weight-dependent mechanics** — items affecting movement/attack speed |
-| Per-env DR on voltage | **Per-agent skill variance** — mechanical skill, decision quality |
-
----
-
-## 4. microduck_rl Sim2Real Transfer
-
-**URL**: https://github.com/pollen-robotics/microduck_rl/blob/develop/AGENTS.md
-
-### Key Insight
-- **AGENTS.md is the distilled playbook** — environment-building workflow + reward-design lessons
-- Sim2real gap closed by: BAM physics + DR + backlash modeling + reward shaping
-- Reward design is the hardest part — actuator fidelity alone isn't enough
-- ONNX export via single safe path (`scripts/export.py`) — never hand-convert
-- `infer_policy.py` rehearses runtime hot-swapping of multiple policies
-
-### NeoTrix Mapping
-- **NT-SIM Reward Engineering**: Complex, multi-objective reward for MOBA behaviors (CS + positioning + objective + kills)
-- **Single export path**: Agents must go through validated export pipeline before deployment
-- **Policy composition**: Multiple specialized policies (lane, teamfight, objective) composed at runtime
-
----
-
-## 5. OpenAI Five Architecture
-
-**URL**: https://cdn.openai.com/research-covers/openai-five/network-architecture.pdf | https://arxiv.org/abs/1912.06680
-
-### Key Insight
-- **5 LSTMs** — one per hero, each controlling a DotA 2 character
-- **Max-pooling** over units (allied/enemy heroes, non-heroes, neutrals)
-- Input encoding: hero stats, nearby terrain (8x8 grid), abilities (embedding+FC), items (embedding+FC), modifiers (embedding+FC)
-- **Action space**: discrete (ability selection) + continuous (target position X/Y, teleport destination, delay)
-- **Unit attention**: dot-product attention over all units for targeting
-- Discount factor γ ≈ 0.999841 (1 - 1/6300) — heavily weights future rewards
-- **Backprop through only 16 timesteps** (2.1 seconds of game time) despite hour-long games
-
-### Architecture Diagram (from paper)
 ```
 Hero Obs → LSTM(1024) → Action Heads:
   ├── Available Actions → Softmax → Selected Action
@@ -147,776 +123,770 @@ Hero Obs → LSTM(1024) → Action Heads:
   └── Unit Attention → Target Unit
 ```
 
-### NeoTrix Mapping
-| OpenAI Five | NT-WORLD-SIM |
-|---|---|
-| Per-hero LSTM | **Per-agent policy network** — separate LSTM/Transformer per agent role |
-| Max-pool over units | **Spatial attention pool** — aggregate nearby agent info |
-| Terrain 8x8 grid | **Lane/map state encoding** — minimap grid with vision |
-| Ability/Item/Modifier embeddings | **Ability/item state vectors** — game state encoding |
-| Unit attention (dot product) | **Target selection attention** — choose who to attack/ability target |
-| γ ≈ 0.999841 | **Long-horizon discount** — objectives (towers, nexus) heavily weighted |
-| 16-step backprop | **BPTT window** — balance credit assignment vs compute |
+#### Key Technical Decisions
 
-### Code Pattern: Hierarchical LSTM
+| Decision | Detail |
+|----------|--------|
+| **Algorithm** | PPO (Proximal Policy Optimization) |
+| **Network Core** | 4096-unit LSTM per hero |
+| **Input Encoding** | Conv layers + FC layers, max-pooling over units |
+| **Unit Categories** | Allied/enemy heroes, non-heroes, neutrals (5 groups) |
+| **Terrain Encoding** | 8x8 grid of height, traversability, creep occupancy |
+| **Ability/Item Encoding** | Embedding + FC + max-pool per ability/item |
+| **Discount Factor** | γ ≈ 0.999841 (1 - 1/6300) — heavily future-weighted |
+| **Backprop Window** | 16 timesteps (2.1s of game time) despite hour-long games |
+| **Training Scale** | 256 GPUs, 128K CPU cores, 10 months |
+| **Self-Play** | 180 years of gameplay per day |
+| **Response Time** | 193ms (133ms observation + 60ms reaction) |
+
+#### Observation Space Design
+
+OpenAI Five processes complex multi-array observations into a single vector:
+- **Hero stats**: HP, mana, regen, attack, level, abilities, items, modifiers
+- **Nearby terrain**: 8x8 grid with height, traversability, creep occupancy
+- **Allied/enemy heroes**: distance, orientation, health over last 12 frames, unit stats
+- **Non-heroes**: health, position, unit type
+- **Global state**: glyph cooldown, day/night, creep wave timing, courier status
+- **Ability/item/modifier**: type embedding + stats (cooldown, charges, duration)
+
+#### Action Space Design
+
+| Action Head | Type | Values |
+|-------------|------|--------|
+| Available Actions | Discrete | Which ability/button to press |
+| Offset X/Y | Discrete | Target position offset |
+| Move X/Y | Discrete | Movement direction |
+| Teleport Destination | Discrete | Where to teleport |
+| Delay | Discrete | Timing delay |
+| Unit Attention | Softmax | Which unit to target (dot-product attention) |
+
+#### Hidden State Analysis (from 1912.06721)
+
+- LSTM hidden states encode **implicit planning** — the agent predicts future states
+- Cosine similarity between embeddings reveals structured representations
+- Agent learns to predict: future locations, team objectives, enemy objectives, future rewards
+- **No explicit MCTS or symbolic planning** — planning emerges from LSTM dynamics
+
+### 2.2 Tencent Honor of Kings — Full MOBA AI (The Master)
+
+**URL**: https://arxiv.org/abs/2011.12692 | NeurIPS 2020
+
+#### Paper: "Towards Playing Full MOBA Games with Deep Reinforcement Learning"
+
+**Achievement**: 97.7% win rate over 642,047 matches against top human players
+
+#### Architecture Innovations
+
+| Innovation | Description |
+|------------|-------------|
+| **Hierarchical Action Heads** | 3-level: What (ability) → Who (target) → How (direction) |
+| **Multi-Head Value (MHV)** | 5 reward categories as 5 value heads (pushing, win/lose related, etc.) |
+| **Curriculum Self-Play** | Start small, gradually increase hero pool and difficulty |
+| **Policy Distillation** | Distill large teacher models into smaller deployable models |
+| **Off-Policy Adaptation** | Adapt to new heroes via transfer from existing policies |
+| **Monte-Carlo Tree Search** | MCTS for final decision-time planning |
+| **Action Mask** | Game-knowledge-based pruning of invalid actions |
+
+#### Training Infrastructure
+
+- 320 GPUs + 35,000 CPUs
+- One "resource unit" for training
+- Distributed training with off-policy adaptation
+
+#### Multi-Head Value Estimation
+
+```
+Reward Categories → 5 Value Heads:
+  1. Pushing Related (turret damage, objective damage)
+  2. Win/Lose Related (game outcome)
+  3. Kill Related (hero kills, assists)
+  4. Gold Related (CS, bounties)
+  5. Survival Related (deaths, damage taken)
+```
+
+### 2.3 Tencent Honor of Kings Arena — Open RL Environment
+
+**URL**: https://github.com/tencent-ailab/hok_env | https://arxiv.org/abs/2209.08483 | NeurIPS 2022
+
+#### Key Features
+
+| Feature | Detail |
+|---------|--------|
+| **Heroes** | 20 heroes with diverse abilities |
+| **Modes** | 1v1 competitive (3v3/5v5 out of scope) |
+| **Observation** | Scalar features + spatial features (mini-map) |
+| **Action Space** | Same as OpenAI Five — hierarchical action heads |
+| **API** | Simple Python-based interface |
+| **Baseline Algorithms** | PPO + Ape-X DQN |
+| **Generalization Challenge** | Different heroes = different "games" |
+
+#### Generalization Challenge
+
+Unlike simpler RL environments where actions remain the same across tasks, Honor of Kings Arena presents:
+- **Different heroes** → different action controls (skills, attack patterns)
+- **Different opponents** → need to adapt strategies
+- **Sparse rewards** → only win/lose signal in competitive mode
+
+#### Baseline Results
+
+- Both PPO and DQN show learning progress
+- Training time to beat BT (built-in trainer) is approximately constant across GPU counts
+- Demonstrates that existing RL methods can learn but struggle with generalization
+
+### 2.4 Tencent Hierarchical Macro Strategy (HMS)
+
+**URL**: https://arxiv.org/abs/1812.07887 | AAAI 2019
+
+#### Key Insight
+
+- **HMS = Macro Strategy Model** — guides where to go on the map
+- HMS is NOT a complete AI solution (no micro control)
+- Agents make **independent strategy decisions** while communicating with allies
+- **Imitated cross-agent communication** mechanism
+- 5-AI team achieves **48% win rate** against top-1% human teams
+
+#### Architecture
+
+```
+Game Features → Attention Layer → Phase Layer → Strategy Decision
+                    ↓
+            Cross-Agent Communication
+```
+
+- **Attention Layer**: Focuses on relevant game entities
+- **Phase Layer**: Recognizes current game phase (laning, mid-game, late-game)
+- **Communication**: Imitated from human replays
+
+### 2.5 Hierarchical RL for Multi-agent MOBA (vivo AI Lab)
+
+**URL**: https://arxiv.org/abs/1901.08004
+
+#### Key Innovation
+
+- **Hierarchical framework**: Macro strategies via imitation learning + micro manipulations via RL
+- **Self-learning method**: Agent learns from its own past good decisions
+- **Dense reward function** for multi-agent cooperation without game API
+- **Multi-target detection** to extract global features from screen
+- **116-dimensional state tensor** from multi-target detection, mini-map, current view
+
+#### Training Results
+
+- 100% win rate against bronze-level built-in AI
+- Competitive multi-agent for King of Glory 5v5 mode
+
+### 2.6 Deep Learning Bot for League of Legends
+
+**URL**: https://github.com/csci-599-applied-ml-for-games/league-of-legends-bot | AIIDE-2020
+
+#### Approach
+
+| Component | Method |
+|-----------|--------|
+| **Object Detection** | YOLOv3 trained on 1200 manually annotated frames |
+| **State Representation** | Feature vectors from YOLOv3 (15 classes) |
+| **Decision Making** | LSTM for action selection |
+| **Actions** | Skill use, attack, flee |
+| **Training** | Against built-in LoL bot in 1v1 MidLane |
+
+#### Limitations
+
+- No official API → screen capture only
+- Simplified to 1v1 MidLane
+- Limited action space compared to full MOBA
+
+### 2.7 MobaQA — LLM-Based MOBA Prediction
+
+**URL**: IEEE Transactions on Games, Vol. 18, No. 2, June 2026
+
+#### Key Innovation
+
+- Uses **LLM fine-tuning** for battlefield information prediction
+- Minimal key data items instead of extensive data inputs
+- Fine-tuned LLMs (Llama-based) for win-rate and match outcome prediction
+- Tested across two major game versions over 2 years
+
+### 2.8 Think in Games — LLM + RL for MOBA Reasoning
+
+**URL**: https://arxiv.org/abs/2508.21365
+
+#### Key Innovation
+
+- **GRPO (Group Relative Policy Optimization)** for training LLMs on MOBA strategies
+- Rule-based reward function (no neural reward model)
+- Multi-stage training: SFT → RL
+- Qwen-3-14B achieves 90.91% accuracy (outperforms Deepseek-R1 at 86.67%)
+
+---
+
+## 3. Core Technical Schemes
+
+### 3.1 Map Representation Methods
+
+| Method | Description | Pros | Cons | NT-WORLD-SIM Mapping |
+|--------|-------------|------|------|----------------------|
+| **Tile-based** | Grid of tiles with properties (height, traversability, fog) | Simple, fast collision detection | High memory for large maps | Default for lane/jungle zones |
+| **Graph-based** | Nodes (locations) + edges (paths) with weights | Natural for pathfinding, strategic reasoning | Loses spatial precision | For macro-strategy layer |
+| **Vector-based** | Continuous coordinates with spatial encoding | Precise, natural for RL | High dimensionality | For micro-control layer |
+| **Hierarchical** | Multi-resolution: global graph + local tiles | Best of both worlds | Complex implementation | **Recommended for NT-WORLD-SIM** |
+
+#### OpenAI Five Map Encoding
+
+- **8x8 grid** per hero with height, traversability, creep occupancy
+- Local view, not global map
+- Encoded as convolutional features
+
+#### Tencent HMS Map Encoding
+
+- **Mini-map features** as spatial channels
+- Global view with fog of war
+- Encoded via attention mechanisms
+
+#### Recommended NT-WORLD-SIM Approach
+
+```
+Three-Layer Map Representation:
+├── Layer 1: Global Graph (100 nodes) — lanes, objectives, jungle paths
+│   └── Used for: macro-strategy, rotation decisions
+├── Layer 2: Zone Tiles (64x64 grid) — current lane/jungle zone
+│   └── Used for: positioning, wave management, vision
+└── Layer 3: Combat Region (16x16 grid) — immediate combat area
+    └── Used for: skillshots, dodging, focus fire
+```
+
+### 3.2 State Encoding
+
+#### Entity Encoding (from OpenAI Five)
+
+| Entity Type | Encoding Method | Features |
+|-------------|----------------|----------|
+| **Heroes** | Embedding + FC | HP, mana, level, abilities, items, position, orientation |
+| **Units** | Embedding + FC | Type, HP, position |
+| **Abilities** | Embedding + FC + max-pool | Cooldown, mana cost, damage, range |
+| **Items** | Embedding + FC + max-pool | Stats, charges, active/passive |
+| **Modifiers** | Embedding + FC + max-pool | Duration, type, effects |
+
+#### Spatial Encoding
+
+| Method | Description | Used By |
+|--------|-------------|---------|
+| **Convolutional** | Feature maps over local grid | OpenAI Five (8x8 terrain) |
+| **Positional** | Absolute/relative coordinates | Most systems |
+| **Attention-based** | Learnable spatial attention | HMS, AlphaStar |
+| **Multi-scale** | Multiple resolution grids | StarCraft II agents |
+
+#### Temporal Encoding
+
+| Method | Description | Used By |
+|--------|-------------|---------|
+| **Frame stacking** | Stack last N frames | DQN variants |
+| **LSTM/GRU** | Recurrent memory | OpenAI Five, most MOBA AI |
+| **Transformer** | Self-attention over time | AlphaStar, recent work |
+| **Delta encoding** | Changes from previous frame | Some StarCraft agents |
+
+#### Recommended NT-WORLD-SIM State Encoding
+
 ```rust
-// NT-WORLD-SIM equivalent of OpenAI Five's architecture
-pub struct AgentPolicy {
-    // Per-agent observation encoder
-    obs_encoder: Linear(obs_dim, hidden),  // hero stats + abilities
-    // Spatial attention over nearby entities
-    spatial_pool: AttentionPool(hidden),
-    // LSTM for temporal memory
-    lstm: LSTM(hidden, hidden),
-    // Action heads
-    action_head: Linear(hidden, num_actions),
-    position_head: Linear(hidden, 2),  // x, y target
-    target_head: Linear(hidden, num_units),  // who to target
+struct AgentObservation {
+    // Entity encoding (from microduck_rl shared contract pattern)
+    hero_self: HeroState,           // 32 floats: hp, mana, level, position, cooldowns...
+    nearby_allies: Vec<UnitState>,  // max 4 allies × 8 floats
+    nearby_enemies: Vec<UnitState>, // max 4 enemies × 8 floats
+    nearby_units: Vec<UnitState>,   // max 20 units × 4 floats
+    
+    // Spatial encoding
+    local_map: [f32; 64*64*3],     // height, traversability, vision
+    
+    // Strategic encoding
+    game_phase: f32,               // 0-1 normalized time
+    team_advantage: f32,           // gold/xp lead
+    objective_timers: [f32; 4],    // dragon, baron, rift, elder
+    
+    // Command encoding (from microduck_rl pattern)
+    current_goal: [f32; 8],        // active strategy encoding
 }
+// Total: ~200 floats (manageable for LSTM/Transformer)
 ```
 
----
+### 3.3 Action Space Design
 
-## 6. OpenAI Five Reward Shaping
+#### Comparison of Approaches
 
-**URL**: https://arxiv.org/abs/1912.06680
+| Approach | Description | Used By | Pros | Cons |
+|----------|-------------|---------|------|------|
+| **Discrete** | Fixed set of actions | OpenAI Five (partially) | Simple, sample efficient | Limited precision |
+| **Continuous** | Continuous parameters | Some robot control | Precise | Hard to explore |
+| **Hierarchical** | Multi-level selection | Tencent, AlphaStar | Natural for MOBA | Complex training |
+| **Auto-regressive** | Sequential action components | AlphaStar | Flexible | Slow inference |
 
-### Key Insight
-- **80% of reward is kill-related**: kill enemy hero (+X), deny allied hero, hero survival
-- **10% structure**: ability accuracy, laning (near creeps but not too close), movement efficiency
-- **10% game outcome**: win/loss, tower advantage
-- **Surgery** technique: when game patches change mechanics, interpolate between old and new reward functions
-- Training: 128,000 cores, 256 GPUs, ~10 months, ~45,000 years of game time
+#### OpenAI Five Action Space (Hierarchical)
 
-### NeoTrix Mapping
-- **Multi-objective reward decomposition**:
-  - 60% team objectives (towers, inhibitors, nexus)
-  - 25% combat performance (kills, deaths, assists)
-  - 10% economic efficiency (CS, gold/xp differential)
-  - 5% positioning (map control, vision)
-- **Reward surgery**: When meta changes, smoothly interpolate reward functions
-- **Distributed training**: 128K cores → scale to multiple GPUs for NT-SIM
+```
+Action Selection:
+1. Available Actions → Softmax → Which ability/button
+2. Offset X/Y → Softmax → Target position (discretized)
+3. Move X/Y → Softmax → Movement direction (discretized)
+4. Teleport Destination → Discrete location
+5. Delay → Discrete timing
+6. Unit Attention → Softmax over all units → Target unit
+```
 
----
+#### Tencent Action Space (3-Level Hierarchy)
 
-## 7. OpenAI Five Self-Play
+```
+Level 1: What to do?
+  → Move, Attack, Skill 1, Skill 2, Skill 3, Recall, Buy, ...
+  
+Level 2: Who/Where?
+  → Target unit (attention over units) OR target position (grid)
+  
+Level 3: How precisely?
+  → Exact offset/direction (further discretization)
+```
 
-**URL**: https://arxiv.org/abs/1912.06680
+#### Action Mask (Exploration Pruning)
 
-### Key Insight
-- **Continuous self-play** against current and past versions of the model
-- **Pool of opponents**: randomly sample from historical checkpoints
-- Prevents "strategy cycling" — model must be robust to all historical strategies
-- **Win-rate based matchmaking**: opponents selected based on similar skill level
-- 10 months of continuous self-play training
+Both OpenAI Five and Tencent use **action masks** to:
+- Eliminate invalid actions (dead skills, no target in range)
+- Guide exploration toward feasible actions
+- Reduce effective action space from ~10^20000 to ~10^1500
 
-### NeoTrix Mapping
-| Self-Play Pattern | NT-WORLD-SIM |
-|---|---|
-| Historical checkpoint pool | **Agent archive** — store checkpoints, sample opponents |
-| Win-rate matchmaking | **ELO-based matching** — pair similar-skilled agents |
-| Anti-cycling | **Diverse opponent pool** — prevent meta collapse |
-| Continuous training | **Online learning loop** — agents improve continuously |
+#### Recommended NT-WORLD-SIM Action Space
 
-### Code Pattern: Self-Play Pool
 ```rust
-pub struct SelfPlayPool {
-    agents: Vec<AgentCheckpoint>,  // historical checkpoints
-    current: AgentCheckpoint,
-    elo_ratings: Vec<f32>,
+enum AgentAction {
+    Move { direction: Direction8, distance: f32 },
+    Attack { target: UnitId },
+    UseAbility { ability_id: u8, target: AbilityTarget },
+    BuyItem { item_id: u8 },
+    Recall,
+    Ward { position: Vec2, ward_type: WardType },
+    Ping { position: Vec2, ping_type: PingType },
 }
 
-impl SelfPlayPool {
-    pub fn sample_opponent(&self, skill_range: f32) -> &AgentCheckpoint {
-        // Sample from historical checkpoints within skill range
-        // Prevents strategy cycling
-    }
-}
-```
-
----
-
-## 8. OpenAI Five Hierarchical LSTM
-
-**URL**: https://arxiv.org/pdf/1912.06721
-
-### Key Insight
-- **LSTM memory acts as implicit plan** — contains info about future goals
-- Hidden State Decoders trained to predict: future gold, net worth rank, tower destruction timing
-- **No explicit macro-actions** — hierarchy emerges from learned representations
-- Plans detected via similarity analysis of distributed representations
-- Sub-goals (reach map location, destroy tower) learned without explicit supervision
-
-### NeoTrix Mapping
-| Hierarchical LSTM | NT-WORLD-SIM |
-|---|---|
-| Implicit planning in LSTM | **Temporal attention** — agent memory encodes current strategic plan |
-| Hidden State Decoders | **Plan introspection** — extract current objective from agent hidden state |
-| Sub-goal detection | **Behavior classification** — detect laning/teamfighting/objective-taking from hidden state |
-| No macro-actions needed | **End-to-end learning** — don't hardcode strategy phases |
-
-### Code Pattern: Plan Introspection
-```rust
-// Extract what the agent is currently planning from hidden state
-pub struct PlanDecoder {
-    // Predicts: "will this agent attack dragon in next 30s?"
-    objective_predictor: Linear(hidden, num_objectives),
-    // Predicts: "how much gold will this agent have in 60s?"
-    resource_predictor: Linear(hidden, 1),
+enum AbilityTarget {
+    Unit(UnitId),
+    Position(Vec2),
+    Direction(Direction8),
+    Self,
+    None,
 }
 
-// Used for:
-// 1. Commentary/spectating
-// 2. Opponent modeling
-// 3. Strategy-aware reward shaping
-```
-
----
-
-## 9. PyMARL QMIX Algorithm
-
-**URL**: https://github.com/oxwhirl/pymarl (2.2k★) | https://arxiv.org/abs/1803.11485
-
-### Key Insight
-- **QMIX**: Centralized training, decentralized execution (CTDE)
-- Learns joint Q-function as **non-linear monotonic mixing** of per-agent utilities
-- `∂Q_tot/∂Q_a ≥ 0` — monotonic constraint enables tractable decentralization
-- **Hypernetwork** conditions mixing weights on global state → state-dependent coordination
-- Significantly outperforms VDN and IQL on SMAC benchmarks
-- Per-agent Q-networks condition only on **local observations** — enables decentralized execution
-
-### Architecture
-```
-Global State → HyperNet → Mixing Weights (per layer)
-Agent_i obs → Agent_i Q-net → Q_i(s, u_i)
-Q_tot = MixNet(Q_1, Q_2, ..., Q_n; state)
-```
-
-### NeoTrix Mapping
-| QMIX Component | NT-WORLD-SIM |
-|---|---|
-| Per-agent Q-network | **Per-agent value function** — estimates value of each action given local observation |
-| Hypernetwork (state-conditioned mixing) | **Team coordination network** — global state informs how individual actions compose |
-| Monotonic constraint | **Non-negative coordination** — team value increases when any agent improves |
-| CTDE paradigm | **Training with full map info, executing with local vision** — matches MOBA fog-of-war |
-
-### Code Pattern: QMIX-style Value Decomposition
-```rust
-pub struct TeamQMIX {
-    agent_q_nets: Vec<AgentQNet>,  // one per agent
-    hyper_net: HyperNetwork,  // generates mixing weights from global state
-}
-
-impl TeamQMIX {
-    pub fn q_tot(&self, agent_actions: &[QValues], global_state: &State) -> QValue {
-        let weights = self.hyper_net.forward(global_state);
-        // Monotonic mixing: Q_tot = Σ w_i * Q_i (simplified)
-        monotonic_mix(agent_actions, weights)
-    }
+// Action mask: compute valid actions each tick
+fn compute_action_mask(state: &AgentState) -> ActionMask {
+    // Based on: cooldowns, mana, range, visibility, alive status
 }
 ```
 
----
+### 3.4 Reward Function Design
 
-## 10. PyMARL VDN Value Decomposition
+#### Taxonomy of Reward Approaches
 
-**URL**: https://arxiv.org/abs/1706.05296
+| Type | Description | Example | Pros | Cons |
+|------|-------------|---------|------|------|
+| **Sparse** | Win/lose only | OpenAI Five (final outcome) | Simple, aligned with goal | Very slow learning |
+| **Dense** | Per-timestep rewards | CS, kills, damage | Faster learning | Can cause reward hacking |
+| **Shaped** | Designed intermediate rewards | Distance to objective | Guides exploration | May not align with goal |
+| **Intrinsic** | Curiosity/novelty | ICM, EXPLORS | Encourages exploration | Can be noisy |
+| **Multi-head** | Decomposed rewards | Tencent MHV | Better value estimation | Complex implementation |
 
-### Key Insight
-- **VDN**: Simplest value decomposition — `Q_tot = Σ Q_i(u_i, obs_i)`
-- **No state conditioning** — each agent's Q-function depends only on local observations
-- **Fully disconnected coordination graph** — no explicit coordination during training
-- Limitation: cannot represent value functions where agent's optimal action depends on other agents' actions
-- Serves as surprisingly strong baseline even in competitive settings
+#### OpenAI Five Reward Shaping
 
-### NeoTrix Mapping
-| VDN | NT-WORLD-SIM |
-|---|---|
-| Sum decomposition | **Independent agent training** — each agent optimizes locally |
-| No state info | **Fog-of-war training** — agents only see their local area |
-| Strong baseline | **Start with VDN, upgrade to QMIX** — progressive complexity |
-
----
-
-## 11. SMAC StarCraft Multi-Agent Challenge
-
-**URL**: https://github.com/oxwhirl/smac
-
-### Key Insight
-- **Standard benchmark** for cooperative MARL
-- Scenarios: 3m (3 marines) → 1c3s5z (colossus + stalkers + zealots)
-- **Perfect and imperfect information** variants
-- Maps test different coordination challenges: focus fire, kiting, flanking
-- Win rate reported as primary metric
-- Used by QMIX, VDN, COMA, IQL, QTRAN papers
-
-### NeoTrix Mapping
-| SMAC Scenario | NT-WORLD-SIM Equivalent |
-|---|---|
-| 3m (simple combat) | **2v2 skirmish** — basic teamfight coordination |
-| 2s3z (mixed units) | **5v5 teamfight** — mixed roles (tank/dps/support) |
-| 1c3s5z (complex) | **Full teamfight with objectives** — dragon/baron fights |
-| Focus fire scenarios | **Target selection** — who to focus in teamfight |
-| Kiting scenarios | **Spacing/positioning** — kiting, zoning |
-
----
-
-## 12. OpenSpiel Game Abstraction
-
-**URL**: https://github.com/google-deepmind/open_spiel (5.5k★)
-
-### Key Insight
-- **C++ core** with Python bindings — procedural extensive-form games
-- Supports: n-player, zero-sum, cooperative, general-sum, one-shot, sequential, simultaneous-move, perfect/imperfect information
-- **Game as first-class object** — standardized API for all game types
-- Algorithms: CFR, MCTS, DQN, Policy Gradient, Deep CFR
-- Analysis tools: exploitability, NashConv, visit distributions
-
-### NeoTrix Mapping
-| OpenSpiel Concept | NT-WORLD-SIM |
-|---|---|
-| Game abstraction | **MOBA match abstraction** — formalize match as extensive-form game |
-| Player API | **Agent API** — standardized interface for all agents |
-| Information set | **Fog-of-war information set** — what each agent can observe |
-| Chance nodes | **RNG elements** — critical strikes, skill shots |
-| Simultaneous moves | **Real-time actions** — all agents act simultaneously |
-| Analysis tools | **Match analysis** — exploitability, Nash equilibrium approximation |
-
-### Code Pattern: Game Abstraction
-```rust
-// NT-WORLD-SIM: Abstract MOBA match as OpenSpiel-compatible game
-pub struct MobaGame {
-    teams: [Team; 2],
-    map: MapState,
-    time: GameTime,
-}
-
-impl Game for MobaGame {
-    type State = MatchState;
-    type Action = AgentAction;
-    
-    fn legal_actions(&self, player: PlayerId) -> Vec<Action> {
-        // Returns actions legal given fog-of-war, cooldowns, mana
-    }
-    
-    fn apply_action(&mut self, action: Action) -> Outcome {
-        // Simulate one game tick with all agents' simultaneous actions
-    }
-}
+```
+Reward Components:
+├── Win/Lose (primary)
+├── Hero kills
+├── Net worth lead
+├── Tower damage
+├── Roshan kills
+├── XP advantage
+└── ...
 ```
 
----
+- **γ = 0.999841** — heavily weights future rewards
+- **Backprop only 16 steps** — credit assignment over short windows
+- LSTM state carries implicit long-term planning
 
-## 13. TorchRL / TensorDict
+#### Tencent Multi-Head Value (MHV)
 
-**URL**: https://github.com/pytorch/rl
-
-### Key Insight
-- **TensorDict**: Dict-like container for tensors with shared batch dimensions
-- **TorchRL**: Modular RL library built on TensorDict
-- Supports: PPO, SAC, TD3, DQN, A2C, REINFORCE
-- **Environment wrappers**: Gym-compatible, transforms, parallel execution
-- **Data collection**: replay buffers, on-policy collectors
-- **Modular design**: environment, collector, loss module, actor-critic are independent
-
-### NeoTrix Mapping
-| TorchRL Concept | NT-WORLD-SIM |
-|---|---|
-| TensorDict | **Agent state dict** — standardized container for agent observations/actions/values |
-| Environment wrapper | **Match environment** — wraps MOBA match as RL environment |
-| Parallel execution | **Batch match simulation** — run multiple matches in parallel |
-| Replay buffer | **Experience replay** — store and sample past match experiences |
-| Modular loss | **Reward decomposition** — separate loss terms for different objectives |
-
----
-
-## 14. MOBA Lane Phase AI
-
-### Key Insight
-- **Laning phase**: 0-15 minutes, heroes stay in assigned lanes (top/mid/bot)
-- **CS (creep score)**: Last-hit minions for gold — core economic mechanic
-- **Trading**: Short trades with opponent, managing health/mana resources
-- **Wave management**: Freeze (keep wave near tower), slow push (build big wave), fast push (shove quickly)
-- **Recall timing**: Return to base when low HP/mana or after kill
-
-### Key Behaviors to Model
-1. **Last-hitting**: Timing attacks to kill minions at low HP
-2. **Trading stance**: Positioning to punish opponent's CS attempts
-3. **Wave manipulation**: Freezing, slow pushing, fast pushing
-4. **Vision control**: Placing/de-clearing wards
-5. **Recall timing**: When to base for items/health
-
-### NeoTrix Mapping
 ```
-LanePhaseAI {
-    state: LaneState {
-        ally_minions: Vec<Minion>,
-        enemy_minions: Vec<Minion>,
-        enemy_hero: HeroState,
-        my_hp: f32,
-        my_mana: f32,
-        wave_position: f32,  // distance from own tower
-    }
-    actions: LaneAction {
-        last_hit: Option<MinionId>,
-        trade: Option<HeroId>,
-        position: Vec2,
-        recall: bool,
-        ward: Option<Vec2>,
-    }
-}
+5 Value Heads:
+  Head 1: Pushing Related (turret damage, objective damage)
+  Head 2: Win/Lose Related (game outcome)
+  Head 3: Kill Related (hero kills, assists)
+  Head 4: Gold Related (CS, bounties, item purchases)
+  Head 5: Survival Related (deaths, damage taken)
 ```
 
----
+- Each head has its own value estimate
+- Combined via learned weights
+- Inspired by Hybrid Reward Architecture (HRA) from Ms. Pac-Man
 
-## 15. MOBA Teamfight Positioning
+#### Dense Reward Design for MOBA
 
-### Key Insight
-- **Frontline** (tanks/bruisers): Absorb damage, create space, engage/disengage
-- **Backline** (ADC/mage): Deal damage from safe distance, protect carries
-- **Support**: Vision, peel, engage, sustain
-- **Positioning principles**:
-  - Don't stack (AoE vulnerability)
-  - Stay near cover (walls, brushes)
-  - Protect carries at all costs
-  - Target priority: low-HP > high-threat > nearest
+| Event | Reward | Weight |
+|-------|--------|--------|
+| Last-hit minion | +1 | 1.0 |
+| Kill enemy hero | +5 | 5.0 |
+| Assist on kill | +2 | 2.0 |
+| Destroy turret | +10 | 10.0 |
+| Die | -3 | -3.0 |
+| Lose turret | -8 | -8.0 |
+| Win game | +100 | 100.0 |
+| Lose game | -100 | -100.0 |
+| Vision score (ward) | +0.5 | 0.5 |
+| Jungle camp clear | +1 | 1.0 |
+| Dragon/Baron kill | +15 | 15.0 |
 
-### Key Metrics
-- **Effective HP**: Total damage before death (HP + armor + MR + shields)
-- **DPS uptime**: Percentage of teamfight spent dealing damage
-- **Positioning error**: Distance from optimal position
+#### Advanced Reward Shaping Techniques
 
-### NeoTrix Mapping
+| Technique | Paper | Key Idea |
+|-----------|-------|----------|
+| **EXPLORS** | NeurIPS 2022 | Exploration-guided reward shaping for sparse rewards |
+| **SORS** | Memarian et al. | Self-supervised online reward shaping via trajectory ranking |
+| **ARMS** | 2025 | Automatic reward shaping for multi-agent systems |
+| **SSRS** | 2025 | Semi-supervised reward shaping using zero-reward transitions |
+| **Dual-Agent** | ICML 2024 | Policy agent + reward agent working together |
+
+### 3.5 Training Architecture
+
+#### Comparison of Training Paradigms
+
+| Paradigm | Description | Used By | Pros | Cons |
+|----------|-------------|---------|------|------|
+| **Centralized** | Single model controls all | OpenAI Five | Simple coordination | Doesn't scale to many agents |
+| **Decentralized** | Independent agents | Simple bots | Scalable | No coordination |
+| **CTDE** | Centralized train, decentralized execute | QMIX, MAPPO | Best of both worlds | Complex infrastructure |
+| **Self-Play** | Agents train against themselves | OpenAI Five, AlphaStar | No human data needed | Can cycle, not converge |
+| **Population** | Multiple populations competing | AlphaStar League | Robust strategies | Very expensive |
+
+#### OpenAI Five Training Loop
+
 ```
-TeamfightPositioning {
-    roles: {
-        frontline: PositioningRule { range: 200-400, target: "nearest_threat" },
-        backline: PositioningRule { range: 500-700, target: "highest_dps" },
-        support: PositioningRule { range: 300-500, target: "ally_lowest_hp" },
-    }
-    formation: {
-        ideal_spacing: 300,  // minimum distance between allies
-        max_cluster: 3,      // max allies in AoE radius
-        escape_vectors: Vec<Vec2>,  // pre-computed escape routes
-    }
-}
-```
-
----
-
-## 16. MOBA Objective Control AI
-
-### Key Insight
-- **Objectives**: Dragon (stacking buff), Baron (team siege buff), Rift Herald (tower push), Towers (map control), Inhibitors (super minions), Nexus (win condition)
-- **Objective value changes** over game time:
-  - Early: Dragon stacks, first tower bonus
-  - Mid: Baron, tower control
-  - Late: Baron, Elder Dragon, Nexus
-- **Zoning**: Control area around objective before starting
-- **Smite fight**: 50/50 steal attempts — high risk, high reward
-- **Cross-map trades**: Give up dragon for tower, give up tower for Baron
-
-### Key Decision Framework
-```
-Should we take this objective?
-├── Can we take it without contest? → Take it
-├── Can we win the teamfight? → Force fight, then take
-├── Can we trade for something better? → Trade
-├── Is it too risky? → Give it up, farm
+Training Pipeline:
+1. Self-Play: Current agent vs historical versions
+2. PPO Update: On batches of 2M frames every 2 seconds
+3. LSTM State: Carried across timesteps within episodes
+4. Continual Training: 10 months with "surgery" for game updates
+5. Humanoid Opponents: Regular matches against human teams
 ```
 
-### NeoTrix Mapping
-| Objective Concept | NT-WORLD-SIM |
-|---|---|
-| Objective value scaling | **Dynamic objective valuation** — value changes with game state |
-| Zoning | **Area control** — claim territory before objective |
-| Smite timing | **Burst timing** — coordinate burst damage for secure |
-| Cross-map trade | **Strategic tradeoff** — model as multi-objective optimization |
+#### Tencent Training Pipeline
 
----
-
-## 17. MOBA Vision Control AI
-
-### Key Insight
-- **Fog of War**: Limited vision creates information asymmetry
-- **Vision types**: Minions (lane vision), towers (area vision), wards (placed vision), champion abilities (temporary vision)
-- **Vision denial**: Clearing enemy wards (Oracle Lens, Control Wards)
-- **Deep wards**: Vision in enemy jungle → track jungler movement
-- **Vision评分**: How much of the map you control vs enemy
-
-### Key Behaviors
-1. **Ward placement**: Strategic locations (bushes, jungle entrances, objectives)
-2. **Ward clearing**: Oracle Lens sweeps, Control Ward denial
-3. **Vision tracking**: Predict enemy positions from visible info
-4. **Fog abuse**: Use fog to ambush, zone, or escape
-
-### NeoTrix Mapping
 ```
-VisionControlAI {
-    ward_budget: 3,  // max wards per player
-    priority_locations: {
-        objective: [dragon_pit, baron_pit],
-        jungle_entrances: [blue_buff_entrance, red_buff_entrance],
-        lane_bushes: [top_bush, mid_bush, bot_bush],
-    }
-    vision_value: Map<Vector2, f32>,  // vision importance per tile
-    enemy_ward_tracker: WardTracker,  // track enemy ward placements
-}
+Training Pipeline:
+1. Curriculum Self-Play: Start with small hero pool
+2. Policy Distillation: Teacher → Student model compression
+3. Off-Policy Adaptation: Adapt to new heroes
+4. MCTS: Decision-time planning
+5. Large-Scale Deployment: 320 GPUs + 35K CPUs
 ```
+
+#### CTDE (Centralized Training, Decentralized Execution) for MOBA
+
+```
+Training Phase:
+├── Central Critic: Sees global state (all heroes, all info)
+├── Per-Agent Actors: Each sees only their local observation
+├── Value Decomposition: Global value → per-agent contributions
+└── Communication Learning: What to share with allies
+
+Execution Phase:
+├── Each agent acts independently
+├── No communication at execution time
+└── Or: learned communication protocol
+```
+
+### 3.6 Curriculum Learning
+
+#### Framework (from JMLR 2020 Survey)
+
+| CL Strategy | Description | MOBA Application |
+|-------------|-------------|------------------|
+| **Task Sequencing** | Order tasks by difficulty | Start with 1v1, then 2v2, then 5v5 |
+| **Agent Pool Expansion** | Start with few heroes, add more | Tencent's curriculum self-play |
+| **Reward Shaping Progression** | Start with dense rewards, move to sparse | Start with CS rewards, end with win/lose |
+| **Opponent Curriculum** | Start with weak opponents, increase | Start with bots, end with pro players |
+| **State Space Curriculum** | Start with full info, add fog of war | Start without fog, gradually enable |
+| **Action Space Curriculum** | Start with simplified actions | Start with move/attack, add abilities |
+
+#### Tencent's Curriculum Self-Play
+
+```
+Phase 1: Small task, small model
+  → Train on subset of heroes (easy heroes first)
+  → Use smaller neural network
+
+Phase 2: Medium task, medium model
+  → Expand hero pool
+  → Increase network capacity
+
+Phase 3: Full task, full model
+  → All heroes
+  → Full network
+  → Policy distillation for deployment
+
+Phase 4: Off-policy adaptation
+  → Adapt to new heroes without full retraining
+  → Transfer from similar existing heroes
+```
+
+#### AlphaStar League Pattern
+
+```
+Population-Based Training:
+├── Main Agent: The primary agent being trained
+├── Historical Agents: Snapshots from training history
+├── Exploiters: Agents that find weaknesses
+├── Leagues: Multiple independent training runs
+└── PBT: Population-based hyperparameter tuning
+```
+
+### 3.7 Transfer Learning
+
+#### Sim-to-Real Transfer (from microduck_rl)
+
+| Technique | Description | microduck_rl Implementation |
+|-----------|-------------|----------------------------|
+| **Domain Randomization** | Randomize sim parameters | Battery voltage, friction, delay, backlash |
+| **Actuator Modeling** | Model real physics precisely | BAM voltage control, back-EMF, friction |
+| **Observation Normalization** | Bake normalizer into ONNX | Export scripts include normalizer |
+| **Policy Hot-Swapping** | Multiple policies for different behaviors | Walk/stand/recover/roulade |
+| **Backlash Modeling** | Model hardware imperfections | ±1° gear play in all joints |
+
+#### Cross-Game Transfer
+
+| Technique | Paper | Description |
+|-----------|-------|-------------|
+| **Action Space Transfer** | Karttunen et al. (ICASSP 2020) | Freeze most layers, retrain last layer for new actions |
+| **Dynamics Adaptation** | GARAT (NeurIPS 2020) | Adverse imitation from observation for dynamics matching |
+| **Real-to-Sim-to-Real** | X-Sim (2025) | Learn from human videos → train in sim → deploy on robot |
+| **Game-to-Real** | RealPlay (2025) | Transfer control from video games to real-world entities |
+
+#### MOBA-Specific Transfer
+
+| Transfer Type | Source → Target | Method |
+|---------------|-----------------|--------|
+| **Hero Transfer** | Trained hero → New hero | Off-policy adaptation + policy distillation |
+| **Game Transfer** | LoL-trained → Dota-trained | Shared action space design + fine-tuning |
+| **Mode Transfer** | 1v1 → 5v5 | Curriculum + additional coordination layer |
+| **Meta Transfer** | Old patch → New patch | Fine-tuning on new patch data |
+
+### 3.8 Fog of War Modeling
+
+#### StarCraft Defogger (NeurIPS 2018)
+
+**URL**: https://arxiv.org/abs/1812.00054
+
+| Aspect | Detail |
+|--------|--------|
+| **Problem** | State estimation from partial observations |
+| **Architecture** | Convolutional encoder-decoder with recurrent cells |
+| **Input** | Sequence of partial observations |
+| **Output** | Full game state prediction |
+| **Training** | 65,000 human games of StarCraft: Brood War |
+| **Applications** | Enemy unit prediction, strategy anticipation |
+
+#### Convolutional Encoder-Decoder for Fog
+
+```
+Partial Observation → Encoder (Conv) → Latent → Decoder (Conv) → Full State Prediction
+                                                    ↑
+                                            Recurrent Memory
+                                            (captures temporal patterns)
+```
+
+#### OpenAI Five's Approach
+
+- **No explicit fog of war modeling** — agent sees all info in training
+- Uses **LSTM memory** to implicitly model what was seen before
+- **Hidden state decoders** analyze what the agent "knows" from its LSTM state
+
+#### MOBA Fog of War Strategies
+
+| Strategy | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **Perfect Info Training** | Train with full info, deploy with partial | Simpler training | May not generalize |
+| **Explicit Modeling** | Predict hidden state | More principled | Complex, noisy |
+| **Recurrent Memory** | Let LSTM learn what to remember | End-to-end | May miss important info |
+| **Belief State** | Maintain probability distribution over hidden states | Theoretically optimal | Computationally expensive |
 
 ---
 
-## 18. MOBA Ward Placement AI
+## 4. Cross-Cutting Patterns
 
-### Key Insight
-- **Ward types**: Stealth Ward (invisible, 90s), Control Ward (visible, reveals stealth), Farsight Alteration (long range, fragile)
-- **Optimal ward locations** depend on game state:
-  - Laning: River bushes, tri-bush
-  - Mid-game: Jungle entrances, objective areas
-  - Late-game: Baron/Dragon, base gates
-- **Ward efficiency**: Maximum vision coverage with minimum wards
-- **Predictive placement**: Ward where enemy WILL go, not where they are
+### 4.1 microduck_rl → NT-WORLD-SIM
 
-### NeoTrix Mapping
-```
-WardPlacementPolicy {
-    game_phase: GamePhase,
-    objective_upcoming: Option<Objective>,
-    enemy_jungler_last_seen: Option<(Position, Time)>,
-    
-    fn place_ward(&self, state: &GameState) -> WardPlacement {
-        // Score candidate locations based on:
-        // 1. Vision coverage (new tiles revealed)
-        // 2. Enemy path prediction
-        // 3. Objective proximity
-        // 4. Safety of placement (not in enemy vision)
-    }
-}
-```
+| Pattern | microduck_rl | NT-WORLD-SIM |
+|---------|-------------|--------------|
+| **Shared observation contract** | 61-dim vector shared across all policies | Standardized ~200-dim observation for all MOBA agents |
+| **BAM actuator model** | Voltage control + back-EMF + friction | Ability cost model + cooldowns + cast times |
+| **Domain randomization** | Per-env DR on physics parameters | Per-agent skill variance, meta shifts |
+| **Backlash modeling** | ±1° gear play as passive joints | Input delay, packet loss as response "backlash" |
+| **Runtime policy hot-swap** | Walk/stand/recover/roulade behind shared obs | Lane/teamfight/objective strategies behind shared interface |
+| **Task registration** | Composable env-cfg modules | Composable agent capability modules |
+| **ONNX export** | Single safe path, baked normalizer | Single validated export pipeline |
+| **AGENTS.md playbook** | Distilled reward-design lessons | Knowledge capture for AI coding agents |
 
----
+### 4.2 OpenAI Five → NT-WORLD-SIM
 
-## 19. MOBA Gank Detection AI
+| Pattern | OpenAI Five | NT-WORLD-SIM |
+|---------|-------------|--------------|
+| **LSTM core** | 4096-unit LSTM per hero | Transformer/LSTM per agent with memory |
+| **Unit attention** | Dot-product attention over all units | Target selection via learned attention |
+| **Action mask** | Game-knowledge pruning of invalid actions | Valid action computation each tick |
+| **Self-play** | Current vs historical versions | Population-based self-play training |
+| **Max-pooling** | Over unit categories | Pooling over ally/enemy unit groups |
+| **Multi-modal encoding** | Conv + FC + Embedding per modality | Multi-branch encoding per observation type |
 
-### Key Insight
-- **Gank**: Jungler + laner coordinate to kill an enemy laner
-- **Detection signals**:
-  - Enemy laner behavior change (aggressive positioning)
-  - Missing minimap info (enemy mid laner disappeared)
-  - Jungle camp clear patterns
-  - Ward vision gaps
-- **Response**: Retreat to tower, place defensive ward, call for counter-gank
+### 4.3 Tencent Full-MOBA → NT-WORLD-SIM
 
-### Key Detection Heuristics
-1. **Aggressive signal**: Enemy laner suddenly positions aggressively → likely gank incoming
-2. **Missing signal**: Enemy last seen on minimap X seconds ago → could be roaming
-3. **Path prediction**: Enemy jungler started bot → will path to top by 3:30
+| Pattern | Tencent | NT-WORLD-SIM |
+|---------|---------|--------------|
+| **Hierarchical action heads** | What → Who → How | 3-level action selection |
+| **Multi-head value** | 5 reward categories → 5 value heads | Decomposed value estimation |
+| **Curriculum self-play** | Small pool → full pool | Progressive difficulty training |
+| **Policy distillation** | Teacher → Student | Large model → deployable model |
+| **Off-policy adaptation** | New hero from existing policies | Quick adaptation to new agents |
+| **MCTS** | Decision-time planning | Lookahead for critical decisions |
 
-### NeoTrix Mapping
-```
-GankDetectionAI {
-    threat_map: ThreatMap,  // per-tile threat level
-    
-    fn update_threat(&mut self, state: &GameState) {
-        // Decrease threat in visible areas
-        // Increase threat in fog near enemy positions
-        // Factor in enemy jungler clear speed and pathing
-    }
-    
-    fn should_retreat(&self, lane_state: &LaneState) -> bool {
-        // Retreat if threat exceeds threshold
-        self.threat_map.get(lane_state.position) > RETREAT_THRESHOLD
-    }
-}
-```
+### 4.4 QMIX/PyMARL → NT-WORLD-SIM
+
+| Pattern | QMIX | NT-WORLD-SIM |
+|---------|------|--------------|
+| **CTDE** | Centralized critic, decentralized actors | Train with global info, execute locally |
+| **Value decomposition** | Global Q → per-agent q_i | Cooperative objective decomposition |
+| **Monotonic constraint** | ∂Q/∂q_i ≥ 0 for all i | Ensures individual improvement helps team |
 
 ---
 
-## 20. MOBA Dragon/Baron AI
-
-### Key Insight
-- **Dragon Soul**: 4 dragons → permanent team buff (elemental types)
-- **Elder Dragon**: Ultra-powerful buff (execute low-HP enemies)
-- **Baron Nashor**: Buff for pushing lanes (empowered minions)
-- **Timing windows**:
-  - Dragon spawns 5:00, respawns 5:00 after kill
-  - Baron spawns 20:00, respawns 7:00 after kill
-- **Team decision**: When to force, when to give, when to contest
-
-### NeoTrix Mapping
-| Dragon/Baron | NT-WORLD-SIM |
-|---|---|
-| Spawn timing | **Timer-based events** — predict spawn windows |
-| Stacking value | **Diminishing/growing returns** — 4th dragon worth more than 1st |
-| Baron buff | **Siege state** — team gets empowered push capability |
-| Elder Dragon | **Win condition** — execute threshold changes teamfight math |
-
----
-
-## 21. MOBA Tower Dive AI
-
-### Key Insight
-- **Tower dive**: Attack enemy under their tower (tower deals heavy damage)
-- **Aggro mechanics**: Tower targets first enemy to damage allied hero
-- **Reset**: Tower aggro resets when no enemy hero in range
-- **Juggling**: Multiple allies take tower aggro turns
-- **Prerequisites**: Minion wave under tower (towers prioritize minions first)
-
-### Key Decision Factors
-1. Enemy HP below execute threshold
-2. Minion wave available to tank initial tower shots
-3. Ally available to juggle aggro
-4. Enemy cooldowns blown (can't CC under tower)
-
-### NeoTrix Mapping
-```
-TowerDiveDecision {
-    enemy_hp: f32,
-    my_burst: f32,  // max damage in one rotation
-    minion_wave: bool,
-    ally_available: bool,
-    enemy_cc_available: bool,
-    
-    fn should_dive(&self) -> DiveDecision {
-        if self.enemy_hp < self.my_burst && self.minion_wave {
-            DiveDecision::Dive { juggle_order: self.plan_juggle() }
-        } else {
-            DiveDecision::PokeAndRetreat
-        }
-    }
-}
-```
-
----
-
-## 22. MOBA Split Push AI
-
-### Key Insight
-- **Split push**: One hero pushes a lane alone while team applies pressure elsewhere
-- **Types**: 1-3-1 (three groups), 1-4 (one solo, four grouped), 4-1 (four pushing, one split)
-- **Requirements**: Strong 1v1 champion, teleport for joins, map awareness
-- **Risk**: Getting collapsed on by multiple enemies
-- **Value**: Forces enemy response → creates numbers advantage elsewhere
-
-### NeoTrix Mapping
-```
-SplitPushAI {
-    champion_strength: SplitPushScore,  // 1v1, waveclear, escape
-    team_state: TeamState,
-    map_pressure: MapPressureMap,  // which lanes have pressure
-    
-    fn should_split_push(&self, state: &GameState) -> bool {
-        // Split push if:
-        // 1. Can win 1v1 against likely defender
-        // 2. Team can disengage if 4v5
-        // 3. No major objective spawning soon
-        // 4. Teleport available for joins
-    }
-}
-```
-
----
-
-## 23. MOBA Team Composition AI
-
-### Key Insight
-- **Team composition** determines strategy:
-  - **Early game comp**: Win lanes, snowball (e.g., Lee Sin, Renekton)
-  - **Late game comp**: Scale, teamfight (e.g., Jax, Kog'Maw)
-  - **Split push comp**: 1-3-1 pressure (e.g., Fiora, Twisted Fate)
-  - **Wombo combo**: AoE synergy (e.g., Malphite + Yasuo)
-- **Role distribution**: 1 top, 1 mid, 1 jungle, 1 ADC, 1 support
-- **Synergy scoring**: How well champions work together
-
-### NeoTrix Mapping
-```
-CompositionScorer {
-    fn score_composition(&self, team: &[Champion]) -> CompositionScore {
-        CompositionScore {
-            early_power: self.early_game_strength(team),
-            late_power: self.late_game_strength(team),
-            teamfight: self.teamfight_synergy(team),
-            split_push: self.split_push_potential(team),
-            engage: self.engage_tools(team),
-            peel: self.peel_tools(team),
-        }
-    }
-}
-```
-
----
-
-## 24. MOBA Counter Pick AI
-
-### Key Insight
-- **Counter pick**: Select champion that advantages against opponent's pick
-- **Counter logic**:
-  - Range vs melee advantage
-  - CC vs mobile champion
-  - Sustained damage vs burst
-  - Magic damage vs armor stack
-- **Counter database**: Historical win rates of matchups
-- **Team-aware countering**: Counter pick considering team composition
-
-### NeoTrix Mapping
-```
-CounterPickAI {
-    matchup_database: MatchupWinrates,  // champion A vs champion B winrates
-    
-    fn suggest_counter(&self, enemy_pick: Champion, team_comp: &[Champion]) -> Vec<Champion> {
-        // Score each champion by:
-        // 1. Head-to-head winrate vs enemy_pick
-        // 2. Synergy with team_comp
-        // 3. Meta strength
-        // 4. Player proficiency
-    }
-}
-```
-
----
-
-## 25. MOBA Draft Phase AI
-
-### Key Insight
-- **Ban phase**: Each team bans champions they don't want to face
-- **Pick phase**: Alternating picks (1-2-2-2-2-1 format in LoL)
-- **First pick advantage**: Strong meta champion available
-- **Last pick advantage**: Counter pick opportunity
-- **Draft strategy**:
-  - **Blind pick**: Pick safe, flexible champions early
-  - **Counter pick**: Save last pick for counter
-  - **Flex pick**: Champions playable in multiple roles
-  - **Priority**: Which role gets the "strong" pick
-
-### Key Draft Concepts
-1. **Ban priority**: Remove strongest meta champions
-2. **First rotation**: Pick flexible, high-priority champions
-3. **Second rotation**: Fill remaining roles, consider counters
-4. **Last pick**: Counter pick or flex pick
-
-### NeoTrix Mapping
-```
-DraftAI {
-    meta_tier: MetaTierList,  // champion strength rankings
-    matchup_database: MatchupDatabase,
-    
-    fn draft_move(&self, state: &DraftState) -> DraftAction {
-        match state.phase {
-            BanPhase => self.suggest_ban(state),
-            PickPhase => self.suggest_pick(state),
-        }
-    }
-    
-    fn suggest_ban(&self, state: &DraftState) -> Champion {
-        // Ban highest tier champion not yet banned
-        // Consider: what enemy team likely wants
-    }
-    
-    fn suggest_pick(&self, state: &DraftState) -> Champion {
-        if state.is_first_pick {
-            // Pick highest tier available
-        } else {
-            // Counter pick against enemy's composition
-        }
-    }
-}
-```
-
----
-
-## Cross-Cutting Patterns: microduck_rl → NT-WORLD-SIM
-
-### Pattern 1: Shared Observation Contract
-**microduck**: 61-dim shared across all policies → hot-swappable at runtime
-**NT-WORLD-SIM**: Standardized observation space for all MOBA agents → strategy switching mid-game
-
-### Pattern 2: Actuator Fidelity = Sim2Real Gap
-**microduck**: BAM voltage control model IS the sim2real gap
-**NT-WORLD-SIM**: Accurate ability model (cooldowns, cast times, resource costs) IS the behavior gap
-
-### Pattern 3: Domain Randomization for Robustness
-**microduck**: Per-env DR on voltage, friction, delay
-**NT-WORLD-SIM**: Per-match DR on agent skill, meta shifts, ping
-
-### Pattern 4: Multi-Task Training
-**microduck**: 13 tasks sharing observation contract
-**NT-WORLD-SIM**: Lane/teamfight/objective sub-policies sharing backbone
-
-### Pattern 5: Policy Composition
-**microduck**: Hot-swap walk/recover/trick policies
-**NT-WORLD-SIM**: Dynamic strategy selection (laning → teamfighting → siege)
-
----
-
-## Cross-Cutting Patterns: OpenAI Five → NT-WORLD-SIM
-
-### Pattern 1: Per-Agent LSTM with Shared Architecture
-**OpenAI Five**: 5 LSTMs, one per hero, same architecture
-**NT-WORLD-SIM**: Per-agent policy networks, role-specific heads
-
-### Pattern 2: Attention over Entities
-**OpenAI Five**: Max-pool + dot-product attention over all units
-**NT-WORLD-SIM**: Spatial attention over nearby agents, minions, structures
-
-### Pattern 3: Long-Horizon Discount
-**OpenAI Five**: γ ≈ 0.999841, backprop 16 steps
-**NT-WORLD-SIM**: High γ for objective rewards, limited BPTT window
-
-### Pattern 4: Self-Play with Historical Pool
-**OpenAI Five**: Continuous self-play against current + past checkpoints
-**NT-WORLD-SIM**: Agent archive for training diversity
-
----
-
-## Cross-Cutting Patterns: QMIX/PyMARL → NT-WORLD-SIM
-
-### Pattern 1: CTDE (Centralized Training, Decentralized Execution)
-**QMIX**: Train with global state, execute with local observations only
-**NT-WORLD-SIM**: Train with full map info (cheat), deploy with fog-of-war
-
-### Pattern 2: Value Decomposition
-**QMIX**: Q_tot = monotonic_mix(Q_1, ..., Q_n)
-**NT-WORLD-SIM**: Team value = composition of individual agent values
-
-### Pattern 3: Hypernetwork for Coordination
-**QMIX**: Hypernetwork conditions mixing weights on global state
-**NT-WORLD-SIM**: Team coordination network takes global state → routes attention to relevant agents
-
----
-
-## Priority Implementation Roadmap for NT-WORLD-SIM
+## 5. Priority Implementation Roadmap for NT-WORLD-SIM
 
 ### Phase 1: Foundation (Week 1-2)
-1. **Shared observation protocol** (from microduck_rl shared obs contract)
-2. **Agent physics model** (from BAM actuator model — abilities, cooldowns, resources)
-3. **Match environment** (from OpenSpiel game abstraction)
+
+| # | Task | Source Pattern | Effort |
+|---|------|---------------|--------|
+| 1 | **Shared observation protocol** | microduck_rl 61-dim contract | Medium |
+| 2 | **Agent physics model** | BAM actuator → ability cost/cooldown model | Medium |
+| 3 | **Map representation** | 3-layer hierarchical (graph + zone tiles + combat region) | High |
+| 4 | **Action space design** | Tencent 3-level hierarchy (what→who→how) | Medium |
 
 ### Phase 2: Single-Agent (Week 3-4)
-4. **Lane phase AI** (last-hit, trading, wave management)
-5. **Teamfight positioning** (role-based positioning rules)
-6. **Vision control** (ward placement, gank detection)
+
+| # | Task | Source Pattern | Effort |
+|---|------|---------------|--------|
+| 5 | **Lane phase AI** | CS, trading, wave management | Medium |
+| 6 | **Teamfight positioning** | Role-based positioning rules | Medium |
+| 7 | **Vision control** | Ward placement, gank detection | Medium |
+| 8 | **Action mask system** | OpenAI Five / Tencent action pruning | Low |
 
 ### Phase 3: Multi-Agent Coordination (Week 5-6)
-7. **QMIX-style value decomposition** (CTDE paradigm)
-8. **Objective control** (dragon/baron decision framework)
-9. **Self-play training loop** (from OpenAI Five pattern)
+
+| # | Task | Source Pattern | Effort |
+|---|------|---------------|--------|
+| 9 | **CTDE training loop** | QMIX-style centralized training | High |
+| 10 | **Objective control** | Dragon/baron decision framework | Medium |
+| 11 | **Self-play training** | OpenAI Five self-play pattern | High |
+| 12 | **Multi-head value estimation** | Tencent MHV for reward decomposition | Medium |
 
 ### Phase 4: Meta-AI (Week 7-8)
-10. **Draft phase AI** (ban/pick strategy)
-11. **Counter pick system** (matchup database)
-12. **Team composition scoring** (synergy evaluation)
+
+| # | Task | Source Pattern | Effort |
+|---|------|---------------|--------|
+| 13 | **Draft phase AI** | Ban/pick strategy | Medium |
+| 14 | **Counter pick system** | Matchup database | Medium |
+| 15 | **Team composition scoring** | Synergy evaluation | Medium |
+| 16 | **Curriculum learning** | Tencent curriculum self-play | High |
+
+### Phase 5: Advanced (Week 9-10)
+
+| # | Task | Source Pattern | Effort |
+|---|------|---------------|--------|
+| 17 | **Fog of war modeling** | StarCraft Defogger + recurrent memory | High |
+| 18 | **MCTS decision-time planning** | OpenAI Five + AlphaStar MCTS | High |
+| 19 | **Policy distillation** | Tencent teacher→student | Medium |
+| 20 | **LLM-enhanced reasoning** | Think in Games (GRPO) | High |
 
 ---
 
-## Key Papers & References
+## 6. References
 
-| Paper | Key Contribution | NT-WORLD-SIM Relevance |
-|---|---|---|
-| OpenAI Five (1912.06680) | Large-scale self-play, PPO, hierarchical LSTM | Agent architecture, training infrastructure |
-| OpenAI Five Planning (1912.06721) | LSTM as implicit planner, hidden state decoders | Plan introspection, opponent modeling |
-| QMIX (1803.11485) | Monotonic value decomposition, CTDE | Multi-agent coordination |
-| VDN (1706.05296) | Independent value decomposition | Baseline multi-agent |
-| SMAC (1902.04043) | Cooperative MARL benchmark | Training scenarios |
-| OpenSpiel (1908.09453) | Game abstraction framework | Match formalization |
-| microduck_rl | BAM actuator, shared obs, sim2real | Agent physics, observation protocol |
-| PyMARL | QMIX/VDN/COMA implementations | Algorithm reference |
+### Core Papers
+
+| Paper | URL | Key Contribution | NT-WORLD-SIM Relevance |
+|-------|-----|------------------|------------------------|
+| OpenAI Five (1912.06680) | https://arxiv.org/abs/1912.06680 | Large-scale self-play PPO, hierarchical LSTM, 4096-unit core | Agent architecture, training infrastructure |
+| OpenAI Five Planning (1912.06721) | https://arxiv.org/abs/1912.06721 | LSTM as implicit planner, hidden state decoders | Plan introspection, opponent modeling |
+| Tencent Full MOBA (2011.12692) | https://arxiv.org/abs/2011.12692 | Curriculum self-play, MHV, hierarchical actions, 97.7% win rate | Complete MOBA AI paradigm |
+| Tencent MOBA 1v1 (1912.09729) | https://arxiv.org/abs/1912.09729 | Control dependency decoupling, action mask, target attention, dual-clip PPO | Micro-control techniques |
+| Honor of Kings Arena (2209.08483) | https://arxiv.org/abs/2209.08483 | Open-source MOBA RL environment, 20 heroes, generalization challenges | Environment design reference |
+| HMS (1812.07887) | https://arxiv.org/abs/1812.07887 | Hierarchical macro strategy, cross-agent communication | Macro-strategy layer |
+| HRL for MOBA (1901.08004) | https://arxiv.org/abs/1901.08004 | Hierarchical RL, imitation + RL, dense reward, no API | Screen-based training approach |
+
+### Multi-Agent RL
+
+| Paper | URL | Key Contribution |
+|-------|-----|------------------|
+| QMIX (1803.11485) | https://arxiv.org/abs/1803.11485 | Monotonic value decomposition, CTDE |
+| VDN (1706.05296) | https://arxiv.org/abs/1706.05296 | Independent value decomposition |
+| MAPPO | Multi-agent PPO with parameter sharing | Scalable multi-agent training |
+
+### Reward Shaping
+
+| Paper | URL | Key Contribution |
+|-------|-----|------------------|
+| EXPLORS (NeurIPS 2022) | Exploration-guided reward shaping for sparse rewards |
+| SORS | Self-supervised online reward shaping via trajectory ranking |
+| ARMS (2025) | Automatic reward shaping for multi-agent systems |
+| SSRS (2025) | Semi-supervised reward shaping using zero-reward transitions |
+| Dual-Agent (ICML 2024) | Policy agent + reward agent framework |
+
+### Curriculum Learning
+
+| Paper | URL | Key Contribution |
+|-------|-----|------------------|
+| CL Survey (JMLR 2020) | http://jmlr.org/papers/v21/20-212.html | Framework for CL in RL |
+| StarCraft League (AlphaStar) | Population-based curriculum via league |
+| Teacher-Student ACL (2025) | Gradient norm reward signals for curriculum |
+
+### Transfer Learning
+
+| Paper | URL | Key Contribution |
+|-------|-----|------------------|
+| Video Game to Robot (ICASSP 2020) | https://arxiv.org/abs/1905.00741 | Action space transfer via layer freezing |
+| Sim-to-Real Survey (IEEE 2021) | Domain randomization, adaptation, meta-learning |
+| X-Sim (2025) | Real-to-sim-to-real with object motion |
+| RealPlay (2025) | Game-to-real-world control transfer |
+
+### Fog of War
+
+| Paper | URL | Key Contribution |
+|-------|-----|------------------|
+| StarCraft Defogger (NeurIPS 2018) | https://arxiv.org/abs/1812.00054 | Conv encoder-decoder for state estimation |
+| Fog Prediction (AAAI 2019) | Conv encoder-decoder for fog prediction in StarCraft |
+
+### Open Source Projects
+
+| Project | URL | Description | Stars |
+|---------|-----|-------------|-------|
+| microduck_rl | https://github.com/pollen-robotics/microduck_rl | RL training for biped robot (MuJoCo + PPO) | 2.1k |
+| microduck | https://github.com/pollen-robotics/microduck | Biped duck robot runtime | 7.2k |
+| hok_env | https://github.com/tencent-ailab/hok_env | Honor of Kings AI environment | - |
+| PyMARL | https://github.com/oxwhirl/pymarl | QMIX/VDN/COMA implementations | - |
+| SMAC | https://github.com/oxwhirl/smac | StarCraft Multi-Agent Challenge | - |
+| OpenSpiel | https://github.com/google-deepmind/open_spiel | Game abstraction framework | - |
+| MOBA-AI-Gamer | https://github.com/adrian27513/MOBA-AI-Gamer | LoL bot with YOLOv5 + RL | - |
+| Deep Learning LoL Bot | https://github.com/csci-599-applied-ml-for-games/league-of-legends-bot | LSTM-based LoL bot | - |
+
+### Related Systems
+
+| System | URL | Key Pattern |
+|--------|-----|-------------|
+| mjlab | https://github.com/mujocolab/mjlab | MuJoCo Warp training framework |
+| BAM | https://github.com/Rhoban/bam | Better actuator models |
+| rsl_rl | https://github.com/leggedrobotics/rsl_rl | RL library for legged robots |
+| TorchRL | PyTorch RL library | TensorDict-based RL infrastructure |
+| OpenSpiel | Google DeepMind | Game abstraction for RL research |
+
+---
+
+*End of RESEARCH_MOBA_V2.md*

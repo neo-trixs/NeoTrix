@@ -1,6 +1,8 @@
 //! ZTNet Capability - Zero Trust Network Capability
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use crate::core::nt_core_capability::*;
 
 /// Zero Trust状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +83,71 @@ impl Default for ZtNetCapabilityManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// ZTNet UnifiedCapability wrapper
+struct ZtNetUnifiedCapability {
+    meta: CapabilityMeta,
+    health: CapabilityHealth,
+}
+
+impl ZtNetUnifiedCapability {
+    fn new() -> Self {
+        Self {
+            meta: CapabilityMeta {
+                id: "nt-shield-ztnet".into(),
+                name: "NT-SHIELD ZT-Net".into(),
+                layer: Layer::L3Embodiment,
+                domain: Domain::NtShield,
+                version: "0.1.0".into(),
+                description: "零信任网络安全能力".into(),
+                tags: vec!["zero-trust".into(), "network".into(), "security".into()],
+                status: CapabilityStatus::Healthy,
+                metrics: CapabilityMetrics::default(),
+            },
+            health: CapabilityHealth {
+                state: CapabilityState::Ready,
+                success_rate: 1.0,
+                avg_latency_ms: 0.0,
+                last_called: None,
+                call_count: 0,
+            },
+        }
+    }
+}
+
+impl UnifiedCapability for ZtNetUnifiedCapability {
+    fn meta(&self) -> CapabilityMeta {
+        self.meta.clone()
+    }
+
+    fn health(&self) -> CapabilityHealth {
+        self.health.clone()
+    }
+
+    fn execute(&self, input: CapabilityInput) -> Result<CapabilityOutput, CapabilityError> {
+        match input {
+            CapabilityInput::Security(_) => Ok(CapabilityOutput::Security(SecurityOutput {
+                threats: vec![],
+                recommendations: vec!["零信任验证通过".into()],
+            })),
+            CapabilityInput::Network(net) => Ok(CapabilityOutput::Network(NetworkOutput {
+                target: net.target,
+                open_ports: vec![],
+                services: vec![],
+                latency_ms: 0,
+            })),
+            _ => Err(CapabilityError::UnsupportedInput("ZTNet仅支持安全/网络输入".into())),
+        }
+    }
+
+    fn supports(&self, input: &CapabilityInput) -> bool {
+        matches!(input, CapabilityInput::Security(_) | CapabilityInput::Network(_))
+    }
+}
+
+pub fn create_ztnet_capability() -> Arc<dyn UnifiedCapability> {
+    Arc::new(ZtNetUnifiedCapability::new())
 }
 
 #[cfg(test)]

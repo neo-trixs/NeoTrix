@@ -41,10 +41,10 @@ pub fn extract_order_metadata(order_folder: &str) -> OrderMetadata {
         }
         // 英文名 -> customer
         if is_english_only(part) {
-            customer_parts.push(part);
+            customer_parts.push(*part);
         } else {
             // 中文 -> country
-            country_parts.push(part);
+            country_parts.push(*part);
         }
     }
 

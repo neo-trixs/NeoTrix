@@ -22,9 +22,8 @@ use super::types::{FileAbilityError, Result};
 /// 性能: 0.2-0.5s/file (vs calamine 1-2s, openpyxl 15-20s)。
 pub fn read_xlsx_fast(path: impl AsRef<Path>) -> Result<Vec<Vec<String>>> {
     let file = std::fs::File::open(path.as_ref()).map_err(FileAbilityError::Io)?;
-    let mut archive = ZipArchive::new(file).map_err(|e| {
-        FileAbilityError::Parse(format!("XLSX ZIP 解析失败: {e}"))
-    })?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| FileAbilityError::Parse(format!("XLSX ZIP 解析失败: {e}")))?;
 
     // 1. 读取 sharedStrings.xml
     let strings = read_shared_strings(&mut archive)?;
@@ -36,9 +35,8 @@ pub fn read_xlsx_fast(path: impl AsRef<Path>) -> Result<Vec<Vec<String>>> {
 /// 快速解析 XLSX 所有 sheet 为文本 grid。
 pub fn read_xlsx_sheets_fast(path: impl AsRef<Path>) -> Result<Vec<(String, Vec<Vec<String>>)>> {
     let file = std::fs::File::open(path.as_ref()).map_err(FileAbilityError::Io)?;
-    let mut archive = ZipArchive::new(file).map_err(|e| {
-        FileAbilityError::Parse(format!("XLSX ZIP 解析失败: {e}"))
-    })?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| FileAbilityError::Parse(format!("XLSX ZIP 解析失败: {e}")))?;
 
     let strings = read_shared_strings(&mut archive)?;
 
@@ -89,7 +87,8 @@ fn read_shared_strings<R: Read + std::io::Seek>(
     };
 
     let mut content = String::new();
-    ss.read_to_string(&mut content).map_err(FileAbilityError::Io)?;
+    ss.read_to_string(&mut content)
+        .map_err(FileAbilityError::Io)?;
 
     // 解析 XML: 提取所有 <t> 标签内容
     let mut in_t = false;
@@ -99,7 +98,8 @@ fn read_shared_strings<R: Read + std::io::Seek>(
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(quick_xml::events::Event::Start(ref e)) | Ok(quick_xml::events::Event::Empty(ref e)) => {
+            Ok(quick_xml::events::Event::Start(ref e))
+            | Ok(quick_xml::events::Event::Empty(ref e)) => {
                 if e.name().as_ref() == b"t" {
                     in_t = true;
                     current.clear();
@@ -158,7 +158,9 @@ fn read_sheet<R: Read + std::io::Seek>(
     };
 
     let mut content = String::new();
-    sheet.read_to_string(&mut content).map_err(FileAbilityError::Io)?;
+    sheet
+        .read_to_string(&mut content)
+        .map_err(FileAbilityError::Io)?;
 
     // 解析 XML: 提取 <row> 中每个 <c> 的 <v> 值
     // <c t="s"> 表示共享字符串，<c> 或 <c t="str"> 表示内联字符串
@@ -173,27 +175,25 @@ fn read_sheet<R: Read + std::io::Seek>(
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(quick_xml::events::Event::Start(ref e)) => {
-                match e.name().as_ref() {
-                    b"row" => {
-                        current_row.clear();
-                    }
-                    b"c" => {
-                        in_c = true;
-                        cell_type.clear();
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"t" {
-                                cell_type = String::from_utf8_lossy(&attr.value).into_owned();
-                            }
+            Ok(quick_xml::events::Event::Start(ref e)) => match e.name().as_ref() {
+                b"row" => {
+                    current_row.clear();
+                }
+                b"c" => {
+                    in_c = true;
+                    cell_type.clear();
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"t" {
+                            cell_type = String::from_utf8_lossy(&attr.value).into_owned();
                         }
                     }
-                    b"v" => {
-                        in_v = true;
-                        current_value.clear();
-                    }
-                    _ => {}
                 }
-            }
+                b"v" => {
+                    in_v = true;
+                    current_value.clear();
+                }
+                _ => {}
+            },
             Ok(quick_xml::events::Event::Text(ref t)) => {
                 if in_v {
                     current_value.push_str(&t.unescape().unwrap_or_default());
