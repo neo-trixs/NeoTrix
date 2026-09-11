@@ -91,7 +91,7 @@ impl MemoryLifecycle {
             return false;
         }
 
-        // 2. FreshnessLedger: clock-tick staleness
+        // 2. FreshnessLedger: explicit forget markers
         if self.freshness.should_forget(node_id) {
             return false;
         }
@@ -133,7 +133,7 @@ impl MemoryLifecycle {
         Ok(ForgettingReport {
             curve_marked,
             confidence_decayed,
-            ledger_marked: 0,
+            ledger_marked,
             current_tick,
         })
     }

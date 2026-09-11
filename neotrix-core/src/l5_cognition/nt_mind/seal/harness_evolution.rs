@@ -157,10 +157,8 @@ impl HarnessEvolution {
             let avg_improvement =
                 evals.iter().map(|e| e.improvement).sum::<f64>() / evals.len() as f64;
             if avg_improvement <= 0.0 {
-                self.rejected.push((
-                    candidate.clone(),
-                    "Round 2: no improvement".to_string(),
-                ));
+                self.rejected
+                    .push((candidate.clone(), "Round 2: no improvement".to_string()));
             }
         }
         candidates.retain(|c| !self.rejected.iter().any(|(r, _)| r.id == c.id));

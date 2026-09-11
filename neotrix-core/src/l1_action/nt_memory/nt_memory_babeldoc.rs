@@ -12,13 +12,7 @@ use crate::core::nt_core_self_test::SelfTest;
 use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
 use uuid::Uuid;
 
-/// 当前 Unix 时间戳 (秒)。
-fn now_ts() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
+use super::shared_utils::now_ts;
 
 /// 文档翻译后端统一接口。
 pub trait DocumentTranslator: Send + Sync {

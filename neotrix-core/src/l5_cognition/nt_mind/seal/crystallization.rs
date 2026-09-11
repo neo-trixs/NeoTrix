@@ -123,7 +123,11 @@ impl CrystallizationEngine {
                 success_count: count,
             },
             None => {
-                if self.crystallized.iter().any(|s| s.source_templates.contains(&template_id.to_string())) {
+                if self
+                    .crystallized
+                    .iter()
+                    .any(|s| s.source_templates.contains(&template_id.to_string()))
+                {
                     let skill_id = self
                         .crystallized
                         .iter()
@@ -142,9 +146,7 @@ impl CrystallizationEngine {
                         .clone();
                     CrystallizationStatus::Rejected { reason }
                 } else {
-                    CrystallizationStatus::Template {
-                        success_count: 0,
-                    }
+                    CrystallizationStatus::Template { success_count: 0 }
                 }
             }
         }
@@ -201,7 +203,10 @@ impl CrystallizationEngine {
             avg_success_rate: if self.crystallized.is_empty() {
                 0.0
             } else {
-                self.crystallized.iter().map(|s| s.success_rate).sum::<f64>()
+                self.crystallized
+                    .iter()
+                    .map(|s| s.success_rate)
+                    .sum::<f64>()
                     / self.crystallized.len() as f64
             },
         }
@@ -262,7 +267,8 @@ mod tests {
     fn test_contract() -> IoContract {
         IoContract {
             input_schema: r#"{"type":"object","properties":{"text":{"type":"string"}}"#.to_string(),
-            output_schema: r#"{"type":"object","properties":{"result":{"type":"string"}}"#.to_string(),
+            output_schema: r#"{"type":"object","properties":{"result":{"type":"string"}}"#
+                .to_string(),
             prerequisites: vec!["base_nlp".to_string()],
             estimated_tokens: 500,
             estimated_latency_ms: 200,

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::nt_memory_types::*;
+use super::shared_utils::now_ts;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfidenceWeights {
@@ -155,13 +155,6 @@ pub struct ConsensusInfo {
     pub contradict_count: usize,
     pub consensus_score: f64,
     pub contradictions: Vec<ContradictingFact>,
-}
-
-fn now_ts() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
 }
 
 pub fn grounding_saturation(composite: f64, k: f64) -> f64 {

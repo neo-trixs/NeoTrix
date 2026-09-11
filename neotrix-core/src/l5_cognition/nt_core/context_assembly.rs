@@ -145,14 +145,16 @@ impl ContextAssembler {
 
         // 关键词触发的额外需求
         let task_lower = task.to_lowercase();
-        if task_lower.contains("知识") || task_lower.contains("kb") || task_lower.contains("知识库") {
+        if task_lower.contains("知识") || task_lower.contains("kb") || task_lower.contains("知识库")
+        {
             needs.push(InformationNeed {
                 description: "知识库检索结果".to_string(),
                 estimated_tokens: 1000,
                 required: false,
             });
         }
-        if task_lower.contains("历史") || task_lower.contains("会话") || task_lower.contains("之前") {
+        if task_lower.contains("历史") || task_lower.contains("会话") || task_lower.contains("之前")
+        {
             needs.push(InformationNeed {
                 description: "历史会话上下文".to_string(),
                 estimated_tokens: 800,
@@ -179,34 +181,46 @@ impl ContextAssembler {
 
     /// Stage 2: Bind — 将需求映射到数据源
     pub fn bind(&self, needs: &[InformationNeed]) -> Vec<(InformationNeed, Vec<ContextSource>)> {
-        needs.iter().map(|n| {
-            let desc = n.description.as_str();
-            let sources = if desc.contains("知识库") || desc.contains("KB") {
-                vec![ContextSource::KnowledgeBase]
-            } else if desc.contains("历史") || desc.contains("会话") {
-                vec![ContextSource::History]
-            } else if desc.contains("技能") || desc.contains("Skill") {
-                vec![ContextSource::SkillTemplate]
-            } else if desc.contains("工具") || desc.contains("Tool") {
-                vec![ContextSource::ToolOutput]
-            } else {
-                // 默认：历史 + KB 双源
-                vec![ContextSource::History, ContextSource::KnowledgeBase]
-            };
-            (n.clone(), sources)
-        }).collect()
+        needs
+            .iter()
+            .map(|n| {
+                let desc = n.description.as_str();
+                let sources = if desc.contains("知识库") || desc.contains("KB") {
+                    vec![ContextSource::KnowledgeBase]
+                } else if desc.contains("历史") || desc.contains("会话") {
+                    vec![ContextSource::History]
+                } else if desc.contains("技能") || desc.contains("Skill") {
+                    vec![ContextSource::SkillTemplate]
+                } else if desc.contains("工具") || desc.contains("Tool") {
+                    vec![ContextSource::ToolOutput]
+                } else {
+                    // 默认：历史 + KB 双源
+                    vec![ContextSource::History, ContextSource::KnowledgeBase]
+                };
+                (n.clone(), sources)
+            })
+            .collect()
     }
 
     /// Stage 3: Optimize — 预算分配
-    pub fn optimize(&self, needs: &[(InformationNeed, Vec<ContextSource>)]) -> Vec<BudgetAllocation> {
+    pub fn optimize(
+        &self,
+        needs: &[(InformationNeed, Vec<ContextSource>)],
+    ) -> Vec<BudgetAllocation> {
         let mut allocations = Vec::new();
         let mut remaining = self.budget;
 
         // 按权重降序排序
         let mut sorted: Vec<_> = needs.to_vec();
         sorted.sort_by(|a, b| {
-            let w_a = a.1.first().and_then(|s| self.source_weights.get(s)).unwrap_or(&0.0);
-            let w_b = b.1.first().and_then(|s| self.source_weights.get(s)).unwrap_or(&0.0);
+            let w_a =
+                a.1.first()
+                    .and_then(|s| self.source_weights.get(s))
+                    .unwrap_or(&0.0);
+            let w_b =
+                b.1.first()
+                    .and_then(|s| self.source_weights.get(s))
+                    .unwrap_or(&0.0);
             w_b.partial_cmp(w_a).unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -216,7 +230,11 @@ impl ContextAssembler {
                 allocations.push(BudgetAllocation {
                     source: sources.first().cloned().unwrap_or(ContextSource::History),
                     allocated_tokens: alloc_tokens,
-                    reason: if need.required { "必需".to_string() } else { "可选".to_string() },
+                    reason: if need.required {
+                        "必需".to_string()
+                    } else {
+                        "可选".to_string()
+                    },
                 });
                 remaining -= alloc_tokens;
             }
@@ -226,7 +244,11 @@ impl ContextAssembler {
     }
 
     /// Stage 4: Execute — 组装上下文
-    pub fn execute(&mut self, allocations: &[BudgetAllocation], fragments: Vec<ContextFragment>) -> AssemblyResult {
+    pub fn execute(
+        &mut self,
+        allocations: &[BudgetAllocation],
+        fragments: Vec<ContextFragment>,
+    ) -> AssemblyResult {
         let mut selected = Vec::new();
         let mut total_tokens = 0;
 
@@ -241,8 +263,12 @@ impl ContextAssembler {
             .collect();
 
         for fragment in sorted_fragments {
-            let cap = alloc_map.get(&fragment.source).copied().unwrap_or(self.budget);
-            let source_used: usize = selected.iter()
+            let cap = alloc_map
+                .get(&fragment.source)
+                .copied()
+                .unwrap_or(self.budget);
+            let source_used: usize = selected
+                .iter()
                 .filter(|f: &&ContextFragment| f.source == fragment.source)
                 .map(|f| f.token_count)
                 .sum();
@@ -262,8 +288,10 @@ impl ContextAssembler {
         };
 
         // 覆盖率：已选来源占分配来源比例
-        let covered_sources: std::collections::HashSet<_> = selected.iter().map(|f| &f.source).collect();
-        let total_sources: std::collections::HashSet<_> = allocations.iter().map(|a| &a.source).collect();
+        let covered_sources: std::collections::HashSet<_> =
+            selected.iter().map(|f| &f.source).collect();
+        let total_sources: std::collections::HashSet<_> =
+            allocations.iter().map(|a| &a.source).collect();
         let coverage = if total_sources.is_empty() {
             1.0
         } else {

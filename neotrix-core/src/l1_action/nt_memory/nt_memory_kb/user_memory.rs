@@ -4,13 +4,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
 use super::nt_memory_unify::{kv_get, kv_set};
-
-fn now_ts() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
+use super::shared_utils::now_ts;
 
 #[derive(Serialize, Deserialize)]
 pub struct UserProfile {

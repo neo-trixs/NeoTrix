@@ -1,5 +1,8 @@
 //! L1 Action Layer - Memory Modules
 
+/// 共享工具函数 — 消除跨模块重复
+pub mod shared_utils;
+
 pub mod nt_trade_product_spec;
 pub mod nt_memory_lead;
 pub use nt_memory_lead::{LeadManager, Lead, LeadSource, LeadStage, LeadQuality, LeadScorer, Interaction, InteractionType};

@@ -93,13 +93,16 @@ impl TripleMemoryStore {
         if success {
             func.success_count += 1;
         }
-        func.avg_latency_ms =
-            (func.avg_latency_ms * (func.call_count - 1) as u64 + latency_ms) / func.call_count as u64;
+        func.avg_latency_ms = (func.avg_latency_ms * (func.call_count - 1) as u64 + latency_ms)
+            / func.call_count as u64;
     }
 
     /// 搜索工作流
     pub fn search_workflows(&self, query: &str) -> Vec<&WorkflowMemory> {
-        self.workflows.iter().filter(|w| w.task.contains(query)).collect()
+        self.workflows
+            .iter()
+            .filter(|w| w.task.contains(query))
+            .collect()
     }
 
     /// 获取函数统计
@@ -110,12 +113,21 @@ impl TripleMemoryStore {
             } else {
                 0.0
             };
-            (f.function_name.as_str(), f.call_count, f.success_count, success_rate)
+            (
+                f.function_name.as_str(),
+                f.call_count,
+                f.success_count,
+                success_rate,
+            )
         })
     }
 
     /// 总统计
     pub fn stats(&self) -> (usize, usize, usize) {
-        (self.workflows.len(), self.subtasks.len(), self.functions.len())
+        (
+            self.workflows.len(),
+            self.subtasks.len(),
+            self.functions.len(),
+        )
     }
 }

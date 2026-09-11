@@ -4,6 +4,8 @@
 
 use std::collections::HashMap;
 
+use super::shared_utils::{cosine_similarity, now_ts};
+
 /// 记忆条目
 #[allow(dead_code)]
 pub struct MemoryEntry {
@@ -85,12 +87,16 @@ impl TrinityMemory {
                 weight: 1.0,
             });
         }
-        self.graph_index.entry(from.to_string()).or_default().push(to.to_string());
+        self.graph_index
+            .entry(from.to_string())
+            .or_default()
+            .push(to.to_string());
     }
 
     /// 向量搜索（简化：余弦相似度）
     pub fn search_vector(&self, query_embedding: &[f32], top_k: usize) -> Vec<(&str, f64)> {
-        let mut scores: Vec<(&str, f64)> = self.entries
+        let mut scores: Vec<(&str, f64)> = self
+            .entries
             .iter()
             .filter(|e| matches!(e.memory_type, MemoryType::Vector))
             .map(|e| {
@@ -141,29 +147,21 @@ impl TrinityMemory {
 
     /// 统计
     pub fn stats(&self) -> (usize, usize, usize) {
-        let vector = self.entries.iter().filter(|e| matches!(e.memory_type, MemoryType::Vector)).count();
-        let graph = self.entries.iter().filter(|e| matches!(e.memory_type, MemoryType::Graph)).count();
-        let relational = self.entries.iter().filter(|e| matches!(e.memory_type, MemoryType::Relational)).count();
+        let vector = self
+            .entries
+            .iter()
+            .filter(|e| matches!(e.memory_type, MemoryType::Vector))
+            .count();
+        let graph = self
+            .entries
+            .iter()
+            .filter(|e| matches!(e.memory_type, MemoryType::Graph))
+            .count();
+        let relational = self
+            .entries
+            .iter()
+            .filter(|e| matches!(e.memory_type, MemoryType::Relational))
+            .count();
         (vector, graph, relational)
     }
-}
-
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    if a.len() != b.len() || a.is_empty() {
-        return 0.0;
-    }
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-    (dot / (norm_a * norm_b)) as f64
-}
-
-fn now_ts() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64
 }

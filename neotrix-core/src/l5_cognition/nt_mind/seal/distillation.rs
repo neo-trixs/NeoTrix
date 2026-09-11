@@ -185,10 +185,14 @@ impl DistillationEngine {
         let mut diffs = Vec::new();
         for (skill, success_steps) in &success_skill_map {
             if let Some(failure_steps) = failure_skill_map.get(skill) {
-                let success_patterns: Vec<&str> =
-                    success_steps.iter().map(|s| s.input_pattern.as_str()).collect();
-                let failure_patterns: Vec<&str> =
-                    failure_steps.iter().map(|s| s.input_pattern.as_str()).collect();
+                let success_patterns: Vec<&str> = success_steps
+                    .iter()
+                    .map(|s| s.input_pattern.as_str())
+                    .collect();
+                let failure_patterns: Vec<&str> = failure_steps
+                    .iter()
+                    .map(|s| s.input_pattern.as_str())
+                    .collect();
 
                 let divergence = compute_pattern_divergence(&success_patterns, &failure_patterns);
 
@@ -425,10 +429,8 @@ mod tests {
         let s = vec!["a", "b", "c"];
         let f = vec!["b", "c", "d"];
 
-        let score = compute_pattern_divergence(
-            &s.iter().copied().collect(),
-            &f.iter().copied().collect(),
-        );
+        let score =
+            compute_pattern_divergence(&s.iter().copied().collect(), &f.iter().copied().collect());
 
         assert!(score > 0.0);
         assert!(score < 1.0);

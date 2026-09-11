@@ -8,15 +8,9 @@ use super::nt_evidence_types::{
 use super::nt_evidence_hypothesis::HypothesisNetwork;
 use crate::l1_action::nt_memory::nt_memory_kb::{KnowledgeBase, KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
 use crate::core::nt_core_consciousness_tree::EvidenceChain;
+use crate::l1_action::nt_memory::shared_utils::now_ts;
 
 const EWHR_DOMAIN: &str = "nt_memory_historian";
-
-fn now_ts() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
 
 pub struct EvidenceStore {
     kb: Arc<Mutex<KnowledgeBase>>,

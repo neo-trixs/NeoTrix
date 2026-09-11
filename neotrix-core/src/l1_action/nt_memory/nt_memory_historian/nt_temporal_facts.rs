@@ -12,12 +12,7 @@
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
-fn now_ts() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
+use crate::l1_action::nt_memory::shared_utils::now_ts;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TemporalFact {

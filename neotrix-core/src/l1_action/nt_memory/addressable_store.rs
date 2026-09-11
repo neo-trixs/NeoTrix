@@ -78,7 +78,8 @@ impl AddressableStore {
     #[allow(dead_code)]
     pub fn append(&mut self, tool_name: &str, input: &str, output: &str) -> String {
         let id = format!("§{:03}", self.next_id);
-        let token_count = estimate_tokens(tool_name) + estimate_tokens(input) + estimate_tokens(output);
+        let token_count =
+            estimate_tokens(tool_name) + estimate_tokens(input) + estimate_tokens(output);
         let observation = Observation {
             id: id.clone(),
             tool_name: tool_name.to_string(),
@@ -97,7 +98,9 @@ impl AddressableStore {
     /// 通过 §id 召回完整观测
     #[allow(dead_code)]
     pub fn recall(&self, id: &str) -> Option<&Observation> {
-        self.index.get(id).and_then(|&idx| self.observations.get(idx))
+        self.index
+            .get(id)
+            .and_then(|&idx| self.observations.get(idx))
     }
 
     /// 为指定 §id 列表创建引用（用于活动视图替代完整内容）
@@ -161,7 +164,8 @@ impl AddressableStore {
     #[allow(dead_code)]
     pub fn range(&self, start: usize, end: usize) -> Vec<&Observation> {
         let end = end.min(self.observations.len());
-        self.observations.get(start..end)
+        self.observations
+            .get(start..end)
             .map(|slice| slice.iter().collect())
             .unwrap_or_default()
     }

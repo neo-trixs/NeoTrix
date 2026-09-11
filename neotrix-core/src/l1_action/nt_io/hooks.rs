@@ -2,19 +2,43 @@
 //!
 //! Session/Tool/Compact 三个层级的生命周期钩子。
 
-#[allow(dead_code)]
-
 /// Hook 事件类型
+#[allow(dead_code)]
 pub enum HookEvent {
-    SessionStart { session_id: String },
-    SessionEnd { session_id: String },
-    PreToolUse { tool_name: String, input: String },
-    PostToolUse { tool_name: String, output: String, success: bool },
-    PreCompact { current_tokens: usize, target_tokens: usize },
-    PostCompact { before_tokens: usize, after_tokens: usize },
-    SubagentStart { agent_id: String },
-    SubagentStop { agent_id: String, success: bool },
-    PermissionDenied { tool_name: String, reason: String },
+    SessionStart {
+        session_id: String,
+    },
+    SessionEnd {
+        session_id: String,
+    },
+    PreToolUse {
+        tool_name: String,
+        input: String,
+    },
+    PostToolUse {
+        tool_name: String,
+        output: String,
+        success: bool,
+    },
+    PreCompact {
+        current_tokens: usize,
+        target_tokens: usize,
+    },
+    PostCompact {
+        before_tokens: usize,
+        after_tokens: usize,
+    },
+    SubagentStart {
+        agent_id: String,
+    },
+    SubagentStop {
+        agent_id: String,
+        success: bool,
+    },
+    PermissionDenied {
+        tool_name: String,
+        reason: String,
+    },
 }
 
 /// Hook 决策
@@ -50,7 +74,10 @@ pub struct HookManager {
 #[allow(dead_code)]
 impl HookManager {
     pub fn new() -> Self {
-        Self { hooks: Vec::new(), hook_count: 0 }
+        Self {
+            hooks: Vec::new(),
+            hook_count: 0,
+        }
     }
 
     /// 注册 hook
@@ -76,7 +103,8 @@ impl HookManager {
             HookEvent::PermissionDenied { .. } => "permission",
         };
 
-        self.hooks.iter()
+        self.hooks
+            .iter()
             .filter(|h| h.event_type == event_type || h.event_type == "*")
             .map(|h| (h.handler)(event))
             .collect()
