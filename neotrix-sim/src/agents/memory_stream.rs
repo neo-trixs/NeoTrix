@@ -1,3 +1,4 @@
+use crate::foundation::math_bridge::cosine_sim;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -286,17 +287,7 @@ fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
-fn cosine_sim(a: &[f32; 16], b: &[f32; 16]) -> f32 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
 
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-
-    (dot / (norm_a * norm_b)).clamp(-1.0, 1.0)
-}
 
 #[cfg(test)]
 mod tests {
@@ -371,27 +362,6 @@ mod tests {
             stream.add(make_node(MemoryKind::Observation, 5.0, i, Some(emb)));
         }
         assert_eq!(stream.len(), 5);
-    }
-
-    #[test]
-    fn cosine_sim_identical() {
-        let a = [1.0f32; 16];
-        let sim = cosine_sim(&a, &a);
-        assert!((sim - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn cosine_sim_zero_vector() {
-        let a = [1.0f32; 16];
-        let b = [0.0f32; 16];
-        assert_eq!(cosine_sim(&a, &b), 0.0);
-    }
-
-    #[test]
-    fn cosine_sim_orthogonal() {
-        let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        let b = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        assert!((cosine_sim(&a, &b)).abs() < 1e-6);
     }
 
     #[test]

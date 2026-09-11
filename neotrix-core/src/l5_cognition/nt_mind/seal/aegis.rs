@@ -292,7 +292,6 @@ impl AegisEngine {
     }
 }
 
-#[derive(Clone)]
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct AegisStats {

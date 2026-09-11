@@ -21,8 +21,33 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use thiserror::Error;
 
-// ── Re-export from anti_distillation for consistency ──────────────────────
-pub use super::anti_distillation::{DetectionSignal, ThreatLevel};
+// ── Detection types (mirrors anti_distillation for module independence) ───
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ThreatLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl ThreatLevel {
+    pub fn numeric(&self) -> u8 {
+        match self {
+            Self::Low => 1,
+            Self::Medium => 2,
+            Self::High => 3,
+            Self::Critical => 4,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DetectionSignal {
+    pub signal_type: String,
+    pub confidence: f64,
+    pub threat_level: ThreatLevel,
+    pub details: String,
+}
 
 // ── Errors ────────────────────────────────────────────────────────────────
 #[derive(Debug, Error)]

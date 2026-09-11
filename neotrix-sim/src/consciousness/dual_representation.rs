@@ -1,3 +1,4 @@
+use crate::foundation::math_bridge::cosine_sim;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
@@ -124,14 +125,6 @@ impl DualRepresentation {
         if norm > 0.0 { emb.iter_mut().for_each(|x| *x /= norm); }
         emb
     }
-}
-
-fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len().min(b.len());
-    let dot: f32 = (0..len).map(|i| a[i] * b[i]).sum();
-    let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if na * nb == 0.0 { 0.0 } else { dot / (na * nb) }
 }
 
 #[cfg(test)]

@@ -31,6 +31,9 @@ pub mod nt_shield_threat_detection;
 pub mod nt_shield_adversarial;
 pub mod nt_shield_osint;
 
+// Proxy network detection (anti-distillation defense)
+pub mod proxy_detection;
+
 /// Shield 域事件发布器
 pub struct ShieldEventPublisher {
     bus: Arc<EventBus>,
