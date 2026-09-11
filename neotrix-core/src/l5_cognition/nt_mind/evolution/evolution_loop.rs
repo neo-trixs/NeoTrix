@@ -64,26 +64,7 @@ pub struct Issue {
     pub cycle_discovered: u64,
 }
 
-// ============================================================
-// 项目快照
-// ============================================================
-
-/// 项目健康快照
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectSnapshot {
-    pub total_files: usize,
-    pub total_lines: usize,
-    pub large_files: Vec<String>,
-    pub modules_without_tests: Vec<String>,
-    pub file_unsafe_hotspots: Vec<String>,
-    pub unsafe_count: usize,
-    pub unwrap_count: usize,
-    pub todo_count: usize,
-    pub compile_errors: usize,
-    pub compile_warnings: usize,
-    pub test_count: usize,
-    pub test_failures: usize,
-}
+pub use crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
 
 // ============================================================
 // 进化报告
@@ -1597,9 +1578,9 @@ impl EvolutionLoopProvider for EvolutionLoop {
 }
 
 impl crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::EvolutionLoopProvider for EvolutionLoop {
-    fn get_snapshot(&self) -> crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::ProjectSnapshot {
+    fn get_snapshot(&self) -> crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::ProjectSnapshotLite {
         let snap = self.last_snapshot.as_ref();
-        crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::ProjectSnapshot {
+        crate::l1_action::nt_act::nt_act_code::evolution_loop_provider::ProjectSnapshotLite {
             modules: snap.map(|s| {
                 let mut m: Vec<String> = Vec::new();
                 m.extend(s.large_files.iter().cloned());

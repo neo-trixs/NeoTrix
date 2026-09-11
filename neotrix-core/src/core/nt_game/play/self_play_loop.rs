@@ -458,6 +458,7 @@ mod tests {
         let config = SelfPlayConfig {
             episodes_per_iteration: 2,
             max_turns: 5,
+            learning_rate: 1e-4,
             buffer_capacity: 16,
             seed: 7,
         };
@@ -477,6 +478,7 @@ mod tests {
         let config = SelfPlayConfig {
             episodes_per_iteration: 1,
             max_turns: 3,
+            learning_rate: 1e-4,
             buffer_capacity: 8,
             seed: 0,
         };
@@ -495,6 +497,7 @@ mod tests {
         let config = SelfPlayConfig {
             episodes_per_iteration: 1,
             max_turns: 10,
+            learning_rate: 1e-4,
             buffer_capacity: 8,
             seed: 0,
         };
@@ -515,6 +518,7 @@ mod tests {
         let config = SelfPlayConfig {
             episodes_per_iteration: 2,
             max_turns: 4,
+            learning_rate: 1e-4,
             buffer_capacity: 16,
             seed: 1,
         };

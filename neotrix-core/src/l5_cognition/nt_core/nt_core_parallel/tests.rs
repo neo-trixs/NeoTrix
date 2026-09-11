@@ -1,8 +1,8 @@
 //! 并行模块测试
 
-// use crate::l5_cognition::nt_core::nt_core_parallel::types::{Agent, Task, AgentPool};
-// use crate::l5_cognition::nt_core::nt_core_parallel::executor::{ParallelExecutor, ExecMode};
-// use crate::l5_cognition::nt_core::nt_core_parallel::hands::{HandsController, HandType};
+use super::types::{Agent, Task, AgentPool};
+use super::executor::{ParallelExecutor, ExecMode};
+use super::hands::{HandsController, HandType};
 
 #[test]
 fn test_agent_creation() {

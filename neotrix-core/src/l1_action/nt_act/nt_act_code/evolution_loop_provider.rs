@@ -35,9 +35,9 @@ pub struct PrioritizedIssue {
     pub plan: DiagnoseActionPlan,
 }
 
-/// Minimal snapshot of project health (L1-local).
+/// Minimal project health snapshot (L1-local, simplified view for the provider trait).
 #[derive(Debug, Clone, Default)]
-pub struct ProjectSnapshot {
+pub struct ProjectSnapshotLite {
     pub modules: Vec<String>,
     pub health_score: f64,
     pub timestamp: String,
@@ -45,7 +45,7 @@ pub struct ProjectSnapshot {
 
 /// L1 trait for evolution loop providers — L5 implements this for its `EvolutionLoop`.
 pub trait EvolutionLoopProvider {
-    fn get_snapshot(&self) -> ProjectSnapshot;
+    fn get_snapshot(&self) -> ProjectSnapshotLite;
     fn self_diagnose(&mut self) -> (Vec<String>, Vec<PrioritizedIssue>);
     fn on_fix_applied(&mut self);
 }

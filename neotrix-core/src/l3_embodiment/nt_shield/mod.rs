@@ -1,18 +1,35 @@
 //! NT-SHIELD Security Module
 //!
 //! NeoTrix安全防护模块，包含:
-//! - 统一防御层 (Unified Defense Layer)
-//! - 输入验证 (Input Gatekeeper)
-//! - 输出验证 (Output Sentinel)
-//! - 提示守护 (Prompt Guardian)
-//! - 拒答篡改 (Refusal Tamper)
-//! - 护栏穿越 (Guardrail Traversal)
-//! - 黑话规范化 (Slang Norm)
-//! - 双证据扫描 (Dual Evidence)
-//! - 钩链锁存 (Grapple Hooks)
-//! - 代理检测 (Proxy Detection)
-//! - 推理保护 (Reasoning Protection)
-//! - 反分馏 (Anti-Distillation)
+//! - 原有模块 (nt_shield, sandbox, audit, etc.)
+//! - 新增防御模块 (Unified Defense Layer)
+
+// ============================================
+// 原有模块 (保持兼容)
+// ============================================
+
+pub mod nt_shield;
+pub mod nt_shield_agentic_scan;
+pub mod nt_shield_audit;
+pub mod nt_shield_comm;
+pub mod nt_shield_oversight;
+pub mod nt_shield_propagation_guard;
+pub mod nt_shield_recon;
+pub mod nt_shield_sandbox;
+
+#[cfg(feature = "sandbox")]
+pub mod nt_shield_sandbox_entry;
+
+pub mod nt_shield_sentry;
+
+#[cfg(feature = "stealth-net")]
+pub mod nt_shield_stealth_net;
+
+pub mod nt_shield_traffic;
+
+// ============================================
+// 新增防御模块 (Phase 1)
+// ============================================
 
 pub mod unified_defense;
 pub mod input_gatekeeper;
@@ -27,6 +44,14 @@ pub mod proxy_detection;
 pub mod reasoning_protection;
 pub mod anti_distillation;
 
+// ============================================
+// Re-exports (保持向后兼容)
+// ============================================
+
+// 原有re-exports
+pub use nt_shield::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
+
+// 新增re-exports
 pub use unified_defense::UnifiedDefenseLayer;
 pub use input_gatekeeper::InputGatekeeper;
 pub use output_sentinel::OutputSentinel;
@@ -39,6 +64,3 @@ pub use grapple_hooks::GrappleHookChain;
 pub use proxy_detection::ProxyDetectionEngine;
 pub use reasoning_protection::ReasoningProtectionEngine;
 pub use anti_distillation::AntiDistillationEngine;
-
-// Re-exports for context_boundary
-pub use nt_shield::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};
