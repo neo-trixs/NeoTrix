@@ -227,7 +227,7 @@ impl AdversarialMemory {
 
                 let time_pattern = if threats.len() >= 3 {
                     let ticks: Vec<u64> = threats.iter().map(|t| t.tick).collect();
-                    let mut intervals: Vec<u64> = ticks.windows(2).map(|w| w[1] - w[0]).collect();
+                    let mut intervals: Vec<u64> = ticks.windows(2).map(|w| w[1].saturating_sub(w[0])).collect();
                     intervals.sort();
                     let median = intervals[intervals.len() / 2];
                     if median > 0 && intervals.iter().all(|i| (*i as f64 - median as f64).abs() < median as f64 * 0.3) {

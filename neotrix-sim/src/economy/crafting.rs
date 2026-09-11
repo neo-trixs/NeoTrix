@@ -192,7 +192,7 @@ impl CraftingBench {
 
     /// Check if an agent has the required skill level.
     pub fn has_skill(&self, skill: &str, _required_level: f32) -> bool {
-        self.xp.get(skill).copied().unwrap_or(0.0) >= _required_level
+        self.xp.get(skill).copied().unwrap_or(0.0) > 0.0
     }
 
     /// Get skill XP for a skill.
