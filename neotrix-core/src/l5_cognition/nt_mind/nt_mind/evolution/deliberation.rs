@@ -512,7 +512,6 @@ mod tests {
     use crate::core::nt_core_kb_primitives::schema_initialize;
     use rusqlite::Connection;
 
-     #[allow(dead_code)]
      fn mem_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         schema_initialize(&conn).unwrap();

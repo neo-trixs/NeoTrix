@@ -40,7 +40,6 @@ struct Observation {
     confidence: f64, // 0..1
     attrs: Map<String, Value>, // 学科特定属性
     source: String, // 可追溯
-    #[allow(dead_code)]
     classification: String, // 分类传播 (branch_215_4)
 }
 

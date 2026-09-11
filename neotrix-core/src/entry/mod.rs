@@ -2056,7 +2056,6 @@ pub fn run_wallet_export(label: &str) {
 ///   1. 初始化 GatewayV2（provider 路由/熔断/限流）
 ///   2. 装配 MCP 原生工具（ToolOrchestrator → AgentLoop 工具集）
 ///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
-#[allow(dead_code)]
 pub fn run_agent_mode(profile: &str) {
     use neotrix::cli::commands::agent_cmds::McpRegistry;
     use neotrix::agent::tool::mcp::{McpTransport, McpToolDef};

@@ -91,10 +91,8 @@ pub enum MessageType {
 pub struct SubagentManager {
     agents: HashMap<String, SubagentInstance>,
     background_tasks: HashMap<String, AgentTask>,
-    #[allow(dead_code)]
     default_capabilities: Vec<String>,
     next_id: u64,
-    #[allow(dead_code)]
     max_agents: usize,
 }
 

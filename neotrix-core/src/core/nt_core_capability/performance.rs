@@ -269,10 +269,8 @@ impl Warmer {
 /// 性能优化器
 pub struct PerformanceOptimizer {
     /// 连接池配置
-    #[allow(dead_code)]
     pool_config: PoolConfig,
     /// 缓存配置
-    #[allow(dead_code)]
     cache_config: CacheConfig,
     /// 预热器
     warmer: Warmer,

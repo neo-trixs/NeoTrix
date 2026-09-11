@@ -614,7 +614,6 @@ mod tests {
     }
 }
 
-#[allow(dead_code)]
 fn truncate_cli(s: &str, max_chars: usize) -> String {
     if s.chars().count() <= max_chars {
         s.to_string()

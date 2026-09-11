@@ -101,7 +101,6 @@ const OBS_BUFFER_RATIO: f64 = 0.2;
 const OBS_BUFFER_ACTIVATION: f64 = 0.8;
 const REF_TOKEN_BUDGET: usize = 40_000;
 const REF_BUFFER_ACTIVATION: f64 = 0.5;
-     #[allow(dead_code)]
      const OBS_BLOCK_AFTER: f64 = 1.2;
 
 /// 简易 token 估算 (单一事实源, 兼容 CJK): 无 tiktoken 时回退逐字符估算 (保守上界, 最小 1)。
@@ -534,7 +533,6 @@ impl Extractor {
     fn new(name: &str, schema: Value, extract: ExtractorFn) -> Self {
         Self { name: name.to_string(), schema, extract, on_extracted: None }
     }
-     #[allow(dead_code)]
      fn with_hook(mut self, hook: fn(&mut Value) -> Result<(), String>) -> Self {
         self.on_extracted = Some(hook);
         self

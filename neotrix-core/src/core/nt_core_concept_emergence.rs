@@ -42,7 +42,6 @@ impl UnionFind {
         true
     }
 
-    #[allow(dead_code)]
     fn cluster_size(&mut self, x: usize) -> usize {
         let root = self.find(x);
         self.size[root]

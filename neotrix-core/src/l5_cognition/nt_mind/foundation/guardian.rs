@@ -884,7 +884,6 @@ mod tests {
     }
 }
 
-#[allow(dead_code)]
 fn temp_mape_dir() -> PathBuf {
     std::env::temp_dir().join(format!(
         "neotrix-mape-{}",

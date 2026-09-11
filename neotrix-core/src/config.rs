@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
-#[allow(dead_code)]
 pub struct NeoTrixConfig {
     pub default_llm_provider: Option<String>,
     pub provider: Option<String>,

@@ -282,7 +282,6 @@ pub struct DiscoveryManager {
     /// 发现任务
     tasks: Vec<DiscoveryTask>,
     /// 最大并发任务
-    #[allow(dead_code)]
     max_concurrent_tasks: usize,
 }
 
