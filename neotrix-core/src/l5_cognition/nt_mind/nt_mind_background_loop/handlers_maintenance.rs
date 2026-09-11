@@ -85,7 +85,7 @@ impl BackgroundLoopHandle {
         // 创建快照用于回滚
         let snapshot_id = self.refiner.snapshot("bg_refinement_cycle");
         // 获取当前状态摘要
-        let (updates, snapshots, state_items) = self.refiner.stats();
+        let (updates, _snapshots, state_items) = self.refiner.stats();
         info!("[bg] refinement: snapshot={}, updates={}, state_items={}",
             snapshot_id, updates, state_items);
     }
