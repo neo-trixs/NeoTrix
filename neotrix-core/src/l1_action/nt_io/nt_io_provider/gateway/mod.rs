@@ -16,10 +16,10 @@ use super::agent_routing::AgentRoutingTable;
 use super::provider_swap::ProviderSwapManager;
 
 // ── Routing ──────────────────────────────────────────────────
-mod consistent_hash;
 mod intelligence;
 mod learned_router;
 mod market_router;
+mod routing_utils;
 mod selection;
 mod subgrid;
 
@@ -27,8 +27,7 @@ mod subgrid;
 mod drift;
 mod health;
 mod resilience;
-mod response_cache;
-mod response_healer;
+mod response_quality;
 
 // ── Execution ────────────────────────────────────────────────
 mod coordinator;
@@ -50,15 +49,14 @@ mod stealth_middleware;
 
 // ── Re-exports ───────────────────────────────────────────────
 // Routing
-pub use consistent_hash::*;
 pub use intelligence::*;
 pub use market_router::*;
+pub use routing_utils::*;
 // Resilience
 pub use drift::*;
 pub use health::*;
 pub use resilience::*;
-pub use response_cache::*;
-pub use response_healer::*;
+pub use response_quality::*;
 // Execution
 pub use coordinator::*;
 pub use modular_gateway::*;
