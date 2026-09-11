@@ -361,11 +361,11 @@ impl EvolutionDaemon {
         // 用快照摘要验证 spec 约束
         let codebase_summary = format!(
             "files={} errors={} warnings={} todo={} untested={}",
-            l1_snapshot.total_files,
-            l1_snapshot.compile_errors,
-            l1_snapshot.compile_warnings,
-            l1_snapshot.todo_count,
-            l1_snapshot.modules_without_tests.len(),
+            snapshot.total_files,
+            snapshot.compile_errors,
+            snapshot.compile_warnings,
+            snapshot.todo_count,
+            snapshot.modules_without_tests.len(),
         );
         let _verifications = self.spec_pipeline.verify_all(&codebase_summary);
 

@@ -115,7 +115,7 @@ impl LatentState {
 
     /// Default zero state with default dimension.
     pub fn default_state() -> Self {
-        Self::zeros(LATENT_DIM)
+        Self::zeros(JEPA_LATENT_DIM)
     }
 
     /// Compute cosine similarity between two latent states.

@@ -57,6 +57,18 @@ pub fn node_sensitivity(node_type: &NodeType) -> PermissionLevel {
 /// 保持 `nt_memory_types::KnowledgeNode/KnowledgeEdge/TemporalValidity` 调用方路径不变。
 pub use crate::core::nt_core_kb_types::{KnowledgeEdge, KnowledgeNode, TemporalValidity};
 
+/// Domain knowledge cluster — 对应 `domain_clusters` 表
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeCluster {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub parent_cluster_id: Option<String>,
+    pub node_count: i64,
+    pub avg_confidence: f64,
+    pub updated_at: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchQuery {
     pub text: Option<String>,

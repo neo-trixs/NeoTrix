@@ -162,6 +162,7 @@ pub use nt_file_ability::{
     StructuredData, TableData, TableEdit, TextEncoding, UnitRule, PdfEdit,
     DirExtractEntry, DirExtractReport,
     CollectionMergeRequest, MergeOutcome, MergeStrategy, collection_merge,
+    SuperResolutionModel, SuperResolutionConfig, PdfIconEnhanceConfig, enhance_pdf_icons_with_config,
 };
 
 pub use nt_file_ability::merge_docx;
