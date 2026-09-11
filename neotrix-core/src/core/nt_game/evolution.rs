@@ -4,6 +4,8 @@
 //! Continuously trains the consciousness entity through self-play,
 //! adapts difficulty, and evolves game rules via constellation unlocks.
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};

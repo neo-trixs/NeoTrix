@@ -7,6 +7,8 @@
 //! - 特征提取
 //! - 图像增强
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 

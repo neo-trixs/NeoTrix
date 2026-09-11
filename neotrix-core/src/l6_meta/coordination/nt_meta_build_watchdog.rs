@@ -7,6 +7,8 @@
 //! - 健康检查
 //! - 告警系统
 
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 
 /// 构建看门狗

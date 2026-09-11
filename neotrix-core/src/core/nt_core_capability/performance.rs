@@ -2,6 +2,8 @@
 //!
 //! 提供能力调用的性能优化和资源管理
 
+#![allow(dead_code)]
+
 use crate::core::nt_core_capability::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

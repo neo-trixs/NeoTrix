@@ -2,6 +2,8 @@
 //!
 //! 支持能力的动态加载、卸载、重载
 
+#![allow(dead_code)]
+
 use crate::core::nt_core_capability::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};

@@ -7,6 +7,8 @@
 //! - 响应生成
 //! - 工具链编排
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 

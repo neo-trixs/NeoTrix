@@ -7,6 +7,8 @@
 //! - 反事实解释
 //! - 模型审计
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 

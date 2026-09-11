@@ -4,6 +4,8 @@
 //! The consciousness entity trains itself through self-play,
 //! evolving difficulty and strategy via constellation progression.
 
+#![allow(dead_code)]
+
 use log::warn;
 use serde::{Deserialize, Serialize};
 

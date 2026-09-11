@@ -8,6 +8,8 @@
 //! - 图谱 wiki link viewer
 //! - 可嵌入 HTML + 丰富组件
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 

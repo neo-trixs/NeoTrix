@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningMemory;
 // // use crate::core::// nt_core_signal::core::SelectiveState;

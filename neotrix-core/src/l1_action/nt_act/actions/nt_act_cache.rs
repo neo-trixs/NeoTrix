@@ -7,6 +7,8 @@
 //! - 缓存预热
 //! - 缓存穿透保护
 
+#![allow(dead_code)]
+
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};

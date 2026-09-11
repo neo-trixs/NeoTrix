@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::*;
 use crate::core::nt_core_gate::{GateDecision, ToolRegistry};
 use crate::l5_cognition::nt_mind::nt_mind::consciousness::bbrain_monitor::BMonitor;

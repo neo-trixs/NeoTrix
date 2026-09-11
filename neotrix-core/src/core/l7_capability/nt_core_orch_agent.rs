@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::core::nt_core_plan::E8Plan;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

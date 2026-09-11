@@ -7,6 +7,8 @@
 //! - 自我评估
 //! - 能力进化
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 

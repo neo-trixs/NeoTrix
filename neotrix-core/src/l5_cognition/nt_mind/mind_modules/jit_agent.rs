@@ -6,6 +6,8 @@
 //! - 按需组合任何任务
 //! - 与模型 scaling 正交
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
