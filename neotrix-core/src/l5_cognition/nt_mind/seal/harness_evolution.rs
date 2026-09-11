@@ -3,6 +3,7 @@
 //! 通过可验证环境驱动 harness 自动优化。
 
 /// 可验证环境
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct VerifiableEnvironment {
     pub id: String,
@@ -12,6 +13,7 @@ pub struct VerifiableEnvironment {
     pub success_threshold: f64, // 0.0-1.0
 }
 
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct TestCase {
     pub input: String,
@@ -58,6 +60,7 @@ pub struct MutationEvaluation {
 }
 
 /// 3 轮筛选结果
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct ScreeningResult {
     pub round: u32,

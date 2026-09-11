@@ -2,11 +2,9 @@
 //!
 //! Digester→Planner→Evolver→Critic 四阶段确定性门控进化。
 
-#[allow(dead_code)]
-use std::collections::HashMap;
-
 /// 执行轨迹（Digest 输入）
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct ExecutionTrace {
     pub trace_id: String,
     pub task: String,
@@ -16,6 +14,7 @@ pub struct ExecutionTrace {
 }
 
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct TraceStep {
     pub action: String,
     pub input: String,
@@ -26,6 +25,7 @@ pub struct TraceStep {
 
 /// Digest 输出（压缩轨迹）
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct TraceDigest {
     pub trace_id: String,
     pub task_summary: String,
@@ -37,6 +37,7 @@ pub struct TraceDigest {
 
 /// 适应景观（Planner 输出）
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct AdaptationLandscape {
     pub dimensions: Vec<AdaptationDimension>,
     pub current_position: Vec<f64>,
@@ -45,6 +46,7 @@ pub struct AdaptationLandscape {
 }
 
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct AdaptationDimension {
     pub name: String,
     pub current_value: f64,
@@ -54,6 +56,7 @@ pub struct AdaptationDimension {
 
 /// 类型化编辑（Evolver 输出）
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct TypedEdit {
     pub edit_id: String,
     pub edit_type: EditType,
@@ -64,6 +67,7 @@ pub struct TypedEdit {
 }
 
 #[allow(dead_code)]
+#[derive(Clone)]
 pub enum EditType {
     PromptModification,
     ToolSelectionChange,
@@ -74,6 +78,7 @@ pub enum EditType {
 
 /// Critic 评估
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct CriticAssessment {
     pub edit_id: String,
     pub supported: bool,

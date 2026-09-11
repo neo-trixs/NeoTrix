@@ -104,21 +104,21 @@ impl TrinityMemory {
     }
 
     /// 图搜索（BFS）
-    pub fn search_graph(&self, start_id: &str, depth: usize) -> Vec<&str> {
+    pub fn search_graph(&self, start_id: &str, depth: usize) -> Vec<String> {
         let mut visited = std::collections::HashSet::new();
-        let mut queue = vec![(start_id, 0)];
+        let mut queue = vec![(start_id.to_string(), 0)];
         let mut results = Vec::new();
 
         while let Some((id, d)) = queue.pop() {
-            if d > depth || visited.contains(id) {
+            if d > depth || visited.contains(&id) {
                 continue;
             }
-            visited.insert(id);
-            results.push(id);
+            visited.insert(id.clone());
+            results.push(id.clone());
 
-            if let Some(related) = self.graph_index.get(id) {
+            if let Some(related) = self.graph_index.get(&id) {
                 for rel_id in related {
-                    queue.push((rel_id, d + 1));
+                    queue.push((rel_id.clone(), d + 1));
                 }
             }
         }

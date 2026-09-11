@@ -13,7 +13,6 @@ pub use crate::l1_action::nt_memory::nt_memory_kb::nt_discovery_github_topics::D
 //       因此这里也必须用 pub(crate) re-export，不能 pub use。
 pub use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadOptions;
 pub(crate) use crate::l1_action::nt_memory::nt_memory_kb::nt_http::download_to_file;
-pub(crate) use crate::l1_action::nt_memory::nt_memory_kb::nt_http::DownloadResult;
 pub(crate) use crate::l1_action::nt_memory::nt_memory_kb::nt_http::shared_blocking_client;
 pub(crate) use crate::l1_action::nt_memory::nt_memory_kb::nt_http::run_blocking;
 
