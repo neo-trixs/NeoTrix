@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use super::cosine_similarity;
+use super::nt_world_model_types::cosine_similarity;
 use super::LATENT_DIM;
 use super::Vector;
 

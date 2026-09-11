@@ -1,12 +1,7 @@
 use serde::{Deserialize, Serialize};
 type Vector = Vec<f64>;
 
-fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f64 = a.iter().map(|x| x * x).sum();
-    let norm_b: f64 = b.iter().map(|x| x * x).sum();
-    if norm_a == 0.0 && norm_b == 0.0 { 1.0 } else { dot / (norm_a.sqrt() * norm_b.sqrt()).max(1e-10) }
-}
+use crate::core::nt_core_math::cosine_similarity_f64;
 use super::types::{
     JEPA_VAR_WEIGHT, JEPA_INV_WEIGHT, JEPA_COV_WEIGHT,
     JEPA_VARIANCE_TARGET, JEPA_LATENT_DIM,
@@ -113,7 +108,7 @@ impl EnergyModel {
         let n = prediction.len().min(target.len());
         match self.metric.as_str() {
             "cosine" => {
-                let sim = cosine_similarity(prediction, target);
+                let sim = cosine_similarity_f64(prediction, target);
                 (-sim + 1.0) / self.temperature
             }
             _ => {

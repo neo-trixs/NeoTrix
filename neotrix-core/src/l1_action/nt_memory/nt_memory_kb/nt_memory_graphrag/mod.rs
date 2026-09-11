@@ -954,19 +954,40 @@ impl GraphRagStore {
     }
 
     /// Community summary using Leiden detection (single fact source).
-    /// Delegates to `community_summary_with()` using a temporary `CommunityAwareSearch`.
+    /// If `searcher` is provided, reuses its detected communities (avoids re-detection).
+    /// If `searcher` is `None`, creates a temporary `CommunityAwareSearch` internally.
     pub fn community_summary(&self) -> Vec<Community> {
+        self.community_summary_with_opt(None)
+    }
+
+    /// Community summary with an existing `CommunityAwareSearch` (avoids re-detection).
+    /// The Leiden hierarchy from `searcher` is the single fact source for community structure.
+    pub fn community_summary_with_searcher(&self, searcher: &CommunityAwareSearch) -> Vec<Community> {
+        self.community_summary_with_opt(Some(searcher))
+    }
+
+    /// Internal: community summary with optional pre-computed searcher.
+    fn community_summary_with_opt(&self, searcher: Option<&CommunityAwareSearch>) -> Vec<Community> {
         if self.graph.entities.is_empty() {
             return Vec::new();
         }
-        let kb_nodes: Vec<KnowledgeNode> = self.graph.entities.values().cloned().map(Into::into).collect();
-        let kb_edges: Vec<KnowledgeEdge> = self.graph.relations.values().cloned().map(Into::into).collect();
 
-        let detector = CommunityDetector::new(1.0, 20, 3);
-        let mut searcher = CommunityAwareSearch::new(detector);
-        searcher.detect(&kb_nodes, &kb_edges);
+        // If no searcher provided, create one internally (backward compatible)
+        let owned_searcher;
+        let effective_searcher = match searcher {
+            Some(s) => s,
+            None => {
+                let kb_nodes: Vec<KnowledgeNode> = self.graph.entities.values().cloned().map(Into::into).collect();
+                let kb_edges: Vec<KnowledgeEdge> = self.graph.relations.values().cloned().map(Into::into).collect();
+                let detector = CommunityDetector::new(1.0, 20, 3);
+                let mut s = CommunityAwareSearch::new(detector);
+                s.detect(&kb_nodes, &kb_edges);
+                owned_searcher = s;
+                &owned_searcher
+            }
+        };
 
-        self.community_summary_with(&searcher)
+        self.community_summary_with(effective_searcher)
     }
 
     /// Community summary using an existing `CommunityAwareSearch` (avoids re-detection).
@@ -1189,6 +1210,13 @@ impl GraphRagStore {
             return self.global_summaries.iter().take(top_k).cloned().collect();
         }
 
+        // Compute communities once (avoids re-detection per summary)
+        let communities = self.community_summary();
+        let comm_map: HashMap<String, &Community> = communities
+            .iter()
+            .map(|c| (c.id.clone(), c))
+            .collect();
+
         let mut scored: Vec<(usize, f64)> = Vec::new();
 
         for (idx, gs) in self.global_summaries.iter().enumerate() {
@@ -1213,19 +1241,14 @@ impl GraphRagStore {
             }
 
             // Entity name match in community
-            for eid in &self
-                .community_summary()
-                .iter()
-                .find(|c| c.id == gs.community_id)
-                .map(|c| &c.entity_ids)
-                .cloned()
-                .unwrap_or_default()
-            {
-                if let Some(entity) = self.graph.entities.get(eid) {
-                    let name_lower = entity.name.to_lowercase();
-                    for qt in &query_terms {
-                        if name_lower.contains(qt) {
-                            score += 0.2;
+            if let Some(comm) = comm_map.get(&gs.community_id) {
+                for eid in &comm.entity_ids {
+                    if let Some(entity) = self.graph.entities.get(eid) {
+                        let name_lower = entity.name.to_lowercase();
+                        for qt in &query_terms {
+                            if name_lower.contains(qt) {
+                                score += 0.2;
+                            }
                         }
                     }
                 }
@@ -1287,17 +1310,22 @@ impl GraphRagStore {
             }
         }
 
-        // Merge entities from global results (those in matching communities)
-        let comm_entity_ids: HashSet<String> = global
+        // Compute communities once (avoids re-detection per summary)
+        let communities = self.community_summary();
+        let comm_map: HashMap<String, &Community> = communities
             .iter()
-            .flat_map(|gs| {
-                self.community_summary()
-                    .iter()
-                    .find(|c| c.id == gs.community_id)
-                    .map(|c| c.entity_ids.clone())
-                    .unwrap_or_default()
-            })
+            .map(|c| (c.id.clone(), c))
             .collect();
+
+        // Merge entities from global results (those in matching communities)
+        let mut comm_entity_ids: HashSet<String> = HashSet::new();
+        for gs in &global {
+            if let Some(comm) = comm_map.get(&gs.community_id) {
+                for eid in &comm.entity_ids {
+                    comm_entity_ids.insert(eid.clone());
+                }
+            }
+        }
 
         for eid in &comm_entity_ids {
             if let Some(entity) = self.graph.entities.get(eid) {

@@ -28,23 +28,6 @@ impl From<crate::core::TaskType> for TaskType {
     }
 }
 
-impl From<crate::l2_perception::nt_world::nt_world_model::TaskType> for TaskType {
-    fn from(tt: crate::l2_perception::nt_world::nt_world_model::TaskType) -> Self {
-        use crate::l2_perception::nt_world::nt_world_model::TaskType as WT;
-        match tt {
-            WT::General => TaskType::General,
-            WT::Design => TaskType::Design,
-            WT::UIDesign => TaskType::UIDesign,
-            WT::CodeAnalysis => TaskType::CodeAnalysis,
-            WT::CodeGeneration => TaskType::CodeGeneration,
-            WT::CodeReview => TaskType::CodeReview,
-            WT::Security => TaskType::Security,
-            WT::Planning => TaskType::Planning,
-            _ => TaskType::General,
-        }
-    }
-}
-
 /// Simple access context with trust score
 #[derive(Debug, Clone)]
 pub struct AccessContext {

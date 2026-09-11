@@ -196,6 +196,76 @@ impl CapabilityNode for EvolutionHarness {
     }
 }
 
+// L5 trait abstraction: EvolutionHarnessApi (JSON-based to avoid L6 type leakage)
+impl crate::l5_cognition::traits::EvolutionHarnessApi for EvolutionHarness {
+    fn new_harness() -> Self {
+        EvolutionHarness::new(LoopConfig::default())
+    }
+
+    fn harness_infos_from_registry_export(json: &str) -> (Vec<crate::l5_cognition::traits::RegistryNodeInfo>, Vec<String>) {
+        let (l6_infos, problems) = EvolutionHarness::infos_from_registry_export(json);
+        let infos = l6_infos.into_iter().map(|i| crate::l5_cognition::traits::RegistryNodeInfo {
+            node_id: i.node_id,
+            domain: i.domain,
+            layer: i.layer,
+            constellation: i.constellation,
+            maturity: i.maturity,
+        }).collect();
+        (infos, problems)
+    }
+
+    fn harness_run_cycle(
+        &mut self,
+        snapshot_json: &serde_json::Value,
+        infos: &[crate::l5_cognition::traits::RegistryNodeInfo],
+    ) -> serde_json::Value {
+        let snapshot: crate::core::nt_core_consciousness_core::CoreSnapshot =
+            serde_json::from_value(snapshot_json.clone()).unwrap_or_default();
+        let l6_infos: Vec<CapabilityNodeInfo> = infos.iter().map(|i| CapabilityNodeInfo {
+            node_id: i.node_id.clone(),
+            domain: i.domain.clone(),
+            layer: i.layer.clone(),
+            constellation: i.constellation.clone(),
+            maturity: i.maturity,
+        }).collect();
+        let report = self.run_cycle(&snapshot, &l6_infos);
+        serde_json::to_value(&report).unwrap_or(serde_json::json!({}))
+    }
+
+    fn harness_persist_suggestions(
+        &mut self,
+        kb: &crate::l5_cognition::kb_facade::KnowledgeBase,
+        report: &serde_json::Value,
+    ) -> usize {
+        let l6_report: LoopReport = match serde_json::from_value(report.clone()) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("[evolution_harness] report deserialization failed: {}", e);
+                return 0;
+            }
+        };
+        self.persist_suggestions(kb, &l6_report)
+    }
+
+    fn harness_actionable_suggestions(
+        report: &serde_json::Value,
+        threshold: f64,
+    ) -> Vec<crate::l5_cognition::traits::RegistrySuggestion> {
+        let l6_report: LoopReport = match serde_json::from_value(report.clone()) {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        EvolutionHarness::actionable_suggestions(&l6_report, threshold)
+            .into_iter()
+            .map(|s| crate::l5_cognition::traits::RegistrySuggestion {
+                node_id: s.node_id,
+                resonance: s.resonance,
+                suggestion: s.suggestion,
+            })
+            .collect()
+    }
+}
+
 impl crate::core::nt_core_self_test::SelfTest for EvolutionHarness {
     fn name(&self) -> &str {
         "nt_mind_transcendent_evolution_harness"

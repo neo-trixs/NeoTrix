@@ -1,13 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let na: f64 = a.iter().map(|x| x * x).sum();
-    let nb: f64 = b.iter().map(|x| x * x).sum();
-    if na == 0.0 && nb == 0.0 { return 1.0; }
-    if na == 0.0 || nb == 0.0 { return 0.0; }
-    dot / (na.sqrt() * nb.sqrt())
-}
+pub use crate::core::nt_core_math::cosine_similarity_f64 as cosine_similarity;
 
 pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vec<f64>>;
@@ -47,12 +40,7 @@ impl LatentState {
 
     /// 计算与另一个状态的相似度
     pub fn similarity(&self, other: &LatentState) -> f64 {
-        let dot: f64 = self.vector.iter().zip(other.vector.iter()).map(|(a, b)| (*a as f64) * (*b as f64)).sum();
-        let na: f64 = self.vector.iter().map(|a| (*a as f64) * (*a as f64)).sum();
-        let nb: f64 = other.vector.iter().map(|b| (*b as f64) * (*b as f64)).sum();
-        if na == 0.0 && nb == 0.0 { return 1.0; }
-        if na == 0.0 || nb == 0.0 { return 0.0; }
-        dot / (na.sqrt() * nb.sqrt())
+        cosine_similarity(&self.vector, &other.vector)
     }
 }
 

@@ -1263,6 +1263,33 @@ impl crate::core::nt_core_self_test::SelfTest for SmallScaleMethod {
     }
 }
 
+// L5 trait abstraction: EvalHarnessApi
+impl crate::l5_cognition::traits::EvalHarnessApi for EvalHarness {
+    fn generate_regression_test(&self, candidate: &str) -> crate::l5_cognition::traits::RegressionCase {
+        let l6_case = EvalHarness::generate_regression_test(self, candidate);
+        crate::l5_cognition::traits::RegressionCase {
+            id: l6_case.id,
+            candidate: l6_case.candidate,
+            forbidden_tokens: l6_case.forbidden_tokens,
+            required_categories: l6_case.required_categories,
+        }
+    }
+
+    fn run_regression_test(&self, case: &crate::l5_cognition::traits::RegressionCase) -> crate::l5_cognition::traits::RegressionResult {
+        let l6_case = RegressionCase {
+            id: case.id.clone(),
+            candidate: case.candidate.clone(),
+            forbidden_tokens: case.forbidden_tokens.clone(),
+            required_categories: case.required_categories.clone(),
+        };
+        let l6_result = EvalHarness::run_regression_test(self, &l6_case);
+        crate::l5_cognition::traits::RegressionResult {
+            passed: l6_result.passed,
+            reasons: l6_result.reasons,
+        }
+    }
+}
+
 impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
     fn name(&self) -> &str {
         "nt_mind_eval_harness_self_verifiable"

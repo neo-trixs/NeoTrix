@@ -235,16 +235,7 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
     }
 }
 
-/// Cosine similarity between two equal-length f32 vectors.
-/// Delegates to canonical `nt_core_math::cosine_similarity_f32`.
-/// Returns 0.0 if vectors have different lengths (logs a warning).
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    if a.len() != b.len() {
-        log::warn!("cosine_similarity: dimension mismatch {} vs {}", a.len(), b.len());
-        return 0.0;
-    }
-    crate::core::nt_core_math::cosine_similarity_f32(a, b)
-}
+use crate::core::nt_core_math::cosine_similarity_f32;
 
 /// Serialize a Vec<f32> to a byte blob for SQLite storage (little-endian f32).
 fn vector_to_blob(v: &[f32]) -> Vec<u8> {
@@ -453,7 +444,7 @@ fn exact_vector_cosine(conn: &Connection, node_id: &str, query_vec: &[f32]) -> O
         let off = i * 4;
         v.push(f32::from_le_bytes([blob[off], blob[off + 1], blob[off + 2], blob[off + 3]]));
     }
-    Some(cosine_similarity(query_vec, &v))
+    Some(cosine_similarity_f32(query_vec, &v))
 }
 
 struct PqCodebook {
@@ -695,14 +686,14 @@ mod tests {
         // Mismatched dims must not panic and should yield 0.0 (silent-safe).
         let a: Vec<f32> = vec![1.0, 0.0];
         let b: Vec<f32> = vec![0.0, 1.0, 0.0];
-        assert_eq!(cosine_similarity(&a, &b), 0.0);
+        assert_eq!(cosine_similarity_f32(&a, &b), 0.0);
     }
 
     #[test]
     fn test_cosine_identical() {
         let a: Vec<f32> = vec![0.5, 0.5, 0.0];
         let b: Vec<f32> = vec![0.5, 0.5, 0.0];
-        assert!((cosine_similarity(&a, &b) - 1.0).abs() < 1e-6);
+        assert!((cosine_similarity_f32(&a, &b) - 1.0).abs() < 1e-6);
     }
 
     #[test]
@@ -721,8 +712,8 @@ mod tests {
         assert_eq!(a[0], a[1]);
         // 相似文本 → 高 cosine
         let b = local_embed_texts(&["neotrix consciousness tree", "random unrelated text about quantum"], 384);
-        let sim_same = cosine_similarity(&a[0], &b[0]);
-        let sim_diff = cosine_similarity(&a[0], &b[1]);
+        let sim_same = cosine_similarity_f32(&a[0], &b[0]);
+        let sim_diff = cosine_similarity_f32(&a[0], &b[1]);
         assert!(sim_same > sim_diff, "similar should rank above dissimilar: {} vs {}", sim_same, sim_diff);
     }
 
@@ -1035,7 +1026,7 @@ mod migration_probe_tests {
         let mut scored: Vec<(usize, f64)> = pool
             .iter()
             .enumerate()
-            .map(|(i, v)| (i, cosine_similarity(target, v)))
+            .map(|(i, v)| (i, cosine_similarity_f32(target, v)))
             .collect();
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         scored.truncate(k);

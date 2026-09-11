@@ -127,7 +127,7 @@ impl SvafGate {
 
         if all.is_empty() { return 1.0; }
         let max_sim: f64 = all.iter()
-            .map(|(_id, vec)| nt_memory_embed::cosine_similarity(&query_vec, vec))
+            .map(|(_id, vec)| crate::core::nt_core_math::cosine_similarity_f32(&query_vec, vec))
             .fold(0.0_f64, |a, b| a.max(b));
         (1.0 - max_sim).clamp(0.0, 1.0)
     }

@@ -395,6 +395,26 @@ impl Default for ConsciousnessMonitor {
     }
 }
 
+// L5 trait abstraction: ConsciousnessMonitorApi
+impl crate::l5_cognition::traits::ConsciousnessMonitorApi for ConsciousnessMonitor {
+    fn new_monitor() -> Self {
+        ConsciousnessMonitor::new()
+    }
+
+    fn observe(&mut self) {
+        ConsciousnessMonitor::observe(self);
+    }
+
+    fn get_report(&self) -> crate::l5_cognition::traits::ConsciousnessAwarenessReport {
+        let report = ConsciousnessMonitor::get_report(self);
+        crate::l5_cognition::traits::ConsciousnessAwarenessReport {
+            consciousness: report.consciousness,
+            coherence: report.coherence,
+            phi: report.phi,
+        }
+    }
+}
+
 impl crate::core::nt_core_self_test::SelfTest for ConsciousnessMonitor {
     fn name(&self) -> &str {
         "consciousness_monitor"

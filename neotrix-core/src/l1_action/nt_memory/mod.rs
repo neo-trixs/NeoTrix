@@ -12,6 +12,5 @@ pub mod nt_memory_yopedia;
 pub mod nt_memory_historian;
 pub mod nt_memory_kb;
 pub mod nt_memory_openknowledge;
-pub use crate::l2_perception::nt_sense::nt_memory_spatial;
 pub mod selective_memory;
 pub mod addressable_store;

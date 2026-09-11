@@ -9,8 +9,8 @@
 // ─── Six-Layer Architecture Modules ──────────────────────────────────────
 pub use crate::l1_action::{nt_act, nt_io, nt_memory};
 pub use crate::l2_perception::{nt_world, nt_sense};
-pub use crate::l3_embodiment::{nt_shield, nt_feel, nt_physical};
-pub use crate::l4_emotion;
+pub use crate::l3_embodiment::{nt_shield, nt_physical};
+pub use crate::l4_emotion::nt_feel;
 pub use crate::l5_cognition::{nt_core, nt_mind};
 pub use crate::l6_meta::{nt_meta, nt_repair, nt_nexus};
 
@@ -75,8 +75,9 @@ pub use crate::l1_action::nt_act::nt_act_autonomy::nt_mind_automation::{
 
 // L1 Action — nt_memory re-exports
 pub use crate::l1_action::nt_memory::{
-    nt_memory_historian, nt_memory_kb, nt_memory_leann_store, nt_memory_spatial,
+    nt_memory_historian, nt_memory_kb, nt_memory_leann_store,
 };
+pub use crate::l1_action::nt_memory_spatial;
 
 // L2 Perception — nt_world re-exports
 pub use crate::l2_perception::nt_world::{

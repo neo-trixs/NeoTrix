@@ -225,6 +225,13 @@ impl Default for ConsciousnessGoldStandard {
     }
 }
 
+// L5 trait abstraction: GoldStandardApi
+impl crate::l5_cognition::traits::GoldStandardApi for ConsciousnessGoldStandard {
+    fn new_gold_standard() -> Self {
+        ConsciousnessGoldStandard::new()
+    }
+}
+
 // ─── Internal helpers ───
 
 fn coherence_from_hexagrams(states: &[E8HexagramState]) -> f64 {
