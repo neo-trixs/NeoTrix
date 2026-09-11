@@ -11,6 +11,7 @@ use office_oxide::DocumentFormat;
 use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_traits::SpecialistType;
+pub use crate::core::nt_core_traits::SpecialistType;
 
 // ─── NT-CORE 能力抽象 trait (L1→L5 解耦) ────────────────────────────────
 

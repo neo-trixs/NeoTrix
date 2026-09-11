@@ -345,6 +345,16 @@ impl DownloadEngine {
         output.flush().await.map_err(|e| DownloadError::Io(format!("flush: {}", e)))?;
         drop(output);
 
+        // 记录镜像速度画像 (adaptive URI 选择)
+        let final_elapsed = loop_start.elapsed().unwrap_or_default().as_secs_f64();
+        if let Some(host) = url.host_str() {
+            if total_size > 0 && final_elapsed > 0.5 {
+                let bps = (total_downloaded - existing_bytes) as f64 / final_elapsed;
+                crate::mirror::record_mirror_speed(host, bps);
+                eprintln!("[mirror] recorded speed for {}: {:.1} MiB/s", host, bps / 1048576.0);
+            }
+        }
+
         // 原子完成标记: 写 .done 文件防止半截文件被误用
         let done_marker = session.path.with_extension("done");
         let done_content = format!(

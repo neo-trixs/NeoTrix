@@ -57,44 +57,71 @@ impl FileOperation {
 
 impl E8StateTransition for FileAbility {
     fn current_bits(&self) -> u8 {
-        self.e8_state.0
+        self.e8_state
     }
 
     fn transition_to(&mut self, target_bits: u8) {
-        use crate::core::nt_core_hex::ReasoningHexagram;
-        let target = ReasoningHexagram::new(target_bits);
+        // 纯位运算实现: 无需依赖 NT-CORE ReasoningHexagram
+        let target = target_bits & 0x3F;
         let current = self.e8_state;
         let mut best = current;
-        let mut best_dist = current.hamming_dist(&target);
-        for n in current.neighbors() {
-            let d = n.hamming_dist(&target);
+        let mut best_dist = (current ^ target).count_ones();
+        // 遍历 6 个邻居 (每位翻转一次)
+        for i in 0..6u8 {
+            let neighbor = current ^ (1 << i);
+            let d = (neighbor ^ target).count_ones();
             if d < best_dist {
                 best_dist = d;
-                best = n;
+                best = neighbor;
             }
         }
         self.e8_state = best;
     }
 
     fn path_to(&self, target_bits: u8) -> Vec<u8> {
-        use crate::core::nt_core_hex::{ReasoningHexagram, ReasoningPath};
-        let target = ReasoningHexagram::new(target_bits);
-        ReasoningPath::shortest(self.e8_state, target)
-            .states
-            .iter()
-            .map(|s| s.0)
-            .collect()
+        // 纯位运算实现: 最短路径 = 逐位翻转差异位
+        let start = self.e8_state;
+        let goal = target_bits & 0x3F;
+        let diff = start ^ goal;
+        let mut path = vec![start];
+        let mut current = start;
+        for i in 0..6 {
+            if (diff >> i) & 1 == 1 {
+                current ^= 1 << i;
+                path.push(current);
+            }
+        }
+        path
     }
 
     fn mode_name(&self) -> &'static str {
-        self.e8_state.mode_name()
+        // 本地查找表，消除对 nt_core_hex::MODE_NAMES 的依赖
+        const MODE_NAMES: [&str; 64] = [
+            "Deep Debug", "Guided Debug", "Experiment", "Guided Experiment",
+            "Code Review", "Pair Review", "Rapid Prototype", "Co-creation",
+            "Root Cause", "Guided RCA", "Hypothesis Test", "Guided Hypothesis",
+            "Design Audit", "Pair Audit", "Brainstorm", "Jam Session",
+            "Formal Proof", "Guided Proof", "Model Check", "Guided Model Check",
+            "Spec Review", "Spec Pairing", "Exploration", "Guided Exploration",
+            "Data Analysis", "Pair Analysis", "Statistical Run", "Guided Statistics",
+            "Architecture", "Pair Arch", "Visioning", "Guided Visioning",
+            "Syntax Check", "Guided Check", "Quick Fix", "Guided Quick Fix",
+            "Lint Review", "Lint Pairing", "Fast Iteration", "Paired Iteration",
+            "Unit Test", "Guided Test", "Fuzz Run", "Guided Fuzz",
+            "Integration", "Pair Integration", "Scaffold", "Guided Scaffold",
+            "Pattern Match", "Guided Pattern", "Refactor", "Guided Refactor",
+            "Style Guide", "Style Pairing", "Generate", "Co-generate",
+            "Trace Analysis", "Pair Tracing", "Benchmark", "Guided Benchmark",
+            "System Design", "Pair System", "Meta-cognition", "Guided Meta",
+        ];
+        MODE_NAMES[self.e8_state as usize & 0x3F]
     }
 }
 
 impl FileAbility {
     /// 当前 E8 推理状态的 6-bit 值 (通过 E8StateTransition trait)
     pub fn e8_state_bits(&self) -> u8 {
-        self.e8_state.0
+        self.e8_state
     }
 
     /// 执行一次状态转移: 将当前状态向目标状态单步推进 (flip 最近的一个差异轴)
@@ -103,7 +130,7 @@ impl FileAbility {
     pub fn transition(&mut self, op: FileOperation) -> u8 {
         let target_bits = op.target_state_bits();
         self.transition_to(target_bits);
-        self.e8_state.0
+        self.e8_state
     }
 
     /// 到目标状态的完整转移路径 (返回路径上各状态的 6-bit 值)

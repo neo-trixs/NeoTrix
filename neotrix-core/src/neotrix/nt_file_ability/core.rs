@@ -6,7 +6,6 @@ use image::GenericImageView;
 use office_oxide::xlsx::{CellRef, CellValue};
 use office_oxide::{Document, DocumentFormat};
 
-use crate::core::nt_core_hex::ReasoningHexagram;
 use nt_core_capability_tree::ConstellationLevel;
 
 use super::excel::tables::{read_csv, read_xlsx_sheets_all};
@@ -29,8 +28,8 @@ pub struct FileAbility {
     pub(super) has_consumers: bool,
     /// 能力成熟度 (复用能力树 ConstellationLevel, 不平行重造)
     pub(super) maturity: ConstellationLevel,
-    /// 当前 E8 推理状态 (Ext-6: 操作驱动状态转移)
-    pub(super) e8_state: ReasoningHexagram,
+    /// 当前 E8 推理状态 (6-bit, 0-63) — 通过 E8StateTransition trait 操作
+    pub(super) e8_state: u8,
     /// Office 句柄缓存 (仅 Office 类文件)
     pub(super) doc: Option<Document>,
     /// 任务摘要 (用于 GWT salience 计算)
@@ -59,7 +58,7 @@ impl FileAbility {
                 size_bytes,
                 has_consumers: false,
                 maturity: ConstellationLevel::C1UnitTest,
-                e8_state: ReasoningHexagram::new(0b001100), // 数据提取模式 (concrete+analytical+deep)
+                e8_state: 0b001100 & 0x3F, // 数据提取模式 (concrete+analytical+deep)
                 doc: Some(doc),
                 task_summary: None,
             });
@@ -74,7 +73,7 @@ impl FileAbility {
                 size_bytes,
                 has_consumers: false,
                 maturity: ConstellationLevel::C1UnitTest,
-                e8_state: ReasoningHexagram::new(0b001100),
+                e8_state: 0b001100 & 0x3F,
                 doc: None,
                 task_summary: None,
             });
@@ -87,7 +86,7 @@ impl FileAbility {
                 size_bytes,
                 has_consumers: false,
                 maturity: ConstellationLevel::C1UnitTest,
-                e8_state: ReasoningHexagram::new(0b001100),
+                e8_state: 0b001100 & 0x3F,
                 doc: None,
                 task_summary: None,
             });
@@ -127,7 +126,7 @@ impl FileAbility {
             size_bytes,
             has_consumers: false,
             maturity: ConstellationLevel::C0Compile,
-            e8_state: ReasoningHexagram::new(0b001001), // 语法/探测模式 (concrete+analytical+focused)
+            e8_state: 0b001001 & 0x3F, // 语法/探测模式 (concrete+analytical+focused)
             doc: None,
             task_summary: None,
         })

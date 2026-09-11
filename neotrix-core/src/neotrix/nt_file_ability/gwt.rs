@@ -3,7 +3,7 @@
 //! 通过 `GwtAttentionRouter` trait 抽象 NT-CORE 的专家谐振路由能力，
 //! 实现 L1 行动层 → L5 认知层的依赖倒置。
 
-use crate::core::nt_core_traits::SpecialistType;
+use super::types::SpecialistType;
 
 use super::core::FileAbility;
 use super::types::GwtAttentionRouter;
@@ -94,27 +94,36 @@ pub fn specialist_index_inv(idx: usize) -> SpecialistType {
 
 impl GwtAttentionRouter for FileAbility {
     fn default_specialist_bits(&self) -> Vec<(SpecialistType, u8)> {
-        // 委托给 NT-CORE 的默认专家态映射 (单一事实源)
-        use crate::core::nt_core_gwt::resonance::default_specialist_states;
-        default_specialist_states()
-            .iter()
-            .enumerate()
-            .map(|(i, s)| (specialist_index_inv(i), s.0))
-            .collect()
+        // 内联 specialist 默认态映射，消除对 nt_core_gwt::resonance 的依赖
+        // 数据源: nt_core_gwt::resonance::default_specialist_states()
+        vec![
+            (SpecialistType::PatternMatcher, 55),
+            (SpecialistType::AnomalyDetector, 10),
+            (SpecialistType::KnowledgeRetriever, 33),
+            (SpecialistType::CodeAnalyzer, 4),
+            (SpecialistType::Planner, 56),
+            (SpecialistType::KnowledgeIntegrator, 57),
+            (SpecialistType::GoalPrioritizer, 62),
+            (SpecialistType::RiskAssessor, 8),
+            (SpecialistType::CreativityGenerator, 14),
+            (SpecialistType::ReflectionEngine, 63),
+            (SpecialistType::MetaCognitionAnalyst, 62),
+            (SpecialistType::AISecurity, 2),
+            (SpecialistType::ImageGenerator, 54),
+            (SpecialistType::EvidenceWeightedHypothesis, 12),
+        ]
     }
 
     fn resonance_strength(&self, a_bits: u8, b_bits: u8) -> u32 {
-        use crate::core::nt_core_hex::ReasoningHexagram;
-        let a = ReasoningHexagram::new(a_bits);
-        let b = ReasoningHexagram::new(b_bits);
-        a.resonance_strength(&b)
+        // 纯位运算: resonance_strength = 6 - hamming_distance
+        6 - (a_bits ^ b_bits).count_ones()
     }
 }
 
 impl FileAbility {
     /// 当前 E8 状态对应的 GWT 注意力投递目标 (通过 GwtAttentionRouter trait)
     pub fn gwt_route(&self) -> (SpecialistType, u32, u8) {
-        let e8_bits = self.e8_state.0;
+        let e8_bits = self.e8_state;
         route_attention(e8_bits, self, self.task_summary.as_deref())
     }
 
