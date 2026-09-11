@@ -13,8 +13,6 @@ pub mod skillopt;
 pub mod harness_adapter;
 pub mod aging_monitor;
 pub mod anti_distillation_stage;
-
-use log::info;
 pub mod secret_scanner;
 pub mod recursive_depth_reward;
 
@@ -161,7 +159,7 @@ mod tests {
         // 设置一个会导致负奖励的场景（通过空任务）
         let task = "x";  // 短任务，可能得到低奖励
         if let Err(e) = brain.run_seal_loop(task, None, None) {
-            info!("SEAL loop returned error: {}", e);
+            log::info!("SEAL loop returned error: {}", e);
         }
 
         // 即使奖励为负，brain 状态应该被回滚
@@ -231,7 +229,7 @@ mod tests {
 
         // 清理
         if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-            info!("Failed to clean up temp dir: {}", e);
+            log::info!("Failed to clean up temp dir: {}", e);
         }
     }
 
@@ -243,12 +241,12 @@ mod tests {
 
         // 第一次运行
         if let Err(e) = brain.run_seal_loop("设计 UI 组件", None, None) {
-            info!("First SEAL loop error: {}", e);
+            log::info!("First SEAL loop error: {}", e);
         }
 
         // 第二次运行，应该能检索到第一次的记忆
         if let Err(e) = brain.run_seal_loop("设计另一个 UI 组件", None, None) {
-            info!("Second SEAL loop error: {}", e);
+            log::info!("Second SEAL loop error: {}", e);
         }
 
         let stats = brain.reasoning_bank.stats();

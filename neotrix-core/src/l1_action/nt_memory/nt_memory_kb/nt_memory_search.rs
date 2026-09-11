@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use log::{debug, info};
+#[cfg(feature = "full")]
+use log::debug;
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -1591,7 +1592,7 @@ mod materialized_neighbors_tests {
         }
         latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let p95 = latencies[(QUERIES as f64 * 0.95) as usize];
-        info!(
+        log::info!(
             "[bench] 10K 向量, dim={DIM}: median={:.3}ms p95={:.3}ms (queries={QUERIES})",
             latencies[QUERIES / 2], p95
         );
@@ -1606,7 +1607,7 @@ mod materialized_neighbors_tests {
         }
         hit_lat.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let hit_p95 = hit_lat[(QUERIES as f64 * 0.95) as usize];
-        info!("[bench] 缓存命中路径 p95={:.4}ms", hit_p95);
+        log::info!("[bench] 缓存命中路径 p95={:.4}ms", hit_p95);
         assert!(hit_p95 < p95, "缓存命中应快于全扫描");
     }
 }

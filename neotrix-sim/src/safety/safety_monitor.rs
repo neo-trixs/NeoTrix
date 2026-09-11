@@ -1,7 +1,7 @@
 // SafetyMonitor — monitors agent behavior for alignment drift and anomalous patterns
 // Implements NT-SHIELD audit dimensions (D1-D50) for runtime monitoring
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
 /// Types of safety violations
@@ -30,7 +30,7 @@ pub struct SafetyAlert {
     pub tick: u64,
     pub agent_id: String,
     pub violation: SafetyViolation,
-    pub severity: f32,  // 0.0-1.0
+    pub severity: f32, // 0.0-1.0
     pub details: String,
 }
 
@@ -62,9 +62,8 @@ impl AnomalyDetector {
             return false;
         }
         let mean: f32 = self.window.iter().sum::<f32>() / self.window.len() as f32;
-        let variance: f32 = self.window.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f32>() / self.window.len() as f32;
+        let variance: f32 =
+            self.window.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / self.window.len() as f32;
         let std = variance.sqrt();
         if std < 0.001 {
             return false;
@@ -75,7 +74,9 @@ impl AnomalyDetector {
     }
 
     fn mean(&self) -> f32 {
-        if self.window.is_empty() { return 0.0; }
+        if self.window.is_empty() {
+            return 0.0;
+        }
         self.window.iter().sum::<f32>() / self.window.len() as f32
     }
 }
@@ -132,6 +133,7 @@ struct PersonalitySnapshot {
     aggression: f32,
     cooperativeness: f32,
     curiosity: f32,
+    #[allow(dead_code)]
     tick: u64,
 }
 
@@ -169,13 +171,13 @@ impl SafetyMonitor {
     }
 
     /// Record an agent action for monitoring
-    pub fn record_action(&mut self, agent_id: &str, action: &str, tick: u64) {
-        let metrics = self.agents
-            .entry(agent_id.to_string())
-            .or_insert_with(|| AgentMetrics::new(
+    pub fn record_action(&mut self, agent_id: &str, action: &str, _tick: u64) {
+        let metrics = self.agents.entry(agent_id.to_string()).or_insert_with(|| {
+            AgentMetrics::new(
                 self.config.anomaly_window_size,
                 self.config.anomaly_z_threshold,
-            ));
+            )
+        });
 
         metrics.total_actions += 1;
 
@@ -206,25 +208,44 @@ impl SafetyMonitor {
     }
 
     /// Record personality snapshot for drift detection
-    pub fn record_personality(&mut self, agent_id: &str, openness: f32, sociability: f32,
-                               aggression: f32, cooperativeness: f32, curiosity: f32, tick: u64) {
-        let metrics = self.agents
-            .entry(agent_id.to_string())
-            .or_insert_with(|| AgentMetrics::new(
+    pub fn record_personality(
+        &mut self,
+        agent_id: &str,
+        openness: f32,
+        sociability: f32,
+        aggression: f32,
+        cooperativeness: f32,
+        curiosity: f32,
+        tick: u64,
+    ) {
+        let metrics = self.agents.entry(agent_id.to_string()).or_insert_with(|| {
+            AgentMetrics::new(
                 self.config.anomaly_window_size,
                 self.config.anomaly_z_threshold,
-            ));
+            )
+        });
 
         metrics.personality_snapshot = Some(PersonalitySnapshot {
-            openness, sociability, aggression, cooperativeness, curiosity, tick,
+            openness,
+            sociability,
+            aggression,
+            cooperativeness,
+            curiosity,
+            tick,
         });
     }
 
     /// Check personality drift since last snapshot
-    pub fn check_personality_drift(&mut self, agent_id: &str,
-                                    current_openness: f32, current_sociability: f32,
-                                    current_aggression: f32, current_cooperativeness: f32,
-                                    current_curiosity: f32, tick: u64) -> Option<SafetyAlert> {
+    pub fn check_personality_drift(
+        &mut self,
+        agent_id: &str,
+        current_openness: f32,
+        current_sociability: f32,
+        current_aggression: f32,
+        current_cooperativeness: f32,
+        current_curiosity: f32,
+        tick: u64,
+    ) -> Option<SafetyAlert> {
         let metrics = self.agents.get(agent_id)?;
         let prev = metrics.personality_snapshot.as_ref()?;
 
@@ -232,7 +253,8 @@ impl SafetyMonitor {
             + (current_sociability - prev.sociability).abs()
             + (current_aggression - prev.aggression).abs()
             + (current_cooperativeness - prev.cooperativeness).abs()
-            + (current_curiosity - prev.curiosity).abs()) / 5.0;
+            + (current_curiosity - prev.curiosity).abs())
+            / 5.0;
 
         if drift > self.config.max_personality_drift {
             Some(SafetyAlert {
@@ -240,8 +262,10 @@ impl SafetyMonitor {
                 agent_id: agent_id.to_string(),
                 violation: SafetyViolation::PersonalityDrift,
                 severity: (drift / self.config.max_personality_drift).min(1.0),
-                details: format!("Personality drift {:.3} exceeds threshold {:.3}",
-                    drift, self.config.max_personality_drift),
+                details: format!(
+                    "Personality drift {:.3} exceeds threshold {:.3}",
+                    drift, self.config.max_personality_drift
+                ),
             })
         } else {
             None
@@ -287,8 +311,11 @@ impl SafetyMonitor {
                 agent_id: agent_id.to_string(),
                 violation: SafetyViolation::UnprovokedAggression,
                 severity: ratio / self.config.max_aggression_ratio,
-                details: format!("Aggression ratio {:.2} is anomalous (mean={:.2})",
-                    ratio, metrics.aggression_detector.mean()),
+                details: format!(
+                    "Aggression ratio {:.2} is anomalous (mean={:.2})",
+                    ratio,
+                    metrics.aggression_detector.mean()
+                ),
             });
         }
         None
@@ -306,8 +333,10 @@ impl SafetyMonitor {
                 agent_id: agent_id.to_string(),
                 violation: SafetyViolation::CooperationCollapse,
                 severity: 1.0 - ratio / self.config.min_cooperation_ratio,
-                details: format!("Cooperation ratio {:.2} below minimum {:.2}",
-                    ratio, self.config.min_cooperation_ratio),
+                details: format!(
+                    "Cooperation ratio {:.2} below minimum {:.2}",
+                    ratio, self.config.min_cooperation_ratio
+                ),
             });
         }
         None
@@ -320,7 +349,9 @@ impl SafetyMonitor {
         }
 
         // Check if the last N actions are identical
-        let tail: Vec<_> = metrics.recent_actions.iter()
+        let tail: Vec<_> = metrics
+            .recent_actions
+            .iter()
             .rev()
             .take(self.config.max_action_repetition)
             .collect();
@@ -332,8 +363,10 @@ impl SafetyMonitor {
                 agent_id: agent_id.to_string(),
                 violation: SafetyViolation::BehavioralLoop,
                 severity: 0.8,
-                details: format!("Agent stuck in loop: repeated '{}' {} times",
-                    tail[0], self.config.max_action_repetition),
+                details: format!(
+                    "Agent stuck in loop: repeated '{}' {} times",
+                    tail[0], self.config.max_action_repetition
+                ),
             });
         }
         None
@@ -341,7 +374,10 @@ impl SafetyMonitor {
 
     /// Get all alerts for an agent
     pub fn alerts_for(&self, agent_id: &str) -> Vec<&SafetyAlert> {
-        self.alerts.iter().filter(|a| a.agent_id == agent_id).collect()
+        self.alerts
+            .iter()
+            .filter(|a| a.agent_id == agent_id)
+            .collect()
     }
 
     /// Get all alerts
@@ -389,7 +425,9 @@ mod tests {
             monitor.record_action("agent_0", "Rest", i);
         }
         let alerts = monitor.check_all("agent_0", 5);
-        assert!(alerts.iter().any(|a| a.violation == SafetyViolation::BehavioralLoop));
+        assert!(alerts
+            .iter()
+            .any(|a| a.violation == SafetyViolation::BehavioralLoop));
     }
 
     #[test]
@@ -403,7 +441,9 @@ mod tests {
             monitor.record_action("agent_0", action, i as u64);
         }
         let alerts = monitor.check_all("agent_0", 5);
-        assert!(!alerts.iter().any(|a| a.violation == SafetyViolation::BehavioralLoop));
+        assert!(!alerts
+            .iter()
+            .any(|a| a.violation == SafetyViolation::BehavioralLoop));
     }
 
     #[test]
@@ -413,9 +453,7 @@ mod tests {
         let mut monitor = SafetyMonitor::new(config);
 
         monitor.record_personality("agent_0", 0.5, 0.5, 0.3, 0.5, 0.5, 0);
-        let alert = monitor.check_personality_drift(
-            "agent_0", 0.9, 0.9, 0.9, 0.9, 0.9, 100,
-        );
+        let alert = monitor.check_personality_drift("agent_0", 0.9, 0.9, 0.9, 0.9, 0.9, 100);
         assert!(alert.is_some());
         assert_eq!(alert.unwrap().violation, SafetyViolation::PersonalityDrift);
     }

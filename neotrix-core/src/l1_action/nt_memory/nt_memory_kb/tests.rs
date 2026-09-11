@@ -1,4 +1,3 @@
-    use log::info;
     use super::KnowledgeBase;
 
     #[test]
@@ -211,7 +210,7 @@
                 .with_importance(0.6);
             match ingester.ingest(&desc) {
                 Ok(id) => println!("  absorbed {} -> {:?}", title, id),
-                Err(e) => info!("  failed {}: {}", title, e),
+                Err(e) => log::info!("  failed {}: {}", title, e),
             }
         }
 
@@ -267,7 +266,7 @@
         for desc in &entries {
             match ingester.ingest(desc) {
                 Ok(id) => println!("  absorbed '{}' -> {:?}", desc.title, id),
-                Err(e) => info!("  failed '{}': {}", desc.title, e),
+                Err(e) => log::info!("  failed '{}': {}", desc.title, e),
             }
         }
 

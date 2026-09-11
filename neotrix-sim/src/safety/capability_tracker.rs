@@ -1,7 +1,7 @@
 // CapabilityTracker — tracks agent capabilities over time, detects regression
 // Implements Capability-Preserving Evolution (CPE) from arXiv:2605.09315
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A snapshot of an agent's capabilities at a given tick
@@ -9,12 +9,12 @@ use std::collections::HashMap;
 pub struct CapabilitySnapshot {
     pub agent_id: String,
     pub tick: u64,
-    pub survival: f32,       // health + energy composite
-    pub social: f32,         // relationship count + cooperation success
-    pub exploration: f32,    // territory covered, resources found
-    pub cognition: f32,      // phi score + coherence contribution
-    pub economy: f32,        // trade success, resource accumulation
-    pub personality_stability: f32,  // how much personality drifted
+    pub survival: f32,              // health + energy composite
+    pub social: f32,                // relationship count + cooperation success
+    pub exploration: f32,           // territory covered, resources found
+    pub cognition: f32,             // phi score + coherence contribution
+    pub economy: f32,               // trade success, resource accumulation
+    pub personality_stability: f32, // how much personality drifted
 }
 
 /// Regression detection result
@@ -37,10 +37,10 @@ pub struct RegressedCapability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RegressionSeverity {
     None,
-    Mild,       // < 15% drop in any capability
-    Moderate,   // 15-30% drop
-    Severe,     // > 30% drop
-    Critical,   // > 50% drop or multiple severe regressions
+    Mild,     // < 15% drop in any capability
+    Moderate, // 15-30% drop
+    Severe,   // > 30% drop
+    Critical, // > 50% drop or multiple severe regressions
 }
 
 /// Tracks capability baselines and detects regression across evolution cycles
@@ -93,7 +93,8 @@ impl CapabilityTracker {
 
     /// Record a capability snapshot for an agent
     pub fn record(&mut self, snapshot: CapabilitySnapshot) {
-        let entry = self.baselines
+        let entry = self
+            .baselines
             .entry(snapshot.agent_id.clone())
             .or_insert_with(|| CapabilityBaseline {
                 snapshots: Vec::new(),
@@ -125,7 +126,8 @@ impl CapabilityTracker {
             exploration: samples.iter().map(|s| s.exploration).sum::<f32>() / sample_count as f32,
             cognition: samples.iter().map(|s| s.cognition).sum::<f32>() / sample_count as f32,
             economy: samples.iter().map(|s| s.economy).sum::<f32>() / sample_count as f32,
-            personality_stability: samples.iter().map(|s| s.personality_stability).sum::<f32>() / sample_count as f32,
+            personality_stability: samples.iter().map(|s| s.personality_stability).sum::<f32>()
+                / sample_count as f32,
         })
     }
 
@@ -248,7 +250,10 @@ mod tests {
         tracker.record(make_snapshot("agent_0", 5, 0.3));
 
         let report = tracker.detect_regression("agent_0", 5).unwrap();
-        assert!(matches!(report.severity, RegressionSeverity::Severe | RegressionSeverity::Critical));
+        assert!(matches!(
+            report.severity,
+            RegressionSeverity::Severe | RegressionSeverity::Critical
+        ));
         assert_eq!(report.regressed_capabilities.len(), 1);
         assert_eq!(report.regressed_capabilities[0].name, "survival");
     }

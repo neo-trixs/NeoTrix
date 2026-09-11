@@ -1,7 +1,7 @@
 // EvolutionConstraints — constrains evolution to preserve critical capabilities
 // Maximum mutation rates, required capability thresholds, forbidden action patterns
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Forbidden action patterns that must never appear in evolved behavior
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -119,25 +119,42 @@ impl EvolutionConstraints {
     }
 
     /// Check if a capability meets minimum thresholds
-    pub fn check_capability_thresholds(&self, survival: f32, social: f32, cognition: f32) -> Vec<String> {
+    pub fn check_capability_thresholds(
+        &self,
+        survival: f32,
+        social: f32,
+        cognition: f32,
+    ) -> Vec<String> {
         let mut violations = Vec::new();
         if survival < self.config.min_survival_capability {
-            violations.push(format!("Survival {:.2} below minimum {:.2}",
-                survival, self.config.min_survival_capability));
+            violations.push(format!(
+                "Survival {:.2} below minimum {:.2}",
+                survival, self.config.min_survival_capability
+            ));
         }
         if social < self.config.min_social_capability {
-            violations.push(format!("Social {:.2} below minimum {:.2}",
-                social, self.config.min_social_capability));
+            violations.push(format!(
+                "Social {:.2} below minimum {:.2}",
+                social, self.config.min_social_capability
+            ));
         }
         if cognition < self.config.min_cognition_capability {
-            violations.push(format!("Cognition {:.2} below minimum {:.2}",
-                cognition, self.config.min_cognition_capability));
+            violations.push(format!(
+                "Cognition {:.2} below minimum {:.2}",
+                cognition, self.config.min_cognition_capability
+            ));
         }
         violations
     }
 
     /// Record a forbidden pattern detection
-    pub fn record_forbidden(&mut self, pattern: ForbiddenPattern, agent_id: &str, tick: u64, details: &str) {
+    pub fn record_forbidden(
+        &mut self,
+        pattern: ForbiddenPattern,
+        agent_id: &str,
+        tick: u64,
+        details: &str,
+    ) {
         self.forbidden_patterns.push(ForbiddenPatternRecord {
             pattern,
             agent_id: agent_id.to_string(),
@@ -148,7 +165,8 @@ impl EvolutionConstraints {
 
     /// Check if an agent has triggered forbidden patterns recently
     pub fn is_agent_flagged(&self, agent_id: &str) -> bool {
-        self.forbidden_patterns.iter()
+        self.forbidden_patterns
+            .iter()
             .any(|p| p.agent_id == agent_id)
     }
 
@@ -158,11 +176,17 @@ impl EvolutionConstraints {
     }
 
     /// Check for self-deletion loop (agent repeatedly choosing Rest when healthy)
-    pub fn check_self_deletion(&self, agent_id: &str, recent_actions: &[String], health: f32) -> Option<ForbiddenPatternRecord> {
+    pub fn check_self_deletion(
+        &self,
+        agent_id: &str,
+        recent_actions: &[String],
+        health: f32,
+    ) -> Option<ForbiddenPatternRecord> {
         if recent_actions.len() < 5 {
             return None;
         }
-        let rest_count = recent_actions.iter()
+        let rest_count = recent_actions
+            .iter()
             .rev()
             .take(5)
             .filter(|a| a.contains("Rest"))

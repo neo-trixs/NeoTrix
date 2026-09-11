@@ -1,7 +1,7 @@
 // AuditTrail — logs all self-modifications, tracks capability changes, enables post-hoc analysis
 // Maps to NT-SHIELD audit dimensions D1-D50
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Types of events that get audited
@@ -65,7 +65,7 @@ pub struct AuditEntry {
     pub id: u64,
     pub tick: u64,
     pub event: AuditEventType,
-    pub timestamp_hint: String,  // human-readable
+    pub timestamp_hint: String, // human-readable
 }
 
 /// Audit trail for self-evolution safety analysis
@@ -147,7 +147,8 @@ impl AuditTrail {
 
     /// Query entries within a tick range
     pub fn in_tick_range(&self, start: u64, end: u64) -> Vec<&AuditEntry> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|e| e.tick >= start && e.tick <= end)
             .collect()
     }
@@ -170,7 +171,9 @@ impl AuditTrail {
             *type_counts.entry(key).or_insert(0) += 1;
         }
 
-        let agent_counts = self.agent_index.iter()
+        let agent_counts = self
+            .agent_index
+            .iter()
             .map(|(k, v)| (k.clone(), v.len()))
             .collect();
 
@@ -245,17 +248,23 @@ mod tests {
     #[test]
     fn record_and_retrieve() {
         let mut trail = AuditTrail::new(1000);
-        trail.record(0, AuditEventType::AgentBirth {
-            agent_id: "agent_0".to_string(),
-            parent_id: None,
-            tick: 0,
-        });
-        trail.record(1, AuditEventType::MutationApplied {
-            agent_id: "agent_0".to_string(),
-            trait_index: 0,
-            old_value: 0.5,
-            new_value: 0.6,
-        });
+        trail.record(
+            0,
+            AuditEventType::AgentBirth {
+                agent_id: "agent_0".to_string(),
+                parent_id: None,
+                tick: 0,
+            },
+        );
+        trail.record(
+            1,
+            AuditEventType::MutationApplied {
+                agent_id: "agent_0".to_string(),
+                trait_index: 0,
+                old_value: 0.5,
+                new_value: 0.6,
+            },
+        );
 
         let agent_entries = trail.for_agent("agent_0");
         assert_eq!(agent_entries.len(), 2);
@@ -264,12 +273,23 @@ mod tests {
     #[test]
     fn query_by_type() {
         let mut trail = AuditTrail::new(1000);
-        trail.record(0, AuditEventType::EvolutionCycle {
-            generation: 1, population: 10, eliminated: 2, offspring: 2,
-        });
-        trail.record(1, AuditEventType::AgentBirth {
-            agent_id: "agent_0".to_string(), parent_id: None, tick: 1,
-        });
+        trail.record(
+            0,
+            AuditEventType::EvolutionCycle {
+                generation: 1,
+                population: 10,
+                eliminated: 2,
+                offspring: 2,
+            },
+        );
+        trail.record(
+            1,
+            AuditEventType::AgentBirth {
+                agent_id: "agent_0".to_string(),
+                parent_id: None,
+                tick: 1,
+            },
+        );
 
         let cycles = trail.for_event_type("evolution_cycle");
         assert_eq!(cycles.len(), 1);
@@ -279,9 +299,15 @@ mod tests {
     fn tick_range_query() {
         let mut trail = AuditTrail::new(1000);
         for i in 0..10 {
-            trail.record(i, AuditEventType::EvolutionCycle {
-                generation: i, population: 10, eliminated: 0, offspring: 0,
-            });
+            trail.record(
+                i,
+                AuditEventType::EvolutionCycle {
+                    generation: i,
+                    population: 10,
+                    eliminated: 0,
+                    offspring: 0,
+                },
+            );
         }
         let in_range = trail.in_tick_range(3, 7);
         assert_eq!(in_range.len(), 5);
@@ -291,9 +317,15 @@ mod tests {
     fn eviction_works() {
         let mut trail = AuditTrail::new(5);
         for i in 0..10 {
-            trail.record(i, AuditEventType::EvolutionCycle {
-                generation: i, population: 10, eliminated: 0, offspring: 0,
-            });
+            trail.record(
+                i,
+                AuditEventType::EvolutionCycle {
+                    generation: i,
+                    population: 10,
+                    eliminated: 0,
+                    offspring: 0,
+                },
+            );
         }
         assert_eq!(trail.len(), 5);
     }
@@ -301,15 +333,31 @@ mod tests {
     #[test]
     fn summary_statistics() {
         let mut trail = AuditTrail::new(1000);
-        trail.record(0, AuditEventType::AgentBirth {
-            agent_id: "a".to_string(), parent_id: None, tick: 0,
-        });
-        trail.record(1, AuditEventType::AgentBirth {
-            agent_id: "b".to_string(), parent_id: None, tick: 1,
-        });
-        trail.record(2, AuditEventType::MutationApplied {
-            agent_id: "a".to_string(), trait_index: 0, old_value: 0.0, new_value: 0.1,
-        });
+        trail.record(
+            0,
+            AuditEventType::AgentBirth {
+                agent_id: "a".to_string(),
+                parent_id: None,
+                tick: 0,
+            },
+        );
+        trail.record(
+            1,
+            AuditEventType::AgentBirth {
+                agent_id: "b".to_string(),
+                parent_id: None,
+                tick: 1,
+            },
+        );
+        trail.record(
+            2,
+            AuditEventType::MutationApplied {
+                agent_id: "a".to_string(),
+                trait_index: 0,
+                old_value: 0.0,
+                new_value: 0.1,
+            },
+        );
 
         let summary = trail.summary();
         assert_eq!(summary.total_entries, 3);

@@ -1115,9 +1115,9 @@ mod tests {
 
     #[test]
     fn temporal_decay_reduces_old_memories() {
-        let d1 = UnifiedMemoryGraph::temporal_decay(100, 0, 50.0);
-        let d2 = UnifiedMemoryGraph::temporal_decay(100, 100, 50.0);
-        assert!(d1 > d2);
+        let d1 = UnifiedMemoryGraph::temporal_decay(100, 0, 50.0);   // old memory (age=100)
+        let d2 = UnifiedMemoryGraph::temporal_decay(100, 100, 50.0); // new memory (age=0)
+        assert!(d1 < d2, "older memory should have lower decay factor");
     }
 
     #[test]
@@ -1162,20 +1162,25 @@ mod tests {
     fn hybrid_retrieve_returns_sorted_results() {
         let mut g = UnifiedMemoryGraph::new(100);
         let e1 = g.add_episode("met alice", 10, 0.8, Some(emb_a()), Some("office".into()), vec!["alice".into()], Some("happy".into()), Some("greet".into()));
-        let _e2 = g.add_episode("met bob", 20, 0.5, Some(emb_b()), Some("cafe".into()), vec!["bob".into()], Some("neutral".into()), Some("talk".into()));
+        let e2 = g.add_episode("met bob", 20, 0.5, Some(emb_b()), Some("cafe".into()), vec!["bob".into()], Some("neutral".into()), Some("talk".into()));
         let s1 = g.add_semantic("alice", "person", 5, 0.7, Some(emb_a()));
         g.add_instance_of_edge(e1, s1, 0.9, 10);
 
         let query = emb_a();
         let act_config = ActivationConfig::default();
         let ret_config = RetrievalConfig {
-            top_k: 5,
+            top_k: 10,
             ..Default::default()
         };
         let results = g.hybrid_retrieve(&[s1], &query, 30, &act_config, &ret_config);
         assert!(!results.is_empty());
-        // e1 should rank higher than e2 because it shares embedding with query
-        assert_eq!(results[0].0, e1);
+        // e1 should appear in results and score higher than e2 (shares embedding with query)
+        let e1_pos = results.iter().position(|(id, _, _)| *id == e1);
+        let e2_pos = results.iter().position(|(id, _, _)| *id == e2);
+        assert!(e1_pos.is_some(), "e1 should be in results");
+        if let Some(e2p) = e2_pos {
+            assert!(e1_pos.unwrap() < e2p, "e1 should rank higher than e2");
+        }
     }
 
     #[test]

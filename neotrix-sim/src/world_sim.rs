@@ -1366,7 +1366,7 @@ impl WorldSim {
 
         // Safety: validate all genomes before entering population
         let mut valid_offspring = Vec::new();
-        for mut genome in offspring {
+        for genome in offspring {
             if self.evolution_constraints.validate_genome(&genome.traits) {
                 valid_offspring.push(genome);
             } else {

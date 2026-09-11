@@ -320,6 +320,30 @@ impl WeaponSet {
     }
 }
 
+/// MTRouter 历史路由条目 — 记录每次路由决策的结果 (arXiv 2604.23530)
+/// 用于 cost-aware 模型路由的历史相似度匹配
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct HistoryEntry {
+    /// 任务特征哈希 (基于任务文本的确定性哈希)
+    pub task_hash: u64,
+    /// 路由到的域标签
+    pub domain: String,
+    /// 使用的模型 ID
+    pub model_id: String,
+    /// 路由是否成功
+    pub success: bool,
+    /// 推理延迟 (毫秒)
+    pub latency_ms: u64,
+    /// 本次路由成本 (token/cost 单位)
+    pub cost: f64,
+    /// 时间戳 (Unix epoch seconds)
+    pub timestamp: i64,
+}
+
+/// MTRouter 历史路由缓冲区容量上限 (环形缓冲区)
+const ROUTE_HISTORY_MAX: usize = 1000;
+
 #[derive(Debug, Clone)]
 pub struct AttentionManager {
     pub heads: Vec<AttentionHead>,
@@ -329,6 +353,9 @@ pub struct AttentionManager {
     pub weapon_set: WeaponSet,
     /// 全局剩余预算份额 ∈ [0.0, 1.0], 1.0 表示预算充足 (Cost-Aware Routing, Axiom A1)
     pub budget_remaining: f64,
+    /// MTRouter 历史路由记录 — 环形缓冲区, 最多保留 ROUTE_HISTORY_MAX 条
+    #[allow(dead_code)]
+    pub route_history: Vec<HistoryEntry>,
 }
 
 impl AttentionManager {
@@ -344,6 +371,7 @@ impl AttentionManager {
             rule_intensity: RuleIntensity::default(),
             weapon_set: WeaponSet::Acquisition,
             budget_remaining: 1.0,
+            route_history: Vec::new(),
         }
     }
 
@@ -644,6 +672,113 @@ impl AttentionManager {
         } else {
             current_domain.clone()
         }
+    }
+
+    // ── MTRouter 历史路由 (arXiv 2604.23530) ──────────────────────────────
+
+    /// 记录一次路由决策到历史缓冲区 (环形缓冲区, 超容量淘汰最旧条目)
+    #[allow(dead_code)]
+    pub fn record_route(&mut self, entry: HistoryEntry) {
+        if self.route_history.len() >= ROUTE_HISTORY_MAX {
+            self.route_history.remove(0);
+        }
+        self.route_history.push(entry);
+    }
+
+    /// 基于任务特征向量预测最佳模型 — 在历史中查找相似任务,
+    /// 返回成功率最高的模型 ID (简单余弦相似度匹配)
+    #[allow(dead_code)]
+    pub fn predict_best_model(&self, task_features: &[f64]) -> Option<String> {
+        if self.route_history.is_empty() || task_features.is_empty() {
+            return None;
+        }
+
+        // 按 (domain, model_id) 分组, 计算每组的加权成功率
+        let mut model_scores: HashMap<String, (f64, u64)> = HashMap::new(); // model → (score, count)
+
+        // 将任务特征哈希作为伪特征向量用于相似度匹配
+        // 实际部署时 task_features 应来自嵌入模型
+        let query_norm: f64 = task_features.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if query_norm < 1e-10 {
+            return None;
+        }
+
+        for entry in &self.route_history {
+            // 使用任务哈希生成伪特征 (简化版: hash 低位展开为特征向量)
+            let entry_features = Self::hash_to_features(entry.task_hash, task_features.len());
+            let entry_norm: f64 = entry_features.iter().map(|x| x * x).sum::<f64>().sqrt();
+            if entry_norm < 1e-10 {
+                continue;
+            }
+
+            // 余弦相似度
+            let dot: f64 = task_features
+                .iter()
+                .zip(entry_features.iter())
+                .map(|(a, b)| a * b)
+                .sum();
+            let similarity = dot / (query_norm * entry_norm);
+
+            // 相似度 > 0.5 的条目参与模型评分
+            if similarity > 0.5 {
+                let weight = similarity * if entry.success { 1.0 } else { 0.2 };
+                let entry_key = entry.model_id.clone();
+                let e = model_scores.entry(entry_key).or_insert((0.0, 0));
+                e.0 += weight;
+                e.1 += 1;
+            }
+        }
+
+        // 返回加权得分最高的模型
+        model_scores
+            .into_iter()
+            .max_by(|a, b| a.1 .0.partial_cmp(&b.1 .0).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(model, _)| model)
+    }
+
+    /// 查询特定 (domain, model_id) 组合在历史中的成功率 ∈ [0.0, 1.0]
+    #[allow(dead_code)]
+    pub fn history_success_rate(&self, domain: &str, model_id: &str) -> f64 {
+        let relevant: Vec<&HistoryEntry> = self
+            .route_history
+            .iter()
+            .filter(|e| e.domain == domain && e.model_id == model_id)
+            .collect();
+        if relevant.is_empty() {
+            return 0.0;
+        }
+        let successes = relevant.iter().filter(|e| e.success).count() as f64;
+        successes / relevant.len() as f64
+    }
+
+    /// 查询特定域在最近 100 条记录中的平均延迟 (毫秒)
+    #[allow(dead_code)]
+    pub fn recent_avg_latency(&self, domain: &str) -> u64 {
+        let recent: Vec<&HistoryEntry> = self
+            .route_history
+            .iter()
+            .rev()
+            .take(100)
+            .filter(|e| e.domain == domain)
+            .collect();
+        if recent.is_empty() {
+            return 0;
+        }
+        let total: u64 = recent.iter().map(|e| e.latency_ms).sum();
+        total / recent.len() as u64
+    }
+
+    /// 将 u64 哈希值展开为伪特征向量 (用于余弦相似度匹配的简化方案)
+    fn hash_to_features(hash: u64, dim: usize) -> Vec<f64> {
+        (0..dim)
+            .map(|i| {
+                let shifted = hash
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add((i as u64) * 14695981039346656037);
+                // 映射到 [-1.0, 1.0]
+                ((shifted >> 33) as f64) / (1u64 << 31) as f64 - 1.0
+            })
+            .collect()
     }
 }
 

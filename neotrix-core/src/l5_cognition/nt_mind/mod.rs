@@ -7,6 +7,7 @@ pub mod nt_mind_skill_engine;
 pub mod evolution;
 pub mod foundation;
 pub mod mind_modules;
+pub mod seal;
 
 pub mod reason {
     pub use super::nt_mind::reason::*;
