@@ -27,7 +27,7 @@ impl AssetMapCapability {
             health: CapabilityHealth {
                 state: CapabilityState::Ready,
                 success_rate: 1.0,
-                avg_latency_ms: 0,
+                avg_latency_ms: 0.0,
                 last_called: None,
                 call_count: 0,
             },
@@ -67,7 +67,7 @@ impl UnifiedCapability for AssetMapCapability {
                     latency_ms: 0,
                 }))
             }
-            _ => Err(CapabilityError::UnsupportedInput),
+            _ => Err(CapabilityError::UnsupportedInput("不支持的输入类型".into())),
         }
     }
 

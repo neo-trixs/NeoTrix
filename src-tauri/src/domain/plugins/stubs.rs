@@ -344,7 +344,9 @@ impl DomainPlugin for AgentPlugin {
         vec!["status","start","stop","set_provider","test_provider","fetch_models",
              "config","provider_config","provider_status","pool_sufficiency",
              "discover_models","probe_all_providers",
-             "set_project","get_project","health"].iter().map(|a| stub_action(a)).collect()
+             "set_project","get_project","health",
+             "pool_status","pool_add","pool_remove","pool_update_key","pool_check",
+             "add_custom_provider","app_version"].iter().map(|a| stub_action(a)).collect()
     }
     fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
         match action {
@@ -362,6 +364,50 @@ impl DomainPlugin for AgentPlugin {
             }
             "app_version" => {
                 Ok(serde_json::json!(env!("CARGO_PKG_VERSION")))
+            }
+            // Model Pool actions — delegate to model_pool commands
+            "pool_status" => {
+                let handle = tokio::runtime::Handle::current();
+                let status = handle.block_on(model_pool::model_pool_status())
+                    .map_err(|e| DomainError { code: "POOL_ERROR".into(), message: e, recoverable: true })?;
+                Ok(serde_json::json!(status))
+            }
+            "pool_add" => {
+                let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let provider = args.get("provider").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let api_key = args.get("api_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let model = args.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let tags: Vec<String> = args.get("tags").and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default();
+                let base_url = args.get("base_url").and_then(|v| v.as_str()).map(String::from);
+                let handle = tokio::runtime::Handle::current();
+                let entry = handle.block_on(model_pool::model_pool_add(
+                    label, provider, api_key, model, tags, base_url,
+                )).map_err(|e| DomainError { code: "POOL_ERROR".into(), message: e, recoverable: true })?;
+                Ok(serde_json::json!(entry))
+            }
+            "pool_remove" => {
+                let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let handle = tokio::runtime::Handle::current();
+                let removed = handle.block_on(model_pool::model_pool_remove(label))
+                    .map_err(|e| DomainError { code: "POOL_ERROR".into(), message: e, recoverable: true })?;
+                Ok(serde_json::json!(removed))
+            }
+            "pool_update_key" => {
+                let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let new_api_key = args.get("new_api_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let handle = tokio::runtime::Handle::current();
+                let updated = handle.block_on(model_pool::model_pool_update_key(label, new_api_key))
+                    .map_err(|e| DomainError { code: "POOL_ERROR".into(), message: e, recoverable: true })?;
+                Ok(serde_json::json!(updated))
+            }
+            "pool_check" => {
+                let label = args.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let handle = tokio::runtime::Handle::current();
+                let result = handle.block_on(model_pool::model_pool_check(label))
+                    .map_err(|e| DomainError { code: "POOL_ERROR".into(), message: e, recoverable: true })?;
+                Ok(serde_json::json!(result))
             }
             _ => stub_call(action, &["start","stop","set_provider","test_provider",
                                      "set_project","get_project","health"]),

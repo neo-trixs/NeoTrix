@@ -63,3 +63,9 @@ pub use orchestrator::{
     OrchBuyerProfile, OrchContract, OrchTradeContext, OrderReview, TradeGroup, TradeOrchestrator,
     TradePhase26,
 };
+
+// ── path_metadata: 路径元数据提取 ────────────────────────
+pub use path_metadata::{extract_order_metadata, OrderMetadata};
+
+// ── template_detector: 合同模板检测 ───────────────────────
+pub use template_detector::{build_column_map, detect_template, ContractTemplate, TemplateColumnMap};

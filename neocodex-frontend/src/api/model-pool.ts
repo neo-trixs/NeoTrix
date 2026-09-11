@@ -1,9 +1,10 @@
 /**
  * Model Pool API — 模型池管理
- * 
- * 通过 Tauri invoke 调用后端 model_pool 命令。
+ *
+ * 通过 domain_call('agent', action, args) 调用后端 AgentPlugin。
+ * 统一走 Domain Plugin 架构。
  */
-import { invoke } from '@tauri-apps/api/core'
+import { domainCall } from './domain-client'
 
 /** 模型池条目 */
 export interface ModelPoolEntry {
@@ -28,7 +29,7 @@ export interface ModelPoolStatus {
  * 获取模型池状态
  */
 export async function getModelPoolStatus(): Promise<ModelPoolStatus> {
-  return invoke<ModelPoolStatus>('model_pool_status')
+  return domainCall<ModelPoolStatus>('agent', 'pool_status')
 }
 
 /**
@@ -42,7 +43,7 @@ export async function addModelProvider(params: {
   tags?: string[]
   base_url?: string
 }): Promise<ModelPoolEntry> {
-  return invoke<ModelPoolEntry>('model_pool_add', {
+  return domainCall<ModelPoolEntry>('agent', 'pool_add', {
     label: params.label,
     provider: params.provider,
     api_key: params.api_key,
@@ -56,7 +57,7 @@ export async function addModelProvider(params: {
  * 删除模型提供者
  */
 export async function removeModelProvider(label: string): Promise<boolean> {
-  return invoke<boolean>('model_pool_remove', { label })
+  return domainCall<boolean>('agent', 'pool_remove', { label })
 }
 
 /**
@@ -66,12 +67,12 @@ export async function updateModelProviderKey(
   label: string,
   new_api_key: string
 ): Promise<boolean> {
-  return invoke<boolean>('model_pool_update_key', { label, new_api_key })
+  return domainCall<boolean>('agent', 'pool_update_key', { label, new_api_key })
 }
 
 /**
  * 检查模型提供者 API 连通性
  */
 export async function checkModelProvider(label: string): Promise<string> {
-  return invoke<string>('model_pool_check', { label })
+  return domainCall<string>('agent', 'pool_check', { label })
 }
