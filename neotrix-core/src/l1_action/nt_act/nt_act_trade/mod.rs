@@ -2,8 +2,10 @@ pub mod finance_compliance;
 pub mod full_cycle;
 pub mod mock_adapters;
 pub mod orchestrator;
+pub mod path_metadata;
 pub mod production_logistics;
 pub mod quote_negotiation;
+pub mod template_detector;
 pub mod trade_core;
 
 // ── trade_core: 算法骨架 (single source of truth) ────────

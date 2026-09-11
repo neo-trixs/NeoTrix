@@ -268,6 +268,22 @@ pub struct QuoteSheet {
     pub risk_flag: Option<String>,
 }
 
+/// 产品配置 (从逗号分隔的 key:value 解析)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProductConfig {
+    pub exec_std: Option<String>,     // 执行标准
+    pub pressure: Option<String>,     // 压力
+    pub valve_body: Option<String>,   // 阀体
+    pub valve_stem: Option<String>,   // 阀杆
+    pub valve_plate: Option<String>,  // 阀板
+    pub valve_seat: Option<String>,   // 阀座
+    pub connection: Option<String>,   // 连接方式
+    pub drive: Option<String>,        // 驱动方式
+    pub color: Option<String>,        // 颜色
+    pub material: Option<String>,     // 材质
+    pub temperature: Option<String>,  // 温度
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contract {
     pub contract_id: String,
@@ -278,6 +294,23 @@ pub struct Contract {
     pub incoterms: String,
     pub payment_terms: String,
     pub delivery_date: String,
+    pub salesperson: Option<String>,      // 业务员
+    pub country: Option<String>,          // 国家
+    pub customer: Option<String>,         // 客户
+    pub order_folder: Option<String>,     // 订单文件夹
+    pub order_no: Option<String>,         // 订单号
+    pub contract_date: Option<String>,    // 签订时间
+    pub seller_name: Option<String>,      // 供方
+    pub buyer_name: Option<String>,       // 需方
+    pub shipping: Option<f64>,            // 运费
+    pub has_packing: Option<String>,      // 包装费 √/X
+    pub has_shipping: Option<String>,     // 运费 √/X
+    pub has_tax: Option<String>,          // 税金 √/X
+    pub exec_std: Option<String>,         // 执行标准
+    pub packing_req: Option<String>,      // 包装要求
+    pub other_req: Option<String>,        // 其它要求
+    pub remarks: Option<String>,          // 备注
+    pub template_type: Option<String>,    // 模板类型: "采购申请单" | "采购清单"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -285,6 +318,15 @@ pub struct ContractItem {
     pub product: String,
     pub qty: u64,
     pub unit_price: f64,
+    pub serial: Option<String>,           // 序号
+    pub model: Option<String>,            // 规格型号
+    pub diameter: Option<String>,         // 口径
+    pub config_raw: Option<String>,       // 配置原始文本 (逗号分隔)
+    pub unit: Option<String>,             // 单位
+    pub total_price: Option<f64>,         // 总价
+    pub unit_weight: Option<f64>,         // 单重kg
+    pub total_weight: Option<f64>,        // 总重kg
+    pub config: Option<ProductConfig>,    // 解析后的配置
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -815,17 +815,18 @@ pub fn confidence_score(
     store_confidence.unwrap_or(node_confidence).max(0.0).min(1.0)
 }
 
-/// Compute relational score from graph edge count and weights.
+/// Compute relational score from graph topology: edge density + PageRank trust.
 /// More edges with higher weights → higher relational score.
+/// Trust-from-topology (PageRank) adds structural importance signal.
 /// Uses logarithmic scaling to prevent degree-1000 hub domination.
-pub fn relational_score(edge_count: usize, total_weight: f64) -> f64 {
+pub fn relational_score(edge_count: usize, total_weight: f64, trust: f64) -> f64 {
     if edge_count == 0 {
-        return 0.0;
+        return trust.min(1.0);
     }
-    // Logarithmic degree + normalized weight component
+    // Logarithmic degree + normalized weight + trust (PageRank) component
     let degree_component = (1.0 + edge_count as f64).ln() / 5.0; // ln(33) ≈ 3.5 for 32 edges
     let weight_component = (total_weight / edge_count as f64).min(1.0);
-    (degree_component * 0.6 + weight_component * 0.4).min(1.0)
+    (degree_component * 0.4 + weight_component * 0.2 + trust * 0.4).min(1.0)
 }
 
 /// Result of SmartVector 4-signal scoring for a single node.
@@ -878,6 +879,10 @@ impl SmartVectorScorer {
         let node_ids: Vec<&str> = results.iter().map(|r| r.node.id.as_str()).collect();
         let edge_map = batch_edge_stats(conn, &node_ids);
 
+        // PageRank trust scores from topology (best-effort, non-fatal)
+        let trust_map: HashMap<String, f64> = super::nt_memory_graph::trust_for_nodes(conn, &node_ids, 0.85, 50)
+            .unwrap_or_default();
+
         // Load ConfidenceStore if available (best-effort, non-fatal)
         let confidence_store: Option<super::nt_memory_confidence::ConfidenceStore> =
             load_confidence_store_from_conn(conn);
@@ -894,7 +899,8 @@ impl SmartVectorScorer {
                 let conf = confidence_score(r.node.confidence, store_conf);
 
                 let (edge_count, total_weight) = edge_map.get(&r.node.id).copied().unwrap_or((0, 0.0));
-                let rel = relational_score(edge_count, total_weight);
+                let trust = trust_map.get(&r.node.id).copied().unwrap_or(1.0 / (results.len() as f64).max(1.0));
+                let rel = relational_score(edge_count, total_weight, trust);
 
                 let fused = self.weights.semantic * sem
                     + self.weights.temporal * temp

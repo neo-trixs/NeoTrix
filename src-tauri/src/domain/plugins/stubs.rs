@@ -1,4 +1,5 @@
 use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
+use crate::commands::model_pool::{self, ModelPoolEntry, ModelPoolStatus};
 
 // ========== Helper ==========
 

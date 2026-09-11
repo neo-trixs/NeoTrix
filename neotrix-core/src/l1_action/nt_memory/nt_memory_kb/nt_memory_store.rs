@@ -59,6 +59,7 @@ pub fn assign_cluster_to_node(conn: &Connection, node_id: &str, domain: Option<&
 }
 
 /// 无事务的 nodes+nodes_fts 双写核心。调用方必须自管事务 (批量路径复用)。
+/// 插入后自动根据 domain 字段分配 cluster_id (domain clustering auto-assignment)。
 pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     let temporal_json = node.temporal.as_ref().map(|t| {
         serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
@@ -108,6 +109,12 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
          VALUES (last_insert_rowid(), ?1, ?2, ?3, ?4)",
         params![node.title, summary, content, domain],
     )?;
+
+    // Domain clustering auto-assignment: ensure cluster exists, then assign node to it.
+    // CommunityAwareSearch (Leiden) handles batch community detection at query-time;
+    // domain-based clustering is the correct insert-time mechanism.
+    assign_cluster_to_node(conn, &node.id, node.domain.as_deref())?;
+
     Ok(())
 }
 
@@ -153,9 +160,8 @@ pub fn insert_or_get_node_rows(
         depth: 0,
         cluster_id: None,
     };
+    // cluster_id auto-assigned inside insert_node_rows
     insert_node_rows(conn, &node)?;
-    // Auto-assign cluster_id based on domain
-    assign_cluster_to_node(conn, &id, node.domain.as_deref())?;
     Ok(id)
 }
 
@@ -165,9 +171,8 @@ pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     });
     // 事务：nodes + nodes_fts 双写保持一致性，crash 不残留孤立 FTS 行
     let tx = conn.unchecked_transaction()?;
+    // cluster_id auto-assigned inside insert_node_rows
     insert_node_rows(&tx, node)?;
-    // Auto-assign cluster_id based on domain
-    assign_cluster_to_node(&tx, &node.id, node.domain.as_deref())?;
     tx.commit()
 }
 
