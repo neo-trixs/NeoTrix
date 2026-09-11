@@ -109,6 +109,7 @@ impl UnionFind {
         }
     }
 
+    #[allow(dead_code)]
     fn get_cluster_members(&self, root: &str) -> Vec<String> {
         self.parent.iter()
             .filter(|(_, v)| self.find_read_only(v) == root)
@@ -128,6 +129,7 @@ impl UnionFind {
 
 // ── Behavioral Profile ────────────────────────────────────────────────────
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct BehavioralProfile {
     /// Average request interval (seconds)
     avg_request_interval: f64,

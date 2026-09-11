@@ -169,47 +169,6 @@ impl ContextBoundary {
     }
 }
 
-impl Clone for ContextRequest {
-    fn clone(&self) -> Self {
-        Self {
-            source: self.source.clone(),
-            trust_level: match self.trust_level {
-                TrustLevel::System => TrustLevel::System,
-                TrustLevel::User => TrustLevel::User,
-                TrustLevel::Tool => TrustLevel::Tool,
-                TrustLevel::External => TrustLevel::External,
-                TrustLevel::Untrusted => TrustLevel::Untrusted,
-            },
-            content: self.content.clone(),
-            requested_actions: self.requested_actions.clone(),
-        }
-    }
-}
-
-impl Clone for ValidationResult {
-    fn clone(&self) -> Self {
-        match self {
-            ValidationResult::Allowed => ValidationResult::Allowed,
-            ValidationResult::Denied { reason } => ValidationResult::Denied {
-                reason: reason.clone(),
-            },
-            ValidationResult::Degraded {
-                new_trust_level,
-                reason,
-            } => ValidationResult::Degraded {
-                new_trust_level: match new_trust_level {
-                    TrustLevel::System => TrustLevel::System,
-                    TrustLevel::User => TrustLevel::User,
-                    TrustLevel::Tool => TrustLevel::Tool,
-                    TrustLevel::External => TrustLevel::External,
-                    TrustLevel::Untrusted => TrustLevel::Untrusted,
-                },
-                reason: reason.clone(),
-            },
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
