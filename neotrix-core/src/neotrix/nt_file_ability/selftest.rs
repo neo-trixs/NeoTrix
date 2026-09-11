@@ -137,7 +137,7 @@ impl SelfTest for PdfImageExtractSelfTest {
             errors.push("Should return error for nonexistent PDF".to_string());
         }
         
-        let result = super::pdf::pdf_image_extract::pdf_image_stats(
+        let result = crate::neotrix::nt_file_ability::pdf_image_stats(
             std::path::Path::new("/nonexistent.pdf")
         );
         if result.is_ok() {

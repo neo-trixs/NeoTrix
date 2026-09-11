@@ -373,7 +373,7 @@ pub fn merge_tables_with_mode(
         let srcs: Vec<TableData> = match ext.as_str() {
             "xlsx" => match read_xlsx_sheets_all(&path) {
                 Ok(tables) => select_preferred_sheets(tables, mode),
-                Err(e: FileAbilityError) => {
+                Err(e) => {
                     report
                         .files_failed
                         .push((path.display().to_string(), e.to_string()));
@@ -382,7 +382,7 @@ pub fn merge_tables_with_mode(
             },
             "csv" | "tsv" => match read_csv(&path) {
                 Ok(t) => vec![t],
-                Err(e: FileAbilityError) => {
+                Err(e) => {
                     report
                         .files_failed
                         .push((path.display().to_string(), e.to_string()));

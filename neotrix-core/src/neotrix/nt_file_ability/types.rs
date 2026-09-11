@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use office_oxide::DocumentFormat;
 use serde::{Deserialize, Serialize};
 
-pub use crate::core::nt_core_traits::SpecialistType;
 
 // ─── NT-CORE 能力抽象 trait (L1→L5 解耦) ────────────────────────────────
 

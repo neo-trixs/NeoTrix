@@ -116,7 +116,7 @@ fn extract_dir_one(
         } else {
             read_xlsx_table(path)
         };
-        if let Ok(table): Result<super::types::TableData, _> = table {
+        if let Ok(table) = table {
             let text = table
                 .rows
                 .iter()

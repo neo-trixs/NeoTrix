@@ -449,7 +449,7 @@ async fn download_chunk(
     url: &reqwest::Url,
     start: u64,
     end: u64,
-    total_size: u64,
+    _total_size: u64,
     path: &Path,
     timeout_secs: u64,
 ) -> Result<u64, String> {
@@ -466,8 +466,8 @@ async fn download_chunk(
         req = req.header("Range", format!("bytes={}-", actual_start));
     }
 
-    let resp = timeout(Duration::from_secs(timeout_secs), req.send())
-        .await.map_err(|_| "timeout".into())?
+    let mut resp = timeout(Duration::from_secs(timeout_secs), req.send())
+        .await.map_err(|_| "timeout".to_string())?
         .map_err(|e| e.to_string())?;
 
     let status = resp.status();
@@ -478,7 +478,7 @@ async fn download_chunk(
         return Err(format!("HTTP {}", status));
     }
 
-    let mut file = if already > 0 {
+    let file = if already > 0 {
         fs::OpenOptions::new().append(true).open(path).await.map_err(|e| format!("append: {}", e))?
     } else {
         fs::File::create(path).await.map_err(|e| format!("create: {}", e))?
