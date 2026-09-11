@@ -153,7 +153,7 @@ impl SlangNormEngine {
         domain_rules.insert(Domain::Pentest, pentest_rules);
         domain_rules.insert(Domain::Malware, malware_rules);
 
-        Self { trie, domain_rules }
+        Self { trie, _domain_rules: domain_rules }
     }
 
     /// 转换黑话

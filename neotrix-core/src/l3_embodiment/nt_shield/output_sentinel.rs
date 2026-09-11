@@ -137,7 +137,7 @@ impl OutputSentinel {
                                 max_threat = ThreatLevel::Low;
                             }
                         }
-                        PolicyAction::Log => {
+                        PolicyAction::_Log => {
                             signals.push(OutputSignal {
                                 signal_type: "policy_log".to_string(),
                                 confidence: 0.3,

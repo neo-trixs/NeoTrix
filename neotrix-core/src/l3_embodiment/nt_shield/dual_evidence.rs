@@ -39,9 +39,9 @@ pub struct DualEvidenceScanner {
 
 #[derive(Debug, Clone)]
 struct Pattern {
-    _name: String,
+    name: String,
     regex: String,
-    _weight: f64,
+    weight: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +64,7 @@ impl DualEvidenceScanner {
                 Pattern { name: "credentials".to_string(), regex: r"password|key|secret".to_string(), weight: 0.85 },
                 Pattern { name: "internal".to_string(), regex: r"internal|confidential|private".to_string(), weight: 0.8 },
             ],
-            soft_signals: vec![],
+            _soft_signals: vec![],
         }
     }
 

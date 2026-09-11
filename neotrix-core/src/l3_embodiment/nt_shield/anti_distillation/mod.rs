@@ -70,7 +70,7 @@ pub struct AntiDistillationEngine {
 impl AntiDistillationEngine {
     pub fn new(config: AntiDistillationConfig) -> Self {
         Self {
-            config: config.clone(),
+            _config: config.clone(),
             extraction_detector: extraction_detector::ExtractionDetector::new(config.clone()),
             session_replay_guard: session_replay_guard::SessionReplayGuard::new(),
             account_clustering: account_clustering::AccountClustering::new(config.clone()),

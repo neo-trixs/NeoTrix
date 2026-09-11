@@ -76,7 +76,7 @@ impl HarnessOptimizer {
     pub fn new(fusion_threshold: usize, compression_target: f64) -> Self {
         Self {
             fusion_threshold,
-            compression_target,
+            _compression_target,
             history: Vec::new(),
         }
     }

@@ -66,7 +66,7 @@ impl PersonaRouter {
                 PrismRoute::Narrate,
                 PrismRoute::Review,
             ],
-            skill_registry: HashMap::new(),
+            _skill_registry: HashMap::new(),
         }
     }
 

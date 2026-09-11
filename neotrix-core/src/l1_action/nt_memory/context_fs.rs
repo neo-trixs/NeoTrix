@@ -44,7 +44,7 @@ impl ContextFileSystem {
     pub fn new() -> Self {
         let mut fs = Self {
             nodes: HashMap::new(),
-            root: "ctx://".to_string(),
+            _root: "ctx://".to_string(),
         };
         // 创建根目录
         fs.nodes.insert(

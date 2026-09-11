@@ -318,6 +318,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_xlsx_structured_read() {
         let path = xlsx_fixture();
         let ab = FileAbility::open(&path).unwrap();
@@ -360,6 +361,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_xlsx_sheet_index_boundaries() {
         let path = xlsx_fixture();
         let ab = FileAbility::open(&path).unwrap();
@@ -380,6 +382,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_xlsx_structured_read_non_xlsx() {
         let path = office_sample(); // docx
         let ab = FileAbility::open(&path).unwrap();

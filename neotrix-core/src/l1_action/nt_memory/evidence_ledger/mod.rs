@@ -73,7 +73,7 @@ impl SessionLedger {
             session_id: session_id.to_string(),
             entries: Vec::new(),
             claims: Vec::new(),
-            claim_gates: Vec::new(),
+            _claim_gates: Vec::new(),
         }
     }
 

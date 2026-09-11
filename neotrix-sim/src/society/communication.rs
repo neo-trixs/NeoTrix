@@ -87,7 +87,7 @@ impl CommunicationChannel {
         }
     }
 
-    pub fn receive(&self, agent_id: &str, channel: &str) -> Vec<&Message> {
+    pub fn receive(&self, _agent_id: &str, channel: &str) -> Vec<&Message> {
         let channel_ids = self.channels.get(channel)
             .cloned()
             .unwrap_or_default();

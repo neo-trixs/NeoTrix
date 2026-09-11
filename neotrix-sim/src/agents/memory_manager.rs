@@ -246,9 +246,9 @@ mod tests {
         let mut mm = MemoryManager::new();
         mm.store(make_event("fire in the forest", 0.8, 0));
         mm.store_episodic(MemoryNode {
-            id: 1,
+            id: 0,
             kind: MemoryKind::Observation,
-            agent_id: "agent_0".into(),
+            agent_id: "agent_1".into(),
             created_tick: 1,
             last_accessed_tick: 1,
             description: "saw fire spread".into(),

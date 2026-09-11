@@ -51,7 +51,7 @@ impl UnifiedDefenseLayer {
             slang_norm: SlangNormEngine::new(),
             dual_evidence: DualEvidenceScanner::new(),
             grapple_hooks: GrappleHookChain::new(),
-            proxy_detection: ProxyDetectionEngine::new(proxy_detection::ProxyDetectionConfig::default()),
+            _proxy_detection: ProxyDetectionEngine::new(proxy_detection::ProxyDetectionConfig::default()),
             reasoning_protection: ReasoningProtectionEngine::new(),
             anti_distillation: AntiDistillationEngine::new(anti_distillation::AntiDistillationConfig::default()),
         }

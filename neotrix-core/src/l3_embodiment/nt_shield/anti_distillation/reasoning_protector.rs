@@ -15,7 +15,7 @@ pub struct ReasoningProtector {
 impl ReasoningProtector {
     pub fn new() -> Self {
         Self {
-            decoy_patterns: vec![
+            _decoy_patterns: vec![
                 "Let me think about this step by step...".to_string(),
                 "First, I need to consider the main factors...".to_string(),
                 "The key insight here is...".to_string(),

@@ -81,7 +81,7 @@ impl AutoInspector {
             ],
             results: Vec::new(),
             repair_queue: Vec::new(),
-            max_concurrent_agents: 4,
+            _max_concurrent_agents: 4,
         }
     }
 

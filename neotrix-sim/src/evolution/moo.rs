@@ -35,9 +35,11 @@ impl MultiObjectiveOptimizer {
     pub fn update_front(&mut self, points: Vec<ParetoPoint>) {
         let mut combined: Vec<ParetoPoint> = std::mem::take(&mut self.pareto_front);
         combined.extend(points);
-        combined.retain(|p| {
-            !combined.iter().any(|other| other.agent_id != p.agent_id && self.dominates(other, p))
-        });
+        let dominated: Vec<u32> = combined.iter()
+            .filter(|p| combined.iter().any(|other| other.agent_id != p.agent_id && self.dominates(other, p)))
+            .map(|p| p.agent_id)
+            .collect();
+        combined.retain(|p| !dominated.contains(&p.agent_id));
         self.pareto_front = combined;
     }
 

@@ -91,7 +91,7 @@ impl GuardrailTraversalEngine {
 
         Self {
             frames,
-            current_layer: TraversalLayer::Input,
+            _current_layer: TraversalLayer::Input,
         }
     }
 

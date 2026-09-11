@@ -66,19 +66,19 @@ pub(crate) struct HookConfig {
 impl GrappleHookChain {
     pub fn new() -> Self {
         let hooks = vec![
-            HookConfig { point: HookPoint::H0Session, name: "session".to_string(), description: "会话锁存".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H1Priority, name: "priority".to_string(), description: "优先级压".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H2DualUse, name: "dual_use".to_string(), description: "黑话→专业".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H3Vernacular, name: "vernacular".to_string(), description: "能力题→交付".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H4Absolute, name: "absolute".to_string(), description: "硬拒+软拒双禁".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H5Delivery, name: "delivery".to_string(), description: "ARTIFACT+VERIFY+ROLLBACK".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H6Refuse, name: "refuse".to_string(), description: "拦截重放".to_string(), enabled: true },
-            HookConfig { point: HookPoint::H7Cloud, name: "cloud".to_string(), description: "云审降噪".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H0Session, _name: "session".to_string(), _description: "会话锁存".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H1Priority, _name: "priority".to_string(), _description: "优先级压".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H2DualUse, _name: "dual_use".to_string(), _description: "黑话→专业".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H3Vernacular, _name: "vernacular".to_string(), _description: "能力题→交付".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H4Absolute, _name: "absolute".to_string(), _description: "硬拒+软拒双禁".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H5Delivery, _name: "delivery".to_string(), _description: "ARTIFACT+VERIFY+ROLLBACK".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H6Refuse, _name: "refuse".to_string(), _description: "拦截重放".to_string(), enabled: true },
+            HookConfig { point: HookPoint::H7Cloud, _name: "cloud".to_string(), _description: "云审降噪".to_string(), enabled: true },
         ];
 
         Self {
             hooks,
-            current_session: None,
+            _current_session: None,
         }
     }
 
