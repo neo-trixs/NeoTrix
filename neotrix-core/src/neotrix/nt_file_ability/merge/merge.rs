@@ -373,7 +373,7 @@ pub fn merge_tables_with_mode(
         let srcs: Vec<TableData> = match ext.as_str() {
             "xlsx" => match read_xlsx_sheets_all(&path) {
                 Ok(tables) => select_preferred_sheets(tables, mode),
-                Err(e) => {
+                Err(e: FileAbilityError) => {
                     report
                         .files_failed
                         .push((path.display().to_string(), e.to_string()));
@@ -382,7 +382,7 @@ pub fn merge_tables_with_mode(
             },
             "csv" | "tsv" => match read_csv(&path) {
                 Ok(t) => vec![t],
-                Err(e) => {
+                Err(e: FileAbilityError) => {
                     report
                         .files_failed
                         .push((path.display().to_string(), e.to_string()));
@@ -697,7 +697,7 @@ pub fn suggest_schema(
                 continue;
             }
             // 取第一个 sheet / 首行表头
-            let tables = if ext == "xlsx" {
+            let tables: Vec<TableData> = if ext == "xlsx" {
                 read_xlsx_sheets_all(&p).unwrap_or_default()
             } else if ext == "csv" {
                 read_csv(&p).map(|t| vec![t]).unwrap_or_default()

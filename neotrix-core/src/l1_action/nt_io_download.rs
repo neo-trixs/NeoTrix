@@ -486,13 +486,16 @@ async fn download_chunk(
 
     let mut writer = BufWriter::with_capacity(256 * 1024, file);
     let mut downloaded = already;
-    let mut stream = resp.bytes_stream();
-    use futures_util::StreamExt;
 
-    while let Some(chunk_result) = stream.next().await {
-        let chunk = chunk_result.map_err(|e| format!("stream: {}", e))?;
-        writer.write_all(&chunk).await.map_err(|e| format!("write: {}", e))?;
-        downloaded += chunk.len() as u64;
+    loop {
+        match resp.chunk().await {
+            Ok(Some(chunk)) => {
+                writer.write_all(&chunk).await.map_err(|e| format!("write: {}", e))?;
+                downloaded += chunk.len() as u64;
+            }
+            Ok(None) => break, // stream complete
+            Err(e) => return Err(format!("stream: {}", e)),
+        }
     }
     writer.flush().await.map_err(|e| format!("flush: {}", e))?;
     Ok(downloaded)
