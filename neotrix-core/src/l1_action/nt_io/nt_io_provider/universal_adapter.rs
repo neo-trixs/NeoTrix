@@ -169,7 +169,7 @@ impl FormatConverter for OpenAiConverter {
 
     fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
         let content = extract_json_string(raw, "content").unwrap_or_default();
-        let tokens_used = extract_json_number(raw, "total_tokens").unwrap_or(0) as u32;
+        let tokens_used = extract_json_number(raw, "total_tokens").unwrap_or(0.0) as u32;
 
         Some(UnifiedResponse {
             content,
@@ -240,7 +240,7 @@ impl FormatConverter for AnthropicConverter {
 pub struct GeminiConverter;
 
 impl FormatConverter for GeminiConverter {
-    fn to_provider_format(&self, request: &UnifiedRequest, model: &ModelConfig) -> String {
+    fn to_provider_format(&self, request: &UnifiedRequest, _model: &ModelConfig) -> String {
         let contents: Vec<String> = request
             .messages
             .iter()
@@ -267,7 +267,7 @@ impl FormatConverter for GeminiConverter {
 
     fn from_provider_response(&self, raw: &str, model: &ModelConfig) -> Option<UnifiedResponse> {
         let content = extract_json_string(raw, "text").unwrap_or_default();
-        let tokens_used = extract_json_number(raw, "totalTokenCount").unwrap_or(0) as u32;
+        let tokens_used = extract_json_number(raw, "totalTokenCount").unwrap_or(0.0) as u32;
 
         Some(UnifiedResponse {
             content,

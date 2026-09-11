@@ -50,3 +50,6 @@ pub mod pipeline_checkpointing;
 pub mod nt_act_cleanup;
 
 pub mod reference_view;
+
+// Re-exports for cross-module integration
+pub use reference_view::ReferenceManager;

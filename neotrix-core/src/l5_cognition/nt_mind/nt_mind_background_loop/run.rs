@@ -772,6 +772,8 @@ impl BackgroundLoop {
         spawn_handler!(cfg.knowledge_chain_interval_secs, |h| h.handle_knowledge_chain().await);
         spawn_handler!(cfg.knowledge_aging_interval_secs, |h| h.handle_knowledge_aging().await);
         spawn_handler!(cfg.crystallization_interval_secs, |h| h.handle_crystallization().await);
+        // Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
+        spawn_handler!(cfg.refinement_interval_secs, "refinement", |h| h.handle_refinement().await);
         spawn_handler!(cfg.nt_act_voice_interval_secs, |h| h.handle_nt_act_voice_tick().await);
         spawn_handler!(cfg.plugin_interval_secs, |h| h.handle_plugin_tick().await);
         spawn_handler!(cfg.exploration_interval_secs, |h| h.handle_exploration().await);

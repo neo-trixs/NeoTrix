@@ -86,3 +86,6 @@ pub use wiki_skill::{
     AccumulatedKnowledge, CoEvolutionEvent, CoEvolutionRecord, ExecutableSkill, KnowledgeSkillLink,
     LinkType, RawExperience, SkillOutput, SkillParameter, WikiSkillConfig, WikiSkillKB,
 };
+
+// Re-exports for io_contract
+pub use io_contract::{ContractRegistry, ToolIoContract, ParamDef, ParamType};

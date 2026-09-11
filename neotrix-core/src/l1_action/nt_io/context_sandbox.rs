@@ -7,9 +7,10 @@
 //! 典型压缩比: 315KB → 5.4KB (~58:1)。
 //!
 //! 骨架阶段 (C0): 三级压缩 + 按工具配置覆盖 + 历史统计。
-//! 待完善: AddressableStore 实际接入、token 精确计数。
+//! 完善阶段 (C1): AddressableStore 实际接入、token 精确计数。
 
 use std::collections::HashMap;
+use crate::l1_action::nt_memory::addressable_store::AddressableStore;
 
 /// 压缩级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +67,8 @@ impl Default for SandboxConfig {
 pub struct ContextSandbox {
     config: SandboxConfig,
     history: Vec<SandboxedOutput>,
+    /// 追加式存储 — 原始输出按 §id 引用
+    store: AddressableStore,
 }
 
 impl ContextSandbox {
@@ -74,6 +77,7 @@ impl ContextSandbox {
         Self {
             config,
             history: Vec::new(),
+            store: AddressableStore::new(),
         }
     }
 
@@ -89,8 +93,8 @@ impl ContextSandbox {
             1.0
         };
 
-        // TODO: 接入 AddressableStore 生成 citation_id
-        let citation_id = None;
+        // 接入 AddressableStore 生成 citation_id
+        let citation_id = Some(self.store.append(tool_name, "", output));
 
         let out = SandboxedOutput {
             tool_name: tool_name.to_string(),
@@ -197,6 +201,16 @@ impl ContextSandbox {
         }
         let total: f64 = self.history.iter().map(|o| o.compression_ratio).sum();
         total / self.history.len() as f64
+    }
+
+    /// 通过 §id 召回完整原始输出
+    pub fn recall(&self, citation_id: &str) -> Option<&str> {
+        self.store.recall(citation_id).map(|obs| obs.output.as_str())
+    }
+
+    /// 获取 AddressableStore 引用
+    pub fn store(&self) -> &AddressableStore {
+        &self.store
     }
 }
 

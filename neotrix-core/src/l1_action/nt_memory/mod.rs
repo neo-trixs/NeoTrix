@@ -26,3 +26,8 @@ pub mod trinity;
 
 /// 三类记忆 — 基于 Grok Build 模式
 pub mod memory_types;
+
+// Re-exports for cross-module integration
+pub use addressable_store::AddressableStore;
+pub use context_fs::{ContextFileSystem, ContextNode, ContextNodeType};
+pub use trinity::TrinityMemory;

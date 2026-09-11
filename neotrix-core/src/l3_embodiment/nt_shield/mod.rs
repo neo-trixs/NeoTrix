@@ -39,3 +39,6 @@ pub use grapple_hooks::GrappleHookChain;
 pub use proxy_detection::ProxyDetectionEngine;
 pub use reasoning_protection::ReasoningProtectionEngine;
 pub use anti_distillation::AntiDistillationEngine;
+
+// Re-exports for context_boundary
+pub use nt_shield::context_boundary::{ContextBoundary, ContextRequest, TrustLevel, ValidationResult};

@@ -19,3 +19,6 @@ pub mod infrastructure {
 pub mod benchmark {
     pub use super::nt_mind_benchmark::*;
 }
+
+// Re-exports for harness module
+pub use harness::refinement::ContinualRefiner;
