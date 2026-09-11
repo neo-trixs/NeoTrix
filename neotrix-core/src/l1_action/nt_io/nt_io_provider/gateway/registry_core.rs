@@ -1,9 +1,61 @@
 use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex, RwLock, Weak};
 use std::time::{Duration, Instant};
 
 use super::super::circuit_breaker::CircuitBreaker;
 use super::super::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::super::rate_limiter::RateLimiter;
+use super::GatewayV2;
+
+// ═══════════════════════════════════════════════════════════════════
+// Auto Exacto 周期重估注册表 (R-P79 生产接线)
+// ═══════════════════════════════════════════════════════════════════
+
+/// 进程级活跃 GatewayV2 注册表 — Weak 持有, 网关释放后自动剔除。
+pub static RE_EVALUATION_GATEWAYS: LazyLock<Mutex<Vec<Weak<GatewayV2>>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// 注册一个进程级共享 GatewayV2 参与 Auto Exacto 周期重估。
+pub fn register_gateway_for_re_evaluation(gateway: &Arc<GatewayV2>) {
+    if let Ok(mut registry) = RE_EVALUATION_GATEWAYS.lock() {
+        registry.retain(|w| w.strong_count() > 0);
+        registry.push(Arc::downgrade(gateway));
+    }
+}
+
+/// 周期驱动 Auto Exacto 重估 — 遍历注册的活跃 GatewayV2 调用
+/// [`GatewayV2::maybe_re_evaluate`]。返回本次实际触发重估的网关数。
+pub fn run_periodic_re_evaluation() -> usize {
+    let mut registry = match RE_EVALUATION_GATEWAYS.lock() {
+        Ok(reg) => reg,
+        Err(e) => {
+            log::warn!("[gateway] re-evaluation registry poisoned: {}", e);
+            e.into_inner()
+        }
+    };
+    registry.retain(|w| w.strong_count() > 0);
+    let mut evaluated = 0usize;
+    for weak in registry.iter() {
+        if let Some(gw) = weak.upgrade() {
+            if gw.maybe_re_evaluate() {
+                evaluated += 1;
+            }
+        }
+    }
+    evaluated
+}
+
+/// 当前注册表中仍存活 (`strong_count > 0`) 的网关注册数。
+pub fn registered_gateway_count() -> usize {
+    RE_EVALUATION_GATEWAYS
+        .lock()
+        .map(|reg| reg.iter().filter(|w| w.strong_count() > 0).count())
+        .unwrap_or(0)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Provider State — provider 运行时状态
+// ═══════════════════════════════════════════════════════════════════
 
 #[derive(Debug)]
 pub struct ProviderState {
@@ -17,9 +69,7 @@ pub struct ProviderState {
     pub cost_per_1k_tokens: f64,
     pub is_free: bool,
     pub category: ProviderCategory,
-    /// 模型级锁 (L3 韧性, 对齐 OmniRoute model lockout): 当某 provider 的特定模型返回
-    /// model_unavailable / 404 时, 仅锁定该模型而非熔断整个 provider, 使 provider 对其它
-    /// 模型仍可用 → 自有 LLM 池不会因单模型下线而缩水。键为请求级 model 串 (含 `{provider}/{id}`)。
+    /// 模型级锁 (L3 韧性, 对齐 OmniRoute model lockout)
     pub model_locks: HashMap<String, Instant>,
 }
 
@@ -45,8 +95,6 @@ impl ProviderState {
     }
 
     /// 配额耗尽标记 — 记录 provider 处于配额耗尽状态 (freellmapi/aimux 模式)。
-    /// 配额耗尽 (quota/credit 耗尽) 与瞬时限速 (429) 语义不同: 重试无益, 应剔除该 provider
-    /// 直至配额恢复, 而不是反复重试同一个耗尽账户。
     pub fn mark_quota_exhausted(&mut self) {
         self.circuit_breaker.force_open();
         self.total_errors += 1;
@@ -58,7 +106,6 @@ impl ProviderState {
     }
 
     /// 锁定某模型 (cooldown_secs 后自动解锁), 不影响该 provider 的其它模型。
-    /// 用于 L3 模型级韧性: 单模型 404/model_unavailable 不应拖垮整个 provider。
     pub fn lock_model(&mut self, model: &str, cooldown_secs: u64) {
         self.model_locks.insert(
             model.to_string(),
@@ -74,7 +121,7 @@ impl ProviderState {
         }
     }
 
-    /// 清理已过期的模型锁, 防止 map 无限增长 (在 record_success/record_failure 内调用)。
+    /// 清理已过期的模型锁, 防止 map 无限增长
     pub fn prune_expired_model_locks(&mut self) {
         let now = Instant::now();
         self.model_locks.retain(|_, &mut until| now < until);
@@ -156,8 +203,7 @@ pub enum AttemptPhase {
 
 pub type CallObserver = std::sync::Arc<dyn Fn(CallEvent) + Send + Sync>;
 
-/// 子网格: 由同一安全画像的 provider 组成的小循环通信单元 (子母阵基本单元)
-/// 每个子网格包含满足特定 CommunicationProfile 的 provider 组合
+/// 子网格: 由同一安全画像的 provider 组成的小循环通信单元
 #[derive(Debug, Clone)]
 pub struct SubGrid {
     /// 子网格名称 (如 "anonymous-local", "proxied-cloud", "tor-anonymous")
@@ -173,7 +219,6 @@ pub struct SubGrid {
 }
 
 /// 子网格运行时健康状态 — 反馈回路 (D21 外部观察 + D30 行为化)
-/// 通过 nt_core_telemetry 记录, 支持画像动态降级 (Gap 4)
 #[derive(Debug, Clone, Default)]
 pub struct SubGridHealth {
     /// 总调用次数

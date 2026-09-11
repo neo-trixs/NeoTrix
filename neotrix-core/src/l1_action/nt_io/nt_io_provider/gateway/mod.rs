@@ -17,7 +17,7 @@ use super::provider_swap::ProviderSwapManager;
 
 // ── Routing ──────────────────────────────────────────────────
 mod consistent_hash;
-mod intelligent_router;
+mod intelligence;
 mod learned_router;
 mod market_router;
 mod selection;
@@ -25,7 +25,7 @@ mod subgrid;
 
 // ── Resilience ───────────────────────────────────────────────
 mod drift;
-mod reliability;
+mod health;
 mod resilience;
 mod response_cache;
 mod response_healer;
@@ -35,41 +35,38 @@ mod coordinator;
 mod execution;
 mod keyless;
 mod modular_gateway;
-mod state;
 
 // ── Observability ────────────────────────────────────────────
-mod ml_predictor;
 mod plugin;
 
 // ── Types & Registry ─────────────────────────────────────────
-mod benchmark_types;
+mod benchmark;
 pub mod pool_health;
-mod registry;
+mod registry_core;
 
 // ── Feature-gated ────────────────────────────────────────────
-mod challenge;
 #[cfg(feature = "stealth-net")]
 mod stealth_middleware;
 
 // ── Re-exports ───────────────────────────────────────────────
 // Routing
 pub use consistent_hash::*;
-pub use intelligent_router::*;
+pub use intelligence::*;
 pub use market_router::*;
 // Resilience
 pub use drift::*;
+pub use health::*;
 pub use resilience::*;
 pub use response_cache::*;
 pub use response_healer::*;
 // Execution
 pub use coordinator::*;
 pub use modular_gateway::*;
-pub use state::*;
+pub use registry_core::*;
 // Observability
-pub use ml_predictor::*;
 pub use plugin::*;
 // Types & Registry
-pub use registry::*;
+pub use registry_core::*;
 // Feature-gated
 #[cfg(feature = "stealth-net")]
 pub use stealth_middleware::*;
