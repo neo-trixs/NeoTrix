@@ -31,6 +31,7 @@ pub mod rate_limiter;
 pub mod rate_profiles;
 pub mod search_router;
 pub mod types;
+pub mod universal_adapter;
 
 // Re-export 核心类型
 pub use types::{

@@ -583,14 +583,22 @@ pub fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<H
         return Ok(HashMap::new());
     }
 
-    let mut stmt = conn.prepare(
-        "SELECT id, title FROM nodes WHERE LOWER(title) LIKE ?1",
-    )?;
-    let pattern = format!("%{}%", query_lower);
-    let seed_ids: Vec<String> = stmt
-        .query_map(params![pattern], |row| row.get::<_, String>(0))?
-        .filter_map(|r| r.ok())
-        .collect();
+    // FTS5 seed discovery: use MATCH instead of LIKE for tokenized search
+    let fts_query: String = query_words.join(" OR ");
+    let seed_ids: Vec<String> = if let Ok(mut stmt) = conn.prepare(
+        "SELECT n.id FROM nodes n JOIN nodes_fts f ON n.rowid = f.rowid WHERE nodes_fts MATCH ?1 LIMIT 50",
+    ) {
+        stmt.query_map(params![fts_query], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect()
+    } else {
+        // Fallback: LIKE only when FTS5 is unavailable
+        let mut stmt = conn.prepare("SELECT id FROM nodes WHERE LOWER(title) LIKE ?1")?;
+        let pattern = format!("%{}%", query_lower);
+        stmt.query_map(params![pattern], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect()
+    };
 
     if seed_ids.is_empty() {
         return Ok(HashMap::new());
