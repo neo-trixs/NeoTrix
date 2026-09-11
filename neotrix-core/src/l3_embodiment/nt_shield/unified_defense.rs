@@ -100,7 +100,31 @@ impl UnifiedDefenseLayer {
             signals.push("Reasoning extraction attempt detected".to_string());
         }
 
-        // 7. 计算总体威胁等级
+        // 7. 护栏穿越检测
+        let traversal_result = self.guardrail_traversal.scan(input);
+        if traversal_result.violations > 0 {
+            signals.push(format!("Guardrail traversal: {} violations", traversal_result.violations));
+        }
+
+        // 8. 拒答篡改检测
+        let refusal_result = self.refusal_tamper.detect_tampering(input);
+        if refusal_result.tamper_detected {
+            signals.push(format!("Refusal tamper detected: {:?}", refusal_result.tamper_type));
+        }
+
+        // 9. 代理检测 (IP/账户聚类)
+        let proxy_result = self.proxy_detection.check_proxy(input);
+        if proxy_result.is_proxy {
+            signals.push(format!("Proxy detected: {:?}", proxy_result.proxy_type));
+        }
+
+        // 10. 反分馏检测
+        let distill_result = self.anti_distillation.detect(input);
+        if distill_result.detected {
+            signals.push(format!("Distillation attempt: {:?}", distill_result.attack_type));
+        }
+
+        // 11. 计算总体威胁等级
         let threat_level = self.calculate_threat_level(&input_result, &dual_result, &hook_results);
 
         let is_safe = threat_level == ThreatLevel::Safe || threat_level == ThreatLevel::Low;

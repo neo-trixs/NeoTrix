@@ -15883,6 +15883,14 @@
       "rationale": "经验 '[蒸馏-NT-WORLD] 聚合 3 条经验的模式: [蒸馏-NT-WORLD] 聚合 6 条经验的模式: OSINT OsintSource trait 统一分发模式: 10个 investigate() 签名完全同构 → 定义 OsintSource trait (associated type Findings + name/requires_domain/requires_identity/requir [关键词: osint, osintsource, gate, impl, trait, 新增模块只需, 自动巡检, 资产模型]' 命中能力标签 'frontend_ui' 于域 World, 应强化对应能力节点",
       "signal": 0.76,
       "promoted_at": 1789116537
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1789120923
     }
   ]
 }

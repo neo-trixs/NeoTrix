@@ -72,6 +72,9 @@ fn main() {
             registry.register(Box::new(SecurityPlugin)).expect("failed to register security");
             registry.register(Box::new(MemoryPlugin::new())).expect("failed to register memory");
             registry.register(Box::new(ExtPlugin)).expect("failed to register ext");
+            registry.register(Box::new(LlamacppPlugin::new())).expect("failed to register llamacpp");
+            registry.register(Box::new(GitPlugin)).expect("failed to register git");
+            registry.register(Box::new(CliPlugin)).expect("failed to register cli");
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {

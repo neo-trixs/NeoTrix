@@ -464,3 +464,35 @@ impl DomainPlugin for ExtPlugin {
                            "cowork_start","cowork_stop","notify"])
     }
 }
+
+// ========== Git Plugin ==========
+
+pub struct GitPlugin;
+
+impl DomainPlugin for GitPlugin {
+    fn name(&self) -> &str { "git" }
+    fn description(&self) -> &str { "Git 版本控制" }
+    fn actions(&self) -> Vec<ActionSpec> {
+        vec!["status","diff","staged_files","branches","checkout","commit","push","apply_diff"]
+            .iter().map(|a| stub_action(a)).collect()
+    }
+    fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+        stub_call(action, &["status","diff","staged_files","branches","checkout","commit","push","apply_diff"])
+    }
+}
+
+// ========== CLI Plugin ==========
+
+pub struct CliPlugin;
+
+impl DomainPlugin for CliPlugin {
+    fn name(&self) -> &str { "cli" }
+    fn description(&self) -> &str { "CLI 命令执行" }
+    fn actions(&self) -> Vec<ActionSpec> {
+        vec!["exec","list"]
+            .iter().map(|a| stub_action(a)).collect()
+    }
+    fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
+        stub_call(action, &["exec","list"])
+    }
+}
