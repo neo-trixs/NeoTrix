@@ -1380,6 +1380,32 @@ impl KnowledgeBase {
         // 检索路径直接生效, 消费方 (agent/UI) 可据 trust 级别决定是否直接采信。
         let results = nt_memory_search::staleness_signal(results);
         let results = self.graph_signal_augment(query, results, limit);
+        // [P0] SmartVector 4-Signal Scoring: semantic(temporal+confidence+graph) ×
+        // configurable weights → fused_score re-rank. After graph_signal_augment so
+        // semantic signal inherits graph-boosted scores; before lifecycle filter so
+        // SmartVector can evaluate ALL candidates (including forget-marked nodes).
+        let results = {
+            let scorer = nt_memory_search::SmartVectorScorer::default();
+            match self.conn.lock() {
+                Ok(conn) => {
+                    let sv_scores = scorer.score_results(&results, &conn);
+                    // Build fused_score lookup and re-rank
+                    let score_map: HashMap<&str, f64> = sv_scores.iter()
+                        .map(|sv| (sv.node_id.as_str(), sv.fused_score))
+                        .collect();
+                    let mut reranked = results;
+                    for r in &mut reranked {
+                        if let Some(&sv) = score_map.get(r.node.id.as_str()) {
+                            r.score = sv;
+                        }
+                    }
+                    reranked.sort_by(|a, b|
+                        b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+                    reranked
+                }
+                Err(_) => results,
+            }
+        };
         // A1 时效过滤 (recall absorb, R-P79): 剔除被显式标记为应遗忘
         // (mark_should_forget) 的节点 — "存储系统忘了该忘的", 避免应遗忘的
         // 记忆仍被自信返回。仅剔除显式标记 (保守语义, 不误伤正常陈旧知识)。

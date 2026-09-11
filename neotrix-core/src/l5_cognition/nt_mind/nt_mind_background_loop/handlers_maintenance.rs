@@ -934,6 +934,86 @@ impl BackgroundLoopHandle {
         log::info!("[bg] heal experience recorded: {} ({} signals)", key, unique_cats.len());
     }
 
+    /// L6 自我改进循环 — 采集系统指标 → 诊断瓶颈 → 生成改进方案 → 执行 → 验证。
+    /// 与 SEAL pipeline 互补: SEAL 聚焦技能模板提取, 本模块聚焦系统层面参数调优。
+    pub(crate) async fn handle_self_improvement(&mut self) {
+        use crate::l6_meta::coordination::self_improvement::SystemMetrics;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+
+        // 从系统各模块采集实时指标
+        let healer_report_len = self.healer_registry.last_report.len();
+        let auto_fixes = self.healer_registry.auto_fixes_applied;
+        let tree_stats = self.skill_engine.skill_tree_stats();
+        let residency = self.skill_engine.audit_residency();
+
+        let success_rate = if healer_report_len == 0 {
+            1.0 // 无发现 = 健康
+        } else {
+            (1.0 - (healer_report_len as f64 / 50.0)).max(0.0)
+        };
+
+        let error_recovery_rate = if auto_fixes > 0 {
+            (auto_fixes as f64 / (auto_fixes as f64 + healer_report_len as f64)).min(1.0)
+        } else {
+            0.5 // 无数据时中性值
+        };
+
+        // 技能命中率: 非孤儿技能占比 (孤儿 = 无父节点)
+        let skill_hit_rate = if tree_stats.total_skills > 0 {
+            (tree_stats.total_skills - tree_stats.orphans) as f64 / tree_stats.total_skills as f64
+        } else {
+            0.0
+        };
+
+        // 结晶率: 根节点占比 (根 = 已结晶为独立技能)
+        let crystallization_rate = if tree_stats.total_skills > 0 {
+            tree_stats.roots as f64 / tree_stats.total_skills as f64
+        } else {
+            0.0
+        };
+
+        // 平均 token 消耗: 驻留审计中位 resident_tokens
+        let avg_tokens = if !residency.is_empty() {
+            let total: usize = residency.iter().map(|r| r.resident_tokens).sum();
+            total as f64 / residency.len() as f64
+        } else {
+            1000.0 // 默认值
+        };
+
+        let metrics = SystemMetrics {
+            success_rate,
+            avg_tokens,
+            skill_hit_rate,
+            crystallization_rate,
+            knowledge_retention: 0.8, // 默认值, 后续可从 KB 衰减模块接入
+            error_recovery_rate,
+            timestamp: now,
+        };
+
+        self.self_improvement.collect_metrics(metrics);
+
+        let result = self.self_improvement.run_cycle();
+
+        if result.issues_found > 0 {
+            log::info!(
+                "[bg] self_improvement cycle {}: health={:.2}, {} issues, {} plans generated, {} applied, improved={}",
+                result.cycle, result.diagnosis_health, result.issues_found,
+                result.plans_generated, result.plans_applied, result.overall_improved
+            );
+            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                component: "self_improvement".into(),
+                error: format!(
+                    "cycle {}: health={:.2}, {} issues, {} applied, improved={}",
+                    result.cycle, result.diagnosis_health, result.issues_found,
+                    result.plans_applied, result.overall_improved
+                ),
+                severity: if result.overall_improved { "info" } else { "warning" }.into(),
+            });
+        }
+    }
+
 }
 
 // Commented out - tests call non-existent methods on BackgroundLoop

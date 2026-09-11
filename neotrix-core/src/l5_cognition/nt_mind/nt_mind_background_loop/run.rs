@@ -49,6 +49,7 @@ const TELEMETRY_INTERVAL_SECS: u64 = 60;
 const SYSTEM_HEALTH_HEAL_INTERVAL_SECS: u64 = 300; // 5min NT-REPAIR 自愈巡检 (Track 3: D22/D26/D27/D28)
 const GAME_TRAINING_INTERVAL_SECS: u64 = 300; // 5min NT-PLAY 自主进化训练
 const CLUSTERING_INTERVAL_SECS: u64 = 3600; // 1h KB 域聚类巡检
+const SELF_IMPROVEMENT_INTERVAL_SECS: u64 = 3600; // 1h 自我改进循环 (L6 元认知)
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
@@ -713,6 +714,7 @@ impl BackgroundLoop {
             readiness: LoopReadyScore::default(),
             autonomy_tier: AutonomyTier::L1,
             refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner::new(),
+            self_improvement: crate::l6_meta::coordination::self_improvement::SelfImprovementLoop::new(),
         }));
 
         macro_rules! spawn_handler {
@@ -819,6 +821,8 @@ impl BackgroundLoop {
         spawn_handler!(NOVEL_INGEST_INTERVAL_SECS, "novel_ingest", |h| h.handle_novel_ingest().await);
         // 3600s — KB 域聚类巡检: 社区检测 + domain_clusters 维护 + cluster_id 分配
         spawn_handler!(CLUSTERING_INTERVAL_SECS, "clustering", |h| h.handle_clustering().await);
+        // 3600s — L6 自我改进循环: 采集指标→诊断→生成改进方案→执行→验证
+        spawn_handler!(SELF_IMPROVEMENT_INTERVAL_SECS, "self_improvement", |h| h.handle_self_improvement().await);
         // ── Constitution hot-reload ──
         spawn_handler!(CONSTITUTION_RELOAD_INTERVAL_SECS, "constitution_reload", |h| h.handle_constitution_reload().await);
         // 缺陷1修复 (自我运转实际情况): 意识核心进化周期改为配置驱动
@@ -1020,6 +1024,8 @@ pub struct BackgroundLoopHandle {
     autonomy_tier: AutonomyTier,
     /// Continual Harness Refinement — 审查轨迹，应用有证据支持的状态更新
     refiner: crate::l5_cognition::nt_mind::harness::refinement::ContinualRefiner,
+    /// L6 自我改进循环 — 采集指标→诊断→生成方案→执行→验证闭环
+    self_improvement: crate::l6_meta::coordination::self_improvement::SelfImprovementLoop,
 }
 
 impl BackgroundLoopHandle {
