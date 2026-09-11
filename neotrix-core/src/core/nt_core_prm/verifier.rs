@@ -937,7 +937,7 @@ mod ws_grpo_tests {
         let coach: Box<dyn Coach> = Box::new(HeuristicCoach::default());
         let mut learner = WsGrpoLearner::new(policy, coach, 0.1, 100);
 
-        let results = learner.learn_step_ws(|collector| {
+        let results = learner.learn_step_ws(|collector: &mut TrajectoryCollector| {
             collector.begin("code debugging".into());
             collector.record_step(
                 SpecialistType::Planner,
