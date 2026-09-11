@@ -19,7 +19,6 @@ pub enum MockOrderStatus {
 }
 
 /// Mock ERP system adapter
-#[allow(dead_code)]
 pub struct MockErpSystem {
     orders: HashMap<String, MockOrder>,
     inventory: HashMap<String, i64>,

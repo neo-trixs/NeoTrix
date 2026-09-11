@@ -12,7 +12,7 @@ use std::path::Path;
 
 use zip::ZipArchive;
 
-use super::super::types::{FileAbilityError, Result};
+use super::super::super::types::{FileAbilityError, Result};
 
 /// 快速解析 XLSX 第一个 sheet 为文本 grid。
 ///

@@ -36,7 +36,6 @@ impl OriEvalCase {
 
 /// Score for a single evaluation case.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct OriCaseScore {
     pub case_id: String,
     pub answer_grade: f64,         // rubric keyword hit rate 0.0-1.0

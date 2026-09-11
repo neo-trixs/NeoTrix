@@ -65,7 +65,6 @@ pub struct LRUCache<K, V> {
 }
 
 /// 磁盘缓存 (L2)
-#[allow(dead_code)]
 pub struct DiskCache {
     path: String,
     max_size_mb: usize,

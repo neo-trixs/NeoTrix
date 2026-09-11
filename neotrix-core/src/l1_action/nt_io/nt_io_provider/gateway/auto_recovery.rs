@@ -48,7 +48,6 @@ struct RecoveryTracker {
 pub struct AutoRecovery {
     config: AutoRecoveryConfig,
     trackers: RwLock<HashMap<String, RecoveryTracker>>,
-    #[allow(dead_code)]
     last_check: RwLock<Instant>,
 }
 

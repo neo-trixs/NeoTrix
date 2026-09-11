@@ -122,7 +122,6 @@ pub struct ProductionPipeline {
 // ============================================================================
 
 /// 批量生产管理器
-#[allow(dead_code)]
 pub struct BatchProductionManager {
     /// 所有流水线
     pipelines: HashMap<String, ProductionPipeline>,

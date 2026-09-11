@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 3D 开发引擎
-#[allow(dead_code)]
 pub struct Development3DEngine {
     scenes: HashMap<String, Scene>,
     objects: HashMap<String, GameObject>,

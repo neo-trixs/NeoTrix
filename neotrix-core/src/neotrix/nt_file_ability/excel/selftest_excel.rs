@@ -21,7 +21,7 @@ impl SelfTest for ExcelSelfTest {
 
         // T3: 生产路径测试
         // 1. ConfigFields::parse
-        let config = super::config_parser::ConfigFields::parse("执行标准:美标,压力:150LB");
+        let config = super::super::config_parser::ConfigFields::parse("执行标准:美标,压力:150LB");
         if config.exec_std.as_deref() != Some("美标") {
             errors.push("ConfigFields::parse 执行标准解析失败".to_string());
         }
@@ -42,8 +42,8 @@ impl SelfTest for ExcelSelfTest {
             "单重kg".into(),
             "总重kg".into(),
         ];
-        let (template, _map) = super::template_engine::ColumnMap::detect(&header);
-        if template != super::template_engine::TemplateType::PurchaseRequest {
+        let (template, _map) = super::super::template_engine::ColumnMap::detect(&header);
+        if template != super::super::template_engine::TemplateType::PurchaseRequest {
             errors.push(format!(
                 "ColumnMap::detect 采购申请单模板检测失败, got {:?}",
                 template
@@ -51,7 +51,7 @@ impl SelfTest for ExcelSelfTest {
         }
 
         // 3. PathMetadata
-        let meta = super::path_metadata::PathMetadata::from_salesperson_order(
+        let meta = super::super::path_metadata::PathMetadata::from_salesperson_order(
             "段留杰",
             "4.01菲律宾 WSD-I-26031303",
         );
@@ -65,7 +65,7 @@ impl SelfTest for ExcelSelfTest {
             headers: vec!["A".into(), "B".into()],
             rows: vec![vec!["1".into(), "2".into()]],
         };
-        let md = super::table_presenter::TablePresenter::new(&table).to_markdown();
+        let md = super::super::table_presenter::TablePresenter::new(&table).to_markdown();
         if !md.contains("| A | B |") {
             errors.push("TablePresenter Markdown 输出失败".to_string());
         }
@@ -74,7 +74,7 @@ impl SelfTest for ExcelSelfTest {
         // (函数存在性由编译器保证)
 
         // 6. chunk_planner 分块
-        let chunks = super::chunk_planner::chunk_table(&table);
+        let chunks = super::super::chunk_planner::chunk_table(&table);
         if chunks.is_empty() {
             errors.push("chunk_planner::chunk_table 返回空分块".to_string());
         }
@@ -119,12 +119,12 @@ mod tests {
 
     #[test]
     fn test_chunk_planner_existence() {
-        let table = super::super::types::TableData {
+        let table = super::super::super::types::TableData {
             name: "test".into(),
             headers: vec!["A".into()],
             rows: vec![vec!["1".into()]],
         };
-        let chunks = super::super::chunk_planner::chunk_table(&table);
+        let chunks = super::super::super::chunk_planner::chunk_table(&table);
         assert!(!chunks.is_empty(), "chunk_table 应返回非空分块");
     }
 
@@ -151,7 +151,7 @@ mod tests {
             "key:value,key:value",
         ];
         for case in cases {
-            let config = super::super::config_parser::ConfigFields::parse(case);
+            let config = super::super::super::config_parser::ConfigFields::parse(case);
             // 不应 panic
             let _ = config.is_empty();
         }
@@ -191,7 +191,7 @@ mod tests {
             vec!["列A".into(), "列B".into(), "列C".into()],
         ];
         for case in cases {
-            let (_, _) = super::super::template_engine::ColumnMap::detect(&case);
+            let (_, _) = super::super::super::template_engine::ColumnMap::detect(&case);
             // 不应 panic
         }
     }
@@ -208,7 +208,7 @@ mod tests {
             "没有订单号的文件夹",
         ];
         for case in cases {
-            let _ = super::super::path_metadata::PathMetadata::from_salesperson_order("测试", case);
+            let _ = super::super::super::path_metadata::PathMetadata::from_salesperson_order("测试", case);
             // 不应 panic
         }
     }

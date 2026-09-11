@@ -30,7 +30,6 @@ impl SearchCapability {
 pub(crate) struct ProviderSlot {
     name: String,
     capability: SearchCapability,
-    #[allow(dead_code)]
     priority: u32,
 }
 

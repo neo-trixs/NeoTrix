@@ -5,7 +5,6 @@
 use std::collections::HashMap;
 
 /// JSON-RPC 请求
-#[allow(dead_code)]
 pub struct AcpRequest {
     pub jsonrpc: String,
     pub id: u64,
@@ -22,7 +21,6 @@ pub struct AcpResponse {
 }
 
 /// JSON-RPC 错误
-#[allow(dead_code)]
 pub struct AcpError {
     pub code: i32,
     pub message: String,
@@ -30,7 +28,6 @@ pub struct AcpError {
 }
 
 /// ACP 服务器
-#[allow(dead_code)]
 pub struct AcpServer {
     handlers: HashMap<
         String,
@@ -38,7 +35,6 @@ pub struct AcpServer {
     >,
 }
 
-#[allow(dead_code)]
 impl AcpServer {
     pub fn new() -> Self {
         Self {
@@ -77,7 +73,6 @@ impl AcpServer {
 }
 
 /// 创建默认 ACP 服务器
-#[allow(dead_code)]
 pub fn create_default_acp_server() -> AcpServer {
     let mut server = AcpServer::new();
 

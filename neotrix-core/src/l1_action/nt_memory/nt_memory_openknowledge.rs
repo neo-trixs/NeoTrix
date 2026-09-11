@@ -62,7 +62,6 @@ pub struct SyncConfig {
 }
 
 /// LLM Wiki — 知识库系统
-#[allow(dead_code)]
 pub struct LLMWiki {
     documents: Vec<MarkdownDocument>,
     search_index: SearchIndex,

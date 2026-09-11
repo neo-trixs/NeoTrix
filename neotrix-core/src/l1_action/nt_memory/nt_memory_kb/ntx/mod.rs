@@ -528,7 +528,6 @@ impl NtxFile {
     // ── Drop 实现 ──────────────────────────────────────
 
     /// Drop: 刷新写缓冲区 + 尝试提交
-    #[allow(dead_code)]
     fn drop(&mut self) {
         // 尝试刷新写缓冲区
         if !self.write_buffer.is_empty() {

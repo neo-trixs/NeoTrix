@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// 技能链管理器
-#[allow(dead_code)]
 pub struct SkillChainManager {
     chains: HashMap<String, SkillChain>,
     executors: HashMap<String, Box<dyn SkillExecutor>>,
@@ -89,7 +88,6 @@ pub struct ChainMetadata {
 }
 
 /// 链执行器
-#[allow(dead_code)]
 pub struct ChainExecutor {
     chain: SkillChain,
     state: ChainState,
@@ -142,7 +140,6 @@ pub enum StepStatus {
 /// 技能执行器 trait
 pub trait SkillExecutor: Send + Sync {
     fn execute(&self, config: &serde_json::Value, input: Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
-    #[allow(dead_code)]
     fn rollback(&self, config: &serde_json::Value, output: &serde_json::Value) -> Result<(), String>;
     fn name(&self) -> &str;
 }
@@ -324,14 +321,12 @@ impl ChainExecutor {
     }
 
     /// 评估条件
-    #[allow(dead_code)]
     fn evaluate_condition(&self, _condition: &str) -> bool {
         // 简化版: 总是返回 true
         true
     }
 
     /// 回滚
-    #[allow(dead_code)]
     fn rollback(&mut self) -> Result<(), String> {
         self.state.status = ChainStatus::RollingBack;
 

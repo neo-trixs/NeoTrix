@@ -543,7 +543,6 @@ impl KnowledgePanoramaBuilder {
         result
     }
 
-    #[allow(dead_code)]
     fn compute_domain_summary(&self, nodes: &[KnowledgeNode]) -> Vec<(String, usize)> {
         let mut counts: HashMap<String, usize> = HashMap::new();
         for node in nodes {

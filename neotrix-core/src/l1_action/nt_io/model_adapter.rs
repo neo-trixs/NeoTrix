@@ -82,7 +82,6 @@ pub struct AdapterResult {
 
 /// 适配器注册配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct ModelAdapterConfig {
     /// 默认适配器目录
     pub adapter_dir: String,
@@ -100,7 +99,6 @@ pub struct ModelAdapterConfig {
 
 /// 模型适配器
 /// 统一管理 LoRA、IP-Adapter、ControlNet 等模型
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ModelAdapter {
     /// 配置

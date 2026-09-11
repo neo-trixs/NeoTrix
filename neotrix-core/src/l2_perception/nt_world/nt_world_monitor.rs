@@ -10,7 +10,6 @@ use super::l1_facade::NodeType;
 use std::collections::HashMap;
 
 /// 当前 Unix 时间戳 (秒)。
-#[allow(dead_code)]
 fn now_ts() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

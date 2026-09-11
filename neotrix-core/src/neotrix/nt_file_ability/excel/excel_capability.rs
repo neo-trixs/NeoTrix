@@ -10,10 +10,10 @@
 
 use nt_core_capability_tree::{CapabilityNode, Domain, NodeLayer};
 
-use super::super::config_parser::ConfigFields;
-use super::super::path_metadata::PathMetadata;
-use super::super::template_engine::{ColumnMap, TemplateType};
-use super::super::types::TableData;
+use super::super::super::config_parser::ConfigFields;
+use super::super::super::path_metadata::PathMetadata;
+use super::super::super::template_engine::{ColumnMap, TemplateType};
+use super::super::super::types::TableData;
 use super::super::{config_parser, path_metadata, template_engine};
 use super::super::excel::{tables, xlsx_parser};
 

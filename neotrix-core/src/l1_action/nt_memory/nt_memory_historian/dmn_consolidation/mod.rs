@@ -59,7 +59,6 @@ pub struct DMNConsolidation {
     pub long_term: LearnedGraphExecutor,
     pub retrieval: FamiliarityWeightedRetrieval,
     pub config: DmnConfig,
-    #[allow(dead_code)]
     tick_count: u64,
 }
 

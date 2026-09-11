@@ -120,7 +120,6 @@ pub struct PlatformResponse {
 
 /// 平台网关配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct PlatformGatewayConfig {
     /// 默认超时时间 (秒)
     pub default_timeout_secs: u32,
@@ -142,7 +141,6 @@ pub struct PlatformGatewayConfig {
 
 /// 平台网关
 /// 统一管理多平台集成
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct PlatformGateway {
     /// 配置

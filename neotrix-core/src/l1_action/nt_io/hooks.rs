@@ -3,7 +3,6 @@
 //! Session/Tool/Compact 三个层级的生命周期钩子。
 
 /// Hook 事件类型
-#[allow(dead_code)]
 pub enum HookEvent {
     SessionStart {
         session_id: String,
@@ -55,7 +54,6 @@ pub enum HookDecision {
 pub type HookHandler = Box<dyn Fn(&HookEvent) -> HookDecision + Send + Sync>;
 
 /// 单个 Hook 注册
-#[allow(dead_code)]
 pub struct HookRegistration {
     pub name: String,
     pub event_type: String,
@@ -65,13 +63,11 @@ pub struct HookRegistration {
 }
 
 /// Hook 管理器 — 三拍子生命周期钩子
-#[allow(dead_code)]
 pub struct HookManager {
     hooks: Vec<HookRegistration>,
     hook_count: u32,
 }
 
-#[allow(dead_code)]
 impl HookManager {
     pub fn new() -> Self {
         Self {
