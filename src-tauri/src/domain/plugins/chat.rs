@@ -8,22 +8,27 @@ use neotrix::core::nt_core_consciousness_core::{
     ExternalClosureConfig, CORE,
 };
 use neotrix::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
-use neotrix::l1_action::nt_io::nt_io_provider::types::{LlmRequest, LlmResponse, LlmError, Usage, FinishReason};
+use neotrix::l1_action::nt_io::nt_io_provider::types::{LlmRequest, LlmResponse, LlmError, Usage, FinishReason, ChatMessage};
 use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-static GATEWAY: OnceLock<Arc<GatewayV2>> = OnceLock::new();
+static GATEWAY: OnceLock<Mutex<Option<Arc<GatewayV2>>>> = OnceLock::new();
 
 pub fn set_app_handle(app: AppHandle) {
     let _ = APP_HANDLE.set(app);
 }
 
 /// 获取或初始化 GatewayV2
-async fn get_gateway() -> &'static GatewayV2 {
-    GATEWAY.get_or_init(|| {
-        // 同步创建一个基础 gateway，异步初始化在首次调用时完成
-        Arc::new(GatewayV2::new())
-    })
+fn get_gateway() -> Arc<GatewayV2> {
+    let guard = GATEWAY.get_or_init(|| Mutex::new(None));
+    let mut lock = guard.lock().unwrap();
+    if let Some(gw) = lock.as_ref() {
+        return gw.clone();
+    }
+    // 同步创建基础 gateway，首次调用时初始化
+    let gw = Arc::new(GatewayV2::new());
+    *lock = Some(gw.clone());
+    gw
 }
 
 /// GatewayV2 LLM 执行器 — 实现 consciousness core 的 SolutionExecutor trait
@@ -43,11 +48,11 @@ impl SolutionExecutor for GatewayExecutor {
         let request = LlmRequest {
             model: String::new(), // Gateway 会自动选择
             messages: vec![
-                neotrix::l1_action::nt_io::nt_io_provider::types::ChatMessage {
+                ChatMessage {
                     role: "system".to_string(),
                     content: system_prompt,
                 },
-                neotrix::l1_action::nt_io::nt_io_provider::types::ChatMessage {
+                ChatMessage {
                     role: "user".to_string(),
                     content: task.summary.clone(),
                 },
@@ -60,7 +65,12 @@ impl SolutionExecutor for GatewayExecutor {
 
         // 使用 tokio runtime 执行异步操作
         let rt = tokio::runtime::Handle::current();
-        match rt.block_on(self.gateway.complete_raw(&request)) {
+        match rt.block_on(async {
+            // 先尝试 llamacpp provider
+            self.gateway.complete_single("llamacpp", &request).await
+                .or_else(|_| rt.block_on(self.gateway.complete_single("ollama", &request)))
+                .or_else(|_| rt.block_on(self.gateway.complete_single("openai", &request)))
+        }) {
             Ok(response) => AttemptOutcome::Solved {
                 solution: response.content,
                 tokens_used: response.usage.total_tokens,
@@ -148,12 +158,8 @@ impl ChatPlugin {
         }
 
         // 使用 GatewayV2 统一路由
-        let executor = {
-            let rt = tokio::runtime::Handle::current();
-            let gateway = rt.block_on(async {
-                Arc::new(create_gateway_async().await)
-            });
-            GatewayExecutor { gateway }
+        let executor = GatewayExecutor {
+            gateway: get_gateway(),
         };
         
         let config = ExternalClosureConfig {
