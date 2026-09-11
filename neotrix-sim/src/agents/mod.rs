@@ -9,6 +9,7 @@ pub mod personality_drift;
 pub mod reflection;
 pub mod action_costs;
 pub mod pheromone;
+pub mod behavior_tree;
 
 // Fusion Adapters (External Model Integration)
 pub mod goal_outcome_feedback;
