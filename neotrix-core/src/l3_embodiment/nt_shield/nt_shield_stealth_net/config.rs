@@ -10,7 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock, Arc};
 
-// TODO: inject via DI — pass StealthNetConfig as &Config through subsystem constructors
+// DI: use resolve_config() for DI-aware access, or register via nt_core_di::register_global
 pub static INSTANCE: LazyLock<RwLock<Arc<StealthNetConfig>>> = LazyLock::new(|| {
     RwLock::new(Arc::new(init_config()))
 });

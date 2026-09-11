@@ -169,6 +169,8 @@ noyalib = { version = "0.0.24", features = ["compat-serde-yaml"] }
 zip = { version = "2", default-features = false, features = ["deflate", "time"] }
 quick-xml = "0.41"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+ort = { version = "2.0", features = ["load-dynamic"], optional = true }
+ndarray = { version = "0.15", optional = true }
 tiktoken-rs = "0.12.0"
 office_oxide = "0.1"
 encoding_rs = "0.8"
@@ -245,7 +247,8 @@ anydoc = ["dep:anydoc"]
 simd-vsa = ["dep:holon"]
 self-update = ["dep:self_update"]
 ios-bridge = ["dep:uniffi"]
-full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "ios-bridge"]
+onnx = ["dep:ort", "dep:ndarray"]
+full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "ios-bridge", "onnx"]
 # Internal features (not for external use)
 wip = []
 research = []

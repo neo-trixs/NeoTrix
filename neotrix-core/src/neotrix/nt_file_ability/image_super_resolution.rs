@@ -6,7 +6,9 @@
 //! 设计 (R-P42): 复用 video_post_processor 的架构模式，扩展到静态图像
 //! 跨域错位: 将视频超分的帧处理能力泛化为图像处理能力
 //!
-//! 实现: 使用 image crate 的高质量双三次插值作为默认超分算法
+//! 实现: 
+//! - 默认: Lanczos/Bicubic 插值 (CPU，无依赖)
+//! - ONNX: Real-ESRGAN 推理 (需 onnx feature)
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -17,7 +19,7 @@ use image::imageops::FilterType;
 // ============================================================================
 
 /// 超分模型类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum SuperResolutionModel {
     /// Real-ESRGAN 通用模型 (推荐，速度快)
     RealEsrganGeneral,
@@ -84,6 +86,19 @@ impl SuperResolutionModel {
                 | Self::CustomOnnx(_)
         )
     }
+    
+    /// 获取默认 ONNX 模型路径
+    pub fn default_model_path(&self) -> Option<&'static str> {
+        match self {
+            Self::RealEsrganGeneral => Some("models/RealESRGAN_x4plus.onnx"),
+            Self::RealEsrganAnime => Some("models/RealESRGAN_x4plus_anime_6B.onnx"),
+            Self::RealEsrganPhoto => Some("models/RealESRGAN_x4plus.onnx"),
+            Self::SwinIRClassic => Some("models/SwinIR_M_x2.onnx"),
+            Self::SwinIRRealWorld => Some("models/SwinIRRealWorld_x4.onnx"),
+            Self::CustomOnnx(path) => Some(path),
+            _ => None,
+        }
+    }
 }
 
 /// 超分配置
@@ -103,6 +118,8 @@ pub struct SuperResolutionConfig {
     pub pre_scale: f32,
     /// 输出质量 (JPEG 1-100, PNG 忽略)
     pub output_quality: u8,
+    /// ONNX 模型路径 (覆盖默认)
+    pub model_path: Option<String>,
 }
 
 impl Default for SuperResolutionConfig {
@@ -115,6 +132,7 @@ impl Default for SuperResolutionConfig {
             use_fp16: true,
             pre_scale: 1.0,
             output_quality: 95,
+            model_path: None,
         }
     }
 }
@@ -149,6 +167,83 @@ pub struct SuperResolutionStats {
     pub successful: usize,
     pub failed: usize,
     pub avg_processing_time_ms: u64,
+}
+
+// ============================================================================
+// ONNX 推理引擎 (可选)
+// ============================================================================
+
+#[cfg(feature = "onnx")]
+mod onnx_engine {
+    use super::*;
+    use ort::{Session, SessionOutputs, Value};
+    use ndarray::{Array, Array4, CowArray, Axis};
+    
+    /// ONNX 超分推理器
+    pub struct OnnxSuperResolver {
+        session: Session,
+        scale: u32,
+    }
+    
+    impl OnnxSuperResolver {
+        /// 从模型路径创建
+        pub fn from_path(model_path: &str, scale: u32) -> Result<Self> {
+            let session = Session::builder()?
+                .commit_from_file(model_path)?;
+            
+            Ok(Self { session, scale })
+        }
+        
+        /// 推理单张图像
+        pub fn upscale(&self, input: &image::DynamicImage) -> Result<image::DynamicImage> {
+            let (w, h) = input.dimensions();
+            let rgb = input.to_rgb8();
+            
+            // 预处理: 转换为 NCHW 格式的 float32 tensor
+            let input_tensor = image_to_tensor(&rgb, w, h)?;
+            
+            // 推理
+            let outputs = self.session.run(ort::inputs![input_tensor]?)?;
+            
+            // 后处理: 转换回图像
+            let output_tensor = outputs["output"].try_extract_tensor::<f32>()?;
+            let output_image = tensor_to_image(&output_tensor, w * self.scale, h * self.scale)?;
+            
+            Ok(image::DynamicImage::ImageRgb8(output_image))
+        }
+    }
+    
+    /// 图像 → NCHW tensor
+    fn image_to_tensor(img: &image::RgbImage, w: u32, h: u32) -> Result<CowArray<'_, f32, ndarray::Dim<[usize; 4]>>> {
+        let pixels: Vec<f32> = img.pixels()
+            .flat_map(|p| [p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0])
+            .collect();
+        
+        let array = Array::from_shape_vec((1, 3, h as usize, w as usize), pixels)?;
+        Ok(CowArray::Owned(array))
+    }
+    
+    /// NCHW tensor → 图像
+    fn tensor_to_image(tensor: &ndarray::ArrayView<f32, ndarray::Dim<[usize; 4]>>, w: u32, h: u32) -> Result<image::RgbImage> {
+        let data = tensor.as_slice().unwrap();
+        let mut img = image::RgbImage::new(w, h);
+        
+        for y in 0..h as usize {
+            for x in 0..w as usize {
+                let r = (data[0 * h as usize * w as usize + y * w as usize + x] * 255.0).clamp(0.0, 255.0) as u8;
+                let g = (data[1 * h as usize * w as usize + y * w as usize + x] * 255.0).clamp(0.0, 255.0) as u8;
+                let b = (data[2 * h as usize * w as usize + y * w as usize + x] * 255.0).clamp(0.0, 255.0) as u8;
+                img.put_pixel(x as u32, y as u32, image::Rgb([r, g, b]));
+            }
+        }
+        
+        Ok(img)
+    }
+}
+
+#[cfg(not(feature = "onnx"))]
+mod onnx_engine {
+    // ONNX 未启用时的占位
 }
 
 // ============================================================================
@@ -220,9 +315,12 @@ impl ImageSuperResolver {
                     FilterType::Lanczos3,
                 )
             }
+            _ if self.config.model.requires_onnx() => {
+                // 尝试使用 ONNX 推理
+                self.upscale_with_onnx(&img)
+            }
             _ => {
-                // 对于需要 ONNX 的模型，回退到 Lanczos
-                // TODO: 实现真实的 ONNX Runtime 推理
+                // 回退到 Lanczos
                 img.resize(
                     input_size.0 * self.config.scale,
                     input_size.1 * self.config.scale,
@@ -264,6 +362,47 @@ impl ImageSuperResolver {
         
         self.history.push(result.clone());
         result
+    }
+    
+    /// ONNX 推理超分
+    #[cfg(feature = "onnx")]
+    fn upscale_with_onnx(&self, img: &image::DynamicImage) -> image::DynamicImage {
+        let model_path = self.config.model_path.as_deref()
+            .or_else(|| self.config.model.default_model_path())
+            .unwrap_or("models/RealESRGAN_x4plus.onnx");
+        
+        match onnx_engine::OnnxSuperResolver::from_path(model_path, self.config.scale) {
+            Ok(resolver) => {
+                match resolver.upscale(img) {
+                    Ok(output) => output,
+                    Err(e) => {
+                        eprintln!("ONNX 推理失败，回退到插值: {e}");
+                        self.upscale_with_interpolation(img)
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("ONNX 模型加载失败，回退到插值: {e}");
+                self.upscale_with_interpolation(img)
+            }
+        }
+    }
+    
+    /// ONNX 未启用时的占位
+    #[cfg(not(feature = "onnx"))]
+    fn upscale_with_onnx(&self, img: &image::DynamicImage) -> image::DynamicImage {
+        eprintln!("ONNX feature 未启用，回退到插值");
+        self.upscale_with_interpolation(img)
+    }
+    
+    /// 插值超分 (后备方案)
+    fn upscale_with_interpolation(&self, img: &image::DynamicImage) -> image::DynamicImage {
+        let (w, h) = img.dimensions();
+        img.resize(
+            w * self.config.scale,
+            h * self.config.scale,
+            FilterType::Lanczos3,
+        )
     }
     
     /// 执行内存中的图像超分
@@ -314,8 +453,10 @@ impl ImageSuperResolver {
                     FilterType::Lanczos3,
                 )
             }
+            _ if self.config.model.requires_onnx() => {
+                self.upscale_with_onnx(&img)
+            }
             _ => {
-                // 对于需要 ONNX 的模型，回退到 Lanczos
                 img.resize(
                     input_size.0 * self.config.scale,
                     input_size.1 * self.config.scale,

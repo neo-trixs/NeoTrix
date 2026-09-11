@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -31,7 +31,15 @@ impl CommunicationChannel {
         }
     }
 
-    pub fn send(&mut self, sender: u32, receiver: Option<u32>, channel: &str, content: &str, priority: u8, timestamp: u64) -> u64 {
+    pub fn send(
+        &mut self,
+        sender: u32,
+        receiver: Option<u32>,
+        channel: &str,
+        content: &str,
+        priority: u8,
+        timestamp: u64,
+    ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
 
@@ -47,7 +55,10 @@ impl CommunicationChannel {
 
         self.messages.push(msg);
 
-        self.channels.entry(channel.to_string()).or_default().push(id);
+        self.channels
+            .entry(channel.to_string())
+            .or_default()
+            .push(id);
 
         if let Some(recv) = receiver {
             self.agent_inbox.entry(recv).or_default().push(id);
@@ -62,16 +73,31 @@ impl CommunicationChannel {
 
     pub fn receive(&self, agent_id: u32) -> Vec<&Message> {
         let inbox = self.agent_inbox.get(&agent_id).cloned().unwrap_or_default();
-        self.messages.iter().filter(|m| inbox.contains(&m.id)).collect()
+        self.messages
+            .iter()
+            .filter(|m| inbox.contains(&m.id))
+            .collect()
     }
 
     pub fn receive_channel(&self, channel: &str) -> Vec<&Message> {
         let ids = self.channels.get(channel).cloned().unwrap_or_default();
-        self.messages.iter().filter(|m| ids.contains(&m.id)).collect()
+        self.messages
+            .iter()
+            .filter(|m| ids.contains(&m.id))
+            .collect()
     }
 
-    pub fn broadcast(&mut self, sender: u32, channel: &str, content: &str, priority: u8, timestamp: u64, receivers: &[u32]) -> Vec<u64> {
-        receivers.iter()
+    pub fn broadcast(
+        &mut self,
+        sender: u32,
+        channel: &str,
+        content: &str,
+        priority: u8,
+        timestamp: u64,
+        receivers: &[u32],
+    ) -> Vec<u64> {
+        receivers
+            .iter()
             .map(|&r| self.send(sender, Some(r), channel, content, priority, timestamp))
             .collect()
     }

@@ -35,7 +35,7 @@ impl Container {
     }
 
     /// 解析服务实例 (按具体类型)
-    pub fn resolve<T: Send + Sync + 'static>(&self) -> Option<T> {
+    pub fn resolve<T: Clone + Send + Sync + 'static>(&self) -> Option<T> {
         let map = self.services.read().unwrap_or_else(|e| e.into_inner());
         map.get(&TypeId::of::<T>())
             .and_then(|b| b.downcast_ref::<T>())
@@ -103,7 +103,7 @@ pub fn register_global<T: Send + Sync + 'static>(instance: T) {
 }
 
 /// 从全局容器解析服务
-pub fn resolve_global<T: Send + Sync + 'static>() -> Option<T> {
+pub fn resolve_global<T: Clone + Send + Sync + 'static>() -> Option<T> {
     global_container().resolve()
 }
 

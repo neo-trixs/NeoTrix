@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NegotiationProposal {
@@ -40,9 +40,15 @@ impl NegotiationEngine {
         }
     }
 
-    pub fn evaluate_proposal(&self, proposal: &NegotiationProposal, responder_inventory: &[(String, f32)]) -> bool {
+    pub fn evaluate_proposal(
+        &self,
+        proposal: &NegotiationProposal,
+        responder_inventory: &[(String, f32)],
+    ) -> bool {
         let has_resources = proposal.demand.iter().all(|(item, amount)| {
-            responder_inventory.iter().any(|(i, a)| i == item && a >= amount)
+            responder_inventory
+                .iter()
+                .any(|(i, a)| i == item && a >= amount)
         });
 
         if !has_resources {
@@ -98,7 +104,8 @@ mod tests {
     fn test_negotiation_creation() {
         let engine = NegotiationEngine::new();
         let proposal = engine.start_negotiation(
-            0, 1,
+            0,
+            1,
             vec![("food".to_string(), 10.0)],
             vec![("wood".to_string(), 5.0)],
         );
@@ -110,7 +117,8 @@ mod tests {
     fn test_counter_proposal() {
         let engine = NegotiationEngine::new();
         let proposal = engine.start_negotiation(
-            0, 1,
+            0,
+            1,
             vec![("food".to_string(), 10.0)],
             vec![("wood".to_string(), 5.0)],
         );
@@ -123,7 +131,8 @@ mod tests {
     fn test_fairness() {
         let engine = NegotiationEngine::new();
         let proposal = engine.start_negotiation(
-            0, 1,
+            0,
+            1,
             vec![("food".to_string(), 10.0)],
             vec![("wood".to_string(), 10.0)],
         );

@@ -15,3 +15,5 @@ pub use constitutional::*;
 pub use faction::*;
 pub use negotiation::*;
 pub use communication::*;
+pub mod gossip;
+pub use gossip::*;
