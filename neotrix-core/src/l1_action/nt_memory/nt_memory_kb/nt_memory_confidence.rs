@@ -1200,9 +1200,6 @@ mod tests {
                 )
                 .expect("in-memory temporal ledger"),
             ),
-            freshness: std::sync::RwLock::new(
-                crate::l1_action::nt_memory::nt_memory_kb::nt_memory_sweep_20260815::FreshnessLedger::new(),
-            ),
             lifecycle: std::sync::RwLock::new(
                 crate::l1_action::nt_memory::nt_memory_kb::nt_memory_lifecycle::MemoryLifecycle::default(),
             ),

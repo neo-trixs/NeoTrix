@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 pub use neotrix_types::shared::Severity;
 
-use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::WriteGuardStats;
+use crate::l3_embodiment::l1_facade::WriteGuardStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AuditMode {
@@ -1469,10 +1469,10 @@ mod tests {
 
     #[test]
     fn test_write_guard_check_result_failed_with_evidence() {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::{
+        use crate::l3_embodiment::l1_facade::{
             record_write_evidence, scan_write_guard_evidence, WriteGuardVerdict,
+            KnowledgeBase,
         };
-        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
         let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))).unwrap();
         record_write_evidence(
             &kb,
@@ -1494,10 +1494,10 @@ mod tests {
 
     #[test]
     fn test_write_guard_check_result_clean_passed() {
-        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_write_guard::{
+        use crate::l3_embodiment::l1_facade::{
             scan_write_guard_evidence,
+            KnowledgeBase,
         };
-        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
         let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))).unwrap();
         let stats = scan_write_guard_evidence(&kb);
         let check = write_guard_check_result(&stats);

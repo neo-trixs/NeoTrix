@@ -11,6 +11,8 @@ pub mod coordination;
 pub mod memory;
 pub mod healing;
 pub mod evolution;
+/// L1 Facade — L6 对 L1 共享类型的 re-export 门面
+pub mod l1_facade;
 
 pub use coordination as nt_meta;
 pub use coordination as nt_governance;

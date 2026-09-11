@@ -29,7 +29,6 @@ pub struct SocialLearning {
     action_patterns: HashMap<String, HashMap<String, u32>>,
     /// agent_id -> (trait_name -> adjustment)
     personality_adjustments: HashMap<String, Vec<(String, f32)>>,
-    _max_pattern_history: usize,
     learning_rate: f32,
     mimicry_threshold: f32,
 }
@@ -39,7 +38,6 @@ impl SocialLearning {
         Self {
             action_patterns: HashMap::new(),
             personality_adjustments: HashMap::new(),
-            _max_pattern_history: 50,
             learning_rate: 0.1,
             mimicry_threshold: 0.6,
         }

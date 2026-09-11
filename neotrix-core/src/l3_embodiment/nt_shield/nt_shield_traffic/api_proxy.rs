@@ -13,9 +13,8 @@ use tokio::sync::Mutex;
 use tokio_stream::wrappers::ReceiverStream as RxStream;
 
 use super::analyzer::TrafficAnalyzer;
-use crate::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
-use crate::l1_action::nt_io::nt_io_provider::types::{
-    FinishReason, LlmRequest, Message, Role, Tool,
+use crate::l3_embodiment::l1_facade::{
+    GatewayV2, FinishReason, LlmRequest, Message, Role, Tool,
 };
 
 #[derive(Debug, Clone)]

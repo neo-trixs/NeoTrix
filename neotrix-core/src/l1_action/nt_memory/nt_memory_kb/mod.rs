@@ -171,9 +171,6 @@ pub struct KnowledgeBase {
     /// 时序事实账本 (TemporalFactLedger 接线, R-P79): 节点写入/更正自动记
     /// temporal_facts, 知识变更获得 append-only + supersede + point-in-time 语义。
     pub temporal_ledger: Mutex<TemporalFactLedger>,
-    /// A1 时效账本 (recall absorb, R-P79): 追踪节点最后更新时刻 + 应遗忘标记,
-    /// 检索时过滤 "自信但过期" 的陈旧事实, 减少 agent 被误导决策。
-    pub freshness: RwLock<nt_memory_sweep_20260815::FreshnessLedger>,
     /// Unified memory lifecycle orchestrator — coordinates ForgettingCurve,
     /// FreshnessLedger, and ConfidenceStore decay into a single interface.
     pub lifecycle: RwLock<nt_memory_lifecycle::MemoryLifecycle>,
@@ -236,7 +233,6 @@ impl KnowledgeBase {
             vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
             retrieval_evolver: RwLock::new(nt_memory_search::RetrievalEvolver::new()),
             temporal_ledger: Mutex::new(temporal_ledger),
-            freshness: RwLock::new(nt_memory_sweep_20260815::FreshnessLedger::new()),
             lifecycle: RwLock::new(nt_memory_lifecycle::MemoryLifecycle::default()),
             absorb_scanner: RwLock::new(None),
             receipt_emitter: RwLock::new(None),
@@ -733,9 +729,9 @@ impl KnowledgeBase {
         if r.is_ok() {
             self.record_node_fact(node);
             // A1 时效账本 (recall absorb, R-P79): 写入即刷新时刻, 避免新数据被误判陈旧。
-            if let Ok(mut f) = self.freshness.write() {
-                let now = f.tick();
-                f.note_updated(&node.id, now);
+            if let Ok(mut lc) = self.lifecycle.write() {
+                let now = lc.freshness.tick();
+                lc.freshness.note_updated(&node.id, now);
             }
         }
         r
@@ -803,8 +799,8 @@ impl KnowledgeBase {
             self.mark_bm25_dirty();
             // A1 时效账本 (recall absorb, R-P79): 删除即标记应遗忘, 使仍残留在
             // 内存索引/缓存里的该 id 不再被检索返回。
-            if let Ok(mut f) = self.freshness.write() {
-                f.mark_should_forget(id);
+            if let Ok(mut lc) = self.lifecycle.write() {
+                lc.freshness.mark_should_forget(id);
             }
         }
         r
@@ -888,9 +884,9 @@ impl KnowledgeBase {
         if r.is_ok() {
             self.mark_bm25_dirty();
             // A1 时效账本 (recall absorb, R-P79): 更新即刷新时刻 + 撤销遗忘标记。
-            if let Ok(mut f) = self.freshness.write() {
-                let now = f.tick();
-                f.note_updated(&node.id, now);
+            if let Ok(mut lc) = self.lifecycle.write() {
+                let now = lc.freshness.tick();
+                lc.freshness.note_updated(&node.id, now);
             }
         }
         r
@@ -1386,13 +1382,13 @@ impl KnowledgeBase {
         // (mark_should_forget) 的节点 — "存储系统忘了该忘的", 避免应遗忘的
         // 记忆仍被自信返回。仅剔除显式标记 (保守语义, 不误伤正常陈旧知识)。
         let freshness_results = {
-            let ledger = match self.freshness.read() {
-                Ok(l) => l,
+            let lc = match self.lifecycle.read() {
+                Ok(lc) => lc,
                 Err(_) => return self._finalize_tail(cache_key, query, results),
             };
             let retained: Vec<SearchResult> = results
                 .into_iter()
-                .filter(|r| !ledger.should_forget(&r.node.id))
+                .filter(|r| !lc.freshness.should_forget(&r.node.id))
                 .collect();
             retained
         };

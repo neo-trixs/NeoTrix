@@ -36,7 +36,7 @@ use crate::agents::goal_outcome_feedback::GoalOutcomeFeedback;
 use crate::agents::intention_commitment::IntentionCommitment;
 use crate::agents::thought_generation::ThoughtGeneration;
 use crate::agents::social_learning::SocialLearning;
-use crate::agents::pheromone::{PheromoneField, PheromoneType, PheromoneSignal};
+use crate::agents::pheromone::{PheromoneField, PheromoneType};
 use crate::safety::{
     CapabilityTracker, CapabilitySnapshot, CapabilityConfig,
     SafetyMonitor, SafetyMonitorConfig,
@@ -597,7 +597,7 @@ impl WorldSim {
 
         // Background tier — every 500 ticks
         if self.schedule.should_run(TickTier::Background) {
-            // 9. Evolution cycle
+            // 15. Evolution cycle
             self.evolution_cycle().await;
         }
 
@@ -985,6 +985,35 @@ impl WorldSim {
         }
     }
 
+    /// Build a dynamic inventory from nearby resource nodes for a given position.
+    fn build_inventory_near(&self, x: f32, y: f32, radius: f32) -> crate::society::economy::Inventory {
+        use crate::environment::terrain::resources::ResourceType as RT;
+        let mut inv = crate::society::economy::Inventory::new();
+        for r in self.resources.nodes.iter().filter(|r| !r.depleted) {
+            let dx = r.position.0 - x;
+            let dy = r.position.1 - y;
+            if (dx * dx + dy * dy).sqrt() >= radius {
+                continue;
+            }
+            match r.resource_type {
+                RT::Berries | RT::Fish | RT::Meat => {
+                    inv.add(crate::society::economy::ResourceType::Food, r.amount * 0.3);
+                }
+                RT::Wood => {
+                    inv.add(crate::society::economy::ResourceType::Wood, r.amount * 0.3);
+                }
+                RT::Stone | RT::Ore => {
+                    inv.add(crate::society::economy::ResourceType::Stone, r.amount * 0.2);
+                }
+                RT::Water => {
+                    inv.add(crate::society::economy::ResourceType::Water, r.amount * 0.3);
+                }
+                _ => {}
+            }
+        }
+        inv
+    }
+
     async fn execute_action(&mut self, agent_id: &str, action: &AgentAction) {
         let agent_idx = self.agents.iter().position(|a| &a.core.id == agent_id);
         let Some(idx) = agent_idx else { return };
@@ -1009,7 +1038,7 @@ impl WorldSim {
             AgentAction::Rest => {
                 self.agents[idx].core.rest(5.0);
             }
-            AgentAction::Talk { target_id, message: _message } => {
+            AgentAction::Talk { target_id, message } => {
                 let agent_id = agent_id.to_string();
                 let target_id = target_id.clone();
                 self.relationships.update_interaction(&agent_id, &target_id, 0.1, self.tick);
@@ -1021,7 +1050,7 @@ impl WorldSim {
                     success: true,
                 });
                 // Culture: spread meme from conversation
-                let meme = self.culture.create_meme(&_message, &agent_id, self.tick);
+                let meme = self.culture.create_meme(message, &agent_id, self.tick);
                 let meme_id = meme.id.clone();
                 self.culture.spread_meme(&meme_id, &target_id, 0.5);
             }
@@ -1038,69 +1067,11 @@ impl WorldSim {
                 // Build dynamic inventories from nearby resources for both agents
                 let agent_inv = {
                     let agent = &self.agents[idx];
-                    let mut inv = crate::society::economy::Inventory::new();
-                    let nearby: Vec<&crate::environment::terrain::resources::ResourceNode> = self.resources.nodes.iter()
-                        .filter(|r| !r.depleted)
-                        .filter(|r| {
-                            let dx = r.position.0 - agent.core.position.x;
-                            let dy = r.position.1 - agent.core.position.y;
-                            (dx * dx + dy * dy).sqrt() < 150.0
-                        })
-                        .collect();
-                    for r in &nearby {
-                        match r.resource_type {
-                            crate::environment::terrain::resources::ResourceType::Berries
-                            | crate::environment::terrain::resources::ResourceType::Fish
-                            | crate::environment::terrain::resources::ResourceType::Meat => {
-                                inv.add(crate::society::economy::ResourceType::Food, r.amount * 0.3);
-                            }
-                            crate::environment::terrain::resources::ResourceType::Wood => {
-                                inv.add(crate::society::economy::ResourceType::Wood, r.amount * 0.3);
-                            }
-                            crate::environment::terrain::resources::ResourceType::Stone
-                            | crate::environment::terrain::resources::ResourceType::Ore => {
-                                inv.add(crate::society::economy::ResourceType::Stone, r.amount * 0.2);
-                            }
-                            crate::environment::terrain::resources::ResourceType::Water => {
-                                inv.add(crate::society::economy::ResourceType::Water, r.amount * 0.3);
-                            }
-                            _ => {}
-                        }
-                    }
-                    inv
+                    self.build_inventory_near(agent.core.position.x, agent.core.position.y, 150.0)
                 };
                 let target_inv = {
                     if let Some(target_agent) = self.agents.iter().find(|a| &a.core.id == &target_id_owned) {
-                        let mut inv = crate::society::economy::Inventory::new();
-                        let nearby: Vec<&crate::environment::terrain::resources::ResourceNode> = self.resources.nodes.iter()
-                            .filter(|r| !r.depleted)
-                            .filter(|r| {
-                                let dx = r.position.0 - target_agent.core.position.x;
-                                let dy = r.position.1 - target_agent.core.position.y;
-                                (dx * dx + dy * dy).sqrt() < 150.0
-                            })
-                            .collect();
-                        for r in &nearby {
-                            match r.resource_type {
-                                crate::environment::terrain::resources::ResourceType::Berries
-                                | crate::environment::terrain::resources::ResourceType::Fish
-                                | crate::environment::terrain::resources::ResourceType::Meat => {
-                                    inv.add(crate::society::economy::ResourceType::Food, r.amount * 0.3);
-                                }
-                                crate::environment::terrain::resources::ResourceType::Wood => {
-                                    inv.add(crate::society::economy::ResourceType::Wood, r.amount * 0.3);
-                                }
-                                crate::environment::terrain::resources::ResourceType::Stone
-                                | crate::environment::terrain::resources::ResourceType::Ore => {
-                                    inv.add(crate::society::economy::ResourceType::Stone, r.amount * 0.2);
-                                }
-                                crate::environment::terrain::resources::ResourceType::Water => {
-                                    inv.add(crate::society::economy::ResourceType::Water, r.amount * 0.3);
-                                }
-                                _ => {}
-                            }
-                        }
-                        inv
+                        self.build_inventory_near(target_agent.core.position.x, target_agent.core.position.y, 150.0)
                     } else {
                         crate::society::economy::Inventory::new()
                     }
@@ -1381,7 +1352,7 @@ impl WorldSim {
 
         // 5. Speciation
         let mut all_genomes = result.survivors.clone();
-        all_genomes.extend(valid_offspring.clone());
+        all_genomes.extend(valid_offspring.iter().cloned());
         self.speciation.speciate(&all_genomes);
 
         // 6. Record evolution

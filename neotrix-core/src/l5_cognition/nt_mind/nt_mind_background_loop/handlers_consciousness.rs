@@ -1501,7 +1501,7 @@ impl BackgroundLoopHandle {
         // 异常 (被拒/需审批仍 executed = 守卫被绕过) 汇入 MetaAuditor +
         // 落盘 KB `consciousness` 命名空间 (行为接地, 与 converge_check 同模式)。
         if let Some(ref kb) = self.kb {
-            use crate::l3_embodiment::nt_shield::nt_shield_audit::{
+            use crate::l5_cognition::l3_facade::{
                 write_guard_check_result, CheckStatus,
             };
             use crate::l5_cognition::kb_facade::{

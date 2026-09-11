@@ -292,7 +292,7 @@ pub(crate) async fn fetch_safe_http_async(url: &str) -> Result<(String, String),
 /// - 网络错误重试 (仅 ECONNRESET/ENOTFOUND/ETIMEDOUT 语义)
 /// - 自定义 UA — Wikimedia/Cloudflare CDN 403 规避
 /// - 可选 MIME 白名单 + 大小上限
-pub(crate) struct DownloadOptions<'a> {
+pub struct DownloadOptions<'a> {
     pub url: &'a str,
     pub dest: &'a Path,
     /// 覆盖默认 UA (默认 `NeoTrix/0.19 (nt_http)`)。上游 403 时设可辨识 UA。

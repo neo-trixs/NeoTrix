@@ -27,6 +27,7 @@ mod subgrid;
 mod anomaly_detector;
 mod auto_recovery;
 mod circuit_breaker;
+mod drift;
 mod reliability;
 mod response_cache;
 mod response_healer;
@@ -62,6 +63,7 @@ pub use market_router::*;
 pub use anomaly_detector::*;
 pub use auto_recovery::*;
 pub use circuit_breaker::*;
+pub use drift::*;
 pub use response_cache::*;
 pub use response_healer::*;
 // Execution

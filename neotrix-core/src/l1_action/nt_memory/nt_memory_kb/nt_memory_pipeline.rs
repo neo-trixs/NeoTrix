@@ -19,7 +19,6 @@ use super::KnowledgeBase;
 
 use crate::core::nt_core_kb_types::{NodeType, RelationType};
 use super::nt_memory_gwt_router::RetrievalChannel;
-use crate::core::nt_core_traits::{AbsorbTextScanner, ReceiptEmitter};
 
 use serde::{Deserialize, Serialize};
 

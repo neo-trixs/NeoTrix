@@ -879,12 +879,13 @@ impl CommunityAwareSearch {
         results
     }
 
-    // ── Get All Communities ─────────────────────────────────────
+    // ── Get All Communities (Leiden) ────────────────────────────
 
-    /// Returns all detected communities across all hierarchy levels as `CommunityResult`s.
-    /// This is the unified community detection interface used by both the community module
-    /// and GraphRagStore (replacing GraphRagStore's internal label propagation).
-    pub fn get_communities(&self) -> Vec<CommunityResult> {
+    /// Returns all Leiden-detected communities across all hierarchy levels.
+    /// This is the single fact source for community detection — both the community
+    /// module and GraphRagStore delegate to this method instead of running their own
+    /// label propagation or separate detection.
+    pub fn get_communities_leiden(&self) -> Vec<CommunityResult> {
         let hierarchy = match self.hierarchy.as_ref() {
             Some(h) => h,
             None => return Vec::new(),
@@ -907,6 +908,36 @@ impl CommunityAwareSearch {
             }
         }
         results
+    }
+
+    /// Alias for `get_communities_leiden()` — kept for backward compatibility.
+    pub fn get_communities(&self) -> Vec<CommunityResult> {
+        self.get_communities_leiden()
+    }
+
+    /// Returns Leiden communities at a specific hierarchy level.
+    /// Useful when callers need only the finest (0) or coarsest level.
+    pub fn get_communities_at_level(&self, level: usize) -> Vec<CommunityResult> {
+        let hierarchy = match self.hierarchy.as_ref() {
+            Some(h) => h,
+            None => return Vec::new(),
+        };
+        match hierarchy.levels.get(level) {
+            Some(comms) => comms
+                .iter()
+                .map(|c| CommunityResult {
+                    community_id: c.id,
+                    level: c.level,
+                    summary: c
+                        .summary
+                        .clone()
+                        .unwrap_or_else(|| format!("Community #{} ({} members)", c.id, c.members.len())),
+                    score: c.modularity_score,
+                    member_count: c.members.len(),
+                })
+                .collect(),
+            None => Vec::new(),
+        }
     }
 
     // ── Fusion ────────────────────────────────────────────────────

@@ -17,6 +17,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::core::nt_core_math::normalize_url;
 use crate::neotrix::nt_memory_kb::{KnowledgeBase, NodeType, RelationType};
 
 /// 资产层级: 从 URL 解析出 root_domain / subdomain / service / endpoint。
@@ -182,16 +183,7 @@ impl ScopeFrontier {
     }
 }
 
-/// URL 规范化: 去 fragment + 尾斜杠 (缺陷#6 去重无指纹的轻量修复)。
-fn normalize_url(url: &str) -> String {
-    let without_frag = url.split('#').next().unwrap_or(url);
-    let trimmed = without_frag.trim_end_matches('/');
-    if trimmed.is_empty() {
-        "/".to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
+// normalize_url 已统一到 crate::core::nt_core_math::normalize_url
 
 /// 多 scope 探索图管理器: scope → ScopeFrontier。
 #[derive(Default)]

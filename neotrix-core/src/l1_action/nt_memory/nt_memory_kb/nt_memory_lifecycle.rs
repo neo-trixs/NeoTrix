@@ -102,7 +102,7 @@ impl MemoryLifecycle {
     /// 3. FreshnessLedger tracks staleness for index filtering
     ///
     /// Returns `(nodes_marked_by_curve, confidences_decayed)`.
-    pub fn update_all(
+    pub fn run_forgetting_cycle(
         &mut self,
         conn: &Connection,
         confidence_store: &ConfidenceStore,
@@ -119,6 +119,26 @@ impl MemoryLifecycle {
         self.freshness.tick();
 
         Ok((marked, decayed))
+    }
+
+    /// Advance the freshness clock and return the new tick.
+    pub fn tick(&mut self) -> u64 {
+        self.freshness.tick()
+    }
+
+    /// Record that a document was updated at the given tick.
+    pub fn note_updated(&mut self, doc_id: &str, at: u64) {
+        self.freshness.note_updated(doc_id, at);
+    }
+
+    /// Mark a document as explicitly forgotten (removed from index).
+    pub fn mark_should_forget(&mut self, doc_id: &str) {
+        self.freshness.mark_should_forget(doc_id);
+    }
+
+    /// Check if a document is marked as should-forget.
+    pub fn is_marked_forget(&self, doc_id: &str) -> bool {
+        self.freshness.should_forget(doc_id)
     }
 }
 
@@ -166,7 +186,7 @@ mod tests {
         super::super::nt_memory_schema::initialize(&conn).unwrap();
         let store = ConfidenceStore::new(DecayConfig::default());
 
-        let (marked, _decayed) = lifecycle.update_all(&conn, &store).unwrap();
+        let (marked, _decayed) = lifecycle.run_forgetting_cycle(&conn, &store).unwrap();
         // With empty DB, nothing to mark
         assert_eq!(marked, 0);
     }

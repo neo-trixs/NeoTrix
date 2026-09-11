@@ -61,6 +61,28 @@ pub fn cosine_similarity_bytes(a: &[u8], b: &[u8]) -> f64 {
     1.0 - 2.0 * hd as f64 / dim
 }
 
+/// URL 规范化: 去空白 + 去 fragment (#) + 尾斜杠 + 域名小写。
+/// 用于跨模块 URL 去重 (asset_graph, experience absorb, KB dedup)。
+pub fn normalize_url(url: &str) -> String {
+    let mut u = url.trim().to_string();
+    if let Some(idx) = u.find('#') {
+        u.truncate(idx);
+    }
+    u = u.trim_end_matches('/').to_string();
+    // 域名小写 (仅 http/https)
+    if let Some(pos) = u.find("://") {
+        let rest = &u[pos + 3..];
+        if let Some(slash) = rest.find('/') {
+            let (host, path) = rest.split_at(slash);
+            u = format!("{}://{}{}", &u[..pos], host.to_lowercase(), path);
+        } else {
+            let host = rest;
+            u = format!("{}://{}", &u[..pos], host.to_lowercase());
+        }
+    }
+    u
+}
+
 /// Hamming 距离：两个字节向量不同的比特数。
 pub fn hamming_distance(a: &[u8], b: &[u8]) -> u64 {
     a.iter()
@@ -173,5 +195,32 @@ mod tests {
         let a = vec![0b00000000u8];
         let b = vec![0b11111111u8];
         assert_eq!(hamming_distance(&a, &b), 8);
+    }
+
+    #[test]
+    fn normalize_url_strips_fragment() {
+        assert_eq!(normalize_url("https://a.com/x#sec"), "https://a.com/x");
+    }
+
+    #[test]
+    fn normalize_url_strips_trailing_slash() {
+        assert_eq!(normalize_url("https://a.com/x/"), "https://a.com/x");
+        assert_eq!(normalize_url("https://a.com/"), "https://a.com");
+    }
+
+    #[test]
+    fn normalize_url_lowercases_domain() {
+        assert_eq!(normalize_url("https://A.COM/X"), "https://a.com/X");
+        assert_eq!(normalize_url("HTTP://Example.COM/Path"), "http://example.com/Path");
+    }
+
+    #[test]
+    fn normalize_url_trims_whitespace() {
+        assert_eq!(normalize_url("  https://a.com/x  "), "https://a.com/x");
+    }
+
+    #[test]
+    fn normalize_url_no_scheme() {
+        assert_eq!(normalize_url("example.com/x#y"), "example.com/x");
     }
 }

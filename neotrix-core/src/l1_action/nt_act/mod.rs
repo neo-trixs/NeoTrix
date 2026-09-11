@@ -46,3 +46,5 @@ pub use actions::{error_classifier, observability_stack, cost_tracker, gpu_sched
 pub use actions::{video_job_pipeline, video_object_storage, video_spec, video_stitcher, audio_orchestrator};
 
 pub mod pipeline_checkpointing;
+
+pub mod nt_act_cleanup;

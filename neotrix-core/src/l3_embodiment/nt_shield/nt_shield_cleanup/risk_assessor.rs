@@ -4,7 +4,7 @@
 //! 域: NT-SHIELD (影卫)
 //! 层: L3 Embodiment
 
-use crate::l1_action::nt_act::nt_act_cleanup::shared::*;
+use crate::l3_embodiment::l1_facade::*;
 
 pub struct RiskAssessor {
     confirmation_threshold: u8,

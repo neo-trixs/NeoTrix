@@ -4,7 +4,7 @@
 //! 域: NT-META (元吸收者)
 //! 层: L6 Meta-Cognition
 
-use crate::l1_action::nt_act::nt_act_cleanup::shared::*;
+use crate::l6_meta::l1_facade::*;
 use std::collections::HashMap;
 
 /// 清理事件类型

@@ -53,6 +53,7 @@ use neotrix::core::nt_core_hcube::ghrr_vsa::{
     ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
 };
 use neotrix::core::nt_core_hcube::{PersistentHomology, PointCloud};
+use neotrix::core::nt_core_math::normalize_url;
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
@@ -136,27 +137,7 @@ fn cn_stop() -> &'static HashSet<char> {
 // ─── value 透明压缩层 (方案 D) ─────────────────────────────────────
 const VALUE_MAGIC: &[u8] = b"NTZ1";
 
-/// UNBP URL 规范化: 去锚点/尾斜杠/域名小写 (用于 absorb-node 去重)
-/// 锚点 (#zh-full/#RealEarth4D) 是视角标记, 非 URL 唯一性的一部分
-fn normalize_url(url: &str) -> String {
-    let mut u = url.trim().to_string();
-    if let Some(idx) = u.find('#') {
-        u.truncate(idx);
-    }
-    u = u.trim_end_matches('/').to_string();
-    // 域名小写 (仅 http/https)
-    if let Some(pos) = u.find("://") {
-        let rest = &u[pos + 3..];
-        if let Some(slash) = rest.find('/') {
-            let (host, path) = rest.split_at(slash);
-            u = format!("{}://{}{}", &u[..pos], host.to_lowercase(), path);
-        } else {
-            let host = rest;
-            u = format!("{}://{}", &u[..pos], host.to_lowercase());
-        }
-    }
-    u
-}
+// normalize_url 已统一到 neotrix::core::nt_core_math::normalize_url
 
 fn now_ts() -> i64 {
     SystemTime::now()

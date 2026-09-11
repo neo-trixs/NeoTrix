@@ -8,6 +8,7 @@ members = [
     "neotrix-core/src/neotrix/nt_core_capability_tree",
     "crates/nt-lang",
     "neotrix-sim",
+    "nt-world-sim",
 ]
 
 resolver = "2"

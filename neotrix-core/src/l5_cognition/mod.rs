@@ -9,3 +9,5 @@ pub mod io_facade;
 pub mod io_skills_facade;
 /// ACT Facade — L5 对 L1 NT-ACT 共享类型的 re-export 门面
 pub mod act_facade;
+/// L3 Facade — L5 对 L3 共享类型的 re-export 门面
+pub mod l3_facade;

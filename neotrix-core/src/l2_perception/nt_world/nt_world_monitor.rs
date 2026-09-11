@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn index_fts5_to_kb_writes_source_node() {
-        use crate::l1_action::nt_memory::nt_memory_kb::KnowledgeBase;
+        use crate::l2_perception::nt_world::l1_facade::KnowledgeBase;
         use std::path::PathBuf;
         let Ok(kb) = KnowledgeBase::open(Some(PathBuf::from(":memory:"))) else {
             eprintln!("skip: KB (FTS5) unavailable in this build");

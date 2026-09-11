@@ -307,10 +307,6 @@ pub struct GraphRagStore {
     global_summaries: Vec<GlobalSummary>,
     change_log: Vec<IncrementalChange>,
     lightrag_index: LightRagIndex,
-    /// Unified community detector (delegates to `CommunityAwareSearch` hierarchical Leiden
-    /// instead of reimplementing label propagation). Set via `set_community_detector()`.
-    #[serde(skip)]
-    community_detector: Option<std::sync::Arc<std::sync::RwLock<super::nt_memory_community::CommunityAwareSearch>>>,
 }
 
 impl GraphRagStore {
@@ -322,18 +318,7 @@ impl GraphRagStore {
             global_summaries: Vec::new(),
             change_log: Vec::new(),
             lightrag_index: LightRagIndex::new(),
-            community_detector: None,
         }
-    }
-
-    /// Inject the unified community detector. When set, `community_summary()` delegates
-    /// to `CommunityAwareSearch::get_communities()` (hierarchical Leiden) instead of
-    /// running its own label propagation algorithm.
-    pub fn set_community_detector(
-        &mut self,
-        detector: std::sync::Arc<std::sync::RwLock<super::nt_memory_community::CommunityAwareSearch>>,
-    ) {
-        self.community_detector = Some(detector);
     }
 
     pub fn config(&self) -> &GraphRagConfig {
@@ -720,6 +705,11 @@ impl GraphRagStore {
         id
     }
 
+    /// Add a `KnowledgeNode` directly — converts via `From<KnowledgeNode> for EntityNode`.
+    pub fn add_entity_from_kb(&mut self, node: KnowledgeNode) -> String {
+        self.add_entity(node.into())
+    }
+
     fn add_entity_internal(&mut self, entity: EntityNode) {
         let id = entity.id.clone();
         if !self.graph.adjacency.contains_key(&id) {
@@ -735,6 +725,11 @@ impl GraphRagStore {
         self.add_relation_internal(relation);
         self.stats.total_relations = self.graph.relations.len();
         id
+    }
+
+    /// Add a `KnowledgeEdge` directly — converts via `From<KnowledgeEdge> for RelationEdge`.
+    pub fn add_relation_from_kb(&mut self, edge: KnowledgeEdge) -> String {
+        self.add_relation(edge.into())
     }
 
     fn add_relation_internal(&mut self, relation: RelationEdge) {
@@ -958,12 +953,12 @@ impl GraphRagStore {
         }
     }
 
+    /// Community summary using Leiden detection (single fact source).
+    /// Delegates to `community_summary_with()` using a temporary `CommunityAwareSearch`.
     pub fn community_summary(&self) -> Vec<Community> {
         if self.graph.entities.is_empty() {
             return Vec::new();
         }
-
-        // Bridge to KB types and run Leiden via CommunityAwareSearch (single fact source)
         let kb_nodes: Vec<KnowledgeNode> = self.graph.entities.values().cloned().map(Into::into).collect();
         let kb_edges: Vec<KnowledgeEdge> = self.graph.relations.values().cloned().map(Into::into).collect();
 
@@ -971,26 +966,37 @@ impl GraphRagStore {
         let mut searcher = CommunityAwareSearch::new(detector);
         searcher.detect(&kb_nodes, &kb_edges);
 
-        let hierarchy = match searcher.hierarchy() {
-            Some(h) => h,
-            None => return Vec::new(),
-        };
+        self.community_summary_with(&searcher)
+    }
 
-        // Use finest level (level 0) for community membership
-        let level0 = match hierarchy.levels.first() {
-            Some(l) if !l.is_empty() => l,
-            _ => return Vec::new(),
-        };
+    /// Community summary using an existing `CommunityAwareSearch` (avoids re-detection).
+    /// The Leiden hierarchy from `searcher` is the single fact source for community structure.
+    pub fn community_summary_with(&self, searcher: &CommunityAwareSearch) -> Vec<Community> {
+        if self.graph.entities.is_empty() {
+            return Vec::new();
+        }
+
+        // Use Leiden results at finest level (level 0) for community membership
+        let leiden_communities = searcher.get_communities_at_level(0);
+        if leiden_communities.is_empty() {
+            return Vec::new();
+        }
 
         // Precompute centrality once
         let centrality = self.compute_centrality();
 
-        // Convert Leiden communities to GraphRAG Community structs
-        let mut communities: Vec<Community> = level0
+        // Convert Leiden CommunityResult to GraphRAG Community structs
+        let mut communities: Vec<Community> = leiden_communities
             .iter()
-            .map(|c| {
-                let label = c.id.0 as usize;
-                self.build_community_summary(label, &c.members, &centrality)
+            .map(|cr| {
+                // Reconstruct member IDs from hierarchy for this community
+                let hierarchy = searcher.hierarchy();
+                let member_ids = hierarchy
+                    .and_then(|h| {
+                        h.levels.first()?.iter().find(|c| c.id == cr.community_id).map(|c| c.members.clone())
+                    })
+                    .unwrap_or_default();
+                self.build_community_summary(cr.community_id.0 as usize, &member_ids, &centrality)
             })
             .collect();
 
