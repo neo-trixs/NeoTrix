@@ -1284,6 +1284,27 @@ impl ConsciousnessCoreHandle {
         }
         report.internal_results = internal_results;
 
+        // PDF 图标增强结果 → KB 持久化 (experience namespace)
+        // 内置子任务执行完毕后, 检查是否有 PDF 增强结果需要落盘
+        {
+            let kb_pdf = KnowledgeBase::open(None).ok();
+            if let Some(ref kb) = kb_pdf {
+                for r in &report.internal_results {
+                    if r.summary.contains("PDF 图标增强完成") && r.executed && !r.output.is_empty() {
+                        let key = format!("pdf_enhance:{}", r.task_id);
+                        let value = serde_json::json!({
+                            "task_id": r.task_id,
+                            "summary": r.summary,
+                            "output": r.output,
+                            "provider_path": r.provider_path,
+                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                        });
+                        let _ = kb.kv_set("experience", &key, &value.to_string());
+                    }
+                }
+            }
+        }
+
         // 外部缺口执行: 每个 External 子任务 → 自动外部求解闭环
         // 最短路径: 读端 serve_core 接地 (GWT 路由), 写端 absorb_core 吸收经验
         let kb = KnowledgeBase::open(None).ok();
