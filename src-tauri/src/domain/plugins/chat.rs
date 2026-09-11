@@ -278,6 +278,9 @@ impl DomainPlugin for ChatPlugin {
                 Ok(serde_json::json!(assistant_content))
             }
             "stop_stream" | "stop" => {
+                if let Some(app) = APP_HANDLE.get() {
+                    let _ = app.emit("neocodex_stream_cancel", "");
+                }
                 Ok(serde_json::json!({ "ok": true }))
             }
             "get_session_messages" | "history" => {

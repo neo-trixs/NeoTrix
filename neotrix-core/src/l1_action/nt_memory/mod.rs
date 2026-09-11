@@ -17,3 +17,9 @@ pub mod addressable_store;
 
 // Context-as-Filesystem — 基于 OpenViking 模式
 pub mod context_fs;
+
+/// Trinity Memory — 基于 TencentDB Agent Memory 模式
+pub mod trinity;
+
+/// 三类记忆 — 基于 Grok Build 模式
+pub mod memory_types;

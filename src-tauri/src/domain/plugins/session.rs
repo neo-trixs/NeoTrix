@@ -351,6 +351,18 @@ impl DomainPlugin for SessionPlugin {
             ActionSpec { name: "search".into(), description: "搜索会话".into(),
                 params: vec![ParamSpec { name: "query".into(), r#type: "string".into(), description: "搜索关键词".into(), optional: false }],
                 ..Default::default() },
+            ActionSpec { name: "tag".into(), description: "给会话打标".into(),
+                params: vec![
+                    ParamSpec { name: "id".into(), r#type: "string".into(), description: "会话 ID".into(), optional: false },
+                    ParamSpec { name: "tag".into(), r#type: "string".into(), description: "标签名".into(), optional: false },
+                ],
+                ..Default::default() },
+            ActionSpec { name: "untag".into(), description: "移除会话标签".into(),
+                params: vec![
+                    ParamSpec { name: "id".into(), r#type: "string".into(), description: "会话 ID".into(), optional: false },
+                    ParamSpec { name: "tag".into(), r#type: "string".into(), description: "标签名".into(), optional: false },
+                ],
+                ..Default::default() },
         ]
     }
 
@@ -404,6 +416,22 @@ impl DomainPlugin for SessionPlugin {
                     .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'query'".into(), recoverable: true })?;
                 let results = self.search(query)?;
                 Ok(serde_json::to_value(results).unwrap_or_default())
+            }
+            "tag" => {
+                let id = args.get("id").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'id'".into(), recoverable: true })?;
+                let tag = args.get("tag").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'tag'".into(), recoverable: true })?;
+                let tags = self.tag(id, tag)?;
+                Ok(serde_json::json!({ "ok": true, "tags": tags }))
+            }
+            "untag" => {
+                let id = args.get("id").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'id'".into(), recoverable: true })?;
+                let tag = args.get("tag").and_then(|v| v.as_str())
+                    .ok_or_else(|| DomainError { code: "INVALID_ARGS".into(), message: "missing 'tag'".into(), recoverable: true })?;
+                let tags = self.untag(id, tag)?;
+                Ok(serde_json::json!({ "ok": true, "tags": tags }))
             }
             _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
         }

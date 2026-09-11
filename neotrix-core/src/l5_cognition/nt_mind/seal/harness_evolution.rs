@@ -20,6 +20,7 @@ pub struct TestCase {
 }
 
 /// Harness 变异
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct HarnessMutation {
     pub id: String,
@@ -29,6 +30,7 @@ pub struct HarnessMutation {
     pub proposed_at: i64,
 }
 
+#[derive(Clone)]
 #[allow(dead_code)]
 pub enum MutationType {
     /// 修改提示词
@@ -44,6 +46,7 @@ pub enum MutationType {
 }
 
 /// 变异评估结果
+#[derive(Clone)]
 #[allow(dead_code)]
 pub struct MutationEvaluation {
     pub mutation_id: String,
