@@ -56,12 +56,14 @@ impl super::OsintSource for CryptoPubInvestigator {
     fn name(&self) -> &'static str { "cryptopub" }
     fn priority(&self) -> u8 { 6 }
 
+    fn needs_api_key(&self) -> bool { false }
+
     async fn investigate(
         &self,
         target: &super::OsintTarget,
-        client: &Client,
-        config: &super::OsintConfig,
+        _client: &Client,
+        _config: &super::OsintConfig,
     ) -> Result<CryptoPubFindings, String> {
-        investigate(target, client, config).await
+        investigate(target, _client, _config).await
     }
 }
