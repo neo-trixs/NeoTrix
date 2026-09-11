@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::neotrix::nt_world_model::TaskType;
+    use crate::core::nt_core_knowledge::TaskType;
     use crate::SelfIteratingBrain;
     use crate::core::nt_core_bank::ReasoningMemory;
 
