@@ -315,6 +315,16 @@ impl SessionPlugin {
         .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("取消打标失败: {}", e), recoverable: true })?;
         Ok(tags)
     }
+
+    fn clear(&self, id: &str) -> Result<(), DomainError> {
+        let conn = self.open_db()?;
+        conn.execute(
+            "UPDATE sessions SET messages = '[]' WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(|e| DomainError { code: "DB_ERROR".into(), message: format!("清空消息失败: {}", e), recoverable: true })?;
+        Ok(())
+    }
 }
 
 impl DomainPlugin for SessionPlugin {

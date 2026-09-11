@@ -450,6 +450,26 @@ export interface CliCommand {
 
 // ========== Domain Proxy (动态调用) ==========
 
+// ========== Llamacpp 域 ==========
+
+export interface LlamacppModel {
+  name: string
+  path: string
+  size: number
+}
+
+export const llamacpp = {
+  health: () => call<{ status: string; pid?: number; uptime_secs?: number }>('llamacpp', 'health'),
+  models: () => call<LlamacppModel[]>('llamacpp', 'models'),
+  start: (model?: string) => call<{ port: number }>('llamacpp', 'start', { model }),
+  stop: () => call<void>('llamacpp', 'stop'),
+  swap: (model: string) => call<void>('llamacpp', 'swap', { model }),
+  send: (prompt: string, opts?: { temperature?: number; max_tokens?: number }) =>
+    call<string>('llamacpp', 'send', { prompt, ...opts }),
+}
+
+// ========== Domain Proxy (动态调用) ==========
+
 /**
  * 动态域代理 — 用于未定义 typed helper 的域
  *

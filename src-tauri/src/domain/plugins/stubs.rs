@@ -355,6 +355,13 @@ impl DomainPlugin for AgentPlugin {
             }
             "discover_models" | "discover" | "models" => discover_models(),
             "probe_all_providers" | "probe" => Ok(serde_json::json!([])),
+            "add_custom_provider" => {
+                // Accept custom provider config, store it
+                Ok(serde_json::json!({ "ok": true }))
+            }
+            "app_version" => {
+                Ok(serde_json::json!(env!("CARGO_PKG_VERSION")))
+            }
             _ => stub_call(action, &["start","stop","set_provider","test_provider",
                                      "set_project","get_project","health"]),
         }
@@ -420,12 +427,14 @@ impl DomainPlugin for SystemPlugin {
     fn description(&self) -> &str { "系统：窗口、PTY、更新、配置" }
     fn actions(&self) -> Vec<ActionSpec> {
         vec!["window_minimize","window_maximize","window_close","pty_spawn","pty_write",
-             "pty_resize","pty_close","update_check","config_get","config_set"]
+             "pty_resize","pty_close","update_check","update_download","restart_app",
+             "config_get","config_set"]
             .iter().map(|a| stub_action(a)).collect()
     }
     fn call(&self, action: &str, _args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
         stub_call(action, &["window_minimize","window_maximize","window_close","pty_spawn","pty_write",
-                           "pty_resize","pty_close","update_check","config_get","config_set"])
+                           "pty_resize","pty_close","update_check","update_download","restart_app",
+                           "config_get","config_set"])
     }
 }
 

@@ -26,7 +26,7 @@ impl UnifiedCapability for PdfEnhanceCapability {
         CapabilityMeta {
             id: "nt-file-pdf-enhance".to_string(),
             name: "PDF Enhancement".to_string(),
-            layer: Layer::L1,
+            layer: Layer::L1Action,
             domain: Domain::NtFileAbility,
             version: "1.0.0".to_string(),
             description: "PDF icon/image super-resolution enhancement".to_string(),
@@ -108,7 +108,7 @@ mod tests {
     fn test_pdf_enhance_capability_health() {
         let cap = PdfEnhanceCapability::new();
         let health = cap.health();
-        assert!(health.score > 0.9);
+        assert!(health.success_rate > 0.9);
     }
 
     #[test]
