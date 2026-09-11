@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn selector_picks_first_success() {
-        let s = Selector::new("test", vec![
+        let mut s = Selector::new("test", vec![
             Box::new(Condition::new("fail", Box::new(|_| false))),
             Box::new(Condition::new("pass", Box::new(|_| true))),
         ]);
@@ -315,7 +315,7 @@ mod tests {
 
     #[test]
     fn selector_fails_when_all_fail() {
-        let s = Selector::new("test", vec![
+        let mut s = Selector::new("test", vec![
             Box::new(Condition::new("fail1", Box::new(|_| false))),
             Box::new(Condition::new("fail2", Box::new(|_| false))),
         ]);
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn sequence_succeeds_when_all_pass() {
-        let s = Sequence::new("test", vec![
+        let mut s = Sequence::new("test", vec![
             Box::new(Condition::new("pass1", Box::new(|_| true))),
             Box::new(Condition::new("pass2", Box::new(|_| true))),
         ]);
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn sequence_fails_on_first_failure() {
-        let s = Sequence::new("test", vec![
+        let mut s = Sequence::new("test", vec![
             Box::new(Condition::new("pass", Box::new(|_| true))),
             Box::new(Condition::new("fail", Box::new(|_| false))),
         ]);
@@ -345,14 +345,14 @@ mod tests {
 
     #[test]
     fn inverter_flips_result() {
-        let inv = Inverter::new("inv", Box::new(Condition::new("fail", Box::new(|_| false))));
+        let mut inv = Inverter::new("inv", Box::new(Condition::new("fail", Box::new(|_| false))));
         let mut bb = Blackboard::new();
         assert_eq!(inv.tick(&mut bb), BtStatus::Success);
     }
 
     #[test]
     fn condition_reads_blackboard() {
-        let cond = Condition::new("check", Box::new(|bb| bb.get_float("hp") > 0.5));
+        let mut cond = Condition::new("check", Box::new(|bb| bb.get_float("hp") > 0.5));
         let mut bb = Blackboard::new();
         assert_eq!(cond.tick(&mut bb), BtStatus::Failure);
         bb.set_float("hp", 0.8);

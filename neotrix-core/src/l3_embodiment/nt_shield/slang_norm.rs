@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 /// 域类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Domain {
     Security,
     Reverse,

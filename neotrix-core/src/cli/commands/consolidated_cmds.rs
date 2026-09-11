@@ -31,11 +31,11 @@ pub struct FileCmd;
 impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|schema|suggest|convert|extract|mergepdf|merge|editpdf|enhance <args>" }
+    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff|consolidate|schema|suggest|convert|extract|mergepdf|merge|editpdf <args>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格 [--schema <name>] [--sheet-mode first|preferred|all]\n  /file schema list|show <name>  列出/查看已注册领域 schema (SchemaStore)\n  /file suggest <dir> [--save <name>]  扫描表头生成 schema 初稿 (可固化)\n  /file convert <in> <out>   图像格式转换 (png/jpeg)\n  /file extract <dir>   目录级统一提取 (混合格式 → 文本/表格清单)\n  /file mergepdf <out> <in1> <in2> ...  结构级合并多个 PDF (页面按序拼接)\n  /file merge <out.docx|pptx> <in1> <in2> ...  结构级合并 Office 文档 (DOCX 段落 / PPTX 幻灯片)\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)\n  /file enhance <in.pdf> [out.pdf] [--scale 4] [--model realesrgan]  PDF 图标清晰度提升 (AI 超分辨率)");
+            return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异\n  /file consolidate <dir> [out] 合并目录内 xlsx/csv/tsv 表格 [--schema <name>] [--sheet-mode first|preferred|all]\n  /file schema list|show <name>  列出/查看已注册领域 schema (SchemaStore)\n  /file suggest <dir> [--save <name>]  扫描表头生成 schema 初稿 (可固化)\n  /file convert <in> <out>   图像格式转换 (png/jpeg)\n  /file extract <dir>   目录级统一提取 (混合格式 → 文本/表格清单)\n  /file mergepdf <out> <in1> <in2> ...  结构级合并多个 PDF (页面按序拼接)\n  /file merge <out.docx|pptx> <in1> <in2> ...  结构级合并 Office 文档 (DOCX 段落 / PPTX 幻灯片)\n  /file editpdf <in> <out> <page> <find> [replace] [font.ttf] 编辑 PDF 文本 (span redact + 原位替换)\n  /file tables <in.pdf>   提取 PDF 表格网格 (Markdown 渲染)");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -403,88 +403,7 @@ impl CliCommand for FileCmd {
                     Err(e) => CommandOutput::err(&format!("PDF 编辑失败: {e}")),
                 }
             }
-            "enhance" => {
-                // 用法: /file enhance <in.pdf> [out.pdf] [--scale 4] [--model realesrgan]
-                if rest.is_empty() {
-                    return CommandOutput::err("用法: /file enhance <in.pdf> [out.pdf] [--scale 4] [--model realesrgan]\n  PDF 图标清晰度提升: 提取图像 → AI 超分辨率 → 嵌回 PDF");
-                }
-                let src = std::path::PathBuf::from(&rest[0]);
-                let out = if rest.len() > 1 && !rest[1].starts_with("--") {
-                    std::path::PathBuf::from(&rest[1])
-                } else {
-                    let stem = src.file_stem().unwrap_or_default();
-                    let ext = src.extension().unwrap_or_default();
-                    src.with_file_name(format!("{}_enhanced.{}", stem.to_string_lossy(), ext.to_string_lossy()))
-                };
-                
-                // 解析可选参数
-                let mut scale: u32 = 4;
-                let mut model = "realesrgan".to_string();
-                let mut i = if rest.len() > 1 && !rest[1].starts_with("--") { 2 } else { 1 };
-                while i < rest.len() {
-                    match rest[i].as_str() {
-                        "--scale" => {
-                            i += 1;
-                            if i < rest.len() {
-                                scale = rest[i].parse().unwrap_or(4);
-                            }
-                        }
-                        "--model" => {
-                            i += 1;
-                            if i < rest.len() {
-                                model = rest[i].clone();
-                            }
-                        }
-                        _ => {}
-                    }
-                    i += 1;
-                }
-                
-                // 构造配置
-                let sr_model = match model.as_str() {
-                    "anime" => crate::neotrix::SuperResolutionModel::RealEsrganAnime,
-                    "photo" => crate::neotrix::SuperResolutionModel::RealEsrganPhoto,
-                    "swinir" => crate::neotrix::SuperResolutionModel::SwinIRClassic,
-                    _ => crate::neotrix::SuperResolutionModel::RealEsrganGeneral,
-                };
-                
-                let config = crate::neotrix::PdfIconEnhanceConfig {
-                    super_resolution: crate::neotrix::SuperResolutionConfig {
-                        model: sr_model,
-                        scale,
-                        ..Default::default()
-                    },
-                    output_pdf: Some(out.clone()),
-                    ..Default::default()
-                };
-                
-                match crate::neotrix::enhance_pdf_icons_with_config(&src, config) {
-                    Ok(result) => {
-                        let mut msg = format!(
-                            "PDF 图标增强完成!\n  输入: {}\n  输出: {}\n  提取图像: {} 张\n  成功增强: {} 张\n  耗时: {}ms",
-                            result.input_pdf,
-                            result.output_pdf,
-                            result.images_extracted,
-                            result.images_enhanced,
-                            result.total_time_ms
-                        );
-                        if !result.enhanced_images.is_empty() {
-                            msg.push_str("\n\n增强详情:");
-                            for img in &result.enhanced_images {
-                                msg.push_str(&format!(
-                                    "\n  {}x{} → {}x{} ({:.1}x)",
-                                    img.original_size.0, img.original_size.1,
-                                    img.enhanced_size.0, img.enhanced_size.1,
-                                    img.scale
-                                ));
-                            }
-                        }
-                        CommandOutput::ok(&msg)
-                    }
-                    Err(e) => CommandOutput::err(&format!("PDF 增强失败: {e}")),
-                }
-            }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest, editpdf, enhance", sub)),
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: read, write, create, edit, patch, diff, consolidate, suggest, editpdf", sub)),
         }
     }
 }

@@ -196,6 +196,10 @@
 - **吸收幂等验证**: `absorb-node --apply-capability` 重跑 = 0 insert / N dup / N mapped，是幂等门禁验证的基准流程。吸收后必须重跑一次确认 0 insert。
 - **raw.githubusercontent.com 拉取**: GitHub API 未授权 60/hr 不够 → 用 `raw.githubusercontent.com/{owner}/{repo}/{branch}/README.md` (branch 依次 main/master/HEAD，文件依次 README.md/readme.md/README.rst/readme.rst) 逃逸限流。repo 不存在返回 404 → 记录为 invalid slug 从批中剔除 (本批 6 个)。
 
+## CLI 命令禁令与内部能力调度 (R-P110) — 2026-09-11 PDF图标增强架构复盘
+
+- **R-P110 (非必要禁止 CLI 命令构建 — 内部能力调度优先)**: 新增能力时，**禁止**通过 CLI 命令方式暴露功能。正确架构：①将能力封装为内部模块函数；②通过意识核心 `dispatch_internal_capability` 路由调度；③跨模块调用链路实现功能。**禁止**在 `consolidated_cmds.rs` 添加 CLI 子命令来暴露新能力。反例：PDF图标增强首次实现错误地在 `consolidated_cmds.rs` 添加 `/file enhance` CLI 命令。正例：通过 `dispatch_internal_capability` 的 `pdf_enhance` 路由，意识核心直接调度内部模块完成增强。CLI 仅用于用户交互入口，能力实现必须走内部模块调用链。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：

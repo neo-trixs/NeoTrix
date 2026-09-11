@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_astar_straight_line() {
-        let mut astar = AStar::new(10, 10);
+        let astar = AStar::new(10, 10);
         let path = astar.find_path(GridPos::new(0, 0), GridPos::new(5, 0));
         assert!(path.is_some());
         let path = path.unwrap();
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn test_astar_with_step_limit() {
-        let mut astar = AStar::new(20, 20);
+        let astar = AStar::new(20, 20);
         let path = astar.find_path_with_limit(GridPos::new(0, 0), GridPos::new(19, 19), 10);
         assert!(path.is_none());
     }
