@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use image::imageops::FilterType;
+use image::GenericImageView;
 
 // ============================================================================
 // 超分模型定义

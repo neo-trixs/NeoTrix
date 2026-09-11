@@ -177,7 +177,7 @@ pub fn register_absorbed_modules(mut registry: &mut SelfTestRegistry) {
     // 2026-08-27 外部吸收 (arXiv:2608.23642): NT-SHIELD 监督退化 canary (Rev-明 审计强化)
     crate::l3_embodiment::nt_shield::nt_shield_oversight::register_oversight_self_tests(registry);
     // 2026-08-28 外部吸收 (arXiv:2608.23642): NT-GOVERNANCE 人类监督治理 affordance + 萎缩对策
-    crate::l6_meta::nt_meta::nt_governance::register_human_oversight_self_tests(registry);
+    crate::l6_meta::coordination::nt_governance::register_human_oversight_self_tests(registry);
 }
 
 /// C5 自愈回路检测件 (检测异常 → 自动恢复)。纯内存, 无网络/磁盘/env IO。

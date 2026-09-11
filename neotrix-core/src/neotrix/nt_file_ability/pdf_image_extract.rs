@@ -131,7 +131,7 @@ pub fn extract_pdf_images(
     let mut xref_map: HashMap<u32, bool> = HashMap::new(); // 避免重复提取
     
     // 遍历每一页
-    for (page_num, page_id) in pages.keys().enumerate() {
+    for (page_num, page_id) in pages.iter() {
         // 获取页面对象
         if let Ok(page_obj) = doc.get_object(*page_id) {
             if let Ok(page_dict) = page_obj.as_dict() {
@@ -228,8 +228,8 @@ fn extract_image_from_xobject(
     config: &PdfImageExtractConfig,
 ) -> Option<Result<ImageData>> {
     // 获取图像尺寸
-    let width = xobj_dict.get(b"Width").ok()?.as_u64().ok()? as u32;
-    let height = xobj_dict.get(b"Height").ok()?.as_u64().ok()? as u32;
+    let width = xobj_dict.get(b"Width").ok()?.as_i64().ok()? as u32;
+    let height = xobj_dict.get(b"Height").ok()?.as_i64().ok()? as u32;
     
     // 过滤太小的图像
     if width < config.min_dimension || height < config.min_dimension {
@@ -302,7 +302,7 @@ fn extract_stream_data(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Optio
     
     // 尝试获取流内容
     if let Ok(stream) = stream_obj.as_stream() {
-        return stream.content().ok().cloned();
+        return Some(stream.content.clone());
     }
     
     None
@@ -329,7 +329,7 @@ fn get_color_info(doc: &lopdf::Document, dict: &lopdf::Dictionary) -> Option<(u8
                             b"ICCBased" => {
                                 // ICC 颜色空间，检查 N 值
                                 if let Some(n_val) = cs_array.get(1) {
-                                    if let Ok(n) = n_val.as_u64() {
+                                    if let Ok(n) = n_val.as_i64() {
                                         n as u8
                                     } else {
                                         3
@@ -474,7 +474,7 @@ pub fn pdf_has_images(pdf_path: &Path) -> Result<bool> {
     
     let pages = doc.get_pages();
     
-    for (_page_num, page_id) in pages.iter().enumerate() {
+    for (_page_num, page_id) in pages.iter() {
         if let Ok(page_obj) = doc.get_object(*page_id) {
             if let Ok(page_dict) = page_obj.as_dict() {
                 if let Ok(resources_ref) = page_dict.get(b"Resources") {
@@ -521,7 +521,7 @@ pub fn pdf_image_stats(pdf_path: &Path) -> Result<PdfImageStats> {
     let mut total_height = 0u64;
     let mut image_count = 0u64;
     
-    for (_page_num, page_id) in pages.iter().enumerate() {
+    for (_page_num, page_id) in pages.iter() {
         if let Ok(page_obj) = doc.get_object(*page_id) {
             if let Ok(page_dict) = page_obj.as_dict() {
                 if let Ok(resources_ref) = page_dict.get(b"Resources") {
@@ -538,13 +538,13 @@ pub fn pdf_image_stats(pdf_path: &Path) -> Result<PdfImageStats> {
                                                             total_images += 1;
                                                             
                                                             if let Ok(width) = xobj_dict.get(b"Width") {
-                                                                if let Ok(w) = width.as_u64() {
-                                                                    total_width += w;
+                                                                if let Ok(w) = width.as_i64() {
+                                                                    total_width += w as u64;
                                                                 }
                                                             }
                                                             if let Ok(height) = xobj_dict.get(b"Height") {
-                                                                if let Ok(h) = height.as_u64() {
-                                                                    total_height += h;
+                                                                if let Ok(h) = height.as_i64() {
+                                                                    total_height += h as u64;
                                                                 }
                                                             }
                                                             image_count += 1;

@@ -25,6 +25,21 @@ pub enum HookPoint {
     H7Cloud,
 }
 
+impl std::fmt::Display for HookPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HookPoint::H0Session => write!(f, "H0Session"),
+            HookPoint::H1Priority => write!(f, "H1Priority"),
+            HookPoint::H2DualUse => write!(f, "H2DualUse"),
+            HookPoint::H3Vernacular => write!(f, "H3Vernacular"),
+            HookPoint::H4Absolute => write!(f, "H4Absolute"),
+            HookPoint::H5Delivery => write!(f, "H5Delivery"),
+            HookPoint::H6Refuse => write!(f, "H6Refuse"),
+            HookPoint::H7Cloud => write!(f, "H7Cloud"),
+        }
+    }
+}
+
 /// 钩链结果
 #[derive(Debug, Clone)]
 pub struct HookChainResult {

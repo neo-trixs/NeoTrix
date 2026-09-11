@@ -72,7 +72,7 @@ impl AccountClustering {
         if let Some(creation_time) = metadata.get("creation_time") {
             if let Ok(time) = creation_time.parse::<u64>() {
                 let windows = self.creation_windows.read().await;
-                for window in &windows {
+                for window in windows.iter() {
                     if time >= window.start_time && time <= window.end_time {
                         if window.account_ids.len() >= self.config.cluster_min_accounts {
                             signals.push(DetectionSignal {

@@ -111,7 +111,7 @@ impl UnifiedDefenseLayer {
             input_result,
             output_result: output_sentinel::OutputValidationResult {
                 is_safe: true,
-                threat_level: ThreatLevel::Safe,
+                threat_level: output_sentinel::ThreatLevel::Safe,
                 signals: vec![],
                 sanitized_output: String::new(),
             },
