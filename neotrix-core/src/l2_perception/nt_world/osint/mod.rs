@@ -128,6 +128,68 @@ pub trait OsintSource: Send + Sync {
     ) -> impl std::future::Future<Output = Result<Self::Findings, String>> + Send;
 }
 
+pub struct OsintModuleRegistry {
+    modules: Vec<Box<dyn DynOsintModule>>,
+}
+
+pub trait DynOsintModule: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn requires_domain(&self) -> bool;
+    fn requires_identity(&self) -> bool;
+    fn requires_email(&self) -> bool;
+    fn run(
+        &self,
+        target: &OsintTarget,
+        client: &Client,
+        config: &OsintConfig,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<
+                    Output = Result<Box<dyn erased_serde::Serialize + Send>, String>,
+                > + Send
+                + '_,
+        >,
+    >;
+}
+
+impl OsintModuleRegistry {
+    pub fn new() -> Self {
+        Self {
+            modules: Vec::new(),
+        }
+    }
+
+    pub fn register(&mut self, module: Box<dyn DynOsintModule>) {
+        self.modules.push(module);
+    }
+
+    pub async fn run_all(
+        &self,
+        target: &OsintTarget,
+        client: &Client,
+        config: &OsintConfig,
+    ) -> Vec<(&'static str, Result<Box<dyn erased_serde::Serialize + Send>, String>)> {
+        let mut results = Vec::new();
+        for module in &self.modules {
+            let should_run = if module.requires_email() {
+                target.email.is_some()
+            } else if module.requires_identity() {
+                target.username.is_some() || target.email.is_some()
+            } else if module.requires_domain() {
+                target.domain.is_some() || target.ip.is_some() || target.url.is_some()
+            } else {
+                true
+            };
+            if should_run {
+                let name = module.name();
+                let result = module.run(target, client, config).await;
+                results.push((name, result));
+            }
+        }
+        results
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OsintTarget {
     pub domain: Option<String>,
@@ -547,7 +609,7 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
     report
 }
 
-pub async fn doctor_osint(target: OsintTarget, _config: OsintConfig) -> DoctorReport {
+pub async fn doctor_osint(target: OsintTarget, config: OsintConfig) -> DoctorReport {
     let client = default_client();
 
     let mut dns_ok = false;
@@ -571,7 +633,7 @@ pub async fn doctor_osint(target: OsintTarget, _config: OsintConfig) -> DoctorRe
     if fofa_router.probe_and_select(&target, &client).await.is_ok() { fofa_ok = true }
     _fofa_latency = start.elapsed().as_millis() as u64;
 
-    let securitytrails_ok = _config.api_keys.contains_key("securitytrails");
+    let securitytrails_ok = config.api_keys.contains_key("securitytrails");
 
     DoctorReport {
         target,

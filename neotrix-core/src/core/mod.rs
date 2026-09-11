@@ -120,6 +120,7 @@ pub mod nt_core_state;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l7_capability;
 pub mod nt_core_model_skills;
+pub mod nt_core_capability;
 
 // 能量核心模块
 pub mod energy_core;

@@ -757,6 +757,7 @@ impl CapabilityRouter {
             CapabilityInput::Security(_) => self.route_to_domain(input, Domain::NtShield),
             CapabilityInput::Nlp(_) => self.route_to_domain(input, Domain::NtWorld),
             CapabilityInput::Asset(_) => self.route_to_domain(input, Domain::NtWorld),
+            CapabilityInput::FileEnhance(_) => self.route_to_domain(input, Domain::NtFileAbility),
             CapabilityInput::Kv(_) => self.route_to_domain(input, Domain::NtMemory),
         }
     }

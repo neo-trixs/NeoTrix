@@ -38,8 +38,11 @@ impl UnifiedCapability for PdfEnhanceCapability {
 
     fn health(&self) -> CapabilityHealth {
         CapabilityHealth {
-            score: 1.0,
-            details: "PDF enhance capability operational".to_string(),
+            state: CapabilityState::Healthy,
+            success_rate: 1.0,
+            avg_latency_ms: 0.0,
+            last_called: None,
+            call_count: 0,
         }
     }
 

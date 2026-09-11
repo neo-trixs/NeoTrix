@@ -156,6 +156,7 @@ tracing-opentelemetry = { version = "0.28", optional = true }
 anyhow = { version = "1", optional = true }
 rayon = "1"
 rcgen = { version = "0.13", features = ["x509-parser"] }
+erased-serde = "0.3"
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
 tokio-rustls = "0.24"
 self_update = { version = "0.42", default-features = false, features = ["rustls"], optional = true }
