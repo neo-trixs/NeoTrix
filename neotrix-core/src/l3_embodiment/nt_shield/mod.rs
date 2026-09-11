@@ -43,6 +43,7 @@ pub mod grapple_hooks;
 pub mod proxy_detection;
 pub mod reasoning_protection;
 pub mod anti_distillation;
+pub mod fullbreak;
 pub mod nt_shield_ztnet;
 
 // ============================================
@@ -65,3 +66,4 @@ pub use grapple_hooks::GrappleHookChain;
 pub use proxy_detection::ProxyDetectionEngine;
 pub use reasoning_protection::ReasoningProtectionEngine;
 pub use anti_distillation::AntiDistillationEngine;
+pub use fullbreak::{AttackResult, AttackSurface, FullbreakEngine};

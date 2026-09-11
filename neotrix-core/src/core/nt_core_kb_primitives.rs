@@ -151,7 +151,7 @@ pub fn kv_purge_namespace(conn: &Connection, namespace: &str) -> Result<usize, S
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 
-pub const SCHEMA_VERSION: i32 = 8;
+pub const SCHEMA_VERSION: i32 = 9;
 
 /// 打开默认生产 KB 原生连接 (~/.neotrix/knowledge.db) 并初始化 schema。
 /// 失败返回 None (调用方自行降级, 如内存库)。
@@ -194,7 +194,10 @@ pub fn schema_initialize(conn: &Connection) -> rusqlite::Result<()> {
             supersedes TEXT,
             source_episode TEXT,
             tier TEXT NOT NULL DEFAULT 'warm',
-            norm_title TEXT
+            norm_title TEXT,
+            valid_start_time INTEGER,
+            valid_end_time INTEGER,
+            transaction_time INTEGER NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS edges (

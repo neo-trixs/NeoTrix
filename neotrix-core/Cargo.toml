@@ -169,7 +169,7 @@ noyalib = { version = "0.0.24", features = ["compat-serde-yaml"] }
 zip = { version = "2", default-features = false, features = ["deflate", "time"] }
 quick-xml = "0.41"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-ort = { version = "2.0", features = ["load-dynamic"], optional = true }
+ort = { version = "2.0.0-rc.13", features = ["load-dynamic"], optional = true }
 ndarray = { version = "0.15", optional = true }
 tiktoken-rs = "0.12.0"
 office_oxide = "0.1"

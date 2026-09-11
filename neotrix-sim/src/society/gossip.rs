@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GossipMessage {
@@ -32,7 +32,13 @@ impl GossipProtocol {
         }
     }
 
-    pub fn create_message(&mut self, source: u32, topic: &str, content: &str, reliability: f32) -> u64 {
+    pub fn create_message(
+        &mut self,
+        source: u32,
+        topic: &str,
+        content: &str,
+        reliability: f32,
+    ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
 
@@ -58,7 +64,11 @@ impl GossipProtocol {
     }
 
     pub fn spread(&mut self, agent_id: u32) -> Vec<GossipMessage> {
-        let known: Vec<u64> = self.agent_memory.get(&agent_id).cloned().unwrap_or_default();
+        let known: Vec<u64> = self
+            .agent_memory
+            .get(&agent_id)
+            .cloned()
+            .unwrap_or_default();
 
         let mut to_spread = Vec::new();
         for msg in &mut self.messages {
@@ -68,34 +78,49 @@ impl GossipProtocol {
             }
         }
 
-        self.agent_memory.entry(agent_id).or_default().extend(
-            to_spread.iter().map(|m| m.id)
-        );
+        self.agent_memory
+            .entry(agent_id)
+            .or_default()
+            .extend(to_spread.iter().map(|m| m.id));
 
         to_spread
     }
 
     pub fn receive(&mut self, agent_id: u32, message: GossipMessage) -> bool {
-        let known = self.agent_memory.get(&agent_id).cloned().unwrap_or_default();
+        let known = self
+            .agent_memory
+            .get(&agent_id)
+            .cloned()
+            .unwrap_or_default();
         if known.contains(&message.id) {
             return false;
         }
 
         self.messages.push(message.clone());
-        self.agent_memory.entry(agent_id).or_default().push(message.id);
+        self.agent_memory
+            .entry(agent_id)
+            .or_default()
+            .push(message.id);
         true
     }
 
     pub fn decay(&mut self) {
         for msg in &mut self.messages {
-            msg.reliability *= (1.0 - self.decay_rate);
+            msg.reliability *= 1.0 - self.decay_rate;
         }
         self.messages.retain(|m| m.reliability > 0.01);
     }
 
     pub fn get_messages_for_agent(&self, agent_id: u32) -> Vec<&GossipMessage> {
-        let known = self.agent_memory.get(&agent_id).cloned().unwrap_or_default();
-        self.messages.iter().filter(|m| known.contains(&m.id)).collect()
+        let known = self
+            .agent_memory
+            .get(&agent_id)
+            .cloned()
+            .unwrap_or_default();
+        self.messages
+            .iter()
+            .filter(|m| known.contains(&m.id))
+            .collect()
     }
 
     pub fn get_topic_messages(&self, topic: &str) -> Vec<&GossipMessage> {

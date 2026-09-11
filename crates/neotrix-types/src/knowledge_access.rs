@@ -184,6 +184,12 @@ pub enum RelationType {
     BrandFor,
     Illustrates,
     WikiLink,
+    /// Explicit hierarchical parent-child relation (node A is parent of node B).
+    HierarchicalParent,
+    /// Bridge between two domain clusters (links knowledge across domains).
+    CrossDomainBridge,
+    /// Node belongs to a domain cluster.
+    BelongsToCluster,
 }
 
 impl RelationType {
@@ -227,6 +233,9 @@ impl RelationType {
             RelationType::BrandFor => "brand_for",
             RelationType::Illustrates => "illustrates",
             RelationType::WikiLink => "wiki_link",
+            RelationType::HierarchicalParent => "hierarchical_parent",
+            RelationType::CrossDomainBridge => "cross_domain_bridge",
+            RelationType::BelongsToCluster => "belongs_to_cluster",
         }
     }
 
@@ -269,6 +278,9 @@ impl RelationType {
             "visualizes" => RelationType::Visualizes,
             "brand_for" => RelationType::BrandFor,
             "illustrates" => RelationType::Illustrates,
+            "hierarchical_parent" => RelationType::HierarchicalParent,
+            "cross_domain_bridge" => RelationType::CrossDomainBridge,
+            "belongs_to_cluster" => RelationType::BelongsToCluster,
             _ => RelationType::Related,
         }
     }
@@ -312,6 +324,31 @@ pub struct KnowledgeNode {
     pub temporal: Option<TemporalValidity>,
     pub supersedes: Option<String>,
     pub source_episode: Option<String>,
+    /// Hierarchical parent node ID (None = root-level node).
+    pub parent_id: Option<String>,
+    /// Depth in the knowledge hierarchy (0 = root, 1 = child of root, etc.).
+    pub depth: i32,
+    /// Domain cluster grouping — nodes with the same cluster_id belong to the
+    /// same coherent knowledge domain (e.g. "rust_async", "ml_transformers").
+    pub cluster_id: Option<String>,
+}
+
+/// Domain cluster — groups coherent knowledge nodes into a named domain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeCluster {
+    pub id: String,
+    /// Human-readable domain name (e.g. "rust_async", "ml_transformers").
+    pub name: String,
+    /// Optional description of what this domain covers.
+    pub description: Option<String>,
+    /// Parent cluster ID for inter-domain hierarchy (None = top-level domain).
+    pub parent_cluster_id: Option<String>,
+    /// Number of nodes currently in this cluster.
+    pub node_count: i64,
+    /// Cluster-level confidence: average confidence of member nodes.
+    pub avg_confidence: f64,
+    /// Timestamp of last node addition or cluster metadata update.
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
