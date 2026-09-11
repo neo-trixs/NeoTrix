@@ -3,7 +3,7 @@
 //! Follows dependency inversion: L5 defines the interface, L1 implements.
 //! L5 code uses this trait instead of importing L1 SEAL types directly.
 
-use crate::core::nt_core_self_test::SelfTestResult;
+
 
 /// Oracle decision result (L5层定义)
 #[derive(Debug, Clone)]

@@ -4,25 +4,8 @@
 
 use serde::{Serialize, Deserialize};
 
-
-// ============================================================================
-// 节段数据结构
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum SegmentType {
-    Setup,
-    Conflict,
-    Climax,
-    Transition,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SegmentData {
-    pub r#type: SegmentType,
-    pub base_length: f32,
-    pub content_priority: f32,
-    pub is_core_scuang: bool,
-}
+// 叙事类型定义在 core 层，此处 re-export 保持 L5 内部向后兼容
+pub use crate::core::nt_core_narrative_types::{SegmentType, SegmentData};
 
 // ============================================================================
 // 节段分配结果

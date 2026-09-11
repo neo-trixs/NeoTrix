@@ -83,6 +83,7 @@ pub mod nt_core_task_dispatcher;
 pub mod nt_core_td;
 pub mod nt_core_trajectory_compress;
 pub mod nt_core_ttc;
+pub mod nt_core_narrative_types;
 
 // ═══════════════════════════════════════════════════════════════════
 // L5 — 意识层 (Consciousness)

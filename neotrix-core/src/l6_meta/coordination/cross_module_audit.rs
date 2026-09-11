@@ -5,7 +5,7 @@
 
 use serde::{Serialize, Deserialize};
 use crate::core::nt_core_self::dynamic_params::{DynamicParams, ScalingRating};
-use crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentData;
+use crate::core::nt_core_narrative_types::{SegmentData, SegmentType};
 
 // ============================================================================
 // 一致性检查配置
@@ -210,7 +210,7 @@ impl CrossModuleAudit {
             let first = &segments[0];
             let _last = &segments[segments.len() - 1];
             
-            if first.r#type == crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentType::Climax {
+            if first.r#type == SegmentType::Climax {
                 passed = false;
                 details.push(CrossModuleDetail {
                     dimension: "节奏段落顺序".to_string(),
@@ -286,14 +286,14 @@ mod tests {
         ];
         
         let segments = vec![
-            crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentData {
-                r#type: crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentType::Setup,
+            SegmentData {
+                r#type: SegmentType::Setup,
                 base_length: 60.0,
                 content_priority: 0.5,
                 is_core_scuang: false,
             },
-            crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentData {
-                r#type: crate::l5_cognition::nt_core::seal::rhythm_recalculator::SegmentType::Climax,
+            SegmentData {
+                r#type: SegmentType::Climax,
                 base_length: 80.0,
                 content_priority: 1.0,
                 is_core_scuang: true,
