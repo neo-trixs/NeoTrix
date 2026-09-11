@@ -1,4 +1,5 @@
 use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
+use regex::Regex;
 
 /// NT-WORLD 域插件 — 网页抓取/搜索/内容提取
 pub struct WorldPlugin;

@@ -9,7 +9,6 @@ use neotrix::core::nt_core_consciousness_core::{
 };
 use neotrix::l1_action::nt_io::nt_io_provider::gateway::GatewayV2;
 use neotrix::l1_action::nt_io::nt_io_provider::types::{LlmRequest, LlmResponse, LlmError, Usage, FinishReason, ChatMessage};
-use neotrix::l1_action::nt_io::nt_io_provider::factory::create_gateway_async;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static GATEWAY: OnceLock<Mutex<Option<Arc<GatewayV2>>>> = OnceLock::new();
