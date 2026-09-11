@@ -1,13 +1,17 @@
 use crate::foundation::math_bridge::Vec2;
 use crate::foundation::sim_time::TimeModifiers;
 use crate::agents::sim_agent::{SimAgent, AgentAction, AgentObservation};
+use crate::agents::pheromone::PheromoneSignal;
 use crate::feel::EmotionType;
 use super::WorldSim;
 
 impl WorldSim {
     /// Unified decision pipeline: evaluate layers in priority order, first non-None wins.
     pub(crate) fn decide_action(&mut self, agent: &SimAgent, obs: &AgentObservation, time_mods: &TimeModifiers) -> AgentAction {
-        if let Some(action) = self.layer_survival(agent, obs) {
+        let pos = [agent.core.position.x, agent.core.position.y];
+        let pheromone_signal = self.pheromone_field.sense(pos, 120.0, self.tick);
+
+        if let Some(action) = self.layer_survival(agent, obs, &pheromone_signal) {
             return action;
         }
         if let Some(action) = self.layer_goals(agent, obs) {
@@ -16,7 +20,7 @@ impl WorldSim {
         if let Some(action) = self.layer_social(agent, obs, time_mods) {
             return action;
         }
-        if let Some(action) = self.layer_stigmergy(agent, obs) {
+        if let Some(action) = self.layer_stigmergy(agent, obs, &pheromone_signal) {
             return action;
         }
         if let Some(action) = self.layer_personality(agent, obs, time_mods) {
@@ -35,8 +39,10 @@ impl WorldSim {
     }
 
     /// Layer 1 — Hard constraints: survival needs, terrain hazards, economy prices.
-    fn layer_survival(&mut self, agent: &SimAgent, obs: &AgentObservation) -> Option<AgentAction> {
-        if agent.core.hunger > 60.0 {
+    /// Pheromone signal: danger pheromones boost urgency for food-seeking.
+    fn layer_survival(&mut self, agent: &SimAgent, obs: &AgentObservation, pheromone: &PheromoneSignal) -> Option<AgentAction> {
+        let effective_hunger = agent.core.hunger + pheromone.danger_repel * 5.0;
+        if effective_hunger > 60.0 {
             if let Some(res) = obs.nearby_resources.iter()
                 .filter(|r| r.resource_type.contains("Food") || r.resource_type.contains("Berries"))
                 .min_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
@@ -180,13 +186,12 @@ impl WorldSim {
     }
 
     /// Layer 3.5 — Stigmergy: sense shared pheromone field, react to indirect signals.
-    fn layer_stigmergy(&mut self, agent: &SimAgent, _obs: &AgentObservation) -> Option<AgentAction> {
+    fn layer_stigmergy(&mut self, agent: &SimAgent, _obs: &AgentObservation, pheromone: &PheromoneSignal) -> Option<AgentAction> {
         use crate::agents::pheromone::PheromoneType;
 
         let pos = [agent.core.position.x, agent.core.position.y];
-        let signal = self.pheromone_field.sense(pos, 120.0, self.tick);
 
-        if signal.danger_repel > 0.5 {
+        if pheromone.danger_repel > 0.5 {
             if let Some(dir) = self.pheromone_field.strongest_direction(
                 pos, PheromoneType::Danger, 120.0, self.tick,
             ) {
@@ -198,7 +203,7 @@ impl WorldSim {
             }
         }
 
-        if agent.core.hunger > 30.0 && signal.food_attract > 0.3 {
+        if agent.core.hunger > 30.0 && pheromone.food_attract > 0.3 {
             if let Some(dir) = self.pheromone_field.strongest_direction(
                 pos, PheromoneType::Food, 120.0, self.tick,
             ) {
@@ -210,11 +215,11 @@ impl WorldSim {
             }
         }
 
-        if agent.core.energy < 40.0 && signal.rest_attract > 0.4 {
+        if agent.core.energy < 40.0 && pheromone.rest_attract > 0.4 {
             return Some(AgentAction::Rest);
         }
 
-        if signal.social_attract > 0.6 {
+        if pheromone.social_attract > 0.6 {
             if let Some(target) = _obs.nearby_agents.first() {
                 return Some(AgentAction::Talk {
                     target_id: target.id.clone(),
@@ -227,14 +232,18 @@ impl WorldSim {
     }
 
     /// Layer 4 — Personality + Emotion: trait-driven impulses, emotion modulation.
-    fn layer_personality(&mut self, agent: &SimAgent, _obs: &AgentObservation, _time_mods: &TimeModifiers) -> Option<AgentAction> {
+    /// Pheromone net_valence modulates exploration/exploitation tradeoff.
+    fn layer_personality(&mut self, agent: &SimAgent, _obs: &AgentObservation, _time_mods: &TimeModifiers, pheromone: &PheromoneSignal) -> Option<AgentAction> {
+        let valence = pheromone.net_valence();
+        let explore_boost = if valence > 0.3 { 0.1 } else { 0.0 };
+
         let roll = self.rng.next_f32();
         if agent.personality.aggression > 0.7 && roll < 0.2 {
             if let Some(target) = _obs.nearby_agents.first() {
                 return Some(AgentAction::Attack { target_id: target.id.clone() });
             }
         }
-        if agent.personality.curiosity > 0.7 && roll < 0.4 {
+        if agent.personality.curiosity > 0.7 && roll < 0.4 + explore_boost {
             let angle = self.rng.range_f32(0.0, std::f32::consts::TAU);
             return Some(AgentAction::Explore { direction: Vec2::new(angle.cos(), angle.sin()) });
         }
