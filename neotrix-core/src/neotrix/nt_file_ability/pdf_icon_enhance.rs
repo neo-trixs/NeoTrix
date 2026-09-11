@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::pdf_image_extract::{
-    extract_pdf_images, PdfImageExtractConfig, PdfExtractedImage, PdfImageFormat,
+    extract_pdf_images, PdfExtractedImage, PdfImageExtractConfig, PdfImageFormat,
 };
 use super::types::{FileAbilityError, Result};
 
@@ -19,7 +19,7 @@ use super::types::{FileAbilityError, Result};
 pub struct PdfIconEnhanceConfig {
     /// 图像提取配置
     pub extract: PdfImageExtractConfig,
-    /// 超分配置 (嵌入 image_super_resolution::SuperResolutionConfig)
+    /// 超分配置
     pub super_resolution: SuperResolutionConfig,
     /// 是否将增强后的图像嵌回 PDF
     pub embed_back: bool,
@@ -102,12 +102,12 @@ impl PdfIconEnhancer {
             config: PdfIconEnhanceConfig::default(),
         }
     }
-    
+
     /// 使用配置创建
     pub fn with_config(config: PdfIconEnhanceConfig) -> Self {
         Self { config }
     }
-    
+
     /// 执行 PDF 图标清晰度提升
     ///
     /// # Arguments
@@ -117,7 +117,7 @@ impl PdfIconEnhancer {
     /// 增强结果
     pub fn enhance(&self, pdf_path: &Path) -> Result<PdfIconEnhanceResult> {
         let total_start = std::time::Instant::now();
-        
+
         // 验证输入
         if !pdf_path.exists() {
             return Err(FileAbilityError::Other(format!(
@@ -125,58 +125,57 @@ impl PdfIconEnhancer {
                 pdf_path.display()
             )));
         }
-        
+
         // 确定输出路径
         let output_pdf = self.config.output_pdf.clone().unwrap_or_else(|| {
             let stem = pdf_path.file_stem().unwrap_or_default();
             let ext = pdf_path.extension().unwrap_or_default();
-            pdf_path.with_file_name(format!("{}_enhanced.{}", stem.to_string_lossy(), ext.to_string_lossy()))
+            pdf_path.with_file_name(format!(
+                "{}_enhanced.{}",
+                stem.to_string_lossy(),
+                ext.to_string_lossy()
+            ))
         });
-        
+
         // 创建临时目录
         let temp_dir = std::env::temp_dir().join("neotrix_pdf_enhance");
         std::fs::create_dir_all(&temp_dir).map_err(FileAbilityError::Io)?;
-        
+
         // 阶段 1: 提取图像
         let extract_start = std::time::Instant::now();
-        let extract_result = extract_pdf_images(
-            pdf_path,
-            &temp_dir,
-            &self.config.extract,
-        )?;
+        let extract_result = extract_pdf_images(pdf_path, &temp_dir, &self.config.extract)?;
         let extract_time = extract_start.elapsed().as_millis() as u64;
-        
+
         // 阶段 2: 超分辨率处理
         let sr_start = std::time::Instant::now();
         let mut enhanced_images = Vec::new();
         let mut images_enhanced = 0;
         let mut images_failed = 0;
-        
+
         for img in &extract_result.images {
             let img_start = std::time::Instant::now();
-            
+
             // 构造输出路径
-            let enhanced_path = temp_dir.join(format!(
-                "enhanced_{}_{}.png",
-                img.page,
-                img.xref
-            ));
-            
+            let enhanced_path = temp_dir.join(format!("enhanced_{}_{}.png", img.page, img.xref));
+
             // TODO: 调用 image_super_resolution 进行超分
             // 当前为占位实现
             let enhanced_info = EnhancedImageInfo {
                 original_size: (img.width, img.height),
-                enhanced_size: (img.width * self.config.super_resolution.scale, img.height * self.config.super_resolution.scale),
+                enhanced_size: (
+                    img.width * self.config.super_resolution.scale,
+                    img.height * self.config.super_resolution.scale,
+                ),
                 scale: self.config.super_resolution.scale as f32,
                 processing_time_ms: img_start.elapsed().as_millis() as u64,
                 path: enhanced_path.display().to_string(),
             };
-            
+
             enhanced_images.push(enhanced_info);
             images_enhanced += 1;
         }
         let sr_time = sr_start.elapsed().as_millis() as u64;
-        
+
         // 阶段 3: 嵌回 PDF (如果启用)
         let embed_start = std::time::Instant::now();
         if self.config.embed_back {
@@ -184,14 +183,14 @@ impl PdfIconEnhancer {
             // 当前为占位实现
         }
         let embed_time = embed_start.elapsed().as_millis() as u64;
-        
+
         // 清理临时文件
         if !self.config.keep_backup {
             let _ = std::fs::remove_dir_all(&temp_dir);
         }
-        
+
         let total_time = total_start.elapsed().as_millis() as u64;
-        
+
         Ok(PdfIconEnhanceResult {
             success: true,
             input_pdf: pdf_path.display().to_string(),
@@ -207,12 +206,12 @@ impl PdfIconEnhancer {
             error: None,
         })
     }
-    
+
     /// 获取配置
     pub fn config(&self) -> &PdfIconEnhanceConfig {
         &self.config
     }
-    
+
     /// 更新配置
     pub fn set_config(&mut self, config: PdfIconEnhanceConfig) {
         self.config = config;
@@ -246,14 +245,13 @@ use super::image_super_resolution::SuperResolutionConfig;
 mod tests {
     use super::*;
     use tempfile::TempDir;
-    
+
     #[test]
     fn test_default_config() {
         let config = PdfIconEnhanceConfig::default();
         assert!(config.embed_back);
-        assert!(!config.keep_backup || config.keep_backup);
     }
-    
+
     #[test]
     fn test_enhance_nonexistent_pdf() {
         let result = enhance_pdf_icons(Path::new("/nonexistent.pdf"));

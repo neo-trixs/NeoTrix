@@ -3,6 +3,8 @@ pub mod decision;
 pub mod actions;
 pub mod evolution;
 pub mod observation;
+pub mod persistence;
+pub mod renderer;
 
 pub use config::*;
 

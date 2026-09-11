@@ -1,1 +1,0 @@
-// Stub: event_loop

@@ -102,6 +102,7 @@ pub mod model_routing;
 
 // Cache-Aware Compaction — 基于缓存命中率的智能压缩
 pub mod cache_compaction;
+pub use cache_compaction::{CacheCompactor, CompactionStrategy, CacheEntry, CompactionResult};
 
 // 向后兼容别名
 pub use platform_gateway::PlatformAdapter;

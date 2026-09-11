@@ -101,10 +101,32 @@ impl LatentState {
         Self { value, delta }
     }
 
-    pub fn zero(dim: usize) -> Self {
+    /// Zero-initialized latent state (convenience constructor).
+    pub fn zeros(dim: usize) -> Self {
         Self {
             value: vec![0.0; dim],
             delta: vec![0.0; dim],
+        }
+    }
+
+    pub fn zero(dim: usize) -> Self {
+        Self::zeros(dim)
+    }
+
+    /// Default zero state with default dimension.
+    pub fn default_state() -> Self {
+        Self::zeros(LATENT_DIM)
+    }
+
+    /// Compute cosine similarity between two latent states.
+    pub fn similarity(&self, other: &LatentState) -> f64 {
+        let dot: f64 = self.value.iter().zip(other.value.iter()).map(|(a, b)| a * b).sum();
+        let norm_a: f64 = self.value.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let norm_b: f64 = other.value.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
         }
     }
 }

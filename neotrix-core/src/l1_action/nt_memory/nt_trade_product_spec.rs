@@ -61,7 +61,7 @@ pub struct RoutingTemplateStep {
     pub quality_checkpoints: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SkillLevel {
     Unskilled,
     SemiSkilled,
@@ -118,7 +118,7 @@ pub struct RiskRule {
     pub severity: RiskSeverity,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RiskCategory {
     Quality,
     Delivery,

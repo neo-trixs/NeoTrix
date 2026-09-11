@@ -67,7 +67,7 @@ pub struct CodeUnderlyingIssue {
 }
 
 pub trait EvolutionLoopProvider {
-    fn get_snapshot(&self) -> crate::l5_cognition::nt_mind::evolution::evolution_loop::ProjectSnapshot;
+    fn get_snapshot(&self) -> crate::l1_action::nt_act::nt_act_types::ProjectSnapshot;
     fn self_diagnose(&mut self) -> (Vec<String>, Vec<PrioritizedIssue>);
     fn on_fix_applied(&mut self);
 }
@@ -483,7 +483,7 @@ impl crate::core::nt_core_self_test::SelfTest for SelfDiagnose {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
-        let snapshot = crate::l5_cognition::nt_mind::evolution::evolution_loop::ProjectSnapshot {
+        let snapshot = crate::l1_action::nt_act::nt_act_types::ProjectSnapshot {
             total_files: 10,
             total_lines: 1000,
             large_files: vec!["src/main.rs".into()],

@@ -339,21 +339,8 @@ impl EvolutionDaemon {
 
     pub fn run_intelligent_cycle(&mut self) -> (u32, f64) {
         let snapshot = self.evolution_loop.scan_project();
-        let l1_snapshot = crate::neotrix::nt_act_goal::goal_generator::ProjectSnapshot {
-            total_files: snapshot.total_files,
-            total_lines: snapshot.total_lines,
-            large_files: snapshot.large_files,
-            modules_without_tests: snapshot.modules_without_tests,
-            file_unsafe_hotspots: snapshot.file_unsafe_hotspots,
-            unsafe_count: snapshot.unsafe_count,
-            unwrap_count: snapshot.unwrap_count,
-            todo_count: snapshot.todo_count,
-            compile_errors: snapshot.compile_errors,
-            compile_warnings: snapshot.compile_warnings,
-            test_count: snapshot.test_count,
-            test_failures: snapshot.test_failures,
-        };
-        let goals = AutoGoalGenerator::generate_from_snapshot(&l1_snapshot);
+        // Both L5 and goal_generator now share the same ProjectSnapshot type (nt_act_types)
+        let goals = AutoGoalGenerator::generate_from_snapshot(&snapshot);
         let mut fixes = 0u32;
         let mut total_reward = 0.0;
 

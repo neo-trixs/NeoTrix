@@ -32,6 +32,11 @@ pub mod rate_profiles;
 pub mod search_router;
 pub mod types;
 pub mod universal_adapter;
+pub use universal_adapter::{
+    UniversalAdapter, ModelConfig, ModelCapabilities, FormatConverter,
+    OpenAiConverter, AnthropicConverter, GeminiConverter,
+    UnifiedRequest, UnifiedResponse, Message, Tool, ToolCall,
+};
 
 // Re-export 核心类型
 pub use types::{

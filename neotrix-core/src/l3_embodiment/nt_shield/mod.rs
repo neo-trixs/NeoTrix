@@ -43,6 +43,7 @@ pub mod grapple_hooks;
 pub mod proxy_detection;
 pub mod reasoning_protection;
 pub mod anti_distillation;
+pub mod nt_shield_ztnet;
 
 // ============================================
 // Re-exports (保持向后兼容)

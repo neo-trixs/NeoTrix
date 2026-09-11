@@ -1,1 +1,0 @@
-// Stub: path_score
