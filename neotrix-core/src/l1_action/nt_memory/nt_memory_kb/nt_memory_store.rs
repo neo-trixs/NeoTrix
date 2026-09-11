@@ -25,18 +25,54 @@ pub fn normalize_title(title: &str) -> String {
         .join(" ")
 }
 
+/// Ensure a domain cluster exists for the given domain, returning its id.
+/// Creates a new cluster if none exists for the domain.
+pub fn ensure_domain_cluster(conn: &Connection, domain: &str) -> rusqlite::Result<String> {
+    if let Some(existing) = get_cluster_by_name(conn, domain)? {
+        return Ok(existing.id);
+    }
+    let id = Uuid::new_v4().to_string();
+    let cluster = KnowledgeCluster {
+        id: id.clone(),
+        name: domain.to_string(),
+        description: format!("Auto-created cluster for domain: {}", domain),
+        parent_cluster_id: None,
+        node_count: 0,
+        avg_confidence: 0.0,
+        updated_at: now(),
+    };
+    insert_cluster(conn, &cluster)?;
+    Ok(id)
+}
+
+/// Assign a node to the cluster matching its domain field.
+/// If domain is None/empty, assigns to "unclustered" cluster.
+pub fn assign_cluster_to_node(conn: &Connection, node_id: &str, domain: Option<&str>) -> rusqlite::Result<()> {
+    let cluster_domain = domain.unwrap_or("unclustered");
+    let cluster_id = ensure_domain_cluster(conn, cluster_domain)?;
+    conn.execute(
+        "UPDATE nodes SET cluster_id=?1 WHERE id=?2",
+        params![cluster_id, node_id],
+    )?;
+    update_cluster_stats(conn, &cluster_id)?;
+    Ok(())
+}
+
 /// 无事务的 nodes+nodes_fts 双写核心。调用方必须自管事务 (批量路径复用)。
 pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     let temporal_json = node.temporal.as_ref().map(|t| {
         serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
     });
     let norm_title = normalize_title(&node.title);
+    let ts = now();
     conn.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
             confidence, importance, recall_weight, created_at, updated_at, access_count, metadata,
             data_tier, temporal, supersedes, source_episode, tier, norm_title,
-            parent_id, depth, cluster_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+            parent_id, depth, cluster_id,
+            transaction_time, valid_start_time, valid_end_time)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24,
+                 ?25, ?26, NULL)",
         params![
             node.id,
             node.node_type.as_str(),
@@ -62,6 +98,8 @@ pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Re
             node.parent_id,
             node.depth,
             node.cluster_id,
+            ts,
+            ts,
         ],
     )?;
 
@@ -119,6 +157,8 @@ pub fn insert_or_get_node_rows(
         cluster_id: None,
     };
     insert_node_rows(conn, &node)?;
+    // Auto-assign cluster_id based on domain
+    assign_cluster_to_node(conn, &id, node.domain.as_deref())?;
     Ok(id)
 }
 
@@ -129,6 +169,8 @@ pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     // 事务：nodes + nodes_fts 双写保持一致性，crash 不残留孤立 FTS 行
     let tx = conn.unchecked_transaction()?;
     insert_node_rows(&tx, node)?;
+    // Auto-assign cluster_id based on domain
+    assign_cluster_to_node(&tx, &node.id, node.domain.as_deref())?;
     tx.commit()
 }
 
@@ -383,9 +425,11 @@ pub fn delete_edge(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
 }
 
 pub fn insert_edge(conn: &Connection, edge: &KnowledgeEdge) -> rusqlite::Result<()> {
+    let ts = now();
     conn.execute(
-        "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at, metadata)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at, metadata,
+            transaction_time, valid_start_time, valid_end_time)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL)",
         params![
             edge.id,
             edge.source_id,
@@ -395,6 +439,8 @@ pub fn insert_edge(conn: &Connection, edge: &KnowledgeEdge) -> rusqlite::Result<
             edge.description,
             edge.created_at,
             edge.metadata.as_ref().map(|m| m.to_string()),
+            ts,
+            ts,
         ],
     )?;
     Ok(())

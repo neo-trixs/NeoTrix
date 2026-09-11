@@ -1239,7 +1239,7 @@ impl ConsciousnessCoreHandle {
                 if !executed {
                     if let Some(recovered) = goal_lock.recover(instruction, &output) {
                         let (retry_executed, retry_output) = dispatch_internal_capability(
-                            &crate::l5_cognition::nt_core::Task {
+                            &ConsciousTask {
                                 id: alloc.task.id.clone(),
                                 summary: recovered,
                                 capability_tag: alloc.task.capability_tag.clone(),

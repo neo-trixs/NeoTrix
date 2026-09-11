@@ -48,6 +48,7 @@ const MARKET_RE_EVAL_INTERVAL_SECS: u64 = 300;
 const TELEMETRY_INTERVAL_SECS: u64 = 60;
 const SYSTEM_HEALTH_HEAL_INTERVAL_SECS: u64 = 300; // 5min NT-REPAIR 自愈巡检 (Track 3: D22/D26/D27/D28)
 const GAME_TRAINING_INTERVAL_SECS: u64 = 300; // 5min NT-PLAY 自主进化训练
+const CLUSTERING_INTERVAL_SECS: u64 = 3600; // 1h KB 域聚类巡检
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,

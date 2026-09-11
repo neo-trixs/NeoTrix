@@ -666,6 +666,112 @@ impl BackgroundLoopHandle {
             queue_report.books, queue_report.edges, classified, edges);
     }
 
+    /// KB 域聚类巡检 — 社区检测 + domain_clusters 维护 + cluster_id 分配。
+    ///
+    /// 每次运行:
+    /// 1. 读取全部节点和边
+    /// 2. 运行 CommunityDetector 检测社区结构
+    /// 3. 按 domain 维护 domain_clusters 表条目
+    /// 4. 把社区检测结果分配到节点 cluster_id
+    ///
+    /// 聚类结果供 GWT 注意力路由和知识检索使用 (域感知检索)。
+    pub(crate) async fn handle_clustering(&mut self) {
+        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_community::{CommunityDetector, CommunityAwareSearch};
+        use crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::{
+            get_all_nodes, get_all_edges, ensure_domain_cluster, update_cluster_stats,
+        };
+
+        let kb = match self.kb_pipeline.kb.as_ref() {
+            Some(kb) => kb,
+            None => { log::warn!("[bg] clustering: kb not attached"); return; }
+        };
+
+        let (nodes, edges) = {
+            let conn = match kb.raw_conn() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[bg] clustering: conn lock failed: {}", e); return; }
+            };
+            let nodes = match get_all_nodes(&conn) {
+                Ok(n) => n,
+                Err(e) => { log::warn!("[bg] clustering: get_all_nodes failed: {}", e); return; }
+            };
+            let edges = match get_all_edges(&conn) {
+                Ok(e) => e,
+                Err(e) => { log::warn!("[bg] clustering: get_all_edges failed: {}", e); return; }
+            };
+            (nodes, edges)
+        };
+
+        if nodes.is_empty() {
+            log::debug!("[bg] clustering: no nodes, skipping");
+            return;
+        }
+
+        // 1. Run community detection
+        let detector = CommunityDetector::default();
+        let mut searcher = CommunityAwareSearch::new(detector);
+        searcher.detect(&nodes, &edges);
+
+        let hierarchy = match searcher.hierarchy() {
+            Some(h) => h,
+            None => { log::warn!("[bg] clustering: detection produced no hierarchy"); return; }
+        };
+
+        // 2. Ensure domain_clusters entries exist for all domains
+        {
+            let conn = match kb.raw_conn() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[bg] clustering: conn lock failed: {}", e); return; }
+            };
+            let mut domains_seen = std::collections::HashSet::new();
+            for node in &nodes {
+                let domain = node.domain.as_deref().unwrap_or("unclustered");
+                if domains_seen.insert(domain.to_string()) {
+                    if let Err(e) = ensure_domain_cluster(&conn, domain) {
+                        log::warn!("[bg] clustering: ensure_domain_cluster({}) failed: {}", domain, e);
+                    }
+                }
+            }
+        }
+
+        // 3. Assign cluster_id based on domain
+        {
+            let conn = match kb.raw_conn() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[bg] clustering: conn lock failed: {}", e); return; }
+            };
+            let mut assigned = 0usize;
+            for node in &nodes {
+                let domain = node.domain.as_deref().unwrap_or("unclustered");
+                if let Ok(cluster_id) = ensure_domain_cluster(&conn, domain) {
+                    if node.cluster_id.as_deref() != Some(&cluster_id) {
+                        if let Err(e) = conn.execute(
+                            "UPDATE nodes SET cluster_id=?1 WHERE id=?2",
+                            rusqlite::params![cluster_id, node.id],
+                        ) {
+                            log::warn!("[bg] clustering: assign cluster_id to {} failed: {}", node.id, e);
+                        } else {
+                            assigned += 1;
+                        }
+                    }
+                }
+            }
+
+            // Update stats for all clusters
+            if let Ok(clusters) = crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn) {
+                for cluster in &clusters {
+                    let _ = update_cluster_stats(&conn, &cluster.id);
+                }
+            }
+
+            log::info!("[bg] clustering: {} nodes, {} edges, {} hierarchy levels, {} clusters, {} reassigned",
+                nodes.len(), edges.len(), hierarchy.num_levels(),
+                crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::list_clusters(&conn)
+                    .map(|c| c.len()).unwrap_or(0),
+                assigned);
+        }
+    }
+
     /// 系统健康监控 & NT-REPAIR 自愈闭环 (Track 3: D22/D26/D27/D28)
     /// 扫描磁盘/内存/测试/构建四维信号, 路由到 HealerRegistry 执行自愈动作:
     /// - clean_cache: cargo clean / 清理临时目录

@@ -1225,6 +1225,7 @@ impl ModelManager {
     }
 
     /// 获取模型路径 (自动下载)
+    #[cfg(feature = "onnx")]
     pub fn get_model_path(&mut self, model: &SuperResolutionModel) -> Result<PathBuf, SuperResolutionError> {
         let model_id = model.model_id().to_string();
         
@@ -1239,6 +1240,26 @@ impl ModelManager {
         let path = ModelRegistry::ensure_model(model, &self.cache_dir)?;
         self.loaded_models.insert(model_id, path.clone());
         
+        Ok(path)
+    }
+
+    /// 获取模型路径 (非 onnx 构建时返回缓存路径，不自动下载)
+    #[cfg(not(feature = "onnx"))]
+    pub fn get_model_path(&mut self, model: &SuperResolutionModel) -> Result<PathBuf, SuperResolutionError> {
+        let model_id = model.model_id().to_string();
+        if let Some(path) = self.loaded_models.get(&model_id) {
+            if path.exists() {
+                return Ok(path.clone());
+            }
+        }
+        let path = ModelRegistry::model_cache_path(model, &self.cache_dir);
+        if !path.exists() {
+            return Err(SuperResolutionError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Model {} not cached. Enable 'onnx' feature for auto-download.", model_id),
+            )));
+        }
+        self.loaded_models.insert(model_id, path.clone());
         Ok(path)
     }
 
