@@ -813,8 +813,9 @@ mod inline_tests {
             Domain::NtShield,
             Domain::NtPhysical,
             Domain::NtFeel,
+            Domain::NtFileAbility,
         ];
         assert_eq!(layers.len(), 6);
-        assert_eq!(domains.len(), 9);
+        assert_eq!(domains.len(), 10);
     }
 }

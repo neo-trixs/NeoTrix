@@ -20,6 +20,7 @@ pub mod metadata;
 pub mod repo_reverse_prompt;
 pub mod asset_model;
 pub mod auto_patrol;
+pub mod cryptopub;
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -59,6 +60,76 @@ macro_rules! osint_modules {
             }
         )*
     }};
+}
+
+/// GWT Source Gate — 声明式调度入口
+#[derive(Debug, Clone)]
+pub struct SourceGate {
+    pub name: &'static str,
+    pub priority: u8,
+    pub requires_domain: bool,
+    pub requires_ip: bool,
+    pub requires_email: bool,
+    pub requires_username: bool,
+}
+
+/// 返回所有源模块的 SourceGate 列表
+pub fn source_gates() -> Vec<SourceGate> {
+    vec![
+        SourceGate { name: "dns", priority: 8, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "http", priority: 7, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "shodan", priority: 7, requires_domain: false, requires_ip: true, requires_email: false, requires_username: false },
+        SourceGate { name: "censys", priority: 6, requires_domain: false, requires_ip: true, requires_email: false, requires_username: false },
+        SourceGate { name: "zoomeye", priority: 6, requires_domain: false, requires_ip: true, requires_email: false, requires_username: false },
+        SourceGate { name: "cryptopub", priority: 6, requires_domain: false, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "fofa", priority: 5, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "securitytrails", priority: 5, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "vuln", priority: 5, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "network", priority: 4, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "dark", priority: 3, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "url", priority: 3, requires_domain: true, requires_ip: false, requires_email: false, requires_username: false },
+        SourceGate { name: "person", priority: 4, requires_domain: false, requires_ip: false, requires_email: false, requires_username: true },
+        SourceGate { name: "social", priority: 3, requires_domain: false, requires_ip: false, requires_email: false, requires_username: true },
+        SourceGate { name: "credential", priority: 4, requires_domain: false, requires_ip: false, requires_email: true, requires_username: false },
+    ]
+}
+
+/// 判断某个 gate 是否应该对 target 运行
+pub fn should_run_source(gate: &SourceGate, target: &OsintTarget) -> bool {
+    if gate.requires_domain && target.domain.is_some() { return true; }
+    if gate.requires_ip && target.ip.is_some() { return true; }
+    if gate.requires_email && target.email.is_some() { return true; }
+    if gate.requires_username && target.username.is_some() { return true; }
+    if !gate.requires_domain && !gate.requires_ip && !gate.requires_email && !gate.requires_username { return true; }
+    false
+}
+
+/// GWT 集成 — 基于 priority 的智能调度
+pub fn sorted_modules_by_priority() -> Vec<SourceGate> {
+    let mut gates = source_gates();
+    gates.sort_by(|a, b| b.priority.cmp(&a.priority));
+    gates
+}
+
+/// 基于 target 类型选择最优模块组合
+pub fn optimal_modules_for_target(target: &OsintTarget) -> Vec<&'static str> {
+    let gates = source_gates();
+    let mut selected = Vec::new();
+
+    for gate in &gates {
+        if should_run_source(gate, target) {
+            selected.push(gate.name);
+        }
+    }
+
+    // 按 priority 排序
+    selected.sort_by(|a, b| {
+        let pa = gates.iter().find(|g| g.name == *a).map(|g| g.priority).unwrap_or(0);
+        let pb = gates.iter().find(|g| g.name == *b).map(|g| g.priority).unwrap_or(0);
+        pb.cmp(&pa)
+    });
+
+    selected
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +310,7 @@ pub struct OsintReport {
     pub censys: Option<censys::CensysFindings>,
     pub zoomeye: Option<zoomeye::ZoomEyeFindings>,
     pub securitytrails: Option<securitytrails::SecurityTrailsFindings>,
+    pub cryptopub: Option<cryptopub::CryptoPubFindings>,
     pub started_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
     pub errors: Vec<String>,
@@ -276,6 +348,7 @@ impl OsintReport {
         if let Some(ref c) = self.censys { n += c.services.len(); }
         if let Some(ref z) = self.zoomeye { n += z.host.len(); }
         if let Some(ref st) = self.securitytrails { n += st.subdomains.len() + st.records.len(); }
+        if let Some(ref cp) = self.cryptopub { n += cp.tx_count as usize; }
         n
     }
 
@@ -513,6 +586,12 @@ impl OsintReport {
             }
         }
 
+        if let Some(ref cryptopub) = self.cryptopub {
+            if let Ok(id) = Self::write_with_evidence(kb, &format!("cryptopub: {}", cryptopub.address), NodeType::Source, Some(&format!("Chain: {}, Balance: {}, Txs: {}", cryptopub.chain, cryptopub.balance, cryptopub.tx_count)), None, domain_hint, &run_id) {
+                written.push((id, NodeType::Source));
+            }
+        }
+
         written
     }
 }
@@ -543,6 +622,7 @@ impl std::fmt::Display for OsintReport {
         if let Some(ref c) = self.censys { write!(f, "{}", c)?; }
         if let Some(ref z) = self.zoomeye { write!(f, "{}", z)?; }
         if let Some(ref st) = self.securitytrails { write!(f, "{}", st)?; }
+        if let Some(ref cp) = self.cryptopub { write!(f, "{}", cp)?; }
         writeln!(f, "═══════════════════════════════════════════════════")
     }
 }
@@ -603,6 +683,7 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
         social::investigate    => social:        |t: &OsintTarget| t.username.is_some() || t.email.is_some(),
         securitytrails::investigate => securitytrails: |t: &OsintTarget| t.domain.is_some(),
         credential::investigate => credential:  |t: &OsintTarget| t.email.is_some(),
+        cryptopub::investigate => cryptopub:    |t: &OsintTarget| t.url.is_some() || t.domain.is_some(),
     ]);
 
     report.completed_at = Some(Utc::now());

@@ -18,6 +18,8 @@ impl CapabilityFactory {
             crate::l3_embodiment::nt_shield::nt_shield_ztnet::ztnet_capability::create_ztnet_capability(),
             // NT-WORLD Asset Map
             crate::l2_perception::nt_world::asset_map::asset_map_capability::create_asset_map_capability(),
+            // NT-FILE-ABILITY PDF Enhance
+            crate::neotrix::nt_file_ability::create_pdf_enhance_capability(),
         ]
     }
 
@@ -65,6 +67,7 @@ pub fn create_default_router() -> CapabilityRouter {
         CapabilityInput::Asset(_) => Some("nt-world-asset-map".into()),
         CapabilityInput::Network(_) => Some("nt-shield-ztnet".into()),
         CapabilityInput::Security(_) => Some("nt-shield-ztnet".into()),
+        CapabilityInput::FileEnhance(_) => Some("nt-file-pdf-enhance".into()),
         _ => None,
     });
 
@@ -90,7 +93,7 @@ mod tests {
     #[test]
     fn global_registry() {
         let registry = init_global_registry();
-        assert!(registry.list_all().len() >= 3);
+        assert!(registry.list_all().len() >= 4); // NLP + ZT-Net + Asset + PDF Enhance
     }
 
     #[test]

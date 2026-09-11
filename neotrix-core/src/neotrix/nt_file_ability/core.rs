@@ -33,6 +33,8 @@ pub struct FileAbility {
     pub(super) e8_state: ReasoningHexagram,
     /// Office 句柄缓存 (仅 Office 类文件)
     pub(super) doc: Option<Document>,
+    /// 任务摘要 (用于 GWT salience 计算)
+    pub(super) task_summary: Option<String>,
 }
 
 impl FileAbility {
@@ -59,6 +61,7 @@ impl FileAbility {
                 maturity: ConstellationLevel::C1UnitTest,
                 e8_state: ReasoningHexagram::new(0b001100), // 数据提取模式 (concrete+analytical+deep)
                 doc: Some(doc),
+                task_summary: None,
             });
         }
 
@@ -73,6 +76,7 @@ impl FileAbility {
                 maturity: ConstellationLevel::C1UnitTest,
                 e8_state: ReasoningHexagram::new(0b001100),
                 doc: None,
+                task_summary: None,
             });
         }
         if ext == "pmtiles" {
@@ -85,6 +89,7 @@ impl FileAbility {
                 maturity: ConstellationLevel::C1UnitTest,
                 e8_state: ReasoningHexagram::new(0b001100),
                 doc: None,
+                task_summary: None,
             });
         }
 
@@ -124,6 +129,7 @@ impl FileAbility {
             maturity: ConstellationLevel::C0Compile,
             e8_state: ReasoningHexagram::new(0b001001), // 语法/探测模式 (concrete+analytical+focused)
             doc: None,
+            task_summary: None,
         })
     }
 

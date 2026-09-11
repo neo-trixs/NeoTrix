@@ -89,11 +89,16 @@ pub fn specialist_index_inv(idx: usize) -> SpecialistType {
 impl FileAbility {
     /// 当前 E8 状态对应的 GWT 注意力投递目标
     pub fn gwt_route(&self) -> (SpecialistType, u32, ReasoningHexagram) {
-        route_attention(self.e8_state, None)
+        route_attention(self.e8_state, self.task_summary.as_deref())
     }
 
     /// 该文件的静态专家偏好 (按文件大类映射)
     pub fn specialist(&self) -> SpecialistType {
         self.kind.specialist()
+    }
+    
+    /// 设置任务摘要 (用于 GWT salience 计算)
+    pub fn set_task_summary(&mut self, summary: String) {
+        self.task_summary = Some(summary);
     }
 }
