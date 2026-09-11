@@ -37,6 +37,9 @@ mod types;
 mod visual;
 mod doc_parse;
 mod format_route;
+mod pdf_image_extract;
+mod image_super_resolution;
+mod pdf_icon_enhance;
 
 pub use core::*;
 pub use doc_parse::*;
@@ -55,6 +58,9 @@ pub use tables::*;
 pub use types::*;
 pub use visual::*;
 pub use format_route::*;
+pub use pdf_image_extract::*;
+pub use image_super_resolution::*;
+pub use pdf_icon_enhance::*;
 
 /// 构造最小 DOCX (zip 包: [Content_Types].xml + _rels/.rels + word/document.xml)。
 /// 测试辅助: 模块内 + 意识核心 dispatch 测试复用 (R-P42 复用, 不平行重造)。

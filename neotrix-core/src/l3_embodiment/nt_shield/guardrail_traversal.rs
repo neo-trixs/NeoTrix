@@ -129,7 +129,7 @@ impl GuardrailTraversalEngine {
     }
 
     /// 应用帧
-    fn apply_frame(&self, input: &str, system_prompt: &str, frame: &EvaluationFrame) -> String {
+    fn apply_frame(&self, input: &str, _system_prompt: &str, frame: &EvaluationFrame) -> String {
         match frame.name.as_str() {
             "persona_unlock" => {
                 format!(
@@ -172,7 +172,7 @@ impl GuardrailTraversalEngine {
     }
 
     /// 自动选择最佳帧
-    pub fn auto_select_frame(&self, input: &str, refusal: &str) -> &EvaluationFrame {
+    pub fn auto_select_frame(&self, _input: &str, refusal: &str) -> &EvaluationFrame {
         // 根据输入和拒答类型选择最佳帧
         if refusal.contains("I cannot") || refusal.contains("I'm not able") {
             // 模型拒答 - 使用persona_unlock

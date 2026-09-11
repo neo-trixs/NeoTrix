@@ -8,7 +8,7 @@ mod tests {
         use crate::core::nt_core_hcube::coord::HyperCoord;
         use crate::core::nt_core_hcube::axis::DimensionAxis;
         use crate::core::nt_core_self::AttentionDomain;
-        use crate::l5_cognition::nt_mind::thinking_bridge::ThinkingBridge;
+        use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 
         let mut bridge = ThinkingBridge::new("/tmp");
         let mut gwt = GlobalWorkspace::new(0.3);
@@ -40,7 +40,7 @@ mod tests {
 
     #[test]
     fn test_full_evolution_cycle_affects_archive() {
-        use crate::l5_cognition::nt_mind::thinking_bridge::ThinkingBridge;
+        use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 
         let mut bridge = ThinkingBridge::new("/tmp");
         let initial = bridge.archive.snapshots.len();
@@ -55,7 +55,7 @@ mod tests {
 
     #[test]
     fn test_trace_rewards_after_evolution_cycle() {
-        use crate::l5_cognition::nt_mind::thinking_bridge::ThinkingBridge;
+        use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 
         let mut bridge = ThinkingBridge::new("/tmp");
         bridge.run_full_evolution_cycle();
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_cognitive_health_after_multiple_cycles() {
-        use crate::l5_cognition::nt_mind::thinking_bridge::ThinkingBridge;
+        use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
 
         let mut bridge = ThinkingBridge::new("/tmp");
 
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_intrinsic_motivation_drives_goal_priority() {
-        use crate::l5_cognition::nt_mind::thinking_bridge::ThinkingBridge;
+        use crate::l5_cognition::nt_mind::nt_mind::reason::thinking_bridge::ThinkingBridge;
         use crate::l5_cognition::nt_mind::GoalLoop;
 
         let mut bridge = ThinkingBridge::new("/tmp");
