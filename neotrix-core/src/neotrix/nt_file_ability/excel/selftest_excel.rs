@@ -100,9 +100,15 @@ impl SelfTest for ExcelSelfTest {
     }
 }
 
-/// 注册 Excel SelfTest 到主 registry
-pub fn register_excel_self_tests(registry: &mut crate::neotrix::nt_file_ability::selftest::SelfTestRegistry) {
-    registry.register(Box::new(ExcelSelfTest));
+struct CoreExcelBridge;
+impl crate::core::nt_core_self_test::SelfTest for CoreExcelBridge {
+    fn name(&self) -> &str { "nt_file_ability::excel" }
+    fn self_test(&self) -> Result<(), Vec<String>> { ExcelSelfTest.self_test() }
+}
+
+/// 注册 Excel SelfTest 到核心 registry
+pub fn register_excel_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+    registry.register(Box::new(CoreExcelBridge));
 }
 
 #[cfg(test)]

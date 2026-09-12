@@ -2,7 +2,7 @@
 //! 按扩展名/内容探测文档格式并路由到对应解析器。R-P42 强化 `nt_file_ability`
 //! (复用既有 Office6/PDF/图像探测路径), 不平行重造格式枚举。
 
-use super::selftest::{SelfTest, SelfTestRegistry};
+use super::selftest::SelfTest;
 use std::path::Path;
 
 /// 文档格式 — 路由目标。覆盖 anydoc 支持的多格式 + 通用类型。
@@ -97,9 +97,15 @@ impl SelfTest for FormatRouteSelfTest {
     }
 }
 
-/// 注册文档格式路由 SelfTest 到全局注册表 (T2)。
-pub fn register_format_route_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(FormatRouteSelfTest));
+struct CoreFormatRouteBridge;
+impl crate::core::nt_core_self_test::SelfTest for CoreFormatRouteBridge {
+    fn name(&self) -> &str { "nt_world_file_format_route" }
+    fn self_test(&self) -> Result<(), Vec<String>> { FormatRouteSelfTest.self_test() }
+}
+
+/// 注册文档格式路由 SelfTest 到核心全局注册表 (T2)。
+pub fn register_format_route_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+    registry.register(Box::new(CoreFormatRouteBridge));
 }
 
 #[cfg(test)]

@@ -202,11 +202,44 @@ impl SelfTest for FileAbilitySelfTest {
     }
 }
 
-/// 注册 PDF/SR SelfTest 到主 registry
-pub fn register_pdf_sr_self_tests(registry: &mut SelfTestRegistry) {
-    registry.register(Box::new(PdfIconEnhanceSelfTest));
-    registry.register(Box::new(ImageSuperResolutionSelfTest));
-    registry.register(Box::new(PdfImageExtractSelfTest));
+/// 双 trait 实现: 同时满足本地 SelfTest 和 NT-CORE SelfTest，
+/// 使 FileAbilitySelfTest 可被 NT-MIND 意识树 SelfTestRegistry 注册。
+impl crate::core::nt_core_self_test::SelfTest for FileAbilitySelfTest {
+    fn name(&self) -> &str {
+        "nt_file_ability"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+}
+
+// ─── 核心 trait 桥接包装器 (跨层注册用) ───
+
+struct CorePdfIconEnhanceBridge;
+impl crate::core::nt_core_self_test::SelfTest for CorePdfIconEnhanceBridge {
+    fn name(&self) -> &str { "nt_file_ability::pdf_icon_enhance" }
+    fn self_test(&self) -> Result<(), Vec<String>> { PdfIconEnhanceSelfTest.self_test() }
+}
+
+struct CoreImageSRBridge;
+impl crate::core::nt_core_self_test::SelfTest for CoreImageSRBridge {
+    fn name(&self) -> &str { "nt_file_ability::image_super_resolution" }
+    fn self_test(&self) -> Result<(), Vec<String>> { ImageSuperResolutionSelfTest.self_test() }
+}
+
+struct CorePdfImageExtractBridge;
+impl crate::core::nt_core_self_test::SelfTest for CorePdfImageExtractBridge {
+    fn name(&self) -> &str { "nt_file_ability::pdf_image_extract" }
+    fn self_test(&self) -> Result<(), Vec<String>> { PdfImageExtractSelfTest.self_test() }
+}
+
+/// 注册 PDF/SR SelfTest 到核心 registry
+/// 接受核心 SelfTestRegistry (跨层调用契约)
+pub fn register_pdf_sr_self_tests(registry: &mut crate::core::nt_core_self_test::SelfTestRegistry) {
+    registry.register(Box::new(CorePdfIconEnhanceBridge));
+    registry.register(Box::new(CoreImageSRBridge));
+    registry.register(Box::new(CorePdfImageExtractBridge));
     registry.register(Box::new(FileAbilitySelfTest));
 }
 
