@@ -21,5 +21,7 @@ pub use crate::core::nt_core_span::{
     AttributeValue, ConsoleTracer, CostTracker, NoopTracer, SpanKind, Tracer,
 };
 
-// L1 的纯数据模型当前在 neotrix/ 中定义
-// 随着迁移推进，trait 和数据类型会逐步移入此处
+// L1 子模块
+pub mod nt_core_edit;
+pub mod nt_core_mcp;
+pub mod nt_core_guard_chain;

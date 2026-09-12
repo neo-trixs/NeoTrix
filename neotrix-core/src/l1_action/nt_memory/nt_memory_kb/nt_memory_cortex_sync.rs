@@ -340,7 +340,7 @@ pub(crate) struct DigestReport {
 /// 并写入 `lineage` (G3) + 原始 content/metadata。只读采样, 不改权重 — 把冷库变"可寻址/可检索"的活知识。
 ///
 /// - G4: corpus 未挂载 → 拒绝。
-/// - 复用既有 `insert_or_get_node_rows` (R-P42, 不平行造插入器), 仅以 UPDATE 补 content/lineage。
+/// - 复用既有 `insert_or_get_node` (R-P42, 不平行造插入器), 仅以 UPDATE 补 content/lineage。
 pub fn digest_sample(
     conn: &Connection,
     corpus_db: &Path,
@@ -404,13 +404,14 @@ pub fn digest_sample(
             continue;
         }
         let ntype_enum = NodeType::from_str(validate_node_type(&ntype));
-        let _id = insert_or_get_node_rows(
+        let _id = insert_or_get_node(
             conn,
             &title,
             ntype_enum,
             summary.as_deref(),
             Some(&url),
             domain.as_deref(),
+            false,
         )
         .map_err(|e| e.to_string())?;
         // 写入 lineage + 原始 content/metadata (G3)
@@ -441,7 +442,7 @@ pub fn digest_sample(
 /// Phase 3 (G1+G3+G4): 把外置因果图的高信号节点蒸馏进 live KB。
 ///
 /// 筛选高信号: confidence ≥ 0.8 或 关联边(入+出)数 ≥ 2。每个节点经既有
-/// `insert_or_get_node_rows` 落盘 (url = `cortex_source://causal_graph#<id>`, 不平行造插入器, R-P42),
+/// `insert_or_get_node` 落盘 (url = `cortex_source://causal_graph#<id>`, 不平行造插入器, R-P42),
 /// 并写 `lineage` 块 (G3)。同时更新伞节点 `cortex_source://causal_graph` 的 lineage sha,
 /// 供 `export_delta` 的 G2 版本门禁做指纹比对。挂载门禁 (G4) 由 CLI 层保证。
 pub fn ingest_causal_graph(
@@ -460,13 +461,14 @@ pub fn ingest_causal_graph(
             continue; // 低信号跳过, 防止噪音灌入 live KB
         }
         let url = format!("cortex_source://causal_graph#{}", node.id);
-        let id = insert_or_get_node_rows(
+        let id = insert_or_get_node(
             conn,
             &node.description,
             NodeType::Concept,
             Some(&node.description),
             Some(&url),
             Some("NT-CORE"),
+            false,
         )
         .map_err(|e| e.to_string())?;
         // 写 lineage (G3): 用既有 metadata 增量更新, 不平行造写入器
@@ -484,13 +486,14 @@ pub fn ingest_causal_graph(
         derived += 1;
     }
     // 伞节点 lineage (G2 版本门禁锚点): 复用既有插入器取 id 后写 sha
-    let umbrella_id = insert_or_get_node_rows(
+    let umbrella_id = insert_or_get_node(
         conn,
         "causal_graph",
         NodeType::Concept,
         Some("外置大脑因果图蒸馏锚点"),
         Some("cortex_source://causal_graph"),
         Some("NT-CORE"),
+        false,
     )
     .map_err(|e| e.to_string())?;
     if let Ok(Some(existing)) = get_node(conn, &umbrella_id) {
@@ -789,13 +792,14 @@ mod tests {
         crate::l1_action::nt_memory::nt_memory_kb::nt_memory_schema::initialize(&conn)
             .map_err(|e| e.to_string())?;
         // 先在 live KB 放一个已存在的节点 (复用既有插入器, R-P42)
-        insert_or_get_node_rows(
+        insert_or_get_node(
             &conn,
             "causal",
             NodeType::from_str("cortex_brain"),
             Some("s"),
             Some("cortex_source://causal_graph"),
             Some("example.com"),
+            false,
         )
         .map_err(|e| e.to_string())?;
         let cdir = tempfile::tempdir().expect("tmp");
@@ -897,7 +901,7 @@ mod tests {
             [serde_json::json!({"lineage": {"last_synced_at": 1}}).to_string()],
         )
         .map_err(|e| e.to_string())?;
-        insert_or_get_node_rows(
+        insert_or_get_node(
             &conn, "live", NodeType::from_str("article"), Some("s"), Some("zimid://live/2"), Some("d"),
         )
         .map_err(|e| e.to_string())?;

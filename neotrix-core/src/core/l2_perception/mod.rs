@@ -8,4 +8,7 @@
 //! - L2 的输出必须通过 SourceHierarchy 验证链
 //! - L2 不负责存储（那是 L3 的工作）
 
-pub use crate::core::nt_core_sense as sense;
+// L2 子模块
+pub mod nt_core_llm;
+pub mod nt_core_embed;
+pub mod nt_core_sense;

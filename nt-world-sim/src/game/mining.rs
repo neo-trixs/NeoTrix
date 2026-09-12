@@ -170,7 +170,7 @@ fn pseudo_random(seed: u32) -> u32 {
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
-    x.abs()
+    x
 }
 
 #[cfg(test)]
