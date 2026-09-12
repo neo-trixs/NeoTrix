@@ -7,6 +7,8 @@
 
 pub mod agent_routing;
 pub mod anthropic;
+pub mod inference_router;
+pub use inference_router::{InferenceRouter, RouterConfig};
 pub mod capability_router;
 pub mod account_pool;
 pub mod circuit_breaker;
@@ -19,13 +21,6 @@ pub mod free_catalog;
 pub mod free_pool;
 pub mod free_providers;
 pub mod gateway;
-pub mod unified_inference;
-pub use unified_inference::{
-    UnifiedInference, InferenceRequest, InferenceResponse, InferenceError,
-    InferenceCapabilities, ProviderInfo, ProviderCapabilities,
-    HealthStatus, CostEstimate, RouterHealth, StreamHandle,
-    RequestMetadata, ResponseMetadata, Priority,
-};
 pub mod generation_classifier;
 pub mod gemini;
 pub mod llama_process;
