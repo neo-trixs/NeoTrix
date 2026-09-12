@@ -157,17 +157,51 @@ fn set_proxy(&mut self, proxy_url: &str) {
             200 => {
                 let resp: serde_json::Value = serde_json::from_str(&text)
                     .map_err(|e| LlmError::InvalidRequest(e.to_string()))?;
-                let content = resp["content"].as_array()
-                    .and_then(|arr| arr.first())
-                    .and_then(|v| v["text"].as_str())
-                    .unwrap_or("")
-                    .to_string();
+
+                // Extract text content from content blocks
+                let text_content = resp["content"].as_array()
+                    .map(|blocks| {
+                        blocks.iter()
+                            .filter_map(|b| b["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join("")
+                    })
+                    .unwrap_or_default();
+
+                // Parse tool_use blocks from content array
+                let tool_calls = resp["content"].as_array()
+                    .and_then(|blocks| {
+                        let calls: Vec<super::types::ToolCallInfo> = blocks.iter()
+                            .filter_map(|block| {
+                                if block["type"].as_str() == Some("tool_use") {
+                                    Some(super::types::ToolCallInfo {
+                                        id: block["id"].as_str().unwrap_or("").to_string(),
+                                        call_type: "function".to_string(),
+                                        function: super::types::ToolCallFunction {
+                                            name: block["name"].as_str().unwrap_or("").to_string(),
+                                            arguments: block["input"].to_string(),
+                                        },
+                                    })
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        if calls.is_empty() { None } else { Some(calls) }
+                    });
+
+                let finish_reason = if tool_calls.is_some() {
+                    FinishReason::Tool
+                } else {
+                    FinishReason::Stop
+                };
+
                 let usage = Usage {
                     prompt_tokens: resp["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32,
                     completion_tokens: resp["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32,
                     total_tokens: (resp["usage"]["input_tokens"].as_u64().unwrap_or(0) + resp["usage"]["output_tokens"].as_u64().unwrap_or(0)) as u32,
                 };
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop, tool_calls: None , reasoning: None})
+                Ok(LlmResponse { content: text_content, model: request.model.clone(), usage, finish_reason, tool_calls, reasoning: None })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),

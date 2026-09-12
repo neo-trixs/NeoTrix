@@ -20,19 +20,26 @@ impl OllamaProvider {
         self
     }
 
-    fn build_prompt(&self, request: &LlmRequest) -> String {
-        request.messages.iter()
-            .map(|m| {
-                let role = match m.role {
-                    super::types::Role::System => "system",
-                    super::types::Role::User => "user",
-                    super::types::Role::Assistant => "assistant",
-                    super::types::Role::Tool => "tool",
-                };
-                format!("<|{}|>\n{}\n<|end|>", role, m.content)
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+    fn build_messages(&self, request: &LlmRequest) -> Vec<serde_json::Value> {
+        request.messages.iter().map(|m| {
+            let role = match m.role {
+                super::types::Role::System => "system",
+                super::types::Role::User => "user",
+                super::types::Role::Assistant => "assistant",
+                super::types::Role::Tool => "tool",
+            };
+            let mut msg = serde_json::json!({
+                "role": role,
+                "content": m.content,
+            });
+            if let Some(ref tool_calls) = m.tool_calls {
+                msg["tool_calls"] = serde_json::json!(tool_calls);
+            }
+            if let Some(ref tool_call_id) = m.tool_call_id {
+                msg["tool_call_id"] = serde_json::json!(tool_call_id);
+            }
+            msg
+        }).collect()
     }
 }
 
@@ -53,22 +60,23 @@ impl LlmProvider for OllamaProvider {
     }
 
     async fn complete_raw(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
-        let prompt = self.build_prompt(request);
+        let messages = self.build_messages(request);
         let mut body = serde_json::json!({
             "model": request.model,
-            "prompt": prompt,
+            "messages": messages,
             "stream": false,
-            "options": {
-                "num_predict": request.max_tokens,
-            }
         });
 
         if let Some(temp) = request.temperature_clean() {
-            body["options"]["temperature"] = serde_json::json!(temp);
+            body["options"] = serde_json::json!({ "temperature": temp });
+        }
+
+        if !request.tools.is_empty() {
+            body["tools"] = serde_json::json!(request.tools);
         }
 
         let response = self.client
-            .post(format!("{}/api/generate", self.base_url))
+            .post(format!("{}/api/chat", self.base_url))
             .json(&body)
             .send()
             .await
@@ -81,13 +89,29 @@ impl LlmProvider for OllamaProvider {
             200 => {
                 let resp: serde_json::Value = serde_json::from_str(&text)
                     .map_err(|e| LlmError::InvalidRequest(e.to_string()))?;
-                let content = resp["response"].as_str().unwrap_or("").to_string();
+
+                let content = resp["message"]["content"].as_str().unwrap_or("").to_string();
+
+                let tool_calls = resp.get("message")
+                    .and_then(|m| m.get("tool_calls"))
+                    .and_then(|tc| serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()).ok())
+                    .filter(|v| !v.is_empty());
+
+                let prompt_tokens = resp.get("prompt_eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let completion_tokens = resp.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let usage = Usage {
-                    prompt_tokens: resp.get("prompt_eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    completion_tokens: resp.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    total_tokens: 0,
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens: prompt_tokens + completion_tokens,
                 };
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop, tool_calls: None , reasoning: None})
+
+                let finish_reason = if tool_calls.is_some() {
+                    FinishReason::Tool
+                } else {
+                    FinishReason::Stop
+                };
+
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason, tool_calls, reasoning: None })
             }
             400 => Err(LlmError::InvalidRequest(text)),
             500..=599 => Err(LlmError::Server(text)),
@@ -96,19 +120,21 @@ impl LlmProvider for OllamaProvider {
     }
 
     async fn stream_complete_raw(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
-        let prompt = self.build_prompt(request);
+        let messages = self.build_messages(request);
         let mut body = serde_json::json!({
             "model": request.model,
-            "prompt": prompt,
+            "messages": messages,
             "stream": true,
-            "options": {
-                "num_predict": request.max_tokens,
-            }
         });
 
         if let Some(temp) = request.temperature_clean() {
-            body["options"]["temperature"] = serde_json::json!(temp);
+            body["options"] = serde_json::json!({ "temperature": temp });
         }
+
+        if !request.tools.is_empty() {
+            body["tools"] = serde_json::json!(request.tools);
+        }
+
         let base_url = self.base_url.clone();
         let model = request.model.clone();
 
@@ -116,7 +142,7 @@ impl LlmProvider for OllamaProvider {
 
         tokio::spawn(async move {
             let client = crate::neotrix::nt_io_http_factory::global_client().clone();
-            if let Ok(response) = client.post(format!("{}/api/generate", base_url))
+            if let Ok(response) = client.post(format!("{}/api/chat", base_url))
                 .json(&body)
                 .send().await {
                 if !response.status().is_success() { return; }
@@ -125,24 +151,37 @@ impl LlmProvider for OllamaProvider {
                     let line = line.trim();
                     if line.is_empty() { continue; }
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-                        if let Some(text) = v["response"].as_str() {
-                            if text.is_empty() { continue; }
+                        let content = v["message"]["content"].as_str().unwrap_or("").to_string();
+                        let tool_calls = v.get("message")
+                            .and_then(|m| m.get("tool_calls"))
+                            .and_then(|tc| serde_json::from_value::<Vec<super::types::ToolCallInfo>>(tc.clone()).ok())
+                            .filter(|v| !v.is_empty());
+
+                        if !content.is_empty() || tool_calls.is_some() {
+                            let finish_reason = if tool_calls.is_some() {
+                                FinishReason::Tool
+                            } else {
+                                FinishReason::Unknown
+                            };
                             let _ = tx.send(Ok(LlmResponse {
-                                content: text.to_string(),
+                                content,
                                 model: model.clone(),
                                 usage: Usage::default(),
-                                finish_reason: FinishReason::Unknown,
-                            tool_calls: None,
-                             reasoning: None,})).await;
+                                finish_reason,
+                                tool_calls,
+                                reasoning: None,
+                            })).await;
                         }
+
                         if v.get("done").and_then(|d| d.as_bool()).unwrap_or(false) {
                             let _ = tx.send(Ok(LlmResponse {
                                 content: String::new(),
                                 model: model.clone(),
                                 usage: Usage::default(),
                                 finish_reason: FinishReason::Stop,
-                            tool_calls: None,
-                             reasoning: None,})).await;
+                                tool_calls: None,
+                                reasoning: None,
+                            })).await;
                         }
                     }
                 }
