@@ -20,7 +20,7 @@ pub const NS_VALUE_GATE: &str = "value_gate";
 
 /// 拦截记录。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InterceptionRecord {
+pub(crate) struct InterceptionRecord {
     pub id: String,
     pub action: Action,
     pub arbitration: ArbitrationResult,

@@ -17,6 +17,7 @@ pub mod nt_consciousness_core;
 
 // 保留的独立模块
 pub mod context_assembly;
+pub mod nt_core_intra_reflection;
 pub mod nt_core_parallel;
 pub mod seal;
 pub mod persona_routing;

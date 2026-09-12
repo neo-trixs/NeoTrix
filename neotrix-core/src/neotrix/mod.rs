@@ -108,7 +108,7 @@ pub use crate::l5_cognition::nt_mind::evolution;
 pub use crate::l5_cognition::nt_mind::foundation;
 
 // L6 Meta — re-exports
-pub use crate::l6_meta::coordination::nt_core_intra_reflection;
+pub use crate::l5_cognition::nt_core::nt_core_intra_reflection;
 pub use crate::l6_meta::healing::{
     nt_mind_consciousness_gold_standard, nt_mind_consciousness_monitor,
 };

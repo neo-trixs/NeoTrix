@@ -1043,21 +1043,6 @@ pub struct MixedPrecisionRule {
         }
     }
     
-    /// Get quality benchmark for a format
-    pub fn _get_benchmark(&self, format: &str) -> Option<&QualityBenchmark> {
-        self.benchmarks.get(format)
-    }
-    
-    /// Generate TurboQuant KV cache types
-    pub fn _turboquant_config(&self) -> _TurboQuantConfig {
-        _TurboQuantConfig {
-            k_type: "turbo3".to_string(),
-            v_type: "turbo3".to_string(),
-            kv_tail_tokens: 1024,
-        }
-    }
-}
-
 /// TurboQuant KV cache configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct _TurboQuantConfig {

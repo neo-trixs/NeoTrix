@@ -10,12 +10,15 @@
 
 pub mod nt_shield;
 pub mod nt_shield_agentic_scan;
+pub mod nt_shield_approval;
 pub mod nt_shield_audit;
+pub mod nt_shield_audit_phases;
 pub mod nt_shield_comm;
 pub mod nt_shield_oversight;
 pub mod nt_shield_propagation_guard;
 pub mod nt_shield_recon;
 pub mod nt_shield_sandbox;
+pub mod content_moderation;
 
 #[cfg(feature = "sandbox")]
 pub mod nt_shield_sandbox_entry;

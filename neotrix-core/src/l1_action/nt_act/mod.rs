@@ -51,6 +51,8 @@ pub mod nt_act_cleanup;
 pub mod goal_lock;
 
 pub mod reference_view;
+pub mod video_quality_scorer;
+pub mod video_audit_trail;
 
 // Re-exports for cross-module integration
 pub use reference_view::ReferenceManager;

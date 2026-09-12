@@ -41,7 +41,7 @@ pub enum JudgmentVerdict {
 
 /// 类比链接。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnalogicalLink {
+pub(crate) struct AnalogicalLink {
     pub case_id: String,
     pub case_title: String,
     pub similarity: f64,
@@ -51,7 +51,7 @@ pub struct AnalogicalLink {
 
 /// 直觉配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntuitionConfig {
+pub(crate) struct IntuitionConfig {
     pub min_cases_for_judgment: usize,
     pub max_analogical_chain: usize,
     pub confidence_threshold: f64,
@@ -348,7 +348,7 @@ impl Default for JudgmentContext {
 
 /// 反事实推理结果。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CounterfactualResult {
+pub(crate) struct CounterfactualResult {
     pub factor: String,
     pub original_value: String,
     pub new_value: String,
@@ -359,7 +359,7 @@ pub struct CounterfactualResult {
 
 /// 伦理直觉运行时（线程安全）。
 #[derive(Clone)]
-pub struct EthicalIntuitionRuntime {
+pub(crate) struct EthicalIntuitionRuntime {
     inner: Arc<EthicalIntuition>,
 }
 
