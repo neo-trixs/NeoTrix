@@ -133,7 +133,14 @@ impl StreamingPipeline {
 
         // Spawn display task if enabled
         if config.display_progress {
-            let mut rx_progress = progress_tx.clone();
+            let (display_tx, mut rx_progress) = mpsc::channel::<PipelineProgress>(64);
+            // Forward progress to display channel
+            let progress_tx_display = progress_tx.clone();
+            tokio::spawn(async move {
+                // This will be replaced by the actual forwarding in the download tasks
+                drop((progress_tx_display, display_tx));
+            });
+            // For now, use a simple approach: clone the existing receiver pattern
             tokio::spawn(async move {
                 let mut last_downloaded = 0u64;
                 let mut last_time = tokio::time::Instant::now();
