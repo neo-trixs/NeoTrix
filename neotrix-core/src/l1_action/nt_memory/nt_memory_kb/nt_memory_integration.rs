@@ -77,11 +77,11 @@ pub fn persist_mined_knowledge(conn: &Connection, title: &str, summary: &str, ur
 
     let summary_short = truncate_chars(summary, 2000);
 
-    let node_id = store::insert_or_get_node(conn, title, node_type, Some(summary_short), Some(url), Some(&domain))
+    let node_id = store::insert_or_get_node(conn, title, node_type, Some(summary_short), Some(url), Some(&domain), true)
         .map_err(|e| format!("KB insert node: {}", e))?;
 
     for insight in insights {
-        let insight_id = store::insert_or_get_node(conn, insight, NodeType::Insight, None, None, None)
+        let insight_id = store::insert_or_get_node(conn, insight, NodeType::Insight, None, None, None, true)
             .map_err(|e| format!("KB insert insight: {}", e))?;
         store::upsert_edge(conn, &node_id, &insight_id, RelationType::Related, 0.7, Some("Mined insight"))
             .map_err(|e| format!("KB upsert edge: {}", e))?;
@@ -108,7 +108,7 @@ pub(crate) fn import_from_knowledge_engine(conn: &Connection, entries: &[Knowled
     let summary_short = truncate_chars(summary, 2000);
         let domain = extract_domain(&entry.source_url);
 
-        let node_id = store::insert_or_get_node(conn, &entry.title, node_type, Some(summary_short), Some(&entry.source_url), Some(&domain))
+        let node_id = store::insert_or_get_node(conn, &entry.title, node_type, Some(summary_short), Some(&entry.source_url), Some(&domain), true)
             .map_err(|e| format!("KB insert: {}", e))?;
 
         let mut meta = serde_json::Map::new();

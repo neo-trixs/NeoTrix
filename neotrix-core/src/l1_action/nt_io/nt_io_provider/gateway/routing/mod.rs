@@ -1,15 +1,15 @@
 //! 路由子模块 — 智能路由、能力路由、子网格、免费 provider 选择
 
 // ── 智能路由 ──────────────────────────────────────────────
-mod intelligence;
+pub mod intelligence;
 pub use intelligence::*;
 
 mod learned_router;
 
-mod market_router;
+pub mod market_router;
 pub use market_router::*;
 
-mod routing_utils;
+pub mod routing_utils;
 pub use routing_utils::*;
 
 mod selection;
@@ -27,8 +27,8 @@ mod inference_router;
 pub use inference_router::{InferenceRouter, RouterConfig};
 
 // ── 搜索 & 免费 provider ─────────────────────────────────
-mod search_router;
+pub mod search_router;
 pub use search_router::*;
 
-mod free_providers;
+pub mod free_providers;
 pub use free_providers::*;

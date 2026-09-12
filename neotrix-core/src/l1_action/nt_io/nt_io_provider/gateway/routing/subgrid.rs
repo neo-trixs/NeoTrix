@@ -1,6 +1,6 @@
 use crate::core::nt_core_cache::text_to_embedding;
 
-use super::super::provider_catalog::lookup_provider;
+use super::super::super::catalog::provider_catalog::lookup_provider;
 use super::*;
 
 impl GatewayV2 {
