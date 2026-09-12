@@ -553,14 +553,6 @@ pub fn upsert_edge(
 // 域级聚合 count (by_type/by_domain/...) 保留本模块 (依赖 nt_memory_types)。
 pub use crate::core::nt_core_kb_primitives::{count_edges, count_nodes};
 
-pub fn count_nodes_by_type(conn: &Connection, node_type: &str) -> rusqlite::Result<usize> {
-    conn.query_row(
-        "SELECT COUNT(*) FROM nodes WHERE node_type=?1",
-        params![node_type],
-        |row| row.get(0),
-    )
-}
-
 pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
     let mut stmt = conn.prepare("SELECT node_type, COUNT(*) FROM nodes GROUP BY node_type")?;
     let rows = stmt.query_map([], |row| {

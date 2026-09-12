@@ -122,6 +122,71 @@ impl SeasonalEvent {
             Self::MeditationRetreat => vec!["Awareness", "Focus"],
         }
     }
+
+    pub fn reward_item_id(&self) -> Option<u32> {
+        match self {
+            Self::FlowerFestival => Some(5001),
+            Self::FishingContest => Some(2011),
+            Self::ConcertInthePark => Some(5004),
+            Self::MineExplorationEvent => Some(2015),
+            Self::HarvestFestival => Some(4101),
+            Self::CookingContest => Some(2020),
+            Self::StargazingNight => Some(5002),
+            Self::MeditationRetreat => Some(2013),
+        }
+    }
+
+    pub fn difficulty(&self) -> u32 {
+        match self {
+            Self::FlowerFestival => 2,
+            Self::FishingContest => 1,
+            Self::ConcertInthePark => 1,
+            Self::MineExplorationEvent => 3,
+            Self::HarvestFestival => 2,
+            Self::CookingContest => 2,
+            Self::StargazingNight => 1,
+            Self::MeditationRetreat => 3,
+        }
+    }
+
+    pub fn unlock_level(&self) -> u32 {
+        match self {
+            Self::FlowerFestival => 1,
+            Self::FishingContest => 1,
+            Self::ConcertInthePark => 2,
+            Self::MineExplorationEvent => 3,
+            Self::HarvestFestival => 2,
+            Self::CookingContest => 3,
+            Self::StargazingNight => 4,
+            Self::MeditationRetreat => 5,
+        }
+    }
+
+    pub fn bonus_condition(&self) -> &str {
+        match self {
+            Self::FlowerFestival => "Use a Rare+ flower for 2x score",
+            Self::FishingContest => "Catch a Legendary fish for instant win",
+            Self::ConcertInthePark => "Perform with 3+ instruments for bonus",
+            Self::MineExplorationEvent => "Find the hidden vein for bonus gold",
+            Self::HarvestFestival => "All crops Gold quality for 3x score",
+            Self::CookingContest => "Use 3+ ingredients for bonus points",
+            Self::StargazingNight => "Stay until dawn for bonus reward",
+            Self::MeditationRetreat => "Complete full session without interruption",
+        }
+    }
+
+    pub fn min_participants(&self) -> u32 {
+        match self {
+            Self::FlowerFestival => 2,
+            Self::FishingContest => 2,
+            Self::ConcertInthePark => 4,
+            Self::MineExplorationEvent => 3,
+            Self::HarvestFestival => 3,
+            Self::CookingContest => 2,
+            Self::StargazingNight => 1,
+            Self::MeditationRetreat => 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

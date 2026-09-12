@@ -4,7 +4,6 @@ use crate::game::weather::Weather;
 use crate::game::inventory::Inventory;
 use crate::game::npc::Position;
 use crate::error::{GameError, GameResult};
-use crate::save::SaveData;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
@@ -280,7 +279,7 @@ pub fn load_game_from_file(slot: u32) -> GameResult<String> {
     let mut state = GAME_STATE.lock().map_err(|e| GameError::Game(e.to_string()))?;
     let game = state.as_mut().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
     let manager = crate::save::SaveManager::new();
-    let data = manager.load(slot)?;
-    game.tick_count = data.tick_count;
+    let tick_count = manager.load_tick_count(slot)?;
+    game.tick_count = tick_count;
     Ok(format!("Loaded from slot {}", slot))
 }

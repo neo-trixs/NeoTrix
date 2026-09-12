@@ -753,6 +753,20 @@ pub(crate) fn model_capability_score(provider_name: &str, model_id: &str) -> f64
     0.3
 }
 
+/// 查询 provider 的成本信息 (每千 token 美元)
+pub fn lookup_provider_cost(provider_name: &str) -> Option<f64> {
+    PROVIDER_CATALOG.iter()
+        .find(|p| p.name == provider_name)
+        .map(|p| p.capabilities.cost_per_1k_tokens)
+}
+
+/// 查询 model 的成本信息 (每千 token 美元)
+pub fn lookup_model_cost(provider_name: &str, model_name: &str) -> Option<f64> {
+    PROVIDER_CATALOG.iter()
+        .find(|p| p.name == provider_name && p.models.iter().any(|m| *m == model_name))
+        .map(|p| p.capabilities.cost_per_1k_tokens)
+}
+
 /// 从注册名 (如 "aihub/glm-5.2" 或 "llm7") 提取 provider 名和模型名
 pub(crate) fn parse_provider_model(registered_name: &str) -> (String, String) {
     if let Some((prov, model)) = registered_name.split_once('/') {

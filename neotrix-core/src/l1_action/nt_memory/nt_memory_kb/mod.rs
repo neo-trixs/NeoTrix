@@ -1862,26 +1862,6 @@ impl KnowledgeBase {
         Ok(results)
     }
 
-    /// 三值可见性过滤的检索入口 (x-algorithm visibility-filtering 吸收):
-    /// 在 `hybrid_rerank_search` 之后对候选做 ALLOW/INTERSTITIAL/DROP 末端裁定。
-    /// 仅执行一次查询，复用结果做可见性过滤，返回通过裁定的可展示结果。
-    pub fn search_with_visibility(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<SearchResult>, String> {
-        // 只执行一次查询，复用结果做可见性过滤
-        let results = self.hybrid_rerank_search(query, limit)?;
-        let config = nt_memory_visibility::VisibilityConfig::default();
-        let verdicts = nt_memory_visibility::filter_visibility(results.clone(), &config);
-        Ok(results
-            .into_iter()
-            .zip(verdicts.iter())
-            .filter(|(_, v)| v.visibility != nt_memory_visibility::Visibility::Drop)
-            .map(|(r, _)| r)
-            .collect())
-    }
-
     /// 记录一条决策溯源 (PROV-O, semantica 吸收) 到 kv_store `provenance`。
     /// 供审计链回查 (D14/D20): 谁在何时基于何证据做了何决策。
     pub fn record_decision_provenance(

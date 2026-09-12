@@ -1061,11 +1061,7 @@ impl UnifiedAbsorber {
         let repos = self.kb.find_repositories("github.com", None).unwrap_or_default();
         let conn = self.kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let total_nodes = nt_memory_store::count_nodes(&conn).map_err(|e| format!("count: {}", e))?;
-        let paper_count = nt_memory_store::count_nodes_by_type(&conn, "Paper").map_err(|e| format!("count_papers: {}", e))?;
-        let article_count = nt_memory_store::count_nodes_by_type(&conn, "Article").map_err(|e| format!("count_articles: {}", e))?;
-        let concept_count = nt_memory_store::count_nodes_by_type(&conn, "Concept").map_err(|e| format!("count_concepts: {}", e))?;
-        let code_count = nt_memory_store::count_nodes_by_type(&conn, "CodeSnippet").map_err(|e| format!("count_code: {}", e))?;
-        let insight_count = nt_memory_store::count_nodes_by_type(&conn, "Insight").map_err(|e| format!("count_insights: {}", e))?;
+        let type_map = nt_memory_store::count_nodes_by_type_map(&conn).map_err(|e| format!("count_by_type: {}", e))?;
         let stale_repos = repos.iter().filter(|n| {
             n.metadata.as_ref()
                 .map(|m| {
@@ -1080,11 +1076,11 @@ impl UnifiedAbsorber {
         Ok(AbsorberStatus {
             total_nodes,
             repositories: repos.len(),
-            papers: paper_count,
-            articles: article_count,
-            concepts: concept_count,
-            code_snippets: code_count,
-            insights: insight_count,
+            papers: type_map.get("Paper").copied().unwrap_or(0),
+            articles: type_map.get("Article").copied().unwrap_or(0),
+            concepts: type_map.get("Concept").copied().unwrap_or(0),
+            code_snippets: type_map.get("CodeSnippet").copied().unwrap_or(0),
+            insights: type_map.get("Insight").copied().unwrap_or(0),
             stale_repos,
             last_cycle: self.kb.kv_get("absorber", "last_cycle").unwrap_or(None),
         })
@@ -1202,8 +1198,8 @@ mod nt_memory_store {
     pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
         crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::count_nodes(conn)
     }
-    pub fn count_nodes_by_type(conn: &Connection, node_type: &str) -> rusqlite::Result<usize> {
-        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::count_nodes_by_type(conn, node_type)
+    pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<std::collections::HashMap<String, usize>> {
+        crate::l1_action::nt_memory::nt_memory_kb::nt_memory_store::count_nodes_by_type_map(conn)
     }
 }
 

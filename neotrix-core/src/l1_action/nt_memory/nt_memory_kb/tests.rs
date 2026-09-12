@@ -118,25 +118,6 @@
     }
 
     #[test]
-    fn test_visibility_gate_production_chain() {
-        // C2 集成测试: 打通 search_with_visibility 生产入口全链路 —
-        // 先存知识节点 → hybrid_rerank_search → filter_visibility 三值裁定
-        // → Drop 高风险/低相关, Allow 强相关。
-        let dir = std::env::temp_dir().join(format!("nt_kb_vis_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).ok();
-        let db_path = dir.join("test_vis.db");
-        let mut kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
-
-        let provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
-        provider.store("visible_doc", "clean knowledge content about rust ownership").expect("store allow");
-        provider.store("risky_doc", "clean content").expect("store risk");
-
-        let allowed = kb.search_with_visibility("rust", 5).expect("search w/ visibility");
-        // 返回值已过滤掉 Drop 裁定, 仅含可展示结果
-        assert!(!allowed.is_empty(), "filtered results produced");
-    }
-
-    #[test]
     fn test_memory_provider_store_and_search() {
         let dir = std::env::temp_dir().join(format!("nt_kb_mp_{}", std::process::id()));
         std::fs::create_dir_all(&dir).ok();
