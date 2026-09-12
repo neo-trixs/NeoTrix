@@ -61,6 +61,7 @@ pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, St
         Some(summary),
         Some(&page_url),
         Some("wikipedia.org"),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -74,6 +75,7 @@ pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, St
                     None,
                     None,
                     Some("wikipedia.org"),
+                    true,
                 )
                 .map_err(|e| format!("DB error: {}", e))?;
                 store::upsert_edge(
@@ -128,6 +130,7 @@ pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, Str
         Some(summary),
         Some(&paper_url),
         Some("arxiv.org"),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -141,6 +144,7 @@ pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, Str
                 None,
                 None,
                 Some("arxiv.org"),
+                true,
             )
             .map_err(|e| format!("DB error: {}", e))?;
             store::upsert_edge(
@@ -205,6 +209,7 @@ pub fn ingest_from_alphaxiv_feed(
                 Some(summary),
                 Some(&page_url),
                 Some("alphaxiv.org"),
+                true,
             )
             .map_err(|e| format!("DB error: {}", e))?;
 
@@ -223,6 +228,7 @@ pub fn ingest_from_alphaxiv_feed(
                             None,
                             None,
                             Some("alphaxiv.org"),
+                            true,
                         )
                         .map_err(|e| format!("DB error: {}", e))?;
                         store::upsert_edge(
@@ -253,6 +259,7 @@ pub fn ingest_from_alphaxiv_feed(
                             None,
                             None,
                             Some("alphaxiv.org"),
+                            true,
                         )
                         .map_err(|e| format!("DB error: {}", e))?;
                         store::upsert_edge(
@@ -279,6 +286,7 @@ pub fn ingest_from_alphaxiv_feed(
                         None,
                         Some(gh),
                         Some("github.com"),
+                        true,
                     )
                     .map_err(|e| format!("DB error: {}", e))?;
                     store::upsert_edge(
@@ -378,6 +386,7 @@ pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<
         Some(description),
         Some(repo_url),
         Some("github.com"),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -390,6 +399,7 @@ pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<
                 None,
                 Some(&format!("https://github.com/{}", owner_login)),
                 Some("github.com"),
+                true,
             )
             .map_err(|e| format!("DB error: {}", e))?;
             store::upsert_edge(
@@ -412,6 +422,7 @@ pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<
             None,
             None,
             Some("github.com"),
+            true,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         store::upsert_edge(
@@ -500,6 +511,7 @@ pub fn ingest_from_hf_dataset(conn: &Connection, dataset_ref: &str) -> Result<us
         Some(&summary),
         Some(&ds_url),
         Some("huggingface.co"),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -511,6 +523,7 @@ pub fn ingest_from_hf_dataset(conn: &Connection, dataset_ref: &str) -> Result<us
         None,
         Some(&format!("https://huggingface.co/{}", author)),
         Some("huggingface.co"),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
     store::upsert_edge(
@@ -537,6 +550,7 @@ pub fn ingest_from_hf_dataset(conn: &Connection, dataset_ref: &str) -> Result<us
             None,
             None,
             Some("huggingface.co"),
+            true,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         store::upsert_edge(
@@ -661,6 +675,7 @@ fn fetch_and_ingest_url(conn: &Connection, url: &str) -> Result<(usize, usize), 
         Some(&text.chars().take(2000).collect::<String>()),
         Some(&page_url),
         Some(&domain),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -856,6 +871,7 @@ pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, 
         Some(extract),
         Some(&page_url),
         Some("wikipedia.org"),
+        true,
     )
     .map_err(|e| format!("DB error: {}", e))?;
 
@@ -876,6 +892,7 @@ pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, 
                                     None,
                                     None,
                                     Some("wikipedia.org"),
+                                    true,
                                 )
                                 .ok();
 
@@ -1014,6 +1031,7 @@ pub fn ingest_geo_cities(
             Some(&format!("城市坐标: {},{} (GeoNames cities1000 via cities.json)", lat, lng)),
             None,
             Some("geonames.org"),
+            false,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         existing.insert(title);
@@ -1140,6 +1158,7 @@ pub fn ingest_geo_peaks(
             )),
             None,
             Some("geonames.org"),
+            false,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         existing.insert(node_id.clone());
@@ -1213,6 +1232,7 @@ pub fn ingest_country_boundaries(conn: &Connection, url: &str) -> Result<usize, 
             Some("国家边界 (world-atlas countries-110m)"),
             None,
             Some("world-atlas"),
+            true,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         count += 1;
@@ -1320,6 +1340,7 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
             Some(&format!("{} (Natural Earth {})", name, kind)),
             None,
             Some("natural-earth"),
+            true,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         count += 1;
@@ -1444,6 +1465,7 @@ pub fn ingest_geo_airports(
             )),
             None,
             Some("ourairports.org"),
+            false,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         existing.insert(node_id.clone());
@@ -1627,6 +1649,7 @@ pub fn ingest_geo_boundaries(
             )),
             None,
             Some("natural-earth"),
+            false,
         )
         .map_err(|e| format!("DB error: {}", e))?;
         existing.insert(node_id.clone());
