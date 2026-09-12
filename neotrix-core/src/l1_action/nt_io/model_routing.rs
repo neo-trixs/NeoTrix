@@ -250,8 +250,13 @@ impl ModelRoutingLayer {
                 candidates.sort_by(|a, b| a.price_per_second.partial_cmp(&b.price_per_second).unwrap());
             }
             RoutingStrategy::HighestQuality => {
-                // TODO: 实际基于质量分数排序
-                candidates.sort_by(|a, b| b.priority.cmp(&a.priority));
+                // 基于质量分数排序：优先选择 max_tokens 高、价格适中的模型
+                candidates.sort_by(|a, b| {
+                    // 质量分数 = max_tokens / (price + 0.01) — 高容量低成本优先
+                    let a_quality = a.max_tokens as f64 / (a.price_per_second as f64 + 0.01);
+                    let b_quality = b.max_tokens as f64 / (b.price_per_second as f64 + 0.01);
+                    b_quality.partial_cmp(&a_quality).unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
             RoutingStrategy::RoundRobin => {
                 if !candidates.is_empty() {

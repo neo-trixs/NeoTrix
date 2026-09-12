@@ -358,12 +358,7 @@ fn cmd_diff(args: &[String]) -> CommandOutput {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
-    let conn = match open_raw_conn() {
-        Some(c) => c,
-        None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
-    };
-
-    let kb = match crate::neotrix::nt_memory_kb::KnowledgeBase::new(conn) {
+    let kb = match crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
         Ok(k) => k,
         Err(e) => return CommandOutput::err(&format!("知识库初始化失败: {}", e)),
     };
