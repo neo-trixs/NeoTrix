@@ -24,7 +24,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
-use super::quantization_engine::{QuantizationEngine, QuantLevel, ModelParams, AttentionType, HardwareCapabilities, ModelScore};
+use super::quantization_engine::{QuantizationEngine, ModelParams, AttentionType, HardwareCapabilities};
 
 /// Model selector for local inference — llmfit-enhanced multi-dimensional scoring
 pub struct ModelSelector {
@@ -416,13 +416,6 @@ impl ModelSelector {
         
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         scored
-    }
-
-    /// Estimate model file size
-    pub fn estimate_model_size(&self, model_name: &str) -> f64 {
-        self.known_models.get(model_name)
-            .map(|m| m.file_size_int4_gb)
-            .unwrap_or(4.0)
     }
 }
 

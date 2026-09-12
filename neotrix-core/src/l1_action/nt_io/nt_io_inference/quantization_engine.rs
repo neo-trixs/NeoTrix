@@ -506,7 +506,8 @@ impl QuantizationEngine {
             5.0
         } else { 0.0 };
         
-        (base + attention_bonus).min(100.0)
+        let score: f64 = base + attention_bonus;
+        score.min(100.0)
     }
     
     fn calculate_speed_score(&self, model: &ModelParams, hw: &HardwareCapabilities) -> f64 {
@@ -533,7 +534,7 @@ impl QuantizationEngine {
         if utilization >= 0.5 && utilization <= 0.8 {
             100.0
         } else if utilization < 0.5 {
-            (utilization / 0.5 * 100.0)
+            utilization / 0.5 * 100.0
         } else {
             ((1.0 - (utilization - 0.8) / 0.5) * 100.0).max(0.0)
         }
@@ -665,8 +666,11 @@ impl QuantizationEngine {
         );
         
         // Phase 1: Compute importance matrix from calibration data
+        let calibration_f64: Vec<f64> = calibration.iter()
+            .map(|s| s.len() as f64)
+            .collect();
         let imatrix = ImportanceMatrix::_from_activations(
-            &calibration.join("\n"),
+            &calibration_f64,
             IMMethod::ActivationBased,
         );
         
@@ -1131,7 +1135,7 @@ pub struct GgufHeaderInfo {
 /// Read GGUF file header (first 64KB) to extract metadata
 /// Works for local files — for HTTP range requests, use read_gguf_header_remote()
 pub fn read_gguf_header(path: &str) -> Result<GgufHeaderInfo, String> {
-    use std::io::{Read, Seek, BufReader};
+    use std::io::{Read, BufReader};
     
     let file = std::fs::File::open(path).map_err(|e| format!("open failed: {}", e))?;
     let mut reader = BufReader::new(file);

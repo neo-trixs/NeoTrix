@@ -1,7 +1,7 @@
 use crate::core::{UniversalWorld, Resource};
 use crate::core::scheduler::{ParallelScheduler, UniversalSystem, SystemDependency};
-use crate::engine::renderer::{CanvasRenderer, Camera, Color};
-use crate::engine::physics::SimplePhysicsWorld;
+use crate::engine::renderer::{CanvasRenderer, Camera, Color, Renderer};
+use crate::engine::physics::{SimplePhysicsWorld, PhysicsWorld};
 use crate::engine::input::SimpleInputProvider;
 
 /// Pre-configured game template

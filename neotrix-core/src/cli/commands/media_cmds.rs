@@ -6,7 +6,7 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::l1_action::nt_media::detect::{detect_from_file, detect_from_url, detect_remote};
+use crate::l1_action::nt_media::detect::{detect_from_file, detect_remote};
 use crate::l1_action::nt_media::streaming::{
     PipelineConfig, PipelineStatus, StreamingPipeline,
 };
@@ -135,6 +135,8 @@ impl CliCommand for MediaStreamCmd {
                 proxy: None,
                 timeout: Duration::from_secs(30),
                 chunk_size: 256 * 1024,
+                persistence: None,
+                auth: None,
             };
 
             let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(64);

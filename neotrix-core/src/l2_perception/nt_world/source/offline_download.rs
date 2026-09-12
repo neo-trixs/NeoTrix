@@ -28,7 +28,7 @@ impl OfflineDownloader {
     ///
     /// Returns the local file path and detected `MediaKind`.
     /// Results are cached in the internal `OfflineIndex`.
-    pub async fn download(&self, url: &str) -> Result<DownloadResult, OfflineError> {
+    pub async fn download(&mut self, url: &str) -> Result<DownloadResult, OfflineError> {
         if let Some(entry) = self.index.get(url) {
             return Ok(DownloadResult {
                 path: PathBuf::from(&entry.local_path),
@@ -50,6 +50,8 @@ impl OfflineDownloader {
             .await
             .map_err(|e| OfflineError::Pipeline(e.to_string()))?;
 
+        let output = handle.output_path().to_path_buf();
+
         let mut last_progress: Option<PipelineProgress> = None;
         while let Some(progress) = rx.recv().await {
             if matches!(
@@ -66,8 +68,6 @@ impl OfflineDownloader {
             .wait()
             .await
             .map_err(|e| OfflineError::Pipeline(e.to_string()))?;
-
-        let output = handle.output_path().to_path_buf();
         let media_kind = last_progress
             .as_ref()
             .map(|p| p.media_kind)

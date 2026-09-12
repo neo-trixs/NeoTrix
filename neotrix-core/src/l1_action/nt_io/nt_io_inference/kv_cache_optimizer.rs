@@ -17,7 +17,6 @@
 //! - Memory: Linear in sequence length vs quadratic
 //! - 10x at 2K context, 20x at 4K context
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// KV cache optimization engine
@@ -128,7 +127,7 @@ impl KVCacheOptimizer {
         };
         
         let available_gb = hw_vram_gb * 0.7;  // 70% for KV cache
-        let total_tokens = (available_gb * 1_073_741_824) / per_token_bytes as f64;
+        let total_tokens = (available_gb * 1_073_741_824.0) / per_token_bytes as f64;
         
         KVCacheLayout {
             total_tokens_capacity: total_tokens as usize,
@@ -216,9 +215,9 @@ pub enum KVCACHEType {
     Q4_1,     // 4-bit with extra precision for V
     Q5_0,     // 5-bit quantization
     Q5_1,     // 5-bit with extra precision
-    Q6_K,     // 6-bit K-quant
-    Q4_K_M,   // 4-bit K-quant medium
-    Q5_K_M,   // 5-bit K-quant medium
+    Q6K,     // 6-bit K-quant
+    Q4KM,   // 4-bit K-quant medium
+    Q5KM,   // 5-bit K-quant medium
     Q8_0_2,   // 8-bit quantization variant
     Turbo3,   // TurboQuant 3-bit
     Turbo4,   // TurboQuant 4-bit

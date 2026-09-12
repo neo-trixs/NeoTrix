@@ -7,7 +7,7 @@
 use std::path::Path;
 
 use image::codecs::png::PngEncoder;
-use image::ImageEncoder;
+use image::{ImageEncoder, GenericImageView};
 
 use super::detect;
 

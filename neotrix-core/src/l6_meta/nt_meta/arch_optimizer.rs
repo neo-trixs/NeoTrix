@@ -153,7 +153,7 @@ impl SelfArchitectureOptimizer {
         };
 
         for focus_dim in &report.recommended_focus {
-            let dim_lower: String = focus_dim.to_lowercase();
+            let dim_lower = focus_dim.to_lowercase();
             let (description, effort, impact) = if dim_lower.contains("compound_composition")
                 || dim_lower.contains("design")
             {

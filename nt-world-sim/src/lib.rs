@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod builder;
 pub mod codegen;
 pub mod core;
 pub mod ecs;
@@ -20,6 +21,9 @@ pub use engine::{
     ThemeConfig, AnimationDef, ShadowDef, ThemeManager, ThemeVariant,
     SpriteSheet, AnimationPlayer,
 };
+pub use engine::scene::{SceneGraph, SceneNode};
+pub use engine::event_bus::{TypedEventBus, GameEventHandler};
+pub use engine::audio::{AudioManager, AudioBackend, AudioHandle, StubAudioBackend};
 pub use mechanics::{
     ConsciousnessEntity, TransformComponent, RenderComponent, AiComponent, MaslowNeeds,
     SocialRelationship, EconomyComponent,

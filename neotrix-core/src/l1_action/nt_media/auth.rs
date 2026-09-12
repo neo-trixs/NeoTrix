@@ -368,7 +368,7 @@ impl AuthConfig {
         let builder = self.strategy.apply_to_request(builder);
 
         if let Some(jar) = &self.cookie_jar {
-            return Self::apply_cookies(builder, jar, domain).await;
+            return AuthStrategy::apply_cookies(builder, jar, domain).await;
         }
 
         builder

@@ -192,7 +192,7 @@ impl SelfTest for PdfEditSelfTest {
 
         // T3: 功能验证
         // 1. PdfEdit 结构体构造与字段验证
-        let edit = super::pdf::pdfedit::PdfEdit {
+        let edit = super::pdf::PdfEdit {
             page: 1,
             find: "test".to_string(),
             replace: Some("replaced".to_string()),
@@ -208,7 +208,7 @@ impl SelfTest for PdfEditSelfTest {
         }
 
         // 2. 空替换 (删除模式)
-        let delete_edit = super::pdf::pdfedit::PdfEdit {
+        let delete_edit = super::pdf::PdfEdit {
             page: 2,
             find: "delete me".to_string(),
             replace: None,
@@ -218,7 +218,7 @@ impl SelfTest for PdfEditSelfTest {
         }
 
         // 3. edit_pdf 对不存在文件应返回错误
-        let result = super::pdf::pdfedit::edit_pdf(
+        let result = super::pdf::edit_pdf(
             std::path::Path::new("/nonexistent.pdf"),
             std::path::Path::new("/tmp/out.pdf"),
             &[edit],
@@ -229,7 +229,7 @@ impl SelfTest for PdfEditSelfTest {
         }
 
         // 4. extract_pdf_tables 对不存在文件应返回错误
-        let result = super::pdf::pdfedit::extract_pdf_tables(
+        let result = super::pdf::extract_pdf_tables(
             std::path::Path::new("/nonexistent.pdf"),
         );
         if result.is_ok() {
