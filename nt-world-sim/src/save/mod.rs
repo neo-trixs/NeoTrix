@@ -9,8 +9,7 @@ use crate::game::time::GameTime;
 use crate::game::energy::Energy;
 use crate::game::farming::{CropTile, CropState};
 use crate::game::npc::Npc;
-use crate::world::tile::{TileMap, Tile, TileType};
-use crate::world::zone::WorldMap;
+use crate::world::tile::{WorldMap, Tile, TileType};
 
 // ---------------------------------------------------------------------------
 // Save data structures

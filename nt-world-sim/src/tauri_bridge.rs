@@ -3,6 +3,7 @@ use crate::game::time::GameTime;
 use crate::game::weather::Weather;
 use crate::game::inventory::Inventory;
 use crate::game::npc::Position;
+use crate::error::{GameError, GameResult};
 use crate::save::SaveData;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
@@ -272,24 +273,38 @@ pub fn save_game_to_file(slot: u32) -> GameResult<String> {
     let game = state.as_ref().ok_or_else(|| GameError::InvalidState("Game not initialized".into()))?;
 
     let time = game.world.get_resource::<GameTime>().cloned().unwrap_or_default();
-    let energy_res = game.world.get_resource::<crate::game::energy::Energy>();
-    let inventory = game.world.get_resource::<Inventory>();
-    let default_energy = crate::game::energy::Energy::default();
-    let energy_val = energy_res.unwrap_or(&default_energy);
+    let energy = game.world.get_resource::<crate::game::energy::Energy>().cloned().unwrap_or_default();
 
-    let empty_inv = Inventory::new(0, 0);
-    let inv_ref = inventory.unwrap_or(&empty_inv);
+    let mut skills = std::collections::HashMap::new();
+    skills.insert("awareness".into(), 0u32);
+    skills.insert("focus".into(), 0u32);
+    skills.insert("creativity".into(), 0u32);
+    skills.insert("empathy".into(), 0u32);
+    skills.insert("logic".into(), 0u32);
 
-    let save_data = SaveDataFile::from_game_state(
-        "Player",
-        &time,
-        energy_val,
-        inv_ref,
-        &[],
-        &[],
-        &crate::world::zone::WorldMap::new(),
-        game.tick_count as f64,
-    );
+    let save_data = SaveDataFile {
+        version: 1,
+        slot,
+        player_name: "Player".to_string(),
+        play_time_seconds: game.tick_count as f64,
+        day: time.day,
+        season: format!("{:?}", time.season),
+        year: time.year,
+        hour: time.hour,
+        minute: time.minute,
+        energy: energy.current,
+        max_energy: energy.max,
+        insight_points: 0,
+        resonance: 0,
+        skills,
+        inventory: vec![],
+        hotbar_index: 0,
+        gold: 500,
+        farm_tiles: vec![],
+        npcs: vec![],
+        current_zone: 0,
+        unlocked_zones: vec![0, 1, 2, 3, 4],
+    };
 
     let manager = crate::save::SaveManager::default_dir();
     manager.save(slot, &save_data)?;
