@@ -1,11 +1,11 @@
 //! PTY 终端模块 — portable-pty 驱动的终端会话管理
 
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtyPair, PtySize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tokio::sync::mpsc;
-use serde::Serialize;
-use portable_pty::{PtySize, native_pty_system, CommandBuilder, ChildKiller, PtyPair};
 
 /// PTY 事件（流式输出到前端）
 #[derive(Debug, Clone, Serialize)]
@@ -37,15 +37,25 @@ pub struct PtyManager {
 impl PtyManager {
     pub fn new() -> (Self, mpsc::UnboundedReceiver<PtyEvent>) {
         let (tx, rx) = mpsc::unbounded_channel();
-        (Self { sessions: Mutex::new(HashMap::new()), sender: tx }, rx)
+        (
+            Self {
+                sessions: Mutex::new(HashMap::new()),
+                sender: tx,
+            },
+            rx,
+        )
     }
 
     pub fn spawn(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
         let system = native_pty_system();
-        let pair = system.openpty(PtySize {
-            rows, cols,
-            pixel_width: 0, pixel_height: 0,
-        }).map_err(|e| format!("openpty failed: {}", e))?;
+        let pair = system
+            .openpty(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("openpty failed: {}", e))?;
 
         let cmd = if cfg!(target_os = "windows") {
             CommandBuilder::new("powershell.exe")
@@ -54,12 +64,18 @@ impl PtyManager {
             CommandBuilder::new(shell)
         };
 
-        let child = pair.slave.spawn_command(cmd)
+        let child = pair
+            .slave
+            .spawn_command(cmd)
             .map_err(|e| format!("spawn failed: {}", e))?;
         let killer = child.clone_killer();
-        let mut reader = pair.master.try_clone_reader()
+        let mut reader = pair
+            .master
+            .try_clone_reader()
             .map_err(|e| format!("clone reader failed: {}", e))?;
-        let writer = pair.master.take_writer()
+        let writer = pair
+            .master
+            .take_writer()
             .map_err(|e| format!("take writer failed: {}", e))?;
 
         let sid = session_id.to_string();
@@ -80,56 +96,83 @@ impl PtyManager {
                     }
                     Ok(n) => {
                         let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                        if tx.send(PtyEvent {
-                            session_id: sid.clone(),
-                            event_type: PtyEventType::Output,
-                            data,
-                        }).is_err() { break; }
+                        if tx
+                            .send(PtyEvent {
+                                session_id: sid.clone(),
+                                event_type: PtyEventType::Output,
+                                data,
+                            })
+                            .is_err()
+                        {
+                            break;
+                        }
                     }
                 }
             }
         });
 
         let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
-        sessions.insert(session_id.to_string(), PtySession {
-            pair,
-            writer: Box::new(writer),
-            killer,
-        });
+        sessions.insert(
+            session_id.to_string(),
+            PtySession {
+                pair,
+                writer: Box::new(writer),
+                killer,
+            },
+        );
 
         Ok(())
     }
 
     pub fn write(&self, session_id: &str, data: &str) -> Result<(), String> {
         let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
-        let session = sessions.get_mut(session_id).ok_or_else(|| format!("Session {} not found", session_id))?;
-        session.writer.write_all(data.as_bytes()).map_err(|e| format!("write failed: {}", e))?;
-        session.writer.flush().map_err(|e| format!("flush failed: {}", e))?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("Session {} not found", session_id))?;
+        session
+            .writer
+            .write_all(data.as_bytes())
+            .map_err(|e| format!("write failed: {}", e))?;
+        session
+            .writer
+            .flush()
+            .map_err(|e| format!("flush failed: {}", e))?;
         Ok(())
     }
 
     pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
         let mut sessions = self.sessions.lock().map_err(|e| e.to_string())?;
-        let session = sessions.get_mut(session_id).ok_or_else(|| format!("Session {} not found", session_id))?;
-        session.pair.master.resize(PtySize {
-            rows, cols, pixel_width: 0, pixel_height: 0,
-        }).map_err(|e| format!("resize failed: {}", e))?;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("Session {} not found", session_id))?;
+        session
+            .pair
+            .master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("resize failed: {}", e))?;
         Ok(())
     }
 
     pub fn close(&self, session_id: &str) {
-        let mut sessions = self.sessions.lock().unwrap_or_else(|e| { log::warn!("PTY sessions mutex poisoned"); e.into_inner() });
+        let mut sessions = self.sessions.lock().unwrap_or_else(|e| {
+            log::warn!("PTY sessions mutex poisoned");
+            e.into_inner()
+        });
         if let Some(mut session) = sessions.remove(session_id) {
             let _ = session.killer.kill();
         }
     }
-
 }
 
 // ========== Tauri Command Wrappers ==========
 
-use tauri::State;
 use std::sync::Arc;
+use tauri::State;
 
 #[tauri::command]
 pub fn pty_spawn(
@@ -161,10 +204,7 @@ pub fn pty_resize(
 }
 
 #[tauri::command]
-pub fn pty_close(
-    session_id: String,
-    manager: State<'_, Arc<PtyManager>>,
-) -> Result<(), String> {
+pub fn pty_close(session_id: String, manager: State<'_, Arc<PtyManager>>) -> Result<(), String> {
     manager.close(&session_id);
     Ok(())
 }

@@ -37,8 +37,7 @@ fn load_pool_entries() -> Result<Vec<ModelPoolEntry>, String> {
         return Ok(vec![]);
     }
 
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Read provider pool: {e}"))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read provider pool: {e}"))?;
 
     #[derive(Deserialize)]
     struct RawPool {
@@ -59,28 +58,36 @@ fn load_pool_entries() -> Result<Vec<ModelPoolEntry>, String> {
         created_ts: Option<u64>,
     }
 
-    let pool: RawPool = toml::from_str(&content)
-        .map_err(|e| format!("Parse provider pool: {e}"))?;
+    let pool: RawPool =
+        toml::from_str(&content).map_err(|e| format!("Parse provider pool: {e}"))?;
 
-    let entries = pool.entries.into_iter().map(|e| {
-        // 脱敏: 只显示前 8 位
-        let masked = if e.api_key.len() > 8 {
-            format!("{}...{}", &e.api_key[..4], &e.api_key[e.api_key.len()-4..])
-        } else if e.api_key.starts_with("env:") {
-            e.api_key.clone()
-        } else {
-            "****".into()
-        };
-        ModelPoolEntry {
-            label: e.label,
-            provider: e.provider,
-            api_key_masked: masked,
-            model: e.model,
-            tags: e.tags,
-            base_url: e.base_url,
-            created_ts: e.created_ts.unwrap_or(0),
-        }
-    }).collect();
+    let entries = pool
+        .entries
+        .into_iter()
+        .map(|e| {
+            // 脱敏: 只显示前 8 位
+            let masked = if e.api_key.len() > 8 {
+                format!(
+                    "{}...{}",
+                    &e.api_key[..4],
+                    &e.api_key[e.api_key.len() - 4..]
+                )
+            } else if e.api_key.starts_with("env:") {
+                e.api_key.clone()
+            } else {
+                "****".into()
+            };
+            ModelPoolEntry {
+                label: e.label,
+                provider: e.provider,
+                api_key_masked: masked,
+                model: e.model,
+                tags: e.tags,
+                base_url: e.base_url,
+                created_ts: e.created_ts.unwrap_or(0),
+            }
+        })
+        .collect();
 
     Ok(entries)
 }
@@ -96,8 +103,7 @@ fn read_pool_raw() -> Result<String, String> {
     if !path.exists() {
         return Ok("[[entries]]\n".into());
     }
-    std::fs::read_to_string(&path)
-        .map_err(|e| format!("Read provider pool: {e}"))
+    std::fs::read_to_string(&path).map_err(|e| format!("Read provider pool: {e}"))
 }
 
 /// 写入 pool 配置文件
@@ -110,12 +116,10 @@ fn write_pool_raw(content: &str) -> Result<(), String> {
 
     // 确保目录存在
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Create config dir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Create config dir: {e}"))?;
     }
 
-    std::fs::write(&path, content)
-        .map_err(|e| format!("Write provider pool: {e}"))
+    std::fs::write(&path, content).map_err(|e| format!("Write provider pool: {e}"))
 }
 
 // ═══════════════════════════════════════════════
@@ -171,7 +175,11 @@ created_ts = {created_ts}"#,
         provider = provider,
         api_key = api_key,
         model = model,
-        tags = tags.iter().map(|t| format!("\"{}\"", t)).collect::<Vec<_>>().join(", "),
+        tags = tags
+            .iter()
+            .map(|t| format!("\"{}\"", t))
+            .collect::<Vec<_>>()
+            .join(", "),
         base_url = match &base_url {
             Some(url) => format!("\"{}\"", url),
             None => "null".into(),
@@ -183,7 +191,7 @@ created_ts = {created_ts}"#,
 
     // 返回脱敏版本
     let masked = if api_key.len() > 8 {
-        format!("{}...{}", &api_key[..4], &api_key[api_key.len()-4..])
+        format!("{}...{}", &api_key[..4], &api_key[api_key.len() - 4..])
     } else {
         "****".into()
     };
@@ -265,10 +273,7 @@ pub async fn model_pool_remove(label: String) -> Result<bool, String> {
 
 /// 更新模型提供者的 api_key
 #[tauri::command]
-pub async fn model_pool_update_key(
-    label: String,
-    new_api_key: String,
-) -> Result<bool, String> {
+pub async fn model_pool_update_key(label: String, new_api_key: String) -> Result<bool, String> {
     let raw = read_pool_raw()?;
     let mut result = String::new();
     let mut in_entry = false;
@@ -311,17 +316,22 @@ pub async fn model_pool_update_key(
 #[tauri::command]
 pub async fn model_pool_check(label: String) -> Result<String, String> {
     let entries = load_pool_entries()?;
-    let entry = entries.iter().find(|e| e.label == label)
+    let entry = entries
+        .iter()
+        .find(|e| e.label == label)
         .ok_or_else(|| format!("Provider '{}' not found", label))?;
 
     // 简单连通性检查
-    let base_url = entry.base_url.as_deref().unwrap_or(match entry.provider.as_str() {
-        "openai" => "https://api.openai.com",
-        "anthropic" => "https://api.anthropic.com",
-        "ollama" => "http://localhost:11434",
-        "siliconflow" => "https://api.siliconflow.cn",
-        _ => "https://api.openai.com",
-    });
+    let base_url = entry
+        .base_url
+        .as_deref()
+        .unwrap_or(match entry.provider.as_str() {
+            "openai" => "https://api.openai.com",
+            "anthropic" => "https://api.anthropic.com",
+            "ollama" => "http://localhost:11434",
+            "siliconflow" => "https://api.siliconflow.cn",
+            _ => "https://api.openai.com",
+        });
 
     match reqwest::Client::new()
         .get(&format!("{}/v1/models", base_url))

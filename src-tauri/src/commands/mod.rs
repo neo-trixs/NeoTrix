@@ -4,12 +4,12 @@
 
 #![allow(dead_code)]
 
-pub mod pty;
-pub mod unified;
 pub mod domain_cmd;
+pub mod im;
 pub mod model_pool;
 pub mod proxy_pool;
-pub mod im;
+pub mod pty;
+pub mod unified;
 
 // ========== Types (shared) ==========
 
@@ -34,7 +34,11 @@ pub struct ProxyStatus {
 
 impl Default for ProxyStatus {
     fn default() -> Self {
-        Self { running: false, mode: "off".into(), port: 11080 }
+        Self {
+            running: false,
+            mode: "off".into(),
+            port: 11080,
+        }
     }
 }
 
@@ -75,39 +79,66 @@ pub fn parse_git_diff(input: &str) -> Vec<DiffBlock> {
     let mut blocks = Vec::new();
     for line in input.lines() {
         if let Some(rest) = line.strip_prefix('+') {
-            blocks.push(DiffBlock { r#type: "added".into(), content: rest.into() });
+            blocks.push(DiffBlock {
+                r#type: "added".into(),
+                content: rest.into(),
+            });
         } else if let Some(rest) = line.strip_prefix('-') {
-            blocks.push(DiffBlock { r#type: "removed".into(), content: rest.into() });
-        } else if !line.starts_with("diff ") && !line.starts_with("index ")
-            && !line.starts_with("---") && !line.starts_with("+++") && !line.starts_with("@@")
+            blocks.push(DiffBlock {
+                r#type: "removed".into(),
+                content: rest.into(),
+            });
+        } else if !line.starts_with("diff ")
+            && !line.starts_with("index ")
+            && !line.starts_with("---")
+            && !line.starts_with("+++")
+            && !line.starts_with("@@")
             && !line.starts_with("\\")
         {
-            blocks.push(DiffBlock { r#type: "unchanged".into(), content: line.into() });
+            blocks.push(DiffBlock {
+                r#type: "unchanged".into(),
+                content: line.into(),
+            });
         }
     }
     blocks
 }
 
 pub fn session_create(name: String) -> SessionInfoOld {
-    SessionInfoOld { id: format!("s-{}", &uuid::Uuid::new_v4().to_string()[..8]), name, created: chrono::Utc::now().timestamp(), message_count: 0 }
+    SessionInfoOld {
+        id: format!("s-{}", &uuid::Uuid::new_v4().to_string()[..8]),
+        name,
+        created: chrono::Utc::now().timestamp(),
+        message_count: 0,
+    }
 }
 
 pub fn session_list() -> Vec<SessionInfoOld> {
-    vec![SessionInfoOld { id: "default".into(), name: "默认会话".into(), created: 0, message_count: 0 }]
+    vec![SessionInfoOld {
+        id: "default".into(),
+        name: "默认会话".into(),
+        created: 0,
+        message_count: 0,
+    }]
 }
 
-pub fn payload_to_provider_config(payload: &ProviderConfigPayload) -> ProviderConfigPayload { payload.clone() }
+pub fn payload_to_provider_config(payload: &ProviderConfigPayload) -> ProviderConfigPayload {
+    payload.clone()
+}
 
 // cmd_* stubs
-use std::sync::LazyLock;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 static CMD_SESSIONS: LazyLock<std::sync::Mutex<HashMap<String, SessionInfoOld>>> =
     LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 pub fn cmd_session_create(name: String) -> Result<String, String> {
     let id = format!("s-{}", &uuid::Uuid::new_v4().to_string()[..8]);
-    CMD_SESSIONS.lock().unwrap().insert(id.clone(), session_create(name));
+    CMD_SESSIONS
+        .lock()
+        .unwrap()
+        .insert(id.clone(), session_create(name));
     Ok(id)
 }
 
@@ -116,36 +147,69 @@ pub fn cmd_session_list() -> Result<Vec<SessionInfoOld>, String> {
 }
 
 pub fn cmd_session_switch(id: String) -> Result<(), String> {
-    if CMD_SESSIONS.lock().unwrap().contains_key(&id) { Ok(()) } else { Err("not found".into()) }
+    if CMD_SESSIONS.lock().unwrap().contains_key(&id) {
+        Ok(())
+    } else {
+        Err("not found".into())
+    }
 }
 
 pub fn cmd_session_delete(id: String) -> Result<(), String> {
-    CMD_SESSIONS.lock().unwrap().remove(&id); Ok(())
+    CMD_SESSIONS.lock().unwrap().remove(&id);
+    Ok(())
 }
 
-static CMD_AGENT: LazyLock<std::sync::Mutex<AgentStatus>> =
-    LazyLock::new(|| std::sync::Mutex::new(AgentStatus { running: false, current_task: None }));
+static CMD_AGENT: LazyLock<std::sync::Mutex<AgentStatus>> = LazyLock::new(|| {
+    std::sync::Mutex::new(AgentStatus {
+        running: false,
+        current_task: None,
+    })
+});
 
 pub fn cmd_agent_start(task: String) -> Result<(), String> {
-    let mut s = CMD_AGENT.lock().unwrap(); s.running = true; s.current_task = Some(task); Ok(())
+    let mut s = CMD_AGENT.lock().unwrap();
+    s.running = true;
+    s.current_task = Some(task);
+    Ok(())
 }
 
 pub fn cmd_agent_stop() -> Result<(), String> {
-    let mut s = CMD_AGENT.lock().unwrap(); s.running = false; s.current_task = None; Ok(())
+    let mut s = CMD_AGENT.lock().unwrap();
+    s.running = false;
+    s.current_task = None;
+    Ok(())
 }
 
-pub fn cmd_agent_status() -> Result<AgentStatus, String> { Ok(CMD_AGENT.lock().unwrap().clone()) }
+pub fn cmd_agent_status() -> Result<AgentStatus, String> {
+    Ok(CMD_AGENT.lock().unwrap().clone())
+}
 
 static CMD_PERM: LazyLock<std::sync::Mutex<HashMap<String, PermissionRequestOld>>> =
     LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
-pub fn cmd_permission_request(action: String, target: String) -> Result<PermissionRequestOld, String> {
-    let req = PermissionRequestOld { id: format!("perm-{}", &uuid::Uuid::new_v4().to_string()[..8]), action, target, timestamp: chrono::Utc::now().timestamp() };
-    CMD_PERM.lock().unwrap().insert(req.id.clone(), req.clone()); Ok(req)
+pub fn cmd_permission_request(
+    action: String,
+    target: String,
+) -> Result<PermissionRequestOld, String> {
+    let req = PermissionRequestOld {
+        id: format!("perm-{}", &uuid::Uuid::new_v4().to_string()[..8]),
+        action,
+        target,
+        timestamp: chrono::Utc::now().timestamp(),
+    };
+    CMD_PERM.lock().unwrap().insert(req.id.clone(), req.clone());
+    Ok(req)
 }
 
 pub fn cmd_permission_approve(id: String) -> Result<(), String> {
-    CMD_PERM.lock().unwrap().remove(&id).map(|_| ()).ok_or("not found".into())
+    CMD_PERM
+        .lock()
+        .unwrap()
+        .remove(&id)
+        .map(|_| ())
+        .ok_or("not found".into())
 }
 
-pub fn cmd_permission_deny(id: String) -> Result<(), String> { cmd_permission_approve(id) }
+pub fn cmd_permission_deny(id: String) -> Result<(), String> {
+    cmd_permission_approve(id)
+}

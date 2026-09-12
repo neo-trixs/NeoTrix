@@ -55,17 +55,46 @@ pub struct UnifiedResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ResponsePayload {
-    CodeChanges { changes: Vec<CodeChange> },
-    FileOps { operations: Vec<FileOperation> },
-    TerminalCommands { commands: Vec<TerminalCommand> },
-    KnowledgeGraph { nodes: Vec<GraphNode>, edges: Vec<GraphEdge> },
-    CapabilityTree { domains: Vec<DomainCapability> },
-    HealthSnapshot { phi: f64, coherence: f64, gwt_resonance: f64, modules: Vec<ModuleHealth> },
-    EvolutionPlan { actions: Vec<EvolutionAction> },
-    TaskResult { task_id: String, success: bool, output: String, artifacts: Vec<Artifact> },
-    Sessions { sessions: Vec<SessionInfo> },
-    Providers { providers: Vec<ProviderStatus> },
-    KeyValue { data: HashMap<String, serde_json::Value> },
+    CodeChanges {
+        changes: Vec<CodeChange>,
+    },
+    FileOps {
+        operations: Vec<FileOperation>,
+    },
+    TerminalCommands {
+        commands: Vec<TerminalCommand>,
+    },
+    KnowledgeGraph {
+        nodes: Vec<GraphNode>,
+        edges: Vec<GraphEdge>,
+    },
+    CapabilityTree {
+        domains: Vec<DomainCapability>,
+    },
+    HealthSnapshot {
+        phi: f64,
+        coherence: f64,
+        gwt_resonance: f64,
+        modules: Vec<ModuleHealth>,
+    },
+    EvolutionPlan {
+        actions: Vec<EvolutionAction>,
+    },
+    TaskResult {
+        task_id: String,
+        success: bool,
+        output: String,
+        artifacts: Vec<Artifact>,
+    },
+    Sessions {
+        sessions: Vec<SessionInfo>,
+    },
+    Providers {
+        providers: Vec<ProviderStatus>,
+    },
+    KeyValue {
+        data: HashMap<String, serde_json::Value>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,7 +108,12 @@ pub struct CodeChange {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CodeChangeType { Create, Modify, Delete, Move }
+pub enum CodeChangeType {
+    Create,
+    Modify,
+    Delete,
+    Move,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOperation {
@@ -90,7 +124,13 @@ pub struct FileOperation {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum FileOpType { Read, Write, Delete, List, Search }
+pub enum FileOpType {
+    Read,
+    Write,
+    Delete,
+    List,
+    Search,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminalCommand {
@@ -179,7 +219,12 @@ pub struct ProviderStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
-    Text, Data, Progress, Error, ApprovalRequired, SystemEvent,
+    Text,
+    Data,
+    Progress,
+    Error,
+    ApprovalRequired,
+    SystemEvent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,7 +264,10 @@ pub trait UnifiedApi: Send + Sync {
         request: UnifiedRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<Result<UnifiedResponse, UnifiedError>>, UnifiedError>;
     async fn get_system_state(&self) -> Result<UnifiedResponse, UnifiedError>;
-    async fn create_session(&self, project_path: Option<String>) -> Result<SessionInfo, UnifiedError>;
+    async fn create_session(
+        &self,
+        project_path: Option<String>,
+    ) -> Result<SessionInfo, UnifiedError>;
     async fn list_sessions(&self) -> Result<Vec<SessionInfo>, UnifiedError>;
     async fn delete_session(&self, session_id: &str) -> Result<(), UnifiedError>;
 }
@@ -227,7 +275,9 @@ pub trait UnifiedApi: Send + Sync {
 pub struct UnifiedApiImpl;
 
 impl UnifiedApiImpl {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait::async_trait]
@@ -244,8 +294,11 @@ impl UnifiedApi for UnifiedApiImpl {
                 layers_involved: vec![],
                 capabilities_used: vec![],
                 consciousness_state: ConsciousnessState {
-                    phi: 0.0, coherence: 0.0, gwt_resonance: 0.0,
-                    emotion: "neutral".to_string(), attention_focus: vec![],
+                    phi: 0.0,
+                    coherence: 0.0,
+                    gwt_resonance: 0.0,
+                    emotion: "neutral".to_string(),
+                    attention_focus: vec![],
                 },
                 confidence: 0.0,
             },
@@ -255,26 +308,36 @@ impl UnifiedApi for UnifiedApiImpl {
     }
 
     async fn handle_stream(
-        &self, _request: UnifiedRequest,
-    ) -> Result<tokio::sync::mpsc::Receiver<Result<UnifiedResponse, UnifiedError>>, UnifiedError> {
+        &self,
+        _request: UnifiedRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<UnifiedResponse, UnifiedError>>, UnifiedError>
+    {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         tokio::spawn(async move {
-            let _ = tx.send(Ok(UnifiedResponse {
-                response_id: uuid::Uuid::new_v4().to_string(),
-                session_id: "".to_string(),
-                content: "流式 stub 待实现".to_string(),
-                payload: None,
-                message_type: MessageType::Text,
-                metadata: ResponseMetadata {
-                    duration_ms: 0, layers_involved: vec![], capabilities_used: vec![],
-                    consciousness_state: ConsciousnessState {
-                        phi: 0.0, coherence: 0.0, gwt_resonance: 0.0,
-                        emotion: "neutral".to_string(), attention_focus: vec![],
+            let _ = tx
+                .send(Ok(UnifiedResponse {
+                    response_id: uuid::Uuid::new_v4().to_string(),
+                    session_id: "".to_string(),
+                    content: "流式 stub 待实现".to_string(),
+                    payload: None,
+                    message_type: MessageType::Text,
+                    metadata: ResponseMetadata {
+                        duration_ms: 0,
+                        layers_involved: vec![],
+                        capabilities_used: vec![],
+                        consciousness_state: ConsciousnessState {
+                            phi: 0.0,
+                            coherence: 0.0,
+                            gwt_resonance: 0.0,
+                            emotion: "neutral".to_string(),
+                            attention_focus: vec![],
+                        },
+                        confidence: 0.0,
                     },
-                    confidence: 0.0,
-                },
-                is_stream_chunk: true, stream_done: true,
-            })).await;
+                    is_stream_chunk: true,
+                    stream_done: true,
+                }))
+                .await;
         });
         Ok(rx)
     }
@@ -285,44 +348,74 @@ impl UnifiedApi for UnifiedApiImpl {
             session_id: "system".to_string(),
             content: "系统状态 stub".to_string(),
             payload: Some(ResponsePayload::HealthSnapshot {
-                phi: 0.0, coherence: 0.0, gwt_resonance: 0.0, modules: vec![],
+                phi: 0.0,
+                coherence: 0.0,
+                gwt_resonance: 0.0,
+                modules: vec![],
             }),
             message_type: MessageType::Data,
             metadata: ResponseMetadata {
-                duration_ms: 0, layers_involved: vec![], capabilities_used: vec![],
+                duration_ms: 0,
+                layers_involved: vec![],
+                capabilities_used: vec![],
                 consciousness_state: ConsciousnessState {
-                    phi: 0.0, coherence: 0.0, gwt_resonance: 0.0,
-                    emotion: "neutral".to_string(), attention_focus: vec![],
+                    phi: 0.0,
+                    coherence: 0.0,
+                    gwt_resonance: 0.0,
+                    emotion: "neutral".to_string(),
+                    attention_focus: vec![],
                 },
                 confidence: 1.0,
             },
-            is_stream_chunk: false, stream_done: true,
+            is_stream_chunk: false,
+            stream_done: true,
         })
     }
 
-    async fn create_session(&self, project_path: Option<String>) -> Result<SessionInfo, UnifiedError> {
+    async fn create_session(
+        &self,
+        project_path: Option<String>,
+    ) -> Result<SessionInfo, UnifiedError> {
         Ok(SessionInfo {
             id: uuid::Uuid::new_v4().to_string(),
             title: "新会话".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
             updated_at: chrono::Utc::now().to_rfc3339(),
-            message_count: 0, project_path,
+            message_count: 0,
+            project_path,
         })
     }
 
-    async fn list_sessions(&self) -> Result<Vec<SessionInfo>, UnifiedError> { Ok(vec![]) }
-    async fn delete_session(&self, _: &str) -> Result<(), UnifiedError> { Ok(()) }
+    async fn list_sessions(&self) -> Result<Vec<SessionInfo>, UnifiedError> {
+        Ok(vec![])
+    }
+    async fn delete_session(&self, _: &str) -> Result<(), UnifiedError> {
+        Ok(())
+    }
 }
 
 impl UnifiedRequest {
     pub fn chat(input: impl Into<String>) -> Self {
-        Self { session_id: None, input: input.into(), context: None, mode: ResponseMode::Chat, stream: false }
+        Self {
+            session_id: None,
+            input: input.into(),
+            context: None,
+            mode: ResponseMode::Chat,
+            stream: false,
+        }
     }
 }
 
 impl Default for RequestContext {
     fn default() -> Self {
-        Self { project_path: None, selected_files: vec![], selected_code: None, open_file: None, git_status: None, metadata: HashMap::new() }
+        Self {
+            project_path: None,
+            selected_files: vec![],
+            selected_code: None,
+            open_file: None,
+            git_status: None,
+            metadata: HashMap::new(),
+        }
     }
 }
 

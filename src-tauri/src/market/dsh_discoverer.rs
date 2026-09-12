@@ -84,21 +84,22 @@ impl DshMarketDiscoverer {
                 .map(|p| {
                     let version = p.version.clone();
                     MarketEntry {
-                    id: p.id,
-                    name: p.name,
-                    version: version.clone(),
-                    description: p.description,
-                    author: p.author,
-                    category: p.category,
-                    tags: p.tags,
-                    downloads: p.downloads,
-                    rating: p.rating,
-                    source_type: "dsh-market".into(),
-                    source_repo: p.repo,
-                    icon: p.icon,
-                    homepage: p.homepage,
-                    latest_version: version,
-                }})
+                        id: p.id,
+                        name: p.name,
+                        version: version.clone(),
+                        description: p.description,
+                        author: p.author,
+                        category: p.category,
+                        tags: p.tags,
+                        downloads: p.downloads,
+                        rating: p.rating,
+                        source_type: "dsh-market".into(),
+                        source_repo: p.repo,
+                        icon: p.icon,
+                        homepage: p.homepage,
+                        latest_version: version,
+                    }
+                })
                 .collect(),
             total: data.total,
             page,
@@ -109,10 +110,7 @@ impl DshMarketDiscoverer {
 
     /// 获取插件详情
     pub async fn get_detail(&self, plugin_id: &str) -> Result<MarketEntry, String> {
-        let url = format!(
-            "{}/plugins/{}",
-            self.config.api_endpoint, plugin_id
-        );
+        let url = format!("{}/plugins/{}", self.config.api_endpoint, plugin_id);
 
         let mut request = self.client.get(&url);
 
@@ -155,7 +153,11 @@ impl DshMarketDiscoverer {
     }
 
     /// 获取插件资产列表
-    pub async fn get_assets(&self, plugin_id: &str, version: &str) -> Result<Vec<PluginAsset>, String> {
+    pub async fn get_assets(
+        &self,
+        plugin_id: &str,
+        version: &str,
+    ) -> Result<Vec<PluginAsset>, String> {
         let url = format!(
             "{}/plugins/{}/versions/{}/assets",
             self.config.api_endpoint, plugin_id, version
@@ -227,12 +229,10 @@ impl DshMarketDiscoverer {
             .map_err(|e| format!("Read download: {e}"))?;
 
         // 确保目标目录存在
-        std::fs::create_dir_all(dest_dir)
-            .map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(dest_dir).map_err(|e| format!("Create dir: {e}"))?;
 
         let dest_path = dest_dir.join(asset_name);
-        std::fs::write(&dest_path, &bytes)
-            .map_err(|e| format!("Write file: {e}"))?;
+        std::fs::write(&dest_path, &bytes).map_err(|e| format!("Write file: {e}"))?;
 
         Ok(dest_path)
     }

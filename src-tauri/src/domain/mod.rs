@@ -5,12 +5,12 @@
 //! 每个功能域（session, chat, kb, ...）是一个 DomainPlugin，
 //! 注册到 DomainRegistry，通过统一的 domain_call 入口调用。
 
-pub mod registry;
 pub mod plugins;
+pub mod registry;
 
 // Re-export serde_json for plugin convenience
-pub use serde_json;
 pub use registry::DomainRegistry;
+pub use serde_json;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -28,7 +28,9 @@ pub struct ActionSpec {
     pub returns: String,
 }
 
-fn default_returns() -> String { "Value".into() }
+fn default_returns() -> String {
+    "Value".into()
+}
 
 /// 参数规格
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,7 +69,9 @@ pub struct DomainError {
     pub recoverable: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl fmt::Display for DomainError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -77,7 +81,11 @@ impl fmt::Display for DomainError {
 
 impl From<String> for DomainError {
     fn from(s: String) -> Self {
-        Self { code: "DOMAIN_ERROR".into(), message: s, recoverable: true }
+        Self {
+            code: "DOMAIN_ERROR".into(),
+            message: s,
+            recoverable: true,
+        }
     }
 }
 
@@ -117,7 +125,9 @@ pub trait DomainPlugin: Send + Sync {
     fn name(&self) -> &str;
 
     /// 域描述
-    fn description(&self) -> &str { "" }
+    fn description(&self) -> &str {
+        ""
+    }
 
     /// 该域支持的 action 列表
     fn actions(&self) -> Vec<ActionSpec>;
@@ -127,22 +137,34 @@ pub trait DomainPlugin: Send + Sync {
         -> Result<serde_json::Value, DomainError>;
 
     /// 初始化 (插件注册后调用)
-    fn init(&mut self) -> Result<(), DomainError> { Ok(()) }
+    fn init(&mut self) -> Result<(), DomainError> {
+        Ok(())
+    }
 
     /// 关闭 (应用退出前调用)
-    fn shutdown(&mut self) -> Result<(), DomainError> { Ok(()) }
+    fn shutdown(&mut self) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ========== Helper ==========
 
 /// 构造成功响应
 pub fn ok(data: serde_json::Value) -> DomainResponse {
-    DomainResponse { ok: true, data, error: None }
+    DomainResponse {
+        ok: true,
+        data,
+        error: None,
+    }
 }
 
 /// 构造错误响应
 pub fn err(error: DomainError) -> DomainResponse {
-    DomainResponse { ok: false, data: serde_json::Value::Null, error: Some(error) }
+    DomainResponse {
+        ok: false,
+        data: serde_json::Value::Null,
+        error: Some(error),
+    }
 }
 
 /// 构造错误响应 (from string)

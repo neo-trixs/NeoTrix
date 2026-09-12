@@ -1,4 +1,4 @@
-use crate::domain::{DomainPlugin, ActionSpec, DomainError, serde_json};
+use crate::domain::{serde_json, ActionSpec, DomainError, DomainPlugin};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -51,7 +51,11 @@ impl LlamacppPlugin {
             .and_then(|o| {
                 if o.status.success() {
                     let p = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                    if !p.is_empty() { Some(PathBuf::from(p)) } else { None }
+                    if !p.is_empty() {
+                        Some(PathBuf::from(p))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -60,8 +64,12 @@ impl LlamacppPlugin {
 }
 
 impl DomainPlugin for LlamacppPlugin {
-    fn name(&self) -> &str { "llamacpp" }
-    fn description(&self) -> &str { "本地推理：llama.cpp 进程管理、模型扫描、健康检查" }
+    fn name(&self) -> &str {
+        "llamacpp"
+    }
+    fn description(&self) -> &str {
+        "本地推理：llama.cpp 进程管理、模型扫描、健康检查"
+    }
 
     fn actions(&self) -> Vec<ActionSpec> {
         vec![
@@ -104,8 +112,15 @@ impl DomainPlugin for LlamacppPlugin {
         ]
     }
 
-    fn call(&self, action: &str, args: serde_json::Value) -> Result<serde_json::Value, DomainError> {
-        let mut state = self.state.lock().map_err(|e| DomainError::from(e.to_string()))?;
+    fn call(
+        &self,
+        action: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, DomainError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|e| DomainError::from(e.to_string()))?;
 
         match action {
             "health" => {
@@ -139,17 +154,27 @@ impl DomainPlugin for LlamacppPlugin {
                 Ok(serde_json::json!({ "stopped": true }))
             }
             "swap" => {
-                let model_path = args.get("model_path").and_then(|v| v.as_str())
+                let model_path = args
+                    .get("model_path")
+                    .and_then(|v| v.as_str())
                     .ok_or_else(|| DomainError::from("model_path required"))?;
                 stop_server(&mut state);
                 start_server(&mut state, model_path)?;
                 Ok(serde_json::json!({ "swapped": true }))
             }
             "send" => {
-                let messages = args.get("messages").cloned()
+                let messages = args
+                    .get("messages")
+                    .cloned()
                     .ok_or_else(|| DomainError::from("messages required"))?;
-                let temperature = args.get("temperature").and_then(|v| v.as_f64()).unwrap_or(0.7);
-                let max_tokens = args.get("max_tokens").and_then(|v| v.as_u64()).unwrap_or(2048);
+                let temperature = args
+                    .get("temperature")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.7);
+                let max_tokens = args
+                    .get("max_tokens")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(2048);
 
                 let port = state.port;
                 drop(state);
@@ -163,13 +188,15 @@ impl DomainPlugin for LlamacppPlugin {
 
                 let url = format!("http://127.0.0.1:{port}/v1/chat/completions");
                 let client = reqwest::blocking::Client::new();
-                let resp = client.post(&url)
+                let resp = client
+                    .post(&url)
                     .json(&body)
                     .timeout(Duration::from_secs(120))
                     .send()
                     .map_err(|e| DomainError::from(format!("Request failed: {e}")))?;
 
-                let json: serde_json::Value = resp.json()
+                let json: serde_json::Value = resp
+                    .json()
                     .map_err(|e| DomainError::from(format!("Parse response: {e}")))?;
 
                 Ok(json)
@@ -184,16 +211,21 @@ impl DomainPlugin for LlamacppPlugin {
 }
 
 fn start_server(state: &mut LlamacppState, model_path: &str) -> Result<(), DomainError> {
-    let binary = LlamacppPlugin::find_binary()
-        .ok_or_else(|| DomainError::from("llama-server not found"))?;
+    let binary =
+        LlamacppPlugin::find_binary().ok_or_else(|| DomainError::from("llama-server not found"))?;
 
     let mut child = Command::new(&binary)
         .args([
-            "--host", "127.0.0.1",
-            "--port", &state.port.to_string(),
-            "--model", model_path,
-            "--ctx-size", "4096",
-            "--parallel", "2",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &state.port.to_string(),
+            "--model",
+            model_path,
+            "--ctx-size",
+            "4096",
+            "--parallel",
+            "2",
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -237,7 +269,12 @@ fn scan_models(dir: &PathBuf) -> Vec<serde_json::Value> {
         .map(|entries| {
             entries
                 .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().map(|ext| ext == "gguf").unwrap_or(false))
+                .filter(|e| {
+                    e.path()
+                        .extension()
+                        .map(|ext| ext == "gguf")
+                        .unwrap_or(false)
+                })
                 .filter_map(|e| {
                     let path = e.path();
                     let meta = e.metadata().ok()?;
@@ -255,18 +292,30 @@ fn scan_models(dir: &PathBuf) -> Vec<serde_json::Value> {
 }
 
 fn find_model(dir: &PathBuf) -> Option<PathBuf> {
-    if !dir.exists() { return None; }
-    std::fs::read_dir(dir).ok()?
+    if !dir.exists() {
+        return None;
+    }
+    std::fs::read_dir(dir)
+        .ok()?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "gguf").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "gguf")
+                .unwrap_or(false)
+        })
         .min_by_key(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
         .map(|e| e.path())
 }
 
 fn extract_quant(name: &str) -> String {
     let lower = name.to_lowercase();
-    for q in &["iq4_nl", "q8_0", "q6_k", "q5_k_m", "q4_k_m", "q4_0", "f16", "f32", "bf16"] {
-        if lower.contains(q) { return q.to_uppercase(); }
+    for q in &[
+        "iq4_nl", "q8_0", "q6_k", "q5_k_m", "q4_k_m", "q4_0", "f16", "f32", "bf16",
+    ] {
+        if lower.contains(q) {
+            return q.to_uppercase();
+        }
     }
     "unknown".into()
 }

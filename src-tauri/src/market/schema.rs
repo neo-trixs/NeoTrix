@@ -145,9 +145,15 @@ pub struct PluginRuntime {
     pub max_calls_per_minute: Option<u32>,
 }
 
-fn default_max_memory() -> u32 { 128 }
-fn default_max_cpu() -> u32 { 1000 }
-fn default_timeout() -> u32 { 30 }
+fn default_max_memory() -> u32 {
+    128
+}
+fn default_max_cpu() -> u32 {
+    1000
+}
+fn default_timeout() -> u32 {
+    30
+}
 
 /// 插件依赖
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -216,39 +222,39 @@ pub struct PluginMeta {
     pub repository: Option<String>,
 }
 
-fn default_min_runtime() -> String { "0.21.0".into() }
+fn default_min_runtime() -> String {
+    "0.21.0".into()
+}
 
 impl PluginManifest {
     /// 从 TOML 文件解析
     pub fn from_file(path: &Path) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Read plugin manifest: {e}"))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("Read plugin manifest: {e}"))?;
         Self::from_toml(&content)
     }
 
     /// 从 TOML 字符串解析
     pub fn from_toml(content: &str) -> Result<Self, String> {
-        toml::from_str(content)
-            .map_err(|e| format!("Parse plugin manifest: {e}"))
+        toml::from_str(content).map_err(|e| format!("Parse plugin manifest: {e}"))
     }
 
     /// 转换为 TOML 字符串
     pub fn to_toml(&self) -> Result<String, String> {
-        toml::to_string_pretty(self)
-            .map_err(|e| format!("Serialize plugin manifest: {e}"))
+        toml::to_string_pretty(self).map_err(|e| format!("Serialize plugin manifest: {e}"))
     }
 
     /// 从 JSON 文件解析 (兼容旧格式)
     pub fn from_json_file(path: &Path) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Read plugin manifest: {e}"))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("Read plugin manifest: {e}"))?;
         Self::from_json(&content)
     }
 
     /// 从 JSON 字符串解析
     pub fn from_json(content: &str) -> Result<Self, String> {
-        let json: serde_json::Value = serde_json::from_str(content)
-            .map_err(|e| format!("Parse JSON: {e}"))?;
+        let json: serde_json::Value =
+            serde_json::from_str(content).map_err(|e| format!("Parse JSON: {e}"))?;
 
         // 转换为统一格式
         let manifest = serde_json::json!({
@@ -286,8 +292,7 @@ impl PluginManifest {
             },
         });
 
-        serde_json::from_value(manifest)
-            .map_err(|e| format!("Convert JSON manifest: {e}"))
+        serde_json::from_value(manifest).map_err(|e| format!("Convert JSON manifest: {e}"))
     }
 }
 

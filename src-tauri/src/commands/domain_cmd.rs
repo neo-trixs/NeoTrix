@@ -2,10 +2,10 @@
 //!
 //! 将 DomainRegistry 暴露为 Tauri commands。
 
-use tauri::{command, State};
+use crate::domain::{DomainCall, DomainInfo, DomainRegistry, DomainResponse};
 use std::sync::Arc;
+use tauri::{command, State};
 use tokio::sync::RwLock;
-use crate::domain::{DomainCall, DomainResponse, DomainInfo, DomainRegistry};
 
 /// 域注册表状态
 pub type DomainState = Arc<RwLock<DomainRegistry>>;
@@ -19,25 +19,24 @@ pub async fn domain_call(
     args: serde_json::Value,
 ) -> Result<DomainResponse, String> {
     let registry = state.read().await;
-    let request = DomainCall { domain, action, args };
+    let request = DomainCall {
+        domain,
+        action,
+        args,
+    };
     Ok(registry.call(request))
 }
 
 /// 列出所有已注册域
 #[command]
-pub async fn domain_list(
-    state: State<'_, DomainState>,
-) -> Result<Vec<DomainInfo>, String> {
+pub async fn domain_list(state: State<'_, DomainState>) -> Result<Vec<DomainInfo>, String> {
     let registry = state.read().await;
     Ok(registry.list())
 }
 
 /// 检查域是否存在
 #[command]
-pub async fn domain_has(
-    state: State<'_, DomainState>,
-    domain: String,
-) -> Result<bool, String> {
+pub async fn domain_has(state: State<'_, DomainState>, domain: String) -> Result<bool, String> {
     let registry = state.read().await;
     Ok(registry.has_domain(&domain))
 }

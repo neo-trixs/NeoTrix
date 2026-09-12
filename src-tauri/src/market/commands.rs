@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::market::{MarketConfig, MarketEngine};
 use crate::market::schema::{MarketEntry, PluginManifest};
+use crate::market::{MarketConfig, MarketEngine};
 
 /// 市场状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +54,10 @@ async fn get_engine() -> Result<tokio::sync::MutexGuard<'static, Option<MarketEn
 #[tauri::command]
 pub async fn market_status() -> Result<MarketStatus, String> {
     let engine = get_engine().await?;
-    let installed = engine.as_ref().map(|e| e.list_installed().len()).unwrap_or(0);
+    let installed = engine
+        .as_ref()
+        .map(|e| e.list_installed().len())
+        .unwrap_or(0);
 
     Ok(MarketStatus {
         dsh_enabled: true,
@@ -108,10 +111,7 @@ pub async fn market_search(
 
 /// 获取插件详情
 #[tauri::command]
-pub async fn market_get_detail(
-    plugin_id: String,
-    source: String,
-) -> Result<MarketEntry, String> {
+pub async fn market_get_detail(plugin_id: String, source: String) -> Result<MarketEntry, String> {
     let engine = get_engine().await?;
     let engine = engine.as_ref().ok_or("Market engine not initialized")?;
 
@@ -149,7 +149,9 @@ pub async fn market_install(
         .join("cache");
 
     let download_path = {
-        let engine = engine_guard.as_ref().ok_or("Market engine not initialized")?;
+        let engine = engine_guard
+            .as_ref()
+            .ok_or("Market engine not initialized")?;
         engine.download(&plugin_id, &source, &version).await?
     };
 
@@ -184,7 +186,9 @@ pub async fn market_install(
 #[tauri::command]
 pub async fn market_uninstall(plugin_id: String) -> Result<bool, String> {
     let mut engine_guard = get_engine().await?;
-    let engine = engine_guard.as_mut().ok_or("Market engine not initialized")?;
+    let engine = engine_guard
+        .as_mut()
+        .ok_or("Market engine not initialized")?;
 
     engine.uninstall(&plugin_id)?;
     Ok(true)

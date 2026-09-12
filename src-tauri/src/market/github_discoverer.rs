@@ -94,10 +94,7 @@ impl GitHubDiscoverer {
                 Some(MarketEntry {
                     id: repo.full_name.clone(),
                     name: repo.name.clone(),
-                    version: repo
-                        .default_branch
-                        .clone()
-                        .unwrap_or_else(|| "main".into()),
+                    version: repo.default_branch.clone().unwrap_or_else(|| "main".into()),
                     description: repo.description.unwrap_or_default(),
                     author: repo.owner.login.clone(),
                     category,
@@ -149,9 +146,7 @@ impl GitHubDiscoverer {
         Ok(MarketEntry {
             id: repo.full_name.clone(),
             name: repo.name,
-            version: repo
-                .default_branch
-                .unwrap_or_else(|| "main".into()),
+            version: repo.default_branch.unwrap_or_else(|| "main".into()),
             description: repo.description.unwrap_or_default(),
             author: repo.owner.login,
             category: "other".into(),
@@ -233,12 +228,10 @@ impl GitHubDiscoverer {
             .await
             .map_err(|e| format!("Read download: {e}"))?;
 
-        std::fs::create_dir_all(dest_dir)
-            .map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(dest_dir).map_err(|e| format!("Create dir: {e}"))?;
 
         let dest_path = dest_dir.join(filename);
-        std::fs::write(&dest_path, &bytes)
-            .map_err(|e| format!("Write file: {e}"))?;
+        std::fs::write(&dest_path, &bytes).map_err(|e| format!("Write file: {e}"))?;
 
         Ok(dest_path)
     }

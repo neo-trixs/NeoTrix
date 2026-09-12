@@ -8,20 +8,26 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use clap::Parser;
-use tauri::{Manager, Emitter};
 use std::sync::Arc;
+use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
 mod commands;
-mod stub;
 mod domain;
 pub mod market;
+mod stub;
 
-use domain::{DomainRegistry, plugins::*};
-use commands::domain_cmd::{DomainState, domain_call, domain_list, domain_has, domain_action_count};
+use crate::stub::{UnifiedApi as _, UnifiedApiImpl};
+use commands::domain_cmd::{
+    domain_action_count, domain_call, domain_has, domain_list, DomainState,
+};
+use commands::unified::{
+    unified_chat, unified_chat_stream, unified_cli_list, unified_create_session,
+    unified_delete_session, unified_exec_cli, unified_init, unified_list_sessions,
+    unified_system_state, UnifiedApiState,
+};
+use domain::{plugins::*, DomainRegistry};
 use market::commands::*;
-use commands::unified::{UnifiedApiState, unified_init, unified_chat, unified_chat_stream, unified_system_state, unified_create_session, unified_list_sessions, unified_delete_session, unified_exec_cli, unified_cli_list};
-use crate::stub::{UnifiedApiImpl, UnifiedApi as _};
 
 #[derive(Parser)]
 #[clap(name = "neotrix-tauri", version)]
@@ -60,35 +66,74 @@ fn main() {
         None | Some(Commands::Desktop) => {
             // 创建域注册表并注册 12 个插件
             let mut registry = DomainRegistry::new();
-            registry.register(Box::new(SessionPlugin::new())).expect("failed to register session");
-            registry.register(Box::new(AgentPlugin)).expect("failed to register agent");
-            registry.register(Box::new(KbPlugin::new())).expect("failed to register kb");
-            registry.register(Box::new(FilePlugin)).expect("failed to register file");
-            registry.register(Box::new(PluginPlugin)).expect("failed to register plugin");
-            registry.register(Box::new(WorkflowPluginImpl::new())).expect("failed to register workflow");
-            registry.register(Box::new(ToolPlugin)).expect("failed to register tool");
-            registry.register(Box::new(SystemPlugin)).expect("failed to register system");
-            registry.register(Box::new(SecurityPlugin)).expect("failed to register security");
-            registry.register(Box::new(MemoryPlugin::new())).expect("failed to register memory");
-            registry.register(Box::new(ExtPlugin)).expect("failed to register ext");
-            registry.register(Box::new(LlamacppPlugin::new())).expect("failed to register llamacpp");
-            registry.register(Box::new(GitPlugin)).expect("failed to register git");
-            registry.register(Box::new(CliPlugin)).expect("failed to register cli");
-            registry.register(Box::new(WorldPlugin)).expect("failed to register world");
-            registry.register(Box::new(ContextPlugin)).expect("failed to register context");
+            registry
+                .register(Box::new(SessionPlugin::new()))
+                .expect("failed to register session");
+            registry
+                .register(Box::new(AgentPlugin))
+                .expect("failed to register agent");
+            registry
+                .register(Box::new(KbPlugin::new()))
+                .expect("failed to register kb");
+            registry
+                .register(Box::new(FilePlugin))
+                .expect("failed to register file");
+            registry
+                .register(Box::new(PluginPlugin))
+                .expect("failed to register plugin");
+            registry
+                .register(Box::new(WorkflowPluginImpl::new()))
+                .expect("failed to register workflow");
+            registry
+                .register(Box::new(ToolPlugin))
+                .expect("failed to register tool");
+            registry
+                .register(Box::new(SystemPlugin))
+                .expect("failed to register system");
+            registry
+                .register(Box::new(SecurityPlugin))
+                .expect("failed to register security");
+            registry
+                .register(Box::new(MemoryPlugin::new()))
+                .expect("failed to register memory");
+            registry
+                .register(Box::new(ExtPlugin))
+                .expect("failed to register ext");
+            registry
+                .register(Box::new(LlamacppPlugin::new()))
+                .expect("failed to register llamacpp");
+            registry
+                .register(Box::new(GitPlugin))
+                .expect("failed to register git");
+            registry
+                .register(Box::new(CliPlugin))
+                .expect("failed to register cli");
+            registry
+                .register(Box::new(WorldPlugin))
+                .expect("failed to register world");
+            registry
+                .register(Box::new(ContextPlugin))
+                .expect("failed to register context");
 
             println!("🔌 已注册 {} 个域插件", registry.plugin_count());
             for info in registry.list() {
-                println!("   {} — {} ({} actions)", info.name, info.description, info.actions.len());
+                println!(
+                    "   {} — {} ({} actions)",
+                    info.name,
+                    info.description,
+                    info.actions.len()
+                );
             }
 
             let domain_state: DomainState = Arc::new(RwLock::new(registry));
-            
+
             // 创建 chat plugin 并注册到 domain_state
             let chat_plugin = ChatPlugin::new(domain_state.clone());
             {
                 let mut registry = domain_state.blocking_write();
-                registry.register(Box::new(chat_plugin)).expect("failed to register chat");
+                registry
+                    .register(Box::new(chat_plugin))
+                    .expect("failed to register chat");
             }
             let unified_api: UnifiedApiState = Arc::new(RwLock::new(UnifiedApiImpl::new()));
 
@@ -124,7 +169,8 @@ fn main() {
                 .plugin(
                     tauri_plugin_global_shortcut::Builder::new()
                         .with_handler(|app, shortcut, event| {
-                            if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                            if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed
+                            {
                                 if let Some(window) = app.get_webview_window("main") {
                                     let _ = window.show();
                                     let _ = window.unminimize();
@@ -211,10 +257,12 @@ fn main() {
                         while let Some(evt) = rx.recv().await {
                             match evt.event_type {
                                 crate::commands::pty::PtyEventType::Output => {
-                                    let _ = pty_handle.emit(&format!("pty-output-{}", evt.session_id), &evt.data);
+                                    let _ = pty_handle
+                                        .emit(&format!("pty-output-{}", evt.session_id), &evt.data);
                                 }
                                 crate::commands::pty::PtyEventType::Exit(code) => {
-                                    let _ = pty_handle.emit(&format!("pty-exit-{}", evt.session_id), &code);
+                                    let _ = pty_handle
+                                        .emit(&format!("pty-exit-{}", evt.session_id), &code);
                                 }
                             }
                         }
@@ -222,7 +270,9 @@ fn main() {
 
                     #[cfg(debug_assertions)]
                     {
-                        if let Some(window) = app.get_webview_window("main") { window.open_devtools(); }
+                        if let Some(window) = app.get_webview_window("main") {
+                            window.open_devtools();
+                        }
                     }
 
                     println!("✅ NeoTrix V2 Desktop ready (domain plugin architecture)");
@@ -234,10 +284,11 @@ fn main() {
                 })
                 .build(tauri::generate_context!())
                 .expect("error while building tauri application")
-                .run(|_app, event| {
-                    if let tauri::RunEvent::ExitRequested { .. } = event {
-                    }
-                });
+                .run(
+                    |_app, event| {
+                        if let tauri::RunEvent::ExitRequested { .. } = event {}
+                    },
+                );
         }
         Some(Commands::Headless) => {
             println!("NeoTrix headless mode starting...");
@@ -247,9 +298,11 @@ fn main() {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
                     if let Ok(state) = api.get_system_state().await {
-                        println!("  [tick] phi={:.3} coherence={:.3}",
+                        println!(
+                            "  [tick] phi={:.3} coherence={:.3}",
                             state.metadata.consciousness_state.phi,
-                            state.metadata.consciousness_state.coherence);
+                            state.metadata.consciousness_state.coherence
+                        );
                     }
                 }
             });

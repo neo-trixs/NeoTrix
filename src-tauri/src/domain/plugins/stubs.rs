@@ -401,15 +401,14 @@ fn resolvable(cfg: &ConfigData) -> bool {
 
 // ========== Agent Plugin ==========
 
-static AGENT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
-    LazyLock::new(|| {
-        let mut m = HashMap::new();
-        m.insert("running".into(), serde_json::json!(false));
-        m.insert("project".into(), serde_json::json!(null));
-        m.insert("provider".into(), serde_json::json!(null));
-        m.insert("started_at".into(), serde_json::json!(null));
-        Mutex::new(m)
-    });
+static AGENT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    m.insert("running".into(), serde_json::json!(false));
+    m.insert("project".into(), serde_json::json!(null));
+    m.insert("provider".into(), serde_json::json!(null));
+    m.insert("started_at".into(), serde_json::json!(null));
+    Mutex::new(m)
+});
 
 pub struct AgentPlugin;
 
@@ -631,8 +630,14 @@ impl DomainPlugin for AgentPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                if state.get("running").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    return Ok(serde_json::json!({ "ok": true, "message": "Agent already running" }));
+                if state
+                    .get("running")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
+                    return Ok(
+                        serde_json::json!({ "ok": true, "message": "Agent already running" }),
+                    );
                 }
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -648,7 +653,11 @@ impl DomainPlugin for AgentPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                if !state.get("running").and_then(|v| v.as_bool()).unwrap_or(false) {
+                if !state
+                    .get("running")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
                     return Ok(serde_json::json!({ "ok": true, "message": "Agent not running" }));
                 }
                 state.insert("running".into(), serde_json::json!(false));
@@ -700,9 +709,9 @@ impl DomainPlugin for AgentPlugin {
                 let cfg = read_config_file();
                 let pool = read_pool_entries();
                 let is_configured = cfg.provider == provider
-                    || pool.iter().any(|e| {
-                        e.get("provider").and_then(|v| v.as_str()) == Some(&provider)
-                    });
+                    || pool
+                        .iter()
+                        .any(|e| e.get("provider").and_then(|v| v.as_str()) == Some(&provider));
                 Ok(serde_json::json!({
                     "ok": true,
                     "provider": provider,
@@ -741,10 +750,7 @@ impl DomainPlugin for AgentPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                let path = state
-                    .get("project")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let path = state.get("project").and_then(|v| v.as_str()).unwrap_or("");
                 Ok(serde_json::json!({ "path": path }))
             }
             "health" => {
@@ -753,13 +759,19 @@ impl DomainPlugin for AgentPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                let running = state.get("running").and_then(|v| v.as_bool()).unwrap_or(false);
-                let project = state
-                    .get("project")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let provider_info = state.get("provider").cloned().unwrap_or(serde_json::json!(null));
-                let started_at = state.get("started_at").cloned().unwrap_or(serde_json::json!(null));
+                let running = state
+                    .get("running")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let project = state.get("project").and_then(|v| v.as_str()).unwrap_or("");
+                let provider_info = state
+                    .get("provider")
+                    .cloned()
+                    .unwrap_or(serde_json::json!(null));
+                let started_at = state
+                    .get("started_at")
+                    .cloned()
+                    .unwrap_or(serde_json::json!(null));
                 Ok(serde_json::json!({
                     "status": if running { "running" } else { "stopped" },
                     "running": running,
@@ -774,10 +786,9 @@ impl DomainPlugin for AgentPlugin {
 
 // ========== Plugin Plugin (meta) ==========
 
-static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
-    LazyLock::new(|| {
-        let mut m = HashMap::new();
-        m.insert(
+static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    m.insert(
             "plugins".into(),
             serde_json::json!({
                 "session": { "enabled": true, "description": "会话管理", "version": "0.1.0" },
@@ -797,12 +808,9 @@ static PLUGIN_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
                 "llamacpp": { "enabled": true, "description": "llama.cpp 本地推理", "version": "0.1.0" },
             }),
         );
-        m.insert(
-            "config".into(),
-            serde_json::json!({}),
-        );
-        Mutex::new(m)
-    });
+    m.insert("config".into(), serde_json::json!({}));
+    Mutex::new(m)
+});
 
 pub struct PluginPlugin;
 
@@ -840,7 +848,10 @@ impl DomainPlugin for PluginPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                let plugins = state.get("plugins").cloned().unwrap_or(serde_json::json!({}));
+                let plugins = state
+                    .get("plugins")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
                 let count = plugins.as_object().map(|m| m.len()).unwrap_or(0);
                 Ok(serde_json::json!({
                     "plugins": plugins,
@@ -1011,7 +1022,10 @@ impl DomainPlugin for PluginPlugin {
                         message: e.to_string(),
                         recoverable: true,
                     })?;
-                    state.get("plugins").cloned().unwrap_or(serde_json::json!({}))
+                    state
+                        .get("plugins")
+                        .cloned()
+                        .unwrap_or(serde_json::json!({}))
                 };
                 let available = vec![
                     serde_json::json!({
@@ -1139,7 +1153,10 @@ impl DomainPlugin for PluginPlugin {
                 match plugins.get_mut(&name) {
                     Some(p) => {
                         if let Some(obj) = p.as_object_mut() {
-                            let current_version = obj.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0");
+                            let current_version = obj
+                                .get("version")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("0.0.0");
                             let bumped = bump_version(current_version);
                             obj.insert("version".into(), serde_json::json!(bumped));
                             Ok(serde_json::json!({
@@ -1186,7 +1203,11 @@ impl DomainPlugin for PluginPlugin {
                     })?;
                 if let Some(key) = set_key {
                     // Set config value
-                    let target = if plugin_name.is_empty() { "_global" } else { &plugin_name };
+                    let target = if plugin_name.is_empty() {
+                        "_global"
+                    } else {
+                        &plugin_name
+                    };
                     let plugin_cfg = config
                         .entry(target.to_string())
                         .or_insert_with(|| serde_json::json!({}))
@@ -1196,11 +1217,18 @@ impl DomainPlugin for PluginPlugin {
                             message: "Plugin config corrupted".into(),
                             recoverable: true,
                         })?;
-                    plugin_cfg.insert(key.to_string(), set_value.unwrap_or(serde_json::json!(null)));
+                    plugin_cfg.insert(
+                        key.to_string(),
+                        set_value.unwrap_or(serde_json::json!(null)),
+                    );
                     Ok(serde_json::json!({ "ok": true, "plugin": target, "key": key }))
                 } else {
                     // Get config
-                    let target = if plugin_name.is_empty() { "_global" } else { &plugin_name };
+                    let target = if plugin_name.is_empty() {
+                        "_global"
+                    } else {
+                        &plugin_name
+                    };
                     let plugin_cfg = config.get(target).cloned().unwrap_or(serde_json::json!({}));
                     Ok(serde_json::json!({
                         "plugin": target,
@@ -1429,27 +1457,20 @@ impl DomainPlugin for SystemPlugin {
 
 // ========== Security Plugin ==========
 
-static SECURITY_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
-    LazyLock::new(|| {
-        let mut m = HashMap::new();
-        m.insert(
-            "audit_log".into(),
-            serde_json::json!([]),
-        );
-        m.insert(
-            "policies".into(),
-            serde_json::json!({
-                "require_confirmation": true,
-                "quarantine_on_threat": true,
-                "auto_scan": false,
-            }),
-        );
-        m.insert(
-            "quarantine".into(),
-            serde_json::json!([]),
-        );
-        Mutex::new(m)
-    });
+static SECURITY_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    m.insert("audit_log".into(), serde_json::json!([]));
+    m.insert(
+        "policies".into(),
+        serde_json::json!({
+            "require_confirmation": true,
+            "quarantine_on_threat": true,
+            "auto_scan": false,
+        }),
+    );
+    m.insert("quarantine".into(), serde_json::json!([]));
+    Mutex::new(m)
+});
 
 fn security_add_audit_event(event_type: &str, detail: &str) {
     if let Ok(mut state) = SECURITY_STATE.lock() {
@@ -1504,12 +1525,19 @@ impl DomainPlugin for SecurityPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("system")
                     .to_string();
-                security_add_audit_event("scan", &format!("Security scan triggered for: {}", target));
+                security_add_audit_event(
+                    "scan",
+                    &format!("Security scan triggered for: {}", target),
+                );
                 // Basic scan: check for common sensitive files
                 let mut findings = vec![];
                 let sensitive_patterns = vec![
-                    ".env", "credentials.json", "secrets.yml",
-                    ".ssh/id_rsa", ".aws/credentials", ".npmrc",
+                    ".env",
+                    "credentials.json",
+                    "secrets.yml",
+                    ".ssh/id_rsa",
+                    ".aws/credentials",
+                    ".npmrc",
                 ];
                 let home = dirs::home_dir().unwrap_or_default();
                 for pattern in &sensitive_patterns {
@@ -1543,7 +1571,10 @@ impl DomainPlugin for SecurityPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                let log = state.get("audit_log").cloned().unwrap_or(serde_json::json!([]));
+                let log = state
+                    .get("audit_log")
+                    .cloned()
+                    .unwrap_or(serde_json::json!([]));
                 Ok(serde_json::json!({
                     "ok": true,
                     "detail": detail,
@@ -1568,7 +1599,10 @@ impl DomainPlugin for SecurityPlugin {
                         recoverable: true,
                     });
                 }
-                security_add_audit_event("quarantine", &format!("Quarantined: {} ({})", path, reason));
+                security_add_audit_event(
+                    "quarantine",
+                    &format!("Quarantined: {} ({})", path, reason),
+                );
                 let mut state = SECURITY_STATE.lock().map_err(|e| DomainError {
                     code: "LOCK_ERROR".into(),
                     message: e.to_string(),
@@ -1591,24 +1625,22 @@ impl DomainPlugin for SecurityPlugin {
                 security_add_audit_event(action, &args.to_string());
                 Ok(serde_json::json!({ "ok": true, "action": action }))
             }
-            "stealth_status" => {
-                Ok(serde_json::json!({
-                    "stealth_enabled": false,
-                    "proxy_active": false,
-                    "fingerprint_masked": false,
-                }))
-            }
+            "stealth_status" => Ok(serde_json::json!({
+                "stealth_enabled": false,
+                "proxy_active": false,
+                "fingerprint_masked": false,
+            })),
             "audit_log" => {
-                let limit = args
-                    .get("limit")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(50) as usize;
+                let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
                 let state = SECURITY_STATE.lock().map_err(|e| DomainError {
                     code: "LOCK_ERROR".into(),
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                let log = state.get("audit_log").cloned().unwrap_or(serde_json::json!([]));
+                let log = state
+                    .get("audit_log")
+                    .cloned()
+                    .unwrap_or(serde_json::json!([]));
                 let entries = log
                     .as_array()
                     .map(|a| {
@@ -1627,7 +1659,10 @@ impl DomainPlugin for SecurityPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                let policies = state.get("policies").cloned().unwrap_or(serde_json::json!({}));
+                let policies = state
+                    .get("policies")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
                 Ok(serde_json::json!({ "policies": policies }))
             }
             "policy_set" => {
@@ -1653,10 +1688,7 @@ impl DomainPlugin for SecurityPlugin {
                     message: e.to_string(),
                     recoverable: true,
                 })?;
-                if let Some(policies) = state
-                    .get_mut("policies")
-                    .and_then(|v| v.as_object_mut())
-                {
+                if let Some(policies) = state.get_mut("policies").and_then(|v| v.as_object_mut()) {
                     policies.insert(key.clone(), value.clone());
                 }
                 Ok(serde_json::json!({ "ok": true, "key": key, "value": value }))
@@ -1672,31 +1704,21 @@ impl DomainPlugin for SecurityPlugin {
 
 // ========== Ext Plugin ==========
 
-static EXT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> =
-    LazyLock::new(|| {
-        let mut m = HashMap::new();
-        m.insert(
-            "connections".into(),
-            serde_json::json!({}),
-        );
-        m.insert(
-            "channels".into(),
-            serde_json::json!({}),
-        );
-        m.insert(
-            "cowork".into(),
-            serde_json::json!({
-                "active": false,
-                "session_id": null,
-                "participants": [],
-            }),
-        );
-        m.insert(
-            "notifications".into(),
-            serde_json::json!([]),
-        );
-        Mutex::new(m)
-    });
+static EXT_STATE: LazyLock<Mutex<HashMap<String, serde_json::Value>>> = LazyLock::new(|| {
+    let mut m = HashMap::new();
+    m.insert("connections".into(), serde_json::json!({}));
+    m.insert("channels".into(), serde_json::json!({}));
+    m.insert(
+        "cowork".into(),
+        serde_json::json!({
+            "active": false,
+            "session_id": null,
+            "participants": [],
+        }),
+    );
+    m.insert("notifications".into(), serde_json::json!([]));
+    Mutex::new(m)
+});
 
 pub struct ExtPlugin;
 
@@ -1733,10 +1755,7 @@ impl DomainPlugin for ExtPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("127.0.0.1")
                     .to_string();
-                let port = args
-                    .get("port")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as u16;
+                let port = args.get("port").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
                 let device_id = args
                     .get("device_id")
                     .and_then(|v| v.as_str())
@@ -1788,10 +1807,7 @@ impl DomainPlugin for ExtPlugin {
                     .and_then(|v| v.as_str())
                     .unwrap_or("127.0.0.1")
                     .to_string();
-                let port = args
-                    .get("port")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as u16;
+                let port = args.get("port").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
                 let mut state = EXT_STATE.lock().map_err(|e| DomainError {
                     code: "LOCK_ERROR".into(),
                     message: e.to_string(),

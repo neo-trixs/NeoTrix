@@ -50,11 +50,9 @@ fn load_subscriptions() -> Result<Vec<String>, String> {
         return Ok(vec![]);
     }
 
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Read subscriptions: {e}"))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read subscriptions: {e}"))?;
 
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Parse subscriptions: {e}"))
+    serde_json::from_str(&content).map_err(|e| format!("Parse subscriptions: {e}"))
 }
 
 /// 保存订阅文件
@@ -65,15 +63,12 @@ fn save_subscriptions(subs: &[String]) -> Result<(), String> {
         .join("subscriptions.json");
 
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
 
-    let json = serde_json::to_string_pretty(subs)
-        .map_err(|e| format!("Serialize: {e}"))?;
+    let json = serde_json::to_string_pretty(subs).map_err(|e| format!("Serialize: {e}"))?;
 
-    std::fs::write(&path, json)
-        .map_err(|e| format!("Write subscriptions: {e}"))
+    std::fs::write(&path, json).map_err(|e| format!("Write subscriptions: {e}"))
 }
 
 /// 读取代理池配置
@@ -92,8 +87,7 @@ fn load_pool_config() -> Result<serde_json::Value, String> {
         }));
     }
 
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Read config: {e}"))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read config: {e}"))?;
 
     // TOML 转 JSON (简单处理)
     Ok(serde_json::json!({
@@ -110,32 +104,36 @@ fn save_strategy(strategy: &str) -> Result<(), String> {
 
     // 读取现有配置或创建新的
     let mut config_str = if config_path.exists() {
-        std::fs::read_to_string(&config_path)
-            .unwrap_or_default()
+        std::fs::read_to_string(&config_path).unwrap_or_default()
     } else {
         String::new()
     };
 
     // 更新或插入 strategy
     if config_str.contains("selection_strategy") {
-        config_str = config_str.lines().map(|line| {
-            if line.contains("selection_strategy") {
-                format!("selection_strategy = \"{}\"", strategy)
-            } else {
-                line.to_string()
-            }
-        }).collect::<Vec<_>>().join("\n");
+        config_str = config_str
+            .lines()
+            .map(|line| {
+                if line.contains("selection_strategy") {
+                    format!("selection_strategy = \"{}\"", strategy)
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
     } else {
-        config_str.push_str(&format!("\n[pool]\nselection_strategy = \"{}\"\n", strategy));
+        config_str.push_str(&format!(
+            "\n[pool]\nselection_strategy = \"{}\"\n",
+            strategy
+        ));
     }
 
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
 
-    std::fs::write(&config_path, config_str)
-        .map_err(|e| format!("Write config: {e}"))
+    std::fs::write(&config_path, config_str).map_err(|e| format!("Write config: {e}"))
 }
 
 // ═══════════════════════════════════════════════
@@ -154,10 +152,9 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
         .join("proxy_pool_cache.json");
 
     let nodes: Vec<ProxyPoolEntry> = if cache_path.exists() {
-        let content = std::fs::read_to_string(&cache_path)
-            .map_err(|e| format!("Read cache: {e}"))?;
-        serde_json::from_str(&content)
-            .unwrap_or_default()
+        let content =
+            std::fs::read_to_string(&cache_path).map_err(|e| format!("Read cache: {e}"))?;
+        serde_json::from_str(&content).unwrap_or_default()
     } else {
         // Cache 不存在，从 subscriptions.json 中提取直连代理节点
         let extracted = extract_direct_proxies(&subs);
@@ -177,7 +174,8 @@ pub async fn proxy_pool_status() -> Result<ProxyPoolStatus, String> {
     let unhealthy = nodes.len() - healthy;
 
     let config = load_pool_config()?;
-    let strategy = config.get("pool")
+    let strategy = config
+        .get("pool")
         .and_then(|p| p.get("selection_strategy"))
         .and_then(|s| s.as_str())
         .unwrap_or("adaptive")
@@ -199,7 +197,9 @@ fn extract_direct_proxies(subs: &[String]) -> Vec<ProxyPoolEntry> {
     for url in subs {
         if url.starts_with("http://") || url.starts_with("https://") {
             // 验证格式: 必须包含 ip:port
-            let stripped = url.trim_start_matches("https://").trim_start_matches("http://");
+            let stripped = url
+                .trim_start_matches("https://")
+                .trim_start_matches("http://");
             if let Some(colon_pos) = stripped.rfind(':') {
                 let host = &stripped[..colon_pos];
                 let port_str = &stripped[colon_pos + 1..];
@@ -243,13 +243,17 @@ pub async fn proxy_pool_snapshot() -> Result<ProxyPoolSnapshot, String> {
     let avg_latency = if status.nodes.is_empty() {
         0.0
     } else {
-        let total: u64 = status.nodes.iter()
-            .filter_map(|n| n.latency_ms)
-            .sum();
-        let count = status.nodes.iter()
+        let total: u64 = status.nodes.iter().filter_map(|n| n.latency_ms).sum();
+        let count = status
+            .nodes
+            .iter()
             .filter(|n| n.latency_ms.is_some())
             .count();
-        if count > 0 { total as f64 / count as f64 } else { 0.0 }
+        if count > 0 {
+            total as f64 / count as f64
+        } else {
+            0.0
+        }
     };
 
     let mut geo_dist = std::collections::HashMap::new();
@@ -282,8 +286,8 @@ pub async fn proxy_pool_add(url: String, tag: String) -> Result<ProxyPoolEntry, 
         .join("proxy_pool_cache.json");
 
     let mut nodes: Vec<ProxyPoolEntry> = if cache_path.exists() {
-        let content = std::fs::read_to_string(&cache_path)
-            .map_err(|e| format!("Read cache: {e}"))?;
+        let content =
+            std::fs::read_to_string(&cache_path).map_err(|e| format!("Read cache: {e}"))?;
         serde_json::from_str(&content).unwrap_or_default()
     } else {
         vec![]
@@ -308,10 +312,8 @@ pub async fn proxy_pool_add(url: String, tag: String) -> Result<ProxyPoolEntry, 
     nodes.push(entry.clone());
 
     // 保存到缓存
-    let json = serde_json::to_string_pretty(&nodes)
-        .map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&cache_path, json)
-        .map_err(|e| format!("Write cache: {e}"))?;
+    let json = serde_json::to_string_pretty(&nodes).map_err(|e| format!("Serialize: {e}"))?;
+    std::fs::write(&cache_path, json).map_err(|e| format!("Write cache: {e}"))?;
 
     Ok(entry)
 }
@@ -328,10 +330,8 @@ pub async fn proxy_pool_remove(url: String) -> Result<bool, String> {
         return Ok(false);
     }
 
-    let content = std::fs::read_to_string(&cache_path)
-        .map_err(|e| format!("Read cache: {e}"))?;
-    let mut nodes: Vec<ProxyPoolEntry> = serde_json::from_str(&content)
-        .unwrap_or_default();
+    let content = std::fs::read_to_string(&cache_path).map_err(|e| format!("Read cache: {e}"))?;
+    let mut nodes: Vec<ProxyPoolEntry> = serde_json::from_str(&content).unwrap_or_default();
 
     let original_len = nodes.len();
     nodes.retain(|n| n.url != url);
@@ -340,10 +340,8 @@ pub async fn proxy_pool_remove(url: String) -> Result<bool, String> {
         return Ok(false);
     }
 
-    let json = serde_json::to_string_pretty(&nodes)
-        .map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&cache_path, json)
-        .map_err(|e| format!("Write cache: {e}"))?;
+    let json = serde_json::to_string_pretty(&nodes).map_err(|e| format!("Serialize: {e}"))?;
+    std::fs::write(&cache_path, json).map_err(|e| format!("Write cache: {e}"))?;
 
     Ok(true)
 }
@@ -381,11 +379,22 @@ pub async fn proxy_pool_remove_subscription(url: String) -> Result<Vec<String>, 
 /// 设置选择策略
 #[tauri::command]
 pub async fn proxy_pool_set_strategy(strategy: String) -> Result<String, String> {
-    let valid_strategies = ["fastest", "least_latency", "least_failure",
-        "weighted_random", "geo_preferred", "round_robin", "adaptive", "auto"];
+    let valid_strategies = [
+        "fastest",
+        "least_latency",
+        "least_failure",
+        "weighted_random",
+        "geo_preferred",
+        "round_robin",
+        "adaptive",
+        "auto",
+    ];
 
     if !valid_strategies.contains(&strategy.as_str()) {
-        return Err(format!("Invalid strategy. Valid: {}", valid_strategies.join(", ")));
+        return Err(format!(
+            "Invalid strategy. Valid: {}",
+            valid_strategies.join(", ")
+        ));
     }
 
     save_strategy(&strategy)?;

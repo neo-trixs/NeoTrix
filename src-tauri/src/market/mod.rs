@@ -2,10 +2,10 @@
 //!
 //! 统一多源插件发现、下载和安装。
 
-pub mod schema;
+pub mod commands;
 pub mod dsh_discoverer;
 pub mod github_discoverer;
-pub mod commands;
+pub mod schema;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -57,20 +57,16 @@ pub struct MarketEngine {
 impl MarketEngine {
     /// 创建市场引擎
     pub fn new(config: MarketConfig) -> Self {
-        let dsh = dsh_discoverer::DshMarketDiscoverer::new(
-            dsh_discoverer::DshMarketConfig {
-                api_endpoint: config.dsh_api_endpoint.clone(),
-                auth_token: config.dsh_auth_token.clone(),
-                cache_ttl_secs: 3600,
-            },
-        );
+        let dsh = dsh_discoverer::DshMarketDiscoverer::new(dsh_discoverer::DshMarketConfig {
+            api_endpoint: config.dsh_api_endpoint.clone(),
+            auth_token: config.dsh_auth_token.clone(),
+            cache_ttl_secs: 3600,
+        });
 
-        let github = github_discoverer::GitHubDiscoverer::new(
-            github_discoverer::GitHubConfig {
-                token: config.github_token.clone(),
-                api_base: "https://api.github.com".into(),
-            },
-        );
+        let github = github_discoverer::GitHubDiscoverer::new(github_discoverer::GitHubConfig {
+            token: config.github_token.clone(),
+            api_base: "https://api.github.com".into(),
+        });
 
         Self {
             config,
@@ -160,7 +156,11 @@ impl MarketEngine {
         }
 
         let mut entries: Vec<MarketEntry> = merged.into_values().collect();
-        entries.sort_by(|a, b| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal));
+        entries.sort_by(|a, b| {
+            b.rating
+                .partial_cmp(&a.rating)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         entries
     }
 
@@ -181,8 +181,7 @@ impl MarketEngine {
         version: &str,
     ) -> Result<PathBuf, String> {
         let dest_dir = self.config.cache_dir.join(plugin_id);
-        std::fs::create_dir_all(&dest_dir)
-            .map_err(|e| format!("Create cache dir: {e}"))?;
+        std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Create cache dir: {e}"))?;
 
         match source {
             "dsh-market" => {
@@ -220,7 +219,11 @@ impl MarketEngine {
             match source.source_type {
                 schema::PluginSourceType::DshMarket => {
                     if let Some(repo) = &source.repo {
-                        match self.dsh.check_updates(&[(repo.clone(), manifest.plugin.version.clone())]).await {
+                        match self
+                            .dsh
+                            .check_updates(&[(repo.clone(), manifest.plugin.version.clone())])
+                            .await
+                        {
                             Ok(u) => updates.extend(u),
                             Err(e) => eprintln!("[market] Check updates for {}: {e}", plugin_id),
                         }
@@ -228,7 +231,11 @@ impl MarketEngine {
                 }
                 schema::PluginSourceType::GitHub => {
                     if let Some(repo) = &source.repo {
-                        match self.github.check_updates(&[(repo.clone(), manifest.plugin.version.clone())]).await {
+                        match self
+                            .github
+                            .check_updates(&[(repo.clone(), manifest.plugin.version.clone())])
+                            .await
+                        {
                             Ok(u) => updates.extend(u),
                             Err(e) => eprintln!("[market] Check updates for {}: {e}", plugin_id),
                         }
@@ -251,25 +258,20 @@ impl MarketEngine {
         let dest_dir = self.config.plugin_dir.join(plugin_id);
 
         // 创建目标目录
-        std::fs::create_dir_all(&dest_dir)
-            .map_err(|e| format!("Create plugin dir: {e}"))?;
+        std::fs::create_dir_all(&dest_dir).map_err(|e| format!("Create plugin dir: {e}"))?;
 
         // 复制文件
         if source_path.is_dir() {
             copy_dir_recursive(source_path, &dest_dir)
                 .map_err(|e| format!("Copy plugin files: {e}"))?;
         } else {
-            let dest_file = dest_dir.join(
-                source_path
-                    .file_name()
-                    .unwrap_or_default(),
-            );
-            std::fs::copy(source_path, &dest_file)
-                .map_err(|e| format!("Copy plugin file: {e}"))?;
+            let dest_file = dest_dir.join(source_path.file_name().unwrap_or_default());
+            std::fs::copy(source_path, &dest_file).map_err(|e| format!("Copy plugin file: {e}"))?;
         }
 
         // 写入 plugin.toml
-        let toml_content = manifest.to_toml()
+        let toml_content = manifest
+            .to_toml()
             .map_err(|e| format!("Serialize manifest: {e}"))?;
         std::fs::write(dest_dir.join("plugin.toml"), toml_content)
             .map_err(|e| format!("Write plugin.toml: {e}"))?;
@@ -285,8 +287,7 @@ impl MarketEngine {
         let dest_dir = self.config.plugin_dir.join(plugin_id);
 
         if dest_dir.exists() {
-            std::fs::remove_dir_all(&dest_dir)
-                .map_err(|e| format!("Remove plugin dir: {e}"))?;
+            std::fs::remove_dir_all(&dest_dir).map_err(|e| format!("Remove plugin dir: {e}"))?;
         }
 
         self.installed.remove(plugin_id);

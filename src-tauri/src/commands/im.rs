@@ -153,23 +153,18 @@ fn load_channels() -> Result<Vec<ChannelConfig>, String> {
     if !path.exists() {
         return Ok(default_channels());
     }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Read IM config: {e}"))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Parse IM config: {e}"))
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("Read IM config: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("Parse IM config: {e}"))
 }
 
 /// 保存渠道配置
 fn save_channels(channels: &[ChannelConfig]) -> Result<(), String> {
     let path = config_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
-    let json = serde_json::to_string_pretty(channels)
-        .map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&path, json)
-        .map_err(|e| format!("Write config: {e}"))
+    let json = serde_json::to_string_pretty(channels).map_err(|e| format!("Serialize: {e}"))?;
+    std::fs::write(&path, json).map_err(|e| format!("Write config: {e}"))
 }
 
 /// 加载 DSH 市场配置
@@ -178,37 +173,87 @@ fn load_dsh_market() -> Result<DshMarketConfig, String> {
     if !path.exists() {
         return Ok(DshMarketConfig::default());
     }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Read DSH market config: {e}"))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Parse DSH market config: {e}"))
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("Read DSH market config: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("Parse DSH market config: {e}"))
 }
 
 /// 保存 DSH 市场配置
 fn save_dsh_market(config: &DshMarketConfig) -> Result<(), String> {
     let path = dsh_market_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Create dir: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
-    let json = serde_json::to_string_pretty(config)
-        .map_err(|e| format!("Serialize: {e}"))?;
-    std::fs::write(&path, json)
-        .map_err(|e| format!("Write config: {e}"))
+    let json = serde_json::to_string_pretty(config).map_err(|e| format!("Serialize: {e}"))?;
+    std::fs::write(&path, json).map_err(|e| format!("Write config: {e}"))
 }
 
 /// 默认渠道配置
 fn default_channels() -> Vec<ChannelConfig> {
     vec![
-        ChannelConfig { channel: ChannelType::WeChat, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::Feishu, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::DingTalk, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::WeCom, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::QQ, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::Slack, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::Telegram, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::Discord, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
-        ChannelConfig { channel: ChannelType::WhatsApp, enabled: false, bots: vec![], context_enhancement: false, proactive_delivery: false },
+        ChannelConfig {
+            channel: ChannelType::WeChat,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::Feishu,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::DingTalk,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::WeCom,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::QQ,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::Slack,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::Telegram,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::Discord,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
+        ChannelConfig {
+            channel: ChannelType::WhatsApp,
+            enabled: false,
+            bots: vec![],
+            context_enhancement: false,
+            proactive_delivery: false,
+        },
     ]
 }
 
@@ -223,7 +268,8 @@ pub async fn im_status() -> Result<ImStatus, String> {
     let dsh_market = load_dsh_market()?;
 
     let total_bots: usize = channels.iter().map(|c| c.bots.len()).sum();
-    let connected_bots = channels.iter()
+    let connected_bots = channels
+        .iter()
         .filter(|c| c.enabled)
         .map(|c| c.bots.len())
         .sum();
@@ -245,10 +291,11 @@ pub async fn im_list_channels() -> Result<Vec<ChannelConfig>, String> {
 /// 获取单个渠道配置
 #[tauri::command]
 pub async fn im_get_channel(channel: String) -> Result<ChannelConfig, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let channels = load_channels()?;
-    channels.into_iter()
+    channels
+        .into_iter()
         .find(|c| c.channel == channel_type)
         .ok_or_else(|| format!("Channel not found: {}", channel))
 }
@@ -256,8 +303,8 @@ pub async fn im_get_channel(channel: String) -> Result<ChannelConfig, String> {
 /// 启用/禁用渠道
 #[tauri::command]
 pub async fn im_toggle_channel(channel: String, enabled: bool) -> Result<ChannelConfig, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let mut channels = load_channels()?;
 
     let mut found = false;
@@ -295,11 +342,15 @@ pub async fn im_add_bot(
     workspace: Option<String>,
     model: Option<String>,
 ) -> Result<BotConfig, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let mut channels = load_channels()?;
 
-    let bot_id = format!("bot-{}-{}", channel_type, &uuid::Uuid::new_v4().to_string()[..8]);
+    let bot_id = format!(
+        "bot-{}-{}",
+        channel_type,
+        &uuid::Uuid::new_v4().to_string()[..8]
+    );
 
     let bot = BotConfig {
         id: bot_id,
@@ -335,8 +386,8 @@ pub async fn im_add_bot(
 /// 删除机器人
 #[tauri::command]
 pub async fn im_remove_bot(channel: String, bot_id: String) -> Result<bool, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let mut channels = load_channels()?;
 
     for ch in &mut channels {
@@ -363,8 +414,8 @@ pub async fn im_update_bot(
     workspace: Option<String>,
     model: Option<String>,
 ) -> Result<BotConfig, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let mut channels = load_channels()?;
 
     let mut found = false;
@@ -383,15 +434,23 @@ pub async fn im_update_bot(
         if ch.channel == channel_type {
             for bot in &mut ch.bots {
                 if bot.id == bot_id {
-                    if let Some(ref n) = name { bot.name = n.clone(); }
-                    if let Some(ref w) = workspace { bot.workspace = Some(w.clone()); }
-                    if let Some(ref m) = model { bot.model = Some(m.clone()); }
+                    if let Some(ref n) = name {
+                        bot.name = n.clone();
+                    }
+                    if let Some(ref w) = workspace {
+                        bot.workspace = Some(w.clone());
+                    }
+                    if let Some(ref m) = model {
+                        bot.model = Some(m.clone());
+                    }
                     result = bot.clone();
                     found = true;
                     break;
                 }
             }
-            if found { break; }
+            if found {
+                break;
+            }
         }
     }
 
@@ -405,9 +464,12 @@ pub async fn im_update_bot(
 
 /// 设置上下文增强
 #[tauri::command]
-pub async fn im_set_context_enhancement(channel: String, enabled: bool) -> Result<ChannelConfig, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+pub async fn im_set_context_enhancement(
+    channel: String,
+    enabled: bool,
+) -> Result<ChannelConfig, String> {
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let mut channels = load_channels()?;
 
     let mut found = false;
@@ -438,9 +500,12 @@ pub async fn im_set_context_enhancement(channel: String, enabled: bool) -> Resul
 
 /// 设置主动投递
 #[tauri::command]
-pub async fn im_set_proactive_delivery(channel: String, enabled: bool) -> Result<ChannelConfig, String> {
-    let channel_type = ChannelType::from_name(&channel)
-        .ok_or_else(|| format!("Unknown channel: {}", channel))?;
+pub async fn im_set_proactive_delivery(
+    channel: String,
+    enabled: bool,
+) -> Result<ChannelConfig, String> {
+    let channel_type =
+        ChannelType::from_name(&channel).ok_or_else(|| format!("Unknown channel: {}", channel))?;
     let mut channels = load_channels()?;
 
     let mut found = false;
@@ -496,9 +561,15 @@ pub async fn im_dsh_market_config(
     sync_enabled: Option<bool>,
 ) -> Result<DshMarketConfig, String> {
     let mut config = load_dsh_market()?;
-    if let Some(ep) = api_endpoint { config.api_endpoint = ep; }
-    if let Some(token) = auth_token { config.auth_token = Some(token); }
-    if let Some(sync) = sync_enabled { config.sync_enabled = sync; }
+    if let Some(ep) = api_endpoint {
+        config.api_endpoint = ep;
+    }
+    if let Some(token) = auth_token {
+        config.auth_token = Some(token);
+    }
+    if let Some(sync) = sync_enabled {
+        config.sync_enabled = sync;
+    }
     save_dsh_market(&config)?;
     Ok(config)
 }

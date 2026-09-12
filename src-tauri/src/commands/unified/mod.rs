@@ -2,22 +2,20 @@
 //!
 //! 只暴露极少数高级命令，所有复杂逻辑委托给核心的 UnifiedApi
 
-use serde::{Deserialize, Serialize};
-use tauri::{command, State};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use crate::stub::{
-    UnifiedApi, UnifiedApiImpl, UnifiedRequest, UnifiedResponse,
-    RequestContext, ResponseMode, SessionInfo,
+    RequestContext, ResponseMode, SessionInfo, UnifiedApi, UnifiedApiImpl, UnifiedRequest,
+    UnifiedResponse,
 };
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::{command, State};
+use tokio::sync::RwLock;
 
 // 统一 API 状态
 pub type UnifiedApiState = Arc<RwLock<UnifiedApiImpl>>;
 
 #[command]
-pub async fn unified_init(
-    state: State<'_, UnifiedApiState>,
-) -> Result<(), String> {
+pub async fn unified_init(state: State<'_, UnifiedApiState>) -> Result<(), String> {
     let mut api = state.write().await;
     *api = UnifiedApiImpl::new();
     Ok(())
@@ -39,7 +37,10 @@ pub async fn unified_chat(
             selected_code: c.selected_code,
             open_file: c.open_file,
             git_status: c.git_status,
-            metadata: c.metadata.map(|m| m.into_iter().collect()).unwrap_or_default(),
+            metadata: c
+                .metadata
+                .map(|m| m.into_iter().collect())
+                .unwrap_or_default(),
         }),
         mode: match request.mode.as_deref() {
             Some("code") => ResponseMode::Code,
@@ -54,7 +55,9 @@ pub async fn unified_chat(
         stream: request.stream.unwrap_or(false),
     };
 
-    let response = api.handle(unified_request).await
+    let response = api
+        .handle(unified_request)
+        .await
         .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))?;
 
     Ok(UnifiedChatResponse::from_response(response))
@@ -74,7 +77,10 @@ pub async fn unified_chat_stream(
             selected_code: c.selected_code,
             open_file: c.open_file,
             git_status: c.git_status,
-            metadata: c.metadata.map(|m| m.into_iter().collect()).unwrap_or_default(),
+            metadata: c
+                .metadata
+                .map(|m| m.into_iter().collect())
+                .unwrap_or_default(),
         }),
         mode: match request.mode.as_deref() {
             Some("code") => ResponseMode::Code,
@@ -104,7 +110,9 @@ pub async fn unified_system_state(
     state: State<'_, UnifiedApiState>,
 ) -> Result<UnifiedChatResponse, String> {
     let api = state.read().await;
-    let response = api.get_system_state().await
+    let response = api
+        .get_system_state()
+        .await
         .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))?;
     Ok(UnifiedChatResponse::from_response(response))
 }
@@ -115,7 +123,8 @@ pub async fn unified_create_session(
     project_path: Option<String>,
 ) -> Result<SessionInfo, String> {
     let api = state.read().await;
-    api.create_session(project_path).await
+    api.create_session(project_path)
+        .await
         .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))
 }
 
@@ -124,7 +133,8 @@ pub async fn unified_list_sessions(
     state: State<'_, UnifiedApiState>,
 ) -> Result<Vec<SessionInfo>, String> {
     let api = state.read().await;
-    api.list_sessions().await
+    api.list_sessions()
+        .await
         .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))
 }
 
@@ -134,14 +144,18 @@ pub async fn unified_delete_session(
     session_id: String,
 ) -> Result<(), String> {
     let api = state.read().await;
-    api.delete_session(&session_id).await
+    api.delete_session(&session_id)
+        .await
         .map_err(|e| format!("Unified API error: {} - {}", e.code, e.message))
 }
 
 // ========== CLI stubs ==========
 
 #[command]
-pub async fn unified_exec_cli(command: String, args: Option<Vec<String>>) -> Result<serde_json::Value, String> {
+pub async fn unified_exec_cli(
+    command: String,
+    args: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
     let _ = args;
     Ok(serde_json::json!({
         "success": true,
@@ -223,7 +237,9 @@ pub struct SessionInfoDto {
 
 impl UnifiedChatResponse {
     fn from_response(response: UnifiedResponse) -> Self {
-        let payload = response.payload.map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null));
+        let payload = response
+            .payload
+            .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null));
         Self {
             response_id: response.response_id,
             session_id: response.session_id,
