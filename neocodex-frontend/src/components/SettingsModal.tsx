@@ -16,6 +16,7 @@ import { DataSection } from './settings/DataSection'
 import { TagsSection } from './settings/TagsSection'
 import { AboutSection } from './settings/AboutSection'
 import { CapabilitiesSection } from './settings/CapabilitiesSection'
+import { ModelManagerPanel } from './settings/ModelManagerPanel'
 import { XIcon, ExpandIcon, PaletteIcon, PluginsIcon, DataIcon, TagIcon, InfoIcon, ModelIcon, NetworkIcon, ImIcon, SearchIcon, CapabilitiesIcon } from './settings/settingsIcons'
 
 /* ════════════════════════════════════════════
@@ -639,6 +640,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   onTestConnection={testConnection}
                   testState={testState}
                 />
+                <ModelManagerPanel />
               </Show>
               <Show when={section() === 'network'}>
                 <NetworkSection />
