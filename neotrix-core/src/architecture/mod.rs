@@ -108,17 +108,7 @@ pub trait CognitionLayer {
     fn memory_state(&self) -> MemoryState;
 }
 
-/// L6 Meta-Cognition Layer - 元认知层接口
-pub trait MetaLayer {
-    /// 自我反思
-    fn self_reflect(&self) -> ReflectionResult;
-
-    /// 跨域协调
-    fn coordinate_domains(&self, domains: &[Domain]) -> CoordinationResult;
-
-    /// 进化决策
-    fn evolution_decision(&self, current_state: &SystemState) -> EvolutionDecision;
-}
+// 注: 原 MetaLayer trait 已移除 — 无模块实现，保留在 APPENDIX_SIMULATION_PLATFORM.md 作为架构参考。
 
 // ============================================================================
 // 核心类型定义

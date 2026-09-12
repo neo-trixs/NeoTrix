@@ -1,14 +1,12 @@
 use nt_world_sim::core::{
-    Component, Event, Resource, UniversalWorld, UniversalSystem,
+    Component, Resource, UniversalWorld, UniversalSystem,
     ParallelScheduler, SystemDependency,
 };
-use nt_world_sim::core::world::ComponentTuple;
-use nt_world_sim::mechanics::core_pet::{CorePetState, PetStateEnum, CorePetSystem};
+use nt_world_sim::mechanics::core_pet::{CorePetState, CorePetSystem};
 use nt_world_sim::mechanics::core_hook::{CoreHookEvent, CoreHookManager};
 use nt_world_sim::mechanics::core_theme::CoreThemeManager;
 use nt_world_sim::codegen::parser::GameDefParser;
 use nt_world_sim::codegen::generator::CodeGenerator;
-use std::any::TypeId;
 
 // ---------------------------------------------------------------------------
 // Local component / resource / event types

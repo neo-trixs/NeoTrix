@@ -188,8 +188,8 @@ impl UniversalWorld {
         let mut events = Vec::new();
         let mut remaining = Vec::new();
         for event in self.events.drain(..) {
-            if let Ok(event) = event.downcast::<T>() {
-                events.push(*event);
+            if event.is::<T>() {
+                events.push(*event.downcast::<T>().unwrap());
             } else {
                 remaining.push(event);
             }

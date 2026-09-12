@@ -1,41 +1,10 @@
 //! L6 Meta-Cognition Layer Traits
 //!
 //! 元认知层合约: 元认知协调 (nt_meta) + 自愈修复 (nt_repair) + 跨会话记忆 (nt_nexus)
-//! 吸收来源: PentestCode (持久状态), Git Knowledge Loop (知识版本控制)
+//!
+//! 注: 原 MetaLayer trait 已移除 — 无模块实现，保留在 APPENDIX_SIMULATION_PLATFORM.md 作为架构参考。
 
 use serde::{Deserialize, Serialize};
-
-/// 元认知事件
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MetaEvent {
-    pub event_type: _MetaEventType,
-    pub source: String,
-    pub payload: serde_json::Value,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-}
-
-/// 元认知事件类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum _MetaEventType {
-    SelfReflection,
-    CrossSessionPattern,
-    HealthCheck,
-    _RepairAction,
-    EvolutionStep,
-    _GovernanceViolation,
-}
-
-/// 自愈动作
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _RepairAction {
-    pub action_type: String,
-    pub target: String,
-    pub reason: String,
-    pub expected_outcome: String,
-    pub actual_outcome: Option<String>,
-    pub success: Option<bool>,
-}
 
 /// 跨会话记忆 — PentestCode 持久状态 + Git Knowledge Loop 吸收
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,71 +44,4 @@ pub struct Learning {
     pub insight: String,
     pub source: String,
     pub applicability: Vec<String>,
-}
-
-/// 治理合规状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GovernanceStatus {
-    pub compliant: bool,
-    pub violations: Vec<_GovernanceViolation>,
-    pub last_check: chrono::DateTime<chrono::Utc>,
-}
-
-/// 治理违规
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _GovernanceViolation {
-    pub rule: String,
-    pub severity: String,
-    pub location: String,
-    pub description: String,
-}
-
-/// 元认知层核心合约
-pub trait MetaLayer: Send + Sync {
-    /// 初始化元认知层
-    fn initialize(&mut self) -> Result<(), String>;
-
-    /// 自我反思 — 分析系统状态
-    fn self_reflect(&self) -> Result<_MetaEvent, String>;
-
-    /// 跨会话记忆 — 恢复之前会话状态 (PentestCode 吸收)
-    fn restore_session(&mut self, session_id: &str) -> Result<CrossSessionMemory, String>;
-
-    /// 保存会话 — 持久化当前状态
-    fn save_session(&self, memory: &CrossSessionMemory) -> Result<(), String>;
-
-    /// 跨会话模式挖掘 — 发现跨会话的重复模式
-    fn mine_patterns(
-        &self,
-        sessions: &[CrossSessionMemory],
-    ) -> Result<Vec<serde_json::Value>, String>;
-
-    /// 自愈修复 — 检测问题并执行修复
-    fn detect_and_repair(&mut self) -> Result<Vec<_RepairAction>, String>;
-
-    /// 治理合规检查
-    fn check_governance(&self) -> Result<_GovernanceStatus, String>;
-
-    /// 进化步骤 — SEAL pipeline 元认知层
-    fn evolution_step(&mut self) -> Result<_MetaEvent, String>;
-
-    /// 知识版本控制 — Git Knowledge Loop 吸收
-    fn version_knowledge(
-        &self,
-        knowledge: &serde_json::Value,
-        message: &str,
-    ) -> Result<String, String>;
-
-    /// 获取元认知状态快照
-    fn snapshot(&self) -> _MetaSnapshot;
-}
-
-/// 元认知状态快照
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct _MetaSnapshot {
-    pub active_sessions: usize,
-    pub repair_count: u64,
-    pub governance_compliant: bool,
-    pub evolution_cycle: u64,
-    pub last_update: chrono::DateTime<chrono::Utc>,
 }

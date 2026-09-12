@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
     use nt_world_sim::core::{
-        UniversalWorld, UniversalEntity, Component, Resource, Event,
+        UniversalWorld, Component, Resource, Event,
         ParallelScheduler, SystemDependency, UniversalSystem,
     };
-    use nt_world_sim::adapters::bevy_adapter::{BevyAdapter, ExternalEntity, ExternalPlugin};
+    use nt_world_sim::adapters::bevy_adapter::{BevyAdapter, ExternalEntity};
     use nt_world_sim::adapters::unity_adapter::UnityAdapter;
     use nt_world_sim::codegen::{
-        GameDefinition, EntityDef, SystemDef, ResourceDef, EngineConfig,
+        GameDefinition, EntityDef, SystemDef, EngineConfig,
         CodeGenerator, GameDefParser,
     };
     use std::collections::HashMap;
@@ -78,7 +78,7 @@ mod tests {
         // Query two components — only player matches
         let movers = world.query::<(Position, Velocity)>();
         assert_eq!(movers.len(), 1);
-        let (e, (pos, vel)) = &movers[0];
+        let (_e, (pos, vel)) = &movers[0];
         assert_eq!(*pos, Position { x: 10.0, y: 20.0 });
         assert_eq!(*vel, Velocity { x: 1.0, y: 0.5 });
 

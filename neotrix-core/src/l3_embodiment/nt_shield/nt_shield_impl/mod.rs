@@ -39,9 +39,6 @@ pub mod nt_shield_web_scanner;
 /// AI security testing (ART toolbox integration)
 pub mod nt_shield_ai_security;
 
-/// Local model inference optimization (quantization, KV cache, FlashAttention)
-pub mod nt_shield_local_inference;
-
 /// PentestCode swarm agent system (13 agents)
 pub mod nt_shield_pentest_swarm;
 
@@ -55,8 +52,7 @@ pub use nt_shield_reverse_engineer::GhidraAnalyzer;
 pub use nt_shield_mobile_analyzer::ObjectionAdapter;
 pub use nt_shield_web_scanner::W3afEngine;
 pub use nt_shield_ai_security::ARTToolbox;
-pub use nt_shield_local_inference::{LocalInferenceEngine, QuantizationEngine, KVCacheOptimizer};
-pub use nt_shield_local_inference::{OptimalServerCmd};
+
 
 /// Shield capability orchestrator
 #[derive(Debug)]
@@ -82,9 +78,6 @@ pub struct ShieldCapability {
     /// AI security testing toolkit
     pub ai_security: ARTToolbox,
     
-    /// Local model inference optimization
-    pub local_inference: LocalInferenceEngine,
-    
     /// State management
     pub findings: HashMap<String, Vec<String>>,
     pub attack_graph: HashMap<String, Vec<String>>,
@@ -100,7 +93,6 @@ impl Default for ShieldCapability {
             mobile_analyzer: ObjectionAdapter::new(),
             web_scanner: W3afEngine::new(),
             ai_security: ARTToolbox::new(),
-            local_inference: LocalInferenceEngine::new(),
             findings: HashMap::new(),
             attack_graph: HashMap::new(),
         }
@@ -121,7 +113,6 @@ impl ShieldCapability {
             mobile_analyzer: ObjectionAdapter::new(),
             web_scanner: W3afEngine::new(),
             ai_security: ARTToolbox::new(),
-            local_inference: LocalInferenceEngine::new(),
             findings: HashMap::new(),
             attack_graph: HashMap::new(),
         })

@@ -3,10 +3,10 @@
 //! Single fact source lives in nt_feel submodules; this facade centralises
 //! cross-layer imports so consumers never scatter `use crate::l4_emotion::nt_feel::*`.
 
-pub(crate) use crate::l4_emotion::nt_feel::nt_feel::emotion_engine::{
+pub(crate) use crate::l4_emotion::nt_feel::emotion_engine::{
     _AttentionSignal, _EmotionSnapshot, _FeelConfig, _FeelEngine, _SocialState,
 };
-pub(crate) use crate::l4_emotion::nt_feel::nt_feel::nt_feel_vtuber::{
+pub(crate) use crate::l4_emotion::nt_feel::nt_feel_vtuber::{
     _CharacterPersona, _EmotionReading, _EmotionRegulation, _EmotionResponse, _EmotionSource,
     _EmotionType, _PersonalityTrait, _RegulationStrategy, _ResponseStyle, _SpeakingPattern,
     _VTuberEmotionEngine, _VoiceConfig, _VoiceOutput,
