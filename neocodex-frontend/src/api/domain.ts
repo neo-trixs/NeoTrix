@@ -363,6 +363,14 @@ export interface McpServer { name: string; status: string }
 /**
  * 系统域操作
  */
+export interface SystemInfo {
+  platform: string
+  arch: string
+  hostname: string
+  cpu_count: number
+  memory_total: number
+}
+
 export const system = {
   ptySpawn: (sessionId: string, cols: number, rows: number) =>
     call<void>('system', 'pty_spawn', { session_id: sessionId, cols, rows }),
@@ -372,6 +380,7 @@ export const system = {
     call<void>('system', 'pty_resize', { session_id: sessionId, cols, rows }),
   ptyClose: (sessionId: string) =>
     call<void>('system', 'pty_close', { session_id: sessionId }),
+  systemInfo: () => call<SystemInfo>('system', 'system_info'),
   updateCheck: () => call<UpdateInfo>('system', 'update_check'),
   updateDownload: () => call<void>('system', 'update_download'),
   restartApp: () => call<void>('system', 'restart_app'),

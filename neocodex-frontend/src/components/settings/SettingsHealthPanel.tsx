@@ -7,6 +7,7 @@ import { createSignal, onMount, For, Show } from 'solid-js'
 import { clsx } from 'clsx'
 import { checkAllApis, type HealthCheckResult, type ApiHealthReport } from '../../lib/apiHealthCheck'
 import { InfoIcon, CheckIcon, AlertCircleIcon } from './settingsIcons'
+import { ProviderHealthPanel } from './ProviderHealthPanel'
 
 interface Props {
   onClose?: () => void
@@ -202,6 +203,9 @@ export function SettingsHealthPanel(props: Props) {
           </div>
         )}
       </Show>
+
+      {/* Provider 健康状态 */}
+      <ProviderHealthPanel />
     </div>
   )
 }

@@ -15,6 +15,7 @@ import { TagsSection } from './components/settings/TagsSection'
 import { AboutSection } from './components/settings/AboutSection'
 import { CapabilitiesSection } from './components/settings/CapabilitiesSection'
 import { SettingsHealthPanel } from './components/settings/SettingsHealthPanel'
+import { ProviderHealthPanel } from './components/settings/ProviderHealthPanel'
 
 // 测试 API 模块导入
 import { domain } from './api'
@@ -45,6 +46,7 @@ const components = [
   AboutSection,
   CapabilitiesSection,
   SettingsHealthPanel,
+  ProviderHealthPanel,
   ArtifactPreview,
   SmartCanvas,
 ]

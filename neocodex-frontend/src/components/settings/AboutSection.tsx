@@ -11,6 +11,7 @@ import { clsx } from 'clsx'
 import { InfoIcon, ExpandIcon } from './settingsIcons'
 import { SettingsHealthPanel } from './SettingsHealthPanel'
 import { ComponentInteractionTest } from './ComponentInteractionTest'
+import { SystemInfoPanel } from './SystemInfoPanel'
 
 interface Props {
   /** 应用版本访问器（父组件加载，只读展示） */
@@ -198,6 +199,9 @@ export function AboutSection(props: Props) {
       
       {/* 组件交互测试 */}
       <ComponentInteractionTest />
+
+      {/* 系统信息面板 */}
+      <SystemInfoPanel />
     </div>
   )
 }

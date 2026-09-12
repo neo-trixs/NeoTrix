@@ -8,6 +8,7 @@ import { neocodex, errText } from '../../api'
 import type { McpServerInfo, McpToolInfo } from '../../api/types'
 import { clsx } from 'clsx'
 import { DataIcon } from './settingsIcons'
+import { McpServerPanel } from './McpServerPanel'
 
 interface Props {
   /** 通知回调（由父级注入，非关键） */
@@ -119,6 +120,9 @@ export function McpSection(props: Props) {
             )}
           </For>
         </div>
+
+        {/* MCP 服务器管理面板 */}
+        <McpServerPanel />
 
         {/* 工具一览（可折叠） */}
         <Show when={mcpToolList().length > 0}>
