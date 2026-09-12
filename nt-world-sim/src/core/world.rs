@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use super::entity::{UniversalEntity, EntityId, Archetype, ArchetypeId, Chunk};
 
 /// Component trait
-pub trait Component: Send + Sync + 'static {
+pub trait Component: Send + Sync + Clone + 'static {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -289,7 +289,7 @@ pub trait ComponentTuple {
 }
 
 /// Implement for single component
-impl<T: Component + 'static> ComponentTuple for (T,) {
+impl<T: Component + Clone + 'static> ComponentTuple for (T,) {
     type Item = T;
     
     fn get_components(world: &UniversalWorld, entity: UniversalEntity) -> Option<Self::Item> {
@@ -298,7 +298,7 @@ impl<T: Component + 'static> ComponentTuple for (T,) {
 }
 
 /// Implement for tuple of two components
-impl<T1: Component + 'static, T2: Component + 'static> ComponentTuple for (T1, T2) {
+impl<T1: Component + Clone + 'static, T2: Component + Clone + 'static> ComponentTuple for (T1, T2) {
     type Item = (T1, T2);
     
     fn get_components(world: &UniversalWorld, entity: UniversalEntity) -> Option<Self::Item> {

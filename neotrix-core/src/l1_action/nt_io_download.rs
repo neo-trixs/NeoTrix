@@ -98,11 +98,39 @@ fn ranked_mirrors() -> Vec<(String, f64)> {
 // L2 Protocol — URL 解析 + 协议分发
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// URL 协议类型 — delegates to nt_media::router::UrlScheme
-pub(crate) use crate::l1_action::nt_media::router::UrlScheme;
+/// URL 协议类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UrlScheme {
+    Http,
+    Https,
+    Magnet,
+    Ftp,
+    File,
+    Unknown,
+}
 
-/// 判断是否为 HuggingFace URL — delegates to nt_media::router
-pub(crate) use crate::l1_action::nt_media::router::is_huggingface_url;
+impl UrlScheme {
+    pub fn parse(url: &str) -> Self {
+        if url.starts_with("magnet:") {
+            Self::Magnet
+        } else if url.starts_with("https://") {
+            Self::Https
+        } else if url.starts_with("http://") {
+            Self::Http
+        } else if url.starts_with("ftp://") {
+            Self::Ftp
+        } else if url.starts_with("file://") {
+            Self::File
+        } else {
+            Self::Unknown
+        }
+    }
+}
+
+/// 判断是否为 HuggingFace URL
+fn is_huggingface_url(url: &str) -> bool {
+    url.contains("huggingface.co") || url.contains("hf-mirror.com")
+}
 
 /// 镜像解析 (HuggingFace 自适应)
 async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String {
