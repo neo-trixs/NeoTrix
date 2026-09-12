@@ -2,10 +2,10 @@ use crate::neotrix::nt_io_http_factory::proxy_from_env;
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::super::super::factory::{create_provider, ProviderConfig};
-use super::super::super::free_catalog::{FreeModelCatalog, FreeModelEntry};
-use super::super::super::health::rate_limiter::RateLimiter;
-use super::super::super::health::rate_profiles::get_rate_profile;
+use crate::l1_action::nt_io::nt_io_provider/common::factory::{create_provider, ProviderConfig};
+use crate::l1_action::nt_io::nt_io_provider/catalog::free_catalog::{FreeModelCatalog, FreeModelEntry};
+use crate::l1_action::nt_io::nt_io_provider/health::rate_limiter::RateLimiter;
+use crate::l1_action::nt_io::nt_io_provider/health::rate_profiles::get_rate_profile;
 use super::*;
 
 impl GatewayV2 {

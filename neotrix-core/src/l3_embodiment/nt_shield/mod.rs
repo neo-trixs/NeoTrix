@@ -34,20 +34,9 @@ pub mod nt_shield_traffic;
 // 新增防御模块 (Phase 1)
 // ============================================
 
-pub mod unified_defense;
-pub mod input_gatekeeper;
-pub mod output_sentinel;
-pub mod prompt_guardian;
-pub mod refusal_tamper;
-pub mod guardrail_traversal;
 pub mod slang_norm;
 pub mod dual_evidence;
-pub mod grapple_hooks;
 pub mod proxy_detection;
-pub mod reasoning_protection;
-pub mod anti_distillation;
-pub mod fullbreak;
-pub mod cloud_evade;
 pub mod nt_shield_ztnet;
 
 // ============================================

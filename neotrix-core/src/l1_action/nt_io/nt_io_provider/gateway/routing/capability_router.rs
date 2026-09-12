@@ -5,7 +5,7 @@
 //! and matches against provider catalog metadata via `ProviderCapabilities`.
 
 use crate::core::nt_core_llm::{LlmError, LlmRequest};
-use super::super::super::catalog::provider_catalog::{
+use crate::l1_action::nt_io::nt_io_provider/catalog::provider_catalog::{
     find_by_capabilities, ProviderCapabilities,
 };
 

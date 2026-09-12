@@ -807,6 +807,19 @@ impl GatewayV2 {
         // 需求驱动自愈 (T3): 同 complete_with_selection, 偏薄时按需补充自有 LLM 池。
         self.ensure_pool_sufficient(3, 60).await;
 
+        // Cost budget check (与 complete_with_selection 对齐)
+        if self.cost_budget_per_query > 0.0 {
+            let prompt_tokens = estimate_tokens(&self.prompt_text(request));
+            let cost_estimate = (prompt_tokens as f64 / 1000.0) * 0.002;
+            if cost_estimate > self.cost_budget_per_query {
+                log::warn!(
+                    "[gateway] stream cost estimate ${:.4} exceeds budget ${:.4}",
+                    cost_estimate,
+                    self.cost_budget_per_query
+                );
+            }
+        }
+
         // Phase 1: Normal retry loop (up to 3 providers, best-first)
         let mut used_names: Vec<String> = Vec::new();
 
@@ -870,6 +883,18 @@ impl GatewayV2 {
                 }
                 Err(err) => {
                     let err_msg = err.to_string();
+                    // Quota exhaustion detection
+                    if err.is_quota_exhaustion() {
+                        log::warn!(
+                            "[gateway] stream provider {} quota exhausted, marking",
+                            name
+                        );
+                        self.states_write(|states| {
+                            if let Some(state) = states.get_mut(&name) {
+                                state.circuit_breaker.force_open();
+                            }
+                        });
+                    }
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| {
                             log::warn!("[gateway] states RwLock poisoned: {}", e);

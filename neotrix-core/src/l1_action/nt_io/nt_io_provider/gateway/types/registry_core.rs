@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex, Weak};
 use std::time::{Duration, Instant};
 
-use super::super::circuit_breaker::CircuitBreaker;
-use super::super::provider_catalog::{CommunicationProfile, ProviderCategory};
-use super::super::rate_limiter::RateLimiter;
+use crate::l1_action::nt_io::nt_io_provider/health::circuit_breaker::CircuitBreaker;
+use crate::l1_action::nt_io::nt_io_provider/catalog::provider_catalog::{CommunicationProfile, ProviderCategory};
+use crate::l1_action::nt_io::nt_io_provider/health::rate_limiter::RateLimiter;
 use super::GatewayV2;
 
 // ═══════════════════════════════════════════════════════════════════
