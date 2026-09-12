@@ -10,14 +10,14 @@ pub trait Component: Send + Sync + Clone + 'static {
 }
 
 /// Resource trait (global state)
-pub trait Resource: Send + Sync + 'static {
+pub trait Resource: Any + Send + Sync + 'static {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
 }
 
 /// Event trait
-pub trait Event: Send + Sync + 'static {
+pub trait Event: Any + Send + Sync + 'static {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
