@@ -1,6 +1,6 @@
 //! shanhai 坐标 → geo_index 同步 (R-P42: 强化现有节点，不建平行模块)。
 //!
-//! 把 nt_shanhai_geo 硬编码的现代坐标 (mountains.rs / mappings.rs) 灌入
+//! 把硬编码的现代坐标 (mountains.rs / mappings.rs) 灌入
 //! NT-MEMORY 的 geo_index 表，作为地球知识世界仿真的第一批地理锚点。
 
 use rusqlite::Connection;

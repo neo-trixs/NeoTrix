@@ -7,6 +7,7 @@
 
 pub mod agent_routing;
 pub mod anthropic;
+pub mod capability_router;
 pub mod account_pool;
 pub mod circuit_breaker;
 pub mod compaction;
@@ -26,6 +27,8 @@ pub mod openai;
 pub mod provider_catalog;
 pub mod provider_pool;
 pub mod provider_swap;
+pub mod registry;
+pub use registry::ProviderRegistry;
 pub mod privacy_guard;
 pub mod rate_limiter;
 pub mod rate_profiles;
@@ -101,8 +104,9 @@ pub use account_pool::{
 
 // Re-export ProviderCatalog
 pub use provider_catalog::{
+    find_by_capabilities, find_by_capabilities_in_category,
     keyless_providers, lookup_provider, providers_by_category, providers_with_key,
-    CommunicationProfile, ProviderCategory, ProviderInfo, PROVIDER_CATALOG,
+    CommunicationProfile, ProviderCapabilities, ProviderCategory, ProviderInfo, PROVIDER_CATALOG,
 };
 pub use provider_swap::{
     ProviderHealth, ProviderHealthSummary, ProviderSwapManager, SwapRule, GLOBAL_SWAP_MANAGER,

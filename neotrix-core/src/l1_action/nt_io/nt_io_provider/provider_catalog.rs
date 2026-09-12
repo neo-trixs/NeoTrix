@@ -85,6 +85,77 @@ impl ProviderCategory {
     }
 }
 
+/// Provider 能力画像 — 描述该 provider 默认支持的能力集
+///
+/// 用于路由决策：按能力需求筛选 provider，无需逐个硬编码 if-else。
+/// 采用 `&'static` 字段以兼容 `static PROVIDER_CATALOG`。
+#[derive(Debug, Clone, Copy)]
+pub struct ProviderCapabilities {
+    /// 支持文本生成
+    pub text: bool,
+    /// 支持图像输入 (多模态视觉)
+    pub vision: bool,
+    /// 支持音频输入 (多模态)
+    pub audio: bool,
+    /// 支持函数调用 / 工具调用
+    pub function_calling: bool,
+    /// 支持流式输出 (SSE)
+    pub streaming: bool,
+    /// 最大上下文窗口 (tokens)
+    pub context_window: u32,
+    /// 每千 token 成本 (美元, 0.0 = 免费)
+    pub cost_per_1k_tokens: f64,
+}
+
+impl ProviderCapabilities {
+    pub const fn text_only(max_context: u32) -> Self {
+        Self {
+            text: true,
+            vision: false,
+            audio: false,
+            function_calling: false,
+            streaming: true,
+            context_window: max_context,
+            cost_per_1k_tokens: 0.0,
+        }
+    }
+
+    pub const fn full(max_context: u32, cost: f64) -> Self {
+        Self {
+            text: true,
+            vision: true,
+            audio: false,
+            function_calling: true,
+            streaming: true,
+            context_window: max_context,
+            cost_per_1k_tokens: cost,
+        }
+    }
+
+    pub const fn with_vision(max_context: u32, cost: f64) -> Self {
+        Self {
+            text: true,
+            vision: true,
+            audio: false,
+            function_calling: true,
+            streaming: true,
+            context_window: max_context,
+            cost_per_1k_tokens: cost,
+        }
+    }
+
+    /// 检查 self 是否满足 required 能力集
+    pub const fn satisfies(&self, required: &ProviderCapabilities) -> bool {
+        if required.text && !self.text { return false; }
+        if required.vision && !self.vision { return false; }
+        if required.audio && !self.audio { return false; }
+        if required.function_calling && !self.function_calling { return false; }
+        if required.streaming && !self.streaming { return false; }
+        if required.context_window > self.context_window { return false; }
+        true
+    }
+}
+
 /// Provider 基本信息
 #[derive(Debug, Clone)]
 pub struct ProviderInfo {
@@ -106,6 +177,8 @@ pub struct ProviderInfo {
     pub models: &'static [&'static str],
     /// 通信安全画像：决定该 provider 可组合进哪些安全级别的子网格
     pub security_profile: CommunicationProfile,
+    /// 模型能力画像
+    pub capabilities: ProviderCapabilities,
 }
 
 /// 所有主流 Provider 目录
@@ -121,6 +194,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["llama3.2", "llama3.1", "qwen2.5", "mistral", "codellama", "phi-4", "deepseek-coder"],
         security_profile: CommunicationProfile::Anonymous,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "lm-studio",
@@ -132,6 +206,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["local-model"],
         security_profile: CommunicationProfile::Anonymous,
+        capabilities: ProviderCapabilities::text_only(32_000),
     },
     ProviderInfo {
         name: "llamacpp",
@@ -143,6 +218,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["Agents-A1-4B-kimi-Preview-heretic-IQ4_NL", "qwen3.5-9b-fable", "local-model"],
         security_profile: CommunicationProfile::Anonymous,
+        capabilities: ProviderCapabilities::text_only(32_000),
     },
     ProviderInfo {
         name: "vllm-local",
@@ -154,6 +230,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["local-model"],
         security_profile: CommunicationProfile::Anonymous,
+        capabilities: ProviderCapabilities::text_only(32_000),
     },
     ProviderInfo {
         name: "sglang-local",
@@ -165,6 +242,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["local-model"],
         security_profile: CommunicationProfile::Anonymous,
+        capabilities: ProviderCapabilities::text_only(32_000),
     },
 
     // ── Proxy (客体): 自定义 OpenAI 兼容代理 ──
@@ -178,6 +256,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["gpt-4o-mini", "gpt-4o", "claude-sonnet-4", "custom"],
         security_profile: CommunicationProfile::Proxied,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
 
     // ── Cloud (客体): 主流云端 API ──
@@ -191,6 +270,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o1", "o1-mini", "o3-mini"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.005),
     },
     ProviderInfo {
         name: "anthropic",
@@ -202,6 +282,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["claude-sonnet-4", "claude-haiku-3.5", "claude-3-opus", "claude-3.5-sonnet"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(200_000, 0.003),
     },
     ProviderInfo {
         name: "xai",
@@ -213,6 +294,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["grok-4", "grok-4-fast", "grok-3", "grok-3-mini", "grok-2-vision"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.003),
     },
     ProviderInfo {
         name: "moonshot",
@@ -224,6 +306,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["kimi-k2-0905-preview", "kimi-k2-turbo-preview", "moonshot-v1-128k", "moonshot-v1-32k"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.001),
     },
     ProviderInfo {
         name: "qwen",
@@ -235,6 +318,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["qwen-max", "qwen-plus", "qwen-turbo", "qwen3-coder-plus", "qwen2.5-coder-32b-instruct"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(131_072, 0.002),
     },
     ProviderInfo {
         name: "doubao",
@@ -246,6 +330,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["doubao-seed-1.6", "doubao-1.5-pro", "doubao-pro-32k"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.001),
     },
     ProviderInfo {
         name: "minimax",
@@ -257,6 +342,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["MiniMax-M2", "abab6.5s-chat", "abab6-chat"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.002),
     },
     ProviderInfo {
         name: "perplexity",
@@ -268,6 +354,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["sonar-pro", "sonar-reasoning-pro", "sonar-deep-research"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "gemini",
@@ -279,6 +366,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.0-pro", "gemini-1.5-pro"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(1_048_576, 0.0),
     },
     ProviderInfo {
         name: "groq",
@@ -290,6 +378,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.0),
     },
     ProviderInfo {
         name: "openrouter",
@@ -301,6 +390,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["auto"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
     ProviderInfo {
         name: "cerebras",
@@ -312,6 +402,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["llama-3.3-70b", "llama-3.1-8b"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "sambanova",
@@ -323,6 +414,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["Meta-Llama-3.1-70B-Instruct", "Meta-Llama-3.1-8B-Instruct"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "bazaarlink",
@@ -334,6 +426,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["auto:free", "gpt-4o-mini", "claude-sonnet-4"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
     ProviderInfo {
         name: "freetheai",
@@ -345,6 +438,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["auto", "gpt-4o", "gpt-4o-mini", "claude-3.5-sonnet"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
     ProviderInfo {
         name: "zerolimit",
@@ -356,6 +450,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["auto"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
     ProviderInfo {
         name: "pollinations",
@@ -367,6 +462,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["openai", "mistral", "llama"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "deepseek",
@@ -378,6 +474,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["deepseek-chat", "deepseek-reasoner"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(65_536, 0.001),
     },
     ProviderInfo {
         name: "together",
@@ -389,6 +486,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["meta-llama/Llama-3.3-70B-Instruct-Turbo"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "mistral",
@@ -400,6 +498,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["mistral-large-latest", "mistral-small-latest", "codestral-latest"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.002),
     },
 
     // ── Free Cloud (客体): 免费/免费层云端 API ──
@@ -413,6 +512,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct", "@hf/deepseek-r1-distill-qwen-32b"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "nvidia",
@@ -424,6 +524,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["meta/llama-3.3-70b-instruct", "meta/llama-3.1-405b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "deepseek-ai/deepseek-r1"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "github-models",
@@ -435,6 +536,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "meta-llama-3.3-70b-instruct", "mistral-large-2407", "Phi-4", "cohere-command-r+"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
     ProviderInfo {
         name: "huggingface",
@@ -446,6 +548,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3", "HuggingFaceH4/zephyr-7b-beta"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "cohere",
@@ -457,6 +560,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["command-a", "command-r", "command-r-plus"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.002),
     },
     ProviderInfo {
         name: "together-free",
@@ -468,6 +572,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", "mistralai/Mixtral-8x7B-Instruct-v0.1-Free", "Qwen/Qwen2.5-72B-Instruct-Free"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "llm7",
@@ -479,6 +584,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["codestral-latest", "deepseek-v4-flash:0731", "claude-opus-5", "gpt-oss-20b", "glm-4-flash"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::full(128_000, 0.0),
     },
     ProviderInfo {
         name: "kilo",
@@ -490,6 +596,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["nemotron-70b", "stepfun-32k", "deepseek-v4-flash"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(32_768),
     },
     ProviderInfo {
         name: "siliconflow",
@@ -501,6 +608,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["deepseek-ai/DeepSeek-V3", "Qwen/Qwen3-235B-A22B", "meta-llama/Llama-3.3-70B-Instruct"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "zai",
@@ -512,6 +620,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["glm-4-flash", "glm-4", "glm-4v"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.0),
     },
     ProviderInfo {
         name: "opencode-zen",
@@ -523,6 +632,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["deepseek-v4-flash-free", "deepseek-v4-flash"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "ovh",
@@ -534,6 +644,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["Qwen3.5-397B-A22B", "meta-llama/Llama-3.3-70B-Instruct", "gpt-oss-120b"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "deepseek-free",
@@ -545,6 +656,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["deepseek-chat", "deepseek-reasoner"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(65_536, 0.0),
     },
     ProviderInfo {
         name: "modelscope",
@@ -556,6 +668,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["Qwen/Qwen3-235B-A22B", "iic/LLM"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
     ProviderInfo {
         name: "aihub",
@@ -567,6 +680,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: false,
         models: &["glm-5.2", "Qwen/Qwen3.6-35B-A3B-FP8"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::with_vision(128_000, 0.001),
     },
     ProviderInfo {
         name: "empero",
@@ -578,12 +692,30 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         is_free: true,
         models: &["glm-5.3-flash", "qwen3.8-flash"],
         security_profile: CommunicationProfile::Open,
+        capabilities: ProviderCapabilities::text_only(128_000),
     },
 ];
 
 /// 按名称查找 ProviderInfo
 pub fn lookup_provider(name: &str) -> Option<&'static ProviderInfo> {
     PROVIDER_CATALOG.iter().find(|p| p.name == name)
+}
+
+/// 查找支持特定能力需求的 providers (按能力过滤)
+pub fn find_by_capabilities(required: &ProviderCapabilities) -> Vec<&'static ProviderInfo> {
+    PROVIDER_CATALOG.iter()
+        .filter(|p| p.capabilities.satisfies(required))
+        .collect()
+}
+
+/// 查找支持特定能力需求的 providers，同时按分类过滤
+pub fn find_by_capabilities_in_category(
+    required: &ProviderCapabilities,
+    category: ProviderCategory,
+) -> Vec<&'static ProviderInfo> {
+    PROVIDER_CATALOG.iter()
+        .filter(|p| p.category == category && p.capabilities.satisfies(required))
+        .collect()
 }
 
 /// 按分类列出 providers
@@ -676,5 +808,74 @@ mod tests {
         let kl = keyless_providers();
         assert!(kl.iter().any(|p| p.name == "ollama"));
         assert!(kl.iter().any(|p| p.name == "pollinations"));
+    }
+
+    #[test]
+    fn test_capabilities_satisfies() {
+        let full = ProviderCapabilities::full(128_000, 0.005);
+        let text_only = ProviderCapabilities::text_only(32_000);
+
+        // full satisfies text-only requirement
+        assert!(full.satisfies(&text_only));
+        // text-only does NOT satisfy vision requirement
+        let vision_req = ProviderCapabilities {
+            text: true,
+            vision: true,
+            audio: false,
+            function_calling: false,
+            streaming: false,
+            context_window: 0,
+            cost_per_1k_tokens: 0.0,
+        };
+        assert!(!text_only.satisfies(&vision_req));
+        // full satisfies vision requirement
+        assert!(full.satisfies(&vision_req));
+    }
+
+    #[test]
+    fn test_find_by_capabilities() {
+        // Find providers that support vision
+        let vision_req = ProviderCapabilities {
+            text: true,
+            vision: true,
+            audio: false,
+            function_calling: false,
+            streaming: false,
+            context_window: 0,
+            cost_per_1k_tokens: 0.0,
+        };
+        let vision_providers = find_by_capabilities(&vision_req);
+        assert!(vision_providers.iter().any(|p| p.name == "openai"));
+        assert!(vision_providers.iter().any(|p| p.name == "gemini"));
+        assert!(vision_providers.iter().any(|p| p.name == "anthropic"));
+        // Local providers should NOT support vision
+        assert!(!vision_providers.iter().any(|p| p.name == "ollama"));
+    }
+
+    #[test]
+    fn test_find_by_capabilities_in_category() {
+        let vision_req = ProviderCapabilities {
+            text: true,
+            vision: true,
+            audio: false,
+            function_calling: false,
+            streaming: false,
+            context_window: 0,
+            cost_per_1k_tokens: 0.0,
+        };
+        let local_vision = find_by_capabilities_in_category(&vision_req, ProviderCategory::Local);
+        assert!(local_vision.is_empty());
+        let cloud_vision = find_by_capabilities_in_category(&vision_req, ProviderCategory::Cloud);
+        assert!(!cloud_vision.is_empty());
+    }
+
+    #[test]
+    fn test_all_providers_have_capabilities() {
+        for p in PROVIDER_CATALOG {
+            // Every provider must have text capability
+            assert!(p.capabilities.text, "provider {} missing text capability", p.name);
+            // Every provider must have streaming
+            assert!(p.capabilities.streaming, "provider {} missing streaming capability", p.name);
+        }
     }
 }

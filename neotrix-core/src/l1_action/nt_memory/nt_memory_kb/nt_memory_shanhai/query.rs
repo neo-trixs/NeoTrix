@@ -243,7 +243,7 @@ pub fn export_geojson(conn: &Connection) -> rusqlite::Result<String> {
         "features": features,
         "metadata": {
             "name": "Shanhai Jing Global Mappings",
-            "description": "《山海经》全球地理对应映射 — nt_shanhai_geo::query",
+            "description": "《山海经》全球地理对应映射 — nt_memory_shanhai::query",
             "total_mappings": features.len(),
         },
     });
