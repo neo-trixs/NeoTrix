@@ -49,6 +49,46 @@ impl StardewTheme {
             corner_radius: 6.0,
         }
     }
+
+    pub fn clarity_spring() -> Self {
+        let mut theme = Self::default();
+        theme.panel_bg = Color { r: 0.10, g: 0.15, b: 0.10, a: 0.95 };
+        theme.slot_bg = Color { r: 0.12, g: 0.18, b: 0.10, a: 0.85 };
+        theme.wood_light = Color { r: 0.45, g: 0.55, b: 0.25, a: 1.0 };
+        theme.wood_highlight = Color { r: 0.55, g: 0.65, b: 0.30, a: 1.0 };
+        theme.gold_text = Color { r: 0.85, g: 0.92, b: 0.40, a: 1.0 };
+        theme
+    }
+
+    pub fn flow_summer() -> Self {
+        let mut theme = Self::default();
+        theme.panel_bg = Color { r: 0.15, g: 0.10, b: 0.05, a: 0.95 };
+        theme.slot_bg = Color { r: 0.20, g: 0.12, b: 0.06, a: 0.85 };
+        theme.wood_light = Color { r: 0.65, g: 0.45, b: 0.15, a: 1.0 };
+        theme.wood_highlight = Color { r: 0.75, g: 0.55, b: 0.20, a: 1.0 };
+        theme.gold_text = Color { r: 1.0, g: 0.85, b: 0.30, a: 1.0 };
+        theme
+    }
+
+    pub fn reflection_fall() -> Self {
+        let mut theme = Self::default();
+        theme.panel_bg = Color { r: 0.15, g: 0.08, b: 0.03, a: 0.95 };
+        theme.slot_bg = Color { r: 0.20, g: 0.10, b: 0.04, a: 0.85 };
+        theme.wood_light = Color { r: 0.70, g: 0.40, b: 0.10, a: 1.0 };
+        theme.wood_highlight = Color { r: 0.80, g: 0.50, b: 0.15, a: 1.0 };
+        theme.gold_text = Color { r: 0.95, g: 0.75, b: 0.25, a: 1.0 };
+        theme
+    }
+
+    pub fn stillness_winter() -> Self {
+        let mut theme = Self::default();
+        theme.panel_bg = Color { r: 0.05, g: 0.08, b: 0.15, a: 0.95 };
+        theme.slot_bg = Color { r: 0.08, g: 0.10, b: 0.18, a: 0.85 };
+        theme.wood_light = Color { r: 0.30, g: 0.40, b: 0.60, a: 1.0 };
+        theme.wood_highlight = Color { r: 0.40, g: 0.50, b: 0.70, a: 1.0 };
+        theme.gold_text = Color { r: 0.75, g: 0.85, b: 1.0, a: 1.0 };
+        theme
+    }
 }
 
 pub struct UiRenderer;

@@ -6,6 +6,10 @@ pub mod audio;
 pub mod scene;
 pub mod camera;
 pub mod asset;
+pub mod sprite_batch;
+pub mod particle;
+pub mod input_map;
+pub mod debug_overlay;
 
 pub use renderer::{Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer};
 pub use renderer::{SpriteBatch, TilemapRenderer, ParticleSystem, DebugRenderer, ScreenEffects, GameRenderer};
