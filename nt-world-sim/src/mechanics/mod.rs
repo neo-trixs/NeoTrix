@@ -1,4 +1,4 @@
-use crate::ecs::{Entity, World};
+use crate::ecs::{Entity, World, System};
 use crate::engine::Vec2;
 
 /// 意识实体组件
@@ -208,8 +208,12 @@ impl EconomyComponent {
 /// 意识系统
 pub struct ConsciousnessSystem;
 
-impl ConsciousnessSystem {
-    pub fn update(&self, world: &mut World, _dt: f32) {
+impl System for ConsciousnessSystem {
+    fn name(&self) -> &str {
+        "ConsciousnessSystem"
+    }
+
+    fn update(&mut self, world: &mut World, _dt: f32) {
         // 更新所有实体的意识指标
         let entities = world.query::<ConsciousnessEntity>();
         for entity in entities {
@@ -225,8 +229,12 @@ impl ConsciousnessSystem {
 /// 马斯洛系统
 pub struct MaslowSystem;
 
-impl MaslowSystem {
-    pub fn update(&self, world: &mut World, dt: f32) {
+impl System for MaslowSystem {
+    fn name(&self) -> &str {
+        "MaslowSystem"
+    }
+
+    fn update(&mut self, world: &mut World, dt: f32) {
         let entities = world.query::<MaslowNeeds>();
         for entity in entities {
             if let Some(needs) = world.get_component_mut::<MaslowNeeds>(entity) {
@@ -244,8 +252,12 @@ impl MaslowSystem {
 /// AI 系统
 pub struct AiSystem;
 
-impl AiSystem {
-    pub fn update(&self, world: &mut World, _dt: f32) {
+impl System for AiSystem {
+    fn name(&self) -> &str {
+        "AiSystem"
+    }
+
+    fn update(&mut self, world: &mut World, _dt: f32) {
         let entities = world.query::<AiComponent>();
         for entity in entities {
             if let Some(ai) = world.get_component_mut::<AiComponent>(entity) {

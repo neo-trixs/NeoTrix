@@ -69,6 +69,17 @@ impl WorkflowPluginImpl {
         }
     }
 
+    fn get_runs(&self, workflow_id: Option<&str>) -> Result<serde_json::Value, DomainError> {
+        let runs = self.runs.lock().map_err(|e| DomainError {
+            code: "LOCK_ERROR".into(), message: e.to_string(), recoverable: true
+        })?;
+        let filtered: Vec<&WorkflowRun> = match workflow_id {
+            Some(wid) => runs.values().filter(|r| r.workflow_id == wid).collect(),
+            None => runs.values().collect(),
+        };
+        Ok(serde_json::json!({ "runs": filtered }))
+    }
+
     fn save_workflows(&self) -> Result<(), DomainError> {
         let workflows = self.workflows.lock().map_err(|e| DomainError {
             code: "LOCK_ERROR".into(),
@@ -105,6 +116,7 @@ impl DomainPlugin for WorkflowPluginImpl {
             ActionSpec { name: "run".into(), description: "执行工作流".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "status".into(), description: "查询运行状态".into(), params: vec![], returns: "Value".into() },
             ActionSpec { name: "cancel".into(), description: "取消运行".into(), params: vec![], returns: "Value".into() },
+            ActionSpec { name: "runs".into(), description: "获取工作流执行记录".into(), params: vec![], returns: "Value".into() },
         ]
     }
 
@@ -248,6 +260,10 @@ impl DomainPlugin for WorkflowPluginImpl {
                 } else {
                     Err(DomainError { code: "NOT_FOUND".into(), message: format!("Run {} not found", run_id), recoverable: true })
                 }
+            }
+            "runs" => {
+                let workflow_id = args.get("workflow_id").and_then(|v| v.as_str());
+                self.get_runs(workflow_id)
             }
             _ => Err(DomainError { code: "UNKNOWN_ACTION".into(), message: format!("Unknown action: {}", action), recoverable: true }),
         }

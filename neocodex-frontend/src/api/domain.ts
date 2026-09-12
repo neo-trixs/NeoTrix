@@ -342,6 +342,7 @@ export const workflow = {
   run: (workflowId: string) => call<WorkflowRun>('workflow', 'run', { workflow_id: workflowId }),
   status: (runId: string) => call<WorkflowRun>('workflow', 'status', { run_id: runId }),
   cancel: (runId: string) => call<void>('workflow', 'cancel', { run_id: runId }),
+  runs: (workflowId?: string) => call<WorkflowRun[]>('workflow', 'runs', { workflow_id: workflowId }),
 }
 
 /**
