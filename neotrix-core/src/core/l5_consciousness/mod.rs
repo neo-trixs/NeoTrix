@@ -21,6 +21,6 @@ pub use crate::core::nt_core_gwt::resonance::{
 };
 
 // --- 单文件意识模块 (tree / review / echo_terminal) ---
-pub use crate::core::nt_core_consciousness_review as consciousness_review;
+pub use crate::core::nt_core_consciousness_tree::review as consciousness_review;
 pub use crate::core::nt_core_consciousness_tree as consciousness_tree;
 pub use crate::core::nt_core_echo_terminal as echo_terminal;

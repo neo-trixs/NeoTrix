@@ -890,7 +890,7 @@ impl ConsciousnessTree {
         self.core.last_forecast = report.evolution_forecast.clone();
 
         // ═══ Phase 5: ConsciousnessReview — panoramic topology + connectivity + health chain ═══
-        let mut review = crate::core::nt_core_consciousness_review::ConsciousnessReview::new();
+        let mut review = super::review::ConsciousnessReview::new();
         let scan_report = review.full_review(self);
         self.core.topology_score = scan_report.topology_score;
         self.core.connectivity_score = scan_report.connectivity_score;

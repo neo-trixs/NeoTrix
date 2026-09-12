@@ -94,7 +94,6 @@ pub mod nt_core_heartbeat; // 统一系统健康聚合器
 // L5 意识组件（过渡期保留原路径，供 l5_consciousness 门面转发）
 pub mod nt_core_consciousness;
 pub mod nt_core_consciousness_core;
-pub mod nt_core_consciousness_review;
 pub mod nt_core_consciousness_tree;
 pub mod nt_core_echo_terminal;
 

@@ -1606,7 +1606,7 @@ impl BackgroundLoopHandle {
             crate::l1_action::nt_act::nt_act_sandbox::ActionSandbox::new(),
         ));
         self_tests.register(Box::new(
-            crate::core::nt_core_consciousness_review::ConsciousnessReview::new(),
+            crate::core::nt_core_consciousness_tree::review::ConsciousnessReview::new(),
         ));
         // ── L10 Transcendent evolution harness (T2 注册): 超越层闭环自检 ──
         // evolution_harness::self_test 内部自建实例运行闭环, 可用作架构审计

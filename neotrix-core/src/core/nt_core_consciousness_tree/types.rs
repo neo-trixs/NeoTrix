@@ -743,7 +743,7 @@ pub struct EpiphanicCore {
     pub topology_score: f64,
     pub connectivity_score: f64,
     pub health_chain_score: f64,
-    pub evolution_path: Vec<crate::core::nt_core_consciousness_review::EvolutionStep>,
+    pub evolution_path: Vec<super::review::EvolutionStep>,
     // ── MSCP Triple-Loop Alignment (absorbed Cycle 120) ──
     /// L1 cycle count (fast: per-request predict→act→compare→update)
     pub mscp_l1_cycles: u64,

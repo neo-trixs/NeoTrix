@@ -3093,7 +3093,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(L1SemanticEntropyGate::new()));
         registry.register(Box::new(L1ActionSandbox::new()));
         registry.register(Box::new(
-            crate::core::nt_core_consciousness_review::ConsciousnessReview::new(),
+            crate::core::nt_core_consciousness_tree::review::ConsciousnessReview::new(),
         ));
         // nt_core_fep_iit module not found - removed
         // registry.register(Box::new(

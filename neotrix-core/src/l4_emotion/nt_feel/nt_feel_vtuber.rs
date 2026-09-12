@@ -10,9 +10,14 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
+use super::emotion_engine::_FeelEngine;
+use crate::core::nt_core_self::emotion_state::EmotionLabel;
+
 /// VTuber 情感引擎 — Open-LLM-VTuber 核心
+/// 委托文本情绪检测给 FeelEngine，自身负责角色人格与表达
 pub(crate) struct _VTuberEmotionEngine {
     persona: __CharacterPersona,
+    feel_engine: _FeelEngine,
     emotion_history: Vec<__EmotionReading>,
     #[allow(dead_code)]
     voice_config: __VoiceConfig,
@@ -146,9 +151,10 @@ pub(crate) struct __EmotionResponse {
 
 impl _VTuberEmotionEngine {
     /// 创建新的 VTuber 情感引擎
-    pub fn new(persona: _CharacterPersona) -> Self {
+    pub fn new(persona: _CharacterPersona, feel_engine: _FeelEngine) -> Self {
         Self {
             persona,
+            feel_engine,
             emotion_history: vec![],
             voice_config: _VoiceConfig {
                 tts_provider: "default".into(),
@@ -162,21 +168,30 @@ impl _VTuberEmotionEngine {
         }
     }
 
-    /// 从文本检测情绪
-    pub fn detect_from_text(&self, text: &str) -> _EmotionReading {
-        // 简化版: 基于关键词检测
-        let (emotion, intensity) = if text.contains('!') {
-            (_EmotionType::Excited, 0.8)
-        } else if text.contains('?') {
-            (_EmotionType::Confused, 0.6)
-        } else if text.to_lowercase().contains("happy") || text.to_lowercase().contains("great") {
-            (_EmotionType::Happy, 0.7)
-        } else if text.to_lowercase().contains("sad") || text.to_lowercase().contains("sorry") {
-            (_EmotionType::Sad, 0.6)
-        } else if text.to_lowercase().contains("angry") || text.to_lowercase().contains("mad") {
-            (_EmotionType::Angry, 0.7)
-        } else {
-            (_EmotionType::Neutral, 0.5)
+    /// 从文本检测情绪 — 委托给 FeelEngine，映射 EmotionLabel → _EmotionType
+    pub fn detect_from_text(&mut self, text: &str) -> _EmotionReading {
+        // 委托给 FeelEngine 进行关键词检测与 PAD 维度更新
+        let label = self.feel_engine.detect_from_text(text);
+
+        // 从 FeelEngine 报告中提取强度 (取 arousal 作为情绪强度)
+        let report = self.feel_engine.report();
+        let intensity = report.arousal.clamp(0.0, 1.0);
+
+        // EmotionLabel → _EmotionType 映射
+        let emotion = match label {
+            EmotionLabel::Joy => {
+                if intensity > 0.7 { _EmotionType::Excited } else { _EmotionType::Happy }
+            }
+            EmotionLabel::Sadness => _EmotionType::Sad,
+            EmotionLabel::Anger => _EmotionType::Angry,
+            EmotionLabel::Surprise => _EmotionType::Surprised,
+            EmotionLabel::Fear => _EmotionType::Fearful,
+            EmotionLabel::Disgust => _EmotionType::Disgusted,
+            EmotionLabel::Confused => _EmotionType::Confused,
+            EmotionLabel::Thinking => _EmotionType::Thinking,
+            EmotionLabel::Trust => _EmotionType::Calm,
+            EmotionLabel::Anticipation => _EmotionType::Excited,
+            EmotionLabel::Neutral => _EmotionType::Neutral,
         };
 
         _EmotionReading {
@@ -239,7 +254,7 @@ impl _VTuberEmotionEngine {
     }
 
     /// 生成情绪驱动响应
-    pub fn generate_response(&self, input: &str) -> _EmotionResponse {
+    pub fn generate_response(&mut self, input: &str) -> _EmotionResponse {
         let mut reading = self.detect_from_text(input);
         self.apply_persona(&mut reading);
 

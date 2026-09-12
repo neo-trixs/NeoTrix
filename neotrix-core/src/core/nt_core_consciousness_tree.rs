@@ -7,10 +7,12 @@ mod lifecycle;
 mod ops;
 mod selftest;
 pub mod metacalib;
+pub mod review;
 
 pub use types::*;
 pub use nodes::*;
 pub use contract::*;
+pub use review::*;
 
 use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, SelfTestResult};
 

@@ -1,6 +1,6 @@
 #![deny(clippy::unwrap_used)]
 
-use crate::core::nt_core_consciousness_tree::{
+use super::{
     BranchKind, CapabilityBranch, ConsciousnessTree, VulnerabilityFinding, VulnerabilitySeverity,
 };
 use std::collections::HashMap;
