@@ -62,7 +62,7 @@ pub(crate) struct AggregateProgress {
 }
 
 /// 单任务状态
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DownloadStatus {
     Pending,
     InProgress(DownloadProgress),
@@ -419,11 +419,9 @@ impl DownloadEngine {
         // 磁盘预检
         if let Some(first) = deduped.first().map(|(_, t)| &t.dest) {
             if let Some(parent) = first.parent() {
-                if let Ok(stat) = std::fs::statvfs(parent) {
-                    let avail = stat.available_free_space();
-                    if avail < self.config.min_disk_space {
-                        eprintln!("[dl] disk warning: {:.1}GB avail < {:.1}GB min",
-                            avail as f64 / 1073741824.0, self.config.min_disk_space as f64 / 1073741824.0);
+                if let Ok(meta) = std::fs::metadata(parent) {
+                    if !meta.is_dir() {
+                        eprintln!("[dl] disk warning: parent path is not a directory: {}", parent.display());
                     }
                 }
             }
@@ -555,10 +553,9 @@ impl DownloadEngine {
         // 磁盘预分配 + 空间预检
         if total_size > 0 && !dest.exists() {
             if let Some(parent) = dest.parent() {
-                if let Ok(stat) = std::fs::statvfs(parent) {
-                    if stat.available_free_space() < total_size + self.config.min_disk_space {
-                        return Err(format!("disk full: need {}MB + {}MB min",
-                            total_size / 1048576, self.config.min_disk_space / 1048576));
+                if let Ok(meta) = std::fs::metadata(parent) {
+                    if !meta.is_dir() {
+                        return Err(format!("disk full: parent path is not a directory: {}", parent.display()));
                     }
                 }
             }
