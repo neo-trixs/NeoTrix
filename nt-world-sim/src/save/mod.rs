@@ -198,7 +198,7 @@ impl SaveManager {
     pub fn save_from_world(&self, slot: u32, world: &UniversalWorld, tick_count: u64) -> GameResult<()> {
         let time = world.get_resource::<GameTime>().cloned().unwrap_or_default();
         let energy = world.get_resource::<Energy>().cloned().unwrap_or_default();
-        let inventory = world.get_resource::<Inventory>().cloned().unwrap_or_default();
+        let inventory = world.get_resource::<Inventory>().cloned().unwrap_or_else(|| Inventory::new(20, 12));
 
         let data = SaveData {
             version: 1,

@@ -332,4 +332,39 @@ mod tests {
         assert!(p.contains(&"Awareness"));
         assert!(p.contains(&"Focus"));
     }
+
+    #[test]
+    fn test_reward_items() {
+        assert_eq!(SeasonalEvent::FlowerFestival.reward_item_id(), Some(5001));
+        assert_eq!(SeasonalEvent::StargazingNight.reward_item_id(), Some(5002));
+        assert!(SeasonalEvent::HarvestFestival.reward_item_id().is_some());
+    }
+
+    #[test]
+    fn test_difficulty() {
+        assert_eq!(SeasonalEvent::FishingContest.difficulty(), 1);
+        assert_eq!(SeasonalEvent::MineExplorationEvent.difficulty(), 3);
+        assert_eq!(SeasonalEvent::MeditationRetreat.difficulty(), 3);
+    }
+
+    #[test]
+    fn test_unlock_levels() {
+        assert_eq!(SeasonalEvent::FlowerFestival.unlock_level(), 1);
+        assert_eq!(SeasonalEvent::MeditationRetreat.unlock_level(), 5);
+    }
+
+    #[test]
+    fn test_bonus_conditions() {
+        let bonus = SeasonalEvent::HarvestFestival.bonus_condition();
+        assert!(bonus.contains("Gold quality"));
+        let bonus2 = SeasonalEvent::StargazingNight.bonus_condition();
+        assert!(bonus2.contains("dawn"));
+    }
+
+    #[test]
+    fn test_min_participants() {
+        assert_eq!(SeasonalEvent::StargazingNight.min_participants(), 1);
+        assert_eq!(SeasonalEvent::ConcertInthePark.min_participants(), 4);
+        assert_eq!(SeasonalEvent::MineExplorationEvent.min_participants(), 3);
+    }
 }
