@@ -20,7 +20,6 @@
 use super::detect::{self, MediaKind};
 use super::router::{self, MediaRoute, TransportType, UrlScheme};
 use crate::l1_action::nt_io::nt_io_http_factory;
-use bytes::Bytes;
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;

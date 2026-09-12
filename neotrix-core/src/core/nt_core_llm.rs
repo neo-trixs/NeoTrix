@@ -1359,6 +1359,77 @@ pub fn apply_context_budget(
     result
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Unified Provider Abstraction Layer
+// ═══════════════════════════════════════════════════════════════
+
+/// Provider category — core-layer classification (avoids dependency on IO-layer `LlmProviderType`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CoreProviderCategory {
+    Local,
+    Cloud,
+    Free,
+    Proxy,
+}
+
+/// Provider metadata — static identity information.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProviderMetadata {
+    pub name: String,
+    pub version: String,
+    pub provider_type: CoreProviderCategory,
+    pub endpoint: String,
+    pub data_trust: DataTrust,
+}
+
+/// Model capabilities — what this provider supports.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ModelCapabilities {
+    pub text: bool,
+    pub vision: bool,
+    pub audio: bool,
+    pub function_calling: bool,
+    pub streaming: bool,
+    pub max_tokens: usize,
+    pub context_window: usize,
+    pub supported_params: Vec<String>,
+}
+
+/// Health status — result of a health probe.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded { reason: String },
+    Unavailable { reason: String },
+    Unknown,
+}
+
+/// Cost estimation — predicted cost for a request.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct CostEstimate {
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+    pub estimated_cost_usd: f64,
+    pub model: String,
+}
+
+/// Unified provider trait — extends LlmProvider with metadata, capabilities,
+/// health, and cost estimation.
+#[async_trait::async_trait]
+pub trait UnifiedProvider: LlmProvider {
+    /// Provider metadata — static identity information.
+    fn metadata(&self) -> ProviderMetadata;
+
+    /// Model capabilities — what this provider supports.
+    fn capabilities(&self) -> ModelCapabilities;
+
+    /// Health check — lightweight probe for availability.
+    async fn health(&self) -> HealthStatus;
+
+    /// Cost estimation — predict cost for a given request.
+    fn estimate_cost(&self, request: &LlmRequest) -> CostEstimate;
+}
+
 /// W1.1 (batch3 2026-08-26, 源: arxiv 2608.22752 Compaction Cliff) 验收测试。
 #[cfg(test)]
 mod compaction_cliff_tests {

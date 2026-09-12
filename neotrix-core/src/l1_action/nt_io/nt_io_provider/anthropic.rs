@@ -288,31 +288,97 @@ fn set_proxy(&mut self, proxy_url: &str) {
                         return;
                     }
                     let full = response.text().await.unwrap_or_default();
+
+                    // Accumulator state for streaming tool_use blocks
+                    let mut tool_calls: Vec<super::types::ToolCallInfo> = Vec::new();
+                    let mut current_tool_input = String::new();
+                    let mut in_tool_block = false;
+
                     for line in full.lines() {
                         let line = line.trim();
                         if line.is_empty() { continue; }
                         if let Some(data) = line.strip_prefix("data: ") {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
                                 match v["type"].as_str() {
+                                    Some("content_block_start") => {
+                                        if v["content_block"]["type"].as_str() == Some("tool_use") {
+                                            in_tool_block = true;
+                                            current_tool_input.clear();
+                                            let id = v["content_block"]["id"].as_str().unwrap_or("").to_string();
+                                            let name = v["content_block"]["name"].as_str().unwrap_or("").to_string();
+                                            // Store id and name for later; arguments come via deltas
+                                            // Use a placeholder that will be updated
+                                            tool_calls.push(super::types::ToolCallInfo {
+                                                id,
+                                                call_type: "function".to_string(),
+                                                function: super::types::ToolCallFunction {
+                                                    name,
+                                                    arguments: String::new(),
+                                                },
+                                            });
+                                        }
+                                    }
                                     Some("content_block_delta") => {
-                                        if let Some(text) = v["delta"]["text"].as_str() {
+                                        if in_tool_block && v["delta"]["type"].as_str() == Some("input_json_delta") {
+                                            if let Some(partial) = v["delta"]["partial_json"].as_str() {
+                                                current_tool_input.push_str(partial);
+                                            }
+                                        } else if let Some(text) = v["delta"]["text"].as_str() {
                                             let _ = tx.send(Ok(LlmResponse {
                                                 content: text.to_string(),
                                                 model: model_name.clone(),
                                                 usage: Usage::default(),
                                                 finish_reason: FinishReason::Unknown,
-                                            tool_calls: None,
-                                             reasoning: None,})).await;
+                                                tool_calls: None,
+                                                reasoning: None,
+                                            })).await;
+                                        }
+                                    }
+                                    Some("content_block_stop") => {
+                                        if in_tool_block {
+                                            // Finalize the current tool call with accumulated input
+                                            if let Some(last) = tool_calls.last_mut() {
+                                                last.function.arguments = current_tool_input.clone();
+                                            }
+                                            in_tool_block = false;
+                                            current_tool_input.clear();
+                                        }
+                                    }
+                                    Some("message_delta") => {
+                                        // Final message — emit tool_calls if any
+                                        if !tool_calls.is_empty() {
+                                            let _ = tx.send(Ok(LlmResponse {
+                                                content: String::new(),
+                                                model: model_name.clone(),
+                                                usage: Usage::default(),
+                                                finish_reason: FinishReason::Tool,
+                                                tool_calls: Some(tool_calls.clone()),
+                                                reasoning: None,
+                                            })).await;
+                                            tool_calls.clear();
                                         }
                                     }
                                     Some("message_stop") => {
-                                        let _ = tx.send(Ok(LlmResponse {
-                                            content: String::new(),
+                                        // If there were tool calls not yet emitted (no message_delta), emit now
+                                        if !tool_calls.is_empty() {
+                                            let _ = tx.send(Ok(LlmResponse {
+                                                content: String::new(),
                                                 model: model_name.clone(),
-                                            usage: Usage::default(),
-                                            finish_reason: FinishReason::Stop,
-                                        tool_calls: None,
-                                         reasoning: None,})).await;
+                                                usage: Usage::default(),
+                                                finish_reason: FinishReason::Tool,
+                                                tool_calls: Some(tool_calls.clone()),
+                                                reasoning: None,
+                                            })).await;
+                                        } else {
+                                            let _ = tx.send(Ok(LlmResponse {
+                                                content: String::new(),
+                                                model: model_name.clone(),
+                                                usage: Usage::default(),
+                                                finish_reason: FinishReason::Stop,
+                                                tool_calls: None,
+                                                reasoning: None,
+                                            })).await;
+                                        }
                                     }
                                     _ => {}
                                 }

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, Usage, Role};
+use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, ToolCallFunction, ToolCallInfo, Usage, Role};
 
 pub struct GeminiProvider {
     api_key: String,
@@ -77,9 +77,45 @@ fn set_proxy(&mut self, proxy_url: &str) {
             200 => {
                 let resp: serde_json::Value = serde_json::from_str(&text)
                     .map_err(|e| LlmError::InvalidRequest(e.to_string()))?;
-                let content = resp["candidates"][0]["content"]["parts"][0]["text"]
-                    .as_str().unwrap_or("").to_string();
-                Ok(LlmResponse { content, model: request.model.clone(), usage: Usage::default(), finish_reason: FinishReason::Stop, tool_calls: None , reasoning: None})
+
+                let parts = resp.get("candidates")
+                    .and_then(|c| c.as_array())
+                    .and_then(|c| c.first())
+                    .and_then(|c| c.get("content"))
+                    .and_then(|c| c.get("parts"))
+                    .and_then(|p| p.as_array());
+
+                let mut content = String::new();
+                let mut tool_calls = None;
+
+                if let Some(parts) = parts {
+                    let mut calls = Vec::new();
+                    for part in parts {
+                        if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
+                            if !content.is_empty() { content.push('\n'); }
+                            content.push_str(text);
+                        } else if let Some(fc) = part.get("functionCall") {
+                            let name = fc.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+                            let args = fc.get("args").map(|a| a.to_string()).unwrap_or_else(|| "{}".to_string());
+                            calls.push(ToolCallInfo {
+                                id: format!("call_{}", uuid::Uuid::new_v4()),
+                                call_type: "function".to_string(),
+                                function: ToolCallFunction { name, arguments: args },
+                            });
+                        }
+                    }
+                    if !calls.is_empty() {
+                        tool_calls = Some(calls);
+                    }
+                }
+
+                let finish_reason = if tool_calls.is_some() {
+                    FinishReason::Tool
+                } else {
+                    FinishReason::Stop
+                };
+
+                Ok(LlmResponse { content, model: request.model.clone(), usage: Usage::default(), finish_reason, tool_calls, reasoning: None })
             }
             400 => {
                 let msg = serde_json::from_str::<serde_json::Value>(&text)
@@ -139,14 +175,46 @@ fn set_proxy(&mut self, proxy_url: &str) {
                         if line.is_empty() || line == "[DONE]" { continue; }
                         if let Some(data) = line.strip_prefix("data: ") {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
-                                if let Some(text) = v["candidates"][0]["content"]["parts"][0]["text"].as_str() {
+                                let parts = v.get("candidates")
+                                    .and_then(|c| c.as_array())
+                                    .and_then(|c| c.first())
+                                    .and_then(|c| c.get("content"))
+                                    .and_then(|c| c.get("parts"))
+                                    .and_then(|p| p.as_array());
+
+                                if let Some(parts) = parts {
+                                    let mut content = String::new();
+                                    let mut tool_calls = None;
+
+                                    for part in parts {
+                                        if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
+                                            if !content.is_empty() { content.push('\n'); }
+                                            content.push_str(text);
+                                        } else if let Some(fc) = part.get("functionCall") {
+                                            let name = fc.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+                                            let args = fc.get("args").map(|a| a.to_string()).unwrap_or_else(|| "{}".to_string());
+                                            tool_calls.get_or_insert_with(Vec::new).push(ToolCallInfo {
+                                                id: format!("call_{}", uuid::Uuid::new_v4()),
+                                                call_type: "function".to_string(),
+                                                function: ToolCallFunction { name, arguments: args },
+                                            });
+                                        }
+                                    }
+
+                                    let finish_reason = if tool_calls.is_some() {
+                                        FinishReason::Tool
+                                    } else {
+                                        FinishReason::Unknown
+                                    };
+
                                     let _ = tx.send(Ok(LlmResponse {
-                                        content: text.to_string(),
+                                        content,
                                         model: model_name.clone(),
                                         usage: Usage::default(),
-                                        finish_reason: FinishReason::Unknown,
-                                    tool_calls: None,
-                                     reasoning: None,})).await;
+                                        finish_reason,
+                                        tool_calls,
+                                        reasoning: None,
+                                    })).await;
                                 }
                             }
                         }
