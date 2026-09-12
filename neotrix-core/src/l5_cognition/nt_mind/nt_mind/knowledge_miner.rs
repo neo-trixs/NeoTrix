@@ -478,7 +478,7 @@ pub struct MinedRoundResult {
 }
 
 #[derive(Debug, Clone)]
-pub struct KnowledgeMinerStats {
+pub(crate) struct KnowledgeMinerStats {
     pub total_enqueued: usize,
     pub mined_count: usize,
     pub pending_count: usize,

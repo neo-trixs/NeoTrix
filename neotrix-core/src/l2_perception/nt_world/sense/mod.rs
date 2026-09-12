@@ -40,7 +40,7 @@ pub use loss::{EnergyModel, VicRegLoss, NonContrastiveLoss, levl_jepa_loss};
 pub use sigreg::SIGReg;
 pub use td_jepa::{TDTarget, TDDynamics};
 pub use rgm_jepa::{CGBlock, MultiScaleJEPA, RGMLatent};
-pub use world_model::JepaWorldModel;
+pub use world_model::{JepaWorldModel, WorldModel, ContextEncoder, WifiStatus};
 pub use vit::JepaViTEncoder;
 pub use masking::{MaskingStrategy, MaskInfo};
 pub use action_predictor::{ActionConditionedPredictor, FusionMode};

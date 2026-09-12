@@ -47,7 +47,7 @@ impl CausalInventor {
     }
 
     /// 加载知识引擎数据
-    pub fn load_from_engine(&mut self, entries: &[crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_engine::KnowledgeEntry]) {
+    pub(crate) fn load_from_engine(&mut self, entries: &[crate::l5_cognition::nt_mind::nt_mind::knowledge::knowledge_engine::KnowledgeEntry]) {
         for entry in entries {
             for tag in &entry.tags {
                 self.domain_index.entry(tag.clone()).or_default().push(entry.title.clone());
@@ -114,7 +114,7 @@ impl CausalInventor {
     }
 
     /// 生成发明
-    pub fn invent(&self, focus_domain: Option<&str>) -> Vec<Invention> {
+    pub(crate) fn invent(&self, focus_domain: Option<&str>) -> Vec<Invention> {
         let mut inventions = Vec::new();
 
         for analogy in &self.analogies {
@@ -177,7 +177,7 @@ impl CausalInventor {
     }
 
     /// 获取知识覆盖分析
-    pub fn knowledge_coverage(&self) -> String {
+    pub(crate) fn knowledge_coverage(&self) -> String {
         let mut report = String::new();
         report.push_str("知识覆盖分析:\n");
         let mut count: Vec<(String, usize)> = self.domain_index.iter()
@@ -191,7 +191,7 @@ impl CausalInventor {
     }
 
     /// 生成最优先发明推荐
-    pub fn top_inventions(&self, n: usize) -> Vec<Invention> {
+    pub(crate) fn top_inventions(&self, n: usize) -> Vec<Invention> {
         let all = self.invent(None);
         all.into_iter().take(n).collect()
     }

@@ -58,8 +58,13 @@ pub async fn extract_thumbnail(
                 "video thumbnail requires video-decode feature".into(),
             ));
         }
-    } else {
+    } else if is_image_path(path) {
         extract_image_thumbnail(path).await
+    } else {
+        Err(ThumbError::Unsupported(format!(
+            "unsupported file type: {}",
+            path.display()
+        )))
     }
 }
 
@@ -255,7 +260,7 @@ pub async fn extract_grid(
 ) -> Result<Vec<Thumbnail>, ThumbError> {
     let kind = detect::detect_from_path(path);
 
-    if kind.is_image() || (!kind.is_media()) {
+    if is_image_path(path) || !kind.is_media() {
         let thumb = extract_thumbnail(path, None).await?;
         return Ok(vec![thumb]);
     }
@@ -314,19 +319,31 @@ async fn get_duration_ffprobe(path: &Path) -> Result<f64, ThumbError> {
         .map_err(|_| ThumbError::Parse("invalid duration".into()))
 }
 
-/// Check if a `MediaKind` is an image file (heuristic by extension).
+/// Check if a `MediaKind` is an image file.
+///
+/// Since `detect_from_path` maps image extensions to `Unknown`, we check the
+/// actual extension via `is_image_path` for a reliable result.
 impl detect::MediaKind {
     pub fn is_image(self) -> bool {
         matches!(
             self,
             Self::Unknown
-            // Heuristic: non-audio, non-video, non-document, non-archive, non-model
-            if !self.is_audio()
-                && !self.is_video()
-                && !self.is_document()
-                && !self.is_model()
         )
     }
+}
+
+/// Check if a file path looks like an image by extension.
+fn is_image_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| {
+            matches!(
+                ext.to_lowercase().as_str(),
+                "jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "tiff" | "tif" | "ico"
+                    | "svg" | "avif" | "heic" | "heif"
+            )
+        })
+        .unwrap_or(false)
 }
 
 #[derive(Debug, thiserror::Error)]
