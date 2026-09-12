@@ -6,10 +6,7 @@
 export * as domain from './domain';
 export { call as domainCall, list as domainList, has as domainHas, actionCount as domainActionCount } from './domain';
 
-// ===== 新 API 模块（domain plugin 封装） =====
-export * as sessionApi from './session';
-export * as chatApi from './chat';
-export * as agentApi from './agent';
+
 
 // ===== 旧架构导出（保留向后兼容） =====
 export * from './unified';

@@ -66,20 +66,20 @@ export function listArchived(): Promise<NeoCodexSessionInfo[]> {
 }
 
 export function searchSessions(query: string): Promise<NeoCodexSearchHit[]> {
-  return sessionApi.searchSessions(query) as Promise<NeoCodexSearchHit[]>
+  return domain.session.search(query) as Promise<NeoCodexSearchHit[]>
 }
 
 export function clearSession(sessionId: string): Promise<void> {
-  return sessionApi.deleteSession(sessionId)
+  return domain.session.delete(sessionId)
 }
 
 export function exportSession(sessionId: string, format?: string): Promise<string> {
-  return sessionApi.exportSession(sessionId, format) as Promise<string>
+  return domain.chat.export(sessionId, format) as Promise<string>
 }
 
 /* ── 消息 / 流式（domain plugin） ── */
 export function getSessionMessages(sessionId: string): Promise<NeoCodexMessageItem[]> {
-  return chatApi.getHistory(sessionId) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.history(sessionId) as Promise<NeoCodexMessageItem[]>
 }
 
 export function sendMessageStream(params: {
@@ -90,11 +90,11 @@ export function sendMessageStream(params: {
   temperature?: number
   max_tokens?: number
 }): Promise<string> {
-  return chatApi.sendMessageStream(params.content)
+  return domain.chat.send(params.content)
 }
 
 export function stopStream(): Promise<void> {
-  return chatApi.stopStream()
+  return domain.chat.stop()
 }
 
 /**
@@ -138,28 +138,28 @@ export async function subscribeStream(callbacks: {
 }
 
 export function editMessage(sessionId: string, index: number, content: string): Promise<NeoCodexMessageItem[]> {
-  return chatApi.editMessage(sessionId, index, content) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.editMessage(sessionId, index, content) as Promise<NeoCodexMessageItem[]>
 }
 
 export function deleteMessage(sessionId: string, index: number): Promise<NeoCodexMessageItem[]> {
-  return chatApi.deleteMessage(sessionId, index) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.deleteMessage(sessionId, index) as Promise<NeoCodexMessageItem[]>
 }
 
 export function regenerate(sessionId: string, index: number): Promise<NeoCodexMessageItem[]> {
-  return chatApi.regenerate(sessionId, index) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.regenerate(sessionId, index) as Promise<NeoCodexMessageItem[]>
 }
 
 export function compactSession(sessionId: string, keepMessages?: number): Promise<NeoCodexMessageItem[]> {
-  return chatApi.compactSession(sessionId) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.compact(sessionId) as Promise<NeoCodexMessageItem[]>
 }
 
 /* ── 侧聊（domain plugin） ── */
 export function getSideChat(sessionId: string): Promise<NeoCodexMessageItem[]> {
-  return chatApi.getSideChat(sessionId) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.sideChat.get(sessionId) as Promise<NeoCodexMessageItem[]>
 }
 
 export function sendSideChat(sessionId: string, content: string): Promise<NeoCodexMessageItem[]> {
-  return chatApi.sendSideChat(sessionId, content) as Promise<NeoCodexMessageItem[]>
+  return domain.chat.sideChat.send(sessionId, content) as Promise<NeoCodexMessageItem[]>
 }
 
 /* ── 提供商 / 模式 ── */
