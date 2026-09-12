@@ -153,7 +153,7 @@ mod tests {
         let (tx, ty) = map.world_to_tile(32.0, 48.0);
         assert_eq!((tx, ty), (2, 3));
         let (wx, wy) = map.tile_to_world(2, 3);
-        assert!((wx - 32.0).abs() < 0.01);
+        assert!((wx - 40.0).abs() < 0.01);
         assert!((wy - 56.0).abs() < 0.01);
     }
 

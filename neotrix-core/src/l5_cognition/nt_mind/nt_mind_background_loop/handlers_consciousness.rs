@@ -705,17 +705,15 @@ impl BackgroundLoopHandle {
         );
 
         // ── Phase 3: FEPIITBridge — compute unified consciousness score ──
-        // fep_iit_bridge type is Option<()> (stub); need real FepIitBridge type
-        tracing::warn!("FEP-IIT bridge skipped: type is stub (Option<()>)");
-        // if let Some(ref fep_iit) = self.fep_iit_bridge {
-        //     if let Some(ref monitor) = self.awareness {
-        //         let report = monitor.get_report();
-        //         let fe_val = self.state.free_energy.max(0.0).min(1.0) * 10.0;
-        //         let score = fep_iit.compute_consciousness_score(fe_val, report.phi, report.coherence);
-        //         self.state.record_metric("fep_iit", score);
-        //         let bounded_fe = fep_iit.iit_bounded_free_energy(fe_val, report.phi);
-        //     }
-        // }
+        if let Some(ref fep_iit) = self.fep_iit_bridge {
+            if let Some(ref monitor) = self.awareness {
+                let report = monitor.get_report();
+                let fe_val = self.state.free_energy.max(0.0).min(1.0) * 10.0;
+                let score = fep_iit.compute_consciousness_score(fe_val, report.phi, report.coherence);
+                self.state.record_metric("fep_iit", score);
+                let _bounded_fe = fep_iit.iit_bounded_free_energy(fe_val, report.phi);
+            }
+        }
 
         // ── Phase 3b: EFE 前瞻知识域探索 (R-P79 生产接线) ──
         // Active Inference (arXiv:2401.12917): 用真实 KB 知识域分布做 EFE 动作选择。
@@ -774,57 +772,23 @@ impl BackgroundLoopHandle {
                     }
                 }
             }
-            // fep_iit_bridge is Option<()> (stub); need real FepIitBridge type
-            tracing::warn!("FEP-IIT bridge persistence skipped: type is stub (Option<()>)");
-            // if let Some(ref fep_iit) = self.fep_iit_bridge {
-            //     if let Some(ref kb) = self.kb {
-            //         if let Ok(stats) = kb.stats() {
-            //             let domains = stats.by_domain;
-            //             if !domains.is_empty() {
-            //                 if let Some(idx) =
-            //                     fep_iit.efe_select_domain(&domains, self.config.efe_epistemic_scale)
-            //                 {
-            //                      let (domain, count) = &domains[idx];
-            //                      let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0);
-            //                      let efe_approved = match self.volition.as_mut() {
-            //                          Some(vol) => {
-            //                              vol.clear();
-            //                              let mut action = vec![0u8; 256];
-            //                              for (i, b) in domain.bytes().take(256).enumerate() {
-            //                                  action[i] = b;
-            //                              }
-            //                              vol.set_goal(volition_goal_vector());
-            //                              vol.propose(
-            //                                  crate::core::nt_core_consciousness::ActionCandidate::new(
-            //                                      action, domain,
-            //                                  ).with_confidence(0.7),
-            //                              );
-            //                              matches!(
-            //                                  vol.select_by_goal_alignment(),
-            //                                  Some(ref sel) if sel.description == *domain
-            //                              )
-            //                          }
-            //                          None => true,
-            //                      };
-            //                      let _ = kb.kv_set("consciousness", "volition_stats",
-            //                          &serde_json::json!({
-            //                              "domain": domain,
-            //                              "approved": efe_approved,
-            //                              "timestamp": std::time::SystemTime::now()
-            //                                  .duration_since(std::time::UNIX_EPOCH)
-            //                                  .unwrap_or_default().as_secs(),
-            //                          }).to_string(),
-            //                      );
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
-            // --- orphaned code from commented-out fep_iit block (lines 826-879 removed) ---
-            // if let Ok(Some(stats_json)) = kb.kv_get("consciousness", "efe_stats") { ... }
-            // if let Some(ref mut tree) = self.consciousness_tree { ... }
-            // log::info!("[bg] efe: explore domain ...");
-            // --- end orphaned code ---
+            // ── Phase 3b: EFE domain selection via FepIitBridge ──
+            if let Some(ref fep_iit) = self.fep_iit_bridge {
+                if let Some(ref kb) = self.kb {
+                    if let Ok(stats) = kb.stats() {
+                        let domains: Vec<(String, f64)> = stats.by_domain.iter()
+                            .map(|(name, count)| (name.clone(), *count as f64))
+                            .collect();
+                        if !domains.is_empty() {
+                            let ranked = fep_iit.efe_select_domain(&domains, self.config.efe_epistemic_scale);
+                            if let Some((domain, efe)) = ranked.first() {
+                                self.state.record_metric(&format!("efe_{}", domain), *efe);
+                                tracing::debug!("EFE domain selection: {} (score={:.3})", domain, efe);
+                            }
+                        }
+                    }
+                }
+            }
         } // end if efe_epistemic_scale > 0.0
 
         // ── Phase 4: ConsciousnessMonitor — self-observation cycle ──

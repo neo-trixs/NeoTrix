@@ -963,7 +963,7 @@ pub struct BackgroundLoopHandle {
     proxy_client: Option<crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient>,
     consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
-    fep_iit_bridge: Option<()>,
+    fep_iit_bridge: Option<crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge>,
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案必须经 select_by_goal_alignment 放行。
     volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,

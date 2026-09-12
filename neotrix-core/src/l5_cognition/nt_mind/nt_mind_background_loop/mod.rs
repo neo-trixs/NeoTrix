@@ -107,7 +107,7 @@ pub bbrain: Option<BMonitor>,
     pub session_recovery: Option<SessionRecoveryWrapper>,
     pub consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
     pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
-    pub fep_iit_bridge: Option<()>,
+    pub fep_iit_bridge: Option<crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge>,
     pub cognitive_load: Option<CognitiveLoadMonitor>,
     /// 意图引擎 (F2 接线): EFE 域探索提案经 VolitionEngine 门控后执行。
     pub volition: Option<crate::core::nt_core_consciousness::VolitionEngine>,
@@ -177,7 +177,7 @@ impl BackgroundLoop {
             session_recovery: Some(SessionRecoveryWrapper::new("bg-loop")),
             consciousness_runtime: Some(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()),
             consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
-            fep_iit_bridge: None, // nt_core_fep_iit module not found
+            fep_iit_bridge: Some(crate::l4_emotion::nt_feel::fep_iit_bridge::FepIitBridge::new()),
             cognitive_load: Some(CognitiveLoadMonitor::new()),
             volition: Some(crate::core::nt_core_consciousness::VolitionEngine::new()),
             second_brain: Some(SecondBrain::new()),

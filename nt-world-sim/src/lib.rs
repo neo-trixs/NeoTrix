@@ -4,6 +4,9 @@ pub mod codegen;
 pub mod core;
 pub mod engine;
 pub mod game;
+pub mod ui;
+pub mod world;
+
 
 pub use engine::{
     Color, Vec2, Rect, Transform, Sprite, TileDef, TileMap, Camera, Renderer, CanvasRenderer,

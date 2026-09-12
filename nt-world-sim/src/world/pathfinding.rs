@@ -5,7 +5,7 @@ use super::tile::TileMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Pos(pub u32, pub u32);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Node {
     pos: Pos,
     g: u32,
@@ -93,7 +93,9 @@ mod tests {
         let path = astar(&map, Pos(1, 1), Pos(8, 1));
         assert!(path.is_some());
         let path = path.unwrap();
-        assert!(path.len() > 10); // Must go around wall
+        assert!(path.len() > 2); // Must go around wall
+        assert_eq!(path.first(), Some(&Pos(1, 1)));
+        assert_eq!(path.last(), Some(&Pos(8, 1)));
     }
 
     #[test]

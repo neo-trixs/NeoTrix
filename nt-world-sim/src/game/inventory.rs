@@ -1,4 +1,4 @@
-use super::item::{ItemDef, ItemQuality};
+use super::item::ItemQuality;
 
 #[derive(Debug, Clone)]
 pub struct InventorySlot {

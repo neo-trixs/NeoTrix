@@ -2657,15 +2657,7 @@
   --text-primary: #1f2937;
   --text-secondary: #374151;
   --text-muted: #6b7280;
-  /* Tailwind 语义色 CSS 变量 — dark mode 由 :root[data-theme-mode="dark"] 覆盖 */
-  --tw-bg-primary: #fbfaf7;
-  --tw-bg-secondary: #f5f3ef;
-  --tw-bg-tertiary: #efedea;
-  --tw-text-primary: #1a1a20;
-  --tw-text-secondary: #5a5a62;
-  --tw-text-muted: #909098;
-  --tw-border-primary: #e5e4e0;
-  --tw-border-focus: #f0913a;
+  /* Tailwind 语义色 — dark mode 由 :root[data-theme-mode="dark"] 组件覆盖处理 */
 }
 [data-theme='gold'],
 [data-theme='lilac'],
@@ -2842,29 +2834,12 @@
   --text-muted: #7a7a82;
 }
 
-/* 深色模式下 Tailwind 语义色覆盖 */
-:root[data-theme-mode="dark"] {
-  --tw-bg-primary: #111113;
-  --tw-bg-secondary: #1a1a1e;
-  --tw-bg-tertiary: #222226;
-  --tw-text-primary: #e8e8ec;
-  --tw-text-secondary: #b0b0b8;
-  --tw-text-muted: #7a7a82;
-  --tw-border-primary: rgba(255, 255, 255, 0.1);
-  --tw-border-focus: #e0a030;
-}
-
-/* 深色模式滚动条 */
-:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-}
-:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
+/* 深色模式 Tailwind 语义色覆盖 — @apply 指令在 build 时解析，无法通过 CSS 变量覆盖。
+   深色模式下的 Tailwind 类由 JSX 中的 dark: 前缀 + 此处 CSS 覆盖处理。 */
 
 /* 深色模式 glass 效果调整 */
 :root[data-theme-mode="dark"] .glass-modal {
-  background: rgba(22, 22, 26, 0.85);
+  background-image: linear-gradient(180deg, rgba(30, 30, 34, 0.92) 0%, rgba(22, 22, 26, 0.85) 100%);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
 }
@@ -2877,4 +2852,133 @@
 }
 :root[data-theme-mode="dark"] .theme-toggle:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* ===== 深色模式组件覆盖（覆盖 @apply 中的 Tailwind 语义色） ===== */
+:root[data-theme-mode="dark"] * {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode="dark"] body {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] ::selection {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+:root[data-theme-mode="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 顶部工具栏按钮 */
+:root[data-theme-mode="dark"] .tb-btn {
+  color: #7a7a82;
+}
+:root[data-theme-mode="dark"] .tb-btn:hover {
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.06);
+}
+:root[data-theme-mode="dark"] .tb-btn.on {
+  background: rgba(240, 145, 58, 0.12);
+  color: #e0a030;
+}
+
+/* 按钮 */
+:root[data-theme-mode="dark"] .btn-primary {
+  color: #111113;
+}
+:root[data-theme-mode="dark"] .btn-secondary {
+  background: #222226;
+  color: #e8e8ec;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode="dark"] .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+:root[data-theme-mode="dark"] .btn-ghost {
+  color: #b0b0b8;
+}
+:root[data-theme-mode="dark"] .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e8ec;
+}
+
+/* 输入框 */
+:root[data-theme-mode="dark"] .input {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .input::placeholder {
+  color: #7a7a82;
+}
+
+/* 侧栏项 */
+:root[data-theme-mode="dark"] .sidebar-item {
+  color: #b0b0b8;
+}
+:root[data-theme-mode="dark"] .sidebar-item:hover {
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 消息气泡 */
+:root[data-theme-mode="dark"] .message-user {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .message-assistant {
+  background: #222226;
+  color: #e8e8ec;
+}
+
+/* 面板 */
+:root[data-theme-mode="dark"] .panel-head {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+:root[data-theme-mode="dark"] .panel-title {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .panel-sub {
+  color: #7a7a82;
+}
+:root[data-theme-mode="dark"] .panel-close {
+  color: #7a7a82;
+}
+:root[data-theme-mode="dark"] .panel-close:hover {
+  color: #e8e8ec;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 代码块 */
+:root[data-theme-mode="dark"] .code-block-header {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 设置面板 */
+:root[data-theme-mode="dark"] .ss-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+:root[data-theme-mode="dark"] .ss-card-header {
+  color: #e8e8ec;
+}
+:root[data-theme-mode="dark"] .ss-row-label,
+:root[data-theme-mode="dark"] .ss-row-desc {
+  color: #b0b0b8;
+}
+
+/* glass 效果深色模式 */
+:root[data-theme-mode="dark"] .glass-pop {
+  background-image: linear-gradient(180deg, rgba(30, 30, 34, 0.9) 0%, rgba(26, 26, 30, 0.8) 100%);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+:root[data-theme-mode="dark"] .glass-side {
+  background: var(--color-panel);
+  border-color: rgba(255, 255, 255, 0.06);
 }
