@@ -1,5 +1,5 @@
 use nt_world_sim::core::{
-    Component, Resource, UniversalWorld, UniversalSystem,
+    Component, UniversalWorld, UniversalSystem,
     ParallelScheduler, SystemDependency,
 };
 use nt_world_sim::mechanics::core_pet::{CorePetState, CorePetSystem};
@@ -26,6 +26,7 @@ struct Velocity {
 }
 impl Component for Velocity {}
 
+#[derive(Clone)]
 struct NpcTag;
 impl Component for NpcTag {}
 
