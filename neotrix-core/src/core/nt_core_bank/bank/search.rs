@@ -265,9 +265,10 @@ impl ReasoningBank {
             .iter()
             .filter_map(|&idx| self.memories.get(idx))
             .filter_map(|m| {
-                m.embedding
-                    .as_ref()
-                    .map(|_emb| (0.0_f64, m)) // TODO: compute cosine_similarity
+                m.embedding.as_ref().map(|emb| {
+                    let sim = crate::core::nt_core_math::cosine_similarity_f64(task_embedding, emb);
+                    (sim, m)
+                })
             })
             .filter(|(score, _)| *score > 0.0)
             .map(|(sim, m)| {
