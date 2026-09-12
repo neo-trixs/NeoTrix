@@ -1,4 +1,4 @@
-use crate::ecs::{Entity, World, System};
+use crate::ecs::{World, System};
 use crate::engine::Vec2;
 
 /// 意识实体组件

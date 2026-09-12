@@ -128,7 +128,7 @@ impl System for PhysicsSystem {
 pub struct AISystem;
 
 impl System for AISystem {
-    fn update(&mut self, world: &mut World, dt: f32) {
+    fn update(&mut self, _world: &mut World, _dt: f32) {
         // TODO: 实现AI逻辑
     }
 
