@@ -1,4 +1,4 @@
-use crate::neotrix::nt_io_http_factory::proxy_from_env;
+use crate::l1_action::nt_io::nt_io_http_factory::proxy_from_env;
 use std::sync::Arc;
 use std::time::Instant;
 

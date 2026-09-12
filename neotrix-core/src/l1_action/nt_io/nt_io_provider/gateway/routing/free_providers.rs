@@ -1,5 +1,5 @@
 use crate::l1_action::nt_io::nt_io_provider::common::types::*;
-use crate::neotrix::nt_io_http_factory::global_client;
+use crate::l1_action::nt_io::nt_io_http_factory::global_client;
 
 const GROQ_BASE: &str = "https://api.groq.com/openai/v1";
 const OPENROUTER_BASE: &str = "https://openrouter.ai/api/v1";
