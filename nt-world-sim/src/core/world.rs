@@ -1,6 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
-use super::entity::{UniversalEntity, EntityId, Archetype, ArchetypeId, Chunk};
+use super::entity::{UniversalEntity, EntityId, Archetype, ArchetypeId};
 
 /// Component trait
 pub trait Component: Send + Sync + Clone + 'static {
@@ -10,14 +10,14 @@ pub trait Component: Send + Sync + Clone + 'static {
 }
 
 /// Resource trait (global state)
-pub trait Resource: Any + Send + Sync + 'static {
+pub trait Resource: Send + Sync + 'static {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
 }
 
 /// Event trait
-pub trait Event: Any + Send + Sync + 'static {
+pub trait Event: Send + Sync + 'static {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
@@ -28,8 +28,8 @@ pub struct UniversalWorld {
     entities: Vec<Option<UniversalEntity>>,
     archetypes: HashMap<ArchetypeId, Archetype>,
     components: HashMap<(EntityId, TypeId), Box<dyn Any + Send + Sync>>,
-    resources: HashMap<TypeId, Box<dyn Resource>>,
-    events: Vec<Box<dyn Event>>,
+    resources: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    events: Vec<Box<dyn Any + Send + Sync>>,
     next_entity_id: u64,
     next_archetype_id: u64,
 }
@@ -168,14 +168,14 @@ impl UniversalWorld {
     pub fn get_resource<T: Resource>(&self) -> Option<&T> {
         self.resources
             .get(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.as_ref().downcast_ref::<T>())
+            .and_then(|boxed| boxed.downcast_ref::<T>())
     }
 
     /// Get a mutable resource reference
     pub fn get_resource_mut<T: Resource>(&mut self) -> Option<&mut T> {
         self.resources
             .get_mut(&TypeId::of::<T>())
-            .and_then(|boxed| boxed.as_mut().downcast_mut::<T>())
+            .and_then(|boxed| boxed.downcast_mut::<T>())
     }
 
     /// Send an event
