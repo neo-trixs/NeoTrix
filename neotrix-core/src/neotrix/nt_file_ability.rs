@@ -225,8 +225,8 @@ mod tests {
 
     use crate::core::nt_core_hcube::vsa::{VSAEngine, VsaBackend};
     use crate::core::nt_core_hex::ReasoningHexagram;
-    use crate::core::nt_core_self_test::SelfTest;
-    use crate::core::nt_core_traits::SpecialistType;
+    use crate::neotrix::nt_file_ability::selftest::SelfTest;
+    use crate::neotrix::nt_file_ability::types::SpecialistType;
     use nt_core_capability_tree::ConstellationLevel;
     use office_oxide::{create, DocumentFormat};
 

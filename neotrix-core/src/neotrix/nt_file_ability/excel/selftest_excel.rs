@@ -217,7 +217,7 @@ mod tests {
             "没有订单号的文件夹",
         ];
         for case in cases {
-            let _ = super::crate::neotrix::nt_file_ability::path_metadata::PathMetadata::from_salesperson_order("测试", case);
+            let _ = crate::neotrix::nt_file_ability::path_metadata::PathMetadata::from_salesperson_order("测试", case);
             // 不应 panic
         }
     }
