@@ -328,6 +328,9 @@ impl Default for GameLoop {
     }
 }
 
+impl Component for Npc {}
+impl Component for Position {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
