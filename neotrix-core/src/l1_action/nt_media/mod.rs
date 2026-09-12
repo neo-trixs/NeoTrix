@@ -8,6 +8,7 @@
 
 pub mod auth;
 pub mod detect;
+pub mod persistence;
 pub mod router;
 pub mod streaming;
 

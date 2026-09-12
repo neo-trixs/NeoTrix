@@ -81,7 +81,7 @@ pub struct PipelineConfig {
     pub proxy: Option<String>,
     pub timeout: Duration,
     pub chunk_size: usize,
-    pub auth: Option<AuthConfig>,
+    pub persistence: Option<super::persistence::DownloadStore>,
 }
 
 impl Default for PipelineConfig {
@@ -96,9 +96,10 @@ impl Default for PipelineConfig {
             proxy: None,
             timeout: Duration::from_secs(30),
             chunk_size: 256 * 1024,
-            auth: None,
+            persistence: None,
         }
     }
+}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -137,6 +138,8 @@ impl StreamingPipeline {
             TransportType::HttpRange | TransportType::HttpStream => {
                 let bytes_written = Arc::new(AtomicU64::new(0));
                 let output_clone = output.clone();
+                let auth = config.auth.clone();
+                let url_for_domain = config.url.clone();
 
                 let download_handle = tokio::spawn(async move {
                     stream_http_download(
@@ -149,6 +152,7 @@ impl StreamingPipeline {
                         cancel_rx_flag,
                         progress_tx.clone(),
                         media_kind,
+                        auth.as_ref(),
                     )
                     .await
                 });
@@ -244,6 +248,7 @@ impl StreamingPipeline {
 
                     let fifo_path_clone = fifo_path.clone();
                     let url_clone = url.clone();
+                    let auth = config.auth.clone();
 
                     let player_handle = spawn_fifo_player(
                         &fifo_path,
@@ -261,6 +266,7 @@ impl StreamingPipeline {
                             cancel_rx_flag,
                             progress_tx.clone(),
                             media_kind,
+                            auth.as_ref(),
                         )
                         .await
                     });
@@ -297,6 +303,7 @@ async fn stream_http_download(
     cancel: Arc<AtomicBool>,
     progress_tx: mpsc::Sender<PipelineProgress>,
     media_kind: MediaKind,
+    auth: Option<&AuthConfig>,
 ) -> Result<(), PipelineError> {
     let started = Instant::now();
 
@@ -304,6 +311,13 @@ async fn stream_http_download(
         .get(url)
         .header("Accept-Encoding", "identity")
         .timeout(timeout);
+
+    let req = if let Some(auth_cfg) = auth {
+        let domain = extract_domain(url);
+        auth_cfg.apply(req, &domain).await
+    } else {
+        req
+    };
 
     let start_byte = if output.exists() {
         fs::metadata(output).await.map(|m| m.len()).unwrap_or(0)
@@ -604,10 +618,18 @@ async fn stream_http_to_fifo(
     cancel: Arc<AtomicBool>,
     progress_tx: mpsc::Sender<PipelineProgress>,
     media_kind: MediaKind,
+    auth: Option<&AuthConfig>,
 ) -> Result<(), PipelineError> {
     let started = Instant::now();
 
     let req = client.get(url).header("Accept-Encoding", "identity");
+
+    let req = if let Some(auth_cfg) = auth {
+        let domain = extract_domain(url);
+        auth_cfg.apply(req, &domain).await
+    } else {
+        req
+    };
 
     let mut resp = req
         .send()
@@ -881,6 +903,24 @@ impl PlayerHandle {
     pub fn stop(&self) {
         let _ = self.stop_tx.send(());
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// URL helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+fn extract_domain(url: &str) -> String {
+    url::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            let host = u.host_str()?.to_string();
+            if let Some(port) = u.port() {
+                Some(format!("{}:{}", host, port))
+            } else {
+                Some(host)
+            }
+        })
+        .unwrap_or_default()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -37,6 +37,7 @@ use crate::cli::commands::kb_cmds::KbCmd;
 use crate::cli::commands::wiki_cmds::WikiCmd;
 use crate::cli::commands::chain_cmds::ChainCmd;
 use crate::cli::commands::explore_cmds::ExploreCmd;
+use crate::cli::commands::media_cmds::{MediaDetectCmd, MediaStreamCmd};
 use crate::cli::commands::consolidated_cmds::{
     FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd, MemoryAggCmd,
 };
@@ -144,6 +145,10 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ExploreCmd));
     // LLM 池健康 (NT-REPAIR 自愈可观测性) — /pool-health
     reg.register(Box::new(PoolHealthCmd));
+
+    // Media
+    reg.register(Box::new(MediaStreamCmd));
+    reg.register(Box::new(MediaDetectCmd));
 
     // 快照: 全部命令名 + 别名 (剥离前导 '/'), 供 /completions 动态生成
     {

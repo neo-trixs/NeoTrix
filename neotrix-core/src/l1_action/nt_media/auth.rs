@@ -188,7 +188,7 @@ impl CookieJar {
                 match k.as_str() {
                     "path" => path = Some(v),
                     "expires" => {
-                        expires = parse_cookie.expires(&v);
+                        expires = parse_cookie_expires(&v);
                     }
                     _ if name.is_empty() => {
                         name = k;
@@ -221,7 +221,7 @@ impl CookieJar {
 }
 
 /// Parse an HTTP date string into a unix timestamp.
-fn parse_cookie.expires(date_str: &str) -> Option<u64> {
+fn parse_cookie_expires(date_str: &str) -> Option<u64> {
     // Try RFC 1123 format: "Wed, 21 Oct 2015 07:28:00 GMT"
     if let Ok(t) = chrono::DateTime::parse_from_rfc2822(date_str) {
         return Some(t.timestamp() as u64);

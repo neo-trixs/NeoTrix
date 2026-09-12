@@ -24,3 +24,8 @@ pub mod nt_core_parallel;
 pub mod seal;
 pub mod hybrid_layer;
 pub mod persona_routing;
+
+// 从 L1 nt_act_autonomy 迁移过来的模块
+pub mod awareness_monitor;
+
+pub use awareness_monitor::SelfAwarenessMonitor;

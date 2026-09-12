@@ -114,6 +114,7 @@ pub enum CommandCategory {
     Provider,    // 提供者/模型: provider, model
     Sandbox,     // 沙箱: sandbox
     Connector,   // 连接器: connector
+    Media,       // 媒体流: stream, detect
     Other,       // 其他
 }
 
@@ -135,6 +136,7 @@ impl CommandCategory {
             CommandCategory::Provider => "Providers & Models",
             CommandCategory::Sandbox => "Sandbox & Security",
             CommandCategory::Connector => "Connectors",
+            CommandCategory::Media => "Media Streaming",
             CommandCategory::Other => "Other",
         }
     }
@@ -192,6 +194,8 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Provider,
         "sandbox"
             => CommandCategory::Sandbox,
+        "stream" | "detect" | "media-stream" | "media-detect"
+            => CommandCategory::Media,
         "connector"
             => CommandCategory::Connector,
         "approval" | "review" | "plugin" | "profile" | "session-recovery" | "recover" | "snap" | "vc" | "vcs" | "chain"

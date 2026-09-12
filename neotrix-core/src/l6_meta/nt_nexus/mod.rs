@@ -4,6 +4,11 @@
 
 use std::collections::HashMap;
 
+// 从 L1 nt_act_autonomy 迁移过来的模块
+pub mod cross_session_memory;
+
+pub use cross_session_memory::CrossSessionMemory;
+
 /// 跨会话记忆核心
 pub struct NexusCore {
     /// 会话间连接图
