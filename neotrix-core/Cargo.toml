@@ -251,6 +251,7 @@ simd-vsa = ["dep:holon"]
 self-update = ["dep:self_update"]
 ios-bridge = ["dep:uniffi"]
 audio-decode = ["symphonia"]
+video-decode = []
 onnx = ["dep:ort", "dep:ndarray", "dep:ureq"]
 full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "ios-bridge", "onnx"]
 # Internal features (not for external use)

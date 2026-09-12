@@ -47,7 +47,7 @@
 
 **策略**: Mutex/RwLock 用 `.expect()`；SQL prepare/query 在 scan_* 内部函数中（返回 `Vec<KnowledgeGap>`），最简方案是 `.unwrap_or_default()` 空 vec fallback，避免改签名传播。
 
-### 1.3 `l5_cognition/nt_core/nt_governance/skill_validator/mod.rs` — 12 处
+### 1.3 `l6_meta/coordination/nt_governance/skill_validator/mod.rs` — 12 处
 
 | 行号 | 代码 | 修复方案 |
 |------|------|----------|

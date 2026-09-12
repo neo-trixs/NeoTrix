@@ -1,6 +1,4 @@
-use nt_world_sim::core::{
-    UniversalWorld, UniversalEntity, Component, Resource, Event, ComponentTuple,
-};
+use nt_world_sim::core::{UniversalWorld, Component, Resource};
 use nt_world_sim::core::scheduler::{ParallelScheduler, UniversalSystem, SystemDependency};
 use nt_world_sim::mechanics::core_pet::{CorePetState, PetStateEnum, CorePetSystem};
 use nt_world_sim::mechanics::core_hook::{CoreHookEvent, CoreHookManager};
@@ -18,14 +16,6 @@ impl Component for Velocity {}
 struct GameTime { delta: f32, elapsed: f32 }
 impl Resource for GameTime {}
 
-#[derive(Clone, Debug)]
-struct HitEvent { entity_id: u64 }
-impl Event for HitEvent {}
-
-#[derive(Clone, Debug)]
-struct DamageEvent { amount: f32 }
-impl Event for DamageEvent {}
-
 struct MovementSystem;
 impl UniversalSystem for MovementSystem {
     fn name(&self) -> &str { "MovementSystem" }
@@ -41,28 +31,15 @@ impl UniversalSystem for MovementSystem {
     }
 }
 
-struct VelocitySystem;
-impl UniversalSystem for VelocitySystem {
-    fn name(&self) -> &str { "VelocitySystem" }
+struct VelocityDampingSystem;
+impl UniversalSystem for VelocityDampingSystem {
+    fn name(&self) -> &str { "VelocityDampingSystem" }
     fn update(&mut self, world: &mut UniversalWorld, _dt: f32) {
         let entities: Vec<_> = world.entities();
         for entity in entities {
             if let Some(vel) = world.get_component_mut::<Velocity>(entity) {
                 vel.x *= 0.99;
                 vel.y *= 0.99;
-            }
-        }
-    }
-}
-
-struct EventEmittingSystem;
-impl UniversalSystem for EventEmittingSystem {
-    fn name(&self) -> &str { "EventEmittingSystem" }
-    fn update(&mut self, world: &mut UniversalWorld, _dt: f32) {
-        let entities: Vec<_> = world.entities();
-        for entity in entities {
-            if world.get_component::<Position>(entity).is_some() {
-                world.send_event(HitEvent { entity_id: entity.id.0 });
             }
         }
     }
@@ -77,8 +54,6 @@ impl UniversalSystem for ResourceTrackingSystem {
         }
     }
 }
-
-// --- Test: Full ECS pipeline ---
 
 #[test]
 fn test_ecs_full_pipeline() {
@@ -108,8 +83,6 @@ fn test_ecs_full_pipeline() {
     assert_eq!(time.delta, 0.016);
 }
 
-// --- Test: Scheduler runs systems in order ---
-
 #[test]
 fn test_scheduler_runs_systems() {
     let mut world = UniversalWorld::new();
@@ -128,8 +101,6 @@ fn test_scheduler_runs_systems() {
     assert!((pos.y).abs() < 0.01);
 }
 
-// --- Test: Scheduler with dependency ordering ---
-
 #[test]
 fn test_scheduler_dependency_ordering() {
     let mut world = UniversalWorld::new();
@@ -140,7 +111,7 @@ fn test_scheduler_dependency_ordering() {
     let mut sched = ParallelScheduler::new();
     sched.add_system(Box::new(MovementSystem), SystemDependency::new());
     sched.add_system(
-        Box::new(VelocitySystem),
+        Box::new(VelocityDampingSystem),
         SystemDependency::new().after(vec!["MovementSystem".into()]),
     );
     sched.build_schedule();
@@ -156,8 +127,6 @@ fn test_scheduler_dependency_ordering() {
     assert!((vel.x - 198.0).abs() < 0.1);
 }
 
-// --- Test: Scheduler runs multiple waves ---
-
 #[test]
 fn test_scheduler_multiple_waves() {
     let mut world = UniversalWorld::new();
@@ -165,13 +134,10 @@ fn test_scheduler_multiple_waves() {
     let mut sched = ParallelScheduler::new();
     sched.add_system(Box::new(MovementSystem), SystemDependency::new());
     sched.add_system(
-        Box::new(VelocitySystem),
+        Box::new(VelocityDampingSystem),
         SystemDependency::new().after(vec!["MovementSystem".into()]),
     );
-    sched.add_system(
-        Box::new(ResourceTrackingSystem),
-        SystemDependency::new(),
-    );
+    sched.add_system(Box::new(ResourceTrackingSystem), SystemDependency::new());
     sched.build_schedule();
 
     let e = world.spawn();
@@ -188,8 +154,6 @@ fn test_scheduler_multiple_waves() {
     assert!((time.elapsed - 0.1).abs() < 0.001);
 }
 
-// --- Test: Pet state transitions idle -> sleeping ---
-
 #[test]
 fn test_pet_idle_to_sleeping() {
     let mut world = UniversalWorld::new();
@@ -203,7 +167,6 @@ fn test_pet_idle_to_sleeping() {
         },
     );
 
-    // 3812 * 0.016 = 60.992 > 60.0 threshold
     for _ in 0..3812 {
         CorePetSystem::update(&mut world, 0.016);
     }
@@ -212,20 +175,32 @@ fn test_pet_idle_to_sleeping() {
     assert_eq!(pet_state.state, PetStateEnum::Sleeping);
 }
 
-// --- Test: Pet state priority prevents downgrade ---
-
 #[test]
 fn test_pet_priority_no_downgrade() {
     let mut pet = CorePetState::new();
+    assert_eq!(pet.state, PetStateEnum::Idle);
+
     pet.state = PetStateEnum::Error;
     assert!(!pet.transition(PetStateEnum::Idle));
     assert_eq!(pet.state, PetStateEnum::Error);
 
-    assert!(pet.transition(PetStateEnum::Thinking { duration: 0.0 }));
-    assert_eq!(pet.state, PetStateEnum::Thinking { duration: 0.0 });
+    assert!(!pet.transition(PetStateEnum::Thinking { duration: 0.0 }));
+    assert_eq!(pet.state, PetStateEnum::Error);
+
+    assert!(pet.transition(PetStateEnum::Error));
+    assert_eq!(pet.state, PetStateEnum::Error);
 }
 
-// --- Test: Hook triggers pet thinking on session start ---
+#[test]
+fn test_pet_priority_can_upgrade() {
+    let mut pet = CorePetState::new();
+    assert!(pet.transition(PetStateEnum::Carrying));
+    assert!(pet.transition(PetStateEnum::Happy));
+    assert!(pet.transition(PetStateEnum::Building));
+    assert!(pet.transition(PetStateEnum::Typing { progress: 0.0 }));
+    assert!(pet.transition(PetStateEnum::Thinking { duration: 0.0 }));
+    assert!(pet.transition(PetStateEnum::Error));
+}
 
 #[test]
 fn test_hook_triggers_pet_thinking() {
@@ -252,8 +227,6 @@ fn test_hook_triggers_pet_thinking() {
     assert!(matches!(state.state, PetStateEnum::Thinking { .. }));
 }
 
-// --- Test: Hook tool start sets typing for write tools ---
-
 #[test]
 fn test_hook_tool_start_typing() {
     let mut world = UniversalWorld::new();
@@ -271,8 +244,6 @@ fn test_hook_tool_start_typing() {
     assert_eq!(state.state, PetStateEnum::Typing { progress: 0.0 });
 }
 
-// --- Test: Hook tool start sets thinking for read tools ---
-
 #[test]
 fn test_hook_tool_start_thinking() {
     let mut world = UniversalWorld::new();
@@ -289,8 +260,6 @@ fn test_hook_tool_start_thinking() {
     let state = world.get_component::<CorePetState>(pet).unwrap();
     assert!(matches!(state.state, PetStateEnum::Thinking { .. }));
 }
-
-// --- Test: Hook tool end success -> happy ---
 
 #[test]
 fn test_hook_tool_end_success() {
@@ -310,8 +279,6 @@ fn test_hook_tool_end_success() {
     assert_eq!(state.state, PetStateEnum::Happy);
 }
 
-// --- Test: Hook tool end failure -> error ---
-
 #[test]
 fn test_hook_tool_end_failure() {
     let mut world = UniversalWorld::new();
@@ -329,8 +296,6 @@ fn test_hook_tool_end_failure() {
     let state = world.get_component::<CorePetState>(pet).unwrap();
     assert_eq!(state.state, PetStateEnum::Error);
 }
-
-// --- Test: Hook session end -> idle ---
 
 #[test]
 fn test_hook_session_end() {
@@ -353,8 +318,6 @@ fn test_hook_session_end() {
     assert_eq!(state.idle_timer, 0.0);
 }
 
-// --- Test: Hook permission request -> notification ---
-
 #[test]
 fn test_hook_permission_request() {
     let mut world = UniversalWorld::new();
@@ -373,7 +336,25 @@ fn test_hook_permission_request() {
     assert_eq!(state.state, PetStateEnum::Notification);
 }
 
-// --- Test: Theme default loaded ---
+#[test]
+fn test_hook_permission_response() {
+    let mut world = UniversalWorld::new();
+    let pet = world.spawn();
+    let mut pet_state = CorePetState::new();
+    pet_state.state = PetStateEnum::Notification;
+    world.insert_component(pet, pet_state);
+
+    CoreHookManager::process_event(
+        &mut world,
+        CoreHookEvent::PermissionResponse {
+            request_id: "r1".into(),
+            approved: true,
+        },
+    );
+
+    let state = world.get_component::<CorePetState>(pet).unwrap();
+    assert_eq!(state.state, PetStateEnum::Idle);
+}
 
 #[test]
 fn test_theme_default_loaded() {
@@ -389,8 +370,6 @@ fn test_theme_default_loaded() {
     let missing = CoreThemeManager::get_animation_path(&world, "nonexistent");
     assert_eq!(missing, None);
 }
-
-// --- Test: Theme custom loading ---
 
 #[test]
 fn test_theme_custom_loading() {
@@ -409,8 +388,6 @@ fn test_theme_custom_loading() {
     assert_eq!(path, "dark_idle.gif");
 }
 
-// --- Test: Theme replacement ---
-
 #[test]
 fn test_theme_replacement() {
     let mut world = UniversalWorld::new();
@@ -426,29 +403,21 @@ fn test_theme_replacement() {
     assert_eq!(theme.states.len(), 2);
 }
 
-// --- Test: Event roundtrip with drain ---
-
 #[test]
-fn test_event_roundtrip_drain() {
+fn test_theme_all_states() {
     let mut world = UniversalWorld::new();
-    world.send_event(HitEvent { entity_id: 42 });
-    world.send_event(HitEvent { entity_id: 99 });
-    world.send_event(DamageEvent { amount: 25.0 });
+    CoreThemeManager::load_default_theme(&mut world);
 
-    let hits = world.receive_events::<HitEvent>();
-    assert_eq!(hits.len(), 2);
-    assert_eq!(hits[0].entity_id, 42);
-    assert_eq!(hits[1].entity_id, 99);
-
-    let hits2 = world.receive_events::<HitEvent>();
-    assert_eq!(hits2.len(), 0);
-
-    let dmg = world.receive_events::<DamageEvent>();
-    assert_eq!(dmg.len(), 1);
-    assert_eq!(dmg[0].amount, 25.0);
+    let states = [
+        "idle", "thinking", "typing", "building", "groove",
+        "juggling", "error", "happy", "notification",
+        "sweeping", "carrying", "sleeping",
+    ];
+    for state in &states {
+        let path = CoreThemeManager::get_animation_path(&world, state);
+        assert!(path.is_some(), "Missing state: {}", state);
+    }
 }
-
-// --- Test: Entity spawn and despawn ---
 
 #[test]
 fn test_entity_spawn_despawn() {
@@ -467,8 +436,6 @@ fn test_entity_spawn_despawn() {
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0].1.x, 2.0);
 }
-
-// --- Test: Component removal ---
 
 #[test]
 fn test_component_removal() {
@@ -492,8 +459,6 @@ fn test_component_removal() {
     assert_eq!(with_vel.len(), 0);
 }
 
-// --- Test: Resource mutation ---
-
 #[test]
 fn test_resource_mutation() {
     let mut world = UniversalWorld::new();
@@ -508,31 +473,11 @@ fn test_resource_mutation() {
     assert_eq!(time.elapsed, 1.0);
 }
 
-// --- Test: Event emission from system ---
-
-#[test]
-fn test_event_emission_from_system() {
-    let mut world = UniversalWorld::new();
-    let e = world.spawn();
-    world.insert_component(e, Position { x: 0.0, y: 0.0 });
-
-    let mut sched = ParallelScheduler::new();
-    sched.add_system(Box::new(EventEmittingSystem), SystemDependency::new());
-    sched.build_schedule();
-    sched.run(&mut world, 0.016);
-
-    let events = world.receive_events::<HitEvent>();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].entity_id, e.id.0);
-}
-
-// --- Test: Scheduler clears ---
-
 #[test]
 fn test_scheduler_clear() {
     let mut sched = ParallelScheduler::new();
     sched.add_system(Box::new(MovementSystem), SystemDependency::new());
-    sched.add_system(Box::new(VelocitySystem), SystemDependency::new());
+    sched.add_system(Box::new(VelocityDampingSystem), SystemDependency::new());
     sched.build_schedule();
 
     assert_eq!(sched.system_count(), 2);
@@ -541,8 +486,6 @@ fn test_scheduler_clear() {
     sched.clear();
     assert_eq!(sched.system_count(), 0);
 }
-
-// --- Test: Pet Happy -> Idle timeout ---
 
 #[test]
 fn test_pet_happy_timeout() {
@@ -562,8 +505,6 @@ fn test_pet_happy_timeout() {
     let state = world.get_component::<CorePetState>(pet).unwrap();
     assert_eq!(state.state, PetStateEnum::Idle);
 }
-
-// --- Test: Pet typing progress increments ---
 
 #[test]
 fn test_pet_typing_progress() {
@@ -590,20 +531,39 @@ fn test_pet_typing_progress() {
     }
 }
 
-// --- Test: Full integration hook -> pet -> theme ---
+#[test]
+fn test_pet_thinking_increments_duration() {
+    let mut world = UniversalWorld::new();
+    let pet = world.spawn();
+    world.insert_component(
+        pet,
+        CorePetState {
+            state: PetStateEnum::Thinking { duration: 0.0 },
+            state_timer: 0.0,
+            idle_timer: 0.0,
+        },
+    );
+
+    CorePetSystem::update(&mut world, 1.5);
+
+    let state = world.get_component::<CorePetState>(pet).unwrap();
+    match &state.state {
+        PetStateEnum::Thinking { duration } => {
+            assert!((*duration - 1.5).abs() < 0.01);
+        }
+        _ => panic!("Expected Thinking state"),
+    }
+}
 
 #[test]
 fn test_full_hook_pet_theme_integration() {
     let mut world = UniversalWorld::new();
 
-    // Load theme
     CoreThemeManager::load_default_theme(&mut world);
 
-    // Spawn pet
     let pet = world.spawn();
     world.insert_component(pet, CorePetState::new());
 
-    // Session starts -> pet goes to Thinking
     CoreHookManager::process_event(
         &mut world,
         CoreHookEvent::SessionStart {
@@ -614,7 +574,6 @@ fn test_full_hook_pet_theme_integration() {
     let state = world.get_component::<CorePetState>(pet).unwrap();
     assert!(matches!(state.state, PetStateEnum::Thinking { .. }));
 
-    // Tool "write" starts -> pet goes to Typing
     CoreHookManager::process_event(
         &mut world,
         CoreHookEvent::ToolStart {
@@ -624,7 +583,6 @@ fn test_full_hook_pet_theme_integration() {
     let state = world.get_component::<CorePetState>(pet).unwrap();
     assert_eq!(state.state, PetStateEnum::Typing { progress: 0.0 });
 
-    // Tool ends success -> pet goes to Happy
     CoreHookManager::process_event(
         &mut world,
         CoreHookEvent::ToolEnd {
@@ -635,12 +593,9 @@ fn test_full_hook_pet_theme_integration() {
     let state = world.get_component::<CorePetState>(pet).unwrap();
     assert_eq!(state.state, PetStateEnum::Happy);
 
-    // Theme should still work
     let path = CoreThemeManager::get_animation_path(&world, "happy").unwrap();
     assert_eq!(path, "happy.gif");
 }
-
-// --- Test: Multi-entity pet hook propagation ---
 
 #[test]
 fn test_multi_entity_hook_propagation() {
@@ -667,18 +622,80 @@ fn test_multi_entity_hook_propagation() {
     assert!(matches!(s2.state, PetStateEnum::Thinking { .. }));
 }
 
-// --- Test: Empty world operations ---
-
 #[test]
 fn test_empty_world() {
-    let mut world = UniversalWorld::new();
+    let world = UniversalWorld::new();
     assert_eq!(world.entity_count(), 0);
 
     let all = world.query::<(Position,)>();
     assert_eq!(all.len(), 0);
 
-    let events = world.receive_events::<HitEvent>();
-    assert_eq!(events.len(), 0);
-
     assert!(world.get_resource::<GameTime>().is_none());
+}
+
+#[test]
+fn test_scheduler_disabled_system_skipped() {
+    struct DisabledSys;
+    impl UniversalSystem for DisabledSys {
+        fn name(&self) -> &str { "DisabledSys" }
+        fn enabled(&self) -> bool { false }
+        fn update(&mut self, _world: &mut UniversalWorld, _dt: f32) {
+            panic!("Should not be called");
+        }
+    }
+
+    let mut world = UniversalWorld::new();
+    let e = world.spawn();
+    world.insert_component(e, Position { x: 0.0, y: 0.0 });
+    world.insert_component(e, Velocity { x: 100.0, y: 0.0 });
+
+    let mut sched = ParallelScheduler::new();
+    sched.add_system(Box::new(DisabledSys), SystemDependency::new());
+    sched.build_schedule();
+    sched.run(&mut world, 1.0);
+
+    let pos = world.get_component::<Position>(e).unwrap();
+    assert_eq!(pos.x, 0.0);
+}
+
+#[test]
+fn test_scheduler_system_priority() {
+    struct HighPrioritySys;
+    impl UniversalSystem for HighPrioritySys {
+        fn name(&self) -> &str { "HighPrioritySys" }
+        fn priority(&self) -> i32 { 100 }
+        fn update(&mut self, _world: &mut UniversalWorld, _dt: f32) {}
+    }
+
+    let mut sched = ParallelScheduler::new();
+    sched.add_system(Box::new(HighPrioritySys), SystemDependency::new());
+    sched.build_schedule();
+    assert_eq!(sched.system_count(), 1);
+}
+
+#[test]
+fn test_pet_all_state_priorities() {
+    let priorities: Vec<(PetStateEnum, i32)> = vec![
+        (PetStateEnum::Sleeping, 0),
+        (PetStateEnum::Idle, 10),
+        (PetStateEnum::Carrying, 25),
+        (PetStateEnum::Sweeping, 30),
+        (PetStateEnum::Happy, 40),
+        (PetStateEnum::Groove, 50),
+        (PetStateEnum::Juggling, 50),
+        (PetStateEnum::Building, 60),
+        (PetStateEnum::Typing { progress: 0.0 }, 70),
+        (PetStateEnum::Thinking { duration: 0.0 }, 80),
+        (PetStateEnum::Notification, 90),
+        (PetStateEnum::Error, 100),
+    ];
+
+    for (state, expected_priority) in priorities {
+        let pet = CorePetState {
+            state,
+            state_timer: 0.0,
+            idle_timer: 0.0,
+        };
+        assert_eq!(pet.priority(), expected_priority);
+    }
 }

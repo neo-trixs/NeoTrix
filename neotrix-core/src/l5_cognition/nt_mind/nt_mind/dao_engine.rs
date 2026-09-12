@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 
 /// 道的层级 — 从最抽象到最具体
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DaoLevel {
+pub(crate) enum DaoLevel {
     /// 道: 本源规则 (最底层抽象)
     Dao,
     /// 一: 统一场 (信息/能量/物质三位一体)
@@ -26,7 +26,7 @@ pub enum DaoLevel {
 
 /// 本源规则 — 道的具体表达
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DaoRule {
+pub(crate) struct DaoRule {
     pub id: String,
     pub name: String,
     pub layer: DaoLevel,
@@ -37,7 +37,7 @@ pub struct DaoRule {
 }
 
 /// 道引擎 — 从规则逆推到具体现象 / 从现象追溯到规则
-pub struct DaoEngine {
+pub(crate) struct DaoEngine {
     pub rules: Vec<DaoRule>,
     pub domain_to_rules: HashMap<String, Vec<String>>, // 领域→对应规则
     pub phenomena_to_rules: HashMap<String, Vec<String>>, // 现象→对应规则
@@ -51,7 +51,7 @@ impl Default for DaoEngine {
 
 impl DaoEngine {
     /// 简单线性回归: y = ax + b → 返回表达式字符串
-    pub fn fit_linear(&self, x: &[f64], y: &[f64]) -> Result<String, String> {
+    pub(crate) fn fit_linear(&self, x: &[f64], y: &[f64]) -> Result<String, String> {
         if x.len() != y.len() || x.len() < 2 {
             return Err("insufficient data points for linear regression".to_string());
         }
@@ -69,7 +69,7 @@ impl DaoEngine {
         Ok(format!("y = {:.4}x + {:.4}", a, b))
     }
 
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             rules: Self::init_rules(),
             domain_to_rules: Self::init_domain_mappings(),
@@ -195,7 +195,7 @@ impl DaoEngine {
     }
 
     /// 从具体现象逆推到本源规则
-    pub fn trace_to_dao(&self, phenomenon: &str) -> Vec<String> {
+    pub(crate) fn trace_to_dao(&self, phenomenon: &str) -> Vec<String> {
         let mut chain = Vec::new();
         chain.push(format!("🌍 现象: {}", phenomenon));
         
@@ -217,7 +217,7 @@ impl DaoEngine {
     }
 
     /// 从道向下生成到具体现象
-    pub fn generate_from_dao(&self, target_domain: &str) -> Vec<String> {
+    pub(crate) fn generate_from_dao(&self, target_domain: &str) -> Vec<String> {
         let mut chain = Vec::new();
         chain.push("☯ 道 → 从本源出发...".to_string());
         chain.push("  ↓ 信息=能量=物质 三位一体".to_string());
@@ -237,7 +237,7 @@ impl DaoEngine {
     }
 
     /// 知识引擎的终极架构图
-    pub fn ultimate_architecture(&self) -> String {
+    pub(crate) fn ultimate_architecture(&self) -> String {
         let mut arch = String::new();
         arch.push_str("╔══════════════════════════════════════════════════════════╗\n");
         arch.push_str("║     KNOWLEDGE ENGINE ULTIMATE ARCHITECTURE           ║\n");

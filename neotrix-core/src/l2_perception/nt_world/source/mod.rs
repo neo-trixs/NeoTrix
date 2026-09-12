@@ -11,7 +11,6 @@
 pub mod types;
 pub mod engine;
 pub mod api;
-pub mod playback;
 pub mod now_playing;
 pub mod resource_store;
 pub mod lx_script;
@@ -22,11 +21,7 @@ pub mod security_bridge;
 pub mod evolution_bridge;
 pub mod search_aggregator;
 pub mod search_cache;
-pub mod playback_retry;
-pub mod playback_history;
 pub mod search_normalizer;
-pub mod playback_state;
-pub mod playback_queue;
 pub mod quality_adaptive;
 pub mod offline_index;
 pub mod offline_download;
@@ -168,7 +163,10 @@ impl DataRecord {
 pub use types::*;
 pub use engine::MediaEngine;
 pub use api::{MediaApi, SourceInfo, media_api};
-pub use playback::{PlaybackController, PlayMode, PlaybackState};
+pub use crate::l1_action::nt_media::playback::{
+    EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
+    PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
+};
 pub use now_playing::{NowPlaying, PlayerDisplay};
 pub use resource_store::ResourceStore;
 pub use lx_script::LxScriptSource;
@@ -178,14 +176,10 @@ pub use security_bridge::SecurityBridge;
 pub use evolution_bridge::EvolutionBridge;
 pub use search_aggregator::SearchAggregator;
 pub use search_cache::SearchCache;
-pub use playback_retry::PlaybackRetry;
-pub use playback_history::PlaybackHistory;
 pub use search_normalizer::SearchNormalizer;
-pub use playback_state::{PlaybackState as EnginePlaybackState, PlaybackEngine};
-pub use playback_queue::{PlaybackQueue, RepeatMode};
 pub use quality_adaptive::*;
 pub use offline_index::{OfflineIndex, OfflineEntry};
-pub use offline_download::OfflineDownloader;
+pub use offline_download::{OfflineDownloader, DownloadResult, OfflineError};
 pub use plugin_interface::MediaSourcePlugin;
 pub use plugin_loader::PluginLoader;
 pub use plugin_sandbox::PluginSandbox;

@@ -36,7 +36,7 @@ pub struct KnowledgeChain {
 
 /// 链记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainRecord {
+pub(crate) struct ChainRecord {
     pub phase: KnowledgeChainPhase,
     pub source: String,
     pub success: bool,

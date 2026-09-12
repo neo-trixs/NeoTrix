@@ -98,39 +98,7 @@ fn ranked_mirrors() -> Vec<(String, f64)> {
 // L2 Protocol — URL 解析 + 协议分发
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// URL 协议类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum UrlScheme {
-    Http,
-    Https,
-    Magnet,
-    Ftp,
-    File,
-    Unknown,
-}
-
-impl UrlScheme {
-    pub fn parse(url: &str) -> Self {
-        if url.starts_with("magnet:") {
-            Self::Magnet
-        } else if url.starts_with("https://") {
-            Self::Https
-        } else if url.starts_with("http://") {
-            Self::Http
-        } else if url.starts_with("ftp://") {
-            Self::Ftp
-        } else if url.starts_with("file://") {
-            Self::File
-        } else {
-            Self::Unknown
-        }
-    }
-}
-
-/// 判断是否为 HuggingFace URL
-fn is_huggingface_url(url: &str) -> bool {
-    url.contains("huggingface.co") || url.contains("hf-mirror.com")
-}
+pub(crate) use crate::l1_action::nt_media::router::{is_huggingface_url, UrlScheme};
 
 /// 镜像解析 (HuggingFace 自适应)
 async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String {
@@ -208,30 +176,15 @@ async fn resolve_mirror(client: &reqwest::Client, original_url: &str) -> String 
     original_url.to_string()
 }
 
-/// Content-Disposition 文件名检测
 async fn detect_filename(client: &reqwest::Client, url: &reqwest::Url, dest: &Path) -> PathBuf {
-    if dest
-        .file_stem()
-        .is_some_and(|s| !s.to_string_lossy().is_empty())
-    {
+    if dest.file_stem().is_some_and(|s| !s.to_string_lossy().is_empty()) {
         return dest.to_path_buf();
     }
     if let Ok(resp) = client.head(url.clone()).send().await {
         if let Some(cd) = resp.headers().get("content-disposition") {
             if let Ok(cd_str) = cd.to_str() {
-                if let Some(pos) = cd_str.find("filename*=UTF-8''") {
-                    let encoded = &cd_str[pos + 16..];
-                    if let Some(name) = encoded.split(';').next() {
-                        if let Ok(decoded) = urlencoding::decode(name) {
-                            return dest.with_file_name(decoded.as_ref());
-                        }
-                    }
-                }
-                if let Some(start) = cd_str.find("filename=\"") {
-                    let rest = &cd_str[start + 10..];
-                    if let Some(end) = rest.find('"') {
-                        return dest.with_file_name(&rest[..end]);
-                    }
+                if let Some(name) = crate::l1_action::nt_media::router::parse_content_disposition(cd_str) {
+                    return dest.with_file_name(name);
                 }
             }
         }
@@ -400,43 +353,9 @@ pub struct DownloadEngine {
 
 impl DownloadEngine {
     pub fn new(config: DownloadConfig) -> Self {
-        let mut builder = reqwest::Client::builder()
-            .timeout(Duration::from_secs(config.timeout_secs))
-            .connect_timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(config.max_concurrent + 4)
-            .pool_idle_timeout(Duration::from_secs(90))
-            .tcp_nodelay(true)
-            .redirect(reqwest::redirect::Policy::limited(10))
-            .user_agent("NeoTrix/1.0 (download-engine)")
-            .no_gzip()
-            .no_brotli()
-            .no_deflate();
-
-        for var in &[
-            "HTTPS_PROXY",
-            "https_proxy",
-            "HTTP_PROXY",
-            "http_proxy",
-            "ALL_PROXY",
-            "all_proxy",
-        ] {
-            if let Ok(proxy_url) = std::env::var(var) {
-                let p = proxy_url.trim();
-                if !p.is_empty() {
-                    let p = if p.contains("://") {
-                        p.to_string()
-                    } else {
-                        format!("http://{}", p)
-                    };
-                    if let Ok(proxy) = reqwest::Proxy::all(&p) {
-                        builder = builder.proxy(proxy);
-                        break;
-                    }
-                }
-            }
-        }
-
-        let client = builder.build().expect("create reqwest client");
+        let client = crate::l1_action::nt_io::nt_io_http_factory::build_async_client_with_proxy(
+            std::env::var("HTTPS_PROXY").ok().as_deref()
+        );
         Self {
             task_semaphore: Arc::new(Semaphore::new(config.max_tasks)),
             global_downloaded: Arc::new(AtomicU64::new(0)),

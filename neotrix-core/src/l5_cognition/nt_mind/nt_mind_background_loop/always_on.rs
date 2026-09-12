@@ -214,7 +214,7 @@ pub(crate) struct _EngineStatus {
 }
 
 /// Always-on engine for persistent background task execution
-pub struct AlwaysOnEngine {
+pub(crate) struct AlwaysOnEngine {
     pub enabled: bool,
     pub state: _AlwaysOnState,
     pub tasks: Vec<_AlwaysOnTask>,

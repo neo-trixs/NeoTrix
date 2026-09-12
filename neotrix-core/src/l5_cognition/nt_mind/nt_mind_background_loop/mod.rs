@@ -36,9 +36,9 @@ use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 
 mod builder;
-pub mod config;
+pub(crate) mod config;
 pub mod knowledge_pipeline;
-pub use config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
+pub(crate) use config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
 mod run;
 mod handlers;
 pub mod always_on;

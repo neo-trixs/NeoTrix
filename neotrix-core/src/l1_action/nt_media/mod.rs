@@ -11,6 +11,7 @@ pub mod auth;
 pub mod detect;
 pub mod hls;
 pub mod persistence;
+pub mod playback;
 pub mod router;
 pub mod streaming;
 pub mod thumbnail;
@@ -18,6 +19,10 @@ pub mod yt_extract;
 
 pub use auth::{AuthConfig, AuthStrategy, CookieEntry, CookieJar};
 pub use detect::MediaKind;
+pub use playback::{
+    EnginePlaybackState, PlaybackController, PlaybackEngine, PlaybackHistory, PlaybackQueue,
+    PlaybackRetry, PlaybackState, PlayMode, RepeatMode,
+};
 pub use router::{MediaRoute, TransportType, UrlScheme};
 pub use streaming::{
     PipelineConfig, PipelineError, PipelineHandle, PipelineProgress, PipelineStatus,

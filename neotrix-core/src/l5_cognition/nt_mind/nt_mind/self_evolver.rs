@@ -15,7 +15,7 @@ use super::core::*;
 
 /// 三流分析结果（Skill_Seekers 风格）
 #[derive(Debug, Clone, Default)]
-pub struct ThreeStreamAnalysis {
+pub(crate) struct ThreeStreamAnalysis {
     /// 代码流: API surface, module graph, deps
     pub code_insights: Vec<String>,
     pub code_edits: Vec<MicroEdit>,
@@ -29,7 +29,7 @@ pub struct ThreeStreamAnalysis {
 
 /// One row in the comparison matrix
 #[derive(Debug, Clone)]
-pub struct ComparedItem {
+pub(crate) struct ComparedItem {
     pub name: String,
     pub dimension_scores: HashMap<String, f64>,
     pub evidence: Vec<String>,
@@ -37,7 +37,7 @@ pub struct ComparedItem {
 
 /// Gap status between us and competitor
 #[derive(Debug, Clone, PartialEq)]
-pub enum GapStatus {
+pub(crate) enum GapStatus {
     Has,
     Missing,
     BothMissing,
@@ -46,7 +46,7 @@ pub enum GapStatus {
 
 /// A single gap analysis row
 #[derive(Debug, Clone)]
-pub struct GapRow {
+pub(crate) struct GapRow {
     pub dimension: String,
     pub our_status: GapStatus,
     pub their_status: GapStatus,
@@ -56,7 +56,7 @@ pub struct GapRow {
 
 /// Full comparison matrix output
 #[derive(Debug, Clone)]
-pub struct ComparisonMatrix {
+pub(crate) struct ComparisonMatrix {
     pub dimensions: Vec<String>,
     pub items: Vec<ComparedItem>,
     pub gap_analysis: Vec<GapRow>,
@@ -69,7 +69,7 @@ impl Default for ComparisonMatrix {
 }
 
 impl ComparisonMatrix {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             dimensions: Vec::new(),
             items: Vec::new(),
@@ -554,7 +554,7 @@ impl SelfEvolver {
 
 /// 分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnalysisResult {
+pub(crate) struct AnalysisResult {
     pub source_url: String,
     pub item_type: String,
     pub algebraic_insights: Vec<String>,

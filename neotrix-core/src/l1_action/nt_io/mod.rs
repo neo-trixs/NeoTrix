@@ -80,22 +80,13 @@ pub mod nt_io_video_shotcraft;
 // MCP server — 将 NT 能力暴露为 MCP 工具
 pub mod mcp_server;
 
-// 平台适配器模块 (Seedance2.0/Runtime 等多平台适配)
-pub mod platform_adapter;
-
 // 快速入门向导
 pub mod quick_start_guide;
 
-// 一致性控制接口
-pub mod consistency_adapter;
-
-// 参考生视频模式
-pub mod reference_video_mode;
-
-// 通用能力模块 (从漫剧专用重构为通用)
-pub mod platform_gateway;     // 平台网关 (原 platform_adapter)
-pub mod model_adapter;        // 模型适配器 (原 consistency_adapter)
-pub mod reference_generation; // 基于参考的生成 (原 reference_video_mode)
+// 通用能力模块
+pub mod platform_gateway;     // 平台网关
+pub mod model_adapter;        // 模型适配器
+pub mod reference_generation; // 基于参考的生成
 
 // 多模型路由
 pub mod model_routing;
